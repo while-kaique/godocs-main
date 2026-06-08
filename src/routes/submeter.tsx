@@ -179,7 +179,13 @@ function SubmeterPage() {
     if (n === 2) {
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
-      if (!form.dataCriacao) errs.dataCriacao = "Informe a data de criação";
+      if (!form.dataCriacao) {
+        errs.dataCriacao = "Informe a data de criação";
+      } else if (form.dataCriacao < "2024-01-01") {
+        errs.dataCriacao = "A data mínima é 01/01/2024";
+      } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
+        errs.dataCriacao = "A data não pode ser no futuro";
+      }
       if (!arquivo) errs.documentacao = "Envie a documentação do projeto";
     }
 
@@ -1593,6 +1599,7 @@ function Step2({
         <FormInput
           type="date"
           value={form.dataCriacao}
+          min="2024-01-01"
           max={new Date().toISOString().split("T")[0]}
           onChange={(e) => updateField("dataCriacao", e.currentTarget.value)}
           error={errors.dataCriacao}
