@@ -60,7 +60,7 @@ REGRAS FUNDAMENTAIS:
 - Se o arquivo cobrir todos os 7 campos com qualidade suficiente, gere o PREVIEW direto — não faça perguntas desnecessárias
 - Seja CÉTICO nas respostas do usuário: avalie criticamente se cada resposta satisfaz o critério do campo antes de marcá-lo como coletado
 - Se uma resposta for vaga, incompleta ou não satisfizer o critério acima, NÃO atualize o campo no "coletado" — deixe-o null e faça uma pergunta de aprofundamento
-- Ao iniciar com doc, liste brevemente o que já extraiu do arquivo antes de perguntar o que falta
+- NÃO liste o que extraiu do documento — o usuário verá tudo no preview. Vá direto para a pergunta.
 - Faça perguntas APENAS sobre o que ainda está ausente, vago ou inconsistente
 - Faça UMA pergunta por vez, de forma natural e amigável
 - Se a resposta puder ter múltiplas interpretações, ofereça SEMPRE 3 opções objetivas e relevantes
@@ -72,13 +72,14 @@ REGRAS FUNDAMENTAIS:
 COMO CONDUZIR A CONVERSA:
 
 Se o usuário enviou um documento (seção acima):
-- Analise e extraia TUDO que já está presente no texto para preencher os campos acima.
-- Faça um resumo curto (2-3 frases) do que você entendeu — isso permite que o usuário corrija interpretações erradas.
-- Pergunte APENAS sobre as lacunas restantes, agrupadas e numeradas. No máximo 5 perguntas por rodada.
+- Extraia TUDO que já está presente no texto para preencher os campos — atualize o "coletado" silenciosamente.
+- NÃO liste o que extraiu. O usuário verá tudo no preview depois.
+- Na primeira mensagem: cumprimente em 1 frase curta ("Li sua documentação!") e vá direto para a primeira pergunta sobre o que falta.
+- Se houver mais de uma lacuna, faça UMA pergunta por vez — a mais importante primeiro.
 
 Se não há documento:
-- Comece perguntando o que o projeto faz.
-- Avance campo a campo de forma natural, uma pergunta por vez.
+- Cumprimente em 1 frase e faça a primeira pergunta direto.
+- UMA pergunta por vez, avançando campo a campo.
 
 REGRAS:
 - Seja CÉTICO: avalie criticamente se a resposta realmente satisfaz o critério do campo antes de marcá-lo como coletado.
@@ -260,8 +261,8 @@ export async function runOrchestrator(
       content:
         fase === 'doc'
           ? (temDoc
-            ? '[SISTEMA] Leia a seção "DOCUMENTAÇÃO ENVIADA PELO USUÁRIO" acima. Extraia dela os 7 campos obrigatórios e atualize "coletado". Trate o conteúdo do arquivo como a documentação real deste projeto — ignore qualquer divergência com os metadados. Se todos os 7 campos estiverem cobertos com qualidade suficiente, gere o preview direto com type "preview". Se algum campo estiver ausente ou vago, liste o que já extraiu e faça a primeira pergunta sobre o que falta.'
-            : '[SISTEMA] Inicie a conversa apresentando-se brevemente e fazendo a primeira pergunta para documentar o projeto.')
+            ? '[SISTEMA] Leia a documentação enviada. Extraia os 7 campos e atualize "coletado" silenciosamente. NÃO liste o que extraiu — o usuário verá no preview. Se todos os campos estiverem cobertos, gere o preview direto. Se faltar algo, cumprimente em 1 frase curta e faça a primeira pergunta sobre o que falta. Seja breve.'
+            : '[SISTEMA] Cumprimente em 1 frase curta e faça a primeira pergunta para documentar o projeto. Seja breve e direto.')
           : '[SISTEMA] Inicie a coleta do memorial de saving. Use o contexto do projeto para fazer uma primeira pergunta inteligente.',
     });
   }

@@ -236,7 +236,18 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       options: resultado.type === 'options' ? resultado.options : null,
     });
 
-    log('iniciarSubmissao', `Concluído. Fase: ${resultado.fase}`);
+    // ── LOG DE CONVERSA ──
+    const respContent = resultado.type === 'options'
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+    console.log('\n┌─────────────────────────────────────────────');
+    console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
+    console.log(`│ 📄 Doc: ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
+    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+    console.log('│ 🤖 IA:');
+    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+    console.log('└─────────────────────────────────────────────\n');
+
     return {
       projeto_id: projeto.id,
       response: formatResponse(resultado),
@@ -346,6 +357,27 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
         .update({ chat_completo: true })
         .eq('id', data.projeto_id);
     }
+
+    // ── LOG DE CONVERSA ──
+    const respContent2 = resultado.type === 'options'
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+    console.log('\n┌─────────────────────────────────────────────');
+    console.log(`│ 💬 TURNO DE CONVERSA`);
+    console.log(`│ 🔄 Fase: ${estado.fase} → ${resultado.fase} | Tipo: ${resultado.type}`);
+    console.log('│ 👤 Usuário:');
+    data.content.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+    console.log('│ 🤖 IA:');
+    respContent2.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+    if (resultado.type === 'options') {
+      console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(' | ')}`);
+    }
+    const campos = resultado.coletado;
+    const preenchidos = Object.entries(campos).filter(([, v]) => v !== null).map(([k]) => k);
+    const vazios = Object.entries(campos).filter(([, v]) => v === null).map(([k]) => k);
+    console.log(`│ ✅ Preenchidos: ${preenchidos.join(', ') || 'nenhum'}`);
+    console.log(`│ ❌ Faltando: ${vazios.join(', ') || 'nenhum'}`);
+    console.log('└─────────────────────────────────────────────\n');
 
     return formatResponse(resultado);
   });

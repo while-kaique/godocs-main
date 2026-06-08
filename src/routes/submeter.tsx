@@ -601,6 +601,325 @@ function SubmeterPage() {
 }
 
 /* ──────────────────────────────────────────────
+   Simple Markdown Renderer
+   ────────────────────────────────────────────── */
+
+function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean }) {
+  const accentColor = isSaving ? "#6b6e00" : "var(--go-blue)";
+  const accentBg = isSaving ? "rgba(215,219,0,0.06)" : "rgba(0,89,169,0.04)";
+  const accentBorder = isSaving ? "rgba(215,219,0,0.15)" : "rgba(0,89,169,0.08)";
+
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let listBuffer: string[] = [];
+  let key = 0;
+
+  function flushList() {
+    if (listBuffer.length === 0) return;
+    elements.push(
+      <ul
+        key={key++}
+        className="space-y-1.5 pl-1"
+        style={{ margin: "8px 0" }}
+      >
+        {listBuffer.map((item, i) => (
+          <li
+            key={i}
+            className="flex items-start gap-2.5 text-[13px] leading-relaxed"
+            style={{ color: "var(--go-text-primary)" }}
+          >
+            <span
+              className="mt-[7px] block h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: accentColor, opacity: 0.5 }}
+            />
+            <span>{renderInline(item)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+    listBuffer = [];
+  }
+
+  function renderInline(line: string): React.ReactNode {
+    const parts: React.ReactNode[] = [];
+    const regex = /\*\*(.+?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+    let partKey = 0;
+
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(line.slice(lastIndex, match.index));
+      }
+      parts.push(
+        <strong key={partKey++} style={{ color: accentColor, fontWeight: 700 }}>
+          {match[1]}
+        </strong>
+      );
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < line.length) {
+      parts.push(line.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : line;
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    // H1
+    if (line.startsWith("# ") && !line.startsWith("## ")) {
+      flushList();
+      elements.push(
+        <h2
+          key={key++}
+          className="text-[17px] font-extrabold tracking-tight"
+          style={{ color: accentColor, margin: "0 0 4px" }}
+        >
+          {line.replace(/^# /, "")}
+        </h2>
+      );
+      continue;
+    }
+
+    // H2
+    if (line.startsWith("## ")) {
+      flushList();
+      elements.push(
+        <div key={key++} style={{ margin: elements.length > 0 ? "16px 0 6px" : "0 0 6px" }}>
+          <div
+            className="flex items-center gap-2"
+            style={{ borderBottom: `1.5px solid ${accentBorder}`, paddingBottom: 6 }}
+          >
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ background: accentColor, opacity: 0.6 }}
+            />
+            <h3
+              className="text-[13px] font-bold uppercase tracking-[0.06em]"
+              style={{ color: accentColor }}
+            >
+              {line.replace(/^## /, "")}
+            </h3>
+          </div>
+        </div>
+      );
+      continue;
+    }
+
+    // H3
+    if (line.startsWith("### ")) {
+      flushList();
+      elements.push(
+        <h4
+          key={key++}
+          className="text-[13px] font-semibold"
+          style={{ color: accentColor, margin: "10px 0 4px" }}
+        >
+          {line.replace(/^### /, "")}
+        </h4>
+      );
+      continue;
+    }
+
+    // List items
+    if (/^[-*]\s/.test(line) || /^\d+\.\s/.test(line)) {
+      const content = line.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, "");
+      listBuffer.push(content);
+      continue;
+    }
+
+    // Sub-list items (indented)
+    if (/^\s+[-*]\s/.test(line)) {
+      const content = line.replace(/^\s+[-*]\s+/, "");
+      listBuffer.push(content);
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === "") {
+      flushList();
+      continue;
+    }
+
+    // Regular paragraph
+    flushList();
+    elements.push(
+      <p
+        key={key++}
+        className="text-[13px] leading-relaxed"
+        style={{ color: "var(--go-text-primary)", margin: "4px 0" }}
+      >
+        {renderInline(line)}
+      </p>
+    );
+  }
+
+  flushList();
+
+  return <>{elements}</>;
+}
+
+/* ──────────────────────────────────────────────
+   Preview Panel
+   ────────────────────────────────────────────── */
+
+function PreviewPanel({
+  content,
+  isSaving,
+  onApprove,
+  onRequestChanges,
+  showActions,
+  loading,
+}: {
+  content: string;
+  isSaving: boolean;
+  onApprove: () => void;
+  onRequestChanges: () => void;
+  showActions: boolean;
+  loading: boolean;
+}) {
+  const accentColor = isSaving ? "#6b6e00" : "var(--go-blue)";
+  const cardBg = isSaving ? "rgba(215,219,0,0.03)" : "rgba(0,89,169,0.015)";
+  const headerBg = isSaving ? "rgba(215,219,0,0.08)" : "rgba(0,89,169,0.04)";
+  const borderColor = isSaving ? "rgba(215,219,0,0.18)" : "rgba(0,89,169,0.1)";
+  const label = isSaving ? "Memorial de Cálculo" : "Documentação do Projeto";
+  const icon = isSaving ? "📊" : "📄";
+
+  // Strip trailing prompt lines like "Essa documentação está correta?..."
+  const cleanContent = content
+    .replace(/\n*Essa documentação está correta\?.*$/s, "")
+    .replace(/\n*Está correto\?.*$/s, "")
+    .replace(/\n*Pode aprovar.*$/s, "")
+    .replace(/\n*Você pode aprovar.*$/s, "")
+    .trim();
+
+  return (
+    <div
+      className="w-full"
+      style={{
+        animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both",
+      }}
+    >
+      {/* Document card */}
+      <div
+        className="overflow-hidden"
+        style={{
+          background: "var(--go-white)",
+          border: `1.5px solid ${borderColor}`,
+          borderRadius: "var(--go-radius-lg)",
+          boxShadow: "var(--go-shadow-md)",
+        }}
+      >
+        {/* Header strip */}
+        <div
+          className="flex items-center justify-between px-5 py-3"
+          style={{
+            background: headerBg,
+            borderBottom: `1px solid ${borderColor}`,
+          }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">{icon}</span>
+            <span
+              className="text-[11px] font-bold uppercase tracking-[0.08em]"
+              style={{ color: accentColor }}
+            >
+              {label}
+            </span>
+          </div>
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+            style={{
+              background: "rgba(215,219,0,0.1)",
+              border: "1px solid rgba(215,219,0,0.2)",
+              color: "#8a7d00",
+            }}
+          >
+            Preview
+          </span>
+        </div>
+
+        {/* Content body — scrollable */}
+        <div
+          className="overflow-y-auto px-5 py-4"
+          style={{
+            maxHeight: 300,
+            background: cardBg,
+          }}
+        >
+          <SimpleMarkdown text={cleanContent} isSaving={isSaving} />
+        </div>
+
+        {/* Action buttons — inside the card */}
+        {showActions && (
+          <div
+            className="flex items-center gap-3 px-5 py-3.5"
+            style={{
+              background: "var(--go-white)",
+              borderTop: `1px solid ${borderColor}`,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onApprove}
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-bold transition-all"
+              style={{
+                background: "var(--go-lime)",
+                color: "var(--go-blue)",
+                border: "none",
+                boxShadow: "0 2px 8px rgba(215, 219, 0, 0.2)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(215, 219, 0, 0.35)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(215, 219, 0, 0.2)";
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Aprovar
+            </button>
+            <button
+              type="button"
+              onClick={onRequestChanges}
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold transition-all"
+              style={{
+                background: "transparent",
+                color: "#8b8b9a",
+                border: "1.5px solid rgba(0,0,0,0.08)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,89,169,0.2)";
+                e.currentTarget.style.color = "var(--go-blue)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,0,0,0.08)";
+                e.currentTarget.style.color = "#8b8b9a";
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              Pedir ajustes
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
    Step 3: Chat com o Agente
    ────────────────────────────────────────────── */
 
@@ -691,33 +1010,57 @@ function Step3Chat({
         className="flex-1 overflow-y-auto px-8 py-5 space-y-4 transition-colors duration-500"
         style={{ maxHeight: 420, background: isSavingFase ? "rgba(215,219,0,0.03)" : "transparent" }}
       >
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              "flex",
-              msg.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
+        {messages.map((msg, idx) => {
+          const isPreviewMsg = msg.isPreview && msg.role === "assistant";
+
+          if (isPreviewMsg) {
+            return (
+              <PreviewPanel
+                key={idx}
+                content={msg.content}
+                isSaving={isSavingFase}
+                onApprove={() => onSend("Aprovado")}
+                onRequestChanges={() => {
+                  const textarea = inputRef.current;
+                  if (textarea) {
+                    textarea.focus();
+                    textarea.placeholder = "Descreva o que precisa ser ajustado...";
+                  }
+                }}
+                showActions={idx === messages.length - 1 && !loading}
+                loading={loading}
+              />
+            );
+          }
+
+          return (
             <div
+              key={idx}
               className={cn(
-                "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
-                msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
+                "flex",
+                msg.role === "user" ? "justify-end" : "justify-start"
               )}
-              style={
-                msg.role === "user"
-                  ? { background: userBubbleBg, color: "#fff" }
-                  : {
-                      background: accentBgLight,
-                      border: `1px solid ${accentBorder}`,
-                      color: "var(--go-text-heading)",
-                    }
-              }
             >
-              {msg.content}
+              <div
+                className={cn(
+                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+                  msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
+                )}
+                style={
+                  msg.role === "user"
+                    ? { background: userBubbleBg, color: "#fff" }
+                    : {
+                        background: accentBgLight,
+                        border: `1px solid ${accentBorder}`,
+                        color: "var(--go-text-heading)",
+                      }
+                }
+              >
+                {msg.content}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Loading indicator */}
         {loading && (
@@ -745,56 +1088,6 @@ function Step3Chat({
 
         <div ref={chatBottomRef} />
       </div>
-
-      {/* Preview actions (aprovar / pedir ajustes) */}
-      {showPreviewActions && (
-        <div
-          className="px-8 py-4 flex flex-col gap-2.5"
-          style={{ borderTop: `1px solid ${accentBorder}` }}
-        >
-          <div
-            className="text-[11px] font-semibold"
-            style={{ color: "#8b8b9a" }}
-          >
-            Revise o conteúdo acima. Você pode aprovar ou pedir ajustes:
-          </div>
-          <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={() => onSend("Aprovado")}
-              disabled={loading}
-              className="flex-1 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
-              style={{
-                background: "rgba(22,163,74,0.08)",
-                border: "1.5px solid rgba(22,163,74,0.25)",
-                color: "#15803d",
-              }}
-            >
-              ✅ Aprovar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // Foca no input para o usuário digitar o ajuste
-                const textarea = inputRef.current;
-                if (textarea) {
-                  textarea.focus();
-                  textarea.placeholder = "Descreva o que precisa ser ajustado...";
-                }
-              }}
-              disabled={loading}
-              className="flex-1 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
-              style={{
-                background: "rgba(215,219,0,0.06)",
-                border: "1.5px solid rgba(215,219,0,0.25)",
-                color: "#8a7d00",
-              }}
-            >
-              ✏️ Pedir ajustes
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Options (quando agente oferece opções) */}
       {hasOptions && lastMsg.options && (
