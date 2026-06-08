@@ -42,7 +42,7 @@ DADOS JÁ CONHECIDOS DO PROJETO:
 - Ferramenta utilizada: ${ctx.ferramenta}
 - Membros do time: ${membros}
 
-O DOCUMENTO FINAL SEGUE ESTA ESTRUTURA (6 seções):
+O DOCUMENTO FINAL SEGUE ESTA ESTRUTURA (7 seções):
 
 1. **Nome do Projeto** (nome_projeto) — Título claro e identificável.
 2. **O que faz** (o_que_faz) — Parágrafo de 2-4 frases: qual problema resolve, para quem, e qual o resultado da execução.
@@ -55,41 +55,17 @@ O DOCUMENTO FINAL SEGUE ESTA ESTRUTURA (6 seções):
 ESTADO ATUAL DA COLETA:
 ${JSON.stringify(coletado, null, 2)}
 
-REGRAS FUNDAMENTAIS:
-- A documentação enviada é a fonte de verdade deste projeto — não a compare com os metadados (nome, ferramenta, responsável). Extraia os 7 campos diretamente do conteúdo do arquivo, independente de quem escreveu ou qual ferramenta menciona
-- Se o arquivo cobrir todos os 7 campos com qualidade suficiente, gere o PREVIEW direto — não faça perguntas desnecessárias
-- Seja CÉTICO nas respostas do usuário: avalie criticamente se cada resposta satisfaz o critério do campo antes de marcá-lo como coletado
-- Se uma resposta for vaga, incompleta ou não satisfizer o critério acima, NÃO atualize o campo no "coletado" — deixe-o null e faça uma pergunta de aprofundamento
-- NÃO liste o que extraiu do documento — o usuário verá tudo no preview. Vá direto para a pergunta.
-- Faça perguntas APENAS sobre o que ainda está ausente, vago ou inconsistente
-- Faça UMA pergunta por vez, de forma natural e amigável
-- Se a resposta puder ter múltiplas interpretações, ofereça SEMPRE 3 opções objetivas e relevantes
-- Quando TODOS os 7 campos estiverem preenchidos, gere um PREVIEW da documentação formatado em markdown e peça aprovação
-- Português brasileiro, tom profissional e direto. Acentuação correta obrigatória.
-- Seja direto — não elogie cada resposta, não use frases genéricas
-- NUNCA aceite uma resposta insatisfatória só para avançar — a qualidade da documentação é o objetivo
-
-COMO CONDUZIR A CONVERSA:
-
-Se o usuário enviou um documento (seção acima):
-- Extraia TUDO que já está presente no texto para preencher os campos — atualize o "coletado" silenciosamente.
-- NÃO liste o que extraiu. O usuário verá tudo no preview depois.
-- Na primeira mensagem: cumprimente em 1 frase curta ("Li sua documentação!") e vá direto para a primeira pergunta sobre o que falta.
-- Se houver mais de uma lacuna, faça UMA pergunta por vez — a mais importante primeiro.
-
-Se não há documento:
-- Cumprimente em 1 frase e faça a primeira pergunta direto.
-- UMA pergunta por vez, avançando campo a campo.
-
 REGRAS:
-- Seja CÉTICO: avalie criticamente se a resposta realmente satisfaz o critério do campo antes de marcá-lo como coletado.
-- NUNCA pergunte o que já está respondido (no texto enviado ou em respostas anteriores).
-- Se a resposta for vaga ou ambígua, ofereça 3 opções objetivas.
-- Quando TODOS os 7 campos estiverem preenchidos com informação suficiente, gere um PREVIEW da documentação formatado em markdown e peça aprovação do usuário.
-- Português brasileiro, tom profissional e direto. Frases curtas.
-- Use acentuação correta obrigatoriamente (á, é, í, ó, ú, ã, õ, ç, ê, â).
-- NUNCA invente informações técnicas (nomes de APIs, horários, credenciais). Se não sabe, pergunte.
-- Se a documentação enviada já estiver completa, NÃO invente perguntas — gere o preview direto.
+- O documento enviado é a fonte de verdade — não compare com os metadados do projeto. Extraia os 7 campos do conteúdo do arquivo, independente de quem escreveu ou qual ferramenta menciona.
+- Se o arquivo cobrir todos os 7 campos com qualidade suficiente, gere o PREVIEW direto — não faça perguntas desnecessárias.
+- Seja CÉTICO: avalie criticamente se cada resposta do usuário satisfaz o critério do campo. Se for vaga ou incompleta, NÃO atualize o campo no "coletado" — deixe null e aprofunde.
+- NÃO liste o que extraiu do documento — o usuário verá tudo no preview.
+- Faça UMA pergunta por vez sobre o que ainda está ausente ou vago. A mais importante primeiro.
+- Se a resposta for ambígua, ofereça 3 opções objetivas.
+- NUNCA pergunte o que já está respondido (no documento ou em respostas anteriores).
+- NUNCA invente informações técnicas (nomes de APIs, horários, credenciais).
+- Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown e peça aprovação.
+- Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória (á, é, ã, ç, etc.).
 
 FORMATO DE RESPOSTA — responda APENAS com JSON válido, sem texto adicional:
 
@@ -268,8 +244,15 @@ export async function runOrchestrator(
   }
 
   log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs`);
-  const raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
-  log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
+  let raw: string;
+  try {
+    raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
+    log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
+  } catch (llmErr) {
+    const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
+    log(`Erro no LLM: ${msg}`);
+    throw new Error(`Falha na chamada ao modelo de IA: ${msg}`);
+  }
 
   let parsed: Record<string, unknown>;
   try {
