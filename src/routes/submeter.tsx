@@ -57,11 +57,15 @@ interface FieldErrors {
   [key: string]: string;
 }
 
+type ChatFase = "doc" | "doc_preview" | "saving" | "saving_preview" | "completo";
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   options?: [string, string, string];
   isComplete?: boolean;
+  isPreview?: boolean;
+  fase?: ChatFase;
 }
 
 /* ──────────────────────────────────────────────
@@ -98,6 +102,7 @@ function SubmeterPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatComplete, setChatComplete] = useState(false);
+  const [chatFase, setChatFase] = useState<ChatFase>("doc");
   const [projetoId, setProjetoId] = useState<string | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
   const [submittingProject, setSubmittingProject] = useState(false);
@@ -263,8 +268,11 @@ function SubmeterPage() {
         content: result.response.content,
         options: result.response.options ?? undefined,
         isComplete: result.response.isComplete,
+        isPreview: result.response.isPreview,
+        fase: result.response.fase,
       };
       setChatMessages([firstMsg]);
+      setChatFase(result.response.fase ?? "doc");
 
       if (result.response.isComplete) {
         setChatComplete(true);
@@ -303,13 +311,26 @@ function SubmeterPage() {
         },
       });
 
+      const newFase: ChatFase = result.fase ?? chatFase;
+      const transitionToSaving = chatFase !== "saving" && (newFase === "saving");
+
       const assistantMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
         options: result.options ?? undefined,
         isComplete: result.isComplete,
+        isPreview: result.isPreview,
+        fase: newFase,
       };
-      setChatMessages((prev) => [...prev, assistantMsg]);
+
+      if (transitionToSaving) {
+        // Chat limpa e inicia agente 2 com a mensagem de transição
+        setChatMessages([assistantMsg]);
+      } else {
+        setChatMessages((prev) => [...prev, assistantMsg]);
+      }
+
+      setChatFase(newFase);
 
       if (result.isComplete) {
         setChatComplete(true);
@@ -523,6 +544,7 @@ function SubmeterPage() {
                   onSubmitProject={handleSubmitProject}
                   submitting={submittingProject}
                   chatBottomRef={chatBottomRef}
+                  fase={chatFase}
                 />
               </StepAnimation>
             )}
@@ -592,6 +614,7 @@ function Step3Chat({
   onSubmitProject,
   submitting,
   chatBottomRef,
+  fase,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -602,54 +625,71 @@ function Step3Chat({
   onSubmitProject: () => void;
   submitting: boolean;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
+  fase: ChatFase;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const isSavingFase = fase === "saving" || fase === "saving_preview" || fase === "completo";
+
+  // Cores por fase
+  const accentColor = isSavingFase ? "var(--go-lime)" : "var(--go-blue)";
+  const accentBg = isSavingFase ? "rgba(215,219,0,0.08)" : "rgba(0,89,169,0.08)";
+  const accentBgLight = isSavingFase ? "rgba(215,219,0,0.12)" : "rgba(199,233,253,0.4)";
+  const accentBorder = isSavingFase ? "rgba(215,219,0,0.2)" : "rgba(0,89,169,0.1)";
+  const accentTextOnBg = isSavingFase ? "var(--go-text-heading)" : "#fff";
+  const userBubbleBg = isSavingFase ? "#7a7d00" : "var(--go-blue)";
+
+  const lastMsg = messages[messages.length - 1];
+  const showPreviewActions = lastMsg?.isPreview && !loading;
+  const hasOptions = lastMsg?.role === "assistant" && lastMsg.options && !isComplete && !showPreviewActions;
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !loading && !isComplete) {
+      if (input.trim() && !loading && !isComplete && !showPreviewActions) {
         onSend(input.trim());
       }
     }
   }
 
-  const lastMsg = messages[messages.length - 1];
-  const hasOptions =
-    lastMsg?.role === "assistant" && lastMsg.options && !isComplete;
+  const agentLabel = isSavingFase ? "Agente de Memorial Financeiro" : "Agente de Documentação";
+  const agentStatus = isComplete
+    ? "Submissão completa — pronto para envio"
+    : showPreviewActions
+      ? "Aguardando sua aprovação..."
+      : isSavingFase
+        ? "Coletando memorial de ganhos..."
+        : "Analisando e coletando informações...";
 
   return (
     <div className="flex flex-col" style={{ minHeight: 420 }}>
       {/* Cabeçalho do chat */}
       <div
-        className="flex items-center gap-2.5 px-8 pb-4"
-        style={{ borderBottom: "1px solid rgba(0,89,169,0.08)" }}
+        className="flex items-center gap-2.5 px-8 pb-4 transition-colors duration-500"
+        style={{ borderBottom: `1px solid ${accentBorder}` }}
       >
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-full text-sm"
-          style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors duration-500"
+          style={{ background: accentBg, color: accentColor }}
         >
-          🤖
+          {isSavingFase ? "💰" : "🤖"}
         </div>
         <div>
           <div
-            className="text-[13px] font-bold"
-            style={{ color: "var(--go-text-heading)" }}
+            className="text-[13px] font-bold transition-colors duration-500"
+            style={{ color: isSavingFase ? "#6b6e00" : "var(--go-text-heading)" }}
           >
-            Agente de Documentação
+            {agentLabel}
           </div>
           <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
-            {isComplete
-              ? "✅ Documentação completa — pronto para envio"
-              : "Analisando e coletando informações..."}
+            {agentStatus}
           </div>
         </div>
       </div>
 
       {/* Mensagens */}
       <div
-        className="flex-1 overflow-y-auto px-8 py-5 space-y-4"
-        style={{ maxHeight: 420 }}
+        className="flex-1 overflow-y-auto px-8 py-5 space-y-4 transition-colors duration-500"
+        style={{ maxHeight: 420, background: isSavingFase ? "rgba(215,219,0,0.03)" : "transparent" }}
       >
         {messages.map((msg, idx) => (
           <div
@@ -662,19 +702,14 @@ function Step3Chat({
             <div
               className={cn(
                 "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
-                msg.role === "user"
-                  ? "rounded-tr-sm"
-                  : "rounded-tl-sm"
+                msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
               )}
               style={
                 msg.role === "user"
-                  ? {
-                      background: "var(--go-blue)",
-                      color: "#fff",
-                    }
+                  ? { background: userBubbleBg, color: "#fff" }
                   : {
-                      background: "rgba(199,233,253,0.4)",
-                      border: "1px solid rgba(0,89,169,0.1)",
+                      background: accentBgLight,
+                      border: `1px solid ${accentBorder}`,
                       color: "var(--go-text-heading)",
                     }
               }
@@ -689,36 +724,20 @@ function Step3Chat({
           <div className="flex justify-start">
             <div
               className="rounded-2xl rounded-tl-sm px-4 py-3"
-              style={{
-                background: "rgba(199,233,253,0.4)",
-                border: "1px solid rgba(0,89,169,0.1)",
-              }}
+              style={{ background: accentBgLight, border: `1px solid ${accentBorder}` }}
             >
               <div className="flex gap-1.5 items-center h-5">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    background: "var(--go-blue)",
-                    opacity: 0.5,
-                    animation: "go-bounce 1.2s ease-in-out infinite",
-                  }}
-                />
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    background: "var(--go-blue)",
-                    opacity: 0.5,
-                    animation: "go-bounce 1.2s ease-in-out 0.2s infinite",
-                  }}
-                />
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    background: "var(--go-blue)",
-                    opacity: 0.5,
-                    animation: "go-bounce 1.2s ease-in-out 0.4s infinite",
-                  }}
-                />
+                {[0, 0.2, 0.4].map((delay) => (
+                  <span
+                    key={delay}
+                    className="h-2 w-2 rounded-full"
+                    style={{
+                      background: accentColor,
+                      opacity: 0.5,
+                      animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                    }}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -727,11 +746,61 @@ function Step3Chat({
         <div ref={chatBottomRef} />
       </div>
 
+      {/* Preview actions (aprovar / pedir ajustes) */}
+      {showPreviewActions && (
+        <div
+          className="px-8 py-4 flex flex-col gap-2.5"
+          style={{ borderTop: `1px solid ${accentBorder}` }}
+        >
+          <div
+            className="text-[11px] font-semibold"
+            style={{ color: "#8b8b9a" }}
+          >
+            Revise o conteúdo acima. Você pode aprovar ou pedir ajustes:
+          </div>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => onSend("Aprovado")}
+              disabled={loading}
+              className="flex-1 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
+              style={{
+                background: "rgba(22,163,74,0.08)",
+                border: "1.5px solid rgba(22,163,74,0.25)",
+                color: "#15803d",
+              }}
+            >
+              ✅ Aprovar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Foca no input para o usuário digitar o ajuste
+                const textarea = inputRef.current;
+                if (textarea) {
+                  textarea.focus();
+                  textarea.placeholder = "Descreva o que precisa ser ajustado...";
+                }
+              }}
+              disabled={loading}
+              className="flex-1 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
+              style={{
+                background: "rgba(215,219,0,0.06)",
+                border: "1.5px solid rgba(215,219,0,0.25)",
+                color: "#8a7d00",
+              }}
+            >
+              ✏️ Pedir ajustes
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Options (quando agente oferece opções) */}
       {hasOptions && lastMsg.options && (
         <div
           className="px-8 pb-3 flex flex-wrap gap-2"
-          style={{ borderTop: "1px solid rgba(0,89,169,0.06)" }}
+          style={{ borderTop: `1px solid ${accentBorder}` }}
         >
           <div
             className="w-full pt-3 pb-1 text-[11px] font-semibold"
@@ -747,9 +816,9 @@ function Step3Chat({
               disabled={loading}
               className="rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors"
               style={{
-                background: "rgba(0,89,169,0.06)",
-                border: "1px solid rgba(0,89,169,0.18)",
-                color: "var(--go-blue)",
+                background: accentBg,
+                border: `1px solid ${accentBorder}`,
+                color: isSavingFase ? "#6b6e00" : "var(--go-blue)",
               }}
             >
               {opt}
@@ -762,7 +831,7 @@ function Step3Chat({
       {isComplete && (
         <div
           className="px-8 py-5"
-          style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+          style={{ borderTop: `1px solid ${accentBorder}` }}
         >
           <div
             className="mb-3 rounded-xl p-3.5 text-sm"
@@ -772,7 +841,7 @@ function Step3Chat({
               color: "#15803d",
             }}
           >
-            ✅ A documentação está completa e pronta para avaliação da equipe de RPA & IA.
+            ✅ Documentação e memorial financeiro completos — pronto para avaliação da equipe de RPA & IA.
           </div>
           <button
             type="button"
@@ -796,7 +865,7 @@ function Step3Chat({
       {!isComplete && (
         <div
           className="px-8 py-4"
-          style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+          style={{ borderTop: `1px solid ${accentBorder}` }}
         >
           <div className="flex gap-2.5 items-end">
             <textarea
@@ -821,10 +890,10 @@ function Step3Chat({
                 width: 42,
                 height: 42,
                 background: input.trim() && !loading
-                  ? "var(--go-blue)"
-                  : "rgba(0,89,169,0.1)",
+                  ? (isSavingFase ? "#7a7d00" : "var(--go-blue)")
+                  : (isSavingFase ? "rgba(215,219,0,0.15)" : "rgba(0,89,169,0.1)"),
                 border: "none",
-                color: input.trim() && !loading ? "#fff" : "rgba(0,89,169,0.4)",
+                color: input.trim() && !loading ? "#fff" : (isSavingFase ? "rgba(215,219,0,0.5)" : "rgba(0,89,169,0.4)"),
                 cursor: input.trim() && !loading ? "pointer" : "not-allowed",
               }}
             >

@@ -1,5 +1,6 @@
 // Server functions para o chat interativo
 // Conecta o frontend com o sistema de agentes
+// Fluxo: doc → doc_preview → saving → saving_preview → completo
 
 const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${fn}]`, ...args);
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
@@ -12,10 +13,17 @@ import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
 import { extractTextFromBase64 } from '@/lib/extract-text.server';
-import type { ChatHistoryMessage, DocumentacaoColetada, ProjetoContexto } from '@/lib/agents/types';
-import { documentacaoVazia } from '@/lib/agents/types';
+import type {
+  ChatFase,
+  ChatHistoryMessage,
+  DocumentacaoColetada,
+  ProjetoContexto,
+  SavingColetado,
+} from '@/lib/agents/types';
+import { documentacaoVazia, savingVazio } from '@/lib/agents/types';
 
-// Busca contexto completo do projeto + documentação enviada pelo usuário
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const [{ data, error }, { data: docMsg }] = await Promise.all([
     supabaseAdmin
@@ -45,22 +53,102 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
   };
 }
 
-// Extrai o estado coletado mais recente a partir das mensagens do assistente
-function extrairUltimoColetado(messages: { role: string; content: string }[]): DocumentacaoColetada {
+type EstadoChat = {
+  fase: ChatFase;
+  coletado: DocumentacaoColetada;
+  saving: SavingColetado;
+};
+
+/** Extrai fase + estado mais recente das mensagens do assistente */
+function extrairEstado(messages: { role: string; content: string }[]): EstadoChat {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== 'assistant') continue;
     try {
-      const parsed = JSON.parse(msg.content) as { coletado?: DocumentacaoColetada };
-      if (parsed.coletado) return parsed.coletado;
+      const parsed = JSON.parse(msg.content) as Partial<EstadoChat>;
+      return {
+        fase: parsed.fase ?? 'doc',
+        coletado: parsed.coletado ?? documentacaoVazia(),
+        saving: parsed.saving ?? savingVazio(),
+      };
     } catch {
-      // mensagem não é JSON, continua
+      continue;
     }
   }
-  return documentacaoVazia();
+  return { fase: 'doc', coletado: documentacaoVazia(), saving: savingVazio() };
 }
 
-// ─── Iniciar submissão: cria projeto + extrai doc + inicia agente ─────────────
+/** Monta histórico limpo para o LLM (sem JSON interno) */
+function buildHistory(msgs: { role: string; content: string }[]): ChatHistoryMessage[] {
+  return msgs
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m) => {
+      if (m.role === 'assistant') {
+        try {
+          const parsed = JSON.parse(m.content) as { content?: string; question?: string };
+          return { role: 'assistant' as const, content: parsed.content ?? parsed.question ?? m.content };
+        } catch {
+          return { role: 'assistant' as const, content: m.content };
+        }
+      }
+      return { role: 'user' as const, content: m.content };
+    });
+}
+
+/** Extrai o resumo do projeto da mensagem de transição doc→saving */
+function extrairResumoProjeto(msgs: { role: string; content: string }[]): string {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const msg = msgs[i];
+    if (msg.role !== 'assistant') continue;
+    try {
+      const parsed = JSON.parse(msg.content) as { type?: string; fase?: string; content?: string };
+      if (parsed.type === 'complete' && parsed.fase === 'saving' && parsed.content) {
+        return parsed.content;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return '';
+}
+
+/** Filtra histórico para manter apenas mensagens da fase saving */
+function buildSavingHistory(msgs: { role: string; content: string }[]): ChatHistoryMessage[] {
+  let transitionIdx = -1;
+  for (let i = 0; i < msgs.length; i++) {
+    if (msgs[i].role !== 'assistant') continue;
+    try {
+      const parsed = JSON.parse(msgs[i].content) as { type?: string; fase?: string };
+      if (parsed.type === 'complete' && parsed.fase === 'saving') {
+        transitionIdx = i;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  const savingMsgs = transitionIdx >= 0 ? msgs.slice(transitionIdx + 1) : msgs;
+  return buildHistory(savingMsgs);
+}
+
+/** Formata a resposta do orquestrador para o frontend */
+function formatResponse(resultado: ReturnType<typeof runOrchestrator> extends Promise<infer R> ? R : never) {
+  return {
+    type: resultado.type,
+    content: resultado.type === 'options'
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content,
+    options: resultado.type === 'options' ? resultado.options : null,
+    fase: resultado.fase,
+    isPreview: resultado.type === 'preview',
+    isComplete: resultado.fase === 'completo',
+    coletado: resultado.coletado,
+    saving: resultado.saving,
+  };
+}
+
+// ─── Iniciar submissão: cria projeto + extrai doc + inicia agente ────────────
 
 export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
@@ -80,10 +168,8 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
-    log('iniciarSubmissao', `Arquivo: ${data.doc_filename}, base64 length: ${data.doc_base64.length}`);
 
     // 1. Cria o projeto no banco
-    log('iniciarSubmissao', 'Criando projeto no Supabase...');
     const { data: projeto, error: projErr } = await supabaseAdmin
       .from('projetos')
       .insert({
@@ -105,29 +191,23 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
     log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
     // 2. Extrai texto da documentação
-    log('iniciarSubmissao', 'Extraindo texto do arquivo...');
     let docTexto = '';
     try {
       docTexto = await extractTextFromBase64(data.doc_base64, data.doc_filename);
       log('iniciarSubmissao', `Texto extraído: ${docTexto.length} chars`);
     } catch (extractErr) {
       err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
-      // Não falha — continua sem texto
       docTexto = '';
     }
 
     // 3. Salva o texto da doc como mensagem especial (role='doc')
-    log('iniciarSubmissao', 'Salvando mensagem de contexto (doc) no chat...');
-    const { error: docMsgErr } = await supabaseAdmin.from('chat_messages').insert({
+    await supabaseAdmin.from('chat_messages').insert({
       projeto_id: projeto.id,
       role: 'doc',
       content: docTexto || '(documento sem texto legível)',
     });
-    if (docMsgErr) {
-      err('iniciarSubmissao', 'Falha ao salvar mensagem doc:', docMsgErr);
-    }
 
-    // 4. Monta contexto e coleta inicial (nome já preenchido)
+    // 4. Monta contexto
     const ctx: ProjetoContexto = {
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
@@ -144,19 +224,11 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       nome_projeto: data.nome_projeto,
     };
 
-    // 5. Roda orquestrador — primeira mensagem do agente
-    log('iniciarSubmissao', 'Rodando orquestrador (primeira mensagem)...');
-    let resultado;
-    try {
-      resultado = await runOrchestrator(ctx, [], coletadoInicial);
-      log('iniciarSubmissao', `Orquestrador retornou: type="${resultado.type}"`);
-    } catch (orchErr) {
-      err('iniciarSubmissao', 'Falha no orquestrador:', orchErr);
-      throw new Error(`Falha no agente de IA: ${orchErr instanceof Error ? orchErr.message : String(orchErr)}`);
-    }
+    // 5. Roda orquestrador — primeira mensagem do agente (fase doc)
+    log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
+    const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
     // 6. Salva resposta do assistente
-    log('iniciarSubmissao', 'Salvando primeira resposta do assistente...');
     await supabaseAdmin.from('chat_messages').insert({
       projeto_id: projeto.id,
       role: 'assistant',
@@ -164,20 +236,14 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       options: resultado.type === 'options' ? resultado.options : null,
     });
 
-    log('iniciarSubmissao', 'Concluído com sucesso.');
+    log('iniciarSubmissao', `Concluído. Fase: ${resultado.fase}`);
     return {
       projeto_id: projeto.id,
-      response: {
-        type: resultado.type,
-        content: resultado.type === 'options' ? resultado.question : resultado.content,
-        options: resultado.type === 'options' ? resultado.options : null,
-        isComplete: resultado.type === 'complete',
-        coletado: resultado.coletado,
-      },
+      response: formatResponse(resultado),
     };
   });
 
-// ─── Enviar mensagem no chat ───────────────────────────────────────────────────
+// ─── Enviar mensagem no chat ────────────────────────────────────────────────
 
 export const enviarMensagemFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
@@ -190,7 +256,7 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       .parse(d)
   )
   .handler(async ({ data }) => {
-    log('enviarMensagem', `projeto=${data.projeto_id}, mensagem="${data.content.slice(0, 80)}"`);
+    log('enviarMensagem', `projeto=${data.projeto_id}`);
 
     // 1. Salva mensagem do usuário
     await supabaseAdmin.from('chat_messages').insert({
@@ -201,82 +267,90 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
     });
 
     // 2. Busca histórico (exclui mensagens 'doc')
-    const { data: msgs, error: msgsErr } = await supabaseAdmin
+    const { data: msgs } = await supabaseAdmin
       .from('chat_messages')
       .select('role, content')
       .eq('projeto_id', data.projeto_id)
       .neq('role', 'doc')
       .order('created_at');
 
-    if (msgsErr) err('enviarMensagem', 'Erro ao buscar histórico:', msgsErr);
-    log('enviarMensagem', `Histórico: ${(msgs ?? []).length} mensagens`);
+    const estado = extrairEstado(msgs ?? []);
 
-    const history: ChatHistoryMessage[] = (msgs ?? []).map((m) => {
-      if (m.role === 'assistant') {
-        try {
-          const parsed = JSON.parse(m.content) as { content?: string; question?: string };
-          return { role: 'assistant', content: parsed.content ?? parsed.question ?? m.content };
-        } catch {
-          return { role: 'assistant', content: m.content };
-        }
-      }
-      return { role: 'user', content: m.content };
-    });
+    // Histórico filtrado: na fase saving, agente 2 começa limpo
+    const isSavingFase = estado.fase === 'saving' || estado.fase === 'saving_preview';
+    const history = isSavingFase
+      ? buildSavingHistory(msgs ?? [])
+      : buildHistory(msgs ?? []);
 
-    // 3. Estado coletado e contexto
-    const coletado = extrairUltimoColetado(msgs ?? []);
-    log('enviarMensagem', 'Campos já coletados:', Object.entries(coletado).filter(([, v]) => v !== null).map(([k]) => k));
+    const resumoProjeto = isSavingFase ? extrairResumoProjeto(msgs ?? []) : '';
 
+    // 3. Contexto do projeto
     const ctx = await getProjetoContexto(data.projeto_id);
-    log('enviarMensagem', `Contexto: projeto="${ctx.nome_projeto}", doc=${ctx.doc_texto ? ctx.doc_texto.length + ' chars' : 'nenhum'}`);
+    log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs`);
 
-    // 4. Roda orquestrador
-    log('enviarMensagem', 'Chamando orquestrador...');
-    const resultado = await runOrchestrator(ctx, history, coletado);
-    log('enviarMensagem', `Orquestrador retornou: type="${resultado.type}"`);
+    // 4. Roda o orquestrador na fase atual
+    const resultado = await runOrchestrator(
+      ctx,
+      history,
+      estado.fase,
+      estado.coletado,
+      estado.saving,
+      resumoProjeto
+    );
 
     // 5. Salva resposta do assistente
-    const assistantContent = JSON.stringify(resultado);
     await supabaseAdmin.from('chat_messages').insert({
       projeto_id: data.projeto_id,
       role: 'assistant',
-      content: assistantContent,
+      content: JSON.stringify(resultado),
       options: resultado.type === 'options' ? resultado.options : null,
     });
 
-    // 6. Se completo, compila documentação final
-    if (resultado.type === 'complete') {
-      log('enviarMensagem', 'Chat completo — compilando documentação...');
+    // 6. Ações pós-transição
+
+    // Doc aprovada → compila documentação
+    if (resultado.fase === 'saving' && estado.fase === 'doc_preview') {
+      log('enviarMensagem', 'Doc aprovada — compilando documentação...');
       try {
         const doc = await compilarDocumentacao(ctx, resultado.coletado);
-        log('enviarMensagem', 'Documentação compilada, salvando...');
-
         await supabaseAdmin.from('documentacao').upsert({
           projeto_id: data.projeto_id,
           conteudo: doc as never,
         });
-
-        await supabaseAdmin
-          .from('projetos')
-          .update({ chat_completo: true })
-          .eq('id', data.projeto_id);
-
-        log('enviarMensagem', 'Documentação salva com sucesso.');
+        log('enviarMensagem', 'Documentação compilada e salva.');
       } catch (compErr) {
-        err('enviarMensagem', 'Falha ao compilar/salvar documentação:', compErr);
+        err('enviarMensagem', 'Falha ao compilar:', compErr);
       }
     }
 
-    return {
-      type: resultado.type,
-      content: resultado.type === 'options' ? resultado.question : resultado.content,
-      options: resultado.type === 'options' ? resultado.options : null,
-      isComplete: resultado.type === 'complete',
-      coletado: resultado.coletado,
-    };
+    // Fluxo completo → salva saving na doc e marca projeto
+    if (resultado.fase === 'completo') {
+      log('enviarMensagem', 'Fluxo completo — salvando saving...');
+      const { data: docRow } = await supabaseAdmin
+        .from('documentacao')
+        .select('conteudo')
+        .eq('projeto_id', data.projeto_id)
+        .single();
+
+      if (docRow) {
+        const doc = docRow.conteudo as Record<string, unknown>;
+        doc.saving = resultado.saving;
+        await supabaseAdmin.from('documentacao').upsert({
+          projeto_id: data.projeto_id,
+          conteudo: doc as never,
+        });
+      }
+
+      await supabaseAdmin
+        .from('projetos')
+        .update({ chat_completo: true })
+        .eq('id', data.projeto_id);
+    }
+
+    return formatResponse(resultado);
   });
 
-// ─── Submeter projeto para validação ─────────────────────────────────────────
+// ─── Submeter projeto para validação ────────────────────────────────────────
 
 export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
@@ -299,7 +373,7 @@ export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
-// ─── Validar projeto (chamado pelo admin) ─────────────────────────────────────
+// ─── Validar projeto (chamado pelo admin) ───────────────────────────────────
 
 export const validarProjetoFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>

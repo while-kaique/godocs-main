@@ -27,33 +27,33 @@ export type ResultadoValidacao = {
 
 const CRITERIOS_DEFAULT: CriterioValidacao[] = [
   {
-    nome: 'Problema bem definido',
-    descricao: 'O problema que a automação resolve está claramente descrito com contexto suficiente.',
+    nome: 'Propósito claro',
+    descricao: 'A seção "O que faz" descreve com clareza o problema resolvido, o público-alvo e o resultado esperado.',
     peso: 'obrigatorio',
   },
   {
-    nome: 'Funcionamento descrito',
-    descricao: 'O fluxo de como a automação funciona está explicado de forma compreensível.',
+    nome: 'Trigger definido',
+    descricao: 'A seção "Execução" explica como e quando o projeto é acionado (schedule, webhook, manual, etc.).',
     peso: 'obrigatorio',
   },
   {
-    nome: 'Cálculo de economia consistente',
-    descricao: 'O cálculo de economia (horas × valor hora = R$) está correto e o memorial explica como chegou aos números.',
+    nome: 'Dependências completas',
+    descricao: 'Todos os serviços externos, APIs e credenciais necessárias estão listados na seção "Dependências".',
     peso: 'obrigatorio',
   },
   {
-    nome: 'Valor da hora dentro do limite',
-    descricao: 'O valor da hora utilizado é de pelo menos R$ 8,00.',
+    nome: 'Fluxo lógico e completo',
+    descricao: 'A seção "Fluxo" apresenta a sequência de etapas do início ao fim, sem pular passos, incluindo ramificações condicionais.',
     peso: 'obrigatorio',
   },
   {
-    nome: 'ROI justificado',
-    descricao: 'A economia gerada justifica o esforço de criação e manutenção da automação.',
+    nome: 'Configuração inicial documentada',
+    descricao: 'A seção "Configurar antes de usar" lista os passos necessários para alguém novo conseguir rodar o projeto.',
     peso: 'importante',
   },
   {
-    nome: 'Benefícios além do financeiro',
-    descricao: 'Foram listados benefícios qualitativos além da economia monetária.',
+    nome: 'Riscos e limitações identificados',
+    descricao: 'A seção "Atenção" contém riscos reais e específicos, não genéricos.',
     peso: 'desejavel',
   },
 ];
