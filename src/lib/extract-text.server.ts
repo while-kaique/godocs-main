@@ -27,12 +27,22 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
       const pdfMod = await import('pdf-parse');
       log('pdf-parse importado. Chaves do módulo:', Object.keys(pdfMod));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number }> =
-        (pdfMod as any).default ?? pdfMod;
-      log('Parseando PDF...');
-      const result = await pdfParse(buffer);
-      log(`PDF parseado: ${result.numpages} página(s), ${result.text.length} chars`);
-      text = result.text;
+      const mod = pdfMod as any;
+      if (typeof mod.PDFParse === 'function') {
+        // pdf-parse v2: new PDFParse({ data }) → getText() retorna { text, pages }
+        log('Usando pdf-parse v2 (PDFParse class)...');
+        const parser = new mod.PDFParse({ data: new Uint8Array(buffer) });
+        const result = await parser.getText();
+        text = result.text ?? '';
+        log(`PDF parseado (v2): ${result.pages?.length ?? 0} página(s), ${text.length} chars`);
+      } else {
+        // pdf-parse v1: função default
+        const pdfParse = mod.default ?? mod;
+        log('Usando pdf-parse v1 (default function)...');
+        const result = await pdfParse(buffer);
+        text = result.text;
+        log(`PDF parseado (v1): ${result.numpages} página(s), ${text.length} chars`);
+      }
 
     } else if (ext === 'docx' || ext === 'doc') {
       log('Modo: DOCX — importando mammoth...');
