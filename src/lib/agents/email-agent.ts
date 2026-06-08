@@ -60,8 +60,8 @@ export async function enviarEmailAprovacao(
   <table style="width: 100%; border-collapse: collapse;">
     <tr><td style="padding: 8px 0; color: #6b7280; width: 40%;">Ferramenta</td><td style="padding: 8px 0;"><strong>${doc.ferramenta}</strong></td></tr>
     <tr><td style="padding: 8px 0; color: #6b7280;">Área</td><td style="padding: 8px 0;"><strong>${doc.responsavel.area ?? '—'}</strong></td></tr>
-    <tr><td style="padding: 8px 0; color: #6b7280;">Economia mensal</td><td style="padding: 8px 0;"><strong>R$ ${doc.impacto.economia_reais_mes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td></tr>
-    <tr><td style="padding: 8px 0; color: #6b7280;">Horas economizadas/mês</td><td style="padding: 8px 0;"><strong>${doc.impacto.economia_horas_mes}h</strong></td></tr>
+    <tr><td style="padding: 8px 0; color: #6b7280;">O que faz</td><td style="padding: 8px 0;">${doc.o_que_faz}</td></tr>
+    <tr><td style="padding: 8px 0; color: #6b7280;">Execução</td><td style="padding: 8px 0;">${doc.execucao}</td></tr>
   </table>
 
   <p style="margin-top: 32px; color: #6b7280; font-size: 13px;">GoDocs · Sistema interno de auditoria de automações · Gocase</p>
