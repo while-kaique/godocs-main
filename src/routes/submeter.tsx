@@ -105,7 +105,6 @@ interface FormData {
   nomeProjeto: string;
   dataCriacao: string;
   descricao: string;
-  checkMercado: "sim" | "nao" | "";
   savingHoras: string;
   savingReais: string;
   tipoSaving: "mensal" | "pontual" | "";
@@ -167,7 +166,6 @@ function SubmeterPage() {
     nomeProjeto: "",
     dataCriacao: today,
     descricao: "",
-    checkMercado: "",
     savingHoras: "",
     savingReais: "",
     tipoSaving: "",
@@ -242,14 +240,19 @@ function SubmeterPage() {
     if (n === 2) {
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto";
-      if (!form.dataCriacao) errs.dataCriacao = "Informe a data de criação";
+      if (!form.dataCriacao) {
+        errs.dataCriacao = "Informe a data de criação";
+      } else if (form.dataCriacao < "2024-01-01") {
+        errs.dataCriacao = "A data mínima é 01/01/2024";
+      } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
+        errs.dataCriacao = "A data não pode ser no futuro";
+      }
       if (!form.descricao.trim() || form.descricao.trim().length < 10)
         errs.descricao = "Descreva o projeto (mínimo 10 caracteres)";
       if (!arquivo) errs.documentacao = "Envie a documentação do projeto";
     }
 
     if (n === 3) {
-      if (!form.checkMercado) errs.checkMercado = "Selecione uma opção";
       if (!form.savingHoras || parseFloat(form.savingHoras) <= 0)
         errs.savingHoras = "Informe as horas economizadas (maior que 0)";
       if (!form.savingReais || parseFloat(form.savingReais) <= 0)
@@ -342,7 +345,6 @@ function SubmeterPage() {
       fd.append("nome_projeto", form.nomeProjeto.trim());
       fd.append("data_criacao", form.dataCriacao);
       fd.append("descricao", form.descricao.trim());
-      fd.append("check_mercado", form.checkMercado === "sim" ? "Sim" : "Não");
       fd.append("saving_horas", form.savingHoras);
       fd.append("saving_reais", form.savingReais);
       fd.append("tipo_saving", form.tipoSaving === "mensal" ? "Mensal" : "Pontual");
@@ -1542,12 +1544,6 @@ function Step2({
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // n8n name detection
-  const n8nNameStatus = useMemo(() => {
-    if (!isN8n || form.nomeProjeto.length < 3) return null;
-    if (/^\[.+\]/.test(form.nomeProjeto)) return "ok";
-    return "warn";
-  }, [isN8n, form.nomeProjeto]);
 
   function handleFileSelect(file: File | null) {
     if (!file) return;
@@ -1647,29 +1643,6 @@ function Step2({
           </div>
         )}
 
-        {/* n8n name status badge */}
-        {n8nNameStatus && (
-          <span
-            className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-            style={
-              n8nNameStatus === "ok"
-                ? {
-                    background: "rgba(34,197,94,0.06)",
-                    color: "#16a34a",
-                    border: "1px solid rgba(34,197,94,0.15)",
-                  }
-                : {
-                    background: "rgba(215,219,0,0.06)",
-                    color: "#8a7d00",
-                    border: "1px solid rgba(215,219,0,0.2)",
-                  }
-            }
-          >
-            {n8nNameStatus === "ok"
-              ? "\u2705 Prefixo detectado — parece um nome de fluxo n8n válido"
-              : "\u26A0\uFE0F Nenhum prefixo detectado — verifique se copiou o nome correto do n8n"}
-          </span>
-        )}
       </FormGroup>
 
       <FormGroup>
@@ -1679,6 +1652,7 @@ function Step2({
         <FormInput
           type="date"
           value={form.dataCriacao}
+          min="2024-01-01"
           max={new Date().toISOString().split("T")[0]}
           onChange={(e) => updateField("dataCriacao", e.currentTarget.value)}
           error={errors.dataCriacao}
@@ -1879,30 +1853,8 @@ function Step3({
 
   return (
     <div>
-      <SectionTitle icon={"\uD83D\uDCCA"}>Impacto e Mercado</SectionTitle>
+      <SectionTitle icon={"\uD83D\uDCCA"}>Impacto</SectionTitle>
 
-      <FormGroup>
-        <FormLabel required>
-          Existe solução similar paga no mercado?
-        </FormLabel>
-        <RadioGroup
-          name="checkMercado"
-          value={form.checkMercado}
-          onChange={(v) =>
-            updateField("checkMercado", v as FormData["checkMercado"])
-          }
-          error={errors.checkMercado}
-          options={[
-            { value: "sim", label: "\u2705 Sim" },
-            { value: "nao", label: "\u274C Não" },
-          ]}
-        />
-      </FormGroup>
-
-      <div
-        className="my-5"
-        style={{ height: "1.5px", background: "rgba(0,89,169,0.08)" }}
-      />
 
       <div
         className="mb-2.5 text-xs font-bold uppercase tracking-[0.05em]"
