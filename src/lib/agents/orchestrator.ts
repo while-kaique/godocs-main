@@ -70,13 +70,14 @@ ESTADO ATUAL DA COLETA:
 ${JSON.stringify(coletado, null, 2)}
 
 REGRAS FUNDAMENTAIS:
-- Seja CÉTICO: avalie criticamente se a resposta realmente satisfaz o critério do campo antes de marcá-lo como coletado
-- Se a resposta for vaga, incompleta ou não satisfizer o critério acima, NÃO atualize o campo no "coletado" — deixe-o null e faça uma pergunta de aprofundamento
-- Ao iniciar (primeira mensagem com doc), liste brevemente o que já extraiu antes de perguntar o que falta
+- A documentação enviada é a fonte de verdade deste projeto — não a compare com os metadados (nome, ferramenta, responsável). Extraia os 7 campos diretamente do conteúdo do arquivo, independente de quem escreveu ou qual ferramenta menciona
+- Se o arquivo cobrir todos os 7 campos com qualidade suficiente, responda IMEDIATAMENTE com type "complete" — não faça perguntas desnecessárias
+- Seja CÉTICO nas respostas do usuário: avalie criticamente se cada resposta satisfaz o critério do campo antes de marcá-lo como coletado
+- Se uma resposta for vaga, incompleta ou não satisfizer o critério acima, NÃO atualize o campo no "coletado" — deixe-o null e faça uma pergunta de aprofundamento
+- Ao iniciar com doc, liste brevemente o que já extraiu do arquivo antes de perguntar o que falta
 - Faça perguntas APENAS sobre o que ainda está ausente, vago ou inconsistente
 - Faça UMA pergunta por vez, de forma natural e amigável
 - Se a resposta puder ter múltiplas interpretações, ofereça SEMPRE 3 opções objetivas e relevantes
-- Quando TODOS os 7 campos tiverem informação suficiente segundo os critérios acima, sinalize como completo
 - Tom: profissional mas acessível, português brasileiro
 - Seja direto — não elogie cada resposta, não use frases genéricas
 - NUNCA aceite uma resposta insatisfatória só para avançar — a qualidade da documentação é o objetivo
@@ -110,7 +111,7 @@ export async function runOrchestrator(
     messages.push({
       role: 'user',
       content: temDoc
-        ? '[SISTEMA] Leia a seção "DOCUMENTAÇÃO ENVIADA PELO USUÁRIO" acima com atenção. Extraia dela tudo que responder aos 7 campos obrigatórios e atualize "coletado". No campo "content" da resposta: (1) liste brevemente o que você conseguiu extrair DO ARQUIVO (não dos dados já conhecidos do projeto), e (2) faça a primeira pergunta sobre o campo mais importante que ainda esteja ausente ou vago no arquivo. Se todos os 7 campos estiverem cobertos pelo arquivo, responda com type "complete".'
+        ? '[SISTEMA] Leia a seção "DOCUMENTAÇÃO ENVIADA PELO USUÁRIO" acima. Extraia dela os 7 campos obrigatórios e atualize "coletado". Trate o conteúdo do arquivo como a documentação real deste projeto — ignore qualquer divergência com os metadados (nome, ferramenta, responsável). Se todos os 7 campos estiverem cobertos com qualidade suficiente, responda com type "complete" e uma mensagem confirmando. Se algum campo estiver ausente ou vago, liste o que já extraiu e faça a primeira pergunta sobre o que falta.'
         : '[SISTEMA] Inicie a conversa apresentando-se brevemente e fazendo a primeira pergunta para documentar o projeto.',
     });
   }
