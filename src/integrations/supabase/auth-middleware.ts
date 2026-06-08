@@ -18,7 +18,9 @@ export const requireEdgeAuth = createMiddleware({ type: 'function' }).server(
     }
 
     const headerName = process.env.GODEPLOY_USER_HEADER ?? 'x-user-email';
-    const email = request.headers.get(headerName);
+    const email =
+      request.headers.get(headerName) ??
+      (process.env.NODE_ENV === 'development' ? process.env.DEV_USER_EMAIL ?? null : null);
 
     if (!email) {
       throw new Error('Unauthorized: Missing user email header from edge auth');
@@ -49,7 +51,9 @@ export const requireAdmin = createMiddleware({ type: 'function' }).server(
     }
 
     const headerName = process.env.GODEPLOY_USER_HEADER ?? 'x-user-email';
-    const email = request.headers.get(headerName);
+    const email =
+      request.headers.get(headerName) ??
+      (process.env.NODE_ENV === 'development' ? process.env.DEV_USER_EMAIL ?? null : null);
 
     if (!email) {
       throw new Error('Unauthorized: Missing user email header from edge auth');
