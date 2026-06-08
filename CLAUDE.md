@@ -134,7 +134,7 @@ Definidas em `.env` (nao comitar service_role_key):
 - Home, login, formulario de submissao, CRUD de usuarios e areas estao funcionais
 - Dashboard ainda e placeholder - falta integrar listagem de projetos submetidos
 - Editar e Reenviar ainda redirecionam para webhooks externos (sem UI propria)
-- Design sera revisado usando o `GOGROUP_DESIGN_SYSTEM.md`
+- Design sera revisado usando o `identidade_visual_gogroup.md`
 
 ## Notas importantes
 
