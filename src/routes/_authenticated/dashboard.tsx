@@ -1,76 +1,112 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables, Enums } from "@/integrations/supabase/types";
+
+type Projeto = Tables<"projetos"> & { areas: { nome: string } | null };
+type Status = Enums<"projeto_status">;
+
+const STATUS_LABEL: Record<Status, string> = {
+  rascunho: "Rascunho",
+  em_validacao: "Em validação",
+  validado: "Validado",
+  rejeitado: "Rejeitado",
+};
+
+const STATUS_COLOR: Record<Status, string> = {
+  rascunho: "bg-muted text-muted-foreground",
+  em_validacao: "bg-yellow-100 text-yellow-800",
+  validado: "bg-green-100 text-green-800",
+  rejeitado: "bg-red-100 text-red-800",
+};
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard · Hub Admin" }] }),
+  head: () => ({ meta: [{ title: "Dashboard · GoDocs Admin" }] }),
   component: Dashboard,
 });
 
 function Dashboard() {
-  const { user } = Route.useRouteContext();
-  const [roles, setRoles] = useState<string[]>([]);
-  const [areas, setAreas] = useState<string[]>([]);
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const { data: roleRows } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
-      setRoles((roleRows ?? []).map((r) => r.role));
+    supabase
+      .from("projetos")
+      .select("*, areas(nome)")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setProjetos((data ?? []) as Projeto[]);
+        setLoading(false);
+      });
+  }, []);
 
-      const { data: la } = await supabase
-        .from("leader_areas")
-        .select("areas(nome)")
-        .eq("user_id", user.id);
-      setAreas(
-        ((la ?? []) as unknown as Array<{ areas: { nome: string } | null }>)
-          .map((r) => r.areas?.nome)
-          .filter((n): n is string => !!n),
-      );
-    })();
-  }, [user.id]);
-
-  const isAdmin = roles.includes("admin_master");
+  const contagem = (status: Status) =>
+    projetos.filter((p) => p.status === status).length;
 
   return (
     <div className="mx-auto max-w-5xl p-8">
       <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
       <p className="mt-1 text-muted-foreground">
-        {isAdmin
-          ? "Visão geral da plataforma. Em breve aqui aparecerá a listagem de projetos."
-          : "Seus projetos aparecerão aqui assim que a integração com a base de submissões for ativada."}
+        Acompanhe os projetos submetidos pelos times.
       </p>
 
-      {!isAdmin && (
-        <div className="mt-8 rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold">Áreas que você lidera</h2>
-          {areas.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Nenhuma área vinculada ainda. Solicite ao Admin Master.
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {areas.map((a) => (
-                <li
-                  key={a}
-                  className="rounded-full bg-accent px-3 py-1 text-sm text-accent-foreground"
-                >
-                  {a}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {/* Contadores por status */}
+      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {(["rascunho", "em_validacao", "validado", "rejeitado"] as Status[]).map(
+          (s) => (
+            <div
+              key={s}
+              className="rounded-xl border border-border bg-card p-4"
+            >
+              <div className="text-2xl font-bold">{contagem(s)}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {STATUS_LABEL[s]}
+              </div>
+            </div>
+          )
+        )}
+      </div>
 
-      <div className="mt-8 rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-muted-foreground">
-        <p className="text-sm">
-          📊 Listagem de projetos (em análise · aprovados · reenvio pendente)
-          será habilitada na próxima iteração, quando a leitura dos dados do
-          fluxo de submissão estiver conectada.
-        </p>
+      {/* Lista de projetos */}
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-semibold">Todos os projetos</h2>
+
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Carregando...</div>
+        ) : projetos.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+            Nenhum projeto submetido ainda.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {projetos.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4"
+              >
+                <div>
+                  <div className="font-medium">
+                    {p.nome ?? "Projeto sem nome"}
+                  </div>
+                  <div className="mt-0.5 text-sm text-muted-foreground">
+                    {p.responsavel_nome} · {p.areas?.nome ?? "Sem área"} ·{" "}
+                    {p.ferramenta}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLOR[p.status ?? "rascunho"]}`}
+                  >
+                    {STATUS_LABEL[p.status ?? "rascunho"]}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(p.created_at ?? "").toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

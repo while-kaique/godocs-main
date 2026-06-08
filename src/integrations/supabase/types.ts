@@ -14,46 +14,197 @@ export type Database = {
   }
   public: {
     Tables: {
+      admins: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          nome: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          nome?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          nome?: string | null
+        }
+        Relationships: []
+      }
       areas: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           nome: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           nome: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           nome?: string
         }
         Relationships: []
       }
-      leader_areas: {
+      chat_messages: {
         Row: {
-          area_id: string
-          created_at: string
+          content: string
+          created_at: string | null
           id: string
-          user_id: string
+          options: Json | null
+          projeto_id: string
+          role: string
+          selected_option: number | null
         }
         Insert: {
-          area_id: string
-          created_at?: string
+          content: string
+          created_at?: string | null
           id?: string
-          user_id: string
+          options?: Json | null
+          projeto_id: string
+          role: string
+          selected_option?: number | null
         }
         Update: {
-          area_id?: string
-          created_at?: string
+          content?: string
+          created_at?: string | null
           id?: string
-          user_id?: string
+          options?: Json | null
+          projeto_id?: string
+          role?: string
+          selected_option?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "leader_areas_area_id_fkey"
+            foreignKeyName: "chat_messages_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      configuracoes: {
+        Row: {
+          chave: string
+          descricao: string | null
+          id: string
+          updated_at: string | null
+          updated_by: string | null
+          valor: Json
+        }
+        Insert: {
+          chave: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valor: Json
+        }
+        Update: {
+          chave?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          valor?: Json
+        }
+        Relationships: []
+      }
+      documentacao: {
+        Row: {
+          conteudo: Json
+          created_at: string | null
+          id: string
+          projeto_id: string
+          updated_at: string | null
+          versao: number | null
+        }
+        Insert: {
+          conteudo: Json
+          created_at?: string | null
+          id?: string
+          projeto_id: string
+          updated_at?: string | null
+          versao?: number | null
+        }
+        Update: {
+          conteudo?: Json
+          created_at?: string | null
+          id?: string
+          projeto_id?: string
+          updated_at?: string | null
+          versao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentacao_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: true
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projetos: {
+        Row: {
+          area_id: string | null
+          chat_completo: boolean | null
+          created_at: string | null
+          ferramenta: string
+          id: string
+          membros: Json | null
+          nome: string | null
+          responsavel_email: string
+          responsavel_nome: string
+          status: Database["public"]["Enums"]["projeto_status"] | null
+          submitted_at: string | null
+          updated_at: string | null
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          chat_completo?: boolean | null
+          created_at?: string | null
+          ferramenta: string
+          id?: string
+          membros?: Json | null
+          nome?: string | null
+          responsavel_email: string
+          responsavel_nome: string
+          status?: Database["public"]["Enums"]["projeto_status"] | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          chat_completo?: boolean | null
+          created_at?: string | null
+          ferramenta?: string
+          id?: string
+          membros?: Json | null
+          nome?: string | null
+          responsavel_email?: string
+          responsavel_nome?: string
+          status?: Database["public"]["Enums"]["projeto_status"] | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projetos_area_id_fkey"
             columns: ["area_id"]
             isOneToOne: false
             referencedRelation: "areas"
@@ -61,60 +212,56 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      validacoes: {
         Row: {
-          created_at: string
-          email: string
+          admin_email: string | null
+          created_at: string | null
+          criterios: Json | null
+          email_enviado: boolean | null
           id: string
-          nome: string
+          parecer: string
+          projeto_id: string
+          resultado: string
         }
         Insert: {
-          created_at?: string
-          email: string
-          id: string
-          nome: string
+          admin_email?: string | null
+          created_at?: string | null
+          criterios?: Json | null
+          email_enviado?: boolean | null
+          id?: string
+          parecer: string
+          projeto_id: string
+          resultado: string
         }
         Update: {
-          created_at?: string
-          email?: string
+          admin_email?: string | null
+          created_at?: string | null
+          criterios?: Json | null
+          email_enviado?: boolean | null
           id?: string
-          nome?: string
+          parecer?: string
+          projeto_id?: string
+          resultado?: string
         }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "validacoes_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "admin_master" | "leader"
+      projeto_status: "rascunho" | "em_validacao" | "validado" | "rejeitado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -242,7 +389,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin_master", "leader"],
+      projeto_status: ["rascunho", "em_validacao", "validado", "rejeitado"],
     },
   },
 } as const
