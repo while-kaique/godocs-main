@@ -7,10 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -38,9 +37,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -78,24 +74,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Hub de cadastro, documentação e gestão de projetos de automações do Gogroup." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Hub de cadastro, documentação e gestão de projetos de automações do Gogroup." },
+      { title: "Hub de Projetos · GoGroup" },
+      { name: "description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
+      { name: "author", content: "GoGroup RPA & IA" },
+      { property: "og:title", content: "Hub de Projetos · GoGroup" },
+      { property: "og:description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "Hub de cadastro, documentação e gestão de projetos de automações do Gogroup." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5c74aaa2-958d-4b28-9c24-6148e72f758b/id-preview-fb7839e4--39d9a1a4-6b6b-40e7-a82a-5624ff81b1cc.lovable.app-1780523383265.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5c74aaa2-958d-4b28-9c24-6148e72f758b/id-preview-fb7839e4--39d9a1a4-6b6b-40e7-a82a-5624ff81b1cc.lovable.app-1780523383265.png" },
+      { name: "twitter:title", content: "Hub de Projetos · GoGroup" },
+      { name: "twitter:description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" as const },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" },
+      { rel: "stylesheet", href: appCss },
     ],
   }),
   shellComponent: RootShell,
@@ -106,7 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
