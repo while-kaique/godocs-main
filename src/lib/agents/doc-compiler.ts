@@ -24,6 +24,7 @@ export async function compilarDocumentacao(
   const template = await getDocTemplate();
 
   const templateInstrucao = template
+  
     ? `\n\nSiga o seguinte template/padrão de documentação ao gerar o conteúdo:\n${template}`
     : '';
 

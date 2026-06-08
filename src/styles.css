@@ -186,6 +186,10 @@
 @keyframes go-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes go-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
 
 /* ══════════════════════════════════════════════
    GoGroup Form Components
