@@ -110,12 +110,16 @@ export async function runOrchestrator(
     messages.push({
       role: 'user',
       content: temDoc
-        ? '[SISTEMA] O usuário enviou a documentação acima. Analise-a e responda em JSON: atualize o campo "coletado" com tudo que conseguiu extrair do documento; no campo "content" escreva primeiro um resumo de 1-2 linhas do que já encontrou no documento (ex: "Já identifiquei que a automação faz X e economiza Y horas/mês."), depois faça a primeira pergunta sobre o campo mais importante que ainda está ausente ou vago. Se todos os campos estiverem cobertos, responda com type "complete".'
+        ? '[SISTEMA] Leia a seção "DOCUMENTAÇÃO ENVIADA PELO USUÁRIO" acima com atenção. Extraia dela tudo que responder aos 7 campos obrigatórios e atualize "coletado". No campo "content" da resposta: (1) liste brevemente o que você conseguiu extrair DO ARQUIVO (não dos dados já conhecidos do projeto), e (2) faça a primeira pergunta sobre o campo mais importante que ainda esteja ausente ou vago no arquivo. Se todos os 7 campos estiverem cobertos pelo arquivo, responda com type "complete".'
         : '[SISTEMA] Inicie a conversa apresentando-se brevemente e fazendo a primeira pergunta para documentar o projeto.',
     });
   }
 
-  log(`Chamando LLM — histórico: ${history.length} msgs, doc: ${ctx.doc_texto ? ctx.doc_texto.length + ' chars' : 'nenhum'}`);
+  const temDocLog = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
+  log(`Chamando LLM — histórico: ${history.length} msgs, doc: ${temDocLog ? ctx.doc_texto!.length + ' chars' : 'AUSENTE'}`);
+  if (temDocLog) {
+    log(`Primeiros 300 chars do doc_texto:\n${ctx.doc_texto!.slice(0, 300)}`);
+  }
   let raw: string;
   try {
     raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
