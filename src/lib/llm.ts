@@ -1,5 +1,7 @@
 // Camada de abstração de LLM — suporta OpenAI e Anthropic via variáveis de ambiente
 // Troca de provider: só alterar LLM_PROVIDER no .env
+const log = (...args: unknown[]) => console.log('[llm]', ...args);
+const errLog = (...args: unknown[]) => console.error('[llm]', ...args);
 
 export type LLMMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -20,7 +22,10 @@ export async function llmChat(
   const apiKey = process.env.LLM_API_KEY;
   const model = process.env.LLM_MODEL ?? 'gpt-4.1';
 
-  if (!apiKey) throw new Error('LLM_API_KEY não configurada.');
+  const keyPreview = apiKey ? `${apiKey.slice(0, 12)}... (${apiKey.length} chars)` : '✗ AUSENTE';
+  log(`provider=${provider}, model=${model}, apiKey=${keyPreview}, msgs=${messages.length}`);
+
+  if (!apiKey) throw new Error('LLM_API_KEY não configurada no .env');
 
   if (provider === 'openai') {
     return callOpenAI(messages, { model, apiKey, ...opts });
@@ -58,12 +63,15 @@ async function callOpenAI(
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${err}`);
+    const body = await res.text();
+    errLog(`OpenAI HTTP ${res.status}:`, body);
+    throw new Error(`OpenAI error ${res.status}: ${body}`);
   }
 
   const data = await res.json() as { choices: { message: { content: string } }[] };
-  return data.choices[0].message.content;
+  const content = data.choices[0].message.content;
+  log(`OpenAI respondeu: ${content.slice(0, 120)}${content.length > 120 ? '...' : ''}`);
+  return content;
 }
 
 async function callAnthropic(

@@ -1,8 +1,8 @@
 // Agente Orquestrador
-// Analisa o histórico do chat, extrai o que já foi coletado e decide a próxima ação:
-// - Fazer uma pergunta direta
-// - Oferecer 3 opções (quando a resposta pode ser ambígua)
-// - Sinalizar que a coleta está completa
+const log = (...args: unknown[]) => console.log('[orchestrator]', ...args);
+const err = (...args: unknown[]) => console.error('[orchestrator]', ...args);
+// Analisa a documentação enviada pelo usuário, extrai o que já está claro
+// e faz perguntas de follow-up apenas sobre o que ainda falta ou está vago.
 
 import { llmChat } from '@/lib/llm';
 import type {
@@ -15,39 +15,50 @@ import { documentacaoVazia } from './types';
 
 function buildSystemPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
   const membros = ctx.membros.length > 0 ? ctx.membros.join(', ') : 'Não informado';
+  const temDoc = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
 
-  return `Você é um assistente especializado em documentação de projetos de automação interna da Gocase.
+  const docSection = temDoc
+    ? `DOCUMENTAÇÃO ENVIADA PELO USUÁRIO:
+---
+${ctx.doc_texto}
+---`
+    : `(Nenhuma documentação foi enviada — colete todas as informações via conversa.)`;
 
-Seu objetivo é coletar informações para documentar um projeto de automação através de conversa natural e amigável.
+  return `Você é um assistente especializado em padronização de documentação de projetos de automação interna da Gocase.
 
-CONTEXTO JÁ COLETADO (etapa anterior do formulário):
+${docSection}
+
+DADOS JÁ CONHECIDOS DO PROJETO:
+- Nome do projeto: ${ctx.nome_projeto}
+- Data de criação: ${ctx.data_criacao ?? 'Não informada'}
 - Responsável: ${ctx.responsavel_nome} (${ctx.responsavel_email})
 - Área: ${ctx.area ?? 'Não informada'}
 - Ferramenta utilizada: ${ctx.ferramenta}
 - Membros do time: ${membros}
 
-CAMPOS QUE VOCÊ PRECISA COLETAR:
-1. nome_projeto — Nome do projeto ou automação
-2. problema_resolve — Qual problema ela resolve? Como era o processo manual antes?
-3. como_funciona — Como a automação funciona? Descreva o fluxo em linhas gerais.
-4. economia_horas_mes — Quantas horas por mês essa automação economiza? (número)
-5. valor_hora — Valor da hora trabalhada em R$ (mínimo R$ 8,00)
-6. economia_reais_mes — Total economizado por mês em R$ (horas × valor_hora)
-7. memorial_calculo — Como chegaram a esses números? Explique o cálculo detalhadamente.
-8. beneficios_adicionais — Outros benefícios além do financeiro (qualidade, erros evitados, etc.)
+PADRÃO MÍNIMO DE DOCUMENTAÇÃO EXIGIDO:
+1. problema_resolve — O que a automação resolve? Como era o processo manual antes?
+2. como_funciona — Como a automação funciona? Descreva o fluxo em linhas gerais.
+3. economia_horas_mes — Quantas horas por mês essa automação economiza? (número)
+4. valor_hora — Valor da hora trabalhada em R$ (mínimo R$ 8,00)
+5. economia_reais_mes — Total economizado por mês em R$ (horas × valor_hora)
+6. memorial_calculo — Como chegaram a esses números? Explique o cálculo detalhadamente.
+7. beneficios_adicionais — Outros benefícios além do financeiro (qualidade, erros evitados, etc.)
 
 ESTADO ATUAL DA COLETA:
 ${JSON.stringify(coletado, null, 2)}
 
-REGRAS:
-- Faça UMA pergunta por vez, de forma natural
-- Se a resposta do usuário for vaga ou puder ter múltiplas interpretações, SEMPRE ofereça 3 opções objetivas
-- As opções devem ser específicas e relevantes para o contexto da resposta do usuário
-- Quando TODOS os campos acima tiverem sido coletados com informação suficiente, sinalize como completo
-- Converse em português brasileiro, tom profissional mas acessível
-- Nunca repita perguntas sobre campos já coletados
+REGRAS FUNDAMENTAIS:
+- Se a documentação JÁ cobre claramente um campo, marque-o como coletado — NÃO pergunte sobre ele novamente
+- Ao iniciar (primeira mensagem com doc), liste brevemente o que já extraiu antes de perguntar o que falta
+- Faça perguntas APENAS sobre o que ainda está ausente, vago ou inconsistente
+- Faça UMA pergunta por vez, de forma natural e amigável
+- Se a resposta puder ter múltiplas interpretações, ofereça SEMPRE 3 opções objetivas e relevantes
+- Quando TODOS os 7 campos tiverem informação suficiente, sinalize como completo
+- Tom: profissional mas acessível, português brasileiro
+- Seja direto — não elogie cada resposta, não use frases genéricas
 
-FORMATO DE RESPOSTA — responda APENAS com JSON válido, sem texto adicional:
+FORMATO DE RESPOSTA — responda SOMENTE com JSON válido, sem texto adicional:
 
 Pergunta direta:
 {"type":"question","content":"sua pergunta","coletado":{...campos atualizados}}
@@ -56,7 +67,7 @@ Quando precisar de clareza (oferecer opções):
 {"type":"options","question":"sua pergunta de clarificação","options":["opção concreta 1","opção concreta 2","opção concreta 3"],"coletado":{...campos atualizados}}
 
 Quando todos os campos estiverem completos:
-{"type":"complete","content":"mensagem final resumindo o que foi coletado","coletado":{...todos os campos}}`;
+{"type":"complete","content":"mensagem final confirmando que a documentação está completa e pronta para envio","coletado":{...todos os campos}}`;
 }
 
 export async function runOrchestrator(
@@ -71,21 +82,32 @@ export async function runOrchestrator(
     ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
   ];
 
-  // Se não há histórico ainda, pede para iniciar a coleta
   if (history.length === 0) {
+    const temDoc = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
     messages.push({
       role: 'user',
-      content: '[SISTEMA] Inicie a conversa apresentando-se brevemente e fazendo a primeira pergunta.',
+      content: temDoc
+        ? '[SISTEMA] O usuário enviou a documentação acima. Analise-a e responda em JSON: atualize o campo "coletado" com tudo que conseguiu extrair do documento; no campo "content" escreva primeiro um resumo de 1-2 linhas do que já encontrou no documento (ex: "Já identifiquei que a automação faz X e economiza Y horas/mês."), depois faça a primeira pergunta sobre o campo mais importante que ainda está ausente ou vago. Se todos os campos estiverem cobertos, responda com type "complete".'
+        : '[SISTEMA] Inicie a conversa apresentando-se brevemente e fazendo a primeira pergunta para documentar o projeto.',
     });
   }
 
-  const raw = await llmChat(messages, { jsonMode: true, temperature: 0.5 });
+  log(`Chamando LLM — histórico: ${history.length} msgs, doc: ${ctx.doc_texto ? ctx.doc_texto.length + ' chars' : 'nenhum'}`);
+  let raw: string;
+  try {
+    raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
+    log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
+  } catch (llmErr) {
+    err('Falha na chamada LLM:', llmErr);
+    throw llmErr;
+  }
 
   let parsed: OrchestratorResult;
   try {
     parsed = JSON.parse(raw) as OrchestratorResult;
-  } catch {
-    // Fallback se o LLM não retornar JSON válido
+    log(`JSON parseado: type="${parsed.type}"`);
+  } catch (parseErr) {
+    err('Falha ao parsear JSON do LLM:', parseErr, '\nRaw:', raw.slice(0, 500));
     parsed = {
       type: 'question',
       content: raw,
@@ -93,7 +115,6 @@ export async function runOrchestrator(
     };
   }
 
-  // Garante que o campo coletado sempre existe
   if (!parsed.coletado) {
     parsed.coletado = coletado;
   }
@@ -103,7 +124,7 @@ export async function runOrchestrator(
 
 export function camposFaltando(coletado: DocumentacaoColetada): string[] {
   return (Object.keys(coletado) as (keyof DocumentacaoColetada)[]).filter(
-    (k) => coletado[k] === null || coletado[k] === undefined
+    (k) => k !== 'nome_projeto' && (coletado[k] === null || coletado[k] === undefined)
   );
 }
 

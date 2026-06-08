@@ -38,6 +38,9 @@ export type ProjetoContexto = {
   area: string | null;
   ferramenta: string;
   membros: string[];
+  nome_projeto: string;
+  data_criacao: string | null;
+  doc_texto: string | null;
 };
 
 export type DocumentacaoGerada = {

@@ -1,6 +1,9 @@
 // Server functions para o chat interativo
 // Conecta o frontend com o sistema de agentes
 
+const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${fn}]`, ...args);
+const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
+
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
@@ -8,16 +11,25 @@ import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
+import { extractTextFromBase64 } from '@/lib/extract-text.server';
 import type { ChatHistoryMessage, DocumentacaoColetada, ProjetoContexto } from '@/lib/agents/types';
 import { documentacaoVazia } from '@/lib/agents/types';
 
-// Busca contexto completo do projeto para passar ao orquestrador
+// Busca contexto completo do projeto + documentação enviada pelo usuário
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
-  const { data, error } = await supabaseAdmin
-    .from('projetos')
-    .select('responsavel_nome, responsavel_email, ferramenta, membros, areas(nome)')
-    .eq('id', projeto_id)
-    .single();
+  const [{ data, error }, { data: docMsg }] = await Promise.all([
+    supabaseAdmin
+      .from('projetos')
+      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, areas(nome)')
+      .eq('id', projeto_id)
+      .single(),
+    supabaseAdmin
+      .from('chat_messages')
+      .select('content')
+      .eq('projeto_id', projeto_id)
+      .eq('role', 'doc')
+      .maybeSingle(),
+  ]);
 
   if (error || !data) throw new Error('Projeto não encontrado.');
 
@@ -27,13 +39,14 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     ferramenta: data.ferramenta,
     area: (data.areas as { nome: string } | null)?.nome ?? null,
     membros: Array.isArray(data.membros) ? (data.membros as string[]) : [],
+    nome_projeto: (data.nome as string | null) ?? '',
+    data_criacao: null,
+    doc_texto: docMsg?.content ?? null,
   };
 }
 
 // Extrai o estado coletado mais recente a partir das mensagens do assistente
 function extrairUltimoColetado(messages: { role: string; content: string }[]): DocumentacaoColetada {
-  // O orquestrador embute o campo "coletado" em mensagens assistente como JSON
-  // Busca da mais recente para a mais antiga
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== 'assistant') continue;
@@ -47,6 +60,123 @@ function extrairUltimoColetado(messages: { role: string; content: string }[]): D
   return documentacaoVazia();
 }
 
+// ─── Iniciar submissão: cria projeto + extrai doc + inicia agente ─────────────
+
+export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        responsavel_nome: z.string().min(1).max(120),
+        responsavel_email: z.string().email().max(255),
+        area_id: z.string().uuid().optional(),
+        ferramenta: z.string().min(1).max(100),
+        membros: z.array(z.string()).default([]),
+        nome_projeto: z.string().min(1).max(200),
+        data_criacao: z.string(),
+        doc_base64: z.string().min(1),
+        doc_filename: z.string().min(1),
+      })
+      .parse(d)
+  )
+  .handler(async ({ data }) => {
+    log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
+    log('iniciarSubmissao', `Arquivo: ${data.doc_filename}, base64 length: ${data.doc_base64.length}`);
+
+    // 1. Cria o projeto no banco
+    log('iniciarSubmissao', 'Criando projeto no Supabase...');
+    const { data: projeto, error: projErr } = await supabaseAdmin
+      .from('projetos')
+      .insert({
+        responsavel_nome: data.responsavel_nome,
+        responsavel_email: data.responsavel_email,
+        area_id: data.area_id,
+        ferramenta: data.ferramenta,
+        membros: data.membros,
+        nome: data.nome_projeto,
+        status: 'rascunho',
+      })
+      .select()
+      .single();
+
+    if (projErr || !projeto) {
+      err('iniciarSubmissao', 'Falha ao criar projeto:', projErr);
+      throw new Error(`Falha ao criar projeto: ${projErr?.message ?? 'erro desconhecido'}`);
+    }
+    log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
+
+    // 2. Extrai texto da documentação
+    log('iniciarSubmissao', 'Extraindo texto do arquivo...');
+    let docTexto = '';
+    try {
+      docTexto = await extractTextFromBase64(data.doc_base64, data.doc_filename);
+      log('iniciarSubmissao', `Texto extraído: ${docTexto.length} chars`);
+    } catch (extractErr) {
+      err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
+      // Não falha — continua sem texto
+      docTexto = '';
+    }
+
+    // 3. Salva o texto da doc como mensagem especial (role='doc')
+    log('iniciarSubmissao', 'Salvando mensagem de contexto (doc) no chat...');
+    const { error: docMsgErr } = await supabaseAdmin.from('chat_messages').insert({
+      projeto_id: projeto.id,
+      role: 'doc',
+      content: docTexto || '(documento sem texto legível)',
+    });
+    if (docMsgErr) {
+      err('iniciarSubmissao', 'Falha ao salvar mensagem doc:', docMsgErr);
+    }
+
+    // 4. Monta contexto e coleta inicial (nome já preenchido)
+    const ctx: ProjetoContexto = {
+      responsavel_nome: data.responsavel_nome,
+      responsavel_email: data.responsavel_email,
+      area: null,
+      ferramenta: data.ferramenta,
+      membros: data.membros,
+      nome_projeto: data.nome_projeto,
+      data_criacao: data.data_criacao,
+      doc_texto: docTexto || null,
+    };
+
+    const coletadoInicial: DocumentacaoColetada = {
+      ...documentacaoVazia(),
+      nome_projeto: data.nome_projeto,
+    };
+
+    // 5. Roda orquestrador — primeira mensagem do agente
+    log('iniciarSubmissao', 'Rodando orquestrador (primeira mensagem)...');
+    let resultado;
+    try {
+      resultado = await runOrchestrator(ctx, [], coletadoInicial);
+      log('iniciarSubmissao', `Orquestrador retornou: type="${resultado.type}"`);
+    } catch (orchErr) {
+      err('iniciarSubmissao', 'Falha no orquestrador:', orchErr);
+      throw new Error(`Falha no agente de IA: ${orchErr instanceof Error ? orchErr.message : String(orchErr)}`);
+    }
+
+    // 6. Salva resposta do assistente
+    log('iniciarSubmissao', 'Salvando primeira resposta do assistente...');
+    await supabaseAdmin.from('chat_messages').insert({
+      projeto_id: projeto.id,
+      role: 'assistant',
+      content: JSON.stringify(resultado),
+      options: resultado.type === 'options' ? resultado.options : null,
+    });
+
+    log('iniciarSubmissao', 'Concluído com sucesso.');
+    return {
+      projeto_id: projeto.id,
+      response: {
+        type: resultado.type,
+        content: resultado.type === 'options' ? resultado.question : resultado.content,
+        options: resultado.type === 'options' ? resultado.options : null,
+        isComplete: resultado.type === 'complete',
+        coletado: resultado.coletado,
+      },
+    };
+  });
+
 // ─── Enviar mensagem no chat ───────────────────────────────────────────────────
 
 export const enviarMensagemFn = createServerFn({ method: 'POST' })
@@ -55,12 +185,14 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       .object({
         projeto_id: z.string().uuid(),
         content: z.string().min(1).max(4000),
-        selected_option: z.number().optional(), // 1-3 se clicou em opção
+        selected_option: z.number().optional(),
       })
       .parse(d)
   )
   .handler(async ({ data }) => {
-    // 1. Salva a mensagem do usuário
+    log('enviarMensagem', `projeto=${data.projeto_id}, mensagem="${data.content.slice(0, 80)}"`);
+
+    // 1. Salva mensagem do usuário
     await supabaseAdmin.from('chat_messages').insert({
       projeto_id: data.projeto_id,
       role: 'user',
@@ -68,16 +200,18 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       selected_option: data.selected_option ?? null,
     });
 
-    // 2. Busca histórico completo
-    const { data: msgs } = await supabaseAdmin
+    // 2. Busca histórico (exclui mensagens 'doc')
+    const { data: msgs, error: msgsErr } = await supabaseAdmin
       .from('chat_messages')
       .select('role, content')
       .eq('projeto_id', data.projeto_id)
+      .neq('role', 'doc')
       .order('created_at');
 
+    if (msgsErr) err('enviarMensagem', 'Erro ao buscar histórico:', msgsErr);
+    log('enviarMensagem', `Histórico: ${(msgs ?? []).length} mensagens`);
+
     const history: ChatHistoryMessage[] = (msgs ?? []).map((m) => {
-      // Mensagens do assistente armazenam JSON internamente;
-      // expõe só o campo "content" ou "question" para o histórico do LLM
       if (m.role === 'assistant') {
         try {
           const parsed = JSON.parse(m.content) as { content?: string; question?: string };
@@ -89,16 +223,19 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       return { role: 'user', content: m.content };
     });
 
-    // 3. Extrai o estado coletado até agora
+    // 3. Estado coletado e contexto
     const coletado = extrairUltimoColetado(msgs ?? []);
+    log('enviarMensagem', 'Campos já coletados:', Object.entries(coletado).filter(([, v]) => v !== null).map(([k]) => k));
 
-    // 4. Contexto do projeto (Step 1)
     const ctx = await getProjetoContexto(data.projeto_id);
+    log('enviarMensagem', `Contexto: projeto="${ctx.nome_projeto}", doc=${ctx.doc_texto ? ctx.doc_texto.length + ' chars' : 'nenhum'}`);
 
-    // 5. Roda o orquestrador
+    // 4. Roda orquestrador
+    log('enviarMensagem', 'Chamando orquestrador...');
     const resultado = await runOrchestrator(ctx, history, coletado);
+    log('enviarMensagem', `Orquestrador retornou: type="${resultado.type}"`);
 
-    // 6. Salva resposta do assistente (armazena JSON completo para manter estado)
+    // 5. Salva resposta do assistente
     const assistantContent = JSON.stringify(resultado);
     await supabaseAdmin.from('chat_messages').insert({
       projeto_id: data.projeto_id,
@@ -107,22 +244,29 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       options: resultado.type === 'options' ? resultado.options : null,
     });
 
-    // 7. Se completo, dispara o compilador de documentação
+    // 6. Se completo, compila documentação final
     if (resultado.type === 'complete') {
-      const doc = await compilarDocumentacao(ctx, resultado.coletado);
+      log('enviarMensagem', 'Chat completo — compilando documentação...');
+      try {
+        const doc = await compilarDocumentacao(ctx, resultado.coletado);
+        log('enviarMensagem', 'Documentação compilada, salvando...');
 
-      await supabaseAdmin.from('documentacao').upsert({
-        projeto_id: data.projeto_id,
-        conteudo: doc as never,
-      });
+        await supabaseAdmin.from('documentacao').upsert({
+          projeto_id: data.projeto_id,
+          conteudo: doc as never,
+        });
 
-      await supabaseAdmin
-        .from('projetos')
-        .update({ chat_completo: true })
-        .eq('id', data.projeto_id);
+        await supabaseAdmin
+          .from('projetos')
+          .update({ chat_completo: true })
+          .eq('id', data.projeto_id);
+
+        log('enviarMensagem', 'Documentação salva com sucesso.');
+      } catch (compErr) {
+        err('enviarMensagem', 'Falha ao compilar/salvar documentação:', compErr);
+      }
     }
 
-    // Retorna resposta formatada para o frontend
     return {
       type: resultado.type,
       content: resultado.type === 'options' ? resultado.question : resultado.content,
@@ -132,62 +276,13 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
     };
   });
 
-// ─── Iniciar chat (primeira mensagem do assistente) ───────────────────────────
-
-export const iniciarChatFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z.object({ projeto_id: z.string().uuid() }).parse(d)
-  )
-  .handler(async ({ data }) => {
-    // Verifica se já tem mensagens
-    const { data: existing } = await supabaseAdmin
-      .from('chat_messages')
-      .select('id')
-      .eq('projeto_id', data.projeto_id)
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      // Chat já iniciado, retorna histórico existente
-      const { data: msgs } = await supabaseAdmin
-        .from('chat_messages')
-        .select('*')
-        .eq('projeto_id', data.projeto_id)
-        .order('created_at');
-      return { isNew: false, messages: msgs ?? [] };
-    }
-
-    // Chat novo — roda orquestrador para gerar mensagem inicial
-    const ctx = await getProjetoContexto(data.projeto_id);
-    const resultado = await runOrchestrator(ctx, [], documentacaoVazia());
-
-    const assistantContent = JSON.stringify(resultado);
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: data.projeto_id,
-      role: 'assistant',
-      content: assistantContent,
-      options: resultado.type === 'options' ? resultado.options : null,
-    });
-
-    return {
-      isNew: true,
-      messages: [
-        {
-          role: 'assistant',
-          content: resultado.type === 'options' ? resultado.question : resultado.content,
-          options: resultado.type === 'options' ? resultado.options : null,
-        },
-      ],
-    };
-  });
-
-// ─── Submeter projeto para validação (após chat completo) ─────────────────────
+// ─── Submeter projeto para validação ─────────────────────────────────────────
 
 export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
     z.object({ projeto_id: z.string().uuid() }).parse(d)
   )
   .handler(async ({ data }) => {
-    // Verifica se documentação foi gerada
     const { data: doc } = await supabaseAdmin
       .from('documentacao')
       .select('conteudo')
@@ -196,7 +291,6 @@ export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
 
     if (!doc) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
-    // Atualiza status
     await supabaseAdmin
       .from('projetos')
       .update({ status: 'em_validacao', submitted_at: new Date().toISOString() })
@@ -205,14 +299,13 @@ export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
     return { ok: true };
   });
 
-// ─── Validar projeto (chamado pelo admin ou processo automático) ──────────────
+// ─── Validar projeto (chamado pelo admin) ─────────────────────────────────────
 
 export const validarProjetoFn = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) =>
     z.object({ projeto_id: z.string().uuid() }).parse(d)
   )
   .handler(async ({ data }) => {
-    // Busca documentação
     const { data: docRow } = await supabaseAdmin
       .from('documentacao')
       .select('conteudo')
@@ -222,11 +315,8 @@ export const validarProjetoFn = createServerFn({ method: 'POST' })
     if (!docRow) throw new Error('Documentação não encontrada.');
 
     const doc = docRow.conteudo as Parameters<typeof validarDocumentacao>[0];
-
-    // Roda agente validador
     const resultado = await validarDocumentacao(doc);
 
-    // Salva validação
     await supabaseAdmin.from('validacoes').insert({
       projeto_id: data.projeto_id,
       resultado: resultado.resultado,
@@ -234,24 +324,18 @@ export const validarProjetoFn = createServerFn({ method: 'POST' })
       criterios: resultado.criterios as never,
     });
 
-    // Atualiza status do projeto
     const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
     await supabaseAdmin
       .from('projetos')
-      .update({
-        status: novoStatus,
-        validated_at: new Date().toISOString(),
-      })
+      .update({ status: novoStatus, validated_at: new Date().toISOString() })
       .eq('id', data.projeto_id);
 
-    // Dispara email
     try {
       if (resultado.resultado === 'aprovado') {
         await enviarEmailAprovacao(doc, resultado);
       } else {
         await enviarEmailRejeicao(doc, resultado);
       }
-
       await supabaseAdmin
         .from('validacoes')
         .update({ email_enviado: true })
