@@ -2,10 +2,14 @@
 // Suporta: TXT, MD, PDF, DOCX, DOC, JSON e arquivos de código (TS, JS, PY, etc.)
 
 const MAX_CHARS_PER_FILE = 150_000;
-const MAX_CHARS_TOTAL = 600_000;
+const MAX_CHARS_TOTAL = 200_000;
+const CHARS_PER_TOKEN = 4; // heurística: ~4 chars por token
 
 const log = (...args: unknown[]) => console.log('[extract-text]', ...args);
 const err = (...args: unknown[]) => console.error('[extract-text]', ...args);
+
+const estTokens = (chars: number) => Math.round(chars / CHARS_PER_TOKEN);
+const ext = (filename: string) => (filename.split('.').pop() ?? '?').toLowerCase();
 
 // Extensões que são lidas diretamente como UTF-8
 const TEXT_EXTS = new Set([
@@ -118,13 +122,89 @@ export async function extractTextFromMultipleFiles(
   const parts = comConteudo.map((r) => `=== ${r.filename} ===\n\n${r.text}`);
 
   let combined = parts.join('\n\n---\n\n');
+  const charsAntesTrunc = combined.length;
+  let truncado = false;
 
   if (combined.length > MAX_CHARS_TOTAL) {
     combined = combined.slice(0, MAX_CHARS_TOTAL) + '\n\n[... conteúdo total truncado]';
-    log(`Total truncado para ${MAX_CHARS_TOTAL} chars`);
+    truncado = true;
+    log(`⚠️ Total truncado de ${charsAntesTrunc} para ${MAX_CHARS_TOTAL} chars (perdidos ${charsAntesTrunc - MAX_CHARS_TOTAL} chars)`);
   }
 
-  const tokensEstimados = Math.round(combined.length / 4);
+  logAnaliseEficiencia(comConteudo, charsAntesTrunc, combined.length, truncado, files.length);
+
+  const tokensEstimados = estTokens(combined.length);
   log(`Total combinado: ${combined.length} chars (~${tokensEstimados} tokens) de ${parts.length}/${files.length} arquivo(s) com conteúdo`);
   return combined;
+}
+
+/**
+ * Log de análise interna pós-extração — ajuda a entender onde os tokens são
+ * gastos e identificar oportunidades de eficiência (arquivos dominantes,
+ * tipos que mais consomem, taxa de truncamento).
+ */
+function logAnaliseEficiencia(
+  comConteudo: { filename: string; text: string }[],
+  charsAntesTrunc: number,
+  charsFinais: number,
+  truncado: boolean,
+  totalArquivos: number,
+): void {
+  if (comConteudo.length === 0) {
+    log('📊 ANÁLISE: nenhum arquivo com conteúdo extraível.');
+    return;
+  }
+
+  const tokensTotais = estTokens(charsAntesTrunc) || 1;
+
+  // Ranking por consumo de chars (maiores primeiro)
+  const ranking = comConteudo
+    .map((r) => ({
+      arquivo: r.filename,
+      ext: ext(r.filename),
+      chars: r.text.length,
+      tokens: estTokens(r.text.length),
+      pctTokens: `${((estTokens(r.text.length) / tokensTotais) * 100).toFixed(1)}%`,
+    }))
+    .sort((a, b) => b.chars - a.chars);
+
+  // Agregação por extensão
+  const porExtMap = new Map<string, { chars: number; arquivos: number }>();
+  for (const r of comConteudo) {
+    const e = ext(r.filename);
+    const cur = porExtMap.get(e) ?? { chars: 0, arquivos: 0 };
+    porExtMap.set(e, { chars: cur.chars + r.text.length, arquivos: cur.arquivos + 1 });
+  }
+  const porExt = [...porExtMap.entries()]
+    .map(([e, v]) => ({
+      ext: e,
+      arquivos: v.arquivos,
+      chars: v.chars,
+      tokens: estTokens(v.chars),
+      pctTokens: `${((estTokens(v.chars) / tokensTotais) * 100).toFixed(1)}%`,
+    }))
+    .sort((a, b) => b.chars - a.chars);
+
+  console.log('\n┌─── 📊 ANÁLISE DE EFICIÊNCIA (pós-extração) ───────────────────');
+  console.log(`│ Arquivos com conteúdo: ${comConteudo.length}/${totalArquivos}`);
+  console.log(`│ Chars extraídos: ${charsAntesTrunc} (~${estTokens(charsAntesTrunc)} tokens)`);
+  console.log(`│ Chars enviados à IA: ${charsFinais} (~${estTokens(charsFinais)} tokens)`);
+  console.log(`│ Truncado: ${truncado ? `SIM — descartados ~${estTokens(charsAntesTrunc - charsFinais)} tokens` : 'não'}`);
+  console.log(`│ Limite total: ${MAX_CHARS_TOTAL} chars (~${estTokens(MAX_CHARS_TOTAL)} tokens)`);
+  console.log('│');
+  console.log('│ Top arquivos por consumo de tokens:');
+  ranking.slice(0, 10).forEach((r, i) => {
+    console.log(`│   ${i + 1}. [${r.pctTokens.padStart(5)}] ~${r.tokens} tok — ${r.arquivo} (.${r.ext})`);
+  });
+  if (ranking.length > 10) {
+    const resto = ranking.slice(10);
+    const restoTokens = resto.reduce((acc, r) => acc + r.tokens, 0);
+    console.log(`│   ...+${resto.length} arquivo(s) somando ~${restoTokens} tokens`);
+  }
+  console.log('│');
+  console.log('│ Consumo por tipo de arquivo:');
+  porExt.forEach((r) => {
+    console.log(`│   .${r.ext.padEnd(5)} ${String(r.arquivos).padStart(3)} arq · ~${String(r.tokens).padStart(6)} tok · ${r.pctTokens}`);
+  });
+  console.log('└───────────────────────────────────────────────────────────────\n');
 }
