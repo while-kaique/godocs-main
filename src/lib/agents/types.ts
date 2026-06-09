@@ -26,22 +26,43 @@ export const documentacaoVazia = (): DocumentacaoColetada => ({
   atencao: null,
 });
 
+// ─── Tabela de cargos (source of truth) ────────────────────────────────────
+
+export const CARGOS = [
+  { label: 'Estagiário', valor_hora: 10.78 },
+  { label: 'Assistente', valor_hora: 13.94 },
+  { label: 'Analista Júnior', valor_hora: 21.29 },
+  { label: 'Analista Pleno', valor_hora: 29.90 },
+  { label: 'Analista Sênior', valor_hora: 33.10 },
+  { label: 'Coordenador / Especialista', valor_hora: 55.15 },
+] as const;
+
+export type CargoLabel = typeof CARGOS[number]['label'];
+
 // ─── Agente 2: Memorial de saving ───────────────────────────────────────────
 
 export type SavingColetado = {
+  cargo: string | null;
+  horas_antes: number | null;
+  horas_depois: number | null;
   economia_horas_mes: number | null;
   valor_hora: number | null;
   economia_reais_mes: number | null;
   tipo_saving: 'mensal' | 'pontual' | null;
   memorial_calculo: string | null;
+  valor_ganho_mensal: number | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
+  cargo: null,
+  horas_antes: null,
+  horas_depois: null,
   economia_horas_mes: null,
   valor_hora: null,
   economia_reais_mes: null,
   tipo_saving: null,
   memorial_calculo: null,
+  valor_ganho_mensal: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────

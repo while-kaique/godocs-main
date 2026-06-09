@@ -74,6 +74,13 @@ export interface ChatMessage {
   fase?: ChatFase;
 }
 
+export interface SavingFormData {
+  cargo: string;
+  horasAntes: string;
+  horasDepois: string;
+  tipoSaving: 'mensal' | 'pontual' | '';
+}
+
 export function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

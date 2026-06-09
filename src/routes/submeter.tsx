@@ -2,12 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn } from "@/lib/chat.functions";
+import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn, iniciarSavingFn } from "@/lib/chat.functions";
 
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage } from "@/lib/submeter/constants";
+import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
@@ -55,6 +55,8 @@ function SubmeterPage() {
   const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
   const [approvedSavingPreview, setApprovedSavingPreview] = useState<string | null>(null);
   const [submittingProject, setSubmittingProject] = useState(false);
+  const [showSavingForm, setShowSavingForm] = useState(false);
+  const [savingFormLoading, setSavingFormLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const today = useMemo(() => {
@@ -304,33 +306,10 @@ function SubmeterPage() {
 
         setShowTransition(true);
         setChatFase(newFase);
-        setTimeout(async () => {
+        setTimeout(() => {
           setShowTransition(false);
           setChatMessages([]);
-          setChatLoading(true);
-          try {
-            const savingResult = await enviarMensagemFn({
-              data: {
-                projeto_id: projetoId!,
-                content: "[SISTEMA] Iniciar fase saving",
-              },
-            });
-            const savingMsg: ChatMessage = {
-              role: "assistant",
-              content: savingResult.content,
-              options: savingResult.options ?? undefined,
-              isComplete: savingResult.isComplete,
-              isPreview: savingResult.isPreview,
-              fase: savingResult.fase ?? "saving",
-            };
-            setChatMessages([savingMsg]);
-            if (savingResult.fase) setChatFase(savingResult.fase);
-          } catch (e) {
-            console.error('[submeter] falha ao iniciar saving:', e);
-            toast.error("Erro ao iniciar análise de impacto. Tente enviar uma mensagem.");
-          } finally {
-            setChatLoading(false);
-          }
+          setShowSavingForm(true);
         }, 3000);
       } else {
         setChatMessages((prev) => [...prev, assistantMsg]);
@@ -352,6 +331,40 @@ function SubmeterPage() {
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
+    }
+  }
+
+  /* ── Saving form: envia dados determinísticos e inicia chat ── */
+  async function handleSavingFormSubmit(formData: SavingFormData) {
+    if (!projetoId) return;
+    setSavingFormLoading(true);
+    try {
+      const result = await iniciarSavingFn({
+        data: {
+          projeto_id: projetoId,
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          cargo: formData.cargo || undefined,
+          horas_antes: formData.horasAntes ? parseFloat(formData.horasAntes) : undefined,
+          horas_depois: formData.horasDepois ? parseFloat(formData.horasDepois) : undefined,
+        },
+      });
+      setShowSavingForm(false);
+      const savingMsg: ChatMessage = {
+        role: "assistant",
+        content: result.content,
+        options: result.options ?? undefined,
+        isComplete: result.isComplete,
+        isPreview: result.isPreview,
+        fase: result.fase ?? "saving",
+      };
+      setChatMessages([savingMsg]);
+      if (result.fase) setChatFase(result.fase);
+    } catch (e) {
+      console.error("[submeter] falha ao iniciar saving:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Erro ao iniciar análise de impacto: ${msg}`);
+    } finally {
+      setSavingFormLoading(false);
     }
   }
 
@@ -554,6 +567,10 @@ function SubmeterPage() {
                   showTransition={showTransition}
                   approvedDocPreview={approvedDocPreview}
                   approvedSavingPreview={approvedSavingPreview}
+                  tipoProjeto={form.tipoProjeto}
+                  showSavingForm={showSavingForm}
+                  onSavingFormSubmit={handleSavingFormSubmit}
+                  savingFormLoading={savingFormLoading}
                 />
               </StepAnimation>
             )}

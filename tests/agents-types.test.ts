@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   documentacaoVazia,
   savingVazio,
+  CARGOS,
 } from '@/lib/agents/types';
 import type {
   ChatFase,
@@ -35,13 +36,14 @@ describe('documentacaoVazia', () => {
 });
 
 describe('savingVazio', () => {
-  it('retorna todos os 5 campos como null', () => {
+  it('retorna todos os 9 campos como null', () => {
     const saving = savingVazio();
     const campos: (keyof SavingColetado)[] = [
+      'cargo', 'horas_antes', 'horas_depois',
       'economia_horas_mes', 'valor_hora', 'economia_reais_mes',
-      'tipo_saving', 'memorial_calculo',
+      'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
     ];
-    expect(Object.keys(saving)).toHaveLength(5);
+    expect(Object.keys(saving)).toHaveLength(9);
     for (const campo of campos) {
       expect(saving[campo]).toBeNull();
     }
@@ -119,11 +121,15 @@ describe('OrchestratorResult', () => {
 
   it('tipo complete com saving preenchido', () => {
     const saving: SavingColetado = {
+      cargo: 'Estagiário',
+      horas_antes: 60,
+      horas_depois: 1.7,
       economia_horas_mes: 58.3,
       valor_hora: 10.78,
-      economia_reais_mes: 628.37,
+      economia_reais_mes: 628.47,
       tipo_saving: 'mensal',
       memorial_calculo: 'Detalhamento...',
+      valor_ganho_mensal: null,
     };
     const result: OrchestratorResult = {
       type: 'complete',
@@ -133,7 +139,28 @@ describe('OrchestratorResult', () => {
       saving,
     };
     expect(result.saving.economia_horas_mes).toBe(58.3);
-    expect(result.saving.economia_reais_mes).toBe(628.37);
+    expect(result.saving.cargo).toBe('Estagiário');
     expect(result.saving.tipo_saving).toBe('mensal');
+  });
+});
+
+describe('CARGOS', () => {
+  it('contém 6 cargos com label e valor_hora', () => {
+    expect(CARGOS).toHaveLength(6);
+    for (const cargo of CARGOS) {
+      expect(cargo).toHaveProperty('label');
+      expect(cargo).toHaveProperty('valor_hora');
+      expect(typeof cargo.valor_hora).toBe('number');
+    }
+  });
+
+  it('Estagiário custa R$ 10,78/h', () => {
+    const estagiario = CARGOS.find(c => c.label === 'Estagiário');
+    expect(estagiario?.valor_hora).toBe(10.78);
+  });
+
+  it('Coordenador custa R$ 55,15/h', () => {
+    const coord = CARGOS.find(c => c.label === 'Coordenador / Especialista');
+    expect(coord?.valor_hora).toBe(55.15);
   });
 });

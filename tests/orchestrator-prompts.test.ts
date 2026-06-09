@@ -118,36 +118,44 @@ describe('Prompt fase doc_preview', () => {
   });
 });
 
-describe('Prompt fase saving', () => {
-  it('inclui os 5 campos do saving', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), 'Resumo do projeto');
+describe('Prompt fase saving (tipo saving)', () => {
+  const savingPreenchido = {
+    ...savingVazio(),
+    cargo: 'Analista Pleno' as const,
+    horas_antes: 40,
+    horas_depois: 2,
+    economia_horas_mes: 38,
+    valor_hora: 29.90,
+    economia_reais_mes: 1136.20,
+    tipo_saving: 'mensal' as const,
+  };
+
+  it('inclui dados determinísticos pré-preenchidos', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('economia_horas_mes');
-    expect(system).toContain('valor_hora');
-    expect(system).toContain('economia_reais_mes');
-    expect(system).toContain('tipo_saving');
-    expect(system).toContain('memorial_calculo');
+    expect(system).toContain('Analista Pleno');
+    expect(system).toContain('40h/mês');
+    expect(system).toContain('2h/mês');
+    expect(system).toContain('VALIDAR');
   });
 
-  it('inclui tabela de referência de cargos', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), 'Resumo');
+  it('instrui IA a NÃO perguntar sobre campos já definidos', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('Estagiário');
-    expect(system).toContain('10,78');
-    expect(system).toContain('Coordenador');
-    expect(system).toContain('55,15');
+    expect(system).toContain('NÃO pergunte sobre eles');
+    expect(system).toContain('NÃO MENCIONE valores em R$');
   });
 
   it('inclui regras de validação de horas', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), 'Resumo');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('VALIDAÇÃO DE HORAS');
-    expect(system).toContain('NUNCA aceite um número de horas');
-    expect(system).toContain('JUSTIFICAR');
+    expect(system).toContain('NUNCA aceite as horas');
+    expect(system).toContain('detalhar a rotina manual');
   });
 
   it('inclui regras anti-extrapolação', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), 'Resumo');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('ANTI-EXTRAPOLAÇÃO');
     expect(system).toContain('ganho REAL');
@@ -155,16 +163,46 @@ describe('Prompt fase saving', () => {
 
   it('inclui resumo do projeto como contexto', async () => {
     const resumo = 'O projeto automatiza o cadastro de embaixadores via Typebot.';
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), resumo);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, resumo, 'saving');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain(resumo);
   });
 
-  it('mensagem de sistema pede apresentação + pergunta', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingVazio(), 'Resumo');
+  it('mensagem de sistema inclui dados do formulário', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
     const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
     expect(userMsg).toContain('[SISTEMA]');
-    expect(userMsg).toContain('pergunta');
+    expect(userMsg).toContain('Analista Pleno');
+    expect(userMsg).toContain('40h/mês');
+  });
+});
+
+describe('Prompt fase saving (tipo receita_incremental)', () => {
+  const savingIncremental = {
+    ...savingVazio(),
+    tipo_saving: 'mensal' as const,
+  };
+
+  it('instrui IA a coletar valor de receita ganho', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('receita incremental');
+    expect(system).toContain('valor_ganho_mensal');
+    expect(system).toContain('memorial_calculo');
+  });
+
+  it('não menciona cargo ou horas', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).not.toContain('Horas gastas antes');
+    expect(system).not.toContain('Cargo de quem executava');
+  });
+
+  it('mensagem de sistema menciona receita incremental', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
+    expect(userMsg).toContain('[SISTEMA]');
+    expect(userMsg).toContain('receita incremental');
   });
 });
 

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { ChatFase, ChatMessage } from "./constants";
+import { CARGOS } from "@/lib/agents/types";
+import type { ChatFase, ChatMessage, SavingFormData } from "./constants";
 
 /* ──────────────────────────────────────────────
    Simple Markdown Renderer
@@ -499,6 +500,260 @@ function FinalReview({
 }
 
 /* ──────────────────────────────────────────────
+   Saving Form (deterministic inputs)
+   ────────────────────────────────────────────── */
+
+function SavingForm({
+  tipoProjeto,
+  onSubmit,
+  loading,
+}: {
+  tipoProjeto: "saving" | "receita_incremental";
+  onSubmit: (data: SavingFormData) => void;
+  loading: boolean;
+}) {
+  const [cargo, setCargo] = useState("");
+  const [horasAntes, setHorasAntes] = useState("");
+  const [horasDepois, setHorasDepois] = useState("");
+  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const isSaving = tipoProjeto === "saving";
+  const icon = isSaving ? "💰" : "📈";
+  const title = "Dados para Análise de Impacto";
+
+  function validate(): boolean {
+    const errs: Record<string, string> = {};
+    if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
+    if (isSaving) {
+      if (!cargo) errs.cargo = "Selecione o cargo";
+      if (!horasAntes || parseFloat(horasAntes) <= 0) errs.horasAntes = "Informe as horas";
+      if (horasDepois === "" || parseFloat(horasDepois) < 0) errs.horasDepois = "Informe as horas";
+      if (horasAntes && horasDepois && parseFloat(horasDepois) >= parseFloat(horasAntes)) {
+        errs.horasDepois = "Deve ser menor que as horas antes";
+      }
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  function handleSubmit() {
+    if (!validate()) return;
+    onSubmit({ cargo, horasAntes, horasDepois, tipoSaving: tipoSaving as "mensal" | "pontual" });
+  }
+
+  return (
+    <div
+      className="px-8 py-6"
+      style={{ animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both" }}
+    >
+      {/* Header */}
+      <div className="mb-5 flex items-center gap-2.5">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-full text-base"
+          style={{ background: "rgba(215,219,0,0.1)", border: "1.5px solid rgba(215,219,0,0.2)" }}
+        >
+          {icon}
+        </div>
+        <div>
+          <div className="text-[14px] font-bold" style={{ color: "#6b6e00" }}>{title}</div>
+          <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
+            {isSaving
+              ? "Informe os dados abaixo para iniciar a análise de economia"
+              : "Selecione a frequência para iniciar a análise de receita"}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="rounded-xl p-5 space-y-4"
+        style={{
+          background: "rgba(215,219,0,0.03)",
+          border: "1.5px solid rgba(215,219,0,0.15)",
+        }}
+      >
+        {/* Tipo saving: Mensal / Pontual toggle */}
+        <div>
+          <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+            Frequência do {isSaving ? "saving" : "ganho"} <span style={{ color: "#e53e3e" }}>*</span>
+          </label>
+          <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+            {(["mensal", "pontual"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { setTipoSaving(opt); setErrors(e => { const n = { ...e }; delete n.tipoSaving; return n; }); }}
+                className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                style={{
+                  background: tipoSaving === opt ? "#6b6e00" : "transparent",
+                  color: tipoSaving === opt ? "#fff" : "#6b6e00",
+                  borderRight: opt === "mensal" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                }}
+              >
+                {opt === "mensal" ? "📅 Mensal" : "⚡ Pontual"}
+              </button>
+            ))}
+          </div>
+          {errors.tipoSaving && (
+            <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+              {errors.tipoSaving}
+            </div>
+          )}
+        </div>
+
+        {/* Campos de saving */}
+        {isSaving && (
+          <>
+            {/* Cargo */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                Cargo de quem executava <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <select
+                value={cargo}
+                onChange={(e) => { setCargo(e.target.value); setErrors(er => { const n = { ...er }; delete n.cargo; return n; }); }}
+                className="go-select w-full"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--go-radius-md)",
+                  border: errors.cargo ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                  background: "var(--go-white)",
+                  fontSize: 13,
+                  color: cargo ? "var(--go-text-primary)" : "#8b8b9a",
+                }}
+              >
+                <option value="">Selecione o cargo...</option>
+                {CARGOS.map((c) => (
+                  <option key={c.label} value={c.label}>{c.label}</option>
+                ))}
+              </select>
+              {errors.cargo && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.cargo}
+                </div>
+              )}
+            </div>
+
+            {/* Horas antes / depois */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  Horas/mês antes <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="Ex: 40"
+                  value={horasAntes}
+                  onChange={(e) => { setHorasAntes(e.target.value); setErrors(er => { const n = { ...er }; delete n.horasAntes; delete n.horasDepois; return n; }); }}
+                  className="go-input w-full"
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--go-radius-md)",
+                    border: errors.horasAntes ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                    background: "var(--go-white)",
+                    fontSize: 13,
+                  }}
+                />
+                {errors.horasAntes && (
+                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                    {errors.horasAntes}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  Horas/mês depois <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="Ex: 2"
+                  value={horasDepois}
+                  onChange={(e) => { setHorasDepois(e.target.value); setErrors(er => { const n = { ...er }; delete n.horasDepois; return n; }); }}
+                  className="go-input w-full"
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: "var(--go-radius-md)",
+                    border: errors.horasDepois ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                    background: "var(--go-white)",
+                    fontSize: 13,
+                  }}
+                />
+                {errors.horasDepois && (
+                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                    {errors.horasDepois}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Resumo visual de economia de horas */}
+            {horasAntes && horasDepois && parseFloat(horasDepois) < parseFloat(horasAntes) && (
+              <div
+                className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[12px] font-semibold"
+                style={{
+                  background: "rgba(22,163,74,0.06)",
+                  border: "1px solid rgba(22,163,74,0.12)",
+                  color: "#16a34a",
+                  animation: "go-step-in 0.3s ease",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+                Economia estimada: {(parseFloat(horasAntes) - parseFloat(horasDepois)).toFixed(1)}h/mês
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Botão iniciar */}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-bold transition-all"
+          style={{
+            background: "var(--go-lime)",
+            color: "var(--go-blue)",
+            border: "none",
+            boxShadow: "0 2px 8px rgba(215, 219, 0, 0.2)",
+            marginTop: 4,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.boxShadow = "0 4px 16px rgba(215, 219, 0, 0.35)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(215, 219, 0, 0.2)";
+          }}
+        >
+          {loading ? (
+            <>
+              <span>Analisando...</span>
+              <div className="go-spinner" />
+            </>
+          ) : (
+            <>
+              <span>Iniciar análise</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
    Step 3: Chat com o Agente
    ────────────────────────────────────────────── */
 
@@ -516,6 +771,10 @@ export function Step3Chat({
   showTransition,
   approvedDocPreview,
   approvedSavingPreview,
+  tipoProjeto,
+  showSavingForm,
+  onSavingFormSubmit,
+  savingFormLoading,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -530,6 +789,10 @@ export function Step3Chat({
   showTransition: boolean;
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
+  tipoProjeto?: string;
+  showSavingForm?: boolean;
+  onSavingFormSubmit?: (data: SavingFormData) => void;
+  savingFormLoading?: boolean;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview" || fase === "completo";
@@ -685,8 +948,17 @@ export function Step3Chat({
         </div>
       )}
 
+      {/* Formulário determinístico saving */}
+      {!showTransition && showSavingForm && onSavingFormSubmit && tipoProjeto && (
+        <SavingForm
+          tipoProjeto={tipoProjeto as "saving" | "receita_incremental"}
+          onSubmit={onSavingFormSubmit}
+          loading={savingFormLoading ?? false}
+        />
+      )}
+
       {/* Mensagens */}
-      {!showTransition && (<div
+      {!showTransition && !showSavingForm && (<div
         className="flex-1 overflow-y-auto px-8 py-5 space-y-4 transition-colors duration-500"
         style={{ maxHeight: 420, background: isSavingFase ? "rgba(215,219,0,0.03)" : "transparent" }}
       >
@@ -770,7 +1042,7 @@ export function Step3Chat({
       )}
 
       {/* Options */}
-      {!showTransition && hasOptions && lastMsg.options && (
+      {!showTransition && !showSavingForm && hasOptions && lastMsg.options && (
         <div
           className="px-8 pb-3 flex flex-wrap gap-2"
           style={{ borderTop: `1px solid ${accentBorder}` }}
@@ -801,7 +1073,7 @@ export function Step3Chat({
       )}
 
       {/* Revisão final + envio */}
-      {!showTransition && isComplete && (
+      {!showTransition && !showSavingForm && isComplete && (
         <FinalReview
           approvedDocPreview={approvedDocPreview}
           approvedSavingPreview={approvedSavingPreview}
@@ -811,7 +1083,7 @@ export function Step3Chat({
       )}
 
       {/* Input de mensagem */}
-      {!showTransition && !isComplete && (
+      {!showTransition && !showSavingForm && !isComplete && (
         <div
           className="px-8 py-4"
           style={{ borderTop: `1px solid ${accentBorder}` }}
