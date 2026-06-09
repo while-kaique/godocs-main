@@ -389,9 +389,15 @@ export async function runOrchestrator(
       saving,
     } as OrchestratorResult;
 
-    // Aplica transição de fase mesmo no fallback
+    // Aplica transição de fase mesmo no fallback (espelha o caminho normal)
     if (recoveredType === 'preview' && (fase === 'doc' || fase === 'saving')) {
       fallbackResult.fase = fase === 'doc' ? 'doc_preview' : 'saving_preview';
+    } else if (recoveredType === 'complete') {
+      if (fase === 'doc_preview') {
+        fallbackResult.fase = 'saving';
+      } else if (fase === 'saving_preview') {
+        fallbackResult.fase = 'completo';
+      }
     }
 
     return fallbackResult;

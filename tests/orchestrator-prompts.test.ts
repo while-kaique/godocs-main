@@ -246,4 +246,23 @@ describe('Transições de fase', () => {
     const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'algo' }], 'doc');
     expect(result.fase).toBe('doc');
   });
+
+  // Regressão: JSON truncado (limite de tokens) na aprovação não pode travar a transição.
+  // O resumo longo + echo de `coletado` estourava o limite, caía no fallback de recuperação
+  // e a fase ficava presa em doc_preview (resumo aparecia como mensagem solta no chat).
+  it('doc_preview → saving mesmo com JSON truncado (type=complete recuperado)', async () => {
+    const truncado = '{"type":"complete","content":"Resumo factual do projeto que ficou cortado no meio';
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview');
+    expect(result.type).toBe('complete');
+    expect(result.fase).toBe('saving');
+  });
+
+  it('saving_preview → completo mesmo com JSON truncado (type=complete recuperado)', async () => {
+    const truncado = '{"type":"complete","content":"Memorial aprovado e cortado no meio';
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview');
+    expect(result.type).toBe('complete');
+    expect(result.fase).toBe('completo');
+  });
 });
