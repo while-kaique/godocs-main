@@ -88,10 +88,13 @@ async function callOpenAI(
 }
 
 /**
- * Se o erro 400 for "unsupported_parameter", remove o parâmetro do body e
- * devolve seu nome (para retry). Cobre temperature/max_completion_tokens etc.
+ * Se o erro 400 indicar parâmetro ou valor não suportado pelo modelo, remove o
+ * parâmetro do body (caindo no default do modelo) e devolve seu nome para retry.
+ * Cobre:
+ *  - unsupported_parameter: ex. max_tokens não aceito (gpt-5+)
+ *  - unsupported_value: ex. temperature só aceita o default (gpt-5.5)
  */
-function dropUnsupportedParam(body: Record<string, unknown>, errText: string): string | null {
+export function dropUnsupportedParam(body: Record<string, unknown>, errText: string): string | null {
   let parsed: { error?: { code?: string; param?: string; message?: string } };
   try {
     parsed = JSON.parse(errText);
@@ -100,8 +103,12 @@ function dropUnsupportedParam(body: Record<string, unknown>, errText: string): s
   }
   const err = parsed.error;
   if (!err) return null;
+  const msg = err.message ?? '';
   const isUnsupported =
-    err.code === 'unsupported_parameter' || /unsupported parameter/i.test(err.message ?? '');
+    err.code === 'unsupported_parameter' ||
+    err.code === 'unsupported_value' ||
+    /unsupported (parameter|value)/i.test(msg) ||
+    /only the default .* (value )?is supported/i.test(msg);
   const param = err.param;
   if (!isUnsupported || !param || !(param in body)) return null;
   delete body[param];
