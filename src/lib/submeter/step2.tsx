@@ -72,6 +72,7 @@ function isTextFile(filename: string): boolean {
 const IGNORED_DIRS = new Set([
   "node_modules", ".git", ".svn", ".hg",
   "dist", "build", "out", ".next", ".nuxt", ".output", ".vercel",
+  ".wrangler", ".netlify",
   "coverage", ".cache", ".vite", ".turbo", ".parcel-cache",
   "venv", ".venv", "env", "__pycache__", ".pytest_cache", ".mypy_cache",
   "vendor", "target", "bin", "obj", ".idea", ".vscode", ".gradle",
