@@ -16,6 +16,25 @@ import type {
 } from './types';
 import { documentacaoVazia, savingVazio } from './types';
 
+// Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
+// **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
+const FORMATACAO_PREVIEW = `FORMATAÇÃO DO PREVIEW (markdown — siga à risca):
+- Cada seção começa com "## Título" (ex: "## O que faz").
+- NÃO escreva blocos gigantes corridos. Quebre o conteúdo em parágrafos curtos e listas.
+- Use "\\n" entre parágrafos e entre itens de lista (quebras de linha reais).
+- **O que faz**: 2 a 4 frases curtas e bem pontuadas, em parágrafo (não em uma única linha enorme).
+- **Execução**, **Dependências**, **Configurar antes**, **Atenção**: use LISTA com "- " — um item por linha, cada um uma frase objetiva.
+- **Fluxo**: use LISTA NUMERADA ("1. ", "2. " ...), uma etapa por linha. Condições (IF/ELSE) viram sub-itens "  - se X: ...".
+- Destaque termos técnicos com **negrito**: nomes de APIs, webhooks, variáveis de ambiente, schedules, tabelas.
+- Pontuação correta (ponto final em cada frase) e acentuação do português.
+- NÃO repita o título do projeto dentro das seções; o "# Nome" já vai no topo.
+
+Exemplo de uma seção bem formatada:
+## Dependências
+- **Supabase** — banco e auth (env: \`SUPABASE_URL\`, \`SUPABASE_SERVICE_ROLE_KEY\`).
+- **OpenAI / Anthropic** — LLM (env: \`LLM_API_KEY\`, \`LLM_MODEL\`).
+- **Google Chat** — notificação via webhook.`;
+
 // ─── System prompts por fase ────────────────────────────────────────────────
 
 function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
@@ -70,6 +89,10 @@ REGRAS:
 - Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
 
+Ao gerar o preview, reorganize e formate o conteúdo dos campos (mesmo que tenham sido extraídos como texto corrido) seguindo o guia abaixo — NÃO cole o texto cru.
+
+${FORMATACAO_PREVIEW}
+
 FORMATO DE RESPOSTA — responda APENAS com JSON válido, sem texto adicional:
 
 Pergunta direta:
@@ -79,7 +102,7 @@ Quando precisar de clareza (oferecer opções):
 {"type":"options","question":"sua pergunta de clarificação","options":["opção concreta 1","opção concreta 2","opção concreta 3"],"coletado":{...campos atualizados}}
 
 Quando todos os campos estiverem completos — apresente o preview formatado:
-{"type":"preview","content":"# Nome do Projeto\\n\\n## O que faz\\n...toda a documentação formatada em markdown...\\n\\nEssa documentação está correta? Você pode aprovar ou pedir ajustes.","coletado":{...todos os campos}}`;
+{"type":"preview","content":"# Nome do Projeto\\n\\n## O que faz\\nFrase 1. Frase 2.\\n\\n## Execução\\n- **trigger** ...\\n\\n## Fluxo\\n1. Primeira etapa.\\n2. Segunda etapa.\\n\\nEssa documentação está correta? Você pode aprovar ou pedir ajustes.","coletado":{...todos os campos}}`;
 }
 
 function buildDocPreviewPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
@@ -97,7 +120,10 @@ REGRAS:
 - Se o usuário pedir AJUSTES: aplique as correções no campo "coletado", gere um novo preview atualizado e peça nova aprovação.
 - NUNCA mude o que não foi pedido.
 - NUNCA invente informações. Se a correção for ambígua, pergunte.
+- Ao gerar um novo preview, mantenha a formatação rica (listas, negrito, parágrafos curtos) conforme o guia abaixo.
 - Português brasileiro com acentuação correta.
+
+${FORMATACAO_PREVIEW}
 
 FORMATO DE RESPOSTA — APENAS JSON válido:
 
@@ -105,7 +131,7 @@ Se aprovado:
 {"type":"complete","content":"{resumo factual do projeto em 3-5 frases, sem saudações nem transições}","coletado":{...campos finais}}
 
 Se ajuste + novo preview:
-{"type":"preview","content":"# Nome\\n\\n## O que faz\\n...documentação corrigida em markdown...\\n\\nFiz os ajustes solicitados. Pode aprovar agora?","coletado":{...campos corrigidos}}
+{"type":"preview","content":"# Nome\\n\\n## O que faz\\nFrase 1. Frase 2.\\n\\n## Fluxo\\n1. Etapa.\\n2. Etapa.\\n\\nFiz os ajustes solicitados. Pode aprovar agora?","coletado":{...campos corrigidos}}
 
 Se precisa de clarificação:
 {"type":"question","content":"sua pergunta sobre o ajuste","coletado":{...campos atuais}}`;
