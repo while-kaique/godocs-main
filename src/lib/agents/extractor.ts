@@ -73,19 +73,42 @@ Use null APENAS quando realmente não há informação nos arquivos. Português 
   try {
     const parsed = JSON.parse(raw) as Partial<DocumentacaoColetada>;
     const result: DocumentacaoColetada = {
-      nome_projeto: parsed.nome_projeto ?? ctx.nome_projeto ?? null,
-      o_que_faz: parsed.o_que_faz ?? null,
-      execucao: parsed.execucao ?? null,
-      dependencias: parsed.dependencias ?? null,
-      fluxo: parsed.fluxo ?? null,
-      configurar_antes: parsed.configurar_antes ?? null,
-      atencao: parsed.atencao ?? null,
+      nome_projeto: norm(parsed.nome_projeto) ?? ctx.nome_projeto ?? null,
+      o_que_faz: norm(parsed.o_que_faz),
+      execucao: norm(parsed.execucao),
+      dependencias: norm(parsed.dependencias),
+      fluxo: norm(parsed.fluxo),
+      configurar_antes: norm(parsed.configurar_antes),
+      atencao: norm(parsed.atencao),
     };
     const preenchidos = Object.values(result).filter(v => v !== null).length;
     log(`Extração concluída: ${preenchidos}/7 campos preenchidos`);
+    // nome_projeto vem do form, então 1 campo preenchido = extração falhou de fato
+    if (preenchidos <= 1) {
+      log(`⚠️ Extração praticamente vazia (${preenchidos}/7) — o chat vai coletar via perguntas. Conteúdo: ${docTexto.length} chars`);
+    }
     return result;
   } catch {
     log('Falha ao parsear resposta do extractor — retornando vazio');
     return { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto || null };
   }
+}
+
+/**
+ * Normaliza um valor vindo do LLM para string limpa ou null.
+ * Trata o caso comum em que o modelo devolve a STRING "null"/"undefined"/"n/a"
+ * (entre aspas) em vez do literal JSON null — senão o campo fica preenchido
+ * com o texto "null" e o preview sai todo nulo.
+ */
+function norm(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') {
+    // Arrays/objetos: serializa; números/bool: converte
+    try { return JSON.stringify(value); } catch { return String(value); }
+  }
+  const t = value.trim();
+  if (t === '') return null;
+  const low = t.toLowerCase();
+  if (low === 'null' || low === 'undefined' || low === 'n/a' || low === 'none') return null;
+  return t;
 }
