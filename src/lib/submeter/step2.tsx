@@ -107,15 +107,6 @@ function shouldIgnorePath(relPath: string, fileName: string): string | null {
   return null;
 }
 
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => resolve("");
-    reader.readAsText(file, "utf-8");
-  });
-}
-
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export function Step2({
@@ -154,35 +145,37 @@ export function Step2({
         : "warn"
       : null;
 
-  // Estima os chars de um arquivo (lê conteúdo real p/ texto, tamanho p/ binário)
-  const estimateFileChars = useCallback(async (file: File): Promise<number> => {
-    if (isTextFile(file.name)) {
-      const text = await readFileAsText(file);
-      return text.length;
-    }
-    // PDF/DOCX (binário): não dá pra ler chars no browser → estima por tamanho
-    return Math.round(file.size * 0.8);
-  }, []);
+  // Estima chars de um arquivo pelo tamanho (sem ler conteúdo — rápido).
+  // Texto: bytes ≈ chars (proxy conservador p/ UTF-8). Binário: ~80% do tamanho.
+  function charsFromSize(file: File): number {
+    return isTextFile(file.name) ? file.size : Math.round(file.size * 0.8);
+  }
 
-  // Cede o controle pro browser pintar a tela antes de um trecho síncrono pesado
+  // Cede o controle pro browser pintar a tela antes/durante um trecho pesado
   const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
 
   async function addFiles(incoming: FileList | File[]) {
     const list = Array.from(incoming);
 
     // Mostra o spinner antes de qualquer trabalho pesado (browser pinta a tela)
-    setProcessing({ fase: "Filtrando arquivos", current: 0, total: list.length });
+    setProcessing({ fase: "Analisando arquivos", current: 0, total: list.length });
     await yieldToBrowser();
 
     const accepted: File[] = [];
     const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
     let ignoredCount = 0;
     const ignoredReasons: Record<string, number> = {};
+    const charsAcc = new Map<string, number>();
+
+    // Set de nomes já presentes (dedup O(1) em vez de varrer o array a cada arquivo)
+    const existentes = new Set(arquivos.map((f) => f.name));
 
     console.groupCollapsed(`[Step2/addFiles] Recebidos ${list.length} arquivo(s)`);
 
-    for (const file of list) {
-      // webkitRelativePath traz o caminho completo dentro da pasta selecionada
+    const CHUNK = 2000;
+    for (let i = 0; i < list.length; i++) {
+      const file = list[i];
+      // webkitRelativePath traz o caminho completo (inclui subpastas)
       const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
 
       // 1. Ignora pastas de desenvolvimento/build/deps (node_modules, .git, dist, etc.)
@@ -191,30 +184,31 @@ export function Step2({
         ignoredCount++;
         const key = ignoreReason.startsWith("pasta") ? ignoreReason : "arquivos de lock/build";
         ignoredReasons[key] = (ignoredReasons[key] ?? 0) + 1;
-        continue;
+      } else {
+        const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
+        const hasExt = file.name.includes(".");
+
+        if (!hasExt) {
+          rejected.push({ name: relPath, ext: "(sem extensão)", reason: "sem extensão", size: file.size });
+        } else if (!ACCEPTED_DOC_EXT.includes(ext)) {
+          rejected.push({ name: relPath, ext, reason: "extensão não suportada", size: file.size });
+        } else if (file.size > MAX_FILE_MB * 1024 * 1024) {
+          rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
+          toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
+        } else if (existentes.has(file.name)) {
+          console.log(`⏭️  duplicado, ignorado: ${relPath}`);
+        } else {
+          existentes.add(file.name);
+          accepted.push(file);
+          charsAcc.set(file.name, charsFromSize(file));
+        }
       }
 
-      const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
-      const hasExt = file.name.includes(".");
-
-      if (!hasExt) {
-        rejected.push({ name: relPath, ext: "(sem extensão)", reason: "sem extensão", size: file.size });
-        continue;
+      // Atualiza progresso e cede o controle a cada lote (spinner anima)
+      if (i % CHUNK === 0) {
+        setProcessing({ fase: "Analisando arquivos", current: i, total: list.length });
+        await yieldToBrowser();
       }
-      if (!ACCEPTED_DOC_EXT.includes(ext)) {
-        rejected.push({ name: relPath, ext, reason: "extensão não suportada", size: file.size });
-        continue;
-      }
-      if (file.size > MAX_FILE_MB * 1024 * 1024) {
-        rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
-        toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
-        continue;
-      }
-      if (arquivos.some((f) => f.name === file.name)) {
-        console.log(`⏭️  duplicado, ignorado: ${relPath}`);
-        continue;
-      }
-      accepted.push(file);
     }
 
     // Log dos ignorados (pastas de dev) — só resumo, nunca lista completa
@@ -251,31 +245,21 @@ export function Step2({
       toast.error(`${rejected.length} arquivo(s) ignorado(s) por formato: ${exts}`);
     }
 
-    const merged = [...arquivos, ...accepted].slice(0, MAX_FILES);
-    if (arquivos.length + accepted.length > MAX_FILES) {
-      console.warn(`[Step2/addFiles] Limite de ${MAX_FILES} arquivos atingido — ${arquivos.length + accepted.length - MAX_FILES} descartado(s)`);
-      toast.error(`Limite de ${MAX_FILES} arquivos — só os primeiros ${MAX_FILES} foram mantidos`);
+    let merged = [...arquivos, ...accepted];
+    // Cap de segurança altíssimo (não é um limite prático) — só evita payload absurdo
+    if (merged.length > MAX_FILES) {
+      console.warn(`[Step2/addFiles] Cap de segurança de ${MAX_FILES} arquivos atingido — ${merged.length - MAX_FILES} descartado(s)`);
+      toast.error(`Muitos arquivos (${merged.length}). Mantidos os primeiros ${MAX_FILES}.`);
+      merged = merged.slice(0, MAX_FILES);
     }
 
     setArquivos(merged);
-    clearError("documentacao");
-
-    // Lê o conteúdo dos novos arquivos com progresso visível
-    const novos = accepted.slice(0, MAX_FILES - arquivos.length);
-    const charsAcc = new Map<string, number>();
-    for (let i = 0; i < novos.length; i++) {
-      setProcessing({ fase: "Lendo conteúdo", current: i + 1, total: novos.length });
-      const chars = await estimateFileChars(novos[i]);
-      charsAcc.set(novos[i].name, chars);
-      const tokens = Math.round(chars / 4);
-      console.log(`[Step2/estimate] "${novos[i].name}": ${chars} chars → ~${tokens} tokens`);
-    }
     setFileChars((prev) => {
       const next = new Map(prev);
       for (const [k, v] of charsAcc) next.set(k, v);
       return next;
     });
-
+    clearError("documentacao");
     setProcessing(null);
   }
 
@@ -436,14 +420,14 @@ export function Step2({
           className="mb-2.5 rounded-lg p-3 text-[12px] leading-relaxed"
           style={{ background: "rgba(0,89,169,0.03)", border: "1px solid rgba(0,89,169,0.08)", color: "var(--go-text-primary)" }}
         >
-          🤖 <strong style={{ color: "var(--go-blue)" }}>A IA vai ler todo o código</strong> e gerar a documentação automaticamente.
-          Envie os arquivos relevantes do projeto: workflow JSON, scripts, configs, README.
+          🤖 <strong style={{ color: "var(--go-blue)" }}>A IA vai ler toda a codebase</strong> e gerar a documentação automaticamente.
+          Pode enviar a pasta inteira do projeto (com subpastas) ou os documentos.
           <br />
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · máx. {MAX_FILE_MB}MB por arquivo · até {MAX_FILES} arquivos
+            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · máx. {MAX_FILE_MB}MB por arquivo
           </span>
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            💡 Pode enviar a pasta inteira — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados automaticamente.
+            💡 Sem limite de arquivos — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados. O único limite é ~200k tokens de conteúdo (a barra abaixo avisa se passar).
           </span>
         </div>
 
@@ -490,16 +474,15 @@ export function Step2({
                 {processing.fase}…
               </div>
               <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
-                {processing.fase === "Filtrando arquivos"
-                  ? `${processing.total.toLocaleString("pt-BR")} arquivo(s) recebidos — filtrando node_modules e afins`
-                  : `Lendo ${processing.current} de ${processing.total}`}
+                {processing.total > 0
+                  ? `${processing.current.toLocaleString("pt-BR")} de ${processing.total.toLocaleString("pt-BR")} arquivo(s) — ignorando node_modules e afins`
+                  : "Preparando…"}
               </div>
-              {/* Barra de progresso (só na fase de leitura, onde total é pequeno) */}
-              {processing.fase === "Lendo conteúdo" && processing.total > 0 && (
+              {processing.total > 0 && (
                 <div className="mt-1 h-1.5 w-40 overflow-hidden rounded-full" style={{ background: "rgba(0,89,169,0.1)" }}>
                   <div
                     className="h-full rounded-full transition-all"
-                    style={{ width: `${(processing.current / processing.total) * 100}%`, background: "var(--go-blue)" }}
+                    style={{ width: `${Math.min(100, (processing.current / processing.total) * 100)}%`, background: "var(--go-blue)" }}
                   />
                 </div>
               )}

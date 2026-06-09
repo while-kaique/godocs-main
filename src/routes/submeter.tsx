@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn } from "@/lib/chat.functions";
 
 import {
-  EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64,
+  EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage } from "@/lib/submeter/constants";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
@@ -192,6 +192,21 @@ function SubmeterPage() {
     }
 
     if (arquivos.length === 0) return;
+
+    // Trava do orçamento de tokens: bloqueia se o conteúdo estimado estourar.
+    // Proxy: soma dos tamanhos dos arquivos + descrição (1 byte ≈ 1 char).
+    const charsEstimados =
+      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
+    if (charsEstimados > TOKEN_BLOCK_CHARS) {
+      const tokens = Math.round(charsEstimados / 4);
+      toast.error(
+        `Conteúdo muito grande (~${Math.round(tokens / 1000)}k tokens, limite ~200k). ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`
+      );
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
 
     setIniciandoChat(true);
 

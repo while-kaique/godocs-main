@@ -25,14 +25,16 @@ export const ACCEPTED_CODE_EXT = [
 export const ACCEPTED_DOC_EXT = [...ACCEPTED_DOC_EXT_BASE, ...ACCEPTED_CODE_EXT];
 
 export const MAX_FILE_MB = 10;   // por arquivo
-export const MAX_FILES = 30;     // total de arquivos
+// Sem limite de contagem de arquivos — o gate é o orçamento de tokens (abaixo).
+// Cap de segurança alto só para evitar payloads patológicos.
+export const MAX_FILES = 5000;
 
-// Limites de chars (soma de todos os arquivos + descrição breve)
-// ~4 chars por token. BLOCK alinhado ao truncamento do backend (200k chars):
-// acima disso o conteúdo seria cortado em silêncio, então bloqueamos antes.
-// WARN = ~30k tokens, BLOCK = ~50k tokens (= cap de truncamento do servidor)
-export const TOKEN_WARN_CHARS = 120_000;
-export const TOKEN_BLOCK_CHARS = 200_000;
+// Orçamento de TOKENS (não de arquivos). ~4 chars por token.
+// Analisamos a codebase/pasta inteira desde que não estoure 200k tokens.
+// BLOCK = 200k tokens (= cap de truncamento do backend); WARN um pouco antes.
+export const TOKEN_BUDGET = 200_000;             // tokens
+export const TOKEN_WARN_CHARS = 600_000;         // ~150k tokens
+export const TOKEN_BLOCK_CHARS = 800_000;        // ~200k tokens
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 

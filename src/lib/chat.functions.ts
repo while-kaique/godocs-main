@@ -167,7 +167,7 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         descricao_breve: z.string().max(1000).optional(),
         docs: z.array(
           z.object({ base64: z.string().min(1), filename: z.string().min(1) })
-        ).min(1).max(30),
+        ).min(1).max(5000),
       })
       .parse(d)
   )

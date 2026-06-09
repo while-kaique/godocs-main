@@ -2,7 +2,7 @@
 // Suporta: TXT, MD, PDF, DOCX, DOC, JSON e arquivos de código (TS, JS, PY, etc.)
 
 const MAX_CHARS_PER_FILE = 150_000;
-const MAX_CHARS_TOTAL = 200_000;
+const MAX_CHARS_TOTAL = 800_000; // ~200k tokens — orçamento da codebase inteira
 const CHARS_PER_TOKEN = 4; // heurística: ~4 chars por token
 
 const log = (...args: unknown[]) => console.log('[extract-text]', ...args);
