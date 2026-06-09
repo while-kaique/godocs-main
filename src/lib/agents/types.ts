@@ -93,6 +93,7 @@ export type ProjetoContexto = {
   doc_texto: string | null;
   descricao_breve?: string | null;
   tipo_projeto?: 'saving' | 'receita_incremental' | null;
+  escopo?: 'interno' | 'externo' | null;
 };
 
 // ─── Documentação gerada (output do compiler) ───────────────────────────────

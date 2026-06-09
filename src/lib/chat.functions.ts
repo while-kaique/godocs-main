@@ -29,7 +29,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
   const [{ data, error }, { data: docMsg }] = await Promise.all([
     supabaseAdmin
       .from('projetos')
-      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, tipo_projeto, areas(nome)')
+      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, tipo_projeto, tipos_projeto, escopo, areas(nome)')
       .eq('id', projeto_id)
       .single(),
     supabaseAdmin
@@ -52,6 +52,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     data_criacao: null,
     doc_texto: docMsg?.content ?? null,
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
+    escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
   };
 }
 
@@ -160,11 +161,14 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         responsavel_email: z.string().email().max(255),
         area_id: z.string().uuid().optional(),
         area: z.string().min(1).max(100),
-        ferramenta: z.string().min(1).max(100),
+        ferramenta: z.string().min(1).max(200),
+        escopo: z.enum(['interno', 'externo']).optional(),
+        servico_externo: z.string().max(200).optional(),
         membros: z.array(z.string()).default([]),
         nome_projeto: z.string().min(1).max(200),
         data_criacao: z.string(),
         tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
+        tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
         descricao_breve: z.string().max(1000).optional(),
         docs: z.array(
           z.object({ base64: z.string().min(1), filename: z.string().min(1) })
@@ -184,10 +188,13 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         area_id: data.area_id,
         area: data.area,
         ferramenta: data.ferramenta,
+        escopo: data.escopo ?? null,
+        servico_externo: data.servico_externo ?? null,
         membros: data.membros,
         nome: data.nome_projeto,
         data_criacao_projeto: data.data_criacao,
         tipo_projeto: data.tipo_projeto ?? null,
+        tipos_projeto: data.tipos_projeto ?? null,
         descricao_breve: data.descricao_breve ?? null,
         status: 'rascunho',
       })
@@ -229,6 +236,7 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       doc_texto: docTexto || null,
       descricao_breve: data.descricao_breve ?? null,
       tipo_projeto: data.tipo_projeto ?? null,
+      escopo: data.escopo ?? null,
     };
 
     // 5. Extrator: preenche os 7 campos numa chamada única antes do chat
@@ -419,6 +427,7 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
         cargo: z.string().optional(),
         horas_antes: z.number().min(0).optional(),
         horas_depois: z.number().min(0).optional(),
+        custo_externo_mensal: z.number().min(0).optional(),
       })
       .parse(d)
   )
@@ -437,8 +446,12 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
       const cargoEntry = CARGOS.find(c => c.label === data.cargo);
       const valorHora = cargoEntry?.valor_hora ?? null;
       const economiaHoras = data.horas_antes - data.horas_depois;
-      const economiaReais = valorHora != null
+      const economiaReaisBruta = valorHora != null
         ? Math.round(economiaHoras * valorHora * 100) / 100
+        : null;
+      const custoExterno = data.custo_externo_mensal ?? 0;
+      const economiaReais = economiaReaisBruta != null
+        ? Math.round((economiaReaisBruta - custoExterno) * 100) / 100
         : null;
 
       saving = {
@@ -450,7 +463,11 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
         valor_hora: valorHora,
         economia_reais_mes: economiaReais,
       };
-      log('iniciarSaving', `Saving calculado: ${economiaHoras}h × R$${valorHora} = R$${economiaReais}`);
+      if (custoExterno > 0) {
+        log('iniciarSaving', `Saving: ${economiaHoras}h × R$${valorHora} = R$${economiaReaisBruta} (bruto) − R$${custoExterno} (externo) = R$${economiaReais} (líquido)`);
+      } else {
+        log('iniciarSaving', `Saving calculado: ${economiaHoras}h × R$${valorHora} = R$${economiaReais}`);
+      }
     }
 
     // 3. Buscar histórico para extrair resumo do projeto

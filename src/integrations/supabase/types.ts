@@ -159,8 +159,10 @@ export type Database = {
           area_id: string | null
           chat_completo: boolean | null
           created_at: string | null
+          custo_externo_mensal: number | null
           data_criacao_projeto: string | null
           descricao_breve: string | null
+          escopo: string | null
           ferramenta: string
           id: string
           membros: Json | null
@@ -170,10 +172,12 @@ export type Database = {
           responsavel_nome: string
           saving_horas: number | null
           saving_reais: number | null
+          servico_externo: string | null
           status: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at: string | null
           tipo_projeto: string | null
           tipo_saving: string | null
+          tipos_projeto: string[] | null
           updated_at: string | null
           validated_at: string | null
           validated_by: string | null
@@ -183,8 +187,10 @@ export type Database = {
           area_id?: string | null
           chat_completo?: boolean | null
           created_at?: string | null
+          custo_externo_mensal?: number | null
           data_criacao_projeto?: string | null
           descricao_breve?: string | null
+          escopo?: string | null
           ferramenta: string
           id?: string
           membros?: Json | null
@@ -194,10 +200,12 @@ export type Database = {
           responsavel_nome: string
           saving_horas?: number | null
           saving_reais?: number | null
+          servico_externo?: string | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
           tipo_projeto?: string | null
           tipo_saving?: string | null
+          tipos_projeto?: string[] | null
           updated_at?: string | null
           validated_at?: string | null
           validated_by?: string | null
@@ -207,8 +215,10 @@ export type Database = {
           area_id?: string | null
           chat_completo?: boolean | null
           created_at?: string | null
+          custo_externo_mensal?: number | null
           data_criacao_projeto?: string | null
           descricao_breve?: string | null
+          escopo?: string | null
           ferramenta?: string
           id?: string
           membros?: Json | null
@@ -218,10 +228,12 @@ export type Database = {
           responsavel_nome?: string
           saving_horas?: number | null
           saving_reais?: number | null
+          servico_externo?: string | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
           tipo_projeto?: string | null
           tipo_saving?: string | null
+          tipos_projeto?: string[] | null
           updated_at?: string | null
           validated_at?: string | null
           validated_by?: string | null

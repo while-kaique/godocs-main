@@ -65,17 +65,19 @@ function SubmeterPage() {
   }, []);
 
   const [form, setForm] = useState<FormData>({
+    escopo: "",
     prodStatus: "",
     nome: "",
     email: "",
     area: "",
     ferramenta: "",
     ferramentaOutra: "",
+    servicoExterno: "",
     emEquipe: "",
     participantes: [],
     nomeProjeto: "",
     dataCriacao: today,
-    tipoProjeto: "",
+    tipoProjeto: [],
     descricaoBreve: "",
   });
 
@@ -103,17 +105,21 @@ function SubmeterPage() {
     });
   }, []);
 
-  const prodBlocked = form.prodStatus === "dev" || form.prodStatus === "idle";
+  const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
   /* ── Validation ── */
   function validateStep(n: number): boolean {
     const errs: FieldErrors = {};
 
     if (n === 1) {
+      if (!form.escopo)
+        errs.escopo = "Selecione se a solução é interna ou externa";
       if (!form.prodStatus)
         errs.prodStatus = "Selecione o status do projeto";
       else if (form.prodStatus !== "sim")
-        errs.prodStatus = "Apenas projetos em produção podem ser submetidos";
+        errs.prodStatus = form.escopo === "externo"
+          ? "Apenas ferramentas externas já em uso podem ser submetidas"
+          : "Apenas projetos em produção podem ser submetidos";
       if (!form.nome.trim() || form.nome.trim().length < 2)
         errs.nome = "Este campo é obrigatório";
       else if (/[0-9]/.test(form.nome))
@@ -123,9 +129,14 @@ function SubmeterPage() {
       else if (!ALLOWED_DOMAINS_RE.test(form.email.trim()))
         errs.email = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
       if (!form.area) errs.area = "Selecione sua área";
-      if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
-      if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
-        errs.ferramentaOutra = "Especifique a ferramenta utilizada";
+      if (form.escopo === "externo") {
+        if (!form.servicoExterno.trim())
+          errs.servicoExterno = "Informe o nome do serviço externo";
+      } else {
+        if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
+        if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
+          errs.ferramentaOutra = "Especifique a ferramenta utilizada";
+      }
       if (!form.emEquipe) errs.emEquipe = "Selecione uma opção";
       if (form.emEquipe === "sim" && form.participantes.length === 0)
         errs.participantes = "Informe ao menos um e-mail de participante";
@@ -137,8 +148,8 @@ function SubmeterPage() {
     }
 
     if (n === 2) {
-      if (!form.tipoProjeto)
-        errs.tipoProjeto = "Selecione o tipo do projeto";
+      if (form.tipoProjeto.length === 0)
+        errs.tipoProjeto = "Selecione ao menos um tipo de projeto";
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
       if (!form.dataCriacao) {
@@ -220,19 +231,25 @@ function SubmeterPage() {
         }))
       );
 
+      const ferramentaEnviada = form.escopo === "externo"
+        ? form.servicoExterno.trim()
+        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+          ? `Outros: ${form.ferramentaOutra.trim()}`
+          : form.ferramenta;
+
       const result = await iniciarSubmissaoFn({
         data: {
           responsavel_nome: form.nome.trim(),
           responsavel_email: form.email.trim(),
           area: form.area,
-          ferramenta:
-            form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-              ? `Outros: ${form.ferramentaOutra.trim()}`
-              : form.ferramenta,
+          ferramenta: ferramentaEnviada,
+          escopo: form.escopo as "interno" | "externo",
+          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
-          tipo_projeto: form.tipoProjeto || undefined,
+          tipos_projeto: form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
+          tipo_projeto: form.tipoProjeto[0] || undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           docs,
         },
@@ -339,6 +356,12 @@ function SubmeterPage() {
     if (!projetoId) return;
     setSavingFormLoading(true);
     try {
+      const custoMensal = formData.custoExterno
+        ? formData.custoPeriodicidade === "anual"
+          ? parseFloat(formData.custoExterno) / 12
+          : parseFloat(formData.custoExterno)
+        : undefined;
+
       const result = await iniciarSavingFn({
         data: {
           projeto_id: projetoId,
@@ -346,6 +369,7 @@ function SubmeterPage() {
           cargo: formData.cargo || undefined,
           horas_antes: formData.horasAntes ? parseFloat(formData.horasAntes) : undefined,
           horas_depois: formData.horasDepois ? parseFloat(formData.horasDepois) : undefined,
+          custo_externo_mensal: custoMensal,
         },
       });
       setShowSavingForm(false);
@@ -463,7 +487,10 @@ function SubmeterPage() {
             >
               <SummaryRow label="Projeto" value={form.nomeProjeto} />
               <SummaryRow label="Área" value={form.area} />
-              <SummaryRow label="Ferramenta" value={form.ferramenta} />
+              <SummaryRow
+                label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
+                value={form.escopo === "externo" ? form.servicoExterno : form.ferramenta}
+              />
               <SummaryRow label="Status" value="Aguardando análise" badge last />
             </div>
             <div className="flex flex-col items-center gap-3">
@@ -568,6 +595,7 @@ function SubmeterPage() {
                   approvedDocPreview={approvedDocPreview}
                   approvedSavingPreview={approvedSavingPreview}
                   tipoProjeto={form.tipoProjeto}
+                  escopo={form.escopo}
                   showSavingForm={showSavingForm}
                   onSavingFormSubmit={handleSavingFormSubmit}
                   savingFormLoading={savingFormLoading}

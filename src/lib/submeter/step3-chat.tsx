@@ -505,10 +505,12 @@ function FinalReview({
 
 function SavingForm({
   tipoProjeto,
+  escopo,
   onSubmit,
   loading,
 }: {
-  tipoProjeto: "saving" | "receita_incremental";
+  tipoProjeto: ("saving" | "receita_incremental")[];
+  escopo?: string;
   onSubmit: (data: SavingFormData) => void;
   loading: boolean;
 }) {
@@ -516,9 +518,12 @@ function SavingForm({
   const [horasAntes, setHorasAntes] = useState("");
   const [horasDepois, setHorasDepois] = useState("");
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">("");
+  const [custoExterno, setCustoExterno] = useState("");
+  const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const isSaving = tipoProjeto === "saving";
+  const isSaving = tipoProjeto.includes("saving");
+  const isExterno = escopo === "externo";
   const icon = isSaving ? "💰" : "📈";
   const title = "Dados para Análise de Impacto";
 
@@ -533,13 +538,24 @@ function SavingForm({
         errs.horasDepois = "Deve ser menor que as horas antes";
       }
     }
+    if (isExterno && isSaving) {
+      if (!custoExterno || parseFloat(custoExterno) < 0) errs.custoExterno = "Informe o custo da ferramenta";
+      if (!custoPeriodicidade) errs.custoPeriodicidade = "Selecione a periodicidade";
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
   function handleSubmit() {
     if (!validate()) return;
-    onSubmit({ cargo, horasAntes, horasDepois, tipoSaving: tipoSaving as "mensal" | "pontual" });
+    onSubmit({
+      cargo,
+      horasAntes,
+      horasDepois,
+      tipoSaving: tipoSaving as "mensal" | "pontual",
+      custoExterno,
+      custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
+    });
   }
 
   return (
@@ -711,6 +727,68 @@ function SavingForm({
           </>
         )}
 
+        {/* Custo da ferramenta externa (só para projetos externos com saving) */}
+        {isExterno && isSaving && (
+          <>
+            <div>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                Custo da ferramenta externa <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <div className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ex: 299,90"
+                    value={custoExterno}
+                    onChange={(e) => { setCustoExterno(e.target.value); setErrors(er => { const n = { ...er }; delete n.custoExterno; return n; }); }}
+                    className="go-input w-full"
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "var(--go-radius-md)",
+                      border: errors.custoExterno ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                      background: "var(--go-white)",
+                      fontSize: 13,
+                    }}
+                  />
+                  {errors.custoExterno && (
+                    <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                      {errors.custoExterno}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-0 rounded-xl overflow-hidden shrink-0" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                  {(["mensal", "anual"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => { setCustoPeriodicidade(opt); setErrors(er => { const n = { ...er }; delete n.custoPeriodicidade; return n; }); }}
+                      className="px-3 py-2.5 text-[12px] font-semibold transition-all"
+                      style={{
+                        background: custoPeriodicidade === opt ? "#6b6e00" : "transparent",
+                        color: custoPeriodicidade === opt ? "#fff" : "#6b6e00",
+                        borderRight: opt === "mensal" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {opt === "mensal" ? "R$/mês" : "R$/ano"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {errors.custoPeriodicidade && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.custoPeriodicidade}
+                </div>
+              )}
+              <div className="mt-1.5 text-[10px]" style={{ color: "#8b8b9a" }}>
+                Será abatido do saving para calcular o ganho líquido da automação.
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Botão iniciar */}
         <button
           type="button"
@@ -772,6 +850,7 @@ export function Step3Chat({
   approvedDocPreview,
   approvedSavingPreview,
   tipoProjeto,
+  escopo,
   showSavingForm,
   onSavingFormSubmit,
   savingFormLoading,
@@ -789,7 +868,8 @@ export function Step3Chat({
   showTransition: boolean;
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
-  tipoProjeto?: string;
+  tipoProjeto?: ("saving" | "receita_incremental")[];
+  escopo?: string;
   showSavingForm?: boolean;
   onSavingFormSubmit?: (data: SavingFormData) => void;
   savingFormLoading?: boolean;
@@ -949,9 +1029,10 @@ export function Step3Chat({
       )}
 
       {/* Formulário determinístico saving */}
-      {!showTransition && showSavingForm && onSavingFormSubmit && tipoProjeto && (
+      {!showTransition && showSavingForm && onSavingFormSubmit && tipoProjeto && tipoProjeto.length > 0 && (
         <SavingForm
-          tipoProjeto={tipoProjeto as "saving" | "receita_incremental"}
+          tipoProjeto={tipoProjeto}
+          escopo={escopo}
           onSubmit={onSavingFormSubmit}
           loading={savingFormLoading ?? false}
         />
