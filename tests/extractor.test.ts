@@ -1,6 +1,6 @@
 // Testes: helpers puros do extractor (normalização e divisão em lotes)
 import { describe, it, expect } from 'vitest';
-import { norm, dividirEmLotes } from '@/lib/agents/extractor';
+import { norm, dividirEmLotes, parseFlexivel } from '@/lib/agents/extractor';
 
 describe('norm — normalização de valores do LLM', () => {
   it('converte a STRING "null" (e variações) para null real', () => {
@@ -30,6 +30,31 @@ describe('norm — normalização de valores do LLM', () => {
     expect(norm(['a', 'b'])).toBe('["a","b"]');
     expect(norm({ x: 1 })).toBe('{"x":1}');
     expect(norm(42)).toBe('42');
+  });
+});
+
+describe('parseFlexivel — recuperação de JSON truncado', () => {
+  it('parseia JSON válido normalmente', () => {
+    const r = parseFlexivel('{"nome_projeto":"X","o_que_faz":"faz Y","execucao":null}');
+    expect(r.nome_projeto).toBe('X');
+    expect(r.o_que_faz).toBe('faz Y');
+    expect(r.execucao).toBeNull();
+  });
+
+  it('recupera campos de JSON truncado (estouro de tokens)', () => {
+    // JSON cortado no meio do campo "fluxo" (sem fechar aspas/chave)
+    const truncado = '{"nome_projeto":"App","o_que_faz":"Resolve X.","fluxo":"1. Passo um.\\n2. Passo doi';
+    const r = parseFlexivel(truncado);
+    expect(r.nome_projeto).toBe('App');
+    expect(r.o_que_faz).toBe('Resolve X.');
+    expect(r.fluxo).toContain('Passo um');
+    expect(r.fluxo).toContain('\n'); // \\n desescapado
+  });
+
+  it('preserva aspas escapadas no valor recuperado', () => {
+    const truncado = '{"o_que_faz":"chama a API \\"foo\\" e retorna';
+    const r = parseFlexivel(truncado);
+    expect(r.o_que_faz).toContain('"foo"');
   });
 });
 
