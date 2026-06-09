@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn } from "@/lib/chat.functions";
 
 import {
-  EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64,
+  EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage } from "@/lib/submeter/constants";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
@@ -37,7 +37,7 @@ function SubmeterPage() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [submitted, setSubmitted] = useState(false);
-  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [arquivos, setArquivos] = useState<File[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [shaking, setShaking] = useState(false);
@@ -73,6 +73,8 @@ function SubmeterPage() {
     participantes: [],
     nomeProjeto: "",
     dataCriacao: today,
+    tipoProjeto: "",
+    descricaoBreve: "",
   });
 
   const updateField = useCallback(
@@ -133,6 +135,8 @@ function SubmeterPage() {
     }
 
     if (n === 2) {
+      if (!form.tipoProjeto)
+        errs.tipoProjeto = "Selecione o tipo do projeto";
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
       if (!form.dataCriacao) {
@@ -142,7 +146,9 @@ function SubmeterPage() {
       } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
-      if (!arquivo) errs.documentacao = "Envie a documentação do projeto";
+      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
+        errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (arquivos.length === 0) errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
 
     setErrors(errs);
@@ -185,12 +191,32 @@ function SubmeterPage() {
       return;
     }
 
-    if (!arquivo) return;
+    if (arquivos.length === 0) return;
+
+    // Trava do orçamento de tokens: bloqueia se o conteúdo estimado estourar.
+    // Proxy: soma dos tamanhos dos arquivos + descrição (1 byte ≈ 1 char).
+    const charsEstimados =
+      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
+    if (charsEstimados > TOKEN_BLOCK_CHARS) {
+      const tokens = Math.round(charsEstimados / 4);
+      toast.error(
+        `Conteúdo muito grande (~${Math.round(tokens / 1000)}k tokens, limite ~200k). ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`
+      );
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
 
     setIniciandoChat(true);
 
     try {
-      const base64 = await readFileAsBase64(arquivo);
+      const docs = await Promise.all(
+        arquivos.map(async (f) => ({
+          base64: await readFileAsBase64(f),
+          filename: f.name,
+        }))
+      );
 
       const result = await iniciarSubmissaoFn({
         data: {
@@ -204,8 +230,9 @@ function SubmeterPage() {
           membros: form.participantes,
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
-          doc_base64: base64,
-          doc_filename: arquivo.name,
+          tipo_projeto: form.tipoProjeto || undefined,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          docs,
         },
       });
 
@@ -506,8 +533,8 @@ function SubmeterPage() {
                   errors={errors}
                   updateField={updateField}
                   clearError={clearError}
-                  arquivo={arquivo}
-                  setArquivo={setArquivo}
+                  arquivos={arquivos}
+                  setArquivos={setArquivos}
                 />
               </StepAnimation>
             )}

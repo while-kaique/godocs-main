@@ -20,52 +20,55 @@ import { documentacaoVazia, savingVazio } from './types';
 
 function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
   const membros = ctx.membros.length > 0 ? ctx.membros.join(', ') : 'Não informado';
-  const temDoc = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
+  const temCodigo = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
 
-  const docSection = temDoc
-    ? `DOCUMENTAÇÃO ENVIADA PELO USUÁRIO:
----
-${ctx.doc_texto}
----`
-    : `(Nenhuma documentação foi enviada — colete todas as informações via conversa.)`;
+  const camposPreenchidos = Object.entries(coletado).filter(([, v]) => v !== null).map(([k]) => k);
+  const camposNulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k);
 
-  return `Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
-Seu objetivo é analisar a documentação enviada pelo usuário, validar as informações, e reorganizar tudo no formato padrão.
+  const descricaoSection = ctx.descricao_breve?.trim()
+    ? `CONTEXTO DE NEGÓCIO FORNECIDO PELO USUÁRIO:\n${ctx.descricao_breve.trim()}\n\n`
+    : '';
 
-${docSection}
+  return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
 
-DADOS JÁ CONHECIDOS DO PROJETO:
-- Nome do projeto: ${ctx.nome_projeto}
+SITUAÇÃO ATUAL:
+O sistema já leu e analisou automaticamente TODOS os arquivos do projeto (código, configs, workflows).
+Os campos já preenchidos abaixo foram extraídos DIRETAMENTE do código — são tecnicamente precisos e NÃO devem ser questionados pelo usuário neste momento.
+Os campos ainda em null representam informações de CONTEXTO DE NEGÓCIO que não estão visíveis no código.
+
+METADADOS DO PROJETO:
+- Nome: ${ctx.nome_projeto}
 - Data de criação: ${ctx.data_criacao ?? 'Não informada'}
 - Responsável: ${ctx.responsavel_nome} (${ctx.responsavel_email})
 - Área: ${ctx.area ?? 'Não informada'}
-- Ferramenta utilizada: ${ctx.ferramenta}
-- Membros do time: ${membros}
-
-O DOCUMENTO FINAL SEGUE ESTA ESTRUTURA (7 seções):
-
-1. **Nome do Projeto** (nome_projeto) — Título claro e identificável.
-2. **O que faz** (o_que_faz) — Parágrafo de 2-4 frases: qual problema resolve, para quem, e qual o resultado da execução.
-3. **Execução** (execucao) — Como o projeto é acionado: trigger manual, schedule (horário/frequência), webhook, evento de sistema, etc.
-4. **Dependências** (dependencias) — Lista de serviços externos, APIs, credenciais e acessos necessários para funcionar.
-5. **Fluxo** (fluxo) — Sequência das etapas principais da execução, do início ao fim, incluindo ramificações condicionais (IF/ELSE).
-6. **Configurar antes de usar** (configurar_antes) — O que fazer antes de rodar o projeto pela primeira vez.
-7. **Atenção** (atencao) — Riscos, limitações conhecidas, pontos frágeis ou decisões técnicas que merecem destaque.
+- Ferramenta: ${ctx.ferramenta}
+- Membros: ${membros}
+${!temCodigo ? '\n⚠️ Nenhum arquivo de código foi enviado — colete todas as informações via conversa.' : ''}
 
 ESTADO ATUAL DA COLETA:
 ${JSON.stringify(coletado, null, 2)}
 
+CAMPOS JÁ PREENCHIDOS PELO CÓDIGO: ${camposPreenchidos.length > 0 ? camposPreenchidos.join(', ') : 'nenhum'}
+CAMPOS QUE PRECISAM DE RESPOSTA DO USUÁRIO: ${camposNulos.length > 0 ? camposNulos.join(', ') : 'todos preenchidos'}
+
+ESTRUTURA FINAL (7 seções):
+1. nome_projeto — Título claro e identificável
+2. o_que_faz — Qual problema resolve, para quem, resultado (contexto de negócio)
+3. execucao — Como é acionado (horários e triggers exatos, conforme o código)
+4. dependencias — Serviços externos, APIs, credenciais (conforme o código)
+5. fluxo — Sequência das etapas do código, início ao fim, com IFs reais
+6. configurar_antes — Variáveis de ambiente, credenciais, setup inicial
+7. atencao — Riscos, limitações, pontos frágeis observados no código
+
 REGRAS:
-- O documento enviado é a fonte de verdade — não compare com os metadados do projeto. Extraia os 7 campos do conteúdo do arquivo, independente de quem escreveu ou qual ferramenta menciona.
-- Se o arquivo cobrir todos os 7 campos com qualidade suficiente, gere o PREVIEW direto — não faça perguntas desnecessárias.
-- Seja CÉTICO: avalie criticamente se cada resposta do usuário satisfaz o critério do campo. Se for vaga ou incompleta, NÃO atualize o campo no "coletado" — deixe null e aprofunde.
-- NÃO liste o que extraiu do documento — o usuário verá tudo no preview.
-- Faça UMA pergunta por vez sobre o que ainda está ausente ou vago. A mais importante primeiro.
+- Os campos já preenchidos foram extraídos do código — NÃO peça confirmação deles, NÃO repita o que já foi extraído.
+- Foque APENAS nos campos em null. Esses representam regras de negócio que o código não revela.
+- Faça UMA pergunta por vez, sobre o campo null mais relevante. Vá direto ao ponto.
+- Seja CÉTICO com respostas vagas: se o usuário responder vagamente, aprofunde antes de aceitar.
 - Se a resposta for ambígua, ofereça 3 opções objetivas.
-- NUNCA pergunte o que já está respondido (no documento ou em respostas anteriores).
-- NUNCA invente informações técnicas (nomes de APIs, horários, credenciais).
-- Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown e peça aprovação.
-- Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória (á, é, ã, ç, etc.).
+- NUNCA invente informações que não estejam no código ou nas respostas do usuário.
+- Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown.
+- Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
 
 FORMATO DE RESPOSTA — responda APENAS com JSON válido, sem texto adicional:
 
@@ -238,21 +241,35 @@ export async function runOrchestrator(
 
   if (history.length === 0) {
     const temDoc = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
-    messages.push({
-      role: 'user',
-      content:
-        fase === 'doc'
-          ? (temDoc
-            ? '[SISTEMA] Leia a documentação enviada. Extraia os 7 campos e atualize "coletado" silenciosamente. NÃO liste o que extraiu — o usuário verá no preview. Se todos os campos estiverem cobertos, gere o preview direto. Se faltar algo, cumprimente em 1 frase curta e faça a primeira pergunta sobre o que falta. Seja breve.'
-            : '[SISTEMA] Cumprimente em 1 frase curta e faça a primeira pergunta para documentar o projeto. Seja breve e direto.')
-          : '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
-    });
+    if (fase === 'doc') {
+      const camposPreenchidos = Object.values(coletado).filter(v => v !== null).length;
+      const todosPreenchidos = camposPreenchidos >= 7;
+      const muitosPreenchidos = camposPreenchidos >= 5;
+      let sistemaMsg: string;
+      if (todosPreenchidos) {
+        sistemaMsg = '[SISTEMA] O sistema leu todos os arquivos do projeto e preencheu os 7 campos automaticamente. Gere o PREVIEW DIRETO agora, sem cumprimentos, sem listar o que foi extraído e sem fazer perguntas.';
+      } else if (muitosPreenchidos) {
+        const nulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k).join(', ');
+        sistemaMsg = `[SISTEMA] O sistema leu os arquivos e preencheu ${camposPreenchidos}/7 campos do código. Os campos ainda em null (${nulos}) precisam de contexto de negócio que não está no código. Cumprimente em 1 frase curta explicando que a análise técnica está pronta e você precisa de mais contexto, depois faça UMA pergunta objetiva sobre o campo null mais relevante.`;
+      } else if (temDoc) {
+        sistemaMsg = '[SISTEMA] O sistema leu os arquivos do projeto mas conseguiu pouca informação. Cumprimente brevemente e faça a primeira pergunta sobre o campo mais importante ainda em null. Seja direto.';
+      } else {
+        sistemaMsg = '[SISTEMA] Nenhum arquivo foi enviado. Cumprimente em 1 frase curta e comece a coletar as informações do projeto via conversa. Seja direto.';
+      }
+      messages.push({ role: 'user', content: sistemaMsg });
+    } else {
+      messages.push({
+        role: 'user',
+        content: '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
+      });
+    }
   }
 
-  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs`);
+  const temperature = fase === 'doc' || fase === 'doc_preview' ? 0.2 : 0.4;
+  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}`);
   let raw: string;
   try {
-    raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
+    raw = await llmChat(messages, { jsonMode: true, temperature });
     log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
   } catch (llmErr) {
     const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);

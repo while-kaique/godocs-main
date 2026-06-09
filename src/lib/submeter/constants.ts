@@ -15,8 +15,26 @@ export const FERRAMENTAS = [
   "Selenium", "Puppeteer", "Power BI", "Claude + Vercel", "Outros",
 ] as const;
 
-export const ACCEPTED_DOC_EXT = [".pdf", ".docx", ".doc", ".txt", ".md"];
-export const MAX_FILE_MB = 10;
+// Extensões de documentos legíveis
+export const ACCEPTED_DOC_EXT_BASE = [".pdf", ".docx", ".doc", ".txt", ".md"];
+// Extensões de código e config
+export const ACCEPTED_CODE_EXT = [
+  ".json", ".ts", ".tsx", ".js", ".jsx", ".py",
+  ".sql", ".sh", ".yaml", ".yml", ".toml", ".css", ".html",
+];
+export const ACCEPTED_DOC_EXT = [...ACCEPTED_DOC_EXT_BASE, ...ACCEPTED_CODE_EXT];
+
+export const MAX_FILE_MB = 10;   // por arquivo
+// Sem limite de contagem de arquivos — o gate é o orçamento de tokens (abaixo).
+// Cap de segurança alto só para evitar payloads patológicos.
+export const MAX_FILES = 5000;
+
+// Orçamento de TOKENS (não de arquivos). ~4 chars por token.
+// Analisamos a codebase/pasta inteira desde que não estoure 200k tokens.
+// BLOCK = 200k tokens (= cap de truncamento do backend); WARN um pouco antes.
+export const TOKEN_BUDGET = 200_000;             // tokens
+export const TOKEN_WARN_CHARS = 600_000;         // ~150k tokens
+export const TOKEN_BLOCK_CHARS = 800_000;        // ~200k tokens
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 
@@ -37,6 +55,8 @@ export interface FormData {
   participantes: string[];
   nomeProjeto: string;
   dataCriacao: string;
+  tipoProjeto: "saving" | "receita_incremental" | "";
+  descricaoBreve: string;
 }
 
 export interface FieldErrors {

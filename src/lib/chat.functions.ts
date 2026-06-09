@@ -12,7 +12,8 @@ import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
-import { extractTextFromBase64 } from '@/lib/extract-text.server';
+import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
+import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -162,8 +163,11 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         membros: z.array(z.string()).default([]),
         nome_projeto: z.string().min(1).max(200),
         data_criacao: z.string(),
-        doc_base64: z.string().min(1),
-        doc_filename: z.string().min(1),
+        tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
+        descricao_breve: z.string().max(1000).optional(),
+        docs: z.array(
+          z.object({ base64: z.string().min(1), filename: z.string().min(1) })
+        ).min(1).max(5000),
       })
       .parse(d)
   )
@@ -182,6 +186,8 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         membros: data.membros,
         nome: data.nome_projeto,
         data_criacao_projeto: data.data_criacao,
+        tipo_projeto: (data.tipo_projeto ?? null) as never,
+        descricao_breve: (data.descricao_breve ?? null) as never,
         status: 'rascunho',
       })
       .select()
@@ -193,11 +199,11 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
     }
     log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
-    // 2. Extrai texto da documentação
+    // 2. Extrai texto de todos os arquivos
     let docTexto = '';
     try {
-      docTexto = await extractTextFromBase64(data.doc_base64, data.doc_filename);
-      log('iniciarSubmissao', `Texto extraído: ${docTexto.length} chars`);
+      docTexto = await extractTextFromMultipleFiles(data.docs);
+      log('iniciarSubmissao', `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`);
     } catch (extractErr) {
       err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
       docTexto = '';
@@ -220,18 +226,33 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       nome_projeto: data.nome_projeto,
       data_criacao: data.data_criacao,
       doc_texto: docTexto || null,
+      descricao_breve: data.descricao_breve ?? null,
+      tipo_projeto: data.tipo_projeto ?? null,
     };
 
-    const coletadoInicial: DocumentacaoColetada = {
+    // 5. Extrator: preenche os 7 campos numa chamada única antes do chat
+    let coletadoInicial: DocumentacaoColetada = {
       ...documentacaoVazia(),
       nome_projeto: data.nome_projeto,
     };
 
-    // 5. Roda orquestrador — primeira mensagem do agente (fase doc)
+    if (docTexto || data.descricao_breve) {
+      try {
+        log('iniciarSubmissao', 'Rodando extrator automático...');
+        coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
+        const preenchidos = Object.values(coletadoInicial).filter(v => v !== null).length;
+        log('iniciarSubmissao', `Extrator: ${preenchidos}/7 campos preenchidos`);
+      } catch (extractorErr) {
+        err('iniciarSubmissao', 'Extrator falhou — continuando sem pré-preenchimento:', extractorErr);
+        coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
+      }
+    }
+
+    // 7. Roda orquestrador — primeira mensagem do agente (fase doc)
     log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
     const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
-    // 6. Salva resposta do assistente
+    // 8. Salva resposta do assistente
     await supabaseAdmin.from('chat_messages').insert({
       projeto_id: projeto.id,
       role: 'assistant',
@@ -245,7 +266,7 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       : (resultado as { content: string }).content;
     console.log('\n┌─────────────────────────────────────────────');
     console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
-    console.log(`│ 📄 Doc: ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
+    console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
     console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
     console.log('│ 🤖 IA:');
     respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
