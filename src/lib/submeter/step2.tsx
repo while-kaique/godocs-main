@@ -151,8 +151,8 @@ export function Step2({
           onChange={(v) => updateField("tipoProjeto", v as FormData["tipoProjeto"])}
           error={errors.tipoProjeto}
           options={[
-            { value: "saving", label: "💰 Saving — economia de tempo ou custo operacional" },
-            { value: "receita_incremental", label: "📈 Receita Incremental — aumento de receita gerado pela automação" },
+            { value: "saving", label: "💰 Saving" },
+            { value: "receita_incremental", label: "📈 Receita Incremental" },
           ]}
         />
       </FormGroup>

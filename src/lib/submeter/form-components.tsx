@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { EMAIL_RE, ALLOWED_DOMAINS_RE } from "./constants";
 
@@ -109,14 +110,80 @@ export function RadioGroup({
 }
 
 export function InfoTooltip({ children }: { children: React.ReactNode }) {
+  const iconRef = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState({ bottom: 0, left: 0 });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  function show() {
+    if (iconRef.current) {
+      const rect = iconRef.current.getBoundingClientRect();
+      setCoords({
+        bottom: window.innerHeight - rect.top + 10,
+        left: rect.left + rect.width / 2,
+      });
+    }
+    setVisible(true);
+  }
+
+  const tooltip = mounted && visible
+    ? createPortal(
+        <div
+          style={{
+            position: "fixed",
+            bottom: coords.bottom,
+            left: coords.left,
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            width: 300,
+            maxWidth: "90vw",
+            padding: "12px 14px",
+            background: "var(--go-blue)",
+            borderRadius: "var(--go-radius-sm)",
+            color: "rgba(255,255,255,0.92)",
+            fontSize: 12,
+            fontFamily: "'Poppins', sans-serif",
+            lineHeight: 1.55,
+            textAlign: "left",
+            boxShadow: "0 8px 24px rgba(0,89,169,0.3)",
+            pointerEvents: "none",
+          }}
+        >
+          {children}
+          <span
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              border: "5px solid transparent",
+              borderTopColor: "var(--go-blue)",
+            }}
+          />
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
-    <span className="go-info-icon" tabIndex={0} role="button" aria-label="Mais informações">
-      i
-      <span className="go-info-tooltip">
-        {children}
-        <span className="go-info-tooltip-arrow" />
+    <>
+      <span
+        ref={iconRef}
+        className="go-info-icon"
+        tabIndex={0}
+        role="button"
+        aria-label="Mais informações"
+        onMouseEnter={show}
+        onFocus={show}
+        onMouseLeave={() => setVisible(false)}
+        onBlur={() => setVisible(false)}
+      >
+        i
       </span>
-    </span>
+      {tooltip}
+    </>
   );
 }
 
