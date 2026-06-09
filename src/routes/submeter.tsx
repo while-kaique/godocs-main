@@ -73,6 +73,8 @@ function SubmeterPage() {
     participantes: [],
     nomeProjeto: "",
     dataCriacao: today,
+    tipoProjeto: "",
+    descricaoBreve: "",
   });
 
   const updateField = useCallback(
@@ -133,6 +135,8 @@ function SubmeterPage() {
     }
 
     if (n === 2) {
+      if (!form.tipoProjeto)
+        errs.tipoProjeto = "Selecione o tipo do projeto";
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
       if (!form.dataCriacao) {
@@ -142,6 +146,8 @@ function SubmeterPage() {
       } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
+      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
+        errs.descricaoBreve = "Descreva o projeto em pelo menos 20 caracteres";
       if (!arquivo) errs.documentacao = "Envie a documentação do projeto";
     }
 
@@ -204,6 +210,8 @@ function SubmeterPage() {
           membros: form.participantes,
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
+          tipo_projeto: form.tipoProjeto || undefined,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
           doc_base64: base64,
           doc_filename: arquivo.name,
         },

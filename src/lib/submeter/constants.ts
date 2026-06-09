@@ -15,8 +15,10 @@ export const FERRAMENTAS = [
   "Selenium", "Puppeteer", "Power BI", "Claude + Vercel", "Outros",
 ] as const;
 
-export const ACCEPTED_DOC_EXT = [".pdf", ".docx", ".doc", ".txt", ".md"];
+export const ACCEPTED_DOC_EXT = [".pdf", ".docx", ".doc", ".txt", ".md", ".json"];
 export const MAX_FILE_MB = 10;
+export const TOKEN_WARN_CHARS = 80_000;
+export const TOKEN_BLOCK_CHARS = 200_000;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 
@@ -37,6 +39,8 @@ export interface FormData {
   participantes: string[];
   nomeProjeto: string;
   dataCriacao: string;
+  tipoProjeto: "saving" | "receita_incremental" | "";
+  descricaoBreve: string;
 }
 
 export interface FieldErrors {

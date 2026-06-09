@@ -29,7 +29,14 @@ ${ctx.doc_texto}
 ---`
     : `(Nenhuma documentação foi enviada — colete todas as informações via conversa.)`;
 
-  return `Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
+  const descricaoSection = ctx.descricao_breve?.trim()
+    ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):
+${ctx.descricao_breve.trim()}
+
+`
+    : '';
+
+  return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
 Seu objetivo é analisar a documentação enviada pelo usuário, validar as informações, e reorganizar tudo no formato padrão.
 
 ${docSection}
@@ -238,21 +245,31 @@ export async function runOrchestrator(
 
   if (history.length === 0) {
     const temDoc = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
-    messages.push({
-      role: 'user',
-      content:
-        fase === 'doc'
-          ? (temDoc
+    if (fase === 'doc') {
+      const camposPreenchidos = Object.values(coletado).filter(v => v !== null).length;
+      const todosPreenchidos = camposPreenchidos >= 7;
+      const muitosPreenchidos = camposPreenchidos >= 5;
+      const sistemaMsg = todosPreenchidos
+        ? '[SISTEMA] O extrator automático já preencheu todos os 7 campos com base na documentação e descrição enviadas. Gere o preview DIRETO agora, sem cumprimentos e sem perguntas.'
+        : muitosPreenchidos
+          ? `[SISTEMA] O extrator automático preencheu ${camposPreenchidos}/7 campos. Preencha os campos restantes silenciosamente se conseguir inferir da doc. Se não conseguir, cumprimente em 1 frase curta e faça UMA pergunta sobre o primeiro campo ainda em null. NÃO liste o que já foi extraído.`
+          : temDoc
             ? '[SISTEMA] Leia a documentação enviada. Extraia os 7 campos e atualize "coletado" silenciosamente. NÃO liste o que extraiu — o usuário verá no preview. Se todos os campos estiverem cobertos, gere o preview direto. Se faltar algo, cumprimente em 1 frase curta e faça a primeira pergunta sobre o que falta. Seja breve.'
-            : '[SISTEMA] Cumprimente em 1 frase curta e faça a primeira pergunta para documentar o projeto. Seja breve e direto.')
-          : '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
-    });
+            : '[SISTEMA] Cumprimente em 1 frase curta e faça a primeira pergunta para documentar o projeto. Seja breve e direto.';
+      messages.push({ role: 'user', content: sistemaMsg });
+    } else {
+      messages.push({
+        role: 'user',
+        content: '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
+      });
+    }
   }
 
-  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs`);
+  const temperature = fase === 'doc' || fase === 'doc_preview' ? 0.2 : 0.4;
+  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}`);
   let raw: string;
   try {
-    raw = await llmChat(messages, { jsonMode: true, temperature: 0.4 });
+    raw = await llmChat(messages, { jsonMode: true, temperature });
     log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
   } catch (llmErr) {
     const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);

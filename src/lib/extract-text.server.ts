@@ -56,6 +56,11 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
       }
       text = result.value;
 
+    } else if (ext === 'json') {
+      log('Modo: JSON — lendo como texto puro');
+      text = buffer.toString('utf-8');
+      log(`JSON lido: ${text.length} chars`);
+
     } else {
       log(`Extensão desconhecida "${ext}" — tentando utf-8`);
       text = buffer.toString('utf-8');
