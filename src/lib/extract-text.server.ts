@@ -23,26 +23,26 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
       log(`Texto extraído: ${text.length} chars`);
 
     } else if (ext === 'pdf') {
-      log('Modo: PDF — importando pdf-parse...');
-      const pdfMod = await import('pdf-parse');
-      log('pdf-parse importado. Chaves do módulo:', Object.keys(pdfMod));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mod = pdfMod as any;
-      if (typeof mod.PDFParse === 'function') {
-        // pdf-parse v2: new PDFParse({ data }) → getText() retorna { text, pages }
-        log('Usando pdf-parse v2 (PDFParse class)...');
-        const parser = new mod.PDFParse({ data: new Uint8Array(buffer) });
-        const result = await parser.getText();
-        text = result.text ?? '';
-        log(`PDF parseado (v2): ${result.pages?.length ?? 0} página(s), ${text.length} chars`);
-      } else {
-        // pdf-parse v1: função default
-        const pdfParse = mod.default ?? mod;
-        log('Usando pdf-parse v1 (default function)...');
-        const result = await pdfParse(buffer);
-        text = result.text;
-        log(`PDF parseado (v1): ${result.numpages} página(s), ${text.length} chars`);
+      log('Modo: PDF — enviando ao OCR Worker (Cloudflare)...');
+      const ocrUrl = process.env.OCR_WORKER_URL;
+      const ocrToken = process.env.OCR_WORKER_TOKEN;
+      if (!ocrUrl || !ocrToken) {
+        throw new Error('OCR_WORKER_URL e OCR_WORKER_TOKEN devem estar definidos nas variáveis de ambiente');
       }
+      const resp = await fetch(ocrUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          Authorization: `Bearer ${ocrToken}`,
+        },
+        body: buffer,
+      });
+      if (!resp.ok) {
+        throw new Error(`OCR Worker retornou ${resp.status}: ${await resp.text()}`);
+      }
+      const json = await resp.json() as { text?: string; content?: string };
+      text = json.text ?? json.content ?? '';
+      log(`PDF extraído via OCR Worker: ${text.length} chars`);
 
     } else if (ext === 'docx' || ext === 'doc') {
       log('Modo: DOCX — importando mammoth...');

@@ -8,8 +8,27 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  nitro: {
+    preset: "cloudflare-module",
+    cloudflare: { nodeCompat: true, deployConfig: true },
+  },
+  vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/@radix-ui")) return "vendor-radix";
+            if (id.includes("node_modules/@supabase")) return "vendor-supabase";
+            if (id.includes("node_modules/@tanstack")) return "vendor-tanstack";
+            if (id.includes("node_modules/react-dom")) return "vendor-react";
+            if (id.includes("node_modules/react/")) return "vendor-react";
+          },
+        },
+      },
+      target: "es2022",
+      minify: "esbuild",
+    },
   },
 });

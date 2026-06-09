@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(bun run:*)",
+      "Bash(xargs wc:*)",
+      "Bash(npm ls:*)",
+      "mcp__claude_ai_Supabase__list_projects"
     ]
   }
 }

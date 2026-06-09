@@ -1,0 +1,960 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "submit_workflows_post",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        1136
+      ],
+      "id": "0d73b1fd-31b5-4d8a-8bb2-5112b4c0a933",
+      "name": "Receber Dados",
+      "webhookId": "submit_workflows_post"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        848
+      ],
+      "id": "af35f266-9e07-4b03-a42c-6a0fae06e2dc",
+      "name": "Responder Sucesso"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        1232
+      ],
+      "id": "c006e83b-f9c0-4400-aed1-29eeb2c128ff",
+      "name": "Responder Sucesso1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "571ecfa5-43bb-4f9d-95fc-0df3e665c442",
+              "leftValue": "={{ $json.Projeto.toString() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        1136
+      ],
+      "id": "2126fd29-1c2b-452e-9d99-c452851e94ab",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "data_submissao",
+              "value": "={{ $now.setZone('America/Fortaleza').toFormat('dd/MM/yyyy HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "2a5c69a9-c129-49d5-9370-913cfcb38acd",
+              "name": "data_criacao",
+              "value": "={{ $json.body.data_criacao.split(\"-\")[2]+ \"/\" +$json.body.data_criacao.split(\"-\")[1] + \"/\" + $json.body.data_criacao.split(\"-\")[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "nome",
+              "value": "={{ $json.body.nome }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "email",
+              "value": "={{ $json.body.email }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "area",
+              "value": "={{ $json.body.area }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "ferramenta",
+              "value": "={{ $json.body.ferramenta.replaceAll(\"Outros: \", \"\") }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "nome_projeto",
+              "value": "={{ $json.body.nome_projeto }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "descricao",
+              "value": "={{ $json.body.descricao }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "check_mercado",
+              "value": "={{ $json.body.check_mercado }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "saving_horas",
+              "value": "={{ Number($json.body.saving_horas) }}",
+              "type": "number"
+            },
+            {
+              "id": "10",
+              "name": "saving_reais",
+              "value": "={{ Number($json.body.saving_reais) }}",
+              "type": "number"
+            },
+            {
+              "id": "11",
+              "name": "arquivo_nome",
+              "value": "={{ $binary.documentacao.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "102c8c58-8b06-4662-b362-1cd1b32f45b2",
+              "name": "memorial_calculo",
+              "value": "={{ $json.body.memorial_calculo }}",
+              "type": "string"
+            },
+            {
+              "id": "3307a5d9-3afb-4a87-803e-a7d7c25a2410",
+              "name": "participantes",
+              "value": "={{ $json.body.participantes }}",
+              "type": "string"
+            },
+            {
+              "id": "d8077d22-f594-478e-ae4b-83b3066d49d9",
+              "name": "tipo_saving",
+              "value": "={{ $json.body.tipo_saving }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        1136
+      ],
+      "id": "c673c2c8-e0f6-4505-a0c2-2873ee241641",
+      "name": "Formatar Dados"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "data_submissao",
+              "value": "={{ $('Formatar Dados').item.json.data_submissao }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "nome",
+              "value": "={{ $('Formatar Dados').item.json.nome }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "email",
+              "value": "={{ $('Formatar Dados').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "area",
+              "value": "={{ $('Formatar Dados').item.json.area }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "ferramenta",
+              "value": "={{ $('Formatar Dados').item.json.ferramenta }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "nome_projeto",
+              "value": "={{ $('Formatar Dados').item.json.nome_projeto }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "descricao_projeto",
+              "value": "={{ $('Formatar Dados').item.json.descricao }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "check_mercado",
+              "value": "={{ $('Formatar Dados').item.json.check_mercado }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "saving_horas",
+              "value": "={{ $('Formatar Dados').item.json.saving_horas }}",
+              "type": "number"
+            },
+            {
+              "id": "11",
+              "name": "saving_reais",
+              "value": "={{ $('Formatar Dados').item.json.saving_reais }}",
+              "type": "number"
+            },
+            {
+              "id": "35bb7e3d-5f05-4aa1-9cc3-926a3574c2fe",
+              "name": "memorial_calculo",
+              "value": "={{ $('Formatar Dados').item.json.memorial_calculo }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "status",
+              "value": "={{ $('Formatar Dados').item.json.area == \"RPA\" ? \"Aprovado\" : \"Pendente\" }}",
+              "type": "string"
+            },
+            {
+              "id": "db93893b-490f-4fc8-a609-868d06d6fb55",
+              "name": "participantes",
+              "value": "={{ $('Formatar Dados').item.json.participantes }}",
+              "type": "string"
+            },
+            {
+              "id": "1696cf03-7f53-490c-9c9b-b06c7aa5658e",
+              "name": "data_criacao",
+              "value": "={{ $('Formatar Dados').item.json.data_criacao }}",
+              "type": "string"
+            },
+            {
+              "id": "3ef518c3-ddca-4b94-a99b-4ecbe0b1cd30",
+              "name": "tipo_saving",
+              "value": "={{ $('Formatar Dados').item.json.tipo_saving }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        1136
+      ],
+      "id": "e995e573-d38e-43ec-b44f-26c7bb29043a",
+      "name": "Preparar para Planilha"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk",
+          "mode": "list",
+          "cachedResultName": "Submissão de Automações - Análise",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Página1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Projeto",
+              "lookupValue": "={{ $json.nome_projeto }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        1136
+      ],
+      "id": "4d2ffe0a-2d4f-41fb-b335-b02772e5ea42",
+      "name": "Get row(s) in sheet",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rtG5Ce2KiJNhdluB",
+          "name": "RPA IA - Kaique"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Projetos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data Submissão": "={{ $('Preparar para Planilha').item.json.data_submissao }}",
+            "Data Criação": "={{ $('Preparar para Planilha').item.json.data_criacao }}",
+            "Área": "={{ $('Preparar para Planilha').item.json.area }}",
+            "Nome Completo": "={{ $('Preparar para Planilha').item.json.nome }}",
+            "Participantes": "={{ $('Preparar para Planilha').item.json.participantes }}",
+            "Email": "={{ $('Preparar para Planilha').item.json.email }}",
+            "Ferramenta": "={{ $('Preparar para Planilha').item.json.ferramenta }}",
+            "Projeto": "={{ $('Preparar para Planilha').item.json.nome_projeto }}",
+            "Descrição": "={{ $('Preparar para Planilha').item.json.descricao_projeto }}",
+            "URL": "={{ $json.webViewLink}} ",
+            "Tem mercado": "={{ $('Preparar para Planilha').item.json.check_mercado }}",
+            "Saving Horas": "={{ $('Preparar para Planilha').item.json.saving_horas }}",
+            "Saving Reais": "={{ $('Preparar para Planilha').item.json.saving_reais }}",
+            "Memorial de Saving": "={{ $('Preparar para Planilha').item.json.memorial_calculo }}",
+            "Status": "={{ $('Preparar para Planilha').item.json.status }}",
+            "Tipo de Saving": "={{ $('Preparar para Planilha').item.json.tipo_saving }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Data Submissão",
+              "displayName": "Data Submissão",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Data Criação",
+              "displayName": "Data Criação",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Área",
+              "displayName": "Área",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nome Completo",
+              "displayName": "Nome Completo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Projeto",
+              "displayName": "Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Participantes",
+              "displayName": "Participantes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Descrição",
+              "displayName": "Descrição",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ferramenta",
+              "displayName": "Ferramenta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tem mercado",
+              "displayName": "Tem mercado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Saving Horas",
+              "displayName": "Saving Horas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Saving Reais",
+              "displayName": "Saving Reais",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo de Saving",
+              "displayName": "Tipo de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Memorial de Saving",
+              "displayName": "Memorial de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status Prod",
+              "displayName": "Status Prod",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Obs",
+              "displayName": "Obs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Reenvio",
+              "displayName": "Reenvio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1488,
+        1040
+      ],
+      "id": "446dfdcb-e396-4929-b2ef-7bd324ab9c27",
+      "name": "Salvar na Planilha",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rtG5Ce2KiJNhdluB",
+          "name": "RPA IA - Kaique"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c9e42c2a-9f65-49b9-9c77-26693eca9968",
+              "leftValue": "={{ $json['Data Submissão'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1712,
+        1040
+      ],
+      "id": "65f450ea-46a9-46cd-b75b-7cb46c2541ae",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1264,
+        1232
+      ],
+      "id": "c64dba70-bca4-4f54-8c82-e0fa8aeed89e",
+      "name": "Responder Sucesso2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQArNbm72U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9mlk0to-8pN9Va8OXol-w1dosolvqYKZ824QJ1iAF5Q",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=──────────────────────\n\n🚨 *Novo fluxo de automação cadastrado – aprovação pendente*\n\n📌 *Projeto:* {{ $json[\"Projeto\"] }}\n🏷️ *Área:* {{ $json[\"Área\"] }}\n🛠️ *Ferramenta:* {{ $json[\"Ferramenta\"] }}\n\n👤 *Solicitante:* {{ $json[\"Nome Completo\"] }}\n📧 *E-mail:* {{ $json[\"Email\"] }}\n\n📝 *Descrição resumida:*\n{{ $json[\"Descrição\"] }}\n\n⏱️ *Saving estimado (horas/mês):* {{\n  Number($json[\"Saving Horas\"]).toLocaleString(\"pt-BR\")\n}} horas  \n\n💰 *Saving estimado (R$/mês):* R$ {{\n  Number($json[\"Saving Reais\"]).toLocaleString(\"pt-BR\", {\n    minimumFractionDigits: 2,\n    maximumFractionDigits: 2\n  })\n}}\n\n📎 *Documentação:* {{ $json[\"URL\"] }}\n\n📅 *Data da submissão:* {{ $json[\"Data Submissão\"].split(\" \")[0] }}\n📊 *Status atual:* {{ $json[\"Status\"] }}\n\n👉 *Aguardando avaliação e aprovação dos responsáveis.*\n\n*Link da planilha de automações*: https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk\n\n──────────────────────"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1fbf98e2-79a5-47be-a8d3-49ac00131016",
+      "name": "Aviso Google Chat4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1936,
+        1040
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "documentacao",
+        "name": "={{ $now.setZone('America/Fortaleza').toFormat('yyyy-MM-dd_HHmmss') }}_{{ $('Formatar Dados').item.json.nome_projeto.replace(/[^a-zA-Z0-9]/g, '_') }}_{{ $('Formatar Dados').item.json.area }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1e_Fk8EhFsv_W-3A3dRpMIa2Wg1pBHem_"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1264,
+        1040
+      ],
+      "id": "9ea23d9d-005a-4ec5-be48-986265c7a06c",
+      "name": "Upload Documentação",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mmPbBdDkbtgP8tOJ",
+          "name": "Google Drive RPA (admin)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "errorMessage": "Deu ruim!"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        1232
+      ],
+      "id": "715aff16-083c-48c1-bf62-d0b856a6e392",
+      "name": "Stop and Error"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $('Formatar Dados').item.json;\n\nconst fmtReais = Number(dados.saving_reais).toLocaleString('pt-BR', {minimumFractionDigits: 2});\n\nconst html = `<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Sucesso | Triagem de Fluxos</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap\" rel=\"stylesheet\">\n  <style>\n    :root {\n      --go-blue: #0059A9;\n      --go-lime: #D7DB00;\n      --go-cream: #FBF4EE;\n      --go-light-blue: #C7E9FD;\n      --go-white: #FFFFFF;\n      --go-text-primary: #333333;\n      --go-text-heading: #0059A9;\n      --font-family: 'Poppins', sans-serif;\n      --fw-regular: 400;\n      --fw-semibold: 600;\n      --fw-bold: 700;\n      --fw-extrabold: 800;\n      --radius-sm: 8px;\n      --radius-md: 12px;\n      --radius-lg: 16px;\n      --radius-xl: 24px;\n      --radius-pill: 9999px;\n      --shadow-lg: 0 8px 32px rgba(0, 89, 169, 0.10);\n      --shadow-lime-glow: 0 4px 20px rgba(215, 219, 0, 0.3);\n    }\n    *{margin:0;padding:0;box-sizing:border-box}\n    body{font-family:var(--font-family);background:var(--go-blue);min-height:100vh;color:var(--go-text-primary);line-height:1.6;padding:10px}\n    .page-frame{display:none}\n    .page-inner{background:var(--go-cream);min-height:calc(100vh - 20px);border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center;padding:20px}\n    .container{position:relative;z-index:1;max-width:540px;width:100%}\n    .header{text-align:center;margin-bottom:24px}\n    .header h1{font-size:clamp(1.5rem, 3.5vw, 1.75rem);font-weight:var(--fw-extrabold);color:var(--go-text-heading);letter-spacing:-0.01em;margin-bottom:8px}\n    .logo-container{display:inline-flex;align-items:center;justify-content:center}\n    .logo-text{font-size:11px;font-weight:var(--fw-semibold);color:var(--go-blue);letter-spacing:0.15em;text-transform:uppercase;background:var(--go-lime);padding:4px 14px;border-radius:var(--radius-pill)}\n    .success-card{background:var(--go-white);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-xl);padding:40px 32px 32px;text-align:center;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}\n    .success-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #16a34a 0%, #4ade80 50%, var(--go-lime) 100%)}\n    @media(max-width:640px){.success-card{padding:28px 18px 24px}}\n    .browser-dots{display:flex;gap:7px;margin-bottom:24px;justify-content:center}\n    .browser-dots span{width:10px;height:10px;border-radius:50%;background:var(--go-lime);display:block}\n    .browser-dots span:first-child{background:var(--go-blue);opacity:0.25}\n    .browser-dots span:nth-child(2){background:var(--go-blue);opacity:0.15}\n    .success-icon-wrapper{width:72px;height:72px;background:rgba(22,163,74,0.06);border:2px solid rgba(22,163,74,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;animation:pulse 2.5s ease-in-out infinite}\n    .success-icon-inner{width:48px;height:48px;background:rgba(22,163,74,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center}\n    .success-icon-inner svg{width:24px;height:24px;stroke:#16a34a;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}\n    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,0.08)}50%{box-shadow:0 0 0 12px rgba(22,163,74,0)}}\n    .success-card h2{font-size:22px;font-weight:var(--fw-extrabold);color:var(--go-text-heading);margin-bottom:10px;letter-spacing:-0.01em}\n    .success-card .subtitle{color:var(--go-text-primary);font-size:14px;margin-bottom:28px;line-height:1.6}\n    .info-box{background:var(--go-light-blue);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-md);padding:18px;margin-bottom:28px;text-align:left}\n    .info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(0,89,169,0.06);font-size:13px;gap:12px}\n    .info-row:last-child{border-bottom:none}\n    .info-label{color:var(--go-text-primary);flex-shrink:0;font-weight:var(--fw-regular)}\n    .info-value{color:var(--go-blue);font-weight:var(--fw-semibold);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n    .status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:rgba(215,219,0,0.12);border:1px solid rgba(215,219,0,0.3);border-radius:var(--radius-pill);color:#8a7d00;font-size:12px;font-weight:var(--fw-semibold)}\n    .saving-highlight{display:inline-flex;align-items:center;gap:4px;color:#16a34a;font-weight:var(--fw-bold)}\n    .divider{height:1.5px;background:rgba(0,89,169,0.08);margin:24px 0}\n    .actions{display:flex;flex-direction:column;align-items:center;gap:12px}\n    .btn-primary{display:inline-flex;align-items:center;gap:8px;padding:12px 32px;background:var(--go-lime);border:none;border-radius:var(--radius-pill);color:var(--go-blue);font-size:14px;font-weight:var(--fw-bold);font-family:var(--font-family);text-decoration:none;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s}\n    .btn-primary:hover{transform:translateY(-2px);box-shadow:var(--shadow-lime-glow)}\n    .help-text{color:#8b8b9a;font-size:12px}\n    .footer{text-align:center;margin-top:20px;color:var(--go-text-primary);font-size:11px;opacity:0.7}\n    .footer a{color:var(--go-blue);text-decoration:none;font-weight:var(--fw-semibold)}\n    .footer a:hover{text-decoration:underline}\n  </style>\n</head>\n<body>\n  <div class=\"page-frame\"></div>\n  <div class=\"page-inner\">\n  <div class=\"container\">\n    <header class=\"header\">\n      <h1>Triagem de Fluxos</h1>\n      <div class=\"logo-container\">\n        <span class=\"logo-text\">RPA & IA</span>\n      </div>\n    </header>\n    <div class=\"success-card\">\n      <div class=\"browser-dots\"><span></span><span></span><span></span></div>\n      <div class=\"success-icon-wrapper\">\n        <div class=\"success-icon-inner\">\n          <svg viewBox=\"0 0 24 24\"><polyline points=\"20 6 9 17 4 12\"></polyline></svg>\n        </div>\n      </div>\n      <h2>Enviado com Sucesso!</h2>\n      <p class=\"subtitle\">\n        Sua submissão foi recebida e será analisada pela equipe de RPA/IA.<br>\n        Você receberá um retorno em breve.\n      </p>\n      <div class=\"info-box\">\n        <div class=\"info-row\">\n          <span class=\"info-label\">Projeto</span>\n          <span class=\"info-value\">${dados.nome_projeto}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Área</span>\n          <span class=\"info-value\">${dados.area}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Saving Horas</span>\n          <span class=\"info-value\"><span class=\"saving-highlight\">${dados.saving_horas}h/mês</span></span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Saving Reais</span>\n          <span class=\"info-value\"><span class=\"saving-highlight\">R$ ${fmtReais}/mês</span></span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Status</span>\n          <span class=\"info-value\"><span class=\"status-badge\">Pendente de análise</span></span>\n        </div>\n      </div>\n      <div class=\"actions\">\n        <a href=\"https://n8n-study.gogroupgl.com/webhook/submit_workflows\" class=\"btn-primary\">Submeter outro fluxo</a>\n        <span class=\"help-text\">Dúvidas? Entre em contato com a equipe de RPA/IA</span>\n      </div>\n    </div>\n    <footer class=\"footer\">\n      Desenvolvido pela equipe de <a href=\"#\">RPA & IA</a> · GoGroup © 2025\n    </footer>\n  </div>\n  </div>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        848
+      ],
+      "id": "1edb3ad0-050a-4312-8ed2-ea507933157c",
+      "name": "Gerar HTML Sucesso"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $('Formatar Dados').item.json;\n\nconst html = `<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Erro | Triagem de Fluxos</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap\" rel=\"stylesheet\">\n  <style>\n    :root {\n      --go-blue: #0059A9;\n      --go-lime: #D7DB00;\n      --go-cream: #FBF4EE;\n      --go-light-blue: #C7E9FD;\n      --go-white: #FFFFFF;\n      --go-text-primary: #333333;\n      --go-text-heading: #0059A9;\n      --font-family: 'Poppins', sans-serif;\n      --fw-regular: 400;\n      --fw-semibold: 600;\n      --fw-bold: 700;\n      --fw-extrabold: 800;\n      --radius-sm: 8px;\n      --radius-md: 12px;\n      --radius-lg: 16px;\n      --radius-xl: 24px;\n      --radius-pill: 9999px;\n      --shadow-lg: 0 8px 32px rgba(0, 89, 169, 0.10);\n      --shadow-lime-glow: 0 4px 20px rgba(215, 219, 0, 0.3);\n    }\n    *{margin:0;padding:0;box-sizing:border-box}\n    body{font-family:var(--font-family);background:var(--go-blue);min-height:100vh;color:var(--go-text-primary);line-height:1.6;padding:10px}\n    .page-frame{display:none}\n    .page-inner{background:var(--go-cream);min-height:calc(100vh - 20px);border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center;padding:20px}\n    .container{position:relative;z-index:1;max-width:540px;width:100%}\n    .header{text-align:center;margin-bottom:24px}\n    .header h1{font-size:clamp(1.5rem, 3.5vw, 1.75rem);font-weight:var(--fw-extrabold);color:var(--go-text-heading);letter-spacing:-0.01em;margin-bottom:8px}\n    .logo-container{display:inline-flex;align-items:center;justify-content:center}\n    .logo-text{font-size:11px;font-weight:var(--fw-semibold);color:var(--go-blue);letter-spacing:0.15em;text-transform:uppercase;background:var(--go-lime);padding:4px 14px;border-radius:var(--radius-pill)}\n    .error-card{background:var(--go-white);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-xl);padding:40px 32px 32px;text-align:center;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}\n    .error-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%)}\n    @media(max-width:640px){.error-card{padding:28px 18px 24px}}\n    .browser-dots{display:flex;gap:7px;margin-bottom:24px;justify-content:center}\n    .browser-dots span{width:10px;height:10px;border-radius:50%;background:var(--go-lime);display:block}\n    .browser-dots span:first-child{background:var(--go-blue);opacity:0.25}\n    .browser-dots span:nth-child(2){background:var(--go-blue);opacity:0.15}\n    .error-icon-wrapper{width:72px;height:72px;background:rgba(220,38,38,0.06);border:2px solid rgba(220,38,38,0.18);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;animation:pulse 2.5s ease-in-out infinite}\n    .error-icon-inner{width:48px;height:48px;background:rgba(220,38,38,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:#dc2626;font-weight:var(--fw-bold)}\n    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.08)}50%{box-shadow:0 0 0 12px rgba(220,38,38,0)}}\n    .error-card h2{font-size:22px;font-weight:var(--fw-extrabold);color:var(--go-text-heading);margin-bottom:10px;letter-spacing:-0.01em}\n    .error-card .subtitle{color:var(--go-text-primary);font-size:14px;margin-bottom:28px;line-height:1.6}\n    .info-box{background:var(--go-light-blue);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-md);padding:18px;margin-bottom:28px;text-align:left}\n    .info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(0,89,169,0.06);font-size:13px;gap:12px}\n    .info-row:last-child{border-bottom:none}\n    .info-label{color:var(--go-text-primary);flex-shrink:0;font-weight:var(--fw-regular)}\n    .info-value{color:var(--go-blue);font-weight:var(--fw-semibold);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n    .status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-pill);color:#dc2626;font-size:12px;font-weight:var(--fw-semibold)}\n    .divider{height:1.5px;background:rgba(0,89,169,0.08);margin:24px 0}\n    .actions{display:flex;flex-direction:column;align-items:center;gap:12px}\n    .btn-retry{display:inline-flex;align-items:center;gap:8px;padding:12px 32px;background:var(--go-lime);border:none;border-radius:var(--radius-pill);color:var(--go-blue);font-size:14px;font-weight:var(--fw-bold);font-family:var(--font-family);text-decoration:none;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s}\n    .btn-retry:hover{transform:translateY(-2px);box-shadow:var(--shadow-lime-glow)}\n    .help-text{color:#8b8b9a;font-size:12px}\n    .footer{text-align:center;margin-top:20px;color:var(--go-text-primary);font-size:11px;opacity:0.7}\n    .footer a{color:var(--go-blue);text-decoration:none;font-weight:var(--fw-semibold)}\n    .footer a:hover{text-decoration:underline}\n  </style>\n</head>\n<body>\n  <div class=\"page-frame\"></div>\n  <div class=\"page-inner\">\n  <div class=\"container\">\n    <header class=\"header\">\n      <h1>Triagem de Fluxos</h1>\n      <div class=\"logo-container\">\n        <span class=\"logo-text\">RPA & IA</span>\n      </div>\n    </header>\n    <div class=\"error-card\">\n      <div class=\"browser-dots\"><span></span><span></span><span></span></div>\n      <div class=\"error-icon-wrapper\">\n        <div class=\"error-icon-inner\">✕</div>\n      </div>\n      <h2>Erro na Submissão</h2>\n      <p class=\"subtitle\">\n        Tivemos um problema ao processar seu fluxo.<br>\n        Entre em contato com o time de RPA/IA para entender o ocorrido.\n      </p>\n      <div class=\"info-box\">\n        <div class=\"info-row\">\n          <span class=\"info-label\">Projeto</span>\n          <span class=\"info-value\">${dados?.nome_projeto || '—'}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Área</span>\n          <span class=\"info-value\">${dados?.area || '—'}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Status</span>\n          <span class=\"info-value\"><span class=\"status-badge\">Falha na submissão</span></span>\n        </div>\n      </div>\n      <div class=\"actions\">\n        <a href=\"https://n8n-study.gogroupgl.com/webhook/submit_workflows\" class=\"btn-retry\">Tentar novamente</a>\n        <span class=\"help-text\">Em caso de dúvidas, acione a equipe de RPA/IA</span>\n      </div>\n    </div>\n    <footer class=\"footer\">\n      Desenvolvido pela equipe de <a href=\"#\">RPA & IA</a> · GoGroup © 2025\n    </footer>\n  </div>\n  </div>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        1232
+      ],
+      "id": "abc10993-098a-4aaa-b904-6d8713478d6f",
+      "name": "Gerar HTML Fracasso"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dados = $('Formatar Dados').item.json;\n\nconst html = `<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Projeto já cadastrado | Triagem de Fluxos</title>\n  <link href=\"https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap\" rel=\"stylesheet\">\n  <style>\n    :root {\n      --go-blue: #0059A9;\n      --go-lime: #D7DB00;\n      --go-cream: #FBF4EE;\n      --go-light-blue: #C7E9FD;\n      --go-white: #FFFFFF;\n      --go-text-primary: #333333;\n      --go-text-heading: #0059A9;\n      --font-family: 'Poppins', sans-serif;\n      --fw-regular: 400;\n      --fw-semibold: 600;\n      --fw-bold: 700;\n      --fw-extrabold: 800;\n      --radius-sm: 8px;\n      --radius-md: 12px;\n      --radius-lg: 16px;\n      --radius-xl: 24px;\n      --radius-pill: 9999px;\n      --shadow-lg: 0 8px 32px rgba(0, 89, 169, 0.10);\n    }\n    *{margin:0;padding:0;box-sizing:border-box}\n    body{font-family:var(--font-family);background:var(--go-blue);min-height:100vh;color:var(--go-text-primary);line-height:1.6;padding:10px}\n    .page-frame{display:none}\n    .page-inner{background:var(--go-cream);min-height:calc(100vh - 20px);border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center;padding:20px}\n    .container{position:relative;z-index:1;max-width:540px;width:100%}\n    .header{text-align:center;margin-bottom:24px}\n    .header h1{font-size:clamp(1.5rem, 3.5vw, 1.75rem);font-weight:var(--fw-extrabold);color:var(--go-text-heading);letter-spacing:-0.01em;margin-bottom:8px}\n    .logo-container{display:inline-flex;align-items:center;justify-content:center}\n    .logo-text{font-size:11px;font-weight:var(--fw-semibold);color:var(--go-blue);letter-spacing:0.15em;text-transform:uppercase;background:var(--go-lime);padding:4px 14px;border-radius:var(--radius-pill)}\n    .warning-card{background:var(--go-white);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-xl);padding:40px 32px 32px;text-align:center;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}\n    .warning-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #b8860b 0%, #e0b028 50%, var(--go-lime) 100%)}\n    @media(max-width:640px){.warning-card{padding:28px 18px 24px}}\n    .browser-dots{display:flex;gap:7px;margin-bottom:24px;justify-content:center}\n    .browser-dots span{width:10px;height:10px;border-radius:50%;background:var(--go-lime);display:block}\n    .browser-dots span:first-child{background:var(--go-blue);opacity:0.25}\n    .browser-dots span:nth-child(2){background:var(--go-blue);opacity:0.15}\n    .warning-icon-wrapper{width:72px;height:72px;background:rgba(215,219,0,0.08);border:2px solid rgba(215,219,0,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;animation:pulse 2.5s ease-in-out infinite}\n    .warning-icon-inner{width:48px;height:48px;background:rgba(215,219,0,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px}\n    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(215,219,0,0.08)}50%{box-shadow:0 0 0 12px rgba(215,219,0,0)}}\n    .warning-card h2{font-size:22px;font-weight:var(--fw-extrabold);color:var(--go-text-heading);margin-bottom:10px;letter-spacing:-0.01em}\n    .warning-card .subtitle{color:var(--go-text-primary);font-size:14px;margin-bottom:28px;line-height:1.6}\n    .info-box{background:var(--go-light-blue);border:1px solid rgba(0,89,169,0.08);border-radius:var(--radius-md);padding:18px;margin-bottom:24px;text-align:left}\n    .info-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(0,89,169,0.06);font-size:13px;gap:12px}\n    .info-row:last-child{border-bottom:none}\n    .info-label{color:var(--go-text-primary);flex-shrink:0;font-weight:var(--fw-regular)}\n    .info-value{color:var(--go-blue);font-weight:var(--fw-semibold);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n    .status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:rgba(215,219,0,0.12);border:1px solid rgba(215,219,0,0.3);border-radius:var(--radius-pill);color:#8a7d00;font-size:12px;font-weight:var(--fw-semibold)}\n    .help-text{color:#8b8b9a;font-size:12px;text-align:center}\n    .footer{text-align:center;margin-top:20px;color:var(--go-text-primary);font-size:11px;opacity:0.7}\n    .footer a{color:var(--go-blue);text-decoration:none;font-weight:var(--fw-semibold)}\n    .footer a:hover{text-decoration:underline}\n  </style>\n</head>\n<body>\n  <div class=\"page-frame\"></div>\n  <div class=\"page-inner\">\n  <div class=\"container\">\n    <header class=\"header\">\n      <h1>Triagem de Fluxos</h1>\n      <div class=\"logo-container\">\n        <span class=\"logo-text\">RPA & IA</span>\n      </div>\n    </header>\n    <div class=\"warning-card\">\n      <div class=\"browser-dots\"><span></span><span></span><span></span></div>\n      <div class=\"warning-icon-wrapper\">\n        <div class=\"warning-icon-inner\">⚠️</div>\n      </div>\n      <h2>Projeto já cadastrado</h2>\n      <p class=\"subtitle\">\n        Este projeto já foi cadastrado anteriormente.<br>\n        Não é possível realizar um novo cadastro para o mesmo fluxo.\n      </p>\n      <div class=\"info-box\">\n        <div class=\"info-row\">\n          <span class=\"info-label\">Projeto</span>\n          <span class=\"info-value\">${dados?.nome_projeto || '—'}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Área</span>\n          <span class=\"info-value\">${dados?.area || '—'}</span>\n        </div>\n        <div class=\"info-row\">\n          <span class=\"info-label\">Status</span>\n          <span class=\"info-value\"><span class=\"status-badge\">Já cadastrado</span></span>\n        </div>\n      </div>\n      <p class=\"help-text\">Em caso de dúvidas, acione a equipe de RPA/IA</p>\n    </div>\n    <footer class=\"footer\">\n      Desenvolvido pela equipe de <a href=\"#\">RPA & IA</a> · GoGroup © 2025\n    </footer>\n  </div>\n  </div>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        1232
+      ],
+      "id": "78a108b0-e245-42f7-bd2c-c5557cc13862",
+      "name": "Gerar HTML Fracasso1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n  for (const item of items) {\n    const sourceBinary = $('Formatar Dados').first().binary;\n    if (sourceBinary) {\n      // Pega a chave do binário (pode ser 'data', 'documentacao', etc.)\n      const key = Object.keys(sourceBinary)[0];\n      item.binary = { documentacao: sourceBinary[key] };\n    }\n  }\n\n  return items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        1040
+      ],
+      "id": "59d2fe45-dc36-49ce-bebf-d2c6424599d2",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Receber Dados": {
+      "main": [
+        [
+          {
+            "node": "Formatar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gerar HTML Fracasso1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Dados": {
+      "main": [
+        [
+          {
+            "node": "Preparar para Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar para Planilha": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar na Planilha": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Gerar HTML Sucesso",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aviso Google Chat4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gerar HTML Fracasso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder Sucesso2": {
+      "main": [
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso Google Chat4": {
+      "main": [
+        []
+      ]
+    },
+    "Upload Documentação": {
+      "main": [
+        [
+          {
+            "node": "Salvar na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar HTML Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar HTML Fracasso": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar HTML Fracasso1": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Upload Documentação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0d4b990209edb70c6160e7fd6d309098ee0fba608c4aafe35c79172b7993945f"
+  }
+}

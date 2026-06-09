@@ -10,9 +10,10 @@ Hub interno do Gogroup para cadastro, gestão e documentação de projetos de au
 - **Backend**: Supabase (auth, Postgres com RLS, service role para admin ops)
 - **Server functions**: `createServerFn` do TanStack Start (com middleware de auth)
 - **LLM**: Camada de abstração (`llm.ts`) que suporta OpenAI e Anthropic via env vars
-- **Extração de texto**: pdf-parse v2 (PDF), mammoth (DOCX/DOC), utf-8 direto (TXT/MD)
+- **Extração de texto**: Cloudflare OCR Worker (PDF), mammoth (DOCX/DOC), utf-8 direto (TXT/MD)
 - **Testes**: Vitest (roda automaticamente antes de `npm run dev`)
 - **Build**: Vite 7, npm (package manager), Nitro (SSR runtime via `@lovable.dev/vite-tanstack-config`)
+- **Deploy**: Cloudflare Workers via wrangler (`npm run deploy`)
 - **Linguagem**: TypeScript strict
 
 ## Comandos
@@ -22,8 +23,10 @@ npm install            # instalar dependências
 npm run dev            # roda testes + dev server (vite dev)
 npm run test           # roda testes uma vez
 npm run test:watch     # testes em modo watch
-npm run build          # build produção
-npm run preview        # preview do build
+npm run build          # build produção (Nitro cloudflare-module)
+npm run preview        # preview do build (vite)
+npm run preview:worker # build + preview local via wrangler dev (workerd runtime)
+npm run deploy         # build + deploy no Cloudflare Workers
 npm run lint           # eslint
 npm run format         # prettier
 ```
@@ -236,7 +239,7 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 ### Extração de texto (`extract-text.server.ts`)
 
-- PDF: `pdf-parse` v2 (classe PDFParse, fallback para v1)
+- PDF: Cloudflare OCR Worker (`OCR_WORKER_URL` + `OCR_WORKER_TOKEN`)
 - DOCX/DOC: `mammoth` (extractRawText)
 - TXT/MD: leitura direta utf-8
 - Normaliza whitespace, trunca em 50.000 chars
@@ -276,15 +279,38 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 ## Variáveis de ambiente
 
-Definidas em `.env` (não comitar chaves secretas):
+Definidas em `.env` (não comitar chaves secretas). No Cloudflare Workers, as variáveis runtime são secrets (`wrangler secret bulk .env`).
 
-- `SUPABASE_URL` / `VITE_SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only, necessário para admin ops)
+### Build-time (baked no bundle via `VITE_` prefix — precisam existir no `.env` na hora do build)
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+### Runtime (server-only — lidos via `process.env` no Worker com `nodejs_compat`)
+
+- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 - `LLM_PROVIDER` — `openai` (default) ou `anthropic`
 - `LLM_API_KEY` — chave da API do provider escolhido
 - `LLM_MODEL` — modelo a usar (default: `gpt-4.1`)
 - `GOOGLE_CHAT_WEBHOOK_URL` — webhook do Google Chat para notificações de novo projeto
+- `OCR_WORKER_URL` — URL do Cloudflare Worker de extração de texto de PDFs
+- `OCR_WORKER_TOKEN` — token Bearer de autenticação do OCR Worker
+- `BREVO_API_KEY` / `EMAIL_FROM` — envio de e-mail via Brevo
+- `GODEPLOY_USER_HEADER` — header com email do usuário autenticado (default: `x-user-email`)
+
+## Deploy (Cloudflare Workers)
+
+- **URL produção**: `https://godocs.kaique-rpa.workers.dev`
+- **Runtime**: Cloudflare Workers com `nodejs_compat` (V8 isolate + polyfills Node)
+- **Build**: Nitro preset `cloudflare-module` via `@lovable.dev/vite-tanstack-config`
+- **Config**: `vite.config.ts` habilita Nitro com `nitro: { preset: "cloudflare-module", cloudflare: { nodeCompat: true, deployConfig: true } }`
+- **wrangler.toml** na raiz: apenas `name` e `compatibility_date` — Nitro auto-gera o `wrangler.json` completo em `.output/server/` com entry point, assets, flags e rules
+- **Deploy config**: `.wrangler/deploy/config.json` aponta o wrangler pro config gerado
+- **Secrets**: setados via `wrangler secret bulk .env` (todas as vars runtime)
+- **Fluxo de deploy**: `npm run deploy` = `vite build && wrangler deploy`
+- **Preview local com workerd**: `npm run preview:worker` = `vite build && wrangler dev`
+- **Extração de PDF**: delegada ao Cloudflare OCR Worker externo (removeu `pdf-parse` do bundle)
+- **mammoth (DOCX)**: roda dentro do Worker com `nodejs_compat` — funciona mas é o ponto mais frágil
 
 ## Status atual
 
@@ -294,6 +320,7 @@ Definidas em `.env` (não comitar chaves secretas):
 - **Transição doc → saving**: tela animada com check verde e progress bar
 - **Tela de revisão final**: cards colapsáveis com previews aprovados antes do envio
 - **Submissão interna**: dados salvos no Supabase (sem Sheets), duplicata verificada, auto-aprovação para RPA, notificação Google Chat
+- **Deploy**: live no Cloudflare Workers via wrangler
 - **Testes**: 100 testes passando (6 arquivos), rodam antes de cada `npm run dev`
 - Dashboard ainda é placeholder — falta integrar listagem/gestão de projetos
 - Design usa identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
@@ -303,4 +330,5 @@ Definidas em `.env` (não comitar chaves secretas):
 - Projeto originado do Lovable (gerado por IA) - pode conter código que precisa de refatoração
 - Arquivos marcados "automatically generated" pelo Lovable podem ser editados agora que o desenvolvimento saiu do Lovable
 - O `@lovable.dev/vite-tanstack-config` já inclui tanstackStart, viteReact, tailwindcss, tsConfigPaths, nitro etc - não duplicar plugins no vite.config.ts
+- Fora do sandbox Lovable, o Nitro só roda no build se `nitro` for explicitamente setado no `defineConfig` (truthy). O Nitro instalado (3.0.260429-beta) não suporta `defaultPreset`, então `preset: "cloudflare-module"` deve ser explícito
 - O antigo fluxo n8n → Google Sheets foi substituído por submissão interna via Supabase. O arquivo `forms_submissao_logica.json` contém o fluxo n8n legado para referência
