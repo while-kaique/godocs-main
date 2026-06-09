@@ -71,14 +71,22 @@ src/
     auth-attacher.ts   # Middleware client: anexa access_token nas chamadas RPC
     types.ts           # Tipos gerados do schema Supabase
   lib/
-    agents/            # Sistema de agentes IA (2 fases)
-      types.ts         # Tipos: ChatFase, DocumentacaoColetada, SavingColetado, OrchestratorResult
-      orchestrator.ts  # Orquestrador principal — prompts por fase, transições automáticas
+    agents/            # Sistema de agentes IA
+      types.ts         # Tipos: ChatFase, DocumentacaoColetada, SavingColetado, OrchestratorResult, ProjetoContexto
+      extractor.ts     # 1 chamada (temp 0) que lê toda a codebase → pré-preenche os 7 campos
+      orchestrator.ts  # Orquestrador do chat — prompts por fase, transições automáticas
       doc-compiler.ts  # Compila campos coletados em DocumentacaoGerada (JSON estruturado)
       validator.ts     # Validação automática de documentação (6 critérios)
       email-agent.ts   # Templates de email de aprovação/rejeição
+    submeter/          # UI do formulário /submeter (steps + componentes)
+      constants.ts     # FormData, extensões aceitas, MAX_FILE_MB, TOKEN_* (gate), readFileAsBase64
+      step1.tsx        # Step 1 (Envio): responsável, área, ferramenta, equipe
+      step2.tsx        # Step 2 (Projeto): tipo, nome, data, contexto + upload multi-arquivo (árvore)
+      step3-chat.tsx   # Step 3 (Agente): chat IA, previews, revisão final
+      form-components.tsx # Inputs, RadioGroup, InfoTooltip (via portal), ChipsInput
+      layout.tsx       # PageFrame, WizardProgress, StepAnimation
     chat.functions.ts  # Server functions: iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn
-    extract-text.server.ts  # Extração de texto de PDF/DOCX/DOC/TXT/MD (server-only)
+    extract-text.server.ts  # Extração de texto: PDF/DOCX/DOC/TXT/MD/JSON + código; multi-arquivo (server-only)
     llm.ts             # Camada de abstração LLM (OpenAI / Anthropic)
     admin.functions.ts # Server functions: createUser, deleteUser, updateUserAreas
     utils.ts           # cn() helper (clsx + tailwind-merge)
@@ -102,7 +110,7 @@ supabase/
 | `user_roles` | user_id, role (enum: admin_master, leader) |
 | `areas` | id, nome (departamentos da empresa) |
 | `leader_areas` | user_id, area_id (N:N - quais áreas um leader acompanha) |
-| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, membros, status, chat_completo, data_criacao_projeto, saving_horas, saving_reais, tipo_saving, memorial_calculo, submitted_at, validated_at, validated_by |
+| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, membros, status, chat_completo, data_criacao_projeto, **tipo_projeto** (saving\|receita_incremental), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, submitted_at, validated_at, validated_by |
 | `chat_messages` | id, projeto_id, role (user/assistant/doc), content, options, selected_option |
 | `documentacao` | projeto_id, conteudo (JSON estruturado — DocumentacaoGerada + saving) |
 | `validacoes` | projeto_id, resultado, parecer, criterios, admin_email, email_enviado |
@@ -140,8 +148,20 @@ rascunho → em_validacao → validado | rejeitado
 ## Fluxo de submissão (3 etapas + chat IA)
 
 1. **Envio**: status produção (bloqueia se não em produção), nome, email (apenas @gocase, @gobeaute, @gogroup), área, ferramenta, equipe/participantes
-2. **Projeto**: nome do projeto, data criação, upload de documentação (PDF/DOCX/DOC/TXT/MD, max 10MB)
+2. **Projeto**: tipo (saving | receita_incremental), nome, data criação, **contexto de negócio** (descrição obrigatória), e **upload de arquivos/pasta** (ver seção abaixo)
 3. **Agente IA**: chat interativo em 2 fases (ver seção abaixo). Submissão só disponível após ambos os previews aprovados. Tela de revisão final com previews colapsáveis antes do envio.
+
+### Upload de arquivos (Step 2 — `step2.tsx`)
+
+A IA lê a **codebase/pasta inteira** e gera a documentação automaticamente. Lógica de seleção:
+
+- **Múltiplos arquivos ou pasta inteira** (`webkitdirectory`, recursivo) + drag-and-drop
+- **Extensões**: docs (PDF, DOCX, DOC, TXT, MD) e código (`.json .ts .tsx .js .jsx .py .sql .sh .yaml .yml .toml .css .html`)
+- **Filtro automático** (estilo `.gitignore`, por segmento do caminho): ignora `node_modules`, `.git`, `dist`, `build`, `.output`, `.wrangler`, `.vercel`, `.next`, `.venv`, `__pycache__`, `vendor`, `target` etc. + lock files, `*.min.js/css`, `*.map`. **Sem limite de contagem** de arquivos (cap de segurança 5000)
+- **Gate por tokens** (~4 chars/token): WARN ~150k tokens (600k chars), **BLOCK ~200k tokens (800k chars)** → painel com prompt para gerar pré-documentação no Claude.ai. A trava também roda no submit (`handleIniciarAgente`)
+- **Estimativa por tamanho** (sem ler conteúdo no browser → instantâneo); chars exatos só no backend pós-extração
+- **Árvore de pastas colapsável** (`FileTreeNode`): hierarquia original, agregado por pasta, expandir/recolher, remover arquivo/pasta. Identidade por **caminho completo** (`webkitRelativePath`), não pelo nome
+- **Loading** mostrado já no clique do botão (cobre a enumeração do browser, que é lenta e ocorre antes do `onChange`); evento `cancel` limpa o estado
 
 ### Submissão final (`submeterParaValidacaoFn`)
 
@@ -164,11 +184,10 @@ doc → doc_preview → [transição animada 3s] → saving → saving_preview �
 
 - Cor do chat: azul (--go-blue)
 - Header: "Documentação Técnica"
-- IA recebe o documento enviado, extrai os 7 campos silenciosamente
-- Pergunta apenas sobre lacunas (1 pergunta por vez)
-- Se todos os campos estão cobertos, gera preview direto (sem perguntas desnecessárias)
-- É cética: não aceita respostas vagas — mantém campo null e aprofunda
-- Quando todos os campos estão preenchidos, gera preview em markdown
+- **Pré-extração** (`extractor.ts`): antes do chat, 1 chamada ao LLM (temp 0) lê todo o conteúdo dos arquivos e preenche os 7 campos. Campos **técnicos** (execução, dependências, fluxo, configurar_antes) saem direto do código; campos de **negócio** (o_que_faz, atenção) ficam null se o código não revelar
+- O chat então **só pergunta o que ficou null** (regras de negócio que o código não mostra) — não reconfirma o que já foi extraído
+- Se o extractor preencheu todos os 7, o orquestrador gera o **preview direto** (zero perguntas)
+- 1 pergunta por vez, cética (não aceita respostas vagas — mantém null e aprofunda)
 - Usuário aprova ou pede ajustes no PreviewPanel
 - Na aprovação, IA gera resumo interno do projeto (3-5 frases) para contexto da fase 2
 
@@ -232,7 +251,7 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 ### Server functions do chat (`chat.functions.ts`)
 
-- `iniciarSubmissaoFn`: cria projeto no Supabase (com area, data_criacao_projeto), extrai texto do doc, roda orquestrador na fase `doc`
+- `iniciarSubmissaoFn`: cria projeto (com `tipo_projeto`, `descricao_breve`, area, data), recebe **array `docs`** (até 5000), extrai texto de todos via `extractTextFromMultipleFiles`, roda o **extractor** para pré-preencher os 7 campos, então roda o orquestrador na fase `doc`
 - `enviarMensagemFn`: recebe mensagem do usuário, detecta fase atual, filtra histórico (saving começa limpo), roda orquestrador
 - `submeterParaValidacaoFn`: verifica duplicata, popula colunas de saving, auto-aprova se RPA, notifica Google Chat
 - Ações pós-transição: compila documentação quando doc aprovada, salva saving quando fluxo completo
@@ -241,8 +260,9 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 - PDF: Cloudflare OCR Worker (`OCR_WORKER_URL` + `OCR_WORKER_TOKEN`)
 - DOCX/DOC: `mammoth` (extractRawText)
-- TXT/MD: leitura direta utf-8
-- Normaliza whitespace, trunca em 50.000 chars
+- TXT/MD/JSON/código: leitura direta utf-8
+- `extractTextFromMultipleFiles`: extrai e concatena vários arquivos com separadores `=== caminho ===`; loga análise de eficiência pós-extração (chars/tokens por arquivo e por extensão)
+- Truncamento: **150k chars por arquivo**, **800k chars no total** (~200k tokens)
 
 ### LLM (`llm.ts`)
 
@@ -315,7 +335,8 @@ Definidas em `.env` (não comitar chaves secretas). No Cloudflare Workers, as va
 ## Status atual
 
 - Home, login, formulário de submissão, CRUD de usuários e áreas estão funcionais
-- **Agente Doc (fase 1)**: funcional — extrai texto, faz perguntas, gera preview formatado, ciclo de aprovação
+- **Step 2 (upload)**: upload de codebase/pasta inteira com filtro de pastas de dev, gate de ~200k tokens e árvore de pastas colapsável
+- **Agente Doc (fase 1)**: funcional — pré-extração lê o código e preenche os campos técnicos; chat pergunta só as regras de negócio; gera preview formatado, ciclo de aprovação
 - **Agente Saving (fase 2)**: funcional — validação de horas com detalhamento obrigatório, monta memorial, ciclo de aprovação
 - **Transição doc → saving**: tela animada com check verde e progress bar
 - **Tela de revisão final**: cards colapsáveis com previews aprovados antes do envio
