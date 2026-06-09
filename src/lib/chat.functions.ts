@@ -187,8 +187,8 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         membros: data.membros,
         nome: data.nome_projeto,
         data_criacao_projeto: data.data_criacao,
-        tipo_projeto: (data.tipo_projeto ?? null) as never,
-        descricao_breve: (data.descricao_breve ?? null) as never,
+        tipo_projeto: data.tipo_projeto ?? null,
+        descricao_breve: data.descricao_breve ?? null,
         status: 'rascunho',
       })
       .select()
