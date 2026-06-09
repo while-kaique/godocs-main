@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -72,6 +72,7 @@ function isTextFile(filename: string): boolean {
 const IGNORED_DIRS = new Set([
   "node_modules", ".git", ".svn", ".hg",
   "dist", "build", "out", ".next", ".nuxt", ".output", ".vercel",
+  ".wrangler", ".netlify",
   "coverage", ".cache", ".vite", ".turbo", ".parcel-cache",
   "venv", ".venv", "env", "__pycache__", ".pytest_cache", ".mypy_cache",
   "vendor", "target", "bin", "obj", ".idea", ".vscode", ".gradle",
@@ -107,6 +108,187 @@ function shouldIgnorePath(relPath: string, fileName: string): string | null {
   return null;
 }
 
+/** Caminho relativo do arquivo (com subpastas) ou só o nome se não veio de pasta */
+function pathOf(file: File): string {
+  return (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+}
+
+function isCodeFile(name: string): boolean {
+  return ACCEPTED_CODE_EXT.includes("." + (name.split(".").pop() ?? "").toLowerCase());
+}
+
+// ── Árvore de pastas a partir dos caminhos dos arquivos ───────────────────────
+
+type TreeFile = { kind: "file"; name: string; path: string; size: number; chars: number };
+type TreeFolder = {
+  kind: "folder";
+  name: string;
+  path: string;
+  children: TreeNode[];
+  fileCount: number;
+  chars: number;
+};
+type TreeNode = TreeFile | TreeFolder;
+
+/** Monta a árvore hierárquica e agrega contagem/chars por pasta */
+function buildTree(arquivos: File[], fileChars: Map<string, number>): TreeFolder {
+  const root: TreeFolder = { kind: "folder", name: "", path: "", children: [], fileCount: 0, chars: 0 };
+
+  for (const file of arquivos) {
+    const fullPath = pathOf(file);
+    const segments = fullPath.split("/").filter(Boolean);
+    const fileName = segments.pop() ?? file.name;
+    const chars = fileChars.get(fullPath) ?? 0;
+
+    // Desce/cria as pastas intermediárias
+    let node = root;
+    let acc = "";
+    for (const seg of segments) {
+      acc = acc ? `${acc}/${seg}` : seg;
+      let child = node.children.find(
+        (c): c is TreeFolder => c.kind === "folder" && c.name === seg
+      );
+      if (!child) {
+        child = { kind: "folder", name: seg, path: acc, children: [], fileCount: 0, chars: 0 };
+        node.children.push(child);
+      }
+      node = child;
+    }
+    node.children.push({ kind: "file", name: fileName, path: fullPath, size: file.size, chars });
+  }
+
+  // Agrega contagem e chars (pós-ordem) + ordena (pastas antes, alfabético)
+  const aggregate = (folder: TreeFolder): { count: number; chars: number } => {
+    let count = 0;
+    let chars = 0;
+    for (const child of folder.children) {
+      if (child.kind === "folder") {
+        const r = aggregate(child);
+        count += r.count;
+        chars += r.chars;
+      } else {
+        count += 1;
+        chars += child.chars;
+      }
+    }
+    folder.fileCount = count;
+    folder.chars = chars;
+    folder.children.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return { count, chars };
+  };
+  aggregate(root);
+
+  // Colapsa pastas-corrente (uma pasta com um único filho-pasta) p/ encurtar a árvore
+  return collapseSingleChildFolders(root);
+}
+
+/** Junta "a/b/c" quando cada nível tem só uma subpasta — fica "a/b/c" numa linha só */
+function collapseSingleChildFolders(folder: TreeFolder): TreeFolder {
+  folder.children = folder.children.map((c) =>
+    c.kind === "folder" ? collapseSingleChildFolders(c) : c
+  );
+  if (
+    folder.path !== "" &&
+    folder.children.length === 1 &&
+    folder.children[0].kind === "folder"
+  ) {
+    const only = folder.children[0] as TreeFolder;
+    return {
+      ...folder,
+      name: `${folder.name}/${only.name}`,
+      path: only.path,
+      children: only.children,
+    };
+  }
+  return folder;
+}
+
+// ── Nó da árvore (recursivo) ──────────────────────────────────────────────────
+
+function FileTreeNode({
+  node, depth, expanded, onToggle, onRemoveFile, onRemoveFolder,
+}: {
+  node: TreeNode;
+  depth: number;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
+  onRemoveFile: (path: string) => void;
+  onRemoveFolder: (path: string) => void;
+}) {
+  const indent = 8 + depth * 14;
+
+  if (node.kind === "file") {
+    return (
+      <div
+        className="group flex items-center justify-between py-1 pr-2 text-[11px] hover:bg-[rgba(0,89,169,0.04)]"
+        style={{ paddingLeft: indent }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="shrink-0 text-[12px]">{isCodeFile(node.name) ? "⚙️" : "📄"}</span>
+          <span className="truncate" style={{ color: "var(--go-text-heading)" }}>{node.name}</span>
+          <span className="shrink-0" style={{ color: "#9aa4b2" }}>· {fmtTokens(node.chars)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemoveFile(node.path)}
+          className="ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
+          title="Remover arquivo"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  const isOpen = expanded.has(node.path);
+  return (
+    <div>
+      <div
+        className="group flex cursor-pointer items-center justify-between py-1 pr-2 text-[11px] hover:bg-[rgba(0,89,169,0.05)]"
+        style={{ paddingLeft: indent }}
+        onClick={() => onToggle(node.path)}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="shrink-0 text-[9px]" style={{ color: "#8b8b9a", width: 10 }}>
+            {isOpen ? "▼" : "▶"}
+          </span>
+          <span className="shrink-0 text-[12px]">{isOpen ? "📂" : "📁"}</span>
+          <span className="truncate font-semibold" style={{ color: "var(--go-text-heading)" }}>
+            {node.name}
+          </span>
+          <span className="shrink-0" style={{ color: "#9aa4b2" }}>
+            · {node.fileCount} arq · {fmtTokens(node.chars)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemoveFolder(node.path); }}
+          className="ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
+          title="Remover pasta inteira"
+        >
+          ✕
+        </button>
+      </div>
+      {isOpen && node.children.map((child) => (
+        <FileTreeNode
+          key={child.path || child.name}
+          node={child}
+          depth={depth + 1}
+          expanded={expanded}
+          onToggle={onToggle}
+          onRemoveFile={onRemoveFile}
+          onRemoveFolder={onRemoveFolder}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export function Step2({
@@ -129,14 +311,56 @@ export function Step2({
   const [fileChars, setFileChars] = useState<Map<string, number>>(new Map());
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
+  // Pastas expandidas na árvore (por caminho). Vazio = tudo recolhido.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  // Abre o seletor mostrando feedback IMEDIATO (cobre a enumeração do browser,
+  // que acontece antes do onChange e pode levar segundos em pastas grandes).
+  function openPicker(ref: React.RefObject<HTMLInputElement | null>, isFolder: boolean) {
+    setProcessing({ fase: isFolder ? "Lendo a pasta" : "Lendo arquivos", current: 0, total: 0 });
+    ref.current?.click();
+  }
+
+  // Se o usuário cancelar o diálogo, o evento "cancel" limpa o loading.
+  // (React não tipa onCancel em <input>, então anexamos manualmente.)
+  useEffect(() => {
+    const inputs = [fileInputRef.current, folderInputRef.current];
+    const onCancel = () => setProcessing(null);
+    inputs.forEach((el) => el?.addEventListener("cancel", onCancel));
+    return () => inputs.forEach((el) => el?.removeEventListener("cancel", onCancel));
+  }, []);
 
   const descricaoChars = form.descricaoBreve.length;
   const totalFileChars = [...fileChars.values()].reduce((a, b) => a + b, 0);
   const totalChars = totalFileChars + descricaoChars;
   const gateStatus = calcGate(totalChars);
+
+  // Árvore de pastas (recalcula só quando arquivos/chars mudam)
+  const tree = useMemo(() => buildTree(arquivos, fileChars), [arquivos, fileChars]);
+
+  function toggleFolder(path: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  function setAllFolders(open: boolean) {
+    if (!open) { setExpanded(new Set()); return; }
+    const all = new Set<string>();
+    const walk = (f: TreeFolder) => {
+      for (const c of f.children) {
+        if (c.kind === "folder") { all.add(c.path); walk(c); }
+      }
+    };
+    walk(tree);
+    setExpanded(all);
+  }
 
   const n8nNameStatus =
     isN8n && form.nomeProjeto.length >= 3
@@ -168,7 +392,7 @@ export function Step2({
     const charsAcc = new Map<string, number>();
 
     // Set de nomes já presentes (dedup O(1) em vez de varrer o array a cada arquivo)
-    const existentes = new Set(arquivos.map((f) => f.name));
+    const existentes = new Set(arquivos.map((f) => pathOf(f)));
 
     console.groupCollapsed(`[Step2/addFiles] Recebidos ${list.length} arquivo(s)`);
 
@@ -195,12 +419,12 @@ export function Step2({
         } else if (file.size > MAX_FILE_MB * 1024 * 1024) {
           rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
           toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
-        } else if (existentes.has(file.name)) {
+        } else if (existentes.has(relPath)) {
           console.log(`⏭️  duplicado, ignorado: ${relPath}`);
         } else {
-          existentes.add(file.name);
+          existentes.add(relPath);
           accepted.push(file);
-          charsAcc.set(file.name, charsFromSize(file));
+          charsAcc.set(relPath, charsFromSize(file));
         }
       }
 
@@ -263,13 +487,28 @@ export function Step2({
     setProcessing(null);
   }
 
-  function removeFile(name: string) {
-    setArquivos(arquivos.filter((f) => f.name !== name));
+  function removeFile(path: string) {
+    setArquivos(arquivos.filter((f) => pathOf(f) !== path));
     setFileChars((prev) => {
       const next = new Map(prev);
-      next.delete(name);
+      next.delete(path);
       return next;
     });
+  }
+
+  // Remove uma pasta inteira (todos os arquivos sob aquele prefixo)
+  function removeFolder(folderPath: string) {
+    const prefix = folderPath + "/";
+    const removidos = arquivos.filter((f) => pathOf(f).startsWith(prefix)).map(pathOf);
+    setArquivos(arquivos.filter((f) => !pathOf(f).startsWith(prefix)));
+    setFileChars((prev) => {
+      const next = new Map(prev);
+      for (const p of removidos) next.delete(p);
+      return next;
+    });
+    if (removidos.length > 0) {
+      toast.info(`${removidos.length} arquivo(s) de "${folderPath}/" removido(s)`);
+    }
   }
 
   function handleCopyPrompt() {
@@ -454,7 +693,12 @@ export function Step2({
             multiple
             accept={ACCEPTED_DOC_EXT.join(",")}
             className="hidden"
-            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) void addFiles(files);
+              else setProcessing(null); // seleção vazia
+              e.target.value = "";
+            }}
           />
           {/* webkitdirectory para seleção de pasta */}
           <input
@@ -464,7 +708,12 @@ export function Step2({
             webkitdirectory=""
             multiple
             className="hidden"
-            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) void addFiles(files);
+              else setProcessing(null);
+              e.target.value = "";
+            }}
           />
 
           {processing ? (
@@ -476,7 +725,7 @@ export function Step2({
               <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
                 {processing.total > 0
                   ? `${processing.current.toLocaleString("pt-BR")} de ${processing.total.toLocaleString("pt-BR")} arquivo(s) — ignorando node_modules e afins`
-                  : "Preparando…"}
+                  : "O navegador está lendo os arquivos — pode levar alguns segundos em pastas grandes…"}
               </div>
               {processing.total > 0 && (
                 <div className="mt-1 h-1.5 w-40 overflow-hidden rounded-full" style={{ background: "rgba(0,89,169,0.1)" }}>
@@ -496,7 +745,7 @@ export function Step2({
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => openPicker(fileInputRef, false)}
                   className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
                   style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
                 >
@@ -504,7 +753,7 @@ export function Step2({
                 </button>
                 <button
                   type="button"
-                  onClick={() => folderInputRef.current?.click()}
+                  onClick={() => openPicker(folderInputRef, true)}
                   className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
                   style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
                 >
@@ -517,52 +766,64 @@ export function Step2({
 
         <FieldError message={errors.documentacao} />
 
-        {/* Lista de arquivos */}
+        {/* Árvore de arquivos */}
         {arquivos.length > 0 && (
-          <div className="mt-3 space-y-1.5" style={{ animation: "go-slide-down 0.2s ease" }}>
-            {arquivos.map((file) => {
-              const chars = fileChars.get(file.name);
-              const tokenLabel = chars != null ? fmtTokens(chars) : "estimando...";
-              return (
-                <div
-                  key={file.name}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 text-[11px]"
-                  style={{ background: "rgba(0,89,169,0.03)", border: "1px solid rgba(0,89,169,0.08)" }}
+          <div className="mt-3" style={{ animation: "go-slide-down 0.2s ease" }}>
+            {/* Cabeçalho com contagem + expandir/recolher tudo */}
+            <div className="mb-1.5 flex items-center justify-between px-0.5">
+              <span className="text-[11px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                {arquivos.length} arquivo(s) · {fmtTokens(totalChars)}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAllFolders(true)}
+                  className="text-[10px] font-semibold"
+                  style={{ color: "var(--go-blue)" }}
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="shrink-0 text-[13px]">
-                      {ACCEPTED_CODE_EXT.includes("." + file.name.split(".").pop()?.toLowerCase()) ? "⚙️" : "📄"}
-                    </span>
-                    <span className="truncate font-medium" style={{ color: "var(--go-text-heading)" }}>
-                      {file.name}
-                    </span>
-                    <span style={{ color: "#8b8b9a", whiteSpace: "nowrap" }}>
-                      {fmtSize(file.size)} · {tokenLabel}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(file.name)}
-                    className="ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                    style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
-                  >
-                    remover
-                  </button>
-                </div>
-              );
-            })}
+                  Expandir tudo
+                </button>
+                <span style={{ color: "#cbd5e1" }}>·</span>
+                <button
+                  type="button"
+                  onClick={() => setAllFolders(false)}
+                  className="text-[10px] font-semibold"
+                  style={{ color: "var(--go-blue)" }}
+                >
+                  Recolher tudo
+                </button>
+              </div>
+            </div>
+
+            {/* Container com scroll limitado */}
+            <div
+              className="overflow-y-auto rounded-lg"
+              style={{ maxHeight: 300, border: "1px solid rgba(0,89,169,0.08)", background: "rgba(0,89,169,0.02)" }}
+            >
+              {tree.children.map((node) => (
+                <FileTreeNode
+                  key={node.path || node.name}
+                  node={node}
+                  depth={0}
+                  expanded={expanded}
+                  onToggle={toggleFolder}
+                  onRemoveFile={removeFile}
+                  onRemoveFolder={removeFolder}
+                />
+              ))}
+            </div>
 
             {/* Resumo total + token gate */}
             <div
               className="mt-2 rounded-lg px-3 py-2 text-[11px] font-semibold"
               style={{ background: gc.bg, border: `1px solid ${gc.border}`, color: gc.text }}
             >
-              {gateStatus === "ok" && `✅ ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — dentro do limite`}
-              {gateStatus === "warn" && `⚠️ ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — grande, pode impactar qualidade`}
-              {gateStatus === "block" && `🚫 ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — muito grande para processar diretamente`}
+              {gateStatus === "ok" && `✅ ${fmtTokens(totalChars)} estimados — dentro do limite`}
+              {gateStatus === "warn" && `⚠️ ${fmtTokens(totalChars)} estimados — grande, pode impactar a qualidade`}
+              {gateStatus === "block" && `🚫 ${fmtTokens(totalChars)} estimados — acima do limite de ~200k tokens`}
               {gateStatus === "warn" && (
                 <div className="mt-0.5 text-[10px] font-normal" style={{ color: "#8a7d00" }}>
-                  Documentos muito grandes podem reduzir a qualidade da análise. Se possível, remova arquivos desnecessários.
+                  Conteúdo muito grande pode reduzir a qualidade da análise. Se possível, remova pastas ou arquivos desnecessários.
                 </div>
               )}
             </div>
