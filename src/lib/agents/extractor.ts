@@ -147,16 +147,46 @@ EXTRAÇÕES PARCIAIS POR CAMPO (JSON):
 ${JSON.stringify(agregado, null, 2)}`;
 
   log(`Consolidando ${parciais.length} extração(ões) parciais...`);
-  return chamarEParsear(system, userContent, ctx);
+  const consolidado = await chamarEParsear(system, userContent, ctx, 8192);
+
+  // Se a consolidação do LLM veio vazia (truncou/falhou), funde os lotes
+  // deterministicamente — nunca descarta o que já foi extraído.
+  const camposLLM = CAMPO_KEYS.filter((k) => k !== 'nome_projeto' && consolidado[k] != null).length;
+  if (camposLLM === 0) {
+    log('Consolidação do LLM vazia — usando merge determinístico dos lotes');
+    return mergeDeterministico(agregado, ctx);
+  }
+  return consolidado;
+}
+
+/** Funde os valores parciais de cada campo sem LLM (dedup + junção) */
+function mergeDeterministico(
+  agregado: Record<string, string[]>,
+  ctx: ProjetoContexto,
+): DocumentacaoColetada {
+  const juntar = (key: string): string | null => {
+    const unicos = [...new Set((agregado[key] ?? []).map((v) => v.trim()).filter(Boolean))];
+    return unicos.length ? unicos.join('\n') : null;
+  };
+  return {
+    nome_projeto: (agregado.nome_projeto?.[0]?.trim() || ctx.nome_projeto) ?? null,
+    o_que_faz: juntar('o_que_faz'),
+    execucao: juntar('execucao'),
+    dependencias: juntar('dependencias'),
+    fluxo: juntar('fluxo'),
+    configurar_antes: juntar('configurar_antes'),
+    atencao: juntar('atencao'),
+  };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Chama o LLM (jsonMode, temp 0), parseia e normaliza os 7 campos */
+/** Chama o LLM (jsonMode, temp 0), parseia (com recuperação de JSON truncado) e normaliza */
 async function chamarEParsear(
   system: string,
   userContent: string,
   ctx: ProjetoContexto,
+  maxTokens = 4096,
 ): Promise<DocumentacaoColetada> {
   let raw: string;
   try {
@@ -165,7 +195,7 @@ async function chamarEParsear(
         { role: 'system', content: system },
         { role: 'user', content: userContent },
       ],
-      { jsonMode: true, temperature: 0 },
+      { jsonMode: true, temperature: 0, maxTokens },
     );
     log(`LLM respondeu: ${raw.slice(0, 200)}`);
   } catch (e) {
@@ -173,21 +203,44 @@ async function chamarEParsear(
     return { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto || null };
   }
 
+  const parsed = parseFlexivel(raw);
+  return {
+    nome_projeto: norm(parsed.nome_projeto),
+    o_que_faz: norm(parsed.o_que_faz),
+    execucao: norm(parsed.execucao),
+    dependencias: norm(parsed.dependencias),
+    fluxo: norm(parsed.fluxo),
+    configurar_antes: norm(parsed.configurar_antes),
+    atencao: norm(parsed.atencao),
+  };
+}
+
+/**
+ * Parseia JSON dos 7 campos; se vier truncado/malformado (estouro de tokens),
+ * recupera o que der via regex campo a campo, inclusive o último campo cortado.
+ */
+export function parseFlexivel(raw: string): Record<string, string | null> {
   try {
-    const parsed = JSON.parse(raw) as Partial<DocumentacaoColetada>;
-    return {
-      nome_projeto: norm(parsed.nome_projeto),
-      o_que_faz: norm(parsed.o_que_faz),
-      execucao: norm(parsed.execucao),
-      dependencias: norm(parsed.dependencias),
-      fluxo: norm(parsed.fluxo),
-      configurar_antes: norm(parsed.configurar_antes),
-      atencao: norm(parsed.atencao),
-    };
+    return JSON.parse(raw) as Record<string, string | null>;
   } catch {
-    log('Falha ao parsear resposta do extractor — retornando vazio');
-    return documentacaoVazia();
+    log('JSON inválido/truncado — recuperando campos via regex');
   }
+  const out: Record<string, string | null> = {};
+  for (const key of CAMPO_KEYS) {
+    if (new RegExp(`"${key}"\\s*:\\s*null`).test(raw)) { out[key] = null; continue; }
+    // valor completo: "key":"...." (respeita aspas escapadas)
+    const completo = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`, 's'));
+    if (completo) { out[key] = desescapar(completo[1]); continue; }
+    // valor truncado (último campo cortado no meio): "key":"....<fim>
+    const truncado = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)$`, 's'));
+    if (truncado) out[key] = desescapar(truncado[1]);
+  }
+  return out;
+}
+
+function desescapar(s: string): string {
+  try { return JSON.parse(`"${s}"`); }
+  catch { return s.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\t/g, '\t'); }
 }
 
 /**
