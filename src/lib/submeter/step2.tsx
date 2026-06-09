@@ -137,6 +137,7 @@ export function Step2({
   const [dragOver, setDragOver] = useState(false);
   const [fileChars, setFileChars] = useState<Map<string, number>>(new Map());
   const [copied, setCopied] = useState(false);
+  const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -153,29 +154,26 @@ export function Step2({
         : "warn"
       : null;
 
-  // Estima chars de um arquivo e guarda no state
-  const estimateFile = useCallback(async (file: File) => {
-    let chars: number;
-    let metodo: string;
+  // Estima os chars de um arquivo (lê conteúdo real p/ texto, tamanho p/ binário)
+  const estimateFileChars = useCallback(async (file: File): Promise<number> => {
     if (isTextFile(file.name)) {
-      // Texto: lê o conteúdo real e conta os caracteres
       const text = await readFileAsText(file);
-      chars = text.length;
-      metodo = "leitura real (chars do conteúdo)";
-    } else {
-      // PDF/DOCX (binário): não dá pra ler chars no browser → estima por tamanho
-      chars = Math.round(file.size * 0.8);
-      metodo = "estimativa por tamanho (bytes × 0.8)";
+      return text.length;
     }
-    const tokens = Math.round(chars / 4);
-    console.log(
-      `[Step2/estimateFile] "${file.name}": ${chars} chars → ~${tokens} tokens (${metodo})`
-    );
-    setFileChars((prev) => new Map(prev).set(file.name, chars));
+    // PDF/DOCX (binário): não dá pra ler chars no browser → estima por tamanho
+    return Math.round(file.size * 0.8);
   }, []);
+
+  // Cede o controle pro browser pintar a tela antes de um trecho síncrono pesado
+  const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
 
   async function addFiles(incoming: FileList | File[]) {
     const list = Array.from(incoming);
+
+    // Mostra o spinner antes de qualquer trabalho pesado (browser pinta a tela)
+    setProcessing({ fase: "Filtrando arquivos", current: 0, total: list.length });
+    await yieldToBrowser();
+
     const accepted: File[] = [];
     const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
     let ignoredCount = 0;
@@ -262,10 +260,23 @@ export function Step2({
     setArquivos(merged);
     clearError("documentacao");
 
-    // Estima tokens de cada novo arquivo
-    for (const file of accepted.slice(0, MAX_FILES - arquivos.length)) {
-      estimateFile(file);
+    // Lê o conteúdo dos novos arquivos com progresso visível
+    const novos = accepted.slice(0, MAX_FILES - arquivos.length);
+    const charsAcc = new Map<string, number>();
+    for (let i = 0; i < novos.length; i++) {
+      setProcessing({ fase: "Lendo conteúdo", current: i + 1, total: novos.length });
+      const chars = await estimateFileChars(novos[i]);
+      charsAcc.set(novos[i].name, chars);
+      const tokens = Math.round(chars / 4);
+      console.log(`[Step2/estimate] "${novos[i].name}": ${chars} chars → ~${tokens} tokens`);
     }
+    setFileChars((prev) => {
+      const next = new Map(prev);
+      for (const [k, v] of charsAcc) next.set(k, v);
+      return next;
+    });
+
+    setProcessing(null);
   }
 
   function removeFile(name: string) {
@@ -472,28 +483,53 @@ export function Step2({
             onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
           />
 
-          <div className="mb-3 text-[26px] opacity-50">📂</div>
-          <div className="mb-3 text-xs" style={{ color: "var(--go-text-primary)" }}>
-            Arraste arquivos aqui ou use os botões abaixo
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
-              style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
-            >
-              📄 Selecionar arquivos
-            </button>
-            <button
-              type="button"
-              onClick={() => folderInputRef.current?.click()}
-              className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
-              style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
-            >
-              📁 Selecionar pasta
-            </button>
-          </div>
+          {processing ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-1">
+              <div className="go-spinner" />
+              <div className="text-xs font-semibold" style={{ color: "var(--go-blue)" }}>
+                {processing.fase}…
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
+                {processing.fase === "Filtrando arquivos"
+                  ? `${processing.total.toLocaleString("pt-BR")} arquivo(s) recebidos — filtrando node_modules e afins`
+                  : `Lendo ${processing.current} de ${processing.total}`}
+              </div>
+              {/* Barra de progresso (só na fase de leitura, onde total é pequeno) */}
+              {processing.fase === "Lendo conteúdo" && processing.total > 0 && (
+                <div className="mt-1 h-1.5 w-40 overflow-hidden rounded-full" style={{ background: "rgba(0,89,169,0.1)" }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${(processing.current / processing.total) * 100}%`, background: "var(--go-blue)" }}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 text-[26px] opacity-50">📂</div>
+              <div className="mb-3 text-xs" style={{ color: "var(--go-text-primary)" }}>
+                Arraste arquivos aqui ou use os botões abaixo
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                  style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
+                >
+                  📄 Selecionar arquivos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                  style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
+                >
+                  📁 Selecionar pasta
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <FieldError message={errors.documentacao} />
