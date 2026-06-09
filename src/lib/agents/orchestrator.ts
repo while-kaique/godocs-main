@@ -281,14 +281,43 @@ export async function runOrchestrator(
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    log('Falha ao parsear JSON, usando fallback');
-    return {
-      type: 'question',
-      content: raw,
+    log('Falha ao parsear JSON, tentando recuperar campos do texto truncado...');
+
+    // Tenta extrair campos do JSON truncado via regex
+    const typeMatch = raw.match(/"type"\s*:\s*"(\w+)"/);
+    const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"(?:coletado|saving|options)|"\s*})/);
+    const recoveredType = typeMatch?.[1] ?? 'question';
+    let recoveredContent = contentMatch?.[1] ?? '';
+
+    if (recoveredContent) {
+      // Unescape JSON string escapes
+      try { recoveredContent = JSON.parse(`"${recoveredContent}"`); } catch { /* usa como está */ }
+    } else {
+      // Último recurso: extrai tudo entre "content":" e o fim
+      const lastResort = raw.match(/"content"\s*:\s*"([\s\S]+)/);
+      if (lastResort) {
+        recoveredContent = lastResort[1].replace(/"\s*,?\s*"coletado[\s\S]*$/, '').replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      } else {
+        recoveredContent = 'Houve um erro ao processar a resposta da IA. Por favor, tente novamente.';
+      }
+    }
+
+    log(`Recuperado do JSON truncado: type="${recoveredType}", content=${recoveredContent.length} chars`);
+
+    const fallbackResult: OrchestratorResult = {
+      type: recoveredType as OrchestratorResult['type'],
+      content: recoveredContent,
       fase,
       coletado,
       saving,
-    };
+    } as OrchestratorResult;
+
+    // Aplica transição de fase mesmo no fallback
+    if (recoveredType === 'preview' && (fase === 'doc' || fase === 'saving')) {
+      fallbackResult.fase = fase === 'doc' ? 'doc_preview' : 'saving_preview';
+    }
+
+    return fallbackResult;
   }
 
   const type = (parsed.type as string) ?? 'question';
