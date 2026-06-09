@@ -1,5 +1,6 @@
 // Extrator de campos de documentação — chamada única ao LLM, sem chat
-// Recebe doc + descrição breve → devolve DocumentacaoColetada preenchida
+// Lê TODOS os arquivos de código/config → preenche os 7 campos diretamente
+// Campos técnicos vêm do código; campos de negócio ficam null para o chat pedir
 
 const log = (...args: unknown[]) => console.log('[extractor]', ...args);
 
@@ -12,47 +13,47 @@ export async function extrairCamposDocumentacao(
   docTexto: string,
 ): Promise<DocumentacaoColetada> {
   const descricao = ctx.descricao_breve?.trim() || '';
-  const temDoc = docTexto.trim().length > 10;
+  const temConteudo = docTexto.trim().length > 10;
 
-  if (!temDoc && !descricao) {
-    log('Sem doc e sem descrição — retornando vazio com nome_projeto');
+  if (!temConteudo && !descricao) {
+    log('Sem conteúdo — retornando vazio com nome_projeto');
     return { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto || null };
   }
 
-  const docSection = temDoc
-    ? `DOCUMENTAÇÃO ENVIADA:\n---\n${docTexto}\n---`
-    : '(Nenhuma documentação foi enviada)';
+  const system = `Você é um analisador técnico de projetos de automação.
+Recebeu o conteúdo completo dos arquivos do projeto — código, configs e documentação.
+Sua tarefa é preencher os 7 campos da documentação padrão DIRETAMENTE a partir do que está nos arquivos.
 
-  const descSection = descricao
-    ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):\n${descricao}`
-    : '';
-
-  const system = `Você é um extrator de dados de projetos de automação.
-Analise o conteúdo abaixo e preencha os 7 campos da documentação.
-Para cada campo, extraia o que conseguir. Se não houver informação suficiente, retorne null.
-Responda APENAS com JSON válido, sem texto adicional.
+REGRAS:
+- Campos TÉCNICOS (execucao, dependencias, fluxo, configurar_antes): preencha sempre que encontrar no código. NÃO deixe null se a informação existir nos arquivos.
+- Campos de NEGÓCIO (o_que_faz, atencao): preencha o que conseguir inferir do código, mas podem ficar null se não houver contexto de negócio suficiente.
+- nome_projeto: use o nome informado nos metadados se não estiver claro no código.
+- Seja preciso e técnico. Extraia URLs, nomes de APIs, horários de cron, nomes de variáveis de ambiente, nomes de workflows — use as informações EXATAS do código.
+- Responda APENAS com JSON válido, sem texto adicional.
 
 CAMPOS:
 1. nome_projeto — Título do projeto (string ou null)
-2. o_que_faz — O que faz, para quem, resultado (string ou null)
-3. execucao — Como é acionado: trigger, schedule, webhook (string ou null)
-4. dependencias — Serviços externos, APIs, credenciais (string ou null)
-5. fluxo — Sequência de etapas do início ao fim, com IFs (string ou null)
-6. configurar_antes — O que fazer antes da primeira execução (string ou null)
-7. atencao — Riscos, limitações, pontos frágeis (string ou null)
+2. o_que_faz — O que faz, para quem, qual o resultado — precisa de contexto de negócio (string ou null)
+3. execucao — Como é acionado: trigger, schedule (com horário/frequência exatos), webhook URL, evento (string ou null)
+4. dependencias — Lista de serviços, APIs externas, variáveis de ambiente necessárias, credenciais (string ou null)
+5. fluxo — Sequência DETALHADA das etapas do código do início ao fim, com condicionais reais (IFs, switches) (string ou null)
+6. configurar_antes — Variáveis de ambiente, credenciais, configurações iniciais obrigatórias (string ou null)
+7. atencao — Limitações, pontos frágeis, edge cases observados no código (string ou null)
 
-Responda no formato:
+Formato da resposta:
 {"nome_projeto":"...","o_que_faz":"...","execucao":"...","dependencias":"...","fluxo":"...","configurar_antes":"...","atencao":"..."}
 
-Use null para campos sem informação suficiente. Português brasileiro, acentuação correta.`;
+Use null APENAS quando realmente não há informação nos arquivos. Português brasileiro, acentuação correta.`;
 
   const userContent = [
-    descSection,
-    docSection,
-    `DADOS CONHECIDOS: nome="${ctx.nome_projeto}", ferramenta="${ctx.ferramenta}", área="${ctx.area ?? ''}"`,
+    ctx.descricao_breve?.trim()
+      ? `CONTEXTO DE NEGÓCIO FORNECIDO PELO USUÁRIO:\n${ctx.descricao_breve.trim()}`
+      : '',
+    `METADADOS: nome="${ctx.nome_projeto}", ferramenta="${ctx.ferramenta}", área="${ctx.area ?? ''}"`,
+    `\nCONTEÚDO DOS ARQUIVOS DO PROJETO:\n\n${docTexto}`,
   ].filter(Boolean).join('\n\n');
 
-  log(`Extraindo campos — doc: ${docTexto.length} chars, descrição: ${descricao.length} chars`);
+  log(`Extraindo campos — conteúdo: ${docTexto.length} chars, descrição: ${descricao.length} chars`);
 
   let raw: string;
   try {
@@ -63,7 +64,7 @@ Use null para campos sem informação suficiente. Português brasileiro, acentua
       ],
       { jsonMode: true, temperature: 0 },
     );
-    log(`LLM respondeu: ${raw.slice(0, 200)}`);
+    log(`LLM respondeu: ${raw.slice(0, 300)}`);
   } catch (e) {
     log('Erro no LLM extractor:', e);
     return { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto || null };

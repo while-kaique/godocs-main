@@ -37,7 +37,7 @@ function SubmeterPage() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [submitted, setSubmitted] = useState(false);
-  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [arquivos, setArquivos] = useState<File[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [shaking, setShaking] = useState(false);
@@ -147,8 +147,8 @@ function SubmeterPage() {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
       if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
-        errs.descricaoBreve = "Descreva o projeto em pelo menos 20 caracteres";
-      if (!arquivo) errs.documentacao = "Envie a documentação do projeto";
+        errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (arquivos.length === 0) errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
 
     setErrors(errs);
@@ -191,12 +191,17 @@ function SubmeterPage() {
       return;
     }
 
-    if (!arquivo) return;
+    if (arquivos.length === 0) return;
 
     setIniciandoChat(true);
 
     try {
-      const base64 = await readFileAsBase64(arquivo);
+      const docs = await Promise.all(
+        arquivos.map(async (f) => ({
+          base64: await readFileAsBase64(f),
+          filename: f.name,
+        }))
+      );
 
       const result = await iniciarSubmissaoFn({
         data: {
@@ -212,8 +217,7 @@ function SubmeterPage() {
           data_criacao: form.dataCriacao,
           tipo_projeto: form.tipoProjeto || undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
-          doc_base64: base64,
-          doc_filename: arquivo.name,
+          docs,
         },
       });
 
@@ -514,8 +518,8 @@ function SubmeterPage() {
                   errors={errors}
                   updateField={updateField}
                   clearError={clearError}
-                  arquivo={arquivo}
-                  setArquivo={setArquivo}
+                  arquivos={arquivos}
+                  setArquivos={setArquivos}
                 />
               </StepAnimation>
             )}

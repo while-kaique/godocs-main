@@ -15,10 +15,22 @@ export const FERRAMENTAS = [
   "Selenium", "Puppeteer", "Power BI", "Claude + Vercel", "Outros",
 ] as const;
 
-export const ACCEPTED_DOC_EXT = [".pdf", ".docx", ".doc", ".txt", ".md", ".json"];
-export const MAX_FILE_MB = 10;
-export const TOKEN_WARN_CHARS = 80_000;
-export const TOKEN_BLOCK_CHARS = 200_000;
+// Extensões de documentos legíveis
+export const ACCEPTED_DOC_EXT_BASE = [".pdf", ".docx", ".doc", ".txt", ".md"];
+// Extensões de código e config
+export const ACCEPTED_CODE_EXT = [
+  ".json", ".ts", ".tsx", ".js", ".jsx", ".py",
+  ".sql", ".sh", ".yaml", ".yml", ".toml", ".css", ".html",
+];
+export const ACCEPTED_DOC_EXT = [...ACCEPTED_DOC_EXT_BASE, ...ACCEPTED_CODE_EXT];
+
+export const MAX_FILE_MB = 10;   // por arquivo
+export const MAX_FILES = 30;     // total de arquivos
+
+// Limites de chars (soma de todos os arquivos + descrição breve)
+// ~4 chars por token → WARN = ~50k tokens, BLOCK = ~150k tokens
+export const TOKEN_WARN_CHARS = 200_000;
+export const TOKEN_BLOCK_CHARS = 600_000;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 

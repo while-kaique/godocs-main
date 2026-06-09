@@ -1,10 +1,17 @@
 // Extração de texto de arquivos enviados pelo usuário
-// Suporta: TXT, MD, PDF, DOCX, DOC
+// Suporta: TXT, MD, PDF, DOCX, DOC, JSON e arquivos de código (TS, JS, PY, etc.)
 
-const MAX_CHARS = 50_000;
+const MAX_CHARS_PER_FILE = 150_000;
+const MAX_CHARS_TOTAL = 600_000;
 
 const log = (...args: unknown[]) => console.log('[extract-text]', ...args);
 const err = (...args: unknown[]) => console.error('[extract-text]', ...args);
+
+// Extensões que são lidas diretamente como UTF-8
+const TEXT_EXTS = new Set([
+  'txt', 'md', 'json', 'ts', 'tsx', 'js', 'jsx', 'py',
+  'sql', 'sh', 'yaml', 'yml', 'toml', 'css', 'html', 'xml',
+]);
 
 export async function extractTextFromBase64(base64: string, fileName: string): Promise<string> {
   const ext = (fileName.split('.').pop() ?? '').toLowerCase();
@@ -17,8 +24,8 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
   let text = '';
 
   try {
-    if (ext === 'txt' || ext === 'md') {
-      log('Modo: texto puro (utf-8)');
+    if (TEXT_EXTS.has(ext)) {
+      log(`Modo: texto puro UTF-8 (${ext})`);
       text = buffer.toString('utf-8');
       log(`Texto extraído: ${text.length} chars`);
 
@@ -47,19 +54,9 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
     } else if (ext === 'docx' || ext === 'doc') {
       log('Modo: DOCX — importando mammoth...');
       const mammoth = await import('mammoth');
-      log('mammoth importado. Chaves do módulo:', Object.keys(mammoth));
-      log('Extraindo texto do DOCX...');
       const result = await mammoth.extractRawText({ buffer });
       log(`DOCX extraído: ${result.value.length} chars`);
-      if (result.messages.length > 0) {
-        log('Avisos do mammoth:', result.messages);
-      }
       text = result.value;
-
-    } else if (ext === 'json') {
-      log('Modo: JSON — lendo como texto puro');
-      text = buffer.toString('utf-8');
-      log(`JSON lido: ${text.length} chars`);
 
     } else {
       log(`Extensão desconhecida "${ext}" — tentando utf-8`);
@@ -72,14 +69,47 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
     text = '';
   }
 
-  // Normaliza espaços e trunca
+  // Normaliza e trunca por arquivo
   const rawLen = text.length;
   text = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (text.length > MAX_CHARS) {
-    text = text.slice(0, MAX_CHARS) + '\n\n[... documento truncado]';
-    log(`Texto truncado de ${rawLen} para ${MAX_CHARS} chars`);
+  if (text.length > MAX_CHARS_PER_FILE) {
+    text = text.slice(0, MAX_CHARS_PER_FILE) + '\n\n[... arquivo truncado]';
+    log(`Texto truncado de ${rawLen} para ${MAX_CHARS_PER_FILE} chars`);
   }
 
   log(`Extração finalizada: ${text.length} chars retornados`);
   return text;
+}
+
+/** Extrai e concatena texto de múltiplos arquivos com separadores claros */
+export async function extractTextFromMultipleFiles(
+  files: { base64: string; filename: string }[],
+): Promise<string> {
+  log(`Extraindo ${files.length} arquivo(s)...`);
+
+  const results = await Promise.all(
+    files.map(async (f) => {
+      try {
+        const text = await extractTextFromBase64(f.base64, f.filename);
+        return { filename: f.filename, text };
+      } catch (e) {
+        err(`Falha no arquivo "${f.filename}":`, e);
+        return { filename: f.filename, text: '' };
+      }
+    }),
+  );
+
+  const parts = results
+    .filter((r) => r.text.trim().length > 0)
+    .map((r) => `=== ${r.filename} ===\n\n${r.text}`);
+
+  let combined = parts.join('\n\n---\n\n');
+
+  if (combined.length > MAX_CHARS_TOTAL) {
+    combined = combined.slice(0, MAX_CHARS_TOTAL) + '\n\n[... conteúdo total truncado]';
+    log(`Total truncado para ${MAX_CHARS_TOTAL} chars`);
+  }
+
+  log(`Total combinado: ${combined.length} chars de ${parts.length} arquivo(s) com conteúdo`);
+  return combined;
 }

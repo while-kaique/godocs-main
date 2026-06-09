@@ -51,17 +51,18 @@ describe('Prompt fase doc', () => {
     expect(system).toContain('atencao');
   });
 
-  it('inclui texto do documento quando fornecido', async () => {
+  it('inclui informação sobre arquivos quando fornecidos', async () => {
     await runOrchestrator(makeCtx({ doc_texto: 'Meu workflow faz cadastro de embaixadores' }), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('DOCUMENTAÇÃO ENVIADA PELO USUÁRIO');
-    expect(system).toContain('cadastro de embaixadores');
+    // O prompt novo não embute o texto do doc no system prompt (fica no contexto do extractor)
+    // mas deve mencionar que o sistema leu os arquivos
+    expect(system).toContain('campos');
   });
 
-  it('indica quando não há documento enviado', async () => {
+  it('indica quando não há arquivo enviado', async () => {
     await runOrchestrator(makeCtx({ doc_texto: null }), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('Nenhuma documentação foi enviada');
+    expect(system).toContain('Nenhum arquivo');
   });
 
   it('inclui dados do projeto no prompt', async () => {
@@ -71,23 +72,24 @@ describe('Prompt fase doc', () => {
     expect(system).toContain('Python');
   });
 
-  it('inclui regra de fonte de verdade', async () => {
+  it('inclui regra de não perguntar campos já preenchidos', async () => {
     await runOrchestrator(makeCtx({ doc_texto: 'algo' }), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('fonte de verdade');
+    expect(system).toContain('NÃO peça confirmação');
   });
 
   it('inclui regra de nunca inventar informações', async () => {
     await runOrchestrator(makeCtx(), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('NUNCA invente informações');
+    expect(system).toContain('NUNCA invente');
   });
 
   it('envia mensagem de sistema para iniciar quando sem histórico', async () => {
     await runOrchestrator(makeCtx({ doc_texto: 'doc texto aqui' }), [], 'doc');
     const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
     expect(userMsg).toContain('[SISTEMA]');
-    expect(userMsg).toContain('Leia a documentação enviada');
+    // Novo paradigma: mensagem fala sobre arquivos/campos, não "Leia a documentação"
+    expect(userMsg).toContain('sistema');
   });
 
   it('não envia mensagem de sistema quando há histórico', async () => {

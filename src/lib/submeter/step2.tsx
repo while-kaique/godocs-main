@@ -1,9 +1,11 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ACCEPTED_DOC_EXT,
+  ACCEPTED_CODE_EXT,
   MAX_FILE_MB,
+  MAX_FILES,
   TOKEN_WARN_CHARS,
   TOKEN_BLOCK_CHARS,
 } from "./constants";
@@ -18,7 +20,7 @@ import {
   InfoTooltip,
 } from "./form-components";
 
-// ── Prompt para Claude.ai quando doc é muito grande ───────────────────────────
+// ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
 
 const REDIRECT_PROMPT = `Você é um especialista em documentação de automações RPA/IA.
 Com base no contexto abaixo, gere uma documentação técnica condensada com exatamente estas 7 seções:
@@ -31,20 +33,47 @@ Com base no contexto abaixo, gere uma documentação técnica condensada com exa
 6. **Configurar antes de usar** — pré-requisitos de setup
 7. **Atenção** — riscos, limitações, pontos frágeis
 
-Contexto do projeto: [cole aqui o que você tiver]`;
+Cole aqui o conteúdo dos seus arquivos: [cole aqui]`;
 
-// ── Token gate ────────────────────────────────────────────────────────────────
-
-function estimarTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 type GateStatus = "ok" | "warn" | "block";
 
-function calcGate(charCount: number): GateStatus {
-  if (charCount >= TOKEN_BLOCK_CHARS) return "block";
-  if (charCount >= TOKEN_WARN_CHARS) return "warn";
+function calcGate(totalChars: number): GateStatus {
+  if (totalChars >= TOKEN_BLOCK_CHARS) return "block";
+  if (totalChars >= TOKEN_WARN_CHARS) return "warn";
   return "ok";
+}
+
+function fmtTokens(chars: number): string {
+  const tokens = Math.round(chars / 4);
+  return tokens >= 1000 ? `~${Math.round(tokens / 1000)}k tokens` : `~${tokens} tokens`;
+}
+
+function fmtSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+// Extensões que podem ser lidas como texto no browser
+const TEXT_EXTS = new Set([
+  "json", "ts", "tsx", "js", "jsx", "py", "sql", "sh",
+  "yaml", "yml", "toml", "css", "html", "txt", "md", "xml",
+]);
+
+function isTextFile(filename: string): boolean {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return TEXT_EXTS.has(ext);
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => resolve("");
+    reader.readAsText(file, "utf-8");
+  });
 }
 
 // ── Componente principal ─────────────────────────────────────────────────────
@@ -54,56 +83,91 @@ export function Step2({
   errors,
   updateField,
   clearError,
-  arquivo,
-  setArquivo,
+  arquivos,
+  setArquivos,
 }: {
   form: FormData;
   errors: FieldErrors;
   updateField: <K extends keyof FormData>(key: K, value: FormData[K]) => void;
   clearError: (key: string) => void;
-  arquivo: File | null;
-  setArquivo: (f: File | null) => void;
+  arquivos: File[];
+  setArquivos: (files: File[]) => void;
 }) {
   const isN8n = form.ferramenta === "n8n";
   const [dragOver, setDragOver] = useState(false);
-  const [fileCharCount, setFileCharCount] = useState<number>(0);
+  const [fileChars, setFileChars] = useState<Map<string, number>>(new Map());
   const [copied, setCopied] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const descricaoCharCount = form.descricaoBreve.length;
-
-  const totalChars = descricaoCharCount + fileCharCount;
+  const descricaoChars = form.descricaoBreve.length;
+  const totalFileChars = [...fileChars.values()].reduce((a, b) => a + b, 0);
+  const totalChars = totalFileChars + descricaoChars;
   const gateStatus = calcGate(totalChars);
-  const tokensEstimados = estimarTokens(totalChars.toString()) > 0
-    ? estimarTokens(Array(totalChars).fill("a").join(""))
-    : 0;
 
-  const n8nNameStatus = useMemo(() => {
-    if (!isN8n || form.nomeProjeto.length < 3) return null;
-    if (/^\[.+\]/.test(form.nomeProjeto)) return "ok";
-    return "warn";
-  }, [isN8n, form.nomeProjeto]);
+  const n8nNameStatus =
+    isN8n && form.nomeProjeto.length >= 3
+      ? /^\[.+\]/.test(form.nomeProjeto)
+        ? "ok"
+        : "warn"
+      : null;
 
-  function handleFileSelect(file: File | null) {
-    if (!file) return;
-    const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
-    if (!ACCEPTED_DOC_EXT.includes(ext)) {
-      toast.error(`Formato não aceito. Use: ${ACCEPTED_DOC_EXT.join(", ")}`);
-      return;
+  // Estima chars de um arquivo e guarda no state
+  const estimateFile = useCallback(async (file: File) => {
+    let chars: number;
+    if (isTextFile(file.name)) {
+      const text = await readFileAsText(file);
+      chars = text.length;
+    } else {
+      // PDF/DOCX: estimativa conservadora por tamanho
+      chars = Math.round(file.size * 0.8);
     }
-    if (file.size > MAX_FILE_MB * 1024 * 1024) {
-      toast.error(`Arquivo muito grande. Máximo: ${MAX_FILE_MB}MB`);
-      return;
+    setFileChars((prev) => new Map(prev).set(file.name, chars));
+  }, []);
+
+  async function addFiles(incoming: FileList | File[]) {
+    const list = Array.from(incoming);
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+
+    for (const file of list) {
+      const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
+      if (!ACCEPTED_DOC_EXT.includes(ext)) { rejected.push(file.name); continue; }
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
+        continue;
+      }
+      // Evita duplicatas pelo nome
+      if (arquivos.some((f) => f.name === file.name)) continue;
+      accepted.push(file);
     }
-    // Estima chars do arquivo para o token gate
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = typeof reader.result === "string" ? reader.result : "";
-      setFileCharCount(text.length);
-    };
-    reader.readAsText(file);
-    setArquivo(file);
+
+    if (rejected.length > 0) {
+      toast.error(`${rejected.length} arquivo(s) ignorado(s) — formato não suportado`);
+    }
+
+    const merged = [...arquivos, ...accepted].slice(0, MAX_FILES);
+    if (arquivos.length + accepted.length > MAX_FILES) {
+      toast.error(`Limite de ${MAX_FILES} arquivos atingido`);
+    }
+
+    setArquivos(merged);
     clearError("documentacao");
+
+    // Estima tokens de cada novo arquivo
+    for (const file of accepted.slice(0, MAX_FILES - arquivos.length)) {
+      estimateFile(file);
+    }
+  }
+
+  function removeFile(name: string) {
+    setArquivos(arquivos.filter((f) => f.name !== name));
+    setFileChars((prev) => {
+      const next = new Map(prev);
+      next.delete(name);
+      return next;
+    });
   }
 
   function handleCopyPrompt() {
@@ -113,17 +177,12 @@ export function Step2({
     });
   }
 
-  const gateColor = {
-    ok: { bg: "rgba(34,197,94,0.05)", border: "rgba(34,197,94,0.2)", text: "#16a34a" },
-    warn: { bg: "rgba(215,219,0,0.06)", border: "rgba(215,219,0,0.25)", text: "#8a7d00" },
-    block: { bg: "rgba(220,38,38,0.04)", border: "rgba(220,38,38,0.2)", text: "#dc2626" },
-  }[gateStatus];
-
-  const gateLabel = {
-    ok: `✅ ~${Math.round(totalChars / 1000)}k chars — dentro do limite`,
-    warn: `⚠️ ~${Math.round(totalChars / 1000)}k chars — grande, pode impactar qualidade`,
-    block: `🚫 ~${Math.round(totalChars / 1000)}k chars — muito grande para processar`,
-  }[gateStatus];
+  const gateColors = {
+    ok:   { bg: "rgba(34,197,94,0.05)",   border: "rgba(34,197,94,0.2)",   text: "#16a34a" },
+    warn: { bg: "rgba(215,219,0,0.06)",   border: "rgba(215,219,0,0.25)",  text: "#8a7d00" },
+    block:{ bg: "rgba(220,38,38,0.04)",   border: "rgba(220,38,38,0.2)",   text: "#dc2626" },
+  };
+  const gc = gateColors[gateStatus];
 
   return (
     <div>
@@ -151,7 +210,7 @@ export function Step2({
           onChange={(v) => updateField("tipoProjeto", v as FormData["tipoProjeto"])}
           error={errors.tipoProjeto}
           options={[
-            { value: "saving", label: "💰 Saving" },
+            { value: "saving",              label: "💰 Saving" },
             { value: "receita_incremental", label: "📈 Receita Incremental" },
           ]}
         />
@@ -173,15 +232,12 @@ export function Step2({
           error={errors.nomeProjeto}
         />
         {isN8n && (
-          <div
-            className="mt-2 rounded-lg p-2.5"
-            style={{ background: "rgba(215,219,0,0.06)", border: "1px solid rgba(215,219,0,0.2)", animation: "go-slide-down 0.25s ease" }}
-          >
-            <div className="mb-1 flex items-center gap-1 text-[11px] font-bold" style={{ color: "#8a7d00" }}>
+          <div className="mt-2 rounded-lg p-2.5" style={{ background: "rgba(215,219,0,0.06)", border: "1px solid rgba(215,219,0,0.2)" }}>
+            <div className="mb-1 text-[11px] font-bold" style={{ color: "#8a7d00" }}>
               ⚠️ Atenção: nome deve ser idêntico ao do n8n
             </div>
-            <div className="text-[11px] leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
-              O nome precisa ser <strong style={{ color: "#8a7d00" }}>copiado exatamente</strong> como aparece no n8n — incluindo maiúsculas, espaços e prefixo entre colchetes.
+            <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
+              Copie <strong style={{ color: "#8a7d00" }}>exatamente</strong> como aparece no n8n — maiúsculas, espaços e prefixo entre colchetes incluídos.
             </div>
           </div>
         )}
@@ -194,9 +250,7 @@ export function Step2({
                 : { background: "rgba(215,219,0,0.06)", color: "#8a7d00", border: "1px solid rgba(215,219,0,0.2)" }
             }
           >
-            {n8nNameStatus === "ok"
-              ? "✅ Prefixo detectado — parece um nome válido de fluxo n8n"
-              : "⚠️ Sem prefixo — verifique se copiou o nome correto do n8n"}
+            {n8nNameStatus === "ok" ? "✅ Prefixo detectado" : "⚠️ Sem prefixo — verifique o nome"}
           </span>
         )}
       </FormGroup>
@@ -217,13 +271,13 @@ export function Step2({
         />
       </FormGroup>
 
-      {/* Descrição breve */}
+      {/* Contexto de negócio */}
       <FormGroup>
         <FormLabel
           required
-          hint="Descreva em 2-4 frases o que este projeto faz, para quem e qual o resultado"
+          hint="Descreva em 2-4 frases para que serve este projeto, para quem e qual o resultado esperado"
         >
-          Descrição do Projeto
+          Contexto de Negócio
         </FormLabel>
         <textarea
           className={cn(
@@ -231,14 +285,14 @@ export function Step2({
             errors.descricaoBreve && "!border-[#dc2626]"
           )}
           style={{
-            minHeight: 96,
+            minHeight: 88,
             border: "1.5px solid rgba(0,89,169,0.18)",
             background: "var(--go-white)",
             color: "var(--go-text-heading)",
             outline: "none",
-            transition: "border-color 0.15s, box-shadow 0.15s",
+            transition: "border-color 0.15s",
           }}
-          placeholder="Ex: Esta automação busca diariamente os pedidos pendentes no ERP, consulta o status de entrega na transportadora e envia um e-mail automático para o cliente com a atualização. Reduz o trabalho manual da equipe de CX e melhora o tempo de resposta."
+          placeholder="Ex: Esta automação busca os pedidos pendentes no ERP, consulta o status de entrega na transportadora e envia e-mail automático para o cliente. Reduz o trabalho manual do time de CX e melhora o tempo de resposta."
           value={form.descricaoBreve}
           onChange={(e) => {
             updateField("descricaoBreve", e.currentTarget.value);
@@ -248,131 +302,161 @@ export function Step2({
         />
         <div className="mt-1 flex justify-between">
           <FieldError message={errors.descricaoBreve} />
-          <span
-            className="text-[10px]"
-            style={{ color: descricaoCharCount > 900 ? "#dc2626" : "#8b8b9a" }}
-          >
-            {descricaoCharCount}/1000
+          <span className="text-[10px]" style={{ color: descricaoChars > 900 ? "#dc2626" : "#8b8b9a" }}>
+            {descricaoChars}/1000
           </span>
         </div>
       </FormGroup>
 
-      {/* Documentação */}
+      {/* Upload de arquivos */}
       <FormGroup>
-        <FormLabel required hint="Envie qualquer documentação que descreva o projeto">
-          Documentação do Projeto
+        <FormLabel required>
+          Arquivos do Projeto
         </FormLabel>
 
         <div
-          className="mb-2 rounded-lg p-3 text-[12px] leading-relaxed"
+          className="mb-2.5 rounded-lg p-3 text-[12px] leading-relaxed"
           style={{ background: "rgba(0,89,169,0.03)", border: "1px solid rgba(0,89,169,0.08)", color: "var(--go-text-primary)" }}
         >
-          🤖 <strong style={{ color: "var(--go-blue)" }}>O agente vai analisar sua documentação</strong> e solicitar apenas as informações que estiverem faltando. Quanto mais detalhada, menos perguntas serão feitas.
+          🤖 <strong style={{ color: "var(--go-blue)" }}>A IA vai ler todo o código</strong> e gerar a documentação automaticamente.
+          Envie os arquivos relevantes do projeto: workflow JSON, scripts, configs, README.
           <br />
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            Aceita: PDF, DOCX, DOC, TXT, MD, JSON (fluxo n8n ou JSON geral)
+            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · máx. {MAX_FILE_MB}MB por arquivo · até {MAX_FILES} arquivos
           </span>
         </div>
 
+        {/* Drop zone */}
         <div
           className={cn(
-            "relative cursor-pointer rounded-xl p-6 text-center transition-colors",
+            "relative rounded-xl p-5 text-center transition-colors",
             dragOver && "!border-[var(--go-blue)] !bg-[rgba(199,233,253,0.4)]",
             errors.documentacao && "!border-[#dc2626]"
           )}
-          style={{ border: "2px dashed rgba(0,89,169,0.25)", background: "rgba(199,233,253,0.15)" }}
-          onClick={() => fileInputRef.current?.click()}
+          style={{ border: "2px dashed rgba(0,89,169,0.25)", background: "rgba(199,233,253,0.12)" }}
           onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            const file = e.dataTransfer.files[0];
-            if (file) handleFileSelect(file);
+            void addFiles(e.dataTransfer.files);
           }}
         >
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept={ACCEPTED_DOC_EXT.join(",")}
             className="hidden"
-            onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
+            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
           />
-          <div className="mb-2 text-[28px] opacity-60">📄</div>
-          <div className="text-xs" style={{ color: "var(--go-text-primary)" }}>
-            <strong style={{ color: "var(--go-blue)" }}>Clique para selecionar</strong> ou arraste o arquivo
-            <br />
-            <small>PDF, DOCX, DOC, TXT, MD, JSON — máx. {MAX_FILE_MB}MB</small>
+          {/* webkitdirectory para seleção de pasta */}
+          <input
+            ref={folderInputRef}
+            type="file"
+            // @ts-expect-error webkitdirectory não está no tipo padrão
+            webkitdirectory=""
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
+          />
+
+          <div className="mb-3 text-[26px] opacity-50">📂</div>
+          <div className="mb-3 text-xs" style={{ color: "var(--go-text-primary)" }}>
+            Arraste arquivos aqui ou use os botões abaixo
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+              style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
+            >
+              📄 Selecionar arquivos
+            </button>
+            <button
+              type="button"
+              onClick={() => folderInputRef.current?.click()}
+              className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
+              style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
+            >
+              📁 Selecionar pasta
+            </button>
           </div>
         </div>
 
-        {arquivo && (
-          <div
-            className="mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold"
-            style={{ background: "rgba(0,89,169,0.04)", color: "var(--go-blue)" }}
-          >
-            <span>📎 {arquivo.name}</span>
-            <button
-              type="button"
-              onClick={() => { setArquivo(null); setFileCharCount(0); }}
-              className="ml-2 rounded-full px-2 py-0.5 text-[10px]"
-              style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
-            >
-              remover
-            </button>
-          </div>
-        )}
-
         <FieldError message={errors.documentacao} />
 
-        {/* Token gate — só exibe quando há conteúdo */}
-        {totalChars > 0 && (
-          <div
-            className="mt-3 rounded-lg px-3 py-2.5 text-[11px] font-semibold"
-            style={{
-              background: gateColor.bg,
-              border: `1px solid ${gateColor.border}`,
-              color: gateColor.text,
-              animation: "go-slide-down 0.25s ease",
-            }}
-          >
-            {gateLabel}
-            {gateStatus === "warn" && (
-              <div className="mt-1 text-[10px] font-normal" style={{ color: "#8a7d00" }}>
-                Documentos muito grandes podem reduzir a qualidade da análise. Se possível, envie uma versão resumida.
-              </div>
-            )}
+        {/* Lista de arquivos */}
+        {arquivos.length > 0 && (
+          <div className="mt-3 space-y-1.5" style={{ animation: "go-slide-down 0.2s ease" }}>
+            {arquivos.map((file) => {
+              const chars = fileChars.get(file.name);
+              const tokenLabel = chars != null ? fmtTokens(chars) : "estimando...";
+              return (
+                <div
+                  key={file.name}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-[11px]"
+                  style={{ background: "rgba(0,89,169,0.03)", border: "1px solid rgba(0,89,169,0.08)" }}
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="shrink-0 text-[13px]">
+                      {ACCEPTED_CODE_EXT.includes("." + file.name.split(".").pop()?.toLowerCase()) ? "⚙️" : "📄"}
+                    </span>
+                    <span className="truncate font-medium" style={{ color: "var(--go-text-heading)" }}>
+                      {file.name}
+                    </span>
+                    <span style={{ color: "#8b8b9a", whiteSpace: "nowrap" }}>
+                      {fmtSize(file.size)} · {tokenLabel}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file.name)}
+                    className="ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                    style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
+                  >
+                    remover
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Resumo total + token gate */}
+            <div
+              className="mt-2 rounded-lg px-3 py-2 text-[11px] font-semibold"
+              style={{ background: gc.bg, border: `1px solid ${gc.border}`, color: gc.text }}
+            >
+              {gateStatus === "ok" && `✅ ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — dentro do limite`}
+              {gateStatus === "warn" && `⚠️ ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — grande, pode impactar qualidade`}
+              {gateStatus === "block" && `🚫 ${arquivos.length} arquivo(s) · ${fmtTokens(totalChars)} estimados — muito grande para processar diretamente`}
+              {gateStatus === "warn" && (
+                <div className="mt-0.5 text-[10px] font-normal" style={{ color: "#8a7d00" }}>
+                  Documentos muito grandes podem reduzir a qualidade da análise. Se possível, remova arquivos desnecessários.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </FormGroup>
 
-      {/* Painel de bloqueio: redireciona ao Claude.ai para condensar */}
+      {/* Painel de bloqueio */}
       {gateStatus === "block" && (
         <div
-          className="mt-4 rounded-xl p-4"
-          style={{
-            background: "rgba(220,38,38,0.03)",
-            border: "1px solid rgba(220,38,38,0.15)",
-            animation: "go-slide-down 0.3s ease",
-          }}
+          className="mt-2 rounded-xl p-4"
+          style={{ background: "rgba(220,38,38,0.03)", border: "1px solid rgba(220,38,38,0.15)", animation: "go-slide-down 0.3s ease" }}
         >
           <div className="mb-2 text-[13px] font-bold" style={{ color: "#dc2626" }}>
-            🚫 Documentação muito grande
+            🚫 Arquivos grandes demais
           </div>
           <p className="mb-3 text-[12px] leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
-            O arquivo enviado ultrapassa o limite de processamento. Use o prompt abaixo no{" "}
-            <strong>Claude.ai</strong> para gerar uma versão condensada e depois envie aqui.
+            O volume de código ultrapassa o limite de processamento direto. Use o prompt abaixo no{" "}
+            <strong>Claude.ai</strong> para gerar uma pré-documentação condensada — depois envie essa documentação aqui.
           </p>
           <div
             className="mb-3 rounded-lg p-3 text-[11px] font-mono leading-relaxed whitespace-pre-wrap"
-            style={{
-              background: "rgba(0,0,0,0.03)",
-              border: "1px solid rgba(0,0,0,0.08)",
-              color: "var(--go-text-primary)",
-              maxHeight: 160,
-              overflowY: "auto",
-            }}
+            style={{ background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.08)", color: "var(--go-text-primary)", maxHeight: 160, overflowY: "auto" }}
           >
             {REDIRECT_PROMPT}
           </div>

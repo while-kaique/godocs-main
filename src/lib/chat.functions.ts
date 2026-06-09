@@ -12,7 +12,7 @@ import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
-import { extractTextFromBase64 } from '@/lib/extract-text.server';
+import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import type {
   ChatFase,
@@ -165,8 +165,9 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         data_criacao: z.string(),
         tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
         descricao_breve: z.string().max(1000).optional(),
-        doc_base64: z.string().min(1),
-        doc_filename: z.string().min(1),
+        docs: z.array(
+          z.object({ base64: z.string().min(1), filename: z.string().min(1) })
+        ).min(1).max(30),
       })
       .parse(d)
   )
@@ -198,11 +199,11 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
     }
     log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
-    // 2. Extrai texto da documentação
+    // 2. Extrai texto de todos os arquivos
     let docTexto = '';
     try {
-      docTexto = await extractTextFromBase64(data.doc_base64, data.doc_filename);
-      log('iniciarSubmissao', `Texto extraído: ${docTexto.length} chars`);
+      docTexto = await extractTextFromMultipleFiles(data.docs);
+      log('iniciarSubmissao', `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`);
     } catch (extractErr) {
       err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
       docTexto = '';
@@ -265,7 +266,7 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
       : (resultado as { content: string }).content;
     console.log('\n┌─────────────────────────────────────────────');
     console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
-    console.log(`│ 📄 Doc: ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
+    console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
     console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
     console.log('│ 🤖 IA:');
     respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
