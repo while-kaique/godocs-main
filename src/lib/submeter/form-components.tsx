@@ -109,6 +109,49 @@ export function RadioGroup({
   );
 }
 
+export function CheckboxGroup({
+  options, value, onChange, error,
+}: {
+  options: { value: string; label: string; description?: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  error?: string;
+}) {
+  function toggle(v: string) {
+    onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
+  }
+
+  return (
+    <>
+      <div className="flex gap-2.5">
+        {options.map((opt) => {
+          const checked = value.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className={cn("go-radio-label flex-1 cursor-pointer select-none", checked && "go-radio-checked")}
+              style={checked ? undefined : undefined}
+            >
+              <input
+                type="checkbox"
+                value={opt.value}
+                checked={checked}
+                onChange={() => toggle(opt.value)}
+                className="absolute opacity-0"
+              />
+              <span>{opt.label}</span>
+              {opt.description && (
+                <span className="ml-1 text-[10px] font-normal opacity-70">{opt.description}</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </>
+  );
+}
+
 export function InfoTooltip({ children }: { children: React.ReactNode }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);

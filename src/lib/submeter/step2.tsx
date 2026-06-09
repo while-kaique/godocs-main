@@ -17,6 +17,7 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
+  CheckboxGroup,
   InfoTooltip,
 } from "./form-components";
 
@@ -466,7 +467,7 @@ export function Step2({
     }
     if (rejected.length > 0) {
       const exts = [...new Set(rejected.map((r) => r.ext))].slice(0, 8).join(", ");
-      toast.error(`${rejected.length} arquivo(s) ignorado(s) por formato: ${exts}`);
+      toast.info(`${rejected.length} arquivo(s) ignorado(s) por formato (não suportado): ${exts}`);
     }
 
     let merged = [...arquivos, ...accepted];
@@ -532,21 +533,23 @@ export function Step2({
       {/* Tipo de projeto */}
       <FormGroup>
         <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-          Este projeto é de saving ou receita incremental?
+          Este projeto gera saving, receita incremental ou ambos?
           <InfoTooltip>
             <strong className="mb-1 block text-white">Saving vs. Receita Incremental</strong>
             <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
               <strong style={{ color: "var(--go-lime)" }}>Saving</strong> — economia gerada pela automação.
               Ex: processo manual que levava 20h/mês agora é automático (economia de horas e custo operacional).
             </span>
-            <span className="block" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
               <strong style={{ color: "var(--go-lime)" }}>Receita Incremental</strong> — aumento de receita gerado pela automação.
               Ex: automação que dispara ofertas personalizadas e aumenta conversão de vendas.
             </span>
+            <span className="block text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
+              Pode selecionar os dois se o projeto gerar ambos os benefícios.
+            </span>
           </InfoTooltip>
         </div>
-        <RadioGroup
-          name="tipoProjeto"
+        <CheckboxGroup
           value={form.tipoProjeto}
           onChange={(v) => updateField("tipoProjeto", v as FormData["tipoProjeto"])}
           error={errors.tipoProjeto}

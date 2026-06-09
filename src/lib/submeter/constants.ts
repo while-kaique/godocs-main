@@ -45,17 +45,19 @@ export const STEPS = [
 ];
 
 export interface FormData {
+  escopo: "interno" | "externo" | "";
   prodStatus: "sim" | "dev" | "idle" | "";
   nome: string;
   email: string;
   area: string;
   ferramenta: string;
   ferramentaOutra: string;
+  servicoExterno: string;
   emEquipe: "sim" | "nao" | "";
   participantes: string[];
   nomeProjeto: string;
   dataCriacao: string;
-  tipoProjeto: "saving" | "receita_incremental" | "";
+  tipoProjeto: ("saving" | "receita_incremental")[];
   descricaoBreve: string;
 }
 
@@ -79,6 +81,8 @@ export interface SavingFormData {
   horasAntes: string;
   horasDepois: string;
   tipoSaving: 'mensal' | 'pontual' | '';
+  custoExterno: string;
+  custoPeriodicidade: 'mensal' | 'anual' | '';
 }
 
 export function readFileAsBase64(file: File): Promise<string> {
