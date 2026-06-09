@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -316,6 +316,22 @@ export function Step2({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  // Abre o seletor mostrando feedback IMEDIATO (cobre a enumeração do browser,
+  // que acontece antes do onChange e pode levar segundos em pastas grandes).
+  function openPicker(ref: React.RefObject<HTMLInputElement | null>, isFolder: boolean) {
+    setProcessing({ fase: isFolder ? "Lendo a pasta" : "Lendo arquivos", current: 0, total: 0 });
+    ref.current?.click();
+  }
+
+  // Se o usuário cancelar o diálogo, o evento "cancel" limpa o loading.
+  // (React não tipa onCancel em <input>, então anexamos manualmente.)
+  useEffect(() => {
+    const inputs = [fileInputRef.current, folderInputRef.current];
+    const onCancel = () => setProcessing(null);
+    inputs.forEach((el) => el?.addEventListener("cancel", onCancel));
+    return () => inputs.forEach((el) => el?.removeEventListener("cancel", onCancel));
+  }, []);
 
   const descricaoChars = form.descricaoBreve.length;
   const totalFileChars = [...fileChars.values()].reduce((a, b) => a + b, 0);
@@ -677,7 +693,12 @@ export function Step2({
             multiple
             accept={ACCEPTED_DOC_EXT.join(",")}
             className="hidden"
-            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) void addFiles(files);
+              else setProcessing(null); // seleção vazia
+              e.target.value = "";
+            }}
           />
           {/* webkitdirectory para seleção de pasta */}
           <input
@@ -687,7 +708,12 @@ export function Step2({
             webkitdirectory=""
             multiple
             className="hidden"
-            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }}
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files && files.length > 0) void addFiles(files);
+              else setProcessing(null);
+              e.target.value = "";
+            }}
           />
 
           {processing ? (
@@ -699,7 +725,7 @@ export function Step2({
               <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
                 {processing.total > 0
                   ? `${processing.current.toLocaleString("pt-BR")} de ${processing.total.toLocaleString("pt-BR")} arquivo(s) — ignorando node_modules e afins`
-                  : "Preparando…"}
+                  : "O navegador está lendo os arquivos — pode levar alguns segundos em pastas grandes…"}
               </div>
               {processing.total > 0 && (
                 <div className="mt-1 h-1.5 w-40 overflow-hidden rounded-full" style={{ background: "rgba(0,89,169,0.1)" }}>
@@ -719,7 +745,7 @@ export function Step2({
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => openPicker(fileInputRef, false)}
                   className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
                   style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
                 >
@@ -727,7 +753,7 @@ export function Step2({
                 </button>
                 <button
                   type="button"
-                  onClick={() => folderInputRef.current?.click()}
+                  onClick={() => openPicker(folderInputRef, true)}
                   className="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors"
                   style={{ background: "rgba(0,89,169,0.08)", border: "1px solid rgba(0,89,169,0.2)", color: "var(--go-blue)" }}
                 >
