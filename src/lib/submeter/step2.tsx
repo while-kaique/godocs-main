@@ -67,6 +67,46 @@ function isTextFile(filename: string): boolean {
   return TEXT_EXTS.has(ext);
 }
 
+// Pastas de desenvolvimento/build/deps que NUNCA devem ser enviadas
+// (verificadas por segmento do caminho — estilo .gitignore)
+const IGNORED_DIRS = new Set([
+  "node_modules", ".git", ".svn", ".hg",
+  "dist", "build", "out", ".next", ".nuxt", ".output", ".vercel",
+  "coverage", ".cache", ".vite", ".turbo", ".parcel-cache",
+  "venv", ".venv", "env", "__pycache__", ".pytest_cache", ".mypy_cache",
+  "vendor", "target", "bin", "obj", ".idea", ".vscode", ".gradle",
+  "tmp", "temp", ".terraform",
+]);
+
+// Padrões de arquivo que devem ser ignorados (lock, minificados, mapas, etc.)
+function isIgnoredFileName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    lower.endsWith(".min.js") ||
+    lower.endsWith(".min.css") ||
+    lower.endsWith(".map") ||
+    lower === "package-lock.json" ||
+    lower === "yarn.lock" ||
+    lower === "pnpm-lock.yaml" ||
+    lower === "bun.lockb" ||
+    lower === "poetry.lock" ||
+    lower === "composer.lock" ||
+    lower === ".ds_store" ||
+    lower === "thumbs.db"
+  );
+}
+
+/** Decide se um arquivo deve ser ignorado com base no caminho relativo */
+function shouldIgnorePath(relPath: string, fileName: string): string | null {
+  // Algum segmento do caminho é uma pasta de desenvolvimento?
+  const segments = relPath.split("/");
+  for (const seg of segments) {
+    if (IGNORED_DIRS.has(seg)) return `pasta ignorada: ${seg}/`;
+  }
+  if (isIgnoredFileName(fileName)) return "arquivo de lock/build";
+  return null;
+}
+
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -138,12 +178,24 @@ export function Step2({
     const list = Array.from(incoming);
     const accepted: File[] = [];
     const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
+    let ignoredCount = 0;
+    const ignoredReasons: Record<string, number> = {};
 
     console.groupCollapsed(`[Step2/addFiles] Recebidos ${list.length} arquivo(s)`);
 
     for (const file of list) {
       // webkitRelativePath traz o caminho completo dentro da pasta selecionada
       const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+
+      // 1. Ignora pastas de desenvolvimento/build/deps (node_modules, .git, dist, etc.)
+      const ignoreReason = shouldIgnorePath(relPath, file.name);
+      if (ignoreReason) {
+        ignoredCount++;
+        const key = ignoreReason.startsWith("pasta") ? ignoreReason : "arquivos de lock/build";
+        ignoredReasons[key] = (ignoredReasons[key] ?? 0) + 1;
+        continue;
+      }
+
       const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
       const hasExt = file.name.includes(".");
 
@@ -165,35 +217,46 @@ export function Step2({
         continue;
       }
       accepted.push(file);
-      console.log(`✅ aceito: ${relPath} (${ext}, ${fmtSize(file.size)})`);
     }
 
-    // Log detalhado dos rejeitados, agrupado por motivo
-    if (rejected.length > 0) {
-      console.warn(`⚠️ ${rejected.length} arquivo(s) rejeitado(s):`);
-      console.table(rejected.map((r) => ({
-        arquivo: r.name,
-        extensão: r.ext,
-        motivo: r.reason,
-        tamanho: fmtSize(r.size),
-      })));
+    // Log dos ignorados (pastas de dev) — só resumo, nunca lista completa
+    if (ignoredCount > 0) {
+      console.warn(`🚫 ${ignoredCount} arquivo(s) ignorado(s) automaticamente (pastas de desenvolvimento):`, ignoredReasons);
+    }
 
-      // Resumo por extensão rejeitada (útil para decidir o que suportar)
+    // Log detalhado dos rejeitados por formato (limitado p/ não travar o console)
+    if (rejected.length > 0) {
+      console.warn(`⚠️ ${rejected.length} arquivo(s) rejeitado(s) por formato:`);
+      console.table(
+        rejected.slice(0, 100).map((r) => ({
+          arquivo: r.name, extensão: r.ext, motivo: r.reason, tamanho: fmtSize(r.size),
+        }))
+      );
+      if (rejected.length > 100) console.warn(`...+${rejected.length - 100} não mostrados na tabela`);
+
       const porExt = rejected.reduce<Record<string, number>>((acc, r) => {
         acc[r.ext] = (acc[r.ext] ?? 0) + 1;
         return acc;
       }, {});
       console.warn("Extensões rejeitadas (contagem):", porExt);
-
-      const exts = [...new Set(rejected.map((r) => r.ext))].join(", ");
-      toast.error(`${rejected.length} arquivo(s) ignorado(s). Não suportado: ${exts}`);
     }
+
+    console.log(`📦 Resultado: ${accepted.length} aceito(s), ${ignoredCount} ignorado(s) (dev), ${rejected.length} rejeitado(s) (formato)`);
     console.groupEnd();
+
+    // Toasts informativos
+    if (ignoredCount > 0) {
+      toast.info(`${ignoredCount} arquivo(s) de pastas de desenvolvimento ignorados automaticamente`);
+    }
+    if (rejected.length > 0) {
+      const exts = [...new Set(rejected.map((r) => r.ext))].slice(0, 8).join(", ");
+      toast.error(`${rejected.length} arquivo(s) ignorado(s) por formato: ${exts}`);
+    }
 
     const merged = [...arquivos, ...accepted].slice(0, MAX_FILES);
     if (arquivos.length + accepted.length > MAX_FILES) {
       console.warn(`[Step2/addFiles] Limite de ${MAX_FILES} arquivos atingido — ${arquivos.length + accepted.length - MAX_FILES} descartado(s)`);
-      toast.error(`Limite de ${MAX_FILES} arquivos atingido`);
+      toast.error(`Limite de ${MAX_FILES} arquivos — só os primeiros ${MAX_FILES} foram mantidos`);
     }
 
     setArquivos(merged);
@@ -367,6 +430,9 @@ export function Step2({
           <br />
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
             Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · máx. {MAX_FILE_MB}MB por arquivo · até {MAX_FILES} arquivos
+          </span>
+          <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
+            💡 Pode enviar a pasta inteira — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados automaticamente.
           </span>
         </div>
 
