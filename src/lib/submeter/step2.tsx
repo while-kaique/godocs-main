@@ -116,39 +116,83 @@ export function Step2({
   // Estima chars de um arquivo e guarda no state
   const estimateFile = useCallback(async (file: File) => {
     let chars: number;
+    let metodo: string;
     if (isTextFile(file.name)) {
+      // Texto: lê o conteúdo real e conta os caracteres
       const text = await readFileAsText(file);
       chars = text.length;
+      metodo = "leitura real (chars do conteúdo)";
     } else {
-      // PDF/DOCX: estimativa conservadora por tamanho
+      // PDF/DOCX (binário): não dá pra ler chars no browser → estima por tamanho
       chars = Math.round(file.size * 0.8);
+      metodo = "estimativa por tamanho (bytes × 0.8)";
     }
+    const tokens = Math.round(chars / 4);
+    console.log(
+      `[Step2/estimateFile] "${file.name}": ${chars} chars → ~${tokens} tokens (${metodo})`
+    );
     setFileChars((prev) => new Map(prev).set(file.name, chars));
   }, []);
 
   async function addFiles(incoming: FileList | File[]) {
     const list = Array.from(incoming);
     const accepted: File[] = [];
-    const rejected: string[] = [];
+    const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
+
+    console.groupCollapsed(`[Step2/addFiles] Recebidos ${list.length} arquivo(s)`);
 
     for (const file of list) {
+      // webkitRelativePath traz o caminho completo dentro da pasta selecionada
+      const relPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
-      if (!ACCEPTED_DOC_EXT.includes(ext)) { rejected.push(file.name); continue; }
+      const hasExt = file.name.includes(".");
+
+      if (!hasExt) {
+        rejected.push({ name: relPath, ext: "(sem extensão)", reason: "sem extensão", size: file.size });
+        continue;
+      }
+      if (!ACCEPTED_DOC_EXT.includes(ext)) {
+        rejected.push({ name: relPath, ext, reason: "extensão não suportada", size: file.size });
+        continue;
+      }
       if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
         toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
         continue;
       }
-      // Evita duplicatas pelo nome
-      if (arquivos.some((f) => f.name === file.name)) continue;
+      if (arquivos.some((f) => f.name === file.name)) {
+        console.log(`⏭️  duplicado, ignorado: ${relPath}`);
+        continue;
+      }
       accepted.push(file);
+      console.log(`✅ aceito: ${relPath} (${ext}, ${fmtSize(file.size)})`);
     }
 
+    // Log detalhado dos rejeitados, agrupado por motivo
     if (rejected.length > 0) {
-      toast.error(`${rejected.length} arquivo(s) ignorado(s) — formato não suportado`);
+      console.warn(`⚠️ ${rejected.length} arquivo(s) rejeitado(s):`);
+      console.table(rejected.map((r) => ({
+        arquivo: r.name,
+        extensão: r.ext,
+        motivo: r.reason,
+        tamanho: fmtSize(r.size),
+      })));
+
+      // Resumo por extensão rejeitada (útil para decidir o que suportar)
+      const porExt = rejected.reduce<Record<string, number>>((acc, r) => {
+        acc[r.ext] = (acc[r.ext] ?? 0) + 1;
+        return acc;
+      }, {});
+      console.warn("Extensões rejeitadas (contagem):", porExt);
+
+      const exts = [...new Set(rejected.map((r) => r.ext))].join(", ");
+      toast.error(`${rejected.length} arquivo(s) ignorado(s). Não suportado: ${exts}`);
     }
+    console.groupEnd();
 
     const merged = [...arquivos, ...accepted].slice(0, MAX_FILES);
     if (arquivos.length + accepted.length > MAX_FILES) {
+      console.warn(`[Step2/addFiles] Limite de ${MAX_FILES} arquivos atingido — ${arquivos.length + accepted.length - MAX_FILES} descartado(s)`);
       toast.error(`Limite de ${MAX_FILES} arquivos atingido`);
     }
 

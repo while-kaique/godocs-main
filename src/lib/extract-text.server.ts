@@ -85,23 +85,37 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
 export async function extractTextFromMultipleFiles(
   files: { base64: string; filename: string }[],
 ): Promise<string> {
-  log(`Extraindo ${files.length} arquivo(s)...`);
+  log(`Extraindo ${files.length} arquivo(s):`, files.map((f) => f.filename).join(', '));
 
   const results = await Promise.all(
     files.map(async (f) => {
       try {
         const text = await extractTextFromBase64(f.base64, f.filename);
-        return { filename: f.filename, text };
+        if (text.trim().length === 0) {
+          err(`Arquivo "${f.filename}" extraído com 0 chars (vazio ou formato não legível)`);
+        }
+        return { filename: f.filename, text, ok: true };
       } catch (e) {
-        err(`Falha no arquivo "${f.filename}":`, e);
-        return { filename: f.filename, text: '' };
+        err(`Falha ao extrair "${f.filename}":`, e instanceof Error ? e.message : String(e));
+        return { filename: f.filename, text: '', ok: false };
       }
     }),
   );
 
-  const parts = results
-    .filter((r) => r.text.trim().length > 0)
-    .map((r) => `=== ${r.filename} ===\n\n${r.text}`);
+  // Resumo por arquivo: chars extraídos e status
+  log('Resultado da extração por arquivo:');
+  for (const r of results) {
+    const status = !r.ok ? '❌ ERRO' : r.text.trim().length === 0 ? '⚠️ VAZIO' : '✅ OK';
+    log(`  ${status} — "${r.filename}": ${r.text.length} chars`);
+  }
+
+  const comConteudo = results.filter((r) => r.text.trim().length > 0);
+  const semConteudo = results.filter((r) => r.text.trim().length === 0);
+  if (semConteudo.length > 0) {
+    err(`${semConteudo.length} arquivo(s) sem conteúdo extraível:`, semConteudo.map((r) => r.filename).join(', '));
+  }
+
+  const parts = comConteudo.map((r) => `=== ${r.filename} ===\n\n${r.text}`);
 
   let combined = parts.join('\n\n---\n\n');
 
@@ -110,6 +124,7 @@ export async function extractTextFromMultipleFiles(
     log(`Total truncado para ${MAX_CHARS_TOTAL} chars`);
   }
 
-  log(`Total combinado: ${combined.length} chars de ${parts.length} arquivo(s) com conteúdo`);
+  const tokensEstimados = Math.round(combined.length / 4);
+  log(`Total combinado: ${combined.length} chars (~${tokensEstimados} tokens) de ${parts.length}/${files.length} arquivo(s) com conteúdo`);
   return combined;
 }
