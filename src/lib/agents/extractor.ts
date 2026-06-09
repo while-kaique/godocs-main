@@ -13,10 +13,12 @@ import { llmChat } from '@/lib/llm';
 import type { DocumentacaoColetada, ProjetoContexto } from './types';
 import { documentacaoVazia } from './types';
 
-// ~4 chars/token. Abaixo de ~20k tokens, uma chamada extrai bem.
-const SINGLE_CALL_MAX_CHARS = 80_000;
-// Lotes de ~17k tokens — tamanho onde a extração é confiável.
-const CHUNK_CHARS = 70_000;
+// ~4 chars/token. Modelos atuais (gpt-5+) extraem bem com blocos maiores,
+// então elevamos os limites para fazer MENOS chamadas (menos latência total).
+// Projetos médios (até ~37k tokens) cabem numa única chamada.
+const SINGLE_CALL_MAX_CHARS = 150_000;
+// Lotes de ~37k tokens — equilíbrio entre nº de chamadas e qualidade.
+const CHUNK_CHARS = 150_000;
 
 const CAMPOS = `CAMPOS:
 1. nome_projeto — Título do projeto (string ou null)

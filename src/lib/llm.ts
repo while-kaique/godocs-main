@@ -38,6 +38,10 @@ export async function llmChat(
   throw new Error(`Provider desconhecido: ${provider}. Use "openai" ou "anthropic".`);
 }
 
+// Cache de parâmetros que cada modelo rejeita (ex: gpt-5.5 não aceita temperature).
+// Evita pagar um round-trip 400 em TODA chamada — só a primeira "aprende".
+const unsupportedByModel = new Map<string, Set<string>>();
+
 async function callOpenAI(
   messages: LLMMessage[],
   opts: { model: string; apiKey: string; temperature?: number; maxTokens?: number; jsonMode?: boolean }
@@ -54,8 +58,12 @@ async function callOpenAI(
     body.response_format = { type: 'json_object' };
   }
 
-  // Tenta a chamada; se o modelo rejeitar um parâmetro não suportado
-  // (ex: temperature em alguns modelos novos), remove-o e tenta de novo.
+  // Remove de cara os parâmetros que já sabemos que este modelo rejeita.
+  const known = unsupportedByModel.get(opts.model);
+  if (known) for (const p of known) delete body[p];
+
+  // Tenta a chamada; se o modelo rejeitar um parâmetro (não suportado ou valor
+  // inválido), remove-o, memoriza para as próximas chamadas e tenta de novo.
   for (let attempt = 0; attempt < 4; attempt++) {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -76,7 +84,11 @@ async function callOpenAI(
     const errText = await res.text();
     const dropped = res.status === 400 ? dropUnsupportedParam(body, errText) : null;
     if (dropped) {
-      log(`Parâmetro '${dropped}' não suportado por ${opts.model} — removendo e tentando novamente`);
+      // Memoriza para não repetir o erro nas próximas chamadas deste modelo
+      const set = unsupportedByModel.get(opts.model) ?? new Set<string>();
+      set.add(dropped);
+      unsupportedByModel.set(opts.model, set);
+      log(`Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`);
       continue;
     }
 
