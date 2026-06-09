@@ -160,6 +160,7 @@ export type Database = {
           chat_completo: boolean | null
           created_at: string | null
           data_criacao_projeto: string | null
+          descricao_breve: string | null
           ferramenta: string
           id: string
           membros: Json | null
@@ -171,6 +172,7 @@ export type Database = {
           saving_reais: number | null
           status: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at: string | null
+          tipo_projeto: string | null
           tipo_saving: string | null
           updated_at: string | null
           validated_at: string | null
@@ -182,6 +184,7 @@ export type Database = {
           chat_completo?: boolean | null
           created_at?: string | null
           data_criacao_projeto?: string | null
+          descricao_breve?: string | null
           ferramenta: string
           id?: string
           membros?: Json | null
@@ -193,6 +196,7 @@ export type Database = {
           saving_reais?: number | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
+          tipo_projeto?: string | null
           tipo_saving?: string | null
           updated_at?: string | null
           validated_at?: string | null
@@ -204,6 +208,7 @@ export type Database = {
           chat_completo?: boolean | null
           created_at?: string | null
           data_criacao_projeto?: string | null
+          descricao_breve?: string | null
           ferramenta?: string
           id?: string
           membros?: Json | null
@@ -215,6 +220,7 @@ export type Database = {
           saving_reais?: number | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
+          tipo_projeto?: string | null
           tipo_saving?: string | null
           updated_at?: string | null
           validated_at?: string | null
