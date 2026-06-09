@@ -101,6 +101,21 @@ describe('Prompt fase doc', () => {
     const msgs = capturedMessages.filter(m => m.content.includes('[SISTEMA]'));
     expect(msgs).toHaveLength(0);
   });
+
+  it('inclui guia de formatação do preview (listas/negrito/parágrafos)', async () => {
+    await runOrchestrator(makeCtx(), [], 'doc');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('FORMATAÇÃO DO PREVIEW');
+    expect(system).toContain('LISTA NUMERADA');
+  });
+});
+
+describe('Prompt fase doc_preview', () => {
+  it('inclui guia de formatação ao gerar novo preview após ajuste', async () => {
+    await runOrchestrator(makeCtx(), [{ role: 'user', content: 'ajuste o fluxo' }], 'doc_preview');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('FORMATAÇÃO DO PREVIEW');
+  });
 });
 
 describe('Prompt fase saving', () => {
