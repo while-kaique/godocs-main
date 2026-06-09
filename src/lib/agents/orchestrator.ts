@@ -90,10 +90,7 @@ O usuário pode:
 2. PEDIR AJUSTES — apontar correções específicas em uma ou mais seções.
 
 REGRAS:
-- Se o usuário APROVAR: sinalize como "complete". No campo "content", inclua:
-  1. Uma confirmação curta ("Documentação aprovada!")
-  2. Um RESUMO DO PROJETO em 3-5 frases que sintetize: o que o projeto faz, como funciona em linhas gerais, quais ferramentas/serviços usa, e com que frequência roda. Esse resumo será usado como contexto para a próxima etapa.
-  3. A transição: "Agora vamos para a segunda etapa: o memorial de ganhos financeiros do projeto."
+- Se o usuário APROVAR: sinalize como "complete". No campo "content", coloque APENAS um RESUMO DO PROJETO em 3-5 frases que sintetize: o que o projeto faz, como funciona em linhas gerais, quais ferramentas/serviços usa, e com que frequência roda. Esse resumo será usado internamente como contexto para a próxima etapa. NÃO inclua "Documentação aprovada", transições ou qualquer texto além do resumo factual — o frontend cuida da transição visual.
 - Se o usuário pedir AJUSTES: aplique as correções no campo "coletado", gere um novo preview atualizado e peça nova aprovação.
 - NUNCA mude o que não foi pedido.
 - NUNCA invente informações. Se a correção for ambígua, pergunte.
@@ -102,7 +99,7 @@ REGRAS:
 FORMATO DE RESPOSTA — APENAS JSON válido:
 
 Se aprovado:
-{"type":"complete","content":"Documentação aprovada!\\n\\n**Resumo do projeto:** {resumo factual em 3-5 frases}\\n\\nAgora vamos para a segunda etapa: o memorial de ganhos financeiros do projeto.","coletado":{...campos finais}}
+{"type":"complete","content":"{resumo factual do projeto em 3-5 frases, sem saudações nem transições}","coletado":{...campos finais}}
 
 Se ajuste + novo preview:
 {"type":"preview","content":"# Nome\\n\\n## O que faz\\n...documentação corrigida em markdown...\\n\\nFiz os ajustes solicitados. Pode aprovar agora?","coletado":{...campos corrigidos}}
@@ -155,10 +152,19 @@ COMO CONDUZIR:
 7. Monte o memorial_calculo conforme o usuário responde — não peça para ele escrever o memorial, VOCÊ monta com base nas respostas.
 8. Quando todos os 5 campos estiverem preenchidos, gere um PREVIEW do memorial formatado e peça aprovação.
 
+VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
+- NUNCA aceite um número de horas "de cara". Quando o usuário disser algo como "gastava 20h por mês", você DEVE pedir o detalhamento: "Certo, mas essas 20h eram gastas em quais atividades exatamente? Me detalhe a rotina passo a passo."
+- O usuário precisa JUSTIFICAR as horas descrevendo a rotina manual concreta: quais tarefas eram feitas, com que frequência, quanto tempo cada uma levava, quantas pessoas executavam.
+- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se ele disse 20h, aponte a discrepância e peça para explicar o restante.
+- Se a estimativa parecer inflada para o tipo de tarefa (ex: tarefa simples consumindo dezenas de horas de cargo sênior), questione diretamente: "Tem certeza? Um processo de [X] geralmente leva [Y] — o que justifica esse volume?"
+- Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), 40h manuais não faz sentido. Desafie.
+- Só preencha economia_horas_mes quando a justificativa for concreta e a conta fechar. Enquanto não fechar, mantenha null e continue investigando.
+
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Saving deve refletir ganho REAL e comprovável, não estimativas otimistas.
 - Se o processo manual não existia, saving de horas é 0 — explore se há saving de custo direto (ex: substituiu ferramenta paga).
 - O memorial precisa ter lógica verificável: frequência × tempo × pessoas = total de horas.
+- Se cargo informado for de nível alto (sênior, coordenador, gerente, diretor, CEO) para uma tarefa operacional, questione se era realmente essa pessoa que executava ou se delegava.
 
 Português brasileiro, tom direto. Acentuação correta.
 
@@ -239,7 +245,7 @@ export async function runOrchestrator(
           ? (temDoc
             ? '[SISTEMA] Leia a documentação enviada. Extraia os 7 campos e atualize "coletado" silenciosamente. NÃO liste o que extraiu — o usuário verá no preview. Se todos os campos estiverem cobertos, gere o preview direto. Se faltar algo, cumprimente em 1 frase curta e faça a primeira pergunta sobre o que falta. Seja breve.'
             : '[SISTEMA] Cumprimente em 1 frase curta e faça a primeira pergunta para documentar o projeto. Seja breve e direto.')
-          : '[SISTEMA] Inicie a coleta do memorial de saving. Use o contexto do projeto para fazer uma primeira pergunta inteligente.',
+          : '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
     });
   }
 

@@ -105,6 +105,9 @@ function SubmeterPage() {
   const [chatFase, setChatFase] = useState<ChatFase>("doc");
   const [projetoId, setProjetoId] = useState<string | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
+  const [showTransition, setShowTransition] = useState(false);
+  const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
+  const [approvedSavingPreview, setApprovedSavingPreview] = useState<string | null>(null);
   const [submittingProject, setSubmittingProject] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -167,6 +170,8 @@ function SubmeterPage() {
         errs.nome = "O nome não pode conter números";
       if (!EMAIL_RE.test(form.email.trim()))
         errs.email = "Informe um e-mail válido";
+      else if (!ALLOWED_DOMAINS_RE.test(form.email.trim()))
+        errs.email = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
       if (!form.area) errs.area = "Selecione sua área";
       if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
       if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
@@ -242,13 +247,11 @@ function SubmeterPage() {
       // Lê o arquivo como base64
       const base64 = await readFileAsBase64(arquivo);
 
-      const area_id = undefined; // TODO: mapear área para UUID se necessário
-
       const result = await iniciarSubmissaoFn({
         data: {
           responsavel_nome: form.nome.trim(),
           responsavel_email: form.email.trim(),
-          area_id,
+          area: form.area,
           ferramenta:
             form.ferramenta === "Outros" && form.ferramentaOutra.trim()
               ? `Outros: ${form.ferramentaOutra.trim()}`
@@ -324,15 +327,50 @@ function SubmeterPage() {
       };
 
       if (transitionToSaving) {
-        // Chat limpa e inicia agente 2 com a mensagem de transição
-        setChatMessages([assistantMsg]);
+        // Salva o preview da doc aprovado (última mensagem de preview no chat)
+        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
+        if (lastPreviewMsg) setApprovedDocPreview(lastPreviewMsg.content);
+
+        // Mostra tela de transição por 3s, depois inicia o agente saving
+        setShowTransition(true);
+        setChatFase(newFase);
+        setTimeout(async () => {
+          setShowTransition(false);
+          setChatMessages([]);
+          setChatLoading(true);
+          try {
+            const savingResult = await enviarMensagemFn({
+              data: {
+                projeto_id: projetoId!,
+                content: "[SISTEMA] Iniciar fase saving",
+              },
+            });
+            const savingMsg: ChatMessage = {
+              role: "assistant",
+              content: savingResult.content,
+              options: savingResult.options ?? undefined,
+              isComplete: savingResult.isComplete,
+              isPreview: savingResult.isPreview,
+              fase: savingResult.fase ?? "saving",
+            };
+            setChatMessages([savingMsg]);
+            if (savingResult.fase) setChatFase(savingResult.fase);
+          } catch (e) {
+            console.error('[submeter] falha ao iniciar saving:', e);
+            toast.error("Erro ao iniciar análise de impacto. Tente enviar uma mensagem.");
+          } finally {
+            setChatLoading(false);
+          }
+        }, 3000);
       } else {
         setChatMessages((prev) => [...prev, assistantMsg]);
+        setChatFase(newFase);
       }
 
-      setChatFase(newFase);
-
       if (result.isComplete) {
+        // Salva o preview do saving aprovado
+        const lastSavingPreview = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
+        if (lastSavingPreview) setApprovedSavingPreview(lastSavingPreview.content);
         setChatComplete(true);
       }
     } catch (err) {
@@ -545,6 +583,9 @@ function SubmeterPage() {
                   submitting={submittingProject}
                   chatBottomRef={chatBottomRef}
                   fase={chatFase}
+                  showTransition={showTransition}
+                  approvedDocPreview={approvedDocPreview}
+                  approvedSavingPreview={approvedSavingPreview}
                 />
               </StepAnimation>
             )}
@@ -578,7 +619,7 @@ function SubmeterPage() {
                   type="button"
                   onClick={handleIniciarAgente}
                   disabled={iniciandoChat}
-                  className={cn("go-btn-next", shaking && "go-shake")}
+                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
                 >
                   {iniciandoChat ? (
                     <>
@@ -920,6 +961,199 @@ function PreviewPanel({
 }
 
 /* ──────────────────────────────────────────────
+   Final Review (previews colapsáveis + envio)
+   ────────────────────────────────────────────── */
+
+function FinalReview({
+  approvedDocPreview,
+  approvedSavingPreview,
+  onSubmitProject,
+  submitting,
+}: {
+  approvedDocPreview: string | null;
+  approvedSavingPreview: string | null;
+  onSubmitProject: () => void;
+  submitting: boolean;
+}) {
+  const [expandedDoc, setExpandedDoc] = useState(false);
+  const [expandedSaving, setExpandedSaving] = useState(false);
+
+  return (
+    <div
+      className="px-8 py-6"
+      style={{
+        borderTop: "1px solid rgba(22,163,74,0.15)",
+        animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both",
+      }}
+    >
+      {/* Header */}
+      <div className="mb-4 flex items-center gap-2.5">
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-full"
+          style={{ background: "rgba(22,163,74,0.08)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <div>
+          <div className="text-[14px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+            Tudo pronto!
+          </div>
+          <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
+            Revise os documentos abaixo antes de enviar
+          </div>
+        </div>
+      </div>
+
+      {/* Card: Documentação Técnica */}
+      {approvedDocPreview && (
+        <CollapsiblePreviewCard
+          title="Documentação Técnica"
+          icon="📄"
+          accentColor="var(--go-blue)"
+          accentBg="rgba(0,89,169,0.04)"
+          accentBorder="rgba(0,89,169,0.1)"
+          content={approvedDocPreview}
+          expanded={expandedDoc}
+          onToggle={() => setExpandedDoc((v) => !v)}
+          isSaving={false}
+        />
+      )}
+
+      {/* Card: Memorial de Cálculo */}
+      {approvedSavingPreview && (
+        <CollapsiblePreviewCard
+          title="Memorial de Cálculo"
+          icon="📊"
+          accentColor="#6b6e00"
+          accentBg="rgba(215,219,0,0.04)"
+          accentBorder="rgba(215,219,0,0.15)"
+          content={approvedSavingPreview}
+          expanded={expandedSaving}
+          onToggle={() => setExpandedSaving((v) => !v)}
+          isSaving={true}
+        />
+      )}
+
+      {/* Botão de envio */}
+      <button
+        type="button"
+        onClick={onSubmitProject}
+        disabled={submitting}
+        className="go-btn-submit w-full mt-4 inline-flex items-center justify-center gap-2"
+      >
+        {submitting ? (
+          <>
+            <span>Enviando...</span>
+            <div className="go-spinner" />
+          </>
+        ) : (
+          <span>Enviar para Triagem</span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function CollapsiblePreviewCard({
+  title,
+  icon,
+  accentColor,
+  accentBg,
+  accentBorder,
+  content,
+  expanded,
+  onToggle,
+  isSaving,
+}: {
+  title: string;
+  icon: string;
+  accentColor: string;
+  accentBg: string;
+  accentBorder: string;
+  content: string;
+  expanded: boolean;
+  onToggle: () => void;
+  isSaving: boolean;
+}) {
+  const cleanContent = content
+    .replace(/\n*Essa documentação está correta\?.*$/s, "")
+    .replace(/\n*Está correto\?.*$/s, "")
+    .replace(/\n*Pode aprovar.*$/s, "")
+    .replace(/\n*Você pode aprovar.*$/s, "")
+    .replace(/\n*Fiz os ajustes.*$/s, "")
+    .trim();
+
+  return (
+    <div
+      className="mb-3 overflow-hidden rounded-xl transition-all"
+      style={{
+        border: `1.5px solid ${accentBorder}`,
+        background: "var(--go-white)",
+      }}
+    >
+      {/* Header — clicável */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-4 py-3 transition-colors"
+        style={{ background: expanded ? accentBg : "transparent" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">{icon}</span>
+          <span
+            className="text-[12px] font-bold uppercase tracking-[0.06em]"
+            style={{ color: accentColor }}
+          >
+            {title}
+          </span>
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold"
+            style={{
+              background: "rgba(22,163,74,0.08)",
+              border: "1px solid rgba(22,163,74,0.15)",
+              color: "#16a34a",
+            }}
+          >
+            Aprovado
+          </span>
+        </div>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={accentColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="transition-transform"
+          style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Conteúdo colapsável */}
+      {expanded && (
+        <div
+          className="overflow-y-auto px-5 py-4"
+          style={{
+            maxHeight: 280,
+            borderTop: `1px solid ${accentBorder}`,
+            background: accentBg,
+            animation: "go-slide-down 0.25s ease",
+          }}
+        >
+          <SimpleMarkdown text={cleanContent} isSaving={isSaving} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
    Step 3: Chat com o Agente
    ────────────────────────────────────────────── */
 
@@ -934,6 +1168,9 @@ function Step3Chat({
   submitting,
   chatBottomRef,
   fase,
+  showTransition,
+  approvedDocPreview,
+  approvedSavingPreview,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -945,6 +1182,9 @@ function Step3Chat({
   submitting: boolean;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   fase: ChatFase;
+  showTransition: boolean;
+  approvedDocPreview: string | null;
+  approvedSavingPreview: string | null;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview" || fase === "completo";
@@ -970,13 +1210,13 @@ function Step3Chat({
     }
   }
 
-  const agentLabel = isSavingFase ? "Agente de Memorial Financeiro" : "Agente de Documentação";
+  const agentLabel = isSavingFase ? "Análise de Impacto" : "Documentação Técnica";
   const agentStatus = isComplete
     ? "Submissão completa — pronto para envio"
     : showPreviewActions
       ? "Aguardando sua aprovação..."
       : isSavingFase
-        ? "Coletando memorial de ganhos..."
+        ? "Calculando o ganho financeiro do projeto..."
         : "Analisando e coletando informações...";
 
   return (
@@ -1005,8 +1245,108 @@ function Step3Chat({
         </div>
       </div>
 
+      {/* Tela de transição doc → saving */}
+      {showTransition && (
+        <div
+          className="flex flex-col items-center justify-center px-8 py-12"
+          style={{
+            minHeight: 420,
+            animation: "go-step-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) both",
+          }}
+        >
+          {/* Ícone de check animado */}
+          <div
+            className="mb-5 flex items-center justify-center"
+            style={{
+              width: 64,
+              height: 64,
+              background: "rgba(22,163,74,0.08)",
+              border: "2px solid rgba(22,163,74,0.2)",
+              borderRadius: "50%",
+              animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both",
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+
+          <h3
+            className="mb-2 text-[17px] font-extrabold tracking-tight text-center"
+            style={{
+              color: "var(--go-text-heading)",
+              animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
+            }}
+          >
+            Documentação aprovada!
+          </h3>
+          <p
+            className="mb-6 text-[13px] text-center leading-relaxed max-w-[320px]"
+            style={{
+              color: "var(--go-text-primary)",
+              animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
+            }}
+          >
+            Agora vamos calcular o impacto financeiro do seu projeto — quanto tempo e dinheiro ele economiza.
+          </p>
+
+          {/* Barra de progresso visual */}
+          <div
+            className="flex items-center gap-3"
+            style={{
+              animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[10px]"
+                style={{ background: "rgba(22,163,74,0.1)", color: "#16a34a" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>Documentação</span>
+            </div>
+            <div
+              className="h-[2px] w-8"
+              style={{ background: "linear-gradient(90deg, #16a34a, var(--go-lime))" }}
+            />
+            <div className="flex items-center gap-1.5">
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
+                style={{ background: "rgba(215,219,0,0.15)", color: "#6b6e00", border: "1.5px solid rgba(215,219,0,0.3)" }}
+              >
+                2
+              </div>
+              <span className="text-[11px] font-semibold" style={{ color: "#6b6e00" }}>Impacto</span>
+            </div>
+          </div>
+
+          {/* Loading dots */}
+          <div
+            className="mt-6 flex gap-1.5 items-center"
+            style={{
+              animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.7s both",
+            }}
+          >
+            {[0, 0.2, 0.4].map((delay) => (
+              <span
+                key={delay}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: "#6b6e00",
+                  opacity: 0.5,
+                  animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Mensagens */}
-      <div
+      {!showTransition && (<div
         className="flex-1 overflow-y-auto px-8 py-5 space-y-4 transition-colors duration-500"
         style={{ maxHeight: 420, background: isSavingFase ? "rgba(215,219,0,0.03)" : "transparent" }}
       >
@@ -1088,9 +1428,10 @@ function Step3Chat({
 
         <div ref={chatBottomRef} />
       </div>
+      )}
 
       {/* Options (quando agente oferece opções) */}
-      {hasOptions && lastMsg.options && (
+      {!showTransition && hasOptions && lastMsg.options && (
         <div
           className="px-8 pb-3 flex flex-wrap gap-2"
           style={{ borderTop: `1px solid ${accentBorder}` }}
@@ -1120,42 +1461,18 @@ function Step3Chat({
         </div>
       )}
 
-      {/* Botão de envio final */}
-      {isComplete && (
-        <div
-          className="px-8 py-5"
-          style={{ borderTop: `1px solid ${accentBorder}` }}
-        >
-          <div
-            className="mb-3 rounded-xl p-3.5 text-sm"
-            style={{
-              background: "rgba(22,163,74,0.04)",
-              border: "1px solid rgba(22,163,74,0.15)",
-              color: "#15803d",
-            }}
-          >
-            ✅ Documentação e memorial financeiro completos — pronto para avaliação da equipe de RPA & IA.
-          </div>
-          <button
-            type="button"
-            onClick={onSubmitProject}
-            disabled={submitting}
-            className="go-btn-submit w-full"
-          >
-            {submitting ? (
-              <>
-                <span>Enviando...</span>
-                <div className="go-spinner" />
-              </>
-            ) : (
-              <span>Enviar para Triagem</span>
-            )}
-          </button>
-        </div>
+      {/* Revisão final + envio */}
+      {!showTransition && isComplete && (
+        <FinalReview
+          approvedDocPreview={approvedDocPreview}
+          approvedSavingPreview={approvedSavingPreview}
+          onSubmitProject={onSubmitProject}
+          submitting={submitting}
+        />
       )}
 
       {/* Input de mensagem */}
-      {!isComplete && (
+      {!showTransition && !isComplete && (
         <div
           className="px-8 py-4"
           style={{ borderTop: `1px solid ${accentBorder}` }}

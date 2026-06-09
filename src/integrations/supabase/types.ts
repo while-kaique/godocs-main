@@ -155,49 +155,67 @@ export type Database = {
       }
       projetos: {
         Row: {
+          area: string | null
           area_id: string | null
           chat_completo: boolean | null
           created_at: string | null
+          data_criacao_projeto: string | null
           ferramenta: string
           id: string
           membros: Json | null
+          memorial_calculo: string | null
           nome: string | null
           responsavel_email: string
           responsavel_nome: string
+          saving_horas: number | null
+          saving_reais: number | null
           status: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at: string | null
+          tipo_saving: string | null
           updated_at: string | null
           validated_at: string | null
           validated_by: string | null
         }
         Insert: {
+          area?: string | null
           area_id?: string | null
           chat_completo?: boolean | null
           created_at?: string | null
+          data_criacao_projeto?: string | null
           ferramenta: string
           id?: string
           membros?: Json | null
+          memorial_calculo?: string | null
           nome?: string | null
           responsavel_email: string
           responsavel_nome: string
+          saving_horas?: number | null
+          saving_reais?: number | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
+          tipo_saving?: string | null
           updated_at?: string | null
           validated_at?: string | null
           validated_by?: string | null
         }
         Update: {
+          area?: string | null
           area_id?: string | null
           chat_completo?: boolean | null
           created_at?: string | null
+          data_criacao_projeto?: string | null
           ferramenta?: string
           id?: string
           membros?: Json | null
+          memorial_calculo?: string | null
           nome?: string | null
           responsavel_email?: string
           responsavel_nome?: string
+          saving_horas?: number | null
+          saving_reais?: number | null
           status?: Database["public"]["Enums"]["projeto_status"] | null
           submitted_at?: string | null
+          tipo_saving?: string | null
           updated_at?: string | null
           validated_at?: string | null
           validated_by?: string | null
@@ -261,7 +279,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      projeto_status: "rascunho" | "em_validacao" | "validado" | "rejeitado"
+      projeto_status: "rascunho" | "em_validacao" | "validado" | "rejeitado" | "aprovado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -389,7 +407,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      projeto_status: ["rascunho", "em_validacao", "validado", "rejeitado"],
+      projeto_status: ["rascunho", "em_validacao", "validado", "rejeitado", "aprovado"],
     },
   },
 } as const

@@ -157,6 +157,7 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         responsavel_nome: z.string().min(1).max(120),
         responsavel_email: z.string().email().max(255),
         area_id: z.string().uuid().optional(),
+        area: z.string().min(1).max(100),
         ferramenta: z.string().min(1).max(100),
         membros: z.array(z.string()).default([]),
         nome_projeto: z.string().min(1).max(200),
@@ -176,9 +177,11 @@ export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
         responsavel_nome: data.responsavel_nome,
         responsavel_email: data.responsavel_email,
         area_id: data.area_id,
+        area: data.area,
         ferramenta: data.ferramenta,
         membros: data.membros,
         nome: data.nome_projeto,
+        data_criacao_projeto: data.data_criacao,
         status: 'rascunho',
       })
       .select()
@@ -389,20 +392,113 @@ export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
     z.object({ projeto_id: z.string().uuid() }).parse(d)
   )
   .handler(async ({ data }) => {
-    const { data: doc } = await supabaseAdmin
+    log('submeterParaValidacao', `projeto=${data.projeto_id}`);
+
+    // 1. Busca documentação + saving
+    const { data: docRow } = await supabaseAdmin
       .from('documentacao')
       .select('conteudo')
       .eq('projeto_id', data.projeto_id)
       .single();
 
-    if (!doc) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
+    if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
+    const conteudo = docRow.conteudo as Record<string, unknown>;
+    const saving = conteudo.saving as Record<string, unknown> | undefined;
+
+    // 2. Busca dados do projeto para regras de negócio
+    const { data: projeto } = await supabaseAdmin
+      .from('projetos')
+      .select('*')
+      .eq('id', data.projeto_id)
+      .single();
+
+    if (!projeto) throw new Error('Projeto não encontrado.');
+
+    // 3. Verifica duplicata por nome
+    if (projeto.nome) {
+      const { data: duplicata } = await supabaseAdmin
+        .from('projetos')
+        .select('id')
+        .eq('nome', projeto.nome)
+        .neq('id', data.projeto_id)
+        .neq('status', 'rascunho')
+        .limit(1);
+
+      if (duplicata && duplicata.length > 0) {
+        throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
+      }
+    }
+
+    // 4. Auto-aprovação se área = RPA, senão em_validacao
+    const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
+    const now = new Date().toISOString();
+
+    // 5. Popula colunas de saving + atualiza status
     await supabaseAdmin
       .from('projetos')
-      .update({ status: 'em_validacao', submitted_at: new Date().toISOString() })
+      .update({
+        status,
+        submitted_at: now,
+        saving_horas: saving?.economia_horas_mes as number ?? null,
+        saving_reais: saving?.economia_reais_mes as number ?? null,
+        tipo_saving: saving?.tipo_saving as string ?? null,
+        memorial_calculo: saving?.memorial_calculo as string ?? null,
+      })
       .eq('id', data.projeto_id);
 
-    return { ok: true };
+    log('submeterParaValidacao', `Status: ${status}, saving_horas: ${saving?.economia_horas_mes}, saving_reais: ${saving?.economia_reais_mes}`);
+
+    // 6. Notificação Google Chat
+    const chatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
+    if (chatWebhookUrl) {
+      try {
+        const savingHoras = saving?.economia_horas_mes ?? 0;
+        const savingReais = saving?.economia_reais_mes ?? 0;
+        const fmtReais = Number(savingReais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const tipoSaving = saving?.tipo_saving ?? 'mensal';
+        const membros = Array.isArray(projeto.membros) ? (projeto.membros as string[]).join(', ') : '';
+
+        const text = [
+          '──────────────────────',
+          '',
+          '🚨 *Novo fluxo de automação cadastrado – aprovação pendente*',
+          '',
+          `📌 *Projeto:* ${projeto.nome}`,
+          `🏷️ *Área:* ${projeto.area ?? '—'}`,
+          `🛠️ *Ferramenta:* ${projeto.ferramenta}`,
+          '',
+          `👤 *Solicitante:* ${projeto.responsavel_nome}`,
+          `📧 *E-mail:* ${projeto.responsavel_email}`,
+          membros ? `👥 *Participantes:* ${membros}` : '',
+          '',
+          `⏱️ *Saving estimado (horas/mês):* ${savingHoras} horas`,
+          `💰 *Saving estimado (R$/mês):* R$ ${fmtReais}`,
+          `📊 *Tipo de saving:* ${tipoSaving}`,
+          '',
+          `📅 *Data da submissão:* ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
+          `📊 *Status:* ${status === 'aprovado' ? 'Aprovado (auto)' : 'Pendente'}`,
+          '',
+          '👉 *Aguardando avaliação e aprovação dos responsáveis.*',
+          '',
+          '──────────────────────',
+        ].filter(Boolean).join('\n');
+
+        await fetch(chatWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        log('submeterParaValidacao', 'Notificação Google Chat enviada.');
+      } catch (chatErr) {
+        err('submeterParaValidacao', 'Falha ao enviar notificação Google Chat:', chatErr);
+        // Não bloqueia a submissão
+      }
+    } else {
+      log('submeterParaValidacao', 'GOOGLE_CHAT_WEBHOOK_URL não configurada — notificação ignorada.');
+    }
+
+    return { ok: true, status };
   });
 
 // ─── Validar projeto (chamado pelo admin) ───────────────────────────────────
