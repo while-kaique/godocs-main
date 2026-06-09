@@ -62,3 +62,37 @@ describe('LLM message types', () => {
     expect(jsonMode).toBe(false);
   });
 });
+
+describe('dropUnsupportedParam — adaptação a modelos novos (gpt-5+)', () => {
+  it('remove max_tokens em unsupported_parameter', async () => {
+    const { dropUnsupportedParam } = await import('@/lib/llm');
+    const body: Record<string, unknown> = { max_tokens: 2048, temperature: 0.2 };
+    const err = JSON.stringify({ error: { code: 'unsupported_parameter', param: 'max_tokens', message: "Use 'max_completion_tokens' instead." } });
+    expect(dropUnsupportedParam(body, err)).toBe('max_tokens');
+    expect('max_tokens' in body).toBe(false);
+    expect('temperature' in body).toBe(true);
+  });
+
+  it('remove temperature em unsupported_value (só aceita default)', async () => {
+    const { dropUnsupportedParam } = await import('@/lib/llm');
+    const body: Record<string, unknown> = { temperature: 0.2, max_completion_tokens: 4096 };
+    const err = JSON.stringify({ error: { code: 'unsupported_value', param: 'temperature', message: "'temperature' does not support 0.2 with this model. Only the default (1) value is supported." } });
+    expect(dropUnsupportedParam(body, err)).toBe('temperature');
+    expect('temperature' in body).toBe(false);
+  });
+
+  it('retorna null para erro não relacionado', async () => {
+    const { dropUnsupportedParam } = await import('@/lib/llm');
+    const body: Record<string, unknown> = { temperature: 0.2 };
+    const err = JSON.stringify({ error: { code: 'rate_limit_exceeded', message: 'slow down' } });
+    expect(dropUnsupportedParam(body, err)).toBeNull();
+    expect('temperature' in body).toBe(true);
+  });
+
+  it('retorna null quando o param não está no body', async () => {
+    const { dropUnsupportedParam } = await import('@/lib/llm');
+    const body: Record<string, unknown> = { max_completion_tokens: 4096 };
+    const err = JSON.stringify({ error: { code: 'unsupported_value', param: 'temperature', message: 'x' } });
+    expect(dropUnsupportedParam(body, err)).toBeNull();
+  });
+});
