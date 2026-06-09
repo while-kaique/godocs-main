@@ -21,7 +21,7 @@ import type {
   ProjetoContexto,
   SavingColetado,
 } from '@/lib/agents/types';
-import { documentacaoVazia, savingVazio } from '@/lib/agents/types';
+import { documentacaoVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
   const [{ data, error }, { data: docMsg }] = await Promise.all([
     supabaseAdmin
       .from('projetos')
-      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, areas(nome)')
+      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, tipo_projeto, areas(nome)')
       .eq('id', projeto_id)
       .single(),
     supabaseAdmin
@@ -51,6 +51,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     nome_projeto: (data.nome as string | null) ?? '',
     data_criacao: null,
     doc_texto: docMsg?.content ?? null,
+    tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
   };
 }
 
@@ -330,7 +331,8 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       estado.fase,
       estado.coletado,
       estado.saving,
-      resumoProjeto
+      resumoProjeto,
+      ctx.tipo_projeto ?? null
     );
 
     // 5. Salva resposta do assistente
@@ -401,6 +403,96 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
     const vazios = Object.entries(campos).filter(([, v]) => v === null).map(([k]) => k);
     console.log(`│ ✅ Preenchidos: ${preenchidos.join(', ') || 'nenhum'}`);
     console.log(`│ ❌ Faltando: ${vazios.join(', ') || 'nenhum'}`);
+    console.log('└─────────────────────────────────────────────\n');
+
+    return formatResponse(resultado);
+  });
+
+// ─── Iniciar fase saving com dados determinísticos ─────────────────────────
+
+export const iniciarSavingFn = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        projeto_id: z.string().uuid(),
+        tipo_saving: z.enum(['mensal', 'pontual']),
+        cargo: z.string().optional(),
+        horas_antes: z.number().min(0).optional(),
+        horas_depois: z.number().min(0).optional(),
+      })
+      .parse(d)
+  )
+  .handler(async ({ data }) => {
+    log('iniciarSaving', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+
+    // 1. Contexto do projeto
+    const ctx = await getProjetoContexto(data.projeto_id);
+    const tipoProjeto = ctx.tipo_projeto ?? null;
+
+    // 2. Calcular valores para saving (se aplicável)
+    let saving = savingVazio();
+    saving.tipo_saving = data.tipo_saving;
+
+    if (tipoProjeto === 'saving' && data.cargo && data.horas_antes != null && data.horas_depois != null) {
+      const cargoEntry = CARGOS.find(c => c.label === data.cargo);
+      const valorHora = cargoEntry?.valor_hora ?? null;
+      const economiaHoras = data.horas_antes - data.horas_depois;
+      const economiaReais = valorHora != null
+        ? Math.round(economiaHoras * valorHora * 100) / 100
+        : null;
+
+      saving = {
+        ...saving,
+        cargo: data.cargo,
+        horas_antes: data.horas_antes,
+        horas_depois: data.horas_depois,
+        economia_horas_mes: economiaHoras,
+        valor_hora: valorHora,
+        economia_reais_mes: economiaReais,
+      };
+      log('iniciarSaving', `Saving calculado: ${economiaHoras}h × R$${valorHora} = R$${economiaReais}`);
+    }
+
+    // 3. Buscar histórico para extrair resumo do projeto
+    const { data: msgs } = await supabaseAdmin
+      .from('chat_messages')
+      .select('role, content')
+      .eq('projeto_id', data.projeto_id)
+      .neq('role', 'doc')
+      .order('created_at');
+
+    const resumoProjeto = extrairResumoProjeto(msgs ?? []);
+    const estado = extrairEstado(msgs ?? []);
+
+    // 4. Rodar orquestrador na fase saving
+    const resultado = await runOrchestrator(
+      ctx,
+      [],
+      'saving',
+      estado.coletado,
+      saving,
+      resumoProjeto,
+      tipoProjeto
+    );
+
+    // 5. Salvar resposta do assistente
+    await supabaseAdmin.from('chat_messages').insert({
+      projeto_id: data.projeto_id,
+      role: 'assistant',
+      content: JSON.stringify(resultado),
+      options: resultado.type === 'options' ? resultado.options : null,
+    });
+
+    // ── LOG ──
+    const respContent = resultado.type === 'options'
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+    console.log('\n┌─────────────────────────────────────────────');
+    console.log(`│ 💰 INÍCIO SAVING: tipo_projeto=${tipoProjeto}, tipo_saving=${data.tipo_saving}`);
+    if (data.cargo) console.log(`│ 👤 Cargo: ${data.cargo}, Horas: ${data.horas_antes}→${data.horas_depois}`);
+    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+    console.log('│ 🤖 IA:');
+    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
     console.log('└─────────────────────────────────────────────\n');
 
     return formatResponse(resultado);

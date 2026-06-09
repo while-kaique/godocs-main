@@ -137,11 +137,8 @@ Se precisa de clarificação:
 {"type":"question","content":"sua pergunta sobre o ajuste","coletado":{...campos atuais}}`;
 }
 
-function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
-  return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
-A documentação técnica do projeto já foi aprovada pelo usuário. Agora seu objetivo é construir o memorial de cálculo de saving (economia gerada pelo projeto).
-
-RESUMO DO PROJETO (contexto da etapa anterior):
+function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string, tipoProjeto: 'saving' | 'receita_incremental' | null = null): string {
+  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
 
 DETALHES TÉCNICOS APROVADOS:
@@ -149,51 +146,36 @@ DETALHES TÉCNICOS APROVADOS:
 - O que faz: ${coletado.o_que_faz}
 - Execução: ${coletado.execucao}
 - Fluxo: ${coletado.fluxo}
-- Ferramenta: ${ctx.ferramenta}
+- Ferramenta: ${ctx.ferramenta}`;
 
-CAMPOS QUE VOCÊ PRECISA COLETAR:
+  if (tipoProjeto === 'receita_incremental') {
+    return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
+A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental — quanto de receita nova esse projeto gera.
 
-1. **economia_horas_mes** — Quantas horas por mês essa automação economiza? (número)
-2. **valor_hora** — Valor da hora do colaborador que executava a tarefa manualmente, em R$. Mínimo R$ 8,00.
-3. **economia_reais_mes** — Resultado de horas × valor_hora (você calcula e confirma com o usuário).
-4. **tipo_saving** — "mensal" (saving recorrente todo mês) ou "pontual" (saving único, não se repete).
-5. **memorial_calculo** — Descrição detalhada e fundamentada de como os números foram calculados.
+${detalhes}
+
+DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
+- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${saving.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'ganho único'})
+
+CAMPO QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
+1. **valor_ganho_mensal** — Quanto de receita incremental (R$/mês ou R$ total se pontual) o projeto gera?
+2. **memorial_calculo** — Narrativa detalhada que fundamenta o valor informado.
 
 ESTADO ATUAL:
 ${JSON.stringify(saving, null, 2)}
 
-TABELA DE REFERÊNCIA — custo/hora por cargo (com encargos):
-- Estagiário: R$ 10,78
-- Assistente: R$ 13,94
-- Analista Júnior: R$ 21,29
-- Analista Pleno: R$ 29,90
-- Analista Sênior: R$ 33,10
-- Coordenador / Especialista: R$ 55,15
-
 COMO CONDUZIR:
-
-1. Comece usando o contexto do projeto para fazer a primeira pergunta de forma inteligente.
-2. Faça UMA pergunta por vez, focada em fatos concretos sobre o processo manual anterior.
-3. Questione números que não fazem sentido com o contexto.
-4. Se o usuário informar horas e valor_hora, CALCULE economia_reais_mes automaticamente e confirme.
-5. Se valor_hora < R$ 8,00, avise que está abaixo do mínimo e peça para rever.
-6. Se valor_hora > R$ 60,00, alerte que está acima da faixa normal e pergunte se está correto.
-7. Monte o memorial_calculo conforme o usuário responde — não peça para ele escrever o memorial, VOCÊ monta com base nas respostas.
-8. Quando todos os 5 campos estiverem preenchidos, gere um PREVIEW do memorial formatado e peça aprovação.
-
-VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
-- NUNCA aceite um número de horas "de cara". Quando o usuário disser algo como "gastava 20h por mês", você DEVE pedir o detalhamento: "Certo, mas essas 20h eram gastas em quais atividades exatamente? Me detalhe a rotina passo a passo."
-- O usuário precisa JUSTIFICAR as horas descrevendo a rotina manual concreta: quais tarefas eram feitas, com que frequência, quanto tempo cada uma levava, quantas pessoas executavam.
-- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se ele disse 20h, aponte a discrepância e peça para explicar o restante.
-- Se a estimativa parecer inflada para o tipo de tarefa (ex: tarefa simples consumindo dezenas de horas de cargo sênior), questione diretamente: "Tem certeza? Um processo de [X] geralmente leva [Y] — o que justifica esse volume?"
-- Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), 40h manuais não faz sentido. Desafie.
-- Só preencha economia_horas_mes quando a justificativa for concreta e a conta fechar. Enquanto não fechar, mantenha null e continue investigando.
+1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
+2. Pergunte qual é o ganho de receita estimado e a lógica por trás (como esse valor foi calculado, de onde vem, qual a base de comparação).
+3. Faça UMA pergunta por vez. Seja cético — peça evidências concretas.
+4. Se o valor parecer alto, peça detalhamento: "Como você chegou a esse número? Qual era a receita antes e qual é agora?"
+5. Monte o memorial_calculo automaticamente com base nas respostas — o usuário NÃO escreve o memorial.
+6. Quando valor_ganho_mensal e memorial estiverem justificados, gere o PREVIEW.
 
 REGRAS ANTI-EXTRAPOLAÇÃO:
-- Saving deve refletir ganho REAL e comprovável, não estimativas otimistas.
-- Se o processo manual não existia, saving de horas é 0 — explore se há saving de custo direto (ex: substituiu ferramenta paga).
-- O memorial precisa ter lógica verificável: frequência × tempo × pessoas = total de horas.
-- Se cargo informado for de nível alto (sênior, coordenador, gerente, diretor, CEO) para uma tarefa operacional, questione se era realmente essa pessoa que executava ou se delegava.
+- Receita incremental deve refletir ganho REAL e mensurável, não projeções otimistas.
+- O memorial precisa ter lógica verificável: receita antes vs. depois, ou nova receita gerada.
+- Questione números que pareçam estimativas sem base concreta.
 
 Português brasileiro, tom direto. Acentuação correta.
 
@@ -205,8 +187,66 @@ Pergunta:
 Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
-Preview (quando tudo preenchido):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown com a lógica completa...\\n\\n**Resumo:**\\n- Economia: Xh/mês\\n- Valor/hora: R$ X\\n- Saving: R$ X/mês (mensal|pontual)\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+Preview (quando valor e memorial estiverem completos):
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${saving.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+  }
+
+  // Tipo "saving" (default) — com dados determinísticos pré-preenchidos
+  const horasAntes = saving.horas_antes ?? 0;
+  const horasDepois = saving.horas_depois ?? 0;
+  const economiaHoras = saving.economia_horas_mes ?? (horasAntes - horasDepois);
+  const valorHora = saving.valor_hora ?? 0;
+  const economiaReais = saving.economia_reais_mes ?? (economiaHoras * valorHora);
+
+  return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
+A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo.
+
+${detalhes}
+
+DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
+- Cargo de quem executava a tarefa: ${saving.cargo ?? 'não informado'}
+- Horas gastas antes da automação: ${horasAntes}h/mês
+- Horas gastas após a automação: ${horasDepois}h/mês
+- Economia de horas: ${economiaHoras}h/mês
+- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${saving.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'economia única'})
+
+O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA — NÃO MENCIONE valores em R$ para o usuário. Foque apenas nas HORAS.
+
+SEU OBJETIVO: validar que as ${horasAntes}h/mês ANTES da automação são reais e justificáveis, e montar o memorial_calculo.
+
+ESTADO ATUAL:
+${JSON.stringify(saving, null, 2)}
+
+COMO CONDUZIR:
+1. Comece perguntando sobre o processo manual: o que exatamente era feito nessas ${horasAntes}h por mês? Detalhe a rotina passo a passo.
+2. Faça UMA pergunta por vez, focada em fatos concretos sobre o processo manual anterior.
+3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever.
+4. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
+
+VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
+- NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina manual: quais tarefas, com que frequência, quanto tempo cada uma, quantas pessoas executavam.
+- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se ele informou ${horasAntes}h, aponte a discrepância e peça para explicar.
+- Se a estimativa parecer inflada para o tipo de tarefa, questione diretamente.
+- Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), muitas horas manuais não fazem sentido. Desafie.
+- Se após o detalhamento as horas reais forem diferentes das informadas, atualize economia_horas_mes no saving e recalcule.
+
+REGRAS ANTI-EXTRAPOLAÇÃO:
+- Saving deve refletir ganho REAL e comprovável.
+- Se o processo manual não existia, saving de horas é 0.
+- O memorial precisa ter lógica verificável: frequência × tempo × pessoas = total de horas.
+
+Português brasileiro, tom direto. Acentuação correta.
+
+FORMATO — APENAS JSON válido:
+
+Pergunta:
+{"type":"question","content":"sua pergunta","saving":{...campos atualizados}}
+
+Opções:
+{"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
+
+Preview (quando justificativa concreta e memorial completo):
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown com a lógica completa...\\n\\n**Resumo:**\\n- Economia: ${economiaHoras}h/mês\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
 }
 
 function buildSavingPreviewPrompt(saving: SavingColetado): string {
@@ -239,7 +279,8 @@ export async function runOrchestrator(
   fase: ChatFase = 'doc',
   coletado: DocumentacaoColetada = documentacaoVazia(),
   saving: SavingColetado = savingVazio(),
-  resumoProjeto: string = ''
+  resumoProjeto: string = '',
+  tipoProjeto: 'saving' | 'receita_incremental' | null = null
 ): Promise<OrchestratorResult> {
   let systemPrompt: string;
 
@@ -251,7 +292,7 @@ export async function runOrchestrator(
       systemPrompt = buildDocPreviewPrompt(ctx, coletado);
       break;
     case 'saving':
-      systemPrompt = buildSavingPrompt(ctx, coletado, saving, resumoProjeto);
+      systemPrompt = buildSavingPrompt(ctx, coletado, saving, resumoProjeto, tipoProjeto);
       break;
     case 'saving_preview':
       systemPrompt = buildSavingPreviewPrompt(saving);
@@ -283,11 +324,21 @@ export async function runOrchestrator(
         sistemaMsg = '[SISTEMA] Nenhum arquivo foi enviado. Cumprimente em 1 frase curta e comece a coletar as informações do projeto via conversa. Seja direto.';
       }
       messages.push({ role: 'user', content: sistemaMsg });
-    } else {
-      messages.push({
-        role: 'user',
-        content: '[SISTEMA] Inicie a coleta do memorial de saving. Apresente-se em UMA frase curta explicando que agora vamos calcular o ganho financeiro do projeto, e logo em seguida faça a primeira pergunta concreta — pergunte sobre o processo manual que existia antes da automação: quantas pessoas faziam, com que frequência, e quanto tempo levava. Sempre termine com uma pergunta.',
-      });
+    } else if (fase === 'saving') {
+      if (tipoProjeto === 'receita_incremental') {
+        messages.push({
+          role: 'user',
+          content: `[SISTEMA] Projeto de receita incremental, frequência: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
+        });
+      } else {
+        const horasAntes = saving.horas_antes ?? 0;
+        const horasDepois = saving.horas_depois ?? 0;
+        const economiaHoras = horasAntes - horasDepois;
+        messages.push({
+          role: 'user',
+          content: `[SISTEMA] O usuário informou: cargo "${saving.cargo ?? '?'}", ${horasAntes}h/mês antes da automação, ${horasDepois}h/mês depois. Economia declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente nessas ${horasAntes}h. Sempre termine com uma pergunta.`,
+        });
+      }
     }
   }
 
