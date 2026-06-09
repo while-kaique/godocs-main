@@ -42,36 +42,70 @@ async function callOpenAI(
   messages: LLMMessage[],
   opts: { model: string; apiKey: string; temperature?: number; maxTokens?: number; jsonMode?: boolean }
 ): Promise<string> {
+  // Modelos novos (gpt-5+) usam max_completion_tokens em vez de max_tokens.
   const body: Record<string, unknown> = {
     model: opts.model,
     messages,
     temperature: opts.temperature ?? 0.7,
-    max_tokens: opts.maxTokens ?? 2048,
+    max_completion_tokens: opts.maxTokens ?? 2048,
   };
 
   if (opts.jsonMode) {
     body.response_format = { type: 'json_object' };
   }
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${opts.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  // Tenta a chamada; se o modelo rejeitar um parâmetro não suportado
+  // (ex: temperature em alguns modelos novos), remove-o e tenta de novo.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${opts.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-  if (!res.ok) {
-    const body = await res.text();
-    errLog(`OpenAI HTTP ${res.status}:`, body);
-    throw new Error(`OpenAI error ${res.status}: ${body}`);
+    if (res.ok) {
+      const data = await res.json() as { choices: { message: { content: string } }[] };
+      const content = data.choices[0].message.content;
+      log(`OpenAI respondeu: ${content.slice(0, 120)}${content.length > 120 ? '...' : ''}`);
+      return content;
+    }
+
+    const errText = await res.text();
+    const dropped = res.status === 400 ? dropUnsupportedParam(body, errText) : null;
+    if (dropped) {
+      log(`Parâmetro '${dropped}' não suportado por ${opts.model} — removendo e tentando novamente`);
+      continue;
+    }
+
+    errLog(`OpenAI HTTP ${res.status}:`, errText);
+    throw new Error(`OpenAI error ${res.status}: ${errText}`);
   }
 
-  const data = await res.json() as { choices: { message: { content: string } }[] };
-  const content = data.choices[0].message.content;
-  log(`OpenAI respondeu: ${content.slice(0, 120)}${content.length > 120 ? '...' : ''}`);
-  return content;
+  throw new Error('OpenAI: falha após remover parâmetros não suportados');
+}
+
+/**
+ * Se o erro 400 for "unsupported_parameter", remove o parâmetro do body e
+ * devolve seu nome (para retry). Cobre temperature/max_completion_tokens etc.
+ */
+function dropUnsupportedParam(body: Record<string, unknown>, errText: string): string | null {
+  let parsed: { error?: { code?: string; param?: string; message?: string } };
+  try {
+    parsed = JSON.parse(errText);
+  } catch {
+    return null;
+  }
+  const err = parsed.error;
+  if (!err) return null;
+  const isUnsupported =
+    err.code === 'unsupported_parameter' || /unsupported parameter/i.test(err.message ?? '');
+  const param = err.param;
+  if (!isUnsupported || !param || !(param in body)) return null;
+  delete body[param];
+  return param;
 }
 
 async function callAnthropic(
