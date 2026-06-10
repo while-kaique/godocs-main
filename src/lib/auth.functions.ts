@@ -12,6 +12,6 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
     email = process.env.DEV_USER_EMAIL ?? null
   }
   if (!email) return null
-  const admin = getAdminByEmail(email)
+  const admin = await getAdminByEmail(email)
   return { email, isAdmin: !!admin }
 }

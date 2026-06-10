@@ -52,7 +52,8 @@ export async function salvarMensagem(input: unknown) {
 
 export async function getChatHistorico(projeto_id: string) {
   idSchema.parse(projeto_id)
-  return getChatMessages(projeto_id).map((m) => ({
+  const msgs = await getChatMessages(projeto_id)
+  return msgs.map((m) => ({
     ...m,
     options: parseJson(m.options),
   }))
@@ -65,14 +66,14 @@ export async function salvarDocumentacao(input: unknown) {
       conteudo: z.record(z.unknown()),
     })
     .parse(input)
-  upsertDocumentacao(data.projeto_id, data.conteudo)
-  updateProjeto(data.projeto_id, { chat_completo: true })
+  await upsertDocumentacao(data.projeto_id, data.conteudo)
+  await updateProjeto(data.projeto_id, { chat_completo: true })
   return { ok: true }
 }
 
 export async function submeterProjeto(projeto_id: string) {
   idSchema.parse(projeto_id)
-  updateProjeto(projeto_id, {
+  await updateProjeto(projeto_id, {
     status: 'em_validacao',
     submitted_at: new Date().toISOString(),
   })

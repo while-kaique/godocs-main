@@ -1,5 +1,10 @@
 // SQLite database client (server-only)
 // Abstrai o acesso ao banco via interface GoDeployDB (env.DB no Godeploy, wrapper better-sqlite3 em dev)
+//
+// IMPORTANTE: o env.DB do Godeploy é ASSÍNCRONO (query/exec retornam Promise) e
+// exige o argumento de params sempre (mesmo []). Por isso toda a camada é async e
+// sempre passa params. O wrapper better-sqlite3 do dev é síncrono, mas `await`
+// sobre um valor síncrono é no-op — então o mesmo código funciona em dev e em prod.
 
 import { initSchema } from './schema';
 import type { GoDeployDB } from './db-adapter';
@@ -9,15 +14,14 @@ export type { GoDeployDB } from './db-adapter';
 // ─── Singleton global — setado pelo worker ou pelo dev plugin ──────────────
 
 let _db: GoDeployDB | undefined;
-let _initialized = false;
+let _initPromise: Promise<void> | undefined;
 
 /** Injeta a instância do banco. Chamado pelo worker.ts no início de cada request. */
-export function setDb(db: GoDeployDB) {
+export async function setDb(db: GoDeployDB): Promise<void> {
   _db = db;
-  if (!_initialized) {
-    initSchema(db);
-    _initialized = true;
-  }
+  // initSchema roda uma única vez por isolate; chamadas concorrentes aguardam a mesma promise.
+  if (!_initPromise) _initPromise = Promise.resolve(initSchema(db));
+  await _initPromise;
 }
 
 /** Retorna a instância do banco injetada. Lança erro se não foi setada. */
@@ -41,21 +45,20 @@ function rowsToObjects<T>(result: { columns: string[]; rows: unknown[][] }): T[]
 }
 
 /** SELECT que retorna array de objetos */
-function queryAll<T>(sql: string, params?: unknown[]): T[] {
-  const result = getDb().query(sql, params);
+async function queryAll<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const result = await getDb().query(sql, params);
   return rowsToObjects<T>(result);
 }
 
 /** SELECT que retorna um único objeto ou undefined */
-function queryOne<T>(sql: string, params?: unknown[]): T | undefined {
-  const result = getDb().query(sql, params);
-  const rows = rowsToObjects<T>(result);
-  return rows[0];
+async function queryOne<T>(sql: string, params: unknown[] = []): Promise<T | undefined> {
+  const result = await getDb().query(sql, params);
+  return rowsToObjects<T>(result)[0];
 }
 
 /** INSERT/UPDATE/DELETE */
-function exec(sql: string, params?: unknown[]): void {
-  getDb().exec(sql, params);
+async function exec(sql: string, params: unknown[] = []): Promise<void> {
+  await getDb().exec(sql, params);
 }
 
 // ─── Helpers genéricos ─────────────────────────────────────────────────────
@@ -92,14 +95,14 @@ export function getAdminByEmail(email: string) {
   return queryOne<AdminRow>('SELECT * FROM admins WHERE email = ?', [email]);
 }
 
-export function insertAdmin(email: string, nome?: string | null) {
+export async function insertAdmin(email: string, nome?: string | null) {
   const id = generateId();
-  exec('INSERT INTO admins (id, email, nome) VALUES (?, ?, ?)', [id, email, nome ?? null]);
-  return queryOne<AdminRow>('SELECT * FROM admins WHERE id = ?', [id])!;
+  await exec('INSERT INTO admins (id, email, nome) VALUES (?, ?, ?)', [id, email, nome ?? null]);
+  return (await queryOne<AdminRow>('SELECT * FROM admins WHERE id = ?', [id]))!;
 }
 
 export function deleteAdmin(id: string) {
-  exec('DELETE FROM admins WHERE id = ?', [id]);
+  return exec('DELETE FROM admins WHERE id = ?', [id]);
 }
 
 // --- Areas ---
@@ -112,14 +115,14 @@ export function getAreaById(id: string) {
   return queryOne<AreaRow>('SELECT * FROM areas WHERE id = ?', [id]);
 }
 
-export function insertArea(nome: string) {
+export async function insertArea(nome: string) {
   const id = generateId();
-  exec('INSERT INTO areas (id, nome) VALUES (?, ?)', [id, nome]);
-  return queryOne<AreaRow>('SELECT * FROM areas WHERE id = ?', [id])!;
+  await exec('INSERT INTO areas (id, nome) VALUES (?, ?)', [id, nome]);
+  return (await queryOne<AreaRow>('SELECT * FROM areas WHERE id = ?', [id]))!;
 }
 
 export function deleteArea(id: string) {
-  exec('DELETE FROM areas WHERE id = ?', [id]);
+  return exec('DELETE FROM areas WHERE id = ?', [id]);
 }
 
 // --- Projetos ---
@@ -137,8 +140,8 @@ export function getProjetoById(id: string) {
   return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id]);
 }
 
-export function getProjetoWithRelations(id: string) {
-  const projeto = queryOne<ProjetoRow & { area_nome: string | null }>(`
+export async function getProjetoWithRelations(id: string) {
+  const projeto = await queryOne<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
@@ -146,15 +149,15 @@ export function getProjetoWithRelations(id: string) {
   `, [id]);
   if (!projeto) return undefined;
 
-  const chatMessages = queryAll<ChatMessageRow>(
+  const chatMessages = await queryAll<ChatMessageRow>(
     'SELECT * FROM chat_messages WHERE projeto_id = ? ORDER BY created_at', [id]
   );
 
-  const documentacao = queryAll<DocumentacaoRow>(
+  const documentacao = await queryAll<DocumentacaoRow>(
     'SELECT * FROM documentacao WHERE projeto_id = ?', [id]
   );
 
-  const validacoes = queryAll<ValidacaoRow>(
+  const validacoes = await queryAll<ValidacaoRow>(
     'SELECT * FROM validacoes WHERE projeto_id = ?', [id]
   );
 
@@ -188,10 +191,10 @@ export type InsertProjeto = {
   status?: string;
 };
 
-export function insertProjeto(data: InsertProjeto) {
+export async function insertProjeto(data: InsertProjeto) {
   const id = generateId();
   const now = nowISO();
-  exec(`
+  await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, status, created_at, updated_at)
@@ -215,12 +218,12 @@ export function insertProjeto(data: InsertProjeto) {
     now,
     now,
   ]);
-  return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id])!;
+  return (await queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id]))!;
 }
 
 export function updateProjeto(id: string, fields: Record<string, unknown>) {
   const keys = Object.keys(fields);
-  if (keys.length === 0) return;
+  if (keys.length === 0) return Promise.resolve();
   const sets = keys.map((k) => `${k} = ?`).join(', ');
   const values = keys.map((k) => {
     const v = fields[k];
@@ -229,7 +232,7 @@ export function updateProjeto(id: string, fields: Record<string, unknown>) {
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v;
   });
-  exec(`UPDATE projetos SET ${sets}, updated_at = ? WHERE id = ?`, [...values, nowISO(), id]);
+  return exec(`UPDATE projetos SET ${sets}, updated_at = ? WHERE id = ?`, [...values, nowISO(), id]);
 }
 
 export function findDuplicateProjeto(nome: string, excludeId: string) {
@@ -261,7 +264,7 @@ export function getDocMessage(projetoId: string) {
   );
 }
 
-export function insertChatMessage(data: {
+export async function insertChatMessage(data: {
   projeto_id: string;
   role: string;
   content: string;
@@ -269,7 +272,7 @@ export function insertChatMessage(data: {
   selected_option?: number | null;
 }) {
   const id = generateId();
-  exec(`
+  await exec(`
     INSERT INTO chat_messages (id, projeto_id, role, content, options, selected_option)
     VALUES (?, ?, ?, ?, ?, ?)
   `, [
@@ -280,7 +283,7 @@ export function insertChatMessage(data: {
     data.options ? JSON.stringify(data.options) : null,
     data.selected_option ?? null,
   ]);
-  return queryOne<ChatMessageRow>('SELECT * FROM chat_messages WHERE id = ?', [id])!;
+  return (await queryOne<ChatMessageRow>('SELECT * FROM chat_messages WHERE id = ?', [id]))!;
 }
 
 // --- Documentacao ---
@@ -291,21 +294,21 @@ export function getDocumentacao(projetoId: string) {
   );
 }
 
-export function upsertDocumentacao(projetoId: string, conteudo: unknown) {
-  const existing = queryOne<{ id: string }>('SELECT id FROM documentacao WHERE projeto_id = ?', [projetoId]);
+export async function upsertDocumentacao(projetoId: string, conteudo: unknown) {
+  const existing = await queryOne<{ id: string }>('SELECT id FROM documentacao WHERE projeto_id = ?', [projetoId]);
   const now = nowISO();
   const jsonStr = JSON.stringify(conteudo);
   if (existing) {
-    exec('UPDATE documentacao SET conteudo = ?, updated_at = ? WHERE projeto_id = ?', [jsonStr, now, projetoId]);
+    await exec('UPDATE documentacao SET conteudo = ?, updated_at = ? WHERE projeto_id = ?', [jsonStr, now, projetoId]);
   } else {
     const id = generateId();
-    exec('INSERT INTO documentacao (id, projeto_id, conteudo, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id, projetoId, jsonStr, now, now]);
+    await exec('INSERT INTO documentacao (id, projeto_id, conteudo, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id, projetoId, jsonStr, now, now]);
   }
 }
 
 // --- Validacoes ---
 
-export function insertValidacao(data: {
+export async function insertValidacao(data: {
   projeto_id: string;
   resultado: string;
   parecer: string;
@@ -313,7 +316,7 @@ export function insertValidacao(data: {
   admin_email?: string | null;
 }) {
   const id = generateId();
-  exec(`
+  await exec(`
     INSERT INTO validacoes (id, projeto_id, resultado, parecer, criterios, admin_email)
     VALUES (?, ?, ?, ?, ?, ?)
   `, [id, data.projeto_id, data.resultado, data.parecer, data.criterios ? JSON.stringify(data.criterios) : null, data.admin_email ?? null]);
@@ -321,7 +324,7 @@ export function insertValidacao(data: {
 }
 
 export function updateValidacaoEmailEnviado(projetoId: string) {
-  exec('UPDATE validacoes SET email_enviado = 1 WHERE projeto_id = ?', [projetoId]);
+  return exec('UPDATE validacoes SET email_enviado = 1 WHERE projeto_id = ?', [projetoId]);
 }
 
 // --- Configuracoes ---
@@ -336,7 +339,7 @@ export function getConfiguracao(chave: string) {
 
 export function updateConfiguracao(chave: string, valor: unknown, updatedBy: string) {
   const now = nowISO();
-  exec('UPDATE configuracoes SET valor = ?, updated_by = ?, updated_at = ? WHERE chave = ?', [
+  return exec('UPDATE configuracoes SET valor = ?, updated_by = ?, updated_at = ? WHERE chave = ?', [
     JSON.stringify(valor), updatedBy, now, chave
   ]);
 }
@@ -351,17 +354,17 @@ export function getProfileById(id: string) {
   return queryOne<ProfileRow>('SELECT * FROM profiles WHERE id = ?', [id]);
 }
 
-export function upsertProfile(id: string, nome: string, email: string) {
-  const existing = queryOne<{ id: string }>('SELECT id FROM profiles WHERE id = ?', [id]);
+export async function upsertProfile(id: string, nome: string, email: string) {
+  const existing = await queryOne<{ id: string }>('SELECT id FROM profiles WHERE id = ?', [id]);
   if (existing) {
-    exec('UPDATE profiles SET nome = ?, email = ? WHERE id = ?', [nome, email, id]);
+    await exec('UPDATE profiles SET nome = ?, email = ? WHERE id = ?', [nome, email, id]);
   } else {
-    exec('INSERT INTO profiles (id, nome, email) VALUES (?, ?, ?)', [id, nome, email]);
+    await exec('INSERT INTO profiles (id, nome, email) VALUES (?, ?, ?)', [id, nome, email]);
   }
 }
 
 export function deleteProfile(id: string) {
-  exec('DELETE FROM profiles WHERE id = ?', [id]);
+  return exec('DELETE FROM profiles WHERE id = ?', [id]);
 }
 
 // --- User Roles ---
@@ -378,11 +381,11 @@ export function getUserRole(userId: string, role?: string) {
 }
 
 export function deleteUserRoles(userId: string) {
-  exec('DELETE FROM user_roles WHERE user_id = ?', [userId]);
+  return exec('DELETE FROM user_roles WHERE user_id = ?', [userId]);
 }
 
 export function insertUserRole(userId: string, role: string) {
-  exec('INSERT OR REPLACE INTO user_roles (user_id, role) VALUES (?, ?)', [userId, role]);
+  return exec('INSERT OR REPLACE INTO user_roles (user_id, role) VALUES (?, ?)', [userId, role]);
 }
 
 // --- Leader Areas ---
@@ -392,12 +395,12 @@ export function getLeaderAreas() {
 }
 
 export function deleteLeaderAreas(userId: string) {
-  exec('DELETE FROM leader_areas WHERE user_id = ?', [userId]);
+  return exec('DELETE FROM leader_areas WHERE user_id = ?', [userId]);
 }
 
-export function insertLeaderAreas(userId: string, areaIds: string[]) {
+export async function insertLeaderAreas(userId: string, areaIds: string[]) {
   for (const areaId of areaIds) {
-    exec('INSERT INTO leader_areas (user_id, area_id) VALUES (?, ?)', [userId, areaId]);
+    await exec('INSERT INTO leader_areas (user_id, area_id) VALUES (?, ?)', [userId, areaId]);
   }
 }
 
