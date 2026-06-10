@@ -90,6 +90,14 @@ REGRAS:
 - Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
 
+VALIDAÇÃO DE COERÊNCIA (OBRIGATÓRIO):
+Antes de gerar o preview, cruze a FERRAMENTA informada ("${ctx.ferramenta}") com o nome do projeto ("${ctx.nome_projeto}") e o conteúdo dos arquivos enviados. Se detectar inconsistência, aponte ANTES de prosseguir:
+- Se a ferramenta é "n8n" mas os arquivos não contêm nenhum JSON de workflow n8n (nós, conexões, etc.), questione: o usuário enviou os arquivos certos?
+- Se a ferramenta é "Python" mas os arquivos são majoritariamente .json de workflow (n8n, Make, etc.), aponte a discrepância.
+- Se o nome do projeto sugere uma tecnologia diferente da ferramenta escolhida (ex: nome menciona "n8n" mas ferramenta é "Python"), pergunte qual é o correto.
+- Se os arquivos enviados são de documentação/texto (sem código) mas a ferramenta indica desenvolvimento, pergunte se faltam arquivos de código.
+- Seja direto ao apontar: "A ferramenta informada é X, mas os arquivos parecem ser de Y. Pode confirmar?". Não bloqueie — apenas questione e siga com a resposta do usuário.
+
 Ao gerar o preview, reorganize e formate o conteúdo dos campos (mesmo que tenham sido extraídos como texto corrido) seguindo o guia abaixo — NÃO cole o texto cru.
 
 ${FORMATACAO_PREVIEW}
