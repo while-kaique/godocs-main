@@ -76,10 +76,15 @@ export interface ChatMessage {
   fase?: ChatFase;
 }
 
-export interface SavingFormData {
+// Uma linha do formulário = uma pessoa/cargo que executava a tarefa manualmente.
+export interface SavingLinhaInput {
   cargo: string;
   horasAntes: string;
   horasDepois: string;
+}
+
+export interface SavingFormData {
+  linhas: SavingLinhaInput[];
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';

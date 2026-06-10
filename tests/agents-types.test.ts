@@ -36,15 +36,15 @@ describe('documentacaoVazia', () => {
 });
 
 describe('savingVazio', () => {
-  it('retorna todos os 9 campos como null', () => {
+  it('retorna linhas vazias e os demais campos como null', () => {
     const saving = savingVazio();
-    const campos: (keyof SavingColetado)[] = [
-      'cargo', 'horas_antes', 'horas_depois',
-      'economia_horas_mes', 'valor_hora', 'economia_reais_mes',
+    const nulos: (keyof SavingColetado)[] = [
+      'economia_horas_mes', 'economia_reais_mes',
       'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
     ];
-    expect(Object.keys(saving)).toHaveLength(9);
-    for (const campo of campos) {
+    expect(Object.keys(saving)).toHaveLength(6);
+    expect(saving.linhas).toEqual([]);
+    for (const campo of nulos) {
       expect(saving[campo]).toBeNull();
     }
   });
@@ -121,11 +121,10 @@ describe('OrchestratorResult', () => {
 
   it('tipo complete com saving preenchido', () => {
     const saving: SavingColetado = {
-      cargo: 'Estagiário',
-      horas_antes: 60,
-      horas_depois: 1.7,
+      linhas: [
+        { cargo: 'Estagiário', horas_antes: 60, horas_depois: 1.7, valor_hora: 10.78, economia_horas_mes: 58.3, economia_reais_mes: 628.47 },
+      ],
       economia_horas_mes: 58.3,
-      valor_hora: 10.78,
       economia_reais_mes: 628.47,
       tipo_saving: 'mensal',
       memorial_calculo: 'Detalhamento...',
@@ -139,7 +138,7 @@ describe('OrchestratorResult', () => {
       saving,
     };
     expect(result.saving.economia_horas_mes).toBe(58.3);
-    expect(result.saving.cargo).toBe('Estagiário');
+    expect(result.saving.linhas[0].cargo).toBe('Estagiário');
     expect(result.saving.tipo_saving).toBe('mensal');
   });
 });

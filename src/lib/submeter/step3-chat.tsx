@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
-import type { ChatFase, ChatMessage, SavingFormData } from "./constants";
+import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput } from "./constants";
 
 /* ──────────────────────────────────────────────
    Simple Markdown Renderer
@@ -531,9 +531,9 @@ function SavingForm({
   onSubmit: (data: SavingFormData) => void;
   loading: boolean;
 }) {
-  const [cargo, setCargo] = useState("");
-  const [horasAntes, setHorasAntes] = useState("");
-  const [horasDepois, setHorasDepois] = useState("");
+  const [linhas, setLinhas] = useState<SavingLinhaInput[]>([
+    { cargo: "", horasAntes: "", horasDepois: "" },
+  ]);
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">("");
   const [custoExterno, setCustoExterno] = useState("");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">("");
@@ -544,16 +544,52 @@ function SavingForm({
   const icon = isSaving ? "💰" : "📈";
   const title = "Dados para Análise de Impacto";
 
+  const valorHoraDe = (cargo: string) => CARGOS.find((c) => c.label === cargo)?.valor_hora ?? 0;
+  const fmtReais = (v: number) =>
+    "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Economia de uma linha (0 se ainda incompleta/inválida).
+  function economiaLinha(l: SavingLinhaInput) {
+    const a = parseFloat(l.horasAntes);
+    const d = parseFloat(l.horasDepois);
+    if (!(a > 0) || isNaN(d) || d < 0 || d >= a) return { horas: 0, reais: 0 };
+    const horas = a - d;
+    return { horas, reais: horas * valorHoraDe(l.cargo) };
+  }
+
+  const totalHoras = linhas.reduce((s, l) => s + economiaLinha(l).horas, 0);
+  const totalReais = linhas.reduce((s, l) => s + economiaLinha(l).reais, 0);
+
+  function updateLinha(i: number, patch: Partial<SavingLinhaInput>) {
+    setLinhas((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+    setErrors((e) => {
+      const n = { ...e };
+      delete n[`l${i}cargo`];
+      delete n[`l${i}antes`];
+      delete n[`l${i}depois`];
+      return n;
+    });
+  }
+  function addLinha() {
+    setLinhas((ls) => [...ls, { cargo: "", horasAntes: "", horasDepois: "" }]);
+  }
+  function removeLinha(i: number) {
+    setLinhas((ls) => ls.filter((_, idx) => idx !== i));
+    setErrors({});
+  }
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
     if (isSaving) {
-      if (!cargo) errs.cargo = "Selecione o cargo";
-      if (!horasAntes || parseFloat(horasAntes) <= 0) errs.horasAntes = "Informe as horas";
-      if (horasDepois === "" || parseFloat(horasDepois) < 0) errs.horasDepois = "Informe as horas";
-      if (horasAntes && horasDepois && parseFloat(horasDepois) >= parseFloat(horasAntes)) {
-        errs.horasDepois = "Deve ser menor que as horas antes";
-      }
+      linhas.forEach((l, i) => {
+        const a = parseFloat(l.horasAntes);
+        const d = parseFloat(l.horasDepois);
+        if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
+        if (!l.horasAntes || !(a > 0)) errs[`l${i}antes`] = "Informe as horas";
+        if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
+        else if (l.horasAntes && a > 0 && d >= a) errs[`l${i}depois`] = "Deve ser menor que antes";
+      });
     }
     if (isExterno && isSaving) {
       if (!custoExterno || parseFloat(custoExterno) < 0) errs.custoExterno = "Informe o custo da ferramenta";
@@ -566,9 +602,7 @@ function SavingForm({
   function handleSubmit() {
     if (!validate()) return;
     onSubmit({
-      cargo,
-      horasAntes,
-      horasDepois,
+      linhas,
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -634,114 +668,157 @@ function SavingForm({
           )}
         </div>
 
-        {/* Campos de saving */}
+        {/* Campos de saving — uma linha por pessoa que executava a tarefa */}
         {isSaving && (
-          <>
-            {/* Cargo */}
-            <div>
-              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                Cargo de quem executava <span style={{ color: "#e53e3e" }}>*</span>
-              </label>
-              <select
-                value={cargo}
-                onChange={(e) => { setCargo(e.target.value); setErrors(er => { const n = { ...er }; delete n.cargo; return n; }); }}
-                className="go-select w-full"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "var(--go-radius-md)",
-                  border: errors.cargo ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                  background: "var(--go-white)",
-                  fontSize: 13,
-                  color: cargo ? "var(--go-text-primary)" : "#8b8b9a",
-                }}
-              >
-                <option value="">Selecione o cargo...</option>
-                {CARGOS.map((c) => (
-                  <option key={c.label} value={c.label}>{c.label}</option>
-                ))}
-              </select>
-              {errors.cargo && (
-                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
-                  {errors.cargo}
-                </div>
-              )}
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+              Quem executava a tarefa manualmente <span style={{ color: "#e53e3e" }}>*</span>
+            </label>
+            <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+              Uma linha por pessoa/função. Informe as horas/mês gastas antes e depois da automação — o valor em R$ é calculado pela taxa do cargo.
+            </p>
+
+            {/* Cabeçalho das colunas (telas largas) */}
+            <div
+              className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
+              style={{ gridTemplateColumns: "1fr 76px 76px 28px", color: "#9a9aa8" }}
+            >
+              <span>Função</span>
+              <span className="text-center">Horas antes</span>
+              <span className="text-center">Horas depois</span>
+              <span />
             </div>
 
-            {/* Horas antes / depois */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  Horas/mês antes <span style={{ color: "#e53e3e" }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="Ex: 40"
-                  value={horasAntes}
-                  onChange={(e) => { setHorasAntes(e.target.value); setErrors(er => { const n = { ...er }; delete n.horasAntes; delete n.horasDepois; return n; }); }}
-                  className="go-input w-full"
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--go-radius-md)",
-                    border: errors.horasAntes ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                    background: "var(--go-white)",
-                    fontSize: 13,
-                  }}
-                />
-                {errors.horasAntes && (
-                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
-                    {errors.horasAntes}
+            <div className="space-y-2.5">
+              {linhas.map((l, i) => {
+                const vh = valorHoraDe(l.cargo);
+                const eco = economiaLinha(l);
+                const linhaErro = errors[`l${i}cargo`] || errors[`l${i}antes`] || errors[`l${i}depois`];
+                return (
+                  <div
+                    key={i}
+                    className="rounded-xl p-2.5"
+                    style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+                  >
+                    <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 76px 76px 28px" }}>
+                      {/* Função */}
+                      <div className="min-w-0">
+                        <select
+                          aria-label="Função"
+                          value={l.cargo}
+                          onChange={(e) => updateLinha(i, { cargo: e.target.value })}
+                          className="go-select w-full"
+                          style={{
+                            padding: "9px 10px",
+                            borderRadius: "var(--go-radius-md)",
+                            border: errors[`l${i}cargo`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                            background: "var(--go-white)",
+                            fontSize: 13,
+                            color: l.cargo ? "var(--go-text-primary)" : "#8b8b9a",
+                          }}
+                        >
+                          <option value="">Selecione a função...</option>
+                          {CARGOS.map((c) => (
+                            <option key={c.label} value={c.label}>{c.label}</option>
+                          ))}
+                        </select>
+                        {l.cargo && (
+                          <div className="mt-1 px-0.5 text-[10px] font-medium" style={{ color: "#6b6e00" }}>
+                            ~{fmtReais(vh)}/h
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Horas antes */}
+                      <input
+                        type="number" min="0" step="0.5" placeholder="40"
+                        aria-label="Horas por mês antes"
+                        value={l.horasAntes}
+                        onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
+                        className="go-input w-full"
+                        style={{
+                          padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                          border: errors[`l${i}antes`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                          background: "var(--go-white)", fontSize: 13,
+                        }}
+                      />
+
+                      {/* Horas depois */}
+                      <input
+                        type="number" min="0" step="0.5" placeholder="2"
+                        aria-label="Horas por mês depois"
+                        value={l.horasDepois}
+                        onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
+                        className="go-input w-full"
+                        style={{
+                          padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                          border: errors[`l${i}depois`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                          background: "var(--go-white)", fontSize: 13,
+                        }}
+                      />
+
+                      {/* Remover pessoa */}
+                      {linhas.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeLinha(i)}
+                          aria-label="Remover pessoa"
+                          className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
+                          style={{ color: "#b4313b", background: "transparent" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      ) : <span />}
+                    </div>
+
+                    {/* Erro ou economia da linha */}
+                    {linhaErro ? (
+                      <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                        {linhaErro}
+                      </div>
+                    ) : eco.horas > 0 ? (
+                      <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#16a34a" }}>
+                        Economia: {eco.horas.toFixed(1)} h/mês × {fmtReais(vh)} = {fmtReais(eco.reais)}/mês
+                      </div>
+                    ) : null}
                   </div>
-                )}
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  Horas/mês depois <span style={{ color: "#e53e3e" }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="Ex: 2"
-                  value={horasDepois}
-                  onChange={(e) => { setHorasDepois(e.target.value); setErrors(er => { const n = { ...er }; delete n.horasDepois; return n; }); }}
-                  className="go-input w-full"
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--go-radius-md)",
-                    border: errors.horasDepois ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                    background: "var(--go-white)",
-                    fontSize: 13,
-                  }}
-                />
-                {errors.horasDepois && (
-                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
-                    {errors.horasDepois}
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </div>
 
-            {/* Resumo visual de economia de horas */}
-            {horasAntes && horasDepois && parseFloat(horasDepois) < parseFloat(horasAntes) && (
+            {/* Adicionar pessoa */}
+            <button
+              type="button"
+              onClick={addLinha}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
+              style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Adicionar pessoa
+            </button>
+
+            {/* Economia total (bruta — o custo externo é abatido na análise) */}
+            {totalHoras > 0 && (
               <div
-                className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[12px] font-semibold"
-                style={{
-                  background: "rgba(22,163,74,0.06)",
-                  border: "1px solid rgba(22,163,74,0.12)",
-                  color: "#16a34a",
-                  animation: "go-step-in 0.3s ease",
-                }}
+                className="mt-3 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-bold"
+                style={{ background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.16)", color: "#16a34a", animation: "go-step-in 0.3s ease" }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                   <polyline points="17 6 23 6 23 12" />
                 </svg>
-                Economia estimada: {(parseFloat(horasAntes) - parseFloat(horasDepois)).toFixed(1)}h/mês
+                Economia total: {totalHoras.toFixed(1)} h/mês · ~{fmtReais(totalReais)}/mês
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* Custo da ferramenta externa (só para projetos externos com saving) */}

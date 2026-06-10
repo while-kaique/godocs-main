@@ -130,7 +130,6 @@ export function CheckboxGroup({
             <label
               key={opt.value}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", checked && "go-radio-checked")}
-              style={checked ? undefined : undefined}
             >
               <input
                 type="checkbox"
@@ -139,6 +138,25 @@ export function CheckboxGroup({
                 onChange={() => toggle(opt.value)}
                 className="absolute opacity-0"
               />
+              {checked && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    right: 8,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color: "var(--go-blue)",
+                    animation: "go-step-in 0.2s ease",
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+              )}
               <span>{opt.label}</span>
               {opt.description && (
                 <span className="ml-1 text-[10px] font-normal opacity-70">{opt.description}</span>

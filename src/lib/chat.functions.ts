@@ -34,6 +34,7 @@ import type {
   ProjetoContexto,
   ReceitaColetada,
   SavingColetado,
+  SavingLinha,
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 
@@ -195,9 +196,11 @@ const enviarMensagemSchema = z.object({
 const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
-  cargo: z.string().optional(),
-  horas_antes: z.number().min(0).optional(),
-  horas_depois: z.number().min(0).optional(),
+  linhas: z.array(z.object({
+    cargo: z.string(),
+    horas_antes: z.number().min(0),
+    horas_depois: z.number().min(0),
+  })).optional(),
   custo_externo_mensal: z.number().min(0).optional(),
 });
 
@@ -423,26 +426,29 @@ export async function iniciarSaving(rawData: unknown) {
   let saving = savingVazio();
   saving.tipo_saving = data.tipo_saving;
 
-  if (tiposProjeto.includes('saving') && data.cargo && data.horas_antes != null && data.horas_depois != null) {
-    const cargoEntry = CARGOS.find(c => c.label === data.cargo);
-    const valorHora = cargoEntry?.valor_hora ?? null;
-    const economiaHoras = data.horas_antes - data.horas_depois;
-    const economiaReaisBruta = valorHora != null
-      ? Math.round(economiaHoras * valorHora * 100) / 100
-      : null;
+  if (tiposProjeto.includes('saving') && data.linhas && data.linhas.length > 0) {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const linhas: SavingLinha[] = data.linhas.map((l) => {
+      const valorHora = CARGOS.find(c => c.label === l.cargo)?.valor_hora ?? 0;
+      const economiaHoras = Math.max(0, l.horas_antes - l.horas_depois);
+      return {
+        cargo: l.cargo,
+        horas_antes: l.horas_antes,
+        horas_depois: l.horas_depois,
+        valor_hora: valorHora,
+        economia_horas_mes: economiaHoras,
+        economia_reais_mes: round2(economiaHoras * valorHora),
+      };
+    });
+    const totalHoras = round2(linhas.reduce((s, l) => s + l.economia_horas_mes, 0));
+    const totalReaisBruto = round2(linhas.reduce((s, l) => s + l.economia_reais_mes, 0));
     const custoExterno = data.custo_externo_mensal ?? 0;
-    const economiaReais = economiaReaisBruta != null
-      ? Math.round((economiaReaisBruta - custoExterno) * 100) / 100
-      : null;
 
     saving = {
       ...saving,
-      cargo: data.cargo,
-      horas_antes: data.horas_antes,
-      horas_depois: data.horas_depois,
-      economia_horas_mes: economiaHoras,
-      valor_hora: valorHora,
-      economia_reais_mes: economiaReais,
+      linhas,
+      economia_horas_mes: totalHoras,
+      economia_reais_mes: round2(totalReaisBruto - custoExterno),
     };
   }
 
@@ -473,7 +479,7 @@ export async function iniciarSaving(rawData: unknown) {
     : (resultado as { content: string }).content;
   console.log('\n┌─────────────────────────────────────────────');
   console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
-  if (data.cargo) console.log(`│ 👤 Cargo: ${data.cargo}, Horas: ${data.horas_antes}→${data.horas_depois}`);
+  if (data.linhas?.length) console.log(`│ 👤 Linhas: ${data.linhas.map(l => `${l.cargo} ${l.horas_antes}→${l.horas_depois}h`).join(' | ')}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));

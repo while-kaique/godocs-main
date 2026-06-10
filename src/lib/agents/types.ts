@@ -41,24 +41,28 @@ export type CargoLabel = typeof CARGOS[number]['label'];
 
 // ─── Agente 2: Memorial de saving ───────────────────────────────────────────
 
+// Uma linha = uma pessoa/cargo que executava a tarefa manualmente.
+export type SavingLinha = {
+  cargo: string;
+  horas_antes: number;
+  horas_depois: number;
+  valor_hora: number;          // derivado do cargo (tabela CARGOS)
+  economia_horas_mes: number;  // horas_antes - horas_depois
+  economia_reais_mes: number;  // economia_horas_mes * valor_hora
+};
+
 export type SavingColetado = {
-  cargo: string | null;
-  horas_antes: number | null;
-  horas_depois: number | null;
-  economia_horas_mes: number | null;
-  valor_hora: number | null;
-  economia_reais_mes: number | null;
+  linhas: SavingLinha[];               // detalhamento por pessoa/cargo
+  economia_horas_mes: number | null;   // total: soma das linhas
+  economia_reais_mes: number | null;   // total líquido (já abatido o custo externo)
   tipo_saving: 'mensal' | 'pontual' | null;
   memorial_calculo: string | null;
   valor_ganho_mensal: number | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
-  cargo: null,
-  horas_antes: null,
-  horas_depois: null,
+  linhas: [],
   economia_horas_mes: null,
-  valor_hora: null,
   economia_reais_mes: null,
   tipo_saving: null,
   memorial_calculo: null,
@@ -125,8 +129,8 @@ export type DocumentacaoGerada = {
   configurar_antes: string[];
   atencao: { titulo: string; descricao: string }[];
   saving?: {
+    linhas: SavingLinha[];
     economia_horas_mes: number;
-    valor_hora: number;
     economia_reais_mes: number;
     tipo_saving: 'mensal' | 'pontual';
     memorial_calculo: string;
