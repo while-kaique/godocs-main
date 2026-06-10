@@ -1,10 +1,11 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
-import { getCurrentUserFn } from "@/lib/auth.functions";
+import type { CurrentUser } from "@/lib/auth.functions";
 import { LayoutDashboard, Building2, Settings, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
-    const user = await getCurrentUserFn();
+    const response = await fetch("/api/auth/me");
+    const user: CurrentUser | null = response.ok ? ((await response.json()) as CurrentUser | null) : null;
     if (!user) throw redirect({ to: "/" });
     if (!user.isAdmin) throw redirect({ to: "/" });
     return { user };

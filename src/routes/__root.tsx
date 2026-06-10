@@ -4,12 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-
-import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -70,54 +65,16 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Hub de Projetos · GoGroup" },
-      { name: "description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
-      { name: "author", content: "GoGroup RPA & IA" },
-      { property: "og:title", content: "Hub de Projetos · GoGroup" },
-      { property: "og:description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Hub de Projetos · GoGroup" },
-      { name: "twitter:description", content: "Hub de cadastro, documentacao e gestao de projetos de automacoes do Gogroup." },
-    ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" as const },
-      { rel: "preload", as: "style", href: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" },
-      { rel: "stylesheet", href: appCss },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="pt-BR">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster richColors position="top-right" />
     </QueryClientProvider>

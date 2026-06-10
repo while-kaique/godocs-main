@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useServerFn } from "@tanstack/react-start";
-import { createUserFn, deleteUserFn, updateUserAreasFn } from "@/lib/admin.functions";
+import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +36,6 @@ type Row = {
 };
 
 export const Route = createFileRoute("/_authenticated/usuarios")({
-  head: () => ({ meta: [{ title: "Usuários · Hub Admin" }] }),
   component: UsuariosPage,
 });
 
@@ -45,7 +43,6 @@ function UsuariosPage() {
   const { user } = Route.useRouteContext();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   async function load() {
     const [{ data: profiles }, { data: roles }, { data: la }, { data: ars }] =
@@ -76,27 +73,8 @@ function UsuariosPage() {
   }
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin_master")
-        .maybeSingle();
-      setIsAdmin(!!data);
-      if (data) await load();
-    })();
-  }, [user.id]);
-
-  if (isAdmin === null)
-    return <div className="p-8 text-muted-foreground">Carregando...</div>;
-  if (!isAdmin)
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold">Sem permissão</h1>
-        <p className="text-muted-foreground">Apenas Admin Master pode gerenciar usuários.</p>
-      </div>
-    );
+    load();
+  }, []);
 
   return (
     <div className="mx-auto max-w-5xl p-8">
@@ -140,7 +118,7 @@ function UsuariosPage() {
                   key={r.id}
                   row={r}
                   areas={areas}
-                  isSelf={r.id === user.id}
+                  isSelf={r.email === user.email}
                   onChanged={load}
                 />
               ))
@@ -163,14 +141,13 @@ function UserRow({
   isSelf: boolean;
   onChanged: () => void;
 }) {
-  const deleteUser = useServerFn(deleteUserFn);
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
     if (!confirm(`Remover ${row.nome}?`)) return;
     setLoading(true);
     try {
-      await deleteUser({ data: { userId: row.id } });
+      await apiFetch("/api/admin/users/delete", { userId: row.id });
       toast.success("Usuário removido.");
       onChanged();
     } catch (e) {
@@ -236,7 +213,6 @@ function UserRow({
 }
 
 function CreateUserDialog({ areas, onCreated }: { areas: Area[]; onCreated: () => void }) {
-  const createUser = useServerFn(createUserFn);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -255,7 +231,7 @@ function CreateUserDialog({ areas, onCreated }: { areas: Area[]; onCreated: () =
     e.preventDefault();
     setLoading(true);
     try {
-      await createUser({ data: form });
+      await apiFetch("/api/admin/users", form);
       toast.success("Usuário criado.");
       setOpen(false);
       reset();
@@ -352,7 +328,6 @@ function EditAreasDialog({
   areas: Area[];
   onChanged: () => void;
 }) {
-  const updateAreas = useServerFn(updateUserAreasFn);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>(row.areaIds);
   const [loading, setLoading] = useState(false);
@@ -364,7 +339,7 @@ function EditAreasDialog({
   async function save() {
     setLoading(true);
     try {
-      await updateAreas({ data: { userId: row.id, areaIds: selected } });
+      await apiFetch("/api/admin/users/update-areas", { userId: row.id, areaIds: selected });
       toast.success("Áreas atualizadas.");
       setOpen(false);
       onChanged();
