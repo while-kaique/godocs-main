@@ -54,7 +54,7 @@ export async function createArea(nome: string, _adminEmail: string) {
 
 export async function deleteArea(id: string, _adminEmail: string) {
   idSchema.parse(id)
-  dbDeleteArea(id)
+  await dbDeleteArea(id)
   return { ok: true }
 }
 
@@ -73,23 +73,23 @@ export async function addAdmin(input: { email: string; nome?: string }) {
 
 export async function removeAdmin(id: string, currentEmail: string) {
   idSchema.parse(id)
-  const admin = dbGetAdmins().find((a) => a.id === id)
+  const admin = (await dbGetAdmins()).find((a) => a.id === id)
   if (admin?.email === currentEmail) {
     throw new Error('Você não pode remover a si mesmo.')
   }
-  deleteAdmin(id)
+  await deleteAdmin(id)
   return { ok: true }
 }
 
 // ── Projetos ──────────────────────────────────────────────────────────────────
 
 export async function getProjetos() {
-  return getProjetosWithArea().map(mapProjeto)
+  return (await getProjetosWithArea()).map(mapProjeto)
 }
 
 export async function getProjetoDetalhes(id: string) {
   idSchema.parse(id)
-  const projeto = getProjetoWithRelations(id)
+  const projeto = await getProjetoWithRelations(id)
   if (!projeto) throw new Error('Projeto não encontrado.')
 
   const { chat_messages, documentacao, validacoes, ...projetoRow } = projeto
@@ -118,10 +118,12 @@ type Role = 'admin_master' | 'leader'
 // Lista usuários (profiles) com seu papel e áreas vinculadas, junto das áreas
 // disponíveis — em uma única chamada para a página de gestão.
 export async function getUsuarios() {
-  const profiles = getProfiles()
-  const roles = getUserRoles()
-  const leaderAreas = getLeaderAreas()
-  const areas = dbGetAreas()
+  const [profiles, roles, leaderAreas, areas] = await Promise.all([
+    getProfiles(),
+    getUserRoles(),
+    getLeaderAreas(),
+    dbGetAreas(),
+  ])
 
   const roleMap = new Map<string, Role>()
   for (const r of roles) roleMap.set(r.user_id, r.role as Role)
@@ -157,23 +159,23 @@ const createUserSchema = z.object({
 export async function createUser(input: unknown) {
   const data = createUserSchema.parse(input)
   const userId = crypto.randomUUID()
-  upsertProfile(userId, data.nome, data.email)
-  deleteUserRoles(userId)
-  insertUserRole(userId, data.role)
+  await upsertProfile(userId, data.nome, data.email)
+  await deleteUserRoles(userId)
+  await insertUserRole(userId, data.role)
   if (data.role === 'leader' && data.areaIds.length) {
-    insertLeaderAreas(userId, data.areaIds)
+    await insertLeaderAreas(userId, data.areaIds)
   }
   return { id: userId }
 }
 
 export async function deleteUser(userId: string, currentEmail: string) {
   idSchema.parse(userId)
-  const alvo = getProfileById(userId)
+  const alvo = await getProfileById(userId)
   if (alvo?.email && alvo.email === currentEmail) {
     throw new Error('Você não pode remover a si mesmo.')
   }
   // user_roles e leader_areas têm ON DELETE CASCADE.
-  deleteProfile(userId)
+  await deleteProfile(userId)
   return { ok: true }
 }
 
@@ -184,9 +186,9 @@ export async function updateUserAreas(input: unknown) {
       areaIds: z.array(idSchema).default([]),
     })
     .parse(input)
-  deleteLeaderAreas(data.userId)
+  await deleteLeaderAreas(data.userId)
   if (data.areaIds.length) {
-    insertLeaderAreas(data.userId, data.areaIds)
+    await insertLeaderAreas(data.userId, data.areaIds)
   }
   return { ok: true }
 }
@@ -194,13 +196,13 @@ export async function updateUserAreas(input: unknown) {
 // ── Configurações ─────────────────────────────────────────────────────────────
 
 export async function getConfiguracoes() {
-  return dbGetConfiguracoes().map((c) => ({
+  return (await dbGetConfiguracoes()).map((c) => ({
     ...c,
     valor: parseJson(c.valor),
   }))
 }
 
 export async function updateConfiguracao(chave: string, valor: unknown, adminEmail: string) {
-  dbUpdateConfiguracao(chave, valor, adminEmail)
+  await dbUpdateConfiguracao(chave, valor, adminEmail)
   return { ok: true }
 }

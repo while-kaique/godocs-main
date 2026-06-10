@@ -63,7 +63,7 @@ function getEmailFromRequest(request: Request): string | null {
 async function requireAdmin(request: Request): Promise<{ email: string }> {
   const email = getEmailFromRequest(request)
   if (!email) throw Object.assign(new Error('Não autorizado'), { status: 401 })
-  const admin = getAdminByEmail(email)
+  const admin = await getAdminByEmail(email)
   if (!admin) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
   return { email }
 }
@@ -219,9 +219,11 @@ export default {
       if (typeof v === 'string') g.process.env[k] = v
     }
 
-    // Injeta o banco SQLite do Godeploy (env.DB) no client
+    // Injeta o banco SQLite do Godeploy (env.DB) no client.
+    // setDb é async (roda initSchema na primeira chamada) — aguardamos antes de
+    // rotear qualquer request para garantir que as tabelas existam.
     if (env.DB) {
-      setDb(env.DB)
+      await setDb(env.DB)
     }
 
     const url = new URL(request.url)

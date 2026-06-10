@@ -60,7 +60,8 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
           'Content-Type': 'application/pdf',
           Authorization: `Bearer ${ocrToken}`,
         },
-        body: bytes,
+        // bytes é um Uint8Array recém-alocado (offset 0) → .buffer é exatamente o conteúdo.
+        body: bytes.buffer as ArrayBuffer,
       });
       if (!resp.ok) {
         throw new Error(`OCR Worker retornou ${resp.status}: ${await resp.text()}`);

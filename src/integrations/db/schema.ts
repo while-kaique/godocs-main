@@ -104,15 +104,16 @@ const SCHEMA_SQL = `
   );
 `;
 
-export function initSchema(db: GoDeployDB) {
+export async function initSchema(db: GoDeployDB) {
   // env.DB.exec do Godeploy não suporta múltiplos statements em uma única chamada.
   // Dividimos o SQL por ';' e executamos cada statement separadamente.
+  // O env.DB é assíncrono e exige o argumento de params sempre (mesmo []).
   const statements = SCHEMA_SQL
     .split(';')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
   for (const stmt of statements) {
-    db.exec(stmt + ';');
+    await db.exec(stmt + ';', []);
   }
 }

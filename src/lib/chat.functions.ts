@@ -41,9 +41,9 @@ import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agen
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
-  const data = getProjetoContextoData(projeto_id);
+  const data = await getProjetoContextoData(projeto_id);
   if (!data) throw new Error('Projeto não encontrado.');
-  const docMsg = getDocMessage(projeto_id);
+  const docMsg = await getDocMessage(projeto_id);
 
   const tiposRaw = parseJson<string[]>(data.tipos_projeto);
   const tiposProjeto = Array.isArray(tiposRaw)
@@ -219,7 +219,7 @@ export async function iniciarSubmissao(rawData: unknown) {
 
   let projeto;
   try {
-    projeto = insertProjeto({
+    projeto = await insertProjeto({
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
       area_id: data.area_id ?? null,
@@ -250,7 +250,7 @@ export async function iniciarSubmissao(rawData: unknown) {
     docTexto = '';
   }
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: projeto.id,
     role: 'doc',
     content: docTexto || '(documento sem texto legível)',
@@ -290,7 +290,7 @@ export async function iniciarSubmissao(rawData: unknown) {
   log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
   const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: projeto.id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -320,14 +320,14 @@ export async function enviarMensagem(rawData: unknown) {
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'user',
     content: data.content,
     selected_option: data.selected_option ?? null,
   });
 
-  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const estado = extrairEstado(msgs ?? []);
 
@@ -358,7 +358,7 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -369,7 +369,7 @@ export async function enviarMensagem(rawData: unknown) {
     log('enviarMensagem', 'Doc aprovada — compilando documentação...');
     try {
       const doc = await compilarDocumentacao(ctx, resultado.coletado);
-      upsertDocumentacao(data.projeto_id, doc);
+      await upsertDocumentacao(data.projeto_id, doc);
       log('enviarMensagem', 'Documentação compilada e salva.');
     } catch (compErr) {
       err('enviarMensagem', 'Falha ao compilar:', compErr);
@@ -378,17 +378,17 @@ export async function enviarMensagem(rawData: unknown) {
 
   if (resultado.fase === 'completo') {
     log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
-    const docRow = getDocumentacao(data.projeto_id);
+    const docRow = await getDocumentacao(data.projeto_id);
 
     if (docRow) {
       const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
       const tiposProjetoCtx = getTiposProjeto(ctx);
       if (tiposProjetoCtx.includes('saving')) doc.saving = resultado.saving;
       if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
-      upsertDocumentacao(data.projeto_id, doc);
+      await upsertDocumentacao(data.projeto_id, doc);
     }
 
-    updateProjeto(data.projeto_id, { chat_completo: true });
+    await updateProjeto(data.projeto_id, { chat_completo: true });
   }
 
   const respContent2 = resultado.type === 'options'
@@ -452,7 +452,7 @@ export async function iniciarSaving(rawData: unknown) {
     };
   }
 
-  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -467,7 +467,7 @@ export async function iniciarSaving(rawData: unknown) {
     tiposProjeto,
   );
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -500,7 +500,7 @@ export async function iniciarReceita(rawData: unknown) {
   const receita = receitaVazia();
   receita.tipo_saving = data.tipo_saving;
 
-  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -516,7 +516,7 @@ export async function iniciarReceita(rawData: unknown) {
     receita,
   );
 
-  insertChatMessage({
+  await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -542,19 +542,19 @@ export async function submeterParaValidacao(rawData: unknown) {
   const { projeto_id } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
-  const docRow = getDocumentacao(projeto_id);
+  const docRow = await getDocumentacao(projeto_id);
 
   if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
   const saving = conteudo.saving as Record<string, unknown> | undefined;
 
-  const projeto = getProjetoById(projeto_id);
+  const projeto = await getProjetoById(projeto_id);
 
   if (!projeto) throw new Error('Projeto não encontrado.');
 
   if (projeto.nome) {
-    const duplicata = findDuplicateProjeto(projeto.nome, projeto_id);
+    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
     if (duplicata) {
       throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
     }
@@ -563,7 +563,7 @@ export async function submeterParaValidacao(rawData: unknown) {
   const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
   const now = new Date().toISOString();
 
-  updateProjeto(projeto_id, {
+  await updateProjeto(projeto_id, {
     status,
     submitted_at: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
@@ -627,14 +627,14 @@ export async function submeterParaValidacao(rawData: unknown) {
 export async function validarProjeto(rawData: unknown) {
   const { projeto_id } = z.object({ projeto_id: z.string().min(1) }).parse(rawData);
 
-  const docRow = getDocumentacao(projeto_id);
+  const docRow = await getDocumentacao(projeto_id);
 
   if (!docRow) throw new Error('Documentação não encontrada.');
 
   const doc = parseJson<Parameters<typeof validarDocumentacao>[0]>(docRow.conteudo) as Parameters<typeof validarDocumentacao>[0];
   const resultado = await validarDocumentacao(doc);
 
-  insertValidacao({
+  await insertValidacao({
     projeto_id,
     resultado: resultado.resultado,
     parecer: resultado.parecer,
@@ -642,7 +642,7 @@ export async function validarProjeto(rawData: unknown) {
   });
 
   const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
-  updateProjeto(projeto_id, { status: novoStatus, validated_at: new Date().toISOString() });
+  await updateProjeto(projeto_id, { status: novoStatus, validated_at: new Date().toISOString() });
 
   try {
     if (resultado.resultado === 'aprovado') {
@@ -650,7 +650,7 @@ export async function validarProjeto(rawData: unknown) {
     } else {
       await enviarEmailRejeicao(doc, resultado);
     }
-    updateValidacaoEmailEnviado(projeto_id);
+    await updateValidacaoEmailEnviado(projeto_id);
   } catch (emailErr) {
     console.error('[email-agent] Falha ao enviar email:', emailErr);
   }

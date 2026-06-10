@@ -59,7 +59,7 @@ const CRITERIOS_DEFAULT: CriterioValidacao[] = [
 ];
 
 async function getCriterios(): Promise<CriterioValidacao[]> {
-  const row = getConfiguracao('validation_criteria');
+  const row = await getConfiguracao('validation_criteria');
   const valor = row ? parseJson<CriterioValidacao[]>(row.valor) : null;
 
   if (!valor || !Array.isArray(valor) || valor.length === 0) {
