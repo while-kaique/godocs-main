@@ -36,6 +36,8 @@ Com base no contexto abaixo, gere uma documentação técnica condensada com exa
 
 Cole aqui o conteúdo dos seus arquivos: [cole aqui]`;
 
+const GODEPLOY_CLAUDE_URL = "https://godeploy.com";
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 type GateStatus = "ok" | "warn" | "block";
@@ -845,7 +847,17 @@ export function Step2({
           </div>
           <p className="mb-3 text-[12px] leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
             O volume de código ultrapassa o limite de processamento direto. Use o prompt abaixo no{" "}
-            <strong>Claude.ai</strong> para gerar uma pré-documentação condensada — depois envie essa documentação aqui.
+            <strong>Claude</strong> via{" "}
+            <a
+              href={GODEPLOY_CLAUDE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold"
+              style={{ color: "var(--go-blue)" }}
+            >
+              Godeploy
+            </a>{" "}
+            para gerar uma pré-documentação condensada — depois envie essa documentação aqui.
           </p>
           <div
             className="mb-3 rounded-lg p-3 text-[11px] font-mono leading-relaxed whitespace-pre-wrap"
