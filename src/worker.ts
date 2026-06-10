@@ -198,12 +198,14 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
 
 export default {
   async fetch(request: Request, env: Env & Record<string, string>): Promise<Response> {
-    // Injeta as variáveis de ambiente do Cloudflare no process.env para compatibilidade
-    // com supabase-js e outros módulos que leem process.env
-    if (typeof process !== 'undefined') {
-      for (const [k, v] of Object.entries(env)) {
-        if (typeof v === 'string') process.env[k] = v
-      }
+    // O godeploy não expõe o global `process` (não há nodejs_compat). Garantimos
+    // `process.env` e injetamos as env vars do worker, para os módulos que leem
+    // via process.env (supabase, llm, brevo, ocr, etc.). Sem isto, qualquer
+    // process.env.X em runtime estoura "process is not defined".
+    const g = globalThis as unknown as { process?: { env: Record<string, string> } }
+    if (!g.process) g.process = { env: {} }
+    for (const [k, v] of Object.entries(env)) {
+      if (typeof v === 'string') g.process.env[k] = v
     }
 
     const url = new URL(request.url)
