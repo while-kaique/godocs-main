@@ -11,6 +11,7 @@ import {
   enviarMensagem,
   iniciarSaving,
   iniciarReceita,
+  atualizarTipos,
   submeterParaValidacao,
   validarProjeto,
 } from '@/lib/chat.functions'
@@ -30,6 +31,7 @@ import {
   updateConfiguracao,
   getUsuarios,
 } from '@/lib/admin.functions'
+import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
 import { getAdminByEmail, setDb } from '@/integrations/db/client.server'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -85,6 +87,21 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       return json(user)
     }
 
+    // ── Áreas (público — usado pelo seletor da etapa 1) ──
+    if (pathname === '/api/areas' && method === 'GET') {
+      return json(await getAreasPublicas())
+    }
+
+    // ── Cron: sincroniza áreas da TeamGuide (chamado pela plataforma Godeploy) ──
+    // O gateway carimba o header X-Godeploy-Cron; exigimos sua presença para que
+    // a rota não seja disparável externamente.
+    if (pathname === '/api/cron/sync-areas' && method === 'POST') {
+      if (!request.headers.get('x-godeploy-cron')) {
+        return errorJson('Rota exclusiva de cron.', 403)
+      }
+      return json(await sincronizarAreas())
+    }
+
     // ── Chat (público — qualquer usuário pode submeter) ──
     if (pathname === '/api/chat/iniciar-submissao' && method === 'POST') {
       const body = await readBody(request)
@@ -106,6 +123,11 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       const result = await iniciarReceita(body)
       return json(result)
     }
+    if (pathname === '/api/chat/atualizar-tipos' && method === 'POST') {
+      const body = await readBody(request)
+      const result = await atualizarTipos(body)
+      return json(result)
+    }
     if (pathname === '/api/chat/submeter-validacao' && method === 'POST') {
       const body = await readBody(request)
       const result = await submeterParaValidacao(body)
@@ -123,6 +145,10 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
     if (pathname === '/api/admin/areas' && method === 'GET') {
       await requireAdmin(request)
       return json(await getAreas())
+    }
+    if (pathname === '/api/admin/areas/sync' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await sincronizarAreas())
     }
     if (pathname === '/api/admin/areas' && method === 'POST') {
       const { email } = await requireAdmin(request)

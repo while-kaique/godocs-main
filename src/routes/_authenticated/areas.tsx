@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
 
 type Area = { id: string; nome: string };
 
@@ -17,6 +17,7 @@ function AreasPage() {
   const [areas, setAreas] = useState<Area[] | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   async function load() {
     try {
@@ -48,6 +49,22 @@ function AreasPage() {
     }
   }
 
+  async function sync() {
+    setSyncing(true);
+    try {
+      const r = await apiFetch<{ derivadas: number; adicionadas: number; total: number }>(
+        "/api/admin/areas/sync",
+        {},
+      );
+      toast.success(`Sincronizado da TeamGuide: ${r.adicionadas} nova(s), ${r.total} no total.`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar áreas.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function remove(a: Area) {
     if (!confirm(`Remover área "${a.nome}"? Vínculos com leaders serão removidos.`))
       return;
@@ -62,10 +79,18 @@ function AreasPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-8">
-      <h1 className="text-3xl font-bold tracking-tight">Áreas</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Cadastre as áreas/departamentos da empresa. Leaders são vinculados às áreas que acompanham.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Áreas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fonte única das áreas (sincronizada da TeamGuide). Leaders são vinculados às áreas que acompanham.
+          </p>
+        </div>
+        <Button variant="outline" onClick={sync} disabled={syncing} className="shrink-0">
+          {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Sincronizar áreas
+        </Button>
+      </div>
 
       <form onSubmit={create} className="mt-6 flex gap-2">
         <Input

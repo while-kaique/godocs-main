@@ -50,6 +50,9 @@ function SubmeterPage() {
   const [chatComplete, setChatComplete] = useState(false);
   const [chatFase, setChatFase] = useState<ChatFase>("doc");
   const [projetoId, setProjetoId] = useState<string | null>(null);
+  // Tipo(s) com que o fluxo do agente está alinhado — usado para detectar troca
+  // de tipo (saving ↔ receita) quando o usuário volta à etapa 2 no meio do fluxo.
+  const [agentTipos, setAgentTipos] = useState<("saving" | "receita_incremental")[]>([]);
   const [iniciandoChat, setIniciandoChat] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
@@ -261,6 +264,7 @@ function SubmeterPage() {
       );
 
       setProjetoId(result.projeto_id);
+      setAgentTipos(form.tipoProjeto);
 
       const firstMsg: ChatMessage = {
         role: "assistant",
@@ -286,6 +290,54 @@ function SubmeterPage() {
     } finally {
       setIniciandoChat(false);
     }
+  }
+
+  /* ── Step 2 → Step 3 (agente já iniciado): detecta troca de tipo ── */
+  async function handleContinuarAgente() {
+    // Não permite avançar sem ao menos um tipo selecionado.
+    if (form.tipoProjeto.length === 0) {
+      setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
+      toast.error("Selecione ao menos um tipo de projeto para continuar.");
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+
+    const changed =
+      form.tipoProjeto.length !== agentTipos.length ||
+      [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
+
+    if (changed && projetoId) {
+      try {
+        await apiFetch("/api/chat/atualizar-tipos", {
+          projeto_id: projetoId,
+          tipos_projeto: form.tipoProjeto,
+        });
+        setAgentTipos(form.tipoProjeto);
+
+        // Se a documentação (fase 1) já foi concluída, a análise de impacto (fase 2)
+        // precisa recomeçar para o novo tipo. Em fase de doc, o próprio agente roteia
+        // para a fase certa ao aprovar a doc (lê tipos_projeto do banco, já atualizado).
+        const docConcluida = chatFase !== "doc" && chatFase !== "doc_preview";
+        if (docConcluida) {
+          const querSaving = form.tipoProjeto.includes("saving");
+          setChatMessages([]);
+          setChatComplete(false);
+          setApprovedSavingPreview(null);
+          setApprovedReceitaPreview(null);
+          setShowSavingForm(querSaving);
+          setShowReceitaForm(!querSaving);
+          setChatFase(querSaving ? "saving" : "receita");
+        }
+      } catch (e) {
+        console.error("[submeter] falha ao atualizar tipos:", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`Erro ao atualizar o tipo de projeto: ${msg}`);
+        return;
+      }
+    }
+
+    goToStep(3, "forward");
   }
 
   /* ── Chat: enviar mensagem ── */
@@ -696,8 +748,8 @@ function SubmeterPage() {
                 projetoId ? (
                   <button
                     type="button"
-                    onClick={() => goToStep(3, "forward")}
-                    className="go-btn-next"
+                    onClick={handleContinuarAgente}
+                    className={cn("go-btn-next", shaking && "go-shake")}
                   >
                     Continuar com Agente &rarr;
                   </button>
