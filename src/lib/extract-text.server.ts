@@ -11,6 +11,20 @@ const err = (...args: unknown[]) => console.error('[extract-text]', ...args);
 const estTokens = (chars: number) => Math.round(chars / CHARS_PER_TOKEN);
 const ext = (filename: string) => (filename.split('.').pop() ?? '?').toLowerCase();
 
+// Decodifica base64 → bytes sem depender do `Buffer` do Node, que não existe no
+// runtime do Godeploy (Cloudflare workerd). `atob`/Uint8Array/TextDecoder são
+// globais tanto no workerd quanto no Node 18+ (dev), evitando "Buffer is not defined".
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+const decodeUtf8 = (bytes: Uint8Array) => new TextDecoder('utf-8').decode(bytes);
+
 // Extensões que são lidas diretamente como UTF-8
 const TEXT_EXTS = new Set([
   'txt', 'md', 'json', 'ts', 'tsx', 'js', 'jsx', 'py',
@@ -22,15 +36,15 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
   const bufferSize = Math.round((base64.length * 3) / 4 / 1024);
   log(`Iniciando extração — arquivo: "${fileName}", ext: "${ext}", tamanho estimado: ~${bufferSize}KB`);
 
-  const buffer = Buffer.from(base64, 'base64');
-  log(`Buffer criado: ${buffer.length} bytes`);
+  const bytes = base64ToBytes(base64);
+  log(`Bytes decodificados: ${bytes.length} bytes`);
 
   let text = '';
 
   try {
     if (TEXT_EXTS.has(ext)) {
       log(`Modo: texto puro UTF-8 (${ext})`);
-      text = buffer.toString('utf-8');
+      text = decodeUtf8(bytes);
       log(`Texto extraído: ${text.length} chars`);
 
     } else if (ext === 'pdf') {
@@ -46,7 +60,7 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
           'Content-Type': 'application/pdf',
           Authorization: `Bearer ${ocrToken}`,
         },
-        body: buffer,
+        body: bytes,
       });
       if (!resp.ok) {
         throw new Error(`OCR Worker retornou ${resp.status}: ${await resp.text()}`);
@@ -58,13 +72,15 @@ export async function extractTextFromBase64(base64: string, fileName: string): P
     } else if (ext === 'docx' || ext === 'doc') {
       log('Modo: DOCX — importando mammoth...');
       const mammoth = await import('mammoth');
-      const result = await mammoth.extractRawText({ buffer });
+      // No workerd não há Buffer; mammoth aceita { arrayBuffer } (API browser).
+      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      const result = await mammoth.extractRawText({ arrayBuffer });
       log(`DOCX extraído: ${result.value.length} chars`);
       text = result.value;
 
     } else {
       log(`Extensão desconhecida "${ext}" — tentando utf-8`);
-      text = buffer.toString('utf-8');
+      text = decodeUtf8(bytes);
       log(`Texto lido como utf-8: ${text.length} chars`);
     }
   } catch (e) {
