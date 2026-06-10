@@ -28,8 +28,9 @@ import {
   updateUserAreas,
   getConfiguracoes,
   updateConfiguracao,
+  getUsuarios,
 } from '@/lib/admin.functions'
-import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { getAdminByEmail } from '@/integrations/db/client.server'
 
 // No godeploy não há bindings nativos além das env vars (Record<string,string>).
 interface Env {}
@@ -58,12 +59,8 @@ function getEmailFromRequest(request: Request): string | null {
 async function requireAdmin(request: Request): Promise<{ email: string }> {
   const email = getEmailFromRequest(request)
   if (!email) throw Object.assign(new Error('Não autorizado'), { status: 401 })
-  const { data } = await supabaseAdmin
-    .from('admins')
-    .select('email')
-    .eq('email', email)
-    .maybeSingle()
-  if (!data) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
+  const admin = getAdminByEmail(email)
+  if (!admin) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
   return { email }
 }
 
@@ -128,6 +125,11 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       const body = await readBody<{ nome: string }>(request)
       return json(await createArea(body.nome, email))
     }
+    if (pathname === '/api/admin/areas/remove' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody<{ id: string }>(request)
+      return json(await deleteArea(body.id, email))
+    }
     if (pathname.startsWith('/api/admin/areas/') && method === 'DELETE') {
       const { email } = await requireAdmin(request)
       const id = pathname.split('/').pop()!
@@ -157,6 +159,11 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       await requireAdmin(request)
       const id = pathname.split('/').pop()!
       return json(await getProjetoDetalhes(id))
+    }
+
+    if (pathname === '/api/admin/usuarios' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await getUsuarios())
     }
 
     if (pathname === '/api/admin/users' && method === 'POST') {

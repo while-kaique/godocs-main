@@ -4,16 +4,17 @@ Hub interno do Gogroup para cadastro, gestão e documentação de projetos de au
 
 ## Stack
 
-- **Framework**: TanStack Start (SSR) + TanStack Router (file-based routing)
+- **Arquitetura**: **SPA** (Single Page Application) — React puro no cliente + API em `/api/*` servida por um Cloudflare Worker (`src/worker.ts`). Migrado de TanStack Start (SSR) para SPA (PR #24/#25).
+- **Framework**: TanStack Router (file-based routing) rodando como SPA (sem SSR)
 - **UI**: React 19, Tailwind CSS v4, shadcn/ui (new-york style), Lucide icons
 - **Forms**: react-hook-form + zod
-- **Backend**: Supabase (auth, Postgres com RLS, service role para admin ops)
-- **Server functions**: `createServerFn` do TanStack Start (com middleware de auth)
+- **Backend**: SQLite via `better-sqlite3` (banco local `godocs.db`, auto-criado); auth via header do Godeploy edge (Google OAuth)
+- **API**: funções de negócio em `*.functions.ts` chamadas pelo `src/worker.ts` (roteador `/api/*`); o frontend chama via `apiFetch` (`src/lib/api-client.ts`). Em dev, o `vite-plugin-dev-api.ts` serve as rotas `/api/*` reusando o `worker.ts` via `ssrLoadModule`
 - **LLM**: Camada de abstração (`llm.ts`) que suporta OpenAI e Anthropic via env vars
 - **Extração de texto**: Cloudflare OCR Worker (PDF), mammoth (DOCX/DOC), utf-8 direto (TXT/MD)
 - **Testes**: Vitest (roda automaticamente antes de `npm run dev`)
-- **Build**: Vite 7, npm (package manager), Nitro (SSR runtime via `@lovable.dev/vite-tanstack-config`)
-- **Deploy**: Cloudflare Workers via wrangler (`npm run deploy`)
+- **Build**: Vite 7, npm (package manager); build SPA estático em `dist/`
+- **Deploy**: Godeploy (SPA + Worker API). ⚠️ `better-sqlite3` é binário nativo de Node — **não roda em Cloudflare Workers/workerd**; produção exige runtime Node real, ou migração para D1/Turso (ver `PLANO_MIGRACAO_SQLITE.md`)
 - **Linguagem**: TypeScript strict
 
 ## Comandos
@@ -23,10 +24,9 @@ npm install            # instalar dependências
 npm run dev            # roda testes + dev server (vite dev)
 npm run test           # roda testes uma vez
 npm run test:watch     # testes em modo watch
-npm run build          # build produção (Nitro cloudflare-module)
+npm run build          # build produção (SPA estática em dist/)
+npm run build:dev      # build em modo development
 npm run preview        # preview do build (vite)
-npm run preview:worker # build + preview local via wrangler dev (workerd runtime)
-npm run deploy         # build + deploy no Cloudflare Workers
 npm run lint           # eslint
 npm run format         # prettier
 ```
@@ -48,7 +48,7 @@ npm run format         # prettier
 | `form-validation.test.ts` | E-mail (domínios permitidos), arquivo (extensões/tamanho), nome, data, saving |
 | `submission-flow.test.ts` | Auto-aprovação por área, extração de saving do JSON, notificação Google Chat, verificação de duplicata |
 | `llm.test.ts` | Erros de configuração, provider desconhecido, defaults |
-| `routes.test.ts` | Existência de rotas, arquivos de agentes, infra, tipos Supabase (colunas saving, enum aprovado) |
+| `routes.test.ts` | Existência de rotas, arquivos de agentes, infra (`integrations/db/`), schema SQLite e tipos (colunas saving, enum aprovado), ausência do Supabase |
 
 ## Estrutura do projeto
 
@@ -57,19 +57,17 @@ src/
   routes/              # File-based routing (TanStack Router)
     __root.tsx         # Root layout (QueryClientProvider, Toaster, head meta)
     index.tsx          # Home pública - 3 cards de ação (Submeter, Editar, Reenviar)
-    auth.tsx           # Login (Supabase email/password)
+    auth.tsx           # Redireciona para /dashboard (auth é via Godeploy edge)
     submeter.tsx       # Formulário multi-step de submissão (3 etapas) + chat IA
-    _authenticated/    # Layout guard - redireciona para /auth se não logado
-      route.tsx        # Sidebar layout + role check (admin_master | leader)
-      dashboard.tsx    # Dashboard de projetos submetidos
-      usuarios.tsx     # CRUD de usuários (admin only) - cria via Supabase Admin API
-      areas.tsx        # CRUD de áreas/departamentos (admin only)
-  integrations/supabase/
-    client.ts          # Supabase client (browser, lazy proxy)
-    client.server.ts   # Supabase admin client (service_role, server-only)
-    auth-middleware.ts  # Middleware server: valida Bearer token nas server functions
-    auth-attacher.ts   # Middleware client: anexa access_token nas chamadas RPC
-    types.ts           # Tipos gerados do schema Supabase
+    _authenticated/    # Layout guard - beforeLoad chama /api/auth/me; redireciona p/ / se não admin
+      route.tsx        # Sidebar layout + guard de admin (via /api/auth/me)
+      dashboard.tsx    # Dashboard de projetos submetidos (lê via /api/admin/projetos)
+      usuarios.tsx     # CRUD de usuários (admin only) - lê via /api/admin/usuarios
+      areas.tsx        # CRUD de áreas/departamentos (admin only) - via /api/admin/areas
+  integrations/db/
+    client.server.ts   # Client SQLite (better-sqlite3) + funções de acesso ao banco (server-only)
+    schema.ts          # Criação das tabelas SQLite (auto-init na primeira execução)
+    types.ts           # Tipos TypeScript do schema (Projeto, Area, ProjetoStatus, etc.)
   lib/
     agents/            # Sistema de agentes IA
       types.ts         # Tipos: ChatFase, DocumentacaoColetada, SavingColetado, OrchestratorResult, ProjetoContexto
@@ -85,54 +83,56 @@ src/
       step3-chat.tsx   # Step 3 (Agente): chat IA, previews, revisão final
       form-components.tsx # Inputs, RadioGroup, InfoTooltip (via portal), ChipsInput
       layout.tsx       # PageFrame, WizardProgress, StepAnimation
-    chat.functions.ts  # Server functions: iniciarSubmissaoFn, iniciarSavingFn, enviarMensagemFn, submeterParaValidacaoFn
+    chat.functions.ts  # Funções de negócio do chat: iniciarSubmissao, iniciarSaving, enviarMensagem, submeterParaValidacao, validarProjeto
+    admin.functions.ts # Funções admin: áreas, admins, projetos, usuários (createUser/deleteUser/updateUserAreas/getUsuarios), configurações
+    auth.functions.ts  # getCurrentUser (lê email do header Godeploy → consulta tabela admins)
+    projeto.functions.ts # Funções auxiliares de projeto/chat (CRUD via db)
+    api-client.ts      # apiFetch — helper do frontend para chamar /api/*
     extract-text.server.ts  # Extração de texto: PDF/DOCX/DOC/TXT/MD/JSON + código; multi-arquivo (server-only)
     llm.ts             # Camada de abstração LLM (OpenAI / Anthropic)
-    admin.functions.ts # Server functions: createUser, deleteUser, updateUserAreas
     utils.ts           # cn() helper (clsx + tailwind-merge)
   router.tsx           # Configuração do TanStack Router + QueryClient
-  server.ts            # Entry SSR - wrapper de erro sobre o server-entry do TanStack
-  start.ts             # createStart - registra middlewares globais
+  worker.ts            # Entry do Cloudflare Worker — roteia /api/* p/ as funções; fallback SPA
+  main.tsx             # Entry do cliente (monta a SPA React)
   styles.css           # Tokens CSS (light/dark), Tailwind config
+vite-plugin-dev-api.ts # Plugin Vite que serve /api/* em dev reusando o worker.ts
 tests/                 # Testes unitários (Vitest)
-supabase/
-  migrations/          # Migrations SQL (schema, RLS, triggers, colunas de saving)
-  config.toml          # Config local do Supabase CLI
+PLANO_MIGRACAO_SQLITE.md # Plano da migração Supabase → SQLite + risco de runtime no deploy
+godocs.db              # Banco SQLite local (auto-criado, ignorado no git)
 ```
 
-## Banco de dados (Supabase Postgres)
+## Banco de dados (SQLite via better-sqlite3)
 
 ### Tabelas
 
+O schema é criado automaticamente na primeira execução por `initSchema()` em `src/integrations/db/schema.ts`. IDs são gerados como hex de 32 chars (`lower(hex(randomblob(16)))`) — **não são UUID**; colunas JSON (`membros`, `tipos_projeto`, `options`, `conteudo`, `criterios`, `valor`) são armazenadas como TEXT e parseadas via `parseJson()`. Booleanos viram INTEGER 0/1.
+
 | Tabela | Descrição |
 |---|---|
-| `profiles` | id (FK auth.users), nome, email |
-| `user_roles` | user_id, role (enum: admin_master, leader) |
+| `admins` | id, email (UNIQUE), nome — controla quem tem acesso admin |
+| `profiles` | id, nome, email |
+| `user_roles` | user_id, role (admin_master, leader) |
 | `areas` | id, nome (departamentos da empresa) |
 | `leader_areas` | user_id, area_id (N:N - quais áreas um leader acompanha) |
-| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, membros, status, chat_completo, data_criacao_projeto, **tipo_projeto** (saving\|receita_incremental), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, submitted_at, validated_at, validated_by |
-| `chat_messages` | id, projeto_id, role (user/assistant/doc), content, options, selected_option |
-| `documentacao` | projeto_id, conteudo (JSON estruturado — DocumentacaoGerada + saving) |
-| `validacoes` | projeto_id, resultado, parecer, criterios, admin_email, email_enviado |
-| `configuracoes` | chave, valor (JSON), descrição — config dinâmica (ex: critérios de validação) |
+| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, escopo, servico_externo, membros (JSON), status, chat_completo, data_criacao_projeto, **tipo_projeto**, **tipos_projeto** (JSON), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal, submitted_at, validated_at, validated_by |
+| `chat_messages` | id, projeto_id, role (user/assistant/doc), content, options (JSON), selected_option |
+| `documentacao` | projeto_id (UNIQUE), conteudo (JSON — DocumentacaoGerada + saving) |
+| `validacoes` | projeto_id, resultado, parecer, criterios (JSON), admin_email, email_enviado |
+| `configuracoes` | chave (UNIQUE), valor (JSON), descrição — config dinâmica (ex: critérios de validação) |
 
-### Enum `projeto_status`
+### Status (CHECK na coluna `projetos.status`)
 
 ```
 rascunho → em_validacao → validado | rejeitado
                         → aprovado (auto, quando área = RPA)
 ```
 
-### RLS
+### Segurança
 
-- Todas as tabelas têm RLS ativado
-- Admins veem/gerenciam tudo; usuários veem apenas seus próprios dados
-- Função `has_role()` (SECURITY DEFINER) evita recursão nas policies
-
-### Trigger de bootstrap
-
-- `handle_new_user()`: cria profile automaticamente ao signup
-- Se o email for `kaique.breno@gocase.com`, atribui `admin_master` automaticamente
+- Sem RLS (SQLite não tem) — o controle de acesso é feito no `src/worker.ts` (`requireAdmin`) e nos middlewares de auth das funções
+- Auth via header do Godeploy edge (Google OAuth), nome do header em `GODEPLOY_USER_HEADER` (default `x-user-email`)
+- A tabela `admins` define quem é admin (`getCurrentUser` / `requireAdmin` consultam por email)
+- `createUser` apenas cria `profiles` + `user_roles` (+ `leader_areas`); não há mais credenciais locais — a senha do formulário é ignorada
 
 ## Rotas
 
@@ -140,7 +140,7 @@ rascunho → em_validacao → validado | rejeitado
 |---|---|---|
 | `/` | Público | Home com 3 cards de ação |
 | `/submeter` | Público | Formulário 3 etapas + chat IA (doc + saving) |
-| `/auth` | Público | Login email/password |
+| `/auth` | Público | Redireciona para `/dashboard` (auth via Godeploy edge) |
 | `/dashboard` | Autenticado (admin/leader) | Dashboard de projetos |
 | `/usuarios` | Admin Master | CRUD de usuários |
 | `/areas` | Admin Master | CRUD de áreas |
@@ -318,7 +318,7 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 - Path alias: `@/*` -> `./src/*`
 - Componentes UI ficam em `src/components/ui/` (shadcn, não editar diretamente)
-- Server functions em arquivos `.functions.ts` dentro de `src/lib/`
+- Funções de negócio em arquivos `.functions.ts` dentro de `src/lib/` (chamadas pelo `worker.ts`; o frontend usa `apiFetch`). Funções que tocam o banco/`process.env` só rodam no servidor (importam de `integrations/db/client.server`)
 - Formulários usam react-hook-form + zod para validação
 - Toasts via sonner (`toast.success()`, `toast.error()`)
 - Idioma da interface: **português brasileiro**
@@ -329,16 +329,13 @@ Quando ambos os previews são aprovados (`fase = completo`):
 
 ## Variáveis de ambiente
 
-Definidas em `.env` (não comitar chaves secretas). No Cloudflare Workers, as variáveis runtime são secrets (`wrangler secret bulk .env`).
+Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas como variáveis do Worker (lidas via `process.env`).
 
-### Build-time (baked no bundle via `VITE_` prefix — precisam existir no `.env` na hora do build)
+### Runtime (server-only — lidos via `process.env` no `worker.ts` / funções `.server`)
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-### Runtime (server-only — lidos via `process.env` no Worker com `nodejs_compat`)
-
-- `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_PATH` — caminho do arquivo SQLite (default: `./godocs.db`)
+- `GODEPLOY_USER_HEADER` — header com email do usuário autenticado pelo Godeploy edge (default: `x-user-email`)
+- `DEV_USER_EMAIL` — em dev, email usado quando não há header de auth
 - `LLM_PROVIDER` — `openai` (default) ou `anthropic`
 - `LLM_API_KEY` — chave da API do provider escolhido
 - `LLM_MODEL` — modelo a usar (default: `gpt-4.1`)
@@ -346,40 +343,34 @@ Definidas em `.env` (não comitar chaves secretas). No Cloudflare Workers, as va
 - `OCR_WORKER_URL` — URL do Cloudflare Worker de extração de texto de PDFs
 - `OCR_WORKER_TOKEN` — token Bearer de autenticação do OCR Worker
 - `BREVO_API_KEY` / `EMAIL_FROM` — envio de e-mail via Brevo
-- `GODEPLOY_USER_HEADER` — header com email do usuário autenticado (default: `x-user-email`)
 
-## Deploy (Cloudflare Workers)
+## Deploy (Godeploy — SPA + Worker API)
 
-- **URL produção**: `https://godocs.kaique-rpa.workers.dev`
-- **Runtime**: Cloudflare Workers com `nodejs_compat` (V8 isolate + polyfills Node)
-- **Build**: Nitro preset `cloudflare-module` via `@lovable.dev/vite-tanstack-config`
-- **Config**: `vite.config.ts` habilita Nitro com `nitro: { preset: "cloudflare-module", cloudflare: { nodeCompat: true, deployConfig: true } }`
-- **wrangler.toml** na raiz: apenas `name` e `compatibility_date` — Nitro auto-gera o `wrangler.json` completo em `.output/server/` com entry point, assets, flags e rules
-- **Deploy config**: `.wrangler/deploy/config.json` aponta o wrangler pro config gerado
-- **Secrets**: setados via `wrangler secret bulk .env` (todas as vars runtime)
-- **Fluxo de deploy**: `npm run deploy` = `vite build && wrangler deploy`
-- **Preview local com workerd**: `npm run preview:worker` = `vite build && wrangler dev`
-- **Extração de PDF**: delegada ao Cloudflare OCR Worker externo (removeu `pdf-parse` do bundle)
-- **mammoth (DOCX)**: roda dentro do Worker com `nodejs_compat` — funciona mas é o ponto mais frágil
+- **Arquitetura**: SPA estática (`dist/`) + Cloudflare Worker (`src/worker.ts`) que serve `/api/*`
+- **Build**: `npm run build` (Vite) gera a SPA estática em `dist/`
+- **Worker**: o Godeploy serve os assets estáticos e invoca o `worker.ts` para `/api/*` e para recursos sem asset correspondente
+- **process.env**: o Godeploy **não** expõe `process` global (sem `nodejs_compat`) — o `worker.ts` faz um polyfill de `process.env` no início do `fetch`, injetando as env vars do Worker
+- **Dev**: `vite-plugin-dev-api.ts` serve `/api/*` localmente reusando o `worker.ts` via `ssrLoadModule`
+- **Extração de PDF**: delegada ao Cloudflare OCR Worker externo (sem `pdf-parse` no bundle)
+- **⚠️ Risco de runtime do SQLite**: `better-sqlite3` é binário nativo de Node — **não carrega em Cloudflare Workers/workerd** (nem com `nodejs_compat`). Funciona em dev (`npm run dev`, runtime Node) e em qualquer runtime Node real. Para deploy em Workers, migrar para **Cloudflare D1** ou **Turso (libsql)**. Detalhes e mapeamento em `PLANO_MIGRACAO_SQLITE.md`
 
 ## Status atual
 
-- Home, login, formulário de submissão, CRUD de usuários e áreas estão funcionais
+- Home, formulário de submissão, CRUD de usuários e áreas estão funcionais
+- **Arquitetura SPA**: migrada de SSR (TanStack Start) para SPA + Worker API; rotas admin leem via `/api/*` (sem client browser)
+- **Backend SQLite**: migrado de Supabase para `better-sqlite3` (banco local, schema auto-criado); auth via header do Godeploy edge
 - **Step 2 (upload)**: upload de codebase/pasta inteira com filtro de pastas de dev, gate de ~200k tokens e árvore de pastas colapsável
 - **Agente Doc (fase 1)**: funcional — pré-extração lê o código e preenche os campos técnicos; chat pergunta só as regras de negócio; gera preview formatado, ciclo de aprovação
 - **Agente Saving (fase 2)**: funcional — validação de horas com detalhamento obrigatório, monta memorial, ciclo de aprovação
 - **Transição doc → saving**: tela animada com check verde e progress bar
 - **Tela de revisão final**: cards colapsáveis com previews aprovados antes do envio
-- **Submissão interna**: dados salvos no Supabase (sem Sheets), duplicata verificada, auto-aprovação para RPA, notificação Google Chat
-- **Deploy**: live no Cloudflare Workers via wrangler
-- **Testes**: 106 testes passando (6 arquivos), rodam antes de cada `npm run dev`
-- Dashboard ainda é placeholder — falta integrar listagem/gestão de projetos
+- **Submissão interna**: dados salvos no SQLite (sem Sheets), duplicata verificada, auto-aprovação para RPA, notificação Google Chat
+- **Testes**: rodam antes de cada `npm run dev` via `predev`
 - Design usa identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
 
 ## Notas importantes
 
 - Projeto originado do Lovable (gerado por IA) - pode conter código que precisa de refatoração
-- Arquivos marcados "automatically generated" pelo Lovable podem ser editados agora que o desenvolvimento saiu do Lovable
-- O `@lovable.dev/vite-tanstack-config` já inclui tanstackStart, viteReact, tailwindcss, tsConfigPaths, nitro etc - não duplicar plugins no vite.config.ts
-- Fora do sandbox Lovable, o Nitro só roda no build se `nitro` for explicitamente setado no `defineConfig` (truthy). O Nitro instalado (3.0.260429-beta) não suporta `defaultPreset`, então `preset: "cloudflare-module"` deve ser explícito
-- O antigo fluxo n8n → Google Sheets foi substituído por submissão interna via Supabase. O arquivo `forms_submissao_logica.json` contém o fluxo n8n legado para referência
+- A arquitetura saiu de SSR (TanStack Start + Nitro/Cloudflare) para **SPA + Worker API** (`src/worker.ts`). Não há mais `server.ts`/`start.ts`, Nitro nem `@lovable.dev/vite-tanstack-config` — o `vite.config.ts` usa `@vitejs/plugin-react` + `TanStackRouterVite` + `devApiPlugin`
+- `routeTree.gen.ts` é auto-gerado — não editar manualmente
+- O antigo fluxo n8n → Google Sheets foi substituído por submissão interna via SQLite. O arquivo `forms_submissao_logica.json` contém o fluxo n8n legado para referência

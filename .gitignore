@@ -25,6 +25,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# SQLite (banco local — auto-criado)
+*.db
+*.db-wal
+*.db-shm
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

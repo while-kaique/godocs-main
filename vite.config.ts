@@ -19,7 +19,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/@radix-ui')) return 'vendor-radix'
-          if (id.includes('node_modules/@supabase')) return 'vendor-supabase'
           if (id.includes('node_modules/@tanstack')) return 'vendor-tanstack'
           if (id.includes('node_modules/react-dom')) return 'vendor-react'
           if (id.includes('node_modules/react/')) return 'vendor-react'

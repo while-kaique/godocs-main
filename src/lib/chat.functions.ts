@@ -6,7 +6,21 @@ const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${f
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
 
 import { z } from 'zod';
-import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import {
+  insertProjeto,
+  insertChatMessage,
+  getChatMessagesExcludeRole,
+  getProjetoContextoData,
+  getDocMessage,
+  upsertDocumentacao,
+  getDocumentacao,
+  getProjetoById,
+  findDuplicateProjeto,
+  updateProjeto,
+  insertValidacao,
+  updateValidacaoEmailEnviado,
+  parseJson,
+} from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
@@ -26,33 +40,22 @@ import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agen
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
-  const [{ data, error }, { data: docMsg }] = await Promise.all([
-    supabaseAdmin
-      .from('projetos')
-      .select('responsavel_nome, responsavel_email, ferramenta, membros, nome, tipo_projeto, tipos_projeto, escopo, areas(nome)')
-      .eq('id', projeto_id)
-      .single(),
-    supabaseAdmin
-      .from('chat_messages')
-      .select('content')
-      .eq('projeto_id', projeto_id)
-      .eq('role', 'doc')
-      .maybeSingle(),
-  ]);
+  const data = getProjetoContextoData(projeto_id);
+  if (!data) throw new Error('Projeto não encontrado.');
+  const docMsg = getDocMessage(projeto_id);
 
-  if (error || !data) throw new Error('Projeto não encontrado.');
-
-  const tiposProjeto = Array.isArray(data.tipos_projeto)
-    ? (data.tipos_projeto as ('saving' | 'receita_incremental')[])
+  const tiposRaw = parseJson<string[]>(data.tipos_projeto);
+  const tiposProjeto = Array.isArray(tiposRaw)
+    ? (tiposRaw as ('saving' | 'receita_incremental')[])
     : null;
 
   return {
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
     ferramenta: data.ferramenta,
-    area: (data.areas as { nome: string } | null)?.nome ?? null,
-    membros: Array.isArray(data.membros) ? (data.membros as string[]) : [],
-    nome_projeto: (data.nome as string | null) ?? '',
+    area: data.area_nome ?? null,
+    membros: parseJson<string[]>(data.membros) ?? [],
+    nome_projeto: data.nome ?? '',
     data_criacao: null,
     doc_texto: docMsg?.content ?? null,
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
@@ -167,7 +170,7 @@ function getTiposProjeto(ctx: ProjetoContexto): ('saving' | 'receita_incremental
 const iniciarSubmissaoSchema = z.object({
   responsavel_nome: z.string().min(1).max(120),
   responsavel_email: z.string().email().max(255),
-  area_id: z.string().uuid().optional(),
+  area_id: z.string().min(1).optional(),
   area: z.string().min(1).max(100),
   ferramenta: z.string().min(1).max(200),
   escopo: z.enum(['interno', 'externo']).optional(),
@@ -184,13 +187,13 @@ const iniciarSubmissaoSchema = z.object({
 });
 
 const enviarMensagemSchema = z.object({
-  projeto_id: z.string().uuid(),
+  projeto_id: z.string().min(1),
   content: z.string().min(1).max(4000),
   selected_option: z.number().optional(),
 });
 
 const iniciarSavingSchema = z.object({
-  projeto_id: z.string().uuid(),
+  projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
   cargo: z.string().optional(),
   horas_antes: z.number().min(0).optional(),
@@ -199,11 +202,11 @@ const iniciarSavingSchema = z.object({
 });
 
 const iniciarReceitaSchema = z.object({
-  projeto_id: z.string().uuid(),
+  projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
 });
 
-const submeterValidacaoSchema = z.object({ projeto_id: z.string().uuid() });
+const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
 
 // ─── Iniciar submissão ───────────────────────────────────────────────────────
 
@@ -211,12 +214,12 @@ export async function iniciarSubmissao(rawData: unknown) {
   const data = iniciarSubmissaoSchema.parse(rawData);
   log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
 
-  const { data: projeto, error: projErr } = await supabaseAdmin
-    .from('projetos')
-    .insert({
+  let projeto;
+  try {
+    projeto = insertProjeto({
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
-      area_id: data.area_id,
+      area_id: data.area_id ?? null,
       area: data.area,
       ferramenta: data.ferramenta,
       escopo: data.escopo ?? null,
@@ -228,13 +231,10 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipos_projeto: data.tipos_projeto ?? null,
       descricao_breve: data.descricao_breve ?? null,
       status: 'rascunho',
-    })
-    .select()
-    .single();
-
-  if (projErr || !projeto) {
+    });
+  } catch (projErr) {
     err('iniciarSubmissao', 'Falha ao criar projeto:', projErr);
-    throw new Error(`Falha ao criar projeto: ${projErr?.message ?? 'erro desconhecido'}`);
+    throw new Error(`Falha ao criar projeto: ${projErr instanceof Error ? projErr.message : 'erro desconhecido'}`);
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
@@ -247,7 +247,7 @@ export async function iniciarSubmissao(rawData: unknown) {
     docTexto = '';
   }
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: projeto.id,
     role: 'doc',
     content: docTexto || '(documento sem texto legível)',
@@ -287,7 +287,7 @@ export async function iniciarSubmissao(rawData: unknown) {
   log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
   const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: projeto.id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -317,19 +317,14 @@ export async function enviarMensagem(rawData: unknown) {
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'user',
     content: data.content,
     selected_option: data.selected_option ?? null,
   });
 
-  const { data: msgs } = await supabaseAdmin
-    .from('chat_messages')
-    .select('role, content')
-    .eq('projeto_id', data.projeto_id)
-    .neq('role', 'doc')
-    .order('created_at');
+  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const estado = extrairEstado(msgs ?? []);
 
@@ -360,7 +355,7 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -371,10 +366,7 @@ export async function enviarMensagem(rawData: unknown) {
     log('enviarMensagem', 'Doc aprovada — compilando documentação...');
     try {
       const doc = await compilarDocumentacao(ctx, resultado.coletado);
-      await supabaseAdmin.from('documentacao').upsert({
-        projeto_id: data.projeto_id,
-        conteudo: doc as never,
-      });
+      upsertDocumentacao(data.projeto_id, doc);
       log('enviarMensagem', 'Documentação compilada e salva.');
     } catch (compErr) {
       err('enviarMensagem', 'Falha ao compilar:', compErr);
@@ -383,27 +375,17 @@ export async function enviarMensagem(rawData: unknown) {
 
   if (resultado.fase === 'completo') {
     log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
-    const { data: docRow } = await supabaseAdmin
-      .from('documentacao')
-      .select('conteudo')
-      .eq('projeto_id', data.projeto_id)
-      .single();
+    const docRow = getDocumentacao(data.projeto_id);
 
     if (docRow) {
-      const doc = docRow.conteudo as Record<string, unknown>;
+      const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
       const tiposProjetoCtx = getTiposProjeto(ctx);
       if (tiposProjetoCtx.includes('saving')) doc.saving = resultado.saving;
       if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
-      await supabaseAdmin.from('documentacao').upsert({
-        projeto_id: data.projeto_id,
-        conteudo: doc as never,
-      });
+      upsertDocumentacao(data.projeto_id, doc);
     }
 
-    await supabaseAdmin
-      .from('projetos')
-      .update({ chat_completo: true })
-      .eq('id', data.projeto_id);
+    updateProjeto(data.projeto_id, { chat_completo: true });
   }
 
   const respContent2 = resultado.type === 'options'
@@ -464,12 +446,7 @@ export async function iniciarSaving(rawData: unknown) {
     };
   }
 
-  const { data: msgs } = await supabaseAdmin
-    .from('chat_messages')
-    .select('role, content')
-    .eq('projeto_id', data.projeto_id)
-    .neq('role', 'doc')
-    .order('created_at');
+  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -484,7 +461,7 @@ export async function iniciarSaving(rawData: unknown) {
     tiposProjeto,
   );
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -517,12 +494,7 @@ export async function iniciarReceita(rawData: unknown) {
   const receita = receitaVazia();
   receita.tipo_saving = data.tipo_saving;
 
-  const { data: msgs } = await supabaseAdmin
-    .from('chat_messages')
-    .select('role, content')
-    .eq('projeto_id', data.projeto_id)
-    .neq('role', 'doc')
-    .order('created_at');
+  const msgs = getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -538,7 +510,7 @@ export async function iniciarReceita(rawData: unknown) {
     receita,
   );
 
-  await supabaseAdmin.from('chat_messages').insert({
+  insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
@@ -564,35 +536,20 @@ export async function submeterParaValidacao(rawData: unknown) {
   const { projeto_id } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
-  const { data: docRow } = await supabaseAdmin
-    .from('documentacao')
-    .select('conteudo')
-    .eq('projeto_id', projeto_id)
-    .single();
+  const docRow = getDocumentacao(projeto_id);
 
   if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
-  const conteudo = docRow.conteudo as Record<string, unknown>;
+  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
   const saving = conteudo.saving as Record<string, unknown> | undefined;
 
-  const { data: projeto } = await supabaseAdmin
-    .from('projetos')
-    .select('*')
-    .eq('id', projeto_id)
-    .single();
+  const projeto = getProjetoById(projeto_id);
 
   if (!projeto) throw new Error('Projeto não encontrado.');
 
   if (projeto.nome) {
-    const { data: duplicata } = await supabaseAdmin
-      .from('projetos')
-      .select('id')
-      .eq('nome', projeto.nome)
-      .neq('id', projeto_id)
-      .neq('status', 'rascunho')
-      .limit(1);
-
-    if (duplicata && duplicata.length > 0) {
+    const duplicata = findDuplicateProjeto(projeto.nome, projeto_id);
+    if (duplicata) {
       throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
     }
   }
@@ -600,17 +557,14 @@ export async function submeterParaValidacao(rawData: unknown) {
   const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
   const now = new Date().toISOString();
 
-  await supabaseAdmin
-    .from('projetos')
-    .update({
-      status,
-      submitted_at: now,
-      saving_horas: saving?.economia_horas_mes as number ?? null,
-      saving_reais: saving?.economia_reais_mes as number ?? null,
-      tipo_saving: saving?.tipo_saving as string ?? null,
-      memorial_calculo: saving?.memorial_calculo as string ?? null,
-    })
-    .eq('id', projeto_id);
+  updateProjeto(projeto_id, {
+    status,
+    submitted_at: now,
+    saving_horas: (saving?.economia_horas_mes as number) ?? null,
+    saving_reais: (saving?.economia_reais_mes as number) ?? null,
+    tipo_saving: (saving?.tipo_saving as string) ?? null,
+    memorial_calculo: (saving?.memorial_calculo as string) ?? null,
+  });
 
   log('submeterParaValidacao', `Status: ${status}`);
 
@@ -621,7 +575,7 @@ export async function submeterParaValidacao(rawData: unknown) {
       const savingReais = saving?.economia_reais_mes ?? 0;
       const fmtReais = Number(savingReais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const tipoSaving = saving?.tipo_saving ?? 'mensal';
-      const membros = Array.isArray(projeto.membros) ? (projeto.membros as string[]).join(', ') : '';
+      const membros = (parseJson<string[]>(projeto.membros) ?? []).join(', ');
 
       const text = [
         '──────────────────────',
@@ -665,31 +619,24 @@ export async function submeterParaValidacao(rawData: unknown) {
 // ─── Validar projeto ─────────────────────────────────────────────────────────
 
 export async function validarProjeto(rawData: unknown) {
-  const { projeto_id } = z.object({ projeto_id: z.string().uuid() }).parse(rawData);
+  const { projeto_id } = z.object({ projeto_id: z.string().min(1) }).parse(rawData);
 
-  const { data: docRow } = await supabaseAdmin
-    .from('documentacao')
-    .select('conteudo')
-    .eq('projeto_id', projeto_id)
-    .single();
+  const docRow = getDocumentacao(projeto_id);
 
   if (!docRow) throw new Error('Documentação não encontrada.');
 
-  const doc = docRow.conteudo as Parameters<typeof validarDocumentacao>[0];
+  const doc = parseJson<Parameters<typeof validarDocumentacao>[0]>(docRow.conteudo) as Parameters<typeof validarDocumentacao>[0];
   const resultado = await validarDocumentacao(doc);
 
-  await supabaseAdmin.from('validacoes').insert({
+  insertValidacao({
     projeto_id,
     resultado: resultado.resultado,
     parecer: resultado.parecer,
-    criterios: resultado.criterios as never,
+    criterios: resultado.criterios,
   });
 
   const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
-  await supabaseAdmin
-    .from('projetos')
-    .update({ status: novoStatus, validated_at: new Date().toISOString() })
-    .eq('id', projeto_id);
+  updateProjeto(projeto_id, { status: novoStatus, validated_at: new Date().toISOString() });
 
   try {
     if (resultado.resultado === 'aprovado') {
@@ -697,10 +644,7 @@ export async function validarProjeto(rawData: unknown) {
     } else {
       await enviarEmailRejeicao(doc, resultado);
     }
-    await supabaseAdmin
-      .from('validacoes')
-      .update({ email_enviado: true })
-      .eq('projeto_id', projeto_id);
+    updateValidacaoEmailEnviado(projeto_id);
   } catch (emailErr) {
     console.error('[email-agent] Falha ao enviar email:', emailErr);
   }

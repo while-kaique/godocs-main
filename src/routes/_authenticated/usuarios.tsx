@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,31 +44,16 @@ function UsuariosPage() {
   const [areas, setAreas] = useState<Area[]>([]);
 
   async function load() {
-    const [{ data: profiles }, { data: roles }, { data: la }, { data: ars }] =
-      await Promise.all([
-        supabase.from("profiles").select("id,nome,email").order("nome"),
-        supabase.from("user_roles").select("user_id,role"),
-        supabase.from("leader_areas").select("user_id,area_id"),
-        supabase.from("areas").select("id,nome").order("nome"),
-      ]);
-    setAreas(ars ?? []);
-    const roleMap = new Map<string, Role>();
-    (roles ?? []).forEach((r) => roleMap.set(r.user_id, r.role as Role));
-    const areaMap = new Map<string, string[]>();
-    (la ?? []).forEach((r) => {
-      const arr = areaMap.get(r.user_id) ?? [];
-      arr.push(r.area_id);
-      areaMap.set(r.user_id, arr);
-    });
-    setRows(
-      (profiles ?? []).map((p) => ({
-        id: p.id,
-        nome: p.nome,
-        email: p.email,
-        role: roleMap.get(p.id) ?? null,
-        areaIds: areaMap.get(p.id) ?? [],
-      })),
-    );
+    try {
+      const { usuarios, areas } = await apiFetch<{ usuarios: Row[]; areas: Area[] }>(
+        "/api/admin/usuarios",
+      );
+      setAreas(areas ?? []);
+      setRows(usuarios ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao carregar usuários.");
+      setRows([]);
+    }
   }
 
   useEffect(() => {

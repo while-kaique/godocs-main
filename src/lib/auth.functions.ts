@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import { getAdminByEmail } from '@/integrations/db/client.server'
 
 export type CurrentUser = {
   email: string
@@ -12,10 +12,6 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
     email = process.env.DEV_USER_EMAIL ?? null
   }
   if (!email) return null
-  const { data } = await supabaseAdmin
-    .from('admins')
-    .select('email')
-    .eq('email', email)
-    .maybeSingle()
-  return { email, isAdmin: !!data }
+  const admin = getAdminByEmail(email)
+  return { email, isAdmin: !!admin }
 }

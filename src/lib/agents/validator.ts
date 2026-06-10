@@ -3,7 +3,7 @@
 // Usa critérios configuráveis via tabela configuracoes
 
 import { llmChat } from '@/lib/llm';
-import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { getConfiguracao, parseJson } from '@/integrations/db/client.server';
 import type { DocumentacaoGerada } from './types';
 
 type CriterioValidacao = {
@@ -59,17 +59,14 @@ const CRITERIOS_DEFAULT: CriterioValidacao[] = [
 ];
 
 async function getCriterios(): Promise<CriterioValidacao[]> {
-  const { data } = await supabaseAdmin
-    .from('configuracoes')
-    .select('valor')
-    .eq('chave', 'validation_criteria')
-    .single();
+  const row = getConfiguracao('validation_criteria');
+  const valor = row ? parseJson<CriterioValidacao[]>(row.valor) : null;
 
-  if (!data || !Array.isArray(data.valor) || data.valor.length === 0) {
+  if (!valor || !Array.isArray(valor) || valor.length === 0) {
     return CRITERIOS_DEFAULT;
   }
 
-  return data.valor as CriterioValidacao[];
+  return valor;
 }
 
 export async function validarDocumentacao(

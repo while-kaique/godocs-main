@@ -1,155 +1,192 @@
 import { z } from 'zod'
-import { supabaseAdmin } from '@/integrations/supabase/client.server'
+import {
+  getAreas as dbGetAreas,
+  insertArea,
+  deleteArea as dbDeleteArea,
+  getAdmins as dbGetAdmins,
+  insertAdmin,
+  deleteAdmin,
+  getProjetosWithArea,
+  getProjetoWithRelations,
+  upsertProfile,
+  deleteProfile,
+  getProfileById,
+  insertUserRole,
+  deleteUserRoles,
+  deleteLeaderAreas,
+  insertLeaderAreas,
+  getProfiles,
+  getUserRoles,
+  getLeaderAreas,
+  getConfiguracoes as dbGetConfiguracoes,
+  updateConfiguracao as dbUpdateConfiguracao,
+  parseJson,
+  type ProjetoRow,
+} from '@/integrations/db/client.server'
+
+// ID de área/admin/projeto é hex de 32 chars (não é UUID), então validamos
+// apenas como string não-vazia.
+const idSchema = z.string().min(1).max(64)
+
+// ── Mapeadores (linha SQLite → formato consumido pelo frontend) ────────────────
+
+function mapProjeto(row: ProjetoRow & { area_nome?: string | null }) {
+  const { area_nome, membros, tipos_projeto, chat_completo, ...rest } = row
+  return {
+    ...rest,
+    membros: parseJson<string[]>(membros) ?? [],
+    tipos_projeto: parseJson<string[]>(tipos_projeto),
+    chat_completo: !!chat_completo,
+    areas: area_nome ? { nome: area_nome } : null,
+  }
+}
 
 // ── Áreas ────────────────────────────────────────────────────────────────────
 
 export async function getAreas() {
-  const { data, error } = await supabaseAdmin.from('areas').select('*').order('nome')
-  if (error) throw new Error(error.message)
-  return data
+  return dbGetAreas()
 }
 
 export async function createArea(nome: string, _adminEmail: string) {
   const parsed = z.string().min(1).max(100).parse(nome)
-  const { data, error } = await supabaseAdmin
-    .from('areas')
-    .insert({ nome: parsed })
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data
+  return insertArea(parsed)
 }
 
 export async function deleteArea(id: string, _adminEmail: string) {
-  z.string().uuid().parse(id)
-  const { error } = await supabaseAdmin.from('areas').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  idSchema.parse(id)
+  dbDeleteArea(id)
   return { ok: true }
 }
 
 // ── Admins ────────────────────────────────────────────────────────────────────
 
 export async function getAdmins() {
-  const { data, error } = await supabaseAdmin.from('admins').select('*').order('email')
-  if (error) throw new Error(error.message)
-  return data
+  return dbGetAdmins()
 }
 
 export async function addAdmin(input: { email: string; nome?: string }) {
   const parsed = z
     .object({ email: z.string().email(), nome: z.string().optional() })
     .parse(input)
-  const { data, error } = await supabaseAdmin
-    .from('admins')
-    .insert({ email: parsed.email, nome: parsed.nome })
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data
+  return insertAdmin(parsed.email, parsed.nome ?? null)
 }
 
 export async function removeAdmin(id: string, currentEmail: string) {
-  z.string().uuid().parse(id)
-  const { data: admin } = await supabaseAdmin
-    .from('admins')
-    .select('email')
-    .eq('id', id)
-    .single()
+  idSchema.parse(id)
+  const admin = dbGetAdmins().find((a) => a.id === id)
   if (admin?.email === currentEmail) {
     throw new Error('Você não pode remover a si mesmo.')
   }
-  const { error } = await supabaseAdmin.from('admins').delete().eq('id', id)
-  if (error) throw new Error(error.message)
+  deleteAdmin(id)
   return { ok: true }
 }
 
 // ── Projetos ──────────────────────────────────────────────────────────────────
 
 export async function getProjetos() {
-  const { data, error } = await supabaseAdmin
-    .from('projetos')
-    .select('*, areas(nome)')
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return data
+  return getProjetosWithArea().map(mapProjeto)
 }
 
 export async function getProjetoDetalhes(id: string) {
-  z.string().uuid().parse(id)
-  const { data, error } = await supabaseAdmin
-    .from('projetos')
-    .select('*, areas(nome), chat_messages(*), documentacao(*), validacoes(*)')
-    .eq('id', id)
-    .single()
-  if (error) throw new Error(error.message)
-  return data
+  idSchema.parse(id)
+  const projeto = getProjetoWithRelations(id)
+  if (!projeto) throw new Error('Projeto não encontrado.')
+
+  const { chat_messages, documentacao, validacoes, ...projetoRow } = projeto
+  return {
+    ...mapProjeto(projetoRow),
+    chat_messages: chat_messages.map((m) => ({
+      ...m,
+      options: parseJson(m.options),
+    })),
+    documentacao: documentacao.map((d) => ({
+      ...d,
+      conteudo: parseJson(d.conteudo),
+    })),
+    validacoes: validacoes.map((v) => ({
+      ...v,
+      criterios: parseJson(v.criterios),
+      email_enviado: !!v.email_enviado,
+    })),
+  }
 }
 
 // ── Usuários ──────────────────────────────────────────────────────────────────
 
+type Role = 'admin_master' | 'leader'
+
+// Lista usuários (profiles) com seu papel e áreas vinculadas, junto das áreas
+// disponíveis — em uma única chamada para a página de gestão.
+export async function getUsuarios() {
+  const profiles = getProfiles()
+  const roles = getUserRoles()
+  const leaderAreas = getLeaderAreas()
+  const areas = dbGetAreas()
+
+  const roleMap = new Map<string, Role>()
+  for (const r of roles) roleMap.set(r.user_id, r.role as Role)
+
+  const areaMap = new Map<string, string[]>()
+  for (const la of leaderAreas) {
+    const arr = areaMap.get(la.user_id) ?? []
+    arr.push(la.area_id)
+    areaMap.set(la.user_id, arr)
+  }
+
+  const usuarios = profiles.map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    email: p.email,
+    role: roleMap.get(p.id) ?? null,
+    areaIds: areaMap.get(p.id) ?? [],
+  }))
+
+  return { usuarios, areas }
+}
+
 const createUserSchema = z.object({
   nome: z.string().min(1).max(120),
   email: z.string().email(),
-  password: z.string().min(6),
+  // Senha é exigida pelo formulário, mas não é mais usada: a autenticação é
+  // feita pelo Godeploy edge (Google OAuth), não há credenciais locais.
+  password: z.string().min(6).optional(),
   role: z.enum(['admin_master', 'leader']),
-  areaIds: z.array(z.string().uuid()).default([]),
+  areaIds: z.array(idSchema).default([]),
 })
 
 export async function createUser(input: unknown) {
   const data = createUserSchema.parse(input)
-  const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-    email: data.email,
-    password: data.password,
-    email_confirm: true,
-    user_metadata: { nome: data.nome },
-  })
-  if (error) throw new Error(error.message)
-  const userId = created.user.id
-  await supabaseAdmin
-    .from('profiles')
-    .upsert({ id: userId, nome: data.nome, email: data.email }, { onConflict: 'id' })
-  await supabaseAdmin.from('user_roles').delete().eq('user_id', userId)
-  const { error: roleError } = await supabaseAdmin
-    .from('user_roles')
-    .insert({ user_id: userId, role: data.role })
-  if (roleError) throw new Error(roleError.message)
+  const userId = crypto.randomUUID()
+  upsertProfile(userId, data.nome, data.email)
+  deleteUserRoles(userId)
+  insertUserRole(userId, data.role)
   if (data.role === 'leader' && data.areaIds.length) {
-    const { error: areasError } = await supabaseAdmin
-      .from('leader_areas')
-      .insert(data.areaIds.map((area_id) => ({ user_id: userId, area_id })))
-    if (areasError) throw new Error(areasError.message)
+    insertLeaderAreas(userId, data.areaIds)
   }
   return { id: userId }
 }
 
 export async function deleteUser(userId: string, currentEmail: string) {
-  z.string().uuid().parse(userId)
-  const { data: alvo } = await supabaseAdmin
-    .from('profiles')
-    .select('email')
-    .eq('id', userId)
-    .maybeSingle()
+  idSchema.parse(userId)
+  const alvo = getProfileById(userId)
   if (alvo?.email && alvo.email === currentEmail) {
     throw new Error('Você não pode remover a si mesmo.')
   }
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
-  if (error) throw new Error(error.message)
+  // user_roles e leader_areas têm ON DELETE CASCADE.
+  deleteProfile(userId)
   return { ok: true }
 }
 
 export async function updateUserAreas(input: unknown) {
   const data = z
     .object({
-      userId: z.string().uuid(),
-      areaIds: z.array(z.string().uuid()).default([]),
+      userId: idSchema,
+      areaIds: z.array(idSchema).default([]),
     })
     .parse(input)
-  await supabaseAdmin.from('leader_areas').delete().eq('user_id', data.userId)
+  deleteLeaderAreas(data.userId)
   if (data.areaIds.length) {
-    const { error } = await supabaseAdmin
-      .from('leader_areas')
-      .insert(data.areaIds.map((area_id) => ({ user_id: data.userId, area_id })))
-    if (error) throw new Error(error.message)
+    insertLeaderAreas(data.userId, data.areaIds)
   }
   return { ok: true }
 }
@@ -157,19 +194,13 @@ export async function updateUserAreas(input: unknown) {
 // ── Configurações ─────────────────────────────────────────────────────────────
 
 export async function getConfiguracoes() {
-  const { data, error } = await supabaseAdmin
-    .from('configuracoes')
-    .select('*')
-    .order('chave')
-  if (error) throw new Error(error.message)
-  return data
+  return dbGetConfiguracoes().map((c) => ({
+    ...c,
+    valor: parseJson(c.valor),
+  }))
 }
 
 export async function updateConfiguracao(chave: string, valor: unknown, adminEmail: string) {
-  const { error } = await supabaseAdmin
-    .from('configuracoes')
-    .update({ valor: valor as never, updated_by: adminEmail })
-    .eq('chave', chave)
-  if (error) throw new Error(error.message)
+  dbUpdateConfiguracao(chave, valor, adminEmail)
   return { ok: true }
 }
