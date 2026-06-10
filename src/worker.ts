@@ -31,9 +31,8 @@ import {
 } from '@/lib/admin.functions'
 import { supabaseAdmin } from '@/integrations/supabase/client.server'
 
-interface Env {
-  ASSETS: { fetch: (req: Request) => Promise<Response> }
-}
+// No godeploy não há bindings nativos além das env vars (Record<string,string>).
+interface Env {}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +48,7 @@ function errorJson(message: string, status = 400): Response {
 }
 
 function getEmailFromRequest(request: Request): string | null {
-  const headerName = process.env.GODEPLOY_USER_HEADER ?? 'x-user-email'
+  const headerName = process.env.GODEPLOY_USER_HEADER ?? 'x-godeploy-user-email'
   return (
     request.headers.get(headerName) ??
     (process.env.NODE_ENV !== 'production' ? (process.env.DEV_USER_EMAIL ?? null) : null)
@@ -213,7 +212,12 @@ export default {
       return handleApi(request, url)
     }
 
-    // Serve a SPA estática; não_found → index.html (configurado via assetConfig)
-    return env.ASSETS.fetch(request)
+    // No godeploy os assets estáticos são servidos pela própria plataforma:
+    // requests de navegação que não casam com um asset caem no fallback SPA
+    // (assetConfig.not_found_handling = "single-page-application") e nunca
+    // chegam aqui. O worker só é invocado para /api/* e para requests de
+    // recurso sem asset correspondente (ex.: /favicon.ico) — devolvemos 404.
+    // (Não existe binding env.ASSETS no godeploy.)
+    return new Response('Not Found', { status: 404 })
   },
 }
