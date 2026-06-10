@@ -122,11 +122,10 @@ describe('Prompt fase doc_preview', () => {
 describe('Prompt fase saving (tipo saving)', () => {
   const savingPreenchido = {
     ...savingVazio(),
-    cargo: 'Analista Pleno' as const,
-    horas_antes: 40,
-    horas_depois: 2,
+    linhas: [
+      { cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 2, valor_hora: 29.90, economia_horas_mes: 38, economia_reais_mes: 1136.20 },
+    ],
     economia_horas_mes: 38,
-    valor_hora: 29.90,
     economia_reais_mes: 1136.20,
     tipo_saving: 'mensal' as const,
   };
@@ -174,7 +173,7 @@ describe('Prompt fase saving (tipo saving)', () => {
     const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
     expect(userMsg).toContain('[SISTEMA]');
     expect(userMsg).toContain('Analista Pleno');
-    expect(userMsg).toContain('40h/mês');
+    expect(userMsg).toContain('40h→2h');
   });
 });
 

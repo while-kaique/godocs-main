@@ -224,12 +224,15 @@ DETALHES TÉCNICOS APROVADOS:
 - Fluxo: ${coletado.fluxo}
 - Ferramenta: ${ctx.ferramenta}`;
 
-  // Tipo "saving" — com dados determinísticos pré-preenchidos
-  const horasAntes = saving.horas_antes ?? 0;
-  const horasDepois = saving.horas_depois ?? 0;
-  const economiaHoras = saving.economia_horas_mes ?? (horasAntes - horasDepois);
-  const valorHora = saving.valor_hora ?? 0;
-  const economiaReais = saving.economia_reais_mes ?? (economiaHoras * valorHora);
+  // Tipo "saving" — uma ou mais pessoas/cargos executavam a tarefa manualmente.
+  const linhas = saving.linhas ?? [];
+  const totalHoras = saving.economia_horas_mes ?? linhas.reduce((s, l) => s + l.economia_horas_mes, 0);
+  const tabelaLinhas = linhas.length
+    ? linhas
+        .map((l, i) => `  ${i + 1}. ${l.cargo}: ${l.horas_antes}h/mês antes → ${l.horas_depois}h/mês depois (economia ${l.economia_horas_mes}h/mês)`)
+        .join('\n')
+    : '  (nenhuma pessoa informada)';
+  const plural = linhas.length > 1;
 
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo.
@@ -237,40 +240,39 @@ A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VAL
 ${detalhes}
 
 DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
-- Cargo de quem executava a tarefa: ${saving.cargo ?? 'não informado'}
-- Horas gastas antes da automação: ${horasAntes}h/mês
-- Horas gastas após a automação: ${horasDepois}h/mês
-- Economia de horas: ${economiaHoras}h/mês
+Pessoas que executavam a tarefa manualmente (${linhas.length}):
+${tabelaLinhas}
+- Economia total declarada: ${totalHoras}h/mês
 - Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${saving.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'economia única'})
 
-O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA — NÃO MENCIONE valores em R$ para o usuário. Foque apenas nas HORAS.
+O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA (taxa por cargo) — NÃO MENCIONE valores em R$ para o usuário. Foque apenas nas HORAS.
 
-SEU OBJETIVO: validar que as ${horasAntes}h/mês ANTES da automação são reais e justificáveis, e montar o memorial_calculo.
+SEU OBJETIVO: validar que as horas ANTES da automação ${plural ? 'de CADA pessoa listada são' : 'são'} reais e justificáveis, e montar o memorial_calculo.
 
 ESTADO ATUAL:
 ${JSON.stringify(saving, null, 2)}
 
 COMO CONDUZIR:
-1. Comece perguntando sobre o processo manual: o que exatamente era feito nessas ${horasAntes}h por mês? Detalhe a rotina passo a passo.
+1. Comece perguntando sobre o processo manual: o que exatamente era feito nessas horas por mês? Detalhe a rotina passo a passo.${plural ? '\n   Como há mais de uma pessoa, valide as horas de cada uma — pode agrupar a pergunta se a rotina for a mesma.' : ''}
 2. Faça UMA pergunta por vez, focada em fatos concretos sobre o processo manual anterior.
-3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever.
+3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
 4. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
 
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
-- NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina manual: quais tarefas, com que frequência, quanto tempo cada uma, quantas pessoas executavam.
-- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se ele informou ${horasAntes}h, aponte a discrepância e peça para explicar.
-- Se a estimativa parecer inflada para o tipo de tarefa, questione diretamente.
+- NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina manual: quais tarefas, com que frequência, quanto tempo cada uma, quem executava.
+- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se a hora informada destoar, aponte a discrepância e peça para explicar.
+- Se a estimativa de alguma pessoa parecer inflada para o tipo de tarefa, questione diretamente aquela linha.
 - Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), muitas horas manuais não fazem sentido. Desafie.
-- Se após o detalhamento as horas reais forem diferentes das informadas, atualize economia_horas_mes no saving e recalcule.
+- Se após o detalhamento as horas reais de alguma pessoa forem diferentes, atualize horas_antes/horas_depois/economia_horas_mes daquela linha em \`linhas\` e recalcule o total \`economia_horas_mes\`.
 
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Saving deve refletir ganho REAL e comprovável.
 - Se o processo manual não existia, saving de horas é 0.
-- O memorial precisa ter lógica verificável: frequência × tempo × pessoas = total de horas.
+- O memorial precisa ter lógica verificável por pessoa: frequência × tempo = horas; soma das pessoas = total.
 
 Português brasileiro, tom direto. Acentuação correta.
 
-FORMATO — APENAS JSON válido:
+FORMATO — APENAS JSON válido (sempre devolva o objeto \`saving\` completo, incluindo o array \`linhas\`):
 
 Pergunta:
 {"type":"question","content":"sua pergunta","saving":{...campos atualizados}}
@@ -279,7 +281,7 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
 Preview (quando justificativa concreta e memorial completo):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown com a lógica completa...\\n\\n**Resumo:**\\n- Economia: ${economiaHoras}h/mês\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}h/mês\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
 }
 
 function buildSavingPreviewPrompt(saving: SavingColetado): string {
@@ -365,12 +367,15 @@ export async function runOrchestrator(
       }
       messages.push({ role: 'user', content: sistemaMsg });
     } else if (fase === 'saving') {
-      const horasAntes = saving.horas_antes ?? 0;
-      const horasDepois = saving.horas_depois ?? 0;
-      const economiaHoras = horasAntes - horasDepois;
+      const linhas = saving.linhas ?? [];
+      const economiaHoras = saving.economia_horas_mes ?? linhas.reduce((s, l) => s + l.economia_horas_mes, 0);
+      const resumoLinhas = linhas.length
+        ? linhas.map((l) => `${l.cargo} (${l.horas_antes}h→${l.horas_depois}h)`).join(', ')
+        : 'nenhuma pessoa informada';
+      const muitas = linhas.length > 1;
       messages.push({
         role: 'user',
-        content: `[SISTEMA] O usuário informou: cargo "${saving.cargo ?? '?'}", ${horasAntes}h/mês antes da automação, ${horasDepois}h/mês depois. Economia declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente nessas ${horasAntes}h. Sempre termine com uma pergunta.`,
+        content: `[SISTEMA] O usuário informou ${linhas.length} pessoa(s) que executavam a tarefa: ${resumoLinhas}. Economia total declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente${muitas ? ' (validaremos as horas de cada pessoa)' : ` nessas ${economiaHoras}h`}. Sempre termine com uma pergunta.`,
       });
     } else if (fase === 'receita') {
       messages.push({

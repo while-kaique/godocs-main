@@ -386,14 +386,20 @@ function SubmeterPage() {
           : parseFloat(formData.custoExterno)
         : undefined;
 
+      const linhas = formData.linhas
+        .filter((l) => l.cargo && l.horasAntes !== "" && l.horasDepois !== "")
+        .map((l) => ({
+          cargo: l.cargo,
+          horas_antes: parseFloat(l.horasAntes),
+          horas_depois: parseFloat(l.horasDepois),
+        }));
+
       const result = await apiFetch<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-saving",
         {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual",
-          cargo: formData.cargo || undefined,
-          horas_antes: formData.horasAntes ? parseFloat(formData.horasAntes) : undefined,
-          horas_depois: formData.horasDepois ? parseFloat(formData.horasDepois) : undefined,
+          linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
         },
       );
