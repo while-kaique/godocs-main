@@ -52,8 +52,8 @@ describe('Arquivos de infraestrutura existem', () => {
     'integrations/supabase/client.server.ts',
     'integrations/supabase/types.ts',
     'router.tsx',
-    'server.ts',
-    'start.ts',
+    'main.tsx',
+    'worker.ts',
     'styles.css',
   ];
 

@@ -1,11 +1,10 @@
-// Server functions para o chat interativo
-// Conecta o frontend com o sistema de agentes
+// Funções de negócio do chat — sem dependência de TanStack Start.
+// Chamadas diretamente pelo worker (src/worker.ts).
 // Fluxo: doc → doc_preview → saving → saving_preview → completo
 
 const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${fn}]`, ...args);
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
 
-import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
@@ -69,7 +68,6 @@ type EstadoChat = {
   receita: ReceitaColetada;
 };
 
-/** Extrai fase + estado mais recente das mensagens do assistente */
 function extrairEstado(messages: { role: string; content: string }[]): EstadoChat {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
@@ -89,7 +87,6 @@ function extrairEstado(messages: { role: string; content: string }[]): EstadoCha
   return { fase: 'doc', coletado: documentacaoVazia(), saving: savingVazio(), receita: receitaVazia() };
 }
 
-/** Monta histórico limpo para o LLM (sem JSON interno) */
 function buildHistory(msgs: { role: string; content: string }[]): ChatHistoryMessage[] {
   return msgs
     .filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -106,7 +103,6 @@ function buildHistory(msgs: { role: string; content: string }[]): ChatHistoryMes
     });
 }
 
-/** Extrai o resumo do projeto da mensagem de transição doc→saving ou doc→receita */
 function extrairResumoProjeto(msgs: { role: string; content: string }[]): string {
   for (let i = msgs.length - 1; i >= 0; i--) {
     const msg = msgs[i];
@@ -123,7 +119,6 @@ function extrairResumoProjeto(msgs: { role: string; content: string }[]): string
   return '';
 }
 
-/** Filtra histórico mantendo apenas mensagens a partir da última transição de fase relevante */
 function buildPhaseHistory(
   msgs: { role: string; content: string }[],
   targetFase: 'saving' | 'receita',
@@ -145,7 +140,6 @@ function buildPhaseHistory(
   return buildHistory(phaseMsgs);
 }
 
-/** Formata a resposta do orquestrador para o frontend */
 function formatResponse(resultado: ReturnType<typeof runOrchestrator> extends Promise<infer R> ? R : never) {
   return {
     type: resultado.type,
@@ -162,612 +156,554 @@ function formatResponse(resultado: ReturnType<typeof runOrchestrator> extends Pr
   };
 }
 
-/** Deriva os tipos de projeto do contexto, garantindo fallback */
 function getTiposProjeto(ctx: ProjetoContexto): ('saving' | 'receita_incremental')[] {
   if (ctx.tipos_projeto && ctx.tipos_projeto.length > 0) return ctx.tipos_projeto;
   if (ctx.tipo_projeto) return [ctx.tipo_projeto];
   return ['saving'];
 }
 
-// ─── Iniciar submissão: cria projeto + extrai doc + inicia agente ────────────
+// ─── Schemas de validação de entrada ────────────────────────────────────────
 
-export const iniciarSubmissaoFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        responsavel_nome: z.string().min(1).max(120),
-        responsavel_email: z.string().email().max(255),
-        area_id: z.string().uuid().optional(),
-        area: z.string().min(1).max(100),
-        ferramenta: z.string().min(1).max(200),
-        escopo: z.enum(['interno', 'externo']).optional(),
-        servico_externo: z.string().max(200).optional(),
-        membros: z.array(z.string()).default([]),
-        nome_projeto: z.string().min(1).max(200),
-        data_criacao: z.string(),
-        tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
-        tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
-        descricao_breve: z.string().max(1000).optional(),
-        docs: z.array(
-          z.object({ base64: z.string().min(1), filename: z.string().min(1) })
-        ).min(1).max(5000),
-      })
-      .parse(d)
-  )
-  .handler(async ({ data }) => {
-    log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
+const iniciarSubmissaoSchema = z.object({
+  responsavel_nome: z.string().min(1).max(120),
+  responsavel_email: z.string().email().max(255),
+  area_id: z.string().uuid().optional(),
+  area: z.string().min(1).max(100),
+  ferramenta: z.string().min(1).max(200),
+  escopo: z.enum(['interno', 'externo']).optional(),
+  servico_externo: z.string().max(200).optional(),
+  membros: z.array(z.string()).default([]),
+  nome_projeto: z.string().min(1).max(200),
+  data_criacao: z.string(),
+  tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
+  tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
+  descricao_breve: z.string().max(1000).optional(),
+  docs: z.array(
+    z.object({ base64: z.string().min(1), filename: z.string().min(1) })
+  ).min(1).max(5000),
+});
 
-    // 1. Cria o projeto no banco
-    const { data: projeto, error: projErr } = await supabaseAdmin
-      .from('projetos')
-      .insert({
-        responsavel_nome: data.responsavel_nome,
-        responsavel_email: data.responsavel_email,
-        area_id: data.area_id,
-        area: data.area,
-        ferramenta: data.ferramenta,
-        escopo: data.escopo ?? null,
-        servico_externo: data.servico_externo ?? null,
-        membros: data.membros,
-        nome: data.nome_projeto,
-        data_criacao_projeto: data.data_criacao,
-        tipo_projeto: data.tipo_projeto ?? null,
-        tipos_projeto: data.tipos_projeto ?? null,
-        descricao_breve: data.descricao_breve ?? null,
-        status: 'rascunho',
-      })
-      .select()
-      .single();
+const enviarMensagemSchema = z.object({
+  projeto_id: z.string().uuid(),
+  content: z.string().min(1).max(4000),
+  selected_option: z.number().optional(),
+});
 
-    if (projErr || !projeto) {
-      err('iniciarSubmissao', 'Falha ao criar projeto:', projErr);
-      throw new Error(`Falha ao criar projeto: ${projErr?.message ?? 'erro desconhecido'}`);
-    }
-    log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
+const iniciarSavingSchema = z.object({
+  projeto_id: z.string().uuid(),
+  tipo_saving: z.enum(['mensal', 'pontual']),
+  cargo: z.string().optional(),
+  horas_antes: z.number().min(0).optional(),
+  horas_depois: z.number().min(0).optional(),
+  custo_externo_mensal: z.number().min(0).optional(),
+});
 
-    // 2. Extrai texto de todos os arquivos
-    let docTexto = '';
-    try {
-      docTexto = await extractTextFromMultipleFiles(data.docs);
-      log('iniciarSubmissao', `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`);
-    } catch (extractErr) {
-      err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
-      docTexto = '';
-    }
+const iniciarReceitaSchema = z.object({
+  projeto_id: z.string().uuid(),
+  tipo_saving: z.enum(['mensal', 'pontual']),
+});
 
-    // 3. Salva o texto da doc como mensagem especial (role='doc')
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: projeto.id,
-      role: 'doc',
-      content: docTexto || '(documento sem texto legível)',
-    });
+const submeterValidacaoSchema = z.object({ projeto_id: z.string().uuid() });
 
-    // 4. Monta contexto
-    const ctx: ProjetoContexto = {
+// ─── Iniciar submissão ───────────────────────────────────────────────────────
+
+export async function iniciarSubmissao(rawData: unknown) {
+  const data = iniciarSubmissaoSchema.parse(rawData);
+  log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
+
+  const { data: projeto, error: projErr } = await supabaseAdmin
+    .from('projetos')
+    .insert({
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
-      area: null,
+      area_id: data.area_id,
+      area: data.area,
       ferramenta: data.ferramenta,
-      membros: data.membros,
-      nome_projeto: data.nome_projeto,
-      data_criacao: data.data_criacao,
-      doc_texto: docTexto || null,
-      descricao_breve: data.descricao_breve ?? null,
-      tipo_projeto: data.tipo_projeto ?? null,
       escopo: data.escopo ?? null,
-    };
+      servico_externo: data.servico_externo ?? null,
+      membros: data.membros,
+      nome: data.nome_projeto,
+      data_criacao_projeto: data.data_criacao,
+      tipo_projeto: data.tipo_projeto ?? null,
+      tipos_projeto: data.tipos_projeto ?? null,
+      descricao_breve: data.descricao_breve ?? null,
+      status: 'rascunho',
+    })
+    .select()
+    .single();
 
-    // 5. Extrator: preenche os 7 campos numa chamada única antes do chat
-    let coletadoInicial: DocumentacaoColetada = {
-      ...documentacaoVazia(),
-      nome_projeto: data.nome_projeto,
-    };
+  if (projErr || !projeto) {
+    err('iniciarSubmissao', 'Falha ao criar projeto:', projErr);
+    throw new Error(`Falha ao criar projeto: ${projErr?.message ?? 'erro desconhecido'}`);
+  }
+  log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
-    if (docTexto || data.descricao_breve) {
-      try {
-        log('iniciarSubmissao', 'Rodando extrator automático...');
-        coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
-        const preenchidos = Object.values(coletadoInicial).filter(v => v !== null).length;
-        log('iniciarSubmissao', `Extrator: ${preenchidos}/7 campos preenchidos`);
-      } catch (extractorErr) {
-        err('iniciarSubmissao', 'Extrator falhou — continuando sem pré-preenchimento:', extractorErr);
-        coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
-      }
-    }
+  let docTexto = '';
+  try {
+    docTexto = await extractTextFromMultipleFiles(data.docs);
+    log('iniciarSubmissao', `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`);
+  } catch (extractErr) {
+    err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
+    docTexto = '';
+  }
 
-    // 7. Roda orquestrador — primeira mensagem do agente (fase doc)
-    log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
-    const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
-
-    // 8. Salva resposta do assistente
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: projeto.id,
-      role: 'assistant',
-      content: JSON.stringify(resultado),
-      options: resultado.type === 'options' ? resultado.options : null,
-    });
-
-    // ── LOG DE CONVERSA ──
-    const respContent = resultado.type === 'options'
-      ? (resultado as { question: string }).question
-      : (resultado as { content: string }).content;
-    console.log('\n┌─────────────────────────────────────────────');
-    console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
-    console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
-    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
-    console.log('│ 🤖 IA:');
-    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-    console.log('└─────────────────────────────────────────────\n');
-
-    return {
-      projeto_id: projeto.id,
-      response: formatResponse(resultado),
-    };
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: projeto.id,
+    role: 'doc',
+    content: docTexto || '(documento sem texto legível)',
   });
 
-// ─── Enviar mensagem no chat ────────────────────────────────────────────────
+  const ctx: ProjetoContexto = {
+    responsavel_nome: data.responsavel_nome,
+    responsavel_email: data.responsavel_email,
+    area: null,
+    ferramenta: data.ferramenta,
+    membros: data.membros,
+    nome_projeto: data.nome_projeto,
+    data_criacao: data.data_criacao,
+    doc_texto: docTexto || null,
+    descricao_breve: data.descricao_breve ?? null,
+    tipo_projeto: data.tipo_projeto ?? null,
+    escopo: data.escopo ?? null,
+  };
 
-export const enviarMensagemFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        projeto_id: z.string().uuid(),
-        content: z.string().min(1).max(4000),
-        selected_option: z.number().optional(),
-      })
-      .parse(d)
-  )
-  .handler(async ({ data }) => {
-    log('enviarMensagem', `projeto=${data.projeto_id}`);
+  let coletadoInicial: DocumentacaoColetada = {
+    ...documentacaoVazia(),
+    nome_projeto: data.nome_projeto,
+  };
 
-    // 1. Salva mensagem do usuário
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: data.projeto_id,
-      role: 'user',
-      content: data.content,
-      selected_option: data.selected_option ?? null,
-    });
+  if (docTexto || data.descricao_breve) {
+    try {
+      log('iniciarSubmissao', 'Rodando extrator automático...');
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
+      const preenchidos = Object.values(coletadoInicial).filter(v => v !== null).length;
+      log('iniciarSubmissao', `Extrator: ${preenchidos}/7 campos preenchidos`);
+    } catch (extractorErr) {
+      err('iniciarSubmissao', 'Extrator falhou — continuando sem pré-preenchimento:', extractorErr);
+      coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
+    }
+  }
 
-    // 2. Busca histórico (exclui mensagens 'doc')
-    const { data: msgs } = await supabaseAdmin
-      .from('chat_messages')
-      .select('role, content')
+  log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
+  const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
+
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: projeto.id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
+  });
+
+  const respContent = resultado.type === 'options'
+    ? (resultado as { question: string }).question
+    : (resultado as { content: string }).content;
+  console.log('\n┌─────────────────────────────────────────────');
+  console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
+  console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
+  console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log('│ 🤖 IA:');
+  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+  console.log('└─────────────────────────────────────────────\n');
+
+  return {
+    projeto_id: projeto.id,
+    response: formatResponse(resultado),
+  };
+}
+
+// ─── Enviar mensagem ─────────────────────────────────────────────────────────
+
+export async function enviarMensagem(rawData: unknown) {
+  const data = enviarMensagemSchema.parse(rawData);
+  log('enviarMensagem', `projeto=${data.projeto_id}`);
+
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: data.projeto_id,
+    role: 'user',
+    content: data.content,
+    selected_option: data.selected_option ?? null,
+  });
+
+  const { data: msgs } = await supabaseAdmin
+    .from('chat_messages')
+    .select('role, content')
+    .eq('projeto_id', data.projeto_id)
+    .neq('role', 'doc')
+    .order('created_at');
+
+  const estado = extrairEstado(msgs ?? []);
+
+  let history: ChatHistoryMessage[];
+  let resumoProjeto = '';
+  if (estado.fase === 'saving' || estado.fase === 'saving_preview') {
+    history = buildPhaseHistory(msgs ?? [], 'saving');
+    resumoProjeto = extrairResumoProjeto(msgs ?? []);
+  } else if (estado.fase === 'receita' || estado.fase === 'receita_preview') {
+    history = buildPhaseHistory(msgs ?? [], 'receita');
+    resumoProjeto = extrairResumoProjeto(msgs ?? []);
+  } else {
+    history = buildHistory(msgs ?? []);
+  }
+
+  const ctx = await getProjetoContexto(data.projeto_id);
+  const tiposProjeto = getTiposProjeto(ctx);
+  log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
+
+  const resultado = await runOrchestrator(
+    ctx,
+    history,
+    estado.fase,
+    estado.coletado,
+    estado.saving,
+    resumoProjeto,
+    tiposProjeto,
+    estado.receita,
+  );
+
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: data.projeto_id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
+  });
+
+  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
+    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
+    try {
+      const doc = await compilarDocumentacao(ctx, resultado.coletado);
+      await supabaseAdmin.from('documentacao').upsert({
+        projeto_id: data.projeto_id,
+        conteudo: doc as never,
+      });
+      log('enviarMensagem', 'Documentação compilada e salva.');
+    } catch (compErr) {
+      err('enviarMensagem', 'Falha ao compilar:', compErr);
+    }
+  }
+
+  if (resultado.fase === 'completo') {
+    log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
+    const { data: docRow } = await supabaseAdmin
+      .from('documentacao')
+      .select('conteudo')
       .eq('projeto_id', data.projeto_id)
-      .neq('role', 'doc')
-      .order('created_at');
+      .single();
 
-    const estado = extrairEstado(msgs ?? []);
-
-    // Histórico filtrado: fases saving/receita começam limpos (histórico apenas da fase atual)
-    let history: ChatHistoryMessage[];
-    let resumoProjeto = '';
-    if (estado.fase === 'saving' || estado.fase === 'saving_preview') {
-      history = buildPhaseHistory(msgs ?? [], 'saving');
-      resumoProjeto = extrairResumoProjeto(msgs ?? []);
-    } else if (estado.fase === 'receita' || estado.fase === 'receita_preview') {
-      history = buildPhaseHistory(msgs ?? [], 'receita');
-      resumoProjeto = extrairResumoProjeto(msgs ?? []);
-    } else {
-      history = buildHistory(msgs ?? []);
+    if (docRow) {
+      const doc = docRow.conteudo as Record<string, unknown>;
+      const tiposProjetoCtx = getTiposProjeto(ctx);
+      if (tiposProjetoCtx.includes('saving')) doc.saving = resultado.saving;
+      if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
+      await supabaseAdmin.from('documentacao').upsert({
+        projeto_id: data.projeto_id,
+        conteudo: doc as never,
+      });
     }
 
-    // 3. Contexto do projeto
-    const ctx = await getProjetoContexto(data.projeto_id);
-    const tiposProjeto = getTiposProjeto(ctx);
-    log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
+    await supabaseAdmin
+      .from('projetos')
+      .update({ chat_completo: true })
+      .eq('id', data.projeto_id);
+  }
 
-    // 4. Roda o orquestrador na fase atual
-    const resultado = await runOrchestrator(
-      ctx,
-      history,
-      estado.fase,
-      estado.coletado,
-      estado.saving,
-      resumoProjeto,
-      tiposProjeto,
-      estado.receita,
-    );
+  const respContent2 = resultado.type === 'options'
+    ? (resultado as { question: string }).question
+    : (resultado as { content: string }).content;
+  console.log('\n┌─────────────────────────────────────────────');
+  console.log(`│ 💬 TURNO DE CONVERSA`);
+  console.log(`│ 🔄 Fase: ${estado.fase} → ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log('│ 👤 Usuário:');
+  data.content.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+  console.log('│ 🤖 IA:');
+  respContent2.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+  if (resultado.type === 'options') {
+    console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(' | ')}`);
+  }
+  const campos = resultado.coletado;
+  const preenchidos = Object.entries(campos).filter(([, v]) => v !== null).map(([k]) => k);
+  const vazios = Object.entries(campos).filter(([, v]) => v === null).map(([k]) => k);
+  console.log(`│ ✅ Preenchidos: ${preenchidos.join(', ') || 'nenhum'}`);
+  console.log(`│ ❌ Faltando: ${vazios.join(', ') || 'nenhum'}`);
+  console.log('└─────────────────────────────────────────────\n');
 
-    // 5. Salva resposta do assistente
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: data.projeto_id,
-      role: 'assistant',
-      content: JSON.stringify(resultado),
-      options: resultado.type === 'options' ? resultado.options : null,
-    });
+  return formatResponse(resultado);
+}
 
-    // 6. Ações pós-transição
+// ─── Iniciar fase saving ─────────────────────────────────────────────────────
 
-    // Doc aprovada → compila documentação (seja para saving ou receita)
-    if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
-      log('enviarMensagem', 'Doc aprovada — compilando documentação...');
-      try {
-        const doc = await compilarDocumentacao(ctx, resultado.coletado);
-        await supabaseAdmin.from('documentacao').upsert({
-          projeto_id: data.projeto_id,
-          conteudo: doc as never,
-        });
-        log('enviarMensagem', 'Documentação compilada e salva.');
-      } catch (compErr) {
-        err('enviarMensagem', 'Falha ao compilar:', compErr);
-      }
-    }
+export async function iniciarSaving(rawData: unknown) {
+  const data = iniciarSavingSchema.parse(rawData);
+  log('iniciarSaving', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
-    // Fluxo completo → salva saving e/ou receita na doc e marca projeto
-    if (resultado.fase === 'completo') {
-      log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
-      const { data: docRow } = await supabaseAdmin
-        .from('documentacao')
-        .select('conteudo')
-        .eq('projeto_id', data.projeto_id)
-        .single();
+  const ctx = await getProjetoContexto(data.projeto_id);
+  const tiposProjeto = getTiposProjeto(ctx);
 
-      if (docRow) {
-        const doc = docRow.conteudo as Record<string, unknown>;
-        const tiposProjeto = getTiposProjeto(ctx);
-        if (tiposProjeto.includes('saving')) doc.saving = resultado.saving;
-        if (tiposProjeto.includes('receita_incremental')) doc.receita = resultado.receita;
-        await supabaseAdmin.from('documentacao').upsert({
-          projeto_id: data.projeto_id,
-          conteudo: doc as never,
-        });
-      }
+  let saving = savingVazio();
+  saving.tipo_saving = data.tipo_saving;
 
-      await supabaseAdmin
-        .from('projetos')
-        .update({ chat_completo: true })
-        .eq('id', data.projeto_id);
-    }
+  if (tiposProjeto.includes('saving') && data.cargo && data.horas_antes != null && data.horas_depois != null) {
+    const cargoEntry = CARGOS.find(c => c.label === data.cargo);
+    const valorHora = cargoEntry?.valor_hora ?? null;
+    const economiaHoras = data.horas_antes - data.horas_depois;
+    const economiaReaisBruta = valorHora != null
+      ? Math.round(economiaHoras * valorHora * 100) / 100
+      : null;
+    const custoExterno = data.custo_externo_mensal ?? 0;
+    const economiaReais = economiaReaisBruta != null
+      ? Math.round((economiaReaisBruta - custoExterno) * 100) / 100
+      : null;
 
-    // ── LOG DE CONVERSA ──
-    const respContent2 = resultado.type === 'options'
-      ? (resultado as { question: string }).question
-      : (resultado as { content: string }).content;
-    console.log('\n┌─────────────────────────────────────────────');
-    console.log(`│ 💬 TURNO DE CONVERSA`);
-    console.log(`│ 🔄 Fase: ${estado.fase} → ${resultado.fase} | Tipo: ${resultado.type}`);
-    console.log('│ 👤 Usuário:');
-    data.content.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-    console.log('│ 🤖 IA:');
-    respContent2.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-    if (resultado.type === 'options') {
-      console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(' | ')}`);
-    }
-    const campos = resultado.coletado;
-    const preenchidos = Object.entries(campos).filter(([, v]) => v !== null).map(([k]) => k);
-    const vazios = Object.entries(campos).filter(([, v]) => v === null).map(([k]) => k);
-    console.log(`│ ✅ Preenchidos: ${preenchidos.join(', ') || 'nenhum'}`);
-    console.log(`│ ❌ Faltando: ${vazios.join(', ') || 'nenhum'}`);
-    console.log('└─────────────────────────────────────────────\n');
+    saving = {
+      ...saving,
+      cargo: data.cargo,
+      horas_antes: data.horas_antes,
+      horas_depois: data.horas_depois,
+      economia_horas_mes: economiaHoras,
+      valor_hora: valorHora,
+      economia_reais_mes: economiaReais,
+    };
+  }
 
-    return formatResponse(resultado);
+  const { data: msgs } = await supabaseAdmin
+    .from('chat_messages')
+    .select('role, content')
+    .eq('projeto_id', data.projeto_id)
+    .neq('role', 'doc')
+    .order('created_at');
+
+  const resumoProjeto = extrairResumoProjeto(msgs ?? []);
+  const estado = extrairEstado(msgs ?? []);
+
+  const resultado = await runOrchestrator(
+    ctx,
+    [],
+    'saving',
+    estado.coletado,
+    saving,
+    resumoProjeto,
+    tiposProjeto,
+  );
+
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: data.projeto_id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
   });
 
-// ─── Iniciar fase saving com dados determinísticos ─────────────────────────
+  const respContent = resultado.type === 'options'
+    ? (resultado as { question: string }).question
+    : (resultado as { content: string }).content;
+  console.log('\n┌─────────────────────────────────────────────');
+  console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
+  if (data.cargo) console.log(`│ 👤 Cargo: ${data.cargo}, Horas: ${data.horas_antes}→${data.horas_depois}`);
+  console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log('│ 🤖 IA:');
+  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+  console.log('└─────────────────────────────────────────────\n');
 
-export const iniciarSavingFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        projeto_id: z.string().uuid(),
-        tipo_saving: z.enum(['mensal', 'pontual']),
-        cargo: z.string().optional(),
-        horas_antes: z.number().min(0).optional(),
-        horas_depois: z.number().min(0).optional(),
-        custo_externo_mensal: z.number().min(0).optional(),
-      })
-      .parse(d)
-  )
-  .handler(async ({ data }) => {
-    log('iniciarSaving', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
-
-    // 1. Contexto do projeto
-    const ctx = await getProjetoContexto(data.projeto_id);
-    const tiposProjeto = getTiposProjeto(ctx);
-
-    // 2. Calcular valores para saving (se aplicável)
-    let saving = savingVazio();
-    saving.tipo_saving = data.tipo_saving;
-
-    if (tiposProjeto.includes('saving') && data.cargo && data.horas_antes != null && data.horas_depois != null) {
-      const cargoEntry = CARGOS.find(c => c.label === data.cargo);
-      const valorHora = cargoEntry?.valor_hora ?? null;
-      const economiaHoras = data.horas_antes - data.horas_depois;
-      const economiaReaisBruta = valorHora != null
-        ? Math.round(economiaHoras * valorHora * 100) / 100
-        : null;
-      const custoExterno = data.custo_externo_mensal ?? 0;
-      const economiaReais = economiaReaisBruta != null
-        ? Math.round((economiaReaisBruta - custoExterno) * 100) / 100
-        : null;
-
-      saving = {
-        ...saving,
-        cargo: data.cargo,
-        horas_antes: data.horas_antes,
-        horas_depois: data.horas_depois,
-        economia_horas_mes: economiaHoras,
-        valor_hora: valorHora,
-        economia_reais_mes: economiaReais,
-      };
-      if (custoExterno > 0) {
-        log('iniciarSaving', `Saving: ${economiaHoras}h × R$${valorHora} = R$${economiaReaisBruta} (bruto) − R$${custoExterno} (externo) = R$${economiaReais} (líquido)`);
-      } else {
-        log('iniciarSaving', `Saving calculado: ${economiaHoras}h × R$${valorHora} = R$${economiaReais}`);
-      }
-    }
-
-    // 3. Buscar histórico para extrair resumo do projeto
-    const { data: msgs } = await supabaseAdmin
-      .from('chat_messages')
-      .select('role, content')
-      .eq('projeto_id', data.projeto_id)
-      .neq('role', 'doc')
-      .order('created_at');
-
-    const resumoProjeto = extrairResumoProjeto(msgs ?? []);
-    const estado = extrairEstado(msgs ?? []);
-
-    // 4. Rodar orquestrador na fase saving
-    const resultado = await runOrchestrator(
-      ctx,
-      [],
-      'saving',
-      estado.coletado,
-      saving,
-      resumoProjeto,
-      tiposProjeto,
-    );
-
-    // 5. Salvar resposta do assistente
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: data.projeto_id,
-      role: 'assistant',
-      content: JSON.stringify(resultado),
-      options: resultado.type === 'options' ? resultado.options : null,
-    });
-
-    // ── LOG ──
-    const respContent = resultado.type === 'options'
-      ? (resultado as { question: string }).question
-      : (resultado as { content: string }).content;
-    console.log('\n┌─────────────────────────────────────────────');
-    console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
-    if (data.cargo) console.log(`│ 👤 Cargo: ${data.cargo}, Horas: ${data.horas_antes}→${data.horas_depois}`);
-    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
-    console.log('│ 🤖 IA:');
-    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-    console.log('└─────────────────────────────────────────────\n');
-
-    return formatResponse(resultado);
-  });
+  return formatResponse(resultado);
+}
 
 // ─── Iniciar fase receita incremental ────────────────────────────────────────
 
-export const iniciarReceitaFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        projeto_id: z.string().uuid(),
-        tipo_saving: z.enum(['mensal', 'pontual']),
-      })
-      .parse(d)
-  )
-  .handler(async ({ data }) => {
-    log('iniciarReceita', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+export async function iniciarReceita(rawData: unknown) {
+  const data = iniciarReceitaSchema.parse(rawData);
+  log('iniciarReceita', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
-    // 1. Contexto do projeto
-    const ctx = await getProjetoContexto(data.projeto_id);
-    const tiposProjeto = getTiposProjeto(ctx);
+  const ctx = await getProjetoContexto(data.projeto_id);
+  const tiposProjeto = getTiposProjeto(ctx);
 
-    // 2. Monta receitaVazia com tipo_saving
-    const receita = receitaVazia();
-    receita.tipo_saving = data.tipo_saving;
+  const receita = receitaVazia();
+  receita.tipo_saving = data.tipo_saving;
 
-    // 3. Buscar histórico
-    const { data: msgs } = await supabaseAdmin
-      .from('chat_messages')
-      .select('role, content')
-      .eq('projeto_id', data.projeto_id)
-      .neq('role', 'doc')
-      .order('created_at');
+  const { data: msgs } = await supabaseAdmin
+    .from('chat_messages')
+    .select('role, content')
+    .eq('projeto_id', data.projeto_id)
+    .neq('role', 'doc')
+    .order('created_at');
 
-    const resumoProjeto = extrairResumoProjeto(msgs ?? []);
-    const estado = extrairEstado(msgs ?? []);
+  const resumoProjeto = extrairResumoProjeto(msgs ?? []);
+  const estado = extrairEstado(msgs ?? []);
 
-    // 4. Rodar orquestrador na fase receita
-    const resultado = await runOrchestrator(
-      ctx,
-      [],
-      'receita',
-      estado.coletado,
-      estado.saving,
-      resumoProjeto,
-      tiposProjeto,
-      receita,
-    );
+  const resultado = await runOrchestrator(
+    ctx,
+    [],
+    'receita',
+    estado.coletado,
+    estado.saving,
+    resumoProjeto,
+    tiposProjeto,
+    receita,
+  );
 
-    // 5. Salvar resposta do assistente
-    await supabaseAdmin.from('chat_messages').insert({
-      projeto_id: data.projeto_id,
-      role: 'assistant',
-      content: JSON.stringify(resultado),
-      options: resultado.type === 'options' ? resultado.options : null,
-    });
-
-    const respContent = resultado.type === 'options'
-      ? (resultado as { question: string }).question
-      : (resultado as { content: string }).content;
-    console.log('\n┌─────────────────────────────────────────────');
-    console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
-    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
-    console.log('│ 🤖 IA:');
-    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-    console.log('└─────────────────────────────────────────────\n');
-
-    return formatResponse(resultado);
+  await supabaseAdmin.from('chat_messages').insert({
+    projeto_id: data.projeto_id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
   });
 
-// ─── Submeter projeto para validação ────────────────────────────────────────
+  const respContent = resultado.type === 'options'
+    ? (resultado as { question: string }).question
+    : (resultado as { content: string }).content;
+  console.log('\n┌─────────────────────────────────────────────');
+  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
+  console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log('│ 🤖 IA:');
+  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+  console.log('└─────────────────────────────────────────────\n');
 
-export const submeterParaValidacaoFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z.object({ projeto_id: z.string().uuid() }).parse(d)
-  )
-  .handler(async ({ data }) => {
-    log('submeterParaValidacao', `projeto=${data.projeto_id}`);
+  return formatResponse(resultado);
+}
 
-    // 1. Busca documentação + saving
-    const { data: docRow } = await supabaseAdmin
-      .from('documentacao')
-      .select('conteudo')
-      .eq('projeto_id', data.projeto_id)
-      .single();
+// ─── Submeter para validação ─────────────────────────────────────────────────
 
-    if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
+export async function submeterParaValidacao(rawData: unknown) {
+  const { projeto_id } = submeterValidacaoSchema.parse(rawData);
+  log('submeterParaValidacao', `projeto=${projeto_id}`);
 
-    const conteudo = docRow.conteudo as Record<string, unknown>;
-    const saving = conteudo.saving as Record<string, unknown> | undefined;
+  const { data: docRow } = await supabaseAdmin
+    .from('documentacao')
+    .select('conteudo')
+    .eq('projeto_id', projeto_id)
+    .single();
 
-    // 2. Busca dados do projeto para regras de negócio
-    const { data: projeto } = await supabaseAdmin
+  if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
+
+  const conteudo = docRow.conteudo as Record<string, unknown>;
+  const saving = conteudo.saving as Record<string, unknown> | undefined;
+
+  const { data: projeto } = await supabaseAdmin
+    .from('projetos')
+    .select('*')
+    .eq('id', projeto_id)
+    .single();
+
+  if (!projeto) throw new Error('Projeto não encontrado.');
+
+  if (projeto.nome) {
+    const { data: duplicata } = await supabaseAdmin
       .from('projetos')
-      .select('*')
-      .eq('id', data.projeto_id)
-      .single();
+      .select('id')
+      .eq('nome', projeto.nome)
+      .neq('id', projeto_id)
+      .neq('status', 'rascunho')
+      .limit(1);
 
-    if (!projeto) throw new Error('Projeto não encontrado.');
-
-    // 3. Verifica duplicata por nome
-    if (projeto.nome) {
-      const { data: duplicata } = await supabaseAdmin
-        .from('projetos')
-        .select('id')
-        .eq('nome', projeto.nome)
-        .neq('id', data.projeto_id)
-        .neq('status', 'rascunho')
-        .limit(1);
-
-      if (duplicata && duplicata.length > 0) {
-        throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
-      }
+    if (duplicata && duplicata.length > 0) {
+      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
     }
+  }
 
-    // 4. Auto-aprovação se área = RPA, senão em_validacao
-    const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
-    const now = new Date().toISOString();
+  const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
+  const now = new Date().toISOString();
 
-    // 5. Popula colunas de saving + atualiza status
-    await supabaseAdmin
-      .from('projetos')
-      .update({
-        status,
-        submitted_at: now,
-        saving_horas: saving?.economia_horas_mes as number ?? null,
-        saving_reais: saving?.economia_reais_mes as number ?? null,
-        tipo_saving: saving?.tipo_saving as string ?? null,
-        memorial_calculo: saving?.memorial_calculo as string ?? null,
-      })
-      .eq('id', data.projeto_id);
+  await supabaseAdmin
+    .from('projetos')
+    .update({
+      status,
+      submitted_at: now,
+      saving_horas: saving?.economia_horas_mes as number ?? null,
+      saving_reais: saving?.economia_reais_mes as number ?? null,
+      tipo_saving: saving?.tipo_saving as string ?? null,
+      memorial_calculo: saving?.memorial_calculo as string ?? null,
+    })
+    .eq('id', projeto_id);
 
-    log('submeterParaValidacao', `Status: ${status}, saving_horas: ${saving?.economia_horas_mes}, saving_reais: ${saving?.economia_reais_mes}`);
+  log('submeterParaValidacao', `Status: ${status}`);
 
-    // 6. Notificação Google Chat
-    const chatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
-    if (chatWebhookUrl) {
-      try {
-        const savingHoras = saving?.economia_horas_mes ?? 0;
-        const savingReais = saving?.economia_reais_mes ?? 0;
-        const fmtReais = Number(savingReais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const tipoSaving = saving?.tipo_saving ?? 'mensal';
-        const membros = Array.isArray(projeto.membros) ? (projeto.membros as string[]).join(', ') : '';
-
-        const text = [
-          '──────────────────────',
-          '',
-          '🚨 *Novo fluxo de automação cadastrado – aprovação pendente*',
-          '',
-          `📌 *Projeto:* ${projeto.nome}`,
-          `🏷️ *Área:* ${projeto.area ?? '—'}`,
-          `🛠️ *Ferramenta:* ${projeto.ferramenta}`,
-          '',
-          `👤 *Solicitante:* ${projeto.responsavel_nome}`,
-          `📧 *E-mail:* ${projeto.responsavel_email}`,
-          membros ? `👥 *Participantes:* ${membros}` : '',
-          '',
-          `⏱️ *Saving estimado (horas/mês):* ${savingHoras} horas`,
-          `💰 *Saving estimado (R$/mês):* R$ ${fmtReais}`,
-          `📊 *Tipo de saving:* ${tipoSaving}`,
-          '',
-          `📅 *Data da submissão:* ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
-          `📊 *Status:* ${status === 'aprovado' ? 'Aprovado (auto)' : 'Pendente'}`,
-          '',
-          '👉 *Aguardando avaliação e aprovação dos responsáveis.*',
-          '',
-          '──────────────────────',
-        ].filter(Boolean).join('\n');
-
-        await fetch(chatWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-        });
-        log('submeterParaValidacao', 'Notificação Google Chat enviada.');
-      } catch (chatErr) {
-        err('submeterParaValidacao', 'Falha ao enviar notificação Google Chat:', chatErr);
-        // Não bloqueia a submissão
-      }
-    } else {
-      log('submeterParaValidacao', 'GOOGLE_CHAT_WEBHOOK_URL não configurada — notificação ignorada.');
-    }
-
-    return { ok: true, status };
-  });
-
-// ─── Validar projeto (chamado pelo admin) ───────────────────────────────────
-
-export const validarProjetoFn = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) =>
-    z.object({ projeto_id: z.string().uuid() }).parse(d)
-  )
-  .handler(async ({ data }) => {
-    const { data: docRow } = await supabaseAdmin
-      .from('documentacao')
-      .select('conteudo')
-      .eq('projeto_id', data.projeto_id)
-      .single();
-
-    if (!docRow) throw new Error('Documentação não encontrada.');
-
-    const doc = docRow.conteudo as Parameters<typeof validarDocumentacao>[0];
-    const resultado = await validarDocumentacao(doc);
-
-    await supabaseAdmin.from('validacoes').insert({
-      projeto_id: data.projeto_id,
-      resultado: resultado.resultado,
-      parecer: resultado.parecer,
-      criterios: resultado.criterios as never,
-    });
-
-    const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
-    await supabaseAdmin
-      .from('projetos')
-      .update({ status: novoStatus, validated_at: new Date().toISOString() })
-      .eq('id', data.projeto_id);
-
+  const chatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
+  if (chatWebhookUrl) {
     try {
-      if (resultado.resultado === 'aprovado') {
-        await enviarEmailAprovacao(doc, resultado);
-      } else {
-        await enviarEmailRejeicao(doc, resultado);
-      }
-      await supabaseAdmin
-        .from('validacoes')
-        .update({ email_enviado: true })
-        .eq('projeto_id', data.projeto_id);
-    } catch (emailErr) {
-      console.error('[email-agent] Falha ao enviar email:', emailErr);
-    }
+      const savingHoras = saving?.economia_horas_mes ?? 0;
+      const savingReais = saving?.economia_reais_mes ?? 0;
+      const fmtReais = Number(savingReais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const tipoSaving = saving?.tipo_saving ?? 'mensal';
+      const membros = Array.isArray(projeto.membros) ? (projeto.membros as string[]).join(', ') : '';
 
-    return { resultado: resultado.resultado, parecer: resultado.parecer };
+      const text = [
+        '──────────────────────',
+        '',
+        '🚨 *Novo fluxo de automação cadastrado – aprovação pendente*',
+        '',
+        `📌 *Projeto:* ${projeto.nome}`,
+        `🏷️ *Área:* ${projeto.area ?? '—'}`,
+        `🛠️ *Ferramenta:* ${projeto.ferramenta}`,
+        '',
+        `👤 *Solicitante:* ${projeto.responsavel_nome}`,
+        `📧 *E-mail:* ${projeto.responsavel_email}`,
+        membros ? `👥 *Participantes:* ${membros}` : '',
+        '',
+        `⏱️ *Saving estimado (horas/mês):* ${savingHoras} horas`,
+        `💰 *Saving estimado (R$/mês):* R$ ${fmtReais}`,
+        `📊 *Tipo de saving:* ${tipoSaving}`,
+        '',
+        `📅 *Data da submissão:* ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
+        `📊 *Status:* ${status === 'aprovado' ? 'Aprovado (auto)' : 'Pendente'}`,
+        '',
+        '👉 *Aguardando avaliação e aprovação dos responsáveis.*',
+        '',
+        '──────────────────────',
+      ].filter(Boolean).join('\n');
+
+      await fetch(chatWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      log('submeterParaValidacao', 'Notificação Google Chat enviada.');
+    } catch (chatErr) {
+      err('submeterParaValidacao', 'Falha ao enviar notificação Google Chat:', chatErr);
+    }
+  }
+
+  return { ok: true, status };
+}
+
+// ─── Validar projeto ─────────────────────────────────────────────────────────
+
+export async function validarProjeto(rawData: unknown) {
+  const { projeto_id } = z.object({ projeto_id: z.string().uuid() }).parse(rawData);
+
+  const { data: docRow } = await supabaseAdmin
+    .from('documentacao')
+    .select('conteudo')
+    .eq('projeto_id', projeto_id)
+    .single();
+
+  if (!docRow) throw new Error('Documentação não encontrada.');
+
+  const doc = docRow.conteudo as Parameters<typeof validarDocumentacao>[0];
+  const resultado = await validarDocumentacao(doc);
+
+  await supabaseAdmin.from('validacoes').insert({
+    projeto_id,
+    resultado: resultado.resultado,
+    parecer: resultado.parecer,
+    criterios: resultado.criterios as never,
   });
+
+  const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
+  await supabaseAdmin
+    .from('projetos')
+    .update({ status: novoStatus, validated_at: new Date().toISOString() })
+    .eq('id', projeto_id);
+
+  try {
+    if (resultado.resultado === 'aprovado') {
+      await enviarEmailAprovacao(doc, resultado);
+    } else {
+      await enviarEmailRejeicao(doc, resultado);
+    }
+    await supabaseAdmin
+      .from('validacoes')
+      .update({ email_enviado: true })
+      .eq('projeto_id', projeto_id);
+  } catch (emailErr) {
+    console.error('[email-agent] Falha ao enviar email:', emailErr);
+  }
+
+  return { resultado: resultado.resultado, parecer: resultado.parecer };
+}

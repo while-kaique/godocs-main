@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn, iniciarSavingFn, iniciarReceitaFn } from "@/lib/chat.functions";
+import { apiFetch } from "@/lib/api-client";
 
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
@@ -241,8 +241,9 @@ function SubmeterPage() {
           ? `Outros: ${form.ferramentaOutra.trim()}`
           : form.ferramenta;
 
-      const result = await iniciarSubmissaoFn({
-        data: {
+      const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
+        "/api/chat/iniciar-submissao",
+        {
           responsavel_nome: form.nome.trim(),
           responsavel_email: form.email.trim(),
           area: form.area,
@@ -257,7 +258,7 @@ function SubmeterPage() {
           descricao_breve: form.descricaoBreve.trim() || undefined,
           docs,
         },
-      });
+      );
 
       setProjetoId(result.projeto_id);
 
@@ -301,13 +302,10 @@ function SubmeterPage() {
     }, 50);
 
     try {
-      const result = await enviarMensagemFn({
-        data: {
-          projeto_id: projetoId,
-          content,
-          selected_option: selectedOption,
-        },
-      });
+      const result = await apiFetch<ReturnType<typeof Object.create>>(
+        "/api/chat/enviar-mensagem",
+        { projeto_id: projetoId, content, selected_option: selectedOption },
+      );
 
       const newFase: ChatFase = result.fase ?? chatFase;
       const transitionToSaving = chatFase !== "saving" && newFase === "saving";
@@ -388,8 +386,9 @@ function SubmeterPage() {
           : parseFloat(formData.custoExterno)
         : undefined;
 
-      const result = await iniciarSavingFn({
-        data: {
+      const result = await apiFetch<ReturnType<typeof Object.create>>(
+        "/api/chat/iniciar-saving",
+        {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual",
           cargo: formData.cargo || undefined,
@@ -397,7 +396,7 @@ function SubmeterPage() {
           horas_depois: formData.horasDepois ? parseFloat(formData.horasDepois) : undefined,
           custo_externo_mensal: custoMensal,
         },
-      });
+      );
       setShowSavingForm(false);
       const savingMsg: ChatMessage = {
         role: "assistant",
@@ -423,12 +422,10 @@ function SubmeterPage() {
     if (!projetoId) return;
     setReceitaFormLoading(true);
     try {
-      const result = await iniciarReceitaFn({
-        data: {
-          projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
-        },
-      });
+      const result = await apiFetch<ReturnType<typeof Object.create>>(
+        "/api/chat/iniciar-receita",
+        { projeto_id: projetoId, tipo_saving: formData.tipoSaving as "mensal" | "pontual" },
+      );
       setShowReceitaForm(false);
       const receitaMsg: ChatMessage = {
         role: "assistant",
@@ -454,7 +451,7 @@ function SubmeterPage() {
     if (!projetoId) return;
     setSubmittingProject(true);
     try {
-      await submeterParaValidacaoFn({ data: { projeto_id: projetoId } });
+      await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId });
       setSubmitted(true);
     } catch (err) {
       console.error(err);
