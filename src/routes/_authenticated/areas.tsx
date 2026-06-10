@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -14,66 +14,51 @@ export const Route = createFileRoute("/_authenticated/areas")({
 });
 
 function AreasPage() {
-  const { user } = Route.useRouteContext();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [areas, setAreas] = useState<Area[] | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function load() {
-    const { data } = await supabase.from("areas").select("id,nome").order("nome");
-    setAreas(data ?? []);
+    try {
+      const data = await apiFetch<Area[]>("/api/admin/areas");
+      setAreas(data ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao carregar áreas.");
+      setAreas([]);
+    }
   }
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin_master")
-        .maybeSingle();
-      setIsAdmin(!!data);
-      if (data) await load();
-    })();
-  }, [user.id]);
+    load();
+  }, []);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (!novoNome.trim()) return;
     setLoading(true);
-    const { error } = await supabase
-      .from("areas")
-      .insert({ nome: novoNome.trim() });
-    setLoading(false);
-    if (error) toast.error(error.message);
-    else {
+    try {
+      await apiFetch("/api/admin/areas", { nome: novoNome.trim() });
       setNovoNome("");
       toast.success("Área criada.");
       load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao criar área.");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function remove(a: Area) {
     if (!confirm(`Remover área "${a.nome}"? Vínculos com leaders serão removidos.`))
       return;
-    const { error } = await supabase.from("areas").delete().eq("id", a.id);
-    if (error) toast.error(error.message);
-    else {
+    try {
+      await apiFetch("/api/admin/areas/remove", { id: a.id });
       toast.success("Área removida.");
       load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao remover área.");
     }
   }
-
-  if (isAdmin === null)
-    return <div className="p-8 text-muted-foreground">Carregando...</div>;
-  if (!isAdmin)
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold">Sem permissão</h1>
-        <p className="text-muted-foreground">Apenas Admin Master pode gerenciar áreas.</p>
-      </div>
-    );
 
   return (
     <div className="mx-auto max-w-3xl p-8">

@@ -48,9 +48,9 @@ describe('Arquivos do sistema de agentes existem', () => {
 
 describe('Arquivos de infraestrutura existem', () => {
   const requiredFiles = [
-    'integrations/supabase/client.ts',
-    'integrations/supabase/client.server.ts',
-    'integrations/supabase/types.ts',
+    'integrations/db/client.server.ts',
+    'integrations/db/schema.ts',
+    'integrations/db/types.ts',
     'router.tsx',
     'main.tsx',
     'worker.ts',
@@ -84,59 +84,67 @@ describe('package.json está consistente', () => {
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
     expect(deps['react']).toBeDefined();
     expect(deps['@tanstack/react-router']).toBeDefined();
-    expect(deps['@supabase/supabase-js']).toBeDefined();
+    expect(deps['better-sqlite3']).toBeDefined();
     expect(deps['zod']).toBeDefined();
     expect(deps['vitest']).toBeDefined();
   });
-});
 
-describe('Migrations do Supabase existem', () => {
-  const migrationsDir = path.resolve(__dirname, '../supabase/migrations');
-
-  it('diretório de migrations existe', () => {
-    expect(fs.existsSync(migrationsDir)).toBe(true);
-  });
-
-  it('tem pelo menos 4 migrations', () => {
-    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql'));
-    expect(files.length).toBeGreaterThanOrEqual(4);
+  it('não depende mais do Supabase', () => {
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    expect(deps['@supabase/supabase-js']).toBeUndefined();
   });
 });
 
-describe('Tipos do Supabase estão consistentes', () => {
-  const typesContent = fs.readFileSync(
-    path.join(SRC, 'integrations/supabase/types.ts'),
+describe('Schema SQLite está consistente', () => {
+  const schemaContent = fs.readFileSync(
+    path.join(SRC, 'integrations/db/schema.ts'),
     'utf-8'
   );
 
-  it('define tabela projetos', () => {
-    expect(typesContent).toContain('projetos');
+  it('cria tabela projetos', () => {
+    expect(schemaContent).toContain('CREATE TABLE IF NOT EXISTS projetos');
   });
 
-  it('define tabela documentacao', () => {
-    expect(typesContent).toContain('documentacao');
+  it('cria tabela documentacao', () => {
+    expect(schemaContent).toContain('CREATE TABLE IF NOT EXISTS documentacao');
   });
 
-  it('define tabela chat_messages', () => {
-    expect(typesContent).toContain('chat_messages');
+  it('cria tabela chat_messages', () => {
+    expect(schemaContent).toContain('CREATE TABLE IF NOT EXISTS chat_messages');
   });
 
-  it('define tabela validacoes', () => {
-    expect(typesContent).toContain('validacoes');
+  it('cria tabela validacoes', () => {
+    expect(schemaContent).toContain('CREATE TABLE IF NOT EXISTS validacoes');
   });
 
   it('define colunas de saving no projetos', () => {
-    expect(typesContent).toContain('saving_horas');
-    expect(typesContent).toContain('saving_reais');
-    expect(typesContent).toContain('tipo_saving');
-    expect(typesContent).toContain('memorial_calculo');
+    expect(schemaContent).toContain('saving_horas');
+    expect(schemaContent).toContain('saving_reais');
+    expect(schemaContent).toContain('tipo_saving');
+    expect(schemaContent).toContain('memorial_calculo');
   });
 
-  it('enum projeto_status inclui aprovado', () => {
-    expect(typesContent).toContain('"aprovado"');
+  it('status aceita aprovado', () => {
+    expect(schemaContent).toContain("'aprovado'");
   });
 
   it('projetos tem coluna area (texto)', () => {
-    expect(typesContent).toMatch(/area: string \| null/);
+    expect(schemaContent).toMatch(/area TEXT/);
+  });
+});
+
+describe('Tipos SQLite estão consistentes', () => {
+  const typesContent = fs.readFileSync(
+    path.join(SRC, 'integrations/db/types.ts'),
+    'utf-8'
+  );
+
+  it('enum projeto_status inclui aprovado', () => {
+    expect(typesContent).toContain("'aprovado'");
+  });
+
+  it('define colunas de saving', () => {
+    expect(typesContent).toContain('saving_horas');
+    expect(typesContent).toContain('memorial_calculo');
   });
 });

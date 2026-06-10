@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables, Enums } from "@/integrations/supabase/types";
+import { apiFetch } from "@/lib/api-client";
+import type { Projeto as ProjetoBase, ProjetoStatus } from "@/integrations/db/types";
 
-type Projeto = Tables<"projetos"> & { areas: { nome: string } | null };
-type Status = Enums<"projeto_status">;
+type Projeto = ProjetoBase & { areas: { nome: string } | null };
+type Status = ProjetoStatus;
 
 const STATUS_LABEL: Record<Status, string> = {
   rascunho: "Rascunho",
   em_validacao: "Em validação",
   validado: "Validado",
   rejeitado: "Rejeitado",
+  aprovado: "Aprovado",
 };
 
 const STATUS_COLOR: Record<Status, string> = {
@@ -18,6 +19,7 @@ const STATUS_COLOR: Record<Status, string> = {
   em_validacao: "bg-yellow-100 text-yellow-800",
   validado: "bg-green-100 text-green-800",
   rejeitado: "bg-red-100 text-red-800",
+  aprovado: "bg-green-100 text-green-800",
 };
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -30,14 +32,10 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from("projetos")
-      .select("*, areas(nome)")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        setProjetos((data ?? []) as Projeto[]);
-        setLoading(false);
-      });
+    apiFetch<Projeto[]>("/api/admin/projetos")
+      .then((data) => setProjetos(data ?? []))
+      .catch(() => setProjetos([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const contagem = (status: Status) =>
