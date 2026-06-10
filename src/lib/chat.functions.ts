@@ -19,9 +19,10 @@ import type {
   ChatHistoryMessage,
   DocumentacaoColetada,
   ProjetoContexto,
+  ReceitaColetada,
   SavingColetado,
 } from '@/lib/agents/types';
-import { documentacaoVazia, savingVazio, CARGOS } from '@/lib/agents/types';
+import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,10 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
 
   if (error || !data) throw new Error('Projeto não encontrado.');
 
+  const tiposProjeto = Array.isArray(data.tipos_projeto)
+    ? (data.tipos_projeto as ('saving' | 'receita_incremental')[])
+    : null;
+
   return {
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
@@ -52,6 +57,7 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     data_criacao: null,
     doc_texto: docMsg?.content ?? null,
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
+    tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
   };
 }
@@ -60,6 +66,7 @@ type EstadoChat = {
   fase: ChatFase;
   coletado: DocumentacaoColetada;
   saving: SavingColetado;
+  receita: ReceitaColetada;
 };
 
 /** Extrai fase + estado mais recente das mensagens do assistente */
@@ -73,12 +80,13 @@ function extrairEstado(messages: { role: string; content: string }[]): EstadoCha
         fase: parsed.fase ?? 'doc',
         coletado: parsed.coletado ?? documentacaoVazia(),
         saving: parsed.saving ?? savingVazio(),
+        receita: parsed.receita ?? receitaVazia(),
       };
     } catch {
       continue;
     }
   }
-  return { fase: 'doc', coletado: documentacaoVazia(), saving: savingVazio() };
+  return { fase: 'doc', coletado: documentacaoVazia(), saving: savingVazio(), receita: receitaVazia() };
 }
 
 /** Monta histórico limpo para o LLM (sem JSON interno) */
@@ -98,14 +106,14 @@ function buildHistory(msgs: { role: string; content: string }[]): ChatHistoryMes
     });
 }
 
-/** Extrai o resumo do projeto da mensagem de transição doc→saving */
+/** Extrai o resumo do projeto da mensagem de transição doc→saving ou doc→receita */
 function extrairResumoProjeto(msgs: { role: string; content: string }[]): string {
   for (let i = msgs.length - 1; i >= 0; i--) {
     const msg = msgs[i];
     if (msg.role !== 'assistant') continue;
     try {
       const parsed = JSON.parse(msg.content) as { type?: string; fase?: string; content?: string };
-      if (parsed.type === 'complete' && parsed.fase === 'saving' && parsed.content) {
+      if (parsed.type === 'complete' && (parsed.fase === 'saving' || parsed.fase === 'receita') && parsed.content) {
         return parsed.content;
       }
     } catch {
@@ -115,14 +123,17 @@ function extrairResumoProjeto(msgs: { role: string; content: string }[]): string
   return '';
 }
 
-/** Filtra histórico para manter apenas mensagens da fase saving */
-function buildSavingHistory(msgs: { role: string; content: string }[]): ChatHistoryMessage[] {
+/** Filtra histórico mantendo apenas mensagens a partir da última transição de fase relevante */
+function buildPhaseHistory(
+  msgs: { role: string; content: string }[],
+  targetFase: 'saving' | 'receita',
+): ChatHistoryMessage[] {
   let transitionIdx = -1;
   for (let i = 0; i < msgs.length; i++) {
     if (msgs[i].role !== 'assistant') continue;
     try {
       const parsed = JSON.parse(msgs[i].content) as { type?: string; fase?: string };
-      if (parsed.type === 'complete' && parsed.fase === 'saving') {
+      if (parsed.type === 'complete' && parsed.fase === targetFase) {
         transitionIdx = i;
         break;
       }
@@ -130,9 +141,8 @@ function buildSavingHistory(msgs: { role: string; content: string }[]): ChatHist
       continue;
     }
   }
-
-  const savingMsgs = transitionIdx >= 0 ? msgs.slice(transitionIdx + 1) : msgs;
-  return buildHistory(savingMsgs);
+  const phaseMsgs = transitionIdx >= 0 ? msgs.slice(transitionIdx + 1) : msgs;
+  return buildHistory(phaseMsgs);
 }
 
 /** Formata a resposta do orquestrador para o frontend */
@@ -148,7 +158,15 @@ function formatResponse(resultado: ReturnType<typeof runOrchestrator> extends Pr
     isComplete: resultado.fase === 'completo',
     coletado: resultado.coletado,
     saving: resultado.saving,
+    receita: resultado.receita,
   };
+}
+
+/** Deriva os tipos de projeto do contexto, garantindo fallback */
+function getTiposProjeto(ctx: ProjetoContexto): ('saving' | 'receita_incremental')[] {
+  if (ctx.tipos_projeto && ctx.tipos_projeto.length > 0) return ctx.tipos_projeto;
+  if (ctx.tipo_projeto) return [ctx.tipo_projeto];
+  return ['saving'];
 }
 
 // ─── Iniciar submissão: cria projeto + extrai doc + inicia agente ────────────
@@ -320,17 +338,23 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
 
     const estado = extrairEstado(msgs ?? []);
 
-    // Histórico filtrado: na fase saving, agente 2 começa limpo
-    const isSavingFase = estado.fase === 'saving' || estado.fase === 'saving_preview';
-    const history = isSavingFase
-      ? buildSavingHistory(msgs ?? [])
-      : buildHistory(msgs ?? []);
-
-    const resumoProjeto = isSavingFase ? extrairResumoProjeto(msgs ?? []) : '';
+    // Histórico filtrado: fases saving/receita começam limpos (histórico apenas da fase atual)
+    let history: ChatHistoryMessage[];
+    let resumoProjeto = '';
+    if (estado.fase === 'saving' || estado.fase === 'saving_preview') {
+      history = buildPhaseHistory(msgs ?? [], 'saving');
+      resumoProjeto = extrairResumoProjeto(msgs ?? []);
+    } else if (estado.fase === 'receita' || estado.fase === 'receita_preview') {
+      history = buildPhaseHistory(msgs ?? [], 'receita');
+      resumoProjeto = extrairResumoProjeto(msgs ?? []);
+    } else {
+      history = buildHistory(msgs ?? []);
+    }
 
     // 3. Contexto do projeto
     const ctx = await getProjetoContexto(data.projeto_id);
-    log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs`);
+    const tiposProjeto = getTiposProjeto(ctx);
+    log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
 
     // 4. Roda o orquestrador na fase atual
     const resultado = await runOrchestrator(
@@ -340,7 +364,8 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       estado.coletado,
       estado.saving,
       resumoProjeto,
-      ctx.tipo_projeto ?? null
+      tiposProjeto,
+      estado.receita,
     );
 
     // 5. Salva resposta do assistente
@@ -353,8 +378,8 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
 
     // 6. Ações pós-transição
 
-    // Doc aprovada → compila documentação
-    if (resultado.fase === 'saving' && estado.fase === 'doc_preview') {
+    // Doc aprovada → compila documentação (seja para saving ou receita)
+    if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
       log('enviarMensagem', 'Doc aprovada — compilando documentação...');
       try {
         const doc = await compilarDocumentacao(ctx, resultado.coletado);
@@ -368,9 +393,9 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
       }
     }
 
-    // Fluxo completo → salva saving na doc e marca projeto
+    // Fluxo completo → salva saving e/ou receita na doc e marca projeto
     if (resultado.fase === 'completo') {
-      log('enviarMensagem', 'Fluxo completo — salvando saving...');
+      log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
       const { data: docRow } = await supabaseAdmin
         .from('documentacao')
         .select('conteudo')
@@ -379,7 +404,9 @@ export const enviarMensagemFn = createServerFn({ method: 'POST' })
 
       if (docRow) {
         const doc = docRow.conteudo as Record<string, unknown>;
-        doc.saving = resultado.saving;
+        const tiposProjeto = getTiposProjeto(ctx);
+        if (tiposProjeto.includes('saving')) doc.saving = resultado.saving;
+        if (tiposProjeto.includes('receita_incremental')) doc.receita = resultado.receita;
         await supabaseAdmin.from('documentacao').upsert({
           projeto_id: data.projeto_id,
           conteudo: doc as never,
@@ -436,13 +463,13 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
 
     // 1. Contexto do projeto
     const ctx = await getProjetoContexto(data.projeto_id);
-    const tipoProjeto = ctx.tipo_projeto ?? null;
+    const tiposProjeto = getTiposProjeto(ctx);
 
     // 2. Calcular valores para saving (se aplicável)
     let saving = savingVazio();
     saving.tipo_saving = data.tipo_saving;
 
-    if (tipoProjeto === 'saving' && data.cargo && data.horas_antes != null && data.horas_depois != null) {
+    if (tiposProjeto.includes('saving') && data.cargo && data.horas_antes != null && data.horas_depois != null) {
       const cargoEntry = CARGOS.find(c => c.label === data.cargo);
       const valorHora = cargoEntry?.valor_hora ?? null;
       const economiaHoras = data.horas_antes - data.horas_depois;
@@ -489,7 +516,7 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
       estado.coletado,
       saving,
       resumoProjeto,
-      tipoProjeto
+      tiposProjeto,
     );
 
     // 5. Salvar resposta do assistente
@@ -505,8 +532,74 @@ export const iniciarSavingFn = createServerFn({ method: 'POST' })
       ? (resultado as { question: string }).question
       : (resultado as { content: string }).content;
     console.log('\n┌─────────────────────────────────────────────');
-    console.log(`│ 💰 INÍCIO SAVING: tipo_projeto=${tipoProjeto}, tipo_saving=${data.tipo_saving}`);
+    console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
     if (data.cargo) console.log(`│ 👤 Cargo: ${data.cargo}, Horas: ${data.horas_antes}→${data.horas_depois}`);
+    console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+    console.log('│ 🤖 IA:');
+    respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
+    console.log('└─────────────────────────────────────────────\n');
+
+    return formatResponse(resultado);
+  });
+
+// ─── Iniciar fase receita incremental ────────────────────────────────────────
+
+export const iniciarReceitaFn = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        projeto_id: z.string().uuid(),
+        tipo_saving: z.enum(['mensal', 'pontual']),
+      })
+      .parse(d)
+  )
+  .handler(async ({ data }) => {
+    log('iniciarReceita', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+
+    // 1. Contexto do projeto
+    const ctx = await getProjetoContexto(data.projeto_id);
+    const tiposProjeto = getTiposProjeto(ctx);
+
+    // 2. Monta receitaVazia com tipo_saving
+    const receita = receitaVazia();
+    receita.tipo_saving = data.tipo_saving;
+
+    // 3. Buscar histórico
+    const { data: msgs } = await supabaseAdmin
+      .from('chat_messages')
+      .select('role, content')
+      .eq('projeto_id', data.projeto_id)
+      .neq('role', 'doc')
+      .order('created_at');
+
+    const resumoProjeto = extrairResumoProjeto(msgs ?? []);
+    const estado = extrairEstado(msgs ?? []);
+
+    // 4. Rodar orquestrador na fase receita
+    const resultado = await runOrchestrator(
+      ctx,
+      [],
+      'receita',
+      estado.coletado,
+      estado.saving,
+      resumoProjeto,
+      tiposProjeto,
+      receita,
+    );
+
+    // 5. Salvar resposta do assistente
+    await supabaseAdmin.from('chat_messages').insert({
+      projeto_id: data.projeto_id,
+      role: 'assistant',
+      content: JSON.stringify(resultado),
+      options: resultado.type === 'options' ? resultado.options : null,
+    });
+
+    const respContent = resultado.type === 'options'
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+    console.log('\n┌─────────────────────────────────────────────');
+    console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
     console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
     console.log('│ 🤖 IA:');
     respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));

@@ -12,9 +12,10 @@ import type {
   DocumentacaoColetada,
   OrchestratorResult,
   ProjetoContexto,
+  ReceitaColetada,
   SavingColetado,
 } from './types';
-import { documentacaoVazia, savingVazio } from './types';
+import { documentacaoVazia, receitaVazia, savingVazio } from './types';
 
 // Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
 // **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
@@ -137,7 +138,7 @@ Se precisa de clarificação:
 {"type":"question","content":"sua pergunta sobre o ajuste","coletado":{...campos atuais}}`;
 }
 
-function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string, tipoProjeto: 'saving' | 'receita_incremental' | null = null): string {
+function buildReceitaPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, receita: ReceitaColetada, resumoProjeto: string): string {
   const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
 
@@ -148,21 +149,20 @@ DETALHES TÉCNICOS APROVADOS:
 - Fluxo: ${coletado.fluxo}
 - Ferramenta: ${ctx.ferramenta}`;
 
-  if (tipoProjeto === 'receita_incremental') {
-    return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
+  return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental — quanto de receita nova esse projeto gera.
 
 ${detalhes}
 
 DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
-- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${saving.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'ganho único'})
+- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${receita.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'ganho único'})
 
-CAMPO QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
+CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
 1. **valor_ganho_mensal** — Quanto de receita incremental (R$/mês ou R$ total se pontual) o projeto gera?
 2. **memorial_calculo** — Narrativa detalhada que fundamenta o valor informado.
 
 ESTADO ATUAL:
-${JSON.stringify(saving, null, 2)}
+${JSON.stringify(receita, null, 2)}
 
 COMO CONDUZIR:
 1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
@@ -182,16 +182,49 @@ Português brasileiro, tom direto. Acentuação correta.
 FORMATO — APENAS JSON válido:
 
 Pergunta:
-{"type":"question","content":"sua pergunta","saving":{...campos atualizados}}
+{"type":"question","content":"sua pergunta","receita":{...campos atualizados}}
 
 Opções:
-{"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
+{"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"receita":{...campos atualizados}}
 
 Preview (quando valor e memorial estiverem completos):
-{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${saving.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
-  }
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos}}`;
+}
 
-  // Tipo "saving" (default) — com dados determinísticos pré-preenchidos
+function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
+  return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de receita incremental.
+
+MEMORIAL ATUAL:
+${JSON.stringify(receita, null, 2)}
+
+O usuário pode:
+1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
+2. PEDIR AJUSTES — apontar correções.
+
+FORMATO — APENAS JSON válido:
+
+Se aprovado:
+{"type":"complete","content":"Memorial de receita aprovado! Sua submissão está completa e será enviada para análise.","receita":{...campos finais}}
+
+Se ajuste + novo preview:
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...corrigido...\\n\\nFiz os ajustes. Pode aprovar?","receita":{...campos corrigidos}}
+
+Se precisa de clarificação:
+{"type":"question","content":"pergunta","receita":{...campos atuais}}`;
+}
+
+function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
+  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
+${resumoProjeto}
+
+DETALHES TÉCNICOS APROVADOS:
+- Nome: ${coletado.nome_projeto}
+- O que faz: ${coletado.o_que_faz}
+- Execução: ${coletado.execucao}
+- Fluxo: ${coletado.fluxo}
+- Ferramenta: ${ctx.ferramenta}`;
+
+  // Tipo "saving" — com dados determinísticos pré-preenchidos
   const horasAntes = saving.horas_antes ?? 0;
   const horasDepois = saving.horas_depois ?? 0;
   const economiaHoras = saving.economia_horas_mes ?? (horasAntes - horasDepois);
@@ -280,7 +313,8 @@ export async function runOrchestrator(
   coletado: DocumentacaoColetada = documentacaoVazia(),
   saving: SavingColetado = savingVazio(),
   resumoProjeto: string = '',
-  tipoProjeto: 'saving' | 'receita_incremental' | null = null
+  tipos_projeto: ('saving' | 'receita_incremental')[] = ['saving'],
+  receita: ReceitaColetada = receitaVazia(),
 ): Promise<OrchestratorResult> {
   let systemPrompt: string;
 
@@ -292,10 +326,16 @@ export async function runOrchestrator(
       systemPrompt = buildDocPreviewPrompt(ctx, coletado);
       break;
     case 'saving':
-      systemPrompt = buildSavingPrompt(ctx, coletado, saving, resumoProjeto, tipoProjeto);
+      systemPrompt = buildSavingPrompt(ctx, coletado, saving, resumoProjeto);
       break;
     case 'saving_preview':
       systemPrompt = buildSavingPreviewPrompt(saving);
+      break;
+    case 'receita':
+      systemPrompt = buildReceitaPrompt(ctx, coletado, receita, resumoProjeto);
+      break;
+    case 'receita_preview':
+      systemPrompt = buildReceitaPreviewPrompt(receita);
       break;
     default:
       systemPrompt = buildDocPrompt(ctx, coletado);
@@ -325,20 +365,18 @@ export async function runOrchestrator(
       }
       messages.push({ role: 'user', content: sistemaMsg });
     } else if (fase === 'saving') {
-      if (tipoProjeto === 'receita_incremental') {
-        messages.push({
-          role: 'user',
-          content: `[SISTEMA] Projeto de receita incremental, frequência: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
-        });
-      } else {
-        const horasAntes = saving.horas_antes ?? 0;
-        const horasDepois = saving.horas_depois ?? 0;
-        const economiaHoras = horasAntes - horasDepois;
-        messages.push({
-          role: 'user',
-          content: `[SISTEMA] O usuário informou: cargo "${saving.cargo ?? '?'}", ${horasAntes}h/mês antes da automação, ${horasDepois}h/mês depois. Economia declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente nessas ${horasAntes}h. Sempre termine com uma pergunta.`,
-        });
-      }
+      const horasAntes = saving.horas_antes ?? 0;
+      const horasDepois = saving.horas_depois ?? 0;
+      const economiaHoras = horasAntes - horasDepois;
+      messages.push({
+        role: 'user',
+        content: `[SISTEMA] O usuário informou: cargo "${saving.cargo ?? '?'}", ${horasAntes}h/mês antes da automação, ${horasDepois}h/mês depois. Economia declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente nessas ${horasAntes}h. Sempre termine com uma pergunta.`,
+      });
+    } else if (fase === 'receita') {
+      messages.push({
+        role: 'user',
+        content: `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
+      });
     }
   }
 
@@ -354,6 +392,9 @@ export async function runOrchestrator(
     throw new Error(`Falha na chamada ao modelo de IA: ${msg}`);
   }
 
+  const hasSaving = tipos_projeto.includes('saving');
+  const hasReceita = tipos_projeto.includes('receita_incremental');
+
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -362,15 +403,13 @@ export async function runOrchestrator(
 
     // Tenta extrair campos do JSON truncado via regex
     const typeMatch = raw.match(/"type"\s*:\s*"(\w+)"/);
-    const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"(?:coletado|saving|options)|"\s*})/);
+    const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"(?:coletado|saving|receita|options)|"\s*})/);
     const recoveredType = typeMatch?.[1] ?? 'question';
     let recoveredContent = contentMatch?.[1] ?? '';
 
     if (recoveredContent) {
-      // Unescape JSON string escapes
       try { recoveredContent = JSON.parse(`"${recoveredContent}"`); } catch { /* usa como está */ }
     } else {
-      // Último recurso: extrai tudo entre "content":" e o fim
       const lastResort = raw.match(/"content"\s*:\s*"([\s\S]+)/);
       if (lastResort) {
         recoveredContent = lastResort[1].replace(/"\s*,?\s*"coletado[\s\S]*$/, '').replace(/\\n/g, '\n').replace(/\\"/g, '"');
@@ -387,15 +426,19 @@ export async function runOrchestrator(
       fase,
       coletado,
       saving,
+      receita,
     } as OrchestratorResult;
 
-    // Aplica transição de fase mesmo no fallback (espelha o caminho normal)
-    if (recoveredType === 'preview' && (fase === 'doc' || fase === 'saving')) {
-      fallbackResult.fase = fase === 'doc' ? 'doc_preview' : 'saving_preview';
+    if (recoveredType === 'preview') {
+      if (fase === 'doc') fallbackResult.fase = 'doc_preview';
+      else if (fase === 'saving') fallbackResult.fase = 'saving_preview';
+      else if (fase === 'receita') fallbackResult.fase = 'receita_preview';
     } else if (recoveredType === 'complete') {
       if (fase === 'doc_preview') {
-        fallbackResult.fase = 'saving';
+        fallbackResult.fase = hasSaving ? 'saving' : 'receita';
       } else if (fase === 'saving_preview') {
+        fallbackResult.fase = hasReceita ? 'receita' : 'completo';
+      } else if (fase === 'receita_preview') {
         fallbackResult.fase = 'completo';
       }
     }
@@ -411,20 +454,25 @@ export async function runOrchestrator(
     fase,
     coletado: (parsed.coletado as DocumentacaoColetada) ?? coletado,
     saving: (parsed.saving as SavingColetado) ?? saving,
+    receita: (parsed.receita as ReceitaColetada) ?? receita,
     ...(type === 'options'
       ? { question: content, options: (parsed.options as [string, string, string]) ?? ['', '', ''] }
       : { content }),
   } as OrchestratorResult;
 
   // Transição de fase automática
-  if (type === 'preview' && (fase === 'doc' || fase === 'saving')) {
-    result.fase = fase === 'doc' ? 'doc_preview' : 'saving_preview';
+  if (type === 'preview') {
+    if (fase === 'doc') result.fase = 'doc_preview';
+    else if (fase === 'saving') result.fase = 'saving_preview';
+    else if (fase === 'receita') result.fase = 'receita_preview';
   }
 
   if (type === 'complete') {
     if (fase === 'doc_preview') {
-      result.fase = 'saving';
+      result.fase = hasSaving ? 'saving' : 'receita';
     } else if (fase === 'saving_preview') {
+      result.fase = hasReceita ? 'receita' : 'completo';
+    } else if (fase === 'receita_preview') {
       result.fase = 'completo';
     }
   }

@@ -2,7 +2,7 @@
 
 // ─── Fases do chat ──────────────────────────────────────────────────────────
 
-export type ChatFase = 'doc' | 'doc_preview' | 'saving' | 'saving_preview' | 'completo';
+export type ChatFase = 'doc' | 'doc_preview' | 'saving' | 'saving_preview' | 'receita' | 'receita_preview' | 'completo';
 
 // ─── Agente 1: Documentação técnica (6 seções do template) ───────────────────
 
@@ -65,13 +65,27 @@ export const savingVazio = (): SavingColetado => ({
   valor_ganho_mensal: null,
 });
 
+// ─── Agente 3: Receita incremental ──────────────────────────────────────────
+
+export type ReceitaColetada = {
+  tipo_saving: 'mensal' | 'pontual' | null;
+  valor_ganho_mensal: number | null;
+  memorial_calculo: string | null;
+};
+
+export const receitaVazia = (): ReceitaColetada => ({
+  tipo_saving: null,
+  valor_ganho_mensal: null,
+  memorial_calculo: null,
+});
+
 // ─── Resultados do orquestrador ─────────────────────────────────────────────
 
 export type OrchestratorResult =
-  | { type: 'question'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado }
-  | { type: 'options'; question: string; options: [string, string, string]; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado }
-  | { type: 'preview'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado }
-  | { type: 'complete'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado };
+  | { type: 'question'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
+  | { type: 'options'; question: string; options: [string, string, string]; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
+  | { type: 'preview'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
+  | { type: 'complete'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada };
 
 // ─── Mensagem de chat ───────────────────────────────────────────────────────
 
@@ -93,6 +107,7 @@ export type ProjetoContexto = {
   doc_texto: string | null;
   descricao_breve?: string | null;
   tipo_projeto?: 'saving' | 'receita_incremental' | null;
+  tipos_projeto?: ('saving' | 'receita_incremental')[] | null;
   escopo?: 'interno' | 'externo' | null;
 };
 
