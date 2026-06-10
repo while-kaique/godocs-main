@@ -536,6 +536,26 @@ export async function iniciarReceita(rawData: unknown) {
   return formatResponse(resultado);
 }
 
+// ─── Atualizar tipos do projeto ──────────────────────────────────────────────
+// Permite trocar o tipo (saving / receita_incremental) durante o fluxo do agente.
+// O orquestrador e a submissão final leem tipos_projeto do banco, então a troca
+// no formulário precisa persistir aqui para a fase de impacto refletir a mudança.
+
+const atualizarTiposSchema = z.object({
+  projeto_id: z.string().min(1),
+  tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).min(1),
+});
+
+export async function atualizarTipos(rawData: unknown) {
+  const data = atualizarTiposSchema.parse(rawData);
+  log('atualizarTipos', `projeto=${data.projeto_id}, tipos=${data.tipos_projeto.join(',')}`);
+  await updateProjeto(data.projeto_id, {
+    tipos_projeto: data.tipos_projeto,
+    tipo_projeto: data.tipos_projeto[0],
+  });
+  return { ok: true };
+}
+
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
 export async function submeterParaValidacao(rawData: unknown) {

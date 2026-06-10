@@ -544,21 +544,8 @@ function SavingForm({
   const icon = isSaving ? "💰" : "📈";
   const title = "Dados para Análise de Impacto";
 
-  const valorHoraDe = (cargo: string) => CARGOS.find((c) => c.label === cargo)?.valor_hora ?? 0;
-  const fmtReais = (v: number) =>
-    "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  // Economia de uma linha (0 se ainda incompleta/inválida).
-  function economiaLinha(l: SavingLinhaInput) {
-    const a = parseFloat(l.horasAntes);
-    const d = parseFloat(l.horasDepois);
-    if (!(a > 0) || isNaN(d) || d < 0 || d >= a) return { horas: 0, reais: 0 };
-    const horas = a - d;
-    return { horas, reais: horas * valorHoraDe(l.cargo) };
-  }
-
-  const totalHoras = linhas.reduce((s, l) => s + economiaLinha(l).horas, 0);
-  const totalReais = linhas.reduce((s, l) => s + economiaLinha(l).reais, 0);
+  // O cálculo do ganho (horas × taxa do cargo) é uma métrica de gestão e roda no
+  // backend — NÃO é exibido ao usuário aqui para não induzir manipulação dos valores.
 
   function updateLinha(i: number, patch: Partial<SavingLinhaInput>) {
     setLinhas((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -586,9 +573,10 @@ function SavingForm({
         const a = parseFloat(l.horasAntes);
         const d = parseFloat(l.horasDepois);
         if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
-        if (!l.horasAntes || !(a > 0)) errs[`l${i}antes`] = "Informe as horas";
+        // Aceita qualquer valor >= 0 (inclusive 0 antes e horas depois maiores) —
+        // o ganho líquido é calculado/clampado no backend.
+        if (l.horasAntes === "" || isNaN(a) || a < 0) errs[`l${i}antes`] = "Informe as horas";
         if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
-        else if (l.horasAntes && a > 0 && d >= a) errs[`l${i}depois`] = "Deve ser menor que antes";
       });
     }
     if (isExterno && isSaving) {
@@ -675,7 +663,7 @@ function SavingForm({
               Quem executava a tarefa manualmente <span style={{ color: "#e53e3e" }}>*</span>
             </label>
             <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-              Uma linha por pessoa/função. Informe as horas/mês gastas antes e depois da automação — o valor em R$ é calculado pela taxa do cargo.
+              Uma linha por pessoa/função. Informe as horas/mês gastas antes e depois da automação.
             </p>
 
             {/* Cabeçalho das colunas (telas largas) */}
@@ -691,8 +679,6 @@ function SavingForm({
 
             <div className="space-y-2.5">
               {linhas.map((l, i) => {
-                const vh = valorHoraDe(l.cargo);
-                const eco = economiaLinha(l);
                 const linhaErro = errors[`l${i}cargo`] || errors[`l${i}antes`] || errors[`l${i}depois`];
                 return (
                   <div
@@ -722,11 +708,6 @@ function SavingForm({
                             <option key={c.label} value={c.label}>{c.label}</option>
                           ))}
                         </select>
-                        {l.cargo && (
-                          <div className="mt-1 px-0.5 text-[10px] font-medium" style={{ color: "#6b6e00" }}>
-                            ~{fmtReais(vh)}/h
-                          </div>
-                        )}
                       </div>
 
                       {/* Horas antes */}
@@ -775,14 +756,10 @@ function SavingForm({
                       ) : <span />}
                     </div>
 
-                    {/* Erro ou economia da linha */}
+                    {/* Erro da linha (a economia calculada não é exibida ao usuário) */}
                     {linhaErro ? (
                       <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
                         {linhaErro}
-                      </div>
-                    ) : eco.horas > 0 ? (
-                      <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#16a34a" }}>
-                        Economia: {eco.horas.toFixed(1)} h/mês × {fmtReais(vh)} = {fmtReais(eco.reais)}/mês
                       </div>
                     ) : null}
                   </div>
@@ -805,19 +782,6 @@ function SavingForm({
               Adicionar pessoa
             </button>
 
-            {/* Economia total (bruta — o custo externo é abatido na análise) */}
-            {totalHoras > 0 && (
-              <div
-                className="mt-3 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-bold"
-                style={{ background: "rgba(22,163,74,0.07)", border: "1px solid rgba(22,163,74,0.16)", color: "#16a34a", animation: "go-step-in 0.3s ease" }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                  <polyline points="17 6 23 6 23 12" />
-                </svg>
-                Economia total: {totalHoras.toFixed(1)} h/mês · ~{fmtReais(totalReais)}/mês
-              </div>
-            )}
           </div>
         )}
 
@@ -877,7 +841,7 @@ function SavingForm({
                 </div>
               )}
               <div className="mt-1.5 text-[10px]" style={{ color: "#8b8b9a" }}>
-                Será abatido do saving para calcular o ganho líquido da automação.
+                Será abatido para calcular o ganho líquido da automação.
               </div>
             </div>
           </>

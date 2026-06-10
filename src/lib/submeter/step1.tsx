@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { AREAS, FERRAMENTAS } from "./constants";
 import type { FormData, FieldErrors } from "./constants";
+import { apiFetch } from "@/lib/api-client";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
   RadioGroup, InfoTooltip, ChipsInput,
@@ -18,6 +19,21 @@ export function Step1({
   const isExterno = form.escopo === "externo";
   const escopoDefinido = form.escopo === "interno" || form.escopo === "externo";
   const prodBlocked = form.prodStatus === "dev" || form.prodStatus === "idle";
+
+  // Áreas vêm da fonte única (/api/areas — tabela sincronizada da TeamGuide).
+  // Fallback para a lista hardcoded enquanto carrega ou se a API falhar.
+  const [areas, setAreas] = useState<string[]>([...AREAS]);
+  useEffect(() => {
+    let cancelado = false;
+    apiFetch<{ id: string | null; nome: string }[]>("/api/areas")
+      .then((rows) => {
+        if (!cancelado && Array.isArray(rows) && rows.length > 0) {
+          setAreas(rows.map((r) => r.nome));
+        }
+      })
+      .catch(() => { /* mantém o fallback AREAS */ });
+    return () => { cancelado = true; };
+  }, []);
 
   const prodLabel = isExterno
     ? "Essa ferramenta externa já está em uso na solução?"
@@ -108,7 +124,7 @@ export function Step1({
             style={{ background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.1)", color: "var(--go-text-primary)", animation: "go-slide-down 0.25s ease" }}
           >
             <span className="mt-px shrink-0">💡</span>
-            <span>O custo mensal da ferramenta externa será informado na etapa de Análise de Impacto e será abatido do saving calculado.</span>
+            <span>O custo mensal da ferramenta externa será informado na etapa de Análise de Impacto e será abatido do ganho calculado.</span>
           </div>
         )}
       </div>
@@ -206,7 +222,7 @@ export function Step1({
                 error={errors.area}
               >
                 <option value="">Selecione sua área</option>
-                {AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+                {areas.map((a) => <option key={a} value={a}>{a}</option>)}
               </FormSelect>
             </FormGroup>
             <FormGroup>
