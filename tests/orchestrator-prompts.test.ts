@@ -2,7 +2,7 @@
 // Importa as funções de build de prompt indiretamente via o módulo do orquestrador
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ProjetoContexto, DocumentacaoColetada, SavingColetado } from '@/lib/agents/types';
-import { documentacaoVazia, savingVazio } from '@/lib/agents/types';
+import { documentacaoVazia, receitaVazia, savingVazio } from '@/lib/agents/types';
 
 // Mock do LLM para capturar os prompts enviados
 let capturedMessages: { role: string; content: string }[] = [];
@@ -14,6 +14,7 @@ vi.mock('@/lib/llm', () => ({
       content: 'mock response',
       coletado: documentacaoVazia(),
       saving: savingVazio(),
+      receita: receitaVazia(),
     });
   }),
 }));
@@ -131,7 +132,7 @@ describe('Prompt fase saving (tipo saving)', () => {
   };
 
   it('inclui dados determinísticos pré-preenchidos', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('Analista Pleno');
     expect(system).toContain('40h/mês');
@@ -140,14 +141,14 @@ describe('Prompt fase saving (tipo saving)', () => {
   });
 
   it('instrui IA a NÃO perguntar sobre campos já definidos', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('NÃO pergunte sobre eles');
     expect(system).toContain('NÃO MENCIONE valores em R$');
   });
 
   it('inclui regras de validação de horas', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('VALIDAÇÃO DE HORAS');
     expect(system).toContain('NUNCA aceite as horas');
@@ -155,7 +156,7 @@ describe('Prompt fase saving (tipo saving)', () => {
   });
 
   it('inclui regras anti-extrapolação', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('ANTI-EXTRAPOLAÇÃO');
     expect(system).toContain('ganho REAL');
@@ -163,13 +164,13 @@ describe('Prompt fase saving (tipo saving)', () => {
 
   it('inclui resumo do projeto como contexto', async () => {
     const resumo = 'O projeto automatiza o cadastro de embaixadores via Typebot.';
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, resumo, 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, resumo, ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain(resumo);
   });
 
   it('mensagem de sistema inclui dados do formulário', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', 'saving');
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
     expect(userMsg).toContain('[SISTEMA]');
     expect(userMsg).toContain('Analista Pleno');
@@ -177,14 +178,9 @@ describe('Prompt fase saving (tipo saving)', () => {
   });
 });
 
-describe('Prompt fase saving (tipo receita_incremental)', () => {
-  const savingIncremental = {
-    ...savingVazio(),
-    tipo_saving: 'mensal' as const,
-  };
-
+describe('Prompt fase receita (tipo receita_incremental)', () => {
   it('instrui IA a coletar valor de receita ganho', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    await runOrchestrator(makeCtx(), [], 'receita', documentacaoVazia(), savingVazio(), 'Resumo', ['receita_incremental']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('receita incremental');
     expect(system).toContain('valor_ganho_mensal');
@@ -192,14 +188,14 @@ describe('Prompt fase saving (tipo receita_incremental)', () => {
   });
 
   it('não menciona cargo ou horas', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    await runOrchestrator(makeCtx(), [], 'receita', documentacaoVazia(), savingVazio(), 'Resumo', ['receita_incremental']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).not.toContain('Horas gastas antes');
     expect(system).not.toContain('Cargo de quem executava');
   });
 
   it('mensagem de sistema menciona receita incremental', async () => {
-    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingIncremental, 'Resumo', 'receita_incremental');
+    await runOrchestrator(makeCtx(), [], 'receita', documentacaoVazia(), savingVazio(), 'Resumo', ['receita_incremental']);
     const userMsg = capturedMessages.find(m => m.role === 'user')?.content ?? '';
     expect(userMsg).toContain('[SISTEMA]');
     expect(userMsg).toContain('receita incremental');
@@ -215,12 +211,20 @@ describe('Transições de fase', () => {
     expect(result.fase).toBe('doc_preview');
   });
 
-  it('doc_preview → saving quando type=complete', async () => {
+  it('doc_preview → saving quando type=complete e tipos inclui saving', async () => {
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
       JSON.stringify({ type: 'complete', content: 'Resumo', coletado: documentacaoVazia() })
     );
-    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview');
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.fase).toBe('saving');
+  });
+
+  it('doc_preview → receita quando type=complete e tipos é só receita_incremental', async () => {
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
+      JSON.stringify({ type: 'complete', content: 'Resumo', coletado: documentacaoVazia() })
+    );
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview', documentacaoVazia(), savingVazio(), '', ['receita_incremental']);
+    expect(result.fase).toBe('receita');
   });
 
   it('saving → saving_preview quando type=preview', async () => {
@@ -231,11 +235,27 @@ describe('Transições de fase', () => {
     expect(result.fase).toBe('saving_preview');
   });
 
-  it('saving_preview → completo quando type=complete', async () => {
+  it('saving_preview → completo quando type=complete e só saving', async () => {
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
       JSON.stringify({ type: 'complete', content: 'Aprovado!', saving: savingVazio() })
     );
-    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview');
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
+    expect(result.fase).toBe('completo');
+  });
+
+  it('saving_preview → receita quando type=complete e tipos inclui ambos', async () => {
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
+      JSON.stringify({ type: 'complete', content: 'Aprovado!', saving: savingVazio() })
+    );
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview', documentacaoVazia(), savingVazio(), '', ['saving', 'receita_incremental']);
+    expect(result.fase).toBe('receita');
+  });
+
+  it('receita_preview → completo quando type=complete', async () => {
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
+      JSON.stringify({ type: 'complete', content: 'Receita aprovada!' })
+    );
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'receita_preview');
     expect(result.fase).toBe('completo');
   });
 
@@ -253,7 +273,7 @@ describe('Transições de fase', () => {
   it('doc_preview → saving mesmo com JSON truncado (type=complete recuperado)', async () => {
     const truncado = '{"type":"complete","content":"Resumo factual do projeto que ficou cortado no meio';
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
-    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview');
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.type).toBe('complete');
     expect(result.fase).toBe('saving');
   });
@@ -261,7 +281,7 @@ describe('Transições de fase', () => {
   it('saving_preview → completo mesmo com JSON truncado (type=complete recuperado)', async () => {
     const truncado = '{"type":"complete","content":"Memorial aprovado e cortado no meio';
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
-    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview');
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.type).toBe('complete');
     expect(result.fase).toBe('completo');
   });

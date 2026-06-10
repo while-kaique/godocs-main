@@ -58,8 +58,8 @@ describe('savingVazio', () => {
 
 describe('Tipos de fase (ChatFase)', () => {
   it('aceita todas as fases válidas', () => {
-    const fases: ChatFase[] = ['doc', 'doc_preview', 'saving', 'saving_preview', 'completo'];
-    expect(fases).toHaveLength(5);
+    const fases: ChatFase[] = ['doc', 'doc_preview', 'saving', 'saving_preview', 'receita', 'receita_preview', 'completo'];
+    expect(fases).toHaveLength(7);
   });
 });
 

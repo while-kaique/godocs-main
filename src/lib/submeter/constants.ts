@@ -65,7 +65,7 @@ export interface FieldErrors {
   [key: string]: string;
 }
 
-export type ChatFase = "doc" | "doc_preview" | "saving" | "saving_preview" | "completo";
+export type ChatFase = "doc" | "doc_preview" | "saving" | "saving_preview" | "receita" | "receita_preview" | "completo";
 
 export interface ChatMessage {
   role: "user" | "assistant";

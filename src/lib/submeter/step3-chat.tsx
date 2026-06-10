@@ -414,16 +414,19 @@ function CollapsiblePreviewCard({
 function FinalReview({
   approvedDocPreview,
   approvedSavingPreview,
+  approvedReceitaPreview,
   onSubmitProject,
   submitting,
 }: {
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
+  approvedReceitaPreview?: string | null;
   onSubmitProject: () => void;
   submitting: boolean;
 }) {
   const [expandedDoc, setExpandedDoc] = useState(false);
   const [expandedSaving, setExpandedSaving] = useState(false);
+  const [expandedReceita, setExpandedReceita] = useState(false);
 
   return (
     <div
@@ -468,7 +471,7 @@ function FinalReview({
 
       {approvedSavingPreview && (
         <CollapsiblePreviewCard
-          title="Memorial de Cálculo"
+          title="Memorial de Saving"
           icon="📊"
           accentColor="#6b6e00"
           accentBg="rgba(215,219,0,0.04)"
@@ -476,6 +479,20 @@ function FinalReview({
           content={approvedSavingPreview}
           expanded={expandedSaving}
           onToggle={() => setExpandedSaving((v) => !v)}
+          isSaving={true}
+        />
+      )}
+
+      {approvedReceitaPreview && (
+        <CollapsiblePreviewCard
+          title="Memorial de Receita"
+          icon="📈"
+          accentColor="#6b6e00"
+          accentBg="rgba(215,219,0,0.04)"
+          accentBorder="rgba(215,219,0,0.15)"
+          content={approvedReceitaPreview}
+          expanded={expandedReceita}
+          onToggle={() => setExpandedReceita((v) => !v)}
           isSaving={true}
         />
       )}
@@ -847,13 +864,18 @@ export function Step3Chat({
   chatBottomRef,
   fase,
   showTransition,
+  transitionType = "saving",
   approvedDocPreview,
   approvedSavingPreview,
+  approvedReceitaPreview,
   tipoProjeto,
   escopo,
   showSavingForm,
   onSavingFormSubmit,
   savingFormLoading,
+  showReceitaForm,
+  onReceitaFormSubmit,
+  receitaFormLoading,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -866,22 +888,29 @@ export function Step3Chat({
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   fase: ChatFase;
   showTransition: boolean;
+  transitionType?: "saving" | "receita";
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
+  approvedReceitaPreview?: string | null;
   tipoProjeto?: ("saving" | "receita_incremental")[];
   escopo?: string;
   showSavingForm?: boolean;
   onSavingFormSubmit?: (data: SavingFormData) => void;
   savingFormLoading?: boolean;
+  showReceitaForm?: boolean;
+  onReceitaFormSubmit?: (data: SavingFormData) => void;
+  receitaFormLoading?: boolean;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const isSavingFase = fase === "saving" || fase === "saving_preview" || fase === "completo";
+  const isSavingFase = fase === "saving" || fase === "saving_preview";
+  const isReceitaFase = fase === "receita" || fase === "receita_preview";
+  const isFinancialFase = isSavingFase || isReceitaFase || fase === "completo";
 
-  const accentColor = isSavingFase ? "var(--go-lime)" : "var(--go-blue)";
-  const accentBg = isSavingFase ? "rgba(215,219,0,0.08)" : "rgba(0,89,169,0.08)";
-  const accentBgLight = isSavingFase ? "rgba(215,219,0,0.12)" : "rgba(199,233,253,0.4)";
-  const accentBorder = isSavingFase ? "rgba(215,219,0,0.2)" : "rgba(0,89,169,0.1)";
-  const userBubbleBg = isSavingFase ? "#7a7d00" : "var(--go-blue)";
+  const accentColor = isFinancialFase ? "var(--go-lime)" : "var(--go-blue)";
+  const accentBg = isFinancialFase ? "rgba(215,219,0,0.08)" : "rgba(0,89,169,0.08)";
+  const accentBgLight = isFinancialFase ? "rgba(215,219,0,0.12)" : "rgba(199,233,253,0.4)";
+  const accentBorder = isFinancialFase ? "rgba(215,219,0,0.2)" : "rgba(0,89,169,0.1)";
+  const userBubbleBg = isFinancialFase ? "#7a7d00" : "var(--go-blue)";
 
   const lastMsg = messages[messages.length - 1];
   const showPreviewActions = lastMsg?.isPreview && !loading;
@@ -896,14 +925,20 @@ export function Step3Chat({
     }
   }
 
-  const agentLabel = isSavingFase ? "Análise de Impacto" : "Documentação Técnica";
+  const agentLabel = isReceitaFase
+    ? "Análise de Receita Incremental"
+    : isSavingFase
+      ? "Análise de Saving"
+      : "Documentação Técnica";
   const agentStatus = isComplete
     ? "Submissão completa — pronto para envio"
     : showPreviewActions
       ? "Aguardando sua aprovação..."
-      : isSavingFase
-        ? "Calculando o ganho financeiro do projeto..."
-        : "Analisando e coletando informações...";
+      : isReceitaFase
+        ? "Calculando a receita incremental do projeto..."
+        : isSavingFase
+          ? "Calculando a economia de horas do projeto..."
+          : "Analisando e coletando informações...";
 
   return (
     <div className="flex flex-col" style={{ minHeight: 420 }}>
@@ -916,12 +951,12 @@ export function Step3Chat({
           className="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors duration-500"
           style={{ background: accentBg, color: accentColor }}
         >
-          {isSavingFase ? "💰" : "🤖"}
+          {isReceitaFase ? "📈" : isSavingFase ? "💰" : "🤖"}
         </div>
         <div>
           <div
             className="text-[13px] font-bold transition-colors duration-500"
-            style={{ color: isSavingFase ? "#6b6e00" : "var(--go-text-heading)" }}
+            style={{ color: isFinancialFase ? "#6b6e00" : "var(--go-text-heading)" }}
           >
             {agentLabel}
           </div>
@@ -963,7 +998,7 @@ export function Step3Chat({
               animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
             }}
           >
-            Documentação aprovada!
+            {transitionType === "receita" ? "Saving validado!" : "Documentação aprovada!"}
           </h3>
           <p
             className="mb-6 text-[13px] text-center leading-relaxed max-w-[320px]"
@@ -972,7 +1007,9 @@ export function Step3Chat({
               animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
             }}
           >
-            Agora vamos calcular o impacto financeiro do seu projeto — quanto tempo e dinheiro ele economiza.
+            {transitionType === "receita"
+              ? "Agora vamos analisar a receita incremental — quanto de receita nova esse projeto gera."
+              : "Agora vamos calcular o impacto financeiro do seu projeto — quanto tempo e dinheiro ele economiza."}
           </p>
 
           <div
@@ -990,7 +1027,9 @@ export function Step3Chat({
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>Documentação</span>
+              <span className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
+                {transitionType === "receita" ? "Saving" : "Documentação"}
+              </span>
             </div>
             <div
               className="h-[2px] w-8"
@@ -1001,9 +1040,11 @@ export function Step3Chat({
                 className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
                 style={{ background: "rgba(215,219,0,0.15)", color: "#6b6e00", border: "1.5px solid rgba(215,219,0,0.3)" }}
               >
-                2
+                {transitionType === "receita" ? "📈" : "2"}
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: "#6b6e00" }}>Impacto</span>
+              <span className="text-[11px] font-semibold" style={{ color: "#6b6e00" }}>
+                {transitionType === "receita" ? "Receita" : "Impacto"}
+              </span>
             </div>
           </div>
 
@@ -1038,8 +1079,18 @@ export function Step3Chat({
         />
       )}
 
+      {/* Formulário receita incremental (apenas tipo_saving: mensal/pontual) */}
+      {!showTransition && showReceitaForm && onReceitaFormSubmit && (
+        <SavingForm
+          tipoProjeto={["receita_incremental"]}
+          escopo={escopo}
+          onSubmit={onReceitaFormSubmit}
+          loading={receitaFormLoading ?? false}
+        />
+      )}
+
       {/* Mensagens */}
-      {!showTransition && !showSavingForm && (<div
+      {!showTransition && !showSavingForm && !showReceitaForm && (<div
         className="flex-1 overflow-y-auto px-8 py-5 space-y-4 transition-colors duration-500"
         style={{ maxHeight: 420, background: isSavingFase ? "rgba(215,219,0,0.03)" : "transparent" }}
       >
@@ -1123,7 +1174,7 @@ export function Step3Chat({
       )}
 
       {/* Options */}
-      {!showTransition && !showSavingForm && hasOptions && lastMsg.options && (
+      {!showTransition && !showSavingForm && !showReceitaForm && hasOptions && lastMsg.options && (
         <div
           className="px-8 pb-3 flex flex-wrap gap-2"
           style={{ borderTop: `1px solid ${accentBorder}` }}
@@ -1154,17 +1205,18 @@ export function Step3Chat({
       )}
 
       {/* Revisão final + envio */}
-      {!showTransition && !showSavingForm && isComplete && (
+      {!showTransition && !showSavingForm && !showReceitaForm && isComplete && (
         <FinalReview
           approvedDocPreview={approvedDocPreview}
           approvedSavingPreview={approvedSavingPreview}
+          approvedReceitaPreview={approvedReceitaPreview}
           onSubmitProject={onSubmitProject}
           submitting={submitting}
         />
       )}
 
       {/* Input de mensagem */}
-      {!showTransition && !showSavingForm && !isComplete && (
+      {!showTransition && !showSavingForm && !showReceitaForm && !isComplete && (
         <div
           className="px-8 py-4"
           style={{ borderTop: `1px solid ${accentBorder}` }}

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn, iniciarSavingFn } from "@/lib/chat.functions";
+import { iniciarSubmissaoFn, enviarMensagemFn, submeterParaValidacaoFn, iniciarSavingFn, iniciarReceitaFn } from "@/lib/chat.functions";
 
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
@@ -57,6 +57,10 @@ function SubmeterPage() {
   const [submittingProject, setSubmittingProject] = useState(false);
   const [showSavingForm, setShowSavingForm] = useState(false);
   const [savingFormLoading, setSavingFormLoading] = useState(false);
+  const [approvedReceitaPreview, setApprovedReceitaPreview] = useState<string | null>(null);
+  const [showReceitaForm, setShowReceitaForm] = useState(false);
+  const [receitaFormLoading, setReceitaFormLoading] = useState(false);
+  const [transitionType, setTransitionType] = useState<"saving" | "receita">("saving");
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const today = useMemo(() => {
@@ -272,7 +276,7 @@ function SubmeterPage() {
         setChatComplete(true);
       }
 
-      setCompletedSteps((prev) => new Set([...prev, 2]));
+      setCompletedSteps((prev) => new Set([...prev, 2, 3]));
       goToStep(3, "forward");
     } catch (err) {
       console.error('[submeter] iniciarAgente falhou:', err);
@@ -306,7 +310,8 @@ function SubmeterPage() {
       });
 
       const newFase: ChatFase = result.fase ?? chatFase;
-      const transitionToSaving = chatFase !== "saving" && (newFase === "saving");
+      const transitionToSaving = chatFase !== "saving" && newFase === "saving";
+      const transitionToReceita = chatFase !== "receita" && newFase === "receita";
 
       const assistantMsg: ChatMessage = {
         role: "assistant",
@@ -321,6 +326,7 @@ function SubmeterPage() {
         const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
         if (lastPreviewMsg) setApprovedDocPreview(lastPreviewMsg.content);
 
+        setTransitionType("saving");
         setShowTransition(true);
         setChatFase(newFase);
         setTimeout(() => {
@@ -328,14 +334,34 @@ function SubmeterPage() {
           setChatMessages([]);
           setShowSavingForm(true);
         }, 3000);
+      } else if (transitionToReceita) {
+        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
+        // Captura preview de saving se vier de saving_preview, ou doc se vier de doc_preview
+        if (lastPreviewMsg) {
+          if (chatFase === "saving_preview") setApprovedSavingPreview(lastPreviewMsg.content);
+          else setApprovedDocPreview(lastPreviewMsg.content);
+        }
+
+        setTransitionType("receita");
+        setShowTransition(true);
+        setChatFase(newFase);
+        setTimeout(() => {
+          setShowTransition(false);
+          setChatMessages([]);
+          setShowReceitaForm(true);
+        }, 3000);
       } else {
         setChatMessages((prev) => [...prev, assistantMsg]);
         setChatFase(newFase);
       }
 
       if (result.isComplete) {
-        const lastSavingPreview = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
-        if (lastSavingPreview) setApprovedSavingPreview(lastSavingPreview.content);
+        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
+        if (lastPreviewMsg) {
+          // No caso "só saving" ou "ambos" (último preview é de receita ou saving)
+          if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
+          else setApprovedSavingPreview(lastPreviewMsg.content);
+        }
         setChatComplete(true);
       }
     } catch (err) {
@@ -389,6 +415,37 @@ function SubmeterPage() {
       toast.error(`Erro ao iniciar análise de impacto: ${msg}`);
     } finally {
       setSavingFormLoading(false);
+    }
+  }
+
+  /* ── Receita form: inicia fase receita incremental ── */
+  async function handleReceitaFormSubmit(formData: SavingFormData) {
+    if (!projetoId) return;
+    setReceitaFormLoading(true);
+    try {
+      const result = await iniciarReceitaFn({
+        data: {
+          projeto_id: projetoId,
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+        },
+      });
+      setShowReceitaForm(false);
+      const receitaMsg: ChatMessage = {
+        role: "assistant",
+        content: result.content,
+        options: result.options ?? undefined,
+        isComplete: result.isComplete,
+        isPreview: result.isPreview,
+        fase: result.fase ?? "receita",
+      };
+      setChatMessages([receitaMsg]);
+      if (result.fase) setChatFase(result.fase);
+    } catch (e) {
+      console.error("[submeter] falha ao iniciar receita:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Erro ao iniciar análise de receita: ${msg}`);
+    } finally {
+      setReceitaFormLoading(false);
     }
   }
 
@@ -592,13 +649,18 @@ function SubmeterPage() {
                   chatBottomRef={chatBottomRef}
                   fase={chatFase}
                   showTransition={showTransition}
+                  transitionType={transitionType}
                   approvedDocPreview={approvedDocPreview}
                   approvedSavingPreview={approvedSavingPreview}
+                  approvedReceitaPreview={approvedReceitaPreview}
                   tipoProjeto={form.tipoProjeto}
                   escopo={form.escopo}
                   showSavingForm={showSavingForm}
                   onSavingFormSubmit={handleSavingFormSubmit}
                   savingFormLoading={savingFormLoading}
+                  showReceitaForm={showReceitaForm}
+                  onReceitaFormSubmit={handleReceitaFormSubmit}
+                  receitaFormLoading={receitaFormLoading}
                 />
               </StepAnimation>
             )}
@@ -628,21 +690,31 @@ function SubmeterPage() {
               )}
 
               {step === 2 && (
-                <button
-                  type="button"
-                  onClick={handleIniciarAgente}
-                  disabled={iniciandoChat}
-                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
-                >
-                  {iniciandoChat ? (
-                    <>
-                      <span>Analisando...</span>
-                      <div className="go-spinner" />
-                    </>
-                  ) : (
-                    <span>Analisar com Agente &rarr;</span>
-                  )}
-                </button>
+                projetoId ? (
+                  <button
+                    type="button"
+                    onClick={() => goToStep(3, "forward")}
+                    className="go-btn-next"
+                  >
+                    Continuar com Agente &rarr;
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleIniciarAgente}
+                    disabled={iniciandoChat}
+                    className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
+                  >
+                    {iniciandoChat ? (
+                      <>
+                        <span>Analisando...</span>
+                        <div className="go-spinner" />
+                      </>
+                    ) : (
+                      <span>Analisar com Agente &rarr;</span>
+                    )}
+                  </button>
+                )
               )}
             </div>
           )}
