@@ -30,10 +30,14 @@ import {
   updateConfiguracao,
   getUsuarios,
 } from '@/lib/admin.functions'
-import { getAdminByEmail } from '@/integrations/db/client.server'
+import { getAdminByEmail, setDb } from '@/integrations/db/client.server'
+import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
-// No godeploy não há bindings nativos além das env vars (Record<string,string>).
-interface Env {}
+// Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
+interface Env {
+  DB: GoDeployDB;
+  [key: string]: unknown;
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -204,7 +208,7 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
 // ── entry point ───────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request: Request, env: Env & Record<string, string>): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     // O godeploy não expõe o global `process` (não há nodejs_compat). Garantimos
     // `process.env` e injetamos as env vars do worker, para os módulos que leem
     // via process.env (supabase, llm, brevo, ocr, etc.). Sem isto, qualquer
@@ -213,6 +217,11 @@ export default {
     if (!g.process) g.process = { env: {} }
     for (const [k, v] of Object.entries(env)) {
       if (typeof v === 'string') g.process.env[k] = v
+    }
+
+    // Injeta o banco SQLite do Godeploy (env.DB) no client
+    if (env.DB) {
+      setDb(env.DB)
     }
 
     const url = new URL(request.url)

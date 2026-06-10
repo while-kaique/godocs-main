@@ -5,7 +5,8 @@
       "Bash(bun run:*)",
       "Bash(xargs wc:*)",
       "Bash(npm ls:*)",
-      "mcp__claude_ai_Supabase__list_projects"
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Godeploy__listDataSources"
     ]
   }
 }

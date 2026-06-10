@@ -1,22 +1,64 @@
 // SQLite database client (server-only)
-import BetterSqlite3 from 'better-sqlite3';
-import path from 'path';
+// Abstrai o acesso ao banco via interface GoDeployDB (env.DB no Godeploy, wrapper better-sqlite3 em dev)
+
 import { initSchema } from './schema';
+import type { GoDeployDB } from './db-adapter';
 
-let _db: BetterSqlite3.Database | undefined;
+export type { GoDeployDB } from './db-adapter';
 
-export function getDb(): BetterSqlite3.Database {
-  if (!_db) {
-    const dbPath = process.env.DATABASE_PATH || path.resolve('godocs.db');
-    _db = new BetterSqlite3(dbPath);
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('foreign_keys = ON');
-    initSchema(_db);
+// ─── Singleton global — setado pelo worker ou pelo dev plugin ──────────────
+
+let _db: GoDeployDB | undefined;
+let _initialized = false;
+
+/** Injeta a instância do banco. Chamado pelo worker.ts no início de cada request. */
+export function setDb(db: GoDeployDB) {
+  _db = db;
+  if (!_initialized) {
+    initSchema(db);
+    _initialized = true;
   }
+}
+
+/** Retorna a instância do banco injetada. Lança erro se não foi setada. */
+export function getDb(): GoDeployDB {
+  if (!_db) throw new Error('Database não inicializado. Chame setDb() antes de acessar o banco.');
   return _db;
 }
 
-// ─── Helpers genéricos para simplificar queries ─────────────────────────────
+// ─── Helpers de query ──────────────────────────────────────────────────────
+
+/** Converte { columns, rows } do Godeploy em array de objetos tipados */
+function rowsToObjects<T>(result: { columns: string[]; rows: unknown[][] }): T[] {
+  const { columns, rows } = result;
+  return rows.map((row) => {
+    const obj: Record<string, unknown> = {};
+    for (let i = 0; i < columns.length; i++) {
+      obj[columns[i]] = row[i];
+    }
+    return obj as T;
+  });
+}
+
+/** SELECT que retorna array de objetos */
+function queryAll<T>(sql: string, params?: unknown[]): T[] {
+  const result = getDb().query(sql, params);
+  return rowsToObjects<T>(result);
+}
+
+/** SELECT que retorna um único objeto ou undefined */
+function queryOne<T>(sql: string, params?: unknown[]): T | undefined {
+  const result = getDb().query(sql, params);
+  const rows = rowsToObjects<T>(result);
+  return rows[0];
+}
+
+/** INSERT/UPDATE/DELETE */
+function exec(sql: string, params?: unknown[]): void {
+  getDb().exec(sql, params);
+}
+
+// ─── Helpers genéricos ─────────────────────────────────────────────────────
 
 function generateId(): string {
   const bytes = new Uint8Array(16);
@@ -43,90 +85,90 @@ export function parseJson<T = unknown>(raw: string | null | undefined): T | null
 // --- Admins ---
 
 export function getAdmins() {
-  return getDb().prepare('SELECT * FROM admins ORDER BY email').all() as AdminRow[];
+  return queryAll<AdminRow>('SELECT * FROM admins ORDER BY email');
 }
 
 export function getAdminByEmail(email: string) {
-  return getDb().prepare('SELECT * FROM admins WHERE email = ?').get(email) as AdminRow | undefined;
+  return queryOne<AdminRow>('SELECT * FROM admins WHERE email = ?', [email]);
 }
 
 export function insertAdmin(email: string, nome?: string | null) {
   const id = generateId();
-  getDb().prepare('INSERT INTO admins (id, email, nome) VALUES (?, ?, ?)').run(id, email, nome ?? null);
-  return getDb().prepare('SELECT * FROM admins WHERE id = ?').get(id) as AdminRow;
+  exec('INSERT INTO admins (id, email, nome) VALUES (?, ?, ?)', [id, email, nome ?? null]);
+  return queryOne<AdminRow>('SELECT * FROM admins WHERE id = ?', [id])!;
 }
 
 export function deleteAdmin(id: string) {
-  getDb().prepare('DELETE FROM admins WHERE id = ?').run(id);
+  exec('DELETE FROM admins WHERE id = ?', [id]);
 }
 
 // --- Areas ---
 
 export function getAreas() {
-  return getDb().prepare('SELECT * FROM areas ORDER BY nome').all() as AreaRow[];
+  return queryAll<AreaRow>('SELECT * FROM areas ORDER BY nome');
 }
 
 export function getAreaById(id: string) {
-  return getDb().prepare('SELECT * FROM areas WHERE id = ?').get(id) as AreaRow | undefined;
+  return queryOne<AreaRow>('SELECT * FROM areas WHERE id = ?', [id]);
 }
 
 export function insertArea(nome: string) {
   const id = generateId();
-  getDb().prepare('INSERT INTO areas (id, nome) VALUES (?, ?)').run(id, nome);
-  return getDb().prepare('SELECT * FROM areas WHERE id = ?').get(id) as AreaRow;
+  exec('INSERT INTO areas (id, nome) VALUES (?, ?)', [id, nome]);
+  return queryOne<AreaRow>('SELECT * FROM areas WHERE id = ?', [id])!;
 }
 
 export function deleteArea(id: string) {
-  getDb().prepare('DELETE FROM areas WHERE id = ?').run(id);
+  exec('DELETE FROM areas WHERE id = ?', [id]);
 }
 
 // --- Projetos ---
 
 export function getProjetosWithArea() {
-  return getDb().prepare(`
+  return queryAll<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     ORDER BY p.created_at DESC
-  `).all() as (ProjetoRow & { area_nome: string | null })[];
+  `);
 }
 
 export function getProjetoById(id: string) {
-  return getDb().prepare('SELECT * FROM projetos WHERE id = ?').get(id) as ProjetoRow | undefined;
+  return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id]);
 }
 
 export function getProjetoWithRelations(id: string) {
-  const projeto = getDb().prepare(`
+  const projeto = queryOne<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?
-  `).get(id) as (ProjetoRow & { area_nome: string | null }) | undefined;
+  `, [id]);
   if (!projeto) return undefined;
 
-  const chatMessages = getDb().prepare(
-    'SELECT * FROM chat_messages WHERE projeto_id = ? ORDER BY created_at'
-  ).all(id) as ChatMessageRow[];
+  const chatMessages = queryAll<ChatMessageRow>(
+    'SELECT * FROM chat_messages WHERE projeto_id = ? ORDER BY created_at', [id]
+  );
 
-  const documentacao = getDb().prepare(
-    'SELECT * FROM documentacao WHERE projeto_id = ?'
-  ).all(id) as DocumentacaoRow[];
+  const documentacao = queryAll<DocumentacaoRow>(
+    'SELECT * FROM documentacao WHERE projeto_id = ?', [id]
+  );
 
-  const validacoes = getDb().prepare(
-    'SELECT * FROM validacoes WHERE projeto_id = ?'
-  ).all(id) as ValidacaoRow[];
+  const validacoes = queryAll<ValidacaoRow>(
+    'SELECT * FROM validacoes WHERE projeto_id = ?', [id]
+  );
 
   return { ...projeto, chat_messages: chatMessages, documentacao, validacoes };
 }
 
 export function getProjetoContextoData(id: string) {
-  return getDb().prepare(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?
-  `).get(id) as (Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo'> & { area_nome: string | null }) | undefined;
+  `, [id]);
 }
 
 export type InsertProjeto = {
@@ -149,12 +191,12 @@ export type InsertProjeto = {
 export function insertProjeto(data: InsertProjeto) {
   const id = generateId();
   const now = nowISO();
-  getDb().prepare(`
+  exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `, [
     id,
     data.responsavel_nome,
     data.responsavel_email,
@@ -172,8 +214,8 @@ export function insertProjeto(data: InsertProjeto) {
     data.status ?? 'rascunho',
     now,
     now,
-  );
-  return getDb().prepare('SELECT * FROM projetos WHERE id = ?').get(id) as ProjetoRow;
+  ]);
+  return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id])!;
 }
 
 export function updateProjeto(id: string, fields: Record<string, unknown>) {
@@ -187,33 +229,36 @@ export function updateProjeto(id: string, fields: Record<string, unknown>) {
     if (typeof v === 'boolean') return v ? 1 : 0;
     return v;
   });
-  getDb().prepare(`UPDATE projetos SET ${sets}, updated_at = ? WHERE id = ?`).run(...values, nowISO(), id);
+  exec(`UPDATE projetos SET ${sets}, updated_at = ? WHERE id = ?`, [...values, nowISO(), id]);
 }
 
 export function findDuplicateProjeto(nome: string, excludeId: string) {
-  return getDb().prepare(
-    "SELECT id FROM projetos WHERE nome = ? AND id != ? AND status != 'rascunho' LIMIT 1"
-  ).get(nome, excludeId) as { id: string } | undefined;
+  return queryOne<{ id: string }>(
+    "SELECT id FROM projetos WHERE nome = ? AND id != ? AND status != 'rascunho' LIMIT 1",
+    [nome, excludeId]
+  );
 }
 
 // --- Chat Messages ---
 
 export function getChatMessages(projetoId: string) {
-  return getDb().prepare(
-    'SELECT * FROM chat_messages WHERE projeto_id = ? ORDER BY created_at'
-  ).all(projetoId) as ChatMessageRow[];
+  return queryAll<ChatMessageRow>(
+    'SELECT * FROM chat_messages WHERE projeto_id = ? ORDER BY created_at', [projetoId]
+  );
 }
 
 export function getChatMessagesExcludeRole(projetoId: string, excludeRole: string) {
-  return getDb().prepare(
-    'SELECT role, content FROM chat_messages WHERE projeto_id = ? AND role != ? ORDER BY created_at'
-  ).all(projetoId, excludeRole) as { role: string; content: string }[];
+  return queryAll<{ role: string; content: string }>(
+    'SELECT role, content FROM chat_messages WHERE projeto_id = ? AND role != ? ORDER BY created_at',
+    [projetoId, excludeRole]
+  );
 }
 
 export function getDocMessage(projetoId: string) {
-  return getDb().prepare(
-    "SELECT content FROM chat_messages WHERE projeto_id = ? AND role = 'doc' LIMIT 1"
-  ).get(projetoId) as { content: string } | undefined;
+  return queryOne<{ content: string }>(
+    "SELECT content FROM chat_messages WHERE projeto_id = ? AND role = 'doc' LIMIT 1",
+    [projetoId]
+  );
 }
 
 export function insertChatMessage(data: {
@@ -224,38 +269,37 @@ export function insertChatMessage(data: {
   selected_option?: number | null;
 }) {
   const id = generateId();
-  getDb().prepare(`
+  exec(`
     INSERT INTO chat_messages (id, projeto_id, role, content, options, selected_option)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
+  `, [
     id,
     data.projeto_id,
     data.role,
     data.content,
     data.options ? JSON.stringify(data.options) : null,
     data.selected_option ?? null,
-  );
-  return getDb().prepare('SELECT * FROM chat_messages WHERE id = ?').get(id) as ChatMessageRow;
+  ]);
+  return queryOne<ChatMessageRow>('SELECT * FROM chat_messages WHERE id = ?', [id])!;
 }
 
 // --- Documentacao ---
 
 export function getDocumentacao(projetoId: string) {
-  const row = getDb().prepare(
-    'SELECT * FROM documentacao WHERE projeto_id = ?'
-  ).get(projetoId) as DocumentacaoRow | undefined;
-  return row;
+  return queryOne<DocumentacaoRow>(
+    'SELECT * FROM documentacao WHERE projeto_id = ?', [projetoId]
+  );
 }
 
 export function upsertDocumentacao(projetoId: string, conteudo: unknown) {
-  const existing = getDb().prepare('SELECT id FROM documentacao WHERE projeto_id = ?').get(projetoId) as { id: string } | undefined;
+  const existing = queryOne<{ id: string }>('SELECT id FROM documentacao WHERE projeto_id = ?', [projetoId]);
   const now = nowISO();
-  const json = JSON.stringify(conteudo);
+  const jsonStr = JSON.stringify(conteudo);
   if (existing) {
-    getDb().prepare('UPDATE documentacao SET conteudo = ?, updated_at = ? WHERE projeto_id = ?').run(json, now, projetoId);
+    exec('UPDATE documentacao SET conteudo = ?, updated_at = ? WHERE projeto_id = ?', [jsonStr, now, projetoId]);
   } else {
     const id = generateId();
-    getDb().prepare('INSERT INTO documentacao (id, projeto_id, conteudo, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, projetoId, json, now, now);
+    exec('INSERT INTO documentacao (id, projeto_id, conteudo, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id, projetoId, jsonStr, now, now]);
   }
 }
 
@@ -269,96 +313,92 @@ export function insertValidacao(data: {
   admin_email?: string | null;
 }) {
   const id = generateId();
-  getDb().prepare(`
+  exec(`
     INSERT INTO validacoes (id, projeto_id, resultado, parecer, criterios, admin_email)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, data.projeto_id, data.resultado, data.parecer, data.criterios ? JSON.stringify(data.criterios) : null, data.admin_email ?? null);
+  `, [id, data.projeto_id, data.resultado, data.parecer, data.criterios ? JSON.stringify(data.criterios) : null, data.admin_email ?? null]);
   return id;
 }
 
 export function updateValidacaoEmailEnviado(projetoId: string) {
-  getDb().prepare('UPDATE validacoes SET email_enviado = 1 WHERE projeto_id = ?').run(projetoId);
+  exec('UPDATE validacoes SET email_enviado = 1 WHERE projeto_id = ?', [projetoId]);
 }
 
 // --- Configuracoes ---
 
 export function getConfiguracoes() {
-  return getDb().prepare('SELECT * FROM configuracoes ORDER BY chave').all() as ConfiguracaoRow[];
+  return queryAll<ConfiguracaoRow>('SELECT * FROM configuracoes ORDER BY chave');
 }
 
 export function getConfiguracao(chave: string) {
-  return getDb().prepare('SELECT * FROM configuracoes WHERE chave = ?').get(chave) as ConfiguracaoRow | undefined;
+  return queryOne<ConfiguracaoRow>('SELECT * FROM configuracoes WHERE chave = ?', [chave]);
 }
 
 export function updateConfiguracao(chave: string, valor: unknown, updatedBy: string) {
   const now = nowISO();
-  getDb().prepare('UPDATE configuracoes SET valor = ?, updated_by = ?, updated_at = ? WHERE chave = ?').run(
+  exec('UPDATE configuracoes SET valor = ?, updated_by = ?, updated_at = ? WHERE chave = ?', [
     JSON.stringify(valor), updatedBy, now, chave
-  );
+  ]);
 }
 
 // --- Profiles ---
 
 export function getProfiles() {
-  return getDb().prepare('SELECT id, nome, email FROM profiles ORDER BY nome').all() as ProfileRow[];
+  return queryAll<ProfileRow>('SELECT id, nome, email FROM profiles ORDER BY nome');
 }
 
 export function getProfileById(id: string) {
-  return getDb().prepare('SELECT * FROM profiles WHERE id = ?').get(id) as ProfileRow | undefined;
+  return queryOne<ProfileRow>('SELECT * FROM profiles WHERE id = ?', [id]);
 }
 
 export function upsertProfile(id: string, nome: string, email: string) {
-  const existing = getDb().prepare('SELECT id FROM profiles WHERE id = ?').get(id) as { id: string } | undefined;
+  const existing = queryOne<{ id: string }>('SELECT id FROM profiles WHERE id = ?', [id]);
   if (existing) {
-    getDb().prepare('UPDATE profiles SET nome = ?, email = ? WHERE id = ?').run(nome, email, id);
+    exec('UPDATE profiles SET nome = ?, email = ? WHERE id = ?', [nome, email, id]);
   } else {
-    getDb().prepare('INSERT INTO profiles (id, nome, email) VALUES (?, ?, ?)').run(id, nome, email);
+    exec('INSERT INTO profiles (id, nome, email) VALUES (?, ?, ?)', [id, nome, email]);
   }
 }
 
 export function deleteProfile(id: string) {
-  getDb().prepare('DELETE FROM profiles WHERE id = ?').run(id);
+  exec('DELETE FROM profiles WHERE id = ?', [id]);
 }
 
 // --- User Roles ---
 
 export function getUserRoles() {
-  return getDb().prepare('SELECT user_id, role FROM user_roles').all() as UserRoleRow[];
+  return queryAll<UserRoleRow>('SELECT user_id, role FROM user_roles');
 }
 
 export function getUserRole(userId: string, role?: string) {
   if (role) {
-    return getDb().prepare('SELECT * FROM user_roles WHERE user_id = ? AND role = ?').get(userId, role) as UserRoleRow | undefined;
+    return queryOne<UserRoleRow>('SELECT * FROM user_roles WHERE user_id = ? AND role = ?', [userId, role]);
   }
-  return getDb().prepare('SELECT * FROM user_roles WHERE user_id = ?').get(userId) as UserRoleRow | undefined;
+  return queryOne<UserRoleRow>('SELECT * FROM user_roles WHERE user_id = ?', [userId]);
 }
 
 export function deleteUserRoles(userId: string) {
-  getDb().prepare('DELETE FROM user_roles WHERE user_id = ?').run(userId);
+  exec('DELETE FROM user_roles WHERE user_id = ?', [userId]);
 }
 
 export function insertUserRole(userId: string, role: string) {
-  getDb().prepare('INSERT OR REPLACE INTO user_roles (user_id, role) VALUES (?, ?)').run(userId, role);
+  exec('INSERT OR REPLACE INTO user_roles (user_id, role) VALUES (?, ?)', [userId, role]);
 }
 
 // --- Leader Areas ---
 
 export function getLeaderAreas() {
-  return getDb().prepare('SELECT user_id, area_id FROM leader_areas').all() as LeaderAreaRow[];
+  return queryAll<LeaderAreaRow>('SELECT user_id, area_id FROM leader_areas');
 }
 
 export function deleteLeaderAreas(userId: string) {
-  getDb().prepare('DELETE FROM leader_areas WHERE user_id = ?').run(userId);
+  exec('DELETE FROM leader_areas WHERE user_id = ?', [userId]);
 }
 
 export function insertLeaderAreas(userId: string, areaIds: string[]) {
-  const stmt = getDb().prepare('INSERT INTO leader_areas (user_id, area_id) VALUES (?, ?)');
-  const tx = getDb().transaction((ids: string[]) => {
-    for (const areaId of ids) {
-      stmt.run(userId, areaId);
-    }
-  });
-  tx(areaIds);
+  for (const areaId of areaIds) {
+    exec('INSERT INTO leader_areas (user_id, area_id) VALUES (?, ?)', [userId, areaId]);
+  }
 }
 
 // ─── Row types ──────────────────────────────────────────────────────────────
