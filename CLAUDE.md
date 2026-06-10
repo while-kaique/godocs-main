@@ -130,7 +130,7 @@ rascunho → em_validacao → validado | rejeitado
 ### Segurança
 
 - Sem RLS (SQLite não tem) — o controle de acesso é feito no `src/worker.ts` (`requireAdmin`) e nos middlewares de auth das funções
-- Auth via header do Godeploy edge (Google OAuth), nome do header em `GODEPLOY_USER_HEADER` (default `x-user-email`)
+- Auth via header do Godeploy edge (Google OAuth), nome do header em `GODEPLOY_USER_HEADER` (default `x-godeploy-user-email`)
 - A tabela `admins` define quem é admin (`getCurrentUser` / `requireAdmin` consultam por email)
 - `createUser` apenas cria `profiles` + `user_roles` (+ `leader_areas`); não há mais credenciais locais — a senha do formulário é ignorada
 
@@ -334,7 +334,7 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 ### Runtime (server-only — lidos via `process.env` no `worker.ts` / funções `.server`)
 
 - `DATABASE_PATH` — caminho do arquivo SQLite (default: `./godocs.db`)
-- `GODEPLOY_USER_HEADER` — header com email do usuário autenticado pelo Godeploy edge (default: `x-user-email`)
+- `GODEPLOY_USER_HEADER` — header com email do usuário autenticado pelo Godeploy edge (default: `x-godeploy-user-email`)
 - `DEV_USER_EMAIL` — em dev, email usado quando não há header de auth
 - `LLM_PROVIDER` — `openai` (default) ou `anthropic`
 - `LLM_API_KEY` — chave da API do provider escolhido
