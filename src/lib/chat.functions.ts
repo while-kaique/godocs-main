@@ -647,6 +647,50 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   }
 
+  // ── Enviar dados ao n8n (registra na planilha + Drive) ──
+  const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+  if (n8nWebhookUrl) {
+    try {
+      const receita = conteudo.receita as Record<string, unknown> | undefined;
+      const membros = parseJson<string[]>(projeto.membros) ?? [];
+      const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+
+      const n8nPayload = {
+        projeto_id: projeto_id,
+        responsavel_nome: projeto.responsavel_nome,
+        responsavel_email: projeto.responsavel_email,
+        area: projeto.area ?? '—',
+        ferramenta: projeto.ferramenta,
+        escopo: projeto.escopo ?? null,
+        membros,
+        nome_projeto: projeto.nome ?? '',
+        descricao_breve: projeto.descricao_breve ?? '',
+        data_criacao_projeto: projeto.data_criacao_projeto ?? null,
+        tipos_projeto: tiposProjeto,
+        status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
+        saving_horas: (saving?.economia_horas_mes as number) ?? 0,
+        saving_reais: (saving?.economia_reais_mes as number) ?? 0,
+        tipo_saving: (saving?.tipo_saving as string) ?? '',
+        memorial_calculo: (saving?.memorial_calculo as string) ?? '',
+        custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
+        saving_linhas: JSON.stringify(saving?.linhas ?? []),
+        receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
+        receita_memorial: (receita?.memorial_calculo as string) ?? '',
+        documentacao: conteudo,
+      };
+
+      const n8nResp = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload),
+      });
+      const n8nResult = await n8nResp.json().catch(() => null);
+      log('submeterParaValidacao', `n8n respondeu ${n8nResp.status}:`, n8nResult);
+    } catch (n8nErr) {
+      err('submeterParaValidacao', 'Falha ao enviar dados ao n8n:', n8nErr);
+    }
+  }
+
   return { ok: true, status };
 }
 

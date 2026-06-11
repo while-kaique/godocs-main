@@ -22,12 +22,12 @@ const CHUNK_CHARS = 150_000;
 
 const CAMPOS = `CAMPOS:
 1. nome_projeto — Título do projeto (string ou null)
-2. o_que_faz — O que faz, para quem, qual o resultado — precisa de contexto de negócio (string ou null)
+2. o_que_faz — O que faz, para quem, qual o resultado. EXIGE contexto de negócio claro — se o código não revelar O PROPÓSITO e PARA QUEM, retorne null (string ou null)
 3. execucao — Como é acionado: trigger, schedule (com horário/frequência exatos), webhook URL, evento (string ou null)
 4. dependencias — Lista de serviços, APIs externas, variáveis de ambiente necessárias, credenciais (string ou null)
 5. fluxo — Sequência DETALHADA das etapas do código do início ao fim, com condicionais reais (IFs, switches) (string ou null)
 6. configurar_antes — Variáveis de ambiente, credenciais, configurações iniciais obrigatórias (string ou null)
-7. atencao — Limitações, pontos frágeis, edge cases observados no código (string ou null)`;
+7. atencao — Riscos, limitações, pontos frágeis CONCRETOS observados no código. NÃO liste observações genéricas que seriam verdade para qualquer projeto — só o que é ESPECÍFICO deste código (string ou null)`;
 
 const FORMATO = `Formato da resposta — APENAS JSON válido, sem texto adicional:
 {"nome_projeto":"...","o_que_faz":"...","execucao":"...","dependencias":"...","fluxo":"...","configurar_antes":"...","atencao":"..."}
@@ -86,17 +86,24 @@ async function extrairLote(
 ): Promise<DocumentacaoColetada> {
   const escopo = isLote
     ? `Você recebeu uma PARTE de um projeto maior. Extraia apenas o que estiver presente neste trecho; deixe null o que não aparecer aqui.`
-    : `Você recebeu o conteúdo completo dos arquivos do projeto.`;
+    : `Você recebeu os arquivos enviados pelo usuário. ATENÇÃO: isso pode ser o projeto completo OU apenas trechos/fragmentos de um projeto maior. Avalie criticamente se o código cobre o projeto inteiro ou se há lacunas evidentes (ex: só frontend sem backend, só API sem lógica de negócio, poucos arquivos para o escopo descrito).`;
 
-  const system = `Você é um analisador técnico de projetos de automação.
+  const descricaoCtx = ctx.descricao_breve?.trim()
+    ? `\nDESCRIÇÃO BREVE FORNECIDA PELO USUÁRIO: "${ctx.descricao_breve.trim()}"\nUse esta descrição como REFERÊNCIA para julgar se o código cobre todo o escopo do projeto. Se a descrição menciona funcionalidades que NÃO aparecem no código, os campos correspondentes devem ser null — não invente o que o código não mostra.\n`
+    : '';
+
+  const system = `Você é um analisador técnico de projetos de automação. Seu papel é extrair informação dos arquivos com ALTA PRECISÃO e CETICISMO.
 ${escopo}
+${descricaoCtx}
 Sua tarefa é preencher os 7 campos da documentação padrão DIRETAMENTE a partir do que está nos arquivos.
 
-REGRAS:
-- Campos TÉCNICOS (execucao, dependencias, fluxo, configurar_antes): preencha sempre que encontrar no código.
-- Campos de NEGÓCIO (o_que_faz, atencao): preencha o que conseguir inferir; podem ficar null se não houver contexto.
+REGRAS CRÍTICAS DE CETICISMO:
+- Campos TÉCNICOS (execucao, dependencias, fluxo, configurar_antes): preencha SOMENTE com o que está EXPLÍCITO no código. Se o código é parcial (ex: só frontend, só um módulo, sem entry point), preencha apenas o que o trecho mostra e deixe null o resto.
+- **o_que_faz**: preencha SOMENTE se o código revelar CLARAMENTE o propósito de negócio (para quem serve, que problema resolve, qual o resultado). Descrever endpoints ou funções tecnicamente NÃO é o mesmo que explicar o que o projeto faz para o negócio. Se você só consegue dizer "é uma interface que faz X e Y" sem saber POR QUE existe, retorne null.
+- **atencao**: liste SOMENTE riscos/limitações CONCRETOS e ESPECÍFICOS deste código. NÃO inclua observações genéricas que seriam verdade para qualquer software (ex: "se o servidor não responder JSON válido, pode falhar" — isso é óbvio). Se não houver nada realmente específico e relevante, retorne null.
 - nome_projeto: use o nome dos metadados se não estiver claro no código.
 - Seja preciso: extraia URLs, nomes de APIs, horários de cron, variáveis de ambiente, nomes de workflows EXATOS.
+- NA DÚVIDA, RETORNE NULL. É preferível deixar um campo null (o chat vai perguntar ao usuário) do que preencher com inferência fraca ou informação genérica.
 
 ${CAMPOS}
 

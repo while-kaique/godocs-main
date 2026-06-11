@@ -14,14 +14,28 @@ export type { GoDeployDB } from './db-adapter';
 // ─── Singleton global — setado pelo worker ou pelo dev plugin ──────────────
 
 let _db: GoDeployDB | undefined;
-let _initPromise: Promise<void> | undefined;
+let _schemaReady = false;
 
-/** Injeta a instância do banco. Chamado pelo worker.ts no início de cada request. */
+/**
+ * Injeta a instância do banco. Chamado pelo worker.ts no início de cada request.
+ *
+ * IMPORTANTE (Cloudflare Workers): o I/O de um binding (env.DB) fica atrelado ao
+ * request que o originou. NÃO podemos cachear a *promise* do initSchema em escopo
+ * de módulo e dar `await` nela em requests seguintes — isso lança
+ * "Error: Network connection lost." (a plataforma então devolve "App error" em
+ * texto puro, quebrando o JSON.parse do frontend).
+ *
+ * Por isso guardamos apenas um booleano. O initSchema roda dentro do contexto do
+ * request atual sempre que o schema ainda não foi confirmado. CREATE TABLE IF NOT
+ * EXISTS é idempotente, então uma eventual execução concorrente (ou repetida) é
+ * inofensiva. Se o init falhar, `_schemaReady` continua falso e o próximo request
+ * tenta de novo no seu próprio contexto — nunca envenenamos uma promise.
+ */
 export async function setDb(db: GoDeployDB): Promise<void> {
   _db = db;
-  // initSchema roda uma única vez por isolate; chamadas concorrentes aguardam a mesma promise.
-  if (!_initPromise) _initPromise = Promise.resolve(initSchema(db));
-  await _initPromise;
+  if (_schemaReady) return;
+  await initSchema(db);
+  _schemaReady = true;
 }
 
 /** Retorna a instância do banco injetada. Lança erro se não foi setada. */
@@ -32,13 +46,32 @@ export function getDb(): GoDeployDB {
 
 // ─── Helpers de query ──────────────────────────────────────────────────────
 
-/** Converte { columns, rows } do Godeploy em array de objetos tipados */
-function rowsToObjects<T>(result: { columns: string[]; rows: unknown[][] }): T[] {
+/**
+ * Converte o resultado de uma query em array de objetos tipados.
+ *
+ * Lida com os dois formatos possíveis de `rows`:
+ *  - **Produção (env.DB do Godeploy)**: cada row já é um objeto (`Record<string, unknown>`),
+ *    com as colunas como chaves. Usamos o objeto diretamente.
+ *  - **Dev (wrapper better-sqlite3)**: cada row é um array posicional (`unknown[]`),
+ *    indexado pela ordem das colunas. Reconstruímos o objeto via `columns`.
+ *
+ * Tratar sempre como array posicional (como era antes) faz com que, em produção
+ * (rows = objetos), todos os campos virem `undefined` — inclusive `id` —, causando
+ * "NOT NULL constraint failed: chat_messages.projeto_id" ao iniciar a análise.
+ */
+function rowsToObjects<T>(result: { columns: string[]; rows: unknown[] }): T[] {
   const { columns, rows } = result;
+  if (!Array.isArray(rows)) return [];
   return rows.map((row) => {
+    // Já é um objeto (formato do env.DB do Godeploy) → usa direto.
+    if (row !== null && typeof row === 'object' && !Array.isArray(row)) {
+      return row as T;
+    }
+    // Array posicional (wrapper better-sqlite3 em dev) → mapeia por coluna.
+    const arr = row as unknown[];
     const obj: Record<string, unknown> = {};
     for (let i = 0; i < columns.length; i++) {
-      obj[columns[i]] = row[i];
+      obj[columns[i]] = arr[i];
     }
     return obj as T;
   });

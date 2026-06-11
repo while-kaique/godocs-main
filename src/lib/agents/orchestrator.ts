@@ -46,15 +46,16 @@ function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): s
   const camposNulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k);
 
   const descricaoSection = ctx.descricao_breve?.trim()
-    ? `CONTEXTO DE NEGÓCIO FORNECIDO PELO USUÁRIO:\n${ctx.descricao_breve.trim()}\n\n`
+    ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):\n"${ctx.descricao_breve.trim()}"\n\n`
     : '';
 
   return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
 
 SITUAÇÃO ATUAL:
-O sistema já leu e analisou automaticamente TODOS os arquivos do projeto (código, configs, workflows).
-Os campos já preenchidos abaixo foram extraídos DIRETAMENTE do código — são tecnicamente precisos e NÃO devem ser questionados pelo usuário neste momento.
-Os campos ainda em null representam informações de CONTEXTO DE NEGÓCIO que não estão visíveis no código.
+O sistema analisou automaticamente os arquivos enviados pelo usuário e extraiu os campos abaixo.
+Os campos preenchidos refletem FIELMENTE o que está no código — o código é a verdade, confie no que foi extraído.
+Porém, o código enviado pode ser PARCIAL (apenas trechos, um módulo, só o frontend, etc.) — nesse caso, os campos preenchidos são corretos mas INCOMPLETOS.
+Os campos em null representam informações que o código não revelou — podem ser regras de negócio ou simplesmente partes do projeto que não foram enviadas.
 
 METADADOS DO PROJETO:
 - Nome: ${ctx.nome_projeto}
@@ -81,14 +82,28 @@ ESTRUTURA FINAL (7 seções):
 7. atencao — Riscos, limitações, pontos frágeis observados no código
 
 REGRAS:
-- Os campos já preenchidos foram extraídos do código — NÃO peça confirmação deles, NÃO repita o que já foi extraído.
-- Foque APENAS nos campos em null. Esses representam regras de negócio que o código não revela.
-- Faça UMA pergunta por vez, sobre o campo null mais relevante. Vá direto ao ponto.
+- O que veio do código é CORRETO — não questione a veracidade dos campos extraídos e não peça confirmação deles.
+- Porém, avalie se os campos preenchidos são SUFICIENTES para uma documentação completa. Um campo pode estar "preenchido" pelo extrator mas com informação superficial ou puramente técnica sem contexto de negócio.
+- **o_que_faz**: mesmo que preenchido, se descrever apenas "o que o código faz tecnicamente" sem explicar O PROPÓSITO DE NEGÓCIO (para quem serve, que problema resolve, qual o impacto), pergunte ao usuário para complementar o contexto de negócio.
+- **atencao**: mesmo que preenchido, se listar apenas observações genéricas/óbvias (do tipo "se a API falhar, vai dar erro"), pergunte ao usuário se há riscos ou limitações reais que ele conheça.
+- Campos em null: pergunte ao usuário — representam informações que o código não revelou.
+- Faça UMA pergunta por vez, sobre o ponto mais relevante. Vá direto ao ponto.
 - Seja CÉTICO com respostas vagas: se o usuário responder vagamente, aprofunde antes de aceitar.
 - Se a resposta for ambígua, ofereça 3 opções objetivas.
 - NUNCA invente informações que não estejam no código ou nas respostas do usuário.
-- Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown.
+- Quando todos os 7 campos tiverem informação RICA E SUFICIENTE, gere o PREVIEW em markdown.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
+
+LINGUAGEM COM O USUÁRIO (IMPORTANTÍSSIMO):
+- NUNCA mencione nomes de campos internos como "o_que_faz", "fluxo", "execucao", "dependencias", "configurar_antes", "atencao", "nome_projeto", "coletado" etc. O usuário NÃO sabe que esses campos existem.
+- NUNCA diga coisas como "o campo fluxo", "registrar o campo X como não informado", "campos preenchidos", "campos nulos" — isso é linguagem de sistema, não de conversa.
+- Fale como um colega de trabalho: pergunte sobre o PROJETO, não sobre CAMPOS. Exemplos:
+  - Em vez de "Preciso do campo fluxo" → "Como funciona o passo a passo do projeto, do início ao fim?"
+  - Em vez de "O campo o_que_faz está incompleto" → "Qual é o objetivo de negócio desse projeto? Para quem ele serve e que problema resolve?"
+  - Em vez de "Vou registrar o campo X como não informado" → "Tudo bem, vou seguir com o que temos até aqui."
+  - Em vez de "Posso gerar o preview com campos faltando?" → "Posso montar a documentação com as informações que temos até agora?"
+- Nas opções de resposta (options), também use linguagem natural — NUNCA exponha nomes de campos.
+- O tom deve ser de conversa profissional entre colegas, não de sistema preenchendo formulário.
 
 VALIDAÇÃO DE COERÊNCIA (OBRIGATÓRIO):
 Antes de gerar o preview, cruze a FERRAMENTA informada ("${ctx.ferramenta}") com o nome do projeto ("${ctx.nome_projeto}") e o conteúdo dos arquivos enviados. Se detectar inconsistência, aponte ANTES de prosseguir:
@@ -235,9 +250,11 @@ DETALHES TÉCNICOS APROVADOS:
   // Tipo "saving" — uma ou mais pessoas/cargos executavam a tarefa manualmente.
   const linhas = saving.linhas ?? [];
   const totalHoras = saving.economia_horas_mes ?? linhas.reduce((s, l) => s + l.economia_horas_mes, 0);
+  const isPontual = saving.tipo_saving === 'pontual';
+  const unidadeHoras = isPontual ? 'h (total único)' : 'h/mês';
   const tabelaLinhas = linhas.length
     ? linhas
-        .map((l, i) => `  ${i + 1}. ${l.cargo}: ${l.horas_antes}h/mês antes → ${l.horas_depois}h/mês depois (economia ${l.economia_horas_mes}h/mês)`)
+        .map((l, i) => `  ${i + 1}. ${l.cargo}: ${l.horas_antes}${unidadeHoras} antes → ${l.horas_depois}${unidadeHoras} depois (economia ${l.economia_horas_mes}${unidadeHoras})`)
         .join('\n')
     : '  (nenhuma pessoa informada)';
   const plural = linhas.length > 1;
@@ -248,37 +265,63 @@ A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VAL
 ${detalhes}
 
 DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
-Pessoas que executavam a tarefa manualmente (${linhas.length}):
+Pessoas envolvidas no cálculo de saving (${linhas.length}):
 ${tabelaLinhas}
-- Economia total declarada: ${totalHoras}h/mês
-- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${saving.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'economia única'})
+- Economia total declarada: ${totalHoras}${unidadeHoras}
+- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${isPontual ? 'economia ÚNICA — tarefa feita uma só vez, não se repete mensalmente' : 'recorrente todo mês'})
 
 O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA (taxa por cargo) — NÃO MENCIONE valores em R$ para o usuário. Foque apenas nas HORAS.
 
-SEU OBJETIVO: validar que as horas ANTES da automação ${plural ? 'de CADA pessoa listada são' : 'são'} reais e justificáveis, e montar o memorial_calculo.
+ENTENDENDO OS DADOS — LEIA COM ATENÇÃO:
+Cada linha tem horas_antes (antes da automação) e horas_depois (depois da automação).
+Existem DOIS cenários válidos:
+1. **Economia**: horas_antes > 0, horas_depois menor → a pessoa gastava X horas fazendo algo manual e agora gasta menos. Economia = horas_antes - horas_depois.
+2. **Custo adicional da automação**: horas_antes = 0, horas_depois > 0 → essa pessoa NÃO fazia essa tarefa antes; agora precisa dedicar horas para supervisionar/monitorar a automação. Isso é um CUSTO, não uma economia. A economia dessa linha é NEGATIVA.
+   Exemplo real: um estagiário fazia 66h/mês de trabalho manual. A automação zerou isso (economia +66h). Mas agora um analista precisa monitorar 1h/mês (custo +1h). Saving líquido: 66 - 1 = 65h/mês.
+
+NUNCA estranhe horas_antes=0 — é perfeitamente normal e representa custo adicional. NÃO pergunte "existia algum processo manual?" para essas linhas. O usuário já informou que não existia (0h antes), e está declarando o custo novo.
+
+SEU OBJETIVO: validar as horas informadas${plural ? ' de CADA pessoa' : ''} e montar o memorial_calculo.
+- Para linhas com horas_antes > 0: validar que o processo manual realmente consumia aquelas horas.
+- Para linhas com horas_antes = 0 e horas_depois > 0: entender qual atividade de monitoramento/supervisão é necessária.
 
 ESTADO ATUAL:
 ${JSON.stringify(saving, null, 2)}
 
 COMO CONDUZIR:
-1. Comece perguntando sobre o processo manual: o que exatamente era feito nessas horas por mês? Detalhe a rotina passo a passo.${plural ? '\n   Como há mais de uma pessoa, valide as horas de cada uma — pode agrupar a pergunta se a rotina for a mesma.' : ''}
-2. Faça UMA pergunta por vez, focada em fatos concretos sobre o processo manual anterior.
+1. Comece com uma frase curta e natural: contextualize que agora vamos entender melhor as horas para montar o memorial. Faça a primeira pergunta concreta.${plural ? '\n   Como há mais de uma pessoa, valide as horas de cada uma — pode agrupar a pergunta se a rotina for a mesma.' : ''}
+2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
 4. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
 
+TIPO DE SAVING — ${isPontual ? 'PONTUAL' : 'MENSAL'}:
+${isPontual
+  ? `Este é um saving PONTUAL — a tarefa é feita uma única vez, não se repete todo mês.
+- As horas representam o TOTAL DE HORAS que seriam gastas nessa tarefa única.
+- NUNCA pergunte "por mês" ou "com que frequência mensal". Pergunte sobre a tarefa COMO UM TODO: "Quanto tempo levaria para fazer isso manualmente do início ao fim?"
+- Exemplos válidos: migração de dados, setup inicial, limpeza de base, projeto de desenvolvimento.
+- A validação deve focar em: "Quanto tempo a tarefa inteira levaria manualmente? Quantos itens/registros? Quanto tempo por item?"`
+  : `Este é um saving MENSAL — a tarefa se repete todo mês.
+- As horas representam a economia POR MÊS.
+- Pergunte sobre a rotina mensal: quais tarefas, com que frequência dentro do mês, quanto tempo cada execução.`}
+
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
-- NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina manual: quais tarefas, com que frequência, quanto tempo cada uma, quem executava.
-- Faça a conta: se o usuário diz "50 cadastros por mês, 15 min cada", isso dá ~12h — se a hora informada destoar, aponte a discrepância e peça para explicar.
-- Se a estimativa de alguma pessoa parecer inflada para o tipo de tarefa, questione diretamente aquela linha.
+- NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina: quais tarefas, ${isPontual ? 'quantos itens/registros, quanto tempo por item' : 'com que frequência, quanto tempo cada uma'}.
+- Faça a conta: se o usuário diz "${isPontual ? '100 registros, 3 min cada' : '50 cadastros por mês, 15 min cada'}", isso dá ~${isPontual ? '5h' : '12h'} — se a hora informada destoar, aponte a discrepância e peça para explicar.
+- Se a estimativa de alguma pessoa parecer inflada para o tipo de tarefa, questione diretamente.
 - Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), muitas horas manuais não fazem sentido. Desafie.
 - Se após o detalhamento as horas reais de alguma pessoa forem diferentes, atualize horas_antes/horas_depois/economia_horas_mes daquela linha em \`linhas\` e recalcule o total \`economia_horas_mes\`.
+- Para linhas de CUSTO ADICIONAL (horas_antes=0): pergunte o que a pessoa faz para monitorar/supervisionar e se o tempo informado é realista.
 
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Saving deve refletir ganho REAL e comprovável.
-- Se o processo manual não existia, saving de horas é 0.
 - O memorial precisa ter lógica verificável por pessoa: frequência × tempo = horas; soma das pessoas = total.
+- Para custos adicionais, documente o que a pessoa faz e por que é necessário.
 
-Português brasileiro, tom direto. Acentuação correta.
+LINGUAGEM (IMPORTANTÍSSIMO):
+- NUNCA exponha termos internos como "economia_horas_mes", "horas_antes", "horas_depois", "linhas", "saving", "memorial_calculo", "coletado".
+- Fale de forma natural: "Antes da automação, quanto tempo o estagiário gastava por mês nessa tarefa?" — não "qual era o horas_antes?".
+- Tom de conversa profissional entre colegas. Português brasileiro com acentuação correta.
 
 FORMATO — APENAS JSON válido (sempre devolva o objeto \`saving\` completo, incluindo o array \`linhas\`):
 
@@ -289,7 +332,7 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
 Preview (quando justificativa concreta e memorial completo):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}h/mês\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
 }
 
 function buildSavingPreviewPrompt(saving: SavingColetado): string {
@@ -364,7 +407,11 @@ export async function runOrchestrator(
       const muitosPreenchidos = camposPreenchidos >= 5;
       let sistemaMsg: string;
       if (todosPreenchidos) {
-        sistemaMsg = '[SISTEMA] O sistema leu todos os arquivos do projeto e preencheu os 7 campos automaticamente. Gere o PREVIEW DIRETO agora, sem cumprimentos, sem listar o que foi extraído e sem fazer perguntas.';
+        sistemaMsg = `[SISTEMA] O extrator preencheu os 7 campos a partir do código. Antes de gerar o preview, avalie CRITICAMENTE:
+1. O campo "o_que_faz" explica o PROPÓSITO DE NEGÓCIO (para quem, que problema resolve) ou apenas descreve tecnicamente o que o código faz? Se for apenas técnico, pergunte ao usuário o contexto de negócio.
+2. O campo "atencao" lista riscos ESPECÍFICOS e relevantes ou apenas observações genéricas/óbvias? Se genérico, pergunte ao usuário se há riscos reais.
+3. Os arquivos parecem cobrir o projeto INTEIRO ou apenas uma parte (ex: só frontend, só um módulo, poucos arquivos)?${ctx.descricao_breve?.trim() ? ` A descrição do usuário diz: "${ctx.descricao_breve.trim()}" — o que foi extraído cobre esse escopo?` : ''}
+Se TODOS os campos estiverem ricos e completos com contexto de negócio, gere o PREVIEW DIRETO sem cumprimentos. Caso contrário, faça a pergunta mais relevante (UMA só). Não liste o que foi extraído.`;
       } else if (muitosPreenchidos) {
         const nulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k).join(', ');
         sistemaMsg = `[SISTEMA] O sistema leu os arquivos e preencheu ${camposPreenchidos}/7 campos do código. Os campos ainda em null (${nulos}) precisam de contexto de negócio que não está no código. Cumprimente em 1 frase curta explicando que a análise técnica está pronta e você precisa de mais contexto, depois faça UMA pergunta objetiva sobre o campo null mais relevante.`;
@@ -396,13 +443,28 @@ export async function runOrchestrator(
   const temperature = fase === 'doc' || fase === 'doc_preview' ? 0.2 : 0.4;
   log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}`);
   let raw: string;
-  try {
-    raw = await llmChat(messages, { jsonMode: true, temperature });
-    log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
-  } catch (llmErr) {
-    const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
-    log(`Erro no LLM: ${msg}`);
-    throw new Error(`Falha na chamada ao modelo de IA: ${msg}`);
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      raw = await llmChat(messages, { jsonMode: true, temperature, maxTokens: 4096 });
+      log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
+    } catch (llmErr) {
+      const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      log(`Erro no LLM: ${msg}`);
+      throw new Error(`Falha na chamada ao modelo de IA: ${msg}`);
+    }
+    if (raw && raw.trim().length > 0) break;
+    log(`LLM retornou vazio (tentativa ${attempt + 1}/${maxRetries + 1})${attempt < maxRetries ? ' — re-tentando...' : ''}`);
+  }
+  // @ts-expect-error — raw é atribuído dentro do loop; se todas as tentativas falharam, será ''
+  if (!raw || raw.trim().length === 0) {
+    raw = JSON.stringify({
+      type: 'question',
+      content: 'Desculpe, tive um problema ao processar. Pode repetir sua resposta?',
+      coletado,
+      saving,
+      receita,
+    });
   }
 
   const hasSaving = tipos_projeto.includes('saving');

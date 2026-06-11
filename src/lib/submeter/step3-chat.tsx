@@ -4,6 +4,59 @@ import { CARGOS } from "@/lib/agents/types";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput } from "./constants";
 
 /* ──────────────────────────────────────────────
+   Inline Markdown helper (reutilizável)
+   ────────────────────────────────────────────── */
+
+function renderInlineMarkdown(line: string, accentColor: string, isSaving: boolean): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const regex = /\*\*(.+?)\*\*|(?<!\*)\*([^*]+?)\*(?!\*)|\`([^`]+?)\`/g;
+  let lastIndex = 0;
+  let match;
+  let partKey = 0;
+
+  while ((match = regex.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<span key={partKey++}>{line.slice(lastIndex, match.index)}</span>);
+    }
+    if (match[1] !== undefined) {
+      parts.push(
+        <strong key={partKey++} style={{ color: accentColor, fontWeight: 600 }}>
+          {match[1]}
+        </strong>
+      );
+    } else if (match[2] !== undefined) {
+      parts.push(
+        <em key={partKey++} style={{ fontStyle: "italic", opacity: 0.85 }}>
+          {match[2]}
+        </em>
+      );
+    } else if (match[3] !== undefined) {
+      parts.push(
+        <code
+          key={partKey++}
+          className="rounded px-1 py-0.5 text-[12px]"
+          style={{
+            background: isSaving ? "rgba(215,219,0,0.1)" : "rgba(0,89,169,0.06)",
+            color: accentColor,
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            fontWeight: 500,
+          }}
+        >
+          {match[3]}
+        </code>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < line.length) {
+    parts.push(<span key={partKey++}>{line.slice(lastIndex)}</span>);
+  }
+
+  return parts.length > 0 ? <>{parts}</> : line;
+}
+
+/* ──────────────────────────────────────────────
    Simple Markdown Renderer
    ────────────────────────────────────────────── */
 
@@ -21,18 +74,18 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
     elements.push(
       <ul
         key={key++}
-        className="space-y-1.5 pl-1"
-        style={{ margin: "8px 0" }}
+        className="space-y-1 pl-1"
+        style={{ margin: "6px 0" }}
       >
         {listBuffer.map((item, i) => (
           <li
             key={i}
-            className="flex items-start gap-2.5 text-[13px] leading-relaxed"
+            className="flex items-start gap-2 text-[13.5px] leading-[1.6]"
             style={{ color: "var(--go-text-primary)" }}
           >
             <span
-              className="mt-[7px] block h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ background: accentColor, opacity: 0.5 }}
+              className="mt-[8px] block h-[5px] w-[5px] shrink-0 rounded-full"
+              style={{ background: accentColor, opacity: 0.4 }}
             />
             <span>{renderInline(item)}</span>
           </li>
@@ -42,31 +95,7 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
     listBuffer = [];
   }
 
-  function renderInline(line: string): React.ReactNode {
-    const parts: React.ReactNode[] = [];
-    const regex = /\*\*(.+?)\*\*/g;
-    let lastIndex = 0;
-    let match;
-    let partKey = 0;
-
-    while ((match = regex.exec(line)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(line.slice(lastIndex, match.index));
-      }
-      parts.push(
-        <strong key={partKey++} style={{ color: accentColor, fontWeight: 700 }}>
-          {match[1]}
-        </strong>
-      );
-      lastIndex = regex.lastIndex;
-    }
-
-    if (lastIndex < line.length) {
-      parts.push(line.slice(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : line;
-  }
+  const renderInline = (line: string) => renderInlineMarkdown(line, accentColor, isSaving);
 
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
@@ -76,10 +105,10 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
       elements.push(
         <h2
           key={key++}
-          className="text-[17px] font-extrabold tracking-tight"
+          className="text-[15px] font-bold tracking-tight"
           style={{ color: accentColor, margin: "0 0 4px" }}
         >
-          {line.replace(/^# /, "")}
+          {renderInline(line.replace(/^# /, ""))}
         </h2>
       );
       continue;
@@ -88,20 +117,20 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
     if (line.startsWith("## ")) {
       flushList();
       elements.push(
-        <div key={key++} style={{ margin: elements.length > 0 ? "16px 0 6px" : "0 0 6px" }}>
+        <div key={key++} style={{ margin: elements.length > 0 ? "14px 0 5px" : "0 0 5px" }}>
           <div
             className="flex items-center gap-2"
-            style={{ borderBottom: `1.5px solid ${accentBorder}`, paddingBottom: 6 }}
+            style={{ borderBottom: `1.5px solid ${accentBorder}`, paddingBottom: 5 }}
           >
             <div
-              className="h-2 w-2 rounded-full"
-              style={{ background: accentColor, opacity: 0.6 }}
+              className="h-[6px] w-[6px] rounded-full"
+              style={{ background: accentColor, opacity: 0.5 }}
             />
             <h3
-              className="text-[13px] font-bold uppercase tracking-[0.06em]"
+              className="text-[12.5px] font-semibold uppercase tracking-[0.05em]"
               style={{ color: accentColor }}
             >
-              {line.replace(/^## /, "")}
+              {renderInline(line.replace(/^## /, ""))}
             </h3>
           </div>
         </div>
@@ -115,9 +144,9 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
         <h4
           key={key++}
           className="text-[13px] font-semibold"
-          style={{ color: accentColor, margin: "10px 0 4px" }}
+          style={{ color: accentColor, margin: "8px 0 3px" }}
         >
-          {line.replace(/^### /, "")}
+          {renderInline(line.replace(/^### /, ""))}
         </h4>
       );
       continue;
@@ -144,8 +173,8 @@ function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean })
     elements.push(
       <p
         key={key++}
-        className="text-[13px] leading-relaxed"
-        style={{ color: "var(--go-text-primary)", margin: "4px 0" }}
+        className="text-[13.5px] leading-[1.65]"
+        style={{ color: "var(--go-text-primary)", margin: "3px 0" }}
       >
         {renderInline(line)}
       </p>
@@ -1189,8 +1218,8 @@ export function Step3Chat({
             >
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
-                  msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
+                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                  msg.role === "user" ? "rounded-tr-sm whitespace-pre-wrap" : "rounded-tl-sm"
                 )}
                 style={
                   msg.role === "user"
@@ -1202,7 +1231,11 @@ export function Step3Chat({
                       }
                 }
               >
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <SimpleMarkdown text={msg.content} isSaving={isSavingFase} />
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
           );
@@ -1260,7 +1293,7 @@ export function Step3Chat({
                 color: isSavingFase ? "#6b6e00" : "var(--go-blue)",
               }}
             >
-              {opt}
+              {renderInlineMarkdown(opt, isSavingFase ? "#6b6e00" : "var(--go-blue)", isSavingFase)}
             </button>
           ))}
         </div>

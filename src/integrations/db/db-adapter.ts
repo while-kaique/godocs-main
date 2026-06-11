@@ -5,7 +5,13 @@
 // better-sqlite3 do dev é síncrono. O tipo aceita ambos (T | Promise<T>); a
 // camada client.server sempre dá `await` (no-op sobre valor síncrono).
 
-export type QueryResult = { columns: string[]; rows: unknown[][]; rowsRead: number };
+// `rows` vem como array de OBJETOS no env.DB do Godeploy (produção) e como array
+// POSICIONAL no wrapper better-sqlite3 (dev). rowsToObjects normaliza os dois.
+export type QueryResult = {
+  columns: string[];
+  rows: Array<Record<string, unknown>> | unknown[][];
+  rowsRead: number;
+};
 export type ExecResult = { rowsWritten: number };
 
 /** Interface compatível com env.DB do Godeploy */
