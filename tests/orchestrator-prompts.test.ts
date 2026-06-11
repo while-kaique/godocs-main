@@ -73,10 +73,10 @@ describe('Prompt fase doc', () => {
     expect(system).toContain('Python');
   });
 
-  it('inclui regra de não perguntar campos já preenchidos', async () => {
+  it('inclui regra de confiar nos campos extraídos do código', async () => {
     await runOrchestrator(makeCtx({ doc_texto: 'algo' }), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('NÃO peça confirmação');
+    expect(system).toContain('não questione a veracidade dos campos extraídos');
   });
 
   it('inclui regra de nunca inventar informações', async () => {
