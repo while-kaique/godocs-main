@@ -20,11 +20,14 @@ import {
   deleteChatMessagesByProjeto,
   insertValidacao,
   updateValidacaoEmailEnviado,
+  insertAnalise,
+  getLatestAnalise,
   parseJson,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
+import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
@@ -664,6 +667,35 @@ export async function atualizarMetadados(rawData: unknown) {
   return { ok: true, reset: true, response: formatResponse(resultado) };
 }
 
+// ─── Analisar projeto (pré-submissão) ───────────────────────────────────────
+
+const analisarProjetoSchema = z.object({ projeto_id: z.string().min(1) });
+
+export async function analisarProjetoFn(rawData: unknown) {
+  const { projeto_id } = analisarProjetoSchema.parse(rawData);
+  log('analisarProjeto', `projeto=${projeto_id}`);
+
+  const resultado = await analisarProjetoAgent(projeto_id);
+
+  await insertAnalise({
+    projeto_id,
+    resultado: resultado.resultado,
+    pontuacao_total: resultado.pontuacao_total,
+    pontuacao_maxima: resultado.pontuacao_maxima,
+    justificativa: resultado.justificativa,
+    resumo: resultado.resumo,
+    criterios_hardcoded: resultado.criterios_hardcoded,
+    criterios_dinamicos: resultado.criterios_dinamicos,
+  });
+
+  // Persiste a complexidade no projeto
+  await updateProjeto(projeto_id, { complexidade: resultado.complexidade });
+
+  log('analisarProjeto', `Resultado: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+
+  return resultado;
+}
+
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
 export async function submeterParaValidacao(rawData: unknown) {
@@ -691,6 +723,19 @@ export async function submeterParaValidacao(rawData: unknown) {
   const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
   const now = new Date().toISOString();
 
+  // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
+  const receita = conteudo.receita as Record<string, unknown> | undefined;
+  const savingReais = (saving?.economia_reais_mes as number) ?? 0;
+  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
+  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+
+  const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
+  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
+  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
+  const receitaEquivalente = receitaMensal / 10;
+
+  const ganhoTotalMensal = savingMensal + receitaEquivalente;
+
   await updateProjeto(projeto_id, {
     status,
     submitted_at: now,
@@ -698,60 +743,19 @@ export async function submeterParaValidacao(rawData: unknown) {
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
     memorial_calculo: (saving?.memorial_calculo as string) ?? null,
+    ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
 
-  const chatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
-  if (chatWebhookUrl) {
-    try {
-      const savingHoras = saving?.economia_horas_mes ?? 0;
-      const savingReais = saving?.economia_reais_mes ?? 0;
-      const fmtReais = Number(savingReais).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const tipoSaving = saving?.tipo_saving ?? 'mensal';
-      const membros = (parseJson<string[]>(projeto.membros) ?? []).join(', ');
+  // ── Carregar análise do Agente Analisador (se existir) ──
+  const analise = await getLatestAnalise(projeto_id);
+  const analiseResultado = analise?.resultado ?? null;
 
-      const text = [
-        '──────────────────────',
-        '',
-        '🚨 *Novo fluxo de automação cadastrado – aprovação pendente*',
-        '',
-        `📌 *Projeto:* ${projeto.nome}`,
-        `🏷️ *Área:* ${projeto.area ?? '—'}`,
-        `🛠️ *Ferramenta:* ${projeto.ferramenta}`,
-        '',
-        `👤 *Solicitante:* ${projeto.responsavel_nome}`,
-        `📧 *E-mail:* ${projeto.responsavel_email}`,
-        membros ? `👥 *Participantes:* ${membros}` : '',
-        '',
-        `⏱️ *Saving estimado (horas/mês):* ${savingHoras} horas`,
-        `💰 *Saving estimado (R$/mês):* R$ ${fmtReais}`,
-        `📊 *Tipo de saving:* ${tipoSaving}`,
-        '',
-        `📅 *Data da submissão:* ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
-        `📊 *Status:* ${status === 'aprovado' ? 'Aprovado (auto)' : 'Pendente'}`,
-        '',
-        '👉 *Aguardando avaliação e aprovação dos responsáveis.*',
-        '',
-        '──────────────────────',
-      ].filter(Boolean).join('\n');
-
-      await fetch(chatWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      log('submeterParaValidacao', 'Notificação Google Chat enviada.');
-    } catch (chatErr) {
-      err('submeterParaValidacao', 'Falha ao enviar notificação Google Chat:', chatErr);
-    }
-  }
-
-  // ── Enviar dados ao n8n (registra na planilha + Drive) ──
+  // ── Enviar dados ao n8n (registra na planilha + Drive + notifica Google Chat) ──
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
   if (n8nWebhookUrl) {
     try {
-      const receita = conteudo.receita as Record<string, unknown> | undefined;
       const membros = parseJson<string[]>(projeto.membros) ?? [];
       const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
@@ -767,7 +771,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         descricao_breve: projeto.descricao_breve ?? '',
         data_criacao_projeto: projeto.data_criacao_projeto ?? null,
         tipos_projeto: tiposProjeto,
-        status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
+        status: analiseResultado === 'rejeitado' ? 'Em Revisão' : (status === 'aprovado' ? 'Aprovado' : 'Pendente'),
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,
         tipo_saving: (saving?.tipo_saving as string) ?? '',
@@ -775,8 +779,20 @@ export async function submeterParaValidacao(rawData: unknown) {
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
+        receita_tipo_saving: (receita?.tipo_saving as string) ?? '',
         receita_memorial: (receita?.memorial_calculo as string) ?? '',
+        ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
+        complexidade: projeto.complexidade ?? null,
         documentacao: conteudo,
+        // Dados da análise IA
+        analise_resultado: analiseResultado,
+        analise_pontuacao_total: analise?.pontuacao_total ?? null,
+        analise_pontuacao_maxima: analise?.pontuacao_maxima ?? null,
+        analise_justificativa: analise?.justificativa ?? null,
+        analise_criterios: analise ? JSON.stringify({
+          hardcoded: parseJson(analise.criterios_hardcoded),
+          dinamicos: parseJson(analise.criterios_dinamicos),
+        }) : null,
       };
 
       const n8nResp = await fetch(n8nWebhookUrl, {

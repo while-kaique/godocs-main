@@ -10,7 +10,7 @@ const STATUS_LABEL: Record<Status, string> = {
   rascunho: "Rascunho",
   em_validacao: "Em validação",
   validado: "Validado",
-  rejeitado: "Rejeitado",
+  rejeitado: "Em revisão",
   aprovado: "Aprovado",
 };
 
@@ -18,7 +18,7 @@ const STATUS_COLOR: Record<Status, string> = {
   rascunho: "bg-muted text-muted-foreground",
   em_validacao: "bg-yellow-100 text-yellow-800",
   validado: "bg-green-100 text-green-800",
-  rejeitado: "bg-red-100 text-red-800",
+  rejeitado: "bg-amber-100 text-amber-800",
   aprovado: "bg-green-100 text-green-800",
 };
 

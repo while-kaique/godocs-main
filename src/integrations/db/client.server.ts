@@ -371,6 +371,41 @@ export function updateValidacaoEmailEnviado(projetoId: string) {
   return exec('UPDATE validacoes SET email_enviado = 1 WHERE projeto_id = ?', [projetoId]);
 }
 
+// --- Analises ---
+
+export async function insertAnalise(data: {
+  projeto_id: string;
+  resultado: string;
+  pontuacao_total: number;
+  pontuacao_maxima: number;
+  justificativa: string;
+  resumo?: string;
+  criterios_hardcoded?: unknown;
+  criterios_dinamicos?: unknown;
+}) {
+  const id = generateId();
+  await exec(`
+    INSERT INTO analises (id, projeto_id, resultado, pontuacao_total, pontuacao_maxima,
+      justificativa, resumo, criterios_hardcoded, criterios_dinamicos)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    id, data.projeto_id, data.resultado,
+    data.pontuacao_total, data.pontuacao_maxima,
+    data.justificativa,
+    data.resumo ?? null,
+    data.criterios_hardcoded ? JSON.stringify(data.criterios_hardcoded) : null,
+    data.criterios_dinamicos ? JSON.stringify(data.criterios_dinamicos) : null,
+  ]);
+  return id;
+}
+
+export function getLatestAnalise(projetoId: string) {
+  return queryOne<AnaliseRow>(
+    'SELECT * FROM analises WHERE projeto_id = ? ORDER BY created_at DESC LIMIT 1',
+    [projetoId]
+  );
+}
+
 // --- Configuracoes ---
 
 export function getConfiguracoes() {
@@ -485,6 +520,8 @@ export type ProjetoRow = {
   tipo_saving: string | null;
   memorial_calculo: string | null;
   custo_externo_mensal: number | null;
+  ganho_total_mensal: number | null;
+  complexidade: string | null;
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
@@ -519,6 +556,19 @@ export type ValidacaoRow = {
   criterios: string | null; // JSON string
   admin_email: string | null;
   email_enviado: number | null;
+  created_at: string | null;
+};
+
+export type AnaliseRow = {
+  id: string;
+  projeto_id: string;
+  resultado: string;
+  pontuacao_total: number;
+  pontuacao_maxima: number;
+  justificativa: string;
+  resumo: string | null;
+  criterios_hardcoded: string | null; // JSON string
+  criterios_dinamicos: string | null; // JSON string
   created_at: string | null;
 };
 

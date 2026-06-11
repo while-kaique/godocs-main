@@ -53,59 +53,6 @@ describe('Extração de saving do JSON de documentação', () => {
   });
 });
 
-describe('Formatação da notificação Google Chat', () => {
-  it('monta texto de notificação com dados do projeto', () => {
-    const projeto = {
-      nome: 'Cadastro de Embaixadores',
-      area: 'Marketing de Influência',
-      ferramenta: 'n8n',
-      responsavel_nome: 'Teste Testando',
-      responsavel_email: 'teste@gocase.com',
-      membros: ['colega@gocase.com'],
-    };
-    const saving = {
-      economia_horas_mes: 150,
-      economia_reais_mes: 1617,
-      tipo_saving: 'mensal',
-    };
-    const status = 'em_validacao';
-
-    const fmtReais = Number(saving.economia_reais_mes).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const membros = projeto.membros.join(', ');
-
-    const text = [
-      `📌 *Projeto:* ${projeto.nome}`,
-      `🏷️ *Área:* ${projeto.area}`,
-      `🛠️ *Ferramenta:* ${projeto.ferramenta}`,
-      `👤 *Solicitante:* ${projeto.responsavel_nome}`,
-      `📧 *E-mail:* ${projeto.responsavel_email}`,
-      `👥 *Participantes:* ${membros}`,
-      `⏱️ *Saving estimado (horas/mês):* ${saving.economia_horas_mes} horas`,
-      `💰 *Saving estimado (R$/mês):* R$ ${fmtReais}`,
-    ].join('\n');
-
-    expect(text).toContain('Cadastro de Embaixadores');
-    expect(text).toContain('Marketing de Influência');
-    expect(text).toContain('n8n');
-    expect(text).toContain('teste@gocase.com');
-    expect(text).toContain('colega@gocase.com');
-    expect(text).toContain('150 horas');
-    expect(text).toContain('R$');
-  });
-
-  it('omite participantes quando lista vazia', () => {
-    const membros: string[] = [];
-    const membrosStr = membros.join(', ');
-    const lines = [
-      membrosStr ? `👥 *Participantes:* ${membrosStr}` : '',
-    ].filter(Boolean);
-    expect(lines).toHaveLength(0);
-  });
-});
-
 describe('Verificação de duplicata', () => {
   it('identifica projetos com mesmo nome (simulação)', () => {
     const projetos = [

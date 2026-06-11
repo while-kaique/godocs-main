@@ -39,6 +39,7 @@ const SCHEMA_SQL = `
     tipo_saving TEXT,
     memorial_calculo TEXT,
     custo_externo_mensal REAL,
+    ganho_total_mensal REAL,
     submitted_at TEXT,
     validated_at TEXT,
     validated_by TEXT,
@@ -76,6 +77,19 @@ const SCHEMA_SQL = `
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS analises (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    resultado TEXT NOT NULL,
+    pontuacao_total INTEGER NOT NULL,
+    pontuacao_maxima INTEGER NOT NULL,
+    justificativa TEXT NOT NULL,
+    resumo TEXT,
+    criterios_hardcoded TEXT,
+    criterios_dinamicos TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS configuracoes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     chave TEXT NOT NULL UNIQUE,
@@ -104,6 +118,14 @@ const SCHEMA_SQL = `
   );
 `;
 
+// Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
+// Cada migração roda em try/catch: se a coluna já existir (banco novo), ignora silenciosamente.
+const MIGRATIONS = [
+  'ALTER TABLE analises ADD COLUMN resumo TEXT',
+  'ALTER TABLE projetos ADD COLUMN ganho_total_mensal REAL',
+  'ALTER TABLE projetos ADD COLUMN complexidade TEXT',
+];
+
 export async function initSchema(db: GoDeployDB) {
   // env.DB.exec do Godeploy não suporta múltiplos statements em uma única chamada.
   // Dividimos o SQL por ';' e executamos cada statement separadamente.
@@ -115,5 +137,14 @@ export async function initSchema(db: GoDeployDB) {
 
   for (const stmt of statements) {
     await db.exec(stmt + ';', []);
+  }
+
+  // Migrações pós-schema (idempotentes)
+  for (const migration of MIGRATIONS) {
+    try {
+      await db.exec(migration + ';', []);
+    } catch {
+      // Coluna já existe ou tabela não existe — ignorar silenciosamente
+    }
   }
 }

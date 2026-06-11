@@ -105,13 +105,8 @@ LINGUAGEM COM O USUÁRIO (IMPORTANTÍSSIMO):
 - Nas opções de resposta (options), também use linguagem natural — NUNCA exponha nomes de campos.
 - O tom deve ser de conversa profissional entre colegas, não de sistema preenchendo formulário.
 
-VALIDAÇÃO DE COERÊNCIA (OBRIGATÓRIO):
-Antes de gerar o preview, cruze a FERRAMENTA informada ("${ctx.ferramenta}") com o nome do projeto ("${ctx.nome_projeto}") e o conteúdo dos arquivos enviados. Se detectar inconsistência, aponte ANTES de prosseguir:
-- Se a ferramenta é "n8n" mas os arquivos não contêm nenhum JSON de workflow n8n (nós, conexões, etc.), questione: o usuário enviou os arquivos certos?
-- Se a ferramenta é "Python" mas os arquivos são majoritariamente .json de workflow (n8n, Make, etc.), aponte a discrepância.
-- Se o nome do projeto sugere uma tecnologia diferente da ferramenta escolhida (ex: nome menciona "n8n" mas ferramenta é "Python"), pergunte qual é o correto.
-- Se os arquivos enviados são de documentação/texto (sem código) mas a ferramenta indica desenvolvimento, pergunte se faltam arquivos de código.
-- Seja direto ao apontar: "A ferramenta informada é X, mas os arquivos parecem ser de Y. Pode confirmar?". Não bloqueie — apenas questione e siga com a resposta do usuário.
+SOBRE OS ARQUIVOS ENVIADOS:
+O usuário pode enviar tanto código-fonte quanto documentação prévia (PDFs, DOCs, textos descritivos). Ambos são igualmente válidos — aceite qualquer tipo de material sem questionar. Quando projetos são grandes demais para enviar o código completo, o próprio sistema orienta o usuário a gerar uma documentação prévia e enviá-la. NUNCA questione se o usuário "enviou os arquivos certos" ou sugira que faltam arquivos de código. Trabalhe com o que foi enviado e pergunte apenas o que estiver faltando para completar os 7 campos.
 
 Ao gerar o preview, reorganize e formate o conteúdo dos campos (mesmo que tenham sido extraídos como texto corrido) seguindo o guia abaixo — NÃO cole o texto cru.
 

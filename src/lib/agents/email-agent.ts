@@ -75,7 +75,7 @@ export async function enviarEmailRejeicao(
   doc: DocumentacaoGerada,
   validacao: ResultadoValidacao
 ): Promise<void> {
-  const subject = `❌ Projeto necessita ajustes: ${doc.titulo}`;
+  const subject = `🔍 Projeto em revisão: ${doc.titulo}`;
 
   const criteriosReprovados = validacao.criterios
     .filter((c) => !c.aprovado)
@@ -87,28 +87,28 @@ export async function enviarEmailRejeicao(
 <html lang="pt-BR">
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 24px;">
-  <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 4px; margin-bottom: 24px;">
-    <h2 style="margin: 0; color: #b91c1c;">❌ Projeto Necessita de Ajustes</h2>
+  <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px; margin-bottom: 24px;">
+    <h2 style="margin: 0; color: #92400e;">🔍 Projeto em Revisão</h2>
   </div>
 
   <p>Olá, <strong>${doc.responsavel.nome}</strong>!</p>
 
-  <p>Seu projeto <strong>"${doc.titulo}"</strong> foi analisado e precisará de alguns ajustes antes de ser aprovado para produção.</p>
+  <p>Seu projeto <strong>"${doc.titulo}"</strong> foi analisado e a nossa análise identificou alguns pontos que precisam de atenção. O time de RPA entrará em contato para conversar sobre os ajustes necessários.</p>
 
   <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 24px 0;">
-    <h3 style="margin-top: 0; color: #374151;">Parecer do analista</h3>
+    <h3 style="margin-top: 0; color: #374151;">Parecer da análise</h3>
     <p style="margin: 0; line-height: 1.6;">${validacao.parecer}</p>
   </div>
 
   ${criteriosReprovados ? `
-  <h3 style="color: #374151;">Pontos que precisam de atenção</h3>
+  <h3 style="color: #374151;">Pontos de atenção</h3>
   <ul style="line-height: 1.8; color: #374151;">
     ${criteriosReprovados}
   </ul>` : ''}
 
   <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 24px 0;">
     <p style="margin: 0; color: #1d4ed8;">
-      <strong>Próximo passo:</strong> Acesse a plataforma GoDocs, edite seu projeto corrigindo os pontos acima e reenvie para análise.
+      <strong>Próximo passo:</strong> Aguarde o contato do time de RPA. Vocês irão revisar juntos os pontos acima e, se necessário, você poderá ajustar e reenviar o projeto.
     </p>
   </div>
 

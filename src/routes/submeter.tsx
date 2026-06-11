@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
@@ -7,12 +7,13 @@ import { apiFetch } from "@/lib/api-client";
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
+import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, AnaliseResult } from "@/lib/submeter/constants";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
 import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
+import { AnalyzerCard } from "@/lib/submeter/analyzer-overlay";
 
 /* ──────────────────────────────────────────────
    Route
@@ -100,7 +101,19 @@ function SubmeterPage() {
   // Rascunho do formulário de impacto (SavingForm) — vive no pai para persistir
   // quando o usuário navega para fora da etapa 3 e volta (o step 3 desmonta).
   const [formDraft, setFormDraft] = useState<SavingFormData>(emptyFormDraft);
+  const [analysisResult, setAnalysisResult] = useState<AnaliseResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Alerta ao tentar fechar/recarregar a página durante a análise
+  useEffect(() => {
+    if (!analyzing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [analyzing]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -710,18 +723,40 @@ function SubmeterPage() {
     }
   }
 
-  /* ── Enviar projeto ── */
-  async function handleSubmitProject() {
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  /* ── Enviar projeto + disparar análise IA em paralelo ── */
+  async function handleSubmitAndAnalyze() {
     if (!projetoId) return;
     setSubmittingProject(true);
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    setAnalysisError(null);
+
+    // 1) Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
     try {
       await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId });
-      setSubmitted(true);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error("[submeter] envio falhou:", e);
       toast.error("Erro ao enviar projeto. Tente novamente.");
-    } finally {
       setSubmittingProject(false);
+      setAnalyzing(false);
+      return;
+    }
+
+    // 2) Submissão ok → mostra tela de sucesso imediatamente
+    setSubmitted(true);
+    setSubmittingProject(false);
+
+    // 3) Análise IA em background — não bloqueia a tela de sucesso
+    try {
+      const result = await apiFetch<AnaliseResult>("/api/chat/analisar", { projeto_id: projetoId });
+      setAnalysisResult(result);
+    } catch (e) {
+      console.error("[submeter] análise falhou:", e);
+      setAnalysisError("Não foi possível gerar a análise automática. Isso não afeta o envio do seu projeto.");
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -811,13 +846,37 @@ function SubmeterPage() {
               />
               <SummaryRow label="Status" value="Aguardando análise" badge last />
             </div>
+
+            {/* Card da análise IA (inline — loading ou resultado) */}
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#8b8b9a",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: 8,
+                }}
+              >
+                Análise automática
+              </div>
+              <AnalyzerCard
+                loading={analyzing}
+                result={analysisResult}
+                error={analysisError}
+              />
+            </div>
+
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
                 onClick={() => window.location.reload()}
                 className="go-btn-primary"
+                disabled={analyzing}
+                style={analyzing ? { opacity: 0.4, cursor: "not-allowed", pointerEvents: "none" } : undefined}
               >
-                Submeter outro projeto
+                {analyzing ? "Aguardando análise..." : "Submeter outro projeto"}
               </button>
               <button
                 type="button"
@@ -906,7 +965,7 @@ function SubmeterPage() {
                   loading={chatLoading}
                   loadingSteps={chatLoadingSteps}
                   isComplete={chatComplete}
-                  onSubmitProject={handleSubmitProject}
+                  onSubmit={handleSubmitAndAnalyze}
                   submitting={submittingProject}
                   chatBottomRef={chatBottomRef}
                   fase={chatFase}
@@ -994,6 +1053,7 @@ function SubmeterPage() {
 
         <PageFooter />
       </div>
+
     </PageFrame>
   );
 }

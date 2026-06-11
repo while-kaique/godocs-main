@@ -78,7 +78,7 @@ export function CyclingText({ steps, intervalMs = 2200 }: { steps: string[]; int
    Simple Markdown Renderer
    ────────────────────────────────────────────── */
 
-function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean }) {
+export function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boolean }) {
   const accentColor = isSaving ? "#6b6e00" : "var(--go-blue)";
   const accentBorder = isSaving ? "rgba(215,219,0,0.15)" : "rgba(0,89,169,0.08)";
 
@@ -462,13 +462,13 @@ function FinalReview({
   approvedDocPreview,
   approvedSavingPreview,
   approvedReceitaPreview,
-  onSubmitProject,
+  onSubmit,
   submitting,
 }: {
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
   approvedReceitaPreview?: string | null;
-  onSubmitProject: () => void;
+  onSubmit: () => void;
   submitting: boolean;
 }) {
   const [expandedDoc, setExpandedDoc] = useState(false);
@@ -546,7 +546,7 @@ function FinalReview({
 
       <button
         type="button"
-        onClick={onSubmitProject}
+        onClick={onSubmit}
         disabled={submitting}
         className="go-btn-submit w-full mt-4 inline-flex items-center justify-center gap-2"
       >
@@ -1041,7 +1041,7 @@ export function Step3Chat({
   loading,
   loadingSteps,
   isComplete,
-  onSubmitProject,
+  onSubmit,
   submitting,
   chatBottomRef,
   fase,
@@ -1070,7 +1070,7 @@ export function Step3Chat({
   // impacto). Quando presente e `loading` ativo, mostra o passo em vez dos 3 pontos.
   loadingSteps?: string[] | null;
   isComplete: boolean;
-  onSubmitProject: () => void;
+  onSubmit: () => void;
   submitting: boolean;
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   fase: ChatFase;
@@ -1432,7 +1432,7 @@ export function Step3Chat({
           approvedDocPreview={approvedDocPreview}
           approvedSavingPreview={approvedSavingPreview}
           approvedReceitaPreview={approvedReceitaPreview}
-          onSubmitProject={onSubmitProject}
+          onSubmit={onSubmit}
           submitting={submitting}
         />
       )}

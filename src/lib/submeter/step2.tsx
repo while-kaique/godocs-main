@@ -309,7 +309,6 @@ export function Step2({
   arquivos: File[];
   setArquivos: (files: File[]) => void;
 }) {
-  const isN8n = form.ferramenta === "n8n";
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
@@ -377,12 +376,6 @@ export function Step2({
     setExpanded(all);
   }
 
-  const n8nNameStatus =
-    isN8n && form.nomeProjeto.length >= 3
-      ? /^\[.+\]/.test(form.nomeProjeto)
-        ? "ok"
-        : "warn"
-      : null;
 
   // Cede o controle pro browser pintar a tela antes/durante um trecho pesado
   const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -553,41 +546,16 @@ export function Step2({
 
       {/* Nome do projeto */}
       <FormGroup>
-        <FormLabel
-          required
-          hint={isN8n ? "Copie e cole o nome do fluxo exatamente como aparece no n8n" : undefined}
-        >
-          {isN8n ? "Nome exato do Fluxo Principal" : "Nome do Projeto"}
+        <FormLabel required>
+          Nome do Projeto
         </FormLabel>
         <FormInput
           type="text"
-          placeholder={isN8n ? "Ex: [CX] Envio de NPS Automático" : "Ex: Automação de Relatórios de Vendas"}
+          placeholder="Ex: Automação de Relatórios de Vendas"
           value={form.nomeProjeto}
           onChange={(e) => updateField("nomeProjeto", e.currentTarget.value)}
           error={errors.nomeProjeto}
         />
-        {isN8n && (
-          <div className="mt-2 rounded-lg p-2.5" style={{ background: "rgba(215,219,0,0.06)", border: "1px solid rgba(215,219,0,0.2)" }}>
-            <div className="mb-1 text-[11px] font-bold" style={{ color: "#8a7d00" }}>
-              ⚠️ Atenção: nome deve ser idêntico ao do n8n
-            </div>
-            <div className="text-[11px]" style={{ color: "var(--go-text-primary)" }}>
-              Copie <strong style={{ color: "#8a7d00" }}>exatamente</strong> como aparece no n8n — maiúsculas, espaços e prefixo entre colchetes incluídos.
-            </div>
-          </div>
-        )}
-        {n8nNameStatus && (
-          <span
-            className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-            style={
-              n8nNameStatus === "ok"
-                ? { background: "rgba(34,197,94,0.06)", color: "#16a34a", border: "1px solid rgba(34,197,94,0.15)" }
-                : { background: "rgba(215,219,0,0.06)", color: "#8a7d00", border: "1px solid rgba(215,219,0,0.2)" }
-            }
-          >
-            {n8nNameStatus === "ok" ? "✅ Prefixo detectado" : "⚠️ Sem prefixo — verifique o nome"}
-          </span>
-        )}
       </FormGroup>
 
       {/* Data de criação */}

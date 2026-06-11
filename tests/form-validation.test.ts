@@ -98,10 +98,6 @@ describe('Validação de nome do projeto', () => {
     expect('ABC'.trim().length < 3).toBe(false);
   });
 
-  it('detecta prefixo n8n (formato [AREA])', () => {
-    expect(/^\[.+\]/.test('[CX] Envio de NPS')).toBe(true);
-    expect(/^\[.+\]/.test('Envio de NPS')).toBe(false);
-  });
 });
 
 describe('Validação de saving', () => {
