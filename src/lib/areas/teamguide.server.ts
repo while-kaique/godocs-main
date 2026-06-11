@@ -79,6 +79,12 @@ export async function deriveAreasFromTeamGuide(): Promise<string[]> {
   const roots = DOMAIN_LEADERS.map(rootFor);
   if (roots.some((r) => !r)) throw new Error('TeamGuide: não encontrei as 3 raízes de domínio por líder.');
 
+  // As 3 raízes de domínio podem estar aninhadas entre si (ex.: "N1 - Guilherme"
+  // e "N1 - Luis" são filhas L1 da raiz "N1" do Rafael). Uma raiz NÃO é área —
+  // suas áreas são enumeradas quando a processamos como raiz. Sem isso, os nós de
+  // diretoria (N1) vazam como "áreas".
+  const rootIds = new Set(roots.map((r) => r!.id));
+
   const isPassthrough = (leader?: { name: string } | null) => {
     const n = norm(leader?.name);
     return !!leader && PASSTHROUGH_LEADERS.some(([a, b]) => n.includes(a) && n.includes(b));
@@ -88,6 +94,7 @@ export async function deriveAreasFromTeamGuide(): Promise<string[]> {
   const areaNodes: TGTeam[] = [];
   for (const root of roots) {
     for (const l1 of children(root!.id)) {
+      if (rootIds.has(l1.id)) continue; // outra raiz de domínio — não é área
       if (isPassthrough(l1.leader)) areaNodes.push(...children(l1.id));
       else areaNodes.push(l1);
     }

@@ -330,7 +330,7 @@ Quando os previews são aprovados (`fase = completo`): cards colapsáveis ("Docu
 
 As áreas/departamentos são derivadas da árvore organizacional do **TeamGuide** (não mais cadastradas só à mão):
 
-- `areas/teamguide.server.ts`: deriva a lista canônica de áreas da árvore TeamGuide. Os 3 domínios-raiz são achados pelo **nome do líder** (não pelo id, que muda ao recriar times); filhos diretos da raiz (L1) são áreas, exceto 4 nós "passthrough" cujos filhos L2 é que viram área. Dedup por slug. Exige `TG_API_TOKEN`
+- `areas/teamguide.server.ts`: deriva a lista canônica de áreas da árvore TeamGuide. Os 3 domínios-raiz são achados pelo **nome do líder** (não pelo id, que muda ao recriar times); filhos diretos da raiz (L1) são áreas, exceto 4 nós "passthrough" (cujos filhos L2 viram área) e as **outras raízes de domínio aninhadas** (N1/diretoria — não são área). Dedup por slug. Resultado: **20 áreas**. Exige `TG_API_TOKEN`
 - `areas.functions.ts`: `getAreasPublicas()` lê a tabela `areas` e cai na lista hardcoded `AREAS` (em `constants.ts`) como fallback — o formulário nunca fica sem opções; `sincronizarAreas()` faz upsert das áreas derivadas
 - Rotas: `GET /api/areas` (público, consumido pelo Step 1), `POST /api/admin/areas/sync` (admin, botão "Sincronizar áreas"), `POST /api/cron/sync-areas` (cron diário no Godeploy, exige header `X-Godeploy-Cron`)
 
