@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput } from "./constants";
@@ -525,19 +525,32 @@ function SavingForm({
   escopo,
   onSubmit,
   loading,
+  draft,
+  onDraftChange,
 }: {
   tipoProjeto: ("saving" | "receita_incremental")[];
   escopo?: string;
   onSubmit: (data: SavingFormData) => void;
   loading: boolean;
+  // Rascunho persistido no componente pai — sobrevive à desmontagem do step 3 na
+  // navegação entre etapas (senão o que o usuário preencheu aqui se perderia).
+  draft?: SavingFormData;
+  onDraftChange?: (d: SavingFormData) => void;
 }) {
-  const [linhas, setLinhas] = useState<SavingLinhaInput[]>([
-    { cargo: "", horasAntes: "", horasDepois: "" },
-  ]);
-  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">("");
-  const [custoExterno, setCustoExterno] = useState("");
-  const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">("");
+  const [linhas, setLinhas] = useState<SavingLinhaInput[]>(
+    draft?.linhas ?? [{ cargo: "", horasAntes: "", horasDepois: "" }],
+  );
+  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
+  const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
+  const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
+    draft?.custoPeriodicidade ?? "",
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
+  useEffect(() => {
+    onDraftChange?.({ linhas, tipoSaving, custoExterno, custoPeriodicidade });
+  }, [linhas, tipoSaving, custoExterno, custoPeriodicidade, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isExterno = escopo === "externo";
@@ -917,6 +930,8 @@ export function Step3Chat({
   showReceitaForm,
   onReceitaFormSubmit,
   receitaFormLoading,
+  formDraft,
+  onFormDraftChange,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -941,6 +956,8 @@ export function Step3Chat({
   showReceitaForm?: boolean;
   onReceitaFormSubmit?: (data: SavingFormData) => void;
   receitaFormLoading?: boolean;
+  formDraft?: SavingFormData;
+  onFormDraftChange?: (d: SavingFormData) => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview";
@@ -1117,6 +1134,8 @@ export function Step3Chat({
           escopo={escopo}
           onSubmit={onSavingFormSubmit}
           loading={savingFormLoading ?? false}
+          draft={formDraft}
+          onDraftChange={onFormDraftChange}
         />
       )}
 
@@ -1127,6 +1146,8 @@ export function Step3Chat({
           escopo={escopo}
           onSubmit={onReceitaFormSubmit}
           loading={receitaFormLoading ?? false}
+          draft={formDraft}
+          onDraftChange={onFormDraftChange}
         />
       )}
 

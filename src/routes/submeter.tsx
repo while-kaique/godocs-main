@@ -32,6 +32,13 @@ export const Route = createFileRoute("/submeter")({
    Page Component
    ────────────────────────────────────────────── */
 
+const emptyFormDraft = (): SavingFormData => ({
+  linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
+  tipoSaving: "",
+  custoExterno: "",
+  custoPeriodicidade: "",
+});
+
 function SubmeterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -64,6 +71,9 @@ function SubmeterPage() {
   const [showReceitaForm, setShowReceitaForm] = useState(false);
   const [receitaFormLoading, setReceitaFormLoading] = useState(false);
   const [transitionType, setTransitionType] = useState<"saving" | "receita">("saving");
+  // Rascunho do formulário de impacto (SavingForm) — vive no pai para persistir
+  // quando o usuário navega para fora da etapa 3 e volta (o step 3 desmonta).
+  const [formDraft, setFormDraft] = useState<SavingFormData>(emptyFormDraft);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const today = useMemo(() => {
@@ -179,6 +189,10 @@ function SubmeterPage() {
   function goToStep(target: number, dir: "forward" | "back") {
     setDirection(dir);
     setStep(target);
+    // Todo step ALCANÇADO fica navegável pelos índices do topo — não só os que o
+    // usuário "concluiu" avançando. Senão, ao entrar no step 2 e voltar ao 1, o
+    // índice do 2 ficava bloqueado (só "Próximo" funcionava).
+    setCompletedSteps((prev) => (prev.has(target) ? prev : new Set([...prev, target])));
     formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -187,9 +201,15 @@ function SubmeterPage() {
   }
 
   function handleStepClick(target: number) {
-    if (completedSteps.has(target) && target !== step) {
-      goToStep(target, target < step ? "back" : "forward");
+    if (!completedSteps.has(target) || target === step) return;
+    // Ir para a etapa 3 com o agente já iniciado: usa o mesmo fluxo do botão
+    // "Continuar com Agente" para detectar troca de tipo (saving ↔ receita) e
+    // reajustar o agente — senão a navegação pelo topo pularia essa detecção.
+    if (target === 3 && projetoId) {
+      handleContinuarAgente();
+      return;
     }
+    goToStep(target, target < step ? "back" : "forward");
   }
 
   /* ── Step 1 → Step 2 ── */
@@ -456,6 +476,8 @@ function SubmeterPage() {
         },
       );
       setShowSavingForm(false);
+      // Submetido → zera o rascunho (no fluxo "ambos", o form de receita começa limpo).
+      setFormDraft(emptyFormDraft());
       const savingMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -485,6 +507,7 @@ function SubmeterPage() {
         { projeto_id: projetoId, tipo_saving: formData.tipoSaving as "mensal" | "pontual" },
       );
       setShowReceitaForm(false);
+      setFormDraft(emptyFormDraft());
       const receitaMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -716,6 +739,8 @@ function SubmeterPage() {
                   showReceitaForm={showReceitaForm}
                   onReceitaFormSubmit={handleReceitaFormSubmit}
                   receitaFormLoading={receitaFormLoading}
+                  formDraft={formDraft}
+                  onFormDraftChange={setFormDraft}
                 />
               </StepAnimation>
             )}
