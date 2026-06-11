@@ -57,8 +57,9 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     area: data.area_nome ?? null,
     membros: parseJson<string[]>(data.membros) ?? [],
     nome_projeto: data.nome ?? '',
-    data_criacao: null,
+    data_criacao: data.data_criacao_projeto ?? null,
     doc_texto: docMsg?.content ?? null,
+    descricao_breve: data.descricao_breve ?? null,
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
@@ -320,13 +321,10 @@ export async function enviarMensagem(rawData: unknown) {
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
-  await insertChatMessage({
-    projeto_id: data.projeto_id,
-    role: 'user',
-    content: data.content,
-    selected_option: data.selected_option ?? null,
-  });
-
+  // Histórico montado a partir das mensagens JÁ persistidas + o novo turno do
+  // usuário (ainda NÃO persistido). Só gravamos a conversa depois que o turno é
+  // concluído com sucesso — assim, se a compilação da doc falhar (ver abaixo),
+  // nada fica salvo pela metade e o usuário pode simplesmente tentar de novo.
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const estado = extrairEstado(msgs ?? []);
@@ -342,6 +340,7 @@ export async function enviarMensagem(rawData: unknown) {
   } else {
     history = buildHistory(msgs ?? []);
   }
+  history.push({ role: 'user', content: data.content });
 
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
@@ -358,23 +357,32 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
+  // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o
+  // CERNE do produto e é feita pelo agente — NÃO há fallback. Compilamos e
+  // salvamos ANTES de confirmar a transição. Se a IA não devolver uma doc válida
+  // (mesmo após os retries internos), compilarDocumentacao lança: abortamos o
+  // turno SEM persistir nada, e o usuário continua no preview podendo aprovar de
+  // novo (o frontend faz rollback da mensagem e exibe o erro).
+  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
+    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
+    const doc = await compilarDocumentacao(ctx, resultado.coletado);
+    await upsertDocumentacao(data.projeto_id, doc);
+    log('enviarMensagem', 'Documentação compilada e salva.');
+  }
+
+  // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'user',
+    content: data.content,
+    selected_option: data.selected_option ?? null,
+  });
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
     options: resultado.type === 'options' ? resultado.options : null,
   });
-
-  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
-    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
-    try {
-      const doc = await compilarDocumentacao(ctx, resultado.coletado);
-      await upsertDocumentacao(data.projeto_id, doc);
-      log('enviarMensagem', 'Documentação compilada e salva.');
-    } catch (compErr) {
-      err('enviarMensagem', 'Falha ao compilar:', compErr);
-    }
-  }
 
   if (resultado.fase === 'completo') {
     log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
