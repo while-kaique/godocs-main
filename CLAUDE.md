@@ -1,6 +1,6 @@
 # GoDocs - Hub de Projetos Internos
 
-Hub interno do Gogroup para cadastro, gestão e documentação de projetos de automação (RPA & IA). Funcionários submetem projetos, líderes acompanham o status das submissões de suas áreas, e Admin Masters gerenciam toda a plataforma. Todo o fluxo de submissão (documentação + memorial de impacto financeiro) é interno — sem dependência de Google Sheets ou n8n.
+Hub interno do Gogroup para cadastro, gestão e documentação de projetos de automação (RPA & IA). Funcionários submetem projetos, líderes acompanham o status das submissões de suas áreas, e Admin Masters gerenciam toda a plataforma. O fluxo de submissão (documentação + memorial de impacto financeiro) salva no SQLite local e, ao enviar para triagem, também envia os dados para o n8n via webhook (`N8N_WEBHOOK_URL`) para registro em planilha/Google Drive.
 
 ## Stack
 
@@ -110,6 +110,7 @@ src/
 vite-plugin-dev-api.ts # Plugin Vite que serve /api/* em dev reusando o worker.ts (com wrapper better-sqlite3 → GoDeployDB)
 worker.js              # Bundle do Worker (esbuild), COMMITADO — rebuildar via npm run build:worker ao mexer no backend
 tests/                 # Testes unitários (Vitest)
+forms_n8n/             # Workflows n8n (submit_forms.json + fluxos legados)
 PLANO_MIGRACAO_SQLITE.md # Histórico da migração Supabase → SQLite (o risco de runtime foi resolvido pelo env.DB do Godeploy)
 godocs.db              # Banco SQLite local de dev (auto-criado, ignorado no git)
 ```
@@ -205,12 +206,13 @@ A IA lê a **codebase/pasta inteira** e gera a documentação automaticamente. L
 
 ### Submissão final (`submeterParaValidacao`)
 
-Quando o usuário clica "Enviar para Triagem" (substitui o antigo fluxo n8n → Sheets):
+Quando o usuário clica "Enviar para Triagem":
 
 1. Verifica duplicata (mesmo nome de projeto já submetido)
 2. Extrai impacto do JSON da documentação e popula colunas do `projetos` (saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal)
 3. Auto-aprovação: se área = "RPA", status = `aprovado`; senão `em_validacao`
 4. Envia notificação para Google Chat (webhook via env var `GOOGLE_CHAT_WEBHOOK_URL`)
+5. Envia dados completos (projeto + documentação + saving) para n8n via `N8N_WEBHOOK_URL` — o workflow n8n gera Markdown, sobe ao Drive, salva na planilha
 
 ## Sistema de agentes IA (chat por fases)
 
@@ -289,17 +291,20 @@ Quando os previews são aprovados (`fase = completo`): cards colapsáveis ("Docu
 
 - 6 system prompts (um por fase): `buildDocPrompt`, `buildDocPreviewPrompt`, `buildSavingPrompt`, `buildSavingPreviewPrompt`, `buildReceitaPrompt`, `buildReceitaPreviewPrompt`
 - `runOrchestrator(ctx, history, fase, coletado, saving, resumoProjeto, tipos_projeto, receita)` — entry point; `tipos_projeto` é um **array** (`('saving' | 'receita_incremental')[]`)
-- Respostas sempre em JSON: `{type, content/question, coletado/saving/receita, options?}` — fallback robusto p/ JSON truncado
+- Respostas sempre em JSON: `{type, content/question, coletado/saving/receita, options?}` — fallback robusto p/ JSON truncado; retry automático em resposta vazia do LLM
+- **Regras de prompt**: a IA nunca expõe nomes de campos internos ao usuário; linguagem natural de conversa entre colegas; prompts de saving adaptados à frequência (pontual vs mensal) e a quem executava antes (suporte a `horas_antes=0` — ninguém antes — e custo adicional); na receita, desafia o `valor_ganho_mensal` e o racional informados
 - Transições automáticas: `preview` em doc → `doc_preview`; `complete` em doc_preview → `saving` (se `hasSaving`) senão `receita`; `complete` em saving_preview → `receita` (se `hasReceita`) senão `completo`; `complete` em receita_preview → `completo`
+- **Modelo**: quando `LLM_MODEL_FAST` está setado, os turnos de conversa do orquestrador usam o modelo rápido; doc-compiler e extractor seguem no `LLM_MODEL` forte
 
 ### Server functions do chat (`chat.functions.ts`)
 
 - `iniciarSubmissao`: cria projeto (com `tipos_projeto`, `descricao_breve`, area, data), recebe **array `docs`** (até 5000), extrai texto via `extractTextFromMultipleFiles`, roda o **extractor** e então o orquestrador na fase `doc`
 - `iniciarSaving`: recebe `linhas` (cargo + horas) + tipo_saving + custo externo; calcula totais/líquido no backend via `CARGOS`; inicia o chat saving
-- `iniciarReceita`: inicia a fase receita após a doc (ou após o saving, no fluxo de ambos os tipos)
+- `iniciarReceita`: inicia a fase receita após a doc (ou após o saving, no fluxo de ambos os tipos); recebe `valor_ganho_mensal` + `racional` pré-preenchidos para o agente desafiar
 - `enviarMensagem`: detecta fase atual, filtra histórico por fase, **relê `tipos_projeto` do banco**, roda o orquestrador; compila a doc na transição doc→impacto e salva dados financeiros no `completo`
 - `atualizarTipos`: persiste a troca de tipo feita na etapa 2 durante o fluxo do agente
-- `submeterParaValidacao`: verifica duplicata, popula colunas de impacto, auto-aprova se RPA, notifica Google Chat
+- `atualizarMetadados`: persiste edições de metadado feitas após o agente iniciar (descrição, nome, área, ferramenta, data, membros); se os **arquivos** mudarem, re-extrai o texto, re-roda o extractor e **reinicia a doc**
+- `submeterParaValidacao`: verifica duplicata, popula colunas de impacto, auto-aprova se RPA, notifica Google Chat e envia os dados completos ao n8n (`N8N_WEBHOOK_URL`)
 
 ### Extração de texto (`extract-text.server.ts`)
 
@@ -311,8 +316,8 @@ Quando os previews são aprovados (`fase = completo`): cards colapsáveis ("Docu
 
 ### LLM (`llm.ts`)
 
-- Provider via `LLM_PROVIDER` (openai | anthropic) · modelo via `LLM_MODEL` (default: gpt-4.1)
-- JSON mode habilitado; `temperature` adaptada a modelos que só aceitam o default; usa `max_completion_tokens` (gpt-5+)
+- Provider via `LLM_PROVIDER` (openai | anthropic) · modelo via `LLM_MODEL` (default: gpt-4.1) · modelo rápido opcional via `LLM_MODEL_FAST`
+- JSON mode habilitado; `temperature` adaptada a modelos que só aceitam o default; usa `max_completion_tokens` (gpt-5+); o `model` resolvido sempre vence o spread de opts (evita `model: undefined`)
 
 ### Componentes de UI do chat
 
@@ -364,6 +369,7 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - `LLM_MODEL` — modelo a usar (default: `gpt-4.1`)
 - `LLM_MODEL_FAST` — (opcional) modelo mais rápido/barato para os turnos de conversa do orquestrador (perguntas/preview). Se ausente, usa `LLM_MODEL`. A compilação da doc (`doc-compiler`) e a pré-extração (`extractor`) sempre usam o `LLM_MODEL` forte.
 - `GOOGLE_CHAT_WEBHOOK_URL` — webhook do Google Chat para notificações de novo projeto
+- `N8N_WEBHOOK_URL` — webhook do n8n para registrar submissões (gera Markdown, sobe ao Drive, salva na planilha)
 - `OCR_WORKER_URL` / `OCR_WORKER_TOKEN` — Cloudflare OCR Worker (extração de PDF)
 - `TG_API_TOKEN` — token da API do TeamGuide (derivação/sync de áreas)
 - `BREVO_API_KEY` / `EMAIL_FROM` — envio de e-mail via Brevo
@@ -384,14 +390,14 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - **Arquitetura SPA**: SSR (TanStack Start) → SPA + Worker API; rotas admin leem via `/api/*`
 - **Banco**: Supabase → SQLite via interface `GoDeployDB` (async); prod = `env.DB` do Godeploy, dev = better-sqlite3; schema auto-criado; auth via header Godeploy edge
 - **Step 2 (upload)**: codebase/pasta inteira com filtro de pastas de dev, gate de ~200k tokens, árvore colapsável
-- **Multi-tipo + navegação livre**: tipo(s) saving e/ou receita; navegação livre entre steps; troca de tipo no meio do fluxo re-roteia o agente (`atualizar-tipos`)
+- **Multi-tipo + navegação livre**: tipo(s) saving e/ou receita; navegação livre entre steps; troca de tipo no meio do fluxo re-roteia o agente (`atualizar-tipos`); edições de metadado/arquivos se propagam ao agente (`atualizar-metadados`)
 - **Agente Doc (fase 1)**: pré-extração + chat só das regras de negócio, preview formatado, ciclo de aprovação
-- **Agente Saving (fase 2)**: formulário multi-linha (por pessoa/cargo), cálculo só no backend, validação de horas relaxada, memorial automático
-- **Agente Receita (fase 2)**: coleta e desafia `valor_ganho_mensal`, memorial automático
-- **Transições animadas** doc → saving/receita e saving → receita; **revisão final** com cards colapsáveis
-- **Submissão interna**: dados no SQLite (sem Sheets), duplicata verificada, auto-aprovação RPA, notificação Google Chat
+- **Agente Saving (fase 2)**: formulário multi-linha (por pessoa/cargo), cálculo só no backend, validação de horas relaxada (suporte a "ninguém antes/depois"), memorial automático
+- **Agente Receita (fase 2)**: coleta valor + racional curto no formulário e desafia ambos no chat, memorial automático
+- **Transições animadas** doc → saving/receita e saving → receita; **revisão final** com cards colapsáveis; loader com etapa nomeada nas operações pesadas
+- **Submissão interna + n8n**: dados no SQLite, duplicata verificada, auto-aprovação RPA, notificação Google Chat e envio ao n8n (webhook → Markdown/Drive/planilha)
 - **Áreas via TeamGuide**: fonte única + fallback hardcoded + sync (admin/cron)
-- **Testes**: 137 passando; rodam antes de cada `npm run dev` via `predev`
+- **Testes**: 145 passando; rodam antes de cada `npm run dev` via `predev`
 - Identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
 
 ## Notas importantes
@@ -400,4 +406,4 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - A arquitetura saiu de SSR (TanStack Start + Nitro/Cloudflare) para **SPA + Worker API** (`src/worker.ts`). Não há mais `server.ts`/`start.ts`, Nitro nem `@lovable.dev/vite-tanstack-config` — o `vite.config.ts` usa `@vitejs/plugin-react` + `TanStackRouterVite` + `devApiPlugin`
 - `worker.js` é commitado e gerado por `npm run build:worker` — rebuildar ao mexer no backend, senão o deploy fica defasado do source
 - `routeTree.gen.ts` é auto-gerado — não editar manualmente
-- O antigo fluxo n8n → Google Sheets foi substituído por submissão interna via SQLite. `forms_submissao_logica.json` contém o fluxo n8n legado para referência
+- O antigo fluxo n8n → Google Sheets foi reestruturado: a submissão agora salva no SQLite local e **também** envia para o n8n via webhook (`N8N_WEBHOOK_URL`). O workflow n8n atual (`forms_n8n/submit_forms.json`) recebe o JSON, gera Markdown, sobe ao Drive e salva na planilha. Os fluxos legados (erro, manutenção, reenvio, sucesso) estão em `forms_n8n/` para referência
