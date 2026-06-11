@@ -46,15 +46,16 @@ function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): s
   const camposNulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k);
 
   const descricaoSection = ctx.descricao_breve?.trim()
-    ? `CONTEXTO DE NEGÓCIO FORNECIDO PELO USUÁRIO:\n${ctx.descricao_breve.trim()}\n\n`
+    ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):\n"${ctx.descricao_breve.trim()}"\n\n`
     : '';
 
   return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
 
 SITUAÇÃO ATUAL:
-O sistema já leu e analisou automaticamente TODOS os arquivos do projeto (código, configs, workflows).
-Os campos já preenchidos abaixo foram extraídos DIRETAMENTE do código — são tecnicamente precisos e NÃO devem ser questionados pelo usuário neste momento.
-Os campos ainda em null representam informações de CONTEXTO DE NEGÓCIO que não estão visíveis no código.
+O sistema analisou automaticamente os arquivos enviados pelo usuário e extraiu os campos abaixo.
+Os campos preenchidos refletem FIELMENTE o que está no código — o código é a verdade, confie no que foi extraído.
+Porém, o código enviado pode ser PARCIAL (apenas trechos, um módulo, só o frontend, etc.) — nesse caso, os campos preenchidos são corretos mas INCOMPLETOS.
+Os campos em null representam informações que o código não revelou — podem ser regras de negócio ou simplesmente partes do projeto que não foram enviadas.
 
 METADADOS DO PROJETO:
 - Nome: ${ctx.nome_projeto}
@@ -81,13 +82,16 @@ ESTRUTURA FINAL (7 seções):
 7. atencao — Riscos, limitações, pontos frágeis observados no código
 
 REGRAS:
-- Os campos já preenchidos foram extraídos do código — NÃO peça confirmação deles, NÃO repita o que já foi extraído.
-- Foque APENAS nos campos em null. Esses representam regras de negócio que o código não revela.
-- Faça UMA pergunta por vez, sobre o campo null mais relevante. Vá direto ao ponto.
+- O que veio do código é CORRETO — não questione a veracidade dos campos extraídos e não peça confirmação deles.
+- Porém, avalie se os campos preenchidos são SUFICIENTES para uma documentação completa. Um campo pode estar "preenchido" pelo extrator mas com informação superficial ou puramente técnica sem contexto de negócio.
+- **o_que_faz**: mesmo que preenchido, se descrever apenas "o que o código faz tecnicamente" sem explicar O PROPÓSITO DE NEGÓCIO (para quem serve, que problema resolve, qual o impacto), pergunte ao usuário para complementar o contexto de negócio.
+- **atencao**: mesmo que preenchido, se listar apenas observações genéricas/óbvias (do tipo "se a API falhar, vai dar erro"), pergunte ao usuário se há riscos ou limitações reais que ele conheça.
+- Campos em null: pergunte ao usuário — representam informações que o código não revelou.
+- Faça UMA pergunta por vez, sobre o ponto mais relevante. Vá direto ao ponto.
 - Seja CÉTICO com respostas vagas: se o usuário responder vagamente, aprofunde antes de aceitar.
 - Se a resposta for ambígua, ofereça 3 opções objetivas.
 - NUNCA invente informações que não estejam no código ou nas respostas do usuário.
-- Quando todos os 7 campos tiverem informação suficiente, gere o PREVIEW em markdown.
+- Quando todos os 7 campos tiverem informação RICA E SUFICIENTE, gere o PREVIEW em markdown.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
 
 VALIDAÇÃO DE COERÊNCIA (OBRIGATÓRIO):
@@ -364,7 +368,11 @@ export async function runOrchestrator(
       const muitosPreenchidos = camposPreenchidos >= 5;
       let sistemaMsg: string;
       if (todosPreenchidos) {
-        sistemaMsg = '[SISTEMA] O sistema leu todos os arquivos do projeto e preencheu os 7 campos automaticamente. Gere o PREVIEW DIRETO agora, sem cumprimentos, sem listar o que foi extraído e sem fazer perguntas.';
+        sistemaMsg = `[SISTEMA] O extrator preencheu os 7 campos a partir do código. Antes de gerar o preview, avalie CRITICAMENTE:
+1. O campo "o_que_faz" explica o PROPÓSITO DE NEGÓCIO (para quem, que problema resolve) ou apenas descreve tecnicamente o que o código faz? Se for apenas técnico, pergunte ao usuário o contexto de negócio.
+2. O campo "atencao" lista riscos ESPECÍFICOS e relevantes ou apenas observações genéricas/óbvias? Se genérico, pergunte ao usuário se há riscos reais.
+3. Os arquivos parecem cobrir o projeto INTEIRO ou apenas uma parte (ex: só frontend, só um módulo, poucos arquivos)?${ctx.descricao_breve?.trim() ? ` A descrição do usuário diz: "${ctx.descricao_breve.trim()}" — o que foi extraído cobre esse escopo?` : ''}
+Se TODOS os campos estiverem ricos e completos com contexto de negócio, gere o PREVIEW DIRETO sem cumprimentos. Caso contrário, faça a pergunta mais relevante (UMA só). Não liste o que foi extraído.`;
       } else if (muitosPreenchidos) {
         const nulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k).join(', ');
         sistemaMsg = `[SISTEMA] O sistema leu os arquivos e preencheu ${camposPreenchidos}/7 campos do código. Os campos ainda em null (${nulos}) precisam de contexto de negócio que não está no código. Cumprimente em 1 frase curta explicando que a análise técnica está pronta e você precisa de mais contexto, depois faça UMA pergunta objetiva sobre o campo null mais relevante.`;
