@@ -33,6 +33,8 @@ export type Projeto = {
   tipo_saving: string | null;
   memorial_calculo: string | null;
   custo_externo_mensal: number | null;
+  ganho_total_mensal: number | null;
+  complexidade: string | null;
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
@@ -73,6 +75,19 @@ export type Validacao = {
   criterios: Json | null;
   admin_email: string | null;
   email_enviado: boolean | null;
+  created_at: string | null;
+};
+
+export type Analise = {
+  id: string;
+  projeto_id: string;
+  resultado: 'aprovado' | 'rejeitado';
+  pontuacao_total: number;
+  pontuacao_maxima: number;
+  justificativa: string;
+  resumo: string | null;
+  criterios_hardcoded: Json | null;
+  criterios_dinamicos: Json | null;
   created_at: string | null;
 };
 

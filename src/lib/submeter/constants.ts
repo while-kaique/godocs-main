@@ -95,6 +95,24 @@ export interface SavingFormData {
   racionalReceita: string;
 }
 
+// ─── Resultado da análise IA ────────────────────────────────────────────────
+
+export interface AnaliseResultCriterio {
+  criterio: string;
+  pontos: number;
+  justificativa: string;
+}
+
+export interface AnaliseResult {
+  resultado: 'aprovado' | 'rejeitado';
+  pontuacao_total: number;
+  pontuacao_maxima: number;
+  justificativa: string;
+  resumo: string;
+  criterios_hardcoded: AnaliseResultCriterio[];
+  criterios_dinamicos: AnaliseResultCriterio[];
+}
+
 export function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -96,6 +96,27 @@ export type OrchestratorResult =
   | { type: 'preview'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
   | { type: 'complete'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada };
 
+// ─── Agente Analisador ──────────────────────────────────────────────────────
+
+export type CriterioResult = {
+  criterio: string;
+  pontos: number;
+  justificativa: string;
+};
+
+export type Complexidade = 'automacao' | 'inteligencia' | 'autonomia';
+
+export type ResultadoAnalise = {
+  resultado: 'aprovado' | 'rejeitado';
+  pontuacao_total: number;
+  pontuacao_maxima: number;
+  justificativa: string;
+  resumo: string;
+  complexidade: Complexidade;
+  criterios_hardcoded: CriterioResult[];
+  criterios_dinamicos: CriterioResult[];
+};
+
 // ─── Mensagem de chat ───────────────────────────────────────────────────────
 
 export type ChatHistoryMessage = {
