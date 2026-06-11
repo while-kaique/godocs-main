@@ -41,8 +41,7 @@ const areas = [
 ];
 
 const ferramentas = [
-  "n8n","Python","Google Apps Script","Make",
-  "Lovable", "Selenium","Puppeteer","Power BI", "Claude + Vercel", "Outros"
+  "n8n","Python","Google Apps Script", "Claude + GoDeploy", "Outros"
 ];
 
 const areasOptions = areas.map(a => '<option value="' + a + '">' + a + '</option>').join('');
