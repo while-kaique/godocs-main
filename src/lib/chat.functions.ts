@@ -22,7 +22,6 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
-import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
@@ -39,6 +38,24 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Converte coletado + contexto em DocumentacaoGerada sem chamar LLM.
+ *  Garante que a documentação SEMPRE é salva, mesmo se a LLM falhar. */
+function coletadoToDocumentacao(ctx: ProjetoContexto, coletado: DocumentacaoColetada) {
+  return {
+    titulo: coletado.nome_projeto ?? ctx.nome_projeto,
+    responsavel: { nome: ctx.responsavel_nome, email: ctx.responsavel_email, area: ctx.area },
+    ferramenta: ctx.ferramenta,
+    membros: ctx.membros,
+    o_que_faz: coletado.o_que_faz ?? '',
+    execucao: coletado.execucao ?? '',
+    dependencias: coletado.dependencias ?? '',
+    fluxo: coletado.fluxo ?? '',
+    configurar_antes: coletado.configurar_antes ?? '',
+    atencao: coletado.atencao ?? '',
+    gerado_em: new Date().toISOString(),
+  };
+}
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
@@ -366,19 +383,24 @@ export async function enviarMensagem(rawData: unknown) {
   });
 
   if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
-    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
-    try {
-      const doc = await compilarDocumentacao(ctx, resultado.coletado);
-      await upsertDocumentacao(data.projeto_id, doc);
-      log('enviarMensagem', 'Documentação compilada e salva.');
-    } catch (compErr) {
-      err('enviarMensagem', 'Falha ao compilar:', compErr);
-    }
+    log('enviarMensagem', 'Doc aprovada — salvando documentação.');
+    const doc = coletadoToDocumentacao(ctx, resultado.coletado);
+    await upsertDocumentacao(data.projeto_id, doc);
+    log('enviarMensagem', 'Documentação salva.');
   }
 
   if (resultado.fase === 'completo') {
     log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
-    const docRow = await getDocumentacao(data.projeto_id);
+    let docRow = await getDocumentacao(data.projeto_id);
+
+    // Fallback: se a documentação não existe, salva a base a partir do coletado
+    if (!docRow) {
+      log('enviarMensagem', 'Documentação não encontrada — salvando base (fallback)...');
+      const docBase = coletadoToDocumentacao(ctx, resultado.coletado);
+      await upsertDocumentacao(data.projeto_id, docBase);
+      docRow = await getDocumentacao(data.projeto_id);
+      log('enviarMensagem', 'Documentação base salva (fallback).');
+    }
 
     if (docRow) {
       const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
@@ -562,7 +584,26 @@ export async function submeterParaValidacao(rawData: unknown) {
   const { projeto_id } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
-  const docRow = await getDocumentacao(projeto_id);
+  let docRow = await getDocumentacao(projeto_id);
+
+  // Fallback: se a documentação não existe (compilação LLM falhou na transição),
+  // salva a base a partir do coletado — sem LLM, nunca falha.
+  if (!docRow) {
+    log('submeterParaValidacao', 'Documentação não encontrada — salvando base (fallback)...');
+    const ctx = await getProjetoContexto(projeto_id);
+    const msgs = await getChatMessagesExcludeRole(projeto_id, 'doc');
+    const estado = extrairEstado(msgs ?? []);
+    const docBase = coletadoToDocumentacao(ctx, estado.coletado) as Record<string, unknown>;
+
+    // Injeta saving/receita se disponíveis
+    const tiposProjeto = getTiposProjeto(ctx);
+    if (tiposProjeto.includes('saving') && estado.saving) docBase.saving = estado.saving;
+    if (tiposProjeto.includes('receita_incremental') && estado.receita) docBase.receita = estado.receita;
+
+    await upsertDocumentacao(projeto_id, docBase);
+    docRow = await getDocumentacao(projeto_id);
+    log('submeterParaValidacao', 'Documentação base salva (fallback).');
+  }
 
   if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
@@ -636,6 +677,50 @@ export async function submeterParaValidacao(rawData: unknown) {
       log('submeterParaValidacao', 'Notificação Google Chat enviada.');
     } catch (chatErr) {
       err('submeterParaValidacao', 'Falha ao enviar notificação Google Chat:', chatErr);
+    }
+  }
+
+  // ── Enviar dados ao n8n (registra na planilha + Drive) ──
+  const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+  if (n8nWebhookUrl) {
+    try {
+      const receita = conteudo.receita as Record<string, unknown> | undefined;
+      const membros = parseJson<string[]>(projeto.membros) ?? [];
+      const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+
+      const n8nPayload = {
+        projeto_id: projeto_id,
+        responsavel_nome: projeto.responsavel_nome,
+        responsavel_email: projeto.responsavel_email,
+        area: projeto.area ?? '—',
+        ferramenta: projeto.ferramenta,
+        escopo: projeto.escopo ?? null,
+        membros,
+        nome_projeto: projeto.nome ?? '',
+        descricao_breve: projeto.descricao_breve ?? '',
+        data_criacao_projeto: projeto.data_criacao_projeto ?? null,
+        tipos_projeto: tiposProjeto,
+        status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
+        saving_horas: (saving?.economia_horas_mes as number) ?? 0,
+        saving_reais: (saving?.economia_reais_mes as number) ?? 0,
+        tipo_saving: (saving?.tipo_saving as string) ?? '',
+        memorial_calculo: (saving?.memorial_calculo as string) ?? '',
+        custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
+        saving_linhas: JSON.stringify(saving?.linhas ?? []),
+        receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
+        receita_memorial: (receita?.memorial_calculo as string) ?? '',
+        documentacao: conteudo,
+      };
+
+      const n8nResp = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload),
+      });
+      const n8nResult = await n8nResp.json().catch(() => null);
+      log('submeterParaValidacao', `n8n respondeu ${n8nResp.status}:`, n8nResult);
+    } catch (n8nErr) {
+      err('submeterParaValidacao', 'Falha ao enviar dados ao n8n:', n8nErr);
     }
   }
 

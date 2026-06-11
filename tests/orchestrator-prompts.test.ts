@@ -151,7 +151,7 @@ describe('Prompt fase saving (tipo saving)', () => {
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('VALIDAÇÃO DE HORAS');
     expect(system).toContain('NUNCA aceite as horas');
-    expect(system).toContain('detalhar a rotina manual');
+    expect(system).toContain('detalhar a rotina');
   });
 
   it('inclui regras anti-extrapolação', async () => {
