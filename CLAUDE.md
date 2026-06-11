@@ -55,6 +55,7 @@ npm run format         # prettier
 | `areas-teamguide.test.ts` | Derivação de áreas a partir da árvore TeamGuide (regra de passthrough v3, dedup por slug) |
 | `db-async.test.ts` | Camada de banco assíncrona sobre a interface `GoDeployDB` (compatibilidade dev/prod) |
 | `llm.test.ts` | Erros de configuração, provider desconhecido, defaults |
+| `doc-compiler.test.ts` | Compilação da documentação (doc-compiler): merge de saving/receita, campos obrigatórios, resiliência a falhas do LLM |
 | `routes.test.ts` | Existência de rotas, arquivos de agentes, infra (`integrations/db/`), schema SQLite e tipos, ausência do Supabase |
 
 ## Estrutura do projeto
@@ -79,16 +80,18 @@ src/
   lib/
     agents/            # Sistema de agentes IA
       types.ts         # Tipos: ChatFase, DocumentacaoColetada, SavingColetado, ReceitaColetada, OrchestratorResult, ProjetoContexto, CARGOS
-      extractor.ts     # 1 chamada (temp 0) que lê toda a codebase → pré-preenche os 7 campos
+      extractor.ts     # 1 chamada (temp 0) que lê o material enviado (código ou docs) → pré-preenche os 7 campos
       orchestrator.ts  # Orquestrador do chat — prompts por fase, transições automáticas
       doc-compiler.ts  # Compila campos coletados em DocumentacaoGerada (JSON estruturado)
+      analyzer.ts      # Agente analisador pré-submissão — 10 critérios fixos + dinâmicos, complexidade, parecer
       validator.ts     # Validação automática de documentação (6 critérios)
       email-agent.ts   # Templates de email de aprovação/rejeição
     submeter/          # UI do formulário /submeter (steps + componentes)
-      constants.ts     # FormData, AREAS (fallback), extensões aceitas, MAX_FILE_MB, TOKEN_* (gate), readFileAsBase64
+      constants.ts     # FormData, AREAS (fallback), extensões aceitas, MAX_FILE_MB, TOKEN_* (gate), readFileAsBase64, AnaliseResult
       step1.tsx        # Step 1 (Envio): escopo, status, responsável, área (via /api/areas), ferramenta, equipe
       step2.tsx        # Step 2 (Projeto): tipo(s), nome, data, contexto + upload multi-arquivo (árvore)
       step3-chat.tsx   # Step 3 (Agente): chat IA, SavingForm/ReceitaForm, previews, revisão final
+      analyzer-overlay.tsx # Card de análise pré-submissão (loading animado, header com veredito, parecer em texto)
       form-components.tsx # Inputs, RadioGroup, InfoTooltip (via portal), ChipsInput
       layout.tsx       # PageFrame, WizardProgress (steps clicáveis), StepAnimation
     areas/
@@ -135,10 +138,11 @@ O schema é criado automaticamente por `initSchema()` em `schema.ts`. IDs defaul
 | `user_roles` | user_id, role (admin_master, leader) |
 | `areas` | id, nome (departamentos da empresa; populada via sync TeamGuide) |
 | `leader_areas` | user_id, area_id (N:N - quais áreas um leader acompanha) |
-| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, escopo, servico_externo, membros (JSON), status, chat_completo, data_criacao_projeto, **tipo_projeto**, **tipos_projeto** (JSON), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal, submitted_at, validated_at, validated_by |
+| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, escopo, servico_externo, membros (JSON), status, chat_completo, data_criacao_projeto, **tipo_projeto**, **tipos_projeto** (JSON), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal, **complexidade** (automacao\|inteligencia\|autonomia), submitted_at, validated_at, validated_by |
 | `chat_messages` | id, projeto_id, role (user/assistant/doc), content, options (JSON), selected_option |
 | `documentacao` | projeto_id (UNIQUE), conteudo (JSON — DocumentacaoGerada + saving/receita) |
 | `validacoes` | projeto_id, resultado, parecer, criterios (JSON), admin_email, email_enviado |
+| `analises` | id, projeto_id, resultado (aprovado\|rejeitado), pontuacao_total, pontuacao_maxima, justificativa, resumo, criterios_hardcoded (JSON), criterios_dinamicos (JSON), created_at |
 | `configuracoes` | chave (UNIQUE), valor (JSON), descrição — config dinâmica (ex: critérios de validação) |
 
 ### Status (CHECK na coluna `projetos.status`)
@@ -170,7 +174,7 @@ rascunho → em_validacao → validado | rejeitado
 ### Endpoints de API (`/api/*`, roteados pelo `worker.ts`)
 
 - **Auth**: `GET /api/auth/me`
-- **Chat**: `POST /api/chat/iniciar-submissao`, `/iniciar-saving`, `/iniciar-receita`, `/enviar-mensagem`, `/atualizar-tipos`, `/submeter-validacao`
+- **Chat**: `POST /api/chat/iniciar-submissao`, `/iniciar-saving`, `/iniciar-receita`, `/enviar-mensagem`, `/atualizar-tipos`, `/atualizar-metadados`, `/analisar`, `/submeter-validacao`
 - **Áreas**: `GET /api/areas` (público), `POST /api/admin/areas/sync` (admin), `POST /api/cron/sync-areas` (cron)
 - **Admin**: `/api/admin/projetos`, `/usuarios`, `/users` (+ delete/update-areas), `/admins` (+ remove), `/areas` (+ remove), `/configuracoes`, `/validar-projeto`
 
@@ -230,7 +234,7 @@ doc → doc_preview → [transição animada 3s] → saving   → saving_preview
 ### Fase 1 — Documentação técnica
 
 - Cor do chat: azul (--go-blue) · Header: "Documentação Técnica"
-- **Pré-extração** (`extractor.ts`): antes do chat, 1 chamada ao LLM (temp 0) lê todo o conteúdo dos arquivos e preenche os 7 campos. Campos **técnicos** (execução, dependências, fluxo, configurar_antes) saem do código; campos de **negócio** (o_que_faz, atenção) ficam null se o código não revelar
+- **Pré-extração** (`extractor.ts`): antes do chat, 1 chamada ao LLM (temp 0) lê o material enviado (código-fonte ou documentação prévia — ambos aceitos sem questionamento) e preenche os 7 campos. Campos **técnicos** (execução, dependências, fluxo, configurar_antes) saem do material; campos de **negócio** (o_que_faz, atenção) ficam null se não revelados
 - O chat **só pergunta o que ficou null** — não reconfirma o que já foi extraído
 - Se o extractor preencheu todos os 7, o orquestrador gera o **preview direto** (zero perguntas)
 - 1 pergunta por vez, cética (não aceita respostas vagas — mantém null e aprofunda)
@@ -287,6 +291,28 @@ Na aprovação do último preview, o fluxo marca como `completo`.
 
 Quando os previews são aprovados (`fase = completo`): cards colapsáveis ("Documentação Técnica", "Memorial de Cálculo" e/ou "Memorial de Receita", com badge "Aprovado") + botão "Enviar para Triagem".
 
+### Análise automática pré-submissão (`analyzer.ts` + `analyzer-overlay.tsx`)
+
+Quando o usuário clica "Enviar para Triagem", a submissão e a análise IA rodam em paralelo:
+
+1. A submissão (`submeterParaValidacao`) é enviada primeiro — se falhar, não mostra a tela de sucesso
+2. A tela de sucesso aparece imediatamente com o card de análise em estado de **loading** (frases animadas de terminal)
+3. A análise IA (`analisarProjetoFn` → `analisarProjeto` em `analyzer.ts`) roda em background
+4. O botão "Submeter outro projeto" fica **desabilitado** (cinza, texto "Aguardando análise...") até a análise concluir
+5. **`beforeunload`** impede saída acidental da página durante a análise
+
+**Agente analisador** (`analyzer.ts`):
+- 10 critérios fixos (propósito, trigger, dependências, fluxo, config, riscos, saving, ferramenta, descrição, completude) + 2-3 dinâmicos por projeto
+- Classifica complexidade: `automacao` | `inteligencia` | `autonomia`
+- Gera parecer em texto (`resumo`) + justificativa completa em markdown
+- Resultado salvo na tabela `analises`, complexidade salva no `projetos`
+- O LLM avalia todos os critérios internamente mas retorna apenas os mais relevantes no JSON (max 8)
+
+**Card de análise** (`analyzer-overlay.tsx`):
+- Loading: spinner + frases rotativas estilo terminal
+- Resultado: barra lateral colorida (verde/laranja), header com ícone + badge de veredito, seção "Parecer" com resumo em texto limpo
+- Sem exibição de critérios individuais, pontuação ou detalhes ao usuário — apenas o resumo textual
+
 ### Orquestrador (`orchestrator.ts`)
 
 - 6 system prompts (um por fase): `buildDocPrompt`, `buildDocPreviewPrompt`, `buildSavingPrompt`, `buildSavingPreviewPrompt`, `buildReceitaPrompt`, `buildReceitaPreviewPrompt`
@@ -304,6 +330,7 @@ Quando os previews são aprovados (`fase = completo`): cards colapsáveis ("Docu
 - `enviarMensagem`: detecta fase atual, filtra histórico por fase, **relê `tipos_projeto` do banco**, roda o orquestrador; compila a doc na transição doc→impacto e salva dados financeiros no `completo`
 - `atualizarTipos`: persiste a troca de tipo feita na etapa 2 durante o fluxo do agente
 - `atualizarMetadados`: persiste edições de metadado feitas após o agente iniciar (descrição, nome, área, ferramenta, data, membros); se os **arquivos** mudarem, re-extrai o texto, re-roda o extractor e **reinicia a doc**
+- `analisarProjetoFn`: dispara o agente analisador (`analyzer.ts`) para um projeto, persiste o resultado na tabela `analises` e a complexidade no projeto
 - `submeterParaValidacao`: verifica duplicata, popula colunas de impacto, auto-aprova se RPA, notifica Google Chat e envia os dados completos ao n8n (`N8N_WEBHOOK_URL`)
 
 ### Extração de texto (`extract-text.server.ts`)
@@ -397,7 +424,8 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - **Transições animadas** doc → saving/receita e saving → receita; **revisão final** com cards colapsáveis; loader com etapa nomeada nas operações pesadas
 - **Submissão interna + n8n**: dados no SQLite, duplicata verificada, auto-aprovação RPA, notificação Google Chat e envio ao n8n (webhook → Markdown/Drive/planilha)
 - **Áreas via TeamGuide**: fonte única + fallback hardcoded + sync (admin/cron)
-- **Testes**: 145 passando; rodam antes de cada `npm run dev` via `predev`
+- **Análise automática pré-submissão**: agente analisador com 10 critérios fixos + dinâmicos, classificação de complexidade, card com parecer em texto; roda em background após submissão
+- **Testes**: 142 passando; rodam antes de cada `npm run dev` via `predev`
 - Identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
 
 ## Notas importantes
