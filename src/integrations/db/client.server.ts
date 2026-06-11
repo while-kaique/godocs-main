@@ -198,10 +198,10 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo,
-           p.descricao_breve, p.data_criacao_projeto, a.nome as area_nome
+           p.descricao_breve, p.data_criacao_projeto, p.area, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?
@@ -289,6 +289,16 @@ export function getChatMessagesExcludeRole(projetoId: string, excludeRole: strin
     'SELECT role, content FROM chat_messages WHERE projeto_id = ? AND role != ? ORDER BY created_at',
     [projetoId, excludeRole]
   );
+}
+
+/** Remove todas as mensagens de uma role do chat (usado ao re-sincronizar o agente). */
+export function deleteChatMessagesByRole(projetoId: string, role: string) {
+  return exec('DELETE FROM chat_messages WHERE projeto_id = ? AND role = ?', [projetoId, role]);
+}
+
+/** Remove TODAS as mensagens do chat de um projeto (reset da conversa). */
+export function deleteChatMessagesByProjeto(projetoId: string) {
+  return exec('DELETE FROM chat_messages WHERE projeto_id = ?', [projetoId]);
 }
 
 export function getDocMessage(projetoId: string) {

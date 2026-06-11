@@ -12,6 +12,9 @@ export type LLMOptions = {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  // Sobrescreve o modelo (LLM_MODEL) para esta chamada. Usado para rotear turnos
+  // simples de conversa para um modelo mais rápido/barato (ver LLM_MODEL_FAST).
+  model?: string;
 };
 
 export async function llmChat(
@@ -20,19 +23,22 @@ export async function llmChat(
 ): Promise<string> {
   const provider = process.env.LLM_PROVIDER ?? 'openai';
   const apiKey = process.env.LLM_API_KEY;
-  const model = process.env.LLM_MODEL ?? 'gpt-4.1';
+  const model = opts.model ?? process.env.LLM_MODEL ?? 'gpt-4.1';
 
   const keyPreview = apiKey ? `${apiKey.slice(0, 12)}... (${apiKey.length} chars)` : '✗ AUSENTE';
   log(`provider=${provider}, model=${model}, apiKey=${keyPreview}, msgs=${messages.length}`);
 
   if (!apiKey) throw new Error('LLM_API_KEY não configurada no .env');
 
+  // `model` resolvido (opts.model ?? env) tem de VENCER o spread de opts — senão um
+  // opts.model undefined (ex: LLM_MODEL_FAST não configurado) sobrescreveria o modelo
+  // com undefined e a API responderia "you must provide a model parameter".
   if (provider === 'openai') {
-    return callOpenAI(messages, { model, apiKey, ...opts });
+    return callOpenAI(messages, { ...opts, model, apiKey });
   }
 
   if (provider === 'anthropic') {
-    return callAnthropic(messages, { model, apiKey, ...opts });
+    return callAnthropic(messages, { ...opts, model, apiKey });
   }
 
   throw new Error(`Provider desconhecido: ${provider}. Use "openai" ou "anthropic".`);

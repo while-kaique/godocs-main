@@ -12,7 +12,7 @@ import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAni
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
-import { Step3Chat } from "@/lib/submeter/step3-chat";
+import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
 
 /* ──────────────────────────────────────────────
    Route
@@ -37,7 +37,26 @@ const emptyFormDraft = (): SavingFormData => ({
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
+  valorReceita: "",
+  racionalReceita: "",
 });
+
+// Snapshot dos metadados com que o agente está alinhado — usado para detectar
+// edições feitas nas etapas anteriores depois que o agente já iniciou (item:
+// adaptação a idas e vindas).
+type AgentMeta = {
+  nomeProjeto: string;
+  area: string;
+  ferramenta: string;
+  participantes: string[];
+  dataCriacao: string;
+  descricaoBreve: string;
+};
+
+// Passos nomeados estimados por operação pesada (item: loading com etapa explícita).
+const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
+const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
+const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 
 function SubmeterPage() {
   const navigate = useNavigate();
@@ -60,6 +79,13 @@ function SubmeterPage() {
   // Tipo(s) com que o fluxo do agente está alinhado — usado para detectar troca
   // de tipo (saving ↔ receita) quando o usuário volta à etapa 2 no meio do fluxo.
   const [agentTipos, setAgentTipos] = useState<("saving" | "receita_incremental")[]>([]);
+  // Metadados + assinatura dos arquivos com que o agente está alinhado (item:
+  // propagar mudanças de metadado/arquivos ao agente).
+  const [agentMeta, setAgentMeta] = useState<AgentMeta | null>(null);
+  const [agentArquivosSig, setAgentArquivosSig] = useState<string>("");
+  const [continuando, setContinuando] = useState(false);
+  // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
+  const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
@@ -123,6 +149,32 @@ function SubmeterPage() {
   }, []);
 
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
+
+  /* ── Metadados do agente: snapshot + detecção de mudança ── */
+  const computeFerramenta = useCallback((): string => {
+    return form.escopo === "externo"
+      ? form.servicoExterno.trim()
+      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+        ? `Outros: ${form.ferramentaOutra.trim()}`
+        : form.ferramenta;
+  }, [form.escopo, form.servicoExterno, form.ferramenta, form.ferramentaOutra]);
+
+  const snapshotMeta = useCallback((): AgentMeta => ({
+    nomeProjeto: form.nomeProjeto.trim(),
+    area: form.area,
+    ferramenta: computeFerramenta(),
+    participantes: form.participantes,
+    dataCriacao: form.dataCriacao,
+    descricaoBreve: form.descricaoBreve.trim(),
+  }), [form.nomeProjeto, form.area, form.participantes, form.dataCriacao, form.descricaoBreve, computeFerramenta]);
+
+  // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
+  const arquivosSig = useCallback((): string => {
+    return arquivos
+      .map((f) => `${f.webkitRelativePath || f.name}:${f.size}`)
+      .sort()
+      .join("|");
+  }, [arquivos]);
 
   /* ── Validation ── */
   function validateStep(n: number): boolean {
@@ -285,6 +337,8 @@ function SubmeterPage() {
 
       setProjetoId(result.projeto_id);
       setAgentTipos(form.tipoProjeto);
+      setAgentMeta(snapshotMeta());
+      setAgentArquivosSig(arquivosSig());
 
       const firstMsg: ChatMessage = {
         role: "assistant",
@@ -312,7 +366,95 @@ function SubmeterPage() {
     }
   }
 
-  /* ── Step 2 → Step 3 (agente já iniciado): detecta troca de tipo ── */
+  /* ── Reprocessa a documentação quando os ARQUIVOS mudam após o agente iniciar ── */
+  async function reprocessarComNovosArquivos() {
+    if (!projetoId || arquivos.length === 0) return;
+
+    // Mesma trava de tokens do início.
+    const charsEstimados =
+      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
+    if (charsEstimados > TOKEN_BLOCK_CHARS) {
+      const tokens = Math.round(charsEstimados / 4);
+      toast.error(
+        `Conteúdo muito grande (~${Math.round(tokens / 1000)}k tokens, limite ~200k). ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`
+      );
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+
+    setContinuando(true);
+    try {
+      const docs = await Promise.all(
+        arquivos.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })),
+      );
+      const meta = snapshotMeta();
+
+      // Tipos podem ter mudado junto — persiste antes (a doc re-roteia o impacto).
+      const tiposChanged =
+        form.tipoProjeto.length !== agentTipos.length ||
+        [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
+      if (tiposChanged) {
+        await apiFetch("/api/chat/atualizar-tipos", {
+          projeto_id: projetoId,
+          tipos_projeto: form.tipoProjeto,
+        });
+      }
+
+      const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+        "/api/chat/atualizar-metadados",
+        {
+          projeto_id: projetoId,
+          nome_projeto: meta.nomeProjeto,
+          area: meta.area,
+          ferramenta: meta.ferramenta,
+          membros: meta.participantes,
+          data_criacao: meta.dataCriacao,
+          descricao_breve: meta.descricaoBreve,
+          docs,
+        },
+      );
+
+      // A base mudou → reseta TODO o estado do chat para a fase de doc.
+      setAgentMeta(meta);
+      setAgentArquivosSig(arquivosSig());
+      setAgentTipos(form.tipoProjeto);
+      setShowTransition(false);
+      setShowSavingForm(false);
+      setShowReceitaForm(false);
+      setApprovedDocPreview(null);
+      setApprovedSavingPreview(null);
+      setApprovedReceitaPreview(null);
+      setChatComplete(false);
+      setFormDraft(emptyFormDraft());
+
+      if (result.reset && result.response) {
+        const msg: ChatMessage = {
+          role: "assistant",
+          content: result.response.content,
+          options: result.response.options ?? undefined,
+          isComplete: result.response.isComplete,
+          isPreview: result.response.isPreview,
+          fase: result.response.fase,
+        };
+        setChatMessages([msg]);
+        setChatFase(result.response.fase ?? "doc");
+        if (result.response.isComplete) setChatComplete(true);
+      }
+
+      toast.success("Arquivos atualizados — a documentação foi reprocessada.");
+      goToStep(3, "forward");
+    } catch (e) {
+      console.error("[submeter] falha ao reprocessar arquivos:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Erro ao reprocessar os arquivos: ${msg}`);
+    } finally {
+      setContinuando(false);
+    }
+  }
+
+  /* ── Step 2 → Step 3 (agente já iniciado): propaga mudanças e detecta troca de tipo ── */
   async function handleContinuarAgente() {
     // Não permite avançar sem ao menos um tipo selecionado.
     if (form.tipoProjeto.length === 0) {
@@ -321,6 +463,37 @@ function SubmeterPage() {
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
       return;
+    }
+
+    // Arquivos trocados → reprocessa a doc do zero (cuida da navegação e retorna).
+    if (projetoId && arquivosSig() !== agentArquivosSig) {
+      await reprocessarComNovosArquivos();
+      return;
+    }
+
+    // Metadados de texto mudaram → persiste; o agente lê frescos no próximo turno.
+    if (projetoId && agentMeta) {
+      const meta = snapshotMeta();
+      const metaChanged = JSON.stringify(meta) !== JSON.stringify(agentMeta);
+      if (metaChanged) {
+        try {
+          await apiFetch("/api/chat/atualizar-metadados", {
+            projeto_id: projetoId,
+            nome_projeto: meta.nomeProjeto,
+            area: meta.area,
+            ferramenta: meta.ferramenta,
+            membros: meta.participantes,
+            data_criacao: meta.dataCriacao,
+            descricao_breve: meta.descricaoBreve,
+          });
+          setAgentMeta(meta);
+        } catch (e) {
+          console.error("[submeter] falha ao atualizar metadados:", e);
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error(`Erro ao atualizar os dados do projeto: ${msg}`);
+          return;
+        }
+      }
     }
 
     const changed =
@@ -368,6 +541,9 @@ function SubmeterPage() {
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
     setChatLoading(true);
+    // Aprovar a doc dispara a compilação (operação pesada) — mostra passos nomeados
+    // em vez do loading genérico. Turnos simples de conversa ficam com os 3 pontos.
+    setChatLoadingSteps(chatFase === "doc_preview" ? LOADING_STEPS_COMPILAR : null);
 
     setTimeout(() => {
       chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -441,6 +617,7 @@ function SubmeterPage() {
       setChatMessages((prev) => prev.slice(0, -1));
     } finally {
       setChatLoading(false);
+      setChatLoadingSteps(null);
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
@@ -502,9 +679,15 @@ function SubmeterPage() {
     if (!projetoId) return;
     setReceitaFormLoading(true);
     try {
+      const valorReceita = formData.valorReceita ? parseFloat(formData.valorReceita) : undefined;
       const result = await apiFetch<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-receita",
-        { projeto_id: projetoId, tipo_saving: formData.tipoSaving as "mensal" | "pontual" },
+        {
+          projeto_id: projetoId,
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          valor_ganho_mensal: valorReceita,
+          racional: formData.racionalReceita.trim() || undefined,
+        },
       );
       setShowReceitaForm(false);
       setFormDraft(emptyFormDraft());
@@ -721,6 +904,7 @@ function SubmeterPage() {
                   setInput={setChatInput}
                   onSend={handleSendMessage}
                   loading={chatLoading}
+                  loadingSteps={chatLoadingSteps}
                   isComplete={chatComplete}
                   onSubmitProject={handleSubmitProject}
                   submitting={submittingProject}
@@ -774,9 +958,17 @@ function SubmeterPage() {
                   <button
                     type="button"
                     onClick={handleContinuarAgente}
-                    className={cn("go-btn-next", shaking && "go-shake")}
+                    disabled={continuando}
+                    className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
                   >
-                    Continuar com Agente &rarr;
+                    {continuando ? (
+                      <>
+                        <CyclingText steps={LOADING_STEPS_REPROCESSAR} />
+                        <div className="go-spinner" />
+                      </>
+                    ) : (
+                      <span>Continuar com Agente &rarr;</span>
+                    )}
                   </button>
                 ) : (
                   <button
@@ -787,7 +979,7 @@ function SubmeterPage() {
                   >
                     {iniciandoChat ? (
                       <>
-                        <span>Analisando...</span>
+                        <CyclingText steps={LOADING_STEPS_INICIAR} />
                         <div className="go-spinner" />
                       </>
                     ) : (

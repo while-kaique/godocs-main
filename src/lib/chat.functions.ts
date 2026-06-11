@@ -17,6 +17,7 @@ import {
   getProjetoById,
   findDuplicateProjeto,
   updateProjeto,
+  deleteChatMessagesByProjeto,
   insertValidacao,
   updateValidacaoEmailEnviado,
   parseJson,
@@ -54,7 +55,8 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
     ferramenta: data.ferramenta,
-    area: data.area_nome ?? null,
+    // area_nome vem do join por area_id; cai no texto p.area quando não há id mapeado.
+    area: data.area_nome ?? data.area ?? null,
     membros: parseJson<string[]>(data.membros) ?? [],
     nome_projeto: data.nome ?? '',
     data_criacao: data.data_criacao_projeto ?? null,
@@ -208,6 +210,11 @@ const iniciarSavingSchema = z.object({
 const iniciarReceitaSchema = z.object({
   projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
+  // Valor de receita informado pela pessoa no formulário determinístico. O agente
+  // recebe esse valor pré-preenchido e o DESAFIA (em vez de coletar do zero).
+  valor_ganho_mensal: z.number().min(0).optional(),
+  // Racional curto (de onde vem a receita) — ponto de partida para o agente aprofundar.
+  racional: z.string().max(500).optional(),
 });
 
 const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
@@ -507,6 +514,8 @@ export async function iniciarReceita(rawData: unknown) {
 
   const receita = receitaVazia();
   receita.tipo_saving = data.tipo_saving;
+  receita.valor_ganho_mensal = data.valor_ganho_mensal ?? null;
+  receita.racional = data.racional?.trim() || null;
 
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
@@ -535,7 +544,7 @@ export async function iniciarReceita(rawData: unknown) {
     ? (resultado as { question: string }).question
     : (resultado as { content: string }).content;
   console.log('\n┌─────────────────────────────────────────────');
-  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
+  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}, valor=${data.valor_ganho_mensal ?? '—'}, racional=${receita.racional ?? '—'}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
@@ -562,6 +571,97 @@ export async function atualizarTipos(rawData: unknown) {
     tipo_projeto: data.tipos_projeto[0],
   });
   return { ok: true };
+}
+
+// ─── Atualizar metadados do projeto durante o fluxo do agente ────────────────
+// Pessoas voltam às etapas anteriores para corrigir contexto/arquivos/área/datas
+// depois que o agente já começou. Os campos de TEXTO (descrição, nome, área,
+// ferramenta, data, membros) são lidos frescos do banco a cada turno do agente
+// (getProjetoContexto), então basta persisti-los aqui. Quando os ARQUIVOS mudam,
+// a base da documentação muda: re-extraímos o texto, re-rodamos o extrator e
+// REINICIAMOS a fase de doc (limpa a conversa) com uma nova primeira mensagem.
+
+const atualizarMetadadosSchema = z.object({
+  projeto_id: z.string().min(1),
+  nome_projeto: z.string().min(1).max(200).optional(),
+  area: z.string().min(1).max(100).optional(),
+  ferramenta: z.string().min(1).max(200).optional(),
+  membros: z.array(z.string()).optional(),
+  data_criacao: z.string().optional(),
+  descricao_breve: z.string().max(1000).optional(),
+  // Se enviados, substituem os arquivos e reiniciam a documentação.
+  docs: z.array(
+    z.object({ base64: z.string().min(1), filename: z.string().min(1) })
+  ).max(5000).optional(),
+});
+
+export async function atualizarMetadados(rawData: unknown) {
+  const data = atualizarMetadadosSchema.parse(rawData);
+  const temDocs = !!data.docs && data.docs.length > 0;
+  log('atualizarMetadados', `projeto=${data.projeto_id}, docs=${temDocs ? data.docs!.length : 0}`);
+
+  // 1. Persiste os campos de texto fornecidos (o agente lê frescos no próximo turno).
+  const campos: Record<string, unknown> = {};
+  if (data.nome_projeto !== undefined) campos.nome = data.nome_projeto;
+  if (data.area !== undefined) campos.area = data.area;
+  if (data.ferramenta !== undefined) campos.ferramenta = data.ferramenta;
+  if (data.membros !== undefined) campos.membros = data.membros;
+  if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
+  if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (Object.keys(campos).length > 0) {
+    await updateProjeto(data.projeto_id, campos);
+  }
+
+  // 2. Sem arquivos novos → nada a reiniciar; o agente já vê os metadados frescos.
+  if (!temDocs) {
+    return { ok: true, reset: false };
+  }
+
+  // 3. Arquivos mudaram → re-extrai texto, re-roda o extrator e REINICIA a doc.
+  let docTexto = '';
+  try {
+    docTexto = await extractTextFromMultipleFiles(data.docs!);
+    log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+  } catch (extractErr) {
+    err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
+    docTexto = '';
+  }
+
+  // Limpa a conversa inteira (doc + impacto) — a base mudou, recomeçamos do zero.
+  await deleteChatMessagesByProjeto(data.projeto_id);
+
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'doc',
+    content: docTexto || '(documento sem texto legível)',
+  });
+
+  const ctx = await getProjetoContexto(data.projeto_id);
+
+  let coletadoInicial: DocumentacaoColetada = {
+    ...documentacaoVazia(),
+    nome_projeto: ctx.nome_projeto,
+  };
+  if (docTexto || ctx.descricao_breve) {
+    try {
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
+    } catch (extractorErr) {
+      err('atualizarMetadados', 'Extrator falhou — seguindo sem pré-preenchimento:', extractorErr);
+      coletadoInicial = { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto };
+    }
+  }
+
+  const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
+
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
+  });
+
+  log('atualizarMetadados', `Documentação reiniciada — fase: ${resultado.fase}`);
+  return { ok: true, reset: true, response: formatResponse(resultado) };
 }
 
 // ─── Submeter para validação ─────────────────────────────────────────────────

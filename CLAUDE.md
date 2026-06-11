@@ -362,6 +362,7 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - `LLM_PROVIDER` — `openai` (default) ou `anthropic`
 - `LLM_API_KEY` — chave da API do provider escolhido
 - `LLM_MODEL` — modelo a usar (default: `gpt-4.1`)
+- `LLM_MODEL_FAST` — (opcional) modelo mais rápido/barato para os turnos de conversa do orquestrador (perguntas/preview). Se ausente, usa `LLM_MODEL`. A compilação da doc (`doc-compiler`) e a pré-extração (`extractor`) sempre usam o `LLM_MODEL` forte.
 - `GOOGLE_CHAT_WEBHOOK_URL` — webhook do Google Chat para notificações de novo projeto
 - `OCR_WORKER_URL` / `OCR_WORKER_TOKEN` — Cloudflare OCR Worker (extração de PDF)
 - `TG_API_TOKEN` — token da API do TeamGuide (derivação/sync de áreas)

@@ -89,6 +89,10 @@ export interface SavingFormData {
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
+  // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).
+  valorReceita: string;
+  // Receita: racional curto (de onde vem a receita) — o agente usa como ponto de partida.
+  racionalReceita: string;
 }
 
 export function readFileAsBase64(file: File): Promise<string> {

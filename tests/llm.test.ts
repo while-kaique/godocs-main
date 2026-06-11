@@ -12,6 +12,7 @@ beforeEach(() => {
 afterEach(() => {
   process.env = originalEnv;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('LLM provider selection', () => {
@@ -94,5 +95,43 @@ describe('dropUnsupportedParam — adaptação a modelos novos (gpt-5+)', () => 
     const body: Record<string, unknown> = { max_completion_tokens: 4096 };
     const err = JSON.stringify({ error: { code: 'unsupported_value', param: 'temperature', message: 'x' } });
     expect(dropUnsupportedParam(body, err)).toBeNull();
+  });
+});
+
+describe('llmChat — modelo resolvido vence o spread de opts (regressão)', () => {
+  // Regressão: o orquestrador passa `model: LLM_MODEL_FAST` que pode ser undefined.
+  // Se o spread de opts sobrescrevesse o modelo resolvido, a chamada iria sem modelo
+  // → OpenAI responde "you must provide a model parameter".
+  function stubFetchCapturandoBody(): () => Record<string, unknown> {
+    let sentBody: Record<string, unknown> = {};
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      sentBody = JSON.parse(init.body) as Record<string, unknown>;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) } as unknown as Response;
+    }));
+    return () => sentBody;
+  }
+
+  it('usa LLM_MODEL quando opts.model é undefined (não sobrescreve com undefined)', async () => {
+    process.env.LLM_API_KEY = 'fake-key';
+    process.env.LLM_PROVIDER = 'openai';
+    process.env.LLM_MODEL = 'gpt-test-default';
+    const getBody = stubFetchCapturandoBody();
+
+    const { llmChat } = await import('@/lib/llm');
+    await llmChat([{ role: 'user', content: 'oi' }], { model: undefined, jsonMode: true });
+
+    expect(getBody().model).toBe('gpt-test-default');
+  });
+
+  it('usa o modelo override quando fornecido', async () => {
+    process.env.LLM_API_KEY = 'fake-key';
+    process.env.LLM_PROVIDER = 'openai';
+    process.env.LLM_MODEL = 'gpt-test-default';
+    const getBody = stubFetchCapturandoBody();
+
+    const { llmChat } = await import('@/lib/llm');
+    await llmChat([{ role: 'user', content: 'oi' }], { model: 'gpt-fast' });
+
+    expect(getBody().model).toBe('gpt-fast');
   });
 });
