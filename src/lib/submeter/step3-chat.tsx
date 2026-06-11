@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput } from "./constants";
@@ -54,6 +54,24 @@ function renderInlineMarkdown(line: string, accentColor: string, isSaving: boole
   }
 
   return parts.length > 0 ? <>{parts}</> : line;
+}
+
+/* ──────────────────────────────────────────────
+   Cycling label para operações pesadas
+   (mostra "em que passo o agente está" em vez do
+   loading genérico de 3 pontinhos)
+   ────────────────────────────────────────────── */
+
+export function CyclingText({ steps, intervalMs = 2200 }: { steps: string[]; intervalMs?: number }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    setIdx(0);
+    if (steps.length <= 1) return;
+    // Avança pelos passos estimados e PÁRA no último (a resposta chega a qualquer momento).
+    const t = setInterval(() => setIdx((i) => (i + 1 >= steps.length ? i : i + 1)), intervalMs);
+    return () => clearInterval(t);
+  }, [steps, intervalMs]);
+  return <>{steps[Math.min(idx, steps.length - 1)] ?? ""}</>;
 }
 
 /* ──────────────────────────────────────────────
@@ -554,21 +572,37 @@ function SavingForm({
   escopo,
   onSubmit,
   loading,
+  draft,
+  onDraftChange,
 }: {
   tipoProjeto: ("saving" | "receita_incremental")[];
   escopo?: string;
   onSubmit: (data: SavingFormData) => void;
   loading: boolean;
+  // Rascunho persistido no componente pai — sobrevive à desmontagem do step 3 na
+  // navegação entre etapas (senão o que o usuário preencheu aqui se perderia).
+  draft?: SavingFormData;
+  onDraftChange?: (d: SavingFormData) => void;
 }) {
-  const [linhas, setLinhas] = useState<SavingLinhaInput[]>([
-    { cargo: "", horasAntes: "", horasDepois: "" },
-  ]);
-  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">("");
-  const [custoExterno, setCustoExterno] = useState("");
-  const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">("");
+  const [linhas, setLinhas] = useState<SavingLinhaInput[]>(
+    draft?.linhas ?? [{ cargo: "", horasAntes: "", horasDepois: "" }],
+  );
+  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
+  const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
+  const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
+    draft?.custoPeriodicidade ?? "",
+  );
+  const [valorReceita, setValorReceita] = useState(draft?.valorReceita ?? "");
+  const [racionalReceita, setRacionalReceita] = useState(draft?.racionalReceita ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
+  useEffect(() => {
+    onDraftChange?.({ linhas, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+
   const isSaving = tipoProjeto.includes("saving");
+  const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
   const isExterno = escopo === "externo";
   const icon = isSaving ? "💰" : "📈";
   const title = "Dados para Análise de Impacto";
@@ -612,6 +646,12 @@ function SavingForm({
       if (!custoExterno || parseFloat(custoExterno) < 0) errs.custoExterno = "Informe o custo da ferramenta";
       if (!custoPeriodicidade) errs.custoPeriodicidade = "Selecione a periodicidade";
     }
+    if (isReceita) {
+      const v = parseFloat(valorReceita);
+      if (valorReceita === "" || isNaN(v) || v <= 0) errs.valorReceita = "Informe o ganho de receita estimado";
+      if (!racionalReceita.trim() || racionalReceita.trim().length < 10)
+        errs.racionalReceita = "Escreva um racional curto (de onde vem a receita)";
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -623,6 +663,8 @@ function SavingForm({
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
+      valorReceita,
+      racionalReceita,
     });
   }
 
@@ -689,10 +731,12 @@ function SavingForm({
         {isSaving && (
           <div>
             <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-              Quem executava a tarefa manualmente <span style={{ color: "#e53e3e" }}>*</span>
+              Quem trabalhava (ou trabalha) nessa tarefa <span style={{ color: "#e53e3e" }}>*</span>
             </label>
             <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-              Uma linha por pessoa/função. Informe as horas/mês gastas antes e depois da automação.
+              Uma linha por pessoa/função. Informe as horas/mês antes e depois da automação.
+              Se <strong>ninguém fazia</strong> essa tarefa antes, deixe "horas antes" como <strong>0</strong>;
+              se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
             </p>
 
             {/* Cabeçalho das colunas (telas largas) */}
@@ -814,6 +858,73 @@ function SavingForm({
           </div>
         )}
 
+        {/* Ganho de receita estimado (só para projetos de receita incremental) */}
+        {isReceita && (
+          <div>
+            <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+              Ganho de receita estimado <span style={{ color: "#e53e3e" }}>*</span>
+            </label>
+            <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+              Informe quanto de receita nova o projeto gera ({tipoSaving === "pontual" ? "valor total" : "por mês"}).
+              O agente vai pedir a base de cálculo para validar esse número.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-semibold" style={{ color: "#6b6e00" }}>R$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={tipoSaving === "pontual" ? "Ex: 50000,00" : "Ex: 8000,00"}
+                value={valorReceita}
+                onChange={(e) => { setValorReceita(e.target.value); setErrors(er => { const n = { ...er }; delete n.valorReceita; return n; }); }}
+                className="go-input flex-1"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--go-radius-md)",
+                  border: errors.valorReceita ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                  background: "var(--go-white)",
+                  fontSize: 13,
+                }}
+              />
+            </div>
+            {errors.valorReceita && (
+              <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                {errors.valorReceita}
+              </div>
+            )}
+
+            {/* Racional curto — de onde vem a receita */}
+            <div className="mt-3.5">
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                Racional <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                Em uma frase, de onde vem essa receita. Ex: <em>"as estampas com IA vendem esse valor por mês"</em>.
+                O agente vai aprofundar a partir daqui.
+              </p>
+              <textarea
+                rows={2}
+                placeholder="Ex: as estampas geradas com IA vendem cerca desse valor por mês"
+                value={racionalReceita}
+                onChange={(e) => { setRacionalReceita(e.target.value); setErrors(er => { const n = { ...er }; delete n.racionalReceita; return n; }); }}
+                className="go-textarea w-full resize-none"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--go-radius-md)",
+                  border: errors.racionalReceita ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                  background: "var(--go-white)",
+                  fontSize: 13,
+                }}
+              />
+              {errors.racionalReceita && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.racionalReceita}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Custo da ferramenta externa (só para projetos externos com saving) */}
         {isExterno && isSaving && (
           <>
@@ -928,6 +1039,7 @@ export function Step3Chat({
   setInput,
   onSend,
   loading,
+  loadingSteps,
   isComplete,
   onSubmitProject,
   submitting,
@@ -946,12 +1058,17 @@ export function Step3Chat({
   showReceitaForm,
   onReceitaFormSubmit,
   receitaFormLoading,
+  formDraft,
+  onFormDraftChange,
 }: {
   messages: ChatMessage[];
   input: string;
   setInput: (v: string) => void;
   onSend: (content: string, option?: number) => void;
   loading: boolean;
+  // Passos nomeados para operações pesadas (compilar doc, ler arquivos, analisar
+  // impacto). Quando presente e `loading` ativo, mostra o passo em vez dos 3 pontos.
+  loadingSteps?: string[] | null;
   isComplete: boolean;
   onSubmitProject: () => void;
   submitting: boolean;
@@ -970,6 +1087,8 @@ export function Step3Chat({
   showReceitaForm?: boolean;
   onReceitaFormSubmit?: (data: SavingFormData) => void;
   receitaFormLoading?: boolean;
+  formDraft?: SavingFormData;
+  onFormDraftChange?: (d: SavingFormData) => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview";
@@ -1146,6 +1265,8 @@ export function Step3Chat({
           escopo={escopo}
           onSubmit={onSavingFormSubmit}
           loading={savingFormLoading ?? false}
+          draft={formDraft}
+          onDraftChange={onFormDraftChange}
         />
       )}
 
@@ -1156,6 +1277,8 @@ export function Step3Chat({
           escopo={escopo}
           onSubmit={onReceitaFormSubmit}
           loading={receitaFormLoading ?? false}
+          draft={formDraft}
+          onDraftChange={onFormDraftChange}
         />
       )}
 
@@ -1226,19 +1349,44 @@ export function Step3Chat({
               className="rounded-2xl rounded-tl-sm px-4 py-3"
               style={{ background: accentBgLight, border: `1px solid ${accentBorder}` }}
             >
-              <div className="flex gap-1.5 items-center h-5">
-                {[0, 0.2, 0.4].map((delay) => (
+              {loadingSteps && loadingSteps.length > 0 ? (
+                // Operação pesada → mostra o passo nomeado (item: loading com etapa).
+                <div className="flex items-center gap-2.5 h-5">
                   <span
-                    key={delay}
-                    className="h-2 w-2 rounded-full"
-                    style={{
-                      background: accentColor,
-                      opacity: 0.5,
-                      animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
-                    }}
-                  />
-                ))}
-              </div>
+                    className="text-[12.5px] font-medium"
+                    style={{ color: isSavingFase ? "#6b6e00" : "var(--go-blue)" }}
+                  >
+                    <CyclingText steps={loadingSteps} />
+                  </span>
+                  <div className="flex gap-1.5 items-center">
+                    {[0, 0.2, 0.4].map((delay) => (
+                      <span
+                        key={delay}
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{
+                          background: accentColor,
+                          opacity: 0.5,
+                          animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-1.5 items-center h-5">
+                  {[0, 0.2, 0.4].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-2 w-2 rounded-full"
+                      style={{
+                        background: accentColor,
+                        opacity: 0.5,
+                        animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

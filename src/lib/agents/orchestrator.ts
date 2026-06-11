@@ -172,24 +172,49 @@ DETALHES TÉCNICOS APROVADOS:
 - Fluxo: ${coletado.fluxo}
 - Ferramenta: ${ctx.ferramenta}`;
 
+  const isPontualReceita = receita.tipo_saving === 'pontual';
+  const valorInformado = receita.valor_ganho_mensal != null && receita.valor_ganho_mensal > 0;
+  const unidadeReceita = isPontualReceita ? 'total' : '/mês';
+
+  // Espelha a lógica do saving: se o usuário já informou o valor no formulário
+  // determinístico, o agente DESAFIA esse número (pede evidências) em vez de
+  // coletá-lo do zero. Se não veio valor, coleta normalmente via conversa.
+  const blocoRacional = receita.racional?.trim()
+    ? `\n- Racional curto informado pelo usuário: "${receita.racional.trim()}"`
+    : '';
+
+  const blocoValor = valorInformado
+    ? `DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte do zero):
+- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${isPontualReceita ? 'ganho único' : 'recorrente todo mês'})
+- Ganho de receita declarado pelo usuário: R$ ${receita.valor_ganho_mensal}${unidadeReceita}${blocoRacional}
+
+SEU OBJETIVO: VALIDAR e DESAFIAR o valor de R$ ${receita.valor_ganho_mensal}${unidadeReceita} que o usuário já informou — NÃO peça o valor de novo.
+- Use o racional curto acima como PONTO DE PARTIDA. Ele é um resumo de uma linha — seu papel é aprofundá-lo: pergunte a base de cálculo, de onde vem a receita nova, qual a comparação (antes vs. depois) e o que sustenta o número.
+- Se o valor parecer otimista ou sem base, questione diretamente e peça evidências concretas.
+- Se, após o detalhamento, o valor justificado for diferente do declarado, atualize \`valor_ganho_mensal\` com o número correto.
+- Você ainda precisa construir o **memorial_calculo** (narrativa que fundamenta o valor) expandindo o racional curto com as respostas do usuário.`
+    : `DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
+- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${isPontualReceita ? 'ganho único' : 'recorrente todo mês'})
+
+CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
+1. **valor_ganho_mensal** — Quanto de receita incremental (R$/mês ou R$ total se pontual) o projeto gera?
+2. **memorial_calculo** — Narrativa detalhada que fundamenta o valor informado.`;
+
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental — quanto de receita nova esse projeto gera.
 
 ${detalhes}
 
-DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
-- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${receita.tipo_saving === 'mensal' ? 'recorrente todo mês' : 'ganho único'})
-
-CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
-1. **valor_ganho_mensal** — Quanto de receita incremental (R$/mês ou R$ total se pontual) o projeto gera?
-2. **memorial_calculo** — Narrativa detalhada que fundamenta o valor informado.
+${blocoValor}
 
 ESTADO ATUAL:
 ${JSON.stringify(receita, null, 2)}
 
 COMO CONDUZIR:
 1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
-2. Pergunte qual é o ganho de receita estimado e a lógica por trás (como esse valor foi calculado, de onde vem, qual a base de comparação).
+2. ${valorInformado
+    ? `O usuário já informou o valor (R$ ${receita.valor_ganho_mensal}${unidadeReceita}) — pergunte a lógica por trás dele (como foi calculado, de onde vem, qual a base de comparação). NÃO peça o valor novamente.`
+    : 'Pergunte qual é o ganho de receita estimado e a lógica por trás (como esse valor foi calculado, de onde vem, qual a base de comparação).'}
 3. Faça UMA pergunta por vez. Seja cético — peça evidências concretas.
 4. Se o valor parecer alto, peça detalhamento: "Como você chegou a esse número? Qual era a receita antes e qual é agora?"
 5. Monte o memorial_calculo automaticamente com base nas respostas — o usuário NÃO escreve o memorial.
@@ -274,16 +299,18 @@ O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA (taxa por cargo) — NÃO MENCIO
 
 ENTENDENDO OS DADOS — LEIA COM ATENÇÃO:
 Cada linha tem horas_antes (antes da automação) e horas_depois (depois da automação).
-Existem DOIS cenários válidos:
-1. **Economia**: horas_antes > 0, horas_depois menor → a pessoa gastava X horas fazendo algo manual e agora gasta menos. Economia = horas_antes - horas_depois.
-2. **Custo adicional da automação**: horas_antes = 0, horas_depois > 0 → essa pessoa NÃO fazia essa tarefa antes; agora precisa dedicar horas para supervisionar/monitorar a automação. Isso é um CUSTO, não uma economia. A economia dessa linha é NEGATIVA.
+NEM TODO PROJETO TINHA ALGUÉM EXECUTANDO A TAREFA MANUALMENTE ANTES — não parta desse pressuposto. Existem VÁRIOS cenários válidos:
+1. **Economia clássica**: horas_antes > 0, horas_depois menor → a pessoa gastava X horas fazendo algo manual e agora gasta menos. Economia = horas_antes - horas_depois.
+2. **Ninguém fazia antes (nem faz agora)**: horas_antes = 0 e horas_depois = 0 → a tarefa NÃO era executada manualmente por ninguém; a automação passou a fazê-la. Não havia rotina manual prévia. NÃO insista em detalhar um processo manual que nunca existiu — o ganho aqui é a tarefa passar a ser feita (qualidade, cobertura, frequência), não a redução de horas de alguém. Pergunte o que a automação entrega que antes não era feito.
+3. **Custo adicional da automação**: horas_antes = 0, horas_depois > 0 → essa pessoa NÃO fazia essa tarefa antes; agora precisa dedicar horas para supervisionar/monitorar a automação. Isso é um CUSTO, não uma economia. A economia dessa linha é NEGATIVA.
    Exemplo real: um estagiário fazia 66h/mês de trabalho manual. A automação zerou isso (economia +66h). Mas agora um analista precisa monitorar 1h/mês (custo +1h). Saving líquido: 66 - 1 = 65h/mês.
 
-NUNCA estranhe horas_antes=0 — é perfeitamente normal e representa custo adicional. NÃO pergunte "existia algum processo manual?" para essas linhas. O usuário já informou que não existia (0h antes), e está declarando o custo novo.
+NUNCA estranhe horas_antes=0 — é perfeitamente normal. NÃO pergunte "existia algum processo manual?" nem cobre o detalhamento de uma rotina manual para essas linhas: o usuário já declarou que ninguém fazia antes (0h antes). Aceite isso e siga.
 
 SEU OBJETIVO: validar as horas informadas${plural ? ' de CADA pessoa' : ''} e montar o memorial_calculo.
 - Para linhas com horas_antes > 0: validar que o processo manual realmente consumia aquelas horas.
 - Para linhas com horas_antes = 0 e horas_depois > 0: entender qual atividade de monitoramento/supervisão é necessária.
+- Para linhas com horas_antes = 0 e horas_depois = 0: não há horas a validar — registre no memorial que não havia execução manual prévia e foque no que a automação passou a entregar.
 
 ESTADO ATUAL:
 ${JSON.stringify(saving, null, 2)}
@@ -433,20 +460,31 @@ Se TODOS os campos estiverem ricos e completos com contexto de negócio, gere o 
         content: `[SISTEMA] O usuário informou ${linhas.length} pessoa(s) que executavam a tarefa: ${resumoLinhas}. Economia total declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente${muitas ? ' (validaremos as horas de cada pessoa)' : ` nessas ${economiaHoras}h`}. Sempre termine com uma pergunta.`,
       });
     } else if (fase === 'receita') {
+      const temValor = receita.valor_ganho_mensal != null && receita.valor_ganho_mensal > 0;
+      const unidade = receita.tipo_saving === 'pontual' ? 'total' : '/mês';
+      const racionalMsg = receita.racional?.trim() ? ` O racional curto que ele deu foi: "${receita.racional.trim()}".` : '';
       messages.push({
         role: 'user',
-        content: `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
+        content: temValor
+          ? `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}. O usuário JÁ informou o ganho estimado: R$ ${receita.valor_ganho_mensal}${unidade}.${racionalMsg} Apresente-se em UMA frase curta. NÃO peça o valor de novo — partindo do racional, faça a primeira pergunta concreta DESAFIANDO o número: como ele chegou a esse valor e qual a base de cálculo. Sempre termine com uma pergunta.`
+          : `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}.${racionalMsg} Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
       });
     }
   }
 
   const temperature = fase === 'doc' || fase === 'doc_preview' ? 0.2 : 0.4;
-  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}`);
+  // Os turnos do orquestrador são conversa (perguntas/preview curtos) — diferente
+  // da compilação da doc (doc-compiler, modelo forte). Se LLM_MODEL_FAST estiver
+  // configurado, roteamos a conversa para um modelo mais rápido/barato; senão cai
+  // no LLM_MODEL padrão (sem mudança de comportamento). Reduz a latência percebida
+  // em respostas simples sem tocar na qualidade da compilação da doc.
+  const fastModel = process.env.LLM_MODEL_FAST || undefined;
+  log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}${fastModel ? `, modelo rápido: ${fastModel}` : ''}`);
   let raw: string;
   const maxRetries = 2;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      raw = await llmChat(messages, { jsonMode: true, temperature, maxTokens: 4096 });
+      raw = await llmChat(messages, { jsonMode: true, temperature, maxTokens: 4096, model: fastModel });
       log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? '...' : ''}`);
     } catch (llmErr) {
       const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);

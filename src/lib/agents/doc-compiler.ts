@@ -1,9 +1,25 @@
 // Agente Compilador de Documentação
 // Recebe os campos coletados pelo orquestrador + contexto do projeto
-// e gera a documentação final estruturada no padrão das 6 seções
+// e gera a documentação final estruturada no padrão das 6 seções.
+//
+// Esta etapa é o CERNE do produto: o agente transforma os campos coletados em
+// documentação profissional (6 seções, critérios de qualidade, dedup). Por isso
+// NÃO há fallback determinístico — se a IA não devolver uma doc válida, lançamos
+// erro para o chamador abortar a transição e o usuário tentar de novo. Nunca
+// salvamos uma doc "de segunda categoria" que não passou pelo agente.
 
 import { llmChat } from '@/lib/llm';
 import type { DocumentacaoColetada, DocumentacaoGerada, ProjetoContexto } from './types';
+
+const log = (...args: unknown[]) => console.log('[doc-compiler]', ...args);
+
+// Teto de saída generoso: a doc completa (6 seções estruturadas) estoura fácil os
+// 2048 default do llm.ts — e modelos de reasoning (gpt-5*) ainda consomem parte do
+// orçamento com raciocínio. Sem isso, o JSON volta truncado.
+const MAX_OUTPUT_TOKENS = 8192;
+
+// Quantas vezes tentamos obter um JSON válido do agente antes de desistir.
+const MAX_ATTEMPTS = 3;
 
 const SYSTEM_PROMPT = `Você é um especialista em documentação de projetos de automação corporativa do GoGroup.
 Gere uma documentação técnica profissional e completa com base nas informações coletadas.
@@ -40,11 +56,8 @@ Responda APENAS com JSON válido seguindo exatamente a estrutura abaixo:
   "gerado_em": "ISO date string"
 }`;
 
-export async function compilarDocumentacao(
-  ctx: ProjetoContexto,
-  coletado: DocumentacaoColetada
-): Promise<DocumentacaoGerada> {
-  const userMsg = `Gere a documentação com base nestas informações coletadas:
+function buildUserMsg(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
+  return `Gere a documentação com base nestas informações coletadas:
 
 CONTEXTO DO PROJETO:
 - Responsável: ${ctx.responsavel_nome} (${ctx.responsavel_email})
@@ -60,20 +73,73 @@ INFORMAÇÕES COLETADAS VIA CHAT:
 - Fluxo: ${coletado.fluxo}
 - Configurar antes de usar: ${coletado.configurar_antes}
 - Pontos de atenção: ${coletado.atencao}`;
+}
 
-  const raw = await llmChat(
-    [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userMsg },
-    ],
-    { jsonMode: true, temperature: 0.3 }
-  );
+/**
+ * Faz o parse da resposta do LLM com tolerância a falhas. Retorna null quando o
+ * JSON veio truncado/inválido ou sem o conteúdo mínimo esperado — o chamador
+ * decide o que fazer (retry).
+ */
+export function parseDocJson(raw: string): DocumentacaoGerada | null {
+  try {
+    const parsed = JSON.parse(raw) as DocumentacaoGerada;
+    if (parsed && typeof parsed === 'object' && (parsed.o_que_faz || parsed.titulo)) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
-  const doc = JSON.parse(raw) as DocumentacaoGerada;
+/**
+ * Compila a documentação final via agente. Tenta até MAX_ATTEMPTS vezes obter um
+ * JSON válido; entre as tentativas, reapresenta a resposta anterior pedindo o JSON
+ * completo. Se nenhuma tentativa produzir doc válida, LANÇA — não há fallback: a
+ * documentação tem de passar pelo agente.
+ */
+export async function compilarDocumentacao(
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+): Promise<DocumentacaoGerada> {
+  const baseMessages = [
+    { role: 'system' as const, content: SYSTEM_PROMPT },
+    { role: 'user' as const, content: buildUserMsg(ctx, coletado) },
+  ];
 
-  if (!doc.gerado_em) {
-    doc.gerado_em = new Date().toISOString();
+  let ultimaResposta = '';
+  for (let tentativa = 1; tentativa <= MAX_ATTEMPTS; tentativa++) {
+    // A partir da 2ª tentativa, mostramos a resposta anterior e pedimos o JSON completo.
+    const messages = tentativa === 1
+      ? baseMessages
+      : [
+          ...baseMessages,
+          { role: 'assistant' as const, content: ultimaResposta },
+          {
+            role: 'user' as const,
+            content:
+              'Sua resposta anterior veio truncada ou inválida. Responda NOVAMENTE com APENAS o JSON completo e bem-formado (todas as chaves e colchetes fechados), sem nenhum texto fora do JSON. Se necessário, seja mais conciso nas descrições.',
+          },
+        ];
+
+    ultimaResposta = await llmChat(messages, {
+      jsonMode: true,
+      temperature: 0.3,
+      maxTokens: MAX_OUTPUT_TOKENS,
+    });
+
+    const doc = parseDocJson(ultimaResposta);
+    if (doc) {
+      if (tentativa > 1) log(`Documentação compilada na tentativa ${tentativa}.`);
+      if (!doc.gerado_em) doc.gerado_em = new Date().toISOString();
+      return doc;
+    }
+
+    log(`Tentativa ${tentativa}/${MAX_ATTEMPTS}: JSON inválido/truncado.`);
   }
 
-  return doc;
+  // Sem fallback: a doc é o cerne do produto e tem de ser gerada pelo agente.
+  throw new Error(
+    `Não foi possível compilar a documentação técnica: a IA não retornou um JSON válido após ${MAX_ATTEMPTS} tentativas.`,
+  );
 }

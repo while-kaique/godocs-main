@@ -75,12 +75,17 @@ export type ReceitaColetada = {
   tipo_saving: 'mensal' | 'pontual' | null;
   valor_ganho_mensal: number | null;
   memorial_calculo: string | null;
+  // Racional curto informado pela pessoa no formulário (ex: "as estampas com IA
+  // vendem esse valor por mês"). Serve de ponto de partida — o agente o desafia e
+  // aprofunda para montar o memorial_calculo.
+  racional: string | null;
 };
 
 export const receitaVazia = (): ReceitaColetada => ({
   tipo_saving: null,
   valor_ganho_mensal: null,
   memorial_calculo: null,
+  racional: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────

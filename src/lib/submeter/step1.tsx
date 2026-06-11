@@ -228,7 +228,7 @@ export function Step1({
             <FormGroup>
               {isExterno ? (
                 <>
-                  <FormLabel required>Serviço Externo Utilizado</FormLabel>
+                  <FormLabel required>Serviço Externo Contrato</FormLabel>
                   <FormInput
                     type="text"
                     placeholder="Ex: Zapier, Make, HubSpot, Salesforce..."

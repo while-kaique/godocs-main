@@ -17,11 +17,13 @@ import {
   getProjetoById,
   findDuplicateProjeto,
   updateProjeto,
+  deleteChatMessagesByProjeto,
   insertValidacao,
   updateValidacaoEmailEnviado,
   parseJson,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
+import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
@@ -39,24 +41,6 @@ import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agen
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Converte coletado + contexto em DocumentacaoGerada sem chamar LLM.
- *  Garante que a documentação SEMPRE é salva, mesmo se a LLM falhar. */
-function coletadoToDocumentacao(ctx: ProjetoContexto, coletado: DocumentacaoColetada) {
-  return {
-    titulo: coletado.nome_projeto ?? ctx.nome_projeto,
-    responsavel: { nome: ctx.responsavel_nome, email: ctx.responsavel_email, area: ctx.area },
-    ferramenta: ctx.ferramenta,
-    membros: ctx.membros,
-    o_que_faz: coletado.o_que_faz ?? '',
-    execucao: coletado.execucao ?? '',
-    dependencias: coletado.dependencias ?? '',
-    fluxo: coletado.fluxo ?? '',
-    configurar_antes: coletado.configurar_antes ?? '',
-    atencao: coletado.atencao ?? '',
-    gerado_em: new Date().toISOString(),
-  };
-}
-
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
   if (!data) throw new Error('Projeto não encontrado.');
@@ -71,11 +55,13 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
     ferramenta: data.ferramenta,
-    area: data.area_nome ?? null,
+    // area_nome vem do join por area_id; cai no texto p.area quando não há id mapeado.
+    area: data.area_nome ?? data.area ?? null,
     membros: parseJson<string[]>(data.membros) ?? [],
     nome_projeto: data.nome ?? '',
-    data_criacao: null,
+    data_criacao: data.data_criacao_projeto ?? null,
     doc_texto: docMsg?.content ?? null,
+    descricao_breve: data.descricao_breve ?? null,
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
@@ -224,6 +210,11 @@ const iniciarSavingSchema = z.object({
 const iniciarReceitaSchema = z.object({
   projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
+  // Valor de receita informado pela pessoa no formulário determinístico. O agente
+  // recebe esse valor pré-preenchido e o DESAFIA (em vez de coletar do zero).
+  valor_ganho_mensal: z.number().min(0).optional(),
+  // Racional curto (de onde vem a receita) — ponto de partida para o agente aprofundar.
+  racional: z.string().max(500).optional(),
 });
 
 const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
@@ -337,13 +328,10 @@ export async function enviarMensagem(rawData: unknown) {
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
-  await insertChatMessage({
-    projeto_id: data.projeto_id,
-    role: 'user',
-    content: data.content,
-    selected_option: data.selected_option ?? null,
-  });
-
+  // Histórico montado a partir das mensagens JÁ persistidas + o novo turno do
+  // usuário (ainda NÃO persistido). Só gravamos a conversa depois que o turno é
+  // concluído com sucesso — assim, se a compilação da doc falhar (ver abaixo),
+  // nada fica salvo pela metade e o usuário pode simplesmente tentar de novo.
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
   const estado = extrairEstado(msgs ?? []);
@@ -359,6 +347,7 @@ export async function enviarMensagem(rawData: unknown) {
   } else {
     history = buildHistory(msgs ?? []);
   }
+  history.push({ role: 'user', content: data.content });
 
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
@@ -375,6 +364,26 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
+  // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o
+  // CERNE do produto e é feita pelo agente — NÃO há fallback. Compilamos e
+  // salvamos ANTES de confirmar a transição. Se a IA não devolver uma doc válida
+  // (mesmo após os retries internos), compilarDocumentacao lança: abortamos o
+  // turno SEM persistir nada, e o usuário continua no preview podendo aprovar de
+  // novo (o frontend faz rollback da mensagem e exibe o erro).
+  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
+    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
+    const doc = await compilarDocumentacao(ctx, resultado.coletado);
+    await upsertDocumentacao(data.projeto_id, doc);
+    log('enviarMensagem', 'Documentação compilada e salva.');
+  }
+
+  // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'user',
+    content: data.content,
+    selected_option: data.selected_option ?? null,
+  });
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
@@ -382,25 +391,9 @@ export async function enviarMensagem(rawData: unknown) {
     options: resultado.type === 'options' ? resultado.options : null,
   });
 
-  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
-    log('enviarMensagem', 'Doc aprovada — salvando documentação.');
-    const doc = coletadoToDocumentacao(ctx, resultado.coletado);
-    await upsertDocumentacao(data.projeto_id, doc);
-    log('enviarMensagem', 'Documentação salva.');
-  }
-
   if (resultado.fase === 'completo') {
     log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
-    let docRow = await getDocumentacao(data.projeto_id);
-
-    // Fallback: se a documentação não existe, salva a base a partir do coletado
-    if (!docRow) {
-      log('enviarMensagem', 'Documentação não encontrada — salvando base (fallback)...');
-      const docBase = coletadoToDocumentacao(ctx, resultado.coletado);
-      await upsertDocumentacao(data.projeto_id, docBase);
-      docRow = await getDocumentacao(data.projeto_id);
-      log('enviarMensagem', 'Documentação base salva (fallback).');
-    }
+    const docRow = await getDocumentacao(data.projeto_id);
 
     if (docRow) {
       const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
@@ -521,6 +514,8 @@ export async function iniciarReceita(rawData: unknown) {
 
   const receita = receitaVazia();
   receita.tipo_saving = data.tipo_saving;
+  receita.valor_ganho_mensal = data.valor_ganho_mensal ?? null;
+  receita.racional = data.racional?.trim() || null;
 
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
 
@@ -549,7 +544,7 @@ export async function iniciarReceita(rawData: unknown) {
     ? (resultado as { question: string }).question
     : (resultado as { content: string }).content;
   console.log('\n┌─────────────────────────────────────────────');
-  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
+  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}, valor=${data.valor_ganho_mensal ?? '—'}, racional=${receita.racional ?? '—'}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
@@ -578,32 +573,104 @@ export async function atualizarTipos(rawData: unknown) {
   return { ok: true };
 }
 
+// ─── Atualizar metadados do projeto durante o fluxo do agente ────────────────
+// Pessoas voltam às etapas anteriores para corrigir contexto/arquivos/área/datas
+// depois que o agente já começou. Os campos de TEXTO (descrição, nome, área,
+// ferramenta, data, membros) são lidos frescos do banco a cada turno do agente
+// (getProjetoContexto), então basta persisti-los aqui. Quando os ARQUIVOS mudam,
+// a base da documentação muda: re-extraímos o texto, re-rodamos o extrator e
+// REINICIAMOS a fase de doc (limpa a conversa) com uma nova primeira mensagem.
+
+const atualizarMetadadosSchema = z.object({
+  projeto_id: z.string().min(1),
+  nome_projeto: z.string().min(1).max(200).optional(),
+  area: z.string().min(1).max(100).optional(),
+  ferramenta: z.string().min(1).max(200).optional(),
+  membros: z.array(z.string()).optional(),
+  data_criacao: z.string().optional(),
+  descricao_breve: z.string().max(1000).optional(),
+  // Se enviados, substituem os arquivos e reiniciam a documentação.
+  docs: z.array(
+    z.object({ base64: z.string().min(1), filename: z.string().min(1) })
+  ).max(5000).optional(),
+});
+
+export async function atualizarMetadados(rawData: unknown) {
+  const data = atualizarMetadadosSchema.parse(rawData);
+  const temDocs = !!data.docs && data.docs.length > 0;
+  log('atualizarMetadados', `projeto=${data.projeto_id}, docs=${temDocs ? data.docs!.length : 0}`);
+
+  // 1. Persiste os campos de texto fornecidos (o agente lê frescos no próximo turno).
+  const campos: Record<string, unknown> = {};
+  if (data.nome_projeto !== undefined) campos.nome = data.nome_projeto;
+  if (data.area !== undefined) campos.area = data.area;
+  if (data.ferramenta !== undefined) campos.ferramenta = data.ferramenta;
+  if (data.membros !== undefined) campos.membros = data.membros;
+  if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
+  if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (Object.keys(campos).length > 0) {
+    await updateProjeto(data.projeto_id, campos);
+  }
+
+  // 2. Sem arquivos novos → nada a reiniciar; o agente já vê os metadados frescos.
+  if (!temDocs) {
+    return { ok: true, reset: false };
+  }
+
+  // 3. Arquivos mudaram → re-extrai texto, re-roda o extrator e REINICIA a doc.
+  let docTexto = '';
+  try {
+    docTexto = await extractTextFromMultipleFiles(data.docs!);
+    log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+  } catch (extractErr) {
+    err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
+    docTexto = '';
+  }
+
+  // Limpa a conversa inteira (doc + impacto) — a base mudou, recomeçamos do zero.
+  await deleteChatMessagesByProjeto(data.projeto_id);
+
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'doc',
+    content: docTexto || '(documento sem texto legível)',
+  });
+
+  const ctx = await getProjetoContexto(data.projeto_id);
+
+  let coletadoInicial: DocumentacaoColetada = {
+    ...documentacaoVazia(),
+    nome_projeto: ctx.nome_projeto,
+  };
+  if (docTexto || ctx.descricao_breve) {
+    try {
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
+    } catch (extractorErr) {
+      err('atualizarMetadados', 'Extrator falhou — seguindo sem pré-preenchimento:', extractorErr);
+      coletadoInicial = { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto };
+    }
+  }
+
+  const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
+
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'assistant',
+    content: JSON.stringify(resultado),
+    options: resultado.type === 'options' ? resultado.options : null,
+  });
+
+  log('atualizarMetadados', `Documentação reiniciada — fase: ${resultado.fase}`);
+  return { ok: true, reset: true, response: formatResponse(resultado) };
+}
+
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
 export async function submeterParaValidacao(rawData: unknown) {
   const { projeto_id } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
-  let docRow = await getDocumentacao(projeto_id);
-
-  // Fallback: se a documentação não existe (compilação LLM falhou na transição),
-  // salva a base a partir do coletado — sem LLM, nunca falha.
-  if (!docRow) {
-    log('submeterParaValidacao', 'Documentação não encontrada — salvando base (fallback)...');
-    const ctx = await getProjetoContexto(projeto_id);
-    const msgs = await getChatMessagesExcludeRole(projeto_id, 'doc');
-    const estado = extrairEstado(msgs ?? []);
-    const docBase = coletadoToDocumentacao(ctx, estado.coletado) as Record<string, unknown>;
-
-    // Injeta saving/receita se disponíveis
-    const tiposProjeto = getTiposProjeto(ctx);
-    if (tiposProjeto.includes('saving') && estado.saving) docBase.saving = estado.saving;
-    if (tiposProjeto.includes('receita_incremental') && estado.receita) docBase.receita = estado.receita;
-
-    await upsertDocumentacao(projeto_id, docBase);
-    docRow = await getDocumentacao(projeto_id);
-    log('submeterParaValidacao', 'Documentação base salva (fallback).');
-  }
+  const docRow = await getDocumentacao(projeto_id);
 
   if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 

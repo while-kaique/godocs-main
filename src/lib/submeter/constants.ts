@@ -11,8 +11,9 @@ export const AREAS = [
 ] as const;
 
 export const FERRAMENTAS = [
-  "n8n", "Python", "Google Apps Script", "Make", "Lovable",
-  "Selenium", "Puppeteer", "Power BI", "Claude + Vercel", "Outros",
+  "n8n", "Python", "Google Apps Script", "Make",
+  "Selenium", "Puppeteer", "Power BI", "Claude + Vercel",
+  "Claude", "Codex", "Outros",
 ] as const;
 
 // Extensões de documentos legíveis
@@ -88,6 +89,10 @@ export interface SavingFormData {
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
+  // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).
+  valorReceita: string;
+  // Receita: racional curto (de onde vem a receita) — o agente usa como ponto de partida.
+  racionalReceita: string;
 }
 
 export function readFileAsBase64(file: File): Promise<string> {

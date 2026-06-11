@@ -12,6 +12,7 @@ import {
   iniciarSaving,
   iniciarReceita,
   atualizarTipos,
+  atualizarMetadados,
   submeterParaValidacao,
   validarProjeto,
 } from '@/lib/chat.functions'
@@ -126,6 +127,11 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
     if (pathname === '/api/chat/atualizar-tipos' && method === 'POST') {
       const body = await readBody(request)
       const result = await atualizarTipos(body)
+      return json(result)
+    }
+    if (pathname === '/api/chat/atualizar-metadados' && method === 'POST') {
+      const body = await readBody(request)
+      const result = await atualizarMetadados(body)
       return json(result)
     }
     if (pathname === '/api/chat/submeter-validacao' && method === 'POST') {

@@ -311,7 +311,6 @@ export function Step2({
 }) {
   const isN8n = form.ferramenta === "n8n";
   const [dragOver, setDragOver] = useState(false);
-  const [fileChars, setFileChars] = useState<Map<string, number>>(new Map());
   const [copied, setCopied] = useState(false);
   const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
   // Pastas expandidas na árvore (por caminho). Vazio = tudo recolhido.
@@ -335,6 +334,19 @@ export function Step2({
     inputs.forEach((el) => el?.addEventListener("cancel", onCancel));
     return () => inputs.forEach((el) => el?.removeEventListener("cancel", onCancel));
   }, []);
+
+  // Chars são DERIVADOS dos arquivos (estimativa por tamanho), nunca um estado
+  // separado: o step desmonta ao navegar entre etapas, então um Map em useState
+  // se perderia e o total voltaria a ~0 tokens ao retornar. Derivar de `arquivos`
+  // (que vive no componente pai) mantém a contagem sempre consistente.
+  // Texto: bytes ≈ chars (UTF-8). Binário: ~80% do tamanho.
+  const fileChars = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of arquivos) {
+      m.set(pathOf(f), isTextFile(f.name) ? f.size : Math.round(f.size * 0.8));
+    }
+    return m;
+  }, [arquivos]);
 
   const descricaoChars = form.descricaoBreve.length;
   const totalFileChars = [...fileChars.values()].reduce((a, b) => a + b, 0);
@@ -372,12 +384,6 @@ export function Step2({
         : "warn"
       : null;
 
-  // Estima chars de um arquivo pelo tamanho (sem ler conteúdo — rápido).
-  // Texto: bytes ≈ chars (proxy conservador p/ UTF-8). Binário: ~80% do tamanho.
-  function charsFromSize(file: File): number {
-    return isTextFile(file.name) ? file.size : Math.round(file.size * 0.8);
-  }
-
   // Cede o controle pro browser pintar a tela antes/durante um trecho pesado
   const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -392,7 +398,6 @@ export function Step2({
     const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
     let ignoredCount = 0;
     const ignoredReasons: Record<string, number> = {};
-    const charsAcc = new Map<string, number>();
 
     // Set de nomes já presentes (dedup O(1) em vez de varrer o array a cada arquivo)
     const existentes = new Set(arquivos.map((f) => pathOf(f)));
@@ -427,7 +432,6 @@ export function Step2({
         } else {
           existentes.add(relPath);
           accepted.push(file);
-          charsAcc.set(relPath, charsFromSize(file));
         }
       }
 
@@ -481,22 +485,12 @@ export function Step2({
     }
 
     setArquivos(merged);
-    setFileChars((prev) => {
-      const next = new Map(prev);
-      for (const [k, v] of charsAcc) next.set(k, v);
-      return next;
-    });
     clearError("documentacao");
     setProcessing(null);
   }
 
   function removeFile(path: string) {
     setArquivos(arquivos.filter((f) => pathOf(f) !== path));
-    setFileChars((prev) => {
-      const next = new Map(prev);
-      next.delete(path);
-      return next;
-    });
   }
 
   // Remove uma pasta inteira (todos os arquivos sob aquele prefixo)
@@ -504,11 +498,6 @@ export function Step2({
     const prefix = folderPath + "/";
     const removidos = arquivos.filter((f) => pathOf(f).startsWith(prefix)).map(pathOf);
     setArquivos(arquivos.filter((f) => !pathOf(f).startsWith(prefix)));
-    setFileChars((prev) => {
-      const next = new Map(prev);
-      for (const p of removidos) next.delete(p);
-      return next;
-    });
     if (removidos.length > 0) {
       toast.info(`${removidos.length} arquivo(s) de "${folderPath}/" removido(s)`);
     }
