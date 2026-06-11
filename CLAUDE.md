@@ -1,6 +1,6 @@
 # GoDocs - Hub de Projetos Internos
 
-Hub interno do Gogroup para cadastro, gestão e documentação de projetos de automação (RPA & IA). Funcionários submetem projetos, líderes acompanham o status das submissões de suas áreas, e Admin Masters gerenciam toda a plataforma. Todo o fluxo de submissão (documentação + memorial de saving) é interno — sem dependência de Google Sheets ou n8n.
+Hub interno do Gogroup para cadastro, gestão e documentação de projetos de automação (RPA & IA). Funcionários submetem projetos, líderes acompanham o status das submissões de suas áreas, e Admin Masters gerenciam toda a plataforma. O fluxo de submissão (documentação + memorial de saving) salva no SQLite local e também envia os dados para o n8n via webhook (`N8N_WEBHOOK_URL`) para registro em planilha/Google Drive.
 
 ## Stack
 
@@ -97,6 +97,7 @@ src/
   styles.css           # Tokens CSS (light/dark), Tailwind config
 vite-plugin-dev-api.ts # Plugin Vite que serve /api/* em dev reusando o worker.ts
 tests/                 # Testes unitários (Vitest)
+forms_n8n/             # Workflows n8n (submit_forms.json + fluxos legados)
 PLANO_MIGRACAO_SQLITE.md # Plano da migração Supabase → SQLite + risco de runtime no deploy
 godocs.db              # Banco SQLite local (auto-criado, ignorado no git)
 ```
@@ -165,12 +166,13 @@ A IA lê a **codebase/pasta inteira** e gera a documentação automaticamente. L
 
 ### Submissão final (`submeterParaValidacaoFn`)
 
-Quando o usuário clica "Enviar para Triagem" (substitui o antigo fluxo n8n → Sheets):
+Quando o usuário clica "Enviar para Triagem":
 
 1. Verifica duplicata (mesmo nome de projeto já submetido)
-2. Extrai saving do JSON da documentação e popula colunas do `projetos` (saving_horas, saving_reais, tipo_saving, memorial_calculo)
+2. Extrai saving do JSON da documentação e popula colunas do `projetos` (saving_horas, saving_reais, tipo_saving, memorial_calculo). Fallback: se doc não existir no banco, recompila do histórico de chat
 3. Auto-aprovação: se área = "RPA", status = `aprovado`; senão `em_validacao`
 4. Envia notificação para Google Chat (webhook via env var `GOOGLE_CHAT_WEBHOOK_URL`)
+5. Envia dados completos (projeto + documentação + saving) para n8n via `N8N_WEBHOOK_URL` — o workflow n8n gera Markdown, sobe ao Drive, salva na planilha
 
 ## Sistema de agentes IA (chat em 2 fases)
 
@@ -277,14 +279,15 @@ Quando ambos os previews são aprovados (`fase = completo`):
 - `runOrchestrator(ctx, history, fase, coletado, saving, resumoProjeto, tipoProjeto)` — entry point
 - Respostas sempre em JSON: `{type, content/question, coletado/saving, options?}`
 - Transições automáticas: preview em doc → `doc_preview`, complete em doc_preview → `saving`, complete em saving_preview → `completo`
+- **Regras de prompt**: IA nunca expõe nomes de campos internos ao usuário; linguagem natural de conversa entre colegas; prompts de saving adaptados à frequência (pontual vs mensal); suporte a custo adicional (horas_antes=0, horas_depois>0)
 
 ### Server functions do chat (`chat.functions.ts`)
 
 - `iniciarSubmissaoFn`: cria projeto (com `tipo_projeto`, `descricao_breve`, area, data), recebe **array `docs`** (até 5000), extrai texto de todos via `extractTextFromMultipleFiles`, roda o **extractor** para pré-preencher os 7 campos, então roda o orquestrador na fase `doc`
 - `iniciarSavingFn`: recebe dados determinísticos (cargo, horas_antes, horas_depois, tipo_saving), calcula saving no backend via tabela `CARGOS`, inicia chat saving com contexto pré-preenchido
 - `enviarMensagemFn`: recebe mensagem do usuário, detecta fase atual, filtra histórico (saving começa limpo), roda orquestrador com `tipoProjeto`
-- `submeterParaValidacaoFn`: verifica duplicata, popula colunas de saving, auto-aprova se RPA, notifica Google Chat
-- Ações pós-transição: compila documentação quando doc aprovada, salva saving quando fluxo completo
+- `submeterParaValidacaoFn`: verifica duplicata, popula colunas de saving (com fallback de recompilação), auto-aprova se RPA, notifica Google Chat, envia para n8n
+- Ações pós-transição: documentação salva diretamente do coletado aprovado (sem chamada LLM adicional), salva saving quando fluxo completo
 
 ### Extração de texto (`extract-text.server.ts`)
 
@@ -299,10 +302,11 @@ Quando ambos os previews são aprovados (`fase = completo`):
 - Provider configurável via `LLM_PROVIDER` (openai | anthropic)
 - Modelo via `LLM_MODEL` (default: gpt-4.1)
 - JSON mode habilitado para respostas estruturadas do orquestrador
+- maxTokens: 4096 + retry automático em resposta vazia do LLM
 
 ### Componentes de UI do chat
 
-- **SimpleMarkdown**: renderizador leve de markdown (headings com dot colorido, listas, bold, parágrafos)
+- **SimpleMarkdown**: renderizador leve de markdown (headings com dot colorido, listas, bold, parágrafos). Bolhas do assistente e botões de opções renderizam inline markdown via `renderInlineMarkdown`
 - **PreviewPanel**: card estilo documento com header strip, scroll interno (max 300px), botões de Aprovar (lima) e Pedir Alteração (outline)
 - **CollapsiblePreviewCard**: card colapsável para revisão final (header clicável com chevron, badge "Aprovado")
 - **FinalReview**: tela de revisão final com 2 cards colapsáveis + botão de envio
@@ -340,6 +344,7 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - `LLM_API_KEY` — chave da API do provider escolhido
 - `LLM_MODEL` — modelo a usar (default: `gpt-4.1`)
 - `GOOGLE_CHAT_WEBHOOK_URL` — webhook do Google Chat para notificações de novo projeto
+- `N8N_WEBHOOK_URL` — webhook do n8n para registrar submissões (gera Markdown, sobe ao Drive, salva na planilha)
 - `OCR_WORKER_URL` — URL do Cloudflare Worker de extração de texto de PDFs
 - `OCR_WORKER_TOKEN` — token Bearer de autenticação do OCR Worker
 - `BREVO_API_KEY` / `EMAIL_FROM` — envio de e-mail via Brevo
@@ -364,7 +369,9 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - **Agente Saving (fase 2)**: funcional — validação de horas com detalhamento obrigatório, monta memorial, ciclo de aprovação
 - **Transição doc → saving**: tela animada com check verde e progress bar
 - **Tela de revisão final**: cards colapsáveis com previews aprovados antes do envio
-- **Submissão interna**: dados salvos no SQLite (sem Sheets), duplicata verificada, auto-aprovação para RPA, notificação Google Chat
+- **Submissão interna + n8n**: dados salvos no SQLite + envio automático para n8n (webhook) que gera doc Markdown, salva no Drive e na planilha; duplicata verificada, auto-aprovação para RPA, notificação Google Chat
+- **Resiliência de documentação**: doc salva direto do coletado aprovado (sem chamada LLM extra); fallback de recompilação na submissão
+- **Chat com markdown**: bolhas do assistente renderizam bold, itálico e code inline
 - **Testes**: rodam antes de cada `npm run dev` via `predev`
 - Design usa identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
 
@@ -373,4 +380,4 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - Projeto originado do Lovable (gerado por IA) - pode conter código que precisa de refatoração
 - A arquitetura saiu de SSR (TanStack Start + Nitro/Cloudflare) para **SPA + Worker API** (`src/worker.ts`). Não há mais `server.ts`/`start.ts`, Nitro nem `@lovable.dev/vite-tanstack-config` — o `vite.config.ts` usa `@vitejs/plugin-react` + `TanStackRouterVite` + `devApiPlugin`
 - `routeTree.gen.ts` é auto-gerado — não editar manualmente
-- O antigo fluxo n8n → Google Sheets foi substituído por submissão interna via SQLite. O arquivo `forms_submissao_logica.json` contém o fluxo n8n legado para referência
+- O antigo fluxo n8n → Google Sheets foi reestruturado: a submissão agora salva no SQLite local e **também** envia para o n8n via webhook (`N8N_WEBHOOK_URL`). O workflow n8n atual (`forms_n8n/submit_forms.json`) recebe o JSON, gera Markdown, sobe ao Drive e salva na planilha. Os fluxos legados (erro, manutenção, reenvio, sucesso) estão em `forms_n8n/` para referência
