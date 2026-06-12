@@ -569,6 +569,7 @@ export type ProjetoRow = {
   ganho_total_mensal: number | null;
   complexidade: string | null;
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes
+  observacoes: string | null; // parecer da análise automática (staff-only)
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
