@@ -22,7 +22,6 @@ import {
   insertValidacao,
   updateValidacaoEmailEnviado,
   insertAnalise,
-  getLatestAnalise,
   parseJson,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
@@ -44,6 +43,86 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+// Nomes amigáveis dos campos de documentação (7 campos)
+const DOC_FIELD_LABELS: Record<string, string> = {
+  nome_projeto: 'nome do projeto',
+  o_que_faz: 'o que faz',
+  execucao: 'execução',
+  dependencias: 'dependências',
+  fluxo: 'fluxo',
+  configurar_antes: 'configurar antes',
+  atencao: 'atenção/riscos',
+};
+
+// Nomes amigáveis dos campos de saving
+const SAVING_FIELD_LABELS: Record<string, string> = {
+  linhas: 'pessoas/cargos',
+  economia_horas_mes: 'economia de horas',
+  tipo_saving: 'tipo de saving',
+  memorial_calculo: 'memorial de cálculo',
+};
+
+// Nomes amigáveis dos campos de receita
+const RECEITA_FIELD_LABELS: Record<string, string> = {
+  tipo_saving: 'tipo de ganho',
+  valor_ganho_mensal: 'valor de receita',
+  memorial_calculo: 'memorial de cálculo',
+};
+
+function progressoDocumentacao(coletado: DocumentacaoColetada): string {
+  const campos = Object.entries(coletado);
+  const total = campos.length; // 7
+  const preenchidos = campos.filter(([, v]) => v !== null).length;
+  const faltando = campos.filter(([, v]) => v === null).map(([k]) => DOC_FIELD_LABELS[k] ?? k);
+  if (faltando.length === 0) return `documentação ${preenchidos}/${total} ✓ completa`;
+  return `documentação ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+}
+
+function progressoSaving(saving: SavingColetado): string {
+  const checks: [string, boolean][] = [
+    ['pessoas/cargos', saving.linhas != null && saving.linhas.length > 0],
+    ['economia de horas', saving.economia_horas_mes != null],
+    ['tipo de saving', saving.tipo_saving != null],
+    ['memorial de cálculo', saving.memorial_calculo != null],
+  ];
+  const total = checks.length;
+  const preenchidos = checks.filter(([, ok]) => ok).length;
+  const faltando = checks.filter(([, ok]) => !ok).map(([nome]) => nome);
+  if (faltando.length === 0) return `memorial saving ${preenchidos}/${total} ✓ completo`;
+  return `memorial saving ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+}
+
+function progressoReceita(receita: ReceitaColetada): string {
+  const checks: [string, boolean][] = [
+    ['tipo de ganho', receita.tipo_saving != null],
+    ['valor de receita', receita.valor_ganho_mensal != null],
+    ['memorial de cálculo', receita.memorial_calculo != null],
+  ];
+  const total = checks.length;
+  const preenchidos = checks.filter(([, ok]) => ok).length;
+  const faltando = checks.filter(([, ok]) => !ok).map(([nome]) => nome);
+  if (faltando.length === 0) return `memorial receita ${preenchidos}/${total} ✓ completo`;
+  return `memorial receita ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+}
+
+function progressoPorFase(fase: ChatFase, coletado: DocumentacaoColetada, saving: SavingColetado, receita: ReceitaColetada): string {
+  switch (fase) {
+    case 'doc':
+    case 'doc_preview':
+      return progressoDocumentacao(coletado);
+    case 'saving':
+    case 'saving_preview':
+      return progressoSaving(saving);
+    case 'receita':
+    case 'receita_preview':
+      return progressoReceita(receita);
+    case 'completo':
+      return 'fluxo completo ✓';
+    default:
+      return '';
+  }
+}
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
@@ -316,6 +395,7 @@ export async function iniciarSubmissao(rawData: unknown) {
   console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
   console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log(`│ 📊 Progresso: ${progressoDocumentacao(resultado.coletado)}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
   console.log('└─────────────────────────────────────────────\n');
@@ -416,6 +496,7 @@ export async function enviarMensagem(rawData: unknown) {
   console.log('\n┌─────────────────────────────────────────────');
   console.log(`│ 💬 TURNO DE CONVERSA`);
   console.log(`│ 🔄 Fase: ${estado.fase} → ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log(`│ 📊 Progresso: ${progressoPorFase(resultado.fase, resultado.coletado, resultado.saving, resultado.receita ?? receitaVazia())}`);
   console.log('│ 👤 Usuário:');
   data.content.split('\n').forEach((line: string) => console.log(`│    ${line}`));
   console.log('│ 🤖 IA:');
@@ -423,11 +504,6 @@ export async function enviarMensagem(rawData: unknown) {
   if (resultado.type === 'options') {
     console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(' | ')}`);
   }
-  const campos = resultado.coletado;
-  const preenchidos = Object.entries(campos).filter(([, v]) => v !== null).map(([k]) => k);
-  const vazios = Object.entries(campos).filter(([, v]) => v === null).map(([k]) => k);
-  console.log(`│ ✅ Preenchidos: ${preenchidos.join(', ') || 'nenhum'}`);
-  console.log(`│ ❌ Faltando: ${vazios.join(', ') || 'nenhum'}`);
   console.log('└─────────────────────────────────────────────\n');
 
   return formatResponse(resultado);
@@ -505,6 +581,7 @@ export async function iniciarSaving(rawData: unknown) {
   console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
   if (data.linhas?.length) console.log(`│ 👤 Linhas: ${data.linhas.map(l => `${l.cargo} ${l.horas_antes}→${l.horas_depois}h`).join(' | ')}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log(`│ 📊 Progresso: ${progressoSaving(resultado.saving)}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
   console.log('└─────────────────────────────────────────────\n');
@@ -559,6 +636,7 @@ export async function iniciarReceita(rawData: unknown) {
   console.log('\n┌─────────────────────────────────────────────');
   console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}, valor=${data.valor_ganho_mensal ?? '—'}, racional=${receita.racional ?? '—'}`);
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
+  console.log(`│ 📊 Progresso: ${progressoReceita(resultado.receita ?? receitaVazia())}`);
   console.log('│ 🤖 IA:');
   respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
   console.log('└─────────────────────────────────────────────\n');
@@ -703,6 +781,27 @@ export async function analisarProjetoFn(rawData: unknown) {
 
   log('analisarProjeto', `Resultado: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
+  // ── Enviar update ao n8n com dados da análise (atualiza linha na planilha pelo nome do projeto) ──
+  const n8nUpdateUrl = process.env.N8N_WEBHOOK_URL_UPDATE;
+  if (n8nUpdateUrl) {
+    try {
+      const projeto = await getProjetoById(projeto_id);
+      const updatePayload = {
+        projeto: projeto?.nome ?? '',
+        complexidade: resultado.complexidade,
+      };
+
+      const resp = await fetch(n8nUpdateUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      });
+      log('analisarProjeto', `n8n update respondeu ${resp.status}`);
+    } catch (n8nErr) {
+      err('analisarProjeto', 'Falha ao enviar update ao n8n:', n8nErr);
+    }
+  }
+
   return resultado;
 }
 
@@ -758,10 +857,6 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   log('submeterParaValidacao', `Status: ${status}`);
 
-  // ── Carregar análise do Agente Analisador (se existir) ──
-  const analise = await getLatestAnalise(projeto_id);
-  const analiseResultado = analise?.resultado ?? null;
-
   // ── Enviar dados ao n8n (registra na planilha + Drive + notifica Google Chat) ──
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
   if (n8nWebhookUrl) {
@@ -781,7 +876,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         descricao_breve: projeto.descricao_breve ?? '',
         data_criacao_projeto: projeto.data_criacao_projeto ?? null,
         tipos_projeto: tiposProjeto,
-        status: analiseResultado === 'rejeitado' ? 'Em Revisão' : (status === 'aprovado' ? 'Aprovado' : 'Pendente'),
+        status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,
         tipo_saving: (saving?.tipo_saving as string) ?? '',
@@ -792,17 +887,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         receita_tipo_saving: (receita?.tipo_saving as string) ?? '',
         receita_memorial: (receita?.memorial_calculo as string) ?? '',
         ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
-        complexidade: projeto.complexidade ?? null,
         documentacao: conteudo,
-        // Dados da análise IA
-        analise_resultado: analiseResultado,
-        analise_pontuacao_total: analise?.pontuacao_total ?? null,
-        analise_pontuacao_maxima: analise?.pontuacao_maxima ?? null,
-        analise_justificativa: analise?.justificativa ?? null,
-        analise_criterios: analise ? JSON.stringify({
-          hardcoded: parseJson(analise.criterios_hardcoded),
-          dinamicos: parseJson(analise.criterios_dinamicos),
-        }) : null,
       };
 
       const n8nResp = await fetch(n8nWebhookUrl, {
