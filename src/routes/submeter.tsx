@@ -813,7 +813,12 @@ function SubmeterPage() {
       await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId });
     } catch (e) {
       console.error("[submeter] envio falhou:", e);
-      toast.error("Erro ao enviar projeto. Tente novamente.");
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("Já existe um projeto submetido")) {
+        toast.warning(msg, { duration: 8000 });
+      } else {
+        toast.error("Erro ao enviar projeto. Tente novamente.");
+      }
       setSubmittingProject(false);
       setAnalyzing(false);
       return;
