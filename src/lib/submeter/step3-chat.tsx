@@ -589,7 +589,7 @@ function SavingForm({
   );
   // Alguém já fazia/mantinha isso manualmente antes? Define se a tabela mostra a
   // coluna "antes" (sim) ou só "depois" (nao — ninguém antes; economia de horas = 0).
-  const [tinhaAntes, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.tinhaAntes ?? "");
+  const [alguemFazia, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.alguemFazia ?? "");
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
   const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
@@ -601,8 +601,8 @@ function SavingForm({
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
-    onDraftChange?.({ linhas, tinhaAntes, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
-  }, [linhas, tinhaAntes, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+    onDraftChange?.({ linhas, alguemFazia, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, alguemFazia, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
@@ -625,7 +625,7 @@ function SavingForm({
   }
   function addLinha() {
     // No modo "ninguém antes", horas antes é sempre 0 (campo nem aparece).
-    setLinhas((ls) => [...ls, { cargo: "", horasAntes: tinhaAntes === "nao" ? "0" : "", horasDepois: "" }]);
+    setLinhas((ls) => [...ls, { cargo: "", horasAntes: alguemFazia === "nao" ? "0" : "", horasDepois: "" }]);
   }
   function selectTinhaAntes(v: "sim" | "nao") {
     setTinhaAntes(v);
@@ -633,7 +633,7 @@ function SavingForm({
     setLinhas((ls) => ls.map((l) => ({ ...l, horasAntes: v === "nao" ? "0" : "" })));
     setErrors((e) => {
       const n = { ...e };
-      delete n.tinhaAntes;
+      delete n.alguemFazia;
       Object.keys(n).forEach((k) => { if (/^l\d+antes$/.test(k)) delete n[k]; });
       return n;
     });
@@ -647,7 +647,7 @@ function SavingForm({
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
     if (isSaving) {
-      if (!tinhaAntes) errs.tinhaAntes = "Selecione uma opção";
+      if (!alguemFazia) errs.alguemFazia = "Selecione uma opção";
       linhas.forEach((l, i) => {
         const a = parseFloat(l.horasAntes);
         const d = parseFloat(l.horasDepois);
@@ -655,7 +655,7 @@ function SavingForm({
         // "antes" só é cobrado no modo "sim" (havia trabalho manual). No modo "nao"
         // o campo nem aparece (horas_antes = 0). Aceita >= 0; o ganho líquido é
         // calculado/clampado no backend.
-        if (tinhaAntes === "sim" && (l.horasAntes === "" || isNaN(a) || a < 0))
+        if (alguemFazia === "sim" && (l.horasAntes === "" || isNaN(a) || a < 0))
           errs[`l${i}antes`] = "Informe as horas";
         if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
       });
@@ -678,7 +678,7 @@ function SavingForm({
     if (!validate()) return;
     onSubmit({
       linhas,
-      tinhaAntes,
+      alguemFazia,
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -763,8 +763,8 @@ function SavingForm({
                     onClick={() => selectTinhaAntes(opt)}
                     className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
                     style={{
-                      background: tinhaAntes === opt ? "#6b6e00" : "transparent",
-                      color: tinhaAntes === opt ? "#fff" : "#6b6e00",
+                      background: alguemFazia === opt ? "#6b6e00" : "transparent",
+                      color: alguemFazia === opt ? "#fff" : "#6b6e00",
                       borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
                     }}
                   >
@@ -772,21 +772,21 @@ function SavingForm({
                   </button>
                 ))}
               </div>
-              {errors.tinhaAntes && (
+              {errors.alguemFazia && (
                 <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
-                  {errors.tinhaAntes}
+                  {errors.alguemFazia}
                 </div>
               )}
             </div>
 
             {/* Tabela só aparece depois de responder sim/não */}
-            {tinhaAntes && (
+            {alguemFazia && (
               <div>
                 <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  {tinhaAntes === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Quem dedica tempo à automação hoje"} <span style={{ color: "#e53e3e" }}>*</span>
+                  {alguemFazia === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Quem dedica tempo à automação hoje"} <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  {tinhaAntes === "sim" ? (
+                  {alguemFazia === "sim" ? (
                     <>
                       Uma linha por função. Informe as horas/mês <strong>antes</strong> e <strong>depois</strong> da automação.
                       Se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
@@ -802,10 +802,10 @@ function SavingForm({
                 {/* Cabeçalho das colunas (telas largas) */}
                 <div
                   className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
-                  style={{ gridTemplateColumns: tinhaAntes === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px", color: "#9a9aa8" }}
+                  style={{ gridTemplateColumns: alguemFazia === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px", color: "#9a9aa8" }}
                 >
                   <span>Função</span>
-                  {tinhaAntes === "sim" && <span className="text-center">Horas antes</span>}
+                  {alguemFazia === "sim" && <span className="text-center">Horas antes</span>}
                   <span className="text-center">Horas depois</span>
                   <span />
                 </div>
@@ -819,7 +819,7 @@ function SavingForm({
                         className="rounded-xl p-2.5"
                         style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
                       >
-                        <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: tinhaAntes === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px" }}>
+                        <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: alguemFazia === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px" }}>
                           {/* Função */}
                           <div className="min-w-0">
                             <select
@@ -844,7 +844,7 @@ function SavingForm({
                           </div>
 
                           {/* Horas antes — só no modo "sim" */}
-                          {tinhaAntes === "sim" && (
+                          {alguemFazia === "sim" && (
                             <input
                               type="number" min="0" step="0.5" placeholder="40"
                               aria-label="Horas por mês antes"
