@@ -411,6 +411,19 @@ Definidas em `.env` (não comitar chaves secretas). No deploy, são injetadas co
 - **Extração de PDF**: delegada ao Cloudflare OCR Worker externo (sem `pdf-parse` no bundle)
 - **✅ Runtime do SQLite resolvido**: produção usa o `env.DB` do Godeploy (SQLite gerenciado, async) — `better-sqlite3` roda **apenas em dev**. Não há mais dependência de binário nativo de Node no runtime de produção. (O `PLANO_MIGRACAO_SQLITE.md` documenta o histórico.)
 
+### ⚠️ Upload de assets para o Godeploy (regra obrigatória)
+
+Ao fazer deploy via `updateApp`, os arquivos de `dist/` devem ser enviados **SEM o prefixo `dist/`** no path. O `index.html` do Vite referencia `/assets/*`, não `/dist/assets/*`. Exemplo correto:
+
+```
+Upload:   -F "index.html=@./dist/index.html"  -F "assets/foo.js=@./dist/assets/foo.js"
+Assets:   ["index.html", "assets/foo.js"]
+```
+
+**ERRADO** (causa 404): `-F "dist/index.html=@./dist/index.html"` / `["dist/assets/foo.js"]`
+
+Sempre incluir `assetConfig: { "not_found_handling": "single-page-application" }` no `updateApp` para que rotas SPA (`/`, `/submeter`, `/dashboard` etc.) caiam no `index.html` em vez de retornar "Not Found".
+
 ## Status atual
 
 - Home, formulário de submissão, CRUD de usuários e áreas funcionais
