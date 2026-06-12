@@ -884,7 +884,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
-        receita_tipo_saving: (receita?.tipo_saving as string) ?? '',
+        tipo_receita: (receita?.tipo_saving as string) ?? '',
         receita_memorial: (receita?.memorial_calculo as string) ?? '',
         ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
         documentacao: conteudo,
