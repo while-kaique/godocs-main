@@ -21,7 +21,7 @@ const MAX_OUTPUT_TOKENS = 8192;
 // Quantas vezes tentamos obter um JSON válido do agente antes de desistir.
 const MAX_ATTEMPTS = 3;
 
-const SYSTEM_PROMPT = `Você é um especialista em documentação de projetos de automação corporativa do GoGroup.
+export const SYSTEM_PROMPT = `Você é um especialista em documentação de projetos de automação corporativa do GoGroup.
 Gere uma documentação técnica profissional e completa com base nas informações coletadas.
 
 A documentação final deve seguir EXATAMENTE esta estrutura de 6 seções:
@@ -56,7 +56,7 @@ Responda APENAS com JSON válido seguindo exatamente a estrutura abaixo:
   "gerado_em": "ISO date string"
 }`;
 
-function buildUserMsg(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
+export function buildUserMsg(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
   return `Gere a documentação com base nestas informações coletadas:
 
 CONTEXTO DO PROJETO:

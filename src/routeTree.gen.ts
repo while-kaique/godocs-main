@@ -14,9 +14,12 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
-import { Route as AuthenticatedTestesRouteImport } from './routes/_authenticated/testes'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
+import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
+import { Route as AuthenticatedTestesIndexRouteImport } from './routes/_authenticated/testes/index'
+import { Route as AuthenticatedTestesPromptsRouteImport } from './routes/_authenticated/testes/prompts'
+import { Route as AuthenticatedTestesCenariosRouteImport } from './routes/_authenticated/testes/cenarios'
 
 const SubmeterRoute = SubmeterRouteImport.update({
   id: '/submeter',
@@ -42,11 +45,6 @@ const AuthenticatedUsuariosRoute = AuthenticatedUsuariosRouteImport.update({
   path: '/usuarios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedTestesRoute = AuthenticatedTestesRouteImport.update({
-  id: '/testes',
-  path: '/testes',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -57,15 +55,42 @@ const AuthenticatedAreasRoute = AuthenticatedAreasRouteImport.update({
   path: '/areas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTestesRouteRoute =
+  AuthenticatedTestesRouteRouteImport.update({
+    id: '/testes',
+    path: '/testes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTestesIndexRoute =
+  AuthenticatedTestesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedTestesRouteRoute,
+  } as any)
+const AuthenticatedTestesPromptsRoute =
+  AuthenticatedTestesPromptsRouteImport.update({
+    id: '/prompts',
+    path: '/prompts',
+    getParentRoute: () => AuthenticatedTestesRouteRoute,
+  } as any)
+const AuthenticatedTestesCenariosRoute =
+  AuthenticatedTestesCenariosRouteImport.update({
+    id: '/cenarios',
+    path: '/cenarios',
+    getParentRoute: () => AuthenticatedTestesRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/submeter': typeof SubmeterRoute
+  '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/testes': typeof AuthenticatedTestesRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
+  '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
+  '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/testes/': typeof AuthenticatedTestesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -73,8 +98,10 @@ export interface FileRoutesByTo {
   '/submeter': typeof SubmeterRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/testes': typeof AuthenticatedTestesRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
+  '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
+  '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/testes': typeof AuthenticatedTestesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -82,10 +109,13 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/submeter': typeof SubmeterRoute
+  '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/_authenticated/areas': typeof AuthenticatedAreasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/testes': typeof AuthenticatedTestesRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
+  '/_authenticated/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
+  '/_authenticated/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/_authenticated/testes/': typeof AuthenticatedTestesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -93,10 +123,13 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/submeter'
+    | '/testes'
     | '/areas'
     | '/dashboard'
-    | '/testes'
     | '/usuarios'
+    | '/testes/cenarios'
+    | '/testes/prompts'
+    | '/testes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -104,18 +137,23 @@ export interface FileRouteTypes {
     | '/submeter'
     | '/areas'
     | '/dashboard'
-    | '/testes'
     | '/usuarios'
+    | '/testes/cenarios'
+    | '/testes/prompts'
+    | '/testes'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/submeter'
+    | '/_authenticated/testes'
     | '/_authenticated/areas'
     | '/_authenticated/dashboard'
-    | '/_authenticated/testes'
     | '/_authenticated/usuarios'
+    | '/_authenticated/testes/cenarios'
+    | '/_authenticated/testes/prompts'
+    | '/_authenticated/testes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,13 +200,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsuariosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/testes': {
-      id: '/_authenticated/testes'
-      path: '/testes'
-      fullPath: '/testes'
-      preLoaderRoute: typeof AuthenticatedTestesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -183,20 +214,66 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAreasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/testes': {
+      id: '/_authenticated/testes'
+      path: '/testes'
+      fullPath: '/testes'
+      preLoaderRoute: typeof AuthenticatedTestesRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/testes/': {
+      id: '/_authenticated/testes/'
+      path: '/'
+      fullPath: '/testes/'
+      preLoaderRoute: typeof AuthenticatedTestesIndexRouteImport
+      parentRoute: typeof AuthenticatedTestesRouteRoute
+    }
+    '/_authenticated/testes/prompts': {
+      id: '/_authenticated/testes/prompts'
+      path: '/prompts'
+      fullPath: '/testes/prompts'
+      preLoaderRoute: typeof AuthenticatedTestesPromptsRouteImport
+      parentRoute: typeof AuthenticatedTestesRouteRoute
+    }
+    '/_authenticated/testes/cenarios': {
+      id: '/_authenticated/testes/cenarios'
+      path: '/cenarios'
+      fullPath: '/testes/cenarios'
+      preLoaderRoute: typeof AuthenticatedTestesCenariosRouteImport
+      parentRoute: typeof AuthenticatedTestesRouteRoute
+    }
   }
 }
 
+interface AuthenticatedTestesRouteRouteChildren {
+  AuthenticatedTestesCenariosRoute: typeof AuthenticatedTestesCenariosRoute
+  AuthenticatedTestesPromptsRoute: typeof AuthenticatedTestesPromptsRoute
+  AuthenticatedTestesIndexRoute: typeof AuthenticatedTestesIndexRoute
+}
+
+const AuthenticatedTestesRouteRouteChildren: AuthenticatedTestesRouteRouteChildren =
+  {
+    AuthenticatedTestesCenariosRoute: AuthenticatedTestesCenariosRoute,
+    AuthenticatedTestesPromptsRoute: AuthenticatedTestesPromptsRoute,
+    AuthenticatedTestesIndexRoute: AuthenticatedTestesIndexRoute,
+  }
+
+const AuthenticatedTestesRouteRouteWithChildren =
+  AuthenticatedTestesRouteRoute._addFileChildren(
+    AuthenticatedTestesRouteRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedTestesRouteRoute: typeof AuthenticatedTestesRouteRouteWithChildren
   AuthenticatedAreasRoute: typeof AuthenticatedAreasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedTestesRoute: typeof AuthenticatedTestesRoute
   AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedTestesRouteRoute: AuthenticatedTestesRouteRouteWithChildren,
   AuthenticatedAreasRoute: AuthenticatedAreasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedTestesRoute: AuthenticatedTestesRoute,
   AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
 }
 

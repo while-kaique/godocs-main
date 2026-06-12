@@ -29,6 +29,7 @@ const S = {
     flexDirection: 'column' as const,
     background: '#08080d',
     overflow: 'hidden',
+    height: '100%',
   },
   phaseBar: {
     display: 'flex',
@@ -49,6 +50,7 @@ const S = {
   },
   messages: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto' as const,
     padding: '16px',
     display: 'flex',
@@ -486,7 +488,7 @@ export function ChatSimulation() {
                   >
                     <SimpleMarkdown text={msg.content} isSaving={isSaving} />
                   </div>
-                  {msg.rawJson && (
+                  {msg.rawJson != null && (
                     <>
                       <div style={S.jsonToggle} onClick={() => toggleJson(i)}>
                         {expandedJson.has(i) ? '▼ Esconder JSON' : '▶ Ver JSON raw'}

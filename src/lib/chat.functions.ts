@@ -822,6 +822,8 @@ export async function analisarProjetoFn(rawData: unknown) {
     } catch (n8nErr) {
       err('analisarProjeto', 'Falha ao enviar update ao n8n:', n8nErr);
     }
+  } else {
+    log('analisarProjeto', 'N8N_WEBHOOK_URL_UPDATE não definida — update ao n8n pulado');
   }
 
   return resultado;

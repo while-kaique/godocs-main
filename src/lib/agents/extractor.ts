@@ -20,7 +20,7 @@ const SINGLE_CALL_MAX_CHARS = 150_000;
 // Lotes de ~37k tokens — equilíbrio entre nº de chamadas e qualidade.
 const CHUNK_CHARS = 150_000;
 
-const CAMPOS = `CAMPOS:
+export const CAMPOS = `CAMPOS:
 1. nome_projeto — Título do projeto (string ou null)
 2. o_que_faz — O que faz, para quem, qual o resultado. EXIGE contexto de negócio claro — se o material não revelar O PROPÓSITO e PARA QUEM, retorne null (string ou null)
 3. execucao — Como é acionado: trigger, schedule (com horário/frequência exatos), webhook URL, evento (string ou null)
@@ -29,7 +29,7 @@ const CAMPOS = `CAMPOS:
 6. configurar_antes — Variáveis de ambiente, credenciais, configurações iniciais obrigatórias (string ou null)
 7. atencao — Riscos, limitações, pontos frágeis CONCRETOS observados no material. NÃO liste observações genéricas que seriam verdade para qualquer projeto — só o que é ESPECÍFICO deste projeto (string ou null)`;
 
-const FORMATO = `Formato da resposta — APENAS JSON válido, sem texto adicional:
+export const FORMATO = `Formato da resposta — APENAS JSON válido, sem texto adicional:
 {"nome_projeto":"...","o_que_faz":"...","execucao":"...","dependencias":"...","fluxo":"...","configurar_antes":"...","atencao":"..."}
 Para campos sem informação use o literal JSON null (sem aspas), NUNCA a string "null". Português brasileiro, acentuação correta.`;
 
@@ -77,13 +77,9 @@ export async function extrairCamposDocumentacao(
   return result;
 }
 
-// ─── Map: extrai os 7 campos de um lote ─────────────────────────────────────────
+// ─── Prompt builders (exportados para inspeção) ────────────────────────────────
 
-async function extrairLote(
-  ctx: ProjetoContexto,
-  texto: string,
-  isLote: boolean,
-): Promise<DocumentacaoColetada> {
+export function buildExtractorPrompt(ctx: ProjetoContexto, isLote: boolean): string {
   const escopo = isLote
     ? `Você recebeu uma PARTE de um projeto maior. Extraia apenas o que estiver presente neste trecho; deixe null o que não aparecer aqui.`
     : `Você recebeu os arquivos enviados pelo usuário. O material pode ser código-fonte, documentação prévia, ou uma mistura dos dois — todos são igualmente válidos. Extraia o máximo de informação possível do que foi enviado.`;
@@ -92,7 +88,7 @@ async function extrairLote(
     ? `\nDESCRIÇÃO BREVE FORNECIDA PELO USUÁRIO: "${ctx.descricao_breve.trim()}"\nUse esta descrição como REFERÊNCIA complementar ao material enviado. Se a descrição menciona funcionalidades que NÃO aparecem no material, os campos correspondentes devem ser null — não invente o que não está documentado.\n`
     : '';
 
-  const system = `Você é um analisador técnico de projetos de automação. Seu papel é extrair informação do material enviado com ALTA PRECISÃO e CETICISMO.
+  return `Você é um analisador técnico de projetos de automação. Seu papel é extrair informação do material enviado com ALTA PRECISÃO e CETICISMO.
 ${escopo}
 ${descricaoCtx}
 Sua tarefa é preencher os 7 campos da documentação padrão DIRETAMENTE a partir do material enviado.
@@ -110,6 +106,27 @@ REGRAS CRÍTICAS DE CETICISMO:
 ${CAMPOS}
 
 ${FORMATO}`;
+}
+
+export function buildConsolidatorPrompt(): string {
+  return `Você consolida extrações parciais de um mesmo projeto em UMA documentação coesa.
+Recebeu, por campo, uma lista de trechos extraídos de partes diferentes do projeto.
+Funda cada campo num texto único, sem redundância, mantendo todos os detalhes técnicos relevantes.
+Não invente nada além do que está nos trechos.
+
+${CAMPOS}
+
+${FORMATO}`;
+}
+
+// ─── Map: extrai os 7 campos de um lote ─────────────────────────────────────────
+
+async function extrairLote(
+  ctx: ProjetoContexto,
+  texto: string,
+  isLote: boolean,
+): Promise<DocumentacaoColetada> {
+  const system = buildExtractorPrompt(ctx, isLote);
 
   const userContent = [
     ctx.descricao_breve?.trim()
@@ -143,14 +160,7 @@ async function consolidar(
     return { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto || null };
   }
 
-  const system = `Você consolida extrações parciais de um mesmo projeto em UMA documentação coesa.
-Recebeu, por campo, uma lista de trechos extraídos de partes diferentes do projeto.
-Funda cada campo num texto único, sem redundância, mantendo todos os detalhes técnicos relevantes.
-Não invente nada além do que está nos trechos.
-
-${CAMPOS}
-
-${FORMATO}`;
+  const system = buildConsolidatorPrompt();
 
   const userContent = `METADADOS: nome="${ctx.nome_projeto}", ferramenta="${ctx.ferramenta}", área="${ctx.area ?? ''}"
 

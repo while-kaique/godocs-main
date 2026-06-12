@@ -4,10 +4,20 @@ import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical } from
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
+    console.log("[_authenticated] beforeLoad — chamando /api/auth/me...");
     const response = await fetch("/api/auth/me");
+    console.log("[_authenticated] /api/auth/me status:", response.status);
     const user: CurrentUser | null = response.ok ? ((await response.json()) as CurrentUser | null) : null;
-    if (!user) throw redirect({ to: "/" });
-    if (!user.isAdmin) throw redirect({ to: "/" });
+    console.log("[_authenticated] user:", JSON.stringify(user));
+    if (!user) {
+      console.log("[_authenticated] user=null → redirecionando para /");
+      throw redirect({ to: "/" });
+    }
+    if (!user.isAdmin) {
+      console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
+      throw redirect({ to: "/" });
+    }
+    console.log("[_authenticated] Auth OK — admin:", user.email);
     return { user };
   },
   component: AuthenticatedLayout,
@@ -57,7 +67,7 @@ function AuthenticatedLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
     </div>

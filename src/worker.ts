@@ -85,7 +85,9 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
   try {
     // ── Auth ──
     if (pathname === '/api/auth/me' && method === 'GET') {
+      console.log('[worker] /api/auth/me chamado')
       const user = await getCurrentUser(request)
+      console.log('[worker] /api/auth/me resultado:', JSON.stringify(user))
       return json(user)
     }
 

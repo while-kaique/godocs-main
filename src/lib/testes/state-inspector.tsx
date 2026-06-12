@@ -76,6 +76,7 @@ const S = {
     display: 'flex',
     flexDirection: 'column' as const,
     overflow: 'hidden',
+    height: '100%',
   },
   header: {
     padding: '16px 16px 12px',

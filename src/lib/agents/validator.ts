@@ -6,7 +6,7 @@ import { llmChat } from '@/lib/llm';
 import { getConfiguracao, parseJson } from '@/integrations/db/client.server';
 import type { DocumentacaoGerada } from './types';
 
-type CriterioValidacao = {
+export type CriterioValidacao = {
   nome: string;
   descricao: string;
   peso: 'obrigatorio' | 'importante' | 'desejavel';
@@ -25,7 +25,7 @@ export type ResultadoValidacao = {
   pontuacao: number; // 0-100
 };
 
-const CRITERIOS_DEFAULT: CriterioValidacao[] = [
+export const CRITERIOS_DEFAULT: CriterioValidacao[] = [
   {
     nome: 'Propósito claro',
     descricao: 'A seção "O que faz" descreve com clareza o problema resolvido, o público-alvo e o resultado esperado.',
@@ -69,12 +69,8 @@ async function getCriterios(): Promise<CriterioValidacao[]> {
   return valor;
 }
 
-export async function validarDocumentacao(
-  doc: DocumentacaoGerada
-): Promise<ResultadoValidacao> {
-  const criterios = await getCriterios();
-
-  const systemPrompt = `Você é um analista sênior responsável por validar projetos de automação interna da Gocase antes de irem para produção.
+export function buildValidatorPrompt(criterios: CriterioValidacao[]): string {
+  return `Você é um analista sênior responsável por validar projetos de automação interna da Gocase antes de irem para produção.
 
 Avalie a documentação do projeto com base nos critérios fornecidos e retorne APENAS JSON válido.
 
@@ -95,6 +91,14 @@ Responda com JSON exatamente neste formato:
   ],
   "pontuacao": 0-100
 }`;
+}
+
+export async function validarDocumentacao(
+  doc: DocumentacaoGerada
+): Promise<ResultadoValidacao> {
+  const criterios = await getCriterios();
+
+  const systemPrompt = buildValidatorPrompt(criterios);
 
   const userMsg = `Valide a seguinte documentação de projeto:
 

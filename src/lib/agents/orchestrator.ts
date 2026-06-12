@@ -19,7 +19,7 @@ import { documentacaoVazia, receitaVazia, savingVazio } from './types';
 
 // Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
 // **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
-const FORMATACAO_PREVIEW = `FORMATAÇÃO DO PREVIEW (markdown — siga à risca):
+export const FORMATACAO_PREVIEW = `FORMATAÇÃO DO PREVIEW (markdown — siga à risca):
 - Cada seção começa com "## Título" (ex: "## O que faz").
 - NÃO escreva blocos gigantes corridos. Quebre o conteúdo em parágrafos curtos e listas.
 - Use "\\n" entre parágrafos e entre itens de lista (quebras de linha reais).
@@ -38,7 +38,7 @@ Exemplo de uma seção bem formatada:
 
 // ─── System prompts por fase ────────────────────────────────────────────────
 
-function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
+export function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
   const membros = ctx.membros.length > 0 ? ctx.membros.join(', ') : 'Não informado';
   const temCodigo = ctx.doc_texto && ctx.doc_texto.trim().length > 10;
 
@@ -124,7 +124,7 @@ Quando todos os campos estiverem completos — apresente o preview formatado:
 {"type":"preview","content":"# Nome do Projeto\\n\\n## O que faz\\nFrase 1. Frase 2.\\n\\n## Execução\\n- **trigger** ...\\n\\n## Fluxo\\n1. Primeira etapa.\\n2. Segunda etapa.\\n\\nEssa documentação está correta? Você pode aprovar ou pedir ajustes.","coletado":{...todos os campos}}`;
 }
 
-function buildDocPreviewPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
+export function buildDocPreviewPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
   return `Você é o assistente de documentação do GoGroup. O usuário está revisando um preview da documentação gerada.
 
 DOCUMENTAÇÃO ATUAL:
@@ -156,7 +156,7 @@ Se precisa de clarificação:
 {"type":"question","content":"sua pergunta sobre o ajuste","coletado":{...campos atuais}}`;
 }
 
-function buildReceitaPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, receita: ReceitaColetada, resumoProjeto: string): string {
+export function buildReceitaPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, receita: ReceitaColetada, resumoProjeto: string): string {
   const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
 
@@ -234,7 +234,7 @@ Preview (quando valor e memorial estiverem completos):
 {"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos}}`;
 }
 
-function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
+export function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de receita incremental.
 
 MEMORIAL ATUAL:
@@ -256,7 +256,7 @@ Se precisa de clarificação:
 {"type":"question","content":"pergunta","receita":{...campos atuais}}`;
 }
 
-function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
+export function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
   const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
 
@@ -357,7 +357,7 @@ Preview (quando justificativa concreta e memorial completo):
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
 }
 
-function buildSavingPreviewPrompt(saving: SavingColetado): string {
+export function buildSavingPreviewPrompt(saving: SavingColetado): string {
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving.
 
 MEMORIAL ATUAL:

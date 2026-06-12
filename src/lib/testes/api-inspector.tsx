@@ -27,6 +27,7 @@ const S = {
     display: 'flex',
     flexDirection: 'column' as const,
     overflow: 'hidden',
+    height: '100%',
   },
   toolbar: {
     display: 'flex',
