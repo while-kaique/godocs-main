@@ -31,6 +31,7 @@ import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
 import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
+import { stripMarkdown } from '@/lib/strip-markdown';
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -798,8 +799,16 @@ export async function analisarProjetoFn(rawData: unknown) {
     criterios_dinamicos: resultado.criterios_dinamicos,
   });
 
-  // Persiste a complexidade no projeto
-  await updateProjeto(projeto_id, { complexidade: resultado.complexidade });
+  // Parecer da análise (campo `resumo`) → coluna "Observações". É uma mensagem de
+  // STAFF (pontos de atenção), NÃO exibida ao usuário no front (gerava ansiedade).
+  // Sem markdown na persistência (igual ao memorial).
+  const observacoes = stripMarkdown(resultado.resumo || resultado.justificativa);
+
+  // Persiste a complexidade e as observações no projeto
+  await updateProjeto(projeto_id, {
+    complexidade: resultado.complexidade,
+    observacoes,
+  });
 
   log('analisarProjeto', `Resultado: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
@@ -811,6 +820,7 @@ export async function analisarProjetoFn(rawData: unknown) {
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
+        observacoes: observacoes ?? '',
       };
 
       const resp = await fetch(n8nUpdateUrl, {
@@ -867,13 +877,18 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
+  // Memorial sem markdown na persistência (Sheets/SQLite) — mantém quebras de linha,
+  // remove `**`, `#`, backticks, etc. O markdown cru fica em documentacao.conteudo.
+  const memorialLimpo = stripMarkdown(saving?.memorial_calculo as string | undefined);
+  const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+
   await updateProjeto(projeto_id, {
     status,
     submitted_at: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
-    memorial_calculo: (saving?.memorial_calculo as string) ?? null,
+    memorial_calculo: memorialLimpo,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
   });
 
@@ -902,14 +917,14 @@ export async function submeterParaValidacao(rawData: unknown) {
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,
         tipo_saving: (saving?.tipo_saving as string) ?? '',
-        memorial_calculo: (saving?.memorial_calculo as string) ?? '',
+        memorial_calculo: memorialLimpo ?? '',
         // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
         alguem_fazia: projeto.alguem_fazia ?? '',
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
         tipo_receita: (receita?.tipo_saving as string) ?? '',
-        receita_memorial: (receita?.memorial_calculo as string) ?? '',
+        receita_memorial: receitaMemorialLimpo ?? '',
         ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
         documentacao: conteudo,
       };

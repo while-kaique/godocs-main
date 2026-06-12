@@ -35,6 +35,7 @@ export type Projeto = {
   custo_externo_mensal: number | null;
   ganho_total_mensal: number | null;
   complexidade: string | null;
+  observacoes: string | null;
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;

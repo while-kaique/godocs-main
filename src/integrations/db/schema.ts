@@ -41,6 +41,7 @@ const SCHEMA_SQL = `
     custo_externo_mensal REAL,
     ganho_total_mensal REAL,
     alguem_fazia TEXT,
+    observacoes TEXT,
     submitted_at TEXT,
     validated_at TEXT,
     validated_by TEXT,
@@ -131,6 +132,8 @@ const MIGRATIONS = [
   // Ambos em try/catch: o que não se aplicar é ignorado silenciosamente.
   'ALTER TABLE projetos RENAME COLUMN tinha_pessoa_antes TO alguem_fazia',
   'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
+  // Observações da análise automática (parecer da IA) — só para staff, não exibido ao usuário.
+  'ALTER TABLE projetos ADD COLUMN observacoes TEXT',
 ];
 
 export async function initSchema(db: GoDeployDB) {

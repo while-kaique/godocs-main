@@ -138,7 +138,7 @@ O schema é criado automaticamente por `initSchema()` em `schema.ts`. IDs defaul
 | `user_roles` | user_id, role (admin_master, leader) |
 | `areas` | id, nome (departamentos da empresa; populada via sync TeamGuide) |
 | `leader_areas` | user_id, area_id (N:N - quais áreas um leader acompanha) |
-| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, escopo, servico_externo, membros (JSON), status, chat_completo, data_criacao_projeto, **tipo_projeto**, **tipos_projeto** (JSON), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal, **complexidade** (automacao\|inteligencia\|autonomia), submitted_at, validated_at, validated_by |
+| `projetos` | id, nome, responsavel_nome, responsavel_email, area, area_id, ferramenta, escopo, servico_externo, membros (JSON), status, chat_completo, data_criacao_projeto, **tipo_projeto**, **tipos_projeto** (JSON), **descricao_breve**, saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal, **complexidade** (automacao\|inteligencia\|autonomia), **observacoes** (parecer da análise — staff-only), submitted_at, validated_at, validated_by |
 | `chat_messages` | id, projeto_id, role (user/assistant/doc), content, options (JSON), selected_option |
 | `documentacao` | projeto_id (UNIQUE), conteudo (JSON — DocumentacaoGerada + saving/receita) |
 | `validacoes` | projeto_id, resultado, parecer, criterios (JSON), admin_email, email_enviado |
@@ -213,7 +213,7 @@ A IA lê a **codebase/pasta inteira** e gera a documentação automaticamente. L
 Quando o usuário clica "Enviar para Triagem":
 
 1. Verifica duplicata (mesmo nome de projeto já submetido)
-2. Extrai impacto do JSON da documentação e popula colunas do `projetos` (saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal)
+2. Extrai impacto do JSON da documentação e popula colunas do `projetos` (saving_horas, saving_reais, tipo_saving, memorial_calculo, custo_externo_mensal). O `memorial_calculo` (e o `receita_memorial` enviado ao n8n) passa por `stripMarkdown` (`src/lib/strip-markdown.ts`) na fronteira de persistência — remove `**`, `#`, backticks, etc. mantendo as quebras de linha; o markdown cru continua em `documentacao.conteudo` (preview do chat)
 3. Auto-aprovação: se área = "RPA", status = `aprovado`; senão `em_validacao`
 4. Envia notificação para Google Chat (webhook via env var `GOOGLE_CHAT_WEBHOOK_URL`)
 5. Envia dados completos (projeto + documentação + saving) para n8n via `N8N_WEBHOOK_URL` — o workflow n8n gera Markdown, sobe ao Drive, salva na planilha
@@ -305,13 +305,13 @@ Quando o usuário clica "Enviar para Triagem", a submissão e a análise IA roda
 - 10 critérios fixos (propósito, trigger, dependências, fluxo, config, riscos, saving, ferramenta, descrição, completude) + 2-3 dinâmicos por projeto
 - Classifica complexidade: `automacao` | `inteligencia` | `autonomia`
 - Gera parecer em texto (`resumo`) + justificativa completa em markdown
-- Resultado salvo na tabela `analises`, complexidade salva no `projetos`
+- Resultado salvo na tabela `analises`; complexidade salva no `projetos`; o **parecer** (`resumo`, sem markdown) é salvo na coluna `projetos.observacoes` e enviado ao n8n via `N8N_WEBHOOK_URL_UPDATE` (coluna "Observações" do Sheets)
 - O LLM avalia todos os critérios internamente mas retorna apenas os mais relevantes no JSON (max 8)
 
 **Card de análise** (`analyzer-overlay.tsx`):
 - Loading: spinner + frases rotativas estilo terminal
-- Resultado: barra lateral colorida (verde/laranja), header com ícone + badge de veredito, seção "Parecer" com resumo em texto limpo
-- Sem exibição de critérios individuais, pontuação ou detalhes ao usuário — apenas o resumo textual
+- Resultado: **confirmação neutra** ("Análise concluída") — o parecer/pontos de atenção **NÃO é mais exibido ao usuário** (é mensagem de staff que gerava ansiedade; vive na coluna `observacoes`/Sheets). O card só serve para segurar a página (`beforeunload` + botão desabilitado) até a análise concluir e persistir as observações
+- Sem exibição de critérios, pontuação, veredito ou parecer ao usuário
 
 ### Orquestrador (`orchestrator.ts`)
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { AnaliseResult } from "./constants";
-import { SimpleMarkdown } from "./step3-chat";
 
 // ─── Frases de loading (estilo log de terminal) ────────────────────────────
 
@@ -39,8 +38,10 @@ export function AnalyzerCard({
     return () => clearInterval(interval);
   }, [loading]);
 
-  const isApproved = result?.resultado === "aprovado";
-  const accentColor = isApproved ? "#16a34a" : "#ea580c";
+  // O parecer da análise (pontos de atenção) NÃO é mais exibido ao usuário — é uma
+  // mensagem de staff que ia para a coluna "Observações" e só gerava ansiedade no
+  // front. Aqui mostramos apenas uma confirmação neutra quando a análise conclui.
+  const accentColor = "#16a34a";
 
   return (
     <div
@@ -51,9 +52,7 @@ export function AnalyzerCard({
         animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both",
         boxShadow: loading || error
           ? "var(--go-shadow-sm)"
-          : isApproved
-            ? "0 2px 12px rgba(22,163,74,0.08), 0 0 0 1px rgba(22,163,74,0.10)"
-            : "0 2px 12px rgba(234,88,12,0.08), 0 0 0 1px rgba(234,88,12,0.10)",
+          : "0 2px 12px rgba(22,163,74,0.08), 0 0 0 1px rgba(22,163,74,0.10)",
       }}
     >
       {loading ? (
@@ -72,115 +71,48 @@ export function AnalyzerCard({
             }}
           />
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* ── Header ── */}
+          {/* ── Confirmação neutra (sem parecer/pontos de atenção) ── */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "16px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
             <div
               style={{
-                padding: "16px 20px 14px",
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                justifyContent: "center",
+                background: "rgba(22,163,74,0.08)",
+                flexShrink: 0,
               }}
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: isApproved
-                    ? "rgba(22,163,74,0.08)"
-                    : "rgba(234,88,12,0.08)",
-                  flexShrink: 0,
-                }}
-              >
-                {isApproved ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                )}
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: accentColor,
-                    letterSpacing: "-0.01em",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {isApproved ? "Análise Concluída" : "Pontos de Atenção Identificados"}
-                </div>
-                <div style={{ fontSize: 10, color: "#8b8b9a", marginTop: 2, lineHeight: 1.3 }}>
-                  {isApproved
-                    ? "A submissão atende os critérios de qualidade."
-                    : "O time de RPA entrará em contato para alinhar os ajustes."}
-                </div>
-              </div>
-
-              {/* Badge de resultado */}
-              <span
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  padding: "4px 10px",
-                  borderRadius: "var(--go-radius-pill)",
-                  color: accentColor,
-                  background: isApproved
-                    ? "rgba(22,163,74,0.07)"
-                    : "rgba(234,88,12,0.07)",
-                  flexShrink: 0,
-                }}
-              >
-                {isApproved ? "Aprovada" : "Atenção"}
-              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </div>
 
-            {/* ── Separador ── */}
-            <div
-              style={{
-                height: 1,
-                margin: "0 20px",
-                background: isApproved
-                  ? "rgba(22,163,74,0.10)"
-                  : "rgba(234,88,12,0.10)",
-              }}
-            />
-
-            {/* ── Parecer (resumo em texto) ── */}
-            <div style={{ padding: "14px 20px 18px" }}>
+            <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "#8b8b9a",
-                  marginBottom: 8,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: accentColor,
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.2,
                 }}
               >
-                Parecer
+                Análise concluída
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  lineHeight: 1.65,
-                  color: "var(--go-text-primary)",
-                }}
-              >
-                <SimpleMarkdown text={result.resumo || result.justificativa} isSaving={isApproved} />
+              <div style={{ fontSize: 10, color: "#8b8b9a", marginTop: 2, lineHeight: 1.3 }}>
+                Sua submissão foi registrada e encaminhada à equipe de RPA &amp; IA.
               </div>
             </div>
           </div>
