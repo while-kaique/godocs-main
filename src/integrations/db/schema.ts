@@ -40,6 +40,7 @@ const SCHEMA_SQL = `
     memorial_calculo TEXT,
     custo_externo_mensal REAL,
     ganho_total_mensal REAL,
+    tinha_pessoa_antes TEXT,
     submitted_at TEXT,
     validated_at TEXT,
     validated_by TEXT,
@@ -124,6 +125,8 @@ const MIGRATIONS = [
   'ALTER TABLE analises ADD COLUMN resumo TEXT',
   'ALTER TABLE projetos ADD COLUMN ganho_total_mensal REAL',
   'ALTER TABLE projetos ADD COLUMN complexidade TEXT',
+  // Saving: havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao')
+  'ALTER TABLE projetos ADD COLUMN tinha_pessoa_antes TEXT',
 ];
 
 export async function initSchema(db: GoDeployDB) {
