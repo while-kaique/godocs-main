@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
-import { LayoutDashboard, Building2, Settings, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -35,6 +35,9 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/configuracoes" icon={<Settings className="h-4 w-4" />}>
             Configurações
+          </NavItem>
+          <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
+            Testes
           </NavItem>
           <Link
             to="/"
