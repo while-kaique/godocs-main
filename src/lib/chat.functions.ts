@@ -18,6 +18,7 @@ import {
   findDuplicateProjeto,
   updateProjeto,
   deleteChatMessagesByProjeto,
+  deleteChatMessagesAfterFaseMarker,
   insertValidacao,
   updateValidacaoEmailEnviado,
   insertAnalise,
@@ -438,6 +439,11 @@ export async function iniciarSaving(rawData: unknown) {
   const data = iniciarSavingSchema.parse(rawData);
   log('iniciarSaving', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
+  // Reinício limpo: se a pessoa voltou ao formulário determinístico e reenviou,
+  // descarta a conversa anterior da fase saving (ancorada nos números antigos).
+  // No primeiro início é no-op (ainda não há mensagens após o marcador).
+  await deleteChatMessagesAfterFaseMarker(data.projeto_id, 'saving');
+
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
 
@@ -511,6 +517,10 @@ export async function iniciarSaving(rawData: unknown) {
 export async function iniciarReceita(rawData: unknown) {
   const data = iniciarReceitaSchema.parse(rawData);
   log('iniciarReceita', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+
+  // Reinício limpo: se a pessoa voltou ao formulário determinístico e reenviou,
+  // descarta a conversa anterior da fase receita. No primeiro início é no-op.
+  await deleteChatMessagesAfterFaseMarker(data.projeto_id, 'receita');
 
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);

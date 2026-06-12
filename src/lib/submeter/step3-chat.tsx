@@ -1060,6 +1060,7 @@ export function Step3Chat({
   receitaFormLoading,
   formDraft,
   onFormDraftChange,
+  onEditForm,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -1089,6 +1090,8 @@ export function Step3Chat({
   receitaFormLoading?: boolean;
   formDraft?: SavingFormData;
   onFormDraftChange?: (d: SavingFormData) => void;
+  // Reabre o formulário determinístico da fase atual (saving/receita) para editar.
+  onEditForm?: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview";
@@ -1103,6 +1106,16 @@ export function Step3Chat({
 
   const lastMsg = messages[messages.length - 1];
   const showPreviewActions = lastMsg?.isPreview && !loading;
+  // Botão "Editar dados": só faz sentido com o chat da fase financeira ativo
+  // (não durante a transição, o próprio formulário, ou a revisão final).
+  const canEditForm =
+    !!onEditForm &&
+    isFinancialFase &&
+    fase !== "completo" &&
+    !isComplete &&
+    !showTransition &&
+    !showSavingForm &&
+    !showReceitaForm;
   const hasOptions = lastMsg?.role === "assistant" && lastMsg.options && !isComplete && !showPreviewActions;
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1133,26 +1146,61 @@ export function Step3Chat({
     <div className="flex flex-col" style={{ minHeight: 420 }}>
       {/* Cabeçalho do chat */}
       <div
-        className="flex items-center gap-2.5 px-8 pb-4 transition-colors duration-500"
+        className="flex items-center justify-between gap-2.5 px-8 pb-4 transition-colors duration-500"
         style={{ borderBottom: `1px solid ${accentBorder}` }}
       >
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-full text-sm transition-colors duration-500"
-          style={{ background: accentBg, color: accentColor }}
-        >
-          {isReceitaFase ? "📈" : isSavingFase ? "💰" : "🤖"}
-        </div>
-        <div>
+        <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className="text-[13px] font-bold transition-colors duration-500"
-            style={{ color: isFinancialFase ? "#6b6e00" : "var(--go-text-heading)" }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm transition-colors duration-500"
+            style={{ background: accentBg, color: accentColor }}
           >
-            {agentLabel}
+            {isReceitaFase ? "📈" : isSavingFase ? "💰" : "🤖"}
           </div>
-          <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
-            {agentStatus}
+          <div className="min-w-0">
+            <div
+              className="text-[13px] font-bold transition-colors duration-500"
+              style={{ color: isFinancialFase ? "#6b6e00" : "var(--go-text-heading)" }}
+            >
+              {agentLabel}
+            </div>
+            <div className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>
+              {agentStatus}
+            </div>
           </div>
         </div>
+
+        {/* Voltar ao formulário determinístico da fase para editar os dados */}
+        {canEditForm && (
+          <button
+            type="button"
+            onClick={onEditForm}
+            disabled={loading}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all"
+            style={{
+              background: "rgba(215,219,0,0.08)",
+              border: "1.5px solid rgba(215,219,0,0.25)",
+              color: "#6b6e00",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (loading) return;
+              e.currentTarget.style.background = "rgba(215,219,0,0.16)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(215,219,0,0.08)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
+            }}
+            title="Voltar ao formulário para editar os dados informados"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Editar dados
+          </button>
+        )}
       </div>
 
       {/* Tela de transição doc → saving */}
