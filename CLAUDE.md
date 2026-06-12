@@ -170,6 +170,9 @@ rascunho → em_validacao → validado | rejeitado
 | `/dashboard` | Autenticado (admin/leader) | Dashboard de projetos |
 | `/usuarios` | Admin Master | CRUD de usuários |
 | `/areas` | Admin Master | CRUD de áreas + sincronização TeamGuide |
+| `/testes` | Admin Master | Console de testes e simulação (sub-rotas abaixo) |
+| `/testes/prompts` | Admin Master | Inspetor de prompts da IA — exibe todos os system prompts dos agentes com syntax highlight, parâmetros LLM e contagem de tokens |
+| `/testes/cenarios` | Admin Master | Simulador de cenários — chat de teste com inspetor de estado e log de chamadas API |
 
 ### Endpoints de API (`/api/*`, roteados pelo `worker.ts`)
 
@@ -380,6 +383,7 @@ As áreas/departamentos são derivadas da árvore organizacional do **TeamGuide*
 - **Cursor/foco**: elementos não-editáveis têm `caret-color: transparent` (esconde o caret), mantendo seleção de texto. Apenas `input`, `textarea` e `[contenteditable]` reativam o caret. Foco visível só via teclado (`:focus-visible`). Regras globais em `styles.css` na `@layer base` — não sobrescrever
 - **Testes obrigatórios**: rodar `npm run test` após qualquer modificação (rodam também antes de cada `npm run dev` via `predev`)
 - **Backend alterado → rebuildar o bundle**: `npm run build:worker` e comitar o `worker.js` atualizado
+- **Prompts da IA alterados → atualizar o inspetor de prompts**: ao editar qualquer system prompt dos agentes (`orchestrator.ts`, `extractor.ts`, `doc-compiler.ts`, `analyzer.ts`, `validator.ts`), verificar se o **registro de prompts** (`src/lib/testes/prompt-registry.ts`) e o **inspetor** (`src/lib/testes/prompt-inspector.tsx`) refletem a mudança — incluindo descrições, parâmetros LLM, dados mock de contexto e contagem de prompts registrados. A página `/testes/prompts` é a referência da equipe para entender o que a IA recebe
 - `routeTree.gen.ts` é auto-gerado — não editar manualmente
 
 ## Variáveis de ambiente
