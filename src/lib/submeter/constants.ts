@@ -11,7 +11,7 @@ export const AREAS = [
 ] as const;
 
 export const FERRAMENTAS = [
-  "n8n", "Python", "Google Apps Script", "Claude + GoDepoy",
+  "n8n", "Python", "Google Apps Script", "Claude + GoDeploy",
   "Claude", "Outros"
 ] as const;
 

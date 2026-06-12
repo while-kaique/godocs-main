@@ -57,6 +57,14 @@ Os campos preenchidos refletem FIELMENTE o que está no código — o código é
 Porém, o código enviado pode ser PARCIAL (apenas trechos, um módulo, só o frontend, etc.) — nesse caso, os campos preenchidos são corretos mas INCOMPLETOS.
 Os campos em null representam informações que o código não revelou — podem ser regras de negócio ou simplesmente partes do projeto que não foram enviadas.
 
+FERRAMENTAS INTERNAS DO GOGROUP (contexto para você):
+- **Claude**: modelo de IA da Anthropic, usado como LLM para projetos de IA (análise de texto, geração, classificação, agentes, etc.). Acessado via API. Ferramenta legítima e amplamente usada na empresa.
+- **Claude + GoDeploy**: Claude (LLM) + GoDeploy, a plataforma interna de deploy do GoGroup (hospeda SPAs + Workers/APIs, SQLite gerenciado, cron jobs, edge auth). Projetos completos hospedados no GoDeploy que usam Claude como IA.
+- **n8n**: plataforma de automação de workflows (low-code) para integrações, webhooks e orquestração.
+- **Python**: scripts e aplicações para automações, análise de dados, ML, scrapers.
+- **Google Apps Script**: scripts no ecossistema Google.
+Todas essas ferramentas são válidas e reconhecidas. NÃO questione se a ferramenta é legítima.
+
 METADADOS DO PROJETO:
 - Nome: ${ctx.nome_projeto}
 - Data de criação: ${ctx.data_criacao ?? 'Não informada'}
