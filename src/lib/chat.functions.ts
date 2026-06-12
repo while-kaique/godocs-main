@@ -134,20 +134,35 @@ function buildPhaseHistory(
   msgs: { role: string; content: string }[],
   targetFase: 'saving' | 'receita',
 ): ChatHistoryMessage[] {
-  let transitionIdx = -1;
+  // 1) Marcador de transição (type:complete + fase): a conversa da fase vem depois.
+  let startIdx = -1;
   for (let i = 0; i < msgs.length; i++) {
     if (msgs[i].role !== 'assistant') continue;
     try {
       const parsed = JSON.parse(msgs[i].content) as { type?: string; fase?: string };
       if (parsed.type === 'complete' && parsed.fase === targetFase) {
-        transitionIdx = i;
+        startIdx = i;
         break;
       }
     } catch {
       continue;
     }
   }
-  const phaseMsgs = transitionIdx >= 0 ? msgs.slice(transitionIdx + 1) : msgs;
+  // 2) Fallback: fase adicionada depois, sem transição (ex.: receita marcada após o
+  //    saving já concluído). Ancora na PRIMEIRA mensagem da própria fase para isolar
+  //    o histórico, sem arrastar a conversa do saving.
+  if (startIdx < 0) {
+    for (let i = 0; i < msgs.length; i++) {
+      if (msgs[i].role !== 'assistant') continue;
+      try {
+        const parsed = JSON.parse(msgs[i].content) as { fase?: string };
+        if (parsed.fase === targetFase) { startIdx = i - 1; break; }
+      } catch {
+        continue;
+      }
+    }
+  }
+  const phaseMsgs = startIdx >= 0 ? msgs.slice(startIdx + 1) : msgs;
   return buildHistory(phaseMsgs);
 }
 

@@ -85,6 +85,10 @@ export interface SavingLinhaInput {
 
 export interface SavingFormData {
   linhas: SavingLinhaInput[];
+  // Saving: alguém já fazia/mantinha isso manualmente antes da automação?
+  // 'sim' → tabela antes+depois (economia clássica); 'nao' → só "depois"
+  // (ninguém antes; horas_antes assumido 0, então a economia de horas é 0).
+  tinhaAntes: 'sim' | 'nao' | '';
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';

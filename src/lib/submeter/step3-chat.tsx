@@ -587,6 +587,9 @@ function SavingForm({
   const [linhas, setLinhas] = useState<SavingLinhaInput[]>(
     draft?.linhas ?? [{ cargo: "", horasAntes: "", horasDepois: "" }],
   );
+  // Alguém já fazia/mantinha isso manualmente antes? Define se a tabela mostra a
+  // coluna "antes" (sim) ou só "depois" (nao — ninguém antes; economia de horas = 0).
+  const [tinhaAntes, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.tinhaAntes ?? "");
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
   const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
@@ -598,8 +601,8 @@ function SavingForm({
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
-    onDraftChange?.({ linhas, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
-  }, [linhas, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+    onDraftChange?.({ linhas, tinhaAntes, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, tinhaAntes, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
@@ -621,7 +624,19 @@ function SavingForm({
     });
   }
   function addLinha() {
-    setLinhas((ls) => [...ls, { cargo: "", horasAntes: "", horasDepois: "" }]);
+    // No modo "ninguém antes", horas antes é sempre 0 (campo nem aparece).
+    setLinhas((ls) => [...ls, { cargo: "", horasAntes: tinhaAntes === "nao" ? "0" : "", horasDepois: "" }]);
+  }
+  function selectTinhaAntes(v: "sim" | "nao") {
+    setTinhaAntes(v);
+    // "nao" → ninguém fazia antes: zera/oculta o campo "antes". "sim" → libera p/ digitar.
+    setLinhas((ls) => ls.map((l) => ({ ...l, horasAntes: v === "nao" ? "0" : "" })));
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.tinhaAntes;
+      Object.keys(n).forEach((k) => { if (/^l\d+antes$/.test(k)) delete n[k]; });
+      return n;
+    });
   }
   function removeLinha(i: number) {
     setLinhas((ls) => ls.filter((_, idx) => idx !== i));
@@ -632,13 +647,16 @@ function SavingForm({
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
     if (isSaving) {
+      if (!tinhaAntes) errs.tinhaAntes = "Selecione uma opção";
       linhas.forEach((l, i) => {
         const a = parseFloat(l.horasAntes);
         const d = parseFloat(l.horasDepois);
         if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
-        // Aceita qualquer valor >= 0 (inclusive 0 antes e horas depois maiores) —
-        // o ganho líquido é calculado/clampado no backend.
-        if (l.horasAntes === "" || isNaN(a) || a < 0) errs[`l${i}antes`] = "Informe as horas";
+        // "antes" só é cobrado no modo "sim" (havia trabalho manual). No modo "nao"
+        // o campo nem aparece (horas_antes = 0). Aceita >= 0; o ganho líquido é
+        // calculado/clampado no backend.
+        if (tinhaAntes === "sim" && (l.horasAntes === "" || isNaN(a) || a < 0))
+          errs[`l${i}antes`] = "Informe as horas";
         if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
       });
     }
@@ -660,6 +678,7 @@ function SavingForm({
     if (!validate()) return;
     onSubmit({
       linhas,
+      tinhaAntes,
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -727,135 +746,179 @@ function SavingForm({
           )}
         </div>
 
-        {/* Campos de saving — uma linha por pessoa que executava a tarefa */}
+        {/* Saving — quem trabalhava/trabalha na tarefa */}
         {isSaving && (
-          <div>
-            <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-              Quem trabalhava (ou trabalha) nessa tarefa <span style={{ color: "#e53e3e" }}>*</span>
-            </label>
-            <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-              Uma linha por pessoa/função. Informe as horas/mês antes e depois da automação.
-              Se <strong>ninguém fazia</strong> essa tarefa antes, deixe "horas antes" como <strong>0</strong>;
-              se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
-            </p>
-
-            {/* Cabeçalho das colunas (telas largas) */}
-            <div
-              className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
-              style={{ gridTemplateColumns: "1fr 76px 76px 28px", color: "#9a9aa8" }}
-            >
-              <span>Função</span>
-              <span className="text-center">Horas antes</span>
-              <span className="text-center">Horas depois</span>
-              <span />
-            </div>
-
-            <div className="space-y-2.5">
-              {linhas.map((l, i) => {
-                const linhaErro = errors[`l${i}cargo`] || errors[`l${i}antes`] || errors[`l${i}depois`];
-                return (
-                  <div
-                    key={i}
-                    className="rounded-xl p-2.5"
-                    style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+          <>
+            {/* Pergunta-chave: havia trabalho manual antes? Define se mostramos a
+                coluna "antes" (economia clássica) ou só "depois" (ninguém antes). */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                Alguém já fazia ou mantinha isso manualmente antes? <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                {([["sim", "Sim, alguém fazia"], ["nao", "Não, ninguém fazia"]] as const).map(([opt, lbl]) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => selectTinhaAntes(opt)}
+                    className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                    style={{
+                      background: tinhaAntes === opt ? "#6b6e00" : "transparent",
+                      color: tinhaAntes === opt ? "#fff" : "#6b6e00",
+                      borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                    }}
                   >
-                    <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 76px 76px 28px" }}>
-                      {/* Função */}
-                      <div className="min-w-0">
-                        <select
-                          aria-label="Função"
-                          value={l.cargo}
-                          onChange={(e) => updateLinha(i, { cargo: e.target.value })}
-                          className="go-select w-full"
-                          style={{
-                            padding: "9px 10px",
-                            borderRadius: "var(--go-radius-md)",
-                            border: errors[`l${i}cargo`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                            background: "var(--go-white)",
-                            fontSize: 13,
-                            color: l.cargo ? "var(--go-text-primary)" : "#8b8b9a",
-                          }}
-                        >
-                          <option value="">Selecione a função...</option>
-                          {CARGOS.map((c) => (
-                            <option key={c.label} value={c.label}>{c.label}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Horas antes */}
-                      <input
-                        type="number" min="0" step="0.5" placeholder="40"
-                        aria-label="Horas por mês antes"
-                        value={l.horasAntes}
-                        onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
-                        className="go-input w-full"
-                        style={{
-                          padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
-                          border: errors[`l${i}antes`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                          background: "var(--go-white)", fontSize: 13,
-                        }}
-                      />
-
-                      {/* Horas depois */}
-                      <input
-                        type="number" min="0" step="0.5" placeholder="2"
-                        aria-label="Horas por mês depois"
-                        value={l.horasDepois}
-                        onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
-                        className="go-input w-full"
-                        style={{
-                          padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
-                          border: errors[`l${i}depois`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                          background: "var(--go-white)", fontSize: 13,
-                        }}
-                      />
-
-                      {/* Remover pessoa */}
-                      {linhas.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => removeLinha(i)}
-                          aria-label="Remover pessoa"
-                          className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
-                          style={{ color: "#b4313b", background: "transparent" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      ) : <span />}
-                    </div>
-
-                    {/* Erro da linha (a economia calculada não é exibida ao usuário) */}
-                    {linhaErro ? (
-                      <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
-                        {linhaErro}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {errors.tinhaAntes && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.tinhaAntes}
+                </div>
+              )}
             </div>
 
-            {/* Adicionar pessoa */}
-            <button
-              type="button"
-              onClick={addLinha}
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
-              style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Adicionar pessoa
-            </button>
+            {/* Tabela só aparece depois de responder sim/não */}
+            {tinhaAntes && (
+              <div>
+                <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  {tinhaAntes === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Quem dedica tempo à automação hoje"} <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                  {tinhaAntes === "sim" ? (
+                    <>
+                      Uma linha por função. Informe as horas/mês <strong>antes</strong> e <strong>depois</strong> da automação.
+                      Se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
+                    </>
+                  ) : (
+                    <>
+                      Ninguém fazia isso manualmente antes. Informe só as horas/mês que cada função
+                      passou a dedicar à automação agora (manutenção, exceções, acompanhamento).
+                    </>
+                  )}
+                </p>
 
-          </div>
+                {/* Cabeçalho das colunas (telas largas) */}
+                <div
+                  className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
+                  style={{ gridTemplateColumns: tinhaAntes === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px", color: "#9a9aa8" }}
+                >
+                  <span>Função</span>
+                  {tinhaAntes === "sim" && <span className="text-center">Horas antes</span>}
+                  <span className="text-center">Horas depois</span>
+                  <span />
+                </div>
+
+                <div className="space-y-2.5">
+                  {linhas.map((l, i) => {
+                    const linhaErro = errors[`l${i}cargo`] || errors[`l${i}antes`] || errors[`l${i}depois`];
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-xl p-2.5"
+                        style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+                      >
+                        <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: tinhaAntes === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px" }}>
+                          {/* Função */}
+                          <div className="min-w-0">
+                            <select
+                              aria-label="Função"
+                              value={l.cargo}
+                              onChange={(e) => updateLinha(i, { cargo: e.target.value })}
+                              className="go-select w-full"
+                              style={{
+                                padding: "9px 10px",
+                                borderRadius: "var(--go-radius-md)",
+                                border: errors[`l${i}cargo`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)",
+                                fontSize: 13,
+                                color: l.cargo ? "var(--go-text-primary)" : "#8b8b9a",
+                              }}
+                            >
+                              <option value="">Selecione a função...</option>
+                              {CARGOS.map((c) => (
+                                <option key={c.label} value={c.label}>{c.label}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Horas antes — só no modo "sim" */}
+                          {tinhaAntes === "sim" && (
+                            <input
+                              type="number" min="0" step="0.5" placeholder="40"
+                              aria-label="Horas por mês antes"
+                              value={l.horasAntes}
+                              onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
+                              className="go-input w-full"
+                              style={{
+                                padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                                border: errors[`l${i}antes`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                              }}
+                            />
+                          )}
+
+                          {/* Horas depois */}
+                          <input
+                            type="number" min="0" step="0.5" placeholder="2"
+                            aria-label="Horas por mês depois"
+                            value={l.horasDepois}
+                            onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
+                            className="go-input w-full"
+                            style={{
+                              padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                              border: errors[`l${i}depois`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                              background: "var(--go-white)", fontSize: 13,
+                            }}
+                          />
+
+                          {/* Remover função */}
+                          {linhas.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removeLinha(i)}
+                              aria-label="Remover função"
+                              className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
+                              style={{ color: "#b4313b", background: "transparent" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          ) : <span />}
+                        </div>
+
+                        {/* Erro da linha (a economia calculada não é exibida ao usuário) */}
+                        {linhaErro ? (
+                          <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                            {linhaErro}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Adicionar função */}
+                <button
+                  type="button"
+                  onClick={addLinha}
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
+                  style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Adicionar função
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Ganho de receita estimado (só para projetos de receita incremental) */}
@@ -1060,7 +1123,8 @@ export function Step3Chat({
   receitaFormLoading,
   formDraft,
   onFormDraftChange,
-  onEditForm,
+  onEditSaving,
+  onEditReceita,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -1090,8 +1154,10 @@ export function Step3Chat({
   receitaFormLoading?: boolean;
   formDraft?: SavingFormData;
   onFormDraftChange?: (d: SavingFormData) => void;
-  // Reabre o formulário determinístico da fase atual (saving/receita) para editar.
-  onEditForm?: () => void;
+  // Reabrem o formulário determinístico para editar. No fluxo "ambos", os dois podem
+  // aparecer na fase de receita (editar saving já validado + editar receita).
+  onEditSaving?: () => void;
+  onEditReceita?: () => void;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview";
@@ -1106,16 +1172,20 @@ export function Step3Chat({
 
   const lastMsg = messages[messages.length - 1];
   const showPreviewActions = lastMsg?.isPreview && !loading;
-  // Botão "Editar dados": só faz sentido com o chat da fase financeira ativo
-  // (não durante a transição, o próprio formulário, ou a revisão final).
-  const canEditForm =
-    !!onEditForm &&
+  // Botões "Editar": só com o chat da fase financeira ativo (não na transição, no
+  // próprio formulário ou na revisão final).
+  const canEditForms =
+    (!!onEditSaving || !!onEditReceita) &&
     isFinancialFase &&
     fase !== "completo" &&
     !isComplete &&
     !showTransition &&
     !showSavingForm &&
     !showReceitaForm;
+  const bothEdits = !!onEditSaving && !!onEditReceita;
+  const editButtons: { key: string; label: string; onClick: () => void }[] = [];
+  if (onEditSaving) editButtons.push({ key: "saving", label: bothEdits ? "Editar saving" : "Editar dados", onClick: onEditSaving });
+  if (onEditReceita) editButtons.push({ key: "receita", label: bothEdits ? "Editar receita" : "Editar dados", onClick: onEditReceita });
   const hasOptions = lastMsg?.role === "assistant" && lastMsg.options && !isComplete && !showPreviewActions;
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1169,37 +1239,43 @@ export function Step3Chat({
           </div>
         </div>
 
-        {/* Voltar ao formulário determinístico da fase para editar os dados */}
-        {canEditForm && (
-          <button
-            type="button"
-            onClick={onEditForm}
-            disabled={loading}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all"
-            style={{
-              background: "rgba(215,219,0,0.08)",
-              border: "1.5px solid rgba(215,219,0,0.25)",
-              color: "#6b6e00",
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.5 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (loading) return;
-              e.currentTarget.style.background = "rgba(215,219,0,0.16)";
-              e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(215,219,0,0.08)";
-              e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
-            }}
-            title="Voltar ao formulário para editar os dados informados"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Editar dados
-          </button>
+        {/* Voltar ao(s) formulário(s) determinístico(s) para editar os dados */}
+        {canEditForms && (
+          <div className="flex shrink-0 items-center gap-2">
+            {editButtons.map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={b.onClick}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all"
+                style={{
+                  background: "rgba(215,219,0,0.08)",
+                  border: "1.5px solid rgba(215,219,0,0.25)",
+                  color: "#6b6e00",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  opacity: loading ? 0.5 : 1,
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => {
+                  if (loading) return;
+                  e.currentTarget.style.background = "rgba(215,219,0,0.16)";
+                  e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(215,219,0,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
+                }}
+                title="Voltar ao formulário para editar os dados informados"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                {b.label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
