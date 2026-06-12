@@ -35,7 +35,7 @@ export const Route = createFileRoute("/submeter")({
 
 const emptyFormDraft = (): SavingFormData => ({
   linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
-  tinhaAntes: "",
+  alguemFazia: "",
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
@@ -703,7 +703,7 @@ function SubmeterPage() {
         {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual",
-          tinha_pessoa_antes: formData.tinhaAntes || undefined,
+          alguem_fazia: formData.alguemFazia || undefined,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
         },

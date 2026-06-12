@@ -40,7 +40,7 @@ const SCHEMA_SQL = `
     memorial_calculo TEXT,
     custo_externo_mensal REAL,
     ganho_total_mensal REAL,
-    tinha_pessoa_antes TEXT,
+    alguem_fazia TEXT,
     submitted_at TEXT,
     validated_at TEXT,
     validated_by TEXT,
@@ -125,8 +125,12 @@ const MIGRATIONS = [
   'ALTER TABLE analises ADD COLUMN resumo TEXT',
   'ALTER TABLE projetos ADD COLUMN ganho_total_mensal REAL',
   'ALTER TABLE projetos ADD COLUMN complexidade TEXT',
-  // Saving: havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao')
-  'ALTER TABLE projetos ADD COLUMN tinha_pessoa_antes TEXT',
+  // Saving: havia alguém fazendo o processo manualmente antes da automação? ('sim'|'nao')
+  // Renomeado de tinha_pessoa_antes → alguem_fazia (mais descritivo). O RENAME cobre
+  // bancos que já receberam a coluna antiga; o ADD é fallback para bancos novos.
+  // Ambos em try/catch: o que não se aplicar é ignorado silenciosamente.
+  'ALTER TABLE projetos RENAME COLUMN tinha_pessoa_antes TO alguem_fazia',
+  'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
 ];
 
 export async function initSchema(db: GoDeployDB) {

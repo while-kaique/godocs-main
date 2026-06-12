@@ -298,7 +298,7 @@ const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
   // Havia alguém fazendo/mantendo o processo manualmente antes da automação?
-  tinha_pessoa_antes: z.enum(['sim', 'nao']).optional(),
+  alguem_fazia: z.enum(['sim', 'nao']).optional(),
   linhas: z.array(z.object({
     cargo: z.string(),
     horas_antes: z.number().min(0),
@@ -538,8 +538,8 @@ export async function iniciarSaving(rawData: unknown) {
   await deleteChatMessagesAfterFaseMarker(data.projeto_id, 'saving');
 
   // Persiste no projeto se havia trabalho manual antes (coluna mapeada no n8n/SQL).
-  if (data.tinha_pessoa_antes) {
-    await updateProjeto(data.projeto_id, { tinha_pessoa_antes: data.tinha_pessoa_antes });
+  if (data.alguem_fazia) {
+    await updateProjeto(data.projeto_id, { alguem_fazia: data.alguem_fazia });
   }
 
   const ctx = await getProjetoContexto(data.projeto_id);
@@ -904,7 +904,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         tipo_saving: (saving?.tipo_saving as string) ?? '',
         memorial_calculo: (saving?.memorial_calculo as string) ?? '',
         // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
-        tinha_pessoa_antes: projeto.tinha_pessoa_antes ?? '',
+        alguem_fazia: projeto.alguem_fazia ?? '',
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
