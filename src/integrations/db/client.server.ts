@@ -568,6 +568,7 @@ export type ProjetoRow = {
   custo_externo_mensal: number | null;
   ganho_total_mensal: number | null;
   complexidade: string | null;
+  tinha_pessoa_antes: string | null; // 'sim' | 'nao' — havia trabalho manual antes
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
