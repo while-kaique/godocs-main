@@ -703,6 +703,7 @@ function SubmeterPage() {
         {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          tinha_pessoa_antes: formData.tinhaAntes || undefined,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
         },
