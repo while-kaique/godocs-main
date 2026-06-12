@@ -236,7 +236,7 @@ doc → doc_preview → [transição animada 3s] → saving   → saving_preview
 - Cor do chat: azul (--go-blue) · Header: "Documentação Técnica"
 - **Pré-extração** (`extractor.ts`): antes do chat, 1 chamada ao LLM (temp 0) lê o material enviado (código-fonte ou documentação prévia — ambos aceitos sem questionamento) e preenche os 7 campos. Campos **técnicos** (execução, dependências, fluxo, configurar_antes) saem do material; campos de **negócio** (o_que_faz, atenção) ficam null se não revelados
 - O chat **só pergunta o que ficou null** — não reconfirma o que já foi extraído
-- Se o extractor preencheu todos os 7, o orquestrador gera o **preview direto** (zero perguntas)
+- Se o extractor preencheu todos os 7, o orquestrador gera o **preview direto** (zero perguntas) com uma nota convidando o usuário a pedir ajustes caso precise complementar algo — o ciclo de revisão do `doc_preview` cuida disso
 - 1 pergunta por vez, cética (não aceita respostas vagas — mantém null e aprofunda)
 - Na aprovação, IA gera resumo interno do projeto (3-5 frases) para contexto da fase 2
 

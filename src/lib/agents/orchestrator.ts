@@ -437,11 +437,7 @@ export async function runOrchestrator(
       const muitosPreenchidos = camposPreenchidos >= 5;
       let sistemaMsg: string;
       if (todosPreenchidos) {
-        sistemaMsg = `[SISTEMA] O extrator preencheu os 7 campos a partir do código. Antes de gerar o preview, avalie CRITICAMENTE:
-1. O campo "o_que_faz" explica o PROPÓSITO DE NEGÓCIO (para quem, que problema resolve) ou apenas descreve tecnicamente o que o código faz? Se for apenas técnico, pergunte ao usuário o contexto de negócio.
-2. O campo "atencao" lista riscos ESPECÍFICOS e relevantes ou apenas observações genéricas/óbvias? Se genérico, pergunte ao usuário se há riscos reais.
-3. Os arquivos parecem cobrir o projeto INTEIRO ou apenas uma parte (ex: só frontend, só um módulo, poucos arquivos)?${ctx.descricao_breve?.trim() ? ` A descrição do usuário diz: "${ctx.descricao_breve.trim()}" — o que foi extraído cobre esse escopo?` : ''}
-Se TODOS os campos estiverem ricos e completos com contexto de negócio, gere o PREVIEW DIRETO sem cumprimentos. Caso contrário, faça a pergunta mais relevante (UMA só). Não liste o que foi extraído.`;
+        sistemaMsg = `[SISTEMA] O extrator preencheu os 7 campos a partir dos arquivos enviados. Gere o PREVIEW DIRETO — sem cumprimentos, sem perguntas, sem listar o que foi extraído. No final do preview, adicione uma nota curta e natural convidando o usuário a pedir ajustes caso alguma seção precise de mais contexto ou correções (ex: "Se algum ponto precisar de mais detalhe ou correção, é só pedir ajustes.").`;
       } else if (muitosPreenchidos) {
         const nulos = Object.entries(coletado).filter(([, v]) => v === null).map(([k]) => k).join(', ');
         sistemaMsg = `[SISTEMA] O sistema leu os arquivos e preencheu ${camposPreenchidos}/7 campos do código. Os campos ainda em null (${nulos}) precisam de contexto de negócio que não está no código. Cumprimente em 1 frase curta explicando que a análise técnica está pronta e você precisa de mais contexto, depois faça UMA pergunta objetiva sobre o campo null mais relevante.`;
