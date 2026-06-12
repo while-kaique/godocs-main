@@ -317,18 +317,31 @@ export async function deleteChatMessagesAfterFaseMarker(projetoId: string, fase:
   const rows = await queryAll<{ id: string; role: string; content: string }>(
     'SELECT id, role, content FROM chat_messages WHERE projeto_id = ? ORDER BY created_at', [projetoId]
   );
-  let markerIdx = -1;
+  // 1) Marcador de transição (type:complete + fase): a conversa da fase vem DEPOIS
+  //    dele; o marcador é mantido.
+  // 2) Fallback: quando a fase foi ADICIONADA depois (ex.: a pessoa concluiu o saving
+  //    e voltou à etapa 2 para marcar receita), não há transição/marcador. Aí
+  //    ancoramos na PRIMEIRA mensagem da própria fase (startIdx = i-1), de modo que
+  //    a limpeza apague a conversa da fase inteira (inclusive a mensagem de abertura).
+  let startIdx = -1;
   for (let i = 0; i < rows.length; i++) {
     if (rows[i].role !== 'assistant') continue;
     try {
       const parsed = JSON.parse(rows[i].content) as { type?: string; fase?: string };
-      if (parsed.type === 'complete' && parsed.fase === fase) { markerIdx = i; break; }
-    } catch {
-      // mensagem não-JSON (ex.: role 'doc') — ignora
+      if (parsed.type === 'complete' && parsed.fase === fase) { startIdx = i; break; }
+    } catch { /* não-JSON (ex.: role 'doc') — ignora */ }
+  }
+  if (startIdx < 0) {
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].role !== 'assistant') continue;
+      try {
+        const parsed = JSON.parse(rows[i].content) as { fase?: string };
+        if (parsed.fase === fase) { startIdx = i - 1; break; }
+      } catch { /* ignora */ }
     }
   }
-  if (markerIdx < 0) return; // a fase nunca iniciou via transição — nada a limpar
-  const idsToDelete = rows.slice(markerIdx + 1).map((r) => r.id);
+  if (startIdx < 0) return; // a fase nunca iniciou — nada a limpar
+  const idsToDelete = rows.slice(startIdx + 1).map((r) => r.id);
   for (const id of idsToDelete) {
     await exec('DELETE FROM chat_messages WHERE id = ?', [id]);
   }
