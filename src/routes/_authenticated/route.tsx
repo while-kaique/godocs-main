@@ -1,13 +1,23 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
-import { LayoutDashboard, Building2, Settings, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
+    console.log("[_authenticated] beforeLoad — chamando /api/auth/me...");
     const response = await fetch("/api/auth/me");
+    console.log("[_authenticated] /api/auth/me status:", response.status);
     const user: CurrentUser | null = response.ok ? ((await response.json()) as CurrentUser | null) : null;
-    if (!user) throw redirect({ to: "/" });
-    if (!user.isAdmin) throw redirect({ to: "/" });
+    console.log("[_authenticated] user:", JSON.stringify(user));
+    if (!user) {
+      console.log("[_authenticated] user=null → redirecionando para /");
+      throw redirect({ to: "/" });
+    }
+    if (!user.isAdmin) {
+      console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
+      throw redirect({ to: "/" });
+    }
+    console.log("[_authenticated] Auth OK — admin:", user.email);
     return { user };
   },
   component: AuthenticatedLayout,
@@ -36,6 +46,9 @@ function AuthenticatedLayout() {
           <NavItem to="/configuracoes" icon={<Settings className="h-4 w-4" />}>
             Configurações
           </NavItem>
+          <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
+            Testes
+          </NavItem>
           <Link
             to="/"
             className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -54,7 +67,7 @@ function AuthenticatedLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
     </div>

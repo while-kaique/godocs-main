@@ -14,7 +14,7 @@ const err = (...args: unknown[]) => console.error('[analyzer]', ...args);
 
 // ─── Critérios hardcoded ────────────────────────────────────────────────────
 
-const CRITERIOS_HARDCODED = [
+export const CRITERIOS_HARDCODED = [
   {
     id: 'proposito_claro',
     nome: 'Propósito de negócio claro',
@@ -79,7 +79,7 @@ const CRITERIOS_HARDCODED = [
 
 // ─── System prompt ──────────────────────────────────────────────────────────
 
-function buildSystemPrompt(): string {
+export function buildSystemPrompt(): string {
   const criteriosStr = CRITERIOS_HARDCODED.map(
     (c, i) => `${i + 1}. **${c.nome}** (id: ${c.id}): ${c.descricao}`
   ).join('\n');

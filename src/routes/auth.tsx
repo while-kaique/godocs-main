@@ -5,6 +5,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 // valida o acesso e redireciona para / se não autorizado.
 export const Route = createFileRoute("/auth")({
   beforeLoad: async () => {
+    console.log("[auth] Redirecionando para /dashboard...");
     throw redirect({ to: "/dashboard" });
   },
   component: () => null,
