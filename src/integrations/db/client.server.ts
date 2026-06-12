@@ -301,6 +301,39 @@ export function deleteChatMessagesByProjeto(projetoId: string) {
   return exec('DELETE FROM chat_messages WHERE projeto_id = ?', [projetoId]);
 }
 
+/**
+ * Remove as mensagens de uma fase financeira (saving|receita) a partir do marcador
+ * de transição — a mensagem `type:'complete', fase:<alvo>` que abriu a fase. O
+ * marcador (e tudo antes dele: doc + resumo do projeto) é mantido; só a conversa
+ * da fase é apagada.
+ *
+ * Usado quando a pessoa volta ao formulário determinístico para editar os dados e
+ * reinicia a fase: a conversa anterior estava ancorada nos números antigos e, se
+ * mantida, voltaria a aparecer no histórico do agente (buildPhaseHistory). Na
+ * primeira vez que a fase inicia ainda não há mensagens após o marcador, então
+ * isto é um no-op — chamar sempre é seguro e idempotente.
+ */
+export async function deleteChatMessagesAfterFaseMarker(projetoId: string, fase: 'saving' | 'receita') {
+  const rows = await queryAll<{ id: string; role: string; content: string }>(
+    'SELECT id, role, content FROM chat_messages WHERE projeto_id = ? ORDER BY created_at', [projetoId]
+  );
+  let markerIdx = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].role !== 'assistant') continue;
+    try {
+      const parsed = JSON.parse(rows[i].content) as { type?: string; fase?: string };
+      if (parsed.type === 'complete' && parsed.fase === fase) { markerIdx = i; break; }
+    } catch {
+      // mensagem não-JSON (ex.: role 'doc') — ignora
+    }
+  }
+  if (markerIdx < 0) return; // a fase nunca iniciou via transição — nada a limpar
+  const idsToDelete = rows.slice(markerIdx + 1).map((r) => r.id);
+  for (const id of idsToDelete) {
+    await exec('DELETE FROM chat_messages WHERE id = ?', [id]);
+  }
+}
+
 export function getDocMessage(projetoId: string) {
   return queryOne<{ content: string }>(
     "SELECT content FROM chat_messages WHERE projeto_id = ? AND role = 'doc' LIMIT 1",

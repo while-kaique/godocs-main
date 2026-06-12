@@ -101,6 +101,10 @@ function SubmeterPage() {
   // Rascunho do formulário de impacto (SavingForm) — vive no pai para persistir
   // quando o usuário navega para fora da etapa 3 e volta (o step 3 desmonta).
   const [formDraft, setFormDraft] = useState<SavingFormData>(emptyFormDraft);
+  // Snapshot do que foi enviado por último na fase financeira atual. Se a pessoa
+  // reabre o formulário ("Editar dados") e reenvia sem mudar nada, comparamos com
+  // este snapshot e voltamos ao chat existente sem reanalisar. Reseta a cada fase.
+  const [submittedImpactForm, setSubmittedImpactForm] = useState<SavingFormData | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnaliseResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -441,6 +445,7 @@ function SubmeterPage() {
       setApprovedReceitaPreview(null);
       setChatComplete(false);
       setFormDraft(emptyFormDraft());
+      setSubmittedImpactForm(null);
 
       if (result.reset && result.response) {
         const msg: ChatMessage = {
@@ -531,6 +536,8 @@ function SubmeterPage() {
           setChatComplete(false);
           setApprovedSavingPreview(null);
           setApprovedReceitaPreview(null);
+          setFormDraft(emptyFormDraft()); // fase de impacto recomeça → form em branco
+          setSubmittedImpactForm(null);
           setShowSavingForm(querSaving);
           setShowReceitaForm(!querSaving);
           setChatFase(querSaving ? "saving" : "receita");
@@ -591,6 +598,8 @@ function SubmeterPage() {
         setTimeout(() => {
           setShowTransition(false);
           setChatMessages([]);
+          setFormDraft(emptyFormDraft()); // fase nova → formulário em branco
+          setSubmittedImpactForm(null);
           setShowSavingForm(true);
         }, 3000);
       } else if (transitionToReceita) {
@@ -607,6 +616,8 @@ function SubmeterPage() {
         setTimeout(() => {
           setShowTransition(false);
           setChatMessages([]);
+          setFormDraft(emptyFormDraft()); // fase nova → formulário em branco
+          setSubmittedImpactForm(null);
           setShowReceitaForm(true);
         }, 3000);
       } else {
@@ -640,6 +651,12 @@ function SubmeterPage() {
   /* ── Saving form: envia dados determinísticos e inicia chat ── */
   async function handleSavingFormSubmit(formData: SavingFormData) {
     if (!projetoId) return;
+    // Reabriu o formulário e reenviou sem mudar nada → não reanalisa, só volta ao
+    // chat exatamente onde estava (as mensagens da fase continuam em memória).
+    if (submittedImpactForm && JSON.stringify(formData) === JSON.stringify(submittedImpactForm)) {
+      setShowSavingForm(false);
+      return;
+    }
     setSavingFormLoading(true);
     try {
       const custoMensal = formData.custoExterno
@@ -666,8 +683,13 @@ function SubmeterPage() {
         },
       );
       setShowSavingForm(false);
-      // Submetido → zera o rascunho (no fluxo "ambos", o form de receita começa limpo).
-      setFormDraft(emptyFormDraft());
+      // Registra o que foi enviado para detectar "nada mudou" num próximo reenvio.
+      setSubmittedImpactForm(formData);
+      // Preview de saving aprovado anteriormente deixa de valer ao reiniciar a fase.
+      setApprovedSavingPreview(null);
+      // O rascunho é PRESERVADO (não zeramos aqui): permite voltar ao formulário
+      // pelo botão "Editar dados" sem perder o que foi preenchido. O reset acontece
+      // só ao ENTRAR numa nova fase (transições e re-roteamento por troca de tipo).
       const savingMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -690,6 +712,11 @@ function SubmeterPage() {
   /* ── Receita form: inicia fase receita incremental ── */
   async function handleReceitaFormSubmit(formData: SavingFormData) {
     if (!projetoId) return;
+    // Reenvio idêntico → volta ao chat existente sem reanalisar.
+    if (submittedImpactForm && JSON.stringify(formData) === JSON.stringify(submittedImpactForm)) {
+      setShowReceitaForm(false);
+      return;
+    }
     setReceitaFormLoading(true);
     try {
       const valorReceita = formData.valorReceita ? parseFloat(formData.valorReceita) : undefined;
@@ -703,7 +730,11 @@ function SubmeterPage() {
         },
       );
       setShowReceitaForm(false);
-      setFormDraft(emptyFormDraft());
+      // Registra o que foi enviado para detectar "nada mudou" num próximo reenvio.
+      setSubmittedImpactForm(formData);
+      // Preview de receita aprovado anteriormente deixa de valer ao reiniciar a fase.
+      setApprovedReceitaPreview(null);
+      // Rascunho preservado para o botão "Editar dados" (reset só na entrada da fase).
       const receitaMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -720,6 +751,20 @@ function SubmeterPage() {
       toast.error(`Erro ao iniciar análise de receita: ${msg}`);
     } finally {
       setReceitaFormLoading(false);
+    }
+  }
+
+  /* ── Voltar ao formulário determinístico da fase atual para editar os dados ── */
+  // A pessoa pode ter errado as horas/cargo (saving) ou o valor/racional (receita)
+  // e só perceber dentro do chat. Reabrir o formulário recoloca o rascunho (que
+  // agora é preservado) para edição; ao reenviar, a fase reinicia e o backend
+  // descarta a conversa antiga (deleteChatMessagesAfterFaseMarker).
+  function handleEditarFormulario() {
+    if (chatLoading) return;
+    if (chatFase === "saving" || chatFase === "saving_preview") {
+      setShowSavingForm(true);
+    } else if (chatFase === "receita" || chatFase === "receita_preview") {
+      setShowReceitaForm(true);
     }
   }
 
@@ -984,6 +1029,7 @@ function SubmeterPage() {
                   receitaFormLoading={receitaFormLoading}
                   formDraft={formDraft}
                   onFormDraftChange={setFormDraft}
+                  onEditForm={handleEditarFormulario}
                 />
               </StepAnimation>
             )}
