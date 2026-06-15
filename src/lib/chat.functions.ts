@@ -486,10 +486,17 @@ export async function enviarMensagem(rawData: unknown) {
     content: data.content,
     selected_option: data.selected_option ?? null,
   });
+
+  // Se houve transição de fase (ex: doc_preview→saving), preserva a fase de
+  // origem no JSON para que o Investigador agrupe a mensagem na fase correta.
+  const persistido = resultado.fase !== estado.fase
+    ? { ...resultado, fase_origem: estado.fase }
+    : resultado;
+
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
-    content: JSON.stringify(resultado),
+    content: JSON.stringify(persistido),
     options: resultado.type === 'options' ? resultado.options : null,
   });
 

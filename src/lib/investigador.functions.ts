@@ -113,7 +113,9 @@ function inferFaseAtual(messages: ChatMessageRow[]): FaseAtual {
 
 function computeTimeSinceStart(createdAt: string | null): number | null {
   if (!createdAt) return null
-  const start = new Date(createdAt + 'Z').getTime()
+  // Suporta tanto ISO ("2026-06-15T12:00:00.000Z") quanto datetime SQLite ("2026-06-15 12:00:00")
+  const normalized = createdAt.endsWith('Z') || createdAt.includes('+') ? createdAt : createdAt + 'Z'
+  const start = new Date(normalized).getTime()
   if (isNaN(start)) return null
   return Math.round((Date.now() - start) / 60_000) // minutos
 }
@@ -224,8 +226,10 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
     let parsedType: string | null = null
     if (m.role === 'assistant') {
       try {
-        const parsed = JSON.parse(m.content) as { fase?: string; type?: string }
-        parsedFase = parsed.fase ?? null
+        const parsed = JSON.parse(m.content) as { fase?: string; fase_origem?: string; type?: string }
+        // Usa fase_origem (se presente) para agrupar mensagens de transição
+        // na fase correta (ex: complete de doc_preview não cai no grupo saving)
+        parsedFase = parsed.fase_origem ?? parsed.fase ?? null
         parsedType = parsed.type ?? null
       } catch {
         // não-JSON
@@ -248,7 +252,7 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
     nome: p.nome,
     responsavel_nome: p.responsavel_nome,
     responsavel_email: p.responsavel_email,
-    area_nome: p.area_nome,
+    area_nome: p.area_nome ?? p.area,
     ferramenta: p.ferramenta,
     escopo: p.escopo,
     status: p.status,
