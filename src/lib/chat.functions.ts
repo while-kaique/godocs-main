@@ -903,30 +903,39 @@ export async function submeterParaValidacao(rawData: unknown) {
       const membros = parseJson<string[]>(projeto.membros) ?? [];
       const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
+      // Campos de texto/categóricos sem informação chegam na planilha como "—"
+      // (em vez de célula em branco). Não aplicar a numéricos — 0 é valor real
+      // e vira "—" quebraria somas/fórmulas no Sheets.
+      const ouTraco = (v: string | null | undefined): string =>
+        v != null && v.trim() !== '' ? v : '—';
+
       const n8nPayload = {
         projeto_id: projeto_id,
-        responsavel_nome: projeto.responsavel_nome,
-        responsavel_email: projeto.responsavel_email,
-        area: projeto.area ?? '—',
-        ferramenta: projeto.ferramenta,
-        escopo: projeto.escopo ?? null,
+        responsavel_nome: ouTraco(projeto.responsavel_nome),
+        responsavel_email: ouTraco(projeto.responsavel_email),
+        area: ouTraco(projeto.area),
+        ferramenta: ouTraco(projeto.ferramenta),
+        escopo: ouTraco(projeto.escopo),
         membros,
-        nome_projeto: projeto.nome ?? '',
-        descricao_breve: projeto.descricao_breve ?? '',
+        nome_projeto: ouTraco(projeto.nome),
+        descricao_breve: ouTraco(projeto.descricao_breve),
+        // NÃO usar ouTraco aqui: o n8n já converte data ausente em "—" (ramo
+        // falsy do ternário "Formatar Dados"). Mandar "—" cairia no split("-")
+        // e geraria "undefined/undefined/—". Enviar a data crua ou null.
         data_criacao_projeto: projeto.data_criacao_projeto ?? null,
         tipos_projeto: tiposProjeto,
         status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,
-        tipo_saving: (saving?.tipo_saving as string) ?? '',
-        memorial_calculo: memorialLimpo ?? '',
+        tipo_saving: ouTraco(saving?.tipo_saving as string | undefined),
+        memorial_calculo: ouTraco(memorialLimpo),
         // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
-        alguem_fazia: projeto.alguem_fazia ?? '',
+        alguem_fazia: ouTraco(projeto.alguem_fazia),
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
-        tipo_receita: (receita?.tipo_saving as string) ?? '',
-        receita_memorial: receitaMemorialLimpo ?? '',
+        tipo_receita: ouTraco(receita?.tipo_saving as string | undefined),
+        receita_memorial: ouTraco(receitaMemorialLimpo),
         ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
         documentacao: conteudo,
       };
