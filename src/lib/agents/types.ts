@@ -113,6 +113,10 @@ export type ResultadoAnalise = {
   justificativa: string;
   resumo: string;
   complexidade: Complexidade;
+  // Gate determinístico: o LLM declara se há uma IA decidindo o caminho/ação do
+  // processo. Se false, a complexidade é forçada para 'automacao' no backend
+  // (evita classificar automação sofisticada/sem IA como 'inteligencia').
+  ia_decide_caminho?: boolean;
   criterios_hardcoded: CriterioResult[];
   criterios_dinamicos: CriterioResult[];
 };
