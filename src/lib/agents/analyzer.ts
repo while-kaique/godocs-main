@@ -158,16 +158,32 @@ Além da justificativa completa, gere um campo "resumo": um texto curto (2-4 fra
 
 ## CLASSIFICAÇÃO DE COMPLEXIDADE
 
-Classifique o projeto em EXATAMENTE um dos 3 níveis de complexidade, analisando a documentação técnica em conjunto com a descrição breve:
+Classifique o projeto em EXATAMENTE um dos 3 níveis, analisando a documentação técnica em conjunto com a descrição breve.
 
-- **"automacao"**: Nível básico. O projeto apenas automatiza algo que antes era manual ou mais complexo. Não usa IA de forma significativa — é uma automação direta de processo (ex: RPA que preenche planilha, bot que envia e-mails, script que move arquivos).
-- **"inteligencia"**: Nível intermediário. O projeto usa IA para analisar ou executar atividades de forma minimamente inteligente, mudando o processo de alguma forma significativa. A IA tem papel ativo na tomada de decisão ou análise (ex: classificação automática de tickets, análise de sentimento, extração inteligente de dados).
-- **"autonomia"**: Nível mais alto. O projeto elimina completamente ou quase completamente o envolvimento humano do processo E ao mesmo tempo utiliza IA de forma inteligente. A combinação de automação total + IA é o que define este nível (ex: agente que resolve tickets sozinho, pipeline que processa e decide sem intervenção humana).
+REGRA CENTRAL: o que separa os níveis NÃO é "ter ou não uma LLM/IA". É o **papel** que a IA exerce no processo. Uma LLM que apenas AJUDA a pessoa numa etapa — resume, gera rascunho, extrai, traduz, responde, organiza — sem decidir o rumo do processo é **"automacao"**, NÃO "inteligencia". Usar a ferramenta "Claude" (ou qualquer LLM) por si só NÃO eleva a complexidade.
 
-Critérios para decidir:
-1. O projeto usa IA (LLM, ML, NLP, visão computacional, etc.) de forma ativa? Se NÃO → "automacao"
-2. Se SIM, a IA é usada para análise/decisão mas ainda requer intervenção humana significativa? → "inteligencia"
-3. Se a IA é usada E o processo roda de ponta a ponta sem (ou quase sem) intervenção humana? → "autonomia"
+Os 3 níveis, pela ESSÊNCIA:
+
+- **"automacao"** — gatilho. O processo dispara por um trigger (agendamento, evento, ação manual, abertura de uma tela/formulário/dashboard) e segue um caminho fixo/determinístico. NÃO há IA decidindo o rumo. Inclui tanto projetos sem IA quanto projetos onde a LLM é só uma ferramenta auxiliar dentro de um fluxo conduzido por uma pessoa ou por regras fixas. Ex: RPA que preenche planilha; n8n agendado que move dados; app/dashboard que organiza um cadastro; LLM que resume um documento para a pessoa ler e decidir.
+- **"inteligencia"** — julgamento. A IA DECIDE qual caminho/ação tomar com base no conteúdo (faz o julgamento), mas o humano ainda está no loop conduzindo ou executando — tipicamente alguém abre uma tela (dashboard, formulário, chat) e age sobre o que a IA indicou. A inteligência está em a IA ESCOLHER o caminho, não em apenas processar/gerar texto. Ex: IA que classifica e roteia um ticket; IA que decide aprovar/escalar e a pessoa confirma; análise que recomenda a próxima ação para o operador.
+- **"autonomia"** — execução. A IA decide o caminho E executa de ponta a ponta, com pouca ou nenhuma intervenção humana. É um agente que age sozinho. Ex: agente (ex.: uma skill .md executada no Claude) que recebe a tarefa, decide e resolve sozinho; pipeline que processa, decide e age sem humano no meio.
+
+ÁRVORE DE DECISÃO (use exatamente esta lógica, nesta ordem):
+1. Existe uma IA DECIDINDO o caminho/ação do processo (julgamento sobre o conteúdo)? Se **NÃO** → **"automacao"** — mesmo que o projeto use uma LLM apenas como auxiliar e mesmo que rode sozinho por agendamento.
+2. Se **SIM**, o processo age/executa de ponta a ponta com pouca ou nenhuma intervenção humana (ninguém precisa abrir uma tela para conduzir/agir)?
+   - Há humano no loop conduzindo (alguém abre tela/dashboard/formulário/chat e executa) → **"inteligencia"**.
+   - Roda e age sozinho, sem humano conduzindo (agente autônomo) → **"autonomia"**.
+
+ANTIPADRÃO — ERRO COMUM, NÃO COMETA:
+- Projeto sofisticado, abrangente, com MUITAS integrações, painel/dashboard elaborado, ou que "muda bastante o processo / substitui o trabalho manual" NÃO é, por isso, "inteligencia". **Sofisticação de engenharia ≠ inteligência.** Orquestrar dados e ações (puxar de sistemas como Protheus/Metabase/planilhas, notificar pessoas, montar e disparar e-mails) é "automacao" — por mais completo que seja — SE não há uma IA escolhendo o que fazer.
+- Se a submissão NÃO menciona NENHUMA IA/LLM/modelo/classificador/ML tomando uma decisão sobre o conteúdo, a complexidade é OBRIGATORIAMENTE "automacao". Na dúvida entre "automacao" e "inteligencia", escolha **"automacao"**.
+
+EXEMPLOS:
+- "Painel interno que recebe avisos de planilhas com um clique, puxa nº e status de pedidos do Protheus, notifica aprovadores e monta/envia e-mail aos fornecedores, substituindo controle manual por Excel/Metabase" → **automacao** (orquestra dados e ações; NENHUMA IA decide o caminho).
+- "Robô que lê e-mails e CLASSIFICA cada um por assunto usando IA, roteando para a fila certa; um analista trata a fila" → **inteligencia** (a IA decide o roteamento; humano no loop).
+- "Agente que recebe o chamado, decide a solução e responde o cliente sozinho" → **autonomia**.
+
+Antes de escolher a complexidade, responda objetivamente: **existe uma IA decidindo o caminho/ação sobre o conteúdo?** Reporte essa resposta no campo booleano "ia_decide_caminho". Se for false, a complexidade DEVE ser "automacao".
 
 ## FORMATO DE RESPOSTA
 
@@ -185,6 +201,7 @@ IMPORTANTE:
   "pontuacao_maxima": <number>,
   "justificativa": "<texto detalhado em markdown com seções ## Pontos fortes, ## Pontos de atenção, ## Conclusão, ## Recomendações>",
   "resumo": "<2-4 frases claras resumindo o resultado para o usuário>",
+  "ia_decide_caminho": true | false,
   "complexidade": "automacao" | "inteligencia" | "autonomia",
   "criterios_hardcoded": [
     ...apenas os mais relevantes entre os 10 fixos (max 4 aprovados + max 4 reprovados)...
@@ -309,6 +326,14 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   const COMPLEXIDADES_VALIDAS: Complexidade[] = ['automacao', 'inteligencia', 'autonomia'];
   if (!resultado.complexidade || !COMPLEXIDADES_VALIDAS.includes(resultado.complexidade)) {
     resultado.complexidade = 'automacao'; // fallback conservador
+  }
+  // Gate determinístico: sem IA decidindo o caminho, não há "inteligencia" nem
+  // "autonomia" — é "automacao", por mais sofisticada que seja a engenharia. O
+  // modelo erra ao equiparar abrangência/integrações/dashboard a "inteligência";
+  // o booleano (pergunta focada) é bem mais confiável que a escolha entre 3 rótulos.
+  if (resultado.ia_decide_caminho === false && resultado.complexidade !== 'automacao') {
+    log(`Complexidade rebaixada para 'automacao' (ia_decide_caminho=false; LLM havia sugerido '${resultado.complexidade}')`);
+    resultado.complexidade = 'automacao';
   }
 
   // O LLM avalia todos os critérios internamente mas retorna só os mais relevantes.

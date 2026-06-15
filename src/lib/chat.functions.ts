@@ -42,6 +42,7 @@ import type {
   SavingLinha,
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
+import { recomputarSavingFinanceiro } from '@/lib/agents/saving-calc';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -507,7 +508,12 @@ export async function enviarMensagem(rawData: unknown) {
     if (docRow) {
       const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
       const tiposProjetoCtx = getTiposProjeto(ctx);
-      if (tiposProjetoCtx.includes('saving')) doc.saving = resultado.saving;
+      if (tiposProjetoCtx.includes('saving')) {
+        // R$ é sempre re-derivado das horas (o LLM pode ter reajustado horas sem
+        // recalcular o valor) — ver recomputarSavingFinanceiro.
+        const projetoCompleto = await getProjetoById(data.projeto_id);
+        doc.saving = recomputarSavingFinanceiro(resultado.saving, projetoCompleto?.custo_externo_mensal ?? 0);
+      }
       if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
       await upsertDocumentacao(data.projeto_id, doc);
     }
@@ -824,15 +830,16 @@ export async function analisarProjetoFn(rawData: unknown) {
   if (n8nUpdateUrl) {
     try {
       const projeto = await getProjetoById(projeto_id);
-      const statusLabel =
-        projeto?.status === 'aprovado' ? 'Aprovado'
-        : projeto?.status === 'em_validacao' ? 'Pendente'
-        : projeto?.status ?? 'Rascunho';
+      // NÃO enviar `status` aqui. O update roda em background após a submissão e
+      // o status no banco ainda é o de submissão (ex: 'em_validacao' p/ não-RPA).
+      // A aprovação de projetos não-RPA é feita manualmente na planilha pelos
+      // líderes — reenviar o status aqui SOBRESCREVIA essa aprovação com "Pendente".
+      // O Status é responsabilidade exclusiva do webhook de submissão + planilha;
+      // este update só carrega complexidade + observações.
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
         observacoes: observacoes ?? '',
-        status: statusLabel,
       };
 
       const resp = await fetch(n8nUpdateUrl, {
@@ -862,11 +869,21 @@ export async function submeterParaValidacao(rawData: unknown) {
   if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
-  const saving = conteudo.saving as Record<string, unknown> | undefined;
 
   const projeto = await getProjetoById(projeto_id);
 
   if (!projeto) throw new Error('Projeto não encontrado.');
+
+  // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
+  // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
+  // por uma versão anterior ou por um turno que não passou pelo recálculo.
+  if (conteudo.saving && typeof conteudo.saving === 'object') {
+    conteudo.saving = recomputarSavingFinanceiro(
+      conteudo.saving as SavingColetado,
+      projeto.custo_externo_mensal ?? 0,
+    );
+  }
+  const saving = conteudo.saving as Record<string, unknown> | undefined;
 
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
