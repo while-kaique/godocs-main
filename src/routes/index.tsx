@@ -20,7 +20,7 @@ const WEBHOOKS = {
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
-    acesso_negado: search.acesso_negado === true || search.acesso_negado === "true",
+    acesso_negado: search.acesso_negado === true || search.acesso_negado === "true" ? true : undefined,
   }),
   head: () => ({
     meta: [

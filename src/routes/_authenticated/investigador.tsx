@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import {
   Search,
@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Activity,
   ChevronRight,
+  ChevronDown,
   ArrowLeft,
   Zap,
   XCircle,
@@ -16,6 +17,9 @@ import {
   Loader2,
   Filter,
   RefreshCw,
+  FileText,
+  Bot,
+  CircleDot,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -133,15 +137,82 @@ const FASE_LABELS: Record<string, string> = {
   completo: 'Completo',
 }
 
-const FASE_COLORS: Record<string, string> = {
-  aguardando_inicio: 'bg-gray-100 text-gray-600',
-  doc: 'bg-blue-100 text-blue-700',
-  doc_preview: 'bg-blue-50 text-blue-600',
-  saving: 'bg-lime-100 text-lime-700',
-  saving_preview: 'bg-lime-50 text-lime-600',
-  receita: 'bg-emerald-100 text-emerald-700',
-  receita_preview: 'bg-emerald-50 text-emerald-600',
-  completo: 'bg-green-100 text-green-700',
+// Phase groups for visual theming — each group shares a color lane
+type PhaseGroup = 'idle' | 'doc' | 'saving' | 'receita' | 'done'
+
+function getPhaseGroup(fase: string): PhaseGroup {
+  if (fase === 'aguardando_inicio') return 'idle'
+  if (fase === 'doc' || fase === 'doc_preview') return 'doc'
+  if (fase === 'saving' || fase === 'saving_preview') return 'saving'
+  if (fase === 'receita' || fase === 'receita_preview') return 'receita'
+  if (fase === 'completo') return 'done'
+  return 'idle'
+}
+
+// Colors per phase group — using GoGroup tokens + complementary palette
+const PHASE_STYLES: Record<
+  PhaseGroup,
+  {
+    badge: string
+    border: string
+    bg: string
+    divider: string
+    dot: string
+    label: string
+  }
+> = {
+  idle: {
+    badge: 'bg-[#f0ebe6] text-[#8b8b9a]',
+    border: 'border-l-[#c4bfb8]',
+    bg: 'bg-[#f0ebe6]/40',
+    divider: 'bg-[#c4bfb8]',
+    dot: 'bg-[#c4bfb8]',
+    label: 'Aguardando',
+  },
+  doc: {
+    badge: 'bg-[#C7E9FD] text-[#0059A9]',
+    border: 'border-l-[#0059A9]',
+    bg: 'bg-[#C7E9FD]/25',
+    divider: 'bg-[#0059A9]',
+    dot: 'bg-[#0059A9]',
+    label: 'Documentação',
+  },
+  saving: {
+    badge: 'bg-[#D7DB00]/20 text-[#6b6d00]',
+    border: 'border-l-[#D7DB00]',
+    bg: 'bg-[#D7DB00]/8',
+    divider: 'bg-[#D7DB00]',
+    dot: 'bg-[#D7DB00]',
+    label: 'Saving',
+  },
+  receita: {
+    badge: 'bg-[#0d9488]/10 text-[#0d9488]',
+    border: 'border-l-[#0d9488]',
+    bg: 'bg-[#0d9488]/8',
+    divider: 'bg-[#0d9488]',
+    dot: 'bg-[#0d9488]',
+    label: 'Receita',
+  },
+  done: {
+    badge: 'bg-[#16a34a]/10 text-[#16a34a]',
+    border: 'border-l-[#16a34a]',
+    bg: 'bg-[#16a34a]/8',
+    divider: 'bg-[#16a34a]',
+    dot: 'bg-[#16a34a]',
+    label: 'Completo',
+  },
+}
+
+// Badge classes for the project list cards
+const FASE_BADGE: Record<string, string> = {
+  aguardando_inicio: PHASE_STYLES.idle.badge,
+  doc: PHASE_STYLES.doc.badge,
+  doc_preview: PHASE_STYLES.doc.badge,
+  saving: PHASE_STYLES.saving.badge,
+  saving_preview: PHASE_STYLES.saving.badge,
+  receita: PHASE_STYLES.receita.badge,
+  receita_preview: PHASE_STYLES.receita.badge,
+  completo: PHASE_STYLES.done.badge,
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -185,15 +256,39 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
+function formatTime(iso: string | null): string {
+  if (!iso) return ''
+  try {
+    return new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).toLocaleString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return ''
+  }
+}
+
 function isActiveNow(p: ProjetoInvestigador): boolean {
-  // Só rascunhos podem estar "sendo preenchidos"
   if (p.status !== 'rascunho') return false
-  // Usa o último log de API como sinal real de atividade (chamadas ao /api/chat/*)
   const ref = p.ultimo_log_api
   if (!ref) return false
   const lastApiCall = new Date(ref + (ref.endsWith('Z') ? '' : 'Z')).getTime()
   const fiveMinAgo = Date.now() - 5 * 60 * 1000
   return lastApiCall > fiveMinAgo
+}
+
+/** Detect the phase of an assistant message by parsing its JSON content */
+function detectMsgPhase(msg: ChatMsg): PhaseGroup {
+  if (msg.parsed_fase) return getPhaseGroup(msg.parsed_fase)
+  if (msg.role === 'assistant') {
+    try {
+      const parsed = JSON.parse(msg.content) as { fase?: string }
+      if (parsed.fase) return getPhaseGroup(parsed.fase)
+    } catch {
+      // ignore
+    }
+  }
+  return 'doc' // default for messages without phase info
 }
 
 // ── Componente principal ─────────────────────────────────────────────────────
@@ -281,42 +376,45 @@ function Investigador() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
+    <div className="mx-auto max-w-6xl p-6 sm:p-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Search className="h-7 w-7 text-primary" />
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--go-blue)] flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--go-blue)]">
+              <Search className="h-4 w-4 text-white" />
+            </div>
             Investigador
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-sm text-[var(--go-text-primary)]/60">
             Monitore projetos em tempo real — preenchimento, chat e performance da API.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            Atualização automática
+        <div className="flex items-center gap-3 text-xs text-[var(--go-text-primary)]/50">
+          <div className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+            Auto-refresh
           </div>
-          <span>
-            Última: {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          <span className="font-mono text-[11px]">
+            {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
       </div>
 
       {/* Stats globais */}
       {stats && (
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <StatCard label="Preenchendo agora" value={ativos} icon={<Activity className="h-4 w-4 text-green-600" />} highlight={ativos > 0} />
-          <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4 text-blue-600" />} />
-          <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4 text-yellow-600" />} />
-          <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4 text-red-600" />} highlight={stats.total_erros > 0} />
-          <StatCard label="Tempo médio" value={formatDuration(stats.media_duracao_ms)} icon={<Timer className="h-4 w-4 text-purple-600" />} />
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+          <StatCard label="Preenchendo agora" value={ativos} icon={<Activity className="h-4 w-4" />} color="#16a34a" highlight={ativos > 0} />
+          <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4" />} color="var(--go-blue)" />
+          <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4" />} color="#ca8a04" />
+          <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
+          <StatCard label="Tempo médio" value={formatDuration(stats.media_duracao_ms)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
       )}
 
       {/* Filtros + busca */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+      <div className="mt-5 flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-0.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-0.5">
           {([
             ['todos', 'Todos', null],
             ['ativos', 'Ativos agora', ativos],
@@ -326,34 +424,40 @@ function Investigador() {
             <button
               key={key}
               onClick={() => setFiltro(key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all ${
                 filtro === key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-[var(--go-blue)] text-white shadow-sm'
+                  : 'text-[var(--go-text-primary)]/50 hover:text-[var(--go-text-primary)] hover:bg-[var(--go-blue)]/5'
               }`}
             >
               {label}
               {count != null && count > 0 && (
-                <span className="ml-1.5 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px]">{count}</span>
+                <span
+                  className={`ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
+                    filtro === key ? 'bg-white/25 text-white' : 'bg-[var(--go-blue)]/10 text-[var(--go-blue)]'
+                  }`}
+                >
+                  {count}
+                </span>
               )}
             </button>
           ))}
         </div>
 
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--go-text-primary)]/30" />
           <input
             type="text"
             placeholder="Buscar por nome, responsável, e-mail ou área..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white py-2 pl-9 pr-3 text-sm outline-none transition-shadow focus:border-[var(--go-blue)]/25 focus:shadow-[0_0_0_3px_rgba(0,89,169,0.06)]"
           />
         </div>
 
         <button
           onClick={fetchData}
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-2 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Atualizar
@@ -363,17 +467,17 @@ function Investigador() {
       {/* Lista de projetos */}
       <div className="mt-4">
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <div className="flex items-center justify-center py-16 text-[var(--go-text-primary)]/40">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Carregando projetos...
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-[var(--go-radius-md)] border border-dashed border-[var(--go-blue)]/15 bg-white/50 p-8 text-center text-sm text-[var(--go-text-primary)]/40">
             <Filter className="mx-auto mb-2 h-5 w-5" />
             Nenhum projeto encontrado com os filtros atuais.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filtered.map((p) => (
               <ProjetoCard key={p.id} projeto={p} onClick={() => loadDetalhes(p.id)} />
             ))}
@@ -390,91 +494,100 @@ function StatCard({
   label,
   value,
   icon,
+  color,
   highlight,
 }: {
   label: string
   value: string | number
   icon: React.ReactNode
+  color: string
   highlight?: boolean
 }) {
   return (
     <div
-      className={`rounded-xl border bg-card p-3 ${highlight ? 'border-primary/30 bg-primary/5' : 'border-border'}`}
+      className={`rounded-[var(--go-radius-sm)] border bg-white p-3 transition-colors ${
+        highlight ? 'border-current/20' : 'border-[var(--go-blue)]/8'
+      }`}
+      style={highlight ? { borderColor: `${color}30` } : undefined}
     >
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        {icon}
+      <div className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: `${color}99` }}>
+        <span style={{ color }}>{icon}</span>
         {label}
       </div>
-      <div className="mt-1 text-xl font-bold">{value}</div>
+      <div className="mt-1 text-xl font-bold text-[var(--go-text-primary)]">{value}</div>
     </div>
   )
 }
 
 function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; onClick: () => void }) {
   const active = isActiveNow(p)
+  const group = getPhaseGroup(p.fase_atual)
+  const style = PHASE_STYLES[group]
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-border bg-card px-4 py-3 transition-all hover:border-primary/30 hover:shadow-sm"
+      className="group w-full text-left rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white px-4 py-3 transition-all hover:border-[var(--go-blue)]/20 hover:shadow-[var(--go-shadow-sm)]"
     >
       <div className="flex items-center gap-3">
         {/* Indicador de ativo */}
         <div className="flex-shrink-0">
           {active ? (
-            <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" title="Preenchendo agora" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse" title="Preenchendo agora" />
           ) : (
-            <div className="h-2.5 w-2.5 rounded-full bg-gray-300" />
+            <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} style={{ opacity: 0.4 }} />
           )}
         </div>
 
         {/* Info principal */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium truncate">{p.nome ?? 'Projeto sem nome'}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${FASE_COLORS[p.fase_atual] ?? 'bg-gray-100 text-gray-600'}`}>
+            <span className="font-medium text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
+              {p.nome ?? 'Projeto sem nome'}
+            </span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
               {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
             </span>
             {p.status && p.status !== 'rascunho' && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
                 {STATUS_LABELS[p.status] ?? p.status}
               </span>
             )}
             {p.tem_erro && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] text-red-700">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-medium">
                 <AlertTriangle className="h-3 w-3" />
                 {p.total_erros_api} erro{p.total_erros_api !== 1 ? 's' : ''}
               </span>
             )}
             {p.max_duracao_api_ms != null && p.max_duracao_api_ms > 5000 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] text-yellow-700">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-medium">
                 <Clock className="h-3 w-3" />
                 Lento
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
+          <div className="mt-0.5 text-xs text-[var(--go-text-primary)]/45">
             {p.responsavel_nome} · {p.area_nome ?? 'Sem área'} · {p.ferramenta}
           </div>
         </div>
 
         {/* Métricas rápidas */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-shrink-0">
+        <div className="flex items-center gap-5 text-xs flex-shrink-0">
           <div className="text-center" title="Mensagens (usuário / IA)">
-            <div className="font-medium text-foreground">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
-            <div className="text-[10px]">msgs</div>
+            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/35">msgs</div>
           </div>
           <div className="text-center" title="Tempo desde início">
-            <div className="font-medium text-foreground">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
-            <div className="text-[10px]">duração</div>
+            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/35">duração</div>
           </div>
           <div className="text-center" title="Tempo médio de resposta da API">
-            <div className={`font-medium ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-red-600' : 'text-foreground'}`}>
+            <div className={`font-semibold tabular-nums ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>
               {formatDuration(p.media_duracao_api_ms)}
             </div>
-            <div className="text-[10px]">API média</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/35">API média</div>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/20 group-hover:text-[var(--go-blue)]/50 transition-colors" />
         </div>
       </div>
     </button>
@@ -495,10 +608,11 @@ function DetalheView({
   onRefresh: () => void
 }) {
   const [tab, setTab] = useState<'chat' | 'api_logs' | 'dados'>('chat')
+  const [dadosOpen, setDadosOpen] = useState(false)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-16 text-muted-foreground">
+      <div className="flex items-center justify-center p-16 text-[var(--go-text-primary)]/40">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         Carregando detalhes...
       </div>
@@ -507,9 +621,9 @@ function DetalheView({
 
   if (!detalhes) {
     return (
-      <div className="p-8 text-center text-muted-foreground">
+      <div className="p-8 text-center text-[var(--go-text-primary)]/40">
         <p>Projeto não encontrado.</p>
-        <button onClick={onBack} className="mt-4 text-sm text-primary underline">
+        <button onClick={onBack} className="mt-4 text-sm text-[var(--go-blue)] underline">
           Voltar
         </button>
       </div>
@@ -517,68 +631,99 @@ function DetalheView({
   }
 
   const d = detalhes
+  const group = getPhaseGroup(d.fase_atual)
+  const phaseStyle = PHASE_STYLES[group]
 
   return (
-    <div className="mx-auto max-w-6xl p-8">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-6xl p-6 sm:p-8">
+      {/* Header compacto */}
+      <div className="flex items-start gap-3">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+          title="Voltar"
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Voltar
+          <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">{d.nome ?? 'Projeto sem nome'}</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-[var(--go-text-primary)] truncate">
+              {d.nome ?? 'Projeto sem nome'}
+            </h1>
+            <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
+              {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
+            </span>
+            {d.status && d.status !== 'rascunho' && (
+              <span className="flex-shrink-0 rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
+                {STATUS_LABELS[d.status] ?? d.status}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-[var(--go-text-primary)]/45">
             {d.responsavel_nome} ({d.responsavel_email}) · {d.area_nome ?? 'Sem área'} · {d.ferramenta}
           </p>
         </div>
         <button
           onClick={onRefresh}
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex-shrink-0 flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Atualizar
         </button>
       </div>
 
-      {/* Métricas do projeto */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-6">
-        <MiniStat label="Fase atual" value={FASE_LABELS[d.fase_atual] ?? d.fase_atual} color={FASE_COLORS[d.fase_atual]} />
-        <MiniStat label="Status" value={STATUS_LABELS[d.status ?? 'rascunho'] ?? d.status ?? '—'} />
-        <MiniStat label="Msgs (usr/ia)" value={`${d.total_mensagens_usuario} / ${d.total_mensagens_ia}`} />
-        <MiniStat label="Duração total" value={formatTimeSince(d.tempo_desde_inicio_min)} />
+      {/* Métricas inline */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
+        <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
         <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
-        <MiniStat label="Erros API" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
+        <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
+
+        {/* Dados do projeto — collapsible */}
+        <button
+          onClick={() => setDadosOpen(!dadosOpen)}
+          className="ml-auto flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+        >
+          <FileText className="h-3 w-3" />
+          Dados do projeto
+          <ChevronDown className={`h-3 w-3 transition-transform ${dadosOpen ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
-      {/* Dados das etapas */}
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa 1 — Envio</h3>
-          <div className="space-y-1 text-sm">
-            <KV label="Escopo" value={d.step1.escopo} />
-            <KV label="Ferramenta" value={d.step1.ferramenta} />
-            <KV label="Área" value={d.step1.area_nome} />
-            <KV label="Serviço externo" value={d.step1.servico_externo} />
-            <KV label="Membros" value={d.step1.membros.length > 0 ? d.step1.membros.join(', ') : null} />
+      {/* Dados colapsáveis das etapas */}
+      {dadosOpen && (
+        <div
+          className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+          style={{ animation: 'go-slide-down 0.2s ease' }}
+        >
+          <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
+            <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-2">
+              Etapa 1 — Envio
+            </h3>
+            <div className="space-y-1 text-sm">
+              <KV label="Escopo" value={d.step1.escopo} />
+              <KV label="Ferramenta" value={d.step1.ferramenta} />
+              <KV label="Área" value={d.step1.area_nome} />
+              <KV label="Serviço externo" value={d.step1.servico_externo} />
+              <KV label="Membros" value={d.step1.membros.length > 0 ? d.step1.membros.join(', ') : null} />
+            </div>
+          </div>
+          <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
+            <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-2">
+              Etapa 2 — Projeto
+            </h3>
+            <div className="space-y-1 text-sm">
+              <KV label="Nome" value={d.step2.nome} />
+              <KV label="Tipos" value={d.step2.tipos_projeto?.join(', ')} />
+              <KV label="Data criação" value={d.step2.data_criacao_projeto} />
+              <KV label="Descrição" value={d.step2.descricao_breve} />
+            </div>
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Etapa 2 — Projeto</h3>
-          <div className="space-y-1 text-sm">
-            <KV label="Nome" value={d.step2.nome} />
-            <KV label="Tipos" value={d.step2.tipos_projeto?.join(', ')} />
-            <KV label="Data criação" value={d.step2.data_criacao_projeto} />
-            <KV label="Descrição" value={d.step2.descricao_breve} />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Tabs */}
-      <div className="mt-6 flex items-center gap-1 border-b border-border">
+      <div className="mt-5 flex items-center gap-0.5 border-b border-[var(--go-blue)]/8">
         {([
           ['chat', 'Histórico do chat', d.chat_messages.length],
           ['api_logs', 'Logs de API', d.api_logs.length],
@@ -587,14 +732,18 @@ function DetalheView({
           <button
             key={key}
             onClick={() => setTab(key as typeof tab)}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`relative border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${
               tab === key
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-[var(--go-blue)] text-[var(--go-blue)]'
+                : 'border-transparent text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/70'
             }`}
           >
             {label}
-            {count != null && <span className="ml-1.5 text-xs text-muted-foreground">({count})</span>}
+            {count != null && (
+              <span className={`ml-1.5 text-[11px] ${tab === key ? 'text-[var(--go-blue)]/50' : 'text-[var(--go-text-primary)]/25'}`}>
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -608,17 +757,13 @@ function DetalheView({
   )
 }
 
-function MiniStat({ label, value, color, warn }: { label: string; value: string; color?: string; warn?: boolean }) {
+function MiniStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2">
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
-      <div className={`mt-0.5 text-sm font-semibold ${warn ? 'text-red-600' : ''}`}>
-        {color ? (
-          <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${color}`}>{value}</span>
-        ) : (
-          value
-        )}
-      </div>
+    <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+      warn ? 'border-[#dc2626]/15 bg-[#dc2626]/5' : 'border-[var(--go-blue)]/8 bg-white'
+    }`}>
+      <span className="text-[var(--go-text-primary)]/40">{label}</span>
+      <span className={`font-semibold tabular-nums ${warn ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>{value}</span>
     </div>
   )
 }
@@ -626,8 +771,10 @@ function MiniStat({ label, value, color, warn }: { label: string; value: string;
 function KV({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-muted-foreground text-xs w-28 flex-shrink-0">{label}:</span>
-      <span className="text-foreground">{value || <span className="text-muted-foreground/50 italic">—</span>}</span>
+      <span className="text-[var(--go-text-primary)]/35 text-xs w-28 flex-shrink-0">{label}:</span>
+      <span className="text-[var(--go-text-primary)]">
+        {value || <span className="text-[var(--go-text-primary)]/20 italic">—</span>}
+      </span>
     </div>
   )
 }
@@ -635,26 +782,87 @@ function KV({ label, value }: { label: string; value: string | null | undefined 
 // ── Tab: Histórico do chat ───────────────────────────────────────────────────
 
 function ChatTab({ messages }: { messages: ChatMsg[] }) {
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Group messages by phase and insert dividers
+  const groupedMessages = useMemo(() => {
+    if (messages.length === 0) return []
+
+    const result: Array<{ type: 'divider'; phase: PhaseGroup; label: string } | { type: 'message'; msg: ChatMsg; phase: PhaseGroup }> = []
+    let currentPhase: PhaseGroup | null = null
+
+    for (const msg of messages) {
+      // DOC messages don't change the phase context
+      if (msg.role === 'doc') {
+        result.push({ type: 'message', msg, phase: currentPhase ?? 'doc' })
+        continue
+      }
+
+      const phase: PhaseGroup = msg.role === 'assistant' ? detectMsgPhase(msg) : (currentPhase ?? 'doc')
+
+      // Insert phase divider when phase changes
+      if (msg.role === 'assistant' && phase !== currentPhase) {
+        currentPhase = phase
+        const style = PHASE_STYLES[phase]
+        result.push({ type: 'divider', phase, label: style.label })
+      }
+
+      if (msg.role === 'user' && currentPhase === null) {
+        currentPhase = 'doc'
+      }
+
+      result.push({ type: 'message', msg, phase: currentPhase ?? 'doc' })
+    }
+
+    return result
+  }, [messages])
+
   if (messages.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4">Nenhuma mensagem de chat ainda.</p>
+    return (
+      <div className="py-8 text-center text-sm text-[var(--go-text-primary)]/30">
+        <MessageSquare className="mx-auto mb-2 h-5 w-5" />
+        Nenhuma mensagem de chat ainda.
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-      {messages.map((msg) => (
-        <ChatBubble key={msg.id} msg={msg} />
-      ))}
+    <div className="max-h-[650px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+      <div className="space-y-1 py-2">
+        {groupedMessages.map((item, i) => {
+          if (item.type === 'divider') {
+            return <PhaseDivider key={`div-${i}`} phase={item.phase} label={item.label} />
+          }
+          return <ChatBubble key={item.msg.id} msg={item.msg} phase={item.phase} />
+        })}
+        <div ref={chatEndRef} />
+      </div>
     </div>
   )
 }
 
-function ChatBubble({ msg }: { msg: ChatMsg }) {
+function PhaseDivider({ phase, label }: { phase: PhaseGroup; label: string }) {
+  const style = PHASE_STYLES[phase]
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className={`h-[2px] flex-1 ${style.divider}`} style={{ opacity: 0.15 }} />
+      <div className="flex items-center gap-1.5">
+        <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+        <span className={`text-[11px] font-bold uppercase tracking-widest ${style.badge} rounded-full px-2.5 py-0.5`}>
+          {label}
+        </span>
+      </div>
+      <div className={`h-[2px] flex-1 ${style.divider}`} style={{ opacity: 0.15 }} />
+    </div>
+  )
+}
+
+function ChatBubble({ msg, phase }: { msg: ChatMsg; phase: PhaseGroup }) {
   const [docExpanded, setDocExpanded] = useState(false)
   const isUser = msg.role === 'user'
   const isDoc = msg.role === 'doc'
 
   let displayContent = msg.content
-  let faseTag: string | null = null
   let typeTag: string | null = null
   let isMarkdown = false
 
@@ -666,7 +874,6 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
         content?: string
         question?: string
       }
-      faseTag = parsed.fase ?? null
       typeTag = parsed.type ?? null
       displayContent = parsed.content ?? parsed.question ?? msg.content
       isMarkdown = true
@@ -675,95 +882,113 @@ function ChatBubble({ msg }: { msg: ChatMsg }) {
     }
   }
 
-  return (
-    <div
-      className={`rounded-lg border px-3 py-2 text-sm ${
-        isUser
-          ? 'border-blue-200 bg-blue-50/70 ml-8'
-          : isDoc
-            ? 'border-amber-200/60 bg-amber-50/40'
-            : 'border-border bg-card mr-8'
-      }`}
-    >
-      {/* Header com badges */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <span
-          className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-            isUser
-              ? 'bg-blue-200 text-blue-800'
-              : isDoc
-                ? 'bg-amber-200 text-amber-800'
-                : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          {isUser ? 'USUÁRIO' : isDoc ? 'DOC' : 'IA'}
-        </span>
-        {faseTag && (
-          <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${FASE_COLORS[faseTag] ?? 'bg-gray-100 text-gray-600'}`}>
-            {FASE_LABELS[faseTag] ?? faseTag}
-          </span>
-        )}
-        {typeTag && (
-          <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">
-            {typeTag}
-          </span>
-        )}
-        <span className="text-[10px] text-muted-foreground ml-auto">
-          {formatDateTime(msg.created_at)}
-        </span>
-      </div>
+  const phaseStyle = PHASE_STYLES[phase]
 
-      {/* Conteúdo */}
-      {isDoc ? (
-        // Bloco DOC: colapsável, monospace
-        <div>
-          <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground font-mono max-h-[80px] overflow-hidden"
-            style={docExpanded ? { maxHeight: 'none' } : undefined}
-          >
-            {msg.content}
-          </pre>
+  // DOC message — minimal collapsed block
+  if (isDoc) {
+    return (
+      <div className="mx-6 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/6 bg-[var(--go-cream)]/60 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <FileText className="h-3 w-3 text-[var(--go-text-primary)]/25 flex-shrink-0" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--go-text-primary)]/30">
+            Material extraído
+          </span>
+          <span className="text-[10px] text-[var(--go-text-primary)]/20 font-mono">
+            {(msg.content.length / 1024).toFixed(1)}kb
+          </span>
           {msg.content.length > 200 && (
             <button
               onClick={() => setDocExpanded(!docExpanded)}
-              className="mt-1 text-[10px] text-amber-700 hover:underline font-medium"
+              className="ml-auto text-[10px] font-medium text-[var(--go-blue)]/50 hover:text-[var(--go-blue)] transition-colors"
             >
-              {docExpanded ? '▲ Recolher' : `▼ Expandir (${(msg.content.length / 1024).toFixed(1)}kb)`}
+              {docExpanded ? 'Recolher' : 'Expandir'}
             </button>
           )}
         </div>
-      ) : isMarkdown ? (
-        // IA: renderiza markdown
-        <MiniMarkdown text={displayContent} />
-      ) : (
-        // Usuário: texto simples
-        <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">
-          {displayContent}
-        </p>
-      )}
+        {docExpanded && (
+          <pre
+            className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[var(--go-text-primary)]/40 font-mono max-h-[300px] overflow-y-auto"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {msg.content}
+          </pre>
+        )}
+      </div>
+    )
+  }
 
-      {/* Opções */}
-      {msg.options && Array.isArray(msg.options) && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {(msg.options as string[]).map((opt, i) => (
-            <span
-              key={i}
-              className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                msg.selected_option === i
-                  ? 'border-primary bg-primary/10 text-primary font-medium'
-                  : 'border-border text-muted-foreground'
-              }`}
-            >
-              {opt}
-              {msg.selected_option === i && ' ✓'}
-            </span>
-          ))}
+  // User message — right side, distinct shape
+  if (isUser) {
+    return (
+      <div className="flex justify-end pl-16">
+        <div className="max-w-[85%] rounded-[var(--go-radius-md)] rounded-br-[4px] bg-[var(--go-blue)] px-4 py-2.5 text-white shadow-[var(--go-shadow-sm)]">
+          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+            {displayContent}
+          </p>
+          <div className="mt-1 text-[10px] text-white/40 text-right">
+            {formatTime(msg.created_at)}
+          </div>
         </div>
-      )}
+      </div>
+    )
+  }
+
+  // IA message — left side, colored left border by phase
+  return (
+    <div className="flex pr-16">
+      <div
+        className={`max-w-[85%] rounded-[var(--go-radius-md)] rounded-bl-[4px] border-l-[3px] ${phaseStyle.border} bg-white px-4 py-3 shadow-[var(--go-shadow-sm)]`}
+      >
+        {/* Compact header */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <Bot className="h-3 w-3 text-[var(--go-text-primary)]/30" />
+          <span className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">
+            Agente
+          </span>
+          {typeTag && (
+            <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${phaseStyle.badge}`}>
+              {typeTag}
+            </span>
+          )}
+          <span className="text-[10px] text-[var(--go-text-primary)]/20 ml-auto tabular-nums">
+            {formatTime(msg.created_at)}
+          </span>
+        </div>
+
+        {isMarkdown ? (
+          <MiniMarkdown text={displayContent} />
+        ) : (
+          <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words text-[var(--go-text-primary)]">
+            {displayContent}
+          </p>
+        )}
+
+        {/* Options */}
+        {Array.isArray(msg.options) && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {(msg.options as string[]).map((opt, i) => (
+              <span
+                key={i}
+                className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                  msg.selected_option === i
+                    ? 'border-[var(--go-blue)] bg-[var(--go-blue)]/8 text-[var(--go-blue)] font-semibold'
+                    : 'border-[var(--go-blue)]/10 text-[var(--go-text-primary)]/40'
+                }`}
+              >
+                {opt}
+                {msg.selected_option === i && (
+                  <CheckCircle2 className="ml-1 inline h-3 w-3" />
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-/** Renderizador de markdown compacto e neutro para o investigador. */
+/** Renderizador de markdown compacto para o investigador. */
 function MiniMarkdown({ text }: { text: string }) {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
@@ -773,14 +998,14 @@ function MiniMarkdown({ text }: { text: string }) {
   function flushList() {
     if (listBuffer.length === 0) return
     elements.push(
-      <ul key={key++} className="space-y-0.5 pl-0.5 my-1">
+      <ul key={key++} className="space-y-0.5 pl-0.5 my-1.5">
         {listBuffer.map((item, i) => (
-          <li key={i} className="flex items-start gap-1.5 text-xs leading-relaxed">
-            <span className="mt-[7px] block h-1 w-1 shrink-0 rounded-full bg-foreground/30" />
+          <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-[var(--go-text-primary)]/80">
+            <CircleDot className="mt-[5px] h-2.5 w-2.5 shrink-0 text-[var(--go-blue)]/25" />
             <span>{renderInline(item)}</span>
           </li>
         ))}
-      </ul>
+      </ul>,
     )
     listBuffer = []
   }
@@ -792,9 +1017,9 @@ function MiniMarkdown({ text }: { text: string }) {
     if (/^# (?!#)/.test(line)) {
       flushList()
       elements.push(
-        <h3 key={key++} className="text-xs font-bold text-foreground mt-2 mb-0.5">
+        <h3 key={key++} className="text-[13px] font-bold text-[var(--go-text-primary)] mt-2.5 mb-0.5">
           {renderInline(line.replace(/^# /, ''))}
-        </h3>
+        </h3>,
       )
       continue
     }
@@ -802,12 +1027,12 @@ function MiniMarkdown({ text }: { text: string }) {
     if (line.startsWith('## ')) {
       flushList()
       elements.push(
-        <div key={key++} className="mt-2 mb-0.5 flex items-center gap-1.5 border-b border-border/50 pb-1">
-          <div className="h-1 w-1 rounded-full bg-primary/50" />
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div key={key++} className="mt-2.5 mb-1 flex items-center gap-2 border-b border-[var(--go-blue)]/8 pb-1">
+          <div className="h-1.5 w-1.5 rounded-full bg-[var(--go-blue)]/30" />
+          <h4 className="text-[12px] font-semibold uppercase tracking-wide text-[var(--go-text-primary)]/45">
             {renderInline(line.replace(/^## /, ''))}
           </h4>
-        </div>
+        </div>,
       )
       continue
     }
@@ -815,9 +1040,9 @@ function MiniMarkdown({ text }: { text: string }) {
     if (line.startsWith('### ')) {
       flushList()
       elements.push(
-        <h5 key={key++} className="text-xs font-semibold text-foreground/80 mt-1.5 mb-0.5">
+        <h5 key={key++} className="text-[13px] font-semibold text-[var(--go-text-primary)]/70 mt-2 mb-0.5">
           {renderInline(line.replace(/^### /, ''))}
-        </h5>
+        </h5>,
       )
       continue
     }
@@ -839,9 +1064,9 @@ function MiniMarkdown({ text }: { text: string }) {
     // Paragraph
     flushList()
     elements.push(
-      <p key={key++} className="text-xs leading-relaxed my-0.5">
+      <p key={key++} className="text-[13px] leading-relaxed my-0.5 text-[var(--go-text-primary)]/80">
         {renderInline(line)}
-      </p>
+      </p>,
     )
   }
 
@@ -862,14 +1087,22 @@ function renderInline(text: string): React.ReactNode {
       parts.push(<span key={k++}>{text.slice(lastIndex, match.index)}</span>)
     }
     if (match[1] !== undefined) {
-      parts.push(<strong key={k++} className="font-semibold text-foreground">{match[1]}</strong>)
+      parts.push(
+        <strong key={k++} className="font-semibold text-[var(--go-text-primary)]">
+          {match[1]}
+        </strong>,
+      )
     } else if (match[2] !== undefined) {
-      parts.push(<em key={k++} className="italic opacity-85">{match[2]}</em>)
+      parts.push(
+        <em key={k++} className="italic text-[var(--go-text-primary)]/65">
+          {match[2]}
+        </em>,
+      )
     } else if (match[3] !== undefined) {
       parts.push(
-        <code key={k++} className="rounded px-1 py-0.5 text-[10.5px] bg-muted font-mono">
+        <code key={k++} className="rounded px-1 py-0.5 text-[12px] bg-[var(--go-blue)]/5 text-[var(--go-blue)] font-mono">
           {match[3]}
-        </code>
+        </code>,
       )
     }
     lastIndex = regex.lastIndex
@@ -886,20 +1119,25 @@ function renderInline(text: string): React.ReactNode {
 
 function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
   if (logs.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4">Nenhum log de API registrado.</p>
+    return (
+      <div className="py-8 text-center text-sm text-[var(--go-text-primary)]/30">
+        <Zap className="mx-auto mb-2 h-5 w-5" />
+        Nenhum log de API registrado.
+      </div>
+    )
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-xs text-muted-foreground">
-            <th className="py-2 pr-3 font-medium">Quando</th>
-            <th className="py-2 pr-3 font-medium">Endpoint</th>
-            <th className="py-2 pr-3 font-medium text-right">Duração</th>
-            <th className="py-2 pr-3 font-medium text-right">Status</th>
-            <th className="py-2 pr-3 font-medium text-right">Req/Res</th>
-            <th className="py-2 font-medium">Erro</th>
+          <tr className="border-b border-[var(--go-blue)]/8 text-left">
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Quando</th>
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Endpoint</th>
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Duração</th>
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Status</th>
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Req/Res</th>
+            <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Erro</th>
           </tr>
         </thead>
         <tbody>
@@ -909,33 +1147,35 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
             return (
               <tr
                 key={log.id}
-                className={`border-b border-border/50 ${isError ? 'bg-red-50' : isSlow ? 'bg-yellow-50' : ''}`}
+                className={`border-b border-[var(--go-blue)]/4 last:border-0 ${
+                  isError ? 'bg-[#dc2626]/3' : isSlow ? 'bg-[#ca8a04]/3' : ''
+                }`}
               >
-                <td className="py-1.5 pr-3 text-xs text-muted-foreground whitespace-nowrap">
+                <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
                   {formatDateTime(log.created_at)}
                 </td>
-                <td className="py-1.5 pr-3 font-mono text-xs">
+                <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
                   {log.endpoint.replace('/api/chat/', '')}
                 </td>
-                <td className={`py-1.5 pr-3 text-xs text-right font-mono ${isSlow ? 'text-red-600 font-bold' : ''}`}>
+                <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
                   {formatDuration(log.duration_ms)}
                 </td>
-                <td className="py-1.5 pr-3 text-right">
+                <td className="py-2 px-3 text-right">
                   <span
-                    className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                      isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
                     }`}
                   >
                     {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
                     {log.status_code}
                   </span>
                 </td>
-                <td className="py-1.5 pr-3 text-right text-xs text-muted-foreground font-mono">
+                <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
                   {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
                   {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
                 </td>
-                <td className="py-1.5 text-xs text-red-600 max-w-[200px] truncate" title={log.error ?? ''}>
-                  {log.error ?? '—'}
+                <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
+                  {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
                 </td>
               </tr>
             )
@@ -956,18 +1196,18 @@ function DadosTab({
   analise: ProjetoDetalhes['analise']
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {analise && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+        <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
+          <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
             Análise automática
           </h3>
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1.5 text-sm">
             <KV label="Resultado" value={analise.resultado} />
             <KV label="Pontuação" value={`${analise.pontuacao_total} / ${analise.pontuacao_maxima}`} />
             <KV label="Complexidade" value={analise.complexidade} />
             {analise.resumo && (
-              <div className="mt-2 rounded-lg bg-muted/50 p-3 text-xs whitespace-pre-wrap">
+              <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3 text-[13px] leading-relaxed whitespace-pre-wrap text-[var(--go-text-primary)]/70">
                 {analise.resumo}
               </div>
             )}
@@ -975,16 +1215,16 @@ function DadosTab({
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+      <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
+        <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
           Documentação gerada
         </h3>
         {documentacao ? (
-          <pre className="overflow-x-auto text-xs bg-muted/50 rounded-lg p-3 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+          <pre className="overflow-x-auto text-[12px] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 rounded-[var(--go-radius-sm)] p-3 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[var(--go-text-primary)]/60" style={{ scrollbarWidth: 'thin' }}>
             {JSON.stringify(documentacao, null, 2)}
           </pre>
         ) : (
-          <p className="text-sm text-muted-foreground">Documentação ainda não gerada.</p>
+          <p className="text-sm text-[var(--go-text-primary)]/30">Documentação ainda não gerada.</p>
         )}
       </div>
     </div>

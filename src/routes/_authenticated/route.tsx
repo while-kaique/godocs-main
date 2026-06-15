@@ -1,9 +1,21 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
-import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search, Loader2 } from "lucide-react";
+
+// Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
+// Expira após 5 minutos para não ficar stale indefinidamente.
+let cachedUser: CurrentUser | null = null;
+let cachedAt = 0;
+const AUTH_CACHE_MS = 5 * 60 * 1000;
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
+    // Se já autenticou recentemente, usa o cache
+    if (cachedUser && Date.now() - cachedAt < AUTH_CACHE_MS) {
+      console.log("[_authenticated] usando auth cacheado:", cachedUser.email);
+      return { user: cachedUser };
+    }
+
     console.log("[_authenticated] beforeLoad — chamando /api/auth/me...");
     const response = await fetch("/api/auth/me");
     console.log("[_authenticated] /api/auth/me status:", response.status);
@@ -11,17 +23,36 @@ export const Route = createFileRoute("/_authenticated")({
     console.log("[_authenticated] user:", JSON.stringify(user));
     if (!user) {
       console.log("[_authenticated] user=null → redirecionando para /");
+      cachedUser = null;
       throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     if (!user.isAdmin) {
       console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
+      cachedUser = null;
       throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     console.log("[_authenticated] Auth OK — admin:", user.email);
+    cachedUser = user;
+    cachedAt = Date.now();
     return { user };
   },
+  pendingComponent: AuthLoadingScreen,
   component: AuthenticatedLayout,
 });
+
+function AuthLoadingScreen() {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
+      <Loader2
+        className="h-8 w-8 animate-spin"
+        style={{ color: "var(--go-blue)" }}
+      />
+      <p className="text-sm font-medium text-muted-foreground">
+        Verificando permissões...
+      </p>
+    </div>
+  );
+}
 
 function AuthenticatedLayout() {
   const { user } = Route.useRouteContext();
