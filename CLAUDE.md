@@ -72,6 +72,7 @@ src/
       dashboard.tsx    # Dashboard de projetos submetidos (lê via /api/admin/projetos)
       usuarios.tsx     # CRUD de usuários (admin only) - lê via /api/admin/usuarios
       areas.tsx        # CRUD de áreas + botão "Sincronizar áreas" (admin only) - via /api/admin/areas
+      investigador.tsx # Painel de monitoramento em tempo real — projetos ativos, chat, logs de API, métricas
   integrations/db/
     db-adapter.ts      # Interface GoDeployDB (query/exec async) — compatível com env.DB (prod) e better-sqlite3 (dev)
     client.server.ts   # Client do banco sobre GoDeployDB + funções de acesso (server-only, totalmente async)
@@ -97,6 +98,7 @@ src/
     areas/
       teamguide.server.ts # Deriva áreas da árvore TeamGuide (fonte única; regra passthrough v3, dedup por slug) — server-only
     chat.functions.ts  # Funções do chat: iniciarSubmissao, iniciarSaving, iniciarReceita, enviarMensagem, atualizarTipos, submeterParaValidacao
+    investigador.functions.ts # Funções do painel Investigador: getProjetosInvestigador, getProjetoInvestigadorDetalhes, getInvestigadorStats
     areas.functions.ts # getAreasPublicas (tabela areas + fallback hardcoded AREAS) e sincronizarAreas (upsert das derivadas)
     admin.functions.ts # Funções admin: áreas, admins, projetos, usuários (createUser/deleteUser/updateUserAreas/getUsuarios), configurações
     auth.functions.ts  # getCurrentUser (lê email do header Godeploy → consulta tabela admins)
@@ -144,6 +146,7 @@ O schema é criado automaticamente por `initSchema()` em `schema.ts`. IDs defaul
 | `validacoes` | projeto_id, resultado, parecer, criterios (JSON), admin_email, email_enviado |
 | `analises` | id, projeto_id, resultado (aprovado\|rejeitado), pontuacao_total, pontuacao_maxima, justificativa, resumo, criterios_hardcoded (JSON), criterios_dinamicos (JSON), created_at |
 | `configuracoes` | chave (UNIQUE), valor (JSON), descrição — config dinâmica (ex: critérios de validação) |
+| `api_logs` | id, projeto_id (FK), endpoint, method, duration_ms, status_code, error, request_size, response_size, created_at — log de cada chamada `/api/chat/*` para o Investigador; limpeza automática >30 dias no cron |
 
 ### Status (CHECK na coluna `projetos.status`)
 
@@ -170,6 +173,7 @@ rascunho → em_validacao → validado | rejeitado
 | `/dashboard` | Autenticado (admin/leader) | Dashboard de projetos |
 | `/usuarios` | Admin Master | CRUD de usuários |
 | `/areas` | Admin Master | CRUD de áreas + sincronização TeamGuide |
+| `/investigador` | Admin Master | Painel de monitoramento em tempo real — projetos sendo preenchidos, histórico de chat (com markdown renderizado), logs de API (duração, erros, tamanho), métricas de performance; polling a cada 8s; detecção de atividade via último log de API (<5min) |
 | `/testes` | Admin Master | Console de testes e simulação (sub-rotas abaixo) |
 | `/testes/prompts` | Admin Master | Inspetor de prompts da IA — exibe todos os system prompts dos agentes com syntax highlight, parâmetros LLM e contagem de tokens |
 | `/testes/cenarios` | Admin Master | Simulador de cenários — chat de teste com inspetor de estado e log de chamadas API |
@@ -177,9 +181,10 @@ rascunho → em_validacao → validado | rejeitado
 ### Endpoints de API (`/api/*`, roteados pelo `worker.ts`)
 
 - **Auth**: `GET /api/auth/me`
-- **Chat**: `POST /api/chat/iniciar-submissao`, `/iniciar-saving`, `/iniciar-receita`, `/enviar-mensagem`, `/atualizar-tipos`, `/atualizar-metadados`, `/analisar`, `/submeter-validacao`
-- **Áreas**: `GET /api/areas` (público), `POST /api/admin/areas/sync` (admin), `POST /api/cron/sync-areas` (cron)
+- **Chat**: `POST /api/chat/iniciar-submissao`, `/iniciar-saving`, `/iniciar-receita`, `/enviar-mensagem`, `/atualizar-tipos`, `/atualizar-metadados`, `/analisar`, `/submeter-validacao` — todas logadas automaticamente na tabela `api_logs` (duração, status, erro, tamanho req/res)
+- **Áreas**: `GET /api/areas` (público), `POST /api/admin/areas/sync` (admin), `POST /api/cron/sync-areas` (cron + limpeza de api_logs >30 dias)
 - **Admin**: `/api/admin/projetos`, `/usuarios`, `/users` (+ delete/update-areas), `/admins` (+ remove), `/areas` (+ remove), `/configuracoes`, `/validar-projeto`
+- **Investigador**: `GET /api/admin/investigador/projetos` (lista enriquecida com fase, métricas, último log), `/projetos/:id` (detalhes + chat + logs), `/stats` (métricas globais de API)
 
 ## Fluxo de submissão (3 etapas + chat IA)
 
@@ -428,6 +433,18 @@ Assets:   ["index.html", "assets/foo.js"]
 
 Sempre incluir `assetConfig: { "not_found_handling": "single-page-application" }` no `updateApp` para que rotas SPA (`/`, `/submeter`, `/dashboard` etc.) caiam no `index.html` em vez de retornar "Not Found".
 
+### ⚠️ Verificar usuários ativos antes de fazer deploy
+
+Antes de subir uma nova versão no Godeploy, **sempre verificar se há alguém preenchendo o formulário naquele momento**. O deploy pode interromper a sessão e causar perda de dados do preenchimento em andamento.
+
+**Como verificar**: chamar `GET /api/admin/investigador/projetos` (requer auth admin) e checar se algum projeto com `status = 'rascunho'` tem `ultimo_log_api` nos últimos 5 minutos. Se houver, aguardar a conclusão do preenchimento ou avisar o responsável antes de prosseguir.
+
+Em dev, pode verificar via:
+```bash
+curl -s http://localhost:5173/api/admin/investigador/projetos | jq '[.[] | select(.status == "rascunho" and .ultimo_log_api != null)] | length'
+# Se retornar > 0, há alguém preenchendo agora
+```
+
 ## Status atual
 
 - Home, formulário de submissão, CRUD de usuários e áreas funcionais
@@ -442,7 +459,8 @@ Sempre incluir `assetConfig: { "not_found_handling": "single-page-application" }
 - **Submissão interna + n8n**: dados no SQLite, duplicata verificada, auto-aprovação RPA, notificação Google Chat e envio ao n8n (webhook → Markdown/Drive/planilha)
 - **Áreas via TeamGuide**: fonte única + fallback hardcoded + sync (admin/cron)
 - **Análise automática pré-submissão**: agente analisador com 10 critérios fixos + dinâmicos, classificação de complexidade, card com parecer em texto; roda em background após submissão
-- **Testes**: 142 passando; rodam antes de cada `npm run dev` via `predev`
+- **Investigador** (`/investigador`): painel admin de monitoramento em tempo real — lista de projetos com fase atual, métricas de chat e API, filtros (ativos agora, com erros, lentos >5s), busca; detalhe com dados das etapas 1/2, histórico do chat com markdown renderizado, logs de API tabulados, documentação/análise. Polling a cada 8s. Detecção de atividade via `api_logs` (<5min). Tabela `api_logs` registra cada chamada `/api/chat/*`; limpeza automática >30 dias no cron
+- **Testes**: 153 passando; rodam antes de cada `npm run dev` via `predev`
 - Identidade visual GoGroup (--go-blue, --go-lime, --go-cream, Poppins)
 
 ## Notas importantes

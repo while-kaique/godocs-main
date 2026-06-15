@@ -529,6 +529,53 @@ export async function insertLeaderAreas(userId: string, areaIds: string[]) {
   }
 }
 
+// --- Api Logs ---
+
+export async function insertApiLog(data: {
+  projeto_id?: string | null;
+  endpoint: string;
+  method?: string;
+  duration_ms?: number | null;
+  status_code: number;
+  error?: string | null;
+  request_size?: number | null;
+  response_size?: number | null;
+}) {
+  const id = generateId();
+  await exec(`
+    INSERT INTO api_logs (id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    id,
+    data.projeto_id ?? null,
+    data.endpoint,
+    data.method ?? 'POST',
+    data.duration_ms ?? null,
+    data.status_code,
+    data.error ?? null,
+    data.request_size ?? null,
+    data.response_size ?? null,
+  ]);
+}
+
+export function getApiLogsByProjeto(projetoId: string) {
+  return queryAll<ApiLogRow>(
+    'SELECT * FROM api_logs WHERE projeto_id = ? ORDER BY created_at DESC', [projetoId]
+  );
+}
+
+export function getApiLogsRecent(limit = 200) {
+  return queryAll<ApiLogRow>(
+    'SELECT * FROM api_logs ORDER BY created_at DESC LIMIT ?', [limit]
+  );
+}
+
+export function cleanupOldApiLogs(daysToKeep = 30) {
+  return exec(
+    "DELETE FROM api_logs WHERE created_at < datetime('now', '-' || ? || ' days')", [daysToKeep]
+  );
+}
+
 // ─── Row types ──────────────────────────────────────────────────────────────
 
 export type AdminRow = {
@@ -643,4 +690,17 @@ export type UserRoleRow = {
 export type LeaderAreaRow = {
   user_id: string;
   area_id: string;
+};
+
+export type ApiLogRow = {
+  id: string;
+  projeto_id: string | null;
+  endpoint: string;
+  method: string;
+  duration_ms: number | null;
+  status_code: number;
+  error: string | null;
+  request_size: number | null;
+  response_size: number | null;
+  created_at: string | null;
 };

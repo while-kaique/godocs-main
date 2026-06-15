@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
+import { Route as AuthenticatedInvestigadorRouteImport } from './routes/_authenticated/investigador'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
 import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
@@ -45,6 +46,12 @@ const AuthenticatedUsuariosRoute = AuthenticatedUsuariosRouteImport.update({
   path: '/usuarios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInvestigadorRoute =
+  AuthenticatedInvestigadorRouteImport.update({
+    id: '/investigador',
+    path: '/investigador',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/submeter': typeof SubmeterRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/_authenticated/areas': typeof AuthenticatedAreasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/investigador': typeof AuthenticatedInvestigadorRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/_authenticated/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/_authenticated/testes/prompts': typeof AuthenticatedTestesPromptsRoute
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/testes'
     | '/areas'
     | '/dashboard'
+    | '/investigador'
     | '/usuarios'
     | '/testes/cenarios'
     | '/testes/prompts'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/submeter'
     | '/areas'
     | '/dashboard'
+    | '/investigador'
     | '/usuarios'
     | '/testes/cenarios'
     | '/testes/prompts'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
     | '/_authenticated/testes'
     | '/_authenticated/areas'
     | '/_authenticated/dashboard'
+    | '/_authenticated/investigador'
     | '/_authenticated/usuarios'
     | '/_authenticated/testes/cenarios'
     | '/_authenticated/testes/prompts'
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/usuarios'
       fullPath: '/usuarios'
       preLoaderRoute: typeof AuthenticatedUsuariosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/investigador': {
+      id: '/_authenticated/investigador'
+      path: '/investigador'
+      fullPath: '/investigador'
+      preLoaderRoute: typeof AuthenticatedInvestigadorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -267,6 +287,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTestesRouteRoute: typeof AuthenticatedTestesRouteRouteWithChildren
   AuthenticatedAreasRoute: typeof AuthenticatedAreasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInvestigadorRoute: typeof AuthenticatedInvestigadorRoute
   AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
 }
 
@@ -274,6 +295,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTestesRouteRoute: AuthenticatedTestesRouteRouteWithChildren,
   AuthenticatedAreasRoute: AuthenticatedAreasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInvestigadorRoute: AuthenticatedInvestigadorRoute,
   AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
 }
 

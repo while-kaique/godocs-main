@@ -118,6 +118,19 @@ const SCHEMA_SQL = `
     area_id TEXT NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, area_id)
   );
+
+  CREATE TABLE IF NOT EXISTS api_logs (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id TEXT REFERENCES projetos(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT 'POST',
+    duration_ms INTEGER,
+    status_code INTEGER NOT NULL DEFAULT 200,
+    error TEXT,
+    request_size INTEGER,
+    response_size INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -134,6 +147,16 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
   // Observações da análise automática (parecer da IA) — só para staff, não exibido ao usuário.
   'ALTER TABLE projetos ADD COLUMN observacoes TEXT',
+];
+
+// Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).
+const SEED_ADMINS = [
+  'lucas.queiroz@gocase.com',
+  'joao.gabriel@gocase.com',
+  'joaovictor.esteves@gocase.com',
+  'kaique.breno@gocase.com',
+  'luciano.cavalcante@gocase.com',
+  'luis.albuquerque@gocase.com',
 ];
 
 export async function initSchema(db: GoDeployDB) {
@@ -156,5 +179,13 @@ export async function initSchema(db: GoDeployDB) {
     } catch {
       // Coluna já existe ou tabela não existe — ignorar silenciosamente
     }
+  }
+
+  // Seed de admins iniciais
+  for (const email of SEED_ADMINS) {
+    await db.exec(
+      "INSERT OR IGNORE INTO admins (id, email) VALUES (lower(hex(randomblob(16))), ?);",
+      [email]
+    );
   }
 }
