@@ -158,8 +158,8 @@ describe('CARGOS', () => {
     expect(estagiario?.valor_hora).toBe(10.78);
   });
 
-  it('Coordenador custa R$ 55,15/h', () => {
-    const coord = CARGOS.find(c => c.label === 'Coordenador / Especialista');
+  it('Especialista/Gestor/Head custa R$ 55,15/h', () => {
+    const coord = CARGOS.find(c => c.label === 'Especialista / Gestor / Head');
     expect(coord?.valor_hora).toBe(55.15);
   });
 });
