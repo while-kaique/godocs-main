@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
-import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -11,11 +11,11 @@ export const Route = createFileRoute("/_authenticated")({
     console.log("[_authenticated] user:", JSON.stringify(user));
     if (!user) {
       console.log("[_authenticated] user=null → redirecionando para /");
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     if (!user.isAdmin) {
       console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     console.log("[_authenticated] Auth OK — admin:", user.email);
     return { user };
@@ -45,6 +45,9 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/configuracoes" icon={<Settings className="h-4 w-4" />}>
             Configurações
+          </NavItem>
+          <NavItem to="/investigador" icon={<Search className="h-4 w-4" />}>
+            Investigador
           </NavItem>
           <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
             Testes

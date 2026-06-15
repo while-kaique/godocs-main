@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import {
   FilePlus2,
   PencilLine,
@@ -17,6 +19,9 @@ const WEBHOOKS = {
 };
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    acesso_negado: search.acesso_negado === true || search.acesso_negado === "true",
+  }),
   head: () => ({
     meta: [
       { title: "Triagem de Fluxos · GoGroup" },
@@ -37,6 +42,19 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const { acesso_negado } = useSearch({ from: "/" });
+
+  useEffect(() => {
+    if (acesso_negado) {
+      toast.warning(
+        "Acesso restrito. Somente pessoas autorizadas podem acessar o painel de administração.",
+        { duration: 6000 }
+      );
+      // Limpa o param da URL sem recarregar a página
+      window.history.replaceState({}, "", "/");
+    }
+  }, [acesso_negado]);
+
   return (
     <div
       className="min-h-screen px-2.5 pb-2.5"

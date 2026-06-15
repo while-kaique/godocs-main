@@ -34,7 +34,12 @@ import {
   getUsuarios,
 } from '@/lib/admin.functions'
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
-import { getAdminByEmail, setDb } from '@/integrations/db/client.server'
+import {
+  getProjetosInvestigador,
+  getProjetoInvestigadorDetalhes,
+  getInvestigadorStats,
+} from '@/lib/investigador.functions'
+import { getAdminByEmail, setDb, insertApiLog, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -103,49 +108,62 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       if (!request.headers.get('x-godeploy-cron')) {
         return errorJson('Rota exclusiva de cron.', 403)
       }
+      // Limpa logs de API com mais de 30 dias
+      cleanupOldApiLogs(30).catch(() => {})
       return json(await sincronizarAreas())
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──
-    if (pathname === '/api/chat/iniciar-submissao' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await iniciarSubmissao(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/enviar-mensagem' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await enviarMensagem(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/iniciar-saving' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await iniciarSaving(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/iniciar-receita' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await iniciarReceita(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/atualizar-tipos' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await atualizarTipos(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/atualizar-metadados' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await atualizarMetadados(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/analisar' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await analisarProjetoFn(body)
-      return json(result)
-    }
-    if (pathname === '/api/chat/submeter-validacao' && method === 'POST') {
-      const body = await readBody(request)
-      const result = await submeterParaValidacao(body)
-      return json(result)
+    // Todas as rotas /api/chat/* são logadas na tabela api_logs para o Investigador.
+    if (pathname.startsWith('/api/chat/') && method === 'POST') {
+      const body = await readBody<Record<string, unknown>>(request)
+      const requestSize = JSON.stringify(body).length
+      const projetoId = (body.projeto_id as string) ?? null
+      const start = Date.now()
+      let statusCode = 200
+      let errorMsg: string | null = null
+      let responseSize = 0
+      try {
+        let result: unknown
+        if (pathname === '/api/chat/iniciar-submissao') result = await iniciarSubmissao(body)
+        else if (pathname === '/api/chat/enviar-mensagem') result = await enviarMensagem(body)
+        else if (pathname === '/api/chat/iniciar-saving') result = await iniciarSaving(body)
+        else if (pathname === '/api/chat/iniciar-receita') result = await iniciarReceita(body)
+        else if (pathname === '/api/chat/atualizar-tipos') result = await atualizarTipos(body)
+        else if (pathname === '/api/chat/atualizar-metadados') result = await atualizarMetadados(body)
+        else if (pathname === '/api/chat/analisar') result = await analisarProjetoFn(body)
+        else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body)
+        else return errorJson('Rota não encontrada', 404)
+        const resJson = JSON.stringify(result)
+        responseSize = resJson.length
+        // Para iniciar-submissao, o projeto_id vem no resultado (ainda não existia no body)
+        const logProjetoId = projetoId ?? (result as { projeto_id?: string })?.projeto_id ?? null
+        insertApiLog({
+          projeto_id: logProjetoId,
+          endpoint: pathname,
+          method,
+          duration_ms: Date.now() - start,
+          status_code: statusCode,
+          request_size: requestSize,
+          response_size: responseSize,
+        }).catch(() => {}) // fire-and-forget — nunca bloqueia a resposta
+        return new Response(resJson, { status: 200, headers: { 'Content-Type': 'application/json' } })
+      } catch (e) {
+        const err = e as Error & { status?: number }
+        statusCode = err.status ?? 500
+        errorMsg = err.message
+        insertApiLog({
+          projeto_id: projetoId,
+          endpoint: pathname,
+          method,
+          duration_ms: Date.now() - start,
+          status_code: statusCode,
+          error: errorMsg,
+          request_size: requestSize,
+          response_size: 0,
+        }).catch(() => {})
+        return errorJson(err.message, statusCode)
+      }
     }
 
     // ── Admin (requer admin) ──
@@ -234,6 +252,21 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       const { email: adminEmail } = await requireAdmin(request)
       const body = await readBody<{ chave: string; valor: unknown }>(request)
       return json(await updateConfiguracao(body.chave, body.valor, adminEmail))
+    }
+
+    // ── Investigador (requer admin) ──
+    if (pathname === '/api/admin/investigador/projetos' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await getProjetosInvestigador())
+    }
+    if (pathname === '/api/admin/investigador/stats' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await getInvestigadorStats())
+    }
+    if (pathname.startsWith('/api/admin/investigador/projetos/') && method === 'GET') {
+      await requireAdmin(request)
+      const id = pathname.split('/').pop()!
+      return json(await getProjetoInvestigadorDetalhes(id))
     }
 
     return errorJson('Rota não encontrada', 404)
