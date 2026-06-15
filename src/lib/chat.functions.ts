@@ -824,10 +824,15 @@ export async function analisarProjetoFn(rawData: unknown) {
   if (n8nUpdateUrl) {
     try {
       const projeto = await getProjetoById(projeto_id);
+      const statusLabel =
+        projeto?.status === 'aprovado' ? 'Aprovado'
+        : projeto?.status === 'em_validacao' ? 'Pendente'
+        : projeto?.status ?? 'Rascunho';
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
         observacoes: observacoes ?? '',
+        status: statusLabel,
       };
 
       const resp = await fetch(n8nUpdateUrl, {
