@@ -138,7 +138,7 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
         responseSize = resJson.length
         // Para iniciar-submissao, o projeto_id vem no resultado (ainda não existia no body)
         const logProjetoId = projetoId ?? (result as { projeto_id?: string })?.projeto_id ?? null
-        insertApiLog({
+        await insertApiLog({
           projeto_id: logProjetoId,
           endpoint: pathname,
           method,
@@ -146,13 +146,13 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
           status_code: statusCode,
           request_size: requestSize,
           response_size: responseSize,
-        }).catch(() => {}) // fire-and-forget — nunca bloqueia a resposta
+        }).catch(() => {})
         return new Response(resJson, { status: 200, headers: { 'Content-Type': 'application/json' } })
       } catch (e) {
         const err = e as Error & { status?: number }
         statusCode = err.status ?? 500
         errorMsg = err.message
-        insertApiLog({
+        await insertApiLog({
           projeto_id: projetoId,
           endpoint: pathname,
           method,
