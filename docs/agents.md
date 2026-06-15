@@ -155,4 +155,4 @@ Templates de aprovação/rejeição via Brevo (`BREVO_API_KEY`).
 | Analista Júnior | 21,29 |
 | Analista Pleno | 29,90 |
 | Analista Sênior | 33,10 |
-| Coordenador/Especialista | 55,15 |
+| Especialista / Gestor / Head | 55,15 |

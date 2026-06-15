@@ -34,7 +34,7 @@ export const CARGOS = [
   { label: 'Analista Júnior', valor_hora: 21.29 },
   { label: 'Analista Pleno', valor_hora: 29.90 },
   { label: 'Analista Sênior', valor_hora: 33.10 },
-  { label: 'Coordenador / Especialista', valor_hora: 55.15 },
+  { label: 'Especialista / Gestor / Head', valor_hora: 55.15 },
 ] as const;
 
 export type CargoLabel = typeof CARGOS[number]['label'];

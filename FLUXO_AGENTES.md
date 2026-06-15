@@ -252,7 +252,7 @@ economia_reais_mes (total)  = (Σ economia_reais_mes) − custo_externo_mensal
 | Analista Júnior | 21,29 |
 | Analista Pleno | 29,90 |
 | Analista Sênior | 33,10 |
-| Coordenador / Especialista | 55,15 |
+| Especialista / Gestor / Head | 55,15 |
 
 Depois do cálculo, o orquestrador (fase saving) recebe esses valores prontos e só **valida as horas**.
 

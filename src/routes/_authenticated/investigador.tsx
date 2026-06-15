@@ -282,8 +282,18 @@ function detectMsgPhase(msg: ChatMsg): PhaseGroup {
   if (msg.parsed_fase) return getPhaseGroup(msg.parsed_fase)
   if (msg.role === 'assistant') {
     try {
-      const parsed = JSON.parse(msg.content) as { fase?: string }
-      if (parsed.fase) return getPhaseGroup(parsed.fase)
+      const parsed = JSON.parse(msg.content) as { fase?: string; fase_origem?: string; type?: string }
+      const fase = parsed.fase_origem ?? parsed.fase
+      if (fase) {
+        // Fallback para dados antigos sem fase_origem: mensagens "complete"
+        // de transição pertencem à fase anterior, não à fase de destino.
+        if (!parsed.fase_origem && parsed.type === 'complete' && parsed.fase) {
+          if (parsed.fase === 'saving') return 'doc'
+          if (parsed.fase === 'receita') return 'saving'
+          if (parsed.fase === 'completo') return 'receita'
+        }
+        return getPhaseGroup(fase)
+      }
     } catch {
       // ignore
     }
@@ -1203,12 +1213,26 @@ function DadosTab({
             Análise automática
           </h3>
           <div className="space-y-1.5 text-sm">
-            <KV label="Resultado" value={analise.resultado} />
+            <div className="flex items-baseline gap-2">
+              <span className="text-[var(--go-text-primary)]\35 text-xs w-28 flex-shrink-0">Resultado:</span>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                analise.resultado === 'aprovado'
+                  ? 'bg-[#16a34a]/10 text-[#16a34a]'
+                  : 'bg-[#f59e0b]/10 text-[#b45309]'
+              }`}>
+                {analise.resultado === 'aprovado' ? 'Aprovado' : analise.resultado === 'rejeitado' ? 'Em revisão' : analise.resultado}
+              </span>
+            </div>
             <KV label="Pontuação" value={`${analise.pontuacao_total} / ${analise.pontuacao_maxima}`} />
-            <KV label="Complexidade" value={analise.complexidade} />
+            <KV label="Complexidade" value={
+              analise.complexidade === 'automacao' ? 'Automação'
+                : analise.complexidade === 'inteligencia' ? 'Inteligência'
+                : analise.complexidade === 'autonomia' ? 'Autonomia'
+                : analise.complexidade
+            } />
             {analise.resumo && (
-              <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3 text-[13px] leading-relaxed whitespace-pre-wrap text-[var(--go-text-primary)]/70">
-                {analise.resumo}
+              <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3">
+                <MiniMarkdown text={analise.resumo} />
               </div>
             )}
           </div>

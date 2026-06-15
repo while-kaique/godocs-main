@@ -90,7 +90,7 @@ Uma **linha por pessoa/cargo** que executava a tarefa manualmente:
 |---|---|---|---|
 | 1 | **Analista Pleno** | `16` | `2` |
 | 2 | **Analista Júnior** | `12` | `0` |
-| 3 | **Coordenador / Especialista** | `3` | `1` |
+| 3 | **Especialista / Gestor / Head** | `3` | `1` |
 
 - **Mensal / Pontual:** **Mensal** (a auditoria roda todo mês)
 - **Custo externo:** não se aplica (escopo interno) — deixar vazio
@@ -125,7 +125,7 @@ Para cada workflow:
 |---|---|---|---|
 | Analista Pleno | 16h | 2h | Executava a auditoria da maioria dos workflows + consolidava a planilha. Hoje só **revisa** o relatório gerado e valida apontamentos críticos. |
 | Analista Júnior | 12h | 0h | Fazia a coleta braçal (export, taxa de erro, nomenclatura). Hoje **não toca mais** — automatizado 100%. |
-| Coordenador / Especialista | 3h | 1h | Reunião de fechamento + priorização dos apontamentos. Hoje a reunião é mais curta porque o relatório já vem priorizado. |
+| Especialista / Gestor / Head | 3h | 1h | Reunião de fechamento + priorização dos apontamentos. Hoje a reunião é mais curta porque o relatório já vem priorizado. |
 
 **Totais (para coerência das respostas):**
 - Economia de horas/mês: `(16−2) + (12−0) + (3−1)` = **28 h/mês**.
