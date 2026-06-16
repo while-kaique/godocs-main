@@ -257,7 +257,9 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"receita":{...campos atualizados}}
 
 Preview (quando valor e memorial estiverem completos):
-{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
+
+ATENÇÃO: o campo "memorial_calculo" dentro do objeto "receita" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "receita.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
 
 export function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
@@ -421,7 +423,9 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
 Preview (quando justificativa concreta e memorial completo):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
+
+ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
