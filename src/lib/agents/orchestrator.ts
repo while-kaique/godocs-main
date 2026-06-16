@@ -593,7 +593,8 @@ export async function runOrchestrator(
       else if (fase === 'receita') fallbackResult.fase = 'receita_preview';
     } else if (recoveredType === 'complete') {
       if (fase === 'doc_preview') {
-        fallbackResult.fase = hasSaving ? 'saving' : 'receita';
+        // Sem saving nem receita (projeto especial) → encerra após a doc.
+        fallbackResult.fase = hasSaving ? 'saving' : hasReceita ? 'receita' : 'completo';
       } else if (fase === 'saving_preview') {
         fallbackResult.fase = hasReceita ? 'receita' : 'completo';
       } else if (fase === 'receita_preview') {
@@ -627,7 +628,8 @@ export async function runOrchestrator(
 
   if (type === 'complete') {
     if (fase === 'doc_preview') {
-      result.fase = hasSaving ? 'saving' : 'receita';
+      // Sem saving nem receita (projeto especial) → encerra após a doc.
+      result.fase = hasSaving ? 'saving' : hasReceita ? 'receita' : 'completo';
     } else if (fase === 'saving_preview') {
       result.fase = hasReceita ? 'receita' : 'completo';
     } else if (fase === 'receita_preview') {

@@ -288,6 +288,10 @@ const iniciarSubmissaoSchema = z.object({
   tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
   tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
+  // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
+  especial: z.boolean().optional(),
+  contexto_especial: z.string().max(2000).optional(),
   docs: z.array(
     z.object({ base64: z.string().min(1), filename: z.string().min(1) })
   ).min(1).max(5000),
@@ -343,9 +347,13 @@ export async function iniciarSubmissao(rawData: unknown) {
       membros: data.membros,
       nome: data.nome_projeto,
       data_criacao_projeto: data.data_criacao,
-      tipo_projeto: data.tipo_projeto ?? null,
-      tipos_projeto: data.tipos_projeto ?? null,
+      // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
+      // e ignora os tipos financeiros — o fluxo não passa pelas fases de saving/receita.
+      tipo_projeto: data.especial ? 'especial' : (data.tipo_projeto ?? null),
+      tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
+      especial: data.especial ?? false,
+      contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: 'rascunho',
     });
   } catch (projErr) {
@@ -955,7 +963,10 @@ export async function submeterParaValidacao(rawData: unknown) {
   }
   projeto.area = areaFinal;
 
-  const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
+  // Projeto especial nunca auto-aprova (nem na área RPA): a validação é humana,
+  // então fica sempre 'em_validacao' (→ "Pendente" na planilha) até o humano avaliar.
+  const ehEspecial = projeto.especial === 1;
+  const status = ehEspecial ? 'em_validacao' : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
   const now = new Date().toISOString();
 
   // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
@@ -1020,6 +1031,9 @@ export async function submeterParaValidacao(rawData: unknown) {
         // e geraria "undefined/undefined/—". Enviar a data crua ou null.
         data_criacao_projeto: projeto.data_criacao_projeto ?? null,
         tipos_projeto: tiposProjeto,
+        // Flag do projeto especial + contexto coletado na etapa 2.5 (validação humana).
+        especial: ehEspecial,
+        contexto_especial: ouTraco(projeto.contexto_especial),
         status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,

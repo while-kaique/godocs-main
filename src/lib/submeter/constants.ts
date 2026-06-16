@@ -58,6 +58,9 @@ export interface FormData {
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];
   descricaoBreve: string;
+  // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
+  especial: boolean;
+  contextoEspecial: string;
 }
 
 export interface FieldErrors {

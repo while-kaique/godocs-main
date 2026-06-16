@@ -17,8 +17,6 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
-  CheckboxGroup,
-  InfoTooltip,
 } from "./form-components";
 
 // ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
@@ -513,36 +511,6 @@ export function Step2({
   return (
     <div>
       <SectionTitle icon="📋">Dados do Projeto</SectionTitle>
-
-      {/* Tipo de projeto */}
-      <FormGroup>
-        <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-          Este projeto gera saving, receita incremental ou ambos?
-          <InfoTooltip>
-            <strong className="mb-1 block text-white">Saving vs. Receita Incremental</strong>
-            <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-              <strong style={{ color: "var(--go-lime)" }}>Saving</strong> — economia gerada pela automação.
-              Ex: processo manual que levava 20h/mês agora é automático (economia de horas e custo operacional).
-            </span>
-            <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-              <strong style={{ color: "var(--go-lime)" }}>Receita Incremental</strong> — aumento de receita gerado pela automação.
-              Ex: automação que dispara ofertas personalizadas e aumenta conversão de vendas.
-            </span>
-            <span className="block text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-              Pode selecionar os dois se o projeto gerar ambos os benefícios.
-            </span>
-          </InfoTooltip>
-        </div>
-        <CheckboxGroup
-          value={form.tipoProjeto}
-          onChange={(v) => updateField("tipoProjeto", v as FormData["tipoProjeto"])}
-          error={errors.tipoProjeto}
-          options={[
-            { value: "saving",              label: "💰 Saving" },
-            { value: "receita_incremental", label: "📈 Receita Incremental" },
-          ]}
-        />
-      </FormGroup>
 
       {/* Nome do projeto */}
       <FormGroup>
