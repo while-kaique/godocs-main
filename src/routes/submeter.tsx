@@ -48,7 +48,6 @@ const emptyFormDraft = (): SavingFormData => ({
 // adaptação a idas e vindas).
 type AgentMeta = {
   nomeProjeto: string;
-  area: string;
   ferramenta: string;
   participantes: string[];
   dataCriacao: string;
@@ -132,7 +131,6 @@ function SubmeterPage() {
     prodStatus: "",
     nome: "",
     email: "",
-    area: "",
     ferramenta: "",
     ferramentaOutra: "",
     servicoExterno: "",
@@ -181,12 +179,11 @@ function SubmeterPage() {
 
   const snapshotMeta = useCallback((): AgentMeta => ({
     nomeProjeto: form.nomeProjeto.trim(),
-    area: form.area,
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
-  }), [form.nomeProjeto, form.area, form.participantes, form.dataCriacao, form.descricaoBreve, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -217,7 +214,6 @@ function SubmeterPage() {
         errs.email = "Informe um e-mail válido";
       else if (!ALLOWED_DOMAINS_RE.test(form.email.trim()))
         errs.email = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
-      if (!form.area) errs.area = "Selecione sua área";
       if (form.escopo === "externo") {
         if (!form.servicoExterno.trim())
           errs.servicoExterno = "Informe o nome do serviço externo";
@@ -341,7 +337,6 @@ function SubmeterPage() {
         {
           responsavel_nome: form.nome.trim(),
           responsavel_email: form.email.trim(),
-          area: form.area,
           ferramenta: ferramentaEnviada,
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
@@ -427,7 +422,6 @@ function SubmeterPage() {
         {
           projeto_id: projetoId,
           nome_projeto: meta.nomeProjeto,
-          area: meta.area,
           ferramenta: meta.ferramenta,
           membros: meta.participantes,
           data_criacao: meta.dataCriacao,
@@ -502,7 +496,6 @@ function SubmeterPage() {
           await apiFetch("/api/chat/atualizar-metadados", {
             projeto_id: projetoId,
             nome_projeto: meta.nomeProjeto,
-            area: meta.area,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
@@ -920,7 +913,6 @@ function SubmeterPage() {
               }}
             >
               <SummaryRow label="Projeto" value={form.nomeProjeto} />
-              <SummaryRow label="Área" value={form.area} />
               <SummaryRow
                 label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
                 value={form.escopo === "externo" ? form.servicoExterno : form.ferramenta}

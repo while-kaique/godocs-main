@@ -2,7 +2,7 @@
 // Valida a regra v3: filhos L1 da raiz viram área, EXCETO nós passthrough (por
 // líder), cujos filhos L2 é que viram área. Dedup por slug, ordenado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { deriveAreasFromTeamGuide } from '@/lib/areas/teamguide.server';
+import { deriveAreasFromTeamGuide, deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
 
 // Árvore mínima: 3 domínios (por líder) + 1 passthrough em cada um para cobrir a regra.
 const TEAMS = [
@@ -45,5 +45,62 @@ describe('deriveAreasFromTeamGuide', () => {
   it('lança erro sem TG_API_TOKEN', async () => {
     delete process.env.TG_API_TOKEN;
     await expect(deriveAreasFromTeamGuide()).rejects.toThrow(/TG_API_TOKEN/);
+  });
+});
+
+// Membros de teste: cada um aponta para um time da árvore TEAMS acima.
+const MEMBERS = [
+  { id: 'm1', name: 'João Dados Silva', contactEmail: 'joao.dados@gocase.com', teamsIds: ['dados'] },
+  { id: 'm2', name: 'Maria RPA Souza', contactEmail: 'maria.rpa@gocase.com', teamsIds: ['rpa'] },
+  // Pessoa cadastrada na própria raiz (fora de qualquer nó-área mapeado).
+  { id: 'm3', name: 'Chefe Geral', contactEmail: 'chefe.geral@gocase.com', teamsIds: ['r'] },
+];
+
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+describe('deriveAreaFromEmail', () => {
+  beforeEach(() => {
+    process.env.TG_API_TOKEN = 'fake-token';
+    // Mock que diferencia /teams (árvore) de /members (busca por NOME via ?text=).
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = new URL(url);
+      if (u.pathname === '/teams') {
+        return { ok: true, json: async () => TEAMS } as Response;
+      }
+      if (u.pathname.includes('/members')) {
+        const text = norm(u.searchParams.get('text') ?? '');
+        const page = Number(u.searchParams.get('page') ?? '0');
+        // Só a página 0 traz resultados (mimetiza páginas parciais → fim).
+        const hits = page === 0 ? MEMBERS.filter((m) => norm(m.name).includes(text)) : [];
+        return { ok: true, json: async () => hits } as Response;
+      }
+      return { ok: true, json: async () => [] } as Response;
+    }));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.TG_API_TOKEN;
+  });
+
+  it('resolve a área pelo email (L2 de passthrough)', async () => {
+    expect(await deriveAreaFromEmail('joao.dados@gocase.com')).toBe('Dados');
+    expect(await deriveAreaFromEmail('maria.rpa@gocase.com')).toBe('RPA');
+  });
+
+  it('é case-insensitive no email', async () => {
+    expect(await deriveAreaFromEmail('JOAO.DADOS@gocase.com')).toBe('Dados');
+  });
+
+  it('retorna null quando o email não está na TeamGuide', async () => {
+    expect(await deriveAreaFromEmail('ninguem.aqui@gocase.com')).toBeNull();
+  });
+
+  it('retorna null quando a pessoa não cai em nenhum nó-área', async () => {
+    expect(await deriveAreaFromEmail('chefe.geral@gocase.com')).toBeNull();
+  });
+
+  it('lança erro sem TG_API_TOKEN', async () => {
+    delete process.env.TG_API_TOKEN;
+    await expect(deriveAreaFromEmail('joao.dados@gocase.com')).rejects.toThrow(/TG_API_TOKEN/);
   });
 });

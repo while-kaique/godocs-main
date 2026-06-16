@@ -49,7 +49,6 @@ export interface FormData {
   prodStatus: "sim" | "dev" | "idle" | "";
   nome: string;
   email: string;
-  area: string;
   ferramenta: string;
   ferramentaOutra: string;
   servicoExterno: string;
