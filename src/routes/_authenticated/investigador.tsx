@@ -29,6 +29,9 @@ import {
   Eye,
   ArrowUpRight,
   ArrowDownLeft,
+  SlidersHorizontal,
+  X,
+  Calendar,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -136,6 +139,34 @@ type InvestigadorStats = {
 }
 
 type Filtro = 'todos' | 'ativos' | 'com_erros' | 'lentos'
+
+type FiltrosAvancados = {
+  status: string[]
+  fase: string[]
+  area: string[]
+  ferramenta: string[]
+  complexidade: string[]
+  dataInicio: string | null
+  dataFim: string | null
+  chatCompleto: 'todos' | 'completo' | 'em_andamento'
+}
+
+const FILTROS_AVANCADOS_DEFAULT: FiltrosAvancados = {
+  status: [],
+  fase: [],
+  area: [],
+  ferramenta: [],
+  complexidade: [],
+  dataInicio: null,
+  dataFim: null,
+  chatCompleto: 'todos',
+}
+
+const COMPLEXIDADE_LABELS: Record<string, string> = {
+  automacao: 'Automação',
+  inteligencia: 'Inteligência',
+  autonomia: 'Autonomia',
+}
 
 // ── Constantes de UI ─────────────────────────────────────────────────────────
 
@@ -330,6 +361,7 @@ function Investigador() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
+  const [filtrosAv, setFiltrosAv] = useState<FiltrosAvancados>(FILTROS_AVANCADOS_DEFAULT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detalhes, setDetalhes] = useState<ProjetoDetalhes | null>(null)
   const [detalhesLoading, setDetalhesLoading] = useState(false)
@@ -375,9 +407,11 @@ function Investigador() {
 
   // Filtragem
   const filtered = projetos.filter((p) => {
+    // Filtros rápidos
     if (filtro === 'ativos' && !isActiveNow(p)) return false
     if (filtro === 'com_erros' && !p.tem_erro) return false
     if (filtro === 'lentos' && (p.max_duracao_api_ms == null || p.max_duracao_api_ms <= 5000)) return false
+    // Busca textual
     if (busca) {
       const q = busca.toLowerCase()
       const match =
@@ -387,10 +421,30 @@ function Investigador() {
         (p.area_nome ?? '').toLowerCase().includes(q)
       if (!match) return false
     }
+    // Filtros avançados
+    if (filtrosAv.status.length > 0 && !filtrosAv.status.includes(p.status ?? '')) return false
+    if (filtrosAv.fase.length > 0 && !filtrosAv.fase.includes(p.fase_atual)) return false
+    if (filtrosAv.area.length > 0 && !filtrosAv.area.includes(p.area_nome ?? '')) return false
+    if (filtrosAv.ferramenta.length > 0 && !filtrosAv.ferramenta.includes(p.ferramenta)) return false
+    if (filtrosAv.complexidade.length > 0 && !filtrosAv.complexidade.includes(p.complexidade ?? '')) return false
+    if (filtrosAv.dataInicio && p.created_at && p.created_at < filtrosAv.dataInicio) return false
+    if (filtrosAv.dataFim && p.created_at && p.created_at > filtrosAv.dataFim + 'T23:59:59') return false
+    if (filtrosAv.chatCompleto === 'completo' && !p.chat_completo) return false
+    if (filtrosAv.chatCompleto === 'em_andamento' && p.chat_completo) return false
     return true
   })
 
   const ativos = projetos.filter(isActiveNow).length
+
+  // Valores dinâmicos para filtros (extraídos dos projetos carregados)
+  const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
+  const ferramentasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.ferramenta).filter(Boolean))].sort() as string[], [projetos])
+
+  // Contagem de filtros avançados ativos
+  const filtrosAvAtivos = filtrosAv.status.length + filtrosAv.fase.length + filtrosAv.area.length +
+    filtrosAv.ferramenta.length + filtrosAv.complexidade.length +
+    (filtrosAv.dataInicio ? 1 : 0) + (filtrosAv.dataFim ? 1 : 0) +
+    (filtrosAv.chatCompleto !== 'todos' ? 1 : 0)
 
   // Tempo médio de conclusão (apenas projetos completos)
   const completedDurations = projetos
@@ -484,7 +538,7 @@ function Investigador() {
           ))}
         </div>
 
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--go-text-primary)]/30" />
           <input
             type="text"
@@ -495,6 +549,8 @@ function Investigador() {
           />
         </div>
 
+        <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
+
         <button
           onClick={fetchData}
           className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-2 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
@@ -503,6 +559,8 @@ function Investigador() {
           Atualizar
         </button>
       </div>
+      {/* Chips de filtros avançados ativos */}
+      <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />
 
       {/* Lista de projetos */}
       <div className="mt-4">
@@ -1179,6 +1237,269 @@ function renderInline(text: string): React.ReactNode {
 }
 
 // ── Tab: Logs de API ─────────────────────────────────────────────────────────
+
+// ── Componente: Seção de checkboxes dentro do popover de filtros ────────────
+
+function FiltroSecao({
+  titulo,
+  opcoes,
+  selecionados,
+  onChange,
+}: {
+  titulo: string
+  opcoes: { value: string; label: string }[]
+  selecionados: string[]
+  onChange: (next: string[]) => void
+}) {
+  if (opcoes.length === 0) return null
+  const toggle = (v: string) => {
+    onChange(selecionados.includes(v) ? selecionados.filter((s) => s !== v) : [...selecionados, v])
+  }
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">{titulo}</div>
+      <div className="flex flex-wrap gap-1">
+        {opcoes.map((o) => {
+          const active = selecionados.includes(o.value)
+          return (
+            <button
+              key={o.value}
+              onClick={() => toggle(o.value)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                active
+                  ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                  : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25 hover:text-[var(--go-text-primary)]'
+              }`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Componente: Popover de filtros avançados ─────────────────────────────────
+
+function FiltroPopover({
+  filtros,
+  onChange,
+  areas,
+  ferramentas,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+  areas: string[]
+  ferramentas: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const totalAtivos = filtros.status.length + filtros.fase.length + filtros.area.length +
+    filtros.ferramenta.length + filtros.complexidade.length +
+    (filtros.dataInicio ? 1 : 0) + (filtros.dataFim ? 1 : 0) +
+    (filtros.chatCompleto !== 'todos' ? 1 : 0)
+
+  const update = (patch: Partial<FiltrosAvancados>) => onChange({ ...filtros, ...patch })
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border px-3 py-2 text-xs font-medium transition-all ${
+          totalAtivos > 0
+            ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+            : 'bg-white text-[var(--go-text-primary)]/50 border-[var(--go-blue)]/10 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25'
+        }`}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        Filtros
+        {totalAtivos > 0 && (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-bold">
+            {totalAtivos}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-[420px] rounded-[var(--go-radius)] border border-[var(--go-blue)]/10 bg-white shadow-xl shadow-black/8 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[var(--go-blue)]/6 px-4 py-2.5">
+            <span className="text-sm font-semibold text-[var(--go-text-primary)]">Filtros avançados</span>
+            {totalAtivos > 0 && (
+              <button
+                onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+                className="text-[11px] text-[#dc2626] hover:text-[#dc2626]/80 font-medium"
+              >
+                Limpar tudo
+              </button>
+            )}
+          </div>
+
+          {/* Body */}
+          <div className="max-h-[420px] overflow-y-auto p-4 space-y-4">
+            <FiltroSecao
+              titulo="Status"
+              opcoes={Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.status}
+              onChange={(s) => update({ status: s })}
+            />
+
+            <FiltroSecao
+              titulo="Fase"
+              opcoes={Object.entries(FASE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.fase}
+              onChange={(f) => update({ fase: f })}
+            />
+
+            <FiltroSecao
+              titulo="Área"
+              opcoes={areas.map((a) => ({ value: a, label: a }))}
+              selecionados={filtros.area}
+              onChange={(a) => update({ area: a })}
+            />
+
+            <FiltroSecao
+              titulo="Ferramenta"
+              opcoes={ferramentas.map((f) => ({ value: f, label: f }))}
+              selecionados={filtros.ferramenta}
+              onChange={(f) => update({ ferramenta: f })}
+            />
+
+            <FiltroSecao
+              titulo="Complexidade"
+              opcoes={Object.entries(COMPLEXIDADE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.complexidade}
+              onChange={(c) => update({ complexidade: c })}
+            />
+
+            {/* Período */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Período de criação</div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataInicio ?? ''}
+                    onChange={(e) => update({ dataInicio: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                    placeholder="De"
+                  />
+                </div>
+                <span className="text-[var(--go-text-primary)]/20 text-xs">até</span>
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataFim ?? ''}
+                    onChange={(e) => update({ dataFim: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Chat completo */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Formulário</div>
+              <div className="flex gap-1">
+                {([['todos', 'Todos'], ['completo', 'Completo'], ['em_andamento', 'Em andamento']] as const).map(([v, l]) => (
+                  <button
+                    key={v}
+                    onClick={() => update({ chatCompleto: v })}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                      filtros.chatCompleto === v
+                        ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                        : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Componente: Chips de filtros ativos ──────────────────────────────────────
+
+function FiltroChips({
+  filtros,
+  onChange,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+}) {
+  const chips: { key: string; label: string; remove: () => void }[] = []
+
+  filtros.status.forEach((s) =>
+    chips.push({ key: `status-${s}`, label: `Status: ${STATUS_LABELS[s] ?? s}`, remove: () => onChange({ ...filtros, status: filtros.status.filter((x) => x !== s) }) })
+  )
+  filtros.fase.forEach((f) =>
+    chips.push({ key: `fase-${f}`, label: `Fase: ${FASE_LABELS[f] ?? f}`, remove: () => onChange({ ...filtros, fase: filtros.fase.filter((x) => x !== f) }) })
+  )
+  filtros.area.forEach((a) =>
+    chips.push({ key: `area-${a}`, label: `Área: ${a}`, remove: () => onChange({ ...filtros, area: filtros.area.filter((x) => x !== a) }) })
+  )
+  filtros.ferramenta.forEach((f) =>
+    chips.push({ key: `ferr-${f}`, label: `Ferramenta: ${f}`, remove: () => onChange({ ...filtros, ferramenta: filtros.ferramenta.filter((x) => x !== f) }) })
+  )
+  filtros.complexidade.forEach((c) =>
+    chips.push({ key: `comp-${c}`, label: `Complexidade: ${COMPLEXIDADE_LABELS[c] ?? c}`, remove: () => onChange({ ...filtros, complexidade: filtros.complexidade.filter((x) => x !== c) }) })
+  )
+  if (filtros.dataInicio)
+    chips.push({ key: 'di', label: `De: ${filtros.dataInicio}`, remove: () => onChange({ ...filtros, dataInicio: null }) })
+  if (filtros.dataFim)
+    chips.push({ key: 'df', label: `Até: ${filtros.dataFim}`, remove: () => onChange({ ...filtros, dataFim: null }) })
+  if (filtros.chatCompleto !== 'todos')
+    chips.push({
+      key: 'chat',
+      label: filtros.chatCompleto === 'completo' ? 'Formulário completo' : 'Em andamento',
+      remove: () => onChange({ ...filtros, chatCompleto: 'todos' }),
+    })
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--go-blue)]/6 pl-2.5 pr-1 py-0.5 text-[11px] font-medium text-[var(--go-blue)]"
+        >
+          {c.label}
+          <button
+            onClick={c.remove}
+            className="rounded-full p-0.5 hover:bg-[var(--go-blue)]/15 transition-colors"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+        className="text-[11px] text-[#dc2626]/70 hover:text-[#dc2626] font-medium ml-1"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  )
+}
 
 // ── Componente: Visualizador de JSON com cópia e colapso inteligente ────────
 
