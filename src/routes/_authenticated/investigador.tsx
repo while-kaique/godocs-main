@@ -24,6 +24,14 @@ import {
   Shield,
   TrendingUp,
   Sparkles,
+  Copy,
+  Check,
+  Eye,
+  ArrowUpRight,
+  ArrowDownLeft,
+  SlidersHorizontal,
+  X,
+  Calendar,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -131,6 +139,34 @@ type InvestigadorStats = {
 }
 
 type Filtro = 'todos' | 'ativos' | 'com_erros' | 'lentos'
+
+type FiltrosAvancados = {
+  status: string[]
+  fase: string[]
+  area: string[]
+  ferramenta: string[]
+  complexidade: string[]
+  dataInicio: string | null
+  dataFim: string | null
+  chatCompleto: 'todos' | 'completo' | 'em_andamento'
+}
+
+const FILTROS_AVANCADOS_DEFAULT: FiltrosAvancados = {
+  status: [],
+  fase: [],
+  area: [],
+  ferramenta: [],
+  complexidade: [],
+  dataInicio: null,
+  dataFim: null,
+  chatCompleto: 'todos',
+}
+
+const COMPLEXIDADE_LABELS: Record<string, string> = {
+  automacao: 'Automação',
+  inteligencia: 'Inteligência',
+  autonomia: 'Autonomia',
+}
 
 // ── Constantes de UI ─────────────────────────────────────────────────────────
 
@@ -325,6 +361,7 @@ function Investigador() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
+  const [filtrosAv, setFiltrosAv] = useState<FiltrosAvancados>(FILTROS_AVANCADOS_DEFAULT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detalhes, setDetalhes] = useState<ProjetoDetalhes | null>(null)
   const [detalhesLoading, setDetalhesLoading] = useState(false)
@@ -370,9 +407,11 @@ function Investigador() {
 
   // Filtragem
   const filtered = projetos.filter((p) => {
+    // Filtros rápidos
     if (filtro === 'ativos' && !isActiveNow(p)) return false
     if (filtro === 'com_erros' && !p.tem_erro) return false
     if (filtro === 'lentos' && (p.max_duracao_api_ms == null || p.max_duracao_api_ms <= 5000)) return false
+    // Busca textual
     if (busca) {
       const q = busca.toLowerCase()
       const match =
@@ -382,10 +421,38 @@ function Investigador() {
         (p.area_nome ?? '').toLowerCase().includes(q)
       if (!match) return false
     }
+    // Filtros avançados
+    if (filtrosAv.status.length > 0 && !filtrosAv.status.includes(p.status ?? '')) return false
+    if (filtrosAv.fase.length > 0 && !filtrosAv.fase.includes(p.fase_atual)) return false
+    if (filtrosAv.area.length > 0 && !filtrosAv.area.includes(p.area_nome ?? '')) return false
+    if (filtrosAv.ferramenta.length > 0 && !filtrosAv.ferramenta.includes(p.ferramenta)) return false
+    if (filtrosAv.complexidade.length > 0 && !filtrosAv.complexidade.includes(p.complexidade ?? '')) return false
+    if (filtrosAv.dataInicio && p.created_at && p.created_at < filtrosAv.dataInicio) return false
+    if (filtrosAv.dataFim && p.created_at && p.created_at > filtrosAv.dataFim + 'T23:59:59') return false
+    if (filtrosAv.chatCompleto === 'completo' && !p.chat_completo) return false
+    if (filtrosAv.chatCompleto === 'em_andamento' && p.chat_completo) return false
     return true
   })
 
   const ativos = projetos.filter(isActiveNow).length
+
+  // Valores dinâmicos para filtros (extraídos dos projetos carregados)
+  const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
+  const ferramentasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.ferramenta).filter(Boolean))].sort() as string[], [projetos])
+
+  // Contagem de filtros avançados ativos
+  const filtrosAvAtivos = filtrosAv.status.length + filtrosAv.fase.length + filtrosAv.area.length +
+    filtrosAv.ferramenta.length + filtrosAv.complexidade.length +
+    (filtrosAv.dataInicio ? 1 : 0) + (filtrosAv.dataFim ? 1 : 0) +
+    (filtrosAv.chatCompleto !== 'todos' ? 1 : 0)
+
+  // Tempo médio de conclusão (apenas projetos completos)
+  const completedDurations = projetos
+    .filter((p) => p.chat_completo && p.tempo_desde_inicio_min != null)
+    .map((p) => p.tempo_desde_inicio_min!)
+  const avgCompletionMin = completedDurations.length > 0
+    ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length)
+    : null
 
   if (selectedId) {
     return (
@@ -435,7 +502,7 @@ function Investigador() {
           <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4" />} color="var(--go-blue)" />
           <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4" />} color="#ca8a04" />
           <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
-          <StatCard label="Tempo médio" value={formatDuration(stats.media_duracao_ms)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
+          <StatCard label="Tempo médio" value={formatTimeSince(avgCompletionMin)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
       )}
 
@@ -471,7 +538,7 @@ function Investigador() {
           ))}
         </div>
 
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--go-text-primary)]/30" />
           <input
             type="text"
@@ -482,6 +549,8 @@ function Investigador() {
           />
         </div>
 
+        <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
+
         <button
           onClick={fetchData}
           className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-2 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
@@ -490,6 +559,8 @@ function Investigador() {
           Atualizar
         </button>
       </div>
+      {/* Chips de filtros avançados ativos */}
+      <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />
 
       {/* Lista de projetos */}
       <div className="mt-4">
@@ -580,9 +651,11 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
             <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
               {p.nome ?? 'Projeto sem nome'}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
-              {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
-            </span>
+            {p.fase_atual !== 'completo' && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
+                {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
+              </span>
+            )}
             {p.status && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[p.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                 {STATUS_LABELS[p.status] ?? p.status}
@@ -608,12 +681,21 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
 
         {/* Métricas rápidas */}
         <div className="flex items-center gap-4 text-xs flex-shrink-0">
+          <div className="text-center" title="Início do formulário">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(p.created_at)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">início</div>
+          </div>
           <div className="text-center" title="Mensagens (usuário / IA)">
             <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
           </div>
           <div className="text-center" title="Tempo desde início">
-            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
+            <div className={`font-semibold tabular-nums text-[13px] ${
+              p.fase_atual === 'completo' ? 'text-[#16a34a]'
+                : p.fase_atual === 'saving' || p.fase_atual === 'receita' ? 'text-[#ea580c]'
+                : p.fase_atual === 'documentacao' ? 'text-[var(--go-blue)]'
+                : 'text-[var(--go-text-primary)]/80'
+            }`}>{formatTimeSince(p.tempo_desde_inicio_min)}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">duração</div>
           </div>
           <div className="text-center" title="Tempo médio de resposta da API">
@@ -1156,6 +1238,456 @@ function renderInline(text: string): React.ReactNode {
 
 // ── Tab: Logs de API ─────────────────────────────────────────────────────────
 
+// ── Componente: Seção de checkboxes dentro do popover de filtros ────────────
+
+function FiltroSecao({
+  titulo,
+  opcoes,
+  selecionados,
+  onChange,
+}: {
+  titulo: string
+  opcoes: { value: string; label: string }[]
+  selecionados: string[]
+  onChange: (next: string[]) => void
+}) {
+  if (opcoes.length === 0) return null
+  const toggle = (v: string) => {
+    onChange(selecionados.includes(v) ? selecionados.filter((s) => s !== v) : [...selecionados, v])
+  }
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">{titulo}</div>
+      <div className="flex flex-wrap gap-1">
+        {opcoes.map((o) => {
+          const active = selecionados.includes(o.value)
+          return (
+            <button
+              key={o.value}
+              onClick={() => toggle(o.value)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                active
+                  ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                  : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25 hover:text-[var(--go-text-primary)]'
+              }`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Componente: Popover de filtros avançados ─────────────────────────────────
+
+function FiltroPopover({
+  filtros,
+  onChange,
+  areas,
+  ferramentas,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+  areas: string[]
+  ferramentas: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const totalAtivos = filtros.status.length + filtros.fase.length + filtros.area.length +
+    filtros.ferramenta.length + filtros.complexidade.length +
+    (filtros.dataInicio ? 1 : 0) + (filtros.dataFim ? 1 : 0) +
+    (filtros.chatCompleto !== 'todos' ? 1 : 0)
+
+  const update = (patch: Partial<FiltrosAvancados>) => onChange({ ...filtros, ...patch })
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border px-3 py-2 text-xs font-medium transition-all ${
+          totalAtivos > 0
+            ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+            : 'bg-white text-[var(--go-text-primary)]/50 border-[var(--go-blue)]/10 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25'
+        }`}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        Filtros
+        {totalAtivos > 0 && (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-bold">
+            {totalAtivos}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-[420px] rounded-[var(--go-radius)] border border-[var(--go-blue)]/10 bg-white shadow-xl shadow-black/8 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[var(--go-blue)]/6 px-4 py-2.5">
+            <span className="text-sm font-semibold text-[var(--go-text-primary)]">Filtros avançados</span>
+            {totalAtivos > 0 && (
+              <button
+                onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+                className="text-[11px] text-[#dc2626] hover:text-[#dc2626]/80 font-medium"
+              >
+                Limpar tudo
+              </button>
+            )}
+          </div>
+
+          {/* Body */}
+          <div className="max-h-[420px] overflow-y-auto p-4 space-y-4">
+            <FiltroSecao
+              titulo="Status"
+              opcoes={Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.status}
+              onChange={(s) => update({ status: s })}
+            />
+
+            <FiltroSecao
+              titulo="Fase"
+              opcoes={Object.entries(FASE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.fase}
+              onChange={(f) => update({ fase: f })}
+            />
+
+            <FiltroSecao
+              titulo="Área"
+              opcoes={areas.map((a) => ({ value: a, label: a }))}
+              selecionados={filtros.area}
+              onChange={(a) => update({ area: a })}
+            />
+
+            <FiltroSecao
+              titulo="Ferramenta"
+              opcoes={ferramentas.map((f) => ({ value: f, label: f }))}
+              selecionados={filtros.ferramenta}
+              onChange={(f) => update({ ferramenta: f })}
+            />
+
+            <FiltroSecao
+              titulo="Complexidade"
+              opcoes={Object.entries(COMPLEXIDADE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.complexidade}
+              onChange={(c) => update({ complexidade: c })}
+            />
+
+            {/* Período */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Data de Início</div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataInicio ?? ''}
+                    onChange={(e) => update({ dataInicio: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                    placeholder="De"
+                  />
+                </div>
+                <span className="text-[var(--go-text-primary)]/20 text-xs">até</span>
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataFim ?? ''}
+                    onChange={(e) => update({ dataFim: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Chat completo */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Formulário</div>
+              <div className="flex gap-1">
+                {([['todos', 'Todos'], ['completo', 'Completo'], ['em_andamento', 'Em andamento']] as const).map(([v, l]) => (
+                  <button
+                    key={v}
+                    onClick={() => update({ chatCompleto: v })}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                      filtros.chatCompleto === v
+                        ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                        : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Componente: Chips de filtros ativos ──────────────────────────────────────
+
+function FiltroChips({
+  filtros,
+  onChange,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+}) {
+  const chips: { key: string; label: string; remove: () => void }[] = []
+
+  filtros.status.forEach((s) =>
+    chips.push({ key: `status-${s}`, label: `Status: ${STATUS_LABELS[s] ?? s}`, remove: () => onChange({ ...filtros, status: filtros.status.filter((x) => x !== s) }) })
+  )
+  filtros.fase.forEach((f) =>
+    chips.push({ key: `fase-${f}`, label: `Fase: ${FASE_LABELS[f] ?? f}`, remove: () => onChange({ ...filtros, fase: filtros.fase.filter((x) => x !== f) }) })
+  )
+  filtros.area.forEach((a) =>
+    chips.push({ key: `area-${a}`, label: `Área: ${a}`, remove: () => onChange({ ...filtros, area: filtros.area.filter((x) => x !== a) }) })
+  )
+  filtros.ferramenta.forEach((f) =>
+    chips.push({ key: `ferr-${f}`, label: `Ferramenta: ${f}`, remove: () => onChange({ ...filtros, ferramenta: filtros.ferramenta.filter((x) => x !== f) }) })
+  )
+  filtros.complexidade.forEach((c) =>
+    chips.push({ key: `comp-${c}`, label: `Complexidade: ${COMPLEXIDADE_LABELS[c] ?? c}`, remove: () => onChange({ ...filtros, complexidade: filtros.complexidade.filter((x) => x !== c) }) })
+  )
+  if (filtros.dataInicio)
+    chips.push({ key: 'di', label: `De: ${filtros.dataInicio}`, remove: () => onChange({ ...filtros, dataInicio: null }) })
+  if (filtros.dataFim)
+    chips.push({ key: 'df', label: `Até: ${filtros.dataFim}`, remove: () => onChange({ ...filtros, dataFim: null }) })
+  if (filtros.chatCompleto !== 'todos')
+    chips.push({
+      key: 'chat',
+      label: filtros.chatCompleto === 'completo' ? 'Formulário completo' : 'Em andamento',
+      remove: () => onChange({ ...filtros, chatCompleto: 'todos' }),
+    })
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--go-blue)]/6 pl-2.5 pr-1 py-0.5 text-[11px] font-medium text-[var(--go-blue)]"
+        >
+          {c.label}
+          <button
+            onClick={c.remove}
+            className="rounded-full p-0.5 hover:bg-[var(--go-blue)]/15 transition-colors"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+        className="text-[11px] text-[#dc2626]/70 hover:text-[#dc2626] font-medium ml-1"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  )
+}
+
+// ── Componente: Visualizador de JSON com cópia e colapso inteligente ────────
+
+function JsonBodyViewer({ label, body, icon }: { label: string; body: string | null; icon: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(true)
+  const [copied, setCopied] = useState(false)
+
+  if (!body) {
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider mb-1 flex items-center gap-1">
+          {icon} {label}
+        </div>
+        <div className="text-xs text-[var(--go-text-primary)]/20 italic">Sem dados</div>
+      </div>
+    )
+  }
+
+  // Tenta formatar como JSON bonito
+  let formatted = body
+  let isJson = false
+  try {
+    const parsed = JSON.parse(body)
+    formatted = JSON.stringify(parsed, null, 2)
+    isJson = true
+  } catch { /* não é JSON, exibe raw */ }
+
+  const lineCount = formatted.split('\n').length
+  const isLarge = formatted.length > 3000 || lineCount > 60
+  const displayText = collapsed && isLarge ? formatted.slice(0, 2000) + '\n\n…' : formatted
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(formatted)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider flex items-center gap-1">
+          {icon} {label}
+          {isJson && (
+            <span className="ml-1 rounded bg-[var(--go-blue)]/6 px-1.5 py-0.5 text-[9px] text-[var(--go-blue)] font-medium">
+              JSON
+            </span>
+          )}
+          <span className="text-[var(--go-text-primary)]/20 font-normal normal-case">
+            ({(body.length / 1024).toFixed(1)} KB{lineCount > 1 ? ` · ${lineCount} linhas` : ''})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isLarge && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-[10px] text-[var(--go-blue)] hover:text-[var(--go-blue)]/80 font-medium flex items-center gap-0.5 transition-colors"
+            >
+              {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+              {collapsed ? 'Expandir tudo' : 'Colapsar'}
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="text-[var(--go-text-primary)]/30 hover:text-[var(--go-blue)] transition-colors p-0.5"
+            title="Copiar"
+          >
+            {copied ? <Check className="h-3 w-3 text-[#16a34a]" /> : <Copy className="h-3 w-3" />}
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-auto rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/50 border border-[var(--go-blue)]/5 p-2.5 text-[11px] leading-[1.55] font-mono text-[var(--go-text-primary)]/65 max-h-[400px] whitespace-pre-wrap break-all select-text">
+        {displayText}
+      </pre>
+    </div>
+  )
+}
+
+// ── Linha expandível de API Log ─────────────────────────────────────────────
+
+function ApiLogRow({ log }: { log: ApiLog }) {
+  const [expanded, setExpanded] = useState(false)
+  const [bodyData, setBodyData] = useState<{ request_body: string | null; response_body: string | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const isError = log.status_code >= 400
+  const isSlow = (log.duration_ms ?? 0) > 5000
+
+  const handleToggle = async () => {
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
+    if (!bodyData) {
+      setLoading(true)
+      try {
+        const data = await apiFetch<{ request_body: string | null; response_body: string | null }>(
+          `/api/admin/investigador/log/${log.id}`
+        )
+        setBodyData(data)
+      } catch {
+        setBodyData({ request_body: null, response_body: null })
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <>
+      <tr
+        onClick={handleToggle}
+        className={`border-b border-[var(--go-blue)]/4 cursor-pointer transition-colors group ${
+          isError
+            ? 'bg-[#dc2626]/3 hover:bg-[#dc2626]/6'
+            : isSlow
+              ? 'bg-[#ca8a04]/3 hover:bg-[#ca8a04]/6'
+              : 'hover:bg-[var(--go-blue)]/3'
+        } ${expanded ? '!border-b-0' : ''}`}
+      >
+        <td className="py-2 px-3 w-5">
+          <div className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}>
+            <ChevronRight className="h-3.5 w-3.5 text-[var(--go-text-primary)]/25 group-hover:text-[var(--go-blue)]" />
+          </div>
+        </td>
+        <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
+          {formatDateTime(log.created_at)}
+        </td>
+        <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
+          {log.endpoint.replace('/api/chat/', '')}
+        </td>
+        <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
+          {formatDuration(log.duration_ms)}
+        </td>
+        <td className="py-2 px-3 text-right">
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
+            }`}
+          >
+            {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
+            {log.status_code}
+          </span>
+        </td>
+        <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
+          {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
+          {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
+        </td>
+        <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
+          {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
+        </td>
+      </tr>
+      {expanded && (
+        <tr className={`border-b border-[var(--go-blue)]/4 ${isError ? 'bg-[#dc2626]/2' : isSlow ? 'bg-[#ca8a04]/2' : 'bg-[var(--go-blue)]/2'}`}>
+          <td colSpan={7} className="p-3">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs text-[var(--go-text-primary)]/30">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando body…
+              </div>
+            ) : bodyData && !bodyData.request_body && !bodyData.response_body ? (
+              <div className="text-center py-4 text-xs text-[var(--go-text-primary)]/25 italic">
+                <Eye className="mx-auto mb-1 h-4 w-4" />
+                Corpo não disponível para este log (registrado antes da funcionalidade).
+              </div>
+            ) : bodyData ? (
+              <div className="flex gap-3 flex-col lg:flex-row">
+                <JsonBodyViewer
+                  label="Request"
+                  body={bodyData.request_body}
+                  icon={<ArrowUpRight className="h-3 w-3 text-[var(--go-blue)]" />}
+                />
+                <JsonBodyViewer
+                  label="Response"
+                  body={bodyData.response_body}
+                  icon={<ArrowDownLeft className="h-3 w-3 text-[#16a34a]" />}
+                />
+              </div>
+            ) : null}
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+// ── Tab: API Logs ───────────────────────────────────────────────────────────
+
 function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
   if (logs.length === 0) {
     return (
@@ -1171,6 +1703,7 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[var(--go-blue)]/8 text-left">
+            <th className="py-2.5 px-3 w-5"></th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Quando</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Endpoint</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Duração</th>
@@ -1180,45 +1713,9 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
           </tr>
         </thead>
         <tbody>
-          {logs.map((log) => {
-            const isError = log.status_code >= 400
-            const isSlow = (log.duration_ms ?? 0) > 5000
-            return (
-              <tr
-                key={log.id}
-                className={`border-b border-[var(--go-blue)]/4 last:border-0 ${
-                  isError ? 'bg-[#dc2626]/3' : isSlow ? 'bg-[#ca8a04]/3' : ''
-                }`}
-              >
-                <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
-                  {formatDateTime(log.created_at)}
-                </td>
-                <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
-                  {log.endpoint.replace('/api/chat/', '')}
-                </td>
-                <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
-                  {formatDuration(log.duration_ms)}
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <span
-                    className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
-                    }`}
-                  >
-                    {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                    {log.status_code}
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
-                  {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
-                  {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
-                </td>
-                <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
-                  {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
-                </td>
-              </tr>
-            )
-          })}
+          {logs.map((log) => (
+            <ApiLogRow key={log.id} log={log} />
+          ))}
         </tbody>
       </table>
     </div>
