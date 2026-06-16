@@ -548,6 +548,27 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
+  // ── SAFETY NET: memorial_calculo no objeto saving/receita ──────────────────
+  // O LLM às vezes coloca o memorial apenas no campo "content" e deixa
+  // saving.memorial_calculo / receita.memorial_calculo como null no JSON.
+  // Isso faz o memorial virar "-" na planilha. Extraímos do content como fallback.
+  if ((resultado.type === 'preview' || resultado.type === 'complete') && resultado.type !== 'options') {
+    const conteudoMsg = (resultado as { content?: string }).content ?? '';
+    const memorialTexto = conteudoMsg.replace(/\n+Está correto\?[\s\S]*$/, '').trim();
+    if (memorialTexto.length > 50) {
+      if ((estado.fase === 'saving' || estado.fase === 'saving_preview') &&
+          resultado.saving && !resultado.saving.memorial_calculo) {
+        resultado.saving = { ...resultado.saving, memorial_calculo: memorialTexto };
+        log('enviarMensagem', 'memorial_calculo (saving) extraído do content — LLM não populou o campo');
+      }
+      if ((estado.fase === 'receita' || estado.fase === 'receita_preview') &&
+          resultado.receita && !resultado.receita.memorial_calculo) {
+        resultado.receita = { ...resultado.receita, memorial_calculo: memorialTexto };
+        log('enviarMensagem', 'memorial_calculo (receita) extraído do content — LLM não populou o campo');
+      }
+    }
+  }
+
   // ── VALIDAÇÃO ANTI-ZERO: safety net hardcoded ──────────────────────────────
   // Mesmo com prompts instruindo a IA, o LLM pode gerar complete/preview com
   // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
