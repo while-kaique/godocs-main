@@ -37,6 +37,7 @@ import type {
   ChatFase,
   ChatHistoryMessage,
   DocumentacaoColetada,
+  DocumentacaoGerada,
   ProjetoContexto,
   ReceitaColetada,
   SavingColetado,
@@ -127,6 +128,24 @@ function progressoPorFase(fase: ChatFase, coletado: DocumentacaoColetada, saving
   }
 }
 
+// Materialidade real do projeto: saving mensal + receita mensal cheia (pontual ÷ 12).
+// NÃO usa o ÷10 do ganho_total_mensal (métrica de gestão/ranking) — aqui queremos o valor real
+// para o gate de R$ 5.000/mês de validação humana obrigatória.
+function calcularMaterialidade(
+  saving: Record<string, unknown> | undefined,
+  receita: Record<string, unknown> | undefined,
+): number {
+  const savingReais = (saving?.economia_reais_mes as number) ?? 0;
+  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
+  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+
+  const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
+  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
+  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
+
+  return savingMensal + receitaMensal;
+}
+
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
   if (!data) throw new Error('Projeto não encontrado.');
@@ -151,6 +170,8 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
+    especial: data.especial === 1,
+    contexto_especial: data.contexto_especial ?? null,
   };
 }
 
@@ -328,6 +349,41 @@ const iniciarReceitaSchema = z.object({
 
 const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
 
+// Monta a documentação de um projeto ESPECIAL sem nenhuma IA: usa a descrição
+// breve (o que o projeto faz) e o contexto especial (por que é de alto impacto e
+// difícil mensuração) que a pessoa escreveu. As demais seções (execução, fluxo,
+// dependências…) não se aplicam a projetos fundacionais — ficam vazias/"—".
+// O contexto especial também é enviado em campo próprio ao n8n (planilha).
+function buildDocEspecial(data: {
+  nome_projeto: string;
+  responsavel_nome: string;
+  responsavel_email: string;
+  ferramenta: string;
+  membros: string[];
+  descricao_breve?: string;
+  contexto_especial?: string;
+}): DocumentacaoGerada {
+  const descricao = data.descricao_breve?.trim() ?? '';
+  const contexto = data.contexto_especial?.trim() ?? '';
+  const oQueFaz =
+    [descricao, contexto].filter(Boolean).join('\n\n') ||
+    'Projeto de alto impacto e difícil mensuração — submetido para validação humana.';
+
+  return {
+    titulo: data.nome_projeto,
+    responsavel: { nome: data.responsavel_nome, email: data.responsavel_email, area: null },
+    ferramenta: data.ferramenta,
+    membros: data.membros,
+    o_que_faz: oQueFaz,
+    execucao: '—',
+    dependencias: [],
+    fluxo: [],
+    configurar_antes: [],
+    atencao: [],
+    gerado_em: new Date().toISOString(),
+  };
+}
+
 // ─── Iniciar submissão ───────────────────────────────────────────────────────
 
 export async function iniciarSubmissao(rawData: unknown) {
@@ -376,6 +432,20 @@ export async function iniciarSubmissao(rawData: unknown) {
     role: 'doc',
     content: docTexto || '(documento sem texto legível)',
   });
+
+  // ── Projeto especial: pula o agente por completo ────────────────────────────
+  // Projeto de alto impacto e difícil mensuração → não passa pela conversa, pela
+  // análise financeira nem pelo analisador IA (validação é humana). A documentação
+  // é montada direto da descrição + contexto especial (sem nenhuma chamada de IA) e
+  // persistida, para que submeterParaValidacao tenha a doc exigida e o n8n receba o
+  // objeto `documentacao`. O frontend chama submeter-validacao logo em seguida.
+  if (data.especial) {
+    const docEspecial = buildDocEspecial(data);
+    await upsertDocumentacao(projeto.id, docEspecial);
+    await updateProjeto(projeto.id, { chat_completo: true });
+    log('iniciarSubmissao', `Projeto especial ${projeto.id}: doc montada sem IA, pronto para submissão.`);
+    return { projeto_id: projeto.id, especial: true };
+  }
 
   const ctx: ProjetoContexto = {
     responsavel_nome: data.responsavel_nome,
@@ -485,7 +555,8 @@ export async function enviarMensagem(rawData: unknown) {
   if (resultado.type === 'complete') {
     // Saving: economia_horas_mes NUNCA pode ser 0 ao completar
     if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
-      const econHoras = resultado.saving?.economia_horas_mes ?? 0;
+      const savingRecomputado = recomputarSavingFinanceiro(resultado.saving, 0);
+      const econHoras = savingRecomputado.economia_horas_mes ?? 0;
       if (econHoras <= 0) {
         log('enviarMensagem', `⛔ Saving com economia_horas_mes=${econHoras} — bloqueando complete, forçando question`);
         Object.assign(resultado, {
@@ -759,6 +830,11 @@ const atualizarMetadadosSchema = z.object({
   membros: z.array(z.string()).optional(),
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Projeto especial: contexto especial (entrada determinística da fase de doc).
+  contexto_especial: z.string().max(2000).optional(),
+  // Força reiniciar a documentação reusando os arquivos já enviados (sem novo upload).
+  // Usado quando muda a entrada determinística do projeto especial (descrição/contexto).
+  reset_doc: z.boolean().optional(),
   // Se enviados, substituem os arquivos e reiniciam a documentação.
   docs: z.array(
     z.object({ base64: z.string().min(1), filename: z.string().min(1) })
@@ -778,26 +854,35 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
   }
 
-  // 2. Sem arquivos novos → nada a reiniciar; o agente já vê os metadados frescos.
-  if (!temDocs) {
+  // 2. Sem arquivos novos e sem pedido de reset → nada a reiniciar; o agente já vê
+  // os metadados frescos no próximo turno.
+  if (!temDocs && !data.reset_doc) {
     return { ok: true, reset: false };
   }
 
-  // 3. Arquivos mudaram → re-extrai texto, re-roda o extrator e REINICIA a doc.
+  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. Com novos arquivos, re-extrai
+  // o texto; com reset_doc sem upload, reusa o texto já extraído (mensagem role=doc).
   let docTexto = '';
-  try {
-    docTexto = await extractTextFromMultipleFiles(data.docs!);
-    log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-  } catch (extractErr) {
-    err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
-    docTexto = '';
+  if (temDocs) {
+    try {
+      docTexto = await extractTextFromMultipleFiles(data.docs!);
+      log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+    } catch (extractErr) {
+      err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
+      docTexto = '';
+    }
+  } else {
+    const docMsg = await getDocMessage(data.projeto_id);
+    docTexto = docMsg?.content ?? '';
+    log('atualizarMetadados', `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
   }
 
-  // Limpa a conversa inteira (doc + impacto) — a base mudou, recomeçamos do zero.
+  // Limpa a conversa inteira (doc + impacto) — recomeçamos do zero.
   await deleteChatMessagesByProjeto(data.projeto_id);
 
   await insertChatMessage({
@@ -866,14 +951,26 @@ export async function analisarProjetoFn(rawData: unknown) {
   // para o estado ficar correto de ponta a ponta (dashboard + planilha). Vale para
   // qualquer área, inclusive RPA (o veredito pode rebaixar uma auto-aprovação).
   const statusVeredito = resultado.resultado === 'aprovado' ? 'aprovado' : 'rejeitado';
+
+  // Teto de materialidade: projetos acima de R$ 5k/mês exigem validação humana independente do veredito.
+  const TETO_MATERIALIDADE_ANALISE = 5000;
+  const materialidadeProjeto = calcularMaterialidade(
+    conteudo.saving as Record<string, unknown> | undefined,
+    conteudo.receita as Record<string, unknown> | undefined,
+  );
+  const statusFinal = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'em_validacao' : statusVeredito;
+  if (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
+    log(`Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`);
+  }
+
   await updateProjeto(projeto_id, {
     complexidade: resultado.complexidade,
     observacoes,
-    status: statusVeredito,
+    status: statusFinal,
     validated_at: new Date().toISOString(),
   });
 
-  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusVeredito} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
   // ── Enviar update ao n8n com dados da análise (atualiza linha na planilha pelo nome do projeto) ──
   const n8nUpdateUrl = process.env.N8N_WEBHOOK_URL_UPDATE;
@@ -883,7 +980,7 @@ export async function analisarProjetoFn(rawData: unknown) {
       // Status enviado é o VEREDITO do analisador (não o status de submissão):
       // aprovado → "Aprovado"; rejeitado → "Reenvio Pendente". Como é o veredito
       // recém-calculado neste mesmo request, não há risco de leitura defasada.
-      const statusLabel = resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente';
+      const statusLabel = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : (resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente');
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
@@ -933,6 +1030,7 @@ export async function submeterParaValidacao(rawData: unknown) {
     );
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
+  const receita = conteudo.receita as Record<string, unknown> | undefined;
 
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
@@ -966,11 +1064,39 @@ export async function submeterParaValidacao(rawData: unknown) {
   // Projeto especial nunca auto-aprova (nem na área RPA): a validação é humana,
   // então fica sempre 'em_validacao' (→ "Pendente" na planilha) até o humano avaliar.
   const ehEspecial = projeto.especial === 1;
-  const status = ehEspecial ? 'em_validacao' : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
+
+  // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
+  if (!ehEspecial) {
+    const tiposProjetoGate = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+    if (tiposProjetoGate.includes('saving') &&
+        (((saving?.economia_horas_mes as number) ?? 0) <= 0 || ((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
+      throw new Error(
+        'Não é possível submeter este projeto como saving sem economia mensurável de horas. ' +
+        'Uma troca de ferramenta que mantém a mesma rotina de trabalho não gera saving. ' +
+        'Para submeter, comprove redução concreta de horas — ou reclassifique como receita incremental ou projeto especial.'
+      );
+    }
+    if (tiposProjetoGate.includes('receita_incremental') &&
+        (((receita?.valor_ganho_mensal as number) ?? 0) <= 0)) {
+      throw new Error(
+        'Não é possível submeter receita incremental com ganho de R$ 0. ' +
+        'Revise o memorial de receita antes de enviar.'
+      );
+    }
+  }
+
+  // Teto de materialidade: projetos acima de R$ 5.000/mês vão sempre para validação humana.
+  const TETO_MATERIALIDADE = 5000;
+  const materialidade = calcularMaterialidade(saving, receita);
+  const status = ehEspecial || materialidade > TETO_MATERIALIDADE
+    ? 'em_validacao'
+    : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
+  if (materialidade > TETO_MATERIALIDADE) {
+    log('submeterParaValidacao', `Materialidade R$ ${Math.round(materialidade)}/mês > R$ ${TETO_MATERIALIDADE} → em_validacao (validação humana obrigatória)`);
+  }
   const now = new Date().toISOString();
 
   // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
-  const receita = conteudo.receita as Record<string, unknown> | undefined;
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
   const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
   const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;

@@ -198,10 +198,11 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo,
-           p.descricao_breve, p.data_criacao_projeto, p.area, a.nome as area_nome
+           p.descricao_breve, p.data_criacao_projeto, p.area,
+           p.especial, p.contexto_especial, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?

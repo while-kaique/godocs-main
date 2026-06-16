@@ -64,14 +64,14 @@ export function Etapa25({
               onClick={() => onResp("sim")}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", resp === "sim" && "go-radio-checked")}
             >
-              ⭐ Sim, é um projeto especial
+              ⭐ Sim, é um projeto de alto impacto de difícil mensuração
             </button>
             <button
               type="button"
               onClick={() => onResp("nao")}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", resp === "nao" && "go-radio-checked")}
             >
-              📊 Não, gera saving/receita
+              📊 Não, é um projeto padrão que gera saving operacional ou receita
             </button>
           </div>
           <FieldError message={errors.especial} />
@@ -124,11 +124,11 @@ export function Etapa25({
         <div style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
           <FormGroup>
             <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-              Este projeto gera saving, receita incremental ou ambos?
+              Este projeto gera saving operacional, receita incremental ou ambos?
               <InfoTooltip>
-                <strong className="mb-1 block text-white">Saving vs. Receita Incremental</strong>
+                <strong className="mb-1 block text-white">Saving Operacional vs. Receita Incremental</strong>
                 <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <strong style={{ color: "var(--go-lime)" }}>Saving</strong> — economia gerada pela automação.
+                  <strong style={{ color: "var(--go-lime)" }}>Saving Operacional</strong> — economia gerada pela automação.
                   Ex: processo manual que levava 20h/mês agora é automático (economia de horas e custo operacional).
                 </span>
                 <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
@@ -148,7 +148,7 @@ export function Etapa25({
               }}
               error={errors.tipoProjeto}
               options={[
-                { value: "saving",              label: "💰 Saving" },
+                { value: "saving",              label: "💰 Saving Operacional" },
                 { value: "receita_incremental", label: "📈 Receita Incremental" },
               ]}
             />
