@@ -32,6 +32,7 @@ import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-ag
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import { stripMarkdown } from '@/lib/strip-markdown';
+import { deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -275,7 +276,9 @@ const iniciarSubmissaoSchema = z.object({
   responsavel_nome: z.string().min(1).max(120),
   responsavel_email: z.string().email().max(255),
   area_id: z.string().min(1).optional(),
-  area: z.string().min(1).max(100),
+  // A área não é mais escolhida no formulário — é derivada do email (TeamGuide)
+  // na submissão (submeterParaValidacao). Aqui o projeto nasce sem área.
+  area: z.string().min(1).max(100).optional(),
   ferramenta: z.string().min(1).max(200),
   escopo: z.enum(['interno', 'externo']).optional(),
   servico_externo: z.string().max(200).optional(),
@@ -333,7 +336,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
       area_id: data.area_id ?? null,
-      area: data.area,
+      area: data.area ?? null,
       ferramenta: data.ferramenta,
       escopo: data.escopo ?? null,
       servico_externo: data.servico_externo ?? null,
@@ -930,6 +933,28 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   }
 
+  // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
+  // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
+  // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
+  // cadastrado lá), a área vira o aviso "ÁREA NÃO IDENTIFICADA". Em caso de falha
+  // da API (indisponibilidade), preservamos a área já gravada para não perder o
+  // dado durante uma queda transitória.
+  const AREA_NAO_IDENTIFICADA = 'ÁREA NÃO IDENTIFICADA';
+  let areaFinal: string;
+  try {
+    const areaDerivada = await deriveAreaFromEmail(projeto.responsavel_email ?? '');
+    areaFinal = areaDerivada ?? AREA_NAO_IDENTIFICADA;
+    if (areaDerivada) {
+      log('submeterParaValidacao', `Área derivada da TeamGuide: "${areaDerivada}" (${projeto.responsavel_email})`);
+    } else {
+      log('submeterParaValidacao', `Email não encontrado na TeamGuide → "${AREA_NAO_IDENTIFICADA}" (${projeto.responsavel_email})`);
+    }
+  } catch (tgErr) {
+    err('submeterParaValidacao', 'TeamGuide indisponível ao derivar área — preservando área existente:', tgErr);
+    areaFinal = projeto.area ?? AREA_NAO_IDENTIFICADA;
+  }
+  projeto.area = areaFinal;
+
   const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
   const now = new Date().toISOString();
 
@@ -953,6 +978,10 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   await updateProjeto(projeto_id, {
     status,
+    // Área derivada do email vira a fonte de verdade. Zera area_id para que o
+    // area_nome (join por area_id, fallback p.area) reflita a área derivada.
+    area: areaFinal,
+    area_id: null,
     submitted_at: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,

@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { AREAS, FERRAMENTAS } from "./constants";
+import { FERRAMENTAS } from "./constants";
 import type { FormData, FieldErrors } from "./constants";
-import { apiFetch } from "@/lib/api-client";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
   RadioGroup, InfoTooltip, ChipsInput,
@@ -19,21 +17,6 @@ export function Step1({
   const isExterno = form.escopo === "externo";
   const escopoDefinido = form.escopo === "interno" || form.escopo === "externo";
   const prodBlocked = form.prodStatus === "dev" || form.prodStatus === "idle";
-
-  // Áreas vêm da fonte única (/api/areas — tabela sincronizada da TeamGuide).
-  // Fallback para a lista hardcoded enquanto carrega ou se a API falhar.
-  const [areas, setAreas] = useState<string[]>([...AREAS]);
-  useEffect(() => {
-    let cancelado = false;
-    apiFetch<{ id: string | null; nome: string }[]>("/api/areas")
-      .then((rows) => {
-        if (!cancelado && Array.isArray(rows) && rows.length > 0) {
-          setAreas(rows.map((r) => r.nome));
-        }
-      })
-      .catch(() => { /* mantém o fallback AREAS */ });
-    return () => { cancelado = true; };
-  }, []);
 
   const prodLabel = isExterno
     ? "Essa ferramenta externa já está em uso na solução?"
@@ -213,20 +196,8 @@ export function Step1({
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormGroup>
-              <FormLabel required>Área</FormLabel>
-              <FormSelect
-                value={form.area}
-                onChange={(e) => updateField("area", e.currentTarget.value)}
-                error={errors.area}
-              >
-                <option value="">Selecione sua área</option>
-                {areas.map((a) => <option key={a} value={a}>{a}</option>)}
-              </FormSelect>
-            </FormGroup>
-            <FormGroup>
-              {isExterno ? (
+          <FormGroup>
+            {isExterno ? (
                 <>
                   <FormLabel required>Serviço Externo Contrato</FormLabel>
                   <FormInput
@@ -264,8 +235,7 @@ export function Step1({
                   )}
                 </>
               )}
-            </FormGroup>
-          </div>
+          </FormGroup>
 
           <FormGroup>
             <FormLabel required>Projeto desenvolvido em equipe?</FormLabel>
