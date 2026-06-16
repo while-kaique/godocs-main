@@ -810,6 +810,7 @@ export async function analisarProjetoFn(rawData: unknown) {
     resumo: resultado.resumo,
     criterios_hardcoded: resultado.criterios_hardcoded,
     criterios_dinamicos: resultado.criterios_dinamicos,
+    complexidade_justificativa: resultado.complexidade_justificativa,
   });
 
   // Parecer da análise (campo `resumo`) → coluna "Observações". É uma mensagem de

@@ -86,8 +86,12 @@ export type ProjetoInvestigadorDetalhes = ProjetoInvestigador & {
     resultado: string
     pontuacao_total: number
     pontuacao_maxima: number
+    justificativa: string
     resumo: string | null
     complexidade: string | null
+    complexidade_justificativa: string | null
+    criterios_hardcoded: Array<{ criterio: string; pontos: number; justificativa: string }>
+    criterios_dinamicos: Array<{ criterio: string; pontos: number; justificativa: string }>
   } | null
   api_logs: ApiLogRow[]
 }
@@ -294,8 +298,12 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
           resultado: analise.resultado,
           pontuacao_total: analise.pontuacao_total,
           pontuacao_maxima: analise.pontuacao_maxima,
+          justificativa: analise.justificativa,
           resumo: analise.resumo,
           complexidade: (p as ProjetoRow & { complexidade?: string }).complexidade ?? null,
+          complexidade_justificativa: analise.complexidade_justificativa ?? null,
+          criterios_hardcoded: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_hardcoded) ?? [],
+          criterios_dinamicos: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_dinamicos) ?? [],
         }
       : null,
     api_logs: logs,

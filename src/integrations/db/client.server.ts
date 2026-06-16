@@ -428,12 +428,13 @@ export async function insertAnalise(data: {
   resumo?: string;
   criterios_hardcoded?: unknown;
   criterios_dinamicos?: unknown;
+  complexidade_justificativa?: string;
 }) {
   const id = generateId();
   await exec(`
     INSERT INTO analises (id, projeto_id, resultado, pontuacao_total, pontuacao_maxima,
-      justificativa, resumo, criterios_hardcoded, criterios_dinamicos)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      justificativa, resumo, criterios_hardcoded, criterios_dinamicos, complexidade_justificativa)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id, data.projeto_id, data.resultado,
     data.pontuacao_total, data.pontuacao_maxima,
@@ -441,6 +442,7 @@ export async function insertAnalise(data: {
     data.resumo ?? null,
     data.criterios_hardcoded ? JSON.stringify(data.criterios_hardcoded) : null,
     data.criterios_dinamicos ? JSON.stringify(data.criterios_dinamicos) : null,
+    data.complexidade_justificativa ?? null,
   ]);
   return id;
 }
@@ -664,6 +666,7 @@ export type AnaliseRow = {
   resumo: string | null;
   criterios_hardcoded: string | null; // JSON string
   criterios_dinamicos: string | null; // JSON string
+  complexidade_justificativa: string | null;
   created_at: string | null;
 };
 

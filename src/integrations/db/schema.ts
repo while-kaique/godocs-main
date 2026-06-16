@@ -147,6 +147,11 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
   // Observações da análise automática (parecer da IA) — só para staff, não exibido ao usuário.
   'ALTER TABLE projetos ADD COLUMN observacoes TEXT',
+  // Rastreamento de sincronização com n8n
+  'ALTER TABLE projetos ADD COLUMN webhook_sync TEXT',
+  'ALTER TABLE projetos ADD COLUMN webhook_error TEXT',
+  // Justificativa da classificação de complexidade (por que automacao/inteligencia/autonomia)
+  'ALTER TABLE analises ADD COLUMN complexidade_justificativa TEXT',
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).
