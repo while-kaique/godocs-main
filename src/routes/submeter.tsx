@@ -12,6 +12,7 @@ import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAni
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
+import { Etapa25 } from "@/lib/submeter/step25";
 import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
 import { AnalyzerCard } from "@/lib/submeter/analyzer-overlay";
 
@@ -140,7 +141,15 @@ function SubmeterPage() {
     dataCriacao: today,
     tipoProjeto: [],
     descricaoBreve: "",
+    especial: false,
+    contextoEspecial: "",
   });
+
+  // Etapa 2.5 (tipo de projeto): sub-tela entre a etapa 2 e o início do agente.
+  // Só aparece na PRIMEIRA passagem (antes do agente iniciar). Em re-entradas
+  // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
+  const [showEtapa25, setShowEtapa25] = useState(false);
+  const [respEspecial, setRespEspecial] = useState<"sim" | "nao" | "">("");
 
   const updateField = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -233,8 +242,7 @@ function SubmeterPage() {
     }
 
     if (n === 2) {
-      if (form.tipoProjeto.length === 0)
-        errs.tipoProjeto = "Selecione ao menos um tipo de projeto";
+      // O tipo de projeto (saving/receita/especial) passou para a Etapa 2.5.
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
       if (!form.dataCriacao) {
@@ -256,6 +264,8 @@ function SubmeterPage() {
   /* ── Navigation ── */
   function goToStep(target: number, dir: "forward" | "back") {
     setDirection(dir);
+    // Sair da etapa 2 (para 1 ou 3) fecha a sub-tela 2.5.
+    if (target !== 2) setShowEtapa25(false);
     setStep(target);
     // Todo step ALCANÇADO fica navegável pelos índices do topo — não só os que o
     // usuário "concluiu" avançando. Senão, ao entrar no step 2 e voltar ao 1, o
@@ -291,9 +301,55 @@ function SubmeterPage() {
     }
   }
 
+  /* ── Step 2 → Etapa 2.5 (abre a sub-tela de tipo de projeto) ── */
+  function handleAbrirEtapa25() {
+    if (!validateStep(2)) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    // Re-entrada: reflete a resposta já dada (especial vs. saving/receita).
+    if (respEspecial === "") {
+      if (form.especial) setRespEspecial("sim");
+      else if (form.tipoProjeto.length > 0) setRespEspecial("nao");
+    }
+    setShowEtapa25(true);
+    formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ── Etapa 2.5: resposta sim/não ── */
+  function handleRespEspecial(r: "sim" | "nao") {
+    setRespEspecial(r);
+    updateField("especial", r === "sim");
+    // Limpa o campo da opção oposta para não enviar dado obsoleto.
+    if (r === "sim") updateField("tipoProjeto", []);
+    else updateField("contextoEspecial", "");
+    clearError("especial");
+    clearError("contextoEspecial");
+    clearError("tipoProjeto");
+  }
+
+  /* ── Valida a Etapa 2.5 antes de iniciar o agente ── */
+  function validateEtapa25(): boolean {
+    if (respEspecial === "") {
+      setError("especial", "Responda à pergunta acima para continuar");
+      return false;
+    }
+    if (respEspecial === "sim") {
+      if (!form.contextoEspecial.trim() || form.contextoEspecial.trim().length < 20) {
+        setError("contextoEspecial", "Descreva o contexto do projeto em pelo menos 20 caracteres");
+        return false;
+      }
+    } else if (form.tipoProjeto.length === 0) {
+      setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
+      return false;
+    }
+    return true;
+  }
+
   /* ── Step 2 → Step 3: inicia o agente ── */
   async function handleIniciarAgente() {
-    if (!validateStep(2)) {
+    if (!validateStep(2) || !validateEtapa25()) {
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
       return;
@@ -343,15 +399,19 @@ function SubmeterPage() {
           membros: form.participantes,
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
-          tipos_projeto: form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
-          tipo_projeto: form.tipoProjeto[0] || undefined,
+          // Projeto especial não envia tipos financeiros — o backend grava
+          // tipos_projeto=["especial"] e o fluxo pula saving/receita.
+          tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
+          tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          especial: form.especial || undefined,
+          contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
         },
       );
 
       setProjetoId(result.projeto_id);
-      setAgentTipos(form.tipoProjeto);
+      setAgentTipos(form.especial ? [] : form.tipoProjeto);
       setAgentMeta(snapshotMeta());
       setAgentArquivosSig(arquivosSig());
 
@@ -472,8 +532,9 @@ function SubmeterPage() {
 
   /* ── Step 2 → Step 3 (agente já iniciado): propaga mudanças e detecta troca de tipo ── */
   async function handleContinuarAgente() {
-    // Não permite avançar sem ao menos um tipo selecionado.
-    if (form.tipoProjeto.length === 0) {
+    // Projeto especial não tem tipo financeiro — segue direto. Para projeto padrão,
+    // não permite avançar sem ao menos um tipo selecionado.
+    if (!form.especial && form.tipoProjeto.length === 0) {
       setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
       toast.error("Selecione ao menos um tipo de projeto para continuar.");
       setShaking(true);
@@ -515,7 +576,9 @@ function SubmeterPage() {
       form.tipoProjeto.length !== agentTipos.length ||
       [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
 
-    if (changed && projetoId) {
+    // Projeto especial não tem tipos financeiros — pula a sincronização de tipos
+    // (enviar tipos_projeto=[] seria rejeitado pelo backend).
+    if (!form.especial && changed && projetoId) {
       try {
         await apiFetch("/api/chat/atualizar-tipos", {
           projeto_id: projetoId,
@@ -645,8 +708,10 @@ function SubmeterPage() {
       if (result.isComplete) {
         const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
         if (lastPreviewMsg) {
-          // No caso "só saving" ou "ambos" (último preview é de receita ou saving)
-          if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
+          // Projeto especial encerra na fase de doc (sem saving/receita) → o preview
+          // aprovado é o da documentação. Demais casos: receita ou saving.
+          if (chatFase === "doc_preview") setApprovedDocPreview(lastPreviewMsg.content);
+          else if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
           else setApprovedSavingPreview(lastPreviewMsg.content);
         }
         setChatComplete(true);
@@ -821,6 +886,13 @@ function SubmeterPage() {
     // 2) Submissão ok → mostra tela de sucesso imediatamente
     setSubmitted(true);
     setSubmittingProject(false);
+
+    // Projeto especial é validado por um humano (não pelo analisador IA) — não
+    // dispara a análise automática. O status fica "Pendente" até a avaliação humana.
+    if (form.especial) {
+      setAnalyzing(false);
+      return;
+    }
 
     // 3) Análise IA em background — não bloqueia a tela de sucesso
     try {
@@ -1016,7 +1088,7 @@ function SubmeterPage() {
                 </div>
               </StepAnimation>
             )}
-            {step === 2 && (
+            {step === 2 && !showEtapa25 && (
               <StepAnimation direction={direction}>
                 <Step2
                   form={form}
@@ -1025,6 +1097,18 @@ function SubmeterPage() {
                   clearError={clearError}
                   arquivos={arquivos}
                   setArquivos={setArquivos}
+                />
+              </StepAnimation>
+            )}
+            {step === 2 && showEtapa25 && (
+              <StepAnimation direction={direction}>
+                <Etapa25
+                  form={form}
+                  errors={errors}
+                  updateField={updateField}
+                  clearError={clearError}
+                  resp={respEspecial}
+                  onResp={handleRespEspecial}
                 />
               </StepAnimation>
             )}
@@ -1081,7 +1165,7 @@ function SubmeterPage() {
             <div style={{ padding: "0 32px 24px" }} className="mt-6 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={handleBack}
+                onClick={showEtapa25 ? () => setShowEtapa25(false) : handleBack}
                 className="go-btn-back"
                 style={{ visibility: step === 1 ? "hidden" : "visible" }}
               >
@@ -1099,7 +1183,20 @@ function SubmeterPage() {
                 </button>
               )}
 
-              {step === 2 && (
+              {/* Etapa 2 (formulário) → abre a sub-tela 2.5 (tipo de projeto).
+                  Vale na primeira passagem e em re-entradas (permite trocar o tipo). */}
+              {step === 2 && !showEtapa25 && (
+                <button
+                  type="button"
+                  onClick={handleAbrirEtapa25}
+                  className={cn("go-btn-next", shaking && "go-shake")}
+                >
+                  Próximo &rarr;
+                </button>
+              )}
+
+              {/* Etapa 2.5 (tipo de projeto): inicia o agente (1ª vez) ou retoma (re-entrada). */}
+              {step === 2 && showEtapa25 && (
                 projetoId ? (
                   <button
                     type="button"

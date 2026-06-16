@@ -222,6 +222,8 @@ export type InsertProjeto = {
   tipo_projeto?: string | null;
   tipos_projeto?: string[] | null;
   descricao_breve?: string | null;
+  especial?: boolean | null;
+  contexto_especial?: string | null;
   status?: string;
 };
 
@@ -231,8 +233,8 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      descricao_breve, especial, contexto_especial, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -248,6 +250,8 @@ export async function insertProjeto(data: InsertProjeto) {
     data.tipo_projeto ?? null,
     data.tipos_projeto ? JSON.stringify(data.tipos_projeto) : null,
     data.descricao_breve ?? null,
+    data.especial ? 1 : 0,
+    data.contexto_especial ?? null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -641,6 +645,8 @@ export type ProjetoRow = {
   complexidade: string | null;
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes
   observacoes: string | null; // parecer da análise automática (staff-only)
+  especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
+  contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
