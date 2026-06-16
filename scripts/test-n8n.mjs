@@ -91,6 +91,10 @@ const payloadUpdate = {
   projeto: nomeProjeto,
   complexidade: 'automacao',
   observacoes: stripMarkdown(observacoesMarkdown) ?? '',
+  // Veredito do analisador → coluna Status (aprovado → "Aprovado",
+  // rejeitado → "Reenvio Pendente"). Aqui simula um veredito aprovado:
+  // a linha deve virar de "Pendente" (submissão) para "Aprovado".
+  status: 'Aprovado',
 };
 
 async function disparar(label, url, payload, method = 'POST') {
