@@ -109,6 +109,7 @@ type ProjetoDetalhes = ProjetoInvestigador & {
     justificativa: string
     resumo: string | null
     complexidade: string | null
+    complexidade_justificativa: string | null
     criterios_hardcoded: Array<{ criterio: string; pontos: number; justificativa: string }>
     criterios_dinamicos: Array<{ criterio: string; pontos: number; justificativa: string }>
   } | null
@@ -226,8 +227,16 @@ const STATUS_LABELS: Record<string, string> = {
   rascunho: 'Rascunho',
   em_validacao: 'Em validação',
   validado: 'Validado',
-  rejeitado: 'Rejeitado',
+  rejeitado: 'Reenvio Pendente',
   aprovado: 'Aprovado',
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  rascunho: 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/50',
+  em_validacao: 'bg-[#f59e0b]/10 text-[#b45309]',
+  validado: 'bg-[#0d9488]/10 text-[#0d9488]',
+  rejeitado: 'bg-[#dc2626]/8 text-[#dc2626]',
+  aprovado: 'bg-[#16a34a]/10 text-[#16a34a]',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -574,8 +583,8 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
               {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
             </span>
-            {p.status && p.status !== 'rascunho' && (
-              <span className="rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-semibold">
+            {p.status && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[p.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                 {STATUS_LABELS[p.status] ?? p.status}
               </span>
             )}
@@ -683,8 +692,8 @@ function DetalheView({
               <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
                 {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
               </span>
-              {d.status && d.status !== 'rascunho' && (
-                <span className="flex-shrink-0 rounded-full bg-[var(--go-blue)]/5 px-2.5 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-semibold">
+              {d.status && (
+                <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[d.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                   {STATUS_LABELS[d.status] ?? d.status}
                 </span>
               )}
@@ -1328,6 +1337,13 @@ function DadosTab({
                       </span>
                     )}
                   </div>
+
+                  {/* Justificativa da complexidade */}
+                  {analise.complexidade_justificativa && (
+                    <p className="text-[12px] leading-relaxed text-[var(--go-text-primary)]/45 mb-2">
+                      {analise.complexidade_justificativa}
+                    </p>
+                  )}
 
                   {/* Resumo */}
                   {analise.resumo && (

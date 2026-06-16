@@ -89,6 +89,7 @@ export type ProjetoInvestigadorDetalhes = ProjetoInvestigador & {
     justificativa: string
     resumo: string | null
     complexidade: string | null
+    complexidade_justificativa: string | null
     criterios_hardcoded: Array<{ criterio: string; pontos: number; justificativa: string }>
     criterios_dinamicos: Array<{ criterio: string; pontos: number; justificativa: string }>
   } | null
@@ -300,6 +301,7 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
           justificativa: analise.justificativa,
           resumo: analise.resumo,
           complexidade: (p as ProjetoRow & { complexidade?: string }).complexidade ?? null,
+          complexidade_justificativa: analise.complexidade_justificativa ?? null,
           criterios_hardcoded: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_hardcoded) ?? [],
           criterios_dinamicos: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_dinamicos) ?? [],
         }
