@@ -817,29 +817,34 @@ export async function analisarProjetoFn(rawData: unknown) {
   // Sem markdown na persistência (igual ao memorial).
   const observacoes = stripMarkdown(resultado.resumo || resultado.justificativa);
 
-  // Persiste a complexidade e as observações no projeto
+  // O veredito do analisador É a decisão de status (aprovado/rejeitado) — esta é a
+  // função do analisador. Grava no projeto junto com complexidade e observações,
+  // para o estado ficar correto de ponta a ponta (dashboard + planilha). Vale para
+  // qualquer área, inclusive RPA (o veredito pode rebaixar uma auto-aprovação).
+  const statusVeredito = resultado.resultado === 'aprovado' ? 'aprovado' : 'rejeitado';
   await updateProjeto(projeto_id, {
     complexidade: resultado.complexidade,
     observacoes,
+    status: statusVeredito,
+    validated_at: new Date().toISOString(),
   });
 
-  log('analisarProjeto', `Resultado: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusVeredito} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
   // ── Enviar update ao n8n com dados da análise (atualiza linha na planilha pelo nome do projeto) ──
   const n8nUpdateUrl = process.env.N8N_WEBHOOK_URL_UPDATE;
   if (n8nUpdateUrl) {
     try {
       const projeto = await getProjetoById(projeto_id);
-      // NÃO enviar `status` aqui. O update roda em background após a submissão e
-      // o status no banco ainda é o de submissão (ex: 'em_validacao' p/ não-RPA).
-      // A aprovação de projetos não-RPA é feita manualmente na planilha pelos
-      // líderes — reenviar o status aqui SOBRESCREVIA essa aprovação com "Pendente".
-      // O Status é responsabilidade exclusiva do webhook de submissão + planilha;
-      // este update só carrega complexidade + observações.
+      // Status enviado é o VEREDITO do analisador (não o status de submissão):
+      // aprovado → "Aprovado"; rejeitado → "Reenvio Pendente". Como é o veredito
+      // recém-calculado neste mesmo request, não há risco de leitura defasada.
+      const statusLabel = resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente';
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
         observacoes: observacoes ?? '',
+        status: statusLabel,
       };
 
       const resp = await fetch(n8nUpdateUrl, {
