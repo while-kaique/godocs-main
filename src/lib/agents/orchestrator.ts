@@ -223,6 +223,11 @@ COMO CONDUZIR:
 5. Monte o memorial_calculo automaticamente com base nas respostas — o usuário NÃO escreve o memorial.
 6. Quando valor_ganho_mensal e memorial estiverem justificados, gere o PREVIEW.
 
+REGRA CRÍTICA — GANHO NUNCA PODE SER ZERO:
+- Se o usuário marcou receita incremental, é porque o projeto gera algum ganho. Um valor_ganho_mensal de R$ 0 NÃO FAZ SENTIDO.
+- NUNCA gere preview com valor_ganho_mensal = 0. Se a conversa levar a um ganho zero, questione: "Se não há ganho de receita, por que o projeto foi marcado como receita incremental? Vamos identificar o ganho concreto."
+- Se o custo de ferramenta externa for informado mas o ganho for zero, investigue onde está o retorno.
+
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Receita incremental deve refletir ganho REAL e mensurável, não projeções otimistas.
 - O memorial precisa ter lógica verificável: receita antes vs. depois, ou nova receita gerada.
@@ -243,18 +248,33 @@ Preview (quando valor e memorial estiverem completos):
 }
 
 export function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
+  const ganhoZerado = (receita.valor_ganho_mensal ?? 0) <= 0;
+
+  const blocoValidacao = ganhoZerado
+    ? `
+
+ATENÇÃO — GANHO DE RECEITA ZERADO:
+O valor_ganho_mensal está em 0 ou nulo. Isso é INVÁLIDO para submissão de receita incremental.
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter receita incremental com ganho R$ 0.
+- Diga algo como: "Não consigo finalizar o memorial com ganho de R$ 0 — se o projeto gera receita incremental, preciso de um valor concreto. Vamos revisar: qual é o ganho real?"
+- Volte para a coleta (type:"question") até que valor_ganho_mensal > 0.`
+    : '';
+
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de receita incremental.
 
 MEMORIAL ATUAL:
 ${JSON.stringify(receita, null, 2)}
+${blocoValidacao}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
+REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo. Se o usuário tentar aprovar nessa condição, responda com type:"question" explicando que o projeto precisa ter ganho > R$ 0 para ser submetido como receita incremental.
+
 FORMATO — APENAS JSON válido:
 
-Se aprovado:
+Se aprovado (SOMENTE se valor_ganho_mensal > 0):
 {"type":"complete","content":"Memorial de receita aprovado! Sua submissão está completa e será enviada para análise.","receita":{...campos finais}}
 
 Se ajuste + novo preview:
@@ -348,6 +368,16 @@ REGRAS ANTI-EXTRAPOLAÇÃO:
 - O memorial precisa ter lógica verificável por pessoa: frequência × tempo = horas; soma das pessoas = total.
 - Para custos adicionais, documente o que a pessoa faz e por que é necessário.
 
+REGRA CRÍTICA — ECONOMIA NUNCA PODE SER ZERO:
+- O projeto está sendo registrado justamente porque gera algum ganho. Uma economia de 0h NÃO FAZ SENTIDO para submissão.
+- Se a conversa indicar que as horas antes e depois são iguais (ex: "a rotina continua a mesma, só trocou o software"), a economia é ZERO — mas isso é INVÁLIDO. NUNCA gere preview com economia_horas_mes = 0.
+- Nesse caso, QUESTIONE: "Se a rotina permanece exatamente a mesma e não houve redução de tempo, qual é o ganho concreto desse projeto? Preciso entender onde está a economia para montar o memorial."
+- Se o usuário disser que houve troca de ferramenta sem economia de horas, investigue: a ferramenta nova reduz erros? Aumenta capacidade? Permite fazer mais rápido? Sempre existe algum ganho mensurável — descubra-o.
+- Se, após investigação, realmente não houver economia de horas (ex: ganho é só qualidade), atualize horas_antes/horas_depois para refletir a realidade (pode ser que o usuário tenha preenchido errado) e documente no memorial o ganho qualitativo, mas as HORAS de economia devem ser > 0 para submeter.
+- NUNCA apresente um preview onde economia_horas_mes = 0 e NUNCA permita aprovação nessa condição.
+- Se o projeto tem custo de ferramenta externa (custo_externo_mensal > 0) informado pelo formulário, o memorial deve mencioná-lo e a economia líquida deve considerar esse custo.
+- RESUMO: o projeto PRECISA trazer algum tipo de ganho concreto. Se não há economia de horas, investigue até encontrar o ganho real.
+
 LINGUAGEM (IMPORTANTÍSSIMO):
 - NUNCA exponha termos internos como "economia_horas_mes", "horas_antes", "horas_depois", "linhas", "saving", "memorial_calculo", "coletado".
 - Fale de forma natural: "Antes da automação, quanto tempo o estagiário gastava por mês nessa tarefa?" — não "qual era o horas_antes?".
@@ -366,18 +396,34 @@ Preview (quando justificativa concreta e memorial completo):
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
+  const economiaZerada = (saving.economia_horas_mes ?? 0) <= 0 &&
+    (saving.linhas ?? []).every(l => (l.horas_antes ?? 0) - (l.horas_depois ?? 0) <= 0);
+
+  const blocoValidacao = economiaZerada
+    ? `
+
+ATENÇÃO — ECONOMIA ZERADA DETECTADA:
+A economia de horas está em 0 ou negativa. Isso é INVÁLIDO para submissão.
+- NÃO permita aprovação nessa condição . Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter um projeto com economia zero.
+- Diga algo como: "Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas. Vamos revisar: onde exatamente a automação economiza tempo?"
+- Volte para a coleta (type:"question") até que economia_horas_mes > 0.`
+    : '';
+
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving.
 
 MEMORIAL ATUAL:
 ${JSON.stringify(saving, null, 2)}
+${blocoValidacao}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
+REGRA CRÍTICA: NUNCA emita type:"complete" se economia_horas_mes for 0 ou negativa. Se o usuário tentar aprovar nessa condição, responda com type:"question" explicando que o projeto precisa ter economia > 0h para ser submetido.
+
 FORMATO — APENAS JSON válido:
 
-Se aprovado:
+Se aprovado (SOMENTE se economia_horas_mes > 0):
 {"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais}}
 
 Se ajuste + novo preview:
