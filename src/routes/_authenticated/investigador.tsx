@@ -21,6 +21,9 @@ import {
   Bot,
   CircleDot,
   ChevronUp,
+  Shield,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -392,24 +395,25 @@ function Investigador() {
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--go-blue)] flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--go-blue)]">
-              <Search className="h-4 w-4 text-white" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--go-radius-sm)] bg-[var(--go-blue)] shadow-[var(--go-shadow-sm)]">
+              <Search className="h-4.5 w-4.5 text-white" />
             </div>
-            Investigador
-          </h1>
-          <p className="mt-1 text-sm text-[var(--go-text-primary)]/60">
-            Monitore projetos em tempo real — preenchimento, chat e performance da API.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-[var(--go-text-primary)]/50">
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-[#16a34a] animate-pulse" />
-            Auto-refresh
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-[var(--go-text-primary)]">
+                Investigador
+              </h1>
+              <p className="text-[13px] text-[var(--go-text-primary)]/45">
+                Monitore projetos em tempo real
+              </p>
+            </div>
           </div>
-          <span className="font-mono text-[11px]">
+        </div>
+        <div className="flex items-center gap-2 rounded-full bg-[var(--go-blue)]/4 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50">
+          <div className="h-1.5 w-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+          <span className="font-mono text-[11px] tabular-nums">
             {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
@@ -519,16 +523,21 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-[var(--go-radius-sm)] border bg-white p-3 transition-colors ${
-        highlight ? 'border-current/20' : 'border-[var(--go-blue)]/8'
+      className={`relative overflow-hidden rounded-[var(--go-radius-md)] border bg-white p-3.5 transition-all ${
+        highlight ? 'shadow-[var(--go-shadow-sm)]' : 'border-[var(--go-blue)]/8'
       }`}
       style={highlight ? { borderColor: `${color}30` } : undefined}
     >
+      {/* Subtle gradient accent */}
+      <div
+        className="absolute top-0 right-0 h-12 w-12 rounded-full opacity-[0.06] blur-xl"
+        style={{ backgroundColor: color }}
+      />
       <div className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: `${color}99` }}>
         <span style={{ color }}>{icon}</span>
         {label}
       </div>
-      <div className="mt-1 text-xl font-bold text-[var(--go-text-primary)]">{value}</div>
+      <div className="mt-1.5 text-xl font-bold tracking-tight text-[var(--go-text-primary)] tabular-nums">{value}</div>
     </div>
   )
 }
@@ -541,67 +550,70 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white px-4 py-3 transition-all hover:border-[var(--go-blue)]/20 hover:shadow-[var(--go-shadow-sm)]"
+      className={`group relative w-full text-left overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white pl-0 pr-4 py-3 transition-all hover:border-[var(--go-blue)]/18 hover:shadow-[var(--go-shadow-sm)]`}
     >
-      <div className="flex items-center gap-3">
+      {/* Phase accent stripe */}
+      <div className={`absolute top-0 left-0 h-full w-1 ${style.border.replace('border-l-', 'bg-')}`} />
+
+      <div className="flex items-center gap-3 pl-4">
         {/* Indicador de ativo */}
         <div className="flex-shrink-0">
           {active ? (
-            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse" title="Preenchendo agora" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse ring-4 ring-[#16a34a]/10" title="Preenchendo agora" />
           ) : (
-            <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} style={{ opacity: 0.4 }} />
+            <div className={`h-2 w-2 rounded-full ${style.dot}`} style={{ opacity: 0.35 }} />
           )}
         </div>
 
         {/* Info principal */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
               {p.nome ?? 'Projeto sem nome'}
             </span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
               {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
             </span>
             {p.status && p.status !== 'rascunho' && (
-              <span className="rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
+              <span className="rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-semibold">
                 {STATUS_LABELS[p.status] ?? p.status}
               </span>
             )}
             {p.tem_erro && (
-              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-medium">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-semibold">
                 <AlertTriangle className="h-3 w-3" />
                 {p.total_erros_api} erro{p.total_erros_api !== 1 ? 's' : ''}
               </span>
             )}
             {p.max_duracao_api_ms != null && p.max_duracao_api_ms > 5000 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-medium">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-semibold">
                 <Clock className="h-3 w-3" />
                 Lento
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs text-[var(--go-text-primary)]/45">
+          <div className="mt-0.5 text-[12px] text-[var(--go-text-primary)]/40">
             {p.responsavel_nome} · {p.area_nome ?? 'Sem área'} · {p.ferramenta}
           </div>
         </div>
 
         {/* Métricas rápidas */}
-        <div className="flex items-center gap-5 text-xs flex-shrink-0">
+        <div className="flex items-center gap-4 text-xs flex-shrink-0">
           <div className="text-center" title="Mensagens (usuário / IA)">
-            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">msgs</div>
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
           </div>
           <div className="text-center" title="Tempo desde início">
-            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">duração</div>
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">duração</div>
           </div>
           <div className="text-center" title="Tempo médio de resposta da API">
-            <div className={`font-semibold tabular-nums ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>
+            <div className={`font-semibold tabular-nums text-[13px] ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>
               {formatDuration(p.media_duracao_api_ms)}
             </div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">API média</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">API</div>
           </div>
-          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/20 group-hover:text-[var(--go-blue)]/50 transition-colors" />
+          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/15 group-hover:text-[var(--go-blue)]/40 group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </button>
@@ -650,58 +662,62 @@ function DetalheView({
 
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
-      {/* Header compacto */}
-      <div className="flex items-start gap-3">
-        <button
-          onClick={onBack}
-          className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-          title="Voltar"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-[var(--go-text-primary)] truncate">
-              {d.nome ?? 'Projeto sem nome'}
-            </h1>
-            <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
-              {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
-            </span>
-            {d.status && d.status !== 'rascunho' && (
-              <span className="flex-shrink-0 rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
-                {STATUS_LABELS[d.status] ?? d.status}
+      {/* Header com profundidade */}
+      <div className="relative overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white p-5">
+        {/* Faixa decorativa */}
+        <div className={`absolute top-0 left-0 h-full w-1 ${phaseStyle.border.replace('border-l-', 'bg-')}`} />
+
+        <div className="flex items-start gap-3 pl-3">
+          <button
+            onClick={onBack}
+            className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 hover:bg-[var(--go-blue)]/5 transition-all"
+            title="Voltar"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-lg font-bold tracking-tight text-[var(--go-text-primary)]">
+                {d.nome ?? 'Projeto sem nome'}
+              </h1>
+              <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
+                {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
               </span>
-            )}
+              {d.status && d.status !== 'rascunho' && (
+                <span className="flex-shrink-0 rounded-full bg-[var(--go-blue)]/5 px-2.5 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-semibold">
+                  {STATUS_LABELS[d.status] ?? d.status}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--go-text-primary)]/45">
+              {d.responsavel_nome} ({d.responsavel_email}) · {d.area_nome ?? 'Sem área'} · {d.ferramenta}
+            </p>
+
+            {/* Métricas inline dentro do header */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
+              <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
+              <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
+              <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
+            </div>
           </div>
-          <p className="mt-0.5 text-sm text-[var(--go-text-primary)]/45">
-            {d.responsavel_nome} ({d.responsavel_email}) · {d.area_nome ?? 'Sem área'} · {d.ferramenta}
-          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setDadosOpen(!dadosOpen)}
+              className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+            >
+              <FileText className="h-3 w-3" />
+              Dados
+              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${dadosOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <button
+              onClick={onRefresh}
+              className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={onRefresh}
-          className="flex-shrink-0 flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Atualizar
-        </button>
-      </div>
-
-      {/* Métricas inline */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
-        <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
-        <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
-        <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
-
-        {/* Dados do projeto — collapsible */}
-        <button
-          onClick={() => setDadosOpen(!dadosOpen)}
-          className="ml-auto flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-        >
-          <FileText className="h-3 w-3" />
-          Dados do projeto
-          <ChevronDown className={`h-3 w-3 transition-transform ${dadosOpen ? 'rotate-180' : ''}`} />
-        </button>
       </div>
 
       {/* Dados colapsáveis das etapas */}
@@ -737,24 +753,24 @@ function DetalheView({
       )}
 
       {/* Tabs */}
-      <div className="mt-5 flex items-center gap-0.5 border-b border-[var(--go-blue)]/8">
+      <div className="mt-4 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
         {([
-          ['chat', 'Histórico do chat', d.chat_messages.length],
+          ['chat', 'Chat', d.chat_messages.length],
           ['api_logs', 'Logs de API', d.api_logs.length],
-          ['dados', 'Documentação / Análise', null],
+          ['dados', 'Análise & Docs', null],
         ] as [string, string, number | null][]).map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setTab(key as typeof tab)}
-            className={`relative border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+            className={`relative flex-1 rounded-[6px] px-4 py-2 text-[13px] font-medium transition-all ${
               tab === key
-                ? 'border-[var(--go-blue)] text-[var(--go-blue)]'
-                : 'border-transparent text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/70'
+                ? 'bg-white text-[var(--go-blue)] shadow-[var(--go-shadow-sm)]'
+                : 'text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/65'
             }`}
           >
             {label}
             {count != null && (
-              <span className={`ml-1.5 text-[11px] ${tab === key ? 'text-[var(--go-blue)]/50' : 'text-[var(--go-text-primary)]/25'}`}>
+              <span className={`ml-1.5 text-[11px] tabular-nums ${tab === key ? 'text-[var(--go-blue)]/45' : 'text-[var(--go-text-primary)]/20'}`}>
                 {count}
               </span>
             )}
@@ -773,11 +789,11 @@ function DetalheView({
 
 function MiniStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-      warn ? 'border-[#dc2626]/15 bg-[#dc2626]/5' : 'border-[var(--go-blue)]/8 bg-white'
+    <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+      warn ? 'bg-[#dc2626]/6' : 'bg-[var(--go-blue)]/4'
     }`}>
-      <span className="text-[var(--go-text-primary)]/40">{label}</span>
-      <span className={`font-semibold tabular-nums ${warn ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>{value}</span>
+      <span className={`text-[11px] ${warn ? 'text-[#dc2626]/50' : 'text-[var(--go-text-primary)]/35'}`}>{label}</span>
+      <span className={`font-semibold tabular-nums text-[12px] ${warn ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>{value}</span>
     </div>
   )
 }
@@ -1210,107 +1226,210 @@ function DadosTab({
   analise: ProjetoDetalhes['analise']
 }) {
   const [justificativaExpandida, setJustificativaExpandida] = useState(false)
+  const [criteriosExpandidos, setCriteriosExpandidos] = useState(false)
 
   const allCriterios = analise
     ? [...analise.criterios_hardcoded, ...analise.criterios_dinamicos]
     : []
   const cumpridos = allCriterios.filter((c) => c.pontos === 1)
   const descumpridos = allCriterios.filter((c) => c.pontos === 0)
+  const pct = analise && analise.pontuacao_maxima > 0
+    ? Math.round((analise.pontuacao_total / analise.pontuacao_maxima) * 100)
+    : 0
+
+  const complexidadeConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+    automacao: { label: 'Automação', icon: <Zap className="h-3.5 w-3.5" />, color: '#ca8a04' },
+    inteligencia: { label: 'Inteligência', icon: <Sparkles className="h-3.5 w-3.5" />, color: '#7c3aed' },
+    autonomia: { label: 'Autonomia', icon: <TrendingUp className="h-3.5 w-3.5" />, color: '#0d9488' },
+  }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {analise && (
-        <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
-          <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
-            Análise automática
-          </h3>
-          <div className="space-y-1.5 text-sm">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[var(--go-text-primary)]/35 text-xs w-28 flex-shrink-0">Resultado:</span>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                analise.resultado === 'aprovado'
-                  ? 'bg-[#16a34a]/10 text-[#16a34a]'
-                  : 'bg-[#f59e0b]/10 text-[#b45309]'
-              }`}>
-                {analise.resultado === 'aprovado' ? 'Aprovado' : analise.resultado === 'rejeitado' ? 'Em revisão' : analise.resultado}
-              </span>
-            </div>
-            <KV label="Pontuação" value={`${analise.pontuacao_total} / ${analise.pontuacao_maxima}`} />
-            <KV label="Complexidade" value={
-              analise.complexidade === 'automacao' ? 'Automação'
-                : analise.complexidade === 'inteligencia' ? 'Inteligência'
-                : analise.complexidade === 'autonomia' ? 'Autonomia'
-                : analise.complexidade
-            } />
+        <>
+          {/* ── Hero card: resultado + score + complexidade ─────────── */}
+          <div
+            className="relative overflow-hidden rounded-[var(--go-radius-md)] border bg-white"
+            style={{
+              borderColor: analise.resultado === 'aprovado' ? '#16a34a25' : '#f59e0b25',
+            }}
+          >
+            {/* Faixa de cor sutil no topo */}
+            <div
+              className="h-1"
+              style={{
+                background: analise.resultado === 'aprovado'
+                  ? 'linear-gradient(90deg, #16a34a, #22d3ee)'
+                  : 'linear-gradient(90deg, #f59e0b, #f97316)',
+              }}
+            />
 
-            {/* Resumo curto */}
-            {analise.resumo && (
-              <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3">
-                <MiniMarkdown text={analise.resumo} />
+            <div className="p-5">
+              <div className="flex items-start gap-5">
+                {/* Score ring */}
+                <div className="flex-shrink-0">
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <svg className="absolute inset-0 h-20 w-20 -rotate-90" viewBox="0 0 80 80">
+                      <circle
+                        cx="40" cy="40" r="34"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="6"
+                        className="text-[var(--go-blue)]/6"
+                      />
+                      <circle
+                        cx="40" cy="40" r="34"
+                        fill="none"
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 34}`}
+                        strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct / 100)}`}
+                        style={{
+                          stroke: analise.resultado === 'aprovado' ? '#16a34a' : '#f59e0b',
+                          transition: 'stroke-dashoffset 0.6s ease',
+                        }}
+                      />
+                    </svg>
+                    <div className="text-center">
+                      <span className="text-lg font-bold text-[var(--go-text-primary)] tabular-nums leading-none">
+                        {analise.pontuacao_total}
+                      </span>
+                      <span className="text-[11px] text-[var(--go-text-primary)]/30 font-medium">/{analise.pontuacao_maxima}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resultado + complexidade */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold ${
+                      analise.resultado === 'aprovado'
+                        ? 'bg-[#16a34a]/10 text-[#16a34a]'
+                        : 'bg-[#f59e0b]/10 text-[#b45309]'
+                    }`}>
+                      {analise.resultado === 'aprovado' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      )}
+                      {analise.resultado === 'aprovado' ? 'Aprovado' : analise.resultado === 'rejeitado' ? 'Em revisão' : analise.resultado}
+                    </span>
+
+                    {analise.complexidade && complexidadeConfig[analise.complexidade] && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium"
+                        style={{
+                          backgroundColor: `${complexidadeConfig[analise.complexidade].color}12`,
+                          color: complexidadeConfig[analise.complexidade].color,
+                        }}
+                      >
+                        {complexidadeConfig[analise.complexidade].icon}
+                        {complexidadeConfig[analise.complexidade].label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Resumo */}
+                  {analise.resumo && (
+                    <div className="text-[13px] leading-relaxed text-[var(--go-text-primary)]/70">
+                      <MiniMarkdown text={analise.resumo} />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Critérios individuais */}
-            {allCriterios.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <h4 className="text-[11px] font-semibold text-[var(--go-text-primary)]/40 uppercase tracking-wider">
-                  Critérios avaliados ({cumpridos.length} de {allCriterios.length})
-                </h4>
+          {/* ── Critérios individuais ───────────────────────────────── */}
+          {allCriterios.length > 0 && (
+            <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white">
+              <button
+                onClick={() => setCriteriosExpandidos(!criteriosExpandidos)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[var(--go-blue)]/2"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Shield className="h-4 w-4 text-[var(--go-blue)]/40" />
+                  <span className="text-[13px] font-semibold text-[var(--go-text-primary)]">
+                    Critérios avaliados
+                  </span>
+                  <span className="text-[12px] text-[var(--go-text-primary)]/40 tabular-nums">
+                    {cumpridos.length} de {allCriterios.length} cumpridos
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Mini bar */}
+                  <div className="hidden sm:flex items-center gap-1 w-28">
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--go-blue)]/6 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${allCriterios.length > 0 ? (cumpridos.length / allCriterios.length) * 100 : 0}%`,
+                          backgroundColor: descumpridos.length === 0 ? '#16a34a' : cumpridos.length >= descumpridos.length ? '#16a34a' : '#f59e0b',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-[var(--go-text-primary)]/25 transition-transform duration-200 ${criteriosExpandidos ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
 
-                {/* Descumpridos primeiro — são os que o admin mais precisa ver */}
-                {descumpridos.length > 0 && (
-                  <div className="space-y-1.5">
+              {criteriosExpandidos && (
+                <div className="border-t border-[var(--go-blue)]/6 px-5 py-4" style={{ animation: 'go-slide-down 0.2s ease' }}>
+                  <div className="space-y-2">
+                    {/* Descumpridos primeiro */}
                     {descumpridos.map((c, i) => (
                       <CriterioItem key={`desc-${i}`} criterio={c} />
                     ))}
-                  </div>
-                )}
-
-                {/* Cumpridos */}
-                {cumpridos.length > 0 && (
-                  <div className="space-y-1.5">
+                    {descumpridos.length > 0 && cumpridos.length > 0 && (
+                      <div className="flex items-center gap-3 py-1.5">
+                        <div className="h-px flex-1 bg-[var(--go-blue)]/6" />
+                        <span className="text-[10px] font-medium text-[var(--go-text-primary)]/25 uppercase tracking-wider">Cumpridos</span>
+                        <div className="h-px flex-1 bg-[var(--go-blue)]/6" />
+                      </div>
+                    )}
                     {cumpridos.map((c, i) => (
                       <CriterioItem key={`cump-${i}`} criterio={c} />
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
+          )}
 
-            {/* Justificativa completa — expandível */}
-            {analise.justificativa && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setJustificativaExpandida(!justificativaExpandida)}
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--go-blue)]/70 hover:text-[var(--go-blue)] transition-colors"
-                >
-                  {justificativaExpandida ? (
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  )}
-                  {justificativaExpandida ? 'Recolher parecer completo' : 'Mostrar parecer completo da IA'}
-                </button>
-                {justificativaExpandida && (
-                  <div
-                    className="mt-2 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 p-4"
-                    style={{ animation: 'go-slide-down 0.2s ease' }}
-                  >
-                    <MiniMarkdown text={analise.justificativa} />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+          {/* ── Parecer completo da IA ──────────────────────────────── */}
+          {analise.justificativa && (
+            <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white">
+              <button
+                onClick={() => setJustificativaExpandida(!justificativaExpandida)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[var(--go-blue)]/2"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Bot className="h-4 w-4 text-[var(--go-blue)]/40" />
+                  <span className="text-[13px] font-semibold text-[var(--go-text-primary)]">
+                    Parecer completo da IA
+                  </span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-[var(--go-text-primary)]/25 transition-transform duration-200 ${justificativaExpandida ? 'rotate-180' : ''}`} />
+              </button>
+
+              {justificativaExpandida && (
+                <div className="border-t border-[var(--go-blue)]/6 px-5 py-4" style={{ animation: 'go-slide-down 0.2s ease' }}>
+                  <MiniMarkdown text={analise.justificativa} />
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
-        <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
+      {/* ── Documentação gerada ──────────────────────────────────── */}
+      <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white p-5">
+        <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5" />
           Documentação gerada
         </h3>
         {documentacao ? (
-          <pre className="overflow-x-auto text-[12px] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 rounded-[var(--go-radius-sm)] p-3 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[var(--go-text-primary)]/60" style={{ scrollbarWidth: 'thin' }}>
+          <pre className="overflow-x-auto text-[12px] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 rounded-[var(--go-radius-sm)] p-4 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[var(--go-text-primary)]/60 leading-relaxed" style={{ scrollbarWidth: 'thin' }}>
             {JSON.stringify(documentacao, null, 2)}
           </pre>
         ) : (
@@ -1321,30 +1440,31 @@ function DadosTab({
   )
 }
 
-/** Renderiza um critério individual com ícone de cumprido/descumprido e justificativa. */
+/** Renderiza um critério individual com indicador visual e justificativa. */
 function CriterioItem({ criterio }: { criterio: { criterio: string; pontos: number; justificativa: string } }) {
   const ok = criterio.pontos === 1
   return (
-    <div className={`flex items-start gap-2.5 rounded-[var(--go-radius-sm)] border px-3 py-2.5 ${
-      ok
-        ? 'border-[#16a34a]/10 bg-[#16a34a]/3'
-        : 'border-[#dc2626]/10 bg-[#dc2626]/3'
-    }`}>
-      <div className="mt-0.5 flex-shrink-0">
-        {ok ? (
-          <CheckCircle2 className="h-4 w-4 text-[#16a34a]" />
-        ) : (
-          <XCircle className="h-4 w-4 text-[#dc2626]" />
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className={`text-[13px] font-medium ${ok ? 'text-[#15803d]' : 'text-[#b91c1c]'}`}>
+    <div className="flex items-start gap-3 group">
+      {/* Indicator dot */}
+      <div className={`mt-[7px] flex-shrink-0 h-2 w-2 rounded-full ${
+        ok ? 'bg-[#16a34a]' : 'bg-[#dc2626]'
+      }`} />
+      <div className="min-w-0 flex-1">
+        <span className={`text-[13px] font-medium ${ok ? 'text-[var(--go-text-primary)]' : 'text-[#b91c1c]'}`}>
           {criterio.criterio}
         </span>
         {criterio.justificativa && (
-          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--go-text-primary)]/55">
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--go-text-primary)]/50">
             {criterio.justificativa}
           </p>
+        )}
+      </div>
+      {/* Inline status chip */}
+      <div className="flex-shrink-0 mt-0.5">
+        {ok ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-[#16a34a]/60" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 text-[#dc2626]/60" />
         )}
       </div>
     </div>
