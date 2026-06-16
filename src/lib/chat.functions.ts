@@ -467,6 +467,38 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
+  // ── VALIDAÇÃO ANTI-ZERO: safety net hardcoded ──────────────────────────────
+  // Mesmo com prompts instruindo a IA, o LLM pode gerar complete/preview com
+  // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
+  // Mutamos o resultado direto — são objetos locais, sem risco de side-effect.
+  if (resultado.type === 'complete') {
+    // Saving: economia_horas_mes NUNCA pode ser 0 ao completar
+    if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
+      const econHoras = resultado.saving?.economia_horas_mes ?? 0;
+      if (econHoras <= 0) {
+        log('enviarMensagem', `⛔ Saving com economia_horas_mes=${econHoras} — bloqueando complete, forçando question`);
+        Object.assign(resultado, {
+          type: 'question',
+          content: 'Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas para ser submetido. Vamos revisar: em que etapa exatamente a automação economiza tempo comparado ao processo manual?',
+          fase: 'saving',
+        });
+      }
+    }
+
+    // Receita: valor_ganho_mensal NUNCA pode ser 0 ao completar
+    if (tiposProjeto.includes('receita_incremental') && (estado.fase === 'receita_preview' || estado.fase === 'receita')) {
+      const ganho = resultado.receita?.valor_ganho_mensal ?? 0;
+      if (ganho <= 0) {
+        log('enviarMensagem', `⛔ Receita com valor_ganho_mensal=${ganho} — bloqueando complete, forçando question`);
+        Object.assign(resultado, {
+          type: 'question',
+          content: 'Não consigo finalizar o memorial com ganho de R$ 0 — se o projeto gera receita incremental, preciso de um valor concreto. Vamos revisar: qual é o ganho real de receita que o projeto gera?',
+          fase: 'receita',
+        });
+      }
+    }
+  }
+
   // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o
   // CERNE do produto e é feita pelo agente — NÃO há fallback. Compilamos e
   // salvamos ANTES de confirmar a transição. Se a IA não devolver uma doc válida

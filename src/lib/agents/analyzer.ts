@@ -55,7 +55,7 @@ export const CRITERIOS_HARDCODED = [
     id: 'saving_coerente',
     nome: 'Memorial de cálculo com lógica sólida',
     descricao:
-      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente.',
+      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente. REGRA DE REPROVAÇÃO AUTOMÁTICA (0 pontos): se economia_horas_mes = 0, saving_reais = 0 (quando há saving marcado), ou valor de receita incremental = 0 (quando marcou receita), o critério deve receber 0 pontos — um projeto precisa demonstrar ganho concreto para ser aprovado.',
   },
   {
     id: 'ferramenta_compativel',
