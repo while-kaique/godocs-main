@@ -1385,7 +1385,7 @@ function FiltroPopover({
 
             {/* Período */}
             <div>
-              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Período de criação</div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Data de Início</div>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
