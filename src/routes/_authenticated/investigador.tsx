@@ -20,6 +20,7 @@ import {
   FileText,
   Bot,
   CircleDot,
+  ChevronUp,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -102,8 +103,11 @@ type ProjetoDetalhes = ProjetoInvestigador & {
     resultado: string
     pontuacao_total: number
     pontuacao_maxima: number
+    justificativa: string
     resumo: string | null
     complexidade: string | null
+    criterios_hardcoded: Array<{ criterio: string; pontos: number; justificativa: string }>
+    criterios_dinamicos: Array<{ criterio: string; pontos: number; justificativa: string }>
   } | null
   api_logs: ApiLog[]
 }
@@ -1205,6 +1209,14 @@ function DadosTab({
   documentacao: unknown | null
   analise: ProjetoDetalhes['analise']
 }) {
+  const [justificativaExpandida, setJustificativaExpandida] = useState(false)
+
+  const allCriterios = analise
+    ? [...analise.criterios_hardcoded, ...analise.criterios_dinamicos]
+    : []
+  const cumpridos = allCriterios.filter((c) => c.pontos === 1)
+  const descumpridos = allCriterios.filter((c) => c.pontos === 0)
+
   return (
     <div className="space-y-3">
       {analise && (
@@ -1214,7 +1226,7 @@ function DadosTab({
           </h3>
           <div className="space-y-1.5 text-sm">
             <div className="flex items-baseline gap-2">
-              <span className="text-[var(--go-text-primary)]\35 text-xs w-28 flex-shrink-0">Resultado:</span>
+              <span className="text-[var(--go-text-primary)]/35 text-xs w-28 flex-shrink-0">Resultado:</span>
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                 analise.resultado === 'aprovado'
                   ? 'bg-[#16a34a]/10 text-[#16a34a]'
@@ -1230,9 +1242,63 @@ function DadosTab({
                 : analise.complexidade === 'autonomia' ? 'Autonomia'
                 : analise.complexidade
             } />
+
+            {/* Resumo curto */}
             {analise.resumo && (
               <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3">
                 <MiniMarkdown text={analise.resumo} />
+              </div>
+            )}
+
+            {/* Critérios individuais */}
+            {allCriterios.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <h4 className="text-[11px] font-semibold text-[var(--go-text-primary)]/40 uppercase tracking-wider">
+                  Critérios avaliados ({cumpridos.length} de {allCriterios.length})
+                </h4>
+
+                {/* Descumpridos primeiro — são os que o admin mais precisa ver */}
+                {descumpridos.length > 0 && (
+                  <div className="space-y-1.5">
+                    {descumpridos.map((c, i) => (
+                      <CriterioItem key={`desc-${i}`} criterio={c} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Cumpridos */}
+                {cumpridos.length > 0 && (
+                  <div className="space-y-1.5">
+                    {cumpridos.map((c, i) => (
+                      <CriterioItem key={`cump-${i}`} criterio={c} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Justificativa completa — expandível */}
+            {analise.justificativa && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setJustificativaExpandida(!justificativaExpandida)}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--go-blue)]/70 hover:text-[var(--go-blue)] transition-colors"
+                >
+                  {justificativaExpandida ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                  {justificativaExpandida ? 'Recolher parecer completo' : 'Mostrar parecer completo da IA'}
+                </button>
+                {justificativaExpandida && (
+                  <div
+                    className="mt-2 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 p-4"
+                    style={{ animation: 'go-slide-down 0.2s ease' }}
+                  >
+                    <MiniMarkdown text={analise.justificativa} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1249,6 +1315,36 @@ function DadosTab({
           </pre>
         ) : (
           <p className="text-sm text-[var(--go-text-primary)]/30">Documentação ainda não gerada.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Renderiza um critério individual com ícone de cumprido/descumprido e justificativa. */
+function CriterioItem({ criterio }: { criterio: { criterio: string; pontos: number; justificativa: string } }) {
+  const ok = criterio.pontos === 1
+  return (
+    <div className={`flex items-start gap-2.5 rounded-[var(--go-radius-sm)] border px-3 py-2.5 ${
+      ok
+        ? 'border-[#16a34a]/10 bg-[#16a34a]/3'
+        : 'border-[#dc2626]/10 bg-[#dc2626]/3'
+    }`}>
+      <div className="mt-0.5 flex-shrink-0">
+        {ok ? (
+          <CheckCircle2 className="h-4 w-4 text-[#16a34a]" />
+        ) : (
+          <XCircle className="h-4 w-4 text-[#dc2626]" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className={`text-[13px] font-medium ${ok ? 'text-[#15803d]' : 'text-[#b91c1c]'}`}>
+          {criterio.criterio}
+        </span>
+        {criterio.justificativa && (
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--go-text-primary)]/55">
+            {criterio.justificativa}
+          </p>
         )}
       </div>
     </div>
