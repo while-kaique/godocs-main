@@ -213,6 +213,19 @@ ${blocoValor}
 ESTADO ATUAL:
 ${JSON.stringify(receita, null, 2)}
 
+RECEITA INCREMENTAL ≠ SAVING — DISTINÇÃO OBRIGATÓRIA:
+Receita incremental = dinheiro NOVO que entra por causa do projeto (mais vendas, mais conversões, mais faturamento, novo produto/serviço gerado).
+Saving = economia operacional: tempo poupado, horas reduzidas, custo evitado, retrabalho eliminado.
+
+Sinais de que o "ganho" descrito é saving disfarçado de receita:
+- "horas economizadas" / "minutos poupados por chamado/tarefa/registro"
+- "custo/hora × horas reduzidas" → isso é redução de custo laboral = saving
+- "economia operacional" / "eficiência" / "redução de retrabalho"
+- Mesma receita antes e depois, mas agora o processo é mais rápido
+
+SE o racional do usuário descrever qualquer um desses padrões: NÃO monte memorial de receita. Bloqueie com type:"question" e explique:
+"O que você descreveu é uma economia operacional — tempo ou custo poupado — e isso é saving, não receita incremental. Receita incremental é dinheiro novo que entra: mais vendas, mais conversões, mais faturamento. Se o projeto não gera receita nova, ele precisa ser reclassificado como saving. Quer voltar para reclassificar?"
+
 COMO CONDUZIR:
 1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
 2. ${valorInformado
@@ -250,6 +263,24 @@ Preview (quando valor e memorial estiverem completos):
 export function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
   const ganhoZerado = (receita.valor_ganho_mensal ?? 0) <= 0;
 
+  // Detecta memorial de saving disfarçado de receita (horas×custo, economia operacional, etc.)
+  const memorial = receita.memorial_calculo ?? '';
+  const pareceSaving = !ganhoZerado && (
+    /horas?\s*(economizadas?|poupadas?|reduzidas?)/i.test(memorial) ||
+    /economia\s*(operacional|de\s*tempo|de\s*custo|laboral)/i.test(memorial) ||
+    /custo[\s/]hora/i.test(memorial) ||
+    /minutos?\s*por\s*(chamado|item|registro|tarefa)/i.test(memorial)
+  );
+
+  const blocoSavingDisfarcado = pareceSaving
+    ? `
+
+ATENÇÃO — MEMORIAL DESCREVE SAVING, NÃO RECEITA INCREMENTAL:
+O memorial usa linguagem de economia operacional (horas economizadas, minutos por tarefa, custo/hora). Isso é saving, não receita incremental.
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question".
+- Explique: "O que está descrito aqui é uma economia operacional — tempo e custo poupados — que se classifica como saving, não receita incremental. Receita incremental é dinheiro novo que entra (mais vendas, mais faturamento). Para continuar, você precisa voltar e reclassificar o projeto como saving. Quer fazer isso?"`
+    : '';
+
   const blocoValidacao = ganhoZerado
     ? `
 
@@ -264,13 +295,13 @@ O valor_ganho_mensal está em 0 ou nulo. Isso é INVÁLIDO para submissão de re
 
 MEMORIAL ATUAL:
 ${JSON.stringify(receita, null, 2)}
-${blocoValidacao}
+${blocoValidacao}${blocoSavingDisfarcado}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
-REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo. Se o usuário tentar aprovar nessa condição, responda com type:"question" explicando que o projeto precisa ter ganho > R$ 0 para ser submetido como receita incremental.
+REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado). Se o usuário tentar aprovar nessas condições, responda com type:"question".
 
 FORMATO — APENAS JSON válido:
 
@@ -369,14 +400,12 @@ REGRAS ANTI-EXTRAPOLAÇÃO:
 - Para custos adicionais, documente o que a pessoa faz e por que é necessário.
 
 REGRA CRÍTICA — ECONOMIA NUNCA PODE SER ZERO:
-- O projeto está sendo registrado justamente porque gera algum ganho. Uma economia de 0h NÃO FAZ SENTIDO para submissão.
-- Se a conversa indicar que as horas antes e depois são iguais (ex: "a rotina continua a mesma, só trocou o software"), a economia é ZERO — mas isso é INVÁLIDO. NUNCA gere preview com economia_horas_mes = 0.
-- Nesse caso, QUESTIONE: "Se a rotina permanece exatamente a mesma e não houve redução de tempo, qual é o ganho concreto desse projeto? Preciso entender onde está a economia para montar o memorial."
-- Se o usuário disser que houve troca de ferramenta sem economia de horas, investigue: a ferramenta nova reduz erros? Aumenta capacidade? Permite fazer mais rápido? Sempre existe algum ganho mensurável — descubra-o.
-- Se, após investigação, realmente não houver economia de horas (ex: ganho é só qualidade), atualize horas_antes/horas_depois para refletir a realidade (pode ser que o usuário tenha preenchido errado) e documente no memorial o ganho qualitativo, mas as HORAS de economia devem ser > 0 para submeter.
+- Uma economia de 0h NÃO FAZ SENTIDO para submissão como saving. NUNCA gere preview com economia_horas_mes = 0.
+- Se as horas antes e depois forem iguais (rotina idêntica, só trocou o software), a economia é ZERO — bloqueie e investigue primeiro.
+- INVESTIGAÇÃO HONESTA: antes de aceitar o zero, pergunte diretamente — a ferramenta nova elimina erros que geravam retrabalho? Aumenta capacidade processada? Permite fazer mais rápido? Se houver ganho real de horas, descubra e quantifique.
+- NÃO INVENTE GANHOS: se após investigação honesta o usuário confirmar que a rotina é literalmente idêntica (mesmas horas, mesmo processo, só mudou o software sem nenhuma redução real), seja honesto. Explique que sem redução de horas mensurável não é possível submeter como saving e oriente: "Se o projeto cancela uma licença paga, isso é custo evitado — considere submeter como receita incremental. Se o impacto é qualitativo e importante mas difícil de medir em horas, considere a opção de projeto especial (alto impacto, difícil mensuração)."
 - NUNCA apresente um preview onde economia_horas_mes = 0 e NUNCA permita aprovação nessa condição.
-- Se o projeto tem custo de ferramenta externa (custo_externo_mensal > 0) informado pelo formulário, o memorial deve mencioná-lo e a economia líquida deve considerar esse custo.
-- RESUMO: o projeto PRECISA trazer algum tipo de ganho concreto. Se não há economia de horas, investigue até encontrar o ganho real.
+- Se o projeto tem custo de ferramenta externa (custo_externo_mensal > 0), mencione no memorial e considere na economia líquida.
 
 LINGUAGEM (IMPORTANTÍSSIMO):
 - NUNCA exponha termos internos como "economia_horas_mes", "horas_antes", "horas_depois", "linhas", "saving", "memorial_calculo", "coletado".

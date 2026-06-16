@@ -1184,8 +1184,8 @@ export function Step3Chat({
     !showReceitaForm;
   const bothEdits = !!onEditSaving && !!onEditReceita;
   const editButtons: { key: string; label: string; onClick: () => void }[] = [];
-  if (onEditSaving) editButtons.push({ key: "saving", label: bothEdits ? "Editar saving" : "Editar dados", onClick: onEditSaving });
-  if (onEditReceita) editButtons.push({ key: "receita", label: bothEdits ? "Editar receita" : "Editar dados", onClick: onEditReceita });
+  if (canEditForms && onEditSaving) editButtons.push({ key: "saving", label: bothEdits ? "Editar saving" : "Editar dados", onClick: onEditSaving });
+  if (canEditForms && onEditReceita) editButtons.push({ key: "receita", label: bothEdits ? "Editar receita" : "Editar dados", onClick: onEditReceita });
   const hasOptions = lastMsg?.role === "assistant" && lastMsg.options && !isComplete && !showPreviewActions;
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1240,7 +1240,7 @@ export function Step3Chat({
         </div>
 
         {/* Voltar ao(s) formulário(s) determinístico(s) para editar os dados */}
-        {canEditForms && (
+        {editButtons.length > 0 && (
           <div className="flex shrink-0 items-center gap-2">
             {editButtons.map((b) => (
               <button
