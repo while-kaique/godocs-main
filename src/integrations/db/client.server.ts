@@ -533,6 +533,15 @@ export async function insertLeaderAreas(userId: string, areaIds: string[]) {
 
 // --- Api Logs ---
 
+/** Limite de corpo armazenado por log (500 KB). Bodies maiores são truncados. */
+const API_LOG_BODY_LIMIT = 512_000;
+
+function truncateBody(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.length <= API_LOG_BODY_LIMIT) return raw;
+  return raw.slice(0, API_LOG_BODY_LIMIT) + '\n…[truncado — ' + raw.length.toLocaleString('pt-BR') + ' chars]';
+}
+
 export async function insertApiLog(data: {
   projeto_id?: string | null;
   endpoint: string;
@@ -542,11 +551,13 @@ export async function insertApiLog(data: {
   error?: string | null;
   request_size?: number | null;
   response_size?: number | null;
+  request_body?: string | null;
+  response_body?: string | null;
 }) {
   const id = generateId();
   await exec(`
-    INSERT INTO api_logs (id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO api_logs (id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size, request_body, response_body)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.projeto_id ?? null,
@@ -557,18 +568,29 @@ export async function insertApiLog(data: {
     data.error ?? null,
     data.request_size ?? null,
     data.response_size ?? null,
+    truncateBody(data.request_body),
+    truncateBody(data.response_body),
   ]);
 }
 
+/** Colunas leves (sem bodies) para listagens. */
+const API_LOG_LIGHT_COLS = 'id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size, created_at';
+
 export function getApiLogsByProjeto(projetoId: string) {
   return queryAll<ApiLogRow>(
-    'SELECT * FROM api_logs WHERE projeto_id = ? ORDER BY created_at DESC', [projetoId]
+    `SELECT ${API_LOG_LIGHT_COLS} FROM api_logs WHERE projeto_id = ? ORDER BY created_at DESC`, [projetoId]
   );
 }
 
 export function getApiLogsRecent(limit = 200) {
   return queryAll<ApiLogRow>(
-    'SELECT * FROM api_logs ORDER BY created_at DESC LIMIT ?', [limit]
+    `SELECT ${API_LOG_LIGHT_COLS} FROM api_logs ORDER BY created_at DESC LIMIT ?`, [limit]
+  );
+}
+
+export function getApiLogById(id: string) {
+  return queryOne<ApiLogRow>(
+    'SELECT * FROM api_logs WHERE id = ?', [id]
   );
 }
 
@@ -705,5 +727,7 @@ export type ApiLogRow = {
   error: string | null;
   request_size: number | null;
   response_size: number | null;
+  request_body: string | null;
+  response_body: string | null;
   created_at: string | null;
 };

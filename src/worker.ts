@@ -39,7 +39,7 @@ import {
   getProjetoInvestigadorDetalhes,
   getInvestigadorStats,
 } from '@/lib/investigador.functions'
-import { getAdminByEmail, setDb, insertApiLog, cleanupOldApiLogs } from '@/integrations/db/client.server'
+import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -117,7 +117,8 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
     // Todas as rotas /api/chat/* são logadas na tabela api_logs para o Investigador.
     if (pathname.startsWith('/api/chat/') && method === 'POST') {
       const body = await readBody<Record<string, unknown>>(request)
-      const requestSize = JSON.stringify(body).length
+      const reqJson = JSON.stringify(body)
+      const requestSize = reqJson.length
       const projetoId = (body.projeto_id as string) ?? null
       const start = Date.now()
       let statusCode = 200
@@ -146,6 +147,8 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
           status_code: statusCode,
           request_size: requestSize,
           response_size: responseSize,
+          request_body: reqJson,
+          response_body: resJson,
         }).catch(() => {})
         return new Response(resJson, { status: 200, headers: { 'Content-Type': 'application/json' } })
       } catch (e) {
@@ -161,6 +164,8 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
           error: errorMsg,
           request_size: requestSize,
           response_size: 0,
+          request_body: reqJson,
+          response_body: null,
         }).catch(() => {})
         return errorJson(err.message, statusCode)
       }
@@ -267,6 +272,18 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       await requireAdmin(request)
       const id = pathname.split('/').pop()!
       return json(await getProjetoInvestigadorDetalhes(id))
+    }
+    // Corpo de um log de API específico (carregado sob demanda)
+    if (pathname.startsWith('/api/admin/investigador/log/') && method === 'GET') {
+      await requireAdmin(request)
+      const logId = pathname.split('/').pop()!
+      const log = await getApiLogById(logId)
+      if (!log) return errorJson('Log não encontrado', 404)
+      return json({
+        id: log.id,
+        request_body: log.request_body,
+        response_body: log.response_body,
+      })
     }
 
     return errorJson('Rota não encontrada', 404)

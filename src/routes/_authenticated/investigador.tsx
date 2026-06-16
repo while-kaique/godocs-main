@@ -24,6 +24,11 @@ import {
   Shield,
   TrendingUp,
   Sparkles,
+  Copy,
+  Check,
+  Eye,
+  ArrowUpRight,
+  ArrowDownLeft,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -387,6 +392,14 @@ function Investigador() {
 
   const ativos = projetos.filter(isActiveNow).length
 
+  // Tempo médio de conclusão (apenas projetos completos)
+  const completedDurations = projetos
+    .filter((p) => p.chat_completo && p.tempo_desde_inicio_min != null)
+    .map((p) => p.tempo_desde_inicio_min!)
+  const avgCompletionMin = completedDurations.length > 0
+    ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length)
+    : null
+
   if (selectedId) {
     return (
       <DetalheView
@@ -435,7 +448,7 @@ function Investigador() {
           <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4" />} color="var(--go-blue)" />
           <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4" />} color="#ca8a04" />
           <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
-          <StatCard label="Tempo médio" value={formatDuration(stats.media_duracao_ms)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
+          <StatCard label="Tempo médio" value={formatTimeSince(avgCompletionMin)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
       )}
 
@@ -580,9 +593,11 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
             <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
               {p.nome ?? 'Projeto sem nome'}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
-              {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
-            </span>
+            {p.fase_atual !== 'completo' && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
+                {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
+              </span>
+            )}
             {p.status && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[p.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                 {STATUS_LABELS[p.status] ?? p.status}
@@ -608,12 +623,21 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
 
         {/* Métricas rápidas */}
         <div className="flex items-center gap-4 text-xs flex-shrink-0">
+          <div className="text-center" title="Início do formulário">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(p.created_at)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">início</div>
+          </div>
           <div className="text-center" title="Mensagens (usuário / IA)">
             <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
           </div>
           <div className="text-center" title="Tempo desde início">
-            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
+            <div className={`font-semibold tabular-nums text-[13px] ${
+              p.fase_atual === 'completo' ? 'text-[#16a34a]'
+                : p.fase_atual === 'saving' || p.fase_atual === 'receita' ? 'text-[#ea580c]'
+                : p.fase_atual === 'documentacao' ? 'text-[var(--go-blue)]'
+                : 'text-[var(--go-text-primary)]/80'
+            }`}>{formatTimeSince(p.tempo_desde_inicio_min)}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">duração</div>
           </div>
           <div className="text-center" title="Tempo médio de resposta da API">
@@ -1156,6 +1180,193 @@ function renderInline(text: string): React.ReactNode {
 
 // ── Tab: Logs de API ─────────────────────────────────────────────────────────
 
+// ── Componente: Visualizador de JSON com cópia e colapso inteligente ────────
+
+function JsonBodyViewer({ label, body, icon }: { label: string; body: string | null; icon: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(true)
+  const [copied, setCopied] = useState(false)
+
+  if (!body) {
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider mb-1 flex items-center gap-1">
+          {icon} {label}
+        </div>
+        <div className="text-xs text-[var(--go-text-primary)]/20 italic">Sem dados</div>
+      </div>
+    )
+  }
+
+  // Tenta formatar como JSON bonito
+  let formatted = body
+  let isJson = false
+  try {
+    const parsed = JSON.parse(body)
+    formatted = JSON.stringify(parsed, null, 2)
+    isJson = true
+  } catch { /* não é JSON, exibe raw */ }
+
+  const lineCount = formatted.split('\n').length
+  const isLarge = formatted.length > 3000 || lineCount > 60
+  const displayText = collapsed && isLarge ? formatted.slice(0, 2000) + '\n\n…' : formatted
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(formatted)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider flex items-center gap-1">
+          {icon} {label}
+          {isJson && (
+            <span className="ml-1 rounded bg-[var(--go-blue)]/6 px-1.5 py-0.5 text-[9px] text-[var(--go-blue)] font-medium">
+              JSON
+            </span>
+          )}
+          <span className="text-[var(--go-text-primary)]/20 font-normal normal-case">
+            ({(body.length / 1024).toFixed(1)} KB{lineCount > 1 ? ` · ${lineCount} linhas` : ''})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isLarge && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-[10px] text-[var(--go-blue)] hover:text-[var(--go-blue)]/80 font-medium flex items-center gap-0.5 transition-colors"
+            >
+              {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+              {collapsed ? 'Expandir tudo' : 'Colapsar'}
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="text-[var(--go-text-primary)]/30 hover:text-[var(--go-blue)] transition-colors p-0.5"
+            title="Copiar"
+          >
+            {copied ? <Check className="h-3 w-3 text-[#16a34a]" /> : <Copy className="h-3 w-3" />}
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-auto rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/50 border border-[var(--go-blue)]/5 p-2.5 text-[11px] leading-[1.55] font-mono text-[var(--go-text-primary)]/65 max-h-[400px] whitespace-pre-wrap break-all select-text">
+        {displayText}
+      </pre>
+    </div>
+  )
+}
+
+// ── Linha expandível de API Log ─────────────────────────────────────────────
+
+function ApiLogRow({ log }: { log: ApiLog }) {
+  const [expanded, setExpanded] = useState(false)
+  const [bodyData, setBodyData] = useState<{ request_body: string | null; response_body: string | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const isError = log.status_code >= 400
+  const isSlow = (log.duration_ms ?? 0) > 5000
+
+  const handleToggle = async () => {
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
+    if (!bodyData) {
+      setLoading(true)
+      try {
+        const data = await apiFetch<{ request_body: string | null; response_body: string | null }>(
+          `/api/admin/investigador/log/${log.id}`
+        )
+        setBodyData(data)
+      } catch {
+        setBodyData({ request_body: null, response_body: null })
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <>
+      <tr
+        onClick={handleToggle}
+        className={`border-b border-[var(--go-blue)]/4 cursor-pointer transition-colors group ${
+          isError
+            ? 'bg-[#dc2626]/3 hover:bg-[#dc2626]/6'
+            : isSlow
+              ? 'bg-[#ca8a04]/3 hover:bg-[#ca8a04]/6'
+              : 'hover:bg-[var(--go-blue)]/3'
+        } ${expanded ? '!border-b-0' : ''}`}
+      >
+        <td className="py-2 px-3 w-5">
+          <div className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}>
+            <ChevronRight className="h-3.5 w-3.5 text-[var(--go-text-primary)]/25 group-hover:text-[var(--go-blue)]" />
+          </div>
+        </td>
+        <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
+          {formatDateTime(log.created_at)}
+        </td>
+        <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
+          {log.endpoint.replace('/api/chat/', '')}
+        </td>
+        <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
+          {formatDuration(log.duration_ms)}
+        </td>
+        <td className="py-2 px-3 text-right">
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
+            }`}
+          >
+            {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
+            {log.status_code}
+          </span>
+        </td>
+        <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
+          {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
+          {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
+        </td>
+        <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
+          {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
+        </td>
+      </tr>
+      {expanded && (
+        <tr className={`border-b border-[var(--go-blue)]/4 ${isError ? 'bg-[#dc2626]/2' : isSlow ? 'bg-[#ca8a04]/2' : 'bg-[var(--go-blue)]/2'}`}>
+          <td colSpan={7} className="p-3">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs text-[var(--go-text-primary)]/30">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando body…
+              </div>
+            ) : bodyData && !bodyData.request_body && !bodyData.response_body ? (
+              <div className="text-center py-4 text-xs text-[var(--go-text-primary)]/25 italic">
+                <Eye className="mx-auto mb-1 h-4 w-4" />
+                Corpo não disponível para este log (registrado antes da funcionalidade).
+              </div>
+            ) : bodyData ? (
+              <div className="flex gap-3 flex-col lg:flex-row">
+                <JsonBodyViewer
+                  label="Request"
+                  body={bodyData.request_body}
+                  icon={<ArrowUpRight className="h-3 w-3 text-[var(--go-blue)]" />}
+                />
+                <JsonBodyViewer
+                  label="Response"
+                  body={bodyData.response_body}
+                  icon={<ArrowDownLeft className="h-3 w-3 text-[#16a34a]" />}
+                />
+              </div>
+            ) : null}
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+// ── Tab: API Logs ───────────────────────────────────────────────────────────
+
 function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
   if (logs.length === 0) {
     return (
@@ -1171,6 +1382,7 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[var(--go-blue)]/8 text-left">
+            <th className="py-2.5 px-3 w-5"></th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Quando</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Endpoint</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Duração</th>
@@ -1180,45 +1392,9 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
           </tr>
         </thead>
         <tbody>
-          {logs.map((log) => {
-            const isError = log.status_code >= 400
-            const isSlow = (log.duration_ms ?? 0) > 5000
-            return (
-              <tr
-                key={log.id}
-                className={`border-b border-[var(--go-blue)]/4 last:border-0 ${
-                  isError ? 'bg-[#dc2626]/3' : isSlow ? 'bg-[#ca8a04]/3' : ''
-                }`}
-              >
-                <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
-                  {formatDateTime(log.created_at)}
-                </td>
-                <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
-                  {log.endpoint.replace('/api/chat/', '')}
-                </td>
-                <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
-                  {formatDuration(log.duration_ms)}
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <span
-                    className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
-                    }`}
-                  >
-                    {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                    {log.status_code}
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
-                  {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
-                  {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
-                </td>
-                <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
-                  {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
-                </td>
-              </tr>
-            )
-          })}
+          {logs.map((log) => (
+            <ApiLogRow key={log.id} log={log} />
+          ))}
         </tbody>
       </table>
     </div>

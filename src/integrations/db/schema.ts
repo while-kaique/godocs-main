@@ -152,6 +152,9 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN webhook_error TEXT',
   // Justificativa da classificação de complexidade (por que automacao/inteligencia/autonomia)
   'ALTER TABLE analises ADD COLUMN complexidade_justificativa TEXT',
+  // Corpos de request/response para debug no investigador
+  'ALTER TABLE api_logs ADD COLUMN request_body TEXT',
+  'ALTER TABLE api_logs ADD COLUMN response_body TEXT',
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).
