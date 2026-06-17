@@ -191,7 +191,7 @@ EXEMPLOS:
 - "Robô que lê e-mails e CLASSIFICA cada um por assunto usando IA, roteando para a fila certa; um analista trata a fila" → **inteligencia** (IA classifica como feature; humano no loop).
 - "Agente que recebe o chamado, decide a solução e responde o cliente sozinho" → **autonomia**.
 
-Antes de escolher a complexidade, responda objetivamente: **o projeto usa IA como funcionalidade (não apenas como ferramenta de desenvolvimento)?** Reporte essa resposta no campo booleano "ia_decide_caminho" (true = tem IA como funcionalidade ou decidindo o caminho; false = sem IA como funcionalidade). Se for false, a complexidade DEVE ser "automacao".
+Antes de escolher a complexidade, responda objetivamente: **o produto final usa IA como funcionalidade (não apenas como ferramenta de desenvolvimento)?** Reporte essa resposta no campo booleano "usa_ia" (true = IA participa de alguma funcionalidade do produto; false = sem IA no produto final). Se for false, a complexidade DEVE ser "automacao". Se for true, é pelo menos "inteligencia".
 
 Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
 
@@ -211,7 +211,7 @@ IMPORTANTE:
   "pontuacao_maxima": <number>,
   "justificativa": "<texto detalhado em markdown com seções ## Pontos fortes, ## Pontos de atenção, ## Conclusão, ## Recomendações>",
   "resumo": "<2-4 frases claras resumindo o resultado para o usuário>",
-  "ia_decide_caminho": true | false,
+  "usa_ia": true | false,
   "complexidade": "automacao" | "inteligencia" | "autonomia",
   "complexidade_justificativa": "<2-3 frases explicando por que este nível foi escolhido>",
   "criterios_hardcoded": [
@@ -343,24 +343,24 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   if (!resultado.complexidade || !COMPLEXIDADES_VALIDAS.includes(resultado.complexidade)) {
     resultado.complexidade = 'automacao'; // fallback conservador
   }
-  // Gate determinístico: sem IA como funcionalidade E sem IA decidindo o caminho,
-  // a complexidade é "automacao". O campo tem_ia_como_funcionalidade (resposta
-  // explícita do usuário) tem precedência sobre o ia_decide_caminho inferido pelo LLM.
+  // Gate determinístico: o campo tem_ia_como_funcionalidade (resposta explícita
+  // do usuário no chat) tem precedência sobre o usa_ia inferido pelo LLM.
+  // IA usada só para construir/desenvolver (ex: Claude Code) NÃO conta.
   const temIaComoFuncionalidade = (conteudo as Record<string, unknown>).tem_ia_como_funcionalidade;
   if (temIaComoFuncionalidade === true && resultado.complexidade === 'automacao') {
-    // Usuário confirmou que há IA como funcionalidade — rebaixa nunca; eleva para "inteligencia".
     log(`Complexidade elevada para 'inteligencia' (tem_ia_como_funcionalidade=true; LLM havia sugerido 'automacao')`);
     resultado.complexidade = 'inteligencia';
-    resultado.ia_decide_caminho = true;
+    resultado.usa_ia = true;
   } else if (temIaComoFuncionalidade === false && resultado.complexidade !== 'automacao') {
-    // Usuário confirmou que NÃO há IA como funcionalidade — rebaixa para "automacao".
     log(`Complexidade rebaixada para 'automacao' (tem_ia_como_funcionalidade=false; LLM havia sugerido '${resultado.complexidade}')`);
     resultado.complexidade = 'automacao';
-    resultado.ia_decide_caminho = false;
-  } else if (resultado.ia_decide_caminho === false && resultado.complexidade !== 'automacao') {
-    // Fallback sem resposta explícita: LLM concluiu que não há IA decidindo — rebaixa.
-    log(`Complexidade rebaixada para 'automacao' (ia_decide_caminho=false; LLM havia sugerido '${resultado.complexidade}')`);
+    resultado.usa_ia = false;
+  } else if (resultado.usa_ia === false && resultado.complexidade !== 'automacao') {
+    log(`Complexidade rebaixada para 'automacao' (usa_ia=false; LLM havia sugerido '${resultado.complexidade}')`);
     resultado.complexidade = 'automacao';
+  } else if (resultado.usa_ia === true && resultado.complexidade === 'automacao') {
+    log(`Complexidade elevada para 'inteligencia' (usa_ia=true; LLM havia sugerido 'automacao')`);
+    resultado.complexidade = 'inteligencia';
   }
 
   // O LLM avalia todos os critérios internamente mas retorna só os mais relevantes.
