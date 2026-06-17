@@ -11,6 +11,7 @@ import {
   insertChatMessage,
   getChatMessagesExcludeRole,
   getProjetoContextoData,
+  getDocumentacaoConteudo,
   getDocMessage,
   upsertDocumentacao,
   getDocumentacao,
@@ -41,6 +42,7 @@ import type {
   DocumentacaoGerada,
   ProjetoContexto,
   ReceitaColetada,
+  RevisaoContexto,
   SavingColetado,
   SavingLinha,
 } from '@/lib/agents/types';
@@ -157,6 +159,8 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     ? (tiposRaw as ('saving' | 'receita_incremental')[])
     : null;
 
+  const revisao = await buildRevisaoContexto(projeto_id, data);
+
   return {
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
@@ -173,7 +177,72 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
     especial: data.especial === 1,
     contexto_especial: data.contexto_especial ?? null,
+    revisao,
   };
+}
+
+// Monta o contexto de revisão (edição) a partir da submissão anterior. Só retorna
+// dados quando o projeto JÁ FOI submetido (submitted_at presente ou documentação
+// estruturada já existe) — caso contrário é uma primeira submissão e retorna null,
+// deixando os prompts no comportamento padrão. Os valores em R$ aqui são staff-only.
+async function buildRevisaoContexto(
+  projeto_id: string,
+  data: Awaited<ReturnType<typeof getProjetoContextoData>>,
+): Promise<RevisaoContexto | null> {
+  if (!data) return null;
+  const docRow = await getDocumentacaoConteudo(projeto_id);
+  const jaSubmetido = !!data.submitted_at || !!docRow?.conteudo;
+  if (!jaSubmetido) return null;
+
+  const docGerada = docRow?.conteudo
+    ? parseJson<DocumentacaoGerada>(docRow.conteudo)
+    : null;
+
+  const doc = docGerada
+    ? {
+        o_que_faz: docGerada.o_que_faz ?? null,
+        execucao: docGerada.execucao ?? null,
+        // fluxo/dependencias/atencao são estruturados; serializa em texto legível.
+        fluxo: Array.isArray(docGerada.fluxo)
+          ? docGerada.fluxo.map((f, i) => `${i + 1}. ${f.etapa}: ${f.descricao}`).join('\n')
+          : null,
+        dependencias: Array.isArray(docGerada.dependencias)
+          ? docGerada.dependencias.map((d) => `${d.servico}: ${d.descricao}`).join('; ')
+          : null,
+        configurar_antes: Array.isArray(docGerada.configurar_antes)
+          ? docGerada.configurar_antes.join('; ')
+          : null,
+        atencao: Array.isArray(docGerada.atencao)
+          ? docGerada.atencao.map((a) => `${a.titulo}: ${a.descricao}`).join('; ')
+          : null,
+      }
+    : null;
+
+  const savingDoc = docGerada?.saving;
+  const saving = (savingDoc || data.memorial_calculo || data.saving_horas != null)
+    ? {
+        memorial_calculo: savingDoc?.memorial_calculo ?? data.memorial_calculo ?? null,
+        linhas: (savingDoc?.linhas ?? []).map((l) => ({
+          cargo: l.cargo,
+          horas_antes: l.horas_antes,
+          horas_depois: l.horas_depois,
+        })),
+        economia_horas_mes: savingDoc?.economia_horas_mes ?? data.saving_horas ?? null,
+        economia_reais_mes: savingDoc?.economia_reais_mes ?? data.saving_reais ?? null,
+        tipo_saving: savingDoc?.tipo_saving ?? data.tipo_saving ?? null,
+        alguem_fazia: data.alguem_fazia ?? null,
+        custo_externo_mensal: data.custo_externo_mensal ?? null,
+      }
+    : null;
+
+  // O conteúdo de receita não vive em DocumentacaoGerada.saving; usa o memorial do
+  // projeto como aproximação quando o tipo inclui receita.
+  const receita = data.tipo_projeto === 'receita_incremental' && data.memorial_calculo
+    ? { memorial_calculo: data.memorial_calculo, valor_ganho_mensal: data.saving_reais ?? null }
+    : null;
+
+  if (!doc && !saving && !receita) return null;
+  return { doc, saving, receita };
 }
 
 type EstadoChat = {
