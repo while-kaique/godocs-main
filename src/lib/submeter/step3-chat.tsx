@@ -823,9 +823,12 @@ function SavingForm({
     setLinhas((ls) => [...ls, { cargo: "", horasAntes: alguemFazia === "nao" ? "0" : "", horasDepois: "" }]);
   }
   function selectTinhaAntes(v: "sim" | "nao") {
+    if (v === alguemFazia) return; // já selecionado → não mexe nos valores
     setTinhaAntes(v);
-    // "nao" → ninguém fazia antes: zera/oculta o campo "antes". "sim" → libera p/ digitar.
-    setLinhas((ls) => ls.map((l) => ({ ...l, horasAntes: v === "nao" ? "0" : "" })));
+    // "nao" → ninguém fazia antes: zera o campo "antes". "sim" → libera p/ digitar,
+    // mas PRESERVA valores já preenchidos (ex: edição com 25h pré-carregadas); só
+    // limpa o "0" herdado do modo "nao" para o usuário poder digitar.
+    setLinhas((ls) => ls.map((l) => ({ ...l, horasAntes: v === "nao" ? "0" : (l.horasAntes === "0" ? "" : l.horasAntes) })));
     setErrors((e) => {
       const n = { ...e };
       delete n.alguemFazia;
