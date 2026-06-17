@@ -31,6 +31,12 @@ npm run lint / format  # eslint / prettier
 4. **Português com acentuação** — todo texto visível ao usuário DEVE ter acentos corretos (`producao` → `produção`, `area` → `área`)
 5. **`routeTree.gen.ts`** — auto-gerado, não editar
 6. **Banco async** — sempre `await` e sempre passar params (mesmo `[]`)
+7. **Deploy Godeploy — assets dinâmicos** — o Vite gera hashes diferentes a cada `npm run build`. **NUNCA** reutilizar uma lista de assets de um build anterior. Sempre gerar a lista dinamicamente a partir do `dist/` real logo após o build:
+   ```bash
+   # Gerar lista de assets para o updateApp
+   echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
+   ```
+   Se a lista de assets não bater com o `index.html`, o site fica em tela branca (o HTML referencia `.js`/`.css` que não existem no servidor).
 
 ## Documentação detalhada
 

@@ -55,7 +55,7 @@ export const CRITERIOS_HARDCODED = [
     id: 'saving_coerente',
     nome: 'Memorial de cálculo com lógica sólida',
     descricao:
-      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente.',
+      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente. REGRA DE REPROVAÇÃO AUTOMÁTICA (0 pontos): (1) se economia_horas_mes = 0 ou saving_reais = 0 quando há saving marcado; (2) se valor de receita incremental = 0 quando marcou receita; (3) CLASSIFICAÇÃO ERRADA: se o memorial de RECEITA INCREMENTAL descreve economia operacional (horas economizadas, custo/hora, minutos por tarefa, custo laboral reduzido) — isso é saving disfarçado de receita, configurando incoerência de classificação que deve ser apontada.',
   },
   {
     id: 'ferramenta_compativel',
@@ -185,6 +185,8 @@ EXEMPLOS:
 
 Antes de escolher a complexidade, responda objetivamente: **existe uma IA decidindo o caminho/ação sobre o conteúdo?** Reporte essa resposta no campo booleano "ia_decide_caminho". Se for false, a complexidade DEVE ser "automacao".
 
+Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
+
 ## FORMATO DE RESPOSTA
 
 Responda APENAS com JSON válido, exatamente neste formato.
@@ -203,6 +205,7 @@ IMPORTANTE:
   "resumo": "<2-4 frases claras resumindo o resultado para o usuário>",
   "ia_decide_caminho": true | false,
   "complexidade": "automacao" | "inteligencia" | "autonomia",
+  "complexidade_justificativa": "<2-3 frases explicando por que este nível foi escolhido>",
   "criterios_hardcoded": [
     ...apenas os mais relevantes entre os 10 fixos (max 4 aprovados + max 4 reprovados)...
     {"criterio": "Nome legível do critério", "pontos": 0 | 1, "justificativa": "<explicação>"}

@@ -12,6 +12,7 @@ import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAni
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
+import { Etapa25 } from "@/lib/submeter/step25";
 import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
 import { AnalyzerCard } from "@/lib/submeter/analyzer-overlay";
 
@@ -48,17 +49,19 @@ const emptyFormDraft = (): SavingFormData => ({
 // adaptação a idas e vindas).
 type AgentMeta = {
   nomeProjeto: string;
-  area: string;
   ferramenta: string;
   participantes: string[];
   dataCriacao: string;
   descricaoBreve: string;
+  // Projeto especial: o contexto especial é entrada determinística da fase de doc.
+  contextoEspecial: string;
 };
 
 // Passos nomeados estimados por operação pesada (item: loading com etapa explícita).
 const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
+const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 
 function SubmeterPage() {
   const navigate = useNavigate();
@@ -89,6 +92,8 @@ function SubmeterPage() {
   // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
   const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
+  // Projeto especial: envio direto (cria projeto + submete), pulando o agente.
+  const [enviandoEspecial, setEnviandoEspecial] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
   const [approvedSavingPreview, setApprovedSavingPreview] = useState<string | null>(null);
@@ -132,7 +137,6 @@ function SubmeterPage() {
     prodStatus: "",
     nome: "",
     email: "",
-    area: "",
     ferramenta: "",
     ferramentaOutra: "",
     servicoExterno: "",
@@ -142,7 +146,15 @@ function SubmeterPage() {
     dataCriacao: today,
     tipoProjeto: [],
     descricaoBreve: "",
+    especial: false,
+    contextoEspecial: "",
   });
+
+  // Etapa 2.5 (tipo de projeto): sub-tela entre a etapa 2 e o início do agente.
+  // Só aparece na PRIMEIRA passagem (antes do agente iniciar). Em re-entradas
+  // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
+  const [showEtapa25, setShowEtapa25] = useState(false);
+  const [respEspecial, setRespEspecial] = useState<"sim" | "nao" | "">("");
 
   const updateField = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -181,12 +193,12 @@ function SubmeterPage() {
 
   const snapshotMeta = useCallback((): AgentMeta => ({
     nomeProjeto: form.nomeProjeto.trim(),
-    area: form.area,
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
-  }), [form.nomeProjeto, form.area, form.participantes, form.dataCriacao, form.descricaoBreve, computeFerramenta]);
+    contextoEspecial: form.contextoEspecial.trim(),
+  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -217,7 +229,6 @@ function SubmeterPage() {
         errs.email = "Informe um e-mail válido";
       else if (!ALLOWED_DOMAINS_RE.test(form.email.trim()))
         errs.email = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
-      if (!form.area) errs.area = "Selecione sua área";
       if (form.escopo === "externo") {
         if (!form.servicoExterno.trim())
           errs.servicoExterno = "Informe o nome do serviço externo";
@@ -237,8 +248,7 @@ function SubmeterPage() {
     }
 
     if (n === 2) {
-      if (form.tipoProjeto.length === 0)
-        errs.tipoProjeto = "Selecione ao menos um tipo de projeto";
+      // O tipo de projeto (saving/receita/especial) passou para a Etapa 2.5.
       if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
         errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
       if (!form.dataCriacao) {
@@ -260,6 +270,8 @@ function SubmeterPage() {
   /* ── Navigation ── */
   function goToStep(target: number, dir: "forward" | "back") {
     setDirection(dir);
+    // Sair da etapa 2 (para 1 ou 3) fecha a sub-tela 2.5.
+    if (target !== 2) setShowEtapa25(false);
     setStep(target);
     // Todo step ALCANÇADO fica navegável pelos índices do topo — não só os que o
     // usuário "concluiu" avançando. Senão, ao entrar no step 2 e voltar ao 1, o
@@ -295,9 +307,55 @@ function SubmeterPage() {
     }
   }
 
+  /* ── Step 2 → Etapa 2.5 (abre a sub-tela de tipo de projeto) ── */
+  function handleAbrirEtapa25() {
+    if (!validateStep(2)) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    // Re-entrada: reflete a resposta já dada (especial vs. saving/receita).
+    if (respEspecial === "") {
+      if (form.especial) setRespEspecial("sim");
+      else if (form.tipoProjeto.length > 0) setRespEspecial("nao");
+    }
+    setShowEtapa25(true);
+    formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ── Etapa 2.5: resposta sim/não ── */
+  function handleRespEspecial(r: "sim" | "nao") {
+    setRespEspecial(r);
+    updateField("especial", r === "sim");
+    // Limpa o campo da opção oposta para não enviar dado obsoleto.
+    if (r === "sim") updateField("tipoProjeto", []);
+    else updateField("contextoEspecial", "");
+    clearError("especial");
+    clearError("contextoEspecial");
+    clearError("tipoProjeto");
+  }
+
+  /* ── Valida a Etapa 2.5 antes de iniciar o agente ── */
+  function validateEtapa25(): boolean {
+    if (respEspecial === "") {
+      setError("especial", "Responda à pergunta acima para continuar");
+      return false;
+    }
+    if (respEspecial === "sim") {
+      if (!form.contextoEspecial.trim() || form.contextoEspecial.trim().length < 20) {
+        setError("contextoEspecial", "Descreva o contexto do projeto em pelo menos 20 caracteres");
+        return false;
+      }
+    } else if (form.tipoProjeto.length === 0) {
+      setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
+      return false;
+    }
+    return true;
+  }
+
   /* ── Step 2 → Step 3: inicia o agente ── */
   async function handleIniciarAgente() {
-    if (!validateStep(2)) {
+    if (!validateStep(2) || !validateEtapa25()) {
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
       return;
@@ -341,22 +399,25 @@ function SubmeterPage() {
         {
           responsavel_nome: form.nome.trim(),
           responsavel_email: form.email.trim(),
-          area: form.area,
           ferramenta: ferramentaEnviada,
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
-          tipos_projeto: form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
-          tipo_projeto: form.tipoProjeto[0] || undefined,
+          // Projeto especial não envia tipos financeiros — o backend grava
+          // tipos_projeto=["especial"] e o fluxo pula saving/receita.
+          tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
+          tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          especial: form.especial || undefined,
+          contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
         },
       );
 
       setProjetoId(result.projeto_id);
-      setAgentTipos(form.tipoProjeto);
+      setAgentTipos(form.especial ? [] : form.tipoProjeto);
       setAgentMeta(snapshotMeta());
       setAgentArquivosSig(arquivosSig());
 
@@ -383,6 +444,72 @@ function SubmeterPage() {
       toast.error(`Erro ao iniciar análise: ${msg}`);
     } finally {
       setIniciandoChat(false);
+    }
+  }
+
+  /* ── Projeto especial: cria o projeto e submete direto, pulando o agente ── */
+  // Projeto de alto impacto e difícil mensuração não passa pela conversa nem pela
+  // análise financeira: a documentação é montada no backend a partir da descrição +
+  // contexto especial (sem IA) e segue direto para a base (planilha + banco). A
+  // validação é humana.
+  async function handleEnviarEspecial() {
+    if (!validateStep(2) || !validateEtapa25()) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    if (arquivos.length === 0) return;
+
+    setEnviandoEspecial(true);
+    try {
+      const docs = await Promise.all(
+        arquivos.map(async (f) => ({
+          base64: await readFileAsBase64(f),
+          filename: f.name,
+        }))
+      );
+
+      const ferramentaEnviada = form.escopo === "externo"
+        ? form.servicoExterno.trim()
+        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+          ? `Outros: ${form.ferramentaOutra.trim()}`
+          : form.ferramenta;
+
+      // 1) Cria o projeto (backend monta a doc sem IA e marca chat_completo).
+      const result = await apiFetch<{ projeto_id: string; especial?: boolean }>(
+        "/api/chat/iniciar-submissao",
+        {
+          responsavel_nome: form.nome.trim(),
+          responsavel_email: form.email.trim(),
+          ferramenta: ferramentaEnviada,
+          escopo: form.escopo as "interno" | "externo",
+          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
+          membros: form.participantes,
+          nome_projeto: form.nomeProjeto.trim(),
+          data_criacao: form.dataCriacao,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          especial: true,
+          contexto_especial: form.contextoEspecial.trim(),
+          docs,
+        },
+      );
+
+      setProjetoId(result.projeto_id);
+
+      // 2) Submete direto para a base (planilha + banco). Análise IA não se aplica.
+      await apiFetch("/api/chat/submeter-validacao", { projeto_id: result.projeto_id });
+
+      setSubmitted(true);
+    } catch (err) {
+      console.error('[submeter] envio de projeto especial falhou:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Já existe um projeto submetido")) {
+        toast.warning(msg, { duration: 8000 });
+      } else {
+        toast.error(`Erro ao enviar projeto: ${msg}`);
+      }
+    } finally {
+      setEnviandoEspecial(false);
     }
   }
 
@@ -427,11 +554,11 @@ function SubmeterPage() {
         {
           projeto_id: projetoId,
           nome_projeto: meta.nomeProjeto,
-          area: meta.area,
           ferramenta: meta.ferramenta,
           membros: meta.participantes,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
+          contexto_especial: meta.contextoEspecial,
           docs,
         },
       );
@@ -478,12 +605,80 @@ function SubmeterPage() {
 
   /* ── Step 2 → Step 3 (agente já iniciado): propaga mudanças e detecta troca de tipo ── */
   async function handleContinuarAgente() {
-    // Não permite avançar sem ao menos um tipo selecionado.
-    if (form.tipoProjeto.length === 0) {
+    // Projeto especial não tem tipo financeiro — segue direto. Para projeto padrão,
+    // não permite avançar sem ao menos um tipo selecionado.
+    if (!form.especial && form.tipoProjeto.length === 0) {
       setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
       toast.error("Selecione ao menos um tipo de projeto para continuar.");
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
+      return;
+    }
+
+    // ── Projeto especial ──────────────────────────────────────────────────────
+    // As entradas determinísticas da documentação são a descrição de negócio e o
+    // contexto especial. Se algum deles (ou os arquivos) mudou, a documentação é
+    // reavaliada do zero; se nada mudou, só voltamos ao chat (aceita, sem reanalisar)
+    // — mesma lógica do "Editar Dados" do saving/receita.
+    if (form.especial) {
+      if (projetoId && arquivosSig() !== agentArquivosSig) {
+        await reprocessarComNovosArquivos();
+        return;
+      }
+      const meta = snapshotMeta();
+      const metaChanged = !agentMeta || JSON.stringify(meta) !== JSON.stringify(agentMeta);
+      if (projetoId && metaChanged) {
+        setContinuando(true);
+        try {
+          const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+            "/api/chat/atualizar-metadados",
+            {
+              projeto_id: projetoId,
+              nome_projeto: meta.nomeProjeto,
+              ferramenta: meta.ferramenta,
+              membros: meta.participantes,
+              data_criacao: meta.dataCriacao,
+              descricao_breve: meta.descricaoBreve,
+              contexto_especial: meta.contextoEspecial,
+              reset_doc: true,
+            },
+          );
+          setAgentMeta(meta);
+          // A doc foi reavaliada → reseta o estado do chat para a nova fase de doc.
+          setShowTransition(false);
+          setShowSavingForm(false);
+          setShowReceitaForm(false);
+          setApprovedDocPreview(null);
+          setApprovedSavingPreview(null);
+          setApprovedReceitaPreview(null);
+          setChatComplete(false);
+          setFormDraft(emptyFormDraft());
+          setSavingSubmitted(null);
+          setReceitaSubmitted(null);
+          if (result.reset && result.response) {
+            setChatMessages([{
+              role: "assistant",
+              content: result.response.content,
+              options: result.response.options ?? undefined,
+              isComplete: result.response.isComplete,
+              isPreview: result.response.isPreview,
+              fase: result.response.fase,
+            }]);
+            setChatFase(result.response.fase ?? "doc");
+            if (result.response.isComplete) setChatComplete(true);
+          }
+          toast.success("Documentação reavaliada com o novo contexto.");
+        } catch (e) {
+          console.error("[submeter] falha ao reavaliar projeto especial:", e);
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error(`Erro ao reavaliar a documentação: ${msg}`);
+          setContinuando(false);
+          return;
+        } finally {
+          setContinuando(false);
+        }
+      }
+      goToStep(3, "forward");
       return;
     }
 
@@ -502,7 +697,6 @@ function SubmeterPage() {
           await apiFetch("/api/chat/atualizar-metadados", {
             projeto_id: projetoId,
             nome_projeto: meta.nomeProjeto,
-            area: meta.area,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
@@ -522,7 +716,9 @@ function SubmeterPage() {
       form.tipoProjeto.length !== agentTipos.length ||
       [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
 
-    if (changed && projetoId) {
+    // Projeto especial não tem tipos financeiros — pula a sincronização de tipos
+    // (enviar tipos_projeto=[] seria rejeitado pelo backend).
+    if (!form.especial && changed && projetoId) {
       try {
         await apiFetch("/api/chat/atualizar-tipos", {
           projeto_id: projetoId,
@@ -652,8 +848,10 @@ function SubmeterPage() {
       if (result.isComplete) {
         const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
         if (lastPreviewMsg) {
-          // No caso "só saving" ou "ambos" (último preview é de receita ou saving)
-          if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
+          // Projeto especial encerra na fase de doc (sem saving/receita) → o preview
+          // aprovado é o da documentação. Demais casos: receita ou saving.
+          if (chatFase === "doc_preview") setApprovedDocPreview(lastPreviewMsg.content);
+          else if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
           else setApprovedSavingPreview(lastPreviewMsg.content);
         }
         setChatComplete(true);
@@ -798,7 +996,6 @@ function SubmeterPage() {
     setFormDraft(receitaSubmitted ?? emptyFormDraft());
     setShowReceitaForm(true);
   }
-
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   /* ── Enviar projeto + disparar análise IA em paralelo ── */
@@ -828,6 +1025,13 @@ function SubmeterPage() {
     // 2) Submissão ok → mostra tela de sucesso imediatamente
     setSubmitted(true);
     setSubmittingProject(false);
+
+    // Projeto especial é validado por um humano (não pelo analisador IA) — não
+    // dispara a análise automática. O status fica "Pendente" até a avaliação humana.
+    if (form.especial) {
+      setAnalyzing(false);
+      return;
+    }
 
     // 3) Análise IA em background — não bloqueia a tela de sucesso
     try {
@@ -920,34 +1124,36 @@ function SubmeterPage() {
               }}
             >
               <SummaryRow label="Projeto" value={form.nomeProjeto} />
-              <SummaryRow label="Área" value={form.area} />
               <SummaryRow
                 label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
                 value={form.escopo === "externo" ? form.servicoExterno : form.ferramenta}
               />
-              <SummaryRow label="Status" value="Aguardando análise" badge last />
+              <SummaryRow label="Status" value={form.especial ? "Aguardando validação" : "Aguardando análise"} badge last />
             </div>
 
-            {/* Card da análise IA (inline — loading ou resultado) */}
-            <div style={{ marginBottom: 24 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#8b8b9a",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginBottom: 8,
-                }}
-              >
-                Análise automática
+            {/* Card da análise IA (inline — loading ou resultado). Projeto especial
+                não passa pela análise automática (validação é humana) → seção oculta. */}
+            {!form.especial && (
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#8b8b9a",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 8,
+                  }}
+                >
+                  Análise automática
+                </div>
+                <AnalyzerCard
+                  loading={analyzing}
+                  result={analysisResult}
+                  error={analysisError}
+                />
               </div>
-              <AnalyzerCard
-                loading={analyzing}
-                result={analysisResult}
-                error={analysisError}
-              />
-            </div>
+            )}
 
             <div className="flex flex-col items-center gap-3">
               <button
@@ -1024,7 +1230,7 @@ function SubmeterPage() {
                 </div>
               </StepAnimation>
             )}
-            {step === 2 && (
+            {step === 2 && !showEtapa25 && (
               <StepAnimation direction={direction}>
                 <Step2
                   form={form}
@@ -1033,6 +1239,18 @@ function SubmeterPage() {
                   clearError={clearError}
                   arquivos={arquivos}
                   setArquivos={setArquivos}
+                />
+              </StepAnimation>
+            )}
+            {step === 2 && showEtapa25 && (
+              <StepAnimation direction={direction}>
+                <Etapa25
+                  form={form}
+                  errors={errors}
+                  updateField={updateField}
+                  clearError={clearError}
+                  resp={respEspecial}
+                  onResp={handleRespEspecial}
                 />
               </StepAnimation>
             )}
@@ -1089,7 +1307,7 @@ function SubmeterPage() {
             <div style={{ padding: "0 32px 24px" }} className="mt-6 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={handleBack}
+                onClick={showEtapa25 ? () => setShowEtapa25(false) : handleBack}
                 className="go-btn-back"
                 style={{ visibility: step === 1 ? "hidden" : "visible" }}
               >
@@ -1107,7 +1325,39 @@ function SubmeterPage() {
                 </button>
               )}
 
-              {step === 2 && (
+              {/* Etapa 2 (formulário) → abre a sub-tela 2.5 (tipo de projeto).
+                  Vale na primeira passagem e em re-entradas (permite trocar o tipo). */}
+              {step === 2 && !showEtapa25 && (
+                <button
+                  type="button"
+                  onClick={handleAbrirEtapa25}
+                  className={cn("go-btn-next", shaking && "go-shake")}
+                >
+                  Próximo &rarr;
+                </button>
+              )}
+
+              {/* Etapa 2.5 — projeto especial: pula o agente e envia direto à base. */}
+              {step === 2 && showEtapa25 && respEspecial === "sim" && (
+                <button
+                  type="button"
+                  onClick={handleEnviarEspecial}
+                  disabled={enviandoEspecial}
+                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
+                >
+                  {enviandoEspecial ? (
+                    <>
+                      <CyclingText steps={LOADING_STEPS_ENVIAR_ESPECIAL} />
+                      <div className="go-spinner" />
+                    </>
+                  ) : (
+                    <span>Enviar Projeto &rarr;</span>
+                  )}
+                </button>
+              )}
+
+              {/* Etapa 2.5 (projeto padrão): inicia o agente (1ª vez) ou retoma (re-entrada). */}
+              {step === 2 && showEtapa25 && respEspecial !== "sim" && (
                 projetoId ? (
                   <button
                     type="button"

@@ -100,7 +100,7 @@ export const AGENT_COLORS = {
 
 export function getPromptRegistry(): PromptEntry[] {
   return [
-    // ── Orquestrador (6) ──
+    // ── Orquestrador (7) ──
     {
       id: 'orchestrator.doc',
       agent: 'Orquestrador',
@@ -108,7 +108,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildDocPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'doc',
-      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos.',
+      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos. Projeto especial NÃO passa por aqui — pula o agente e é submetido direto (doc montada sem IA).',
       llmParams: { temperature: 0.2, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada'],
       getPromptText: () => buildDocPrompt(MOCK_CTX, documentacaoVazia()),
@@ -132,7 +132,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving',
-      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$.',
+      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. REGRA ANTI-ZERO: economia_horas_mes NUNCA pode ser 0 — a IA investiga se há ganho real (redução de erros, capacidade nova), mas NÃO inventa horas: se a rotina for literalmente idêntica (só mudou o software), bloqueia honestamente e orienta a reclassificar como receita incremental ou projeto especial.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'SavingColetado', 'resumoProjeto'],
       getPromptText: () => buildSavingPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_SAVING, MOCK_RESUMO),
@@ -144,7 +144,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPreviewPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving_preview',
-      description: 'Revisão do memorial de saving. Mesma mecânica de aprovação/ajuste do doc_preview. Se aprovado e há receita pendente, transita para fase receita; senão, marca completo.',
+      description: 'Revisão do memorial de saving. Mesma mecânica de aprovação/ajuste do doc_preview. Se aprovado e há receita pendente, transita para fase receita; senão, marca completo. REGRA ANTI-ZERO: NUNCA emite complete se economia_horas_mes <= 0 — usa valores recomputados das linhas (não os reportados pelo LLM) como fonte de verdade na safety net.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['SavingColetado'],
       getPromptText: () => buildSavingPreviewPrompt(MOCK_SAVING),
@@ -156,7 +156,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildReceitaPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'receita',
-      description: 'Validação de receita incremental. Se o usuário já informou o valor no formulário, a IA desafia o número pedindo base de cálculo e evidências. Se não veio valor, coleta via conversa. Monta o memorial_calculo a partir das respostas.',
+      description: 'Validação de receita incremental. A IA desafia o número pedindo base de cálculo e evidências. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo entrando (mais vendas/conversão/faturamento); saving = economia operacional (horas, custo/hora, retrabalho). Se o racional descrever saving disfarçado (minutos por chamado, horas economizadas, custo/hora), bloqueia e manda reclassificar como saving.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'ReceitaColetada', 'resumoProjeto'],
       getPromptText: () => buildReceitaPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_RECEITA, MOCK_RESUMO),
@@ -168,7 +168,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildReceitaPreviewPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'receita_preview',
-      description: 'Revisão do memorial de receita. Aprovação ou ajuste. Se aprovado, marca como completo — última fase do fluxo.',
+      description: 'Revisão do memorial de receita. Aprovação ou ajuste. REGRA ANTI-ZERO: NUNCA emite complete se valor_ganho_mensal <= 0. DETECÇÃO DE SAVING DISFARÇADO: se o memorial usa linguagem de economia operacional (horas/minutos, custo/hora, economia laboral), bloqueia e manda reclassificar como saving antes de aprovar.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ReceitaColetada'],
       getPromptText: () => buildReceitaPreviewPrompt(MOCK_RECEITA),

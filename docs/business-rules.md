@@ -3,26 +3,49 @@
 ## Fluxo de submissão (visão completa)
 
 ```
-Usuário preenche Step 1 (dados) → Step 2 (projeto + upload) → Step 3 (chat IA)
+Usuário preenche Step 1 (dados) → Step 2 (projeto + upload) → Etapa 2.5 (tipo) → Step 3 (chat IA)
 
-No Step 3:
+Etapa 2.5 (sub-tela entre Step 2 e Step 3 — mantém o wizard de 3 passos):
+  Pergunta: "Seu projeto tem altíssimo impacto, mas não está ligado a ganho de
+  receita ou saving operacional como um projeto padrão?"
+  → SIM  = projeto ESPECIAL → coleta contexto_especial → fluxo especial (ver abaixo)
+  → NÃO  = projeto padrão → escolhe saving/receita/ambos → fluxo padrão
+
+No Step 3 (projeto padrão):
   Extrator pré-preenche 7 campos → Chat doc (pergunta só nulls)
   → Preview doc (aprovar/ajustar)
   → [compila documentação]
   → Formulário Saving/Receita
   → Chat impacto (valida/desafia dados)
   → Preview memorial (aprovar/ajustar)
-  → Revisão final
-  → "Enviar para Triagem"
+  → Revisão final → "Enviar para Triagem"
+
+No Step 3 (projeto ESPECIAL):
+  Mesmo chat de documentação (doc → preview doc) → encerra direto na revisão final
+  (pula saving/receita). Submete e NÃO dispara o analisador IA.
 
 Pós-submissão:
   1. Verifica duplicata (mesmo nome, status != rascunho)
   2. Popula colunas de impacto no projeto
   3. Auto-aprova se área = RPA, senão em_validacao
+     (projeto especial é exceção: SEMPRE em_validacao — validação humana)
   4. Notifica Google Chat
-  5. Envia ao n8n (Markdown → Drive + planilha)
-  6. Análise IA em background (complexidade + observações)
+  5. Envia ao n8n (Markdown → Drive + planilha); especial vai com tipos_projeto=['especial'],
+     status "Pendente" e os campos `especial` + `contexto_especial`
+  6. Análise IA em background (complexidade + observações) — PULADA para projeto especial
 ```
+
+## Projeto especial ("estrela do Mario Kart")
+
+Projetos de altíssimo impacto que **não se encaixam** em saving nem receita incremental
+(importantíssimos, grandes e raros). Fluxo diferenciado:
+
+- Marcado na **Etapa 2.5** (resposta "Sim"); coleta `contexto_especial` (≥ 20 chars) —
+  *por que* é alto impacto e *por que* não se encaixa em saving/receita.
+- Gera documentação técnica normalmente (chat doc), mas **pula** as fases de saving/receita
+  (orquestrador roteia `doc_preview → completo` quando não há saving nem receita).
+- `tipo_projeto = 'especial'`, `tipos_projeto = ['especial']`, `especial = 1`.
+- Status sempre `em_validacao` → "Pendente" na planilha. **Validação é humana**, não pelo analisador IA.
 
 ## Navegação entre steps
 

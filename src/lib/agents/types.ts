@@ -113,6 +113,7 @@ export type ResultadoAnalise = {
   justificativa: string;
   resumo: string;
   complexidade: Complexidade;
+  complexidade_justificativa?: string;
   // Gate determinístico: o LLM declara se há uma IA decidindo o caminho/ação do
   // processo. Se false, a complexidade é forçada para 'automacao' no backend
   // (evita classificar automação sofisticada/sem IA como 'inteligencia').
@@ -143,6 +144,9 @@ export type ProjetoContexto = {
   tipo_projeto?: 'saving' | 'receita_incremental' | null;
   tipos_projeto?: ('saving' | 'receita_incremental')[] | null;
   escopo?: 'interno' | 'externo' | null;
+  // Projeto especial: flag + contexto que a pessoa escreveu para explicar o impacto.
+  especial?: boolean;
+  contexto_especial?: string | null;
 };
 
 // ─── Documentação gerada (output do compiler) ───────────────────────────────

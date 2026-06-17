@@ -147,6 +147,20 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN alguem_fazia TEXT',
   // Observações da análise automática (parecer da IA) — só para staff, não exibido ao usuário.
   'ALTER TABLE projetos ADD COLUMN observacoes TEXT',
+  // Rastreamento de sincronização com n8n
+  'ALTER TABLE projetos ADD COLUMN webhook_sync TEXT',
+  'ALTER TABLE projetos ADD COLUMN webhook_error TEXT',
+  // Justificativa da classificação de complexidade (por que automacao/inteligencia/autonomia)
+  'ALTER TABLE analises ADD COLUMN complexidade_justificativa TEXT',
+  // Corpos de request/response para debug no investigador
+  'ALTER TABLE api_logs ADD COLUMN request_body TEXT',
+  'ALTER TABLE api_logs ADD COLUMN response_body TEXT',
+  // Projeto ESPECIAL ("estrela do Mario Kart"): altíssimo impacto que NÃO se encaixa
+  // em saving nem receita incremental. Pula a análise financeira e o analisador IA —
+  // validação é feita por um humano. `especial` é a flag; `contexto_especial` é a
+  // descrição do contexto do projeto especial coletada na etapa 2.5.
+  'ALTER TABLE projetos ADD COLUMN especial INTEGER DEFAULT 0',
+  'ALTER TABLE projetos ADD COLUMN contexto_especial TEXT',
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).

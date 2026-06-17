@@ -21,6 +21,17 @@ import {
   Bot,
   CircleDot,
   ChevronUp,
+  Shield,
+  TrendingUp,
+  Sparkles,
+  Copy,
+  Check,
+  Eye,
+  ArrowUpRight,
+  ArrowDownLeft,
+  SlidersHorizontal,
+  X,
+  Calendar,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -106,6 +117,7 @@ type ProjetoDetalhes = ProjetoInvestigador & {
     justificativa: string
     resumo: string | null
     complexidade: string | null
+    complexidade_justificativa: string | null
     criterios_hardcoded: Array<{ criterio: string; pontos: number; justificativa: string }>
     criterios_dinamicos: Array<{ criterio: string; pontos: number; justificativa: string }>
   } | null
@@ -127,6 +139,34 @@ type InvestigadorStats = {
 }
 
 type Filtro = 'todos' | 'ativos' | 'com_erros' | 'lentos'
+
+type FiltrosAvancados = {
+  status: string[]
+  fase: string[]
+  area: string[]
+  ferramenta: string[]
+  complexidade: string[]
+  dataInicio: string | null
+  dataFim: string | null
+  chatCompleto: 'todos' | 'completo' | 'em_andamento'
+}
+
+const FILTROS_AVANCADOS_DEFAULT: FiltrosAvancados = {
+  status: [],
+  fase: [],
+  area: [],
+  ferramenta: [],
+  complexidade: [],
+  dataInicio: null,
+  dataFim: null,
+  chatCompleto: 'todos',
+}
+
+const COMPLEXIDADE_LABELS: Record<string, string> = {
+  automacao: 'Automação',
+  inteligencia: 'Inteligência',
+  autonomia: 'Autonomia',
+}
 
 // ── Constantes de UI ─────────────────────────────────────────────────────────
 
@@ -223,8 +263,16 @@ const STATUS_LABELS: Record<string, string> = {
   rascunho: 'Rascunho',
   em_validacao: 'Em validação',
   validado: 'Validado',
-  rejeitado: 'Rejeitado',
+  rejeitado: 'Reenvio Pendente',
   aprovado: 'Aprovado',
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  rascunho: 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/50',
+  em_validacao: 'bg-[#f59e0b]/10 text-[#b45309]',
+  validado: 'bg-[#0d9488]/10 text-[#0d9488]',
+  rejeitado: 'bg-[#dc2626]/8 text-[#dc2626]',
+  aprovado: 'bg-[#16a34a]/10 text-[#16a34a]',
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -313,6 +361,7 @@ function Investigador() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
+  const [filtrosAv, setFiltrosAv] = useState<FiltrosAvancados>(FILTROS_AVANCADOS_DEFAULT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detalhes, setDetalhes] = useState<ProjetoDetalhes | null>(null)
   const [detalhesLoading, setDetalhesLoading] = useState(false)
@@ -358,9 +407,11 @@ function Investigador() {
 
   // Filtragem
   const filtered = projetos.filter((p) => {
+    // Filtros rápidos
     if (filtro === 'ativos' && !isActiveNow(p)) return false
     if (filtro === 'com_erros' && !p.tem_erro) return false
     if (filtro === 'lentos' && (p.max_duracao_api_ms == null || p.max_duracao_api_ms <= 5000)) return false
+    // Busca textual
     if (busca) {
       const q = busca.toLowerCase()
       const match =
@@ -370,10 +421,38 @@ function Investigador() {
         (p.area_nome ?? '').toLowerCase().includes(q)
       if (!match) return false
     }
+    // Filtros avançados
+    if (filtrosAv.status.length > 0 && !filtrosAv.status.includes(p.status ?? '')) return false
+    if (filtrosAv.fase.length > 0 && !filtrosAv.fase.includes(p.fase_atual)) return false
+    if (filtrosAv.area.length > 0 && !filtrosAv.area.includes(p.area_nome ?? '')) return false
+    if (filtrosAv.ferramenta.length > 0 && !filtrosAv.ferramenta.includes(p.ferramenta)) return false
+    if (filtrosAv.complexidade.length > 0 && !filtrosAv.complexidade.includes(p.complexidade ?? '')) return false
+    if (filtrosAv.dataInicio && p.created_at && p.created_at < filtrosAv.dataInicio) return false
+    if (filtrosAv.dataFim && p.created_at && p.created_at > filtrosAv.dataFim + 'T23:59:59') return false
+    if (filtrosAv.chatCompleto === 'completo' && !p.chat_completo) return false
+    if (filtrosAv.chatCompleto === 'em_andamento' && p.chat_completo) return false
     return true
   })
 
   const ativos = projetos.filter(isActiveNow).length
+
+  // Valores dinâmicos para filtros (extraídos dos projetos carregados)
+  const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
+  const ferramentasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.ferramenta).filter(Boolean))].sort() as string[], [projetos])
+
+  // Contagem de filtros avançados ativos
+  const filtrosAvAtivos = filtrosAv.status.length + filtrosAv.fase.length + filtrosAv.area.length +
+    filtrosAv.ferramenta.length + filtrosAv.complexidade.length +
+    (filtrosAv.dataInicio ? 1 : 0) + (filtrosAv.dataFim ? 1 : 0) +
+    (filtrosAv.chatCompleto !== 'todos' ? 1 : 0)
+
+  // Tempo médio de conclusão (apenas projetos completos)
+  const completedDurations = projetos
+    .filter((p) => p.chat_completo && p.tempo_desde_inicio_min != null)
+    .map((p) => p.tempo_desde_inicio_min!)
+  const avgCompletionMin = completedDurations.length > 0
+    ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length)
+    : null
 
   if (selectedId) {
     return (
@@ -392,24 +471,25 @@ function Investigador() {
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--go-blue)] flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--go-blue)]">
-              <Search className="h-4 w-4 text-white" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[var(--go-radius-sm)] bg-[var(--go-blue)] shadow-[var(--go-shadow-sm)]">
+              <Search className="h-4.5 w-4.5 text-white" />
             </div>
-            Investigador
-          </h1>
-          <p className="mt-1 text-sm text-[var(--go-text-primary)]/60">
-            Monitore projetos em tempo real — preenchimento, chat e performance da API.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-[var(--go-text-primary)]/50">
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-[#16a34a] animate-pulse" />
-            Auto-refresh
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-[var(--go-text-primary)]">
+                Investigador
+              </h1>
+              <p className="text-[13px] text-[var(--go-text-primary)]/45">
+                Monitore projetos em tempo real
+              </p>
+            </div>
           </div>
-          <span className="font-mono text-[11px]">
+        </div>
+        <div className="flex items-center gap-2 rounded-full bg-[var(--go-blue)]/4 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50">
+          <div className="h-1.5 w-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+          <span className="font-mono text-[11px] tabular-nums">
             {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
@@ -422,7 +502,7 @@ function Investigador() {
           <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4" />} color="var(--go-blue)" />
           <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4" />} color="#ca8a04" />
           <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
-          <StatCard label="Tempo médio" value={formatDuration(stats.media_duracao_ms)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
+          <StatCard label="Tempo médio" value={formatTimeSince(avgCompletionMin)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
       )}
 
@@ -458,7 +538,7 @@ function Investigador() {
           ))}
         </div>
 
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--go-text-primary)]/30" />
           <input
             type="text"
@@ -469,6 +549,8 @@ function Investigador() {
           />
         </div>
 
+        <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
+
         <button
           onClick={fetchData}
           className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-2 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
@@ -477,6 +559,8 @@ function Investigador() {
           Atualizar
         </button>
       </div>
+      {/* Chips de filtros avançados ativos */}
+      <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />
 
       {/* Lista de projetos */}
       <div className="mt-4">
@@ -519,16 +603,21 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-[var(--go-radius-sm)] border bg-white p-3 transition-colors ${
-        highlight ? 'border-current/20' : 'border-[var(--go-blue)]/8'
+      className={`relative overflow-hidden rounded-[var(--go-radius-md)] border bg-white p-3.5 transition-all ${
+        highlight ? 'shadow-[var(--go-shadow-sm)]' : 'border-[var(--go-blue)]/8'
       }`}
       style={highlight ? { borderColor: `${color}30` } : undefined}
     >
+      {/* Subtle gradient accent */}
+      <div
+        className="absolute top-0 right-0 h-12 w-12 rounded-full opacity-[0.06] blur-xl"
+        style={{ backgroundColor: color }}
+      />
       <div className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: `${color}99` }}>
         <span style={{ color }}>{icon}</span>
         {label}
       </div>
-      <div className="mt-1 text-xl font-bold text-[var(--go-text-primary)]">{value}</div>
+      <div className="mt-1.5 text-xl font-bold tracking-tight text-[var(--go-text-primary)] tabular-nums">{value}</div>
     </div>
   )
 }
@@ -541,67 +630,81 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white px-4 py-3 transition-all hover:border-[var(--go-blue)]/20 hover:shadow-[var(--go-shadow-sm)]"
+      className={`group relative w-full text-left overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white pl-0 pr-4 py-3 transition-all hover:border-[var(--go-blue)]/18 hover:shadow-[var(--go-shadow-sm)]`}
     >
-      <div className="flex items-center gap-3">
+      {/* Phase accent stripe */}
+      <div className={`absolute top-0 left-0 h-full w-1 ${style.border.replace('border-l-', 'bg-')}`} />
+
+      <div className="flex items-center gap-3 pl-4">
         {/* Indicador de ativo */}
         <div className="flex-shrink-0">
           {active ? (
-            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse" title="Preenchendo agora" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse ring-4 ring-[#16a34a]/10" title="Preenchendo agora" />
           ) : (
-            <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} style={{ opacity: 0.4 }} />
+            <div className={`h-2 w-2 rounded-full ${style.dot}`} style={{ opacity: 0.35 }} />
           )}
         </div>
 
         {/* Info principal */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
               {p.nome ?? 'Projeto sem nome'}
             </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
-              {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
-            </span>
-            {p.status && p.status !== 'rascunho' && (
-              <span className="rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
+            {p.fase_atual !== 'completo' && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
+                {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
+              </span>
+            )}
+            {p.status && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[p.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                 {STATUS_LABELS[p.status] ?? p.status}
               </span>
             )}
             {p.tem_erro && (
-              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-medium">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-semibold">
                 <AlertTriangle className="h-3 w-3" />
                 {p.total_erros_api} erro{p.total_erros_api !== 1 ? 's' : ''}
               </span>
             )}
             {p.max_duracao_api_ms != null && p.max_duracao_api_ms > 5000 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-medium">
+              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-semibold">
                 <Clock className="h-3 w-3" />
                 Lento
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs text-[var(--go-text-primary)]/45">
+          <div className="mt-0.5 text-[12px] text-[var(--go-text-primary)]/40">
             {p.responsavel_nome} · {p.area_nome ?? 'Sem área'} · {p.ferramenta}
           </div>
         </div>
 
         {/* Métricas rápidas */}
-        <div className="flex items-center gap-5 text-xs flex-shrink-0">
+        <div className="flex items-center gap-4 text-xs flex-shrink-0">
+          <div className="text-center" title="Início do formulário">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(p.created_at)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">início</div>
+          </div>
           <div className="text-center" title="Mensagens (usuário / IA)">
-            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">msgs</div>
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
           </div>
           <div className="text-center" title="Tempo desde início">
-            <div className="font-semibold text-[var(--go-text-primary)] tabular-nums">{formatTimeSince(p.tempo_desde_inicio_min)}</div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">duração</div>
+            <div className={`font-semibold tabular-nums text-[13px] ${
+              p.fase_atual === 'completo' ? 'text-[#16a34a]'
+                : p.fase_atual === 'saving' || p.fase_atual === 'receita' ? 'text-[#ea580c]'
+                : p.fase_atual === 'documentacao' ? 'text-[var(--go-blue)]'
+                : 'text-[var(--go-text-primary)]/80'
+            }`}>{formatTimeSince(p.tempo_desde_inicio_min)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">duração</div>
           </div>
           <div className="text-center" title="Tempo médio de resposta da API">
-            <div className={`font-semibold tabular-nums ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>
+            <div className={`font-semibold tabular-nums text-[13px] ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>
               {formatDuration(p.media_duracao_api_ms)}
             </div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/35">API média</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">API</div>
           </div>
-          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/20 group-hover:text-[var(--go-blue)]/50 transition-colors" />
+          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/15 group-hover:text-[var(--go-blue)]/40 group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </button>
@@ -650,58 +753,62 @@ function DetalheView({
 
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
-      {/* Header compacto */}
-      <div className="flex items-start gap-3">
-        <button
-          onClick={onBack}
-          className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-          title="Voltar"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-[var(--go-text-primary)] truncate">
-              {d.nome ?? 'Projeto sem nome'}
-            </h1>
-            <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
-              {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
-            </span>
-            {d.status && d.status !== 'rascunho' && (
-              <span className="flex-shrink-0 rounded-full bg-[var(--go-blue)]/5 px-2 py-0.5 text-[10px] text-[var(--go-blue)]/70 font-medium">
-                {STATUS_LABELS[d.status] ?? d.status}
+      {/* Header com profundidade */}
+      <div className="relative overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white p-5">
+        {/* Faixa decorativa */}
+        <div className={`absolute top-0 left-0 h-full w-1 ${phaseStyle.border.replace('border-l-', 'bg-')}`} />
+
+        <div className="flex items-start gap-3 pl-3">
+          <button
+            onClick={onBack}
+            className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 hover:bg-[var(--go-blue)]/5 transition-all"
+            title="Voltar"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-lg font-bold tracking-tight text-[var(--go-text-primary)]">
+                {d.nome ?? 'Projeto sem nome'}
+              </h1>
+              <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${phaseStyle.badge}`}>
+                {FASE_LABELS[d.fase_atual] ?? d.fase_atual}
               </span>
-            )}
+              {d.status && (
+                <span className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[d.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
+                  {STATUS_LABELS[d.status] ?? d.status}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[13px] text-[var(--go-text-primary)]/45">
+              {d.responsavel_nome} ({d.responsavel_email}) · {d.area_nome ?? 'Sem área'} · {d.ferramenta}
+            </p>
+
+            {/* Métricas inline dentro do header */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
+              <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
+              <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
+              <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
+            </div>
           </div>
-          <p className="mt-0.5 text-sm text-[var(--go-text-primary)]/45">
-            {d.responsavel_nome} ({d.responsavel_email}) · {d.area_nome ?? 'Sem área'} · {d.ferramenta}
-          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setDadosOpen(!dadosOpen)}
+              className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+            >
+              <FileText className="h-3 w-3" />
+              Dados
+              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${dadosOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <button
+              onClick={onRefresh}
+              className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={onRefresh}
-          className="flex-shrink-0 flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/40 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Atualizar
-        </button>
-      </div>
-
-      {/* Métricas inline */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
-        <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
-        <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
-        <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
-
-        {/* Dados do projeto — collapsible */}
-        <button
-          onClick={() => setDadosOpen(!dadosOpen)}
-          className="ml-auto flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
-        >
-          <FileText className="h-3 w-3" />
-          Dados do projeto
-          <ChevronDown className={`h-3 w-3 transition-transform ${dadosOpen ? 'rotate-180' : ''}`} />
-        </button>
       </div>
 
       {/* Dados colapsáveis das etapas */}
@@ -737,24 +844,24 @@ function DetalheView({
       )}
 
       {/* Tabs */}
-      <div className="mt-5 flex items-center gap-0.5 border-b border-[var(--go-blue)]/8">
+      <div className="mt-4 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
         {([
-          ['chat', 'Histórico do chat', d.chat_messages.length],
+          ['chat', 'Chat', d.chat_messages.length],
           ['api_logs', 'Logs de API', d.api_logs.length],
-          ['dados', 'Documentação / Análise', null],
+          ['dados', 'Análise & Docs', null],
         ] as [string, string, number | null][]).map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setTab(key as typeof tab)}
-            className={`relative border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+            className={`relative flex-1 rounded-[6px] px-4 py-2 text-[13px] font-medium transition-all ${
               tab === key
-                ? 'border-[var(--go-blue)] text-[var(--go-blue)]'
-                : 'border-transparent text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/70'
+                ? 'bg-white text-[var(--go-blue)] shadow-[var(--go-shadow-sm)]'
+                : 'text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/65'
             }`}
           >
             {label}
             {count != null && (
-              <span className={`ml-1.5 text-[11px] ${tab === key ? 'text-[var(--go-blue)]/50' : 'text-[var(--go-text-primary)]/25'}`}>
+              <span className={`ml-1.5 text-[11px] tabular-nums ${tab === key ? 'text-[var(--go-blue)]/45' : 'text-[var(--go-text-primary)]/20'}`}>
                 {count}
               </span>
             )}
@@ -773,11 +880,11 @@ function DetalheView({
 
 function MiniStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
-    <div className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-      warn ? 'border-[#dc2626]/15 bg-[#dc2626]/5' : 'border-[var(--go-blue)]/8 bg-white'
+    <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+      warn ? 'bg-[#dc2626]/6' : 'bg-[var(--go-blue)]/4'
     }`}>
-      <span className="text-[var(--go-text-primary)]/40">{label}</span>
-      <span className={`font-semibold tabular-nums ${warn ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]'}`}>{value}</span>
+      <span className={`text-[11px] ${warn ? 'text-[#dc2626]/50' : 'text-[var(--go-text-primary)]/35'}`}>{label}</span>
+      <span className={`font-semibold tabular-nums text-[12px] ${warn ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>{value}</span>
     </div>
   )
 }
@@ -1131,6 +1238,456 @@ function renderInline(text: string): React.ReactNode {
 
 // ── Tab: Logs de API ─────────────────────────────────────────────────────────
 
+// ── Componente: Seção de checkboxes dentro do popover de filtros ────────────
+
+function FiltroSecao({
+  titulo,
+  opcoes,
+  selecionados,
+  onChange,
+}: {
+  titulo: string
+  opcoes: { value: string; label: string }[]
+  selecionados: string[]
+  onChange: (next: string[]) => void
+}) {
+  if (opcoes.length === 0) return null
+  const toggle = (v: string) => {
+    onChange(selecionados.includes(v) ? selecionados.filter((s) => s !== v) : [...selecionados, v])
+  }
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">{titulo}</div>
+      <div className="flex flex-wrap gap-1">
+        {opcoes.map((o) => {
+          const active = selecionados.includes(o.value)
+          return (
+            <button
+              key={o.value}
+              onClick={() => toggle(o.value)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                active
+                  ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                  : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25 hover:text-[var(--go-text-primary)]'
+              }`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Componente: Popover de filtros avançados ─────────────────────────────────
+
+function FiltroPopover({
+  filtros,
+  onChange,
+  areas,
+  ferramentas,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+  areas: string[]
+  ferramentas: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const totalAtivos = filtros.status.length + filtros.fase.length + filtros.area.length +
+    filtros.ferramenta.length + filtros.complexidade.length +
+    (filtros.dataInicio ? 1 : 0) + (filtros.dataFim ? 1 : 0) +
+    (filtros.chatCompleto !== 'todos' ? 1 : 0)
+
+  const update = (patch: Partial<FiltrosAvancados>) => onChange({ ...filtros, ...patch })
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border px-3 py-2 text-xs font-medium transition-all ${
+          totalAtivos > 0
+            ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+            : 'bg-white text-[var(--go-text-primary)]/50 border-[var(--go-blue)]/10 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25'
+        }`}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        Filtros
+        {totalAtivos > 0 && (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] font-bold">
+            {totalAtivos}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-[420px] rounded-[var(--go-radius)] border border-[var(--go-blue)]/10 bg-white shadow-xl shadow-black/8 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[var(--go-blue)]/6 px-4 py-2.5">
+            <span className="text-sm font-semibold text-[var(--go-text-primary)]">Filtros avançados</span>
+            {totalAtivos > 0 && (
+              <button
+                onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+                className="text-[11px] text-[#dc2626] hover:text-[#dc2626]/80 font-medium"
+              >
+                Limpar tudo
+              </button>
+            )}
+          </div>
+
+          {/* Body */}
+          <div className="max-h-[420px] overflow-y-auto p-4 space-y-4">
+            <FiltroSecao
+              titulo="Status"
+              opcoes={Object.entries(STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.status}
+              onChange={(s) => update({ status: s })}
+            />
+
+            <FiltroSecao
+              titulo="Fase"
+              opcoes={Object.entries(FASE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.fase}
+              onChange={(f) => update({ fase: f })}
+            />
+
+            <FiltroSecao
+              titulo="Área"
+              opcoes={areas.map((a) => ({ value: a, label: a }))}
+              selecionados={filtros.area}
+              onChange={(a) => update({ area: a })}
+            />
+
+            <FiltroSecao
+              titulo="Ferramenta"
+              opcoes={ferramentas.map((f) => ({ value: f, label: f }))}
+              selecionados={filtros.ferramenta}
+              onChange={(f) => update({ ferramenta: f })}
+            />
+
+            <FiltroSecao
+              titulo="Complexidade"
+              opcoes={Object.entries(COMPLEXIDADE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+              selecionados={filtros.complexidade}
+              onChange={(c) => update({ complexidade: c })}
+            />
+
+            {/* Período */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Data de Início</div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataInicio ?? ''}
+                    onChange={(e) => update({ dataInicio: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                    placeholder="De"
+                  />
+                </div>
+                <span className="text-[var(--go-text-primary)]/20 text-xs">até</span>
+                <div className="relative flex-1">
+                  <Calendar className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--go-text-primary)]/25" />
+                  <input
+                    type="date"
+                    value={filtros.dataFim ?? ''}
+                    onChange={(e) => update({ dataFim: e.target.value || null })}
+                    className="w-full rounded-[6px] border border-[var(--go-blue)]/10 bg-white py-1.5 pl-8 pr-2 text-xs outline-none focus:border-[var(--go-blue)]/25"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Chat completo */}
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider mb-1.5">Formulário</div>
+              <div className="flex gap-1">
+                {([['todos', 'Todos'], ['completo', 'Completo'], ['em_andamento', 'Em andamento']] as const).map(([v, l]) => (
+                  <button
+                    key={v}
+                    onClick={() => update({ chatCompleto: v })}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                      filtros.chatCompleto === v
+                        ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                        : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Componente: Chips de filtros ativos ──────────────────────────────────────
+
+function FiltroChips({
+  filtros,
+  onChange,
+}: {
+  filtros: FiltrosAvancados
+  onChange: (f: FiltrosAvancados) => void
+}) {
+  const chips: { key: string; label: string; remove: () => void }[] = []
+
+  filtros.status.forEach((s) =>
+    chips.push({ key: `status-${s}`, label: `Status: ${STATUS_LABELS[s] ?? s}`, remove: () => onChange({ ...filtros, status: filtros.status.filter((x) => x !== s) }) })
+  )
+  filtros.fase.forEach((f) =>
+    chips.push({ key: `fase-${f}`, label: `Fase: ${FASE_LABELS[f] ?? f}`, remove: () => onChange({ ...filtros, fase: filtros.fase.filter((x) => x !== f) }) })
+  )
+  filtros.area.forEach((a) =>
+    chips.push({ key: `area-${a}`, label: `Área: ${a}`, remove: () => onChange({ ...filtros, area: filtros.area.filter((x) => x !== a) }) })
+  )
+  filtros.ferramenta.forEach((f) =>
+    chips.push({ key: `ferr-${f}`, label: `Ferramenta: ${f}`, remove: () => onChange({ ...filtros, ferramenta: filtros.ferramenta.filter((x) => x !== f) }) })
+  )
+  filtros.complexidade.forEach((c) =>
+    chips.push({ key: `comp-${c}`, label: `Complexidade: ${COMPLEXIDADE_LABELS[c] ?? c}`, remove: () => onChange({ ...filtros, complexidade: filtros.complexidade.filter((x) => x !== c) }) })
+  )
+  if (filtros.dataInicio)
+    chips.push({ key: 'di', label: `De: ${filtros.dataInicio}`, remove: () => onChange({ ...filtros, dataInicio: null }) })
+  if (filtros.dataFim)
+    chips.push({ key: 'df', label: `Até: ${filtros.dataFim}`, remove: () => onChange({ ...filtros, dataFim: null }) })
+  if (filtros.chatCompleto !== 'todos')
+    chips.push({
+      key: 'chat',
+      label: filtros.chatCompleto === 'completo' ? 'Formulário completo' : 'Em andamento',
+      remove: () => onChange({ ...filtros, chatCompleto: 'todos' }),
+    })
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--go-blue)]/6 pl-2.5 pr-1 py-0.5 text-[11px] font-medium text-[var(--go-blue)]"
+        >
+          {c.label}
+          <button
+            onClick={c.remove}
+            className="rounded-full p-0.5 hover:bg-[var(--go-blue)]/15 transition-colors"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={() => onChange(FILTROS_AVANCADOS_DEFAULT)}
+        className="text-[11px] text-[#dc2626]/70 hover:text-[#dc2626] font-medium ml-1"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  )
+}
+
+// ── Componente: Visualizador de JSON com cópia e colapso inteligente ────────
+
+function JsonBodyViewer({ label, body, icon }: { label: string; body: string | null; icon: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(true)
+  const [copied, setCopied] = useState(false)
+
+  if (!body) {
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider mb-1 flex items-center gap-1">
+          {icon} {label}
+        </div>
+        <div className="text-xs text-[var(--go-text-primary)]/20 italic">Sem dados</div>
+      </div>
+    )
+  }
+
+  // Tenta formatar como JSON bonito
+  let formatted = body
+  let isJson = false
+  try {
+    const parsed = JSON.parse(body)
+    formatted = JSON.stringify(parsed, null, 2)
+    isJson = true
+  } catch { /* não é JSON, exibe raw */ }
+
+  const lineCount = formatted.split('\n').length
+  const isLarge = formatted.length > 3000 || lineCount > 60
+  const displayText = collapsed && isLarge ? formatted.slice(0, 2000) + '\n\n…' : formatted
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(formatted)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[10px] font-semibold text-[var(--go-text-primary)]/30 uppercase tracking-wider flex items-center gap-1">
+          {icon} {label}
+          {isJson && (
+            <span className="ml-1 rounded bg-[var(--go-blue)]/6 px-1.5 py-0.5 text-[9px] text-[var(--go-blue)] font-medium">
+              JSON
+            </span>
+          )}
+          <span className="text-[var(--go-text-primary)]/20 font-normal normal-case">
+            ({(body.length / 1024).toFixed(1)} KB{lineCount > 1 ? ` · ${lineCount} linhas` : ''})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {isLarge && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-[10px] text-[var(--go-blue)] hover:text-[var(--go-blue)]/80 font-medium flex items-center gap-0.5 transition-colors"
+            >
+              {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+              {collapsed ? 'Expandir tudo' : 'Colapsar'}
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="text-[var(--go-text-primary)]/30 hover:text-[var(--go-blue)] transition-colors p-0.5"
+            title="Copiar"
+          >
+            {copied ? <Check className="h-3 w-3 text-[#16a34a]" /> : <Copy className="h-3 w-3" />}
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-auto rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/50 border border-[var(--go-blue)]/5 p-2.5 text-[11px] leading-[1.55] font-mono text-[var(--go-text-primary)]/65 max-h-[400px] whitespace-pre-wrap break-all select-text">
+        {displayText}
+      </pre>
+    </div>
+  )
+}
+
+// ── Linha expandível de API Log ─────────────────────────────────────────────
+
+function ApiLogRow({ log }: { log: ApiLog }) {
+  const [expanded, setExpanded] = useState(false)
+  const [bodyData, setBodyData] = useState<{ request_body: string | null; response_body: string | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const isError = log.status_code >= 400
+  const isSlow = (log.duration_ms ?? 0) > 5000
+
+  const handleToggle = async () => {
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
+    if (!bodyData) {
+      setLoading(true)
+      try {
+        const data = await apiFetch<{ request_body: string | null; response_body: string | null }>(
+          `/api/admin/investigador/log/${log.id}`
+        )
+        setBodyData(data)
+      } catch {
+        setBodyData({ request_body: null, response_body: null })
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <>
+      <tr
+        onClick={handleToggle}
+        className={`border-b border-[var(--go-blue)]/4 cursor-pointer transition-colors group ${
+          isError
+            ? 'bg-[#dc2626]/3 hover:bg-[#dc2626]/6'
+            : isSlow
+              ? 'bg-[#ca8a04]/3 hover:bg-[#ca8a04]/6'
+              : 'hover:bg-[var(--go-blue)]/3'
+        } ${expanded ? '!border-b-0' : ''}`}
+      >
+        <td className="py-2 px-3 w-5">
+          <div className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}>
+            <ChevronRight className="h-3.5 w-3.5 text-[var(--go-text-primary)]/25 group-hover:text-[var(--go-blue)]" />
+          </div>
+        </td>
+        <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
+          {formatDateTime(log.created_at)}
+        </td>
+        <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
+          {log.endpoint.replace('/api/chat/', '')}
+        </td>
+        <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
+          {formatDuration(log.duration_ms)}
+        </td>
+        <td className="py-2 px-3 text-right">
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
+            }`}
+          >
+            {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
+            {log.status_code}
+          </span>
+        </td>
+        <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
+          {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
+          {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
+        </td>
+        <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
+          {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
+        </td>
+      </tr>
+      {expanded && (
+        <tr className={`border-b border-[var(--go-blue)]/4 ${isError ? 'bg-[#dc2626]/2' : isSlow ? 'bg-[#ca8a04]/2' : 'bg-[var(--go-blue)]/2'}`}>
+          <td colSpan={7} className="p-3">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-xs text-[var(--go-text-primary)]/30">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando body…
+              </div>
+            ) : bodyData && !bodyData.request_body && !bodyData.response_body ? (
+              <div className="text-center py-4 text-xs text-[var(--go-text-primary)]/25 italic">
+                <Eye className="mx-auto mb-1 h-4 w-4" />
+                Corpo não disponível para este log (registrado antes da funcionalidade).
+              </div>
+            ) : bodyData ? (
+              <div className="flex gap-3 flex-col lg:flex-row">
+                <JsonBodyViewer
+                  label="Request"
+                  body={bodyData.request_body}
+                  icon={<ArrowUpRight className="h-3 w-3 text-[var(--go-blue)]" />}
+                />
+                <JsonBodyViewer
+                  label="Response"
+                  body={bodyData.response_body}
+                  icon={<ArrowDownLeft className="h-3 w-3 text-[#16a34a]" />}
+                />
+              </div>
+            ) : null}
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+// ── Tab: API Logs ───────────────────────────────────────────────────────────
+
 function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
   if (logs.length === 0) {
     return (
@@ -1146,6 +1703,7 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[var(--go-blue)]/8 text-left">
+            <th className="py-2.5 px-3 w-5"></th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Quando</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider">Endpoint</th>
             <th className="py-2.5 px-3 text-[11px] font-semibold text-[var(--go-text-primary)]/35 uppercase tracking-wider text-right">Duração</th>
@@ -1155,45 +1713,9 @@ function ApiLogsTab({ logs }: { logs: ApiLog[] }) {
           </tr>
         </thead>
         <tbody>
-          {logs.map((log) => {
-            const isError = log.status_code >= 400
-            const isSlow = (log.duration_ms ?? 0) > 5000
-            return (
-              <tr
-                key={log.id}
-                className={`border-b border-[var(--go-blue)]/4 last:border-0 ${
-                  isError ? 'bg-[#dc2626]/3' : isSlow ? 'bg-[#ca8a04]/3' : ''
-                }`}
-              >
-                <td className="py-2 px-3 text-xs text-[var(--go-text-primary)]/40 whitespace-nowrap tabular-nums">
-                  {formatDateTime(log.created_at)}
-                </td>
-                <td className="py-2 px-3 font-mono text-xs text-[var(--go-text-primary)]/70">
-                  {log.endpoint.replace('/api/chat/', '')}
-                </td>
-                <td className={`py-2 px-3 text-xs text-right font-mono tabular-nums ${isSlow ? 'text-[#dc2626] font-bold' : 'text-[var(--go-text-primary)]/50'}`}>
-                  {formatDuration(log.duration_ms)}
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <span
-                    className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      isError ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#16a34a]/8 text-[#16a34a]'
-                    }`}
-                  >
-                    {isError ? <XCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                    {log.status_code}
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right text-xs text-[var(--go-text-primary)]/35 font-mono tabular-nums">
-                  {log.request_size != null ? `${(log.request_size / 1024).toFixed(1)}k` : '—'} /{' '}
-                  {log.response_size != null ? `${(log.response_size / 1024).toFixed(1)}k` : '—'}
-                </td>
-                <td className="py-2 px-3 text-xs text-[#dc2626] max-w-[200px] truncate" title={log.error ?? ''}>
-                  {log.error ?? <span className="text-[var(--go-text-primary)]/15">—</span>}
-                </td>
-              </tr>
-            )
-          })}
+          {logs.map((log) => (
+            <ApiLogRow key={log.id} log={log} />
+          ))}
         </tbody>
       </table>
     </div>
@@ -1210,107 +1732,217 @@ function DadosTab({
   analise: ProjetoDetalhes['analise']
 }) {
   const [justificativaExpandida, setJustificativaExpandida] = useState(false)
+  const [criteriosExpandidos, setCriteriosExpandidos] = useState(false)
 
   const allCriterios = analise
     ? [...analise.criterios_hardcoded, ...analise.criterios_dinamicos]
     : []
   const cumpridos = allCriterios.filter((c) => c.pontos === 1)
   const descumpridos = allCriterios.filter((c) => c.pontos === 0)
+  const pct = analise && analise.pontuacao_maxima > 0
+    ? Math.round((analise.pontuacao_total / analise.pontuacao_maxima) * 100)
+    : 0
+
+  const complexidadeConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+    automacao: { label: 'Automação', icon: <Zap className="h-3.5 w-3.5" />, color: '#ca8a04' },
+    inteligencia: { label: 'Inteligência', icon: <Sparkles className="h-3.5 w-3.5" />, color: '#7c3aed' },
+    autonomia: { label: 'Autonomia', icon: <TrendingUp className="h-3.5 w-3.5" />, color: '#0d9488' },
+  }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {analise && (
-        <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
-          <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
-            Análise automática
-          </h3>
-          <div className="space-y-1.5 text-sm">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[var(--go-text-primary)]/35 text-xs w-28 flex-shrink-0">Resultado:</span>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                analise.resultado === 'aprovado'
-                  ? 'bg-[#16a34a]/10 text-[#16a34a]'
-                  : 'bg-[#f59e0b]/10 text-[#b45309]'
-              }`}>
-                {analise.resultado === 'aprovado' ? 'Aprovado' : analise.resultado === 'rejeitado' ? 'Em revisão' : analise.resultado}
-              </span>
-            </div>
-            <KV label="Pontuação" value={`${analise.pontuacao_total} / ${analise.pontuacao_maxima}`} />
-            <KV label="Complexidade" value={
-              analise.complexidade === 'automacao' ? 'Automação'
-                : analise.complexidade === 'inteligencia' ? 'Inteligência'
-                : analise.complexidade === 'autonomia' ? 'Autonomia'
-                : analise.complexidade
-            } />
+        <>
+          {/* ── Hero card: resultado + score + complexidade ─────────── */}
+          <div
+            className="relative overflow-hidden rounded-[var(--go-radius-md)] border bg-white"
+            style={{
+              borderColor: analise.resultado === 'aprovado' ? '#16a34a25' : '#f59e0b25',
+            }}
+          >
+            {/* Faixa de cor sutil no topo */}
+            <div
+              className="h-1"
+              style={{
+                background: analise.resultado === 'aprovado'
+                  ? 'linear-gradient(90deg, #16a34a, #22d3ee)'
+                  : 'linear-gradient(90deg, #f59e0b, #f97316)',
+              }}
+            />
 
-            {/* Resumo curto */}
-            {analise.resumo && (
-              <div className="mt-3 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/60 border border-[var(--go-blue)]/6 p-3">
-                <MiniMarkdown text={analise.resumo} />
+            <div className="p-5">
+              <div className="flex items-start gap-5">
+                {/* Score ring */}
+                <div className="flex-shrink-0">
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <svg className="absolute inset-0 h-20 w-20 -rotate-90" viewBox="0 0 80 80">
+                      <circle
+                        cx="40" cy="40" r="34"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="6"
+                        className="text-[var(--go-blue)]/6"
+                      />
+                      <circle
+                        cx="40" cy="40" r="34"
+                        fill="none"
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 34}`}
+                        strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct / 100)}`}
+                        style={{
+                          stroke: analise.resultado === 'aprovado' ? '#16a34a' : '#f59e0b',
+                          transition: 'stroke-dashoffset 0.6s ease',
+                        }}
+                      />
+                    </svg>
+                    <div className="text-center">
+                      <span className="text-lg font-bold text-[var(--go-text-primary)] tabular-nums leading-none">
+                        {analise.pontuacao_total}
+                      </span>
+                      <span className="text-[11px] text-[var(--go-text-primary)]/30 font-medium">/{analise.pontuacao_maxima}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resultado + complexidade */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold ${
+                      analise.resultado === 'aprovado'
+                        ? 'bg-[#16a34a]/10 text-[#16a34a]'
+                        : 'bg-[#f59e0b]/10 text-[#b45309]'
+                    }`}>
+                      {analise.resultado === 'aprovado' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      )}
+                      {analise.resultado === 'aprovado' ? 'Aprovado' : analise.resultado === 'rejeitado' ? 'Em revisão' : analise.resultado}
+                    </span>
+
+                    {analise.complexidade && complexidadeConfig[analise.complexidade] && (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium"
+                        style={{
+                          backgroundColor: `${complexidadeConfig[analise.complexidade].color}12`,
+                          color: complexidadeConfig[analise.complexidade].color,
+                        }}
+                      >
+                        {complexidadeConfig[analise.complexidade].icon}
+                        {complexidadeConfig[analise.complexidade].label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Justificativa da complexidade */}
+                  {analise.complexidade_justificativa && (
+                    <p className="text-[12px] leading-relaxed text-[var(--go-text-primary)]/45 mb-2">
+                      {analise.complexidade_justificativa}
+                    </p>
+                  )}
+
+                  {/* Resumo */}
+                  {analise.resumo && (
+                    <div className="text-[13px] leading-relaxed text-[var(--go-text-primary)]/70">
+                      <MiniMarkdown text={analise.resumo} />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Critérios individuais */}
-            {allCriterios.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <h4 className="text-[11px] font-semibold text-[var(--go-text-primary)]/40 uppercase tracking-wider">
-                  Critérios avaliados ({cumpridos.length} de {allCriterios.length})
-                </h4>
+          {/* ── Critérios individuais ───────────────────────────────── */}
+          {allCriterios.length > 0 && (
+            <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white">
+              <button
+                onClick={() => setCriteriosExpandidos(!criteriosExpandidos)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[var(--go-blue)]/2"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Shield className="h-4 w-4 text-[var(--go-blue)]/40" />
+                  <span className="text-[13px] font-semibold text-[var(--go-text-primary)]">
+                    Critérios avaliados
+                  </span>
+                  <span className="text-[12px] text-[var(--go-text-primary)]/40 tabular-nums">
+                    {cumpridos.length} de {allCriterios.length} cumpridos
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* Mini bar */}
+                  <div className="hidden sm:flex items-center gap-1 w-28">
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--go-blue)]/6 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${allCriterios.length > 0 ? (cumpridos.length / allCriterios.length) * 100 : 0}%`,
+                          backgroundColor: descumpridos.length === 0 ? '#16a34a' : cumpridos.length >= descumpridos.length ? '#16a34a' : '#f59e0b',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-[var(--go-text-primary)]/25 transition-transform duration-200 ${criteriosExpandidos ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
 
-                {/* Descumpridos primeiro — são os que o admin mais precisa ver */}
-                {descumpridos.length > 0 && (
-                  <div className="space-y-1.5">
+              {criteriosExpandidos && (
+                <div className="border-t border-[var(--go-blue)]/6 px-5 py-4" style={{ animation: 'go-slide-down 0.2s ease' }}>
+                  <div className="space-y-2">
+                    {/* Descumpridos primeiro */}
                     {descumpridos.map((c, i) => (
                       <CriterioItem key={`desc-${i}`} criterio={c} />
                     ))}
-                  </div>
-                )}
-
-                {/* Cumpridos */}
-                {cumpridos.length > 0 && (
-                  <div className="space-y-1.5">
+                    {descumpridos.length > 0 && cumpridos.length > 0 && (
+                      <div className="flex items-center gap-3 py-1.5">
+                        <div className="h-px flex-1 bg-[var(--go-blue)]/6" />
+                        <span className="text-[10px] font-medium text-[var(--go-text-primary)]/25 uppercase tracking-wider">Cumpridos</span>
+                        <div className="h-px flex-1 bg-[var(--go-blue)]/6" />
+                      </div>
+                    )}
                     {cumpridos.map((c, i) => (
                       <CriterioItem key={`cump-${i}`} criterio={c} />
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
+          )}
 
-            {/* Justificativa completa — expandível */}
-            {analise.justificativa && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setJustificativaExpandida(!justificativaExpandida)}
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--go-blue)]/70 hover:text-[var(--go-blue)] transition-colors"
-                >
-                  {justificativaExpandida ? (
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  )}
-                  {justificativaExpandida ? 'Recolher parecer completo' : 'Mostrar parecer completo da IA'}
-                </button>
-                {justificativaExpandida && (
-                  <div
-                    className="mt-2 rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 p-4"
-                    style={{ animation: 'go-slide-down 0.2s ease' }}
-                  >
-                    <MiniMarkdown text={analise.justificativa} />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+          {/* ── Parecer completo da IA ──────────────────────────────── */}
+          {analise.justificativa && (
+            <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white">
+              <button
+                onClick={() => setJustificativaExpandida(!justificativaExpandida)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[var(--go-blue)]/2"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Bot className="h-4 w-4 text-[var(--go-blue)]/40" />
+                  <span className="text-[13px] font-semibold text-[var(--go-text-primary)]">
+                    Parecer completo da IA
+                  </span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-[var(--go-text-primary)]/25 transition-transform duration-200 ${justificativaExpandida ? 'rotate-180' : ''}`} />
+              </button>
+
+              {justificativaExpandida && (
+                <div className="border-t border-[var(--go-blue)]/6 px-5 py-4" style={{ animation: 'go-slide-down 0.2s ease' }}>
+                  <MiniMarkdown text={analise.justificativa} />
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
-        <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3">
+      {/* ── Documentação gerada ──────────────────────────────────── */}
+      <div className="rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white p-5">
+        <h3 className="text-[11px] font-semibold text-[var(--go-blue)]/50 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5" />
           Documentação gerada
         </h3>
         {documentacao ? (
-          <pre className="overflow-x-auto text-[12px] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 rounded-[var(--go-radius-sm)] p-3 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[var(--go-text-primary)]/60" style={{ scrollbarWidth: 'thin' }}>
+          <pre className="overflow-x-auto text-[12px] bg-[var(--go-cream)]/40 border border-[var(--go-blue)]/6 rounded-[var(--go-radius-sm)] p-4 max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words font-mono text-[var(--go-text-primary)]/60 leading-relaxed" style={{ scrollbarWidth: 'thin' }}>
             {JSON.stringify(documentacao, null, 2)}
           </pre>
         ) : (
@@ -1321,30 +1953,31 @@ function DadosTab({
   )
 }
 
-/** Renderiza um critério individual com ícone de cumprido/descumprido e justificativa. */
+/** Renderiza um critério individual com indicador visual e justificativa. */
 function CriterioItem({ criterio }: { criterio: { criterio: string; pontos: number; justificativa: string } }) {
   const ok = criterio.pontos === 1
   return (
-    <div className={`flex items-start gap-2.5 rounded-[var(--go-radius-sm)] border px-3 py-2.5 ${
-      ok
-        ? 'border-[#16a34a]/10 bg-[#16a34a]/3'
-        : 'border-[#dc2626]/10 bg-[#dc2626]/3'
-    }`}>
-      <div className="mt-0.5 flex-shrink-0">
-        {ok ? (
-          <CheckCircle2 className="h-4 w-4 text-[#16a34a]" />
-        ) : (
-          <XCircle className="h-4 w-4 text-[#dc2626]" />
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className={`text-[13px] font-medium ${ok ? 'text-[#15803d]' : 'text-[#b91c1c]'}`}>
+    <div className="flex items-start gap-3 group">
+      {/* Indicator dot */}
+      <div className={`mt-[7px] flex-shrink-0 h-2 w-2 rounded-full ${
+        ok ? 'bg-[#16a34a]' : 'bg-[#dc2626]'
+      }`} />
+      <div className="min-w-0 flex-1">
+        <span className={`text-[13px] font-medium ${ok ? 'text-[var(--go-text-primary)]' : 'text-[#b91c1c]'}`}>
           {criterio.criterio}
         </span>
         {criterio.justificativa && (
-          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--go-text-primary)]/55">
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--go-text-primary)]/50">
             {criterio.justificativa}
           </p>
+        )}
+      </div>
+      {/* Inline status chip */}
+      <div className="flex-shrink-0 mt-0.5">
+        {ok ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-[#16a34a]/60" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 text-[#dc2626]/60" />
         )}
       </div>
     </div>

@@ -36,6 +36,8 @@ export type Projeto = {
   ganho_total_mensal: number | null;
   complexidade: string | null;
   observacoes: string | null;
+  especial: number | null;
+  contexto_especial: string | null;
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;

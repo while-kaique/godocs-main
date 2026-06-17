@@ -198,10 +198,11 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo,
-           p.descricao_breve, p.data_criacao_projeto, p.area, a.nome as area_nome
+           p.descricao_breve, p.data_criacao_projeto, p.area,
+           p.especial, p.contexto_especial, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?
@@ -222,6 +223,8 @@ export type InsertProjeto = {
   tipo_projeto?: string | null;
   tipos_projeto?: string[] | null;
   descricao_breve?: string | null;
+  especial?: boolean | null;
+  contexto_especial?: string | null;
   status?: string;
 };
 
@@ -231,8 +234,8 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      descricao_breve, especial, contexto_especial, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -248,6 +251,8 @@ export async function insertProjeto(data: InsertProjeto) {
     data.tipo_projeto ?? null,
     data.tipos_projeto ? JSON.stringify(data.tipos_projeto) : null,
     data.descricao_breve ?? null,
+    data.especial ? 1 : 0,
+    data.contexto_especial ?? null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -428,12 +433,13 @@ export async function insertAnalise(data: {
   resumo?: string;
   criterios_hardcoded?: unknown;
   criterios_dinamicos?: unknown;
+  complexidade_justificativa?: string;
 }) {
   const id = generateId();
   await exec(`
     INSERT INTO analises (id, projeto_id, resultado, pontuacao_total, pontuacao_maxima,
-      justificativa, resumo, criterios_hardcoded, criterios_dinamicos)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      justificativa, resumo, criterios_hardcoded, criterios_dinamicos, complexidade_justificativa)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id, data.projeto_id, data.resultado,
     data.pontuacao_total, data.pontuacao_maxima,
@@ -441,6 +447,7 @@ export async function insertAnalise(data: {
     data.resumo ?? null,
     data.criterios_hardcoded ? JSON.stringify(data.criterios_hardcoded) : null,
     data.criterios_dinamicos ? JSON.stringify(data.criterios_dinamicos) : null,
+    data.complexidade_justificativa ?? null,
   ]);
   return id;
 }
@@ -531,6 +538,15 @@ export async function insertLeaderAreas(userId: string, areaIds: string[]) {
 
 // --- Api Logs ---
 
+/** Limite de corpo armazenado por log (500 KB). Bodies maiores são truncados. */
+const API_LOG_BODY_LIMIT = 512_000;
+
+function truncateBody(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.length <= API_LOG_BODY_LIMIT) return raw;
+  return raw.slice(0, API_LOG_BODY_LIMIT) + '\n…[truncado — ' + raw.length.toLocaleString('pt-BR') + ' chars]';
+}
+
 export async function insertApiLog(data: {
   projeto_id?: string | null;
   endpoint: string;
@@ -540,11 +556,13 @@ export async function insertApiLog(data: {
   error?: string | null;
   request_size?: number | null;
   response_size?: number | null;
+  request_body?: string | null;
+  response_body?: string | null;
 }) {
   const id = generateId();
   await exec(`
-    INSERT INTO api_logs (id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO api_logs (id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size, request_body, response_body)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.projeto_id ?? null,
@@ -555,18 +573,29 @@ export async function insertApiLog(data: {
     data.error ?? null,
     data.request_size ?? null,
     data.response_size ?? null,
+    truncateBody(data.request_body),
+    truncateBody(data.response_body),
   ]);
 }
 
+/** Colunas leves (sem bodies) para listagens. */
+const API_LOG_LIGHT_COLS = 'id, projeto_id, endpoint, method, duration_ms, status_code, error, request_size, response_size, created_at';
+
 export function getApiLogsByProjeto(projetoId: string) {
   return queryAll<ApiLogRow>(
-    'SELECT * FROM api_logs WHERE projeto_id = ? ORDER BY created_at DESC', [projetoId]
+    `SELECT ${API_LOG_LIGHT_COLS} FROM api_logs WHERE projeto_id = ? ORDER BY created_at DESC`, [projetoId]
   );
 }
 
 export function getApiLogsRecent(limit = 200) {
   return queryAll<ApiLogRow>(
-    'SELECT * FROM api_logs ORDER BY created_at DESC LIMIT ?', [limit]
+    `SELECT ${API_LOG_LIGHT_COLS} FROM api_logs ORDER BY created_at DESC LIMIT ?`, [limit]
+  );
+}
+
+export function getApiLogById(id: string) {
+  return queryOne<ApiLogRow>(
+    'SELECT * FROM api_logs WHERE id = ?', [id]
   );
 }
 
@@ -617,6 +646,8 @@ export type ProjetoRow = {
   complexidade: string | null;
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes
   observacoes: string | null; // parecer da análise automática (staff-only)
+  especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
+  contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
@@ -664,6 +695,7 @@ export type AnaliseRow = {
   resumo: string | null;
   criterios_hardcoded: string | null; // JSON string
   criterios_dinamicos: string | null; // JSON string
+  complexidade_justificativa: string | null;
   created_at: string | null;
 };
 
@@ -702,5 +734,7 @@ export type ApiLogRow = {
   error: string | null;
   request_size: number | null;
   response_size: number | null;
+  request_body: string | null;
+  response_body: string | null;
   created_at: string | null;
 };

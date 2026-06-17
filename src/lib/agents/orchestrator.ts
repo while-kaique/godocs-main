@@ -213,6 +213,19 @@ ${blocoValor}
 ESTADO ATUAL:
 ${JSON.stringify(receita, null, 2)}
 
+RECEITA INCREMENTAL ≠ SAVING — DISTINÇÃO OBRIGATÓRIA:
+Receita incremental = dinheiro NOVO que entra por causa do projeto (mais vendas, mais conversões, mais faturamento, novo produto/serviço gerado).
+Saving = economia operacional: tempo poupado, horas reduzidas, custo evitado, retrabalho eliminado.
+
+Sinais de que o "ganho" descrito é saving disfarçado de receita:
+- "horas economizadas" / "minutos poupados por chamado/tarefa/registro"
+- "custo/hora × horas reduzidas" → isso é redução de custo laboral = saving
+- "economia operacional" / "eficiência" / "redução de retrabalho"
+- Mesma receita antes e depois, mas agora o processo é mais rápido
+
+SE o racional do usuário descrever qualquer um desses padrões: NÃO monte memorial de receita. Bloqueie com type:"question" e explique:
+"O que você descreveu é uma economia operacional — tempo ou custo poupado — e isso é saving, não receita incremental. Receita incremental é dinheiro novo que entra: mais vendas, mais conversões, mais faturamento. Se o projeto não gera receita nova, ele precisa ser reclassificado como saving. Quer voltar para reclassificar?"
+
 COMO CONDUZIR:
 1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
 2. ${valorInformado
@@ -222,6 +235,11 @@ COMO CONDUZIR:
 4. Se o valor parecer alto, peça detalhamento: "Como você chegou a esse número? Qual era a receita antes e qual é agora?"
 5. Monte o memorial_calculo automaticamente com base nas respostas — o usuário NÃO escreve o memorial.
 6. Quando valor_ganho_mensal e memorial estiverem justificados, gere o PREVIEW.
+
+REGRA CRÍTICA — GANHO NUNCA PODE SER ZERO:
+- Se o usuário marcou receita incremental, é porque o projeto gera algum ganho. Um valor_ganho_mensal de R$ 0 NÃO FAZ SENTIDO.
+- NUNCA gere preview com valor_ganho_mensal = 0. Se a conversa levar a um ganho zero, questione: "Se não há ganho de receita, por que o projeto foi marcado como receita incremental? Vamos identificar o ganho concreto."
+- Se o custo de ferramenta externa for informado mas o ganho for zero, investigue onde está o retorno.
 
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Receita incremental deve refletir ganho REAL e mensurável, não projeções otimistas.
@@ -239,22 +257,57 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"receita":{...campos atualizados}}
 
 Preview (quando valor e memorial estiverem completos):
-{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n...memorial formatado em markdown...\\n\\n**Resumo:**\\n- Ganho: R$ X/${receita.tipo_saving === 'pontual' ? 'total' : 'mês'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
+
+ATENÇÃO: o campo "memorial_calculo" dentro do objeto "receita" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "receita.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
 
 export function buildReceitaPreviewPrompt(receita: ReceitaColetada): string {
+  const ganhoZerado = (receita.valor_ganho_mensal ?? 0) <= 0;
+
+  // Detecta memorial de saving disfarçado de receita (horas×custo, economia operacional, etc.)
+  const memorial = receita.memorial_calculo ?? '';
+  const pareceSaving = !ganhoZerado && (
+    /horas?\s*(economizadas?|poupadas?|reduzidas?)/i.test(memorial) ||
+    /economia\s*(operacional|de\s*tempo|de\s*custo|laboral)/i.test(memorial) ||
+    /custo[\s/]hora/i.test(memorial) ||
+    /minutos?\s*por\s*(chamado|item|registro|tarefa)/i.test(memorial)
+  );
+
+  const blocoSavingDisfarcado = pareceSaving
+    ? `
+
+ATENÇÃO — MEMORIAL DESCREVE SAVING, NÃO RECEITA INCREMENTAL:
+O memorial usa linguagem de economia operacional (horas economizadas, minutos por tarefa, custo/hora). Isso é saving, não receita incremental.
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question".
+- Explique: "O que está descrito aqui é uma economia operacional — tempo e custo poupados — que se classifica como saving, não receita incremental. Receita incremental é dinheiro novo que entra (mais vendas, mais faturamento). Para continuar, você precisa voltar e reclassificar o projeto como saving. Quer fazer isso?"`
+    : '';
+
+  const blocoValidacao = ganhoZerado
+    ? `
+
+ATENÇÃO — GANHO DE RECEITA ZERADO:
+O valor_ganho_mensal está em 0 ou nulo. Isso é INVÁLIDO para submissão de receita incremental.
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter receita incremental com ganho R$ 0.
+- Diga algo como: "Não consigo finalizar o memorial com ganho de R$ 0 — se o projeto gera receita incremental, preciso de um valor concreto. Vamos revisar: qual é o ganho real?"
+- Volte para a coleta (type:"question") até que valor_ganho_mensal > 0.`
+    : '';
+
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de receita incremental.
 
 MEMORIAL ATUAL:
 ${JSON.stringify(receita, null, 2)}
+${blocoValidacao}${blocoSavingDisfarcado}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
+REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado). Se o usuário tentar aprovar nessas condições, responda com type:"question".
+
 FORMATO — APENAS JSON válido:
 
-Se aprovado:
+Se aprovado (SOMENTE se valor_ganho_mensal > 0):
 {"type":"complete","content":"Memorial de receita aprovado! Sua submissão está completa e será enviada para análise.","receita":{...campos finais}}
 
 Se ajuste + novo preview:
@@ -348,6 +401,14 @@ REGRAS ANTI-EXTRAPOLAÇÃO:
 - O memorial precisa ter lógica verificável por pessoa: frequência × tempo = horas; soma das pessoas = total.
 - Para custos adicionais, documente o que a pessoa faz e por que é necessário.
 
+REGRA CRÍTICA — ECONOMIA NUNCA PODE SER ZERO:
+- Uma economia de 0h NÃO FAZ SENTIDO para submissão como saving. NUNCA gere preview com economia_horas_mes = 0.
+- Se as horas antes e depois forem iguais (rotina idêntica, só trocou o software), a economia é ZERO — bloqueie e investigue primeiro.
+- INVESTIGAÇÃO HONESTA: antes de aceitar o zero, pergunte diretamente — a ferramenta nova elimina erros que geravam retrabalho? Aumenta capacidade processada? Permite fazer mais rápido? Se houver ganho real de horas, descubra e quantifique.
+- NÃO INVENTE GANHOS: se após investigação honesta o usuário confirmar que a rotina é literalmente idêntica (mesmas horas, mesmo processo, só mudou o software sem nenhuma redução real), seja honesto. Explique que sem redução de horas mensurável não é possível submeter como saving e oriente: "Se o projeto cancela uma licença paga, isso é custo evitado — considere submeter como receita incremental. Se o impacto é qualitativo e importante mas difícil de medir em horas, considere a opção de projeto especial (alto impacto, difícil mensuração)."
+- NUNCA apresente um preview onde economia_horas_mes = 0 e NUNCA permita aprovação nessa condição.
+- Se o projeto tem custo de ferramenta externa (custo_externo_mensal > 0), mencione no memorial e considere na economia líquida.
+
 LINGUAGEM (IMPORTANTÍSSIMO):
 - NUNCA exponha termos internos como "economia_horas_mes", "horas_antes", "horas_depois", "linhas", "saving", "memorial_calculo", "coletado".
 - Fale de forma natural: "Antes da automação, quanto tempo o estagiário gastava por mês nessa tarefa?" — não "qual era o horas_antes?".
@@ -362,22 +423,40 @@ Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
 Preview (quando justificativa concreta e memorial completo):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos}}`;
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
+
+ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
+  const economiaZerada = (saving.economia_horas_mes ?? 0) <= 0 &&
+    (saving.linhas ?? []).every(l => (l.horas_antes ?? 0) - (l.horas_depois ?? 0) <= 0);
+
+  const blocoValidacao = economiaZerada
+    ? `
+
+ATENÇÃO — ECONOMIA ZERADA DETECTADA:
+A economia de horas está em 0 ou negativa. Isso é INVÁLIDO para submissão.
+- NÃO permita aprovação nessa condição . Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter um projeto com economia zero.
+- Diga algo como: "Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas. Vamos revisar: onde exatamente a automação economiza tempo?"
+- Volte para a coleta (type:"question") até que economia_horas_mes > 0.`
+    : '';
+
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving.
 
 MEMORIAL ATUAL:
 ${JSON.stringify(saving, null, 2)}
+${blocoValidacao}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
+REGRA CRÍTICA: NUNCA emita type:"complete" se economia_horas_mes for 0 ou negativa. Se o usuário tentar aprovar nessa condição, responda com type:"question" explicando que o projeto precisa ter economia > 0h para ser submetido.
+
 FORMATO — APENAS JSON válido:
 
-Se aprovado:
+Se aprovado (SOMENTE se economia_horas_mes > 0):
 {"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais}}
 
 Se ajuste + novo preview:
@@ -547,7 +626,8 @@ export async function runOrchestrator(
       else if (fase === 'receita') fallbackResult.fase = 'receita_preview';
     } else if (recoveredType === 'complete') {
       if (fase === 'doc_preview') {
-        fallbackResult.fase = hasSaving ? 'saving' : 'receita';
+        // Sem saving nem receita (projeto especial) → encerra após a doc.
+        fallbackResult.fase = hasSaving ? 'saving' : hasReceita ? 'receita' : 'completo';
       } else if (fase === 'saving_preview') {
         fallbackResult.fase = hasReceita ? 'receita' : 'completo';
       } else if (fase === 'receita_preview') {
@@ -581,7 +661,8 @@ export async function runOrchestrator(
 
   if (type === 'complete') {
     if (fase === 'doc_preview') {
-      result.fase = hasSaving ? 'saving' : 'receita';
+      // Sem saving nem receita (projeto especial) → encerra após a doc.
+      result.fase = hasSaving ? 'saving' : hasReceita ? 'receita' : 'completo';
     } else if (fase === 'saving_preview') {
       result.fase = hasReceita ? 'receita' : 'completo';
     } else if (fase === 'receita_preview') {
