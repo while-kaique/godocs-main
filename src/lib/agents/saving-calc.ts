@@ -1,4 +1,4 @@
-import { CARGOS, type SavingColetado, type SavingLinha } from "./types";
+import { CARGOS, type SavingColetado, type SavingLinha, type ReceitaColetada } from "./types";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -14,12 +14,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  *
  * `valor_hora` por linha vem da tabela CARGOS pelo `cargo`; cai no valor_hora já
  * presente na linha se o cargo não for encontrado. O total líquido soma o custo
- * evitado (mensalizado) e abate o custo externo mensal (mesma fórmula de
+ * evitado (valor cheio) e abate o custo externo mensal (mesma fórmula de
  * `iniciarSaving`).
  *
  * CUSTO EVITADO: ganho monetário além das horas (ex: serviço externo/licença que o
  * projeto deixou de pagar). É coletado pelo agente, não derivado de horas — então é
- * PRESERVADO (não recalculado). Pontual entra mensalizado ÷12; mensal entra cheio.
+ * PRESERVADO (não recalculado). Entra pelo valor cheio independente de ser pontual
+ * ou mensal (pontual NÃO divide por 12).
  */
 export function recomputarSavingFinanceiro(
   saving: SavingColetado,
@@ -39,14 +40,97 @@ export function recomputarSavingFinanceiro(
   const totalHoras = round2(linhas.reduce((s, l) => s + l.economia_horas_mes, 0));
   const totalReaisBruto = round2(linhas.reduce((s, l) => s + l.economia_reais_mes, 0));
 
-  // Custo evitado mensalizado: pontual ÷12, mensal cheio. Negativos viram 0.
+  // Custo evitado: entra cheio (pontual NÃO divide por 12). Negativos viram 0.
   const evitadoBruto = Math.max(0, Number(saving?.custo_evitado_reais) || 0);
-  const evitadoMensal = saving?.custo_evitado_tipo === 'pontual' ? evitadoBruto / 12 : evitadoBruto;
 
   return {
     ...saving,
     linhas,
     economia_horas_mes: totalHoras,
-    economia_reais_mes: round2(totalReaisBruto + evitadoMensal - (custoExternoMensal || 0)),
+    economia_reais_mes: round2(totalReaisBruto + evitadoBruto - (custoExternoMensal || 0)),
   };
+}
+
+/**
+ * Gera a versão INTERNA do memorial de cálculo com valores financeiros (R$).
+ *
+ * O LLM gera o memorial SEM R$ (visível ao usuário). Esta função injeta:
+ * - Valor/hora por cargo (tabela CARGOS)
+ * - Economia financeira por pessoa
+ * - Totais em R$ (bruto, custo evitado, custo externo, líquido)
+ * - Memorial de receita (se houver)
+ *
+ * O resultado vai para `projetos.memorial_calculo` (planilha/dados internos).
+ * NUNCA é exibido ao usuário.
+ */
+export function enriquecerMemorial(
+  saving: SavingColetado | undefined,
+  receita: ReceitaColetada | undefined,
+  tiposProjeto: string[],
+): string {
+  const partes: string[] = [];
+
+  // ── SAVING ──
+  if (tiposProjeto.includes('saving') && saving) {
+    const memorialBase = saving.memorial_calculo ?? '';
+    partes.push(memorialBase);
+
+    // Recalcular financeiro a partir das horas (fonte de verdade) antes de injetar
+    const recomputado = recomputarSavingFinanceiro(saving, saving.custo_externo_mensal ?? 0);
+
+    // Injetar bloco financeiro após o memorial do LLM
+    partes.push('\n---\n### Detalhamento Financeiro (interno)\n');
+
+    const linhas = recomputado.linhas ?? [];
+    if (linhas.length > 0) {
+      partes.push(`**Pessoas (${linhas.length}):**\n`);
+      let totalReaisHoras = 0;
+      for (const l of linhas) {
+        const valorHora = l.valor_hora ?? 0;
+        const economiaReais = round2(l.economia_horas_mes * valorHora);
+        totalReaisHoras += economiaReais;
+        partes.push(
+          `- ${l.cargo} (R$ ${valorHora.toFixed(2)}/h): ` +
+          `${l.economia_horas_mes}h economia × R$ ${valorHora.toFixed(2)} = **R$ ${economiaReais.toFixed(2)}**`
+        );
+      }
+      partes.push(`\n**Total horas:** ${recomputado.economia_horas_mes ?? 0}h`);
+      partes.push(`**Total financeiro (horas):** R$ ${round2(totalReaisHoras).toFixed(2)}`);
+    }
+
+    // Custo evitado
+    const evitadoReais = Math.max(0, Number(saving.custo_evitado_reais) || 0);
+    if (evitadoReais > 0) {
+      partes.push(`\n**Custo evitado:** R$ ${evitadoReais.toFixed(2)} (${saving.custo_evitado_tipo ?? 'mensal'})`);
+      if (saving.custo_evitado_descricao) {
+        partes.push(`  Descrição: ${saving.custo_evitado_descricao}`);
+      }
+    } else {
+      partes.push('\n**Custo evitado:** N/A');
+    }
+
+    // Custo externo
+    const custoExterno = Math.max(0, Number(saving.custo_externo_mensal) || 0);
+    if (custoExterno > 0) {
+      partes.push(`**Custo de ferramenta externa:** R$ ${custoExterno.toFixed(2)}/mês`);
+    } else {
+      partes.push('**Custo de ferramenta externa:** N/A');
+    }
+
+    // Total líquido (já inclui custo evitado e desconta custo externo)
+    partes.push(`\n**Economia líquida total:** R$ ${round2(recomputado.economia_reais_mes ?? 0).toFixed(2)}`);
+    partes.push(`**Tipo de saving:** ${saving.tipo_saving ?? 'mensal'}`);
+  }
+
+  // ── RECEITA ──
+  if (tiposProjeto.includes('receita_incremental') && receita) {
+    if (partes.length > 0) partes.push('\n---\n');
+    const memorialReceita = receita.memorial_calculo ?? '';
+    partes.push(memorialReceita);
+
+    partes.push(`\n**Valor da receita incremental:** R$ ${(receita.valor_ganho_mensal ?? 0).toFixed(2)}`);
+    partes.push(`**Tipo:** ${receita.tipo_saving ?? 'mensal'}`);
+  }
+
+  return partes.join('\n');
 }

@@ -76,7 +76,7 @@ const MOCK_SAVING: SavingColetado = {
   memorial_calculo: null,
   valor_ganho_mensal: null,
   // Exemplo de custo evitado pontual: serviço externo de R$ 2.700 (único) que o
-  // projeto eliminou — entra mensalizado ÷12 no economia_reais_mes pelo backend.
+  // projeto eliminou — entra cheio (sem ÷12) no economia_reais_mes pelo backend.
   custo_evitado_reais: 2700,
   custo_evitado_tipo: 'pontual',
   custo_evitado_descricao: 'Serviço externo de implementação que custaria R$ 2.700 (cobrança única)',
@@ -137,7 +137,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving',
-      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. CUSTO EVITADO: investiga sempre (interno e externo) se o projeto deixou de pagar alguma ferramenta/serviço — recorrente ou pontual — e captura em custo_evitado_reais/tipo/descricao; o backend soma ao saving em R$ (pontual ÷12). Custo evitado é saving (dinheiro que deixou de ser gasto), não receita. REGRA ANTI-ZERO: o ganho pode vir das horas OU do custo evitado — só bloqueia quando economia_horas_mes = 0 E não há custo evitado; nesse caso orienta projeto especial.',
+      description: 'Validação de horas do memorial de saving PADRONIZADO. A IA coleta pontos obrigatórios na ordem fixa (Seções 1-5: Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto é obrigatório — a IA insiste até ter resposta. Nunca expõe valores em R$ (injetados pelo backend via enriquecerMemorial). CUSTO EVITADO: investiga sempre se o projeto deixou de pagar alguma ferramenta/serviço — valor cheio, sem ÷12. REGRA ANTI-ZERO: ganho pode vir das horas OU custo evitado — bloqueia só quando ambos zero.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'SavingColetado', 'resumoProjeto'],
       getPromptText: () => buildSavingPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_SAVING, MOCK_RESUMO),
@@ -161,7 +161,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildReceitaPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'receita',
-      description: 'Validação de receita incremental. A IA desafia o número CRUZANDO o racional com o que o projeto faz (RESUMO + DETALHES TÉCNICOS): se o racional for inconsistente com o projeto, questiona diretamente; se for consistente, aprofunda como o projeto leva ao ganho. Perguntas genéricas são proibidas. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo (mais vendas/conversão/faturamento); saving = economia operacional. Se o racional descrever saving disfarçado, bloqueia e manda reclassificar.',
+      description: 'Validação de receita incremental PADRONIZADA. A IA coleta pontos obrigatórios na ordem fixa (Seção 6: O que gera, Como aumenta, Antes vs. depois, Base de cálculo, Valor, Tipo). Cada ponto é obrigatório — a IA insiste até ter resposta. DISTINÇÃO OBRIGATÓRIA: receita = dinheiro novo; saving = economia. Se saving disfarçado, bloqueia e manda reclassificar.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'ReceitaColetada', 'resumoProjeto'],
       getPromptText: () => buildReceitaPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_RECEITA, MOCK_RESUMO),
