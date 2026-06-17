@@ -8,7 +8,8 @@
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Godeploy__listDataSources",
       "Bash(curl -s http://localhost:8787/health)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(rtk grep:*)"
     ]
   }
 }

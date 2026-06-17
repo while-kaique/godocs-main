@@ -17,8 +17,6 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
-  CheckboxGroup,
-  InfoTooltip,
 } from "./form-components";
 
 // ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
@@ -301,6 +299,7 @@ export function Step2({
   clearError,
   arquivos,
   setArquivos,
+  nomesExistentes,
 }: {
   form: FormData;
   errors: FieldErrors;
@@ -308,6 +307,7 @@ export function Step2({
   clearError: (key: string) => void;
   arquivos: File[];
   setArquivos: (files: File[]) => void;
+  nomesExistentes?: string[];
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -514,36 +514,6 @@ export function Step2({
     <div>
       <SectionTitle icon="📋">Dados do Projeto</SectionTitle>
 
-      {/* Tipo de projeto */}
-      <FormGroup>
-        <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-          Este projeto gera saving, receita incremental ou ambos?
-          <InfoTooltip>
-            <strong className="mb-1 block text-white">Saving vs. Receita Incremental</strong>
-            <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-              <strong style={{ color: "var(--go-lime)" }}>Saving</strong> — economia gerada pela automação.
-              Ex: processo manual que levava 20h/mês agora é automático (economia de horas e custo operacional).
-            </span>
-            <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-              <strong style={{ color: "var(--go-lime)" }}>Receita Incremental</strong> — aumento de receita gerado pela automação.
-              Ex: automação que dispara ofertas personalizadas e aumenta conversão de vendas.
-            </span>
-            <span className="block text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-              Pode selecionar os dois se o projeto gerar ambos os benefícios.
-            </span>
-          </InfoTooltip>
-        </div>
-        <CheckboxGroup
-          value={form.tipoProjeto}
-          onChange={(v) => updateField("tipoProjeto", v as FormData["tipoProjeto"])}
-          error={errors.tipoProjeto}
-          options={[
-            { value: "saving",              label: "💰 Saving" },
-            { value: "receita_incremental", label: "📈 Receita Incremental" },
-          ]}
-        />
-      </FormGroup>
-
       {/* Nome do projeto */}
       <FormGroup>
         <FormLabel required>
@@ -631,6 +601,24 @@ export function Step2({
             💡 Sem limite de arquivos — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados. O único limite é ~200k tokens de conteúdo (a barra abaixo avisa se passar).
           </span>
         </div>
+
+        {/* Arquivos anteriores — exibidos apenas no modo edição quando ainda não há novos */}
+        {arquivos.length === 0 && nomesExistentes && nomesExistentes.length > 0 && (
+          <div
+            className="mb-3 rounded-lg p-3 text-[12px] leading-relaxed"
+            style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "var(--go-text-primary)" }}
+          >
+            <span className="font-semibold" style={{ color: "#8a7d00" }}>📎 Arquivos enviados anteriormente:</span>
+            <ul className="mt-1.5 space-y-0.5 pl-2" style={{ color: "#8b8b9a" }}>
+              {nomesExistentes.map((n) => (
+                <li key={n} className="truncate">· {n}</li>
+              ))}
+            </ul>
+            <p className="mt-2" style={{ color: "#8b8b9a" }}>
+              O texto já extraído será reaproveitado. Suba novos arquivos abaixo para substituir ou adicionar.
+            </p>
+          </div>
+        )}
 
         {/* Drop zone */}
         <div

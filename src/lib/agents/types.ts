@@ -148,6 +148,9 @@ export type ProjetoContexto = {
   tipo_projeto?: 'saving' | 'receita_incremental' | null;
   tipos_projeto?: ('saving' | 'receita_incremental')[] | null;
   escopo?: 'interno' | 'externo' | null;
+  // Projeto especial: flag + contexto que a pessoa escreveu para explicar o impacto.
+  especial?: boolean;
+  contexto_especial?: string | null;
 };
 
 // ─── Documentação gerada (output do compiler) ───────────────────────────────

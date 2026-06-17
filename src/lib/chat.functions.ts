@@ -32,10 +32,12 @@ import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-ag
 import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import { stripMarkdown } from '@/lib/strip-markdown';
+import { deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
 import type {
   ChatFase,
   ChatHistoryMessage,
   DocumentacaoColetada,
+  DocumentacaoGerada,
   ProjetoContexto,
   ReceitaColetada,
   SavingColetado,
@@ -126,6 +128,24 @@ function progressoPorFase(fase: ChatFase, coletado: DocumentacaoColetada, saving
   }
 }
 
+// Materialidade real do projeto: saving mensal + receita mensal cheia (pontual ÷ 12).
+// NÃO usa o ÷10 do ganho_total_mensal (métrica de gestão/ranking) — aqui queremos o valor real
+// para o gate de R$ 5.000/mês de validação humana obrigatória.
+function calcularMaterialidade(
+  saving: Record<string, unknown> | undefined,
+  receita: Record<string, unknown> | undefined,
+): number {
+  const savingReais = (saving?.economia_reais_mes as number) ?? 0;
+  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
+  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+
+  const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
+  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
+  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
+
+  return savingMensal + receitaMensal;
+}
+
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
   if (!data) throw new Error('Projeto não encontrado.');
@@ -150,6 +170,8 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
+    especial: data.especial === 1,
+    contexto_especial: data.contexto_especial ?? null,
   };
 }
 
@@ -275,7 +297,9 @@ const iniciarSubmissaoSchema = z.object({
   responsavel_nome: z.string().min(1).max(120),
   responsavel_email: z.string().email().max(255),
   area_id: z.string().min(1).optional(),
-  area: z.string().min(1).max(100),
+  // A área não é mais escolhida no formulário — é derivada do email (TeamGuide)
+  // na submissão (submeterParaValidacao). Aqui o projeto nasce sem área.
+  area: z.string().min(1).max(100).optional(),
   ferramenta: z.string().min(1).max(200),
   escopo: z.enum(['interno', 'externo']).optional(),
   servico_externo: z.string().max(200).optional(),
@@ -285,6 +309,10 @@ const iniciarSubmissaoSchema = z.object({
   tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
   tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
+  // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
+  especial: z.boolean().optional(),
+  contexto_especial: z.string().max(2000).optional(),
   docs: z.array(
     z.object({ base64: z.string().min(1), filename: z.string().min(1) })
   ).min(1).max(5000),
@@ -319,7 +347,45 @@ const iniciarReceitaSchema = z.object({
   racional: z.string().max(500).optional(),
 });
 
-const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
+const submeterValidacaoSchema = z.object({
+  projeto_id: z.string().min(1),
+  modo: z.enum(['novo', 'edicao']).optional(),
+});
+
+// Monta a documentação de um projeto ESPECIAL sem nenhuma IA: usa a descrição
+// breve (o que o projeto faz) e o contexto especial (por que é de alto impacto e
+// difícil mensuração) que a pessoa escreveu. As demais seções (execução, fluxo,
+// dependências…) não se aplicam a projetos fundacionais — ficam vazias/"—".
+// O contexto especial também é enviado em campo próprio ao n8n (planilha).
+function buildDocEspecial(data: {
+  nome_projeto: string;
+  responsavel_nome: string;
+  responsavel_email: string;
+  ferramenta: string;
+  membros: string[];
+  descricao_breve?: string;
+  contexto_especial?: string;
+}): DocumentacaoGerada {
+  const descricao = data.descricao_breve?.trim() ?? '';
+  const contexto = data.contexto_especial?.trim() ?? '';
+  const oQueFaz =
+    [descricao, contexto].filter(Boolean).join('\n\n') ||
+    'Projeto de alto impacto e difícil mensuração — submetido para validação humana.';
+
+  return {
+    titulo: data.nome_projeto,
+    responsavel: { nome: data.responsavel_nome, email: data.responsavel_email, area: null },
+    ferramenta: data.ferramenta,
+    membros: data.membros,
+    o_que_faz: oQueFaz,
+    execucao: '—',
+    dependencias: [],
+    fluxo: [],
+    configurar_antes: [],
+    atencao: [],
+    gerado_em: new Date().toISOString(),
+  };
+}
 
 // ─── Iniciar submissão ───────────────────────────────────────────────────────
 
@@ -333,16 +399,20 @@ export async function iniciarSubmissao(rawData: unknown) {
       responsavel_nome: data.responsavel_nome,
       responsavel_email: data.responsavel_email,
       area_id: data.area_id ?? null,
-      area: data.area,
+      area: data.area ?? null,
       ferramenta: data.ferramenta,
       escopo: data.escopo ?? null,
       servico_externo: data.servico_externo ?? null,
       membros: data.membros,
       nome: data.nome_projeto,
       data_criacao_projeto: data.data_criacao,
-      tipo_projeto: data.tipo_projeto ?? null,
-      tipos_projeto: data.tipos_projeto ?? null,
+      // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
+      // e ignora os tipos financeiros — o fluxo não passa pelas fases de saving/receita.
+      tipo_projeto: data.especial ? 'especial' : (data.tipo_projeto ?? null),
+      tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
+      especial: data.especial ?? false,
+      contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: 'rascunho',
     });
   } catch (projErr) {
@@ -350,6 +420,11 @@ export async function iniciarSubmissao(rawData: unknown) {
     throw new Error(`Falha ao criar projeto: ${projErr instanceof Error ? projErr.message : 'erro desconhecido'}`);
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
+
+  // Persiste os nomes dos arquivos para exibição na tela de edição
+  if (data.docs.length > 0) {
+    await updateProjeto(projeto.id, { arquivos_nomes: data.docs.map((d) => d.filename) });
+  }
 
   let docTexto = '';
   try {
@@ -365,6 +440,20 @@ export async function iniciarSubmissao(rawData: unknown) {
     role: 'doc',
     content: docTexto || '(documento sem texto legível)',
   });
+
+  // ── Projeto especial: pula o agente por completo ────────────────────────────
+  // Projeto de alto impacto e difícil mensuração → não passa pela conversa, pela
+  // análise financeira nem pelo analisador IA (validação é humana). A documentação
+  // é montada direto da descrição + contexto especial (sem nenhuma chamada de IA) e
+  // persistida, para que submeterParaValidacao tenha a doc exigida e o n8n receba o
+  // objeto `documentacao`. O frontend chama submeter-validacao logo em seguida.
+  if (data.especial) {
+    const docEspecial = buildDocEspecial(data);
+    await upsertDocumentacao(projeto.id, docEspecial);
+    await updateProjeto(projeto.id, { chat_completo: true });
+    log('iniciarSubmissao', `Projeto especial ${projeto.id}: doc montada sem IA, pronto para submissão.`);
+    return { projeto_id: projeto.id, especial: true };
+  }
 
   const ctx: ProjetoContexto = {
     responsavel_nome: data.responsavel_nome,
@@ -467,6 +556,27 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
+  // ── SAFETY NET: memorial_calculo no objeto saving/receita ──────────────────
+  // O LLM às vezes coloca o memorial apenas no campo "content" e deixa
+  // saving.memorial_calculo / receita.memorial_calculo como null no JSON.
+  // Isso faz o memorial virar "-" na planilha. Extraímos do content como fallback.
+  if ((resultado.type === 'preview' || resultado.type === 'complete') && resultado.type !== 'options') {
+    const conteudoMsg = (resultado as { content?: string }).content ?? '';
+    const memorialTexto = conteudoMsg.replace(/\n+Está correto\?[\s\S]*$/, '').trim();
+    if (memorialTexto.length > 50) {
+      if ((estado.fase === 'saving' || estado.fase === 'saving_preview') &&
+          resultado.saving && !resultado.saving.memorial_calculo) {
+        resultado.saving = { ...resultado.saving, memorial_calculo: memorialTexto };
+        log('enviarMensagem', 'memorial_calculo (saving) extraído do content — LLM não populou o campo');
+      }
+      if ((estado.fase === 'receita' || estado.fase === 'receita_preview') &&
+          resultado.receita && !resultado.receita.memorial_calculo) {
+        resultado.receita = { ...resultado.receita, memorial_calculo: memorialTexto };
+        log('enviarMensagem', 'memorial_calculo (receita) extraído do content — LLM não populou o campo');
+      }
+    }
+  }
+
   // ── VALIDAÇÃO ANTI-ZERO: safety net hardcoded ──────────────────────────────
   // Mesmo com prompts instruindo a IA, o LLM pode gerar complete/preview com
   // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
@@ -474,7 +584,8 @@ export async function enviarMensagem(rawData: unknown) {
   if (resultado.type === 'complete') {
     // Saving: economia_horas_mes NUNCA pode ser 0 ao completar
     if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
-      const econHoras = resultado.saving?.economia_horas_mes ?? 0;
+      const savingRecomputado = recomputarSavingFinanceiro(resultado.saving, 0);
+      const econHoras = savingRecomputado.economia_horas_mes ?? 0;
       if (econHoras <= 0) {
         log('enviarMensagem', `⛔ Saving com economia_horas_mes=${econHoras} — bloqueando complete, forçando question`);
         Object.assign(resultado, {
@@ -748,6 +859,11 @@ const atualizarMetadadosSchema = z.object({
   membros: z.array(z.string()).optional(),
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Projeto especial: contexto especial (entrada determinística da fase de doc).
+  contexto_especial: z.string().max(2000).optional(),
+  // Força reiniciar a documentação reusando os arquivos já enviados (sem novo upload).
+  // Usado quando muda a entrada determinística do projeto especial (descrição/contexto).
+  reset_doc: z.boolean().optional(),
   // Se enviados, substituem os arquivos e reiniciam a documentação.
   docs: z.array(
     z.object({ base64: z.string().min(1), filename: z.string().min(1) })
@@ -767,26 +883,36 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
   }
 
-  // 2. Sem arquivos novos → nada a reiniciar; o agente já vê os metadados frescos.
-  if (!temDocs) {
+  // 2. Sem arquivos novos e sem pedido de reset → nada a reiniciar; o agente já vê
+  // os metadados frescos no próximo turno.
+  if (!temDocs && !data.reset_doc) {
     return { ok: true, reset: false };
   }
 
-  // 3. Arquivos mudaram → re-extrai texto, re-roda o extrator e REINICIA a doc.
+  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. Com novos arquivos, re-extrai
+  // o texto; com reset_doc sem upload, reusa o texto já extraído (mensagem role=doc).
   let docTexto = '';
-  try {
-    docTexto = await extractTextFromMultipleFiles(data.docs!);
-    log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-  } catch (extractErr) {
-    err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
-    docTexto = '';
+  if (temDocs) {
+    try {
+      docTexto = await extractTextFromMultipleFiles(data.docs!);
+      log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+      await updateProjeto(data.projeto_id, { arquivos_nomes: data.docs!.map((d) => d.filename) });
+    } catch (extractErr) {
+      err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
+      docTexto = '';
+    }
+  } else {
+    const docMsg = await getDocMessage(data.projeto_id);
+    docTexto = docMsg?.content ?? '';
+    log('atualizarMetadados', `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
   }
 
-  // Limpa a conversa inteira (doc + impacto) — a base mudou, recomeçamos do zero.
+  // Limpa a conversa inteira (doc + impacto) — recomeçamos do zero.
   await deleteChatMessagesByProjeto(data.projeto_id);
 
   await insertChatMessage({
@@ -855,14 +981,30 @@ export async function analisarProjetoFn(rawData: unknown) {
   // para o estado ficar correto de ponta a ponta (dashboard + planilha). Vale para
   // qualquer área, inclusive RPA (o veredito pode rebaixar uma auto-aprovação).
   const statusVeredito = resultado.resultado === 'aprovado' ? 'aprovado' : 'rejeitado';
+
+  // Buscar documentação para calcular materialidade (teto de R$ 5k/mês)
+  const docRow = await getDocumentacao(projeto_id);
+  const conteudo = (parseJson<Record<string, unknown>>(docRow?.conteudo ?? '{}') ?? {}) as Record<string, unknown>;
+
+  // Teto de materialidade: projetos acima de R$ 5k/mês exigem validação humana independente do veredito.
+  const TETO_MATERIALIDADE_ANALISE = 5000;
+  const materialidadeProjeto = calcularMaterialidade(
+    conteudo.saving as Record<string, unknown> | undefined,
+    conteudo.receita as Record<string, unknown> | undefined,
+  );
+  const statusFinal = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'em_validacao' : statusVeredito;
+  if (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
+    log(`Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`);
+  }
+
   await updateProjeto(projeto_id, {
     complexidade: resultado.complexidade,
     observacoes,
-    status: statusVeredito,
+    status: statusFinal,
     validated_at: new Date().toISOString(),
   });
 
-  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusVeredito} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
   // ── Enviar update ao n8n com dados da análise (atualiza linha na planilha pelo nome do projeto) ──
   const n8nUpdateUrl = process.env.N8N_WEBHOOK_URL_UPDATE;
@@ -872,7 +1014,7 @@ export async function analisarProjetoFn(rawData: unknown) {
       // Status enviado é o VEREDITO do analisador (não o status de submissão):
       // aprovado → "Aprovado"; rejeitado → "Reenvio Pendente". Como é o veredito
       // recém-calculado neste mesmo request, não há risco de leitura defasada.
-      const statusLabel = resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente';
+      const statusLabel = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : (resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente');
       const updatePayload = {
         projeto: projeto?.nome ?? '',
         complexidade: resultado.complexidade,
@@ -899,7 +1041,7 @@ export async function analisarProjetoFn(rawData: unknown) {
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
 export async function submeterParaValidacao(rawData: unknown) {
-  const { projeto_id } = submeterValidacaoSchema.parse(rawData);
+  const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
   const docRow = await getDocumentacao(projeto_id);
@@ -922,6 +1064,7 @@ export async function submeterParaValidacao(rawData: unknown) {
     );
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
+  const receita = conteudo.receita as Record<string, unknown> | undefined;
 
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
@@ -930,11 +1073,69 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   }
 
-  const status = projeto.area === 'RPA' ? 'aprovado' : 'em_validacao';
+  // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
+  // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
+  // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
+  // cadastrado lá), a área vira o aviso "ÁREA NÃO IDENTIFICADA". Em caso de falha
+  // da API (indisponibilidade), preservamos a área já gravada para não perder o
+  // dado durante uma queda transitória.
+  const AREA_NAO_IDENTIFICADA = 'ÁREA NÃO IDENTIFICADA';
+  let areaFinal: string;
+  try {
+    const areaDerivada = await deriveAreaFromEmail(projeto.responsavel_email ?? '');
+    areaFinal = areaDerivada ?? AREA_NAO_IDENTIFICADA;
+    if (areaDerivada) {
+      log('submeterParaValidacao', `Área derivada da TeamGuide: "${areaDerivada}" (${projeto.responsavel_email})`);
+    } else {
+      log('submeterParaValidacao', `Email não encontrado na TeamGuide → "${AREA_NAO_IDENTIFICADA}" (${projeto.responsavel_email})`);
+    }
+  } catch (tgErr) {
+    err('submeterParaValidacao', 'TeamGuide indisponível ao derivar área — preservando área existente:', tgErr);
+    areaFinal = projeto.area ?? AREA_NAO_IDENTIFICADA;
+  }
+  projeto.area = areaFinal;
+
+  // Projeto especial nunca auto-aprova (nem na área RPA): a validação é humana,
+  // então fica sempre 'em_validacao' (→ "Pendente" na planilha) até o humano avaliar.
+  const ehEspecial = projeto.especial === 1;
+
+  // Reenvio: detectado quando o projeto já foi submetido antes (submitted_at preenchido)
+  // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
+  // sempre em_validacao para que a re-análise automática recomece do zero.
+  const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
+  // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
+  if (!ehEspecial) {
+    const tiposProjetoGate = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+    if (tiposProjetoGate.includes('saving') &&
+        (((saving?.economia_horas_mes as number) ?? 0) <= 0 || ((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
+      throw new Error(
+        'Não é possível submeter este projeto como saving sem economia mensurável de horas. ' +
+        'Uma troca de ferramenta que mantém a mesma rotina de trabalho não gera saving. ' +
+        'Para submeter, comprove redução concreta de horas — ou reclassifique como receita incremental ou projeto especial.'
+      );
+    }
+    if (tiposProjetoGate.includes('receita_incremental') &&
+        (((receita?.valor_ganho_mensal as number) ?? 0) <= 0)) {
+      throw new Error(
+        'Não é possível submeter receita incremental com ganho de R$ 0. ' +
+        'Revise o memorial de receita antes de enviar.'
+      );
+    }
+  }
+
+  // Teto de materialidade: projetos acima de R$ 5.000/mês vão sempre para validação humana.
+  const TETO_MATERIALIDADE = 5000;
+  const materialidade = calcularMaterialidade(saving, receita);
+  const status = ehEspecial || ehReenvio || materialidade > TETO_MATERIALIDADE
+    ? 'em_validacao'
+    : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
+  if (materialidade > TETO_MATERIALIDADE) {
+    log('submeterParaValidacao', `Materialidade R$ ${Math.round(materialidade)}/mês > R$ ${TETO_MATERIALIDADE} → em_validacao (validação humana obrigatória)`);
+  }
   const now = new Date().toISOString();
 
   // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
-  const receita = conteudo.receita as Record<string, unknown> | undefined;
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
   const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
   const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
@@ -953,12 +1154,18 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   await updateProjeto(projeto_id, {
     status,
+    // Área derivada do email vira a fonte de verdade. Zera area_id para que o
+    // area_nome (join por area_id, fallback p.area) reflita a área derivada.
+    area: areaFinal,
+    area_id: null,
     submitted_at: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
     memorial_calculo: memorialLimpo,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
+    // Reenvio invalida a validação anterior (o humano precisa rever do zero).
+    ...(ehReenvio ? { validated_at: null, validated_by: null } : {}),
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
@@ -978,6 +1185,7 @@ export async function submeterParaValidacao(rawData: unknown) {
 
       const n8nPayload = {
         projeto_id: projeto_id,
+        modo: ehReenvio ? 'edicao' : 'novo',
         responsavel_nome: ouTraco(projeto.responsavel_nome),
         responsavel_email: ouTraco(projeto.responsavel_email),
         area: ouTraco(projeto.area),
@@ -991,6 +1199,9 @@ export async function submeterParaValidacao(rawData: unknown) {
         // e geraria "undefined/undefined/—". Enviar a data crua ou null.
         data_criacao_projeto: projeto.data_criacao_projeto ?? null,
         tipos_projeto: tiposProjeto,
+        // Flag do projeto especial + contexto coletado na etapa 2.5 (validação humana).
+        especial: ehEspecial,
+        contexto_especial: ouTraco(projeto.contexto_especial),
         status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,

@@ -38,6 +38,38 @@ npm run lint / format  # eslint / prettier
    ```
    Se a lista de assets não bater com o `index.html`, o site fica em tela branca (o HTML referencia `.js`/`.css` que não existem no servidor).
 
+## Deploy rápido (Godeploy)
+
+App ID: `674a3710` · URL: `https://godocs.devgogroup.com/`
+
+```bash
+# 1. Build
+npm run test && npm run build && npm run build:worker
+
+# 2. Upload (obter token, subir arquivos, anotar o uploadId)
+# Usar MCP tool getUploadToken → pegar uploadUrl
+# Montar o curl com TODOS os arquivos de dist/ + worker.js:
+curl -X POST "$UPLOAD_URL" \
+  -F "worker.js=@./worker.js" \
+  -F "index.html=@./dist/index.html" \
+  $(for f in dist/assets/*; do echo -F "\"assets/$(basename "$f")=@./$f\""; done)
+
+# 3. Deploy (usar MCP tool updateApp)
+# appId: 674a3710
+# uploadId: <id retornado no passo 2>
+# assets: gerar dinamicamente — NUNCA copiar de um build anterior:
+echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
+# assetConfig: { "not_found_handling": "single-page-application" }
+# description: "Hub interno do Gogroup para documentar projetos de automação (RPA & IA)"
+# entrypoint: "worker.js"
+```
+
+**Regras críticas do deploy:**
+- Assets sem prefixo `dist/` (correto: `assets/foo.js`, errado: `dist/assets/foo.js`)
+- SPA fallback obrigatório (`not_found_handling: "single-page-application"`)
+- Lista de assets DEVE ser gerada do `dist/` real (hashes mudam a cada build)
+- Detalhes completos em [docs/deploy.md](docs/deploy.md)
+
 ## Documentação detalhada
 
 | Documento | Conteúdo |

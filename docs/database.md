@@ -80,9 +80,11 @@ Entidade principal. Uma linha por projeto submetido.
 | status | TEXT | CHECK: rascunho, em_validacao, validado, rejeitado, aprovado |
 | chat_completo | INTEGER | 0/1 |
 | data_criacao_projeto | TEXT | |
-| tipo_projeto | TEXT | Legado: valor único |
-| tipos_projeto | TEXT (JSON) | Array: ['saving', 'receita_incremental'] |
-| descricao_breve | TEXT | Contexto de negócio |
+| tipo_projeto | TEXT | Legado: valor único. `'especial'` quando projeto especial |
+| tipos_projeto | TEXT (JSON) | Array: ['saving', 'receita_incremental'] ou ['especial'] |
+| descricao_breve | TEXT | Contexto de negócio (o que a automação faz/resolve) |
+| especial | INTEGER | 0/1 — projeto especial (altíssimo impacto, validação humana) |
+| contexto_especial | TEXT | Descrição do contexto do projeto especial (etapa 2.5) |
 | saving_horas, saving_reais | REAL | Totais calculados |
 | tipo_saving | TEXT | mensal/pontual |
 | memorial_calculo | TEXT | Texto sem markdown |
@@ -173,6 +175,9 @@ rascunho → em_validacao → validado | rejeitado
                         → aprovado (auto, quando área = RPA)
 ```
 
+Projeto **especial** nunca auto-aprova (nem na área RPA): fica sempre `em_validacao`
+(→ "Pendente" na planilha) e não passa pelo analisador IA — a validação é humana.
+
 ## Migrações
 
 Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
@@ -181,3 +186,5 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `complexidade` TEXT em `projetos`
 - RENAME `tinha_pessoa_antes` → `alguem_fazia` em `projetos`
 - ADD `observacoes` TEXT em `projetos`
+- ADD `especial` INTEGER DEFAULT 0 em `projetos`
+- ADD `contexto_especial` TEXT em `projetos`
