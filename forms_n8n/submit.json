@@ -1,0 +1,1222 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "godocs_submit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4592,
+        656
+      ],
+      "id": "63d2f1ba-88ea-40a8-a8fd-ce7e1c5463e8",
+      "name": "Receber Dados",
+      "webhookId": "submit_workflows_post"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "data_submissao",
+              "value": "={{ $now.setZone('America/Fortaleza').toFormat('dd/MM/yyyy HH:mm:ss') }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "data_criacao",
+              "value": "={{ $json.body.data_criacao_projeto ? $json.body.data_criacao_projeto.split(\"-\")[2] + \"/\" + $json.body.data_criacao_projeto.split(\"-\")[1] + \"/\" + $json.body.data_criacao_projeto.split(\"-\")[0] : '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "nome",
+              "value": "={{ $json.body.responsavel_nome }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "email",
+              "value": "={{ $json.body.responsavel_email }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "area",
+              "value": "={{ $json.body.area }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "ferramenta",
+              "value": "={{ $json.body.ferramenta }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "nome_projeto",
+              "value": "={{ $json.body.nome_projeto }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "descricao_breve",
+              "value": "={{ $json.body.descricao_breve || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "escopo",
+              "value": "={{ $json.body.escopo || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "tipos_projeto",
+              "value": "={{ ($json.body.tipos_projeto || []).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "saving_horas",
+              "value": "={{ Number($json.body.saving_horas || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "12",
+              "name": "saving_reais",
+              "value": "={{ Number($json.body.saving_reais || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "13",
+              "name": "memorial_calculo",
+              "value": "={{ $json.body.memorial_calculo || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "participantes",
+              "value": "={{ ($json.body.membros || []).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "tipo_saving",
+              "value": "={{ $json.body.tipo_saving || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "16",
+              "name": "status",
+              "value": "={{ $json.body.status }}",
+              "type": "string"
+            },
+            {
+              "id": "17",
+              "name": "projeto_id",
+              "value": "={{ $json.body.projeto_id }}",
+              "type": "string"
+            },
+            {
+              "id": "18",
+              "name": "custo_externo_mensal",
+              "value": "={{ Number($json.body.custo_externo_mensal || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "19",
+              "name": "saving_linhas",
+              "value": "={{ $json.body.saving_linhas || '[]' }}",
+              "type": "string"
+            },
+            {
+              "id": "20",
+              "name": "receita_valor_mensal",
+              "value": "={{ Number($json.body.receita_valor_mensal || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "21",
+              "name": "receita_memorial",
+              "value": "={{ $json.body.receita_memorial || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "22",
+              "name": "documentacao_json",
+              "value": "={{ JSON.stringify($json.body.documentacao || {}) }}",
+              "type": "string"
+            },
+            {
+              "id": "3b680dd2-96be-475a-91a3-879cfb72e8eb",
+              "name": "ganho_total",
+              "value": "={{ $json.body.ganho_total_mensal || '0' }}",
+              "type": "number"
+            },
+            {
+              "id": "c0ff4117-eee4-4200-8129-acf5bed667d2",
+              "name": "alguem_fazia",
+              "value": "={{ $json.body.alguem_fazia || '0' }}",
+              "type": "string"
+            },
+            {
+              "id": "d76a88f3-0aeb-44e5-abec-9f14ded2e8ee",
+              "name": "tipo_receita",
+              "value": "={{ $json.body.tipo_receita || '—' }}",
+              "type": "string"
+            },
+            {
+              "id": "b770bbc7-4e14-457d-a2a5-bac4aeb79b17",
+              "name": "especial",
+              "value": "={{ $json.body.especial || false  }}",
+              "type": "boolean"
+            },
+            {
+              "id": "8b98d169-0ee8-4520-a47f-9e73e6b20b4b",
+              "name": "contexto_especial",
+              "value": "={{ $json.body.contexto_especial || '—' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4368,
+        656
+      ],
+      "id": "823673ad-1d93-4e0c-bb24-f5255b9f7d6f",
+      "name": "Formatar Dados"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "Data Submissão",
+              "value": "={{ $json.data_submissao }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "Data Criação",
+              "value": "={{ $json.data_criacao }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "Área",
+              "value": "={{ $json.area }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "Nome Completo",
+              "value": "={{ $json.nome }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "Email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "Projeto",
+              "value": "={{ $json.nome_projeto }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "Participantes",
+              "value": "={{ $json.participantes }}",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "Descrição",
+              "value": "={{ $json.descricao_breve }}",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "Ferramenta",
+              "value": "={{ $json.ferramenta }}",
+              "type": "string"
+            },
+            {
+              "id": "41c7b6a5-e652-4c51-926b-8cc479309c2d",
+              "name": "Alguém Fazia?",
+              "value": "={{ $json.alguem_fazia }}",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "Escopo",
+              "value": "={{ $json.escopo }}",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "Tipos Projeto",
+              "value": "={{ $json.tipos_projeto }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "Saving Horas",
+              "value": "={{ $json.saving_horas }}",
+              "type": "number"
+            },
+            {
+              "id": "13",
+              "name": "Saving Reais",
+              "value": "={{ $json.saving_reais }}",
+              "type": "number"
+            },
+            {
+              "id": "14",
+              "name": "Tipo de Saving",
+              "value": "={{ $json.tipo_saving }}",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "Memorial de Saving",
+              "value": "={{ $json.memorial_calculo }}",
+              "type": "string"
+            },
+            {
+              "id": "16",
+              "name": "Custo Externo Mensal",
+              "value": "={{ $json.custo_externo_mensal }}",
+              "type": "number"
+            },
+            {
+              "id": "17",
+              "name": "Receita Mensal",
+              "value": "={{ $json.receita_valor_mensal }}",
+              "type": "number"
+            },
+            {
+              "id": "fd6a79d8-4bea-4f06-b22e-cb83551b5dd6",
+              "name": "Tipo de Receita",
+              "value": "={{ $json.tipo_receita }}",
+              "type": "string"
+            },
+            {
+              "id": "18",
+              "name": "Receita Memorial",
+              "value": "={{ $json.receita_memorial }}",
+              "type": "string"
+            },
+            {
+              "id": "19",
+              "name": "Status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "20",
+              "name": "ID Projeto",
+              "value": "={{ $json.projeto_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6a093bf3-113f-41d4-b12e-83ad9fc336a5",
+              "name": "Ganho Total",
+              "value": "={{ $json.ganho_total }}",
+              "type": "number"
+            },
+            {
+              "id": "854aa8db-fd0a-430b-a3a5-6cbd3de85976",
+              "name": "Especial?",
+              "value": "={{ $json.especial ? 'Sim' : 'Não' }}",
+              "type": "string"
+            },
+            {
+              "id": "50fd4187-2cb5-4cf9-8844-8236a7ede4a7",
+              "name": "Contexto do Projeto Especial",
+              "value": "={{ $json.contexto_especial }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4144,
+        656
+      ],
+      "id": "a0a0dc7d-7921-4504-9c82-b73ddaf61ecd",
+      "name": "Preparar para Planilha"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk",
+          "mode": "list",
+          "cachedResultName": "Submissão de Automações - Análise",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1359494527,
+          "mode": "list",
+          "cachedResultName": "GoDocs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit#gid=1359494527"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Projeto",
+              "lookupValue": "={{ $json['Projeto'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -3920,
+        656
+      ],
+      "id": "85625b92-ef27-4ae9-b30c-d6e12742d737",
+      "name": "Checar Duplicata na Planilha",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Y0vMDyZQDVtxrGBQ",
+          "name": "RPA IA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "571ecfa5-43bb-4f9d-95fc-0df3e665c442",
+              "leftValue": "={{ $json.Projeto.toString() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3696,
+        656
+      ],
+      "id": "2f5ed9a1-930a-4967-9894-7d237a6e5d51",
+      "name": "Projeto Novo?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gera o conteúdo da documentação como texto para upload ao Drive\nconst dados = $('Formatar Dados').item.json;\nlet docJson = {};\ntry {\n  docJson = JSON.parse(dados.documentacao_json || '{}');\n} catch(e) {\n  docJson = {};\n}\n\nconst linhas = [];\ntry {\n  const arr = JSON.parse(dados.saving_linhas || '[]');\n  if (Array.isArray(arr)) {\n    for (const l of arr) {\n      linhas.push(`  - ${l.cargo}: ${l.horas_antes}h → ${l.horas_depois}h (economia: ${l.economia_horas_mes}h, R$ ${Number(l.economia_reais_mes).toFixed(2)})`);\n    }\n  }\n} catch(e) {}\n\nconst sections = [\n  `# ${dados.nome_projeto}`,\n  '',\n  `**Responsável:** ${dados.nome} (${dados.email})`,\n  `**Área:** ${dados.area}`,\n  `**Ferramenta:** ${dados.ferramenta}`,\n  `**Escopo:** ${dados.escopo}`,\n  `**Participantes:** ${dados.participantes || '—'}`,\n  `**Data de Criação:** ${dados.data_criacao}`,\n  `**Tipos de Projeto:** ${dados.tipos_projeto}`,\n  '',\n  '---',\n  '',\n  '## Descrição',\n  dados.descricao_breve || '—',\n  '',\n];\n\n// Documentação técnica gerada pela IA\nif (docJson.o_que_faz) {\n  sections.push('## O que faz');\n  sections.push(docJson.o_que_faz);\n  sections.push('');\n}\nif (docJson.execucao) {\n  sections.push('## Execução');\n  sections.push(docJson.execucao);\n  sections.push('');\n}\nif (docJson.dependencias && Array.isArray(docJson.dependencias)) {\n  sections.push('## Dependências');\n  for (const d of docJson.dependencias) {\n    sections.push(`- **${d.servico}**: ${d.descricao}`);\n  }\n  sections.push('');\n}\nif (docJson.fluxo && Array.isArray(docJson.fluxo)) {\n  sections.push('## Fluxo');\n  for (const f of docJson.fluxo) {\n    sections.push(`### ${f.etapa}`);\n    sections.push(f.descricao);\n    if (f.condicoes && f.condicoes.length > 0) {\n      for (const c of f.condicoes) {\n        sections.push(`  - SE ${c.se} → ${c.acao}`);\n      }\n    }\n  }\n  sections.push('');\n}\nif (docJson.configurar_antes && Array.isArray(docJson.configurar_antes)) {\n  sections.push('## Configurar antes');\n  for (const item of docJson.configurar_antes) {\n    sections.push(`- ${item}`);\n  }\n  sections.push('');\n}\nif (docJson.atencao && Array.isArray(docJson.atencao)) {\n  sections.push('## Atenção');\n  for (const a of docJson.atencao) {\n    sections.push(`- **${a.titulo}**: ${a.descricao}`);\n  }\n  sections.push('');\n}\n\n// Saving\nsections.push('---');\nsections.push('');\nsections.push('## Memorial de Saving');\nsections.push(`**Tipo:** ${dados.tipo_saving}`);\nsections.push(`**Saving Horas/mês:** ${dados.saving_horas}h`);\nsections.push(`**Saving Reais/mês:** R$ ${Number(dados.saving_reais).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);\nif (dados.custo_externo_mensal > 0) {\n  sections.push(`**Custo Externo Mensal:** R$ ${Number(dados.custo_externo_mensal).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);\n}\nif (linhas.length > 0) {\n  sections.push('');\n  sections.push('**Detalhamento por cargo:**');\n  sections.push(...linhas);\n}\nsections.push('');\nsections.push('**Memorial:**');\nsections.push(dados.memorial_calculo || '—');\n\n// Receita incremental\nif (dados.receita_valor_mensal > 0) {\n  sections.push('');\n  sections.push('---');\n  sections.push('');\n  sections.push('## Receita Incremental');\n  sections.push(`**Valor Mensal:** R$ ${Number(dados.receita_valor_mensal).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`);\n  sections.push(`**Memorial:** ${dados.receita_memorial}`);\n}\n\nsections.push('');\nsections.push('---');\nsections.push(`Gerado automaticamente pelo GoDocs em ${dados.data_submissao}`);\n\nconst text = sections.join('\\n');\n\n// Retorna como binário para upload ao Drive\nconst buffer = Buffer.from(text, 'utf-8');\nreturn [{\n  json: { fileName: `${$now.setZone('America/Fortaleza').toFormat('yyyy-MM-dd_HHmmss')}_${dados.nome_projeto.replace(/[^a-zA-Z0-9]/g, '_')}_${dados.area}.md` },\n  binary: {\n    documentacao: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/markdown',\n      fileName: `${$now.setZone('America/Fortaleza').toFormat('yyyy-MM-dd_HHmmss')}_${dados.nome_projeto.replace(/[^a-zA-Z0-9]/g, '_')}_${dados.area}.md`\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3472,
+        560
+      ],
+      "id": "1db16a79-ad3b-4245-8fe5-ddbb599330ab",
+      "name": "Gerar Documento Markdown"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "documentacao",
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1e_Fk8EhFsv_W-3A3dRpMIa2Wg1pBHem_"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -3248,
+        560
+      ],
+      "id": "1ebecf9c-1bac-407e-b83b-f50b039d9633",
+      "name": "Upload Documentação",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ADOsv0AQfyLWirub",
+          "name": "RPA/IA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1359494527,
+          "mode": "list",
+          "cachedResultName": "GoDocs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit#gid=1359494527"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Data Submissão": "={{ $('Preparar para Planilha').item.json['Data Submissão'] }}",
+            "Data Criação": "={{ $('Preparar para Planilha').item.json['Data Criação'] }}",
+            "Área": "={{ $('Preparar para Planilha').item.json['Área'] }}",
+            "Nome Completo": "={{ $('Preparar para Planilha').item.json['Nome Completo'] }}",
+            "Participantes": "={{ $('Preparar para Planilha').item.json['Participantes'] }}",
+            "Email": "={{ $('Preparar para Planilha').item.json['Email'] }}",
+            "Ferramenta": "={{ $('Preparar para Planilha').item.json['Ferramenta'] }}",
+            "Projeto": "={{ $('Preparar para Planilha').item.json['Projeto'] }}",
+            "Descrição": "={{ $('Preparar para Planilha').item.json['Descrição'] }}",
+            "URL": "={{ $json.webViewLink }}",
+            "Escopo": "={{ $('Preparar para Planilha').item.json['Escopo'] }}",
+            "Tipos Projeto": "={{ $('Preparar para Planilha').item.json['Tipos Projeto'] }}",
+            "Saving Horas": "={{ $('Preparar para Planilha').item.json['Saving Horas'] }}",
+            "Saving Reais": "={{ $('Preparar para Planilha').item.json['Saving Reais'] }}",
+            "Tipo de Saving": "={{ $('Preparar para Planilha').item.json['Tipo de Saving'] }}",
+            "Memorial de Saving": "={{ $('Preparar para Planilha').item.json['Memorial de Saving'] }}",
+            "Custo Externo Mensal": "={{ $('Preparar para Planilha').item.json['Custo Externo Mensal'] }}",
+            "Receita Mensal": "={{ $('Preparar para Planilha').item.json['Receita Mensal'] }}",
+            "Receita Memorial": "={{ $('Preparar para Planilha').item.json['Receita Memorial'] }}",
+            "Status": "={{ $('Preparar para Planilha').item.json['Status'] }}",
+            "ID Projeto": "={{ $('Preparar para Planilha').item.json['ID Projeto'] }}",
+            "Ganho Total": "={{ $('Preparar para Planilha').item.json['Ganho Total'] }}",
+            "Tipo de Receita": "={{ $('Preparar para Planilha').item.json['Tipo de Receita'] }}",
+            "Alguém Fazia?": "={{ $('Preparar para Planilha').item.json['Alguém Fazia?'] }}",
+            "Contexto do Projeto Especial": "={{ $('Preparar para Planilha').item.json['Contexto do Projeto Especial'] }}",
+            "Especial?": "={{ $('Preparar para Planilha').item.json['Especial?'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Data Submissão",
+              "displayName": "Data Submissão",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID Projeto",
+              "displayName": "ID Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Data Criação",
+              "displayName": "Data Criação",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Área",
+              "displayName": "Área",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nome Completo",
+              "displayName": "Nome Completo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Projeto",
+              "displayName": "Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Participantes",
+              "displayName": "Participantes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Descrição",
+              "displayName": "Descrição",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ferramenta",
+              "displayName": "Ferramenta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Escopo",
+              "displayName": "Escopo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipos Projeto",
+              "displayName": "Tipos Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alguém Fazia?",
+              "displayName": "Alguém Fazia?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Saving Horas",
+              "displayName": "Saving Horas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Saving Reais",
+              "displayName": "Saving Reais",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo de Saving",
+              "displayName": "Tipo de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Memorial de Saving",
+              "displayName": "Memorial de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Custo Externo Mensal",
+              "displayName": "Custo Externo Mensal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Receita Mensal",
+              "displayName": "Receita Mensal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo de Receita",
+              "displayName": "Tipo de Receita",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Receita Memorial",
+              "displayName": "Receita Memorial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ganho Total",
+              "displayName": "Ganho Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Complexidade",
+              "displayName": "Complexidade",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Diff Horas / Antes",
+              "displayName": "Diff Horas / Antes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Diff Saving / Antes",
+              "displayName": "Diff Saving / Antes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Memorial anterior",
+              "displayName": "Memorial anterior",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Observações",
+              "displayName": "Observações",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Contexto do Projeto Especial",
+              "displayName": "Contexto do Projeto Especial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Especial?",
+              "displayName": "Especial?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -3024,
+        560
+      ],
+      "id": "22b609c7-d454-4ce9-b187-e22551b1f280",
+      "name": "Salvar na Planilha",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Y0vMDyZQDVtxrGBQ",
+          "name": "RPA IA"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \n  \"ok\": false, \n  \"error\": \"Projeto já cadastrado na planilha.\" \n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -3472,
+        752
+      ],
+      "id": "50833fd7-221d-40ac-bda2-327201de5021",
+      "name": "Responder Duplicata"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \n  \"message\": \"Projeto registrado com sucesso na planilha e Google Drive.\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -2576,
+        560
+      ],
+      "id": "9d12491e-5724-4f57-8dc5-657527407b7c",
+      "name": "Sucesso Registro"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQArNbm72U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9mlk0to-8pN9Va8OXol-w1dosolvqYKZ824QJ1iAF5Q",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=──────────────────────\n\n🚨 *Novo fluxo de automação cadastrado – aprovação aguardando análise*\n\n📌 *Projeto:* {{ $('Preparar para Planilha').item.json['Projeto'] }}\n🏷️ *Área:* {{ $('Preparar para Planilha').item.json['Área'] }}\n🛠️ *Ferramenta:* {{ $('Preparar para Planilha').item.json['Ferramenta'] }}\n📋 *Escopo:* {{ $('Preparar para Planilha').item.json['Escopo'] }}\n📂 *Tipos:* {{ $('Preparar para Planilha').item.json['Tipos Projeto'] }}\n\n👤 *Solicitante:* {{ $('Preparar para Planilha').item.json['Nome Completo'] }}\n📧 *E-mail:* {{ $('Preparar para Planilha').item.json['Email'] }}\n👥 *Participantes:* {{ $('Preparar para Planilha').item.json['Participantes'] || '—' }}\n\n📝 *Descrição resumida:*\n{{ $('Preparar para Planilha').item.json['Descrição'] }}\n\n⏱️ *Saving estimado (horas/mês):* {{ Number($('Preparar para Planilha').item.json['Saving Horas']).toLocaleString('pt-BR') }} horas\n\n💰 *Saving estimado (R$/mês):* R$ {{ Number($('Preparar para Planilha').item.json['Saving Reais']).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}\n\n📊 *Tipo de saving:* {{ $('Preparar para Planilha').item.json['Tipo de Saving'] }}\n\n{{ Number($('Preparar para Planilha').item.json['Receita Mensal']) > 0 ? '📈 *Receita incremental/mês:* R$ ' + Number($('Preparar para Planilha').item.json['Receita Mensal']).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '' }}\n\n📎 *Documentação:* {{ $json.webViewLink || '—' }}\n\n📅 *Data da submissão:* {{ $('Preparar para Planilha').item.json['Data Submissão'].split(' ')[0] }}\n📊 *Status atual:* Aguardando análise da IA\n\n*Link da planilha de automações*: https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk\n\n──────────────────────"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "04acbf32-0b18-40b3-b289-d386867d0af7",
+      "name": "Aviso Google Chat3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2800,
+        560
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Receber Dados": {
+      "main": [
+        [
+          {
+            "node": "Formatar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Dados": {
+      "main": [
+        [
+          {
+            "node": "Preparar para Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar para Planilha": {
+      "main": [
+        [
+          {
+            "node": "Checar Duplicata na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar Duplicata na Planilha": {
+      "main": [
+        [
+          {
+            "node": "Projeto Novo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Projeto Novo?": {
+      "main": [
+        [
+          {
+            "node": "Gerar Documento Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Duplicata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar Documento Markdown": {
+      "main": [
+        [
+          {
+            "node": "Upload Documentação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Documentação": {
+      "main": [
+        [
+          {
+            "node": "Salvar na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar na Planilha": {
+      "main": [
+        [
+          {
+            "node": "Aviso Google Chat3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso Google Chat3": {
+      "main": [
+        [
+          {
+            "node": "Sucesso Registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Receber Dados": [
+      {
+        "headers": {
+          "host": "n8n-prod.gogroupgl.com",
+          "content-length": "7919",
+          "accept-encoding": "gzip, br",
+          "cf-connecting-ip": "2a06:98c0:3600::103",
+          "cf-ew-via": "15",
+          "cf-ipcountry": "BR",
+          "cf-ray": "a0d365296f356d5a-GIG",
+          "cf-visitor": "{\"scheme\":\"https\"}",
+          "cf-worker": "devgogroup.com",
+          "content-type": "application/json",
+          "x-forwarded-for": "172.69.91.82, 152.233.23.194",
+          "x-forwarded-host": "n8n-prod.gogroupgl.com",
+          "x-forwarded-proto": "https",
+          "x-railway-edge": "railway/us-east4-eqdc4a",
+          "x-railway-request-id": "uPF8PkW5StSZc0CUc9o55Q",
+          "x-real-ip": "2a06:98c0:3600::103",
+          "x-request-start": "1781713369244"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "projeto_id": "5ebe736d7bd4b27ba7138ebba2de9daf",
+          "responsavel_nome": "Ana Carolina",
+          "responsavel_email": "ana.estolano@gocase.com",
+          "area": "PRODUTO",
+          "ferramenta": "Claude",
+          "escopo": "interno",
+          "membros": [],
+          "nome_projeto": "Gerador de Vistas",
+          "descricao_breve": "Ferramenta interna capaz de automatizar a geração de vistas de produto\ncom aplicação de cores em escala, reduzindo o esforço operacional envolvido na criação manual das imagens e garantindo maior consistência visual entre todas as variações geradas.\nO projeto foi criado para acelerar o processo de preparação de materiais para validação (Waitlist), lançamento e cadastro de produtos, transformando um fluxo operacional manual em um processo escalável e padronizado.",
+          "data_criacao_projeto": "2026-04-01",
+          "tipos_projeto": [
+            "saving"
+          ],
+          "especial": false,
+          "contexto_especial": "—",
+          "status": "Pendente",
+          "saving_horas": 54.4,
+          "saving_reais": 1158.18,
+          "tipo_saving": "mensal",
+          "memorial_calculo": "Memorial de Cálculo\nAnalista Júnior\nAntes da automação, o trabalho era feito manualmente no Photoshop, vista por vista, com aplicação individual de cores, criação e ajuste de máscaras, correção de tonalidade e refinamentos para garantir fidelidade visual e qualidade final das imagens.\n\nPremissas informadas:\n- Aproximadamente 5 vistas por waitlist\n- Até 10 variações/combinações de cores por waitlist\n- Tempo médio manual por waitlist: 4,5 horas\n- Tempo médio após a automação por waitlist: 52,5 minutos (0,875 hora)\n- Volume médio mensal: 15 waitlists\n\nCálculo da economia por waitlist:\n- 4,5h - 0,875h = 3,625h economizadas por waitlist\n\nCálculo mensal:\n- 3,625h × 15 waitlists/mês = 54,375h/mês\n- Arredondando para duas casas decimais: 54,4h/mês\n\nTempo mensal antes da automação:\n- 4,5h × 15 = 67,5h/mês\n\nTempo mensal após a automação:\n- 0,875h × 15 = 13,125h/mês\n- Arredondando para duas casas decimais: 13,1h/mês\n\nResumo da economia mensal:\n- Economia total: 54,4h/mês\n- Tipo: mensal",
+          "alguem_fazia": "sim",
+          "custo_externo_mensal": 0,
+          "saving_linhas": "[{\"cargo\":\"Analista Júnior\",\"horas_antes\":67.5,\"horas_depois\":13.1,\"valor_hora\":21.29,\"economia_horas_mes\":54.4,\"economia_reais_mes\":1158.18}]",
+          "receita_valor_mensal": 0,
+          "tipo_receita": "—",
+          "receita_memorial": "—",
+          "ganho_total_mensal": 1158.18,
+          "documentacao": {
+            "titulo": "Gerador de Vistas",
+            "responsavel": {
+              "nome": "Ana Carolina",
+              "email": "ana.estolano@gocase.com",
+              "area": "Não informada"
+            },
+            "ferramenta": "Claude",
+            "membros": [],
+            "o_que_faz": "Ferramenta interna voltada para a área de Produto e desenvolvimento de produto que automatiza a geração de vistas de produto com aplicação de cores em escala. Ela reduz o esforço manual, padroniza o resultado visual e acelera a preparação de materiais para validação em Waitlist, lançamento e cadastro de produtos.",
+            "execucao": "A execução é acionada manualmente pelo usuário, que envia as vistas base do produto, informa as referências de cor e define as áreas de aplicação. Após esse input, o sistema processa automaticamente a aplicação das cores e gera as vistas finais.",
+            "dependencias": [
+              {
+                "servico": "Claude AI",
+                "descricao": "Motor de processamento usado para automatizar a geração e a aplicação das variações de cor."
+              },
+              {
+                "servico": "PIAPPI",
+                "descricao": "Serviço integrado utilizado no fluxo de apoio à operação do projeto."
+              },
+              {
+                "servico": "Vistas base do produto",
+                "descricao": "Arquivos de entrada que servem como base para a geração das novas vistas."
+              },
+              {
+                "servico": "Referências de cor em HEX",
+                "descricao": "Dados necessários para orientar a aplicação correta das cores."
+              },
+              {
+                "servico": "Regras de aplicação por componente",
+                "descricao": "Configurações que definem como cada área ou componente deve receber a cor."
+              }
+            ],
+            "fluxo": [
+              {
+                "etapa": "Envio das vistas base",
+                "descricao": "O usuário faz o upload das vistas base do produto que serão usadas como referência para a geração.",
+                "condicoes": []
+              },
+              {
+                "etapa": "Informação das cores",
+                "descricao": "O usuário insere as referências de cor em HEX que devem ser aplicadas nas vistas.",
+                "condicoes": []
+              },
+              {
+                "etapa": "Definição das áreas de aplicação",
+                "descricao": "O usuário delimita quais áreas ou componentes receberão cada cor.",
+                "condicoes": []
+              },
+              {
+                "etapa": "Processamento automático",
+                "descricao": "O sistema aplica as cores nas áreas definidas com base nas regras configuradas por componente.",
+                "condicoes": [
+                  {
+                    "se": "as regras e as áreas estiverem corretamente definidas",
+                    "acao": "a aplicação das cores é executada normalmente"
+                  },
+                  {
+                    "se": "houver inconsistência nas definições fornecidas",
+                    "acao": "o resultado pode ficar incompleto ou exigir ajuste"
+                  }
+                ]
+              },
+              {
+                "etapa": "Geração em lote",
+                "descricao": "O sistema gera múltiplas variações das vistas em lote para uso nos materiais necessários.",
+                "condicoes": []
+              },
+              {
+                "etapa": "Organização dos arquivos",
+                "descricao": "Os arquivos gerados são organizados automaticamente para facilitar o download e o uso posterior.",
+                "condicoes": []
+              },
+              {
+                "etapa": "Revisão final",
+                "descricao": "O usuário confere o material gerado antes de utilizá-lo nos processos internos.",
+                "condicoes": [
+                  {
+                    "se": "o resultado estiver adequado",
+                    "acao": "o material segue para uso"
+                  },
+                  {
+                    "se": "for identificado problema nas vistas",
+                    "acao": "o usuário solicita reprocessamento"
+                  }
+                ]
+              },
+              {
+                "etapa": "Reprocessamento",
+                "descricao": "Se necessário, o fluxo é executado novamente com ajustes nas referências, áreas ou regras de aplicação.",
+                "condicoes": [
+                  {
+                    "se": "a revisão final apontar inconsistências",
+                    "acao": "refazer a geração com os parâmetros corrigidos"
+                  }
+                ]
+              }
+            ],
+            "configurar_antes": [
+              "Disponibilizar previamente as vistas base aprovadas do produto.",
+              "Definir as referências de cor em HEX que serão usadas na geração.",
+              "Configurar as regras de aplicação para cada componente.",
+              "Mapear as áreas exatas em que cada cor será aplicada."
+            ],
+            "atencao": [
+              {
+                "titulo": "Dependência de base aprovada",
+                "descricao": "O processo depende de vistas base previamente aprovadas; se a base estiver incorreta ou desatualizada, o material gerado pode não ser aproveitável."
+              },
+              {
+                "titulo": "Precisão das regras de aplicação",
+                "descricao": "Regras incompletas ou incorretas por componente podem gerar resultados que exijam reprocessamento. Recomenda-se revisar as definições antes de executar."
+              },
+              {
+                "titulo": "Revisão final obrigatória",
+                "descricao": "O fluxo prevê conferência do usuário antes do uso do material final; não é recomendado consumir os arquivos sem essa validação."
+              }
+            ],
+            "gerado_em": "2025-02-14T00:00:00Z",
+            "saving": {
+              "linhas": [
+                {
+                  "cargo": "Analista Júnior",
+                  "horas_antes": 67.5,
+                  "horas_depois": 13.1,
+                  "valor_hora": 21.29,
+                  "economia_horas_mes": 54.4,
+                  "economia_reais_mes": 1158.18
+                }
+              ],
+              "economia_horas_mes": 54.4,
+              "economia_reais_mes": 1158.18,
+              "tipo_saving": "mensal",
+              "memorial_calculo": "## Memorial de Cálculo\n\n### Analista Júnior\nAntes da automação, o trabalho era feito manualmente no Photoshop, vista por vista, com aplicação individual de cores, criação e ajuste de máscaras, correção de tonalidade e refinamentos para garantir fidelidade visual e qualidade final das imagens.\n\n**Premissas informadas:**\n- Aproximadamente **5 vistas por waitlist**\n- Até **10 variações/combinações de cores** por waitlist\n- Tempo médio manual por waitlist: **4,5 horas**\n- Tempo médio após a automação por waitlist: **52,5 minutos** (**0,875 hora**)\n- Volume médio mensal: **15 waitlists**\n\n**Cálculo da economia por waitlist:**\n- 4,5h - 0,875h = **3,625h** economizadas por waitlist\n\n**Cálculo mensal:**\n- 3,625h × 15 waitlists/mês = **54,375h/mês**\n- Arredondando para duas casas decimais: **54,4h/mês**\n\n**Tempo mensal antes da automação:**\n- 4,5h × 15 = **67,5h/mês**\n\n**Tempo mensal após a automação:**\n- 0,875h × 15 = **13,125h/mês**\n- Arredondando para duas casas decimais: **13,1h/mês**\n\n**Resumo da economia mensal:**\n- Economia total: **54,4h/mês**\n- Tipo: **mensal**",
+              "valor_ganho_mensal": 1158.18
+            }
+          }
+        },
+        "webhookUrl": "https://n8n-prod.gogroupgl.com/webhook/godocs_submit",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "171f99811848621122d69c9bd23f7df7cdb206bf5e783e87001278135248b4a7"
+  }
+}
