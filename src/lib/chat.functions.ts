@@ -347,7 +347,10 @@ const iniciarReceitaSchema = z.object({
   racional: z.string().max(500).optional(),
 });
 
-const submeterValidacaoSchema = z.object({ projeto_id: z.string().min(1) });
+const submeterValidacaoSchema = z.object({
+  projeto_id: z.string().min(1),
+  modo: z.enum(['novo', 'edicao']).optional(),
+});
 
 // Monta a documentação de um projeto ESPECIAL sem nenhuma IA: usa a descrição
 // breve (o que o projeto faz) e o contexto especial (por que é de alto impacto e
@@ -417,6 +420,11 @@ export async function iniciarSubmissao(rawData: unknown) {
     throw new Error(`Falha ao criar projeto: ${projErr instanceof Error ? projErr.message : 'erro desconhecido'}`);
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
+
+  // Persiste os nomes dos arquivos para exibição na tela de edição
+  if (data.docs.length > 0) {
+    await updateProjeto(projeto.id, { arquivos_nomes: data.docs.map((d) => d.filename) });
+  }
 
   let docTexto = '';
   try {
@@ -893,6 +901,7 @@ export async function atualizarMetadados(rawData: unknown) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
       log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+      await updateProjeto(data.projeto_id, { arquivos_nomes: data.docs!.map((d) => d.filename) });
     } catch (extractErr) {
       err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
       docTexto = '';
@@ -1032,7 +1041,7 @@ export async function analisarProjetoFn(rawData: unknown) {
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
 export async function submeterParaValidacao(rawData: unknown) {
-  const { projeto_id } = submeterValidacaoSchema.parse(rawData);
+  const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
   const docRow = await getDocumentacao(projeto_id);
@@ -1090,6 +1099,11 @@ export async function submeterParaValidacao(rawData: unknown) {
   // então fica sempre 'em_validacao' (→ "Pendente" na planilha) até o humano avaliar.
   const ehEspecial = projeto.especial === 1;
 
+  // Reenvio: detectado quando o projeto já foi submetido antes (submitted_at preenchido)
+  // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
+  // sempre em_validacao para que a re-análise automática recomece do zero.
+  const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
     const tiposProjetoGate = parseJson<string[]>(projeto.tipos_projeto) ?? [];
@@ -1113,7 +1127,7 @@ export async function submeterParaValidacao(rawData: unknown) {
   // Teto de materialidade: projetos acima de R$ 5.000/mês vão sempre para validação humana.
   const TETO_MATERIALIDADE = 5000;
   const materialidade = calcularMaterialidade(saving, receita);
-  const status = ehEspecial || materialidade > TETO_MATERIALIDADE
+  const status = ehEspecial || ehReenvio || materialidade > TETO_MATERIALIDADE
     ? 'em_validacao'
     : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
   if (materialidade > TETO_MATERIALIDADE) {
@@ -1150,6 +1164,8 @@ export async function submeterParaValidacao(rawData: unknown) {
     tipo_saving: (saving?.tipo_saving as string) ?? null,
     memorial_calculo: memorialLimpo,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
+    // Reenvio invalida a validação anterior (o humano precisa rever do zero).
+    ...(ehReenvio ? { validated_at: null, validated_by: null } : {}),
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
@@ -1169,6 +1185,7 @@ export async function submeterParaValidacao(rawData: unknown) {
 
       const n8nPayload = {
         projeto_id: projeto_id,
+        modo: ehReenvio ? 'edicao' : 'novo',
         responsavel_nome: ouTraco(projeto.responsavel_nome),
         responsavel_email: ouTraco(projeto.responsavel_email),
         area: ouTraco(projeto.area),

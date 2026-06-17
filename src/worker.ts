@@ -40,6 +40,7 @@ import {
   getInvestigadorStats,
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
+import { listarMeusProjetos, getMeuProjeto } from '@/lib/meus-projetos.functions'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -111,6 +112,19 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       // Limpa logs de API com mais de 30 dias
       cleanupOldApiLogs(30).catch(() => {})
       return json(await sincronizarAreas())
+    }
+
+    // ── Meus Projetos (filtrado pelo email do header — anti-IDOR) ──
+    if (pathname === '/api/meus-projetos' && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      return json(await listarMeusProjetos(email))
+    }
+    if (pathname.startsWith('/api/meus-projetos/') && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
+      return json(await getMeuProjeto(id, email))
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──

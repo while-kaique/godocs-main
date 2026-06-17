@@ -299,6 +299,7 @@ export function Step2({
   clearError,
   arquivos,
   setArquivos,
+  nomesExistentes,
 }: {
   form: FormData;
   errors: FieldErrors;
@@ -306,6 +307,7 @@ export function Step2({
   clearError: (key: string) => void;
   arquivos: File[];
   setArquivos: (files: File[]) => void;
+  nomesExistentes?: string[];
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -599,6 +601,24 @@ export function Step2({
             💡 Sem limite de arquivos — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados. O único limite é ~200k tokens de conteúdo (a barra abaixo avisa se passar).
           </span>
         </div>
+
+        {/* Arquivos anteriores — exibidos apenas no modo edição quando ainda não há novos */}
+        {arquivos.length === 0 && nomesExistentes && nomesExistentes.length > 0 && (
+          <div
+            className="mb-3 rounded-lg p-3 text-[12px] leading-relaxed"
+            style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "var(--go-text-primary)" }}
+          >
+            <span className="font-semibold" style={{ color: "#8a7d00" }}>📎 Arquivos enviados anteriormente:</span>
+            <ul className="mt-1.5 space-y-0.5 pl-2" style={{ color: "#8b8b9a" }}>
+              {nomesExistentes.map((n) => (
+                <li key={n} className="truncate">· {n}</li>
+              ))}
+            </ul>
+            <p className="mt-2" style={{ color: "#8b8b9a" }}>
+              O texto já extraído será reaproveitado. Suba novos arquivos abaixo para substituir ou adicionar.
+            </p>
+          </div>
+        )}
 
         {/* Drop zone */}
         <div

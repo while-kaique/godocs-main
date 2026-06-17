@@ -3,8 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import {
   FilePlus2,
-  PencilLine,
-  RefreshCcw,
+  LayoutList,
   ShieldCheck,
   Clock,
   CheckCircle2,
@@ -12,11 +11,6 @@ import {
   ArrowRight,
   Zap,
 } from "lucide-react";
-
-const WEBHOOKS = {
-  edit: "https://n8n-study.gogroupgl.com/webhook/edit_workflow",
-  resend: "https://n8n-study.gogroupgl.com/webhook/re_workflow",
-};
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -28,7 +22,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Plataforma para submissão, edição e reenvio de projetos internos de RPA & IA.",
+          "Plataforma para submissão e gestão de projetos internos de RPA & IA.",
       },
       { property: "og:title", content: "Triagem de Fluxos · GoGroup" },
       {
@@ -219,7 +213,7 @@ function Home() {
               className="mx-auto mt-4 max-w-lg text-[length:var(--fs-body,1rem)] leading-relaxed"
               style={{ color: "rgba(255,255,255,0.75)" }}
             >
-              Submeta, edite ou reenvie projetos de automação.
+              Submeta seus projetos de automação ou gerencie os já enviados.
               <br />
               Escolha uma ação abaixo para começar.
             </p>
@@ -243,7 +237,7 @@ function Home() {
 
         <main className="mx-auto max-w-6xl px-8 pt-8">
           {/* Action Cards */}
-          <section className="grid grid-cols-1 gap-6 pb-12 md:grid-cols-3">
+          <section className="grid grid-cols-1 gap-6 pb-12 md:grid-cols-2">
             <ActionCard
               to="/submeter"
               icon={<FilePlus2 className="h-6 w-6" />}
@@ -253,18 +247,11 @@ function Home() {
               accent
             />
             <ActionCard
-              href={WEBHOOKS.edit}
-              icon={<PencilLine className="h-6 w-6" />}
-              title="Editar projeto"
-              description="Ajuste informações de um projeto já submetido antes da análise."
-              badge="Em análise"
-            />
-            <ActionCard
-              href={WEBHOOKS.resend}
-              icon={<RefreshCcw className="h-6 w-6" />}
-              title="Reenviar projeto"
-              description="Reenvio de projetos com status Reenvio Pendente após análise."
-              badge="Reenvio"
+              to="/meus-projetos"
+              icon={<LayoutList className="h-6 w-6" />}
+              title="Meus Projetos"
+              description="Visualize, edite ou reenvie seus projetos submetidos."
+              badge="Editar e reenviar"
             />
           </section>
 
