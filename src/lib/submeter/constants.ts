@@ -130,3 +130,25 @@ export function readFileAsBase64(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+// Oculta valores financeiros de SAVING do texto exibido ao usuário (memorial/preview).
+// O cliente só pode ver HORAS — nunca R$, taxa/hora ou custo evitado em R$. Isso evita
+// que ele manipule os números (as taxas por cargo são internas); só a equipe que
+// analisa as submissões vê os valores em R$. É uma rede de segurança: o prompt do
+// agente já instrui a não emitir R$, mas aqui removemos qualquer vazamento antes de
+// exibir. NÃO aplicar a receita (valor declarado pelo próprio usuário).
+export function ocultarReaisSaving(content: string): string {
+  // Só remove linhas que de fato carregam dinheiro (R$, "X reais", valor/taxa por
+  // hora). NÃO remove por palavras como "custo"/"economia" — uma linha de horas
+  // ("Custo adicional: 1h/mês") é legítima e deve permanecer.
+  const ehLinhaFinanceira = (l: string) =>
+    /r\$/i.test(l) || /\d[\d.,]*\s*reais\b/i.test(l) || /(valor|taxa)[\s/]*(por\s*)?hora/i.test(l);
+  return content
+    .split("\n")
+    .filter((linha) => !ehLinhaFinanceira(linha))
+    .join("\n")
+    // Segurança extra: remove qualquer "R$ 1.234,56" residual inline
+    .replace(/r\$\s*[\d.,]+/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
