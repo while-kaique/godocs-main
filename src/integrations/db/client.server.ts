@@ -225,6 +225,7 @@ export type InsertProjeto = {
   descricao_breve?: string | null;
   especial?: boolean | null;
   contexto_especial?: string | null;
+  arquivos_nomes?: string[] | null;
   status?: string;
 };
 
@@ -234,8 +235,8 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, especial, contexto_especial, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      descricao_breve, especial, contexto_especial, arquivos_nomes, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -253,6 +254,7 @@ export async function insertProjeto(data: InsertProjeto) {
     data.descricao_breve ?? null,
     data.especial ? 1 : 0,
     data.contexto_especial ?? null,
+    data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -279,6 +281,16 @@ export function findDuplicateProjeto(nome: string, excludeId: string) {
     "SELECT id FROM projetos WHERE nome = ? AND id != ? AND status != 'rascunho' LIMIT 1",
     [nome, excludeId]
   );
+}
+
+export function getProjetosByOwnerEmail(email: string) {
+  return queryAll<ProjetoRow & { area_nome: string | null }>(`
+    SELECT p.*, a.nome as area_nome
+    FROM projetos p
+    LEFT JOIN areas a ON p.area_id = a.id
+    WHERE p.responsavel_email = ? OR p.membros LIKE ?
+    ORDER BY p.created_at DESC
+  `, [email, `%"${email}"%`]);
 }
 
 // --- Chat Messages ---
@@ -648,6 +660,7 @@ export type ProjetoRow = {
   observacoes: string | null; // parecer da análise automática (staff-only)
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
+  arquivos_nomes: string | null; // JSON array de nomes dos arquivos enviados no upload
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;

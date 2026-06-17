@@ -161,6 +161,8 @@ const MIGRATIONS = [
   // descrição do contexto do projeto especial coletada na etapa 2.5.
   'ALTER TABLE projetos ADD COLUMN especial INTEGER DEFAULT 0',
   'ALTER TABLE projetos ADD COLUMN contexto_especial TEXT',
+  // Nomes dos arquivos enviados no upload (JSON array de strings) — exibidos na edição
+  'ALTER TABLE projetos ADD COLUMN arquivos_nomes TEXT',
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).

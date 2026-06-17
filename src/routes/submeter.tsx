@@ -30,6 +30,10 @@ export const Route = createFileRoute("/submeter")({
   component: SubmeterPage,
 });
 
+function SubmeterPage() {
+  return <SubmeterPageContent />;
+}
+
 /* ──────────────────────────────────────────────
    Page Component
    ────────────────────────────────────────────── */
@@ -63,9 +67,11 @@ const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a 
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 
-function SubmeterPage() {
+export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [seedLoading, setSeedLoading] = useState(!!editProjetoId);
+  const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [submitted, setSubmitted] = useState(false);
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -126,6 +132,129 @@ function SubmeterPage() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [analyzing]);
+
+  // Seed do estado quando em modo edição
+  useEffect(() => {
+    if (!editProjetoId) return;
+    let cancelled = false;
+    apiFetch(`/api/meus-projetos/${editProjetoId}`)
+      .then((data: Record<string, unknown>) => {
+        if (cancelled) return;
+        const membros = (data.membros as string[]) ?? [];
+        const tiposProjeto = ((data.tipos_projeto as string[]) ?? []).filter(
+          (t): t is "saving" | "receita_incremental" =>
+            t === "saving" || t === "receita_incremental"
+        );
+        const ferramentaRaw = (data.ferramenta as string) ?? "";
+        let ferramenta = ferramentaRaw;
+        let ferramentaOutra = "";
+        if (ferramentaRaw.startsWith("Outros: ")) {
+          ferramenta = "Outros";
+          ferramentaOutra = ferramentaRaw.slice("Outros: ".length);
+        }
+
+        const newForm: FormData = {
+          escopo: (data.escopo as string) ?? "interno",
+          prodStatus: "sim",
+          nome: (data.responsavel_nome as string) ?? "",
+          email: (data.responsavel_email as string) ?? "",
+          ferramenta,
+          ferramentaOutra,
+          servicoExterno: (data.servico_externo as string) ?? "",
+          emEquipe: membros.length > 0 ? "sim" : "nao",
+          participantes: membros,
+          nomeProjeto: (data.nome_projeto as string) ?? "",
+          dataCriacao: (data.data_criacao_projeto as string) ?? "",
+          tipoProjeto: tiposProjeto,
+          descricaoBreve: (data.descricao_breve as string) ?? "",
+          especial: data.especial === true,
+          contextoEspecial: (data.contexto_especial as string) ?? "",
+        };
+
+        setForm(newForm);
+        setNomesExistentes((data.arquivos_nomes as string[]) ?? []);
+        setProjetoId(editProjetoId);
+        setAgentTipos(tiposProjeto);
+        setRespEspecial(data.especial ? "sim" : "nao");
+
+        // Seed de previews e snapshots financeiros a partir da documentação já salva
+        const doc = data.documentacao as Record<string, unknown> | null;
+        if (doc) {
+          // Doc preview
+          const conteudo = doc as Record<string, unknown>;
+          const partes: string[] = [];
+          if (conteudo.o_que_faz) partes.push(`**O que faz:** ${conteudo.o_que_faz}`);
+          if (conteudo.execucao) partes.push(`**Execução:** ${conteudo.execucao}`);
+          if (partes.length > 0) setApprovedDocPreview(partes.join("\n\n"));
+
+          // Saving snapshot
+          const saving = conteudo.saving as Record<string, unknown> | undefined;
+          if (saving) {
+            const linhasRaw = (saving.linhas as Array<Record<string, unknown>>) ?? [];
+            const linhas = linhasRaw.map((l) => ({
+              cargo: String(l.cargo ?? ""),
+              horasAntes: String(l.horas_antes ?? ""),
+              horasDepois: String(l.horas_depois ?? ""),
+            }));
+            const savingSnap: import("@/lib/submeter/constants").SavingFormData = {
+              linhas: linhas.length > 0 ? linhas : [{ cargo: "", horasAntes: "", horasDepois: "" }],
+              alguemFazia: (data.alguem_fazia as string) ?? "",
+              tipoSaving: (data.tipo_saving as string) ?? "",
+              custoExterno: String(data.custo_externo_mensal ?? ""),
+              custoPeriodicidade: "mensal",
+              valorReceita: "",
+              racionalReceita: "",
+            };
+            setSavingSubmitted(savingSnap);
+            setFormDraft(savingSnap);
+            if (saving.memorial_calculo) setApprovedSavingPreview(String(saving.memorial_calculo));
+          }
+
+          // Receita snapshot
+          const receita = conteudo.receita as Record<string, unknown> | undefined;
+          if (receita) {
+            const receitaSnap: import("@/lib/submeter/constants").SavingFormData = {
+              linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
+              alguemFazia: "",
+              tipoSaving: (receita.tipo_saving as string) ?? "mensal",
+              custoExterno: "",
+              custoPeriodicidade: "mensal",
+              valorReceita: String(receita.valor_ganho_mensal ?? ""),
+              racionalReceita: (receita.racional as string) ?? "",
+            };
+            setReceitaSubmitted(receitaSnap);
+            if (receita.memorial_calculo) setApprovedReceitaPreview(String(receita.memorial_calculo));
+          }
+        }
+
+        // Snapshot do agentMeta para que o agente não reprocesse se nada mudou
+        setAgentMeta({
+          nomeProjeto: newForm.nomeProjeto.trim(),
+          ferramenta: newForm.escopo === "externo"
+            ? newForm.servicoExterno.trim()
+            : newForm.ferramenta === "Outros" && newForm.ferramentaOutra.trim()
+              ? `Outros: ${newForm.ferramentaOutra.trim()}`
+              : newForm.ferramenta,
+          participantes: newForm.participantes,
+          dataCriacao: newForm.dataCriacao,
+          descricaoBreve: newForm.descricaoBreve.trim(),
+          contextoEspecial: newForm.contextoEspecial.trim(),
+        });
+
+        setStep(2);
+        setCompletedSteps(new Set([1, 2, 3]));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error("[editar] falha ao carregar projeto:", e);
+        toast.error("Não foi possível carregar o projeto para edição.");
+      })
+      .finally(() => {
+        if (!cancelled) setSeedLoading(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editProjetoId]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -260,7 +389,8 @@ function SubmeterPage() {
       }
       if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
         errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
-      if (arquivos.length === 0) errs.documentacao = "Selecione pelo menos um arquivo do projeto";
+      if (arquivos.length === 0 && nomesExistentes.length === 0)
+        errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
 
     setErrors(errs);
@@ -1008,7 +1138,10 @@ function SubmeterPage() {
 
     // 1) Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
     try {
-      await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId });
+      await apiFetch("/api/chat/submeter-validacao", {
+        projeto_id: projetoId,
+        ...(editProjetoId ? { modo: "edicao" } : {}),
+      });
     } catch (e) {
       console.error("[submeter] envio falhou:", e);
       const msg = e instanceof Error ? e.message : "";
@@ -1043,6 +1176,23 @@ function SubmeterPage() {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  /* ── Seed Loading Screen (modo edição) ── */
+  if (seedLoading) {
+    return (
+      <PageFrame>
+        <div className="relative z-[1] mx-auto flex w-full max-w-[540px] flex-col items-center justify-center py-24 text-center">
+          <div
+            className="mb-4 h-10 w-10 animate-spin rounded-full border-4"
+            style={{ borderColor: "var(--go-blue)", borderTopColor: "transparent" }}
+          />
+          <p className="text-sm font-medium" style={{ color: "var(--go-text-heading)" }}>
+            Carregando seu projeto…
+          </p>
+        </div>
+      </PageFrame>
+    );
   }
 
   /* ── Success Screen ── */
@@ -1239,6 +1389,7 @@ function SubmeterPage() {
                   clearError={clearError}
                   arquivos={arquivos}
                   setArquivos={setArquivos}
+                  nomesExistentes={nomesExistentes}
                 />
               </StepAnimation>
             )}
