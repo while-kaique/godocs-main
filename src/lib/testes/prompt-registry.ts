@@ -40,6 +40,33 @@ export type PromptEntry = {
 
 // ─── Dados mock ─────────────────────────────────────────────────────────────
 
+// Contexto de revisão: simula uma EDIÇÃO de projeto já submetido. Quando presente,
+// os prompts de doc/saving/receita ganham o bloco "CONTEXTO DE REVISÃO (EDIÇÃO)"
+// com a documentação anterior aprovada — o agente valida só o que mudou.
+const MOCK_REVISAO = {
+  doc: {
+    o_que_faz: 'Consulta a API do SAP B1, gera relatório PDF e envia por email para a equipe comercial.',
+    execucao: 'Cron job diário às 07:00 no servidor interno.',
+    fluxo: '1. Cron dispara: 07:00\n2. Conecta SAP B1: Service Layer\n3. Gera PDF e envia email',
+    dependencias: 'SAP B1 Service Layer; SMTP Google Workspace; PostgreSQL 15',
+    configurar_antes: 'SAP_URL; SAP_USER; SMTP_USER',
+    atencao: 'API SAP fora: falha silenciosa',
+  },
+  saving: {
+    memorial_calculo: 'Analista Pleno gastava 40h/mês compilando relatórios manualmente; passou a 2h/mês de conferência. Estagiário fazia 20h/mês de coleta, zeradas.',
+    linhas: [
+      { cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 2 },
+      { cargo: 'Estagiário', horas_antes: 20, horas_depois: 0 },
+    ],
+    economia_horas_mes: 58,
+    economia_reais_mes: 1351.8,
+    tipo_saving: 'mensal',
+    alguem_fazia: 'sim',
+    custo_externo_mensal: 0,
+  },
+  receita: null,
+};
+
 const MOCK_CTX: ProjetoContexto = {
   responsavel_nome: 'Maria Silva',
   responsavel_email: 'maria.silva@gogroup.com.br',
@@ -54,6 +81,10 @@ const MOCK_CTX: ProjetoContexto = {
   tipos_projeto: ['saving'],
   escopo: 'interno',
 };
+
+// Contexto idêntico ao MOCK_CTX, mas em modo EDIÇÃO (com documentação anterior).
+// Usado nos previews de prompt para exibir o bloco de revisão no inspector.
+const MOCK_CTX_REVISAO: ProjetoContexto = { ...MOCK_CTX, revisao: MOCK_REVISAO };
 
 const MOCK_COLETADO: DocumentacaoColetada = {
   nome_projeto: 'Automação de Relatórios Diários',
@@ -113,10 +144,10 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildDocPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'doc',
-      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos. Projeto especial NÃO passa por aqui — pula o agente e é submetido direto (doc montada sem IA).',
+      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos. Projeto especial NÃO passa por aqui — pula o agente e é submetido direto (doc montada sem IA). IA COMO FUNCIONALIDADE (padronizado): antes do preview, SEMPRE pergunta com caixas de seleção (type:"options") se o projeto usa IA como funcionalidade — em toda submissão, mesmo quando a doc deixa óbvio; nunca infere o campo sozinho (define tem_ia_como_funcionalidade só pela resposta do usuário). Não repete se já respondido. REVISÃO (edição): quando ctx.revisao existe (projeto já submetido), o prompt ganha o bloco "CONTEXTO DE REVISÃO" com a doc anterior aprovada — o agente parte dela e valida só o que mudou, sem recomeçar do zero. (O preview abaixo está em modo edição para mostrar esse bloco.)',
       llmParams: { temperature: 0.2, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
-      contextParams: ['ProjetoContexto', 'DocumentacaoColetada'],
-      getPromptText: () => buildDocPrompt(MOCK_CTX, documentacaoVazia()),
+      contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'RevisaoContexto (só em edição)'],
+      getPromptText: () => buildDocPrompt(MOCK_CTX_REVISAO, documentacaoVazia()),
     },
     {
       id: 'orchestrator.doc_preview',
@@ -137,10 +168,10 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving',
-      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. CUSTO EVITADO: investiga sempre (interno e externo) se o projeto deixou de pagar alguma ferramenta/serviço — recorrente ou pontual — e captura em custo_evitado_reais/tipo/descricao; o backend soma ao saving em R$ (pontual ÷12). Custo evitado é saving (dinheiro que deixou de ser gasto), não receita. REGRA ANTI-ZERO: o ganho pode vir das horas OU do custo evitado — só bloqueia quando economia_horas_mes = 0 E não há custo evitado; nesse caso orienta projeto especial.',
+      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. CUSTO EVITADO: investiga sempre (interno e externo) se o projeto deixou de pagar alguma ferramenta/serviço — recorrente ou pontual — e captura em custo_evitado_reais/tipo/descricao; o backend soma ao saving em R$ (pontual ÷12). Custo evitado é saving (dinheiro que deixou de ser gasto), não receita. REGRA ANTI-ZERO: o ganho pode vir das horas OU do custo evitado — só bloqueia quando economia_horas_mes = 0 E não há custo evitado; nesse caso orienta projeto especial. ABERTURA DETERMINÍSTICA: o prompt computa o perfil das horas (todas 0h antes, 0h antes+0h depois, custo de monitoramento, ou rotina real) e injeta uma diretiva "COMO ABRIR A CONVERSA" que VENCE as regras genéricas — proíbe perguntar sobre rotina manual em linhas com 0h antes (evita perguntas que contradizem os dados informados). REVISÃO (edição): quando o projeto já foi submetido, o prompt ganha o bloco "CONTEXTO DE REVISÃO" com o memorial e as horas antes/depois anteriores (financeiro staff-only) — o agente valida só o que mudou em vez de recoletar a rotina inteira. (Preview em modo edição.)',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
-      contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'SavingColetado', 'resumoProjeto'],
-      getPromptText: () => buildSavingPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_SAVING, MOCK_RESUMO),
+      contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'SavingColetado', 'resumoProjeto', 'RevisaoContexto (só em edição)'],
+      getPromptText: () => buildSavingPrompt(MOCK_CTX_REVISAO, MOCK_COLETADO, MOCK_SAVING, MOCK_RESUMO),
     },
     {
       id: 'orchestrator.saving_preview',
@@ -161,9 +192,9 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildReceitaPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'receita',
-      description: 'Validação de receita incremental. A IA desafia o número CRUZANDO o racional com o que o projeto faz (RESUMO + DETALHES TÉCNICOS): se o racional for inconsistente com o projeto, questiona diretamente; se for consistente, aprofunda como o projeto leva ao ganho. Perguntas genéricas são proibidas. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo (mais vendas/conversão/faturamento); saving = economia operacional. Se o racional descrever saving disfarçado, bloqueia e manda reclassificar.',
+      description: 'Validação de receita incremental. A IA desafia o número CRUZANDO o racional com o que o projeto faz (RESUMO + DETALHES TÉCNICOS): se o racional for inconsistente com o projeto, questiona diretamente; se for consistente, aprofunda como o projeto leva ao ganho. Perguntas genéricas são proibidas. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo (mais vendas/conversão/faturamento); saving = economia operacional. Se o racional descrever saving disfarçado, bloqueia e manda reclassificar. REVISÃO (edição): quando o projeto já foi submetido, o prompt ganha o bloco "CONTEXTO DE REVISÃO" com o memorial e o valor de receita anterior — o agente valida só o que mudou.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
-      contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'ReceitaColetada', 'resumoProjeto'],
+      contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'ReceitaColetada', 'resumoProjeto', 'RevisaoContexto (só em edição)'],
       getPromptText: () => buildReceitaPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_RECEITA, MOCK_RESUMO),
     },
     {
