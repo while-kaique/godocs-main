@@ -75,6 +75,11 @@ const MOCK_SAVING: SavingColetado = {
   tipo_saving: 'mensal',
   memorial_calculo: null,
   valor_ganho_mensal: null,
+  // Exemplo de custo evitado pontual: serviço externo de R$ 2.700 (único) que o
+  // projeto eliminou — entra mensalizado ÷12 no economia_reais_mes pelo backend.
+  custo_evitado_reais: 2700,
+  custo_evitado_tipo: 'pontual',
+  custo_evitado_descricao: 'Serviço externo de implementação que custaria R$ 2.700 (cobrança única)',
 };
 
 const MOCK_RECEITA: ReceitaColetada = {
@@ -132,7 +137,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving',
-      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. REGRA ANTI-ZERO: economia_horas_mes NUNCA pode ser 0 — a IA investiga se há ganho real (redução de erros, capacidade nova), mas NÃO inventa horas: se a rotina for literalmente idêntica (só mudou o software), bloqueia honestamente e orienta a reclassificar como receita incremental ou projeto especial.',
+      description: 'Validação de horas do memorial de saving. A IA recebe as linhas de saving (cargo + horas antes/depois) já preenchidas pelo formulário, valida cada pessoa com perguntas concretas sobre a rotina manual, e monta o memorial_calculo automaticamente. Nunca expõe valores em R$. CUSTO EVITADO: investiga sempre (interno e externo) se o projeto deixou de pagar alguma ferramenta/serviço — recorrente ou pontual — e captura em custo_evitado_reais/tipo/descricao; o backend soma ao saving em R$ (pontual ÷12). Custo evitado é saving (dinheiro que deixou de ser gasto), não receita. REGRA ANTI-ZERO: o ganho pode vir das horas OU do custo evitado — só bloqueia quando economia_horas_mes = 0 E não há custo evitado; nesse caso orienta projeto especial.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'SavingColetado', 'resumoProjeto'],
       getPromptText: () => buildSavingPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_SAVING, MOCK_RESUMO),
@@ -144,7 +149,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildSavingPreviewPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'saving_preview',
-      description: 'Revisão do memorial de saving. Mesma mecânica de aprovação/ajuste do doc_preview. Se aprovado e há receita pendente, transita para fase receita; senão, marca completo. REGRA ANTI-ZERO: NUNCA emite complete se economia_horas_mes <= 0 — usa valores recomputados das linhas (não os reportados pelo LLM) como fonte de verdade na safety net.',
+      description: 'Revisão do memorial de saving. Mesma mecânica de aprovação/ajuste do doc_preview. Se aprovado e há receita pendente, transita para fase receita; senão, marca completo. REGRA ANTI-ZERO: NUNCA emite complete sem ganho — bloqueia só quando economia_horas_mes <= 0 E custo_evitado_reais nulo/zero (ganho válido pode vir das horas OU do custo evitado). Usa valores recomputados das linhas (não os reportados pelo LLM) como fonte de verdade na safety net.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['SavingColetado'],
       getPromptText: () => buildSavingPreviewPrompt(MOCK_SAVING),
@@ -156,7 +161,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildReceitaPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'receita',
-      description: 'Validação de receita incremental. A IA desafia o número pedindo base de cálculo e evidências. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo entrando (mais vendas/conversão/faturamento); saving = economia operacional (horas, custo/hora, retrabalho). Se o racional descrever saving disfarçado (minutos por chamado, horas economizadas, custo/hora), bloqueia e manda reclassificar como saving.',
+      description: 'Validação de receita incremental. A IA desafia o número CRUZANDO o racional com o que o projeto faz (RESUMO + DETALHES TÉCNICOS): se o racional for inconsistente com o projeto, questiona diretamente; se for consistente, aprofunda como o projeto leva ao ganho. Perguntas genéricas são proibidas. DISTINÇÃO OBRIGATÓRIA: receita incremental = dinheiro novo (mais vendas/conversão/faturamento); saving = economia operacional. Se o racional descrever saving disfarçado, bloqueia e manda reclassificar.',
       llmParams: { temperature: 0.4, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'ReceitaColetada', 'resumoProjeto'],
       getPromptText: () => buildReceitaPrompt(MOCK_CTX, MOCK_COLETADO, MOCK_RECEITA, MOCK_RESUMO),

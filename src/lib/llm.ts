@@ -91,7 +91,19 @@ async function callOpenAI(
 
   // Tenta a chamada; se o modelo rejeitar um parâmetro (não suportado ou valor
   // inválido), remove-o, memoriza para as próximas chamadas e tenta de novo.
-  for (let attempt = 0; attempt < 4; attempt++) {
+  // Erros de gateway transitórios (502/503/520/522/524) fazem 1 retry após 2s.
+  // Mais de 1 retry seria contraproducente: cada 522 já custa ~30s de timeout do
+  // Cloudflare, então 2 tentativas falhadas + espera = mais de 60s desnecessários.
+  const isGatewayError = (status: number) =>
+    status === 502 || status === 503 || status === 520 || status === 522 || status === 524;
+
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0 && lastErr) {
+      log(`Tentativa ${attempt + 1}/3 após 2s (erro anterior: ${lastErr.message.slice(0, 60)})`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -102,6 +114,7 @@ async function callOpenAI(
     });
 
     if (res.ok) {
+      if (attempt > 0) log(`Sucesso na tentativa ${attempt + 1}.`);
       const data = (await res.json()) as { choices: { message: { content: string } }[] };
       const content = data.choices[0].message.content;
       log(`OpenAI respondeu: ${content.slice(0, 120)}${content.length > 120 ? "..." : ""}`);
@@ -118,12 +131,22 @@ async function callOpenAI(
       log(
         `Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`,
       );
+      lastErr = null; // reset: não é erro de gateway, é ajuste de parâmetro
       continue;
     }
 
     errLog(`OpenAI HTTP ${res.status}:`, errText);
-    throw new Error(`OpenAI error ${res.status}: ${errText}`);
+    // Resposta HTML (ex: página de erro do Cloudflare 520/522) — não expõe o HTML.
+    const errSummary = errText.trimStart().startsWith('<')
+      ? `gateway indisponível (HTTP ${res.status}) — tente novamente em instantes`
+      : errText;
+    lastErr = new Error(`OpenAI error ${res.status}: ${errSummary}`);
+
+    if (!isGatewayError(res.status)) throw lastErr; // erro definitivo, não retenta
+    // erro de gateway → loop continua com backoff
   }
+
+  throw lastErr ?? new Error("OpenAI: falha após tentativas com parâmetros ajustados");
 
   throw new Error("OpenAI: falha após remover parâmetros não suportados");
 }

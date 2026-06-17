@@ -23,6 +23,7 @@ import {
   updateValidacaoEmailEnviado,
   insertAnalise,
   parseJson,
+  gravarVersaoProjeto,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
@@ -923,6 +924,23 @@ export async function atualizarMetadados(rawData: unknown) {
 
   const ctx = await getProjetoContexto(data.projeto_id);
 
+  // Projeto especial: reconstrói doc direto da descrição + contexto, sem IA.
+  if (ctx.especial) {
+    const docEspecial = buildDocEspecial({
+      nome_projeto: ctx.nome_projeto,
+      responsavel_nome: ctx.responsavel_nome,
+      responsavel_email: ctx.responsavel_email,
+      ferramenta: ctx.ferramenta,
+      membros: ctx.membros,
+      descricao_breve: ctx.descricao_breve ?? undefined,
+      contexto_especial: ctx.contexto_especial ?? undefined,
+    });
+    await upsertDocumentacao(data.projeto_id, docEspecial);
+    await updateProjeto(data.projeto_id, { chat_completo: true });
+    log('atualizarMetadados', `Projeto especial ${data.projeto_id}: doc remontada sem IA.`);
+    return { ok: true, reset: true, response: 'Documentação especial atualizada.' };
+  }
+
   let coletadoInicial: DocumentacaoColetada = {
     ...documentacaoVazia(),
     nome_projeto: ctx.nome_projeto,
@@ -1066,13 +1084,6 @@ export async function submeterParaValidacao(rawData: unknown) {
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
-  if (projeto.nome) {
-    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
-    if (duplicata) {
-      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
-    }
-  }
-
   // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
   // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
   // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
@@ -1103,6 +1114,14 @@ export async function submeterParaValidacao(rawData: unknown) {
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
+  // Reenvio atualiza o projeto existente — não bloquear por nome duplicado.
+  if (projeto.nome && !ehReenvio) {
+    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
+    if (duplicata) {
+      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
+    }
+  }
 
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
@@ -1135,15 +1154,16 @@ export async function submeterParaValidacao(rawData: unknown) {
   }
   const now = new Date().toISOString();
 
-  // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
+  // ── Calcular ganho_total_mensal (saving + receita/10) ──
+  // Saving entra com o valor cheio (economia_reais_mes já inclui custo evitado
+  // mensalizado e abate o custo externo). A receita NÃO mensaliza por 12 — entra
+  // pelo valor informado e só aplica o ÷10 (fator de equivalência saving×receita).
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
-  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+  const savingMensal = savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
   const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
-  const receitaEquivalente = receitaMensal / 10;
+  const receitaEquivalente = receitaValor / 10;
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
@@ -1169,6 +1189,40 @@ export async function submeterParaValidacao(rawData: unknown) {
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
+
+  // ── Snapshot imutável de auditoria ────────────────────────────────────────────
+  // Grava uma cópia do estado do projeto no momento da submissão. Não propaga
+  // erros — o snapshot é observabilidade, não deve bloquear a submissão.
+  try {
+    const projetoAtualizado = await getProjetoById(projeto_id);
+    if (projetoAtualizado) {
+      const snapshotProjeto: Record<string, unknown> = {
+        nome: projetoAtualizado.nome,
+        descricao_breve: projetoAtualizado.descricao_breve,
+        ferramenta: projetoAtualizado.ferramenta,
+        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
+        especial: projetoAtualizado.especial,
+        area: projetoAtualizado.area,
+        saving_horas: projetoAtualizado.saving_horas,
+        saving_reais: projetoAtualizado.saving_reais,
+        tipo_saving: projetoAtualizado.tipo_saving,
+        memorial_calculo: projetoAtualizado.memorial_calculo,
+        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
+        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
+        alguem_fazia: projetoAtualizado.alguem_fazia,
+        status: projetoAtualizado.status,
+      };
+      await gravarVersaoProjeto(
+        projeto_id,
+        ehReenvio ? 'reenvio' : 'submit_inicial',
+        snapshotProjeto,
+        conteudo,
+        projetoAtualizado.responsavel_email,
+      );
+    }
+  } catch (versionErr) {
+    err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
+  }
 
   // ── Enviar dados ao n8n (registra na planilha + Drive + notifica Google Chat) ──
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
@@ -1230,7 +1284,21 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   }
 
-  return { ok: true, status };
+  // Números finais recalculados — o cliente usa para o comparativo antes×depois
+  // na tela pós-envio (edição). São os MESMOS valores gravados no projeto/snapshot.
+  return {
+    ok: true,
+    status,
+    ganho: {
+      saving_horas: (saving?.economia_horas_mes as number) ?? null,
+      saving_reais: (saving?.economia_reais_mes as number) ?? null,
+      tipo_saving: (saving?.tipo_saving as string) ?? null,
+      receita_valor: receitaValor > 0 ? receitaValor : null,
+      receita_tipo: receitaTipo,
+      custo_externo_mensal: projeto.custo_externo_mensal ?? null,
+      ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
+    },
+  };
 }
 
 // ─── Validar projeto ─────────────────────────────────────────────────────────

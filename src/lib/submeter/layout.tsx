@@ -93,14 +93,17 @@ export function WizardProgress({
   current,
   completed,
   onStepClick,
+  editMode,
 }: {
   current: number;
   completed: Set<number>;
   onStepClick: (n: number) => void;
+  editMode?: boolean;
 }) {
+  const visibleSteps = editMode ? STEPS.filter((s) => s.id !== 1) : STEPS;
   return (
     <div className="mb-8 flex items-start justify-center px-2">
-      {STEPS.map((s, idx) => {
+      {visibleSteps.map((s, idx) => {
         const isActive = current === s.id;
         const isDone = completed.has(s.id) && !isActive;
         return (
@@ -140,7 +143,7 @@ export function WizardProgress({
                 {s.label}
               </span>
             </div>
-            {idx < STEPS.length - 1 && (
+            {idx < visibleSteps.length - 1 && (
               <div
                 className="relative mt-[17px] min-w-8 flex-1 self-start"
                 style={{ height: "2.5px", background: "rgba(0,89,169,0.1)", borderRadius: 2 }}
