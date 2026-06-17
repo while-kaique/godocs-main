@@ -924,6 +924,23 @@ export async function atualizarMetadados(rawData: unknown) {
 
   const ctx = await getProjetoContexto(data.projeto_id);
 
+  // Projeto especial: reconstrói doc direto da descrição + contexto, sem IA.
+  if (ctx.especial) {
+    const docEspecial = buildDocEspecial({
+      nome_projeto: ctx.nome_projeto,
+      responsavel_nome: ctx.responsavel_nome,
+      responsavel_email: ctx.responsavel_email,
+      ferramenta: ctx.ferramenta,
+      membros: ctx.membros,
+      descricao_breve: ctx.descricao_breve ?? undefined,
+      contexto_especial: ctx.contexto_especial ?? undefined,
+    });
+    await upsertDocumentacao(data.projeto_id, docEspecial);
+    await updateProjeto(data.projeto_id, { chat_completo: true });
+    log('atualizarMetadados', `Projeto especial ${data.projeto_id}: doc remontada sem IA.`);
+    return { ok: true, reset: true, response: 'Documentação especial atualizada.' };
+  }
+
   let coletadoInicial: DocumentacaoColetada = {
     ...documentacaoVazia(),
     nome_projeto: ctx.nome_projeto,
@@ -1067,14 +1084,6 @@ export async function submeterParaValidacao(rawData: unknown) {
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
-  // Reenvio atualiza o projeto existente — não bloquear por nome duplicado.
-  if (projeto.nome && !ehReenvio) {
-    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
-    if (duplicata) {
-      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
-    }
-  }
-
   // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
   // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
   // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
@@ -1105,6 +1114,14 @@ export async function submeterParaValidacao(rawData: unknown) {
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
+  // Reenvio atualiza o projeto existente — não bloquear por nome duplicado.
+  if (projeto.nome && !ehReenvio) {
+    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
+    if (duplicata) {
+      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
+    }
+  }
 
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
@@ -1137,10 +1154,10 @@ export async function submeterParaValidacao(rawData: unknown) {
   }
   const now = new Date().toISOString();
 
-  // ── Calcular ganho_total_mensal (saving mensalizado + receita/10 mensalizada) ──
+  // ── Calcular ganho_total_mensal (saving + receita/10 mensalizada) ──
+  // Saving pontual entra com o valor cheio — não mensaliza por 12.
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
-  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+  const savingMensal = savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
   const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
