@@ -793,6 +793,9 @@ function SavingForm({
   const [valorReceita, setValorReceita] = useState(draft?.valorReceita ?? "");
   const [racionalReceita, setRacionalReceita] = useState(draft?.racionalReceita ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Guarda as horas "antes" digitadas antes de mudar para "não" (que zera o campo),
+  // para restaurar caso o usuário volte para "sim" — senão o valor pré-carregado some.
+  const horasAntesBackup = useRef<string[] | null>(null);
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
@@ -825,10 +828,21 @@ function SavingForm({
   function selectTinhaAntes(v: "sim" | "nao") {
     if (v === alguemFazia) return; // já selecionado → não mexe nos valores
     setTinhaAntes(v);
-    // "nao" → ninguém fazia antes: zera o campo "antes". "sim" → libera p/ digitar,
-    // mas PRESERVA valores já preenchidos (ex: edição com 25h pré-carregadas); só
-    // limpa o "0" herdado do modo "nao" para o usuário poder digitar.
-    setLinhas((ls) => ls.map((l) => ({ ...l, horasAntes: v === "nao" ? "0" : (l.horasAntes === "0" ? "" : l.horasAntes) })));
+    setLinhas((ls) => {
+      if (v === "nao") {
+        // ninguém fazia antes → zera o campo, mas guarda o que estava lá para
+        // restaurar se o usuário voltar para "sim".
+        horasAntesBackup.current = ls.map((l) => l.horasAntes);
+        return ls.map((l) => ({ ...l, horasAntes: "0" }));
+      }
+      // "sim" → restaura o valor guardado (ex: 25h pré-carregadas); na falta de
+      // backup, só limpa o "0" herdado do modo "nao" para o usuário digitar.
+      const bkp = horasAntesBackup.current;
+      return ls.map((l, i) => ({
+        ...l,
+        horasAntes: bkp && bkp[i] != null && bkp[i] !== "0" ? bkp[i] : (l.horasAntes === "0" ? "" : l.horasAntes),
+      }));
+    });
     setErrors((e) => {
       const n = { ...e };
       delete n.alguemFazia;
