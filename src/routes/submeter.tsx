@@ -84,8 +84,6 @@ function GanhoComparison({
   atual: GanhoFinal;
 }) {
   const sp = anterior.snapshot_projeto;
-  const fmtReais = (n: number | null | undefined) =>
-    n != null ? `R$ ${n.toFixed(2).replace(".", ",")}` : "—";
   const fmtHoras = (n: number | null | undefined, tipo: string | null | undefined) =>
     n != null ? `${n}h${tipo === "pontual" ? " (total)" : "/mês"}` : "—";
 
@@ -94,10 +92,9 @@ function GanhoComparison({
     if (a == null && d == null) return;
     linhas.push({ label, antes: fmt(a), depois: fmt(d), mudou: (a ?? null) !== (d ?? null) });
   };
+  // SOMENTE horas — o usuário NÃO pode ver valores financeiros de saving (R$, custo
+  // externo, ganho total). Isso é visível só para a equipe que analisa as submissões.
   push("Economia (horas)", sp?.saving_horas, atual.saving_horas, (v) => fmtHoras(v, atual.tipo_saving ?? sp?.tipo_saving));
-  push("Economia (R$)", sp?.saving_reais, atual.saving_reais, fmtReais);
-  push("Custo externo", sp?.custo_externo_mensal, atual.custo_externo_mensal, fmtReais);
-  push("Ganho total (ranking)", sp?.ganho_total_mensal, atual.ganho_total_mensal, fmtReais);
 
   if (linhas.length === 0) return null;
 
@@ -1078,6 +1075,21 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
       }
     }
 
+    // Edição sem mudanças: em vez de pular direto para a revisão final, leva o
+    // usuário pelas telas determinísticas (saving → receita) pré-preenchidas para
+    // revisão. Se ele não mudar nada, o submit do formulário avança sem reprocessar
+    // (ver handleSavingFormSubmit/handleReceitaFormSubmit). Só dispara quando o seed
+    // marcou o fluxo como completo (chatComplete) e nenhum formulário está aberto.
+    if (editProjetoId && !form.especial && chatComplete && !showSavingForm && !showReceitaForm) {
+      if (form.tipoProjeto.includes("saving")) {
+        setChatComplete(false);
+        openSavingForm();
+      } else if (form.tipoProjeto.includes("receita_incremental")) {
+        setChatComplete(false);
+        openReceitaForm();
+      }
+    }
+
     goToStep(3, "forward");
   }
 
@@ -1197,6 +1209,12 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // inclusive quando se edita o saving estando já na receita (fluxo "ambos").
     if (savingSubmitted && JSON.stringify(formData) === JSON.stringify(savingSubmitted)) {
       setShowSavingForm(false);
+      // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
+      // abre o formulário de receita; senão, vai para a revisão final.
+      if (editProjetoId) {
+        if (form.tipoProjeto.includes("receita_incremental")) openReceitaForm();
+        else setChatComplete(true);
+      }
       return;
     }
     setSavingFormLoading(true);
@@ -1262,6 +1280,8 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // Reenvio idêntico → volta ao chat existente sem reanalisar.
     if (receitaSubmitted && JSON.stringify(formData) === JSON.stringify(receitaSubmitted)) {
       setShowReceitaForm(false);
+      // Edição (revisão guiada): nada mudou → vai direto para a revisão final.
+      if (editProjetoId) setChatComplete(true);
       return;
     }
     setReceitaFormLoading(true);

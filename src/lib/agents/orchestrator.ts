@@ -364,6 +364,7 @@ ${tabelaLinhas}
 - Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${isPontual ? 'economia ÚNICA — tarefa feita uma só vez, não se repete mensalmente' : 'recorrente todo mês'})
 
 O VALOR EM REAIS JÁ FOI CALCULADO PELO SISTEMA (taxa por cargo) — NÃO MENCIONE valores em R$ para o usuário. Foque apenas nas HORAS.
+⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o texto do preview são exibidos ao usuário. Eles NÃO podem conter NENHUM valor financeiro de saving (nem economia em R$, nem taxa/hora, nem custo evitado em R$, nem total em R$). Use SOMENTE horas (antes/depois/economia) e descrições qualitativas. Os valores em R$ ficam apenas nos campos estruturados, visíveis só para a equipe que analisa as submissões. Expor R$ ao usuário permitiria que ele manipulasse os números — é proibido.
 
 ENTENDENDO OS DADOS — LEIA COM ATENÇÃO:
 Cada linha tem horas_antes (antes da automação) e horas_depois (depois da automação).
@@ -419,8 +420,8 @@ CUSTO EVITADO (ganho monetário além das horas — vale para projetos internos 
 - Quando houver, capture nos campos: \`custo_evitado_reais\` (valor em R$), \`custo_evitado_tipo\` ("mensal" se recorrente, "pontual" se gasto único) e \`custo_evitado_descricao\` (o que foi evitado — para auditoria).
 - Isso é DIFERENTE de receita incremental: custo evitado é dinheiro que a empresa DEIXOU DE GASTAR (saving), não dinheiro novo entrando (receita). NÃO mande reclassificar custo evitado como receita.
 - É DIFERENTE de custo externo incorrido (custo_externo_mensal): aquele é um gasto que a automação PASSOU a ter (subtrai); custo evitado é um gasto que ela ELIMINOU (soma).
-- O sistema soma o custo evitado ao saving em R$ automaticamente (pontual mensalizado ÷12). Você NÃO calcula o valor final em R$ — só preencha os três campos e detalhe a conta no memorial.
-- OBRIGATÓRIO no memorial: registre o custo evitado de forma explícita e auditável — o que era pago, quanto, com que periodicidade, e como entra no cálculo (ex: "Serviço externo de implementação que custaria R$ 2.700 (único) — mensalizado: 2.700 ÷ 12 = R$ 225/mês.").
+- O sistema soma o custo evitado ao saving em R$ automaticamente (pontual mensalizado ÷12). Você NÃO calcula o valor final em R$ — só preencha os três campos estruturados.
+- Você PODE perguntar ao usuário o valor do custo evitado (é um número que ele conhece) e gravá-lo em \`custo_evitado_reais\`. Mas NÃO escreva esse valor em R$ no \`memorial_calculo\` nem no preview — o memorial é visível ao usuário e NÃO pode conter valores financeiros de saving (ver regra abaixo). No memorial, descreva o custo evitado de forma QUALITATIVA: o que era pago e a periodicidade (ex: "O projeto eliminou a contratação de um serviço externo de implementação, que era uma cobrança única."). O valor em R$ fica só no campo \`custo_evitado_reais\` (auditoria da equipe).
 
 REGRA CRÍTICA — O SAVING NUNCA PODE SER ZERO:
 - Um saving sem NENHUM ganho não faz sentido. O ganho pode vir das horas economizadas OU de um custo evitado (ou ambos).
@@ -448,7 +449,8 @@ Preview (quando justificativa concreta e memorial completo):
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
-ATENÇÃO 2: se houver custo evitado, inclua no objeto "saving" os campos "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula esse valor a partir das horas + custo evitado.`;
+ATENÇÃO 2: se houver custo evitado, inclua no objeto "saving" os campos "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula esse valor a partir das horas + custo evitado.
+ATENÇÃO 3: NUNCA escreva valores em R$ no "content" nem no "memorial_calculo" (são visíveis ao usuário). Nada de "R$", "reais", taxa/hora ou totais financeiros — apenas horas e descrições. O custo evitado em R$ vai SÓ no campo estruturado "custo_evitado_reais".`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
@@ -478,6 +480,8 @@ ${blocoValidacao}
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
+
+REGRA DE OURO: o "content" e o "memorial_calculo" são vistos pelo usuário — NUNCA inclua valores financeiros de saving (R$, taxa/hora, custo evitado em R$, totais). Só horas e descrições. Se ao ajustar o memorial precisar mexer no custo evitado, altere só o campo estruturado "custo_evitado_reais".
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 

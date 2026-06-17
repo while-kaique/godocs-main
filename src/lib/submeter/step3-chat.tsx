@@ -218,6 +218,27 @@ function cleanPreviewContent(content: string) {
     .trim();
 }
 
+// Rede de segurança: o usuário NUNCA pode ver valores financeiros de SAVING (R$,
+// taxa/hora, totais) — só horas. Isso evita que ele manipule os números (as taxas
+// por cargo são internas). Só a equipe que analisa as submissões vê os R$.
+// O prompt já instrui o agente a não emitir R$, mas aqui removemos qualquer
+// vazamento antes de exibir. NÃO aplicar a receita (valor declarado pelo usuário).
+export function ocultarReaisSaving(content: string): string {
+  // Só remove linhas que de fato carregam dinheiro (R$, "X reais", valor/taxa por
+  // hora). NÃO remove por palavras como "custo"/"economia" — uma linha de horas
+  // ("Custo adicional: 1h/mês") é legítima e deve permanecer.
+  const ehLinhaFinanceira = (l: string) =>
+    /r\$/i.test(l) || /\d[\d.,]*\s*reais\b/i.test(l) || /(valor|taxa)[\s/]*(por\s*)?hora/i.test(l);
+  return content
+    .split("\n")
+    .filter((linha) => !ehLinhaFinanceira(linha))
+    .join("\n")
+    // Segurança extra: remove qualquer "R$ 1.234,56" residual inline
+    .replace(/r\$\s*[\d.,]+/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function PreviewPanel({
   content,
   isSaving,
@@ -240,7 +261,9 @@ function PreviewPanel({
   const label = isSaving ? "Memorial de Cálculo" : "Documentação do Projeto";
   const icon = isSaving ? "📊" : "📄";
 
-  const cleanContent = cleanPreviewContent(content);
+  const cleanContent = isSaving
+    ? ocultarReaisSaving(cleanPreviewContent(content))
+    : cleanPreviewContent(content);
 
   return (
     <div
@@ -386,7 +409,9 @@ function CollapsiblePreviewCard({
   onToggle: () => void;
   isSaving: boolean;
 }) {
-  const cleanContent = cleanPreviewContent(content);
+  const cleanContent = isSaving
+    ? ocultarReaisSaving(cleanPreviewContent(content))
+    : cleanPreviewContent(content);
 
   return (
     <div
@@ -464,32 +489,64 @@ function CollapsiblePreviewCard({
 
 type VersaoSnapshot = import("@/lib/meus-projetos.functions").VersaoSnapshot;
 
+function ComparisonValue({
+  value,
+  markdown,
+  isSaving,
+}: {
+  value: string | null | undefined;
+  markdown?: boolean;
+  isSaving?: boolean;
+}) {
+  const text = value?.trim();
+  if (!text) return <span style={{ color: "#bbb", fontStyle: "italic" }}>—</span>;
+  // Conteúdo de memorial tem markdown (#, -, **) → renderiza formatado, em caixa
+  // rolável para não estourar a tela com textos longos. Demais campos: texto simples
+  // com clamp de altura (descrição breve pode ser enorme).
+  return (
+    <div style={{ maxHeight: 150, overflowY: "auto" }}>
+      {markdown ? (
+        <div style={{ fontSize: 11 }}>
+          <SimpleMarkdown text={text} isSaving={!!isSaving} />
+        </div>
+      ) : (
+        <div className="text-[11px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "inherit" }}>
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComparisonRow({
   label,
   antes,
   depois,
+  markdown,
+  isSaving,
 }: {
   label: string;
   antes: string | null | undefined;
   depois: string | null | undefined;
+  markdown?: boolean;
+  isSaving?: boolean;
 }) {
   const changed = (antes ?? "").trim() !== (depois ?? "").trim();
   return (
-    <div className="grid grid-cols-[1fr_1fr] gap-0" style={{ borderBottom: "1px solid rgba(0,89,169,0.06)" }}>
-      <div className="px-3 py-2" style={{ background: "rgba(239,68,68,0.03)", borderRight: "1px solid rgba(0,89,169,0.06)" }}>
-        <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9b4040" }}>{label}</div>
-        <div className="text-[11px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#555" }}>
-          {antes?.trim() || <span style={{ color: "#bbb", fontStyle: "italic" }}>—</span>}
-        </div>
+    <div className="grid grid-cols-[1fr_1fr] gap-0 items-start" style={{ borderBottom: "1px solid rgba(0,89,169,0.06)" }}>
+      <div className="px-3 py-2 min-w-0" style={{ background: "rgba(239,68,68,0.03)", borderRight: "1px solid rgba(0,89,169,0.06)", color: "#555" }}>
+        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: "#9b4040" }}>{label}</div>
+        <ComparisonValue value={antes} markdown={markdown} isSaving={isSaving} />
       </div>
       <div
-        className="px-3 py-2"
+        className="px-3 py-2 min-w-0"
         style={{
           background: changed ? "rgba(22,163,74,0.04)" : undefined,
           borderLeft: changed ? "2px solid rgba(22,163,74,0.35)" : undefined,
+          color: "#333",
         }}
       >
-        <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-1" style={{ color: changed ? "#166534" : "#8b8b9a" }}>
+        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: changed ? "#166534" : "#8b8b9a" }}>
           {label}
           {changed && (
             <span style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a", borderRadius: 4, padding: "0px 4px", fontSize: 9 }}>
@@ -497,9 +554,7 @@ function ComparisonRow({
             </span>
           )}
         </div>
-        <div className="text-[11px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#333" }}>
-          {depois?.trim() || <span style={{ color: "#bbb", fontStyle: "italic" }}>—</span>}
-        </div>
+        <ComparisonValue value={depois} markdown={markdown} isSaving={isSaving} />
       </div>
     </div>
   );
@@ -583,10 +638,16 @@ function ComparisonPanel({
           <ComparisonRow label="Tipos" antes={tiposLabel(sp?.tipos_projeto ?? [])} depois={tiposLabel(novoResumo.tiposProjeto)} />
           <ComparisonRow label="Descrição breve" antes={sp?.descricao_breve} depois={novoResumo.descricaoBreve} />
           {(sd?.saving?.memorial_calculo || approvedSavingPreview) && (
-            <ComparisonRow label="Memorial de saving" antes={sd?.saving?.memorial_calculo} depois={approvedSavingPreview} />
+            <ComparisonRow
+              label="Memorial de saving"
+              antes={sd?.saving?.memorial_calculo ? ocultarReaisSaving(sd.saving.memorial_calculo) : null}
+              depois={approvedSavingPreview ? ocultarReaisSaving(approvedSavingPreview) : null}
+              markdown
+              isSaving
+            />
           )}
           {(sd?.receita?.memorial_calculo || approvedReceitaPreview) && (
-            <ComparisonRow label="Memorial de receita" antes={sd?.receita?.memorial_calculo} depois={approvedReceitaPreview} />
+            <ComparisonRow label="Memorial de receita" antes={sd?.receita?.memorial_calculo} depois={approvedReceitaPreview} markdown />
           )}
         </div>
       )}
