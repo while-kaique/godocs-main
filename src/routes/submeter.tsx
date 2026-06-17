@@ -253,7 +253,8 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         });
 
         setStep(2);
-        setCompletedSteps(new Set([1, 2, 3]));
+        // Etapa 3 ainda não foi percorrida nesta sessão — não marcar como concluída.
+        setCompletedSteps(new Set([1, 2]));
       })
       .catch((e) => {
         if (cancelled) return;
@@ -422,10 +423,14 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   }
 
   function handleBack() {
+    // Em modo edição começa na etapa 2 — não volta para a 1.
+    if (editProjetoId && step <= 2) return;
     if (step > 1) goToStep(step - 1, "back");
   }
 
   function handleStepClick(target: number) {
+    // Em modo edição a etapa 1 não é acessível.
+    if (editProjetoId && target === 1) return;
     if (!completedSteps.has(target) || target === step) return;
     // Ir para a etapa 3 com o agente já iniciado: usa o mesmo fluxo do botão
     // "Continuar com Agente" para detectar troca de tipo (saving ↔ receita) e
@@ -1414,6 +1419,7 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
               current={step}
               completed={completedSteps}
               onStepClick={handleStepClick}
+              editMode={!!editProjetoId}
             />
           </div>
 
@@ -1512,7 +1518,7 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
                 type="button"
                 onClick={showEtapa25 ? () => setShowEtapa25(false) : handleBack}
                 className="go-btn-back"
-                style={{ visibility: step === 1 ? "hidden" : "visible" }}
+                style={{ visibility: (step === 1 || (editProjetoId && step === 2 && !showEtapa25)) ? "hidden" : "visible" }}
               >
                 &larr; Voltar
               </button>
