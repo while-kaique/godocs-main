@@ -247,11 +247,12 @@ function Home() {
               accent
             />
             <ActionCard
-              to="/meus-projetos"
+              to={import.meta.env.DEV ? "/meus-projetos" : undefined}
               icon={<LayoutList className="h-6 w-6" />}
               title="Meus Projetos"
               description="Visualize, edite ou reenvie seus projetos submetidos."
-              badge="Editar e reenviar"
+              badge={import.meta.env.DEV ? "Editar e reenviar" : "Em breve"}
+              disabled={!import.meta.env.DEV}
             />
           </section>
 
@@ -367,6 +368,7 @@ function ActionCard({
   description,
   badge,
   accent,
+  disabled,
 }: {
   href?: string;
   to?: string;
@@ -375,6 +377,7 @@ function ActionCard({
   description: string;
   badge: string;
   accent?: boolean;
+  disabled?: boolean;
 }) {
   const inner = (
     <div
@@ -387,12 +390,17 @@ function ActionCard({
         borderRadius: "var(--go-radius-xl)",
         padding: "28px 24px 24px",
         boxShadow: "var(--go-shadow-sm)",
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+        pointerEvents: disabled ? "none" : undefined,
       }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         e.currentTarget.style.transform = "translateY(-4px)";
         e.currentTarget.style.boxShadow = "var(--go-shadow-lg)";
       }}
       onMouseLeave={(e) => {
+        if (disabled) return;
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "var(--go-shadow-sm)";
       }}
@@ -474,9 +482,8 @@ function ActionCard({
     </div>
   );
 
-  if (to) {
-    return <Link to={to}>{inner}</Link>;
-  }
+  if (disabled) return <div>{inner}</div>;
+  if (to) return <Link to={to}>{inner}</Link>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer">
       {inner}
