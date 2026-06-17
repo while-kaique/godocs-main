@@ -99,8 +99,19 @@ REGRAS:
 - Seja CÉTICO com respostas vagas: se o usuário responder vagamente, aprofunde antes de aceitar.
 - Se a resposta for ambígua, ofereça 3 opções objetivas.
 - NUNCA invente informações que não estejam no código ou nas respostas do usuário.
-- Quando todos os 7 campos tiverem informação RICA E SUFICIENTE, gere o PREVIEW em markdown.
+- Quando todos os 7 campos tiverem informação RICA E SUFICIENTE, siga o fluxo abaixo ANTES de gerar o PREVIEW.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
+
+VERIFICAÇÃO DE IA COMO FUNCIONALIDADE (obrigatória antes do preview):
+Antes de gerar o preview, verifique se o projeto usa IA como funcionalidade — ou seja, se alguma parte do que o projeto ENTREGA ao usuário envolve IA (gerar texto, classificar, transcrever, recomendar, extrair com LLM, etc.). Isso é diferente de ter sido construído com ajuda de IA.
+
+- Se a documentação já deixar CLARO que há IA como funcionalidade (ex: "usa Claude para classificar", "gera documentação com IA", "LLM extrai os dados"), defina tem_ia_como_funcionalidade como true e gere o preview direto.
+- Se a documentação deixar CLARO que NÃO há IA (processo puramente determinístico, sem menção a LLM/ML/classificador), defina tem_ia_como_funcionalidade como false e gere o preview direto.
+- Se NÃO estiver claro (qualquer dúvida), faça a pergunta abaixo com type:"options" ANTES do preview:
+  question: "Antes de montar a documentação: esse projeto usa IA como funcionalidade? Por exemplo, geração de texto, classificação automática, transcrição, extração inteligente de dados, ou qualquer outra função baseada em LLM ou modelo de IA — mesmo que seja algo secundário no fluxo."
+  options: ["Sim, tem IA como funcionalidade", "Não, é uma automação determinística", "Não tenho certeza, me explique melhor"]
+  Se o usuário escolher "Não tenho certeza, me explique melhor", responda com type:"question" explicando a diferença em 2 frases simples e pergunte novamente (com type:"options" e as mesmas 3 opções).
+  Após a resposta, defina tem_ia_como_funcionalidade (true para "Sim", false para "Não") e gere o preview.
 
 LINGUAGEM COM O USUÁRIO (IMPORTANTÍSSIMO):
 - NUNCA mencione nomes de campos internos como "o_que_faz", "fluxo", "execucao", "dependencias", "configurar_antes", "atencao", "nome_projeto", "coletado" etc. O usuário NÃO sabe que esses campos existem.
@@ -129,7 +140,7 @@ Quando precisar de clareza (oferecer opções):
 {"type":"options","question":"sua pergunta de clarificação","options":["opção concreta 1","opção concreta 2","opção concreta 3"],"coletado":{...campos atualizados}}
 
 Quando todos os campos estiverem completos — apresente o preview formatado:
-{"type":"preview","content":"# Nome do Projeto\\n\\n## O que faz\\nFrase 1. Frase 2.\\n\\n## Execução\\n- **trigger** ...\\n\\n## Fluxo\\n1. Primeira etapa.\\n2. Segunda etapa.\\n\\nEssa documentação está correta? Você pode aprovar ou pedir ajustes.","coletado":{...todos os campos}}`;
+{"type":"preview","content":"# Nome do Projeto\\n\\n## O que faz\\nFrase 1. Frase 2.\\n\\n## Execução\\n- **trigger** ...\\n\\n## Fluxo\\n1. Primeira etapa.\\n2. Segunda etapa.\\n\\nEssa documentação está correta? Você pode aprovar ou pedir ajustes.","coletado":{...todos os campos, incluindo tem_ia_como_funcionalidade: true|false}}`;
 }
 
 export function buildDocPreviewPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {

@@ -14,6 +14,9 @@ export type DocumentacaoColetada = {
   fluxo: string | null;
   configurar_antes: string | null;
   atencao: string | null;
+  // Indica se o projeto usa IA como funcionalidade (mesmo que secundária).
+  // null = ainda não perguntado; true/false = resposta do usuário ou inferência da doc.
+  tem_ia_como_funcionalidade?: boolean | null;
 };
 
 export const documentacaoVazia = (): DocumentacaoColetada => ({
@@ -24,6 +27,7 @@ export const documentacaoVazia = (): DocumentacaoColetada => ({
   fluxo: null,
   configurar_antes: null,
   atencao: null,
+  tem_ia_como_funcionalidade: null,
 });
 
 // ─── Tabela de cargos (source of truth) ────────────────────────────────────
