@@ -14,16 +14,17 @@ import type {
 } from '@/lib/agents/types';
 
 describe('documentacaoVazia', () => {
-  it('retorna todos os 7 campos como null', () => {
+  it('retorna os 7 campos de documentação como null, mais tem_ia_como_funcionalidade como null', () => {
     const doc = documentacaoVazia();
     const campos: (keyof DocumentacaoColetada)[] = [
       'nome_projeto', 'o_que_faz', 'execucao', 'dependencias',
       'fluxo', 'configurar_antes', 'atencao',
     ];
-    expect(Object.keys(doc)).toHaveLength(7);
+    expect(Object.keys(doc)).toHaveLength(8);
     for (const campo of campos) {
       expect(doc[campo]).toBeNull();
     }
+    expect(doc.tem_ia_como_funcionalidade).toBeNull();
   });
 
   it('retorna instância nova a cada chamada (sem referência compartilhada)', () => {

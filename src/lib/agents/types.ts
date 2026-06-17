@@ -14,6 +14,9 @@ export type DocumentacaoColetada = {
   fluxo: string | null;
   configurar_antes: string | null;
   atencao: string | null;
+  // Indica se o projeto usa IA como funcionalidade (mesmo que secundária).
+  // null = ainda não perguntado; true/false = resposta do usuário ou inferência da doc.
+  tem_ia_como_funcionalidade?: boolean | null;
 };
 
 export const documentacaoVazia = (): DocumentacaoColetada => ({
@@ -24,6 +27,7 @@ export const documentacaoVazia = (): DocumentacaoColetada => ({
   fluxo: null,
   configurar_antes: null,
   atencao: null,
+  tem_ia_como_funcionalidade: null,
 });
 
 // ─── Tabela de cargos (source of truth) ────────────────────────────────────
@@ -125,10 +129,10 @@ export type ResultadoAnalise = {
   resumo: string;
   complexidade: Complexidade;
   complexidade_justificativa?: string;
-  // Gate determinístico: o LLM declara se há uma IA decidindo o caminho/ação do
-  // processo. Se false, a complexidade é forçada para 'automacao' no backend
-  // (evita classificar automação sofisticada/sem IA como 'inteligencia').
-  ia_decide_caminho?: boolean;
+  // Gate determinístico: o LLM declara se o produto final usa IA como
+  // funcionalidade (IA usada só para construir/desenvolver NÃO conta).
+  // Se false → automacao; se true → pelo menos inteligencia.
+  usa_ia?: boolean;
   criterios_hardcoded: CriterioResult[];
   criterios_dinamicos: CriterioResult[];
 };
