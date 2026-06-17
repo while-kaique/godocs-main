@@ -68,6 +68,21 @@ const SCHEMA_SQL = `
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS projeto_versions (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    versao_num INTEGER NOT NULL,
+    acao TEXT NOT NULL CHECK(acao IN ('submit_inicial','reenvio')),
+    snapshot_projeto TEXT NOT NULL,
+    snapshot_doc TEXT,
+    submetido_por TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(projeto_id, versao_num)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_projeto_versions_projeto_id
+    ON projeto_versions(projeto_id);
+
   CREATE TABLE IF NOT EXISTS validacoes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     projeto_id TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,

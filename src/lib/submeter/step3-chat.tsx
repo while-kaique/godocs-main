@@ -458,18 +458,161 @@ function CollapsiblePreviewCard({
    Final Review
    ────────────────────────────────────────────── */
 
+/* ──────────────────────────────────────────────
+   Comparison Panel (antes/depois — só em reenvio)
+   ────────────────────────────────────────────── */
+
+type VersaoSnapshot = import("@/lib/meus-projetos.functions").VersaoSnapshot;
+
+function ComparisonRow({
+  label,
+  antes,
+  depois,
+}: {
+  label: string;
+  antes: string | null | undefined;
+  depois: string | null | undefined;
+}) {
+  const changed = (antes ?? "").trim() !== (depois ?? "").trim();
+  return (
+    <div className="grid grid-cols-[1fr_1fr] gap-0" style={{ borderBottom: "1px solid rgba(0,89,169,0.06)" }}>
+      <div className="px-3 py-2" style={{ background: "rgba(239,68,68,0.03)", borderRight: "1px solid rgba(0,89,169,0.06)" }}>
+        <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9b4040" }}>{label}</div>
+        <div className="text-[11px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#555" }}>
+          {antes?.trim() || <span style={{ color: "#bbb", fontStyle: "italic" }}>—</span>}
+        </div>
+      </div>
+      <div
+        className="px-3 py-2"
+        style={{
+          background: changed ? "rgba(22,163,74,0.04)" : undefined,
+          borderLeft: changed ? "2px solid rgba(22,163,74,0.35)" : undefined,
+        }}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-1" style={{ color: changed ? "#166534" : "#8b8b9a" }}>
+          {label}
+          {changed && (
+            <span style={{ background: "rgba(22,163,74,0.12)", color: "#16a34a", borderRadius: 4, padding: "0px 4px", fontSize: 9 }}>
+              alterado
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#333" }}>
+          {depois?.trim() || <span style={{ color: "#bbb", fontStyle: "italic" }}>—</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonPanel({
+  versaoAnterior,
+  novoResumo,
+  approvedSavingPreview,
+  approvedReceitaPreview,
+}: {
+  versaoAnterior: VersaoSnapshot;
+  novoResumo: { nome: string; descricaoBreve: string; ferramenta: string; tiposProjeto: string[] };
+  approvedSavingPreview: string | null;
+  approvedReceitaPreview?: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const sp = versaoAnterior.snapshot_projeto;
+  const sd = versaoAnterior.snapshot_doc;
+  const dataFormatada = versaoAnterior.created_at
+    ? new Date(versaoAnterior.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : null;
+
+  const tiposLabel = (tipos: string[]) =>
+    tipos.map((t) => (t === "saving" ? "Saving" : t === "receita_incremental" ? "Receita" : t)).join(", ") || "—";
+
+  return (
+    <div
+      className="mb-4 overflow-hidden"
+      style={{
+        border: "1px solid rgba(0,89,169,0.12)",
+        borderRadius: "var(--go-radius-md, 10px)",
+        background: "var(--go-white)",
+      }}
+    >
+      {/* Header clicável */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        style={{ background: "rgba(0,89,169,0.03)", cursor: "pointer", border: "none" }}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--go-blue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span className="text-[12px] font-semibold" style={{ color: "var(--go-blue)" }}>
+            Comparação com versão anterior
+          </span>
+          {dataFormatada && (
+            <span className="text-[10px]" style={{ color: "#8b8b9a" }}>
+              · v{versaoAnterior.versao_num} enviada em {dataFormatada}
+            </span>
+          )}
+        </div>
+        <svg
+          width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b8b9a" strokeWidth="2"
+          style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div>
+          {/* Cabeçalho colunas */}
+          <div className="grid grid-cols-[1fr_1fr] gap-0" style={{ borderBottom: "1px solid rgba(0,89,169,0.1)" }}>
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#9b4040", background: "rgba(239,68,68,0.04)", borderRight: "1px solid rgba(0,89,169,0.06)" }}>
+              Versão anterior
+            </div>
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#166534", background: "rgba(22,163,74,0.04)" }}>
+              Esta versão
+            </div>
+          </div>
+
+          <ComparisonRow label="Nome do projeto" antes={sp?.nome} depois={novoResumo.nome} />
+          <ComparisonRow label="Ferramenta" antes={sp?.ferramenta} depois={novoResumo.ferramenta} />
+          <ComparisonRow label="Tipos" antes={tiposLabel(sp?.tipos_projeto ?? [])} depois={tiposLabel(novoResumo.tiposProjeto)} />
+          <ComparisonRow label="Descrição breve" antes={sp?.descricao_breve} depois={novoResumo.descricaoBreve} />
+          {(sd?.saving?.memorial_calculo || approvedSavingPreview) && (
+            <ComparisonRow label="Memorial de saving" antes={sd?.saving?.memorial_calculo} depois={approvedSavingPreview} />
+          )}
+          {(sd?.receita?.memorial_calculo || approvedReceitaPreview) && (
+            <ComparisonRow label="Memorial de receita" antes={sd?.receita?.memorial_calculo} depois={approvedReceitaPreview} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FinalReview({
   approvedDocPreview,
   approvedSavingPreview,
   approvedReceitaPreview,
   onSubmit,
   submitting,
+  versaoAnterior,
+  novoResumo,
 }: {
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
   approvedReceitaPreview?: string | null;
   onSubmit: () => void;
   submitting: boolean;
+  versaoAnterior?: VersaoSnapshot | null;
+  novoResumo?: {
+    nome: string;
+    descricaoBreve: string;
+    ferramenta: string;
+    tiposProjeto: string[];
+  };
 }) {
   const [expandedDoc, setExpandedDoc] = useState(false);
   const [expandedSaving, setExpandedSaving] = useState(false);
@@ -501,6 +644,15 @@ function FinalReview({
           </div>
         </div>
       </div>
+
+      {versaoAnterior && novoResumo && (
+        <ComparisonPanel
+          versaoAnterior={versaoAnterior}
+          novoResumo={novoResumo}
+          approvedSavingPreview={approvedSavingPreview}
+          approvedReceitaPreview={approvedReceitaPreview}
+        />
+      )}
 
       {approvedDocPreview && (
         <CollapsiblePreviewCard
@@ -1125,6 +1277,8 @@ export function Step3Chat({
   onFormDraftChange,
   onEditSaving,
   onEditReceita,
+  versaoAnterior,
+  novoResumo,
 }: {
   messages: ChatMessage[];
   input: string;
@@ -1158,6 +1312,13 @@ export function Step3Chat({
   // aparecer na fase de receita (editar saving já validado + editar receita).
   onEditSaving?: () => void;
   onEditReceita?: () => void;
+  versaoAnterior?: import("@/lib/meus-projetos.functions").VersaoSnapshot | null;
+  novoResumo?: {
+    nome: string;
+    descricaoBreve: string;
+    ferramenta: string;
+    tiposProjeto: string[];
+  };
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSavingFase = fase === "saving" || fase === "saving_preview";
@@ -1558,6 +1719,8 @@ export function Step3Chat({
           approvedReceitaPreview={approvedReceitaPreview}
           onSubmit={onSubmit}
           submitting={submitting}
+          versaoAnterior={versaoAnterior}
+          novoResumo={novoResumo}
         />
       )}
 

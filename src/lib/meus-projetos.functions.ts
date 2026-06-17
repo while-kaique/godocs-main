@@ -4,6 +4,7 @@
 import {
   getProjetosByOwnerEmail,
   getProjetoWithRelations,
+  getLatestVersionByProjeto,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
@@ -20,6 +21,30 @@ export type MeuProjetoItem = {
   updated_at: string | null;
   submitted_at: string | null;
   arquivos_nomes: string[];
+};
+
+export type VersaoSnapshot = {
+  versao_num: number;
+  acao: string;
+  snapshot_projeto: {
+    nome: string | null;
+    descricao_breve: string | null;
+    ferramenta: string | null;
+    tipos_projeto: string[];
+    area: string | null;
+    saving_horas: number | null;
+    saving_reais: number | null;
+    tipo_saving: string | null;
+    memorial_calculo: string | null;
+    ganho_total_mensal: number | null;
+    custo_externo_mensal: number | null;
+    alguem_fazia: string | null;
+  };
+  snapshot_doc: {
+    saving?: { memorial_calculo?: string | null };
+    receita?: { memorial_calculo?: string | null };
+  } | null;
+  created_at: string | null;
 };
 
 export type MeuProjetoDetalhes = MeuProjetoItem & {
@@ -40,6 +65,7 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   alguem_fazia: string | null;
   memorial_calculo: string | null;
   documentacao: unknown | null;
+  ultima_versao: VersaoSnapshot | null;
 };
 
 function ehDono(projeto: ProjetoRow, email: string): boolean {
@@ -87,6 +113,18 @@ export async function getMeuProjeto(
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;
 
+  const ultimaVersaoRow = await getLatestVersionByProjeto(id);
+  let ultima_versao: VersaoSnapshot | null = null;
+  if (ultimaVersaoRow) {
+    ultima_versao = {
+      versao_num: ultimaVersaoRow.versao_num,
+      acao: ultimaVersaoRow.acao,
+      snapshot_projeto: parseJson(ultimaVersaoRow.snapshot_projeto) ?? ({} as VersaoSnapshot['snapshot_projeto']),
+      snapshot_doc: parseJson(ultimaVersaoRow.snapshot_doc ?? null),
+      created_at: ultimaVersaoRow.created_at,
+    };
+  }
+
   const base = mapItem({ ...data, area_nome: data.area_nome ?? null });
   return {
     ...base,
@@ -107,5 +145,6 @@ export async function getMeuProjeto(
     alguem_fazia: data.alguem_fazia,
     memorial_calculo: data.memorial_calculo,
     documentacao: docConteudo,
+    ultima_versao,
   };
 }

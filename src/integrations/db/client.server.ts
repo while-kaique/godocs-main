@@ -283,6 +283,48 @@ export function findDuplicateProjeto(nome: string, excludeId: string) {
   );
 }
 
+// --- Versões ---
+
+export async function gravarVersaoProjeto(
+  projeto_id: string,
+  acao: 'submit_inicial' | 'reenvio',
+  snapshotProjeto: Record<string, unknown>,
+  snapshotDoc: Record<string, unknown> | null,
+  submetidoPor: string | null,
+): Promise<void> {
+  const row = await queryOne<{ proxima: number }>(
+    'SELECT COALESCE(MAX(versao_num), 0) + 1 AS proxima FROM projeto_versions WHERE projeto_id = ?',
+    [projeto_id],
+  );
+  const versao_num = row?.proxima ?? 1;
+  await exec(
+    `INSERT INTO projeto_versions (id, projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, submetido_por, created_at)
+     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [
+      projeto_id,
+      versao_num,
+      acao,
+      JSON.stringify(snapshotProjeto),
+      snapshotDoc ? JSON.stringify(snapshotDoc) : null,
+      submetidoPor,
+    ],
+  );
+}
+
+export function getVersionsByProjeto(projeto_id: string) {
+  return queryAll<VersionRow>(
+    'SELECT * FROM projeto_versions WHERE projeto_id = ? ORDER BY versao_num ASC',
+    [projeto_id],
+  );
+}
+
+export function getLatestVersionByProjeto(projeto_id: string) {
+  return queryOne<VersionRow>(
+    'SELECT * FROM projeto_versions WHERE projeto_id = ? ORDER BY versao_num DESC LIMIT 1',
+    [projeto_id],
+  );
+}
+
 export function getProjetosByOwnerEmail(email: string) {
   return queryAll<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
@@ -685,6 +727,17 @@ export type DocumentacaoRow = {
   versao: number | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type VersionRow = {
+  id: string;
+  projeto_id: string;
+  versao_num: number;
+  acao: string;
+  snapshot_projeto: string; // JSON
+  snapshot_doc: string | null; // JSON
+  submetido_por: string | null;
+  created_at: string | null;
 };
 
 export type ValidacaoRow = {

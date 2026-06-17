@@ -8,6 +8,7 @@ import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, AnaliseResult } from "@/lib/submeter/constants";
+import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
@@ -95,6 +96,9 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   const [agentMeta, setAgentMeta] = useState<AgentMeta | null>(null);
   const [agentArquivosSig, setAgentArquivosSig] = useState<string>("");
   const [continuando, setContinuando] = useState(false);
+  // Snapshot da versão anterior — capturado uma vez no seed, nunca sobrescrito.
+  // Usado na tela de comparação antes/depois do FinalReview.
+  const [versaoAnterior, setVersaoAnterior] = useState<VersaoSnapshot | null>(null);
   // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
   const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
@@ -226,6 +230,10 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
             if (receita.memorial_calculo) setApprovedReceitaPreview(String(receita.memorial_calculo));
           }
         }
+
+        // Snapshot congelado da última versão submetida — para a tela de comparação.
+        const ultimaVersao = data.ultima_versao as VersaoSnapshot | null;
+        if (ultimaVersao) setVersaoAnterior(ultimaVersao);
 
         // Se o projeto já tem previews completos, não precisa rodar o agente novamente.
         // chatComplete = true faz o botão "Enviar" aparecer direto na etapa 3.
@@ -1506,6 +1514,17 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
                       ? openReceitaForm
                       : undefined
                   }
+                  versaoAnterior={versaoAnterior}
+                  novoResumo={{
+                    nome: form.nomeProjeto.trim(),
+                    descricaoBreve: form.descricaoBreve.trim(),
+                    ferramenta: form.escopo === "externo"
+                      ? form.servicoExterno.trim()
+                      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+                        ? `Outros: ${form.ferramentaOutra.trim()}`
+                        : form.ferramenta,
+                    tiposProjeto: form.tipoProjeto,
+                  }}
                 />
               </StepAnimation>
             )}

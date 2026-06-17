@@ -23,6 +23,7 @@ import {
   updateValidacaoEmailEnviado,
   insertAnalise,
   parseJson,
+  gravarVersaoProjeto,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
@@ -1170,6 +1171,40 @@ export async function submeterParaValidacao(rawData: unknown) {
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
+
+  // ── Snapshot imutável de auditoria ────────────────────────────────────────────
+  // Grava uma cópia do estado do projeto no momento da submissão. Não propaga
+  // erros — o snapshot é observabilidade, não deve bloquear a submissão.
+  try {
+    const projetoAtualizado = await getProjetoById(projeto_id);
+    if (projetoAtualizado) {
+      const snapshotProjeto: Record<string, unknown> = {
+        nome: projetoAtualizado.nome,
+        descricao_breve: projetoAtualizado.descricao_breve,
+        ferramenta: projetoAtualizado.ferramenta,
+        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
+        especial: projetoAtualizado.especial,
+        area: projetoAtualizado.area,
+        saving_horas: projetoAtualizado.saving_horas,
+        saving_reais: projetoAtualizado.saving_reais,
+        tipo_saving: projetoAtualizado.tipo_saving,
+        memorial_calculo: projetoAtualizado.memorial_calculo,
+        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
+        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
+        alguem_fazia: projetoAtualizado.alguem_fazia,
+        status: projetoAtualizado.status,
+      };
+      await gravarVersaoProjeto(
+        projeto_id,
+        ehReenvio ? 'reenvio' : 'submit_inicial',
+        snapshotProjeto,
+        conteudo,
+        projetoAtualizado.responsavel_email,
+      );
+    }
+  } catch (versionErr) {
+    err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
+  }
 
   // ── Enviar dados ao n8n (registra na planilha + Drive + notifica Google Chat) ──
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
