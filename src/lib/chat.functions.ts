@@ -973,6 +973,10 @@ export async function analisarProjetoFn(rawData: unknown) {
   // qualquer área, inclusive RPA (o veredito pode rebaixar uma auto-aprovação).
   const statusVeredito = resultado.resultado === 'aprovado' ? 'aprovado' : 'rejeitado';
 
+  // Buscar documentação para calcular materialidade (teto de R$ 5k/mês)
+  const docRow = await getDocumentacao(projeto_id);
+  const conteudo = (parseJson<Record<string, unknown>>(docRow?.conteudo ?? '{}') ?? {}) as Record<string, unknown>;
+
   // Teto de materialidade: projetos acima de R$ 5k/mês exigem validação humana independente do veredito.
   const TETO_MATERIALIDADE_ANALISE = 5000;
   const materialidadeProjeto = calcularMaterialidade(
