@@ -227,6 +227,17 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
           }
         }
 
+        // Se o projeto já tem previews completos, não precisa rodar o agente novamente.
+        // chatComplete = true faz o botão "Enviar" aparecer direto na etapa 3.
+        // Quando o usuário altera algo, handleContinuarAgente reseta chatComplete.
+        if (!data.especial && partes.length > 0) {
+          const hasSavingType = tiposProjeto.includes("saving");
+          const hasReceitaType = tiposProjeto.includes("receita_incremental");
+          const savingOk = !hasSavingType || (saving && saving.memorial_calculo);
+          const receitaOk = !hasReceitaType || (receita && receita.memorial_calculo);
+          if (savingOk && receitaOk) setChatComplete(true);
+        }
+
         // Snapshot do agentMeta para que o agente não reprocesse se nada mudou
         setAgentMeta({
           nomeProjeto: newForm.nomeProjeto.trim(),
@@ -896,6 +907,47 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         const msg = e instanceof Error ? e.message : String(e);
         toast.error(`Erro ao atualizar o tipo de projeto: ${msg}`);
         return;
+      }
+    }
+
+    // Fallback de edição: se chegou aqui sem mensagens e sem estar completo,
+    // o projeto tem documentação mas nenhum preview foi gerado (estado incompleto).
+    // Reinicializa o agente a partir do texto já extraído no banco.
+    if (editProjetoId && chatMessages.length === 0 && !chatComplete && projetoId) {
+      setContinuando(true);
+      try {
+        const meta = snapshotMeta();
+        const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+          "/api/chat/atualizar-metadados",
+          {
+            projeto_id: projetoId,
+            nome_projeto: meta.nomeProjeto,
+            ferramenta: meta.ferramenta,
+            membros: meta.participantes,
+            data_criacao: meta.dataCriacao,
+            descricao_breve: meta.descricaoBreve,
+            reset_doc: true,
+          }
+        );
+        setAgentMeta(meta);
+        if (result.reset && result.response) {
+          setChatMessages([{
+            role: "assistant",
+            content: result.response.content,
+            options: result.response.options ?? undefined,
+            isComplete: result.response.isComplete,
+            isPreview: result.response.isPreview,
+            fase: result.response.fase,
+          }]);
+          setChatFase(result.response.fase ?? "doc");
+          if (result.response.isComplete) setChatComplete(true);
+        }
+      } catch (e) {
+        console.error("[submeter] falha ao inicializar agente (edit fallback):", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`Erro ao inicializar análise: ${msg}`);
+      } finally {
+        setContinuando(false);
       }
     }
 

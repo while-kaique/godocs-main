@@ -1066,7 +1066,8 @@ export async function submeterParaValidacao(rawData: unknown) {
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
-  if (projeto.nome) {
+  // Reenvio atualiza o projeto existente — não bloquear por nome duplicado.
+  if (projeto.nome && !ehReenvio) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
     if (duplicata) {
       throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
