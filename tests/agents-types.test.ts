@@ -41,8 +41,9 @@ describe('savingVazio', () => {
     const nulos: (keyof SavingColetado)[] = [
       'economia_horas_mes', 'economia_reais_mes',
       'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
+      'custo_evitado_reais', 'custo_evitado_tipo', 'custo_evitado_descricao',
     ];
-    expect(Object.keys(saving)).toHaveLength(6);
+    expect(Object.keys(saving)).toHaveLength(9);
     expect(saving.linhas).toEqual([]);
     for (const campo of nulos) {
       expect(saving[campo]).toBeNull();
@@ -129,6 +130,9 @@ describe('OrchestratorResult', () => {
       tipo_saving: 'mensal',
       memorial_calculo: 'Detalhamento...',
       valor_ganho_mensal: null,
+      custo_evitado_reais: null,
+      custo_evitado_tipo: null,
+      custo_evitado_descricao: null,
     };
     const result: OrchestratorResult = {
       type: 'complete',

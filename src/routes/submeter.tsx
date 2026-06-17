@@ -62,6 +62,88 @@ type AgentMeta = {
   contextoEspecial: string;
 };
 
+// Números finais recalculados pelo servidor na submissão (retorno de submeter-validacao).
+type GanhoFinal = {
+  saving_horas: number | null;
+  saving_reais: number | null;
+  tipo_saving: string | null;
+  receita_valor: number | null;
+  receita_tipo: string | null;
+  custo_externo_mensal: number | null;
+  ganho_total_mensal: number | null;
+};
+
+// Comparativo numérico antes×depois exibido na tela de sucesso após uma edição.
+// "antes" vem do snapshot da versão anterior; "depois" dos números recalculados
+// pelo servidor nesta submissão. Só renderiza quando há versão anterior.
+function GanhoComparison({
+  anterior,
+  atual,
+}: {
+  anterior: VersaoSnapshot;
+  atual: GanhoFinal;
+}) {
+  const sp = anterior.snapshot_projeto;
+  const fmtReais = (n: number | null | undefined) =>
+    n != null ? `R$ ${n.toFixed(2).replace(".", ",")}` : "—";
+  const fmtHoras = (n: number | null | undefined, tipo: string | null | undefined) =>
+    n != null ? `${n}h${tipo === "pontual" ? " (total)" : "/mês"}` : "—";
+
+  const linhas: { label: string; antes: string; depois: string; mudou: boolean }[] = [];
+  const push = (label: string, a: number | null | undefined, d: number | null | undefined, fmt: (v: number | null | undefined) => string) => {
+    if (a == null && d == null) return;
+    linhas.push({ label, antes: fmt(a), depois: fmt(d), mudou: (a ?? null) !== (d ?? null) });
+  };
+  push("Economia (horas)", sp?.saving_horas, atual.saving_horas, (v) => fmtHoras(v, atual.tipo_saving ?? sp?.tipo_saving));
+  push("Economia (R$)", sp?.saving_reais, atual.saving_reais, fmtReais);
+  push("Custo externo", sp?.custo_externo_mensal, atual.custo_externo_mensal, fmtReais);
+  push("Ganho total (ranking)", sp?.ganho_total_mensal, atual.ganho_total_mensal, fmtReais);
+
+  if (linhas.length === 0) return null;
+
+  const dataFmt = anterior.created_at
+    ? new Date(anterior.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : null;
+
+  return (
+    <div
+      className="mb-7 text-left overflow-hidden"
+      style={{
+        border: "1px solid rgba(0,89,169,0.12)",
+        borderRadius: "var(--go-radius-md)",
+      }}
+    >
+      <div
+        className="px-4 py-2.5 text-[11px] font-bold"
+        style={{ color: "var(--go-blue)", background: "rgba(0,89,169,0.04)" }}
+      >
+        Comparativo com a versão anterior
+        {dataFmt && (
+          <span className="font-normal" style={{ color: "#8b8b9a" }}>
+            {" "}· v{anterior.versao_num} de {dataFmt}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-[1.2fr_1fr_1fr]" style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}>
+        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#9b9bab" }} />
+        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#9b4040" }}>Antes</div>
+        <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "#166534" }}>Agora</div>
+      </div>
+      {linhas.map((l) => (
+        <div
+          key={l.label}
+          className="grid grid-cols-[1.2fr_1fr_1fr] items-center"
+          style={{ borderTop: "1px solid rgba(0,89,169,0.06)", background: l.mudou ? "rgba(22,163,74,0.04)" : undefined }}
+        >
+          <div className="px-3 py-2 text-[11px] font-medium" style={{ color: "#555" }}>{l.label}</div>
+          <div className="px-3 py-2 text-[11px]" style={{ color: "#888" }}>{l.antes}</div>
+          <div className="px-3 py-2 text-[11px] font-semibold" style={{ color: l.mudou ? "#166534" : "#555" }}>{l.depois}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Passos nomeados estimados por operação pesada (item: loading com etapa explícita).
 const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
@@ -125,6 +207,9 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   const [receitaSubmitted, setReceitaSubmitted] = useState<SavingFormData | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnaliseResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  // Números finais recalculados pelo servidor na submissão — usados no comparativo
+  // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
+  const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Alerta ao tentar fechar/recarregar a página durante a análise
@@ -229,22 +314,22 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
             setReceitaSubmitted(receitaSnap);
             if (receita.memorial_calculo) setApprovedReceitaPreview(String(receita.memorial_calculo));
           }
+
+          // Se o projeto já tem previews completos, não precisa rodar o agente novamente.
+          // chatComplete = true faz o botão "Enviar" aparecer direto na etapa 3.
+          // Quando o usuário altera algo, handleContinuarAgente reseta chatComplete.
+          if (!data.especial && partes.length > 0) {
+            const hasSavingType = tiposProjeto.includes("saving");
+            const hasReceitaType = tiposProjeto.includes("receita_incremental");
+            const savingOk = !hasSavingType || (saving && saving.memorial_calculo);
+            const receitaOk = !hasReceitaType || (receita && receita.memorial_calculo);
+            if (savingOk && receitaOk) setChatComplete(true);
+          }
         }
 
         // Snapshot congelado da última versão submetida — para a tela de comparação.
         const ultimaVersao = data.ultima_versao as VersaoSnapshot | null;
         if (ultimaVersao) setVersaoAnterior(ultimaVersao);
-
-        // Se o projeto já tem previews completos, não precisa rodar o agente novamente.
-        // chatComplete = true faz o botão "Enviar" aparecer direto na etapa 3.
-        // Quando o usuário altera algo, handleContinuarAgente reseta chatComplete.
-        if (!data.especial && partes.length > 0) {
-          const hasSavingType = tiposProjeto.includes("saving");
-          const hasReceitaType = tiposProjeto.includes("receita_incremental");
-          const savingOk = !hasSavingType || (saving && saving.memorial_calculo);
-          const receitaOk = !hasReceitaType || (receita && receita.memorial_calculo);
-          if (savingOk && receitaOk) setChatComplete(true);
-        }
 
         // Snapshot do agentMeta para que o agente não reprocesse se nada mudou
         setAgentMeta({
@@ -612,22 +697,44 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
       setTimeout(() => setShaking(false), 350);
       return;
     }
-    if (arquivos.length === 0) return;
+    if (!editProjetoId && arquivos.length === 0) return;
 
     setEnviandoEspecial(true);
     try {
+      const ferramentaEnviada = form.escopo === "externo"
+        ? form.servicoExterno.trim()
+        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+          ? `Outros: ${form.ferramentaOutra.trim()}`
+          : form.ferramenta;
+
+      if (editProjetoId && projetoId) {
+        // Modo edição: atualiza metadados do projeto existente, reconstrói doc especial e reenvia.
+        const docs = arquivos.length > 0
+          ? await Promise.all(arquivos.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })))
+          : undefined;
+
+        await apiFetch("/api/chat/atualizar-metadados", {
+          projeto_id: projetoId,
+          nome_projeto: form.nomeProjeto.trim(),
+          ferramenta: ferramentaEnviada,
+          membros: form.participantes,
+          data_criacao: form.dataCriacao,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          contexto_especial: form.contextoEspecial.trim(),
+          ...(docs ? { docs } : { reset_doc: true }),
+        });
+
+        await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId, modo: "edicao" });
+        setSubmitted(true);
+        return;
+      }
+
       const docs = await Promise.all(
         arquivos.map(async (f) => ({
           base64: await readFileAsBase64(f),
           filename: f.name,
         }))
       );
-
-      const ferramentaEnviada = form.escopo === "externo"
-        ? form.servicoExterno.trim()
-        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-          ? `Outros: ${form.ferramentaOutra.trim()}`
-          : form.ferramenta;
 
       // 1) Cria o projeto (backend monta a doc sem IA e marca chat_completo).
       const result = await apiFetch<{ projeto_id: string; especial?: boolean }>(
@@ -926,7 +1033,12 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // Fallback de edição: se chegou aqui sem mensagens e sem estar completo,
     // o projeto tem documentação mas nenhum preview foi gerado (estado incompleto).
     // Reinicializa o agente a partir do texto já extraído no banco.
-    if (editProjetoId && chatMessages.length === 0 && !chatComplete && projetoId) {
+    // GUARDA: se o preview de doc já existe (fase doc concluída) e nada mudou desde
+    // o seed, não reinicia — o usuário só voltou a verificar, não alterou nada.
+    const _fbMeta = snapshotMeta();
+    const _fbNothingChanged = agentMeta !== null && JSON.stringify(_fbMeta) === JSON.stringify(agentMeta);
+    if (editProjetoId && chatMessages.length === 0 && !chatComplete && projetoId &&
+        !(approvedDocPreview !== null && _fbNothingChanged)) {
       setContinuando(true);
       try {
         const meta = snapshotMeta();
@@ -959,6 +1071,8 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         console.error("[submeter] falha ao inicializar agente (edit fallback):", e);
         const msg = e instanceof Error ? e.message : String(e);
         toast.error(`Erro ao inicializar análise: ${msg}`);
+        setContinuando(false);
+        return;
       } finally {
         setContinuando(false);
       }
@@ -1012,9 +1126,14 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         setTimeout(() => {
           setShowTransition(false);
           setChatMessages([]);
-          setFormDraft(emptyFormDraft()); // fase nova → formulário em branco
-          setSavingSubmitted(null);
-          setReceitaSubmitted(null);
+          if (editProjetoId) {
+            // edição: pré-preenche com dados salvos anteriormente
+            setFormDraft(savingSubmitted ?? emptyFormDraft());
+          } else {
+            setFormDraft(emptyFormDraft());
+            setSavingSubmitted(null);
+            setReceitaSubmitted(null);
+          }
           setShowSavingForm(true);
         }, 3000);
       } else if (transitionToReceita) {
@@ -1031,8 +1150,13 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         setTimeout(() => {
           setShowTransition(false);
           setChatMessages([]);
-          setFormDraft(emptyFormDraft()); // fase nova → formulário em branco
-          setReceitaSubmitted(null); // saving (se houver) é preservado p/ edição posterior
+          if (editProjetoId) {
+            // edição: pré-preenche com dados salvos anteriormente
+            setFormDraft(receitaSubmitted ?? emptyFormDraft());
+          } else {
+            setFormDraft(emptyFormDraft());
+            setReceitaSubmitted(null);
+          }
           setShowReceitaForm(true);
         }, 3000);
       } else {
@@ -1203,10 +1327,14 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
 
     // 1) Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
     try {
-      await apiFetch("/api/chat/submeter-validacao", {
-        projeto_id: projetoId,
-        ...(editProjetoId ? { modo: "edicao" } : {}),
-      });
+      const res = await apiFetch<{ ok: boolean; status: string; ganho?: GanhoFinal }>(
+        "/api/chat/submeter-validacao",
+        {
+          projeto_id: projetoId,
+          ...(editProjetoId ? { modo: "edicao" } : {}),
+        },
+      );
+      if (res?.ganho) setGanhoFinal(res.ganho);
     } catch (e) {
       console.error("[submeter] envio falhou:", e);
       const msg = e instanceof Error ? e.message : "";
@@ -1345,6 +1473,11 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
               />
               <SummaryRow label="Status" value={form.especial ? "Aguardando validação" : "Aguardando análise"} badge last />
             </div>
+
+            {/* Comparativo numérico antes×depois — só em edição com versão anterior. */}
+            {editProjetoId && versaoAnterior && ganhoFinal && (
+              <GanhoComparison anterior={versaoAnterior} atual={ganhoFinal} />
+            )}
 
             {/* Card da análise IA (inline — loading ou resultado). Projeto especial
                 não passa pela análise automática (validação é humana) → seção oculta. */}

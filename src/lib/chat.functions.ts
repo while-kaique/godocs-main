@@ -1154,15 +1154,16 @@ export async function submeterParaValidacao(rawData: unknown) {
   }
   const now = new Date().toISOString();
 
-  // ── Calcular ganho_total_mensal (saving + receita/10 mensalizada) ──
-  // Saving pontual entra com o valor cheio — não mensaliza por 12.
+  // ── Calcular ganho_total_mensal (saving + receita/10) ──
+  // Saving entra com o valor cheio (economia_reais_mes já inclui custo evitado
+  // mensalizado e abate o custo externo). A receita NÃO mensaliza por 12 — entra
+  // pelo valor informado e só aplica o ÷10 (fator de equivalência saving×receita).
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
   const savingMensal = savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
   const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
-  const receitaEquivalente = receitaMensal / 10;
+  const receitaEquivalente = receitaValor / 10;
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
@@ -1283,7 +1284,21 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   }
 
-  return { ok: true, status };
+  // Números finais recalculados — o cliente usa para o comparativo antes×depois
+  // na tela pós-envio (edição). São os MESMOS valores gravados no projeto/snapshot.
+  return {
+    ok: true,
+    status,
+    ganho: {
+      saving_horas: (saving?.economia_horas_mes as number) ?? null,
+      saving_reais: (saving?.economia_reais_mes as number) ?? null,
+      tipo_saving: (saving?.tipo_saving as string) ?? null,
+      receita_valor: receitaValor > 0 ? receitaValor : null,
+      receita_tipo: receitaTipo,
+      custo_externo_mensal: projeto.custo_externo_mensal ?? null,
+      ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
+    },
+  };
 }
 
 // ─── Validar projeto ─────────────────────────────────────────────────────────

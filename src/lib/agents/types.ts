@@ -54,10 +54,18 @@ export type SavingLinha = {
 export type SavingColetado = {
   linhas: SavingLinha[];               // detalhamento por pessoa/cargo
   economia_horas_mes: number | null;   // total: soma das linhas
-  economia_reais_mes: number | null;   // total líquido (já abatido o custo externo)
+  economia_reais_mes: number | null;   // total líquido (horas×cargo + custo evitado − custo externo)
   tipo_saving: 'mensal' | 'pontual' | null;
   memorial_calculo: string | null;
   valor_ganho_mensal: number | null;
+  // Custo que o projeto passou a EVITAR (ex: serviço externo/licença que deixou de
+  // ser paga). É um saving monetário ALÉM das horas — soma ao economia_reais_mes
+  // (pontual entra mensalizado ÷12). Coletado pelo agente na conversa do memorial,
+  // não pelo formulário. Distingue-se do custo_externo_mensal (custo INCORRIDO, que
+  // subtrai). Os três campos juntos viabilizam a auditoria do cálculo.
+  custo_evitado_reais: number | null;
+  custo_evitado_tipo: 'mensal' | 'pontual' | null;
+  custo_evitado_descricao: string | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -67,6 +75,9 @@ export const savingVazio = (): SavingColetado => ({
   tipo_saving: null,
   memorial_calculo: null,
   valor_ganho_mensal: null,
+  custo_evitado_reais: null,
+  custo_evitado_tipo: null,
+  custo_evitado_descricao: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────

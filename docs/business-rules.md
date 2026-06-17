@@ -82,25 +82,29 @@ O usuário pode navegar livremente entre steps já completados sem perder o prog
 
 ## Cálculos financeiros
 
-### Saving (`iniciarSaving`)
+### Saving (`iniciarSaving` / `recomputarSavingFinanceiro`)
 ```
 Para cada linha:
   valor_hora = CARGOS[cargo].valor  (lookup fixo)
   economia_horas = max(0, horas_antes - horas_depois)
   economia_reais = economia_horas × valor_hora
 
+Custo evitado (ganho monetário além das horas — coletado pelo agente, não pelo form):
+  custo_evitado_mensal = custo_evitado_tipo == 'pontual' ? custo_evitado_reais / 12 : custo_evitado_reais
+
 Total:
   economia_horas_mes = sum(economia_horas)
-  economia_reais_mes = sum(economia_reais) - custo_externo_mensal
+  economia_reais_mes = sum(economia_reais) + custo_evitado_mensal - custo_externo_mensal
 ```
 
-**Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna.
+- **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (licença/serviço cancelado). É saving (soma), não receita. Pontual entra mensalizado ÷12. Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai).
+- O agente investiga custo evitado em projetos internos E externos e registra o cálculo explícito no memorial (auditoria).
+- **Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna.
 
 ### Ganho total mensal (`submeterParaValidacao`)
 ```
-saving_mensal = tipo_saving == 'pontual' ? saving_reais / 12 : saving_reais
-receita_mensal = tipo == 'pontual' ? valor_ganho_mensal / 12 : valor_ganho_mensal
-receita_equiv = receita_mensal / 10  (÷ 10)
+saving_mensal = saving_reais                 (valor cheio — já inclui custo evitado e abate custo externo)
+receita_equiv = valor_ganho_mensal / 10      (÷ 10; NÃO mensaliza por 12, mesmo se pontual)
 ganho_total = saving_mensal + receita_equiv
 ```
 

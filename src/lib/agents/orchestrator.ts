@@ -229,10 +229,11 @@ SE o racional do usuário descrever qualquer um desses padrões: NÃO monte memo
 COMO CONDUZIR:
 1. Apresente-se em 1 frase curta explicando que agora vamos avaliar o ganho de receita do projeto.
 2. ${valorInformado
-    ? `O usuário já informou o valor (R$ ${receita.valor_ganho_mensal}${unidadeReceita}) — pergunte a lógica por trás dele (como foi calculado, de onde vem, qual a base de comparação). NÃO peça o valor novamente.`
-    : 'Pergunte qual é o ganho de receita estimado e a lógica por trás (como esse valor foi calculado, de onde vem, qual a base de comparação).'}
+    ? `O usuário já informou o valor (R$ ${receita.valor_ganho_mensal}${unidadeReceita}) — CRUZE o racional com o RESUMO DO PROJETO e os DETALHES TÉCNICOS APROVADOS para formular a primeira pergunta. Se o racional não condiz com o que o projeto faz, questione essa inconsistência diretamente. Se condiz, aprofunde como especificamente o projeto leva a esse ganho. NÃO peça o valor novamente e NÃO faça perguntas genéricas desconectadas do projeto.`
+    : 'Baseando-se no RESUMO DO PROJETO e nos DETALHES TÉCNICOS APROVADOS, formule a primeira pergunta sobre como o projeto especificamente gera receita nova — não faça perguntas genéricas desconectadas do que o projeto faz.'}
 3. Faça UMA pergunta por vez. Seja cético — peça evidências concretas.
-4. Se o valor parecer alto, peça detalhamento: "Como você chegou a esse número? Qual era a receita antes e qual é agora?"
+4. Baseie cada pergunta no que o projeto realmente faz (RESUMO DO PROJETO + DETALHES TÉCNICOS acima). Se o racional for inconsistente com o que o projeto faz, questione essa inconsistência diretamente. Perguntas genéricas desconectadas do projeto são inaceitáveis.
+5. Se o valor parecer alto, peça detalhamento: "Como você chegou a esse número? Qual era a receita antes e qual é agora?"
 5. Monte o memorial_calculo automaticamente com base nas respostas — o usuário NÃO escreve o memorial.
 6. Quando valor_ganho_mensal e memorial estiverem justificados, gere o PREVIEW.
 
@@ -401,12 +402,22 @@ REGRAS ANTI-EXTRAPOLAÇÃO:
 - O memorial precisa ter lógica verificável por pessoa: frequência × tempo = horas; soma das pessoas = total.
 - Para custos adicionais, documente o que a pessoa faz e por que é necessário.
 
-REGRA CRÍTICA — ECONOMIA NUNCA PODE SER ZERO:
-- Uma economia de 0h NÃO FAZ SENTIDO para submissão como saving. NUNCA gere preview com economia_horas_mes = 0.
-- Se as horas antes e depois forem iguais (rotina idêntica, só trocou o software), a economia é ZERO — bloqueie e investigue primeiro.
-- INVESTIGAÇÃO HONESTA: antes de aceitar o zero, pergunte diretamente — a ferramenta nova elimina erros que geravam retrabalho? Aumenta capacidade processada? Permite fazer mais rápido? Se houver ganho real de horas, descubra e quantifique.
-- NÃO INVENTE GANHOS: se após investigação honesta o usuário confirmar que a rotina é literalmente idêntica (mesmas horas, mesmo processo, só mudou o software sem nenhuma redução real), seja honesto. Explique que sem redução de horas mensurável não é possível submeter como saving e oriente: "Se o projeto cancela uma licença paga, isso é custo evitado — considere submeter como receita incremental. Se o impacto é qualitativo e importante mas difícil de medir em horas, considere a opção de projeto especial (alto impacto, difícil mensuração)."
-- NUNCA apresente um preview onde economia_horas_mes = 0 e NUNCA permita aprovação nessa condição.
+CUSTO EVITADO (ganho monetário além das horas — vale para projetos internos E externos):
+- Além do tempo economizado, MUITOS projetos passam a EVITAR um custo: uma licença/assinatura cancelada, um serviço externo que deixou de ser contratado, uma cobrança pontual de implementação que não foi mais necessária, etc.
+- SEMPRE investigue isso: pergunte de forma natural se o projeto fez a empresa deixar de gastar com alguma ferramenta, serviço ou contratação — recorrente (mensal) ou única (pontual).
+- Quando houver, capture nos campos: \`custo_evitado_reais\` (valor em R$), \`custo_evitado_tipo\` ("mensal" se recorrente, "pontual" se gasto único) e \`custo_evitado_descricao\` (o que foi evitado — para auditoria).
+- Isso é DIFERENTE de receita incremental: custo evitado é dinheiro que a empresa DEIXOU DE GASTAR (saving), não dinheiro novo entrando (receita). NÃO mande reclassificar custo evitado como receita.
+- É DIFERENTE de custo externo incorrido (custo_externo_mensal): aquele é um gasto que a automação PASSOU a ter (subtrai); custo evitado é um gasto que ela ELIMINOU (soma).
+- O sistema soma o custo evitado ao saving em R$ automaticamente (pontual mensalizado ÷12). Você NÃO calcula o valor final em R$ — só preencha os três campos e detalhe a conta no memorial.
+- OBRIGATÓRIO no memorial: registre o custo evitado de forma explícita e auditável — o que era pago, quanto, com que periodicidade, e como entra no cálculo (ex: "Serviço externo de implementação que custaria R$ 2.700 (único) — mensalizado: 2.700 ÷ 12 = R$ 225/mês.").
+
+REGRA CRÍTICA — O SAVING NUNCA PODE SER ZERO:
+- Um saving sem NENHUM ganho não faz sentido. O ganho pode vir das horas economizadas OU de um custo evitado (ou ambos).
+- Só bloqueie quando economia_horas_mes = 0 E NÃO houver custo evitado (custo_evitado_reais nulo/zero). Nesse caso, NÃO gere preview.
+- Se as horas antes e depois forem iguais (rotina idêntica, só trocou o software) e não há custo evitado, a economia é ZERO — bloqueie e investigue primeiro.
+- INVESTIGAÇÃO HONESTA: antes de aceitar o zero, pergunte diretamente — a ferramenta nova elimina erros que geravam retrabalho? Aumenta capacidade processada? Permite fazer mais rápido? O projeto deixou de pagar por alguma ferramenta/serviço (custo evitado)? Se houver ganho real, descubra e quantifique.
+- NÃO INVENTE GANHOS: se após investigação honesta o usuário confirmar que não há redução de horas NEM custo evitado (mesmas horas, mesmo processo, só trocou o software, sem deixar de pagar nada), seja honesto. Explique que sem ganho mensurável não é possível submeter como saving e oriente: "Se o impacto é qualitativo e importante mas difícil de medir, considere a opção de projeto especial (alto impacto, difícil mensuração)."
+- NUNCA apresente um preview com economia_horas_mes = 0 E sem custo evitado, e NUNCA permita aprovação nessa condição.
 - Se o projeto tem custo de ferramenta externa (custo_externo_mensal > 0), mencione no memorial e considere na economia líquida.
 
 LINGUAGEM (IMPORTANTÍSSIMO):
@@ -425,21 +436,26 @@ Opções:
 Preview (quando justificativa concreta e memorial completo):
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n...memorial formatado em markdown, detalhando cada pessoa/cargo e somando o total...\\n\\n**Resumo:**\\n- Economia total: ${totalHoras}${unidadeHoras}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto completo do memorial — OBRIGATÓRIO, mesmo texto que está no content antes do 'Está correto?'>"}}
 
-ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
+ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo a pergunta final "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
+ATENÇÃO 2: se houver custo evitado, inclua no objeto "saving" os campos "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula esse valor a partir das horas + custo evitado.`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
-  const economiaZerada = (saving.economia_horas_mes ?? 0) <= 0 &&
+  // O ganho pode vir das horas OU de um custo evitado. Só é "zerado" quando não há
+  // economia de horas E não há custo evitado.
+  const semHoras = (saving.economia_horas_mes ?? 0) <= 0 &&
     (saving.linhas ?? []).every(l => (l.horas_antes ?? 0) - (l.horas_depois ?? 0) <= 0);
+  const semCustoEvitado = (saving.custo_evitado_reais ?? 0) <= 0;
+  const economiaZerada = semHoras && semCustoEvitado;
 
   const blocoValidacao = economiaZerada
     ? `
 
-ATENÇÃO — ECONOMIA ZERADA DETECTADA:
-A economia de horas está em 0 ou negativa. Isso é INVÁLIDO para submissão.
-- NÃO permita aprovação nessa condição . Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter um projeto com economia zero.
-- Diga algo como: "Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas. Vamos revisar: onde exatamente a automação economiza tempo?"
-- Volte para a coleta (type:"question") até que economia_horas_mes > 0.`
+ATENÇÃO — GANHO ZERADO DETECTADO:
+Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question" explicando que não é possível submeter um projeto sem nenhum ganho.
+- Diga algo como: "Não consigo finalizar o memorial sem nenhum ganho concreto — o projeto precisa economizar horas ou evitar algum custo. Vamos revisar: onde exatamente está o ganho?"
+- Volte para a coleta (type:"question") até que haja economia de horas > 0 OU um custo evitado > 0.`
     : '';
 
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving.
@@ -452,11 +468,11 @@ O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
-REGRA CRÍTICA: NUNCA emita type:"complete" se economia_horas_mes for 0 ou negativa. Se o usuário tentar aprovar nessa condição, responda com type:"question" explicando que o projeto precisa ter economia > 0h para ser submetido.
+REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
 FORMATO — APENAS JSON válido:
 
-Se aprovado (SOMENTE se economia_horas_mes > 0):
+Se aprovado (SOMENTE se houver economia de horas > 0 OU custo evitado > 0):
 {"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais}}
 
 Se ajuste + novo preview:
@@ -540,12 +556,13 @@ export async function runOrchestrator(
     } else if (fase === 'receita') {
       const temValor = receita.valor_ganho_mensal != null && receita.valor_ganho_mensal > 0;
       const unidade = receita.tipo_saving === 'pontual' ? 'total' : '/mês';
-      const racionalMsg = receita.racional?.trim() ? ` O racional curto que ele deu foi: "${receita.racional.trim()}".` : '';
+      const racionalMsg = receita.racional?.trim() ? ` O racional curto informado: "${receita.racional.trim()}".` : '';
+      const oQueFazMsg = coletado.o_que_faz?.trim() ? ` O projeto faz: "${coletado.o_que_faz.trim()}".` : '';
       messages.push({
         role: 'user',
         content: temValor
-          ? `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}. O usuário JÁ informou o ganho estimado: R$ ${receita.valor_ganho_mensal}${unidade}.${racionalMsg} Apresente-se em UMA frase curta. NÃO peça o valor de novo — partindo do racional, faça a primeira pergunta concreta DESAFIANDO o número: como ele chegou a esse valor e qual a base de cálculo. Sempre termine com uma pergunta.`
-          : `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}.${racionalMsg} Apresente-se em UMA frase curta explicando que agora vamos avaliar o ganho de receita do projeto. Faça a primeira pergunta concreta sobre quanto de receita nova o projeto gera e como esse valor foi estimado. Sempre termine com uma pergunta.`,
+          ? `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}.${oQueFazMsg} O usuário JÁ informou o ganho estimado: R$ ${receita.valor_ganho_mensal}${unidade}.${racionalMsg} Apresente-se em UMA frase curta. NÃO peça o valor de novo — CRUZE o racional com o que o projeto faz: se forem inconsistentes, questione essa inconsistência diretamente; se forem consistentes, aprofunde como o projeto leva especificamente a esse ganho. Sempre termine com uma pergunta.`
+          : `[SISTEMA] Projeto de receita incremental, frequência: ${receita.tipo_saving ?? 'mensal'}.${oQueFazMsg}${racionalMsg} Apresente-se em UMA frase curta. Baseando-se no que o projeto faz, faça a primeira pergunta concreta e específica sobre como ele gera receita nova e como o valor foi estimado. Sempre termine com uma pergunta.`,
       });
     }
   }

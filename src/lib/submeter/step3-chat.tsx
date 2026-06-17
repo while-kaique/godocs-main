@@ -516,7 +516,9 @@ function ComparisonPanel({
   approvedSavingPreview: string | null;
   approvedReceitaPreview?: string | null;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // Expandido por padrão: este painel só renderiza em reenvio/edição (quando há
+  // versão anterior), e nesse fluxo o diff é justamente o ponto central da revisão.
+  const [expanded, setExpanded] = useState(true);
   const sp = versaoAnterior.snapshot_projeto;
   const sd = versaoAnterior.snapshot_doc;
   const dataFormatada = versaoAnterior.created_at

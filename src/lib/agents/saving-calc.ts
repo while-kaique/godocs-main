@@ -13,8 +13,13 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * (saving_reais=0 → ganho_total_mensal=null).
  *
  * `valor_hora` por linha vem da tabela CARGOS pelo `cargo`; cai no valor_hora já
- * presente na linha se o cargo não for encontrado. O total líquido abate o custo
- * externo mensal (mesma fórmula de `iniciarSaving`).
+ * presente na linha se o cargo não for encontrado. O total líquido soma o custo
+ * evitado (mensalizado) e abate o custo externo mensal (mesma fórmula de
+ * `iniciarSaving`).
+ *
+ * CUSTO EVITADO: ganho monetário além das horas (ex: serviço externo/licença que o
+ * projeto deixou de pagar). É coletado pelo agente, não derivado de horas — então é
+ * PRESERVADO (não recalculado). Pontual entra mensalizado ÷12; mensal entra cheio.
  */
 export function recomputarSavingFinanceiro(
   saving: SavingColetado,
@@ -33,10 +38,15 @@ export function recomputarSavingFinanceiro(
   });
   const totalHoras = round2(linhas.reduce((s, l) => s + l.economia_horas_mes, 0));
   const totalReaisBruto = round2(linhas.reduce((s, l) => s + l.economia_reais_mes, 0));
+
+  // Custo evitado mensalizado: pontual ÷12, mensal cheio. Negativos viram 0.
+  const evitadoBruto = Math.max(0, Number(saving?.custo_evitado_reais) || 0);
+  const evitadoMensal = saving?.custo_evitado_tipo === 'pontual' ? evitadoBruto / 12 : evitadoBruto;
+
   return {
     ...saving,
     linhas,
     economia_horas_mes: totalHoras,
-    economia_reais_mes: round2(totalReaisBruto - (custoExternoMensal || 0)),
+    economia_reais_mes: round2(totalReaisBruto + evitadoMensal - (custoExternoMensal || 0)),
   };
 }
