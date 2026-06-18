@@ -41,12 +41,19 @@ import {
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto } from '@/lib/meus-projetos.functions'
+import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
 interface Env {
   DB: GoDeployDB;
   [key: string]: unknown;
+}
+
+// Subconjunto mínimo do ExecutionContext do runtime (evita depender de
+// @cloudflare/workers-types só para o waitUntil).
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -109,8 +116,8 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
       if (!request.headers.get('x-godeploy-cron')) {
         return errorJson('Rota exclusiva de cron.', 403)
       }
-      // Limpa logs de API com mais de 30 dias
-      cleanupOldApiLogs(30).catch(() => {})
+      // Limpa logs de API com mais de 30 dias (em segundo plano, via waitUntil)
+      runBackground(cleanupOldApiLogs(30))
       return json(await sincronizarAreas())
     }
 
@@ -312,15 +319,25 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
 // ── entry point ───────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // O godeploy não expõe o global `process` (não há nodejs_compat). Garantimos
     // `process.env` e injetamos as env vars do worker, para os módulos que leem
     // via process.env (supabase, llm, brevo, ocr, etc.). Sem isto, qualquer
     // process.env.X em runtime estoura "process is not defined".
-    const g = globalThis as unknown as { process?: { env: Record<string, string> } }
+    const g = globalThis as unknown as {
+      process?: { env: Record<string, string> }
+      __waitUntil?: (p: Promise<unknown>) => void
+    }
     if (!g.process) g.process = { env: {} }
     for (const [k, v] of Object.entries(env)) {
       if (typeof v === 'string') g.process.env[k] = v
+    }
+
+    // Expõe o waitUntil do runtime para o trabalho fire-and-forget (sync Google,
+    // limpeza de logs). Sem isto, promises não-aguardadas são canceladas quando a
+    // Response retorna — e o sync para Sheets/Chat morre no meio. Ver lib/background.ts.
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      g.__waitUntil = (p: Promise<unknown>) => ctx.waitUntil(p)
     }
 
     // Injeta o banco SQLite do Godeploy (env.DB) no client.

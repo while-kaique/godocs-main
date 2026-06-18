@@ -3,16 +3,16 @@
 // Nunca propaga erros — tudo é logado via console.error.
 
 import type { ProjetoRow } from '@/integrations/db/client.server';
-import { appendRow, updateRowByProjectName } from './sheets';
+import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
 import { sendChatNotification, buildSubmitMessage, buildUpdateMessage } from './chat';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const ouTraco = (v: string | null | undefined): string =>
-  v != null && v.trim() !== '' ? v : '\u2014';
+  v != null && v.trim() !== '' ? v : '—';
 
 function formatDateBR(isoDate: string | null | undefined): string {
-  if (!isoDate) return '\u2014';
+  if (!isoDate) return '—';
   const parts = isoDate.split('-');
   if (parts.length !== 3) return isoDate;
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -47,63 +47,74 @@ export type SubmitSyncParams = {
 };
 
 export type UpdateSyncParams = {
+  projetoId: string;
   projectName: string;
   complexidade: string;
   observacoes: string;
   status: string;
 };
 
-// ─── Submit: Drive → Sheets → Chat (fire-and-forget) ────────────────────────
+// ─── Submit: Sheets → Chat (fire-and-forget) ────────────────────────────────
 
 export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
   try {
     const dataSubmissao = nowFortaleza();
     const dataCriacao = formatDateBR(p.projeto.data_criacao_projeto);
-    const participantes = p.membros.join(', ') || '\u2014';
-    const tiposStr = p.tiposProjeto.join(', ') || '\u2014';
+    const participantes = p.membros.join(', ') || '—';
+    const tiposStr = p.tiposProjeto.join(', ') || '—';
 
     const savingHoras = (p.saving?.economia_horas_mes as number) ?? 0;
     const savingReais = (p.saving?.economia_reais_mes as number) ?? 0;
     const receitaValor = (p.receita?.valor_ganho_mensal as number) ?? 0;
     const ganhoTotal = p.ganhoTotalMensal > 0 ? Math.round(p.ganhoTotalMensal * 100) / 100 : 0;
 
-    // 1. Append na planilha (26 colunas na ordem exata)
-    const values: (string | number)[] = [
-      /* 0  Data Submissão          */ dataSubmissao,
-      /* 1  Data Criação            */ dataCriacao,
-      /* 2  Área                    */ p.area,
-      /* 3  Nome Completo           */ ouTraco(p.projeto.responsavel_nome),
-      /* 4  Participantes           */ participantes,
-      /* 5  Email                   */ ouTraco(p.projeto.responsavel_email),
-      /* 6  Ferramenta              */ ouTraco(p.projeto.ferramenta),
-      /* 7  Projeto                 */ ouTraco(p.projeto.nome),
-      /* 8  Descrição               */ ouTraco(p.projeto.descricao_breve),
-      /* 9  URL                     */ '\u2014',
-      /* 10 Escopo                  */ ouTraco(p.projeto.escopo),
-      /* 11 Tipos Projeto           */ tiposStr,
-      /* 12 Saving Horas            */ savingHoras,
-      /* 13 Saving Reais            */ savingReais,
-      /* 14 Tipo de Saving          */ ouTraco(p.saving?.tipo_saving as string | undefined),
-      /* 15 Memorial de Saving      */ ouTraco(p.memorialLimpo),
-      /* 16 Custo Externo Mensal    */ p.projeto.custo_externo_mensal ?? 0,
-      /* 17 Receita Mensal          */ receitaValor,
-      /* 18 Receita Memorial        */ ouTraco(p.receitaMemorialLimpo),
-      /* 19 Status                  */ p.status,
-      /* 20 ID Projeto              */ p.projetoId,
-      /* 21 Ganho Total             */ ganhoTotal,
-      /* 22 Tipo de Receita         */ ouTraco(p.receita?.tipo_saving as string | undefined),
-      /* 23 Alguém Fazia?           */ ouTraco(p.projeto.alguem_fazia),
-      /* 24 Contexto Projeto Esp.   */ ouTraco(p.projeto.contexto_especial),
-      /* 25 Especial?               */ p.projeto.especial === 1 ? 'Sim' : 'Não',
-      /* 26 Custo Evitado?          */ ouTraco(p.projeto.custo_evitado),
-      /* 27 Justificativa Custo Ev. */ ouTraco(p.projeto.custo_evitado_justificativa),
-      /* 28 Custo Evitado (itens)   */ p.projeto.custo_evitado_itens ?? '[]',
-    ];
+    // Colunas preenchidas pelo sistema na submissão. As colunas manuais
+    // (Diff*/Memorial anterior) e as do analisador (Complexidade/Observações)
+    // são deliberadamente omitidas — não são escritas aqui.
+    const row: Partial<Record<SheetColumn, string | number>> = {
+      'Data Submissão': dataSubmissao,
+      'ID Projeto': p.projetoId,
+      'Data Criação': dataCriacao,
+      'Área': p.area,
+      'Nome Completo': ouTraco(p.projeto.responsavel_nome),
+      'Email': ouTraco(p.projeto.responsavel_email),
+      'Projeto': ouTraco(p.projeto.nome),
+      'Participantes': participantes,
+      'Descrição': ouTraco(p.projeto.descricao_breve),
+      'URL': '—',
+      'Ferramenta': ouTraco(p.projeto.ferramenta),
+      'Escopo': ouTraco(p.projeto.escopo),
+      'Tipos Projeto': tiposStr,
+      'Alguém Fazia?': ouTraco(p.projeto.alguem_fazia),
+      'Saving Horas': savingHoras,
+      'Saving Reais': savingReais,
+      'Tipo de Saving': ouTraco(p.saving?.tipo_saving as string | undefined),
+      'Memorial de Saving': ouTraco(p.memorialLimpo),
+      'Custo Externo Mensal': p.projeto.custo_externo_mensal ?? 0,
+      'Receita Mensal': receitaValor,
+      'Tipo de Receita': ouTraco(p.receita?.tipo_saving as string | undefined),
+      'Receita Memorial': ouTraco(p.receitaMemorialLimpo),
+      'Status': p.status,
+      'Ganho Total': ganhoTotal,
+      'Contexto do Projeto Especial': ouTraco(p.projeto.contexto_especial),
+      'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
+      'Custo Evitado': ouTraco(p.projeto.custo_evitado),
+      'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
+    };
 
+    // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
+    // — só dá pra editar um projeto que já está na planilha. Nova: append.
     try {
-      await appendRow(values);
+      if (p.modo === 'edicao') {
+        await updateRowByProjectId(p.projetoId, row);
+      } else {
+        await appendRow(row);
+      }
     } catch (sheetsErr) {
-      console.error('[google/sync] Falha ao append na planilha:', sheetsErr);
+      console.error(
+        `[google/sync] Falha ao ${p.modo === 'edicao' ? 'atualizar' : 'inserir'} na planilha:`,
+        sheetsErr,
+      );
     }
 
     // 2. Notificação Google Chat
@@ -138,9 +149,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
 
 export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
   try {
-    // 1. Update na planilha
+    // 1. Update na planilha (match por ID Projeto — estável e único)
     try {
-      await updateRowByProjectName(p.projectName, {
+      await updateRowByProjectId(p.projetoId, {
         'Complexidade': p.complexidade,
         'Observações': p.observacoes,
         'Status': p.status,

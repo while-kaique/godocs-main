@@ -23,8 +23,10 @@ import {
   insertValidacao,
   updateValidacaoEmailEnviado,
   insertAnalise,
+  gravarVersaoProjeto,
   parseJson,
 } from '@/integrations/db/client.server';
+import { runBackground } from '@/lib/background';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
@@ -1117,12 +1119,13 @@ export async function analisarProjetoFn(rawData: unknown) {
     // continua correto. Reverter para 'Aprovado' quando a validação terminar.
     const statusLabel = resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
 
-    syncUpdateToGoogle({
+    runBackground(syncUpdateToGoogle({
+      projetoId: projeto_id,
       projectName: projeto?.nome ?? '',
       complexidade: resultado.complexidade,
       observacoes: observacoes ?? '',
       status: statusLabel,
-    }).catch(e => err('analisarProjeto', 'Google sync falhou:', e));
+    }));
   }
 
   return resultado;
@@ -1311,7 +1314,7 @@ export async function submeterParaValidacao(rawData: unknown) {
     const membros = parseJson<string[]>(projeto.membros) ?? [];
     const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
-    syncSubmitToGoogle({
+    runBackground(syncSubmitToGoogle({
       projetoId: projeto_id,
       modo: ehReenvio ? 'edicao' : 'novo',
       projeto,
@@ -1329,7 +1332,7 @@ export async function submeterParaValidacao(rawData: unknown) {
       memorialLimpo: memorialInterno ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
       ganhoTotalMensal,
-    }).catch(e => err('submeterParaValidacao', 'Google sync falhou:', e));
+    }));
   }
 
   // Números finais recalculados — o cliente usa para o comparativo antes×depois
