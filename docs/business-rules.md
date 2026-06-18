@@ -96,16 +96,19 @@ Para cada linha:
   economia_horas = max(0, horas_antes - horas_depois)
   economia_reais = economia_horas × valor_hora
 
-Custo evitado (ganho monetário além das horas — coletado pelo agente, não pelo form):
-  custo_evitado_valor = custo_evitado_reais  // valor cheio, pontual NÃO divide por 12
+Custo evitado (ganho monetário além das horas — coletado no FORMULÁRIO de saving):
+  Para cada ferramenta evitada (custo_evitado_itens):
+    item_mensal = recorrencia == 'pontual' ? valor / 12 : valor
+  custo_evitado_reais = sum(item_mensal)   // já mensalizado → entra cheio no recálculo
 
 Total:
   economia_horas_mes = sum(economia_horas)
-  economia_reais_mes = sum(economia_reais) + custo_evitado_valor - custo_externo_mensal
+  economia_reais_mes = sum(economia_reais) + custo_evitado_reais - custo_externo_mensal
 ```
 
-- **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (licença/serviço cancelado). É saving (soma), não receita. Entra pelo valor cheio (pontual NÃO divide por 12). Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai).
-- O agente investiga custo evitado em projetos internos E externos e registra o cálculo explícito no memorial (auditoria).
+- **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (ferramenta/serviço externo que a solução tornou desnecessário). É saving (soma), não receita. Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai) e do `servico_externo` (ferramenta USADA pela automação).
+- **Coletado no formulário de saving** (3º tópico, abaixo de "Alguém já fazia"): pergunta obrigatória Sim/Não; se Sim, lista incremental de ferramentas com `nome → valor → recorrência (mensal/pontual) → justificativa`. O backend (`iniciarSaving`) mensaliza cada item — **pontual ÷12**, mensal cheio — soma em `custo_evitado_reais` e persiste `custo_evitado` (sim/não), `custo_evitado_justificativa` (texto) e `custo_evitado_itens` (JSON).
+- O agente NÃO pergunta mais custo evitado (vem do form): apenas reconhece e descreve qualitativamente no memorial, sem R$ (preserva os campos estruturados).
 - **Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna. A versão do memorial salva na planilha (`projetos.memorial_calculo`) é enriquecida pelo backend com valores financeiros via `enriquecerMemorial()` — o LLM nunca gera R$ no texto visível.
 
 ### Ganho total mensal (`submeterParaValidacao`)

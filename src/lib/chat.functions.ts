@@ -399,6 +399,17 @@ const iniciarSavingSchema = z.object({
     horas_depois: z.number().min(0),
   })).optional(),
   custo_externo_mensal: z.number().min(0).optional(),
+  // Custo evitado: a solução fez a empresa deixar de pagar ferramentas/serviços
+  // externos? Lista incremental coletada no formulário (≠ custo_externo_mensal,
+  // que é o custo INCORRIDO pela automação). Cada item: recorrência 'pontual' é
+  // mensalizada ÷12; 'mensal' entra cheia. Soma ao saving (custo_evitado_reais).
+  tem_custo_evitado: z.enum(['sim', 'nao']).optional(),
+  custo_evitado_itens: z.array(z.object({
+    nome: z.string(),
+    valor: z.number().min(0),
+    recorrencia: z.enum(['mensal', 'pontual']),
+    justificativa: z.string(),
+  })).optional(),
 });
 
 const iniciarReceitaSchema = z.object({
@@ -763,14 +774,39 @@ export async function iniciarSaving(rawData: unknown) {
     await updateProjeto(data.projeto_id, { alguem_fazia: data.alguem_fazia });
   }
 
+  // Custo evitado: agrega a lista de ferramentas evitadas vinda do formulário.
+  // Mensaliza cada item (pontual ÷12; mensal cheio) → valor único que soma ao
+  // saving. Persiste sim/não, justificativa concatenada e o detalhe (JSON) no
+  // projeto (colunas mapeadas no n8n/planilha).
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const itensEvitado = data.tem_custo_evitado === 'sim' ? (data.custo_evitado_itens ?? []) : [];
+  const custoEvitadoMensal = round2(
+    itensEvitado.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
+  );
+  const custoEvitadoDescricao = itensEvitado
+    .map((it) => {
+      const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
+      const just = it.justificativa ? ` — ${it.justificativa}` : '';
+      return `${it.nome} (R$ ${it.valor.toFixed(2)}, ${rec})${just}`;
+    })
+    .join('; ');
+  await updateProjeto(data.projeto_id, {
+    custo_evitado: data.tem_custo_evitado ?? null,
+    custo_evitado_justificativa: custoEvitadoDescricao || null,
+    custo_evitado_itens: JSON.stringify(itensEvitado),
+  });
+
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
 
   let saving = savingVazio();
   saving.tipo_saving = data.tipo_saving;
+  // Custo evitado já mensalizado entra cheio no recálculo (não divide de novo).
+  saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
+  saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
+  saving.custo_evitado_descricao = custoEvitadoDescricao || null;
 
   if (tiposProjeto.includes('saving') && data.linhas && data.linhas.length > 0) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const linhas: SavingLinha[] = data.linhas.map((l) => {
       const valorHora = CARGOS.find(c => c.label === l.cargo)?.valor_hora ?? 0;
       const economiaHoras = Math.max(0, l.horas_antes - l.horas_depois);
@@ -791,7 +827,9 @@ export async function iniciarSaving(rawData: unknown) {
       ...saving,
       linhas,
       economia_horas_mes: totalHoras,
-      economia_reais_mes: round2(totalReaisBruto - custoExterno),
+      // Líquido: horas + custo evitado (mensalizado) − custo externo. Mesma
+      // fórmula de recomputarSavingFinanceiro (que recalcula do zero no preview).
+      economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno),
     };
   }
 
@@ -1279,6 +1317,9 @@ export async function submeterParaValidacao(rawData: unknown) {
         ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
         custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
         alguem_fazia: projetoAtualizado.alguem_fazia,
+        custo_evitado: projetoAtualizado.custo_evitado,
+        custo_evitado_justificativa: projetoAtualizado.custo_evitado_justificativa,
+        custo_evitado_itens: projetoAtualizado.custo_evitado_itens,
         status: projetoAtualizado.status,
       };
       await gravarVersaoProjeto(
@@ -1333,6 +1374,11 @@ export async function submeterParaValidacao(rawData: unknown) {
         // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
         alguem_fazia: ouTraco(projeto.alguem_fazia),
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
+        // Custo evitado: a solução fez a empresa deixar de pagar ferramentas/serviços?
+        // sim/não + justificativa concatenada + detalhe (JSON) das ferramentas evitadas.
+        custo_evitado: ouTraco(projeto.custo_evitado),
+        custo_evitado_justificativa: ouTraco(projeto.custo_evitado_justificativa),
+        custo_evitado_itens: projeto.custo_evitado_itens ?? '[]',
         saving_linhas: JSON.stringify(saving?.linhas ?? []),
         receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
         tipo_receita: ouTraco(receita?.tipo_saving as string | undefined),

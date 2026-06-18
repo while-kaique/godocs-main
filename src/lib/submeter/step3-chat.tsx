@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
-import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput } from "./constants";
-import { ocultarReaisSaving } from "./constants";
+import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput, CustoEvitadoItemInput } from "./constants";
+import { ocultarReaisSaving, formatMoedaBR, parseMoedaBR } from "./constants";
 
 /* ──────────────────────────────────────────────
    Inline Markdown helper (reutilizável)
@@ -792,6 +792,14 @@ function SavingForm({
   // Alguém já fazia/mantinha isso manualmente antes? Define se a tabela mostra a
   // coluna "antes" (sim) ou só "depois" (nao — ninguém antes; economia de horas = 0).
   const [alguemFazia, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.alguemFazia ?? "");
+  // Custo evitado: a solução fez a empresa deixar de pagar alguma ferramenta/serviço?
+  // 'sim' → lista incremental de ferramentas evitadas (nome/valor/recorrência/justificativa).
+  const [temCustoEvitado, setTemCustoEvitado] = useState<"sim" | "nao" | "">(draft?.temCustoEvitado ?? "");
+  const [custoEvitadoItens, setCustoEvitadoItens] = useState<CustoEvitadoItemInput[]>(
+    draft?.custoEvitadoItens?.length
+      ? draft.custoEvitadoItens
+      : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  );
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
   const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
@@ -806,8 +814,8 @@ function SavingForm({
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
-    onDraftChange?.({ linhas, alguemFazia, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
-  }, [linhas, alguemFazia, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+    onDraftChange?.({ linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
@@ -862,6 +870,38 @@ function SavingForm({
     setErrors({});
   }
 
+  // ── Custo evitado (lista de ferramentas/serviços que deixaram de ser pagos) ──
+  function selectTemCustoEvitado(v: "sim" | "nao") {
+    setTemCustoEvitado(v);
+    if (v === "sim" && custoEvitadoItens.length === 0) {
+      setCustoEvitadoItens([{ nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+    }
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.temCustoEvitado;
+      Object.keys(n).forEach((k) => { if (/^ce\d+/.test(k)) delete n[k]; });
+      return n;
+    });
+  }
+  function updateCustoEvitado(i: number, patch: Partial<CustoEvitadoItemInput>) {
+    setCustoEvitadoItens((its) => its.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+    setErrors((e) => {
+      const n = { ...e };
+      delete n[`ce${i}nome`];
+      delete n[`ce${i}valor`];
+      delete n[`ce${i}recorrencia`];
+      delete n[`ce${i}justificativa`];
+      return n;
+    });
+  }
+  function addCustoEvitado() {
+    setCustoEvitadoItens((its) => [...its, { nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+  }
+  function removeCustoEvitado(i: number) {
+    setCustoEvitadoItens((its) => its.filter((_, idx) => idx !== i));
+    setErrors({});
+  }
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
@@ -878,6 +918,18 @@ function SavingForm({
           errs[`l${i}antes`] = "Informe as horas";
         if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
       });
+      // Custo evitado: pergunta obrigatória. Se "sim", cada ferramenta precisa estar completa.
+      if (!temCustoEvitado) errs.temCustoEvitado = "Selecione uma opção";
+      if (temCustoEvitado === "sim") {
+        if (custoEvitadoItens.length === 0) errs.temCustoEvitado = "Adicione ao menos uma ferramenta evitada";
+        custoEvitadoItens.forEach((it, i) => {
+          const v = parseMoedaBR(it.valor);
+          if (!it.nome.trim()) errs[`ce${i}nome`] = "Informe o nome";
+          if (it.valor === "" || v <= 0) errs[`ce${i}valor`] = "Informe o valor";
+          if (!it.recorrencia) errs[`ce${i}recorrencia`] = "Selecione";
+          if (!it.justificativa.trim()) errs[`ce${i}justificativa`] = "Informe a justificativa";
+        });
+      }
     }
     if (isExterno && isSaving) {
       if (!custoExterno || parseFloat(custoExterno) < 0) errs.custoExterno = "Informe o custo da ferramenta";
@@ -898,6 +950,8 @@ function SavingForm({
     onSubmit({
       linhas,
       alguemFazia,
+      temCustoEvitado,
+      custoEvitadoItens,
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -1171,6 +1225,171 @@ function SavingForm({
                 </button>
               </div>
             )}
+
+            {/* Custo evitado — a solução fez a empresa DEIXAR de pagar alguma
+                ferramenta/serviço externo? (≠ ferramenta usada pela automação) */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                A solução evitou algum custo de ferramenta ou serviço externo? <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                Ferramentas ou serviços pagos que a empresa <strong>deixou de contratar</strong> por causa desta solução
+                (ex: uma licença SaaS cancelada, um serviço terceirizado eliminado).
+              </p>
+              <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                {([["sim", "Sim, evitou"], ["nao", "Não evitou"]] as const).map(([opt, lbl]) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => selectTemCustoEvitado(opt)}
+                    className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                    style={{
+                      background: temCustoEvitado === opt ? "#6b6e00" : "transparent",
+                      color: temCustoEvitado === opt ? "#fff" : "#6b6e00",
+                      borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {errors.temCustoEvitado && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.temCustoEvitado}
+                </div>
+              )}
+
+              {/* Lista incremental de ferramentas evitadas */}
+              {temCustoEvitado === "sim" && (
+                <div className="mt-3">
+                  {/* Cabeçalho (telas largas) */}
+                  <div
+                    className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
+                    style={{ gridTemplateColumns: "1fr 96px 104px 28px", color: "#9a9aa8" }}
+                  >
+                    <span>Ferramenta / serviço</span>
+                    <span className="text-center">Valor (R$)</span>
+                    <span className="text-center">Recorrência</span>
+                    <span />
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {custoEvitadoItens.map((it, i) => {
+                      const linhaErro =
+                        errors[`ce${i}nome`] || errors[`ce${i}valor`] ||
+                        errors[`ce${i}recorrencia`] || errors[`ce${i}justificativa`];
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-xl p-2.5"
+                          style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+                        >
+                          <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 96px 104px 28px" }}>
+                            {/* Nome da ferramenta */}
+                            <input
+                              type="text"
+                              placeholder="Ex: Zapier"
+                              aria-label="Nome da ferramenta evitada"
+                              value={it.nome}
+                              onChange={(e) => updateCustoEvitado(i, { nome: e.target.value })}
+                              className="go-input w-full"
+                              style={{
+                                height: 38, padding: "0 10px", borderRadius: "var(--go-radius-md)",
+                                border: errors[`ce${i}nome`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                              }}
+                            />
+                            {/* Valor — máscara de moeda BR (só dígitos → 1.234,56) */}
+                            <input
+                              type="text" inputMode="numeric" placeholder="299,90"
+                              aria-label="Valor evitado"
+                              value={it.valor}
+                              onChange={(e) => updateCustoEvitado(i, { valor: formatMoedaBR(e.target.value) })}
+                              className="go-input w-full"
+                              style={{
+                                height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                                border: errors[`ce${i}valor`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                              }}
+                            />
+                            {/* Recorrência */}
+                            <select
+                              aria-label="Recorrência"
+                              value={it.recorrencia}
+                              onChange={(e) => updateCustoEvitado(i, { recorrencia: e.target.value as "mensal" | "pontual" | "" })}
+                              className="go-select w-full"
+                              style={{
+                                height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)",
+                                border: errors[`ce${i}recorrencia`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                                color: it.recorrencia ? "var(--go-text-primary)" : "#8b8b9a",
+                                textAlign: "center", textAlignLast: "center",
+                              }}
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="mensal">Mensal</option>
+                              <option value="pontual">Pontual</option>
+                            </select>
+                            {/* Remover */}
+                            {custoEvitadoItens.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => removeCustoEvitado(i)}
+                                aria-label="Remover ferramenta evitada"
+                                className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
+                                style={{ color: "#b4313b", background: "transparent" }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            ) : <span />}
+                          </div>
+
+                          {/* Justificativa breve */}
+                          <input
+                            type="text"
+                            placeholder="Justificativa breve (ex: substituída pelo fluxo no n8n)"
+                            aria-label="Justificativa do custo evitado"
+                            value={it.justificativa}
+                            onChange={(e) => updateCustoEvitado(i, { justificativa: e.target.value })}
+                            className="go-input mt-2 w-full"
+                            style={{
+                              padding: "9px 10px", borderRadius: "var(--go-radius-md)",
+                              border: errors[`ce${i}justificativa`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                              background: "var(--go-white)", fontSize: 13,
+                            }}
+                          />
+
+                          {linhaErro ? (
+                            <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                              {linhaErro}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Adicionar ferramenta */}
+                  <button
+                    type="button"
+                    onClick={addCustoEvitado}
+                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
+                    style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Adicionar ferramenta evitada
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
 

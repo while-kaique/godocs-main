@@ -178,6 +178,14 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN contexto_especial TEXT',
   // Nomes dos arquivos enviados no upload (JSON array de strings) — exibidos na edição
   'ALTER TABLE projetos ADD COLUMN arquivos_nomes TEXT',
+  // Custo evitado: a solução fez a empresa DEIXAR de pagar ferramentas/serviços
+  // externos? `custo_evitado` = 'sim'|'nao'; `custo_evitado_justificativa` = texto
+  // concatenado legível; `custo_evitado_itens` = JSON [{nome,valor,recorrencia,justificativa}].
+  // O valor (mensalizado: pontual ÷12) entra no saving_reais/ganho_total. Coletado no
+  // formulário de saving (≠ custo_externo_mensal, que é o custo INCORRIDO).
+  'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
 ];
 
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).

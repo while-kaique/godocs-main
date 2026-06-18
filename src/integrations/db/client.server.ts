@@ -708,6 +708,9 @@ export type ProjetoRow = {
   tipo_saving: string | null;
   memorial_calculo: string | null;
   custo_externo_mensal: number | null;
+  custo_evitado: string | null; // 'sim' | 'nao' — a solução evitou custo externo?
+  custo_evitado_justificativa: string | null; // texto concatenado das ferramentas evitadas
+  custo_evitado_itens: string | null; // JSON [{nome,valor,recorrencia,justificativa}]
   ganho_total_mensal: number | null;
   complexidade: string | null;
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes

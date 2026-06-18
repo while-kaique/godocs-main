@@ -15,8 +15,14 @@ export type DocumentacaoColetada = {
   configurar_antes: string | null;
   atencao: string | null;
   // Indica se o projeto usa IA como funcionalidade (mesmo que secundária).
-  // null = ainda não perguntado; true/false = resposta do usuário ou inferência da doc.
+  // null = ainda não perguntado; true/false = resposta do usuário.
   tem_ia_como_funcionalidade?: boolean | null;
+  // O que o agente inferiu dos arquivos ANTES de perguntar ao usuário.
+  // null = não foi possível inferir (arquivos insuficientes).
+  ia_inferida_dos_arquivos?: boolean | null;
+  // true quando o usuário contradiz a inferência dos arquivos.
+  // Sinaliza para o analisador que vale investigar a inconsistência.
+  ia_contradição?: boolean | null;
 };
 
 export const documentacaoVazia = (): DocumentacaoColetada => ({

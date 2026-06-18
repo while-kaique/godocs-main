@@ -92,7 +92,9 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 **Memorial duplo (opção B):** o LLM gera memorial SEM R$ (visível ao usuário). O backend injeta valores financeiros via `enriquecerMemorial()` em `saving-calc.ts` — a versão com R$ vai para `projetos.memorial_calculo` (planilha). R$ nunca toca o LLM.
 
-**Pontual NÃO divide por 12** — custo evitado, saving e receita pontual entram pelo valor cheio.
+**Pontual e o ÷12** — saving e receita pontual entram pelo valor cheio (NÃO dividem por 12). **Exceção: custo evitado** (coletado no formulário de saving) — cada ferramenta evitada com recorrência **pontual é mensalizada ÷12** antes de somar ao saving; mensal entra cheio.
+
+**Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON, enviadas ao n8n). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
 
 ## Convenções rápidas
 
