@@ -40,34 +40,22 @@ Por isso, leituras de `process.env.X` em **escopo de módulo** retornam `undefin
 
 ## Checklist pré-deploy
 
-### 1. Verificar usuários ativos
-Antes de subir uma nova versão, checar se alguém está preenchendo o formulário:
-
-```bash
-# Em dev:
-curl -s http://localhost:5173/api/admin/investigador/projetos | \
-  jq '[.[] | select(.status == "rascunho" and .ultimo_log_api != null)] | length'
-# Se > 0, há alguém preenchendo agora
-```
-
-Em produção: `GET /api/admin/investigador/projetos` (requer auth admin), checar `rascunho` com `ultimo_log_api` < 5 minutos.
-
-### 2. Rebuildar worker
+### 1. Rebuildar worker
 ```bash
 npm run build:worker
 ```
 
-### 3. Rodar testes
+### 2. Rodar testes
 ```bash
 npm run test
 ```
 
-### 4. Build do frontend
+### 3. Build do frontend
 ```bash
 npm run build
 ```
 
-### 5. Comitar worker.js atualizado
+### 4. Comitar worker.js atualizado
 ```bash
 git add worker.js
 git commit -m "build: rebuild worker.js"

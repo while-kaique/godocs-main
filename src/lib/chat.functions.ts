@@ -1111,7 +1111,11 @@ export async function analisarProjetoFn(rawData: unknown) {
   // ── Sync Google (planilha + chat) — fire-and-forget ──
   {
     const projeto = await getProjetoById(projeto_id);
-    const statusLabel = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : (resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente');
+    // TEMPORÁRIO: enquanto validamos a eficácia do formulário, projetos aprovados
+    // pelo analisador também vão como "Pendente" na planilha — a aprovação
+    // automática não é refletida no Sheets. O status interno (SQLite/dashboard)
+    // continua correto. Reverter para 'Aprovado' quando a validação terminar.
+    const statusLabel = resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
 
     syncUpdateToGoogle({
       projectName: projeto?.nome ?? '',
@@ -1316,7 +1320,11 @@ export async function submeterParaValidacao(rawData: unknown) {
       receita,
       membros,
       tiposProjeto,
-      status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
+      // TEMPORÁRIO: durante a validação da eficácia do formulário, gravamos sempre
+      // "Pendente" na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
+      // status interno (SQLite/dashboard) continua correto. Reverter para
+      // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
+      status: 'Pendente',
       area: areaFinal ?? '—',
       memorialLimpo: memorialInterno ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
