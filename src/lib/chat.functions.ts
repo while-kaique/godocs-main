@@ -399,6 +399,17 @@ const iniciarSavingSchema = z.object({
     horas_depois: z.number().min(0),
   })).optional(),
   custo_externo_mensal: z.number().min(0).optional(),
+  // Custo evitado: a solução fez a empresa deixar de pagar ferramentas/serviços
+  // externos? Lista incremental coletada no formulário (≠ custo_externo_mensal,
+  // que é o custo INCORRIDO pela automação). Cada item: recorrência 'pontual' é
+  // mensalizada ÷12; 'mensal' entra cheia. Soma ao saving (custo_evitado_reais).
+  tem_custo_evitado: z.enum(['sim', 'nao']).optional(),
+  custo_evitado_itens: z.array(z.object({
+    nome: z.string(),
+    valor: z.number().min(0),
+    recorrencia: z.enum(['mensal', 'pontual']),
+    justificativa: z.string(),
+  })).optional(),
 });
 
 const iniciarReceitaSchema = z.object({
@@ -763,14 +774,39 @@ export async function iniciarSaving(rawData: unknown) {
     await updateProjeto(data.projeto_id, { alguem_fazia: data.alguem_fazia });
   }
 
+  // Custo evitado: agrega a lista de ferramentas evitadas vinda do formulário.
+  // Mensaliza cada item (pontual ÷12; mensal cheio) → valor único que soma ao
+  // saving. Persiste sim/não, justificativa concatenada e o detalhe (JSON) no
+  // projeto (colunas mapeadas no n8n/planilha).
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const itensEvitado = data.tem_custo_evitado === 'sim' ? (data.custo_evitado_itens ?? []) : [];
+  const custoEvitadoMensal = round2(
+    itensEvitado.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
+  );
+  const custoEvitadoDescricao = itensEvitado
+    .map((it) => {
+      const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
+      const just = it.justificativa ? ` — ${it.justificativa}` : '';
+      return `${it.nome} (R$ ${it.valor.toFixed(2)}, ${rec})${just}`;
+    })
+    .join('; ');
+  await updateProjeto(data.projeto_id, {
+    custo_evitado: data.tem_custo_evitado ?? null,
+    custo_evitado_justificativa: custoEvitadoDescricao || null,
+    custo_evitado_itens: JSON.stringify(itensEvitado),
+  });
+
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
 
   let saving = savingVazio();
   saving.tipo_saving = data.tipo_saving;
+  // Custo evitado já mensalizado entra cheio no recálculo (não divide de novo).
+  saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
+  saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
+  saving.custo_evitado_descricao = custoEvitadoDescricao || null;
 
   if (tiposProjeto.includes('saving') && data.linhas && data.linhas.length > 0) {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const linhas: SavingLinha[] = data.linhas.map((l) => {
       const valorHora = CARGOS.find(c => c.label === l.cargo)?.valor_hora ?? 0;
       const economiaHoras = Math.max(0, l.horas_antes - l.horas_depois);
@@ -791,7 +827,9 @@ export async function iniciarSaving(rawData: unknown) {
       ...saving,
       linhas,
       economia_horas_mes: totalHoras,
-      economia_reais_mes: round2(totalReaisBruto - custoExterno),
+      // Líquido: horas + custo evitado (mensalizado) − custo externo. Mesma
+      // fórmula de recomputarSavingFinanceiro (que recalcula do zero no preview).
+      economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno),
     };
   }
 
@@ -1230,6 +1268,43 @@ export async function submeterParaValidacao(rawData: unknown) {
   });
 
   log('submeterParaValidacao', `Status: ${status}`);
+
+  // ── Snapshot imutável de auditoria ────────────────────────────────────────────
+  // Grava uma cópia do estado do projeto no momento da submissão. Não propaga
+  // erros — o snapshot é observabilidade, não deve bloquear a submissão.
+  try {
+    const projetoAtualizado = await getProjetoById(projeto_id);
+    if (projetoAtualizado) {
+      const snapshotProjeto: Record<string, unknown> = {
+        nome: projetoAtualizado.nome,
+        descricao_breve: projetoAtualizado.descricao_breve,
+        ferramenta: projetoAtualizado.ferramenta,
+        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
+        especial: projetoAtualizado.especial,
+        area: projetoAtualizado.area,
+        saving_horas: projetoAtualizado.saving_horas,
+        saving_reais: projetoAtualizado.saving_reais,
+        tipo_saving: projetoAtualizado.tipo_saving,
+        memorial_calculo: projetoAtualizado.memorial_calculo,
+        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
+        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
+        alguem_fazia: projetoAtualizado.alguem_fazia,
+        custo_evitado: projetoAtualizado.custo_evitado,
+        custo_evitado_justificativa: projetoAtualizado.custo_evitado_justificativa,
+        custo_evitado_itens: projetoAtualizado.custo_evitado_itens,
+        status: projetoAtualizado.status,
+      };
+      await gravarVersaoProjeto(
+        projeto_id,
+        ehReenvio ? 'reenvio' : 'submit_inicial',
+        snapshotProjeto,
+        conteudo,
+        projetoAtualizado.responsavel_email,
+      );
+    }
+  } catch (versionErr) {
+    err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
+  }
 
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {

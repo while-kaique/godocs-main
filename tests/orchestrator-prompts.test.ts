@@ -103,12 +103,16 @@ describe('Prompt fase doc', () => {
     expect(msgs).toHaveLength(0);
   });
 
-  it('padroniza a verificação de IA: SEMPRE pergunta com caixas de seleção, nunca infere sozinho', async () => {
+  it('padroniza a verificação de IA: infere dos arquivos, SEMPRE pergunta com caixas de seleção, detecta contradição', async () => {
     await runOrchestrator(makeCtx(), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('SEMPRE com caixas de seleção');
-    expect(system).toContain('DEVE SEMPRE fazer esta pergunta com type:"options"');
-    expect(system).toContain('NUNCA defina tem_ia_como_funcionalidade por conta própria');
+    // Passo 1: inferência dos arquivos
+    expect(system).toContain('ia_inferida_dos_arquivos');
+    // Passo 2: pergunta com contexto
+    expect(system).toContain('PASSO 2 — PERGUNTE COM CONTEXTO');
+    // Passo 3: detecção de contradição
+    expect(system).toContain('ia_contradição');
     // As 3 opções padrão continuam presentes
     expect(system).toContain('Sim, tem IA como funcionalidade');
     expect(system).toContain('Não, é uma automação determinística');

@@ -247,12 +247,11 @@ function Home() {
               accent
             />
             <ActionCard
-              to={import.meta.env.DEV ? "/meus-projetos" : undefined}
+              to="/meus-projetos"
               icon={<LayoutList className="h-6 w-6" />}
               title="Meus Projetos"
               description="Visualize, edite ou reenvie seus projetos submetidos."
-              badge={import.meta.env.DEV ? "Editar e reenviar" : "Em breve"}
-              disabled={!import.meta.env.DEV}
+              badge="Editar e reenviar"
             />
           </section>
 

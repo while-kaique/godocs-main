@@ -85,12 +85,27 @@ export interface SavingLinhaInput {
   horasDepois: string;
 }
 
+// Uma ferramenta/serviço externo que a solução fez a empresa DEIXAR de pagar
+// (custo evitado). Distinto do `servicoExterno`/`custoExterno`, que é a ferramenta
+// USADA pela automação (custo incorrido, que subtrai). Aqui é o que foi ELIMINADO.
+// `recorrencia`: 'mensal' → entra cheio no saving; 'pontual' → valor único, ÷12.
+export interface CustoEvitadoItemInput {
+  nome: string;
+  valor: string;
+  recorrencia: 'mensal' | 'pontual' | '';
+  justificativa: string;
+}
+
 export interface SavingFormData {
   linhas: SavingLinhaInput[];
   // Saving: alguém já fazia/mantinha isso manualmente antes da automação?
   // 'sim' → tabela antes+depois (economia clássica); 'nao' → só "depois"
   // (ninguém antes; horas_antes assumido 0, então a economia de horas é 0).
   alguemFazia: 'sim' | 'nao' | '';
+  // Saving: a solução evitou um custo externo (ferramenta/serviço que deixou de
+  // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens).
+  temCustoEvitado: 'sim' | 'nao' | '';
+  custoEvitadoItens: CustoEvitadoItemInput[];
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
@@ -116,6 +131,31 @@ export interface AnaliseResult {
   resumo: string;
   criterios_hardcoded: AnaliseResultCriterio[];
   criterios_dinamicos: AnaliseResultCriterio[];
+}
+
+// ─── Máscara de moeda BR (padroniza a entrada financeira) ───────────────────
+// Entrada baseada em centavos: o usuário só digita dígitos e o valor é formatado
+// como "1.234,56" automaticamente (não precisa — nem pode — digitar "." ou ",").
+
+// Recebe qualquer string (com ou sem máscara) e devolve "1.234,56" a partir só dos
+// dígitos. "" quando não há dígitos.
+export function formatMoedaBR(raw: string): string {
+  const digits = String(raw).replace(/\D/g, "");
+  if (!digits) return "";
+  const cents = parseInt(digits, 10);
+  return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// "1.234,56" → 1234.56 (0 se inválido). Inverso de formatMoedaBR/numeroParaMoedaBR.
+export function parseMoedaBR(formatted: string): number {
+  const n = parseFloat(String(formatted).replace(/\./g, "").replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+
+// 1234.56 → "1.234,56" (para repopular o form na edição a partir do número salvo).
+export function numeroParaMoedaBR(n: number): string {
+  if (n == null || isNaN(n)) return "";
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function readFileAsBase64(file: File): Promise<string> {

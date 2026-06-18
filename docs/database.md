@@ -88,9 +88,12 @@ Entidade principal. Uma linha por projeto submetido.
 | saving_horas, saving_reais | REAL | Totais calculados |
 | tipo_saving | TEXT | mensal/pontual |
 | memorial_calculo | TEXT | Texto sem markdown |
-| custo_externo_mensal | REAL | |
+| custo_externo_mensal | REAL | Custo INCORRIDO pela automação (ferramenta usada — subtrai) |
+| custo_evitado | TEXT | sim/não — a solução evitou custo de ferramenta/serviço externo? (form de saving) |
+| custo_evitado_justificativa | TEXT | Texto concatenado das ferramentas evitadas |
+| custo_evitado_itens | TEXT | JSON `[{nome,valor,recorrencia,justificativa}]`; pontual ÷12, soma em saving_reais |
 | ganho_total_mensal | REAL | saving + receita ponderados |
-| alguem_fazia | INTEGER | 0/1 — tinha processo manual antes? |
+| alguem_fazia | TEXT | sim/não — tinha processo manual antes? |
 | complexidade | TEXT | automacao/inteligencia/autonomia |
 | observacoes | TEXT | Parecer da análise (staff-only) |
 | submitted_at, validated_at | TEXT | |

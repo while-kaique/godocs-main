@@ -33,6 +33,11 @@ export type Projeto = {
   tipo_saving: string | null;
   memorial_calculo: string | null;
   custo_externo_mensal: number | null;
+  // Custo evitado (ferramentas/serviços que a solução fez deixar de ser pagos).
+  // 'sim'|'nao'; justificativa concatenada; itens em JSON. Coletado no formulário.
+  custo_evitado: string | null;
+  custo_evitado_justificativa: string | null;
+  custo_evitado_itens: string | null;
   ganho_total_mensal: number | null;
   complexidade: string | null;
   observacoes: string | null;
