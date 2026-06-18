@@ -1355,6 +1355,88 @@ export async function submeterParaValidacao(rawData: unknown) {
   };
 }
 
+// ─── Re-sync Google (TEMPORÁRIO) ──────────────────────────────────────────────
+// Re-dispara o sync para Google Sheets + Chat de um projeto JÁ submetido, SEM
+// re-rodar o analisador de IA e SEM mutar o estado do projeto. Usa os valores já
+// gravados no banco (saving/receita do doc, complexidade/observações da análise
+// anterior). Útil para repor no Sheets/Chat o que se perdeu por uma submissão
+// cujo sync foi cancelado (bug do waitUntil). Reproduz os dois eventos de sync da
+// edição: UPDATE da linha (por ID) + atualização de complexidade/observações.
+// REMOVER quando não for mais necessário.
+export async function resyncGoogle(rawData: unknown) {
+  const { projeto_id } = z.object({ projeto_id: z.string().min(1) }).parse(rawData);
+  log('resyncGoogle', `projeto=${projeto_id}`);
+
+  const docRow = await getDocumentacao(projeto_id);
+  if (!docRow) throw new Error('Documentação não encontrada.');
+  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+
+  const projeto = await getProjetoById(projeto_id);
+  if (!projeto) throw new Error('Projeto não encontrado.');
+
+  // Re-deriva R$ das horas (mesma rede de segurança do submit).
+  if (conteudo.saving && typeof conteudo.saving === 'object') {
+    conteudo.saving = recomputarSavingFinanceiro(
+      conteudo.saving as SavingColetado,
+      projeto.custo_externo_mensal ?? 0,
+    );
+  }
+  const saving = conteudo.saving as Record<string, unknown> | undefined;
+  const receita = conteudo.receita as Record<string, unknown> | undefined;
+
+  // ganho_total_mensal — mesma fórmula do submeterParaValidacao.
+  const savingReais = (saving?.economia_reais_mes as number) ?? 0;
+  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
+  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+  const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
+  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
+  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
+  const ganhoTotalMensal = savingMensal + receitaMensal / 10;
+
+  const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+  const memorialInterno = stripMarkdown(
+    enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto),
+  );
+  const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+  const membros = parseJson<string[]>(projeto.membros) ?? [];
+
+  // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
+  await syncSubmitToGoogle({
+    projetoId: projeto_id,
+    modo: 'edicao',
+    projeto,
+    conteudo,
+    saving,
+    receita,
+    membros,
+    tiposProjeto,
+    status: 'Pendente',
+    area: projeto.area ?? '—',
+    memorialLimpo: memorialInterno ?? '—',
+    receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+    ganhoTotalMensal,
+  });
+
+  // 2. Complexidade/Observações/Status (o que o analisador já havia gravado).
+  await syncUpdateToGoogle({
+    projetoId: projeto_id,
+    projectName: projeto.nome ?? '',
+    complexidade: projeto.complexidade ?? '',
+    observacoes: projeto.observacoes ?? '',
+    status: 'Pendente',
+  });
+
+  log('resyncGoogle', `OK — ${projeto.nome} (área=${projeto.area}, ganho=${Math.round(ganhoTotalMensal)})`);
+  return {
+    ok: true,
+    projeto_id,
+    nome: projeto.nome,
+    area: projeto.area,
+    saving_horas: (saving?.economia_horas_mes as number) ?? null,
+    ganho_total_mensal: Math.round(ganhoTotalMensal * 100) / 100,
+  };
+}
+
 // ─── Validar projeto ─────────────────────────────────────────────────────────
 
 export async function validarProjeto(rawData: unknown) {

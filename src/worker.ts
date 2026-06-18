@@ -16,6 +16,7 @@ import {
   analisarProjetoFn,
   submeterParaValidacao,
   validarProjeto,
+  resyncGoogle,
 } from '@/lib/chat.functions'
 import {
   getAreas,
@@ -326,6 +327,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         request_body: log.request_body,
         response_body: log.response_body,
       })
+    }
+
+    // ── Re-sync Google (TEMPORÁRIO, admin) ──
+    // Re-dispara o sync Sheets+Chat de um projeto já submetido, SEM reanálise de
+    // IA. GET para facilitar o disparo pelo navegador logado. REMOVER depois.
+    if (pathname === '/api/admin/resync-google' && method === 'GET') {
+      await requireAdmin(request)
+      const projetoId = url.searchParams.get('projeto_id')
+      if (!projetoId) return errorJson('Informe ?projeto_id=...', 400)
+      return json(await resyncGoogle({ projeto_id: projetoId }))
     }
 
     return errorJson('Rota não encontrada', 404)
