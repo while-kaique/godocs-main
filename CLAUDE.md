@@ -18,7 +18,7 @@ Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funci
 ```bash
 npm run dev            # testes + dev server
 npm run test           # testes (Vitest)
-npm run build          # SPA em dist/
+npm run build          # SPA em dist
 npm run build:worker   # bundle worker.js (esbuild)
 npm run lint / format  # eslint / prettier
 ```

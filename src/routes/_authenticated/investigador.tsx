@@ -4,7 +4,6 @@ import { apiFetch } from '@/lib/api-client'
 import {
   Search,
   AlertTriangle,
-  Clock,
   MessageSquare,
   Activity,
   ChevronRight,
@@ -665,12 +664,6 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
               <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-semibold">
                 <AlertTriangle className="h-3 w-3" />
                 {p.total_erros_api} erro{p.total_erros_api !== 1 ? 's' : ''}
-              </span>
-            )}
-            {p.max_duracao_api_ms != null && p.max_duracao_api_ms > 5000 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-[#ca8a04]/8 px-2 py-0.5 text-[10px] text-[#ca8a04] font-semibold">
-                <Clock className="h-3 w-3" />
-                Lento
               </span>
             )}
           </div>
