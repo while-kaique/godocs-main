@@ -136,10 +136,13 @@ export async function updateRowByProjectId(
   const searchData = (await searchResp.json()) as { values?: string[][] };
   const rows = searchData.values ?? [];
 
-  // Encontrar a linha (1-indexed; pula header na posição 0).
+  // Encontrar a linha (1-indexed; pula header na posição 0). Match case-insensitive:
+  // linhas legadas inseridas na mão usam ID em MAIÚSCULAS (ex.: "LEGADO-270"),
+  // enquanto o ID do banco é minúsculo ("legado-270").
+  const alvo = projetoId.trim().toLowerCase();
   let rowNumber = -1;
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i]?.[0]?.trim() === projetoId.trim()) {
+    if (rows[i]?.[0]?.trim().toLowerCase() === alvo) {
       rowNumber = i + 1; // Sheets é 1-indexed
       break;
     }
