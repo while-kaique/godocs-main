@@ -36,6 +36,59 @@ Exemplo de uma seção bem formatada:
 - **OpenAI / Anthropic** — LLM (env: \`LLM_API_KEY\`, \`LLM_MODEL\`).
 - **Google Chat** — notificação via webhook.`;
 
+// ─── Bloco de contexto de revisão (edição) ──────────────────────────────────
+// Quando ctx.revisao existe, o projeto está sendo EDITADO: ele já foi submetido,
+// documentado e teve memorial aprovado. O agente DEVE partir desse contexto e
+// validar apenas o que mudou — nunca recomeçar a coleta do zero. Retorna '' no
+// fluxo de primeira submissão (ctx.revisao null).
+export function buildRevisaoBlock(ctx: ProjetoContexto, fase: 'doc' | 'saving' | 'receita'): string {
+  const rev = ctx.revisao;
+  if (!rev) return '';
+
+  const linhasAnteriores = (rev.saving?.linhas ?? [])
+    .map((l, i) => `  ${i + 1}. ${l.cargo}: ${l.horas_antes}h antes → ${l.horas_depois}h depois`)
+    .join('\n');
+
+  // Conteúdo da submissão anterior relevante para CADA fase.
+  let anterior = '';
+  if (fase === 'doc' && rev.doc) {
+    anterior = `DOCUMENTAÇÃO TÉCNICA APROVADA ANTERIORMENTE:
+- O que faz: ${rev.doc.o_que_faz ?? '—'}
+- Execução: ${rev.doc.execucao ?? '—'}
+- Fluxo: ${rev.doc.fluxo ?? '—'}
+- Dependências: ${rev.doc.dependencias ?? '—'}
+- Configurar antes: ${rev.doc.configurar_antes ?? '—'}
+- Atenção: ${rev.doc.atencao ?? '—'}`;
+  } else if (fase === 'saving' && rev.saving) {
+    anterior = `MEMORIAL DE SAVING APROVADO ANTERIORMENTE:
+- Horas por pessoa (antes → depois):
+${linhasAnteriores || '  (nenhuma linha registrada)'}
+- Economia total anterior: ${rev.saving.economia_horas_mes ?? '—'}h (tipo: ${rev.saving.tipo_saving ?? '—'})
+- Havia trabalho manual antes: ${rev.saving.alguem_fazia ?? '—'}
+- Memorial anterior (texto): ${rev.saving.memorial_calculo ?? '—'}
+(Os valores em R$ anteriores são staff-only e NÃO devem ser mencionados ao usuário.)`;
+  } else if (fase === 'receita' && rev.receita) {
+    anterior = `MEMORIAL DE RECEITA APROVADO ANTERIORMENTE:
+- Valor anterior: R$ ${rev.receita.valor_ganho_mensal ?? '—'}
+- Memorial anterior (texto): ${rev.receita.memorial_calculo ?? '—'}`;
+  }
+
+  return `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONTEXTO DE REVISÃO (EDIÇÃO) — LEIA ANTES DE TUDO:
+Este projeto JÁ FOI submetido e documentado antes. O usuário está EDITANDO uma submissão existente — NÃO é uma primeira documentação.
+Abaixo está o que foi aprovado na versão anterior. Use isso como ponto de partida e como verdade já estabelecida.
+
+${anterior}
+
+COMO AGIR NA EDIÇÃO:
+- Você JÁ TEM todo o contexto acima antes da primeira pergunta — NÃO recomece do zero, NÃO refaça a coleta inteira nem peça de novo o que já está documentado.
+- Compare os dados atuais (informados agora) com os anteriores e identifique O QUE MUDOU.
+- Valide APENAS o que mudou. Para o que não mudou, reaproveite a justificativa/memorial anterior.
+- Se nada de relevante mudou nesta fase, confirme rapidamente e siga para o preview — não invente perguntas.
+- Sua primeira mensagem deve demonstrar que você conhece o histórico (ex: cite o que existia antes e o que aparenta ter mudado), não uma pergunta genérica de coleta inicial.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+}
+
 // ─── System prompts por fase ────────────────────────────────────────────────
 
 export function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
@@ -49,7 +102,7 @@ export function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColet
     ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):\n"${ctx.descricao_breve.trim()}"\n\n`
     : '';
 
-  return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.
+  return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.${buildRevisaoBlock(ctx, 'doc')}
 
 SITUAÇÃO ATUAL:
 O sistema analisou automaticamente os arquivos enviados pelo usuário e extraiu os campos abaixo.
@@ -102,15 +155,18 @@ REGRAS:
 - Quando todos os 7 campos tiverem informação RICA E SUFICIENTE, siga o fluxo abaixo ANTES de gerar o PREVIEW.
 - Português brasileiro, tom direto, frases curtas. Acentuação correta obrigatória.
 
-VERIFICAÇÃO DE IA COMO FUNCIONALIDADE (obrigatória antes do preview):
-Antes de gerar o preview, verifique se o projeto usa IA como funcionalidade — ou seja, se alguma parte do que o projeto ENTREGA ao usuário envolve IA (gerar texto, classificar, transcrever, recomendar, extrair com LLM, etc.). Isso é diferente de ter sido construído com ajuda de IA.
+VERIFICAÇÃO DE IA COMO FUNCIONALIDADE (obrigatória e PADRONIZADA — SEMPRE com caixas de seleção):
+IA como funcionalidade = alguma parte do que o projeto ENTREGA ao usuário envolve IA (gerar texto, classificar, transcrever, recomendar, extrair com LLM, etc.). É diferente de ter sido construído com ajuda de IA.
 
-- Se a documentação já deixar CLARO que há IA como funcionalidade (ex: "usa Claude para classificar", "gera documentação com IA", "LLM extrai os dados"), defina tem_ia_como_funcionalidade como true e gere o preview direto.
-- Se a documentação deixar CLARO que NÃO há IA (processo puramente determinístico, sem menção a LLM/ML/classificador), defina tem_ia_como_funcionalidade como false e gere o preview direto.
-- Se NÃO estiver claro (qualquer dúvida), faça a pergunta abaixo com type:"options" ANTES do preview:
+REGRA DE PADRONIZAÇÃO (siga à risca):
+- Você DEVE SEMPRE fazer esta pergunta com type:"options" (caixas de seleção) ANTES de gerar o preview — em TODA submissão, sem exceção. NUNCA pule esta etapa e NUNCA defina tem_ia_como_funcionalidade por conta própria a partir da documentação. A caixa de seleção aparece sempre, para não gerar ambiguidade (ora com opções, ora sem).
+- Faça a pergunta UMA única vez, no momento em que os 7 campos já estiverem completos e logo antes do preview. Mesmo que a documentação deixe ÓBVIO se há ou não IA, ainda assim apresente as opções — a escolha é do usuário. Você pode citar na pergunta o que percebeu, mas a decisão vem da resposta dele.
+- Só NÃO repita a pergunta se tem_ia_como_funcionalidade JÁ estiver definido (true ou false) no ESTADO ATUAL DA COLETA — nesse caso a pergunta já foi respondida; siga direto para o preview.
+
+Pergunta padrão (sempre com type:"options"):
   question: "Antes de montar a documentação: esse projeto usa IA como funcionalidade? Por exemplo, geração de texto, classificação automática, transcrição, extração inteligente de dados, ou qualquer outra função baseada em LLM ou modelo de IA — mesmo que seja algo secundário no fluxo."
   options: ["Sim, tem IA como funcionalidade", "Não, é uma automação determinística", "Não tenho certeza, me explique melhor"]
-  Se o usuário escolher "Não tenho certeza, me explique melhor", responda com type:"question" explicando a diferença em 2 frases simples e pergunte novamente (com type:"options" e as mesmas 3 opções).
+  Se o usuário escolher "Não tenho certeza, me explique melhor", responda com type:"question" explicando a diferença em 2 frases simples e pergunte de novo (com type:"options" e as mesmas 3 opções).
   Após a resposta, defina tem_ia_como_funcionalidade (true para "Sim", false para "Não") e gere o preview.
 
 LINGUAGEM COM O USUÁRIO (IMPORTANTÍSSIMO):
@@ -215,7 +271,7 @@ CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
 2. **memorial_calculo** — Narrativa detalhada que fundamenta o valor informado.`;
 
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
-A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental PADRONIZADO.
+A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental PADRONIZADO — quanto de receita nova esse projeto gera.${buildRevisaoBlock(ctx, 'receita')}
 
 ${detalhes}
 
@@ -367,8 +423,30 @@ DETALHES TÉCNICOS APROVADOS:
     : '  (nenhuma pessoa informada)';
   const plural = linhas.length > 1;
 
+  // Perfil das horas (determinístico) — define COMO abrir a conversa, evitando que o
+  // agente faça perguntas que contradizem os dados já informados (ex.: pedir o
+  // detalhamento de uma "rotina manual" para uma linha com 0h antes).
+  const temLinhas = linhas.length > 0;
+  const linhasComHorasAntes = linhas.filter((l) => l.horas_antes > 0);
+  const temHorasAntes = linhasComHorasAntes.length > 0;
+  const todasZeroAntes = temLinhas && !temHorasAntes; // ninguém fazia manualmente antes
+  const todasZeroTotal = temLinhas && linhas.every((l) => l.horas_antes === 0 && l.horas_depois === 0);
+  const temCustoMonitoramento = linhas.some((l) => l.horas_antes === 0 && l.horas_depois > 0);
+  const algumaParcialZero = temHorasAntes && linhas.some((l) => l.horas_antes === 0);
+
+  // Diretiva de abertura — é a PRIMEIRA e mais forte instrução de conduta, calculada
+  // a partir das horas reais. Vence as regras genéricas de "detalhar a rotina".
+  const comoAbrir = todasZeroTotal
+    ? `⛔ NINGUÉM fazia esta tarefa manualmente antes (0h antes) E ninguém gasta horas com ela hoje (0h depois). NÃO EXISTE rotina manual — é TERMINANTEMENTE PROIBIDO perguntar "o que a pessoa fazia nessas 0h", "com que frequência" ou "quanto tempo levava". Essa pergunta contradiz o que o usuário JÁ informou e passa a impressão de que você não leu os dados.
+   Como não há economia de horas, o ganho precisa vir de OUTRO lugar. Sua primeira mensagem deve: (a) reconhecer que a automação passou a fazer uma tarefa que ninguém fazia; (b) perguntar o que ela entrega agora que antes não era feito (qualidade, cobertura, frequência) e se a empresa deixou de pagar por alguma ferramenta/serviço (custo evitado). NÃO force um memorial de horas que não existe. Se não houver custo evitado nem ganho concreto, siga a regra anti-zero e oriente projeto especial.`
+    : todasZeroAntes
+      ? `Ninguém fazia esta(s) tarefa(s) manualmente antes (0h antes) — o usuário JÁ informou isso. É PROIBIDO pedir o passo a passo, a frequência ou o tempo de uma rotina manual que nunca existiu. ${temCustoMonitoramento ? 'Como há horas DEPOIS (monitoramento/supervisão da automação), abra perguntando o que a pessoa faz para acompanhar a automação e se esse tempo é realista — isso é um custo adicional.' : 'Abra perguntando o que a automação passou a entregar que antes não era feito e se há custo evitado.'}`
+      : algumaParcialZero
+        ? `ATENÇÃO: parte das linhas tem 0h antes (a pessoa NÃO fazia a tarefa) e parte tem horas antes > 0. Para as linhas com 0h antes, é PROIBIDO perguntar sobre rotina manual prévia — pergunte sobre monitoramento (horas depois) ou o que passou a ser entregue. Para as linhas com horas antes > 0, valide a rotina manual normalmente. Abra pela linha que tem rotina manual real.`
+        : `Há rotina manual real (horas antes > 0). Abra contextualizando em 1 frase que vamos validar as horas para montar o memorial e faça a primeira pergunta concreta sobre essa rotina (passo a passo, frequência, tempo por execução).`;
+
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
-A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo PADRONIZADO.
+A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo PADRONIZADO.${buildRevisaoBlock(ctx, 'saving')}
 
 ${detalhes}
 
@@ -426,12 +504,19 @@ REGRAS DE PREENCHIMENTO POR CENÁRIO:
 
 NUNCA estranhe horas_antes=0 — é perfeitamente normal.
 
+⚠️ ANTES DE PERGUNTAR QUALQUER COISA — RELEIA AS HORAS ACIMA E PENSE:
+Olhe horas_antes e horas_depois de CADA linha. NUNCA faça uma pergunta que contradiga o que o usuário já informou. O erro mais grave (e proibido) é pedir o detalhamento de uma rotina manual para uma linha que tem 0h antes — ninguém fazia, não há rotina a detalhar. Antes de escrever a primeira mensagem, confirme mentalmente que a sua pergunta faz sentido para as horas exatas que estão na tabela.
+
+COMO ABRIR A CONVERSA (siga à risca — esta diretiva vence as regras genéricas de validação abaixo):
+${comoAbrir}
+
 COMO CONDUZIR:
-1. Comece com uma frase curta e natural: contextualize que agora vamos entender melhor as horas para montar o memorial. Faça a primeira pergunta concreta.${plural ? '\n   Como há mais de uma pessoa, valide as horas de cada uma — pode agrupar a pergunta se a rotina for a mesma.' : ''}
-2. Você pode agrupar perguntas quando fizer sentido, mas se o usuário não responder tudo, volte nos pontos faltantes.
-3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever.
+1. Abra exatamente conforme a diretiva "COMO ABRIR A CONVERSA" acima. Faça a primeira pergunta concreta e coerente com as horas informadas.${plural ? '\n   Como há mais de uma pessoa, valide as horas de cada uma — pode agrupar a pergunta se a rotina for a mesma.' : ''}
+2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
+3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
 4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) e 3.1 estão preenchidos.
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
+6. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
 
 TIPO DE SAVING — ${isPontual ? 'PONTUAL' : 'MENSAL'}:
 ${isPontual
@@ -443,11 +528,15 @@ ${isPontual
 - As horas representam a economia POR MÊS.
 - Pergunte sobre a rotina mensal: quais tarefas, com que frequência dentro do mês, quanto tempo cada execução.`}
 
-VALIDAÇÃO DE HORAS — OBRIGATÓRIO:
-- NUNCA aceite as horas "de cara" para linhas com horas_antes > 0. O usuário DEVE detalhar a rotina: quais tarefas, ${isPontual ? 'quantos itens/registros, quanto tempo por item' : 'com que frequência, quanto tempo cada uma'}.
+VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0):
+- ATENÇÃO: as regras abaixo valem APENAS para linhas que TÊM rotina manual prévia (horas_antes > 0). Para linhas com 0h antes, NÃO se aplicam — não cobre detalhamento de rotina nem "faça a conta" de algo que ninguém fazia.
+- Para essas linhas, NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina: quais tarefas, ${isPontual ? 'quantos itens/registros, quanto tempo por item' : 'com que frequência, quanto tempo cada uma'}.
 - Faça a conta: se o usuário diz "${isPontual ? '100 registros, 3 min cada' : '50 cadastros por mês, 15 min cada'}", isso dá ~${isPontual ? '5h' : '12h'} — se a hora informada destoar, aponte a discrepância e peça para explicar.
-- Se a estimativa parecer inflada para o tipo de tarefa, questione diretamente.
-- Se após o detalhamento as horas reais forem diferentes, atualize as linhas e recalcule o total.
+- Se a estimativa de alguma pessoa parecer inflada para o tipo de tarefa, questione diretamente.
+- Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), muitas horas manuais não fazem sentido. Desafie.
+- Se após o detalhamento as horas reais de alguma pessoa forem diferentes, atualize horas_antes/horas_depois/economia_horas_mes daquela linha em \`linhas\` e recalcule o total \`economia_horas_mes\`.
+- Para linhas de CUSTO ADICIONAL (horas_antes=0, horas_depois>0): NÃO peça rotina manual prévia; pergunte o que a pessoa faz para monitorar/supervisionar a automação e se o tempo informado é realista.
+- Para linhas com 0h antes E 0h depois: não há horas a validar — não pergunte nada sobre rotina; foque no que a automação entrega e no custo evitado (ver diretiva de abertura).
 
 CUSTO EVITADO (SEÇÃO 3 — OBRIGATÓRIO INVESTIGAR):
 - Além do tempo economizado, MUITOS projetos passam a EVITAR um custo: licença cancelada, serviço externo que deixou de ser contratado, cobrança pontual de implementação que não foi mais necessária, etc.

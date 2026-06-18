@@ -144,6 +144,40 @@ export type ChatHistoryMessage = {
   content: string;
 };
 
+// ─── Contexto de revisão (edição de projeto já submetido) ───────────────────
+// Quando o usuário EDITA um projeto que já foi submetido e documentado, o
+// agente precisa partir da documentação anterior — não recomeçar do zero. Estes
+// campos carregam o que foi APROVADO na submissão anterior (doc técnica + memoriais
+// + horas/valores financeiros, inclusive os que ficam staff-only). O agente usa
+// isso para validar APENAS o que mudou. Só é populado em edição (null no fluxo novo).
+export type RevisaoContexto = {
+  // Seções técnicas aprovadas na submissão anterior (vindas de documentacao.conteudo).
+  doc: {
+    o_que_faz?: string | null;
+    execucao?: string | null;
+    fluxo?: string | null;
+    dependencias?: string | null;
+    configurar_antes?: string | null;
+    atencao?: string | null;
+  } | null;
+  // Memorial e números do saving anterior (horas antes/depois por cargo + financeiro).
+  // Os valores em R$ aqui são staff-only — NUNCA expostos ao usuário no chat.
+  saving: {
+    memorial_calculo?: string | null;
+    linhas?: { cargo: string; horas_antes: number; horas_depois: number }[] | null;
+    economia_horas_mes?: number | null;
+    economia_reais_mes?: number | null;
+    tipo_saving?: string | null;
+    alguem_fazia?: string | null;
+    custo_externo_mensal?: number | null;
+  } | null;
+  // Memorial e valor da receita incremental anterior.
+  receita: {
+    memorial_calculo?: string | null;
+    valor_ganho_mensal?: number | null;
+  } | null;
+};
+
 // ─── Contexto do projeto (vem do formulário + doc enviado) ──────────────────
 
 export type ProjetoContexto = {
@@ -162,6 +196,9 @@ export type ProjetoContexto = {
   // Projeto especial: flag + contexto que a pessoa escreveu para explicar o impacto.
   especial?: boolean;
   contexto_especial?: string | null;
+  // Documentação anterior aprovada — presente apenas quando o projeto está sendo
+  // EDITADO (já foi submetido antes). null no fluxo de primeira submissão.
+  revisao?: RevisaoContexto | null;
 };
 
 // ─── Documentação gerada (output do compiler) ───────────────────────────────
