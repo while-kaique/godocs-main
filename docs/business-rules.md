@@ -29,10 +29,10 @@ Pós-submissão:
   2. Popula colunas de impacto no projeto
   3. Auto-aprova se área = RPA, senão em_validacao
      (projeto especial é exceção: SEMPRE em_validacao — validação humana)
-  4. Notifica Google Chat
-  5. Envia ao n8n (Markdown → Drive + planilha); especial vai com tipos_projeto=['especial'],
-     status "Pendente" e os campos `especial` + `contexto_especial`
-  6. Análise IA em background (complexidade + observações) — PULADA para projeto especial
+  4. Sincroniza direto com Google Sheets (linha na planilha) + notifica Google Chat
+     (via Service Account, `src/lib/google/` — substitui o antigo n8n); especial vai
+     com tipos_projeto=['especial'], status "Pendente" e `especial` + `contexto_especial`
+  5. Análise IA em background (complexidade + observações) — PULADA para projeto especial
 ```
 
 ## Projeto especial ("estrela do Mario Kart")
@@ -156,9 +156,8 @@ n8n, Python, Google Apps Script, Claude + GoDeploy, Claude, Outros
 
 | Serviço | Env var | Uso |
 |---|---|---|
-| n8n | `N8N_WEBHOOK_URL_SUBMIT` | Submissão → Markdown + Drive + planilha |
-| n8n | `N8N_WEBHOOK_URL_UPDATE` | Observações pós-análise |
-| Google Chat | `GOOGLE_CHAT_WEBHOOK_URL` | Notificação de novo projeto |
+| Google Sheets | `GOOGLE_SA_KEY_BASE64`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SHEETS_ID`, `GOOGLE_SHEETS_TAB` | Submissão → linha na planilha (Service Account, `src/lib/google/`). Substitui o antigo n8n |
+| Google Chat | `GOOGLE_CHAT_WEBHOOK_URL` | Notificação de novo projeto / pós-análise |
 | Brevo | `BREVO_API_KEY` | Emails de aprovação/rejeição |
 | OCR Worker | `OCR_WORKER_URL` | Extração de PDF |
 | TeamGuide | `TG_API_TOKEN` | Sync de áreas |

@@ -1,6 +1,6 @@
 # GoDocs
 
-Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funcionários submetem projetos via formulário de 3 etapas com chat IA que coleta documentação técnica + memorial de impacto financeiro (saving e/ou receita). Os dados ficam no SQLite local e são enviados ao n8n (webhook → Markdown/Drive/planilha) na submissão.
+Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funcionários submetem projetos via formulário de 3 etapas com chat IA que coleta documentação técnica + memorial de impacto financeiro (saving e/ou receita). Os dados ficam no SQLite local e são sincronizados diretamente com o Google Sheets (planilha) + Google Chat (notificação) na submissão, via Service Account (`src/lib/google/`).
 
 ## Stack
 
@@ -94,7 +94,7 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 **Pontual e o ÷12** — saving e receita pontual entram pelo valor cheio (NÃO dividem por 12). **Exceção: custo evitado** (coletado no formulário de saving) — cada ferramenta evitada com recorrência **pontual é mensalizada ÷12** antes de somar ao saving; mensal entra cheio.
 
-**Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON, enviadas ao n8n). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
+**Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON, enviadas ao Google Sheets nas colunas 26-28). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
 
 ## Convenções rápidas
 
