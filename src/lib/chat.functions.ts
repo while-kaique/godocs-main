@@ -24,7 +24,6 @@ import {
   updateValidacaoEmailEnviado,
   insertAnalise,
   parseJson,
-  gravarVersaoProjeto,
 } from '@/integrations/db/client.server';
 import { runOrchestrator } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
@@ -46,8 +45,9 @@ import type {
   SavingColetado,
   SavingLinha,
 } from '@/lib/agents/types';
-import { documentacaoVazia, receitaVazia, savingVazio, CARGOS, type SavingColetado, type ReceitaColetada } from '@/lib/agents/types';
+import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
+import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -987,23 +987,6 @@ export async function atualizarMetadados(rawData: unknown) {
 
   const ctx = await getProjetoContexto(data.projeto_id);
 
-  // Projeto especial: reconstrói doc direto da descrição + contexto, sem IA.
-  if (ctx.especial) {
-    const docEspecial = buildDocEspecial({
-      nome_projeto: ctx.nome_projeto,
-      responsavel_nome: ctx.responsavel_nome,
-      responsavel_email: ctx.responsavel_email,
-      ferramenta: ctx.ferramenta,
-      membros: ctx.membros,
-      descricao_breve: ctx.descricao_breve ?? undefined,
-      contexto_especial: ctx.contexto_especial ?? undefined,
-    });
-    await upsertDocumentacao(data.projeto_id, docEspecial);
-    await updateProjeto(data.projeto_id, { chat_completo: true });
-    log('atualizarMetadados', `Projeto especial ${data.projeto_id}: doc remontada sem IA.`);
-    return { ok: true, reset: true, response: 'Documentação especial atualizada.' };
-  }
-
   let coletadoInicial: DocumentacaoColetada = {
     ...documentacaoVazia(),
     nome_projeto: ctx.nome_projeto,
@@ -1087,33 +1070,17 @@ export async function analisarProjetoFn(rawData: unknown) {
 
   log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
 
-  // ── Enviar update ao n8n com dados da análise (atualiza linha na planilha pelo nome do projeto) ──
-  const n8nUpdateUrl = process.env.N8N_WEBHOOK_URL_UPDATE;
-  if (n8nUpdateUrl) {
-    try {
-      const projeto = await getProjetoById(projeto_id);
-      // Status enviado é o VEREDITO do analisador (não o status de submissão):
-      // aprovado → "Aprovado"; rejeitado → "Reenvio Pendente". Como é o veredito
-      // recém-calculado neste mesmo request, não há risco de leitura defasada.
-      const statusLabel = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : (resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente');
-      const updatePayload = {
-        projeto: projeto?.nome ?? '',
-        complexidade: resultado.complexidade,
-        observacoes: observacoes ?? '',
-        status: statusLabel,
-      };
+  // ── Sync Google (planilha + chat) — fire-and-forget ──
+  {
+    const projeto = await getProjetoById(projeto_id);
+    const statusLabel = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : (resultado.resultado === 'aprovado' ? 'Aprovado' : 'Reenvio Pendente');
 
-      const resp = await fetch(n8nUpdateUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload),
-      });
-      log('analisarProjeto', `n8n update respondeu ${resp.status}`);
-    } catch (n8nErr) {
-      err('analisarProjeto', 'Falha ao enviar update ao n8n:', n8nErr);
-    }
-  } else {
-    log('analisarProjeto', 'N8N_WEBHOOK_URL_UPDATE não definida — update ao n8n pulado');
+    syncUpdateToGoogle({
+      projectName: projeto?.nome ?? '',
+      complexidade: resultado.complexidade,
+      observacoes: observacoes ?? '',
+      status: statusLabel,
+    }).catch(e => err('analisarProjeto', 'Google sync falhou:', e));
   }
 
   return resultado;
@@ -1147,6 +1114,13 @@ export async function submeterParaValidacao(rawData: unknown) {
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
+  if (projeto.nome) {
+    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
+    if (duplicata) {
+      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
+    }
+  }
+
   // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
   // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
   // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
@@ -1177,14 +1151,6 @@ export async function submeterParaValidacao(rawData: unknown) {
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
-
-  // Reenvio atualiza o projeto existente — não bloquear por nome duplicado.
-  if (projeto.nome && !ehReenvio) {
-    const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
-    if (duplicata) {
-      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
-    }
-  }
 
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
@@ -1222,11 +1188,13 @@ export async function submeterParaValidacao(rawData: unknown) {
   // externo). Receita entra cheia e aplica ÷10 (fator de equivalência).
   // Pontual NÃO divide por 12 — valor cheio em ambos os casos.
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingMensal = savingReais;
+  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
+  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
   const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaEquivalente = receitaValor / 10;
+  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
+  const receitaEquivalente = receitaMensal / 10;
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
@@ -1259,98 +1227,26 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   log('submeterParaValidacao', `Status: ${status}`);
 
-  // ── Snapshot imutável de auditoria ────────────────────────────────────────────
-  // Grava uma cópia do estado do projeto no momento da submissão. Não propaga
-  // erros — o snapshot é observabilidade, não deve bloquear a submissão.
-  try {
-    const projetoAtualizado = await getProjetoById(projeto_id);
-    if (projetoAtualizado) {
-      const snapshotProjeto: Record<string, unknown> = {
-        nome: projetoAtualizado.nome,
-        descricao_breve: projetoAtualizado.descricao_breve,
-        ferramenta: projetoAtualizado.ferramenta,
-        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
-        especial: projetoAtualizado.especial,
-        area: projetoAtualizado.area,
-        saving_horas: projetoAtualizado.saving_horas,
-        saving_reais: projetoAtualizado.saving_reais,
-        tipo_saving: projetoAtualizado.tipo_saving,
-        memorial_calculo: projetoAtualizado.memorial_calculo,
-        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
-        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
-        alguem_fazia: projetoAtualizado.alguem_fazia,
-        status: projetoAtualizado.status,
-      };
-      await gravarVersaoProjeto(
-        projeto_id,
-        ehReenvio ? 'reenvio' : 'submit_inicial',
-        snapshotProjeto,
-        conteudo,
-        projetoAtualizado.responsavel_email,
-      );
-    }
-  } catch (versionErr) {
-    err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
-  }
+  // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
+  {
+    const membros = parseJson<string[]>(projeto.membros) ?? [];
+    const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
-  // ── Enviar dados ao n8n (registra na planilha + Drive + notifica Google Chat) ──
-  const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
-  if (n8nWebhookUrl) {
-    try {
-      const membros = parseJson<string[]>(projeto.membros) ?? [];
-      const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
-
-      // Campos de texto/categóricos sem informação chegam na planilha como "—"
-      // (em vez de célula em branco). Não aplicar a numéricos — 0 é valor real
-      // e vira "—" quebraria somas/fórmulas no Sheets.
-      const ouTraco = (v: string | null | undefined): string =>
-        v != null && v.trim() !== '' ? v : '—';
-
-      const n8nPayload = {
-        projeto_id: projeto_id,
-        modo: ehReenvio ? 'edicao' : 'novo',
-        responsavel_nome: ouTraco(projeto.responsavel_nome),
-        responsavel_email: ouTraco(projeto.responsavel_email),
-        area: ouTraco(projeto.area),
-        ferramenta: ouTraco(projeto.ferramenta),
-        escopo: ouTraco(projeto.escopo),
-        membros,
-        nome_projeto: ouTraco(projeto.nome),
-        descricao_breve: ouTraco(projeto.descricao_breve),
-        // NÃO usar ouTraco aqui: o n8n já converte data ausente em "—" (ramo
-        // falsy do ternário "Formatar Dados"). Mandar "—" cairia no split("-")
-        // e geraria "undefined/undefined/—". Enviar a data crua ou null.
-        data_criacao_projeto: projeto.data_criacao_projeto ?? null,
-        tipos_projeto: tiposProjeto,
-        // Flag do projeto especial + contexto coletado na etapa 2.5 (validação humana).
-        especial: ehEspecial,
-        contexto_especial: ouTraco(projeto.contexto_especial),
-        status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
-        saving_horas: (saving?.economia_horas_mes as number) ?? 0,
-        saving_reais: (saving?.economia_reais_mes as number) ?? 0,
-        tipo_saving: ouTraco(saving?.tipo_saving as string | undefined),
-        memorial_calculo: ouTraco(memorialInterno),
-        // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
-        alguem_fazia: ouTraco(projeto.alguem_fazia),
-        custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
-        saving_linhas: JSON.stringify(saving?.linhas ?? []),
-        receita_valor_mensal: (receita?.valor_ganho_mensal as number) ?? 0,
-        tipo_receita: ouTraco(receita?.tipo_saving as string | undefined),
-        receita_memorial: ouTraco(receitaMemorialLimpo),
-        ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : 0,
-        documentacao: conteudo,
-      };
-
-      const n8nResp = await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(n8nPayload),
-      });
-      const n8nResult = await n8nResp.json().catch(() => null);
-      log('submeterParaValidacao', `n8n respondeu ${n8nResp.status}:`, n8nResult);
-    } catch (n8nErr) {
-      err('submeterParaValidacao', 'Falha ao enviar dados ao n8n:', n8nErr);
-    }
+    syncSubmitToGoogle({
+      projetoId: projeto_id,
+      modo: ehReenvio ? 'edicao' : 'novo',
+      projeto,
+      conteudo,
+      saving,
+      receita,
+      membros,
+      tiposProjeto,
+      status: status === 'aprovado' ? 'Aprovado' : 'Pendente',
+      area: areaFinal ?? '—',
+      memorialLimpo: memorialInterno ?? '—',
+      receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+      ganhoTotalMensal,
+    }).catch(e => err('submeterParaValidacao', 'Google sync falhou:', e));
   }
 
   // Números finais recalculados — o cliente usa para o comparativo antes×depois

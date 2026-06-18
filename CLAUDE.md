@@ -1,6 +1,6 @@
 # GoDocs
 
-Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funcionários submetem projetos via formulário de 3 etapas com chat IA que coleta documentação técnica + memorial de impacto financeiro (saving e/ou receita). Os dados ficam no SQLite local e são enviados ao n8n (webhook → Markdown/Drive/planilha) na submissão.
+Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funcionários submetem projetos via formulário de 3 etapas com chat IA que coleta documentação técnica + memorial de impacto financeiro (saving e/ou receita). Os dados ficam no SQLite local e são sincronizados diretamente com o Google Sheets (planilha) + Google Chat (notificação) na submissão, via Service Account (`src/lib/google/`).
 
 ## Stack
 

@@ -1,0 +1,794 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQArNbm72U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9mlk0to-8pN9Va8OXol-w1dosolvqYKZ824QJ1iAF5Q",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=──────────────────────\n\n🚨 *Novo fluxo de automação cadastrado – Análise Pendente*\n📌 *Projeto:* {{ $json['Projeto'] }}\n\n──────────────────────"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "90029367-4a6b-43e0-bfa9-0a065fd6fe54",
+      "name": "Aviso Google Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3696,
+        -64
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \n  \"message\": \"Projeto registrado com sucesso na planilha e Google Drive.\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -3472,
+        -64
+      ],
+      "id": "65a4dd13-50c7-488a-abfc-478aa7a119c8",
+      "name": "Responder Sucesso"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Status }}",
+                    "rightValue": "Aprovado",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3f9901b3-3be5-4afb-9710-d285a3de965c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f24a2c6d-fc4b-4fee-b260-e786ff3e94ff",
+                    "leftValue": "={{ $json.Status }}",
+                    "rightValue": "Pendente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -3920,
+        -80
+      ],
+      "id": "55172799-c0cc-4daa-896a-119000c0b82c",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQArNbm72U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9mlk0to-8pN9Va8OXol-w1dosolvqYKZ824QJ1iAF5Q",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=──────────────────────\n\n✅ *Fluxo de automação aprovado*\n📌 *Projeto:* {{ $json['Projeto'] }}\n\n──────────────────────\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4694200e-7171-4d45-b7d1-e47ac855e775",
+      "name": "Aviso Google Chat1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3696,
+        -256
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.googleapis.com/v1/spaces/AAQArNbm72U/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9mlk0to-8pN9Va8OXol-w1dosolvqYKZ824QJ1iAF5Q",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "=──────────────────────\n\n🔄 *Fluxo de automação reenviado para aprovação*\n📌 *Projeto:* {{ $json['Projeto'] }}\n\n──────────────────────"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d699f6f7-b1fc-489b-859e-7504f453a876",
+      "name": "Aviso Google Chat2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3696,
+        128
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "PATCH",
+        "path": "godocs_update_submit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -4592,
+        240
+      ],
+      "id": "a97cc39c-cb41-438e-8541-39809a6348f2",
+      "name": "Adicionar Complexidade",
+      "webhookId": "dbf316d0-e2f7-4564-a38b-61aea851405b"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": false, \n  \"message\": \"Complexidade não foi cadastrada no sheets.\" \n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -4144,
+        336
+      ],
+      "id": "286ced6c-e816-460e-be0d-12ab913cbf59",
+      "name": "Responder Erro"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "53bcce00-8f9e-43a1-bbf3-bd6694b21581",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4144,
+        144
+      ],
+      "id": "103b12a2-89a5-4f8e-b050-0182f1e4ffe1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \n  \"ok\": false, \n  \"error\": \"Projeto já cadastrado na planilha.\" \n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -3936,
+        272
+      ],
+      "id": "9bddfd73-b525-451b-9f0d-8e39ff9b9877",
+      "name": "Responder Duplicata1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk",
+          "mode": "list",
+          "cachedResultName": "Submissão de Automações - Análise",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1359494527,
+          "mode": "list",
+          "cachedResultName": "GoDocs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk/edit#gid=1359494527"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Projeto": "={{ $json.body.projeto }}",
+            "Complexidade": "={{ $json.body.complexidade }}",
+            "Observações": "={{ $json.body.observacoes }}",
+            "Status": "={{ $json.body.status }}"
+          },
+          "matchingColumns": [
+            "Projeto"
+          ],
+          "schema": [
+            {
+              "id": "Data Submissão",
+              "displayName": "Data Submissão",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ID Projeto",
+              "displayName": "ID Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Data Criação",
+              "displayName": "Data Criação",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Área",
+              "displayName": "Área",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Nome Completo",
+              "displayName": "Nome Completo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Projeto",
+              "displayName": "Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Participantes",
+              "displayName": "Participantes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Descrição",
+              "displayName": "Descrição",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Ferramenta",
+              "displayName": "Ferramenta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Escopo",
+              "displayName": "Escopo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tipos Projeto",
+              "displayName": "Tipos Projeto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Alguém Fazia?",
+              "displayName": "Alguém Fazia?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Saving Horas",
+              "displayName": "Saving Horas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Saving Reais",
+              "displayName": "Saving Reais",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tipo de Saving",
+              "displayName": "Tipo de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Memorial de Saving",
+              "displayName": "Memorial de Saving",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Custo Externo Mensal",
+              "displayName": "Custo Externo Mensal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Receita Mensal",
+              "displayName": "Receita Mensal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Tipo de Receita",
+              "displayName": "Tipo de Receita",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Receita Memorial",
+              "displayName": "Receita Memorial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ganho Total",
+              "displayName": "Ganho Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Complexidade",
+              "displayName": "Complexidade",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Diff Horas / Antes",
+              "displayName": "Diff Horas / Antes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Diff Saving / Antes",
+              "displayName": "Diff Saving / Antes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Memorial anterior",
+              "displayName": "Memorial anterior",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Observações",
+              "displayName": "Observações",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Contexto do Projeto Especial",
+              "displayName": "Contexto do Projeto Especial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Especial?",
+              "displayName": "Especial?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -4368,
+        240
+      ],
+      "id": "76da8850-6be3-4ac7-a0ed-b05fcc55319b",
+      "name": "Add \"Complexidade\"",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Y0vMDyZQDVtxrGBQ",
+          "name": "RPA IA"
+        }
+      },
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Aviso Google Chat": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Aviso Google Chat1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aviso Google Chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aviso Google Chat2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso Google Chat1": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso Google Chat2": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adicionar Complexidade": {
+      "main": [
+        [
+          {
+            "node": "Add \"Complexidade\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Duplicata1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add \"Complexidade\"": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Adicionar Complexidade": [
+      {
+        "headers": {
+          "host": "n8n-prod.gogroupgl.com",
+          "content-length": "432",
+          "accept-encoding": "gzip, br",
+          "cf-connecting-ip": "2a06:98c0:3600::103",
+          "cf-ew-via": "15",
+          "cf-ipcountry": "BR",
+          "cf-ray": "a0ca2d6139b0c4a8-SSA",
+          "cf-visitor": "{\"scheme\":\"https\"}",
+          "cf-worker": "devgogroup.com",
+          "content-type": "application/json",
+          "x-forwarded-for": "162.158.214.150, 152.233.23.193",
+          "x-forwarded-host": "n8n-prod.gogroupgl.com",
+          "x-forwarded-proto": "https",
+          "x-railway-edge": "railway/us-east4-eqdc4a",
+          "x-railway-request-id": "hZ2zziVJR9yahPhwg4a9AQ",
+          "x-real-ip": "2a06:98c0:3600::103",
+          "x-request-start": "1781616712151"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "projeto": "Gocheck",
+          "complexidade": "automacao",
+          "observacoes": "A submissão está bem estruturada e descreve de forma coerente uma automação interna de checklists para lojas. O principal ajuste necessário é alinhar o saving: a descrição fala em R$ 1.500/mês, mas o memorial informa zero economia. No restante, a documentação técnica está consistente e a ferramenta escolhida faz sentido para o caso.",
+          "status": "Aprovado"
+        },
+        "webhookUrl": "https://n8n-prod.gogroupgl.com/webhook/godocs_update_submit",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "171f99811848621122d69c9bd23f7df7cdb206bf5e783e87001278135248b4a7"
+  }
+}
