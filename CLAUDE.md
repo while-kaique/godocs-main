@@ -2,6 +2,10 @@
 
 Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funcionários submetem projetos via formulário de 3 etapas com chat IA que coleta documentação técnica + memorial de impacto financeiro (saving e/ou receita). Os dados ficam no SQLite local e são sincronizados diretamente com o Google Sheets (planilha) + Google Chat (notificação) na submissão, via Service Account (`src/lib/google/`).
 
+> ⚠️ **TEMPORÁRIO — Status sempre "Pendente" na planilha**
+> Enquanto validamos a eficácia do formulário, o sync para o Google Sheets grava **"Pendente"** na coluna Status de **todos** os projetos — inclusive os auto-aprovados (RPA) e os aprovados pelo agente analisador. O status interno (SQLite/dashboard) continua correto e inalterado; só o Sheets é afetado.
+> Pontos marcados com `// TEMPORÁRIO` em `src/lib/chat.functions.ts` (`submeterParaValidacao` e `analisarProjeto`). **Reverter** para `status === 'aprovado' ? 'Aprovado' : ...` quando a validação terminar.
+
 ## Stack
 
 | Camada | Tecnologia |
