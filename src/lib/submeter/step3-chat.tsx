@@ -769,6 +769,8 @@ function SavingForm({
   loading,
   draft,
   onDraftChange,
+  onVoltar,
+  voltarLabel,
 }: {
   tipoProjeto: ("saving" | "receita_incremental")[];
   escopo?: string;
@@ -778,6 +780,11 @@ function SavingForm({
   // navegação entre etapas (senão o que o usuário preencheu aqui se perderia).
   draft?: SavingFormData;
   onDraftChange?: (d: SavingFormData) => void;
+  // Backtracking: volta para a tela anterior do fluxo determinístico (seleção de
+  // tipo na etapa 2, ou o formulário de saving quando se está na receita do fluxo
+  // "ambos"). Quando ausente, o botão de voltar não é renderizado.
+  onVoltar?: () => void;
+  voltarLabel?: string;
 }) {
   const [linhas, setLinhas] = useState<SavingLinhaInput[]>(
     draft?.linhas ?? [{ cargo: "", horasAntes: "", horasDepois: "" }],
@@ -904,22 +911,56 @@ function SavingForm({
       className="px-8 py-6"
       style={{ animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both" }}
     >
-      {/* Header */}
-      <div className="mb-5 flex items-center gap-2.5">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-full text-base"
-          style={{ background: "rgba(215,219,0,0.1)", border: "1.5px solid rgba(215,219,0,0.2)" }}
-        >
-          {icon}
-        </div>
-        <div>
-          <div className="text-[14px] font-bold" style={{ color: "#6b6e00" }}>{title}</div>
-          <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
-            {isSaving
-              ? "Informe os dados abaixo para iniciar a análise de economia"
-              : "Selecione a frequência para iniciar a análise de receita"}
+      {/* Header — título à esquerda, atalho de edição (padrão "Editar dados") à direita */}
+      <div className="mb-5 flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-full text-base"
+            style={{ background: "rgba(215,219,0,0.1)", border: "1.5px solid rgba(215,219,0,0.2)" }}
+          >
+            {icon}
+          </div>
+          <div>
+            <div className="text-[14px] font-bold" style={{ color: "#6b6e00" }}>{title}</div>
+            <div className="text-[11px]" style={{ color: "#8b8b9a" }}>
+              {isSaving
+                ? "Informe os dados abaixo para iniciar a análise de economia"
+                : "Selecione a frequência para iniciar a análise de receita"}
+            </div>
           </div>
         </div>
+        {onVoltar && (
+          <button
+            type="button"
+            onClick={onVoltar}
+            disabled={loading}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold transition-all"
+            style={{
+              background: "rgba(215,219,0,0.08)",
+              border: "1.5px solid rgba(215,219,0,0.25)",
+              color: "#6b6e00",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.5 : 1,
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => {
+              if (loading) return;
+              e.currentTarget.style.background = "rgba(215,219,0,0.16)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(215,219,0,0.08)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
+            }}
+            title={voltarLabel ?? "Editar"}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            {voltarLabel ?? "Editar"}
+          </button>
+        )}
       </div>
 
       <div
@@ -1337,6 +1378,10 @@ export function Step3Chat({
   onFormDraftChange,
   onEditSaving,
   onEditReceita,
+  onSavingFormVoltar,
+  savingFormVoltarLabel,
+  onReceitaFormVoltar,
+  receitaFormVoltarLabel,
   versaoAnterior,
   novoResumo,
 }: {
@@ -1372,6 +1417,12 @@ export function Step3Chat({
   // aparecer na fase de receita (editar saving já validado + editar receita).
   onEditSaving?: () => void;
   onEditReceita?: () => void;
+  // Backtracking dentro do fluxo determinístico: "voltar" a partir do próprio
+  // formulário (saving → seleção de tipo; receita → saving no fluxo "ambos").
+  onSavingFormVoltar?: () => void;
+  savingFormVoltarLabel?: string;
+  onReceitaFormVoltar?: () => void;
+  receitaFormVoltarLabel?: string;
   versaoAnterior?: import("@/lib/meus-projetos.functions").VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -1612,6 +1663,8 @@ export function Step3Chat({
           loading={savingFormLoading ?? false}
           draft={formDraft}
           onDraftChange={onFormDraftChange}
+          onVoltar={onSavingFormVoltar}
+          voltarLabel={savingFormVoltarLabel}
         />
       )}
 
@@ -1624,6 +1677,8 @@ export function Step3Chat({
           loading={receitaFormLoading ?? false}
           draft={formDraft}
           onDraftChange={onFormDraftChange}
+          onVoltar={onReceitaFormVoltar}
+          voltarLabel={receitaFormVoltarLabel}
         />
       )}
 

@@ -198,15 +198,27 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'submitted_at'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo,
            p.descricao_breve, p.data_criacao_projeto, p.area,
-           p.especial, p.contexto_especial, a.nome as area_nome
+           p.especial, p.contexto_especial,
+           p.saving_horas, p.saving_reais, p.tipo_saving, p.memorial_calculo,
+           p.custo_externo_mensal, p.alguem_fazia, p.submitted_at,
+           a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
     WHERE p.id = ?
   `, [id]);
+}
+
+// Conteúdo da documentação estruturada aprovada (DocumentacaoGerada serializada).
+// Presente apenas quando o projeto já foi compilado/submetido — usado como
+// contexto de revisão quando o projeto é editado.
+export function getDocumentacaoConteudo(projetoId: string) {
+  return queryOne<{ conteudo: string }>(
+    'SELECT conteudo FROM documentacao WHERE projeto_id = ? LIMIT 1', [projetoId]
+  );
 }
 
 export type InsertProjeto = {

@@ -1209,12 +1209,20 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // inclusive quando se edita o saving estando já na receita (fluxo "ambos").
     if (savingSubmitted && JSON.stringify(formData) === JSON.stringify(savingSubmitted)) {
       setShowSavingForm(false);
-      // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
-      // abre o formulário de receita; senão, vai para a revisão final.
+      const temReceita = form.tipoProjeto.includes("receita_incremental");
       if (editProjetoId) {
-        if (form.tipoProjeto.includes("receita_incremental")) openReceitaForm();
+        // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
+        // abre o formulário de receita; senão, vai para a revisão final.
+        if (temReceita) openReceitaForm();
         else setChatComplete(true);
+      } else if (temReceita && approvedSavingPreview !== null) {
+        // Fluxo "ambos": o usuário reabriu o saving (ex.: via "Voltar ao saving" da
+        // receita) e não mudou nada. Como o saving já foi aprovado, volta ao
+        // formulário de receita — senão cairia num chat vazio (as mensagens da fase
+        // de saving foram limpas na transição para a receita).
+        openReceitaForm();
       }
+      // Demais casos: cai no chat da fase de saving exatamente onde estava.
       return;
     }
     setSavingFormLoading(true);
@@ -1666,6 +1674,23 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
                     chatFase === "receita" || chatFase === "receita_preview"
                       ? openReceitaForm
                       : undefined
+                  }
+                  // "Editar tipo": volta à tela de seleção de tipo (Etapa 2.5), não ao
+                  // início da etapa 2. showSavingForm persiste no pai; ao "Continuar com
+                  // Agente" sem mudanças, o form reaparece (handleContinuarAgente não o reseta).
+                  onSavingFormVoltar={() => { setShowEtapa25(true); goToStep(2, "back"); }}
+                  savingFormVoltarLabel="Editar tipo"
+                  // Form de receita: no fluxo "ambos" volta ao formulário de saving (sem
+                  // sair da etapa 3); se for só receita, volta à seleção de tipo (2.5).
+                  onReceitaFormVoltar={
+                    form.tipoProjeto.includes("saving")
+                      ? () => { setShowReceitaForm(false); openSavingForm(); }
+                      : () => { setShowEtapa25(true); goToStep(2, "back"); }
+                  }
+                  receitaFormVoltarLabel={
+                    form.tipoProjeto.includes("saving")
+                      ? "Editar saving"
+                      : "Editar tipo"
                   }
                   versaoAnterior={versaoAnterior}
                   novoResumo={{

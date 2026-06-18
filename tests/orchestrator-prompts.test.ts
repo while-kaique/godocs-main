@@ -103,11 +103,97 @@ describe('Prompt fase doc', () => {
     expect(msgs).toHaveLength(0);
   });
 
+  it('padroniza a verificação de IA: SEMPRE pergunta com caixas de seleção, nunca infere sozinho', async () => {
+    await runOrchestrator(makeCtx(), [], 'doc');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('SEMPRE com caixas de seleção');
+    expect(system).toContain('DEVE SEMPRE fazer esta pergunta com type:"options"');
+    expect(system).toContain('NUNCA defina tem_ia_como_funcionalidade por conta própria');
+    // As 3 opções padrão continuam presentes
+    expect(system).toContain('Sim, tem IA como funcionalidade');
+    expect(system).toContain('Não, é uma automação determinística');
+    expect(system).toContain('Não tenho certeza, me explique melhor');
+    // Não repete se já respondido
+    expect(system).toContain('Só NÃO repita a pergunta se tem_ia_como_funcionalidade JÁ estiver definido');
+  });
+
   it('inclui guia de formatação do preview (listas/negrito/parágrafos)', async () => {
     await runOrchestrator(makeCtx(), [], 'doc');
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('FORMATAÇÃO DO PREVIEW');
     expect(system).toContain('LISTA NUMERADA');
+  });
+});
+
+describe('Contexto de revisão (edição)', () => {
+  const revisao = {
+    doc: {
+      o_que_faz: 'Gera relatório PDF e envia por email.',
+      execucao: 'Cron diário 07:00.',
+      fluxo: '1. Dispara\n2. Consulta SAP\n3. Envia',
+      dependencias: 'SAP B1; SMTP',
+      configurar_antes: 'SAP_URL; SMTP_USER',
+      atencao: 'API SAP fora: falha silenciosa',
+    },
+    saving: {
+      memorial_calculo: 'Analista gastava 40h/mês; passou a 2h/mês.',
+      linhas: [{ cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 2 }],
+      economia_horas_mes: 38,
+      economia_reais_mes: 1136.2,
+      tipo_saving: 'mensal',
+      alguem_fazia: 'sim',
+      custo_externo_mensal: 0,
+    },
+    receita: { memorial_calculo: 'Aumento de conversão.', valor_ganho_mensal: 25000 },
+  };
+
+  const savingPreenchido = {
+    ...savingVazio(),
+    linhas: [{ cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 6, valor_hora: 29.9, economia_horas_mes: 34, economia_reais_mes: 1016.6 }],
+    economia_horas_mes: 34,
+    economia_reais_mes: 1016.6,
+    tipo_saving: 'mensal' as const,
+  };
+
+  it('NÃO adiciona o bloco de revisão na primeira submissão (sem revisao)', async () => {
+    await runOrchestrator(makeCtx(), [], 'doc');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).not.toContain('CONTEXTO DE REVISÃO');
+  });
+
+  it('adiciona o bloco de revisão na fase doc quando o projeto já foi submetido', async () => {
+    await runOrchestrator(makeCtx({ revisao }), [], 'doc');
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('CONTEXTO DE REVISÃO (EDIÇÃO)');
+    expect(system).toContain('DOCUMENTAÇÃO TÉCNICA APROVADA ANTERIORMENTE');
+    expect(system).toContain('Gera relatório PDF e envia por email.');
+    expect(system).toContain('NÃO recomece do zero');
+    expect(system).toContain('Valide APENAS o que mudou');
+  });
+
+  it('na fase saving traz o memorial e as horas antes/depois anteriores', async () => {
+    await runOrchestrator(makeCtx({ revisao }), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('MEMORIAL DE SAVING APROVADO ANTERIORMENTE');
+    expect(system).toContain('Analista Pleno: 40h antes → 2h depois');
+    expect(system).toContain('Analista gastava 40h/mês; passou a 2h/mês.');
+    // O bloco vem ANTES dos dados atuais do formulário (contexto antes da 1ª pergunta)
+    expect(system.indexOf('CONTEXTO DE REVISÃO')).toBeLessThan(system.indexOf('DADOS JÁ DEFINIDOS PELO USUÁRIO'));
+  });
+
+  it('não vaza valores em R$ anteriores no bloco de saving', async () => {
+    await runOrchestrator(makeCtx({ revisao }), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    const bloco = system.slice(system.indexOf('CONTEXTO DE REVISÃO'), system.indexOf('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', system.indexOf('CONTEXTO DE REVISÃO') + 1));
+    expect(bloco).not.toContain('1136');
+    expect(bloco).toContain('staff-only');
+  });
+
+  it('na fase receita traz o memorial e o valor anteriores', async () => {
+    await runOrchestrator(makeCtx({ revisao }), [], 'receita', documentacaoVazia(), savingVazio(), 'Resumo', ['receita_incremental']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('MEMORIAL DE RECEITA APROVADO ANTERIORMENTE');
+    expect(system).toContain('25000');
   });
 });
 
@@ -143,7 +229,7 @@ describe('Prompt fase saving (tipo saving)', () => {
     await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('NÃO pergunte sobre eles');
-    expect(system).toContain('NÃO MENCIONE valores em R$');
+    expect(system).toContain('SEM R$ NO CONTEÚDO VISÍVEL');
   });
 
   it('inclui regras de validação de horas', async () => {
@@ -174,6 +260,54 @@ describe('Prompt fase saving (tipo saving)', () => {
     expect(userMsg).toContain('[SISTEMA]');
     expect(userMsg).toContain('Analista Pleno');
     expect(userMsg).toContain('40h→2h');
+  });
+});
+
+describe('Abertura determinística por perfil das horas (anti-pergunta-burra)', () => {
+  const mkSaving = (linhas: { cargo: string; horas_antes: number; horas_depois: number }[]) => ({
+    ...savingVazio(),
+    linhas: linhas.map((l) => ({ ...l, valor_hora: 29.9, economia_horas_mes: Math.max(0, l.horas_antes - l.horas_depois), economia_reais_mes: 0 })),
+    economia_horas_mes: linhas.reduce((s, l) => s + Math.max(0, l.horas_antes - l.horas_depois), 0),
+    economia_reais_mes: 0,
+    tipo_saving: 'mensal' as const,
+  });
+
+  it('0h antes + 0h depois: PROÍBE perguntar sobre rotina manual e foca em entrega/custo evitado', async () => {
+    const saving = mkSaving([{ cargo: 'Estagiário', horas_antes: 0, horas_depois: 0 }]);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('NINGUÉM fazia esta tarefa manualmente antes');
+    expect(system).toContain('PROIBIDO');
+    expect(system).toContain('custo evitado');
+    // A diretiva de abertura precede e domina a regra genérica de validação de horas
+    expect(system.indexOf('COMO ABRIR A CONVERSA')).toBeLessThan(system.indexOf('VALIDAÇÃO DE HORAS'));
+  });
+
+  it('0h antes + horas depois > 0: trata como custo de monitoramento, não rotina prévia', async () => {
+    const saving = mkSaving([{ cargo: 'Analista Pleno', horas_antes: 0, horas_depois: 2 }]);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('monitoramento/supervisão');
+    expect(system).toContain('PROIBIDO pedir o passo a passo');
+  });
+
+  it('horas antes > 0: abre validando a rotina manual real', async () => {
+    const saving = mkSaving([{ cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 2 }]);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('Há rotina manual real');
+    expect(system).toContain('VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0)');
+  });
+
+  it('linhas mistas (uma 0h antes, outra com horas): instrui a separar os casos', async () => {
+    const saving = mkSaving([
+      { cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 2 },
+      { cargo: 'Estagiário', horas_antes: 0, horas_depois: 1 },
+    ]);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('parte das linhas tem 0h antes');
+    expect(system).toContain('valide a rotina manual normalmente');
   });
 });
 
