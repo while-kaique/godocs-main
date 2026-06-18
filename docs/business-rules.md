@@ -63,21 +63,28 @@ O usuário pode navegar livremente entre steps já completados sem perder o prog
 - Se todos 7 preenchidos → preview direto (zero perguntas)
 - Na aprovação, gera resumo interno (3-5 frases) para contexto da fase 2
 
-### Fase saving
+### Fase saving (memorial padronizado)
 - IA recebe linhas (cargo + horas) pré-preenchidas do formulário
 - **Não pergunta** valores em R$, cargo, ou tipo_saving — já tem do form
-- **Foco**: validar/desafiar as horas declaradas
-  - Pede detalhamento passo a passo da rotina manual
-  - Mensal: frequência × tempo por execução
-  - Pontual: total de itens × tempo por item
-  - Flagra discrepâncias (ex: "100 registros, 3 min cada = 5h, mas você disse 20h")
+- **Foco**: coletar pontos obrigatórios do memorial padronizado na ordem fixa
+- **Estrutura fixa do memorial de saving:**
+  - Seção 1 — Contexto: [1.1] Nome do projeto, [1.2] Resumo
+  - Seção 2 — Saving de Pessoas: [2.1] Lista de pessoas, [2.2] Por pessoa (rotina, frequência, cálculo, antes/depois, economia), [2.3] Totais
+  - Seção 3 — Contratos/Serviços Evitados: [3.1] O que, [3.2] Valor, [3.3] Rateio (ou N/A)
+  - Seção 4 — Custo da Automação: [4.1] Ferramenta, [4.2] Monitoramento, [4.3] Total (ou N/A)
+  - Seção 5 — Resumo: [5.1] Economia bruta de horas, [5.2] Tipo
+- IA **insiste** até ter resposta para cada ponto. Se o usuário for raso, preenche com o que tem — mas nunca pula
 - **horas_antes = 0 é válido**: significa que ninguém fazia antes; automação faz algo novo
-- Monta o memorial automaticamente
+- Monta o memorial automaticamente — usuário nunca redige
+- **Memorial duplo**: o preview mostra o memorial SEM R$. O `projetos.memorial_calculo` (planilha) recebe a versão enriquecida com R$ via `enriquecerMemorial()` (backend injeta valor/hora × economia = R$)
 
-### Fase receita
+### Fase receita (memorial padronizado)
+- **Estrutura fixa do memorial de receita:**
+  - Seção 6 — Receita Incremental: [6.1] O que gera, [6.2] Como aumenta, [6.3] Antes vs. depois, [6.4] Base de cálculo, [6.5] Valor, [6.6] Tipo
 - Se valor pré-preenchido no form: **desafia** ("como chegou em R$ X?")
 - Se sem valor: coleta do zero via conversa
 - Usa o `racional` do form como ponto de partida para aprofundar
+- IA **insiste** em cada ponto antes de gerar preview
 - Agente escreve o memorial (usuário nunca redige)
 
 ## Cálculos financeiros
@@ -90,16 +97,16 @@ Para cada linha:
   economia_reais = economia_horas × valor_hora
 
 Custo evitado (ganho monetário além das horas — coletado pelo agente, não pelo form):
-  custo_evitado_mensal = custo_evitado_tipo == 'pontual' ? custo_evitado_reais / 12 : custo_evitado_reais
+  custo_evitado_valor = custo_evitado_reais  // valor cheio, pontual NÃO divide por 12
 
 Total:
   economia_horas_mes = sum(economia_horas)
-  economia_reais_mes = sum(economia_reais) + custo_evitado_mensal - custo_externo_mensal
+  economia_reais_mes = sum(economia_reais) + custo_evitado_valor - custo_externo_mensal
 ```
 
-- **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (licença/serviço cancelado). É saving (soma), não receita. Pontual entra mensalizado ÷12. Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai).
+- **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (licença/serviço cancelado). É saving (soma), não receita. Entra pelo valor cheio (pontual NÃO divide por 12). Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai).
 - O agente investiga custo evitado em projetos internos E externos e registra o cálculo explícito no memorial (auditoria).
-- **Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna.
+- **Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna. A versão do memorial salva na planilha (`projetos.memorial_calculo`) é enriquecida pelo backend com valores financeiros via `enriquecerMemorial()` — o LLM nunca gera R$ no texto visível.
 
 ### Ganho total mensal (`submeterParaValidacao`)
 ```

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { recomputarSavingFinanceiro } from "@/lib/agents/saving-calc";
-import type { SavingColetado } from "@/lib/agents/types";
+import { recomputarSavingFinanceiro, enriquecerMemorial } from "@/lib/agents/saving-calc";
+import type { SavingColetado, ReceitaColetada } from "@/lib/agents/types";
 
 describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fonte de verdade)", () => {
   // Cenário real do bug (projeto AVD da Jessica): o agente reajustou a linha de
@@ -90,7 +90,7 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.economia_reais_mes).toBe(995.4); // 1295.4 - 300
   });
 
-  it("soma custo evitado PONTUAL mensalizado ÷12 ao total", () => {
+  it("soma custo evitado PONTUAL cheio (sem ÷12) ao total", () => {
     const out = recomputarSavingFinanceiro({
       linhas: [
         { cargo: "Analista Pleno", horas_antes: 40, horas_depois: 14, valor_hora: 29.9, economia_horas_mes: 26, economia_reais_mes: 777.4 },
@@ -105,8 +105,8 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
       custo_evitado_descricao: "Serviço externo único de R$ 2.700",
     });
 
-    // 777.40 (horas) + 2700/12 (225 do custo evitado pontual) = 1002.40
-    expect(out.economia_reais_mes).toBe(1002.4);
+    // 777.40 (horas) + 2700 (custo evitado pontual cheio) = 3477.40
+    expect(out.economia_reais_mes).toBe(3477.4);
   });
 
   it("soma custo evitado MENSAL cheio (sem ÷12)", () => {
@@ -146,8 +146,8 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
       100, // custo externo mensal incorrido
     );
 
-    // 777.40 + 225 (evitado pontual) - 100 (custo externo) = 902.40
-    expect(out.economia_reais_mes).toBe(902.4);
+    // 777.40 + 2700 (evitado pontual cheio) - 100 (custo externo) = 3377.40
+    expect(out.economia_reais_mes).toBe(3377.4);
   });
 
   it("ignora custo evitado ausente/nulo (objeto sem os campos)", () => {
@@ -187,5 +187,127 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.linhas[0].economia_horas_mes).toBe(0);
     expect(out.linhas[0].economia_reais_mes).toBe(0);
     expect(out.economia_reais_mes).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// enriquecerMemorial — injeta R$ no memorial interno (planilha)
+// ═══════════════════════════════════════════════════════════════════
+
+describe("enriquecerMemorial — memorial interno com valores financeiros", () => {
+  it("injeta valor/hora, economia em R$ por pessoa e totais no memorial de saving", () => {
+    const saving: SavingColetado = {
+      linhas: [
+        { cargo: "Estagiário", horas_antes: 180, horas_depois: 0, valor_hora: 10.78, economia_horas_mes: 180, economia_reais_mes: 1940.4 },
+        { cargo: "Analista Sênior", horas_antes: 60, horas_depois: 0, valor_hora: 33.10, economia_horas_mes: 60, economia_reais_mes: 1986 },
+      ],
+      economia_horas_mes: 240,
+      economia_reais_mes: 3926.4,
+      tipo_saving: "mensal",
+      memorial_calculo: "## Memorial de Cálculo\n\nTexto do LLM sem R$",
+      valor_ganho_mensal: null,
+      custo_evitado_reais: null,
+      custo_evitado_tipo: null,
+      custo_evitado_descricao: null,
+    };
+
+    const result = enriquecerMemorial(saving, undefined, ["saving"]);
+
+    // Deve conter o memorial base
+    expect(result).toContain("Texto do LLM sem R$");
+    // Deve conter detalhamento financeiro
+    expect(result).toContain("Detalhamento Financeiro (interno)");
+    // Deve conter valor/hora de cada cargo
+    expect(result).toContain("R$ 10.78/h");
+    expect(result).toContain("R$ 33.10/h");
+    // Deve conter economia em R$ por pessoa
+    expect(result).toContain("R$ 1940.40");
+    expect(result).toContain("R$ 1986.00");
+    // Deve conter totais
+    expect(result).toContain("Total horas:** 240h");
+    expect(result).toContain("Total financeiro (horas):** R$ 3926.40");
+    // Custo evitado N/A
+    expect(result).toContain("Custo evitado:** N/A");
+    // Economia líquida
+    expect(result).toContain("Economia líquida total:** R$ 3926.40");
+  });
+
+  it("inclui custo evitado e custo externo no detalhamento financeiro", () => {
+    const saving: SavingColetado = {
+      linhas: [
+        { cargo: "Analista Pleno", horas_antes: 40, horas_depois: 14, valor_hora: 29.9, economia_horas_mes: 26, economia_reais_mes: 777.4 },
+      ],
+      economia_horas_mes: 26,
+      economia_reais_mes: 3377.4, // 777.4 + 2700 - 100
+      tipo_saving: "mensal",
+      memorial_calculo: "Memorial base",
+      valor_ganho_mensal: null,
+      custo_evitado_reais: 2700,
+      custo_evitado_tipo: "pontual",
+      custo_evitado_descricao: "Serviço externo de implementação",
+      custo_externo_mensal: 100,
+    };
+
+    const result = enriquecerMemorial(saving, undefined, ["saving"]);
+
+    expect(result).toContain("R$ 2700.00");
+    expect(result).toContain("pontual");
+    expect(result).toContain("Serviço externo de implementação");
+    expect(result).toContain("R$ 100.00/mês");
+    expect(result).toContain("Economia líquida total:** R$ 3377.40");
+  });
+
+  it("gera memorial com receita incremental quando tipo é receita", () => {
+    const receita: ReceitaColetada = {
+      tipo_saving: "mensal",
+      valor_ganho_mensal: 5000,
+      memorial_calculo: "## Memorial de Receita\n\nTexto da receita",
+      racional: "Vendas de estampas IA",
+    };
+
+    const result = enriquecerMemorial(undefined, receita, ["receita_incremental"]);
+
+    expect(result).toContain("Texto da receita");
+    expect(result).toContain("R$ 5000.00");
+    expect(result).toContain("mensal");
+  });
+
+  it("gera memorial combinado (saving + receita) com divisão clara", () => {
+    const saving: SavingColetado = {
+      linhas: [
+        { cargo: "Estagiário", horas_antes: 10, horas_depois: 0, valor_hora: 10.78, economia_horas_mes: 10, economia_reais_mes: 107.8 },
+      ],
+      economia_horas_mes: 10,
+      economia_reais_mes: 107.8,
+      tipo_saving: "mensal",
+      memorial_calculo: "Memorial saving",
+      valor_ganho_mensal: null,
+      custo_evitado_reais: null,
+      custo_evitado_tipo: null,
+      custo_evitado_descricao: null,
+    };
+    const receita: ReceitaColetada = {
+      tipo_saving: "mensal",
+      valor_ganho_mensal: 3000,
+      memorial_calculo: "Memorial receita",
+      racional: null,
+    };
+
+    const result = enriquecerMemorial(saving, receita, ["saving", "receita_incremental"]);
+
+    // Deve conter ambos os memoriais
+    expect(result).toContain("Memorial saving");
+    expect(result).toContain("Memorial receita");
+    // Deve ter separação
+    expect(result).toContain("---");
+    // Saving financeiro
+    expect(result).toContain("R$ 10.78/h");
+    // Receita
+    expect(result).toContain("R$ 3000.00");
+  });
+
+  it("retorna string vazia quando não há saving nem receita", () => {
+    const result = enriquecerMemorial(undefined, undefined, []);
+    expect(result).toBe("");
   });
 });

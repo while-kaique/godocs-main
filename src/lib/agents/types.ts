@@ -64,7 +64,7 @@ export type SavingColetado = {
   valor_ganho_mensal: number | null;
   // Custo que o projeto passou a EVITAR (ex: serviço externo/licença que deixou de
   // ser paga). É um saving monetário ALÉM das horas — soma ao economia_reais_mes
-  // (pontual entra mensalizado ÷12). Coletado pelo agente na conversa do memorial,
+  // (valor cheio, pontual NÃO divide por 12). Coletado pelo agente na conversa do memorial,
   // não pelo formulário. Distingue-se do custo_externo_mensal (custo INCORRIDO, que
   // subtrai). Os três campos juntos viabilizam a auditoria do cálculo.
   custo_evitado_reais: number | null;

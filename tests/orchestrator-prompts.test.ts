@@ -229,7 +229,7 @@ describe('Prompt fase saving (tipo saving)', () => {
     await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('NÃO pergunte sobre eles');
-    expect(system).toContain('NÃO MENCIONE valores em R$');
+    expect(system).toContain('SEM R$ NO CONTEÚDO VISÍVEL');
   });
 
   it('inclui regras de validação de horas', async () => {

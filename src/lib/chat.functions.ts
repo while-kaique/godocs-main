@@ -46,8 +46,8 @@ import type {
   SavingColetado,
   SavingLinha,
 } from '@/lib/agents/types';
-import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
-import { recomputarSavingFinanceiro } from '@/lib/agents/saving-calc';
+import { documentacaoVazia, receitaVazia, savingVazio, CARGOS, type SavingColetado, type ReceitaColetada } from '@/lib/agents/types';
+import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ function progressoPorFase(fase: ChatFase, coletado: DocumentacaoColetada, saving
   }
 }
 
-// Materialidade real do projeto: saving mensal + receita mensal cheia (pontual ÷ 12).
+// Materialidade real do projeto: saving + receita (valores cheios, pontual NÃO divide por 12).
 // NÃO usa o ÷10 do ganho_total_mensal (métrica de gestão/ranking) — aqui queremos o valor real
 // para o gate de R$ 5.000/mês de validação humana obrigatória.
 function calcularMaterialidade(
@@ -139,14 +139,8 @@ function calcularMaterialidade(
   receita: Record<string, unknown> | undefined,
 ): number {
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
-  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
-
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
-  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
-
-  return savingMensal + receitaMensal;
+  return savingReais + receitaValor;
 }
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
@@ -1224,9 +1218,9 @@ export async function submeterParaValidacao(rawData: unknown) {
   const now = new Date().toISOString();
 
   // ── Calcular ganho_total_mensal (saving + receita/10) ──
-  // Saving entra com o valor cheio (economia_reais_mes já inclui custo evitado
-  // mensalizado e abate o custo externo). A receita NÃO mensaliza por 12 — entra
-  // pelo valor informado e só aplica o ÷10 (fator de equivalência saving×receita).
+  // Saving entra cheio (economia_reais_mes já inclui custo evitado e abate custo
+  // externo). Receita entra cheia e aplica ÷10 (fator de equivalência).
+  // Pontual NÃO divide por 12 — valor cheio em ambos os casos.
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
   const savingMensal = savingReais;
 
@@ -1236,9 +1230,15 @@ export async function submeterParaValidacao(rawData: unknown) {
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
-  // Memorial sem markdown na persistência (Sheets/SQLite) — mantém quebras de linha,
-  // remove `**`, `#`, backticks, etc. O markdown cru fica em documentacao.conteudo.
-  const memorialLimpo = stripMarkdown(saving?.memorial_calculo as string | undefined);
+  // Memorial interno (planilha/SQLite): versão ENRIQUECIDA com valores financeiros (R$).
+  // O LLM gera o memorial sem R$ (visível ao usuário); o backend injeta os valores
+  // usando a tabela CARGOS + campos estruturados. O markdown cru fica em documentacao.conteudo.
+  const tiposProjeto = (projeto.tipos_projeto
+    ? JSON.parse(projeto.tipos_projeto as string)
+    : [projeto.tipo_projeto].filter(Boolean)) as string[];
+  const memorialInterno = stripMarkdown(
+    enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto)
+  );
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
 
   await updateProjeto(projeto_id, {
@@ -1251,7 +1251,7 @@ export async function submeterParaValidacao(rawData: unknown) {
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
-    memorial_calculo: memorialLimpo,
+    memorial_calculo: memorialInterno,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
     // Reenvio invalida a validação anterior (o humano precisa rever do zero).
     ...(ehReenvio ? { validated_at: null, validated_by: null } : {}),
@@ -1329,7 +1329,7 @@ export async function submeterParaValidacao(rawData: unknown) {
         saving_horas: (saving?.economia_horas_mes as number) ?? 0,
         saving_reais: (saving?.economia_reais_mes as number) ?? 0,
         tipo_saving: ouTraco(saving?.tipo_saving as string | undefined),
-        memorial_calculo: ouTraco(memorialLimpo),
+        memorial_calculo: ouTraco(memorialInterno),
         // Havia pessoa fazendo o processo manualmente antes da automação? ('sim'|'nao'|'')
         alguem_fazia: ouTraco(projeto.alguem_fazia),
         custo_externo_mensal: projeto.custo_externo_mensal ?? 0,
