@@ -1061,8 +1061,12 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // o seed, não reinicia — o usuário só voltou a verificar, não alterou nada.
     const _fbMeta = snapshotMeta();
     const _fbNothingChanged = agentMeta !== null && JSON.stringify(_fbMeta) === JSON.stringify(agentMeta);
+    // Marca quando o fallback reinicializou a fase de doc — nesse caso o usuário
+    // deve revisar a doc, não pular direto para o formulário financeiro abaixo.
+    let reinitedDoc = false;
     if (editProjetoId && chatMessages.length === 0 && !chatComplete && projetoId &&
         !(approvedDocPreview !== null && _fbNothingChanged)) {
+      reinitedDoc = true;
       setContinuando(true);
       try {
         const meta = snapshotMeta();
@@ -1105,13 +1109,26 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     // Edição sem mudanças: em vez de pular direto para a revisão final, leva o
     // usuário pelas telas determinísticas (saving → receita) pré-preenchidas para
     // revisão. Se ele não mudar nada, o submit do formulário avança sem reprocessar
-    // (ver handleSavingFormSubmit/handleReceitaFormSubmit). Só dispara quando o seed
-    // marcou o fluxo como completo (chatComplete) e nenhum formulário está aberto.
-    if (editProjetoId && !form.especial && chatComplete && !showSavingForm && !showReceitaForm) {
-      if (form.tipoProjeto.includes("saving")) {
+    // (ver handleSavingFormSubmit/handleReceitaFormSubmit).
+    //
+    // Dispara sempre que a documentação já existe (approvedDocPreview), não só
+    // quando chatComplete=true. Projetos com a doc gerada mas SEM memorial
+    // financeiro salvo (ex.: memorial_calculo nulo) entram aqui com chatComplete
+    // =false — antes caíam num chat de doc vazio e travavam em "Analisando e
+    // coletando informações...". Não dispara se o fallback acabou de reinicializar
+    // a doc (reinitedDoc): nesse caso o usuário precisa revisar a doc primeiro.
+    const docPronta = chatComplete || approvedDocPreview !== null;
+    if (editProjetoId && !form.especial && !reinitedDoc && docPronta && !showSavingForm && !showReceitaForm) {
+      const querSaving = form.tipoProjeto.includes("saving");
+      const querReceita = form.tipoProjeto.includes("receita_incremental");
+      // Fluxo "ambos": se o saving já foi aprovado e só a receita está pendente,
+      // abre direto a receita em vez de re-percorrer o saving.
+      const irParaReceita =
+        querReceita && (!querSaving || (approvedSavingPreview !== null && approvedReceitaPreview === null));
+      if (querSaving && !irParaReceita) {
         setChatComplete(false);
         openSavingForm();
-      } else if (form.tipoProjeto.includes("receita_incremental")) {
+      } else if (querReceita) {
         setChatComplete(false);
         openReceitaForm();
       }
