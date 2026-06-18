@@ -50,12 +50,6 @@ interface Env {
   [key: string]: unknown;
 }
 
-// Subconjunto mínimo do ExecutionContext do runtime (evita depender de
-// @cloudflare/workers-types só para o waitUntil).
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-}
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function json(data: unknown, status = 200): Response {
@@ -91,7 +85,18 @@ async function readBody<T>(request: Request): Promise<T> {
 
 // ── roteador ─────────────────────────────────────────────────────────────────
 
-async function handleApi(request: Request, url: URL): Promise<Response> {
+// Contexto mínimo do Worker — só precisamos de waitUntil para rodar a análise
+// automática em background (sobrevive ao fechamento da aba pelo usuário).
+interface ExecCtx { waitUntil(promise: Promise<unknown>): void }
+
+// Dispara a análise do projeto sem propagar erros (background, best-effort).
+function analisarEmBackground(projetoId: string): Promise<unknown> {
+  return analisarProjetoFn({ projeto_id: projetoId }).catch((e) =>
+    console.error('[worker] análise automática em background falhou:', e),
+  )
+}
+
+async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Response> {
   const { pathname } = url
   const method = request.method
 
@@ -156,6 +161,22 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
         else if (pathname === '/api/chat/analisar') result = await analisarProjetoFn(body)
         else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body)
         else return errorJson('Rota não encontrada', 404)
+
+        // Análise automática (analisador) roda no SERVIDOR, em background, logo após
+        // a submissão — projetos especiais são validados por humano e ficam de fora.
+        // Antes a tela de sucesso esperava essa análise (gerava ansiedade e travava o
+        // botão); agora a pessoa vê só "Projeto Enviado!", pode fechar a aba, e o
+        // resultado aparece depois em "Meus Projetos". O waitUntil mantém o Worker
+        // vivo até a análise concluir mesmo sem o cliente conectado.
+        if (pathname === '/api/chat/submeter-validacao' &&
+            (result as { especial?: boolean })?.especial !== true) {
+          const pid = (body.projeto_id as string) ?? null
+          if (pid) {
+            const p = analisarEmBackground(pid)
+            if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(p)
+          }
+        }
+
         const resJson = JSON.stringify(result)
         responseSize = resJson.length
         // Para iniciar-submissao, o projeto_id vem no resultado (ainda não existia no body)
@@ -319,7 +340,7 @@ async function handleApi(request: Request, url: URL): Promise<Response> {
 // ── entry point ───────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecCtx): Promise<Response> {
     // O godeploy não expõe o global `process` (não há nodejs_compat). Garantimos
     // `process.env` e injetamos as env vars do worker, para os módulos que leem
     // via process.env (supabase, llm, brevo, ocr, etc.). Sem isto, qualquer
@@ -350,7 +371,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname.startsWith('/api/')) {
-      return handleApi(request, url)
+      return handleApi(request, url, ctx)
     }
 
     // No godeploy os assets estáticos são servidos pela própria plataforma:
