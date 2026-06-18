@@ -111,6 +111,9 @@ describe('Prompt fase doc', () => {
     expect(system).toContain('ia_inferida_dos_arquivos');
     // Passo 2: pergunta com contexto
     expect(system).toContain('PASSO 2 — PERGUNTE COM CONTEXTO');
+    // Passo 2.5: se "Sim" sem descrever como, pergunta como a IA é usada (aceita resposta simples)
+    expect(system).toContain('PASSO 2.5 — SE "SIM", ENTENDA COMO A IA É USADA');
+    expect(system).toContain('Aceite uma resposta SIMPLES e curta');
     // Passo 3: detecção de contradição
     expect(system).toContain('ia_contradição');
     // As 3 opções padrão continuam presentes

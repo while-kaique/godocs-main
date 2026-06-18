@@ -179,6 +179,12 @@ Exemplos de pergunta com inferência:
 options sempre: ["Sim, tem IA como funcionalidade", "Não, é uma automação determinística", "Não tenho certeza, me explique melhor"]
 Se o usuário escolher "Não tenho certeza", responda com type:"question" explicando a diferença em 2 frases e pergunte de novo (type:"options", mesmas 3 opções).
 
+PASSO 2.5 — SE "SIM", ENTENDA COMO A IA É USADA:
+- Quando o usuário responder "Sim, tem IA como funcionalidade", verifique se você JÁ sabe COMO a IA é usada (descrito na conversa OU claramente inferido dos arquivos — ex: você identificou a chamada de LLM e para quê serve).
+- Se JÁ sabe como a IA é usada: registre tem_ia_como_funcionalidade: true e siga normalmente (não pergunte de novo).
+- Se o usuário apenas marcou "Sim" SEM descrever como (e os arquivos não deixaram claro): faça UMA pergunta curta (type:"question") para entender em que parte do projeto a IA atua. Ex: "Legal! Em que parte do projeto a IA entra? Por exemplo: gera um texto, classifica os itens, transcreve áudio, extrai dados... pode ser bem rápido."
+- Aceite uma resposta SIMPLES e curta — basta saber qual a função da IA, não exija detalhes técnicos nem aprofunde. Incorpore essa informação no campo o_que_faz (e/ou fluxo), defina tem_ia_como_funcionalidade: true e siga para o preview.
+
 PASSO 3 — REGISTRE E DETECTE CONTRADIÇÃO:
 - Defina tem_ia_como_funcionalidade: true ("Sim") ou false ("Não").
 - Se a resposta do usuário CONTRADIZ ia_inferida_dos_arquivos (ex: arquivos mostram LLM mas usuário diz "Não"), defina ia_contradição: true — sem questionar o usuário, aceite a resposta dele normalmente e siga para o preview. O analisador usará essa informação depois.
