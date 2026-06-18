@@ -16,6 +16,7 @@ import {
   analisarProjetoFn,
   submeterParaValidacao,
   validarProjeto,
+  resyncGoogle,
 } from '@/lib/chat.functions'
 import {
   getAreas,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto } from '@/lib/meus-projetos.functions'
+import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -120,8 +122,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!request.headers.get('x-godeploy-cron')) {
         return errorJson('Rota exclusiva de cron.', 403)
       }
-      // Limpa logs de API com mais de 30 dias
-      cleanupOldApiLogs(30).catch(() => {})
+      // Limpa logs de API com mais de 30 dias (em segundo plano, via waitUntil)
+      runBackground(cleanupOldApiLogs(30))
       return json(await sincronizarAreas())
     }
 
@@ -327,6 +329,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       })
     }
 
+    // ── Re-sync Google (TEMPORÁRIO, admin) ──
+    // Re-dispara o sync Sheets+Chat de um projeto já submetido, SEM reanálise de
+    // IA. GET para facilitar o disparo pelo navegador logado. REMOVER depois.
+    if (pathname === '/api/admin/resync-google' && method === 'GET') {
+      await requireAdmin(request)
+      const projetoId = url.searchParams.get('projeto_id')
+      if (!projetoId) return errorJson('Informe ?projeto_id=...', 400)
+      return json(await resyncGoogle({ projeto_id: projetoId }))
+    }
+
     return errorJson('Rota não encontrada', 404)
   } catch (e) {
     const err = e as Error & { status?: number }
@@ -344,10 +356,20 @@ export default {
     // `process.env` e injetamos as env vars do worker, para os módulos que leem
     // via process.env (supabase, llm, brevo, ocr, etc.). Sem isto, qualquer
     // process.env.X em runtime estoura "process is not defined".
-    const g = globalThis as unknown as { process?: { env: Record<string, string> } }
+    const g = globalThis as unknown as {
+      process?: { env: Record<string, string> }
+      __waitUntil?: (p: Promise<unknown>) => void
+    }
     if (!g.process) g.process = { env: {} }
     for (const [k, v] of Object.entries(env)) {
       if (typeof v === 'string') g.process.env[k] = v
+    }
+
+    // Expõe o waitUntil do runtime para o trabalho fire-and-forget (sync Google,
+    // limpeza de logs). Sem isto, promises não-aguardadas são canceladas quando a
+    // Response retorna — e o sync para Sheets/Chat morre no meio. Ver lib/background.ts.
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      g.__waitUntil = (p: Promise<unknown>) => ctx.waitUntil(p)
     }
 
     // Injeta o banco SQLite do Godeploy (env.DB) no client.

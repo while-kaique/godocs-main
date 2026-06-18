@@ -13,13 +13,84 @@ function getSheetConfig() {
   };
 }
 
-// ─── Append: adiciona nova linha ao final da planilha ────────────────────────
+// ─── Layout das colunas (FONTE ÚNICA DE VERDADE) ─────────────────────────────
+//
+// A ordem abaixo DEVE espelhar exatamente a aba 'GoDocs' (coluna A em diante).
+// Tanto o append quanto o update derivam daqui — mudou a planilha, muda só aqui.
+//
+// ⚠️ As colunas "Diff Horas / Antes", "Diff Saving / Antes" e "Memorial anterior"
+// são preenchidas manualmente pela equipe — o sistema NUNCA escreve nelas. Elas
+// continuam na lista apenas para manter o alinhamento das letras das demais.
+export const SHEET_COLUMNS = [
+  'Data Submissão',                 // A
+  'ID Projeto',                     // B
+  'Data Criação',                   // C
+  'Área',                           // D
+  'Nome Completo',                  // E
+  'Email',                          // F
+  'Projeto',                        // G
+  'Participantes',                  // H
+  'Descrição',                      // I
+  'URL',                            // J
+  'Ferramenta',                     // K
+  'Escopo',                         // L
+  'Tipos Projeto',                  // M
+  'Alguém Fazia?',                  // N
+  'Saving Horas',                   // O
+  'Saving Reais',                   // P
+  'Tipo de Saving',                 // Q
+  'Memorial de Saving',             // R
+  'Custo Externo Mensal',           // S
+  'Receita Mensal',                 // T
+  'Tipo de Receita',                // U
+  'Receita Memorial',               // V
+  'Status',                         // W
+  'Ganho Total',                    // X
+  'Complexidade',                   // Y  (preenchida pelo analisador)
+  'Diff Horas / Antes',             // Z  (manual — não escrever)
+  'Diff Saving / Antes',            // AA (manual — não escrever)
+  'Memorial anterior',              // AB (manual — não escrever)
+  'Observações',                    // AC (preenchida pelo analisador)
+  'Contexto do Projeto Especial',   // AD
+  'Especial?',                      // AE
+  'Custo Evitado',                  // AF
+  'Justificativa Custo Evitado',    // AG
+] as const;
 
-export async function appendRow(values: (string | number)[]): Promise<void> {
+export type SheetColumn = (typeof SHEET_COLUMNS)[number];
+
+// Índice 0-based → letra da coluna (0→A, 25→Z, 26→AA, 27→AB...).
+function colLetter(index: number): string {
+  let n = index;
+  let s = '';
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
+
+const COLUMN_LETTERS: Record<string, string> = Object.fromEntries(
+  SHEET_COLUMNS.map((header, i) => [header, colLetter(i)]),
+);
+
+const ID_COLUMN_LETTER = COLUMN_LETTERS['ID Projeto']; // 'B'
+const LAST_COLUMN_LETTER = colLetter(SHEET_COLUMNS.length - 1); // 'AG'
+
+// ─── Append: adiciona nova linha ao final da planilha ────────────────────────
+//
+// Recebe um mapa header→valor. Colunas ausentes (ex.: as manuais, ou as que o
+// analisador preenche depois) entram vazias, preservando o alinhamento.
+export async function appendRow(values: Partial<Record<SheetColumn, string | number>>): Promise<void> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  const range = `'${sheetName}'!A:Z`;
+  const rowValues: (string | number)[] = SHEET_COLUMNS.map((header) => {
+    const v = values[header];
+    return v == null ? '' : v;
+  });
+
+  const range = `'${sheetName}'!A:${LAST_COLUMN_LETTER}`;
   const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
   const resp = await fetch(url, {
@@ -28,9 +99,7 @@ export async function appendRow(values: (string | number)[]): Promise<void> {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      values: [values],
-    }),
+    body: JSON.stringify({ values: [rowValues] }),
   });
 
   if (!resp.ok) {
@@ -39,53 +108,20 @@ export async function appendRow(values: (string | number)[]): Promise<void> {
   }
 }
 
-// ─── Update: atualiza linha existente por nome do projeto ────────────────────
-
-// Mapa de colunas header → letra (0-indexed → A, B, C...)
-const COLUMN_LETTERS: Record<string, string> = {
-  'Data Submissão': 'A',
-  'Data Criação': 'B',
-  'Área': 'C',
-  'Nome Completo': 'D',
-  'Participantes': 'E',
-  'Email': 'F',
-  'Ferramenta': 'G',
-  'Projeto': 'H',
-  'Descrição': 'I',
-  'URL': 'J',
-  'Escopo': 'K',
-  'Tipos Projeto': 'L',
-  'Saving Horas': 'M',
-  'Saving Reais': 'N',
-  'Tipo de Saving': 'O',
-  'Memorial de Saving': 'P',
-  'Custo Externo Mensal': 'Q',
-  'Receita Mensal': 'R',
-  'Receita Memorial': 'S',
-  'Status': 'T',
-  'ID Projeto': 'U',
-  'Ganho Total': 'V',
-  'Tipo de Receita': 'W',
-  'Alguém Fazia?': 'X',
-  'Contexto do Projeto Especial': 'Y',
-  'Especial?': 'Z',
-  // Colunas extras (AA em diante)
-  'Complexidade': 'AA',
-  'Observações': 'AB',
-};
-
-// Coluna "Projeto" está na posição H (índice 7)
-const PROJETO_COLUMN_INDEX = 7;
-
-export async function updateRowByProjectName(
-  projectName: string,
-  updates: Record<string, string | number>,
+// ─── Update: atualiza linha existente por ID Projeto (coluna B) ──────────────
+//
+// O ID é estável e único (ex.: 'legado-270'), então não quebra se o nome do
+// projeto mudar — diferente do match por nome. Atualiza apenas as colunas
+// informadas em `updates`; as demais (inclusive as manuais) ficam intactas.
+export async function updateRowByProjectId(
+  projetoId: string,
+  updates: Partial<Record<SheetColumn, string | number>>,
 ): Promise<void> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  // 1. Ler toda a coluna H (Projeto) para achar o row number
-  const searchRange = `'${sheetName}'!H:H`;
+  // 1. Ler a coluna do ID (B) para achar o número da linha.
+  const searchRange = `'${sheetName}'!${ID_COLUMN_LETTER}:${ID_COLUMN_LETTER}`;
   const searchUrl = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(searchRange)}`;
 
   const searchResp = await fetch(searchUrl, {
@@ -100,24 +136,27 @@ export async function updateRowByProjectName(
   const searchData = (await searchResp.json()) as { values?: string[][] };
   const rows = searchData.values ?? [];
 
-  // Encontrar a linha (1-indexed, pula header na posição 0)
+  // Encontrar a linha (1-indexed; pula header na posição 0). Match case-insensitive:
+  // linhas legadas inseridas na mão usam ID em MAIÚSCULAS (ex.: "LEGADO-270"),
+  // enquanto o ID do banco é minúsculo ("legado-270").
+  const alvo = projetoId.trim().toLowerCase();
   let rowNumber = -1;
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i]?.[0]?.trim() === projectName.trim()) {
+    if (rows[i]?.[0]?.trim().toLowerCase() === alvo) {
       rowNumber = i + 1; // Sheets é 1-indexed
       break;
     }
   }
 
   if (rowNumber === -1) {
-    console.warn(`[google/sheets] Projeto "${projectName}" não encontrado na planilha para update`);
+    console.warn(`[google/sheets] ID Projeto "${projetoId}" não encontrado na planilha para update`);
     return;
   }
 
-  // 2. Montar os ranges e valores para batch update
+  // 2. Montar ranges/valores para o batch update.
   const data: { range: string; values: (string | number)[][] }[] = [];
-
   for (const [columnName, value] of Object.entries(updates)) {
+    if (value == null) continue;
     const col = COLUMN_LETTERS[columnName];
     if (!col) {
       console.warn(`[google/sheets] Coluna "${columnName}" não mapeada, pulando`);
@@ -131,19 +170,15 @@ export async function updateRowByProjectName(
 
   if (data.length === 0) return;
 
-  // 3. Batch update
+  // 3. Batch update.
   const batchUrl = `${BASE_URL}/${spreadsheetId}/values:batchUpdate`;
-
   const batchResp = await fetch(batchUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      valueInputOption: 'USER_ENTERED',
-      data,
-    }),
+    body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data }),
   });
 
   if (!batchResp.ok) {

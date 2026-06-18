@@ -98,7 +98,13 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 **Pontual e o ÷12** — saving e receita pontual entram pelo valor cheio (NÃO dividem por 12). **Exceção: custo evitado** (coletado no formulário de saving) — cada ferramenta evitada com recorrência **pontual é mensalizada ÷12** antes de somar ao saving; mensal entra cheio.
 
-**Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON, enviadas ao Google Sheets nas colunas 26-28). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
+**Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON). As duas primeiras vão ao Google Sheets; `custo_evitado_itens` é **só no banco** (não há coluna pra ele no layout atual da planilha). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
+
+## Sync Google (Sheets + Chat)
+
+- **Layout da planilha = fonte única de verdade** em `src/lib/google/sheets.ts` (`SHEET_COLUMNS`, colunas A→AG da aba `GoDocs`). Append e update derivam dele — mudou a planilha, muda só ali. Colunas `Diff Horas / Antes`, `Diff Saving / Antes` e `Memorial anterior` são **manuais** (o sistema nunca escreve nelas).
+- **Submissão nova → append**; **edição → UPDATE in-place** casando por `ID Projeto` (coluna B), via `updateRowByProjectId`. Nunca duplica linha numa edição.
+- **`waitUntil` obrigatório p/ fire-and-forget** — o sync para Sheets/Chat roda via `runBackground()` (`src/lib/background.ts`), que registra a promise no `ctx.waitUntil` exposto pelo worker em `globalThis.__waitUntil`. Sem isso, no runtime do Godeploy a promise não-aguardada é cancelada quando a Response retorna e o sync morre no meio.
 
 ## Convenções rápidas
 
