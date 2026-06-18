@@ -5,6 +5,7 @@ import {
   getProjetosByOwnerEmail,
   getProjetoWithRelations,
   getLatestVersionByProjeto,
+  getAdminByEmail,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
@@ -106,7 +107,9 @@ export async function getMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  if (!ehDono(data, email)) {
+  // Dono (responsável ou membro) pode abrir/editar. Admins (emails do RPA
+  // cadastrados na tabela `admins`) podem abrir/editar QUALQUER projeto.
+  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
 
