@@ -8,7 +8,7 @@ import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, AnaliseResult } from "@/lib/submeter/constants";
+import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
@@ -16,7 +16,6 @@ import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
 import { Etapa25 } from "@/lib/submeter/step25";
 import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
-import { AnalyzerCard } from "@/lib/submeter/analyzer-overlay";
 
 /* ──────────────────────────────────────────────
    Route
@@ -205,22 +204,10 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   // saving→receita; o de receita reseta ao (re)entrar na fase de receita.
   const [savingSubmitted, setSavingSubmitted] = useState<SavingFormData | null>(null);
   const [receitaSubmitted, setReceitaSubmitted] = useState<SavingFormData | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnaliseResult | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   // Números finais recalculados pelo servidor na submissão — usados no comparativo
   // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
-
-  // Alerta ao tentar fechar/recarregar a página durante a análise
-  useEffect(() => {
-    if (!analyzing) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [analyzing]);
 
   // Seed do estado quando em modo edição
   useEffect(() => {
@@ -1403,17 +1390,16 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
     setFormDraft(receitaSubmitted ?? emptyFormDraft());
     setShowReceitaForm(true);
   }
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  /* ── Enviar projeto + disparar análise IA em paralelo ── */
-  async function handleSubmitAndAnalyze() {
+  /* ── Enviar projeto ──────────────────────────────────────────────────────────
+     A análise automática (analisador) NÃO roda mais no cliente: o servidor a
+     dispara em background ao submeter (ver worker.ts → ctx.waitUntil). Assim a
+     tela de sucesso aparece na hora, a pessoa pode fechar a aba, e o resultado
+     fica disponível depois em "Meus Projetos". */
+  async function handleSubmitProjeto() {
     if (!projetoId) return;
     setSubmittingProject(true);
-    setAnalyzing(true);
-    setAnalysisResult(null);
-    setAnalysisError(null);
 
-    // 1) Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
+    // Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
     try {
       const res = await apiFetch<{ ok: boolean; status: string; ganho?: GanhoFinal }>(
         "/api/chat/submeter-validacao",
@@ -1432,31 +1418,12 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         toast.error("Erro ao enviar projeto. Tente novamente.");
       }
       setSubmittingProject(false);
-      setAnalyzing(false);
       return;
     }
 
-    // 2) Submissão ok → mostra tela de sucesso imediatamente
+    // Submissão ok → tela de sucesso. A análise segue por trás dos panos no servidor.
     setSubmitted(true);
     setSubmittingProject(false);
-
-    // Projeto especial é validado por um humano (não pelo analisador IA) — não
-    // dispara a análise automática. O status fica "Pendente" até a avaliação humana.
-    if (form.especial) {
-      setAnalyzing(false);
-      return;
-    }
-
-    // 3) Análise IA em background — não bloqueia a tela de sucesso
-    try {
-      const result = await apiFetch<AnaliseResult>("/api/chat/analisar", { projeto_id: projetoId });
-      setAnalysisResult(result);
-    } catch (e) {
-      console.error("[submeter] análise falhou:", e);
-      setAnalysisError("Não foi possível gerar a análise automática. Isso não afeta o envio do seu projeto.");
-    } finally {
-      setAnalyzing(false);
-    }
   }
 
   /* ── Seed Loading Screen (modo edição) ── */
@@ -1543,7 +1510,7 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
             >
               Sua documentação foi recebida e está em análise pela equipe de RPA & IA.
               <br />
-              Você receberá um retorno em breve por e-mail.
+              Pode fechar esta página — o resultado ficará disponível em <strong>Meus Projetos</strong> e você receberá um retorno por e-mail.
             </p>
             <div
               className="mb-7 text-left"
@@ -1567,47 +1534,24 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
               <GanhoComparison anterior={versaoAnterior} atual={ganhoFinal} />
             )}
 
-            {/* Card da análise IA (inline — loading ou resultado). Projeto especial
-                não passa pela análise automática (validação é humana) → seção oculta. */}
-            {!form.especial && (
-              <div style={{ marginBottom: 24 }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#8b8b9a",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 8,
-                  }}
-                >
-                  Análise automática
-                </div>
-                <AnalyzerCard
-                  loading={analyzing}
-                  result={analysisResult}
-                  error={analysisError}
-                />
-              </div>
-            )}
-
+            {/* A análise automática roda por trás dos panos no servidor — não há mais
+                tela de carregamento aqui (gerava ansiedade). O resultado fica em
+                "Meus Projetos". */}
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={() => navigate({ to: "/meus-projetos" })}
                 className="go-btn-primary"
-                disabled={analyzing}
-                style={analyzing ? { opacity: 0.4, cursor: "not-allowed", pointerEvents: "none" } : undefined}
               >
-                {analyzing ? "Aguardando análise..." : "Submeter outro projeto"}
+                Ver em Meus Projetos
               </button>
               <button
                 type="button"
-                onClick={() => navigate({ to: "/" })}
+                onClick={() => window.location.reload()}
                 className="text-xs"
                 style={{ color: "#8b8b9a" }}
               >
-                Voltar à Home
+                Submeter outro projeto
               </button>
             </div>
           </div>
@@ -1702,7 +1646,7 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
                   loading={chatLoading}
                   loadingSteps={chatLoadingSteps}
                   isComplete={chatComplete}
-                  onSubmit={handleSubmitAndAnalyze}
+                  onSubmit={handleSubmitProjeto}
                   submitting={submittingProject}
                   chatBottomRef={chatBottomRef}
                   fase={chatFase}

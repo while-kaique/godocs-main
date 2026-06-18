@@ -1337,6 +1337,9 @@ export async function submeterParaValidacao(rawData: unknown) {
   return {
     ok: true,
     status,
+    // Projeto especial é validado por humano — o worker NÃO dispara a análise
+    // automática em background para ele.
+    especial: ehEspecial,
     ganho: {
       saving_horas: (saving?.economia_horas_mes as number) ?? null,
       saving_reais: (saving?.economia_reais_mes as number) ?? null,
