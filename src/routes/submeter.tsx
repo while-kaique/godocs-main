@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
+  parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, AnaliseResult } from "@/lib/submeter/constants";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
@@ -42,6 +43,8 @@ function SubmeterPage() {
 const emptyFormDraft = (): SavingFormData => ({
   linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
   alguemFazia: "",
+  temCustoEvitado: "",
+  custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
@@ -282,9 +285,31 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
               horasAntes: String(l.horas_antes ?? ""),
               horasDepois: String(l.horas_depois ?? ""),
             }));
+            // Custo evitado: repopula a partir da coluna do projeto (JSON salvo na
+            // submissão). Mantém a edição fiel ao que foi enviado.
+            let custoEvitadoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
+            try {
+              const raw = data.custo_evitado_itens;
+              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(arr)) {
+                custoEvitadoItens = arr.map((it: Record<string, unknown>) => ({
+                  nome: String(it.nome ?? ""),
+                  // valor é salvo como número no JSON → reexibe com máscara BR.
+                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
+                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
+                  justificativa: String(it.justificativa ?? ""),
+                }));
+              }
+            } catch {
+              custoEvitadoItens = [];
+            }
             const savingSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: linhas.length > 0 ? linhas : [{ cargo: "", horasAntes: "", horasDepois: "" }],
               alguemFazia: (data.alguem_fazia as string) ?? "",
+              temCustoEvitado: (data.custo_evitado as "sim" | "nao" | "") ?? "",
+              custoEvitadoItens: custoEvitadoItens.length > 0
+                ? custoEvitadoItens
+                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (data.tipo_saving as string) ?? "",
               custoExterno: String(data.custo_externo_mensal ?? ""),
               custoPeriodicidade: "mensal",
@@ -302,6 +327,8 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
             const receitaSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
               alguemFazia: "",
+              temCustoEvitado: "",
+              custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (receita.tipo_saving as string) ?? "mensal",
               custoExterno: "",
               custoPeriodicidade: "mensal",
@@ -1241,6 +1268,20 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
           horas_depois: parseFloat(l.horasDepois),
         }));
 
+      // Custo evitado: só envia itens válidos quando a pessoa marcou "sim". O
+      // backend mensaliza (pontual ÷12) e soma ao saving.
+      const custoEvitadoItens =
+        formData.temCustoEvitado === "sim"
+          ? formData.custoEvitadoItens
+              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
+              .map((it) => ({
+                nome: it.nome.trim(),
+                valor: parseMoedaBR(it.valor),
+                recorrencia: it.recorrencia as "mensal" | "pontual",
+                justificativa: it.justificativa.trim(),
+              }))
+          : [];
+
       const result = await apiFetch<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-saving",
         {
@@ -1249,6 +1290,8 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
           alguem_fazia: formData.alguemFazia || undefined,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
+          tem_custo_evitado: formData.temCustoEvitado || undefined,
+          custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
         },
       );
       setShowSavingForm(false);

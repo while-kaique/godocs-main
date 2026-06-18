@@ -106,11 +106,12 @@ const MOCK_SAVING: SavingColetado = {
   tipo_saving: 'mensal',
   memorial_calculo: null,
   valor_ganho_mensal: null,
-  // Exemplo de custo evitado pontual: serviço externo de R$ 2.700 (único) que o
-  // projeto eliminou — entra cheio (sem ÷12) no economia_reais_mes pelo backend.
-  custo_evitado_reais: 2700,
-  custo_evitado_tipo: 'pontual',
-  custo_evitado_descricao: 'Serviço externo de implementação que custaria R$ 2.700 (cobrança única)',
+  // Custo evitado coletado no FORMULÁRIO (não pelo agente). O backend mensaliza
+  // cada item: serviço pontual de R$ 2.700 (cobrança única) ÷12 = R$ 225/mês, que
+  // soma cheio ao economia_reais_mes. O agente apenas reconhece e descreve (sem R$).
+  custo_evitado_reais: 225,
+  custo_evitado_tipo: 'mensal',
+  custo_evitado_descricao: 'Serviço externo de implementação (R$ 2700.00, pontual) — cobrança única eliminada pela automação',
 };
 
 const MOCK_RECEITA: ReceitaColetada = {
@@ -144,7 +145,7 @@ export function getPromptRegistry(): PromptEntry[] {
       functionName: 'buildDocPrompt',
       filePath: 'src/lib/agents/orchestrator.ts',
       fase: 'doc',
-      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos. Projeto especial NÃO passa por aqui — pula o agente e é submetido direto (doc montada sem IA). IA COMO FUNCIONALIDADE (padronizado): antes do preview, SEMPRE pergunta com caixas de seleção (type:"options") se o projeto usa IA como funcionalidade — em toda submissão, mesmo quando a doc deixa óbvio; nunca infere o campo sozinho (define tem_ia_como_funcionalidade só pela resposta do usuário). Não repete se já respondido. REVISÃO (edição): quando ctx.revisao existe (projeto já submetido), o prompt ganha o bloco "CONTEXTO DE REVISÃO" com a doc anterior aprovada — o agente parte dela e valida só o que mudou, sem recomeçar do zero. (O preview abaixo está em modo edição para mostrar esse bloco.)',
+      description: 'Prompt principal da fase de documentação. A IA analisa os arquivos enviados, usa os campos já extraídos pelo extrator, e coleta via conversa o que ficou pendente (campos null). Faz uma pergunta por vez, é cética com respostas vagas, e gera o preview quando os 7 campos estão completos. Projeto especial NÃO passa por aqui — pula o agente e é submetido direto (doc montada sem IA). IA COMO FUNCIONALIDADE (3 passos): (1) infere internamente dos arquivos se há IA como funcionalidade e registra em ia_inferida_dos_arquivos; (2) SEMPRE pergunta com type:"options" antes do preview — menciona o que percebeu nos arquivos se inferiu algo, caso contrário faz a pergunta neutra; (3) registra tem_ia_como_funcionalidade pela resposta do usuário e define ia_contradição:true se a resposta contradiz a inferência dos arquivos (sem questionar o usuário — aceita e segue). Não repete a pergunta se já respondida. REVISÃO (edição): quando ctx.revisao existe (projeto já submetido), o prompt ganha o bloco "CONTEXTO DE REVISÃO" com a doc anterior aprovada — o agente parte dela e valida só o que mudou, sem recomeçar do zero. (O preview abaixo está em modo edição para mostrar esse bloco.)',
       llmParams: { temperature: 0.2, maxTokens: 4096, modelTier: 'fast', jsonMode: true },
       contextParams: ['ProjetoContexto', 'DocumentacaoColetada', 'RevisaoContexto (só em edição)'],
       getPromptText: () => buildDocPrompt(MOCK_CTX_REVISAO, documentacaoVazia()),

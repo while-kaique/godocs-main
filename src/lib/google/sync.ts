@@ -95,6 +95,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       /* 23 Alguém Fazia?           */ ouTraco(p.projeto.alguem_fazia),
       /* 24 Contexto Projeto Esp.   */ ouTraco(p.projeto.contexto_especial),
       /* 25 Especial?               */ p.projeto.especial === 1 ? 'Sim' : 'Não',
+      /* 26 Custo Evitado?          */ ouTraco(p.projeto.custo_evitado),
+      /* 27 Justificativa Custo Ev. */ ouTraco(p.projeto.custo_evitado_justificativa),
+      /* 28 Custo Evitado (itens)   */ p.projeto.custo_evitado_itens ?? '[]',
     ];
 
     try {
