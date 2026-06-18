@@ -188,6 +188,64 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
 ];
 
+// Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
+// INSERT OR IGNORE com `id` fixo garante idempotência: roda em todo cold start
+// mas só insere uma vez. Cada entrada é um array de params na ordem do INSERT abaixo.
+// Para adicionar novos legados, basta acrescentar um array aqui.
+const SEED_PROJETOS_LEGADO_SQL = `
+  INSERT OR IGNORE INTO projetos (
+    id, nome, responsavel_nome, responsavel_email, area, ferramenta, escopo,
+    membros, status, chat_completo, data_criacao_projeto, tipo_projeto, tipos_projeto,
+    descricao_breve, saving_horas, saving_reais, tipo_saving, memorial_calculo,
+    custo_externo_mensal, ganho_total_mensal, alguem_fazia, complexidade, observacoes,
+    especial, submitted_at, validated_at, created_at, updated_at
+  ) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+  );
+`;
+
+const SEED_PROJETOS_LEGADO: (string | number | null)[][] = [
+  [
+    /* id                    */ 'legado-270',
+    /* nome                  */ 'HRBP Workspace',
+    /* responsavel_nome      */ 'Erivania Apolonia Santos Martins',
+    /* responsavel_email     */ 'erivania.martins@gocase.com',
+    /* area                  */ 'Gente e Gestão',
+    /* ferramenta            */ 'Claude Code',
+    /* escopo                */ 'interno',
+    /* membros               */ null,
+    /* status                */ 'aprovado',
+    /* chat_completo         */ 1,
+    /* data_criacao_projeto  */ '2026-05-15',
+    /* tipo_projeto          */ 'saving',
+    /* tipos_projeto         */ '["saving"]',
+    /* descricao_breve       */ 'Workspace centralizado para HRBPs com dados e ferramentas de gestão de pessoas.',
+    /* saving_horas          */ 12,
+    /* saving_reais          */ 661.8,
+    /* tipo_saving           */ 'mensal',
+    /* memorial_calculo      */
+      '12h × R$55,15 (Coord) = R$661,80.\n\n' +
+      '- Tempo semanal economizado: 3h, totalizando 12h mensais de um Especialista.\n\n' +
+      'Esse saving considera apenas o tempo direto de compilação e preparação de relatórios ' +
+      'semanais para liderança, que passou a ser gerado automaticamente pela plataforma. ' +
+      'Não estão incluídos ganhos adicionais como redução no tempo de atualização de organogramas, ' +
+      'gestão de vagas e acompanhamento de riscos de turnover — o que torna esse número conservador.',
+    /* custo_externo_mensal  */ 0,
+    /* ganho_total_mensal    */ 661.8,
+    /* alguem_fazia          */ 'sim',
+    /* complexidade          */ 'automacao',
+    /* observacoes           */
+      'Projeto legado (código original: LEGADO-270), importado manualmente — anterior ao formulário GoDocs. ' +
+      'Parecer original: "Saving OK. R$55,15 ✓." ' +
+      'Documento: https://drive.google.com/file/d/1i_fwDL-_ME0InuR84eDWJHFkwDHVbrYe/view',
+    /* especial              */ 0,
+    /* submitted_at          */ '2026-06-09T12:00:00.000Z',
+    /* validated_at          */ '2026-06-09T12:00:00.000Z',
+    /* created_at            */ '2026-06-09T12:00:00.000Z',
+    /* updated_at            */ '2026-06-09T12:00:00.000Z',
+  ],
+];
+
 // Admins iniciais — INSERT OR IGNORE garante idempotência (se já existir, não duplica).
 const SEED_ADMINS = [
   'lucas.queiroz@gocase.com',
@@ -226,5 +284,14 @@ export async function initSchema(db: GoDeployDB) {
       "INSERT OR IGNORE INTO admins (id, email) VALUES (lower(hex(randomblob(16))), ?);",
       [email]
     );
+  }
+
+  // Seed de projetos legado (idempotente — id fixo + INSERT OR IGNORE)
+  for (const params of SEED_PROJETOS_LEGADO) {
+    try {
+      await db.exec(SEED_PROJETOS_LEGADO_SQL, params);
+    } catch (e) {
+      console.error('[schema] Falha ao inserir projeto legado:', e);
+    }
   }
 }
