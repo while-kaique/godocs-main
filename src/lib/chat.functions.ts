@@ -1349,6 +1349,9 @@ export async function submeterParaValidacao(rawData: unknown) {
       memorialLimpo: memorialInterno ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
       ganhoTotalMensal,
+      // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
+      // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
+      memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
     }));
   }
 
