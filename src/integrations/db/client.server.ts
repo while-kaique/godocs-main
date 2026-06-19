@@ -368,7 +368,7 @@ export function getProjetosByOwnerEmail(email: string) {
     SELECT p.*, a.nome as area_nome
     FROM projetos p
     LEFT JOIN areas a ON p.area_id = a.id
-    WHERE p.responsavel_email = ? OR p.membros LIKE ?
+    WHERE LOWER(p.responsavel_email) = LOWER(?) OR p.membros LIKE ?
     ORDER BY p.created_at DESC
   `, [email, `%"${email}"%`]);
 }

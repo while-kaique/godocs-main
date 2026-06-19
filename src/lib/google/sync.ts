@@ -22,6 +22,45 @@ function parseArquivosLinks(raw: string | null | undefined): string[] {
   }
 }
 
+// Colunas NUMÉRICAS da planilha (valores financeiros / horas). Vazio → 0.
+// Todas as demais são tratadas como TEXTO: vazio → "—". É a padronização para a
+// planilha não ter célula suja/vazia. Mudou alguma regra → ajustar só aqui.
+const COLUNAS_NUMERICAS = new Set<SheetColumn>([
+  'Saving Horas',
+  'Horas em Reais',
+  'Custo Evitado',
+  'Saving Reais',
+  'Custo Externo Mensal',
+  'Receita Mensal',
+  'Ganho Total',
+]);
+
+// Padroniza a linha ANTES de gravar: coluna numérica vazia/inválida → 0; coluna de
+// texto vazia (null, "", "-", "—") → "—". Garante que toda submissão siga o padrão.
+export function padronizarLinha(
+  row: Partial<Record<SheetColumn, string | number | null | undefined>>,
+): Partial<Record<SheetColumn, string | number>> {
+  const out: Partial<Record<SheetColumn, string | number>> = {};
+  for (const [k, v] of Object.entries(row) as [SheetColumn, string | number | null | undefined][]) {
+    if (COLUNAS_NUMERICAS.has(k)) {
+      let n: number;
+      if (typeof v === 'number') {
+        n = v;
+      } else {
+        // pt-BR: se há vírgula, ela é o decimal e o ponto é milhar; senão ponto é decimal.
+        let str = String(v ?? '').replace(/[^0-9,.-]/g, '');
+        if (str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
+        n = parseFloat(str);
+      }
+      out[k] = Number.isFinite(n) ? n : 0;
+    } else {
+      const s = v == null ? '' : String(v).trim();
+      out[k] = s === '' || s === '-' || s === '—' ? '—' : (v as string | number);
+    }
+  }
+  return out;
+}
+
 // Recorrência do custo evitado = o que a pessoa marcou no formulário ('mensal' ou
 // 'pontual'). Deriva dos itens persistidos (cada um com sua recorrência); itens com
 // recorrências diferentes → "Misto". Função pura — testável.
@@ -145,7 +184,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Alguém Fazia?': ouTraco(p.projeto.alguem_fazia),
       'Saving Horas': savingHoras,
       'Horas em Reais': horasEmReais,
-      'Custo Evitado': custoEvitadoReais > 0 ? custoEvitadoReais : '—',
+      'Custo Evitado': custoEvitadoReais, // numérico: 0 quando não há (padrão)
       'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
       'Custo Mensal ou Pontual': custoEvitadoRecorrencia,
       'Saving Reais': savingReais,
@@ -170,13 +209,16 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       row['Memorial anterior'] = p.memorialAnterior.trim();
     }
 
+    // Padroniza antes de gravar: numérico vazio → 0; texto vazio → "—".
+    const rowPadronizada = padronizarLinha(row);
+
     // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
     // — só dá pra editar um projeto que já está na planilha. Nova: append.
     try {
       if (p.modo === 'edicao') {
-        await updateRowByProjectId(p.projetoId, row);
+        await updateRowByProjectId(p.projetoId, rowPadronizada);
       } else {
-        await appendRow(row);
+        await appendRow(rowPadronizada);
       }
     } catch (sheetsErr) {
       console.error(
@@ -219,12 +261,12 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
   try {
     // 1. Update na planilha (match por ID Projeto — estável e único)
     try {
-      await updateRowByProjectId(p.projetoId, {
+      await updateRowByProjectId(p.projetoId, padronizarLinha({
         'Complexidade': p.complexidade,
         'Observações': p.observacoes,
         'Status': p.status,
         'Atualizado Em': nowFortaleza(),
-      });
+      }));
     } catch (sheetsErr) {
       console.error('[google/sync] Falha ao update na planilha:', sheetsErr);
     }
