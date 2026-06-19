@@ -76,6 +76,9 @@ export type SubmitSyncParams = {
   memorialLimpo: string;
   receitaMemorialLimpo: string;
   ganhoTotalMensal: number;
+  // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
+  // Em submissão nova fica null (não há versão anterior).
+  memorialAnterior?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -122,9 +125,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);
     const urlDocs = arquivosLinks.length > 0 ? arquivosLinks.join('\n') : '—';
 
-    // Colunas preenchidas pelo sistema na submissão. As colunas manuais
-    // (Diff*/Memorial anterior) e as do analisador (Complexidade/Observações)
-    // são deliberadamente omitidas — não são escritas aqui.
+    // Colunas preenchidas pelo sistema na submissão. As colunas de Diff (manuais)
+    // e as do analisador (Complexidade/Observações) são omitidas. "Memorial
+    // anterior" é escrita só na edição (logo abaixo), com o memorial pré-edição.
     const row: Partial<Record<SheetColumn, string | number>> = {
       'Data Submissão': dataSubmissao,
       'ID Projeto': p.projetoId,
@@ -158,6 +161,14 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
       'Atualizado Em': dataSubmissao,
     };
+
+    // "Memorial anterior": só na EDIÇÃO, grava o memorial da última versão ANTES
+    // desta edição (sempre o último, não o histórico todo). Em submissão nova fica
+    // em branco. Só adiciona a chave quando há valor → no append de projeto novo a
+    // coluna fica vazia; na edição sem anterior, não sobrescreve a célula manual.
+    if (p.modo === 'edicao' && p.memorialAnterior && p.memorialAnterior.trim()) {
+      row['Memorial anterior'] = p.memorialAnterior.trim();
+    }
 
     // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
     // — só dá pra editar um projeto que já está na planilha. Nova: append.
