@@ -42,6 +42,7 @@ import {
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto } from '@/lib/meus-projetos.functions'
+import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -310,6 +311,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/investigador/stats' && method === 'GET') {
       await requireAdmin(request)
       return json(await getInvestigadorStats())
+    }
+
+    // ── Backfill de docs ao Drive: AVALIAÇÃO (read-only) ──
+    // Conta quantos documentos de projetos recentes (não-legado) são recuperáveis
+    // do api_logs (recuperável × parcial × perdido) antes de executar o backfill.
+    if (pathname === '/api/admin/docs-backfill/assess' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await assessDocsBackfill())
     }
     if (pathname.startsWith('/api/admin/investigador/projetos/') && method === 'GET') {
       await requireAdmin(request)
