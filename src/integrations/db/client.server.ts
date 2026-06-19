@@ -442,6 +442,35 @@ export function deleteChatMessagesByProjeto(projetoId: string) {
 }
 
 /**
+ * Apaga um projeto e TUDO que depende dele. Deleta explicitamente as tabelas
+ * relacionadas (não dependemos do ON DELETE CASCADE estar ativo no runtime) e
+ * por último o próprio projeto. Usado para excluir rascunhos.
+ */
+export async function excluirProjetoCascade(projetoId: string) {
+  for (const tabela of ['chat_messages', 'documentacao', 'projeto_versions', 'analises', 'validacoes']) {
+    await exec(`DELETE FROM ${tabela} WHERE projeto_id = ?`, [projetoId]);
+  }
+  await exec('DELETE FROM projetos WHERE id = ?', [projetoId]);
+}
+
+/**
+ * Remove projetos de TESTE E2E (nome com prefixo "[E2E-") e tudo que depende deles.
+ * O schema tem ON DELETE CASCADE (chat_messages, documentacao, projeto_versions,
+ * validacoes, analises, api_logs, form_events), então deletar de `projetos` limpa
+ * o resto. Retorna os IDs removidos para auditoria/limpeza da planilha.
+ * Usado pelo endpoint admin POST /api/admin/e2e-cleanup. Ver scripts/e2e/.
+ */
+export async function deleteProjetosTesteE2E(): Promise<string[]> {
+  const rows = await queryAll<{ id: string }>(
+    "SELECT id FROM projetos WHERE nome LIKE '[E2E-%'", []
+  );
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return [];
+  await exec("DELETE FROM projetos WHERE nome LIKE '[E2E-%'", []);
+  return ids;
+}
+
+/**
  * Remove as mensagens de uma fase financeira (saving|receita) a partir do marcador
  * de transição — a mensagem `type:'complete', fase:<alvo>` que abriu a fase. O
  * marcador (e tudo antes dele: doc + resumo do projeto) é mantido; só a conversa

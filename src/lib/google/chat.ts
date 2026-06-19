@@ -1,5 +1,13 @@
 // Notificação via webhook do Google Chat (não precisa de auth Google — URL contém key+token).
 
+// Projetos de teste E2E (nome com prefixo "[E2E-") NÃO notificam o Google Chat —
+// o harness de validação roda contra produção e gravaria N pings no espaço do time.
+// A gravação na planilha continua normal (é o alvo da validação); só o Chat é mudo.
+// Ver scripts/e2e/ e CLAUDE.md. Reverter junto com o harness quando a validação terminar.
+export function ehProjetoTesteE2E(nome: string | null | undefined): boolean {
+  return typeof nome === 'string' && nome.startsWith('[E2E-');
+}
+
 export async function sendChatNotification(message: string): Promise<void> {
   const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
   if (!webhookUrl) {

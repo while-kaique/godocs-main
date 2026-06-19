@@ -4,7 +4,7 @@
 
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
-import { sendChatNotification, buildSubmitMessage, buildUpdateMessage } from './chat';
+import { sendChatNotification, buildSubmitMessage, buildUpdateMessage, ehProjetoTesteE2E } from './chat';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -233,8 +233,12 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       );
     }
 
-    // 2. Notificação Google Chat
+    // 2. Notificação Google Chat (mudo para projetos de teste E2E)
     try {
+      if (ehProjetoTesteE2E(p.projeto.nome)) {
+        console.warn(`[google/sync] Projeto de teste E2E "${p.projeto.nome}" — notificação Google Chat suprimida.`);
+        return;
+      }
       const message = buildSubmitMessage({
         projeto: ouTraco(p.projeto.nome),
         area: p.area,
@@ -277,8 +281,12 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       console.error('[google/sync] Falha ao update na planilha:', sheetsErr);
     }
 
-    // 2. Notificação Google Chat
+    // 2. Notificação Google Chat (mudo para projetos de teste E2E)
     try {
+      if (ehProjetoTesteE2E(p.projectName)) {
+        console.warn(`[google/sync] Projeto de teste E2E "${p.projectName}" — notificação de update Google Chat suprimida.`);
+        return;
+      }
       const message = buildUpdateMessage({
         projeto: p.projectName,
         status: p.status,

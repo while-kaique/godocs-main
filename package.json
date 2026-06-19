@@ -13,7 +13,10 @@
     "build:worker": "esbuild src/worker.ts --bundle --format=esm --platform=browser --target=es2022 --conditions=worker,browser --minify --outfile=worker.js",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "e2e:run": "node --experimental-strip-types scripts/e2e/run.mjs",
+    "e2e:validate": "node --experimental-strip-types scripts/e2e/validate.mjs",
+    "e2e:cleanup": "node --experimental-strip-types scripts/e2e/cleanup.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

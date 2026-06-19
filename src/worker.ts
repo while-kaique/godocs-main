@@ -42,8 +42,8 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
-import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto } from '@/lib/meus-projetos.functions'
+import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
+import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
@@ -145,6 +145,20 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const email = getEmailFromRequest(request)
       if (!email) return errorJson('Não autorizado.', 401)
       return json(await listarMeusProjetos(email))
+    }
+    // Contagem de pendentes (legados sem "Atualizado Em") — selo da home. ANTES do
+    // GET genérico abaixo, senão "pendentes" seria tratado como id de projeto.
+    if (pathname === '/api/meus-projetos/pendentes' && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      return json(await contarPendentes(email))
+    }
+    // Excluir um RASCUNHO (ownership + só status 'rascunho').
+    if (pathname.startsWith('/api/meus-projetos/') && method === 'DELETE') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
+      return json(await excluirRascunho(email, id))
     }
     if (pathname.startsWith('/api/meus-projetos/') && method === 'GET') {
       const email = getEmailFromRequest(request)
@@ -377,6 +391,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
       await requireAdmin(request)
       return json(await syncSheetsToSqlite())
+    }
+
+    // ── Limpeza de projetos de TESTE E2E (admin) ──
+    // Remove do SQLite todos os projetos com nome "[E2E-..." (cascata limpa o resto).
+    // Usado pelo harness de validação (scripts/e2e/cleanup.mjs) DEPOIS de remover as
+    // linhas da planilha — ordem importa: se o SQLite for limpo antes, o sync reverso
+    // por dono (listarMeusProjetos) ressuscita do Sheets. Remover com o harness.
+    if (pathname === '/api/admin/e2e-cleanup' && method === 'POST') {
+      await requireAdmin(request)
+      const ids = await deleteProjetosTesteE2E()
+      return json({ ok: true, deletados: ids.length, ids })
     }
 
     return errorJson('Rota não encontrada', 404)

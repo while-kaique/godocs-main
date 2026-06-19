@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import {
   Clock,
@@ -8,8 +9,12 @@ import {
   XCircle,
   FileText,
   PencilLine,
+  Trash2,
   Loader2,
 } from "lucide-react";
+
+// Prazo para regularizar legados (editar/reenviar até deixar de constar como legado).
+const PRAZO_LEGADO = "30/06";
 
 export const Route = createFileRoute("/meus-projetos")({
   head: () => ({
@@ -32,6 +37,8 @@ type Projeto = {
   created_at: string | null;
   submitted_at: string | null;
   arquivos_nomes: string[];
+  atualizado_em: string | null;
+  pendente: boolean;
 };
 
 const STATUS_CONFIG: Record<
@@ -116,12 +123,37 @@ function MeusProjetosPage() {
   // manter a tela limpa (só o que de fato foi enviado aparece de cara).
   const [aba, setAba] = useState<"submetidos" | "rascunhos">("submetidos");
 
+  const [excluindo, setExcluindo] = useState<string | null>(null);
+
   useEffect(() => {
     apiFetch<Projeto[]>("/api/meus-projetos")
       .then(setProjetos)
       .catch((e) => setErro(e instanceof Error ? e.message : "Erro ao carregar projetos."))
       .finally(() => setLoading(false));
   }, []);
+
+  // Exclusão de rascunho com confirmação no próprio toast (sonner).
+  function pedirExclusaoRascunho(id: string, nome: string | null) {
+    toast(`Excluir o rascunho "${nome ?? "sem nome"}"?`, {
+      description: "Esta ação não pode ser desfeita.",
+      action: {
+        label: "Excluir",
+        onClick: async () => {
+          setExcluindo(id);
+          try {
+            await apiFetch(`/api/meus-projetos/${id}`, undefined, "DELETE");
+            setProjetos((ps) => ps.filter((p) => p.id !== id));
+            toast.success("Rascunho excluído.");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Erro ao excluir o rascunho.");
+          } finally {
+            setExcluindo(null);
+          }
+        },
+      },
+      cancel: { label: "Cancelar", onClick: () => {} },
+    });
+  }
 
   const submetidos = projetos.filter((p) => p.status !== "rascunho");
   const rascunhos = projetos.filter((p) => p.status === "rascunho");
@@ -310,9 +342,9 @@ function MeusProjetosPage() {
                       )}
                       <span>{p.submitted_at ? `Enviado em ${fmtDate(p.submitted_at)}` : `Criado em ${fmtDate(p.created_at)}`}</span>
                     </div>
-                    {p.status === "aprovado" && (
-                      <p className="mt-1.5 text-[11px]" style={{ color: "#dc9900" }}>
-                        ⚠️ Reenviar um projeto aprovado o devolve para análise.
+                    {p.pendente && (
+                      <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
+                        ⚠️ Projeto pendente — edite e reenvie até {PRAZO_LEGADO} para regularizar (deixar de constar como legado).
                       </p>
                     )}
                   </div>
@@ -320,15 +352,28 @@ function MeusProjetosPage() {
                   <div className="flex shrink-0 items-center gap-3">
                     <StatusBadge status={p.status} />
                     {p.status === "rascunho" ? (
-                      <Link
-                        to="/submeter"
-                        search={{ retomar: p.id }}
-                        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                        style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                      >
-                        <PencilLine className="h-3.5 w-3.5" />
-                        Continuar
-                      </Link>
+                      <>
+                        <Link
+                          to="/submeter"
+                          search={{ retomar: p.id }}
+                          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                          style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                          Continuar
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => pedirExclusaoRascunho(p.id, p.nome)}
+                          disabled={excluindo === p.id}
+                          title="Excluir rascunho"
+                          aria-label="Excluir rascunho"
+                          className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                          style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
+                        >
+                          {excluindo === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </>
                     ) : (
                       <Link
                         to="/editar/$id"
