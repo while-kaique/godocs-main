@@ -1356,7 +1356,9 @@ export async function submeterParaValidacao(rawData: unknown) {
     // area_nome (join por area_id, fallback p.area) reflita a área derivada.
     area: areaFinal,
     area_id: null,
-    submitted_at: now,
+    // submitted_at = data da PRIMEIRA submissão. No reenvio (edição) NÃO atualiza —
+    // preserva "quando a pessoa submeteu" (só validated_*/Atualizado Em refletem a edição).
+    ...(ehReenvio ? {} : { submitted_at: now }),
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
