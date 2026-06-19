@@ -5,6 +5,7 @@ import { llmChat } from '@/lib/llm';
 import {
   getProjetoById,
   getDocumentacao,
+  getDocMessage,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ResultadoAnalise, CriterioResult, Complexidade } from './types';
@@ -107,6 +108,17 @@ Quando a ferramenta for "Claude", "Claude + GoDeploy" ou qualquer outra listada 
 - Brevidade NÃO é defeito. Um campo curto mas preciso e correto vale tanto quanto um campo longo.
 - Na dúvida entre aprovar e reprovar, APROVE — e registre as ressalvas nas recomendações. A triagem humana fará o ajuste fino.
 - Reserve a reprovação para casos onde a submissão realmente não se sustenta: saving sem lógica, documentação contraditória, ou informações que não fazem sentido juntas.
+- Considere SEMPRE o campo \`documentacao_enviada_usuario\` (texto extraído dos arquivos que a pessoa anexou) — é a fonte mais rica sobre o que o projeto realmente faz.
+
+## AVALIAÇÃO DE PROJETO ESPECIAL (só quando metadados.marcado_como_especial = true)
+
+Projeto ESPECIAL legítimo = **altíssimo impacto** para a empresa, MAS **não diretamente ligado a um ganho de receita ou redução de custos OBJETIVAMENTE mensurável** (ex.: engajamento, qualidade do produto/entrega, estratégia, fundação para outros projetos). Esses NÃO passam por memorial de saving/receita — vão direto para validação humana.
+
+Julgue CRITICAMENTE, cruzando descrição + \`contexto_especial\` (a justificativa que a pessoa deu) + \`documentacao_enviada_usuario\`, se o projeto **realmente se enquadra como especial** OU se é uma **automação/projeto PADRÃO mal rotulado** (ex.: um RPA simples, uma notificação, uma movimentação de dados, um relatório automático — coisas com saving/receita mensurável que deveriam seguir o fluxo padrão). MUITA gente marca "especial" pra pular a etapa de impacto — seja cético.
+
+- Declare seu VEREDITO de forma explícita no \`resumo\` e na \`justificativa\`: ou "**Enquadra-se como especial** porque \<motivo do alto impacto + por que a mensuração é difícil>", ou "**NÃO parece especial** — é uma automação padrão que \<gera saving/receita mensurável / é simples>; recomendo reclassificar como saving e/ou receita."
+- Para projetos marcados como especiais NÃO há memorial de saving/receita — **NÃO penalize** a ausência dele (o critério "Memorial de cálculo" não se aplica; avalie pela doc técnica + contexto + arquivos).
+- O resultado (aprovado/rejeitado) e a pontuação são secundários para especiais (a decisão é humana) — o foco é a CLASSIFICAÇÃO de complexidade + o PARECER sobre a legitimidade do "especial".
 
 ## CRITÉRIOS FIXOS (avalie cada um com 0 ou 1 ponto)
 
@@ -230,9 +242,11 @@ IMPORTANTE:
 function buildUserMessage(
   projeto: Record<string, unknown>,
   conteudo: Record<string, unknown>,
+  docTexto?: string | null,
 ): string {
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
+  const ehEspecial = projeto.especial === 1 || projeto.especial === true;
 
   const dados: Record<string, unknown> = {
     metadados: {
@@ -243,6 +257,10 @@ function buildUserMessage(
       escopo: projeto.escopo ?? null,
       responsavel: `${projeto.responsavel_nome} (${projeto.responsavel_email})`,
       tipo_projeto: projeto.tipo_projeto ?? null,
+      // Marcado pelo usuário como "projeto especial" (alto impacto, difícil
+      // mensuração). O analisador deve JULGAR se isso se sustenta (ver prompt).
+      marcado_como_especial: ehEspecial,
+      contexto_especial: projeto.contexto_especial ?? null,
       // Resposta explícita do usuário sobre uso de IA como funcionalidade.
       // true  → projeto tem IA como feature (mesmo secundária) — considere ao menos "inteligencia".
       // false → sem IA como funcionalidade, processo puramente determinístico.
@@ -258,6 +276,14 @@ function buildUserMessage(
       atencao: conteudo.atencao ?? '(não preenchido)',
     },
   };
+
+  // Texto extraído dos arquivos que a pessoa enviou (capado p/ não estourar o
+  // contexto). É a fonte mais rica — sobretudo p/ especial, que não passa pelo chat.
+  const docUser = (docTexto ?? '').trim();
+  if (docUser) {
+    dados.documentacao_enviada_usuario =
+      docUser.length > 40000 ? `${docUser.slice(0, 40000)}\n…[texto truncado]` : docUser;
+  }
 
   if (saving) {
     dados.memorial_saving = {
@@ -293,8 +319,16 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
 
+  // Texto extraído dos arquivos enviados (role 'doc') — alimenta a análise com o
+  // material original da pessoa (essencial p/ especial, que não passa pelo chat).
+  const docMsg = await getDocMessage(projetoId);
+
   const systemPrompt = buildSystemPrompt();
-  const userMessage = buildUserMessage(projeto as unknown as Record<string, unknown>, conteudo);
+  const userMessage = buildUserMessage(
+    projeto as unknown as Record<string, unknown>,
+    conteudo,
+    docMsg?.content ?? null,
+  );
 
   log(`Chamando LLM para análise (${userMessage.length} chars de contexto)...`);
 

@@ -24,6 +24,13 @@ describe("analyzer — classificação de complexidade", () => {
     expect(prompt).toContain("IA como funcionalidade");
   });
 
+  it("avalia criticamente se o projeto marcado como especial é realmente especial", () => {
+    expect(prompt).toContain("AVALIAÇÃO DE PROJETO ESPECIAL");
+    expect(prompt).toContain("marcado_como_especial");
+    expect(prompt).toContain("NÃO parece especial");
+    expect(prompt).toContain("documentacao_enviada_usuario");
+  });
+
   it("inclui o exemplo do painel de pedidos (orquestração sem IA) como automacao", () => {
     expect(prompt).toContain("Protheus");
     expect(prompt.toLowerCase()).toContain("nenhuma ia como funcionalidade");

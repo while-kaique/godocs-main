@@ -184,13 +184,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         else return errorJson('Rota não encontrada', 404)
 
         // Análise automática (analisador) roda no SERVIDOR, em background, logo após
-        // a submissão — projetos especiais são validados por humano e ficam de fora.
-        // Antes a tela de sucesso esperava essa análise (gerava ansiedade e travava o
-        // botão); agora a pessoa vê só "Projeto Enviado!", pode fechar a aba, e o
-        // resultado aparece depois em "Meus Projetos". O waitUntil mantém o Worker
-        // vivo até a análise concluir mesmo sem o cliente conectado.
-        if (pathname === '/api/chat/submeter-validacao' &&
-            (result as { especial?: boolean })?.especial !== true) {
+        // a submissão. Roda também para ESPECIAIS — neles o analisador NÃO decide
+        // status (validação é humana), mas agrega complexidade + parecer (incl. o
+        // veredito "é mesmo especial?"). Antes a tela de sucesso esperava a análise
+        // (gerava ansiedade); agora a pessoa vê "Projeto Enviado!" e o resultado
+        // aparece depois em "Meus Projetos". O waitUntil mantém o Worker vivo até
+        // concluir mesmo sem o cliente conectado.
+        if (pathname === '/api/chat/submeter-validacao') {
           const pid = (body.projeto_id as string) ?? null
           if (pid) {
             const p = analisarEmBackground(pid)
