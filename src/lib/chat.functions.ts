@@ -1415,7 +1415,14 @@ export async function submeterParaValidacao(rawData: unknown) {
   // edições não geram N arquivos. Não bloqueia a submissão se o Drive falhar.
   try {
     const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
-    const md = renderResumoDocumentacao(projeto, conteudo);
+    // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
+    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, 'doc');
+    const docUsuarioMsg = await getDocMessage(projeto_id);
+    const md = renderResumoDocumentacao(projeto, conteudo, {
+      resumoProjeto: extrairResumoProjeto(msgsResumo),
+      docUsuario: docUsuarioMsg?.content ?? null,
+      arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
+    });
     const sanit = (x: string) =>
       (x || '')
         .replace(/[|/\\]+/g, '-')
