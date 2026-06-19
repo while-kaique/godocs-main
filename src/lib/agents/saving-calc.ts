@@ -22,6 +22,27 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * PRESERVADO (não recalculado). Entra pelo valor cheio independente de ser pontual
  * ou mensal (pontual NÃO divide por 12).
  */
+/**
+ * Re-deriva o custo evitado mensal a partir dos ITENS persistidos no projeto
+ * (`custo_evitado_itens`, JSON). Fonte da verdade — usado no submit para NÃO
+ * depender do `custo_evitado_reais` que vive no estado volátil do chat (o LLM
+ * pode "esquecê-lo" em fluxos com muitos turnos, zerando o valor). Item pontual
+ * é mensalizado ÷12; mensal entra cheio. Mesma regra de `iniciarSaving`.
+ */
+export function custoEvitadoMensalFromItens(itensRaw: unknown): number {
+  let itens: Array<{ valor?: number; recorrencia?: string }> = [];
+  if (typeof itensRaw === 'string') {
+    try { itens = JSON.parse(itensRaw) || []; } catch { itens = []; }
+  } else if (Array.isArray(itensRaw)) {
+    itens = itensRaw as Array<{ valor?: number; recorrencia?: string }>;
+  }
+  const total = itens.reduce((s, it) => {
+    const v = Math.max(0, Number(it?.valor) || 0);
+    return s + (it?.recorrencia === 'pontual' ? v / 12 : v);
+  }, 0);
+  return round2(total);
+}
+
 export function recomputarSavingFinanceiro(
   saving: SavingColetado,
   custoExternoMensal = 0,

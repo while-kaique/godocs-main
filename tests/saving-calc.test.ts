@@ -1,6 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { recomputarSavingFinanceiro, enriquecerMemorial } from "@/lib/agents/saving-calc";
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from "@/lib/agents/saving-calc";
 import type { SavingColetado, ReceitaColetada } from "@/lib/agents/types";
+
+describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", () => {
+  it("item mensal entra cheio", () => {
+    expect(custoEvitadoMensalFromItens([{ valor: 240, recorrencia: "mensal" }])).toBe(240);
+  });
+  it("item pontual é mensalizado ÷12", () => {
+    expect(custoEvitadoMensalFromItens([{ valor: 6000, recorrencia: "pontual" }])).toBe(500);
+  });
+  it("misto soma mensal cheio + pontual ÷12", () => {
+    expect(
+      custoEvitadoMensalFromItens([
+        { valor: 100, recorrencia: "mensal" },
+        { valor: 1200, recorrencia: "pontual" },
+      ]),
+    ).toBe(200);
+  });
+  it("aceita JSON string (formato persistido no projeto)", () => {
+    expect(custoEvitadoMensalFromItens('[{"valor":6000,"recorrencia":"pontual"}]')).toBe(500);
+  });
+  it("vazio/nulo/inválido → 0", () => {
+    expect(custoEvitadoMensalFromItens(null)).toBe(0);
+    expect(custoEvitadoMensalFromItens("[]")).toBe(0);
+    expect(custoEvitadoMensalFromItens("lixo")).toBe(0);
+  });
+});
 
 describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fonte de verdade)", () => {
   // Cenário real do bug (projeto AVD da Jessica): o agente reajustou a linha de

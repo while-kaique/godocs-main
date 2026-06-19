@@ -51,7 +51,7 @@ import type {
   SavingLinha,
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
-import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { upsertResumoDoc } from '@/lib/google/drive';
 import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
@@ -841,6 +841,10 @@ export async function iniciarSaving(rawData: unknown) {
     custo_evitado: data.tem_custo_evitado ?? null,
     custo_evitado_justificativa: custoEvitadoDescricao || null,
     custo_evitado_itens: JSON.stringify(itensEvitado),
+    // Persiste o custo externo (custo INCORRIDO pela automação) no projeto. Sem
+    // isto o valor só vivia em memória e se perdia: o submit relê
+    // projeto.custo_externo_mensal (null → 0) e não abatia do Saving Reais.
+    custo_externo_mensal: data.custo_externo_mensal ?? 0,
   });
 
   const ctx = await getProjetoContexto(data.projeto_id);
@@ -1264,6 +1268,11 @@ export async function submeterParaValidacao(rawData: unknown) {
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
   // por uma versão anterior ou por um turno que não passou pelo recálculo.
   if (conteudo.saving && typeof conteudo.saving === 'object') {
+    // Re-deriva o custo evitado dos ITENS persistidos (fonte da verdade), em vez
+    // de confiar no custo_evitado_reais que vinha do estado volátil do chat (o LLM
+    // podia zerá-lo em fluxos longos — sumia o custo evitado pontual da planilha).
+    const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
+    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
@@ -1537,8 +1546,11 @@ export async function resyncGoogle(rawData: unknown) {
   const projeto = await getProjetoById(projeto_id);
   if (!projeto) throw new Error('Projeto não encontrado.');
 
-  // Re-deriva R$ das horas (mesma rede de segurança do submit).
+  // Re-deriva R$ das horas (mesma rede de segurança do submit), incluindo o custo
+  // evitado a partir dos itens persistidos.
   if (conteudo.saving && typeof conteudo.saving === 'object') {
+    const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
+    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
