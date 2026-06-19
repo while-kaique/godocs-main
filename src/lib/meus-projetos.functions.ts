@@ -6,9 +6,11 @@ import {
   getProjetoWithRelations,
   getLatestVersionByProjeto,
   getAdminByEmail,
+  getChatMessages,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
+import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 
 export type MeuProjetoItem = {
   id: string;
@@ -70,9 +72,10 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
 };
 
 function ehDono(projeto: ProjetoRow, email: string): boolean {
-  if (projeto.responsavel_email === email) return true;
+  const alvo = email.trim().toLowerCase();
+  if ((projeto.responsavel_email ?? '').trim().toLowerCase() === alvo) return true;
   const membros = parseJson<string[]>(projeto.membros) ?? [];
-  return membros.includes(email);
+  return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
 
 function mapItem(p: ProjetoRow & { area_nome: string | null }): MeuProjetoItem {
@@ -92,6 +95,14 @@ function mapItem(p: ProjetoRow & { area_nome: string | null }): MeuProjetoItem {
 }
 
 export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[]> {
+  // Sheets é a fonte da verdade: antes de listar, espelha do Sheets os projetos
+  // deste usuário (legados que só existem na planilha, edições manuais). Falha de
+  // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
+  try {
+    await syncOwnerRowsFromSheet(email);
+  } catch (e) {
+    console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
+  }
   const rows = await getProjetosByOwnerEmail(email);
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro
   return rows
@@ -150,4 +161,26 @@ export async function getMeuProjeto(
     documentacao: docConteudo,
     ultima_versao,
   };
+}
+
+// Histórico de chat de um projeto do usuário — usado na RETOMADA de um rascunho
+// quando não há snapshot local (ex.: outro navegador). Ownership idêntico ao
+// getMeuProjeto: dono (responsável/membro) ou admin.
+export async function getHistoricoMeuProjeto(
+  id: string,
+  email: string,
+): Promise<Array<{ role: string; content: string; options: string[] | null }>> {
+  const data = await getProjetoWithRelations(id);
+  if (!data) {
+    throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  }
+  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
+    throw Object.assign(new Error('Acesso negado.'), { status: 403 });
+  }
+  const msgs = await getChatMessages(id);
+  return msgs.map((m) => ({
+    role: m.role,
+    content: m.content,
+    options: parseJson<string[]>(m.options),
+  }));
 }

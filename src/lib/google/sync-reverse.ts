@@ -247,3 +247,70 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
   );
   return result;
 }
+
+// ─── Sync sob demanda dos projetos de UM dono ────────────────────────────────
+//
+// Usado ao abrir "Meus Projetos": espelha do Sheets (fonte de verdade) só as
+// linhas onde o usuário é responsável (col "Email") ou participante (col
+// "Participantes"), para o legado aparecer imediatamente sem esperar o cron
+// horário. Reusa criarLegado/atualizarExistente; nunca propaga erro (o caller
+// deve cair de volta no SQLite se a planilha falhar).
+export async function syncOwnerRowsFromSheet(email: string): Promise<ReverseSyncResult> {
+  const result: ReverseSyncResult = {
+    total: 0,
+    criados: 0,
+    atualizados: 0,
+    ignorados: 0,
+    erros: 0,
+    detalhes: [],
+  };
+
+  const alvo = email.trim().toLowerCase();
+  if (!alvo) return result;
+
+  let rows: SheetRow[];
+  try {
+    rows = await readAllRows();
+  } catch (e) {
+    console.error('[sync-reverse:owner] Falha ao ler a planilha:', e);
+    result.erros = 1;
+    result.detalhes.push(`Falha ao ler a planilha: ${(e as Error).message}`);
+    return result;
+  }
+
+  const doDono = rows.filter((row) => {
+    const responsavel = (row['Email'] ?? '').trim().toLowerCase();
+    if (responsavel === alvo) return true;
+    return parseMembros(row['Participantes']).some((m) => m.toLowerCase() === alvo);
+  });
+
+  const existingIds = new Set((await getAllProjetoIds()).map((x) => x.toLowerCase()));
+
+  for (const row of doDono) {
+    const rawId = row['ID Projeto'];
+    if (!rawId || !rawId.trim()) continue;
+    const id = rawId.trim().toLowerCase();
+    result.total++;
+    try {
+      if (existingIds.has(id)) {
+        const changed = await atualizarExistente(id, row);
+        if (changed) result.atualizados++;
+        else result.ignorados++;
+      } else {
+        await criarLegado(id, row);
+        existingIds.add(id);
+        result.criados++;
+      }
+    } catch (e) {
+      result.erros++;
+      result.detalhes.push(`${id}: ${(e as Error).message}`);
+      console.error(`[sync-reverse:owner] Erro no projeto ${id}:`, e);
+    }
+  }
+
+  console.log(
+    `[sync-reverse:owner] email=${alvo} total=${result.total} criados=${result.criados} ` +
+      `atualizados=${result.atualizados} ignorados=${result.ignorados} erros=${result.erros}`,
+  );
+  return result;
+}
