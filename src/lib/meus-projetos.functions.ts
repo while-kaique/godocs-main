@@ -4,9 +4,11 @@
 import {
   getProjetosByOwnerEmail,
   getProjetoWithRelations,
+  getProjetoById,
   getLatestVersionByProjeto,
   getAdminByEmail,
   getChatMessages,
+  excluirProjetoCascade,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
@@ -24,7 +26,16 @@ export type MeuProjetoItem = {
   updated_at: string | null;
   submitted_at: string | null;
   arquivos_nomes: string[];
+  // "Atualizado Em" do Sheets (carimbo da última escrita do sistema). Vazio = o app
+  // nunca escreveu na planilha p/ este projeto = legado pendente de edição.
+  atualizado_em: string | null;
+  // Legado pendente: submetido (não-rascunho) mas sem "Atualizado Em" no Sheets →
+  // precisa ser editado/reenviado até o prazo para regularizar.
+  pendente: boolean;
 };
+
+// Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
+export const PRAZO_LEGADO = '30/06/2026';
 
 export type VersaoSnapshot = {
   versao_num: number;
@@ -78,7 +89,8 @@ function ehDono(projeto: ProjetoRow, email: string): boolean {
   return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
 
-function mapItem(p: ProjetoRow & { area_nome: string | null }): MeuProjetoItem {
+function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: string | null): MeuProjetoItem {
+  const at = atualizadoEm && atualizadoEm !== '—' && atualizadoEm !== '-' ? atualizadoEm : null;
   return {
     id: p.id,
     nome: p.nome,
@@ -91,6 +103,10 @@ function mapItem(p: ProjetoRow & { area_nome: string | null }): MeuProjetoItem {
     updated_at: p.updated_at,
     submitted_at: p.submitted_at,
     arquivos_nomes: parseJson<string[]>(p.arquivos_nomes) ?? [],
+    atualizado_em: at,
+    // Pendente = submetido (não-rascunho) e sem "Atualizado Em" no Sheets (o app
+    // nunca escreveu lá → legado por regularizar).
+    pendente: p.status !== 'rascunho' && !at,
   };
 }
 
@@ -98,8 +114,14 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // Sheets é a fonte da verdade: antes de listar, espelha do Sheets os projetos
   // deste usuário (legados que só existem na planilha, edições manuais). Falha de
   // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
+  // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
+  const atualizadoMap = new Map<string, string>();
   try {
-    await syncOwnerRowsFromSheet(email);
+    const { rows } = await syncOwnerRowsFromSheet(email);
+    for (const r of rows) {
+      const id = (r['ID Projeto'] ?? '').trim().toLowerCase();
+      if (id) atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+    }
   } catch (e) {
     console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
   }
@@ -107,7 +129,28 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro
   return rows
     .filter((p) => ehDono(p, email))
-    .map(mapItem);
+    .map((p) => mapItem(p, atualizadoMap.get(p.id.toLowerCase()) ?? null));
+}
+
+/** Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o selo da home. */
+export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
+  const itens = await listarMeusProjetos(email);
+  return { count: itens.filter((i) => i.pendente).length, prazo: PRAZO_LEGADO };
+}
+
+/**
+ * Exclui um RASCUNHO do usuário. Gate de ownership (email do header) + só permite
+ * apagar projeto com status 'rascunho' (nunca submetido). Apaga em cascata.
+ */
+export async function excluirRascunho(email: string, projetoId: string): Promise<{ ok: true }> {
+  const p = await getProjetoById(projetoId);
+  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  if (!ehDono(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
+  if (p.status !== 'rascunho') {
+    throw Object.assign(new Error('Apenas rascunhos podem ser excluídos.'), { status: 400 });
+  }
+  await excluirProjetoCascade(projetoId);
+  return { ok: true };
 }
 
 export async function getMeuProjeto(
@@ -139,7 +182,8 @@ export async function getMeuProjeto(
     };
   }
 
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null });
+  // Detalhe não consulta o Sheets; "Atualizado Em"/pendente não são exibidos aqui.
+  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, null);
   return {
     ...base,
     responsavel_nome: data.responsavel_nome,

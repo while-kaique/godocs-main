@@ -442,6 +442,18 @@ export function deleteChatMessagesByProjeto(projetoId: string) {
 }
 
 /**
+ * Apaga um projeto e TUDO que depende dele. Deleta explicitamente as tabelas
+ * relacionadas (não dependemos do ON DELETE CASCADE estar ativo no runtime) e
+ * por último o próprio projeto. Usado para excluir rascunhos.
+ */
+export async function excluirProjetoCascade(projetoId: string) {
+  for (const tabela of ['chat_messages', 'documentacao', 'projeto_versions', 'analises', 'validacoes']) {
+    await exec(`DELETE FROM ${tabela} WHERE projeto_id = ?`, [projetoId]);
+  }
+  await exec('DELETE FROM projetos WHERE id = ?', [projetoId]);
+}
+
+/**
  * Remove projetos de TESTE E2E (nome com prefixo "[E2E-") e tudo que depende deles.
  * O schema tem ON DELETE CASCADE (chat_messages, documentacao, projeto_versions,
  * validacoes, analises, api_logs, form_events), então deletar de `projetos` limpa

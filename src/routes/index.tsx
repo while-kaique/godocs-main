@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
 import {
   FilePlus2,
   LayoutList,
@@ -9,6 +10,7 @@ import {
   CheckCircle2,
   RotateCcw,
   ArrowRight,
+  AlertTriangle,
   Zap,
 } from "lucide-react";
 
@@ -37,6 +39,15 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { acesso_negado } = useSearch({ from: "/" });
+  // Projetos legados pendentes de regularização (sem "Atualizado Em" no Sheets).
+  // Busca silenciosa: se falhar, o selo simplesmente não aparece.
+  const [pendentes, setPendentes] = useState<{ count: number; prazo: string } | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ count: number; prazo: string }>("/api/meus-projetos/pendentes")
+      .then(setPendentes)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (acesso_negado) {
@@ -250,8 +261,13 @@ function Home() {
               to="/meus-projetos"
               icon={<LayoutList className="h-6 w-6" />}
               title="Meus Projetos"
-              description="Visualize, edite ou reenvie seus projetos submetidos."
+              description={
+                pendentes && pendentes.count > 0
+                  ? `Você tem ${pendentes.count} projeto${pendentes.count > 1 ? "s" : ""} pendente${pendentes.count > 1 ? "s" : ""} — edite e reenvie até ${pendentes.prazo} para regularizar.`
+                  : "Visualize, edite ou reenvie seus projetos submetidos."
+              }
               badge="Editar e reenviar"
+              pendingCount={pendentes?.count ?? 0}
             />
           </section>
 
@@ -368,6 +384,7 @@ function ActionCard({
   badge,
   accent,
   disabled,
+  pendingCount = 0,
 }: {
   href?: string;
   to?: string;
@@ -377,6 +394,7 @@ function ActionCard({
   badge: string;
   accent?: boolean;
   disabled?: boolean;
+  pendingCount?: number;
 }) {
   const inner = (
     <div
@@ -404,6 +422,17 @@ function ActionCard({
         e.currentTarget.style.boxShadow = "var(--go-shadow-sm)";
       }}
     >
+      {/* Selo de pendentes — só aparece quando há legados por regularizar */}
+      {pendingCount > 0 && (
+        <span
+          className="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[11px] font-bold shadow-sm"
+          style={{ background: "#dc2626", color: "#fff" }}
+        >
+          <AlertTriangle className="h-3 w-3" />
+          {pendingCount} pendente{pendingCount > 1 ? "s" : ""}
+        </span>
+      )}
+
       {/* Browser dots */}
       <div className="mb-5 flex gap-[6px]">
         <span
