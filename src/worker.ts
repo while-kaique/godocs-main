@@ -40,6 +40,7 @@ import {
   getProjetosInvestigador,
   getProjetoInvestigadorDetalhes,
   getInvestigadorStats,
+  getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto } from '@/lib/meus-projetos.functions'
@@ -329,6 +330,10 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/investigador/stats' && method === 'GET') {
       await requireAdmin(request)
       return json(await getInvestigadorStats())
+    }
+    if (pathname === '/api/admin/investigador/edicoes' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await getEdicoesInvestigador())
     }
 
     // ── Backfill de docs ao Drive: AVALIAÇÃO (read-only) ──

@@ -9,7 +9,10 @@ import { z } from 'zod';
 import {
   insertProjeto,
   insertChatMessage,
+  getChatMessages,
   getChatMessagesExcludeRole,
+  recordFormEvent,
+  hasFormEventTipo,
   getProjetoContextoData,
   getDocumentacaoConteudo,
   getDocMessage,
@@ -53,6 +56,22 @@ import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { uploadDocsToDrive } from '@/lib/google/drive';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+// Registra um evento determinístico do formulário (valores marcados, "voltar
+// etapa") para o timeline do Investigador. NÃO-bloqueante: é observabilidade e
+// nunca deve quebrar a submissão — erros são apenas logados.
+async function gravarEvento(
+  projetoId: string,
+  tipo: string,
+  fase: string | null,
+  dados?: unknown,
+) {
+  try {
+    await recordFormEvent({ projeto_id: projetoId, tipo, fase, dados });
+  } catch (e) {
+    err('gravarEvento', `Falha ao gravar evento '${tipo}' (não bloqueante):`, e);
+  }
+}
 
 // Nomes amigáveis dos campos de documentação (7 campos)
 const DOC_FIELD_LABELS: Record<string, string> = {
@@ -499,6 +518,21 @@ export async function iniciarSubmissao(rawData: unknown) {
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
+  // Evento de timeline: valores determinísticos das etapas 1 e 2 (não viram chat).
+  await gravarEvento(projeto.id, 'submissao', 'doc', {
+    nome_projeto: data.nome_projeto,
+    escopo: data.escopo ?? null,
+    ferramenta: data.ferramenta,
+    servico_externo: data.servico_externo ?? null,
+    membros: data.membros,
+    data_criacao: data.data_criacao,
+    tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
+    descricao_breve: data.descricao_breve ?? null,
+    especial: data.especial ?? false,
+    contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
+    arquivos: data.docs.map((d) => d.filename),
+  });
+
   // Persiste os nomes dos arquivos e faz upload ao Google Drive. O link de cada
   // arquivo (webViewLink) vai para projetos.arquivos_links e, na submissão, para
   // a coluna "URL" da planilha. Roda para AMBOS os fluxos (normal e especial —
@@ -861,6 +895,26 @@ export async function iniciarSaving(rawData: unknown) {
     tiposProjeto,
   );
 
+  // Evento de timeline: valores do formulário de saving. `voltou` indica reentrada
+  // (a pessoa voltou à etapa para reeditar) — já havia um evento 'saving' antes.
+  const savingVoltou = await hasFormEventTipo(data.projeto_id, 'saving');
+  await gravarEvento(data.projeto_id, 'saving', 'saving', {
+    voltou: savingVoltou,
+    tipo_saving: data.tipo_saving,
+    alguem_fazia: data.alguem_fazia ?? null,
+    linhas: (data.linhas ?? []).map((l) => ({
+      cargo: l.cargo,
+      horas_antes: l.horas_antes,
+      horas_depois: l.horas_depois,
+    })),
+    custo_externo_mensal: data.custo_externo_mensal ?? null,
+    tem_custo_evitado: data.tem_custo_evitado ?? null,
+    custo_evitado_itens: itensEvitado,
+    economia_horas_mes: saving.economia_horas_mes ?? null,
+    economia_reais_mes: saving.economia_reais_mes ?? null,
+    custo_evitado_mensal: custoEvitadoMensal > 0 ? custoEvitadoMensal : null,
+  });
+
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
@@ -917,6 +971,15 @@ export async function iniciarReceita(rawData: unknown) {
     receita,
   );
 
+  // Evento de timeline: valores do formulário de receita. `voltou` = reentrada.
+  const receitaVoltou = await hasFormEventTipo(data.projeto_id, 'receita');
+  await gravarEvento(data.projeto_id, 'receita', 'receita', {
+    voltou: receitaVoltou,
+    tipo_saving: data.tipo_saving,
+    valor_ganho_mensal: data.valor_ganho_mensal ?? null,
+    racional: data.racional?.trim() || null,
+  });
+
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
@@ -954,6 +1017,9 @@ export async function atualizarTipos(rawData: unknown) {
   await updateProjeto(data.projeto_id, {
     tipos_projeto: data.tipos_projeto,
     tipo_projeto: data.tipos_projeto[0],
+  });
+  await gravarEvento(data.projeto_id, 'tipos', 'doc', {
+    tipos_projeto: data.tipos_projeto,
   });
   return { ok: true };
 }
@@ -1001,6 +1067,27 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
+  }
+
+  // Evento de timeline: edição de metadados das etapas anteriores. `voltou` quando
+  // a mudança reinicia a documentação (arquivos novos ou reset_doc). Só registra se
+  // houve algo relevante (campos alterados, arquivos novos ou pedido de reset).
+  const metadadosReset = temDocs || !!data.reset_doc;
+  if (Object.keys(campos).length > 0 || metadadosReset) {
+    await gravarEvento(data.projeto_id, 'metadados', 'doc', {
+      voltou: metadadosReset,
+      reset_doc: metadadosReset,
+      campos: {
+        nome: data.nome_projeto ?? null,
+        area: data.area ?? null,
+        ferramenta: data.ferramenta ?? null,
+        membros: data.membros ?? null,
+        data_criacao: data.data_criacao ?? null,
+        descricao_breve: data.descricao_breve ?? null,
+        contexto_especial: data.contexto_especial ?? null,
+      },
+      arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
+    });
   }
 
   // 2. Sem arquivos novos e sem pedido de reset → nada a reiniciar; o agente já vê
@@ -1314,17 +1401,28 @@ export async function submeterParaValidacao(rawData: unknown) {
         custo_evitado_itens: projetoAtualizado.custo_evitado_itens,
         status: projetoAtualizado.status,
       };
+      // Snapshot da conversa ATUAL — congela os agentes originais desta versão para
+      // o Investigador (os chat_messages são apagados ao voltar etapas/reeditar).
+      const chatSnapshot = await getChatMessages(projeto_id);
       await gravarVersaoProjeto(
         projeto_id,
         ehReenvio ? 'reenvio' : 'submit_inicial',
         snapshotProjeto,
         conteudo,
         projetoAtualizado.responsavel_email,
+        chatSnapshot,
       );
     }
   } catch (versionErr) {
     err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
   }
+
+  // Evento de timeline: submissão/reenvio finalizado (fecha o histórico).
+  await gravarEvento(projeto_id, 'submit', 'completo', {
+    reenvio: ehReenvio,
+    status,
+    ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
+  });
 
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {

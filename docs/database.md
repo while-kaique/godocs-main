@@ -169,7 +169,9 @@ Config dinâmica (chave-valor).
 - **`profiles`**: id, nome, email (UNIQUE) — usuários cadastrados
 - **`user_roles`**: user_id FK CASCADE, role (`admin_master` | `leader`) — PK composto
 - **`leader_areas`**: user_id FK CASCADE, area_id FK CASCADE — N:N líder↔área
-- **`api_logs`**: id, projeto_id FK CASCADE, endpoint, method, duration_ms, status_code, error, request_size, response_size, created_at — métricas para o Investigador; limpeza >30 dias no cron
+- **`api_logs`**: id, projeto_id FK CASCADE, endpoint, method, duration_ms, status_code, error, request_size, response_size, request_body, response_body, created_at — métricas para o Investigador; limpeza >30 dias no cron
+- **`projeto_versions`**: id, projeto_id FK CASCADE, versao_num, acao (`submit_inicial` | `reenvio`), snapshot_projeto (JSON), snapshot_doc (JSON), **snapshot_chat** (JSON — conversa congelada da versão; NULL em versões antigas), submetido_por, created_at — UNIQUE(projeto_id, versao_num). Snapshot imutável a cada submissão/reenvio (sistema de versionamento). Alimenta a aba "Edições" e a visão da submissão original no Investigador (os `chat_messages` são apagados ao voltar etapas; o snapshot preserva o original).
+- **`form_events`**: id, projeto_id FK CASCADE, tipo (`submissao`|`saving`|`receita`|`tipos`|`metadados`|`back`|`submit`), fase (`doc`|`saving`|`receita`|`completo`), dados (JSON — pares label→valor), created_at — **APPEND-ONLY**: ao contrário de `chat_messages`, NUNCA é apagado pelas limpezas de chat. É a fonte do timeline determinístico do Investigador (os valores marcados no formulário — saving mensal, horas, receita… — chegam por payloads e não viram `chat_messages`, então sem isto não apareceriam). O flag `voltou` em `dados` marca reentradas (a pessoa voltou e reeditou a etapa).
 
 ## Status do projeto
 
@@ -193,6 +195,10 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `contexto_especial` TEXT em `projetos`
 - ADD `arquivos_nomes` TEXT em `projetos` (JSON — nomes dos arquivos)
 - ADD `arquivos_links` TEXT em `projetos` (JSON — links dos arquivos no Drive; vão p/ coluna "URL" da planilha)
+- ADD `request_body`/`response_body` TEXT em `api_logs` (corpos p/ debug no Investigador)
+- ADD `custo_evitado`/`custo_evitado_justificativa`/`custo_evitado_itens` TEXT em `projetos`
+- ADD `snapshot_chat` TEXT em `projeto_versions` (conversa congelada por versão — forward-only)
+- Tabela nova `form_events` (criada no schema base, não migração) — timeline determinístico do Investigador
 
 ## Sync reverso (Sheets → SQLite)
 

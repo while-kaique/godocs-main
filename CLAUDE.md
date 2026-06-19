@@ -110,6 +110,12 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 - **Drive (documentos)** — os arquivos enviados no upload são salvos no Google Drive via `uploadDocsToDrive` (`src/lib/google/drive.ts`), chamado em `iniciarSubmissao` e `atualizarMetadados` (cobre fluxo normal E especial). Os links (webViewLink) ficam em `projetos.arquivos_links` (JSON) e vão para a coluna **J "URL"** da planilha. Pasta: env `GOOGLE_DRIVE_FOLDER_ID` (default `1e_Fk8...`, dona `rpa_ia@gocase.com`). ⚠️ **O upload usa OAuth de USUÁRIO** (`getDriveAccessToken` em `auth.ts`, envs `GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN`), NÃO a Service Account — Service Accounts não têm cota de storage e recebem 403 ao criar arquivos no Meu Drive. `uploadDocsToDrive` NÃO propaga erro (loga e segue sem link), para nunca quebrar a submissão.
 - **`waitUntil` obrigatório p/ fire-and-forget** — o sync de IDA para Sheets/Chat roda via `runBackground()` (`src/lib/background.ts`), que registra a promise no `ctx.waitUntil` exposto pelo worker em `globalThis.__waitUntil`. Sem isso, no runtime do Godeploy a promise não-aguardada é cancelada quando a Response retorna e o sync morre no meio.
 
+## Investigador (painel admin)
+
+- **3 abas**: **Submetidos** (`submitted_at != null`, abre a submissão original) · **Edições** (1 linha por reenvio, com chat/API/métricas da edição) · **Abandonados** (rascunho nunca submetido e inativo há **> 1h** — diagnóstico de travamentos). Sem "tempo de submissão"/"tempo médio" (inflavam com o form aberto).
+- **`form_events` é APPEND-ONLY** ⚠️ — os valores marcados no formulário (saving mensal, horas, custo evitado, receita, metadados) chegam por payloads e **não viram `chat_messages`**; são gravados em `form_events` por `chat.functions.ts` (helper `gravarEvento`, não-bloqueante) para aparecerem no timeline do Investigador. **Ao mexer nas limpezas de chat (`deleteChatMessages*`), NUNCA apague `form_events`** — é uma tabela separada justamente para sobreviver às limpezas e preservar o histórico de "voltar etapa" (`voltou: true`).
+- **`snapshot_chat`** em `projeto_versions` — `submeterParaValidacao` congela a conversa de cada versão (via `gravarVersaoProjeto`). Forward-only: versões antigas (NULL) caem no chat atual. As abas usam o snapshot da versão; métricas/eventos por versão são fatiados pela janela `[versão anterior, versão]`.
+
 ## Convenções rápidas
 
 - Path alias: `@/*` → `./src/*`

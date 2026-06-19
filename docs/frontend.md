@@ -12,7 +12,7 @@ SPA React com TanStack Router (file-based routing). Entry point: `src/main.tsx` 
 | `/dashboard` | `_authenticated/dashboard.tsx` | Admin/Leader | Projetos submetidos |
 | `/usuarios` | `_authenticated/usuarios.tsx` | Admin Master | CRUD de usuários com roles e áreas |
 | `/areas` | `_authenticated/areas.tsx` | Admin Master | CRUD áreas + botão sync TeamGuide |
-| `/investigador` | `_authenticated/investigador.tsx` | Admin Master | Monitoramento real-time: projetos ativos, chat, logs de API, métricas. Polling 8s |
+| `/investigador` | `_authenticated/investigador.tsx` | Admin Master | 3 abas — **Submetidos** (submissão original), **Edições** (1 linha por reenvio, com chat/API/métricas da edição), **Abandonados** (rascunho parado > 1h). Detalhe tem seletor de versão (Original/Edição/Atual); o histórico do chat intercala os valores marcados no formulário (`form_events`) e o marcador "Voltou e editou". Polling 8s |
 | `/testes/prompts` | `_authenticated/testes/prompts.tsx` | Admin Master | Inspetor de prompts IA com syntax highlight e contagem de tokens |
 | `/testes/cenarios` | `_authenticated/testes/cenarios.tsx` | Admin Master | Simulador de cenários com inspetor de estado |
 
