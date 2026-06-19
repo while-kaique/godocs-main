@@ -5,7 +5,6 @@ import {
   Search,
   AlertTriangle,
   MessageSquare,
-  Activity,
   ChevronRight,
   ChevronDown,
   ArrowLeft,
@@ -56,7 +55,6 @@ type ProjetoInvestigador = {
   total_mensagens: number
   total_mensagens_usuario: number
   total_mensagens_ia: number
-  tempo_desde_inicio_min: number | null
   ultima_atividade: string | null
   tem_erro: boolean
   total_erros_api: number
@@ -64,9 +62,47 @@ type ProjetoInvestigador = {
   max_duracao_api_ms: number | null
   ultimo_log_api: string | null
   chat_completo: boolean
+  total_edicoes: number
   created_at: string | null
   updated_at: string | null
   submitted_at: string | null
+}
+
+type FormEvent = {
+  id: string
+  tipo: string
+  fase: string | null
+  dados: Record<string, unknown> | null
+  created_at: string | null
+}
+
+type Versao = {
+  versao_num: number
+  acao: string
+  created_at: string | null
+  snapshot_projeto: unknown
+  snapshot_doc: unknown | null
+  snapshot_chat: ChatMsg[] | null
+}
+
+type EdicaoInvestigador = {
+  projeto_id: string
+  versao_num: number
+  nome: string | null
+  responsavel_nome: string
+  responsavel_email: string
+  area_nome: string | null
+  ferramenta: string
+  created_at: string | null
+  janela_inicio: string | null
+  total_mensagens: number
+  total_mensagens_usuario: number
+  total_mensagens_ia: number
+  total_erros_api: number
+  media_duracao_api_ms: number | null
+  tem_erro: boolean
+  status: string | null
+  ganho_total_mensal: number | null
 }
 
 type ChatMsg = {
@@ -108,6 +144,8 @@ type ProjetoDetalhes = ProjetoInvestigador & {
     descricao_breve: string | null
   }
   chat_messages: ChatMsg[]
+  versions: Versao[]
+  form_events: FormEvent[]
   documentacao: unknown | null
   analise: {
     resultado: string
@@ -319,13 +357,49 @@ function formatTime(iso: string | null): string {
   }
 }
 
-function isActiveNow(p: ProjetoInvestigador): boolean {
-  if (p.status !== 'rascunho') return false
-  const ref = p.ultimo_log_api
-  if (!ref) return false
-  const lastApiCall = new Date(ref + (ref.endsWith('Z') ? '' : 'Z')).getTime()
-  const fiveMinAgo = Date.now() - 5 * 60 * 1000
-  return lastApiCall > fiveMinAgo
+// Rascunho nunca submetido e inativo há mais de 1h = abandonado (travou/desistiu).
+const ABANDONO_MIN = 60
+
+/** Minutos desde um carimbo (ISO com Z/offset ou datetime SQLite). null se inválido. */
+function minutesSince(iso: string | null): number | null {
+  if (!iso) return null
+  const norm = iso.endsWith('Z') || iso.includes('+') ? iso : iso.replace(' ', 'T') + 'Z'
+  const t = new Date(norm).getTime()
+  if (isNaN(t)) return null
+  return Math.round((Date.now() - t) / 60_000)
+}
+
+/** Projeto submetido (passou por submeter-validacao). */
+function isSubmetido(p: ProjetoInvestigador): boolean {
+  return !!p.submitted_at
+}
+
+/** Rascunho nunca submetido e parado há > ABANDONO_MIN — caso de diagnóstico. */
+function isAbandonado(p: ProjetoInvestigador): boolean {
+  if (p.submitted_at) return false
+  const ref = p.ultima_atividade ?? p.ultimo_log_api ?? p.created_at
+  const min = minutesSince(ref)
+  return min != null && min > ABANDONO_MIN
+}
+
+type AbaInvestigador = 'submetidos' | 'edicoes' | 'abandonados'
+
+/** Carimbo → epoch ms (aceita ISO com Z/offset ou datetime SQLite). NaN se inválido. */
+function tsToEpoch(iso: string | null | undefined): number {
+  if (!iso) return NaN
+  const norm = iso.endsWith('Z') || iso.includes('+') ? iso : iso.replace(' ', 'T') + 'Z'
+  return new Date(norm).getTime()
+}
+
+/** ts dentro da janela (lower, upper]? lower exclusivo, upper inclusivo; nulls = sem limite. */
+function inWindow(ts: string | null, lower: string | null, upper: string | null): boolean {
+  const t = tsToEpoch(ts)
+  if (isNaN(t)) return false
+  const lo = tsToEpoch(lower)
+  const hi = tsToEpoch(upper)
+  if (!isNaN(lo) && t <= lo) return false
+  if (!isNaN(hi) && t > hi) return false
+  return true
 }
 
 /** Detect the phase of an assistant message by parsing its JSON content */
@@ -356,12 +430,15 @@ function detectMsgPhase(msg: ChatMsg): PhaseGroup {
 
 function Investigador() {
   const [projetos, setProjetos] = useState<ProjetoInvestigador[]>([])
+  const [edicoes, setEdicoes] = useState<EdicaoInvestigador[]>([])
   const [stats, setStats] = useState<InvestigadorStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [aba, setAba] = useState<AbaInvestigador>('submetidos')
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [busca, setBusca] = useState('')
   const [filtrosAv, setFiltrosAv] = useState<FiltrosAvancados>(FILTROS_AVANCADOS_DEFAULT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [focusVersao, setFocusVersao] = useState<number | null>(null)
   const [detalhes, setDetalhes] = useState<ProjetoDetalhes | null>(null)
   const [detalhesLoading, setDetalhesLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -369,12 +446,14 @@ function Investigador() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [p, s] = await Promise.all([
+      const [p, s, e] = await Promise.all([
         apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
         apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
+        apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
       ])
       setProjetos(p ?? [])
       setStats(s ?? null)
+      setEdicoes(e ?? [])
       setLastRefresh(new Date())
     } catch {
       // silencioso — mantém dados anteriores
@@ -391,8 +470,10 @@ function Investigador() {
     }
   }, [fetchData])
 
-  const loadDetalhes = useCallback(async (id: string) => {
+  // versao = reenvio específico (aba Edições) ou null (submissão original / abandonado)
+  const loadDetalhes = useCallback(async (id: string, versao: number | null = null) => {
     setSelectedId(id)
+    setFocusVersao(versao)
     setDetalhesLoading(true)
     try {
       const d = await apiFetch<ProjetoDetalhes>(`/api/admin/investigador/projetos/${id}`)
@@ -404,10 +485,16 @@ function Investigador() {
     }
   }, [])
 
-  // Filtragem
-  const filtered = projetos.filter((p) => {
+  const ehEdicoes = aba === 'edicoes'
+
+  // Projetos da aba atual (Submetidos × Abandonados). Edições têm lista própria.
+  const projetosDaAba = projetos.filter((p) =>
+    aba === 'submetidos' ? isSubmetido(p) : aba === 'abandonados' ? isAbandonado(p) : false,
+  )
+
+  // Filtragem (Submetidos/Abandonados)
+  const filtered = projetosDaAba.filter((p) => {
     // Filtros rápidos
-    if (filtro === 'ativos' && !isActiveNow(p)) return false
     if (filtro === 'com_erros' && !p.tem_erro) return false
     if (filtro === 'lentos' && (p.max_duracao_api_ms == null || p.max_duracao_api_ms <= 5000)) return false
     // Busca textual
@@ -433,39 +520,50 @@ function Investigador() {
     return true
   })
 
-  const ativos = projetos.filter(isActiveNow).length
+  // Edições filtradas por busca textual (aba Edições)
+  const edicoesFiltradas = edicoes.filter((e) => {
+    if (filtro === 'com_erros' && !e.tem_erro) return false
+    if (filtro === 'lentos' && (e.media_duracao_api_ms == null || e.media_duracao_api_ms <= 5000)) return false
+    if (!busca) return true
+    const q = busca.toLowerCase()
+    return (
+      (e.nome ?? '').toLowerCase().includes(q) ||
+      e.responsavel_nome.toLowerCase().includes(q) ||
+      e.responsavel_email.toLowerCase().includes(q) ||
+      (e.area_nome ?? '').toLowerCase().includes(q)
+    )
+  })
+
+  // Contagens por aba
+  const countSubmetidos = projetos.filter(isSubmetido).length
+  const countAbandonados = projetos.filter(isAbandonado).length
+  const countEdicoes = edicoes.length
 
   // Valores dinâmicos para filtros (extraídos dos projetos carregados)
   const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
   const ferramentasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.ferramenta).filter(Boolean))].sort() as string[], [projetos])
-
-  // Contagem de filtros avançados ativos
-  const filtrosAvAtivos = filtrosAv.status.length + filtrosAv.fase.length + filtrosAv.area.length +
-    filtrosAv.ferramenta.length + filtrosAv.complexidade.length +
-    (filtrosAv.dataInicio ? 1 : 0) + (filtrosAv.dataFim ? 1 : 0) +
-    (filtrosAv.chatCompleto !== 'todos' ? 1 : 0)
-
-  // Tempo médio de conclusão (apenas projetos completos)
-  const completedDurations = projetos
-    .filter((p) => p.chat_completo && p.tempo_desde_inicio_min != null)
-    .map((p) => p.tempo_desde_inicio_min!)
-  const avgCompletionMin = completedDurations.length > 0
-    ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length)
-    : null
 
   if (selectedId) {
     return (
       <DetalheView
         detalhes={detalhes}
         loading={detalhesLoading}
+        focusVersao={focusVersao}
         onBack={() => {
           setSelectedId(null)
           setDetalhes(null)
+          setFocusVersao(null)
         }}
-        onRefresh={() => loadDetalhes(selectedId)}
+        onRefresh={() => loadDetalhes(selectedId, focusVersao)}
       />
     )
   }
+
+  const ABAS: [AbaInvestigador, string, number][] = [
+    ['submetidos', 'Submetidos', countSubmetidos],
+    ['edicoes', 'Edições', countEdicoes],
+    ['abandonados', 'Abandonados', countAbandonados],
+  ]
 
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
@@ -481,7 +579,7 @@ function Investigador() {
                 Investigador
               </h1>
               <p className="text-[13px] text-[var(--go-text-primary)]/45">
-                Monitore projetos em tempo real
+                Submissões, edições e abandonos
               </p>
             </div>
           </div>
@@ -497,22 +595,41 @@ function Investigador() {
       {/* Stats globais */}
       {stats && (
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-          <StatCard label="Preenchendo agora" value={ativos} icon={<Activity className="h-4 w-4" />} color="#16a34a" highlight={ativos > 0} />
-          <StatCard label="Total projetos" value={projetos.length} icon={<MessageSquare className="h-4 w-4" />} color="var(--go-blue)" />
-          <StatCard label="Chamadas API" value={stats.total_chamadas} icon={<Zap className="h-4 w-4" />} color="#ca8a04" />
+          <StatCard label="Submetidos" value={countSubmetidos} icon={<CheckCircle2 className="h-4 w-4" />} color="#16a34a" />
+          <StatCard label="Edições" value={countEdicoes} icon={<RefreshCw className="h-4 w-4" />} color="var(--go-blue)" />
+          <StatCard label="Abandonados" value={countAbandonados} icon={<AlertTriangle className="h-4 w-4" />} color="#ea580c" highlight={countAbandonados > 0} />
           <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
-          <StatCard label="Tempo médio" value={formatTimeSince(avgCompletionMin)} icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
+          <StatCard label="Tempo médio" value="—" icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
       )}
 
+      {/* Abas */}
+      <div className="mt-5 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
+        {ABAS.map(([key, label, count]) => (
+          <button
+            key={key}
+            onClick={() => { setAba(key); setFiltro('todos') }}
+            className={`relative flex-1 rounded-[6px] px-4 py-2 text-[13px] font-medium transition-all ${
+              aba === key
+                ? 'bg-white text-[var(--go-blue)] shadow-[var(--go-shadow-sm)]'
+                : 'text-[var(--go-text-primary)]/40 hover:text-[var(--go-text-primary)]/65'
+            }`}
+          >
+            {label}
+            <span className={`ml-1.5 text-[11px] tabular-nums ${aba === key ? 'text-[var(--go-blue)]/45' : 'text-[var(--go-text-primary)]/20'}`}>
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Filtros + busca */}
-      <div className="mt-5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-4 flex flex-wrap items-center gap-2.5">
         <div className="flex items-center gap-0.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-0.5">
           {([
             ['todos', 'Todos', null],
-            ['ativos', 'Ativos agora', ativos],
-            ['com_erros', 'Com erros', projetos.filter((p) => p.tem_erro).length],
-            ['lentos', 'Lentos (>5s)', projetos.filter((p) => (p.max_duracao_api_ms ?? 0) > 5000).length],
+            ['com_erros', 'Com erros', ehEdicoes ? edicoes.filter((e) => e.tem_erro).length : projetosDaAba.filter((p) => p.tem_erro).length],
+            ['lentos', 'Lentos (>5s)', ehEdicoes ? edicoes.filter((e) => (e.media_duracao_api_ms ?? 0) > 5000).length : projetosDaAba.filter((p) => (p.max_duracao_api_ms ?? 0) > 5000).length],
           ] as [Filtro, string, number | null][]).map(([key, label, count]) => (
             <button
               key={key}
@@ -548,7 +665,9 @@ function Investigador() {
           />
         </div>
 
-        <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
+        {!ehEdicoes && (
+          <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
+        )}
 
         <button
           onClick={fetchData}
@@ -559,24 +678,39 @@ function Investigador() {
         </button>
       </div>
       {/* Chips de filtros avançados ativos */}
-      <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />
+      {!ehEdicoes && <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />}
 
-      {/* Lista de projetos */}
+      {/* Lista */}
       <div className="mt-4">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-[var(--go-text-primary)]/40">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Carregando projetos...
+            Carregando…
           </div>
+        ) : ehEdicoes ? (
+          edicoesFiltradas.length === 0 ? (
+            <div className="rounded-[var(--go-radius-md)] border border-dashed border-[var(--go-blue)]/15 bg-white/50 p-8 text-center text-sm text-[var(--go-text-primary)]/40">
+              <RefreshCw className="mx-auto mb-2 h-5 w-5" />
+              Nenhuma edição registrada ainda.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {edicoesFiltradas.map((e) => (
+                <EdicaoCard key={`${e.projeto_id}-${e.versao_num}`} edicao={e} onClick={() => loadDetalhes(e.projeto_id, e.versao_num)} />
+              ))}
+            </div>
+          )
         ) : filtered.length === 0 ? (
           <div className="rounded-[var(--go-radius-md)] border border-dashed border-[var(--go-blue)]/15 bg-white/50 p-8 text-center text-sm text-[var(--go-text-primary)]/40">
             <Filter className="mx-auto mb-2 h-5 w-5" />
-            Nenhum projeto encontrado com os filtros atuais.
+            {aba === 'abandonados'
+              ? 'Nenhum projeto abandonado (rascunho parado há mais de 1h) encontrado.'
+              : 'Nenhum projeto encontrado com os filtros atuais.'}
           </div>
         ) : (
           <div className="space-y-1.5">
             {filtered.map((p) => (
-              <ProjetoCard key={p.id} projeto={p} onClick={() => loadDetalhes(p.id)} />
+              <ProjetoCard key={p.id} projeto={p} aba={aba} onClick={() => loadDetalhes(p.id)} />
             ))}
           </div>
         )}
@@ -621,10 +755,11 @@ function StatCard({
   )
 }
 
-function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; onClick: () => void }) {
-  const active = isActiveNow(p)
+function ProjetoCard({ projeto: p, aba, onClick }: { projeto: ProjetoInvestigador; aba: AbaInvestigador; onClick: () => void }) {
   const group = getPhaseGroup(p.fase_atual)
   const style = PHASE_STYLES[group]
+  const ehAbandonado = aba === 'abandonados'
+  const inativoMin = minutesSince(p.ultima_atividade ?? p.ultimo_log_api ?? p.created_at)
 
   return (
     <button
@@ -635,13 +770,9 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
       <div className={`absolute top-0 left-0 h-full w-1 ${style.border.replace('border-l-', 'bg-')}`} />
 
       <div className="flex items-center gap-3 pl-4">
-        {/* Indicador de ativo */}
+        {/* Indicador de fase */}
         <div className="flex-shrink-0">
-          {active ? (
-            <div className="h-2.5 w-2.5 rounded-full bg-[#16a34a] animate-pulse ring-4 ring-[#16a34a]/10" title="Preenchendo agora" />
-          ) : (
-            <div className={`h-2 w-2 rounded-full ${style.dot}`} style={{ opacity: 0.35 }} />
-          )}
+          <div className={`h-2 w-2 rounded-full ${style.dot}`} style={{ opacity: 0.35 }} />
         </div>
 
         {/* Info principal */}
@@ -650,14 +781,21 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
             <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
               {p.nome ?? 'Projeto sem nome'}
             </span>
-            {p.fase_atual !== 'completo' && (
+            {/* Fase: em abandonados, mostra onde parou */}
+            {(ehAbandonado || p.fase_atual !== 'completo') && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FASE_BADGE[p.fase_atual] ?? PHASE_STYLES.idle.badge}`}>
-                {FASE_LABELS[p.fase_atual] ?? p.fase_atual}
+                {ehAbandonado ? `Parou em: ${FASE_LABELS[p.fase_atual] ?? p.fase_atual}` : (FASE_LABELS[p.fase_atual] ?? p.fase_atual)}
               </span>
             )}
-            {p.status && (
+            {!ehAbandonado && p.status && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[p.status] ?? 'bg-[var(--go-blue)]/5 text-[var(--go-blue)]/70'}`}>
                 {STATUS_LABELS[p.status] ?? p.status}
+              </span>
+            )}
+            {!ehAbandonado && p.total_edicoes > 0 && (
+              <span className="flex items-center gap-0.5 rounded-full bg-[var(--go-blue)]/8 px-2 py-0.5 text-[10px] text-[var(--go-blue)] font-semibold">
+                <RefreshCw className="h-3 w-3" />
+                {p.total_edicoes} edição{p.total_edicoes !== 1 ? 'ões' : ''}
               </span>
             )}
             {p.tem_erro && (
@@ -678,22 +816,78 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
             <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(p.created_at)}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">início</div>
           </div>
+          {ehAbandonado ? (
+            <div className="text-center" title="Tempo sem atividade">
+              <div className="font-semibold tabular-nums text-[13px] text-[#ea580c]">{formatTimeSince(inativoMin)}</div>
+              <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">inativo há</div>
+            </div>
+          ) : (
+            <div className="text-center" title="Enviado em">
+              <div className="font-semibold tabular-nums text-[13px] text-[#16a34a]">{formatDateTime(p.submitted_at)}</div>
+              <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">enviado</div>
+            </div>
+          )}
           <div className="text-center" title="Mensagens (usuário / IA)">
             <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{p.total_mensagens_usuario}/{p.total_mensagens_ia}</div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
           </div>
-          <div className="text-center" title="Tempo desde início">
-            <div className={`font-semibold tabular-nums text-[13px] ${
-              p.fase_atual === 'completo' ? 'text-[#16a34a]'
-                : p.fase_atual === 'saving' || p.fase_atual === 'receita' ? 'text-[#ea580c]'
-                : p.fase_atual === 'documentacao' ? 'text-[var(--go-blue)]'
-                : 'text-[var(--go-text-primary)]/80'
-            }`}>{formatTimeSince(p.tempo_desde_inicio_min)}</div>
-            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">duração</div>
-          </div>
           <div className="text-center" title="Tempo médio de resposta da API">
             <div className={`font-semibold tabular-nums text-[13px] ${(p.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>
               {formatDuration(p.media_duracao_api_ms)}
+            </div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">API</div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/15 group-hover:text-[var(--go-blue)]/40 group-hover:translate-x-0.5 transition-all" />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ── Card de uma edição (reenvio) — aba "Edições" ─────────────────────────────
+
+function EdicaoCard({ edicao: e, onClick }: { edicao: EdicaoInvestigador; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group relative w-full text-left overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white pl-0 pr-4 py-3 transition-all hover:border-[var(--go-blue)]/18 hover:shadow-[var(--go-shadow-sm)]"
+    >
+      <div className="absolute top-0 left-0 h-full w-1 bg-[var(--go-blue)]" />
+      <div className="flex items-center gap-3 pl-4">
+        <div className="flex-shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--go-blue)]/8 text-[var(--go-blue)]">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
+              {e.nome ?? 'Projeto sem nome'}
+            </span>
+            <span className="rounded-full bg-[var(--go-blue)]/8 px-2 py-0.5 text-[10px] font-semibold text-[var(--go-blue)]">
+              Edição v{e.versao_num}
+            </span>
+            {e.tem_erro && (
+              <span className="flex items-center gap-0.5 rounded-full bg-[#dc2626]/8 px-2 py-0.5 text-[10px] text-[#dc2626] font-semibold">
+                <AlertTriangle className="h-3 w-3" />
+                {e.total_erros_api} erro{e.total_erros_api !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 text-[12px] text-[var(--go-text-primary)]/40">
+            {e.responsavel_nome} · {e.area_nome ?? 'Sem área'} · {e.ferramenta}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs flex-shrink-0">
+          <div className="text-center" title="Editado em">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(e.created_at)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">editado</div>
+          </div>
+          <div className="text-center" title="Mensagens (usuário / IA) na edição">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{e.total_mensagens_usuario}/{e.total_mensagens_ia}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">msgs</div>
+          </div>
+          <div className="text-center" title="Tempo médio de resposta da API na edição">
+            <div className={`font-semibold tabular-nums text-[13px] ${(e.media_duracao_api_ms ?? 0) > 5000 ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/80'}`}>
+              {formatDuration(e.media_duracao_api_ms)}
             </div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">API</div>
           </div>
@@ -709,16 +903,26 @@ function ProjetoCard({ projeto: p, onClick }: { projeto: ProjetoInvestigador; on
 function DetalheView({
   detalhes,
   loading,
+  focusVersao,
   onBack,
   onRefresh,
 }: {
   detalhes: ProjetoDetalhes | null
   loading: boolean
+  focusVersao: number | null
   onBack: () => void
   onRefresh: () => void
 }) {
   const [tab, setTab] = useState<'chat' | 'api_logs' | 'dados'>('chat')
   const [dadosOpen, setDadosOpen] = useState(false)
+  // Versão selecionada: número do reenvio/original, ou 'atual' (chat ao vivo).
+  // `null` = usar o default derivado (focusVersao, ou a submissão original).
+  const [versaoOverride, setVersaoOverride] = useState<number | 'atual' | null>(null)
+
+  // Ao trocar de projeto/foco, descarta a escolha manual anterior.
+  useEffect(() => {
+    setVersaoOverride(null)
+  }, [detalhes?.id, focusVersao])
 
   if (loading) {
     return (
@@ -743,6 +947,47 @@ function DetalheView({
   const d = detalhes
   const group = getPhaseGroup(d.fase_atual)
   const phaseStyle = PHASE_STYLES[group]
+
+  // ── Versões e seleção ──────────────────────────────────────────────────────
+  const versoesAsc = [...d.versions].sort((a, b) => a.versao_num - b.versao_num)
+  const temVersoes = versoesAsc.length > 0
+  const versaoOriginal = versoesAsc.find((v) => v.acao === 'submit_inicial')
+  // Default: foco explícito (aba Edições) → senão a submissão original → senão ao vivo.
+  const selDefault: number | 'atual' =
+    focusVersao != null ? focusVersao : versaoOriginal ? versaoOriginal.versao_num : 'atual'
+  const sel: number | 'atual' = versaoOverride ?? selDefault
+
+  // Resolve o que exibir conforme a seleção: chat (snapshot ou ao vivo), eventos e
+  // logs fatiados pela janela de tempo daquela versão.
+  let chatView = d.chat_messages
+  let eventosView = d.form_events
+  let logsView = d.api_logs
+  let snapshotIndisponivel = false
+  if (sel === 'atual') {
+    // Ao vivo: tudo após a última versão registrada (ou tudo, se não há versões).
+    const ultima = versoesAsc[versoesAsc.length - 1]
+    const lower = ultima ? ultima.created_at : null
+    eventosView = d.form_events.filter((e) => inWindow(e.created_at, lower, null))
+    logsView = d.api_logs.filter((l) => inWindow(l.created_at, lower, null))
+    chatView = d.chat_messages
+  } else {
+    const idx = versoesAsc.findIndex((v) => v.versao_num === sel)
+    const v = idx >= 0 ? versoesAsc[idx] : undefined
+    const lower = idx > 0 ? versoesAsc[idx - 1].created_at : d.created_at
+    const upper = v?.created_at ?? null
+    eventosView = d.form_events.filter((e) => inWindow(e.created_at, lower, upper))
+    logsView = d.api_logs.filter((l) => inWindow(l.created_at, lower, upper))
+    // Conversa congelada da versão; cai para o chat atual se o snapshot não existir
+    // (versões anteriores à introdução do snapshot_chat — forward-only).
+    if (v?.snapshot_chat) {
+      chatView = v.snapshot_chat
+    } else {
+      chatView = d.chat_messages
+      snapshotIndisponivel = true
+    }
+  }
+
+  const rotuloVersao = (v: Versao) => (v.acao === 'submit_inicial' ? 'Original' : `Edição v${v.versao_num}`)
 
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
@@ -780,7 +1025,6 @@ function DetalheView({
             {/* Métricas inline dentro do header */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <MiniStat label="Msgs" value={`${d.total_mensagens_usuario}u / ${d.total_mensagens_ia}ia`} />
-              <MiniStat label="Duração" value={formatTimeSince(d.tempo_desde_inicio_min)} />
               <MiniStat label="API média" value={formatDuration(d.media_duracao_api_ms)} warn={(d.media_duracao_api_ms ?? 0) > 5000} />
               <MiniStat label="Erros" value={String(d.total_erros_api)} warn={d.total_erros_api > 0} />
             </div>
@@ -836,11 +1080,50 @@ function DetalheView({
         </div>
       )}
 
+      {/* Seletor de versão — quando o projeto tem submissão original + edições */}
+      {temVersoes && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium text-[var(--go-text-primary)]/35 mr-1">Versão:</span>
+          {versoesAsc.map((v) => (
+            <button
+              key={v.versao_num}
+              onClick={() => setVersaoOverride(v.versao_num)}
+              title={formatDateTime(v.created_at)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+                sel === v.versao_num
+                  ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                  : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25'
+              }`}
+            >
+              {rotuloVersao(v)}
+            </button>
+          ))}
+          <button
+            onClick={() => setVersaoOverride('atual')}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-all ${
+              sel === 'atual'
+                ? 'bg-[var(--go-blue)] text-white border-[var(--go-blue)] shadow-sm'
+                : 'bg-white text-[var(--go-text-primary)]/60 border-[var(--go-blue)]/10 hover:border-[var(--go-blue)]/25'
+            }`}
+          >
+            Atual (ao vivo)
+          </button>
+        </div>
+      )}
+
+      {/* Aviso: snapshot da conversa indisponível para esta versão (forward-only) */}
+      {snapshotIndisponivel && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-[var(--go-radius-sm)] bg-[#f59e0b]/8 px-3 py-1.5 text-[11px] text-[#b45309]">
+          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+          Conversa congelada desta versão indisponível (anterior ao snapshot) — exibindo o chat atual.
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="mt-4 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
         {([
-          ['chat', 'Chat', d.chat_messages.length],
-          ['api_logs', 'Logs de API', d.api_logs.length],
+          ['chat', 'Chat', chatView.length],
+          ['api_logs', 'Logs de API', logsView.length],
           ['dados', 'Análise & Docs', null],
         ] as [string, string, number | null][]).map(([key, label, count]) => (
           <button
@@ -863,8 +1146,8 @@ function DetalheView({
       </div>
 
       <div className="mt-4">
-        {tab === 'chat' && <ChatTab messages={d.chat_messages} />}
-        {tab === 'api_logs' && <ApiLogsTab logs={d.api_logs} />}
+        {tab === 'chat' && <ChatTab messages={chatView} eventos={eventosView} />}
+        {tab === 'api_logs' && <ApiLogsTab logs={logsView} />}
         {tab === 'dados' && <DadosTab documentacao={d.documentacao} analise={d.analise} />}
       </div>
     </div>
@@ -895,43 +1178,83 @@ function KV({ label, value }: { label: string; value: string | null | undefined 
 
 // ── Tab: Histórico do chat ───────────────────────────────────────────────────
 
-function ChatTab({ messages }: { messages: ChatMsg[] }) {
+/** Mapeia a fase de um evento de formulário para o grupo visual de fase. */
+function eventFaseToGroup(fase: string | null): PhaseGroup | null {
+  if (!fase) return null
+  if (fase === 'doc') return 'doc'
+  if (fase === 'saving') return 'saving'
+  if (fase === 'receita') return 'receita'
+  if (fase === 'completo' || fase === 'done') return 'done'
+  return null
+}
+
+type TimelineItem =
+  | { type: 'divider'; phase: PhaseGroup; label: string; key: string }
+  | { type: 'message'; msg: ChatMsg; phase: PhaseGroup; key: string }
+  | { type: 'event'; event: FormEvent; phase: PhaseGroup; key: string }
+
+function ChatTab({ messages, eventos }: { messages: ChatMsg[]; eventos: FormEvent[] }) {
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Group messages by phase and insert dividers
-  const groupedMessages = useMemo(() => {
-    if (messages.length === 0) return []
+  // Timeline unificado: mensagens do chat + eventos determinísticos do formulário,
+  // ordenados por created_at. Em empate de carimbo, o evento vem antes da mensagem
+  // (o evento precede a resposta da IA que ele disparou). Tanto mensagens da IA
+  // quanto eventos com fase definem os divisores de fase.
+  const timeline = useMemo<TimelineItem[]>(() => {
+    const combined: Array<
+      | { kind: 'message'; msg: ChatMsg; ts: number }
+      | { kind: 'event'; event: FormEvent; ts: number }
+    > = []
+    for (const m of messages) combined.push({ kind: 'message', msg: m, ts: tsToEpoch(m.created_at) })
+    for (const e of eventos) combined.push({ kind: 'event', event: e, ts: tsToEpoch(e.created_at) })
+    combined.sort((a, b) => {
+      const av = isNaN(a.ts) ? 0 : a.ts
+      const bv = isNaN(b.ts) ? 0 : b.ts
+      if (av !== bv) return av - bv
+      const ap = a.kind === 'event' ? 0 : 1
+      const bp = b.kind === 'event' ? 0 : 1
+      return ap - bp
+    })
 
-    const result: Array<{ type: 'divider'; phase: PhaseGroup; label: string } | { type: 'message'; msg: ChatMsg; phase: PhaseGroup }> = []
+    const result: TimelineItem[] = []
     let currentPhase: PhaseGroup | null = null
+    let idx = 0
 
-    for (const msg of messages) {
+    for (const it of combined) {
+      if (it.kind === 'event') {
+        const ev = it.event
+        const evPhase = eventFaseToGroup(ev.fase)
+        if (evPhase && evPhase !== currentPhase) {
+          currentPhase = evPhase
+          result.push({ type: 'divider', phase: evPhase, label: PHASE_STYLES[evPhase].label, key: `dive-${idx}` })
+        }
+        result.push({ type: 'event', event: ev, phase: currentPhase ?? 'doc', key: `ev-${ev.id}` })
+        idx++
+        continue
+      }
+
+      const msg = it.msg
       // DOC messages don't change the phase context
       if (msg.role === 'doc') {
-        result.push({ type: 'message', msg, phase: currentPhase ?? 'doc' })
+        result.push({ type: 'message', msg, phase: currentPhase ?? 'doc', key: `m-${msg.id}` })
+        idx++
         continue
       }
 
       const phase: PhaseGroup = msg.role === 'assistant' ? detectMsgPhase(msg) : (currentPhase ?? 'doc')
-
-      // Insert phase divider when phase changes
       if (msg.role === 'assistant' && phase !== currentPhase) {
         currentPhase = phase
-        const style = PHASE_STYLES[phase]
-        result.push({ type: 'divider', phase, label: style.label })
+        result.push({ type: 'divider', phase, label: PHASE_STYLES[phase].label, key: `divm-${idx}` })
       }
-
-      if (msg.role === 'user' && currentPhase === null) {
-        currentPhase = 'doc'
-      }
-
-      result.push({ type: 'message', msg, phase: currentPhase ?? 'doc' })
+      if (msg.role === 'user' && currentPhase === null) currentPhase = 'doc'
+      result.push({ type: 'message', msg, phase: currentPhase ?? 'doc', key: `m-${msg.id}` })
+      idx++
     }
 
     return result
-  }, [messages])
+  }, [messages, eventos])
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && eventos.length === 0) {
     return (
       <div className="py-8 text-center text-sm text-[var(--go-text-primary)]/30">
         <MessageSquare className="mx-auto mb-2 h-5 w-5" />
@@ -943,13 +1266,137 @@ function ChatTab({ messages }: { messages: ChatMsg[] }) {
   return (
     <div className="max-h-[650px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
       <div className="space-y-1 py-2">
-        {groupedMessages.map((item, i) => {
-          if (item.type === 'divider') {
-            return <PhaseDivider key={`div-${i}`} phase={item.phase} label={item.label} />
-          }
-          return <ChatBubble key={item.msg.id} msg={item.msg} phase={item.phase} />
+        {timeline.map((item) => {
+          if (item.type === 'divider') return <PhaseDivider key={item.key} phase={item.phase} label={item.label} />
+          if (item.type === 'event') return <EventBubble key={item.key} event={item.event} />
+          return <ChatBubble key={item.key} msg={item.msg} phase={item.phase} />
         })}
         <div ref={chatEndRef} />
+      </div>
+    </div>
+  )
+}
+
+// ── Bolha de evento determinístico do formulário ─────────────────────────────
+
+function fmtReais(n: unknown): string {
+  if (typeof n !== 'number' || isNaN(n)) return '—'
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function tipoSavingLabel(t: unknown): string {
+  return t === 'pontual' ? 'pontual' : t === 'mensal' ? 'mensal' : '—'
+}
+
+type EventoLinha = { cargo?: string; horas_antes?: number; horas_depois?: number }
+type EventoCustoItem = { nome?: string; valor?: number; recorrencia?: string }
+
+/** Renderiza um evento do formulário como um cartão central, discreto e legível —
+ * mostra os valores que o usuário marcou (saving mensal, horas, receita…) e, em
+ * reentradas, o marcador "voltou e editou". */
+function EventBubble({ event }: { event: FormEvent }) {
+  const d = (event.dados ?? {}) as Record<string, unknown>
+  const voltou = d.voltou === true
+
+  // Título + etapa do "voltou" por tipo de evento
+  const CONFIG: Record<string, { titulo: string; etapa: string }> = {
+    submissao: { titulo: 'Formulário enviado (etapas 1 e 2)', etapa: 'Etapa inicial' },
+    saving: { titulo: 'Saving informado', etapa: 'Etapa de Saving' },
+    receita: { titulo: 'Receita informada', etapa: 'Etapa de Receita' },
+    metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
+    tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
+    submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
+  }
+  const cfg = CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
+
+  // Constrói os pares label → valor a exibir, por tipo
+  const rows: Array<{ label: string; value: string }> = []
+  const chips: string[] = []
+
+  if (event.tipo === 'submissao') {
+    if (d.escopo) rows.push({ label: 'Escopo', value: String(d.escopo) })
+    if (d.ferramenta) rows.push({ label: 'Ferramenta', value: String(d.ferramenta) })
+    if (Array.isArray(d.tipos_projeto) && d.tipos_projeto.length > 0) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
+    if (d.servico_externo) rows.push({ label: 'Serviço externo', value: String(d.servico_externo) })
+    if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
+    if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Arquivos', value: (d.arquivos as string[]).join(', ') })
+    if (d.especial === true) rows.push({ label: 'Especial', value: 'Sim' })
+  } else if (event.tipo === 'saving') {
+    rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
+    if (typeof d.economia_horas_mes === 'number') rows.push({ label: 'Economia (horas)', value: `${d.economia_horas_mes} h/mês` })
+    if (typeof d.economia_reais_mes === 'number') rows.push({ label: 'Saving', value: `${fmtReais(d.economia_reais_mes)}/mês` })
+    if (typeof d.custo_externo_mensal === 'number' && d.custo_externo_mensal > 0) rows.push({ label: 'Custo externo', value: `${fmtReais(d.custo_externo_mensal)}/mês` })
+    if (typeof d.custo_evitado_mensal === 'number' && d.custo_evitado_mensal > 0) rows.push({ label: 'Custo evitado', value: `${fmtReais(d.custo_evitado_mensal)}/mês` })
+    if (d.alguem_fazia) rows.push({ label: 'Alguém fazia antes', value: d.alguem_fazia === 'sim' ? 'Sim' : 'Não' })
+    if (Array.isArray(d.linhas)) {
+      for (const l of d.linhas as EventoLinha[]) {
+        if (l && l.cargo != null) chips.push(`${l.cargo}: ${l.horas_antes ?? 0}h → ${l.horas_depois ?? 0}h`)
+      }
+    }
+    if (Array.isArray(d.custo_evitado_itens)) {
+      for (const it of d.custo_evitado_itens as EventoCustoItem[]) {
+        if (it && it.nome != null) chips.push(`Evitado: ${it.nome} (${fmtReais(it.valor)}, ${it.recorrencia ?? '—'})`)
+      }
+    }
+  } else if (event.tipo === 'receita') {
+    rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
+    if (typeof d.valor_ganho_mensal === 'number') rows.push({ label: 'Receita', value: `${fmtReais(d.valor_ganho_mensal)}/mês` })
+    if (d.racional) rows.push({ label: 'Racional', value: String(d.racional) })
+  } else if (event.tipo === 'metadados') {
+    if (d.reset_doc === true) rows.push({ label: 'Documentação', value: 'Reiniciada' })
+    const campos = (d.campos ?? {}) as Record<string, unknown>
+    const CAMPO_LABELS: Record<string, string> = {
+      nome: 'Nome', area: 'Área', ferramenta: 'Ferramenta', membros: 'Membros',
+      data_criacao: 'Data', descricao_breve: 'Descrição', contexto_especial: 'Contexto especial',
+    }
+    for (const [k, label] of Object.entries(CAMPO_LABELS)) {
+      const v = campos[k]
+      if (v == null) continue
+      rows.push({ label, value: Array.isArray(v) ? (v as string[]).join(', ') : String(v) })
+    }
+    if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Novos arquivos', value: (d.arquivos as string[]).join(', ') })
+  } else if (event.tipo === 'tipos') {
+    if (Array.isArray(d.tipos_projeto)) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
+  } else if (event.tipo === 'submit') {
+    if (d.status) rows.push({ label: 'Status', value: String(d.status) })
+    if (typeof d.ganho_total_mensal === 'number') rows.push({ label: 'Ganho total', value: `${fmtReais(d.ganho_total_mensal)}/mês` })
+    if (d.reenvio === true) rows.push({ label: 'Tipo', value: 'Reenvio' })
+  }
+
+  return (
+    <div className="flex justify-center px-6 py-1">
+      <div className="w-full max-w-[88%] rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-2">
+        {voltou && (
+          <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-[#b45309]">
+            <ArrowLeft className="h-3 w-3" />
+            Voltou e editou — {cfg.etapa}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <SlidersHorizontal className="h-3 w-3 flex-shrink-0 text-[var(--go-blue)]/45" />
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--go-text-primary)]/45">
+            {cfg.titulo}
+          </span>
+        </div>
+        {rows.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            {rows.map((r, i) => (
+              <span key={i} className="text-[12px] text-[var(--go-text-primary)]/70">
+                <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>{' '}
+                <span className="font-medium">{r.value}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        {chips.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {chips.map((c, i) => (
+              <span key={i} className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[var(--go-text-primary)]/65 border border-[var(--go-blue)]/10">
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

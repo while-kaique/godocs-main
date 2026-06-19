@@ -329,6 +329,10 @@ export async function gravarVersaoProjeto(
   snapshotProjeto: Record<string, unknown>,
   snapshotDoc: Record<string, unknown> | null,
   submetidoPor: string | null,
+  // Snapshot da conversa (chat_messages) no momento da submissão — preserva a
+  // conversa ORIGINAL de cada versão (os chat_messages são apagados ao voltar
+  // etapas). Opcional/forward-only: versões antigas ficam com NULL.
+  snapshotChat?: unknown[] | null,
 ): Promise<void> {
   const row = await queryOne<{ proxima: number }>(
     'SELECT COALESCE(MAX(versao_num), 0) + 1 AS proxima FROM projeto_versions WHERE projeto_id = ?',
@@ -336,17 +340,56 @@ export async function gravarVersaoProjeto(
   );
   const versao_num = row?.proxima ?? 1;
   await exec(
-    `INSERT INTO projeto_versions (id, projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, submetido_por, created_at)
-     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT INTO projeto_versions (id, projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, snapshot_chat, submetido_por, created_at)
+     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       projeto_id,
       versao_num,
       acao,
       JSON.stringify(snapshotProjeto),
       snapshotDoc ? JSON.stringify(snapshotDoc) : null,
+      snapshotChat && snapshotChat.length > 0 ? JSON.stringify(snapshotChat) : null,
       submetidoPor,
     ],
   );
+}
+
+/** Contagem de reenvios (edições) por projeto — usado na listagem do Investigador. */
+export async function getReenvioCounts(): Promise<Map<string, number>> {
+  const rows = await queryAll<{ projeto_id: string; total: number }>(
+    "SELECT projeto_id, COUNT(*) AS total FROM projeto_versions WHERE acao = 'reenvio' GROUP BY projeto_id",
+  );
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.projeto_id, r.total);
+  return map;
+}
+
+/** Todos os reenvios (edições) com dados do projeto — alimenta a aba "Edições".
+ * `prev_created_at` = carimbo da versão imediatamente anterior (limite inferior da
+ * janela de tempo desta edição, usada para fatiar api_logs); cai para
+ * `projeto_created_at` quando não há versão anterior. */
+export function getAllReenvios() {
+  return queryAll<VersionRow & {
+    nome: string | null;
+    responsavel_nome: string;
+    responsavel_email: string;
+    ferramenta: string;
+    area: string | null;
+    area_nome: string | null;
+    prev_created_at: string | null;
+    projeto_created_at: string | null;
+  }>(`
+    SELECT v.*, p.nome, p.responsavel_nome, p.responsavel_email, p.ferramenta,
+           p.area, a.nome AS area_nome,
+           (SELECT MAX(v2.created_at) FROM projeto_versions v2
+              WHERE v2.projeto_id = v.projeto_id AND v2.versao_num < v.versao_num) AS prev_created_at,
+           p.created_at AS projeto_created_at
+    FROM projeto_versions v
+    JOIN projetos p ON v.projeto_id = p.id
+    LEFT JOIN areas a ON p.area_id = a.id
+    WHERE v.acao = 'reenvio'
+    ORDER BY v.created_at DESC
+  `);
 }
 
 export function getVersionsByProjeto(projeto_id: string) {
@@ -471,6 +514,46 @@ export async function insertChatMessage(data: {
     data.selected_option ?? null,
   ]);
   return (await queryOne<ChatMessageRow>('SELECT * FROM chat_messages WHERE id = ?', [id]))!;
+}
+
+// --- Form Events (timeline determinístico do formulário) ---
+
+/**
+ * Registra um evento determinístico do formulário (valores marcados, "voltar etapa").
+ * Append-only — NÃO é tocado pelas limpezas de chat. `dados` é serializado para JSON.
+ */
+export async function recordFormEvent(data: {
+  projeto_id: string;
+  tipo: string;
+  fase?: string | null;
+  dados?: unknown;
+}) {
+  await exec(
+    `INSERT INTO form_events (id, projeto_id, tipo, fase, dados, created_at)
+     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, datetime('now'))`,
+    [
+      data.projeto_id,
+      data.tipo,
+      data.fase ?? null,
+      data.dados != null ? JSON.stringify(data.dados) : null,
+    ],
+  );
+}
+
+export function getFormEventsByProjeto(projetoId: string) {
+  return queryAll<FormEventRow>(
+    'SELECT * FROM form_events WHERE projeto_id = ? ORDER BY created_at', [projetoId]
+  );
+}
+
+/** Já existe algum evento desse tipo para o projeto? Usado para detectar reentradas
+ * (ex.: 2ª vez que a fase saving inicia → o usuário "voltou e editou"). */
+export async function hasFormEventTipo(projetoId: string, tipo: string): Promise<boolean> {
+  const row = await queryOne<{ total: number }>(
+    'SELECT COUNT(*) AS total FROM form_events WHERE projeto_id = ? AND tipo = ?',
+    [projetoId, tipo],
+  );
+  return (row?.total ?? 0) > 0;
 }
 
 // --- Documentacao ---
@@ -798,7 +881,17 @@ export type VersionRow = {
   acao: string;
   snapshot_projeto: string; // JSON
   snapshot_doc: string | null; // JSON
+  snapshot_chat: string | null; // JSON (array de chat_messages); NULL em versões antigas
   submetido_por: string | null;
+  created_at: string | null;
+};
+
+export type FormEventRow = {
+  id: string;
+  projeto_id: string;
+  tipo: string; // submissao|saving|receita|tipos|metadados|back|submit
+  fase: string | null; // doc|saving|receita — alinhamento com o chat
+  dados: string | null; // JSON (pares label → valor)
   created_at: string | null;
 };
 
