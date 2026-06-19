@@ -880,6 +880,9 @@ export type ProjetoRow = {
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
+  // Espelho do "Atualizado Em" do Sheets. NULL = app nunca sincronizou p/ a planilha
+  // = legado pendente (alimenta a contagem de pendentes sem ler o Sheets).
+  atualizado_em: string | null;
   created_at: string | null;
   updated_at: string | null;
 };

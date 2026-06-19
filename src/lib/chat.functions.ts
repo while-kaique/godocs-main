@@ -1385,6 +1385,10 @@ export async function submeterParaValidacao(rawData: unknown) {
     // submitted_at = data da PRIMEIRA submissão. No reenvio (edição) NÃO atualiza —
     // preserva "quando a pessoa submeteu" (só validated_*/Atualizado Em refletem a edição).
     ...(ehReenvio ? {} : { submitted_at: now }),
+    // A submissão SEMPRE escreve "Atualizado Em" no Sheets (IDA) → marca no SQLite na
+    // hora p/ o projeto deixar de contar como pendente (selo da home) sem esperar o
+    // sync reverso. O reverse sync depois reconcilia com o carimbo formatado da planilha.
+    atualizado_em: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,

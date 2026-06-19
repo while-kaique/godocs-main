@@ -89,8 +89,15 @@ function ehDono(projeto: ProjetoRow, email: string): boolean {
   return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
 
+// "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
+function temAtualizadoEm(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const s = String(v).trim();
+  return s !== '' && s !== '—' && s !== '-';
+}
+
 function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: string | null): MeuProjetoItem {
-  const at = atualizadoEm && atualizadoEm !== '—' && atualizadoEm !== '-' ? atualizadoEm : null;
+  const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
     id: p.id,
     nome: p.nome,
@@ -126,16 +133,28 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
     console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
   }
   const rows = await getProjetosByOwnerEmail(email);
-  // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro
+  // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
+  // "Atualizado Em": usa o valor recém-lido da planilha; se a leitura falhou (mapa
+  // vazio), cai no espelho persistido no SQLite — nunca marca tudo como pendente.
   return rows
     .filter((p) => ehDono(p, email))
-    .map((p) => mapItem(p, atualizadoMap.get(p.id.toLowerCase()) ?? null));
+    .map((p) => mapItem(p, atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null));
 }
 
-/** Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o selo da home. */
+/**
+ * Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o
+ * selo da home. Lê SÓ do SQLite (coluna `atualizado_em`, espelho do Sheets mantido
+ * pelo sync reverso e pela submissão) — NÃO chama o Google Sheets, então é
+ * instantânea. A precisão é mantida pelo cron horário, pela submissão (IDA marca na
+ * hora) e pelo sync sob demanda ao abrir "Meus Projetos".
+ */
 export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
-  const itens = await listarMeusProjetos(email);
-  return { count: itens.filter((i) => i.pendente).length, prazo: PRAZO_LEGADO };
+  const rows = await getProjetosByOwnerEmail(email);
+  const count = rows
+    .filter((p) => ehDono(p, email))
+    .filter((p) => p.status !== 'rascunho' && !temAtualizadoEm(p.atualizado_em))
+    .length;
+  return { count, prazo: PRAZO_LEGADO };
 }
 
 /**
@@ -182,8 +201,8 @@ export async function getMeuProjeto(
     };
   }
 
-  // Detalhe não consulta o Sheets; "Atualizado Em"/pendente não são exibidos aqui.
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, null);
+  // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
+  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null);
   return {
     ...base,
     responsavel_nome: data.responsavel_nome,

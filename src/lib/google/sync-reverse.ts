@@ -135,6 +135,8 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     custo_evitado_justificativa: txt(row['Justificativa Custo Evitado']),
     submitted_at: submittedAt,
     validated_at: status === 'aprovado' ? submittedAt : null,
+    // Espelha "Atualizado Em": vazio nos legados → fica null → projeto pendente.
+    atualizado_em: txt(row['Atualizado Em']),
   });
 }
 
@@ -168,6 +170,8 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   // SQLite — não é sincronizado de volta para não gravar número no campo flag.
   { col: 'Justificativa Custo Evitado', field: 'custo_evitado_justificativa', kind: 'text' },
   { col: 'Contexto do Projeto Especial', field: 'contexto_especial', kind: 'text' },
+  // Mantém o espelho do "Atualizado Em" fresco no SQLite (alimenta o selo de pendentes).
+  { col: 'Atualizado Em', field: 'atualizado_em', kind: 'text' },
 ];
 
 async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
