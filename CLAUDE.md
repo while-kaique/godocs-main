@@ -117,6 +117,37 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 - **`form_events` é APPEND-ONLY** ⚠️ — os valores marcados no formulário (saving mensal, horas, custo evitado, receita, metadados) chegam por payloads e **não viram `chat_messages`**; são gravados em `form_events` por `chat.functions.ts` (helper `gravarEvento`, não-bloqueante) para aparecerem no timeline do Investigador. **Ao mexer nas limpezas de chat (`deleteChatMessages*`), NUNCA apague `form_events`** — é uma tabela separada justamente para sobreviver às limpezas e preservar o histórico de "voltar etapa" (`voltou: true`).
 - **`snapshot_chat`** em `projeto_versions` — `submeterParaValidacao` congela a conversa de cada versão (via `gravarVersaoProjeto`). Forward-only: versões antigas (NULL) caem no chat atual. As abas usam o snapshot da versão; métricas/eventos por versão são fatiados pela janela `[versão anterior, versão]`.
 
+## Testes E2E em produção (validação coluna-a-coluna)
+
+Harness em **`scripts/e2e/`** para validar de ponta a ponta os cálculos de saving/receita e o
+preenchimento das colunas A→AJ da planilha, fazendo submissões/edições reais contra produção e
+comparando cada coluna com o valor esperado. Útil para validar mudanças nas regras financeiras
+**antes/depois de mexer no fluxo**. Detalhes em [scripts/e2e/README.md](scripts/e2e/README.md).
+
+```bash
+npm run e2e:run              # roda os 10 cenários (gera runId) → .runs/<runId>.json
+npm run e2e:run -- <runId>   # runId fixo; E2E_ONLY=saving-puro roda só 1 (sanidade)
+npm run e2e:validate -- <runId>   # compara colunas da planilha × esperado (pass/fail)
+npm run e2e:cleanup -- <runId>    # remove as linhas de teste (planilha → SQLite)
+```
+
+- **Pré-requisito: `E2E_COOKIE` no `.env`.** O gateway Godeploy exige **OAuth no edge para TODAS as
+  rotas** (inclusive `/api/*`) — sem sessão, leva `302 → /auth/login`. Logue em
+  `godocs.devgogroup.com` (como admin, ex. `luis.albuquerque@gocase.com`), copie o header
+  `cookie:` (formato `SESSION=...`) e ponha em `E2E_COOKIE="SESSION=..."`. O harness replica o
+  cookie; o edge injeta o `x-godeploy-user-email` a partir dele (cobre chat e admin). O cookie
+  expira — se der 302 no meio, renove.
+- **Tag `[E2E-<runId>]`** no nome de todo projeto de teste: identifica/filtra na planilha e no
+  Investigador, é a chave da limpeza e o **gatilho do mute de Google Chat** (`ehProjetoTesteE2E`
+  em `chat.ts`/`sync.ts` — projetos `[E2E-` NÃO notificam o time; a gravação na planilha é normal).
+- **Roda contra a aba GoDocs REAL** (o worker escreve onde `GOOGLE_SHEETS_TAB` aponta). As linhas
+  ficam marcadas e são removidas no fim. **Ordem da limpeza importa: planilha primeiro, depois
+  SQLite** (`POST /api/admin/e2e-cleanup`) — senão o sync reverso por dono ressuscita do Sheets.
+- O chat é dirigido por um **LLM responder** (`lib/responder.mjs`, reusa `llmChat`); a validação lê
+  a planilha via Service Account (`lib/sheets.mjs`). Cenários e valores esperados em `scenarios.mjs`.
+- ⚠️ O guard de Chat mudo e o endpoint `e2e-cleanup` são **temporários** (escopo `[E2E-]`); reverter
+  quando a validação por testes não for mais necessária (ver README).
+
 ## Convenções rápidas
 
 - Path alias: `@/*` → `./src/*`

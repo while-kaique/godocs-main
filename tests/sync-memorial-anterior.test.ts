@@ -1,5 +1,6 @@
-// "Memorial anterior" no Sheets: escrito SÓ na edição (memorial pré-edição);
-// em submissão nova não entra. Isola syncSubmitToGoogle mockando sheets + chat.
+// "Memorial anterior" no Sheets: na edição recebe o memorial pré-edição; quando
+// não há anterior (submissão nova ou edição sem versão prévia) recebe "—" (regra:
+// texto vazio → traço). Isola syncSubmitToGoogle mockando sheets + chat.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/google/sheets', () => ({
@@ -39,17 +40,17 @@ describe('Memorial anterior no sync', () => {
     expect(row['Memorial anterior']).toBe('memo da versão anterior');
   });
 
-  it('SUBMISSÃO NOVA: não inclui "Memorial anterior"', async () => {
+  it('SUBMISSÃO NOVA: grava "—" em "Memorial anterior" (regra: texto vazio → traço)', async () => {
     await syncSubmitToGoogle({ ...baseParams, modo: 'novo', memorialAnterior: null });
     expect(appendRow).toHaveBeenCalledTimes(1);
     const row = (appendRow as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect('Memorial anterior' in row).toBe(false);
+    expect(row['Memorial anterior']).toBe('—');
   });
 
-  it('EDIÇÃO sem anterior: não escreve "Memorial anterior" (não sobrescreve célula manual)', async () => {
+  it('EDIÇÃO sem anterior: grava "—" em "Memorial anterior"', async () => {
     await syncSubmitToGoogle({ ...baseParams, modo: 'edicao', memorialAnterior: null });
     const row = (updateRowByProjectId as ReturnType<typeof vi.fn>).mock.calls[0][1];
-    expect('Memorial anterior' in row).toBe(false);
+    expect(row['Memorial anterior']).toBe('—');
   });
 
   it('NOVA: grava "Data Submissão" e "Atualizado Em"', async () => {
