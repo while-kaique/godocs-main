@@ -42,7 +42,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
+import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
@@ -377,6 +377,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
       await requireAdmin(request)
       return json(await syncSheetsToSqlite())
+    }
+
+    // ── Limpeza de projetos de TESTE E2E (admin) ──
+    // Remove do SQLite todos os projetos com nome "[E2E-..." (cascata limpa o resto).
+    // Usado pelo harness de validação (scripts/e2e/cleanup.mjs) DEPOIS de remover as
+    // linhas da planilha — ordem importa: se o SQLite for limpo antes, o sync reverso
+    // por dono (listarMeusProjetos) ressuscita do Sheets. Remover com o harness.
+    if (pathname === '/api/admin/e2e-cleanup' && method === 'POST') {
+      await requireAdmin(request)
+      const ids = await deleteProjetosTesteE2E()
+      return json({ ok: true, deletados: ids.length, ids })
     }
 
     return errorJson('Rota não encontrada', 404)
