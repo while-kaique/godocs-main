@@ -399,10 +399,17 @@ export function SubmeterPageContent({
     setReceitaSubmitted(d.receitaSubmitted ?? null);
     if (d.formDraft) setFormDraft(d.formDraft);
     setRespEspecial(d.respEspecial ?? "");
-    // Restaura a sub-tela ativa da etapa 3 ANTES do step, no mesmo batch do formDraft,
-    // para o SavingForm montar já com o draft certo (senão retomava no chat e/ou vazio).
-    setShowSavingForm(!!d.showSavingForm);
-    setShowReceitaForm(!!d.showReceitaForm);
+    // Sub-tela ativa da etapa 3 (no mesmo batch do formDraft p/ o SavingForm montar
+    // já com o draft certo). Em fase de IMPACTO ainda em coleta ("saving"/"receita"),
+    // retoma SEMPRE no formulário determinístico — o chat dessa fase, retomado sem
+    // requisição ativa, fica preso em "Calculando…" sem nada acontecer. Em previews,
+    // doc ou submissão completa, mantém a sub-tela que estava salva.
+    const faseRetomada = d.chatFase ?? "doc";
+    const emColetaSaving = faseRetomada === "saving";
+    const emColetaReceita = faseRetomada === "receita";
+    const forcaFormulario = !d.chatComplete && (emColetaSaving || emColetaReceita);
+    setShowSavingForm(forcaFormulario ? emColetaSaving : !!d.showSavingForm);
+    setShowReceitaForm(forcaFormulario ? emColetaReceita : !!d.showReceitaForm);
     setStep(d.step ?? 3);
   }, []);
 
@@ -834,6 +841,10 @@ export function SubmeterPageContent({
       );
 
       setProjetoId(result.projeto_id);
+      // Cacheia os NOMES dos arquivos enviados — os File[] não sobrevivem a um
+      // reload, mas os nomes são persistidos no rascunho e exibidos na etapa 2 ao
+      // retomar (a pessoa vê o que já enviou, sem precisar reenviar para visualizar).
+      setNomesExistentes(arquivos.map((f) => f.name));
       setAgentTipos(form.especial ? [] : form.tipoProjeto);
       setAgentMeta(snapshotMeta());
       setAgentArquivosSig(arquivosSig());
