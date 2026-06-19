@@ -100,10 +100,11 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 **Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado`, `custo_evitado_justificativa`, `custo_evitado_itens` (JSON). As duas primeiras vão ao Google Sheets; `custo_evitado_itens` é **só no banco** (não há coluna pra ele no layout atual da planilha). O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
 
-## Sync Google (Sheets + Chat)
+## Sync Google (Sheets + Chat + Drive)
 
 - **Layout da planilha = fonte única de verdade** em `src/lib/google/sheets.ts` (`SHEET_COLUMNS`, colunas A→AG da aba `GoDocs`). Append e update derivam dele — mudou a planilha, muda só ali. Colunas `Diff Horas / Antes`, `Diff Saving / Antes` e `Memorial anterior` são **manuais** (o sistema nunca escreve nelas).
 - **Submissão nova → append**; **edição → UPDATE in-place** casando por `ID Projeto` (coluna B), via `updateRowByProjectId`. Nunca duplica linha numa edição.
+- **Drive (documentos)** — os arquivos enviados no upload são salvos no Google Drive via `uploadDocsToDrive` (`src/lib/google/drive.ts`), chamado em `iniciarSubmissao` e `atualizarMetadados` (cobre fluxo normal E especial). Os links (webViewLink) ficam em `projetos.arquivos_links` (JSON) e vão para a coluna **J "URL"** da planilha. Pasta: env `GOOGLE_DRIVE_FOLDER_ID` (default `1e_Fk8...`); scope `drive.file` em `auth.ts`. ⚠️ **A Service Account precisa de acesso Editor à pasta** — sem isso a API responde 403/404; `uploadDocsToDrive` NÃO propaga erro (loga e segue sem link), para nunca quebrar a submissão.
 - **`waitUntil` obrigatório p/ fire-and-forget** — o sync para Sheets/Chat roda via `runBackground()` (`src/lib/background.ts`), que registra a promise no `ctx.waitUntil` exposto pelo worker em `globalThis.__waitUntil`. Sem isso, no runtime do Godeploy a promise não-aguardada é cancelada quando a Response retorna e o sync morre no meio.
 
 ## Convenções rápidas
