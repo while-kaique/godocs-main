@@ -42,10 +42,31 @@ const slug = (s?: string | null) =>
 const DOMAIN_LEADERS: [string, string][] = [['rafael', 'lobo'], ['guilherme', 'nobrega'], ['luis', 'liveri']];
 const PASSTHROUGH_LEADERS: [string, string][] = [['bruno', 'bezerra'], ['pedro', 'glycerio'], ['rafael', 'menezes'], ['joaquim', 'quindere']];
 
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+// GET com RETRY para falhas TRANSITÓRIAS (erro de rede, 429, 5xx) — um soluço
+// momentâneo da TeamGuide não deve derrubar a derivação de área (que caía no
+// fallback "ÁREA NÃO IDENTIFICADA"). Erros permanentes (401/403/404) NÃO são
+// re-tentados. Até 3 tentativas com backoff curto.
 async function tgGet<T>(path: string, token: string): Promise<T> {
-  const r = await fetch(BASE + path, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`TeamGuide GET ${path} -> ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  return r.json() as Promise<T>;
+  const MAX = 3;
+  for (let attempt = 1; ; attempt++) {
+    let r: Response;
+    try {
+      r = await fetch(BASE + path, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (netErr) {
+      if (attempt >= MAX) throw netErr; // rede caiu nas 3 tentativas
+      await sleep(250 * attempt);
+      continue;
+    }
+    if (r.ok) return (await r.json()) as T;
+    const transitorio = r.status === 429 || r.status >= 500;
+    if (transitorio && attempt < MAX) {
+      await sleep(250 * attempt);
+      continue;
+    }
+    throw new Error(`TeamGuide GET ${path} -> ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  }
 }
 
 function getToken(): string {
