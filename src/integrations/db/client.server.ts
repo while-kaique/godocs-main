@@ -691,6 +691,26 @@ export function getApiLogById(id: string) {
   );
 }
 
+/**
+ * Logs de iniciar-submissao COM o request_body (contém o base64 dos docs).
+ * Usado pelo backfill retroativo de documentos ao Drive. Inclui o body inteiro
+ * (pode ser grande) — usar só em fluxos admin/backfill, nunca em listagens.
+ */
+export function getIniciarSubmissaoLogs() {
+  return queryAll<{ id: string; projeto_id: string | null; request_body: string | null; created_at: string | null }>(
+    `SELECT id, projeto_id, request_body, created_at FROM api_logs
+     WHERE endpoint = '/api/chat/iniciar-submissao' AND request_body IS NOT NULL
+     ORDER BY created_at`, []
+  );
+}
+
+/** id, nome e arquivos_links de todos os projetos (cross-ref do backfill). */
+export function getProjetosLinkInfo() {
+  return queryAll<{ id: string; nome: string | null; arquivos_links: string | null }>(
+    'SELECT id, nome, arquivos_links FROM projetos', []
+  );
+}
+
 export function cleanupOldApiLogs(daysToKeep = 30) {
   return exec(
     "DELETE FROM api_logs WHERE created_at < datetime('now', '-' || ? || ' days')", [daysToKeep]
