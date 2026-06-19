@@ -7,9 +7,23 @@ import {
   FormGroup,
   FormLabel,
   FieldError,
-  CheckboxGroup,
-  InfoTooltip,
 } from "./form-components";
+
+/* Opções de tipo de projeto padrão (saving / receita) — cards selecionáveis. */
+const TIPOS_PROJETO = [
+  {
+    value: "saving",
+    icon: "💰",
+    title: "Saving Operacional",
+    desc: "Economia gerada pela automação (horas e custos). Nas próximas etapas, o agente vai coletar as rotinas, a frequência e os cargos envolvidos para montar o memorial de economia.",
+  },
+  {
+    value: "receita_incremental",
+    icon: "📈",
+    title: "Receita Incremental",
+    desc: "Aumento de receita gerado pela automação. Nas próximas etapas, o agente vai coletar como o projeto gera receita e a base de cálculo do ganho.",
+  },
+] as const;
 
 /* ──────────────────────────────────────────────
    Etapa 2.5 — Tipo de Projeto
@@ -143,35 +157,77 @@ export function Etapa25({
       {resp === "nao" && (
         <div style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
           <FormGroup>
-            <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+            <div className="mb-3 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
               Este projeto gera saving operacional, receita incremental ou ambos?
-              <InfoTooltip>
-                <strong className="mb-1 block text-white">Saving Operacional vs. Receita Incremental</strong>
-                <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <strong style={{ color: "var(--go-lime)" }}>Saving Operacional</strong> — economia gerada pela automação.
-                  Ex: processo manual que levava 20h/mês agora é automático (economia de horas e custo operacional).
-                </span>
-                <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <strong style={{ color: "var(--go-lime)" }}>Receita Incremental</strong> — aumento de receita gerado pela automação.
-                  Ex: automação que dispara ofertas personalizadas e aumenta conversão de vendas.
-                </span>
-                <span className="block text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-                  Pode selecionar os dois se o projeto gerar ambos os benefícios.
-                </span>
-              </InfoTooltip>
             </div>
-            <CheckboxGroup
-              value={form.tipoProjeto}
-              onChange={(v) => {
-                updateField("tipoProjeto", v as FormData["tipoProjeto"]);
-                clearError("tipoProjeto");
-              }}
-              error={errors.tipoProjeto}
-              options={[
-                { value: "saving",              label: "💰 Saving Operacional" },
-                { value: "receita_incremental", label: "📈 Receita Incremental" },
-              ]}
-            />
+
+            <div className="flex flex-col gap-2.5">
+              {TIPOS_PROJETO.map((opt) => {
+                const checked = form.tipoProjeto.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer select-none items-center gap-3 rounded-xl p-3.5 transition-all duration-150"
+                    style={{
+                      background: checked ? "rgba(0,89,169,0.05)" : "var(--go-white)",
+                      border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.15)",
+                      boxShadow: checked ? "0 0 0 3px rgba(0,89,169,0.08)" : "none",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={checked}
+                      onChange={() => {
+                        const next = checked
+                          ? form.tipoProjeto.filter((x) => x !== opt.value)
+                          : [...form.tipoProjeto, opt.value];
+                        updateField("tipoProjeto", next as FormData["tipoProjeto"]);
+                        clearError("tipoProjeto");
+                      }}
+                    />
+                    {/* Indicador do checkbox — o "check" só aparece quando marcado */}
+                    <span
+                      aria-hidden="true"
+                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150 peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
+                      style={{
+                        background: checked ? "var(--go-blue)" : "var(--go-white)",
+                        border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.3)",
+                      }}
+                    >
+                      {checked && (
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ animation: "go-step-in 0.15s ease" }}
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
+                    {/* Título + explicação das próximas etapas */}
+                    <span className="min-w-0">
+                      <span className="block text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                        {opt.icon} {opt.title}
+                      </span>
+                      <span
+                        className="mt-1 block text-[11.5px] leading-relaxed"
+                        style={{ color: "var(--go-text-muted, #6b6b7a)" }}
+                      >
+                        {opt.desc}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <FieldError message={errors.tipoProjeto} />
           </FormGroup>
         </div>
       )}

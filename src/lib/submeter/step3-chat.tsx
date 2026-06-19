@@ -823,6 +823,47 @@ function SavingForm({
   const icon = isSaving ? "💰" : "📈";
   const title = "Dados para Análise de Impacto";
 
+  // ── Revelação progressiva ──
+  // Como todas as informações são obrigatórias, cada tópico só aparece quando o
+  // anterior está respondido/completo — guiando o usuário um passo de cada vez.
+  const num = (s: string) => parseFloat(s);
+  const linhaCompleta = (l: SavingLinhaInput) => {
+    const a = num(l.horasAntes);
+    const d = num(l.horasDepois);
+    const antesOk = alguemFazia === "nao" || (l.horasAntes !== "" && !isNaN(a) && a >= 0);
+    const depoisOk = l.horasDepois !== "" && !isNaN(d) && d >= 0;
+    return l.cargo !== "" && antesOk && depoisOk;
+  };
+  const tabelaSavingCompleta = alguemFazia !== "" && linhas.every(linhaCompleta);
+  const custoEvitadoItemCompleto = (it: CustoEvitadoItemInput) =>
+    it.nome.trim() !== "" && it.valor !== "" && parseMoedaBR(it.valor) > 0 && it.recorrencia !== "" && it.justificativa.trim() !== "";
+  const custoEvitadoCompleto =
+    temCustoEvitado === "nao" ||
+    (temCustoEvitado === "sim" && custoEvitadoItens.length > 0 && custoEvitadoItens.every(custoEvitadoItemCompleto));
+
+  // Gates de exibição (saving). A tabela mantém o gate atual (`alguemFazia`).
+  // Custo evitado/externo: no "não" aparece já; no "sim" só após a tabela completa.
+  const mostrarSecaoSaving = isSaving && tipoSaving !== "";
+  const mostrarCustoEvitado =
+    isSaving && (alguemFazia === "nao" || (alguemFazia === "sim" && tabelaSavingCompleta));
+  const mostrarCustoFerramentaExterna = isExterno && isSaving && mostrarCustoEvitado && custoEvitadoCompleto;
+
+  // Gate (receita): racional só aparece depois do valor preenchido.
+  const mostrarRacionalReceita = isReceita && num(valorReceita) > 0;
+
+  // Botão de envio só aparece quando todo o caminho obrigatório está completo.
+  const formCompleto =
+    tipoSaving !== "" &&
+    (isReceita
+      ? num(valorReceita) > 0 && racionalReceita.trim().length >= 10
+      : alguemFazia !== "" &&
+        tabelaSavingCompleta &&
+        custoEvitadoCompleto &&
+        (!isExterno || (custoExterno !== "" && num(custoExterno) >= 0 && custoPeriodicidade !== "")));
+
+  // Animação padrão de entrada (slide de baixo pra cima) para cada novo tópico.
+  const revelar = { animation: "go-fade-in-up 0.35s ease both" } as const;
+
   // O cálculo do ganho (horas × taxa do cargo) é uma métrica de gestão e roda no
   // backend — NÃO é exibido ao usuário aqui para não induzir manipulação dos valores.
 
@@ -1053,12 +1094,12 @@ function SavingForm({
           )}
         </div>
 
-        {/* Saving — quem trabalhava/trabalha na tarefa */}
-        {isSaving && (
+        {/* Saving — quem trabalhava/trabalha na tarefa (só após escolher a frequência) */}
+        {mostrarSecaoSaving && (
           <>
             {/* Pergunta-chave: havia trabalho manual antes? Define se mostramos a
                 coluna "antes" (economia clássica) ou só "depois" (ninguém antes). */}
-            <div>
+            <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 Alguém já fazia ou mantinha isso manualmente antes? <span style={{ color: "#e53e3e" }}>*</span>
               </label>
@@ -1088,7 +1129,7 @@ function SavingForm({
 
             {/* Tabela só aparece depois de responder sim/não */}
             {alguemFazia && (
-              <div>
+              <div style={revelar}>
                 <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                   {alguemFazia === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Quem dedica tempo à automação hoje"} <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
@@ -1227,8 +1268,10 @@ function SavingForm({
             )}
 
             {/* Custo evitado — a solução fez a empresa DEIXAR de pagar alguma
-                ferramenta/serviço externo? (≠ ferramenta usada pela automação) */}
-            <div>
+                ferramenta/serviço externo? (≠ ferramenta usada pela automação)
+                No "não" aparece já; no "sim" só após a tabela estar completa. */}
+            {mostrarCustoEvitado && (
+            <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 A solução evitou algum custo de ferramenta ou serviço externo? <span style={{ color: "#e53e3e" }}>*</span>
               </label>
@@ -1390,12 +1433,13 @@ function SavingForm({
                 </div>
               )}
             </div>
+            )}
           </>
         )}
 
         {/* Ganho de receita estimado (só para projetos de receita incremental) */}
-        {isReceita && (
-          <div>
+        {isReceita && tipoSaving && (
+          <div style={revelar}>
             <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
               Ganho de receita estimado <span style={{ color: "#e53e3e" }}>*</span>
             </label>
@@ -1428,8 +1472,9 @@ function SavingForm({
               </div>
             )}
 
-            {/* Racional curto — de onde vem a receita */}
-            <div className="mt-3.5">
+            {/* Racional curto — de onde vem a receita (só após informar o valor) */}
+            {mostrarRacionalReceita && (
+            <div className="mt-3.5" style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 Racional <span style={{ color: "#e53e3e" }}>*</span>
               </label>
@@ -1457,13 +1502,14 @@ function SavingForm({
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 
-        {/* Custo da ferramenta externa (só para projetos externos com saving) */}
-        {isExterno && isSaving && (
+        {/* Custo da ferramenta externa (só projetos externos; após o custo evitado) */}
+        {mostrarCustoFerramentaExterna && (
           <>
-            <div>
+            <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 Custo da ferramenta externa <span style={{ color: "#e53e3e" }}>*</span>
               </label>
@@ -1522,7 +1568,8 @@ function SavingForm({
           </>
         )}
 
-        {/* Botão iniciar */}
+        {/* Botão iniciar — só aparece quando todo o formulário está completo */}
+        {formCompleto && (
         <button
           type="button"
           onClick={handleSubmit}
@@ -1534,6 +1581,7 @@ function SavingForm({
             border: "none",
             boxShadow: "0 2px 8px rgba(215, 219, 0, 0.2)",
             marginTop: 4,
+            ...revelar,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "translateY(-1px)";
@@ -1559,6 +1607,7 @@ function SavingForm({
             </>
           )}
         </button>
+        )}
       </div>
     </div>
   );
