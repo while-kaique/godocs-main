@@ -53,9 +53,10 @@ export function Etapa25({
           >
             Seu projeto tem altíssimo impacto para a empresa, mas{" "}
             <span style={{ color: "var(--go-blue)" }}>
-              não está diretamente ligado a um ganho de receita ou saving operacional
-            </span>{" "}
-            como um projeto padrão?
+              não está diretamente ligado a um ganho de receita ou redução de custos
+              objetivamente mensuráveis
+            </span>
+            , destoando assim de um projeto padrão?
           </p>
 
           <div className="flex gap-2.5">
@@ -64,16 +65,23 @@ export function Etapa25({
               onClick={() => onResp("sim")}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", resp === "sim" && "go-radio-checked")}
             >
-              ⭐ Sim, é um projeto de alto impacto de difícil mensuração
+              ⭐ Sim. É um projeto de alto impacto, com difícil mensuração objetiva
             </button>
             <button
               type="button"
               onClick={() => onResp("nao")}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", resp === "nao" && "go-radio-checked")}
             >
-              📊 Não, é um projeto padrão que gera saving operacional ou receita
+              📊 Não. É um projeto padrão, com mensuração objetiva de receita incremental ou de redução de custos
             </button>
           </div>
+
+          <p className="mt-3 text-[11.5px] leading-relaxed" style={{ color: "var(--go-text-muted, #6b6b7a)" }}>
+            <strong>Exemplos de Projetos Especiais:</strong> projetos que geram muito
+            engajamento nas redes, que aumentam vendas sem atribuições claras, que atuam
+            diretamente na qualidade do produto ou da entrega etc. P.ex. Piapp, Agente
+            Autônomo de Comentários.
+          </p>
           <FieldError message={errors.especial} />
         </div>
       </FormGroup>
