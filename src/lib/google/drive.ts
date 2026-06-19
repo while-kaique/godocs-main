@@ -4,11 +4,12 @@
 // (webViewLink) de cada arquivo é gravado na coluna "URL" da planilha e em
 // projetos.arquivos_links.
 //
-// ⚠️ A Service Account precisa ter acesso de Editor à pasta — caso contrário a
-// API responde 403/404. Por isso uploadDocsToDrive NUNCA propaga erro: loga e
-// segue, para não quebrar a submissão enquanto o acesso não estiver liberado.
+// ⚠️ O upload usa OAuth de USUÁRIO (getDriveAccessToken), não a Service Account:
+// Service Accounts não têm cota de storage e recebem 403 ao criar arquivos no
+// Meu Drive. As credenciais OAuth (rpa_ia@gocase.com, dono da pasta) resolvem.
+// uploadDocsToDrive NUNCA propaga erro: loga e segue, para não quebrar a submissão.
 
-import { getAccessToken } from './auth';
+import { getDriveAccessToken } from './auth';
 
 const DEFAULT_FOLDER_ID = '1e_Fk8EhFsv_W-3A3dRpMIa2Wg1pBHem_';
 const UPLOAD_URL =
@@ -56,7 +57,7 @@ function base64ToUint8Array(b64: string): Uint8Array {
 
 // Upload de um arquivo via multipart/related. Retorna o webViewLink.
 export async function uploadFileToDrive(doc: DriveDoc): Promise<{ id: string; link: string }> {
-  const token = await getAccessToken();
+  const token = await getDriveAccessToken();
   const folderId = getFolderId();
   const boundary = `godocs-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
 
