@@ -58,11 +58,21 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | POST | `/api/admin/areas/remove` | Remove área |
 | GET/POST | `/api/admin/configuracoes` | Config dinâmica (chave-valor) |
 | GET | `/api/admin/validar-projeto` | Validação de projeto |
-| GET | `/api/admin/investigador/projetos` | Lista enriquecida (fase, métricas, último log) |
-| GET | `/api/admin/investigador/projetos/:id` | Detalhes + chat + logs + análise |
+| GET | `/api/admin/investigador/projetos` | Lista enriquecida (fase, métricas, último log, `total_edicoes`) |
+| GET | `/api/admin/investigador/projetos/:id` | Detalhes + chat + logs + análise + `versions` (snapshots) + `form_events` |
 | GET | `/api/admin/investigador/stats` | Métricas globais de API |
+| GET | `/api/admin/investigador/edicoes` | Lista de reenvios (1 linha por edição) com métricas da janela daquela edição |
+| GET | `/api/admin/investigador/log/:id` | Corpo (request/response) de um log de API específico |
 | GET | `/api/admin/resync-google` | Re-dispara sync de IDA (Sheets+Chat) de um projeto, sem reanálise (`?projeto_id=`) |
 | POST | `/api/admin/sync-sheets-now` | Dispara o sync reverso Sheets → SQLite sob demanda (mesmo trabalho do cron) |
+
+## Investigador (`src/lib/investigador.functions.ts`)
+
+Painel admin com **3 abas**: **Submetidos** (`submitted_at != null` — abre a submissão original), **Edições** (1 linha por reenvio, via `getEdicoesInvestigador`, com chat/API/métricas daquela edição) e **Abandonados** (rascunho nunca submetido e inativo há > 1h — diagnóstico de travamentos). Não há mais "tempo de submissão"/"tempo médio" (inflavam porque o form fica aberto): `computeTimeSinceStart`/`tempo_desde_inicio_min` foram removidos.
+
+**Timeline determinístico (`form_events`)** — os valores que a pessoa marca no formulário (saving mensal, horas antes/depois, custo evitado, receita, metadados) chegam por payloads a `iniciar*`/`atualizar*` e **não viram `chat_messages`**. Por isso `chat.functions.ts` grava esses valores em `form_events` (via helper `gravarEvento`, não-bloqueante) nas funções `iniciarSubmissao`, `iniciarSaving`, `iniciarReceita`, `atualizarMetadados`, `atualizarTipos` e `submeterParaValidacao`. Reentradas (a pessoa volta e reedita) recebem `voltou: true` (detectado por `hasFormEventTipo`). O frontend intercala esses eventos no histórico do chat, na ordem dos acontecimentos, com marcador "Voltou e editou".
+
+**Snapshot por versão** — `submeterParaValidacao` grava `snapshot_chat` (conversa congelada) em `projeto_versions` via `gravarVersaoProjeto`. As abas Submetidos/Edições usam o snapshot da versão; quando ausente (versões antigas), caem no chat atual. Métricas/eventos por versão são fatiados pela janela `[versão anterior, versão]`.
 
 ## Autenticação
 

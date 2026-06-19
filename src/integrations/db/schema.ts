@@ -146,6 +146,27 @@ const SCHEMA_SQL = `
     response_size INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  -- Eventos determinísticos do formulário (saving mensal, horas, custo evitado,
+  -- receita, metadados…) e marcadores de "voltar etapa". APPEND-ONLY: ao contrário
+  -- de chat_messages, NUNCA são apagados quando a pessoa volta etapas e reinicia o
+  -- agente (deleteChatMessages*). É a fonte de verdade do timeline do Investigador:
+  -- como os valores chegam por payloads e não viram chat, sem isto não apareceriam.
+  -- 'tipo': submissao|saving|receita|tipos|metadados|back|submit.
+  -- 'fase': fase do chat à qual o evento se alinha (doc|saving|receita) — usada para
+  -- intercalar o evento no lugar certo do histórico.
+  -- 'dados': JSON com pares legíveis (label → valor) já prontos para exibição.
+  CREATE TABLE IF NOT EXISTS form_events (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    tipo TEXT NOT NULL,
+    fase TEXT,
+    dados TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_form_events_projeto_id
+    ON form_events(projeto_id);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -187,6 +208,12 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
+  // Snapshot imutável da conversa (chat_messages) no momento de cada submissão/reenvio.
+  // Os chat_messages são mutados/apagados in-place quando a pessoa volta etapas; este
+  // snapshot preserva a conversa ORIGINAL de cada versão para o Investigador (abas
+  // Submetidos × Edições). Forward-only: versões antigas (anteriores a esta coluna)
+  // ficam com snapshot_chat NULL e caem no fallback do chat atual.
+  'ALTER TABLE projeto_versions ADD COLUMN snapshot_chat TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
