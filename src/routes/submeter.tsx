@@ -399,6 +399,10 @@ export function SubmeterPageContent({
     setReceitaSubmitted(d.receitaSubmitted ?? null);
     if (d.formDraft) setFormDraft(d.formDraft);
     setRespEspecial(d.respEspecial ?? "");
+    // Restaura a sub-tela ativa da etapa 3 ANTES do step, no mesmo batch do formDraft,
+    // para o SavingForm montar já com o draft certo (senão retomava no chat e/ou vazio).
+    setShowSavingForm(!!d.showSavingForm);
+    setShowReceitaForm(!!d.showReceitaForm);
     setStep(d.step ?? 3);
   }, []);
 
@@ -548,12 +552,14 @@ export function SubmeterPageContent({
       receitaSubmitted,
       formDraft,
       respEspecial,
+      showSavingForm,
+      showReceitaForm,
     });
   }, [
     editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
     completedSteps, chatMessages, chatFase, chatComplete, agentTipos, agentMeta,
     agentArquivosSig, approvedDocPreview, approvedSavingPreview, approvedReceitaPreview,
-    savingSubmitted, receitaSubmitted, formDraft, respEspecial,
+    savingSubmitted, receitaSubmitted, formDraft, respEspecial, showSavingForm, showReceitaForm,
   ]);
 
   // Ao submeter (qualquer fluxo), o rascunho deixa de existir — descarta o snapshot
@@ -1543,12 +1549,14 @@ export function SubmeterPageContent({
   // por isso cada um recoloca o SEU snapshot (não o rascunho compartilhado).
   function openSavingForm() {
     if (chatLoading) return;
-    setFormDraft(savingSubmitted ?? emptyFormDraft());
+    // Reabre com o saving já submetido; na falta dele, preserva o rascunho em
+    // andamento (NUNCA volta a um formulário vazio descartando o que foi digitado).
+    setFormDraft(savingSubmitted ?? formDraft ?? emptyFormDraft());
     setShowSavingForm(true);
   }
   function openReceitaForm() {
     if (chatLoading) return;
-    setFormDraft(receitaSubmitted ?? emptyFormDraft());
+    setFormDraft(receitaSubmitted ?? formDraft ?? emptyFormDraft());
     setShowReceitaForm(true);
   }
   /* ── Enviar projeto ──────────────────────────────────────────────────────────
