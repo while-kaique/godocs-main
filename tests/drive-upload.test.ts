@@ -1,7 +1,7 @@
 // Upload ao Google Drive — mocka auth (token) e fetch (rede).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/google/auth', () => ({ getAccessToken: vi.fn().mockResolvedValue('tok-123') }));
+vi.mock('@/lib/google/auth', () => ({ getDriveAccessToken: vi.fn().mockResolvedValue('tok-123') }));
 
 import { uploadFileToDrive, uploadDocsToDrive } from '@/lib/google/drive';
 
