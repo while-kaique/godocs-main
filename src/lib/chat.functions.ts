@@ -1159,6 +1159,11 @@ export async function analisarProjetoFn(rawData: unknown) {
 
   const resultado = await analisarProjetoAgent(projeto_id);
 
+  // Projeto especial: a decisão de status é 100% humana — o analisador só agrega
+  // complexidade + parecer (observações), incl. o veredito de "é mesmo especial?".
+  const projetoAtual = await getProjetoById(projeto_id);
+  const ehEspecial = projetoAtual?.especial === 1;
+
   await insertAnalise({
     projeto_id,
     resultado: resultado.resultado,
@@ -1192,8 +1197,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     conteudo.saving as Record<string, unknown> | undefined,
     conteudo.receita as Record<string, unknown> | undefined,
   );
-  const statusFinal = materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'em_validacao' : statusVeredito;
-  if (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
+  const statusFinal = ehEspecial
+    ? 'em_validacao' // especial nunca auto-aprova/reprova — validação humana
+    : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
+      ? 'em_validacao'
+      : statusVeredito;
+  if (!ehEspecial && materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
     log(`Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`);
   }
 
@@ -1201,7 +1210,8 @@ export async function analisarProjetoFn(rawData: unknown) {
     complexidade: resultado.complexidade,
     observacoes,
     status: statusFinal,
-    validated_at: new Date().toISOString(),
+    // Especial não é "validado" pelo analisador — quem valida é o humano; não carimba validated_at.
+    ...(ehEspecial ? {} : { validated_at: new Date().toISOString() }),
   });
 
   log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
@@ -1213,7 +1223,9 @@ export async function analisarProjetoFn(rawData: unknown) {
     // pelo analisador também vão como "Pendente" na planilha — a aprovação
     // automática não é refletida no Sheets. O status interno (SQLite/dashboard)
     // continua correto. Reverter para 'Aprovado' quando a validação terminar.
-    const statusLabel = resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
+    const statusLabel = ehEspecial
+      ? 'Pendente' // especial → sempre validação humana
+      : resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
 
     runBackground(syncUpdateToGoogle({
       projetoId: projeto_id,
