@@ -100,6 +100,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
       'Custo Evitado': ouTraco(p.projeto.custo_evitado),
       'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
+      'Atualizado Em': dataSubmissao,
     };
 
     // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
@@ -155,6 +156,7 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
         'Complexidade': p.complexidade,
         'Observações': p.observacoes,
         'Status': p.status,
+        'Atualizado Em': nowFortaleza(),
       });
     } catch (sheetsErr) {
       console.error('[google/sync] Falha ao update na planilha:', sheetsErr);

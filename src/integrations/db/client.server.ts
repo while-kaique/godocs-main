@@ -288,6 +288,32 @@ export function updateProjeto(id: string, fields: Record<string, unknown>) {
   return exec(`UPDATE projetos SET ${sets}, updated_at = ? WHERE id = ?`, [...values, nowISO(), id]);
 }
 
+/** IDs de todos os projetos (usado pelo sync reverso Sheets→SQLite). */
+export async function getAllProjetoIds(): Promise<string[]> {
+  const rows = await queryAll<{ id: string }>('SELECT id FROM projetos', []);
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Insert genérico em `projetos` a partir de um mapa coluna→valor (exige `id`).
+ * Usado pelo sync reverso para importar projetos legados que só existem na
+ * planilha. `INSERT OR IGNORE` garante idempotência (se o id já existir, no-op).
+ * Objetos/arrays viram JSON; booleans viram 1/0.
+ */
+export async function insertProjetoRaw(fields: Record<string, unknown>): Promise<void> {
+  const keys = Object.keys(fields).filter((k) => fields[k] !== undefined);
+  if (!keys.includes('id')) throw new Error('insertProjetoRaw requer o campo id');
+  const cols = keys.join(', ');
+  const placeholders = keys.map(() => '?').join(', ');
+  const values = keys.map((k) => {
+    const v = fields[k];
+    if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    return v;
+  });
+  await exec(`INSERT OR IGNORE INTO projetos (${cols}) VALUES (${placeholders})`, values);
+}
+
 export function findDuplicateProjeto(nome: string, excludeId: string) {
   return queryOne<{ id: string }>(
     "SELECT id FROM projetos WHERE nome = ? AND id != ? AND status != 'rascunho' LIMIT 1",

@@ -41,6 +41,7 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | GET | `/api/areas` | Nenhuma | Lista áreas (formulador) |
 | POST | `/api/admin/areas/sync` | Admin | Sincroniza áreas do TeamGuide |
 | POST | `/api/cron/sync-areas` | Header `X-Godeploy-Cron` | Cron diário + limpeza api_logs >30d |
+| POST | `/api/cron/sync-sheets-to-sqlite` | Header `X-Godeploy-Cron` | Cron **horário**: sync reverso Sheets → SQLite (cria legados faltantes + reflete edições manuais em campos seguros) |
 
 ### Admin (todas requerem `requireAdmin`)
 | Método | Rota | Descrição |
@@ -60,6 +61,8 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | GET | `/api/admin/investigador/projetos` | Lista enriquecida (fase, métricas, último log) |
 | GET | `/api/admin/investigador/projetos/:id` | Detalhes + chat + logs + análise |
 | GET | `/api/admin/investigador/stats` | Métricas globais de API |
+| GET | `/api/admin/resync-google` | Re-dispara sync de IDA (Sheets+Chat) de um projeto, sem reanálise (`?projeto_id=`) |
+| POST | `/api/admin/sync-sheets-now` | Dispara o sync reverso Sheets → SQLite sob demanda (mesmo trabalho do cron) |
 
 ## Autenticação
 
