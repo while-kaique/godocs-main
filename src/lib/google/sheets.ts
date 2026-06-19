@@ -1,4 +1,4 @@
-// Google Sheets API v4 — append e update de linhas.
+// Google Sheets API v4 — append, update e leitura de linhas.
 
 import { getAccessToken } from './auth';
 
@@ -13,14 +13,17 @@ function getSheetConfig() {
   };
 }
 
-// ─── Layout das colunas (FONTE ÚNICA DE VERDADE) ─────────────────────────────
+// ─── Nomes de coluna conhecidos pelo sistema ─────────────────────────────────
 //
-// A ordem abaixo DEVE espelhar exatamente a aba 'GoDocs' (coluna A em diante).
-// Tanto o append quanto o update derivam daqui — mudou a planilha, muda só aqui.
+// Esta lista é a FONTE DE VERDADE dos NOMES de coluna que o sistema lê/escreve —
+// NÃO da posição. O mapeamento posição↔coluna é feito em tempo de execução lendo
+// o cabeçalho REAL da planilha (linha 1), por NOME (ver `fetchHeaderMap`). Assim,
+// reordenar/inserir colunas na planilha não quebra o sync — basta o NOME bater.
 //
-// ⚠️ As colunas "Diff Horas / Antes", "Diff Saving / Antes" e "Memorial anterior"
-// são preenchidas manualmente pela equipe — o sistema NUNCA escreve nelas. Elas
-// continuam na lista apenas para manter o alinhamento das letras das demais.
+// A ordem abaixo apenas documenta o layout atual da aba 'GoDocs' (A→AJ).
+//
+// ⚠️ "Diff Horas / Antes", "Diff Saving / Antes" e "Memorial anterior" são
+// preenchidas manualmente pela equipe — o sistema NUNCA escreve nelas.
 export const SHEET_COLUMNS = [
   'Data Submissão',                 // A
   'ID Projeto',                     // B
@@ -37,31 +40,34 @@ export const SHEET_COLUMNS = [
   'Tipos Projeto',                  // M
   'Alguém Fazia?',                  // N
   'Saving Horas',                   // O
-  'Saving Reais',                   // P
-  'Tipo de Saving',                 // Q
-  'Memorial de Saving',             // R
-  'Custo Externo Mensal',           // S
-  'Receita Mensal',                 // T
-  'Tipo de Receita',                // U
-  'Receita Memorial',               // V
-  'Status',                         // W
-  'Ganho Total',                    // X
-  'Complexidade',                   // Y  (preenchida pelo analisador)
-  'Diff Horas / Antes',             // Z  (manual — não escrever)
-  'Diff Saving / Antes',            // AA (manual — não escrever)
-  'Memorial anterior',              // AB (manual — não escrever)
-  'Observações',                    // AC (preenchida pelo analisador)
-  'Contexto do Projeto Especial',   // AD
-  'Especial?',                      // AE
-  'Custo Evitado',                  // AF
-  'Justificativa Custo Evitado',    // AG
-  'Atualizado Em',                  // AH (marcador de última escrita do sistema)
+  'Horas em Reais',                 // P  (R$ das horas economizadas — bruto)
+  'Custo Evitado',                  // Q  (valor R$ mensal do custo evitado)
+  'Justificativa Custo Evitado',    // R
+  'Custo Mensal ou Pontual',        // S  (recorrência marcada no custo evitado)
+  'Saving Reais',                   // T  (líquido: horas + custo evitado − custo externo)
+  'Tipo de Saving',                 // U
+  'Memorial de Saving',             // V
+  'Custo Externo Mensal',           // W
+  'Receita Mensal',                 // X
+  'Tipo de Receita',                // Y
+  'Receita Memorial',               // Z
+  'Status',                         // AA
+  'Ganho Total',                    // AB
+  'Complexidade',                   // AC (preenchida pelo analisador)
+  'Diff Horas / Antes',             // AD (manual — não escrever)
+  'Diff Saving / Antes',            // AE (manual — não escrever)
+  'Memorial anterior',              // AF (manual — não escrever)
+  'Observações',                    // AG (preenchida pelo analisador)
+  'Contexto do Projeto Especial',   // AH
+  'Especial?',                      // AI
+  'Atualizado Em',                  // AJ (carimbo da última escrita do sistema)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
+export type SheetRow = Partial<Record<SheetColumn, string>>;
 
 // Índice 0-based → letra da coluna (0→A, 25→Z, 26→AA, 27→AB...).
-function colLetter(index: number): string {
+export function colLetter(index: number): string {
   let n = index;
   let s = '';
   do {
@@ -71,27 +77,65 @@ function colLetter(index: number): string {
   return s;
 }
 
-const COLUMN_LETTERS: Record<string, string> = Object.fromEntries(
-  SHEET_COLUMNS.map((header, i) => [header, colLetter(i)]),
-);
+// ─── Mapeamento por NOME a partir do cabeçalho real ──────────────────────────
+//
+// Lê a linha 1 da aba e devolve os nomes na ORDEM real + o mapa nome→letra. É a
+// peça que torna o sync robusto a reordenação/inserção manual de colunas: nada
+// aqui depende de posição fixa.
+export type HeaderMap = { headers: string[]; letterByName: Record<string, string> };
 
-const ID_COLUMN_LETTER = COLUMN_LETTERS['ID Projeto']; // 'B'
-const LAST_COLUMN_LETTER = colLetter(SHEET_COLUMNS.length - 1); // 'AG'
+export async function fetchHeaderMap(token: string, spreadsheetId: string, sheetName: string): Promise<HeaderMap> {
+  const range = `'${sheetName}'!1:1`;
+  const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(range)}?majorDimension=ROWS`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Sheets header read falhou (${resp.status}): ${text}`);
+  }
+  const data = (await resp.json()) as { values?: string[][] };
+  const headers = (data.values?.[0] ?? []).map((h) => String(h ?? '').trim());
+  const letterByName: Record<string, string> = {};
+  headers.forEach((h, i) => {
+    if (h && !(h in letterByName)) letterByName[h] = colLetter(i);
+  });
+  return { headers, letterByName };
+}
+
+// Ordena os valores (mapa nome→valor) conforme a ORDEM real do cabeçalho. Colunas
+// sem valor entram vazias (preserva alinhamento). Função pura — testável.
+export function orderValuesByHeaders(
+  headers: string[],
+  values: Partial<Record<string, string | number>>,
+): (string | number)[] {
+  return headers.map((h) => {
+    const v = values[h];
+    return v == null ? '' : v;
+  });
+}
 
 // ─── Append: adiciona nova linha ao final da planilha ────────────────────────
 //
-// Recebe um mapa header→valor. Colunas ausentes (ex.: as manuais, ou as que o
-// analisador preenche depois) entram vazias, preservando o alinhamento.
+// Recebe um mapa header→valor e o alinha à ordem REAL do cabeçalho (por nome).
+// Colunas ausentes entram vazias. Chaves que não existem no cabeçalho são
+// ignoradas (com aviso) — nunca escrevem na coluna errada.
 export async function appendRow(values: Partial<Record<SheetColumn, string | number>>): Promise<void> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  const rowValues: (string | number)[] = SHEET_COLUMNS.map((header) => {
-    const v = values[header];
-    return v == null ? '' : v;
-  });
+  const { headers } = await fetchHeaderMap(token, spreadsheetId, sheetName);
+  if (headers.length === 0) {
+    throw new Error('Sheets append abortado: cabeçalho da planilha está vazio.');
+  }
 
-  const range = `'${sheetName}'!A:${LAST_COLUMN_LETTER}`;
+  const headerSet = new Set(headers);
+  for (const key of Object.keys(values)) {
+    if (values[key as SheetColumn] != null && !headerSet.has(key)) {
+      console.warn(`[google/sheets] Coluna "${key}" não existe no cabeçalho da planilha — valor ignorado no append.`);
+    }
+  }
+
+  const rowValues = orderValuesByHeaders(headers, values);
+  const range = `'${sheetName}'!A:${colLetter(headers.length - 1)}`;
   const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
   const resp = await fetch(url, {
@@ -112,16 +156,15 @@ export async function appendRow(values: Partial<Record<SheetColumn, string | num
 // ─── Read: lê todas as linhas de dados da aba (Sheets → app) ─────────────────
 //
 // Usado pelo sync reverso (planilha = fonte de verdade) para atualizar o SQLite.
-// Mapeia cada linha por POSIÇÃO usando SHEET_COLUMNS (fonte única de verdade do
-// layout) — robusto a variações do texto do cabeçalho. Pula a linha de cabeçalho
-// e linhas totalmente vazias. Só inclui células não-vazias no objeto.
-export type SheetRow = Partial<Record<SheetColumn, string>>;
-
+// Cada célula é chaveada pelo NOME REAL da coluna no cabeçalho (linha 1) — robusto
+// a reordenação. Pula o cabeçalho e linhas totalmente vazias; só inclui células
+// não-vazias.
 export async function readAllRows(): Promise<SheetRow[]> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  const range = `'${sheetName}'!A1:${LAST_COLUMN_LETTER}`;
+  // Lê o bloco inteiro de A1 em diante; a 1ª linha é o cabeçalho real.
+  const range = `'${sheetName}'!A1:ZZ`;
   const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
 
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -134,25 +177,30 @@ export async function readAllRows(): Promise<SheetRow[]> {
   const rows = data.values ?? [];
   if (rows.length < 2) return []; // só cabeçalho (ou vazia)
 
+  const headers = (rows[0] ?? []).map((h) => String(h ?? '').trim());
+
   const out: SheetRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.every((c) => c == null || String(c).trim() === '')) continue;
-    const obj: SheetRow = {};
-    SHEET_COLUMNS.forEach((header, idx) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((header, idx) => {
+      if (!header) return;
       const v = row[idx];
       if (v != null && String(v).trim() !== '') obj[header] = String(v);
     });
-    out.push(obj);
+    out.push(obj as SheetRow);
   }
   return out;
 }
 
-// ─── Update: atualiza linha existente por ID Projeto (coluna B) ──────────────
+// ─── Update: atualiza linha existente por ID Projeto ─────────────────────────
 //
 // O ID é estável e único (ex.: 'legado-270'), então não quebra se o nome do
-// projeto mudar — diferente do match por nome. Atualiza apenas as colunas
-// informadas em `updates`; as demais (inclusive as manuais) ficam intactas.
+// projeto mudar. Tanto a coluna do ID quanto as colunas a atualizar são
+// resolvidas por NOME a partir do cabeçalho real — robusto a reordenação.
+// Atualiza apenas as colunas informadas; as demais (inclusive manuais) ficam
+// intactas.
 export async function updateRowByProjectId(
   projetoId: string,
   updates: Partial<Record<SheetColumn, string | number>>,
@@ -160,8 +208,16 @@ export async function updateRowByProjectId(
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  // 1. Ler a coluna do ID (B) para achar o número da linha.
-  const searchRange = `'${sheetName}'!${ID_COLUMN_LETTER}:${ID_COLUMN_LETTER}`;
+  // 0. Resolver as letras das colunas pelo cabeçalho real.
+  const { letterByName } = await fetchHeaderMap(token, spreadsheetId, sheetName);
+  const idCol = letterByName['ID Projeto'];
+  if (!idCol) {
+    console.warn('[google/sheets] Coluna "ID Projeto" não encontrada no cabeçalho — update abortado.');
+    return;
+  }
+
+  // 1. Ler a coluna do ID para achar o número da linha.
+  const searchRange = `'${sheetName}'!${idCol}:${idCol}`;
   const searchUrl = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(searchRange)}`;
 
   const searchResp = await fetch(searchUrl, {
@@ -193,13 +249,13 @@ export async function updateRowByProjectId(
     return;
   }
 
-  // 2. Montar ranges/valores para o batch update.
+  // 2. Montar ranges/valores para o batch update (coluna resolvida por nome).
   const data: { range: string; values: (string | number)[][] }[] = [];
   for (const [columnName, value] of Object.entries(updates)) {
     if (value == null) continue;
-    const col = COLUMN_LETTERS[columnName];
+    const col = letterByName[columnName];
     if (!col) {
-      console.warn(`[google/sheets] Coluna "${columnName}" não mapeada, pulando`);
+      console.warn(`[google/sheets] Coluna "${columnName}" não existe no cabeçalho da planilha, pulando`);
       continue;
     }
     data.push({

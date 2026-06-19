@@ -1,6 +1,8 @@
 // Autenticação Google Service Account via Web Crypto API (sem deps npm).
 // Gera JWT RS256 e troca por access_token. Cache em módulo.
 
+// A Service Account é usada só para Sheets. O Drive usa OAuth de usuário
+// (getDriveAccessToken) porque Service Accounts não têm cota de storage própria.
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -122,5 +124,56 @@ export async function getAccessToken(): Promise<string> {
     expiresAt: now + expires_in,
   };
 
+  return access_token;
+}
+
+// ─── OAuth de usuário (Drive) ────────────────────────────────────────────────
+//
+// Service Accounts não têm cota de storage, então o upload ao Drive usa as
+// credenciais OAuth de um usuário real (rpa_ia@gocase.com, dono da pasta). Aqui
+// trocamos o refresh token (offline) por um access_token de curta duração.
+// Env: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN.
+
+let _driveCached: { token: string; expiresAt: number } | null = null;
+
+export async function getDriveAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (_driveCached && _driveCached.expiresAt > now + RENEW_MARGIN_SECS) {
+    return _driveCached.token;
+  }
+
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      'GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET e GOOGLE_OAUTH_REFRESH_TOKEN são obrigatórios para o upload ao Drive',
+    );
+  }
+
+  const resp = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Google OAuth refresh falhou (${resp.status}): ${text}`);
+  }
+
+  const { access_token, expires_in } = (await resp.json()) as {
+    access_token: string;
+    expires_in: number;
+  };
+
+  _driveCached = { token: access_token, expiresAt: now + expires_in };
   return access_token;
 }

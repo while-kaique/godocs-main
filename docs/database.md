@@ -191,6 +191,8 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `observacoes` TEXT em `projetos`
 - ADD `especial` INTEGER DEFAULT 0 em `projetos`
 - ADD `contexto_especial` TEXT em `projetos`
+- ADD `arquivos_nomes` TEXT em `projetos` (JSON — nomes dos arquivos)
+- ADD `arquivos_links` TEXT em `projetos` (JSON — links dos arquivos no Drive; vão p/ coluna "URL" da planilha)
 
 ## Sync reverso (Sheets → SQLite)
 

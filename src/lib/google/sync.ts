@@ -11,6 +11,38 @@ import { sendChatNotification, buildSubmitMessage, buildUpdateMessage } from './
 const ouTraco = (v: string | null | undefined): string =>
   v != null && v.trim() !== '' ? v : '—';
 
+// Parse seguro do JSON de links dos arquivos (coluna projetos.arquivos_links).
+function parseArquivosLinks(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+// Recorrência do custo evitado = o que a pessoa marcou no formulário ('mensal' ou
+// 'pontual'). Deriva dos itens persistidos (cada um com sua recorrência); itens com
+// recorrências diferentes → "Misto". Função pura — testável.
+export function custoEvitadoRecorrenciaLabel(
+  flag: string | null | undefined,
+  itensJson: string | null | undefined,
+): string {
+  if (flag !== 'sim') return '—';
+  let itens: { recorrencia?: string }[] = [];
+  try {
+    const parsed = itensJson ? JSON.parse(itensJson) : [];
+    if (Array.isArray(parsed)) itens = parsed;
+  } catch {
+    return '—';
+  }
+  const recs = [...new Set(itens.map((i) => (i?.recorrencia === 'pontual' ? 'pontual' : 'mensal')))];
+  if (recs.length === 0) return '—';
+  if (recs.length > 1) return 'Misto';
+  return recs[0] === 'pontual' ? 'Pontual' : 'Mensal';
+}
+
 function formatDateBR(isoDate: string | null | undefined): string {
   if (!isoDate) return '—';
   const parts = isoDate.split('-');
@@ -68,6 +100,28 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     const receitaValor = (p.receita?.valor_ganho_mensal as number) ?? 0;
     const ganhoTotal = p.ganhoTotalMensal > 0 ? Math.round(p.ganhoTotalMensal * 100) / 100 : 0;
 
+    // "Horas em Reais" (bruto): valor das horas de cada pessoa (horas × valor-hora
+    // do cargo), ANTES de somar custo evitado e de abater custo externo. O líquido
+    // total continua em "Saving Reais".
+    const linhasSaving = Array.isArray(p.saving?.linhas)
+      ? (p.saving!.linhas as { economia_reais_mes?: number }[])
+      : [];
+    const horasEmReais =
+      Math.round(linhasSaving.reduce((s, l) => s + (Number(l.economia_reais_mes) || 0), 0) * 100) / 100;
+
+    // Custo evitado: valor R$ mensal (já mensalizado; pontual ÷12) que entra no
+    // saving — substitui o antigo "sim/não" na coluna. A recorrência marcada pela
+    // pessoa no formulário vai em "Custo Mensal ou Pontual".
+    const custoEvitadoReais = Math.max(0, Number(p.saving?.custo_evitado_reais) || 0);
+    const custoEvitadoRecorrencia = custoEvitadoRecorrenciaLabel(
+      p.projeto.custo_evitado as string | null,
+      p.projeto.custo_evitado_itens as string | null,
+    );
+
+    // Link(s) dos documentos no Google Drive → coluna "URL" da planilha.
+    const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);
+    const urlDocs = arquivosLinks.length > 0 ? arquivosLinks.join('\n') : '—';
+
     // Colunas preenchidas pelo sistema na submissão. As colunas manuais
     // (Diff*/Memorial anterior) e as do analisador (Complexidade/Observações)
     // são deliberadamente omitidas — não são escritas aqui.
@@ -81,12 +135,16 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Projeto': ouTraco(p.projeto.nome),
       'Participantes': participantes,
       'Descrição': ouTraco(p.projeto.descricao_breve),
-      'URL': '—',
+      'URL': urlDocs,
       'Ferramenta': ouTraco(p.projeto.ferramenta),
       'Escopo': ouTraco(p.projeto.escopo),
       'Tipos Projeto': tiposStr,
       'Alguém Fazia?': ouTraco(p.projeto.alguem_fazia),
       'Saving Horas': savingHoras,
+      'Horas em Reais': horasEmReais,
+      'Custo Evitado': custoEvitadoReais > 0 ? custoEvitadoReais : '—',
+      'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
+      'Custo Mensal ou Pontual': custoEvitadoRecorrencia,
       'Saving Reais': savingReais,
       'Tipo de Saving': ouTraco(p.saving?.tipo_saving as string | undefined),
       'Memorial de Saving': ouTraco(p.memorialLimpo),
@@ -98,8 +156,6 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Ganho Total': ganhoTotal,
       'Contexto do Projeto Especial': ouTraco(p.projeto.contexto_especial),
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
-      'Custo Evitado': ouTraco(p.projeto.custo_evitado),
-      'Justificativa Custo Evitado': ouTraco(p.projeto.custo_evitado_justificativa),
       'Atualizado Em': dataSubmissao,
     };
 

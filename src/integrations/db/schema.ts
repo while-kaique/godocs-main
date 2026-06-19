@@ -178,6 +178,7 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN contexto_especial TEXT',
   // Nomes dos arquivos enviados no upload (JSON array de strings) — exibidos na edição
   'ALTER TABLE projetos ADD COLUMN arquivos_nomes TEXT',
+'ALTER TABLE projetos ADD COLUMN arquivos_links TEXT',
   // Custo evitado: a solução fez a empresa DEIXAR de pagar ferramentas/serviços
   // externos? `custo_evitado` = 'sim'|'nao'; `custo_evitado_justificativa` = texto
   // concatenado legível; `custo_evitado_itens` = JSON [{nome,valor,recorrencia,justificativa}].

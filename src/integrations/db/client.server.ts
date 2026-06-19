@@ -691,6 +691,26 @@ export function getApiLogById(id: string) {
   );
 }
 
+/**
+ * Logs de iniciar-submissao COM o request_body (contém o base64 dos docs).
+ * Usado pelo backfill retroativo de documentos ao Drive. Inclui o body inteiro
+ * (pode ser grande) — usar só em fluxos admin/backfill, nunca em listagens.
+ */
+export function getIniciarSubmissaoLogs() {
+  return queryAll<{ id: string; projeto_id: string | null; request_body: string | null; created_at: string | null }>(
+    `SELECT id, projeto_id, request_body, created_at FROM api_logs
+     WHERE endpoint = '/api/chat/iniciar-submissao' AND request_body IS NOT NULL
+     ORDER BY created_at`, []
+  );
+}
+
+/** id, nome e arquivos_links de todos os projetos (cross-ref do backfill). */
+export function getProjetosLinkInfo() {
+  return queryAll<{ id: string; nome: string | null; arquivos_links: string | null }>(
+    'SELECT id, nome, arquivos_links FROM projetos', []
+  );
+}
+
 export function cleanupOldApiLogs(daysToKeep = 30) {
   return exec(
     "DELETE FROM api_logs WHERE created_at < datetime('now', '-' || ? || ' days')", [daysToKeep]
@@ -744,6 +764,7 @@ export type ProjetoRow = {
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   arquivos_nomes: string | null; // JSON array de nomes dos arquivos enviados no upload
+  arquivos_links: string | null; // JSON array de links (webViewLink) dos arquivos no Drive
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;
