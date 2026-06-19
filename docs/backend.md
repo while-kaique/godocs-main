@@ -26,7 +26,7 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 ### Chat (todas POST, logadas em `api_logs`)
 | Rota | Função | Descrição |
 |---|---|---|
-| `/api/chat/iniciar-submissao` | `iniciarSubmissao` | Cria projeto, extrai texto dos docs, roda extractor + orquestrador |
+| `/api/chat/iniciar-submissao` | `iniciarSubmissao` | Cria projeto, extrai texto dos docs, **faz upload dos arquivos ao Drive** (link → `arquivos_links`/coluna URL), roda extractor + orquestrador |
 | `/api/chat/enviar-mensagem` | `enviarMensagem` | Avança o chat; compila doc na transição doc→impacto |
 | `/api/chat/iniciar-saving` | `iniciarSaving` | Inicia fase saving com linhas pré-preenchidas; calcula economia |
 | `/api/chat/iniciar-receita` | `iniciarReceita` | Inicia fase receita com valor/racional opcionais |

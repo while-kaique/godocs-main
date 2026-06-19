@@ -1,7 +1,8 @@
 // Autenticação Google Service Account via Web Crypto API (sem deps npm).
 // Gera JWT RS256 e troca por access_token. Cache em módulo.
 
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const SCOPES =
+  'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const TOKEN_LIFETIME_SECS = 3600;

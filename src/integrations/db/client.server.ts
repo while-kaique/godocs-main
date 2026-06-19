@@ -744,6 +744,7 @@ export type ProjetoRow = {
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   arquivos_nomes: string | null; // JSON array de nomes dos arquivos enviados no upload
+  arquivos_links: string | null; // JSON array de links (webViewLink) dos arquivos no Drive
   submitted_at: string | null;
   validated_at: string | null;
   validated_by: string | null;

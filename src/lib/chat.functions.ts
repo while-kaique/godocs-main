@@ -50,6 +50,7 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
+import { uploadDocsToDrive } from '@/lib/google/drive';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -498,9 +499,19 @@ export async function iniciarSubmissao(rawData: unknown) {
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
-  // Persiste os nomes dos arquivos para exibição na tela de edição
+  // Persiste os nomes dos arquivos e faz upload ao Google Drive. O link de cada
+  // arquivo (webViewLink) vai para projetos.arquivos_links e, na submissão, para
+  // a coluna "URL" da planilha. Roda para AMBOS os fluxos (normal e especial —
+  // este trecho é anterior ao early-return do especial). uploadDocsToDrive nunca
+  // propaga erro (se a SA ainda não tem acesso à pasta, segue sem link).
   if (data.docs.length > 0) {
-    await updateProjeto(projeto.id, { arquivos_nomes: data.docs.map((d) => d.filename) });
+    const arquivosLinks = await uploadDocsToDrive(
+      data.docs.map((d) => ({ base64: d.base64, filename: d.filename })),
+    );
+    await updateProjeto(projeto.id, {
+      arquivos_nomes: data.docs.map((d) => d.filename),
+      ...(arquivosLinks.length > 0 ? { arquivos_links: arquivosLinks } : {}),
+    });
   }
 
   let docTexto = '';
@@ -1005,7 +1016,13 @@ export async function atualizarMetadados(rawData: unknown) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
       log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-      await updateProjeto(data.projeto_id, { arquivos_nomes: data.docs!.map((d) => d.filename) });
+      const arquivosLinks = await uploadDocsToDrive(
+        data.docs!.map((d) => ({ base64: d.base64, filename: d.filename })),
+      );
+      await updateProjeto(data.projeto_id, {
+        arquivos_nomes: data.docs!.map((d) => d.filename),
+        ...(arquivosLinks.length > 0 ? { arquivos_links: arquivosLinks } : {}),
+      });
     } catch (extractErr) {
       err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
       docTexto = '';
