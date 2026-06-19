@@ -149,8 +149,8 @@ describe('OrchestratorResult', () => {
 });
 
 describe('CARGOS', () => {
-  it('contém 6 cargos com label e valor_hora', () => {
-    expect(CARGOS).toHaveLength(6);
+  it('contém 7 cargos com label e valor_hora', () => {
+    expect(CARGOS).toHaveLength(7);
     for (const cargo of CARGOS) {
       expect(cargo).toHaveProperty('label');
       expect(cargo).toHaveProperty('valor_hora');
@@ -163,8 +163,13 @@ describe('CARGOS', () => {
     expect(estagiario?.valor_hora).toBe(10.78);
   });
 
-  it('Especialista/Gestor/Head custa R$ 55,15/h', () => {
-    const coord = CARGOS.find(c => c.label === 'Especialista / Gestor / Head');
+  it('Especialista+ custa R$ 55,15/h', () => {
+    const coord = CARGOS.find(c => c.label === 'Especialista+');
     expect(coord?.valor_hora).toBe(55.15);
+  });
+
+  it('Supervisor custa R$ 42,75/h', () => {
+    const sup = CARGOS.find(c => c.label === 'Supervisor');
+    expect(sup?.valor_hora).toBe(42.75);
   });
 });

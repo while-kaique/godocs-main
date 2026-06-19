@@ -10,7 +10,7 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     const savingDoLLM: SavingColetado = {
       linhas: [
         {
-          cargo: "Especialista / Gestor / Head",
+          cargo: "Especialista+",
           horas_antes: 30,
           horas_depois: 1.5,
           valor_hora: 55.15,
