@@ -51,4 +51,18 @@ describe('Memorial anterior no sync', () => {
     const row = (updateRowByProjectId as ReturnType<typeof vi.fn>).mock.calls[0][1];
     expect('Memorial anterior' in row).toBe(false);
   });
+
+  it('NOVA: grava "Data Submissão" e "Atualizado Em"', async () => {
+    await syncSubmitToGoogle({ ...baseParams, modo: 'novo' });
+    const row = (appendRow as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect('Data Submissão' in row).toBe(true);
+    expect('Atualizado Em' in row).toBe(true);
+  });
+
+  it('EDIÇÃO: NÃO grava "Data Submissão" (preserva original); só "Atualizado Em"', async () => {
+    await syncSubmitToGoogle({ ...baseParams, modo: 'edicao' });
+    const row = (updateRowByProjectId as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect('Data Submissão' in row).toBe(false);
+    expect('Atualizado Em' in row).toBe(true);
+  });
 });

@@ -168,7 +168,6 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // e as do analisador (Complexidade/Observações) são omitidas. "Memorial
     // anterior" é escrita só na edição (logo abaixo), com o memorial pré-edição.
     const row: Partial<Record<SheetColumn, string | number>> = {
-      'Data Submissão': dataSubmissao,
       'ID Projeto': p.projetoId,
       'Data Criação': dataCriacao,
       'Área': p.area,
@@ -207,6 +206,13 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // coluna fica vazia; na edição sem anterior, não sobrescreve a célula manual.
     if (p.modo === 'edicao' && p.memorialAnterior && p.memorialAnterior.trim()) {
       row['Memorial anterior'] = p.memorialAnterior.trim();
+    }
+
+    // "Data Submissão" é a data em que a pessoa SUBMETEU — só na submissão nova
+    // (append). Na EDIÇÃO, NÃO escrevemos essa coluna (preserva a data original);
+    // só "Atualizado Em" reflete a edição.
+    if (p.modo !== 'edicao') {
+      row['Data Submissão'] = dataSubmissao;
     }
 
     // Padroniza antes de gravar: numérico vazio → 0; texto vazio → "—".
