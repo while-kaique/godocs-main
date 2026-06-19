@@ -50,7 +50,8 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
-import { uploadDocsToDrive } from '@/lib/google/drive';
+import { upsertResumoDoc } from '@/lib/google/drive';
+import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -499,18 +500,12 @@ export async function iniciarSubmissao(rawData: unknown) {
   }
   log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
 
-  // Persiste os nomes dos arquivos e faz upload ao Google Drive. O link de cada
-  // arquivo (webViewLink) vai para projetos.arquivos_links e, na submissão, para
-  // a coluna "URL" da planilha. Roda para AMBOS os fluxos (normal e especial —
-  // este trecho é anterior ao early-return do especial). uploadDocsToDrive nunca
-  // propaga erro (se a SA ainda não tem acesso à pasta, segue sem link).
+  // Persiste só os NOMES dos arquivos enviados (referência). NÃO subimos os
+  // arquivos crus ao Drive — o que vai para a coluna "URL" é UM link do RESUMO da
+  // documentação gerada pelo agente, salvo no Drive em `submeterParaValidacao`.
   if (data.docs.length > 0) {
-    const arquivosLinks = await uploadDocsToDrive(
-      data.docs.map((d) => ({ base64: d.base64, filename: d.filename })),
-    );
     await updateProjeto(projeto.id, {
       arquivos_nomes: data.docs.map((d) => d.filename),
-      ...(arquivosLinks.length > 0 ? { arquivos_links: arquivosLinks } : {}),
     });
   }
 
@@ -1016,12 +1011,9 @@ export async function atualizarMetadados(rawData: unknown) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
       log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-      const arquivosLinks = await uploadDocsToDrive(
-        data.docs!.map((d) => ({ base64: d.base64, filename: d.filename })),
-      );
+      // Só os nomes — o link do Drive (resumo da doc) é gerado em submeterParaValidacao.
       await updateProjeto(data.projeto_id, {
         arquivos_nomes: data.docs!.map((d) => d.filename),
-        ...(arquivosLinks.length > 0 ? { arquivos_links: arquivosLinks } : {}),
       });
     } catch (extractErr) {
       err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
@@ -1324,6 +1316,33 @@ export async function submeterParaValidacao(rawData: unknown) {
     }
   } catch (versionErr) {
     err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
+  }
+
+  // ── Resumo da documentação → UM doc no Drive (link único na coluna "URL") ──
+  // Salva o RESUMO da documentação gerada pelo agente como UM documento no Drive
+  // (NÃO os arquivos crus enviados). Em edição, atualiza o MESMO doc in-place — N
+  // edições não geram N arquivos. Não bloqueia a submissão se o Drive falhar.
+  try {
+    const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
+    const md = renderResumoDocumentacao(projeto, conteudo);
+    const sanit = (x: string) =>
+      (x || '')
+        .replace(/[|/\\]+/g, '-')
+        .replace(/->|→|<>/g, '-')
+        .replace(/\s+/g, ' ')
+        .replace(/[^\w\sÀ-ÿ.\-]/g, '')
+        .trim()
+        .replace(/\s/g, '_')
+        .slice(0, 80);
+    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, '')}_${sanit(projeto.nome ?? 'projeto')}_${sanit(areaFinal ?? '')}.md`;
+    const link = await upsertResumoDoc(filename, md, linkExistente);
+    if (link) {
+      await updateProjeto(projeto_id, { arquivos_links: [link] });
+      (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
+      log('submeterParaValidacao', `Resumo da doc salvo no Drive: ${link}`);
+    }
+  } catch (driveErr) {
+    err('submeterParaValidacao', 'Falha ao salvar resumo no Drive (não bloqueante):', driveErr);
   }
 
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──

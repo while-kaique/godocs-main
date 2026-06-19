@@ -110,3 +110,59 @@ export async function uploadDocsToDrive(docs: DriveDoc[]): Promise<string[]> {
   }
   return links;
 }
+
+// Extrai o fileId de um webViewLink do Drive (".../d/<id>/view" ou "?id=<id>").
+function fileIdFromLink(link?: string | null): string | null {
+  if (!link) return null;
+  return link.match(/\/d\/([^/?]+)/)?.[1] ?? link.match(/[?&]id=([^&]+)/)?.[1] ?? null;
+}
+
+// Salva o RESUMO da documentação gerada (markdown) como UM ÚNICO documento no
+// Drive e retorna o webViewLink. Se `linkExistente` aponta para um doc já criado,
+// ATUALIZA o conteúdo dele in-place (mesmo link) — assim editar o projeto N vezes
+// não cria N arquivos. Se não existir (ou o update falhar), cria um novo.
+// Nunca propaga erro (loga e retorna null) — a submissão não pode quebrar.
+export async function upsertResumoDoc(
+  filename: string,
+  markdown: string,
+  linkExistente?: string | null,
+): Promise<string | null> {
+  try {
+    const token = await getDriveAccessToken();
+    const fileId = fileIdFromLink(linkExistente);
+
+    // 1) Atualização in-place (conteúdo) de um doc já existente.
+    if (fileId) {
+      const patchUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&supportsAllDrives=true&fields=id,webViewLink`;
+      const resp = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/markdown; charset=UTF-8' },
+        body: markdown,
+      });
+      if (resp.ok) {
+        const d = (await resp.json()) as { id: string; webViewLink?: string };
+        return d.webViewLink ?? linkExistente ?? `https://drive.google.com/file/d/${d.id}/view`;
+      }
+      console.error(`[google/drive] PATCH do resumo falhou (${resp.status}) — criando novo.`);
+      // cai para criar um novo abaixo
+    }
+
+    // 2) Criação de um novo doc (multipart/related, text/markdown UTF-8).
+    const boundary = `godocs-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const metadata = { name: filename, parents: [getFolderId()], mimeType: 'text/markdown' };
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: text/markdown; charset=UTF-8\r\n\r\n${markdown}\r\n--${boundary}--`;
+    const resp = await fetch(UPLOAD_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    if (!resp.ok) throw new Error(`Drive upload (resumo) falhou (${resp.status}): ${(await resp.text()).slice(0, 200)}`);
+    const d = (await resp.json()) as { id: string; webViewLink?: string };
+    return d.webViewLink ?? `https://drive.google.com/file/d/${d.id}/view`;
+  } catch (e) {
+    console.error('[google/drive] Falha no upsert do resumo da documentação:', e);
+    return null;
+  }
+}
