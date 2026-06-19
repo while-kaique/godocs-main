@@ -55,6 +55,7 @@ export const SHEET_COLUMNS = [
   'Especial?',                      // AE
   'Custo Evitado',                  // AF
   'Justificativa Custo Evitado',    // AG
+  'Atualizado Em',                  // AH (marcador de última escrita do sistema)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
@@ -106,6 +107,45 @@ export async function appendRow(values: Partial<Record<SheetColumn, string | num
     const text = await resp.text();
     throw new Error(`Sheets append falhou (${resp.status}): ${text}`);
   }
+}
+
+// ─── Read: lê todas as linhas de dados da aba (Sheets → app) ─────────────────
+//
+// Usado pelo sync reverso (planilha = fonte de verdade) para atualizar o SQLite.
+// Mapeia cada linha por POSIÇÃO usando SHEET_COLUMNS (fonte única de verdade do
+// layout) — robusto a variações do texto do cabeçalho. Pula a linha de cabeçalho
+// e linhas totalmente vazias. Só inclui células não-vazias no objeto.
+export type SheetRow = Partial<Record<SheetColumn, string>>;
+
+export async function readAllRows(): Promise<SheetRow[]> {
+  const token = await getAccessToken();
+  const { spreadsheetId, sheetName } = getSheetConfig();
+
+  const range = `'${sheetName}'!A1:${LAST_COLUMN_LETTER}`;
+  const url = `${BASE_URL}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Sheets read falhou (${resp.status}): ${text}`);
+  }
+
+  const data = (await resp.json()) as { values?: string[][] };
+  const rows = data.values ?? [];
+  if (rows.length < 2) return []; // só cabeçalho (ou vazia)
+
+  const out: SheetRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => c == null || String(c).trim() === '')) continue;
+    const obj: SheetRow = {};
+    SHEET_COLUMNS.forEach((header, idx) => {
+      const v = row[idx];
+      if (v != null && String(v).trim() !== '') obj[header] = String(v);
+    });
+    out.push(obj);
+  }
+  return out;
 }
 
 // ─── Update: atualiza linha existente por ID Projeto (coluna B) ──────────────

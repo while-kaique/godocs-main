@@ -35,6 +35,7 @@ import {
   getUsuarios,
 } from '@/lib/admin.functions'
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
+import { syncSheetsToSqlite } from '@/lib/google/sync-reverse'
 import {
   getProjetosInvestigador,
   getProjetoInvestigadorDetalhes,
@@ -125,6 +126,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       // Limpa logs de API com mais de 30 dias (em segundo plano, via waitUntil)
       runBackground(cleanupOldApiLogs(30))
       return json(await sincronizarAreas())
+    }
+
+    // ── Cron: sync reverso Sheets → SQLite (planilha = fonte de verdade) ──
+    // Importa legados que só existem na planilha e reflete edições manuais nos
+    // campos seguros. Agendado de hora em hora pela plataforma Godeploy.
+    if (pathname === '/api/cron/sync-sheets-to-sqlite' && method === 'POST') {
+      if (!request.headers.get('x-godeploy-cron')) {
+        return errorJson('Rota exclusiva de cron.', 403)
+      }
+      return json(await syncSheetsToSqlite())
     }
 
     // ── Meus Projetos (filtrado pelo email do header — anti-IDOR) ──
@@ -337,6 +348,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const projetoId = url.searchParams.get('projeto_id')
       if (!projetoId) return errorJson('Informe ?projeto_id=...', 400)
       return json(await resyncGoogle({ projeto_id: projetoId }))
+    }
+
+    // ── Sync reverso manual (admin) ──
+    // Dispara o sync Sheets → SQLite sob demanda (mesmo trabalho do cron), útil
+    // para validar antes de confiar no agendamento horário.
+    if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await syncSheetsToSqlite())
     }
 
     return errorJson('Rota não encontrada', 404)

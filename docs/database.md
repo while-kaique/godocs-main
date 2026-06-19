@@ -191,3 +191,12 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `observacoes` TEXT em `projetos`
 - ADD `especial` INTEGER DEFAULT 0 em `projetos`
 - ADD `contexto_especial` TEXT em `projetos`
+
+## Sync reverso (Sheets → SQLite)
+
+A planilha (aba `GoDocs`) é a fonte de verdade. `syncSheetsToSqlite()` (`src/lib/google/sync-reverse.ts`), rodado de hora em hora pelo cron, reconcilia o SQLite:
+
+- **Legados** (existem só na planilha) → `insertProjetoRaw(fields)` cria a linha em `projetos` (id = `ID Projeto` em minúsculo). Isso os torna visíveis em "Meus Projetos" e editáveis pelos donos (match por `responsavel_email`/`membros`, vindos das colunas F/H).
+- **Existentes** → `updateProjeto` apenas dos **campos seguros** (diff-aware). `status`, `responsavel_*` e `membros` **não** são sobrescritos; célula vazia nunca apaga dado.
+- Helpers novos em `client.server.ts`: `getAllProjetoIds()` e `insertProjetoRaw(fields)` (INSERT genérico por mapa coluna→valor, exige `id`, `INSERT OR IGNORE`).
+- Legados importados **não têm `documentacao`** — a edição funciona (forms financeiros começam vazios), pois `getMeuProjeto` lida com doc ausente.
