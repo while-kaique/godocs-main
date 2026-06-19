@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import type { FormData, FieldErrors } from "./constants";
 import {
@@ -34,6 +36,16 @@ export function Etapa25({
 }) {
   const contextoChars = form.contextoEspecial.length;
 
+  // Modal de confirmação ao marcar "Sim": avisa que o projeto pulará a
+  // verificação de saving/receita e irá para avaliação humana rigorosa.
+  const [confirmarEspecial, setConfirmarEspecial] = useState(false);
+
+  // Clicar "Sim" não marca direto: abre o alerta de confirmação.
+  // Se já estava em "sim", reabre o alerta para reconfirmar/voltar atrás.
+  function handleClickSim() {
+    setConfirmarEspecial(true);
+  }
+
   return (
     <div>
       <SectionTitle icon="🎯">Tipo de Projeto</SectionTitle>
@@ -62,7 +74,7 @@ export function Etapa25({
           <div className="flex gap-2.5">
             <button
               type="button"
-              onClick={() => onResp("sim")}
+              onClick={handleClickSim}
               className={cn("go-radio-label flex-1 cursor-pointer select-none", resp === "sim" && "go-radio-checked")}
             >
               ⭐ Sim. É um projeto de alto impacto, com difícil mensuração objetiva
@@ -163,6 +175,128 @@ export function Etapa25({
           </FormGroup>
         </div>
       )}
+
+      {/* Modal de confirmação — projeto especial → avaliação humana rigorosa */}
+      {confirmarEspecial && (
+        <ConfirmEspecialModal
+          onConfirmar={() => {
+            setConfirmarEspecial(false);
+            onResp("sim");
+          }}
+          onRecusar={() => {
+            setConfirmarEspecial(false);
+            onResp("nao");
+          }}
+          onFechar={() => setConfirmarEspecial(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   Modal de confirmação de Projeto Especial
+   Alerta o usuário que, ao prosseguir como projeto especial, ele PULA a
+   verificação automática de saving/receita e vai para avaliação humana
+   rigorosa (alguém entra em contato para validar o alto impacto).
+   ────────────────────────────────────────────── */
+function ConfirmEspecialModal({
+  onConfirmar,
+  onRecusar,
+  onFechar,
+}: {
+  onConfirmar: () => void;
+  onRecusar: () => void;
+  onFechar: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      onClick={onFechar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        animation: "go-fade-in-up 0.25s ease both",
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="especial-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          background: "var(--go-white)",
+          borderRadius: "var(--go-radius, 16px)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          overflow: "hidden",
+          animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both",
+        }}
+      >
+        {/* Faixa de alerta */}
+        <div
+          className="flex items-center gap-2.5 px-5 py-3.5"
+          style={{ background: "rgba(245,158,11,0.12)", borderBottom: "1.5px solid rgba(245,158,11,0.25)" }}
+        >
+          <span style={{ fontSize: 20, lineHeight: 1 }}>⚠️</span>
+          <span
+            id="especial-modal-title"
+            className="text-[14px] font-extrabold"
+            style={{ color: "#92600a", letterSpacing: "-0.01em" }}
+          >
+            Atenção: avaliação humana rigorosa
+          </span>
+        </div>
+
+        {/* Corpo */}
+        <div className="px-5 py-4">
+          <p className="text-[13px] leading-relaxed" style={{ color: "var(--go-text-heading)" }}>
+            Ao prosseguir como <strong>projeto especial</strong>, você{" "}
+            <strong style={{ color: "#b45309" }}>pula as etapas de verificação de saving e/ou receita</strong>{" "}
+            e segue direto para uma <strong>avaliação humana rigorosa</strong>.
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--go-text-muted, #6b6b7a)" }}>
+            Uma pessoa entrará em contato com você para entender e validar este projeto de
+            altíssimo impacto. Confirme apenas se o projeto realmente não se encaixa em uma
+            mensuração objetiva de receita ou redução de custos.
+          </p>
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-col-reverse gap-2.5 px-5 pb-5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onRecusar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold transition-colors"
+            style={{
+              background: "transparent",
+              color: "var(--go-text-muted, #6b6b7a)",
+              border: "1.5px solid rgba(0,0,0,0.12)",
+            }}
+          >
+            Não, seguir fluxo normal
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold text-white transition-colors"
+            style={{ background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }}
+          >
+            Sim, é um projeto especial
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
