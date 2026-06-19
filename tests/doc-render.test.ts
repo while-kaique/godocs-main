@@ -39,6 +39,19 @@ describe('renderResumoDocumentacao', () => {
     expect(md).toContain('## Atenção\ncuidado com rate limit');
   });
 
+  it('inclui resumo do agente + documentação enviada pelo usuário (extras)', () => {
+    const md = renderResumoDocumentacao(projeto, { o_que_faz: 'X' }, {
+      resumoProjeto: 'Resumo factual do projeto em 3 frases.',
+      docUsuario: 'function main() { return 42; }',
+      arquivosNomes: ['app.js', 'README.md'],
+    });
+    expect(md).toContain('## Resumo do projeto\nResumo factual do projeto em 3 frases.');
+    expect(md).toContain('## Documentação enviada pelo usuário');
+    expect(md).toContain('**Arquivos:** app.js, README.md');
+    expect(md).toContain('### Conteúdo extraído');
+    expect(md).toContain('function main() { return 42; }');
+  });
+
   it('projeto especial usa contexto especial + descrição (sem doc compilada)', () => {
     const esp = { ...projeto, especial: 1, contexto_especial: 'Alto impacto, difícil mensuração.' };
     const md = renderResumoDocumentacao(esp, {});
