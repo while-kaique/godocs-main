@@ -36,6 +36,10 @@ export type DraftSnapshot = {
   receitaSubmitted: SavingFormData | null;
   formDraft: SavingFormData;
   respEspecial: "sim" | "nao" | "";
+  // Qual sub-tela da etapa 3 estava ativa (formulário determinístico vs. chat).
+  // Sem isso, retomar um rascunho na fase de saving/receita caía no chat do agente.
+  showSavingForm: boolean;
+  showReceitaForm: boolean;
 };
 
 export function saveDraft(snapshot: DraftSnapshot): void {
