@@ -226,9 +226,6 @@ export function SubmeterPageContent({
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Garante que o seed/retomada roda uma única vez no mount.
-  const seededRef = useRef(false);
-
   // Aplica no estado do wizard os dados de um projeto vindos do servidor —
   // usado tanto na EDIÇÃO de um projeto submetido quanto na RETOMADA de um
   // rascunho (cross-device, quando não há snapshot local). `id` é o projeto a
@@ -408,9 +405,25 @@ export function SubmeterPageContent({
   // Mount: decide entre EDIÇÃO, RETOMADA de rascunho (local ou cross-device) ou
   // submissão nova (fresh). Roda uma única vez.
   useEffect(() => {
-    if (seededRef.current) return;
-    seededRef.current = true;
+    // Sem guarda de "já seedou": sob StrictMode (dev) o efeito monta → desmonta →
+    // remonta. Um ref persistente faria a 2ª montagem (a final) sair cedo, deixando
+    // o seedLoading preso em true (o fetch da 1ª já vem com cancelled=true). O flag
+    // `cancelled` abaixo já descarta com segurança o resultado da montagem efêmera.
     let cancelled = false;
+
+    // Rede de segurança: o seed NUNCA pode prender a tela "Carregando seu
+    // projeto…". Se algo travar (fetch pendurado, rascunho problemático), libera
+    // o formulário em branco e descarta o rascunho que estava sendo retomado.
+    const safety = setTimeout(() => {
+      if (cancelled) return;
+      console.warn("[seed] timeout ao carregar — liberando formulário e descartando rascunho local");
+      clearDraft();
+      setSeedLoading(false);
+    }, 8000);
+    const finishSeed = () => {
+      clearTimeout(safety);
+      if (!cancelled) setSeedLoading(false);
+    };
 
     // ── Modo edição: seed do servidor ──
     if (editProjetoId) {
@@ -423,17 +436,15 @@ export function SubmeterPageContent({
           console.error("[editar] falha ao carregar projeto:", e);
           toast.error("Não foi possível carregar o projeto para edição.");
         })
-        .finally(() => {
-          if (!cancelled) setSeedLoading(false);
-        });
-      return () => { cancelled = true; };
+        .finally(finishSeed);
+      return () => { cancelled = true; clearTimeout(safety); };
     }
 
     // ── Modo retomada de rascunho ──
     const local = loadDraft();
     const wantedId = resumeDraftId ?? local?.projetoId;
     if (!wantedId) {
-      setSeedLoading(false);
+      finishSeed();
       return;
     }
 
@@ -477,10 +488,8 @@ export function SubmeterPageContent({
         console.warn("[rascunho] não foi possível retomar — começando do zero:", e);
         clearDraft();
       })
-      .finally(() => {
-        if (!cancelled) setSeedLoading(false);
-      });
-    return () => { cancelled = true; };
+      .finally(finishSeed);
+    return () => { cancelled = true; clearTimeout(safety); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editProjetoId, resumeDraftId]);
 
