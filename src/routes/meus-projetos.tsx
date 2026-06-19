@@ -112,6 +112,9 @@ function MeusProjetosPage() {
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  // Abre na aba "Submetidos"; rascunhos ficam atrás de uma aba secundária para
+  // manter a tela limpa (só o que de fato foi enviado aparece de cara).
+  const [aba, setAba] = useState<"submetidos" | "rascunhos">("submetidos");
 
   useEffect(() => {
     apiFetch<Projeto[]>("/api/meus-projetos")
@@ -119,6 +122,10 @@ function MeusProjetosPage() {
       .catch((e) => setErro(e instanceof Error ? e.message : "Erro ao carregar projetos."))
       .finally(() => setLoading(false));
   }, []);
+
+  const submetidos = projetos.filter((p) => p.status !== "rascunho");
+  const rascunhos = projetos.filter((p) => p.status === "rascunho");
+  const visiveis = aba === "submetidos" ? submetidos : rascunhos;
 
   return (
     <div
@@ -199,8 +206,75 @@ function MeusProjetosPage() {
           )}
 
           {!loading && !erro && projetos.length > 0 && (
+            <>
+              {/* Abas: Submetidos (padrão) e Rascunhos (secundária, em cinza) */}
+              <div className="mb-6 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAba("submetidos")}
+                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all"
+                  style={
+                    aba === "submetidos"
+                      ? { background: "var(--go-blue)", color: "var(--go-white)" }
+                      : { background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.1)" }
+                  }
+                >
+                  Submetidos
+                  <span
+                    className="rounded-full px-1.5 text-[11px] font-bold"
+                    style={
+                      aba === "submetidos"
+                        ? { background: "rgba(255,255,255,0.2)" }
+                        : { background: "rgba(0,0,0,0.05)" }
+                    }
+                  >
+                    {submetidos.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAba("rascunhos")}
+                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all"
+                  style={
+                    aba === "rascunhos"
+                      ? { background: "var(--go-blue)", color: "var(--go-white)" }
+                      : { background: "transparent", color: "#a5a5b3", border: "1px solid rgba(0,0,0,0.08)" }
+                  }
+                >
+                  Rascunhos
+                  <span
+                    className="rounded-full px-1.5 text-[11px] font-bold"
+                    style={
+                      aba === "rascunhos"
+                        ? { background: "rgba(255,255,255,0.2)" }
+                        : { background: "rgba(0,0,0,0.04)" }
+                    }
+                  >
+                    {rascunhos.length}
+                  </span>
+                </button>
+              </div>
+
+              {visiveis.length === 0 && (
+                <div
+                  className="rounded-xl p-10 text-center"
+                  style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.08)" }}
+                >
+                  <FileText className="mx-auto mb-3 h-10 w-10 opacity-30" style={{ color: "var(--go-blue)" }} />
+                  <p className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                    {aba === "submetidos" ? "Nenhum projeto submetido" : "Nenhum rascunho em andamento"}
+                  </p>
+                  <p className="mt-1 text-sm" style={{ color: "#8b8b9a" }}>
+                    {aba === "submetidos"
+                      ? "Você ainda não enviou nenhum projeto para análise."
+                      : "Rascunhos aparecem aqui enquanto você preenche uma submissão."}
+                  </p>
+                </div>
+              )}
+
+              {visiveis.length > 0 && (
             <div className="space-y-3">
-              {projetos.map((p) => (
+              {visiveis.map((p) => (
                 <div
                   key={p.id}
                   className="group flex flex-col gap-3 overflow-hidden rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
@@ -245,22 +319,33 @@ function MeusProjetosPage() {
 
                   <div className="flex shrink-0 items-center gap-3">
                     <StatusBadge status={p.status} />
-                    <Link
-                      to="/editar/$id"
-                      params={{ id: p.id }}
-                      className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                      style={{
-                        background: "var(--go-blue)",
-                        color: "var(--go-white)",
-                      }}
-                    >
-                      <PencilLine className="h-3.5 w-3.5" />
-                      Editar
-                    </Link>
+                    {p.status === "rascunho" ? (
+                      <Link
+                        to="/submeter"
+                        search={{ retomar: p.id }}
+                        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                        style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+                      >
+                        <PencilLine className="h-3.5 w-3.5" />
+                        Continuar
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/editar/$id"
+                        params={{ id: p.id }}
+                        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                        style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+                      >
+                        <PencilLine className="h-3.5 w-3.5" />
+                        Editar
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+              )}
+            </>
           )}
         </main>
       </div>

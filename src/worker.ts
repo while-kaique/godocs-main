@@ -43,7 +43,7 @@ import {
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
 import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs } from '@/integrations/db/client.server'
-import { listarMeusProjetos, getMeuProjeto } from '@/lib/meus-projetos.functions'
+import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
@@ -151,6 +151,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!email) return errorJson('Não autorizado.', 401)
       const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
       return json(await getMeuProjeto(id, email))
+    }
+    // Histórico de chat de um rascunho — usado na retomada cross-device.
+    if (pathname.startsWith('/api/chat/historico/') && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const id = pathname.replace('/api/chat/historico/', '').split('/')[0]
+      return json(await getHistoricoMeuProjeto(id, email))
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──

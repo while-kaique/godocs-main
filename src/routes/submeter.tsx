@@ -9,7 +9,12 @@ import {
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
+import { saveDraft, loadDraft, clearDraft, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
+
+function hasLocalDraft(): boolean {
+  return loadDraft() !== null;
+}
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
@@ -28,11 +33,16 @@ export const Route = createFileRoute("/submeter")({
       { name: "description", content: "Formulário interno para submissão de projetos de RPA e IA." },
     ],
   }),
+  // ?retomar=<id> reabre um rascunho específico (botão "Continuar" de Meus Projetos).
+  validateSearch: (search: Record<string, unknown>): { retomar?: string } => ({
+    retomar: typeof search.retomar === "string" ? search.retomar : undefined,
+  }),
   component: SubmeterPage,
 });
 
 function SubmeterPage() {
-  return <SubmeterPageContent />;
+  const { retomar } = Route.useSearch();
+  return <SubmeterPageContent resumeDraftId={retomar} />;
 }
 
 /* ──────────────────────────────────────────────
@@ -149,10 +159,17 @@ const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a 
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 
-export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string } = {}) {
+export function SubmeterPageContent({
+  editProjetoId,
+  resumeDraftId,
+}: { editProjetoId?: string; resumeDraftId?: string } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [seedLoading, setSeedLoading] = useState(!!editProjetoId);
+  // Carrega tela de "preparando" enquanto seedamos: edição (servidor) OU
+  // retomada de rascunho (localStorage ou ?retomar).
+  const [seedLoading, setSeedLoading] = useState(
+    !!editProjetoId || !!resumeDraftId || hasLocalDraft(),
+  );
   const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [submitted, setSubmitted] = useState(false);
@@ -209,13 +226,16 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Seed do estado quando em modo edição
-  useEffect(() => {
-    if (!editProjetoId) return;
-    let cancelled = false;
-    apiFetch(`/api/meus-projetos/${editProjetoId}`)
-      .then((data: Record<string, unknown>) => {
-        if (cancelled) return;
+  // Garante que o seed/retomada roda uma única vez no mount.
+  const seededRef = useRef(false);
+
+  // Aplica no estado do wizard os dados de um projeto vindos do servidor —
+  // usado tanto na EDIÇÃO de um projeto submetido quanto na RETOMADA de um
+  // rascunho (cross-device, quando não há snapshot local). `id` é o projeto a
+  // seedar. A semântica de "edição" (modo:'edicao', bloqueio da etapa 1) é
+  // gateada por `editProjetoId` em outros pontos — aqui o seed é idêntico.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const applySeed = useCallback((data: Record<string, unknown>, id: string) => {
         const membros = (data.membros as string[]) ?? [];
         const tiposProjeto = ((data.tipos_projeto as string[]) ?? []).filter(
           (t): t is "saving" | "receita_incremental" =>
@@ -249,7 +269,7 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
 
         setForm(newForm);
         setNomesExistentes((data.arquivos_nomes as string[]) ?? []);
-        setProjetoId(editProjetoId);
+        setProjetoId(id);
         setAgentTipos(tiposProjeto);
         setRespEspecial(data.especial ? "sim" : "nao");
 
@@ -359,18 +379,110 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
         setStep(2);
         // Etapa 3 ainda não foi percorrida nesta sessão — não marcar como concluída.
         setCompletedSteps(new Set([1, 2]));
+  }, []);
+
+  // Repõe o estado do wizard a partir do snapshot local (mesmo navegador) —
+  // retomada fiel de um rascunho ao atualizar/voltar à página, sem ida ao servidor.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rehydrateFromLocal = useCallback((d: DraftSnapshot) => {
+    setForm(d.form);
+    setNomesExistentes(d.nomesExistentes ?? []);
+    setProjetoId(d.projetoId);
+    setCompletedSteps(new Set(d.completedSteps ?? [1, 2]));
+    setChatMessages(d.chatMessages ?? []);
+    setChatFase(d.chatFase ?? "doc");
+    setChatComplete(!!d.chatComplete);
+    setAgentTipos(d.agentTipos ?? []);
+    setAgentMeta((d.agentMeta as AgentMeta | null) ?? null);
+    setAgentArquivosSig(d.agentArquivosSig ?? "");
+    setApprovedDocPreview(d.approvedDocPreview ?? null);
+    setApprovedSavingPreview(d.approvedSavingPreview ?? null);
+    setApprovedReceitaPreview(d.approvedReceitaPreview ?? null);
+    setSavingSubmitted(d.savingSubmitted ?? null);
+    setReceitaSubmitted(d.receitaSubmitted ?? null);
+    if (d.formDraft) setFormDraft(d.formDraft);
+    setRespEspecial(d.respEspecial ?? "");
+    setStep(d.step ?? 3);
+  }, []);
+
+  // Mount: decide entre EDIÇÃO, RETOMADA de rascunho (local ou cross-device) ou
+  // submissão nova (fresh). Roda uma única vez.
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    let cancelled = false;
+
+    // ── Modo edição: seed do servidor ──
+    if (editProjetoId) {
+      apiFetch<Record<string, unknown>>(`/api/meus-projetos/${editProjetoId}`)
+        .then((data) => {
+          if (!cancelled) applySeed(data, editProjetoId);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          console.error("[editar] falha ao carregar projeto:", e);
+          toast.error("Não foi possível carregar o projeto para edição.");
+        })
+        .finally(() => {
+          if (!cancelled) setSeedLoading(false);
+        });
+      return () => { cancelled = true; };
+    }
+
+    // ── Modo retomada de rascunho ──
+    const local = loadDraft();
+    const wantedId = resumeDraftId ?? local?.projetoId;
+    if (!wantedId) {
+      setSeedLoading(false);
+      return;
+    }
+
+    apiFetch<Record<string, unknown>>(`/api/meus-projetos/${wantedId}`)
+      .then(async (data) => {
+        if (cancelled) return;
+        // O rascunho só é retomável enquanto não foi submetido. Se já virou
+        // em_validacao/aprovado (ou sumiu), descarta o snapshot e começa do zero.
+        if ((data.status as string) !== "rascunho") {
+          clearDraft();
+          return;
+        }
+        if (local && local.projetoId === wantedId) {
+          // Caminho rápido: snapshot local fiel.
+          rehydrateFromLocal(local);
+          return;
+        }
+        // Cross-device: sem snapshot local → seed do servidor + histórico do chat.
+        applySeed(data, wantedId);
+        try {
+          const hist = await apiFetch<Array<Record<string, unknown>>>(
+            `/api/chat/historico/${wantedId}`,
+          );
+          if (!cancelled && Array.isArray(hist) && hist.length > 0) {
+            setChatMessages(
+              hist.map((m) => ({
+                role: (m.role as "user" | "assistant") ?? "assistant",
+                content: String(m.content ?? ""),
+                options: (m.options as ChatMessage["options"]) ?? undefined,
+              })),
+            );
+            setStep(3);
+            setCompletedSteps(new Set([1, 2, 3]));
+          }
+        } catch (e) {
+          console.warn("[rascunho] histórico do chat indisponível:", e);
+        }
       })
       .catch((e) => {
         if (cancelled) return;
-        console.error("[editar] falha ao carregar projeto:", e);
-        toast.error("Não foi possível carregar o projeto para edição.");
+        console.warn("[rascunho] não foi possível retomar — começando do zero:", e);
+        clearDraft();
       })
       .finally(() => {
         if (!cancelled) setSeedLoading(false);
       });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editProjetoId]);
+  }, [editProjetoId, resumeDraftId]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -400,6 +512,46 @@ export function SubmeterPageContent({ editProjetoId }: { editProjetoId?: string 
   // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
   const [showEtapa25, setShowEtapa25] = useState(false);
   const [respEspecial, setRespEspecial] = useState<"sim" | "nao" | "">("");
+
+  // Persiste o rascunho em andamento no localStorage para retomar ao
+  // atualizar/voltar à página (sem criar um rascunho órfão novo). Só vale fora do
+  // modo edição, depois que o rascunho existe no servidor (projetoId), e não
+  // durante o seed inicial nem após submeter.
+  useEffect(() => {
+    if (editProjetoId) return;
+    if (!projetoId || submitted || seedLoading) return;
+    saveDraft({
+      projetoId,
+      step,
+      form,
+      nomesExistentes,
+      completedSteps: [...completedSteps],
+      chatMessages,
+      chatFase,
+      chatComplete,
+      agentTipos,
+      agentMeta,
+      agentArquivosSig,
+      approvedDocPreview,
+      approvedSavingPreview,
+      approvedReceitaPreview,
+      savingSubmitted,
+      receitaSubmitted,
+      formDraft,
+      respEspecial,
+    });
+  }, [
+    editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
+    completedSteps, chatMessages, chatFase, chatComplete, agentTipos, agentMeta,
+    agentArquivosSig, approvedDocPreview, approvedSavingPreview, approvedReceitaPreview,
+    savingSubmitted, receitaSubmitted, formDraft, respEspecial,
+  ]);
+
+  // Ao submeter (qualquer fluxo), o rascunho deixa de existir — descarta o snapshot
+  // local para não reaparecer como rascunho "duplicado".
+  useEffect(() => {
+    if (submitted && !editProjetoId) clearDraft();
+  }, [submitted, editProjetoId]);
 
   const updateField = useCallback(
     <K extends keyof FormData>(key: K, value: FormData[K]) => {

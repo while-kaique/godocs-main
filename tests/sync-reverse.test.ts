@@ -9,7 +9,7 @@ vi.mock('@/lib/google/sheets', () => ({ readAllRows: vi.fn() }));
 
 import { readAllRows } from '@/lib/google/sheets';
 import { setDb, getProjetoById } from '@/integrations/db/client.server';
-import { syncSheetsToSqlite } from '@/lib/google/sync-reverse';
+import { syncSheetsToSqlite, syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 
 const mockedRead = readAllRows as unknown as ReturnType<typeof vi.fn>;
 
@@ -164,5 +164,84 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
     const r = await syncSheetsToSqlite();
     expect(r.erros).toBe(1);
     expect(r.detalhes[0]).toContain('429');
+  });
+});
+
+describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {
+  // Reusa o DB (com schema) já configurado pelo describe anterior — o
+  // _schemaReady é module-global, então um db novo aqui ficaria sem tabelas.
+  // IDs OWN-*/OUTRO-* não colidem com os LEGADO-* do bloco acima.
+
+  it('cria só as linhas onde o usuário é responsável (Email) — case-insensitive', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'OWN-1',
+        'Nome Completo': 'Dono',
+        Email: 'Dono@Gocase.com', // caixa diferente do login → deve casar
+        Projeto: 'Projeto do Dono',
+        Ferramenta: 'n8n',
+        Status: 'Aprovado',
+      },
+      {
+        'ID Projeto': 'OUTRO-1',
+        'Nome Completo': 'Alheio',
+        Email: 'alheio@gocase.com',
+        Projeto: 'Projeto Alheio',
+        Ferramenta: 'python',
+        Status: 'Aprovado',
+      },
+    ]);
+
+    const r = await syncOwnerRowsFromSheet('dono@gocase.com');
+    expect(r.criados).toBe(1);
+    expect(r.total).toBe(1);
+
+    expect((await getProjetoById('own-1'))?.nome).toBe('Projeto do Dono');
+    expect(await getProjetoById('outro-1')).toBeFalsy(); // alheio NÃO foi importado
+  });
+
+  it('casa também quando o usuário é participante (col Participantes)', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'OWN-2',
+        'Nome Completo': 'Responsável',
+        Email: 'chefe@gocase.com',
+        Participantes: 'membro@gocase.com, outro@gocase.com',
+        Projeto: 'Projeto em Equipe',
+        Ferramenta: 'n8n',
+        Status: 'Pendente',
+      },
+    ]);
+
+    const r = await syncOwnerRowsFromSheet('membro@gocase.com');
+    expect(r.criados).toBe(1);
+    expect((await getProjetoById('own-2'))?.nome).toBe('Projeto em Equipe');
+  });
+
+  it('atualiza campo seguro de um projeto já existente do dono', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'OWN-1',
+        'Nome Completo': 'Dono',
+        Email: 'dono@gocase.com',
+        Projeto: 'Projeto do Dono — renomeado',
+        Ferramenta: 'n8n',
+        Status: 'Aprovado',
+      },
+    ]);
+    const r = await syncOwnerRowsFromSheet('dono@gocase.com');
+    expect(r.atualizados).toBe(1);
+    expect((await getProjetoById('own-1'))?.nome).toBe('Projeto do Dono — renomeado');
+  });
+
+  it('email vazio não faz nada', async () => {
+    const r = await syncOwnerRowsFromSheet('');
+    expect(r.total).toBe(0);
+  });
+
+  it('falha de leitura não propaga', async () => {
+    mockedRead.mockRejectedValueOnce(new Error('500 boom'));
+    const r = await syncOwnerRowsFromSheet('dono@gocase.com');
+    expect(r.erros).toBe(1);
   });
 });
