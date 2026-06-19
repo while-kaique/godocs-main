@@ -825,13 +825,18 @@ export async function iniciarSaving(rawData: unknown) {
   const custoEvitadoMensal = round2(
     itensEvitado.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
   );
+  // Justificativa do custo evitado = TODAS as informações que a pessoa preencheu
+  // na etapa, uma ferramenta por linha: nome + custo (R$ + recorrência) + a
+  // justificativa/explicação que ela deu. (O valor R$ TOTAL fica na coluna "Custo
+  // Evitado"; aqui é o detalhamento por ferramenta.)
+  const moedaBR = (n: number) => n.toFixed(2).replace('.', ',');
   const custoEvitadoDescricao = itensEvitado
     .map((it) => {
       const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
-      const just = it.justificativa ? ` — ${it.justificativa}` : '';
-      return `${it.nome} (R$ ${it.valor.toFixed(2)}, ${rec})${just}`;
+      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : '';
+      return `• ${it.nome} — R$ ${moedaBR(it.valor)} (${rec}).${just}`;
     })
-    .join('; ');
+    .join('\n');
   await updateProjeto(data.projeto_id, {
     custo_evitado: data.tem_custo_evitado ?? null,
     custo_evitado_justificativa: custoEvitadoDescricao || null,
