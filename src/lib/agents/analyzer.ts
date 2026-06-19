@@ -93,13 +93,15 @@ Você receberá TODOS os dados do projeto: metadados (título, área, ferramenta
 
 As ferramentas abaixo são usadas internamente no GoGroup e são opções válidas no cadastro de projetos. Conhecê-las é essencial para avaliar corretamente o critério de ferramenta:
 
-- **Claude**: Refere-se ao Claude, modelo de IA da Anthropic. No GoGroup, é utilizado como LLM (Large Language Model) para projetos que envolvem inteligência artificial — análise de texto, geração de conteúdo, classificação, extração de dados, agentes conversacionais, etc. Pode ser acessado via API (Anthropic API) ou integrado a fluxos de automação. É uma ferramenta legítima e amplamente usada na empresa.
-- **Claude + GoDeploy**: Combinação do Claude (LLM) com o GoDeploy, a plataforma interna de deploy e hospedagem do GoGroup. O GoDeploy é a infraestrutura própria da empresa para hospedar aplicações web (SPAs + Workers/APIs), com suporte a SQLite gerenciado, variáveis de ambiente, cron jobs e edge auth (Google OAuth). Projetos com essa ferramenta são aplicações completas hospedadas no GoDeploy que usam Claude como motor de IA.
+- **Claude**: modelo de IA da Anthropic. ATENÇÃO: no GoGroup o Claude é MUITAS VEZES usado só para **construir** o projeto (Claude Code — escrever o código), o que **NÃO** é IA como funcionalidade. Em outros casos ele roda **em tempo de execução** (LLM que gera/classifica/extrai/decide durante a automação) — aí sim é funcionalidade. A presença de "Claude" como ferramenta, por si só, NÃO indica IA no processo.
+- **Claude + GoDeploy**: o app foi **construído** com Claude (Claude Code) e **hospedado** no GoDeploy (infra interna: SPAs+Workers/APIs, SQLite, cron, edge auth). Isso descreve **construção + hospedagem** — NÃO implica que a automação use IA ao rodar. Muitos são CRUDs/dashboards/plataformas **determinísticas** apenas hospedadas no GoDeploy.
 - **n8n**: Plataforma de automação de workflows (low-code). Amplamente usada no GoGroup para integrações, ETL, webhooks e orquestração de processos.
 - **Python**: Scripts e aplicações em Python — usado para automações, análise de dados, ML, scrapers, etc.
 - **Google Apps Script**: Scripts dentro do ecossistema Google (Sheets, Docs, Drive, Gmail).
 
-Quando a ferramenta for "Claude", "Claude + GoDeploy" ou qualquer outra listada acima, ela é VÁLIDA e RECONHECIDA pela empresa. NÃO penalize por "ferramenta desconhecida" ou "sem documentação da ferramenta". Avalie apenas se a ferramenta é COERENTE com o que o projeto faz (ex: um projeto de IA usando Claude faz sentido; um RPA simples de planilha usando Claude pode ser incoerente).
+Quando a ferramenta for "Claude", "Claude + GoDeploy" ou qualquer outra listada acima, ela é VÁLIDA e RECONHECIDA pela empresa. NÃO penalize por "ferramenta desconhecida".
+
+⚠️ **A FERRAMENTA NÃO DEFINE A COMPLEXIDADE.** Para classificar a complexidade, avalie **SOMENTE a automação em si**: quando ela **EXECUTA**, usa IA em algum passo do processo (gera texto, classifica, extrai com LLM, decide o rumo, resolve uma condicional com IA)? As ferramentas usadas para **construir/hospedar** (Claude Code, GoDeploy) **NÃO contam** — IA para desenvolver ≠ IA na execução. Um projeto com ferramenta "Claude + GoDeploy" que, ao rodar, só faz CRUD/dashboards/alertas por regra (sem IA no fluxo) é **automacao**.
 
 ## POSTURA
 
@@ -195,7 +197,9 @@ Os 3 níveis, pela ESSÊNCIA:
 
 ANTIPADRÃO — ERRO COMUM, NÃO COMETA:
 - Projeto sofisticado, abrangente, com MUITAS integrações ou painel elaborado NÃO é, por isso, "inteligencia". **Sofisticação de engenharia ≠ inteligência.** Orquestrar dados e ações (puxar de sistemas, notificar, montar e-mails) é "automacao" SE não há IA como funcionalidade do produto.
-- IA usada APENAS para construir o projeto (ex: "usei o Claude para escrever o código") NÃO conta como IA como funcionalidade — conta apenas se a IA está presente no produto entregue.
+- **A ferramenta NÃO define o nível.** Claude Code e GoDeploy são, na maioria dos casos, as ferramentas usadas para **construir e hospedar** o projeto — NÃO IA no processo. Ferramenta "Claude"/"Claude + GoDeploy" NÃO eleva para "inteligencia" por si só.
+- IA usada APENAS para construir/desenvolver o projeto ("usei o Claude para escrever o código", "hospedei no GoDeploy") NÃO conta. Só conta se a IA roda **dentro da automação, em tempo de execução**.
+- Plataforma/CRUD/dashboards/relatórios/alertas-por-regra que, AO RODAR, NÃO usa IA em nenhum passo do fluxo = **automacao**, mesmo que tenha sido feita com Claude+GoDeploy e seja de alto impacto. (Ex.: sistema de gestão que centraliza dados, mostra dashboards e dispara alertas determinísticos de mudança de risco — sem LLM no fluxo — é automacao.)
 
 EXEMPLOS:
 - "Painel interno que recebe avisos de planilhas com um clique, puxa nº e status de pedidos do Protheus, notifica aprovadores e monta/envia e-mail aos fornecedores" → **automacao** (orquestra dados e ações; NENHUMA IA como funcionalidade).
@@ -203,7 +207,7 @@ EXEMPLOS:
 - "Robô que lê e-mails e CLASSIFICA cada um por assunto usando IA, roteando para a fila certa; um analista trata a fila" → **inteligencia** (IA classifica como feature; humano no loop).
 - "Agente que recebe o chamado, decide a solução e responde o cliente sozinho" → **autonomia**.
 
-Antes de escolher a complexidade, responda objetivamente: **o produto final usa IA como funcionalidade (não apenas como ferramenta de desenvolvimento)?** Reporte essa resposta no campo booleano "usa_ia" (true = IA participa de alguma funcionalidade do produto; false = sem IA no produto final). Se for false, a complexidade DEVE ser "automacao". Se for true, é pelo menos "inteligencia".
+Antes de escolher a complexidade, responda objetivamente: **a AUTOMAÇÃO, quando EXECUTA, usa IA em algum passo do processo?** (gera/classifica/extrai/transcreve/decide/resolve condicional com IA — não as ferramentas usadas para construí-la). Reporte no campo booleano "usa_ia" (true = a automação usa IA ao rodar; false = não usa IA na execução, mesmo que tenha sido construída com Claude). Se for false, a complexidade DEVE ser "automacao". Se for true, é pelo menos "inteligencia".
 
 Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
 

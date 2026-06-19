@@ -8,9 +8,9 @@ describe("analyzer — classificação de complexidade", () => {
 
   it("usa o campo usa_ia e a distinção IA de construção vs funcionalidade", () => {
     expect(prompt).toContain("usa_ia");
-    // Prompt distingue IA usada para construir o projeto vs IA como funcionalidade
-    expect(prompt).toContain("construir o projeto");
-    expect(prompt).toContain("ferramenta de desenvolvimento");
+    // Prompt distingue IA usada para construir/desenvolver vs IA na execução da automação
+    expect(prompt).toContain("construir/desenvolver o projeto");
+    expect(prompt).toContain("construir/hospedar");
   });
 
   it('não usa mais a régua antiga ("usa IA de forma ativa" / "minimamente inteligente")', () => {
@@ -29,6 +29,14 @@ describe("analyzer — classificação de complexidade", () => {
     expect(prompt).toContain("marcado_como_especial");
     expect(prompt).toContain("NÃO parece especial");
     expect(prompt).toContain("documentacao_enviada_usuario");
+  });
+
+  it("classifica pela automação ao rodar, não pela ferramenta de construção (Claude/GoDeploy)", () => {
+    expect(prompt).toContain("A FERRAMENTA NÃO DEFINE A COMPLEXIDADE");
+    expect(prompt).toContain("quando EXECUTA");
+    // ferramenta Claude+GoDeploy não eleva sozinha; build ≠ IA na execução
+    expect(prompt).toContain("construir/hospedar");
+    expect(prompt.toLowerCase()).toContain("ia para desenvolver ≠ ia na execução".toLowerCase());
   });
 
   it("inclui o exemplo do painel de pedidos (orquestração sem IA) como automacao", () => {
