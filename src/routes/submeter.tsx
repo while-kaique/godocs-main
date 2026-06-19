@@ -400,16 +400,31 @@ export function SubmeterPageContent({
     if (d.formDraft) setFormDraft(d.formDraft);
     setRespEspecial(d.respEspecial ?? "");
     // Sub-tela ativa da etapa 3 (no mesmo batch do formDraft p/ o SavingForm montar
-    // já com o draft certo). Em fase de IMPACTO ainda em coleta ("saving"/"receita"),
-    // retoma SEMPRE no formulário determinístico — o chat dessa fase, retomado sem
-    // requisição ativa, fica preso em "Calculando…" sem nada acontecer. Em previews,
-    // doc ou submissão completa, mantém a sub-tela que estava salva.
+    // já com o draft certo). Em fase de IMPACTO em coleta ("saving"/"receita"):
+    //  • dados determinísticos INALTERADOS (formDraft == *Submitted) e conversa num
+    //    ponto retomável (última msg do agente) → PRESERVA o chat; nada a reprocessar
+    //    e a pessoa não perde a conversa.
+    //  • saving/receita ALTERADO (precisa reprocessar) OU conversa parada no meio de
+    //    uma requisição (última msg é do usuário, sem resposta) → volta ao FORMULÁRIO.
+    // Previews/doc/submissão completa mantêm a sub-tela que estava salva.
     const faseRetomada = d.chatFase ?? "doc";
-    const emColetaSaving = faseRetomada === "saving";
-    const emColetaReceita = faseRetomada === "receita";
-    const forcaFormulario = !d.chatComplete && (emColetaSaving || emColetaReceita);
-    setShowSavingForm(forcaFormulario ? emColetaSaving : !!d.showSavingForm);
-    setShowReceitaForm(forcaFormulario ? emColetaReceita : !!d.showReceitaForm);
+    const msgs = d.chatMessages ?? [];
+    const ultimaMsg = msgs[msgs.length - 1];
+    const conversaRetomavel = !!ultimaMsg && ultimaMsg.role === "assistant";
+    const inalterado = (snap: SavingFormData | null) =>
+      snap != null && JSON.stringify(snap) === JSON.stringify(d.formDraft);
+    if (faseRetomada === "saving") {
+      const preservaChat = conversaRetomavel && inalterado(d.savingSubmitted);
+      setShowSavingForm(!preservaChat);
+      setShowReceitaForm(false);
+    } else if (faseRetomada === "receita") {
+      const preservaChat = conversaRetomavel && inalterado(d.receitaSubmitted);
+      setShowReceitaForm(!preservaChat);
+      setShowSavingForm(false);
+    } else {
+      setShowSavingForm(!!d.showSavingForm);
+      setShowReceitaForm(!!d.showReceitaForm);
+    }
     setStep(d.step ?? 3);
   }, []);
 
