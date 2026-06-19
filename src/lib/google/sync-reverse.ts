@@ -82,6 +82,19 @@ function parseEspecial(v: string | undefined): number {
   return (v ?? '').trim().toLowerCase().startsWith('s') ? 1 : 0;
 }
 
+// A coluna "Custo Evitado" passou a guardar o VALOR R$ (não mais 'sim'/'não').
+// Deriva o flag sim/não para o SQLite: número > 0 → 'sim'; 0 → 'não'; legados
+// antigos com texto 's…/n…' preservados; vazio → null.
+function custoEvitadoFlag(v: string | undefined): string | null {
+  const n = parseNum(v);
+  if (n != null) return n > 0 ? 'sim' : 'nao';
+  const s = txt(v);
+  if (!s) return null;
+  if (/^s/i.test(s)) return 'sim';
+  if (/^n/i.test(s)) return 'nao';
+  return null;
+}
+
 // ─── Criação de legado (projeto só existe na planilha) ───────────────────────
 
 async function criarLegado(id: string, row: SheetRow): Promise<void> {
@@ -118,7 +131,7 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     observacoes: txt(row['Observações']),
     especial,
     contexto_especial: txt(row['Contexto do Projeto Especial']),
-    custo_evitado: txt(row['Custo Evitado']),
+    custo_evitado: custoEvitadoFlag(row['Custo Evitado']),
     custo_evitado_justificativa: txt(row['Justificativa Custo Evitado']),
     submitted_at: submittedAt,
     validated_at: status === 'aprovado' ? submittedAt : null,
@@ -151,7 +164,8 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   { col: 'Ganho Total', field: 'ganho_total_mensal', kind: 'num' },
   { col: 'Complexidade', field: 'complexidade', kind: 'text' },
   { col: 'Observações', field: 'observacoes', kind: 'text' },
-  { col: 'Custo Evitado', field: 'custo_evitado', kind: 'text' },
+  // "Custo Evitado" guarda o VALOR R$ (não 'sim/não') e não tem coluna própria no
+  // SQLite — não é sincronizado de volta para não gravar número no campo flag.
   { col: 'Justificativa Custo Evitado', field: 'custo_evitado_justificativa', kind: 'text' },
   { col: 'Contexto do Projeto Especial', field: 'contexto_especial', kind: 'text' },
 ];
