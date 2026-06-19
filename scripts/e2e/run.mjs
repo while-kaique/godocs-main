@@ -83,7 +83,13 @@ async function runEdicao(scenario, projetoIdExistente) {
 async function main() {
   console.log(`\n🚀 E2E run "${runId}" contra ${BASE_URL}`);
   console.log(`   Dono: ${OWNER_EMAIL}\n`);
-  const cenarios = buildScenarios(runId);
+  let cenarios = buildScenarios(runId);
+  // E2E_ONLY=key1,key2 → roda só esses cenários (útil para a sanidade).
+  const only = process.env.E2E_ONLY?.split(',').map((s) => s.trim()).filter(Boolean);
+  if (only && only.length) {
+    cenarios = cenarios.filter((c) => only.includes(c.key));
+    console.log(`   (filtro E2E_ONLY: ${only.join(', ')} → ${cenarios.length} cenário(s))`);
+  }
   const results = [];
   const idByKey = {};
 

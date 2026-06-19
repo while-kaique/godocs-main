@@ -195,18 +195,23 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Receita Memorial': ouTraco(p.receitaMemorialLimpo),
       'Status': p.status,
       'Ganho Total': ganhoTotal,
+      // Observações vem do analisador (preenchida depois, via syncUpdateToGoogle).
+      // No append ainda está vazia → grava "—" (regra: texto vazio → traço) em vez
+      // de deixar a célula em branco. O analisador sobrescreve quando concluir.
+      'Observações': ouTraco(p.projeto.observacoes as string | null | undefined),
       'Contexto do Projeto Especial': ouTraco(p.projeto.contexto_especial),
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
       'Atualizado Em': dataSubmissao,
     };
 
-    // "Memorial anterior": só na EDIÇÃO, grava o memorial da última versão ANTES
-    // desta edição (sempre o último, não o histórico todo). Em submissão nova fica
-    // em branco. Só adiciona a chave quando há valor → no append de projeto novo a
-    // coluna fica vazia; na edição sem anterior, não sobrescreve a célula manual.
-    if (p.modo === 'edicao' && p.memorialAnterior && p.memorialAnterior.trim()) {
-      row['Memorial anterior'] = p.memorialAnterior.trim();
-    }
+    // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
+    // submissão nova (ou edição sem anterior) grava "—" (regra: texto vazio → traço),
+    // em vez de deixar a célula em branco. (Não confundir com as colunas Diff, que
+    // são manuais e o sistema nunca escreve.)
+    row['Memorial anterior'] =
+      p.modo === 'edicao' && p.memorialAnterior && p.memorialAnterior.trim()
+        ? p.memorialAnterior.trim()
+        : '—';
 
     // "Data Submissão" é a data em que a pessoa SUBMETEU — só na submissão nova
     // (append). Na EDIÇÃO, NÃO escrevemos essa coluna (preserva a data original);
