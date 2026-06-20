@@ -344,7 +344,7 @@ function MeusProjetosPage() {
                     </div>
                     {p.pendente && (
                       <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
-                        ⚠️ Projeto pendente — edite e reenvie até {PRAZO_LEGADO} para regularizar (deixar de constar como legado).
+                        ⚠️ Projeto pendente — edite e reenvie até {PRAZO_LEGADO} para regularizar.
                       </p>
                     )}
                   </div>
