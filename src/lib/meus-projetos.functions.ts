@@ -96,6 +96,13 @@ function temAtualizadoEm(v: string | null | undefined): boolean {
   return s !== '' && s !== '—' && s !== '-';
 }
 
+// Projeto LEGADO? Só os ids no padrão "LEGADO-233" (importados antes do formulário)
+// contam como pendentes. Projetos submetidos pelo app têm id aleatório (hex) e NUNCA
+// são pendentes, mesmo sem "Atualizado Em" — a pendência só vale para regularizar legado.
+function ehLegado(id: string): boolean {
+  return id.toLowerCase().includes('legado');
+}
+
 function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: string | null): MeuProjetoItem {
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
@@ -111,9 +118,10 @@ function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: str
     submitted_at: p.submitted_at,
     arquivos_nomes: parseJson<string[]>(p.arquivos_nomes) ?? [],
     atualizado_em: at,
-    // Pendente = submetido (não-rascunho) e sem "Atualizado Em" no Sheets (o app
-    // nunca escreveu lá → legado por regularizar).
-    pendente: p.status !== 'rascunho' && !at,
+    // Pendente = LEGADO (id "LEGADO-…") e sem "Atualizado Em" no Sheets → precisa ser
+    // editado/reenviado para regularizar. Projetos comuns submetidos pelo app NUNCA
+    // são pendentes (mesmo sem Atualizado Em).
+    pendente: ehLegado(p.id) && !at,
   };
 }
 
@@ -152,7 +160,7 @@ export async function contarPendentes(email: string): Promise<{ count: number; p
   const rows = await getProjetosByOwnerEmail(email);
   const count = rows
     .filter((p) => ehDono(p, email))
-    .filter((p) => p.status !== 'rascunho' && !temAtualizadoEm(p.atualizado_em))
+    .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
     .length;
   return { count, prazo: PRAZO_LEGADO };
 }
