@@ -17,6 +17,7 @@ import {
   submeterParaValidacao,
   validarProjeto,
   resyncGoogle,
+  reconciliarComplexidade,
 } from '@/lib/chat.functions'
 import {
   getAreas,
@@ -138,6 +139,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson('Rota exclusiva de cron.', 403)
       }
       return json(await syncSheetsToSqlite())
+    }
+
+    // ── Cron: reconcilia a coluna "Complexidade" da planilha ──
+    // A análise roda em background (waitUntil) e às vezes é cancelada antes de
+    // gravar a Complexidade no Sheets. Este cron repõe o que faltou (resync) ou
+    // re-roda o analisador para os que nunca foram analisados. Idempotente.
+    if (pathname === '/api/cron/reanalisar-pendentes' && method === 'POST') {
+      if (!request.headers.get('x-godeploy-cron')) {
+        return errorJson('Rota exclusiva de cron.', 403)
+      }
+      return json(await reconciliarComplexidade())
     }
 
     // ── Meus Projetos (filtrado pelo email do header — anti-IDOR) ──

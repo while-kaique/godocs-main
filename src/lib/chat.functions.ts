@@ -19,6 +19,7 @@ import {
   upsertDocumentacao,
   getDocumentacao,
   getProjetoById,
+  getProjetosSubmetidos,
   findDuplicateProjeto,
   updateProjeto,
   deleteChatMessagesByProjeto,
@@ -53,6 +54,7 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
+import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
 import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
 
@@ -1236,16 +1238,75 @@ export async function analisarProjetoFn(rawData: unknown) {
       ? 'Pendente' // especial → sempre validação humana
       : resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
 
-    runBackground(syncUpdateToGoogle({
+    // AGUARDADO (não fire-and-forget): assim o sync da Complexidade/Observações faz
+    // parte da promise da análise. Evita o FAF aninhado que o runtime cancelava,
+    // deixando a coluna "Complexidade" vazia de forma intermitente. O cron de
+    // reconciliação (reconciliarComplexidade) é a rede de segurança para os casos em
+    // que a própria análise é cancelada antes de concluir.
+    await syncUpdateToGoogle({
       projetoId: projeto_id,
       projectName: projeto?.nome ?? '',
       complexidade: resultado.complexidade,
       observacoes: observacoes ?? '',
       status: statusLabel,
-    }));
+    });
   }
 
   return resultado;
+}
+
+// ─── Reconciliação de Complexidade/Observações (rede de segurança) ───────────
+//
+// A análise roda em background (waitUntil) após o submit e ocasionalmente é
+// CANCELADA pelo runtime antes de gravar a Complexidade na planilha — daí a coluna
+// ficar vazia "às vezes". Esta função (chamada por um cron) varre a planilha,
+// acha projetos SUBMETIDOS com "Complexidade" vazia e conserta:
+//  - se o SQLite já tem complexidade (só faltou o sync) → repõe na planilha SEM
+//    notificar o Google Chat (update direto, evita spam);
+//  - se o SQLite também não tem → re-roda o analisador (que analisa + sincroniza).
+// Idempotente: rodar repetidamente é seguro. Legados sem `submitted_at` são pulados.
+export async function reconciliarComplexidade(maxReanalises = 15) {
+  // Mapa id→Complexidade da planilha (1 leitura). Só os SUBMETIDOS no SQLite são
+  // candidatos (evita varrer ~270 legados sem submissão).
+  const rows = await readAllRows();
+  const compNaPlanilha = new Map<string, string>();
+  for (const r of rows) {
+    const id = (r['ID Projeto'] ?? '').toString().trim().toLowerCase();
+    if (id) compNaPlanilha.set(id, (r['Complexidade'] ?? '').toString().trim());
+  }
+
+  const submetidos = await getProjetosSubmetidos();
+  let ressincronizados = 0;
+  let reanalisados = 0;
+  let faltando = 0;
+
+  for (const p of submetidos) {
+    const comp = compNaPlanilha.get(String(p.id).trim().toLowerCase());
+    // Pula quem já tem complexidade não-vazia na planilha (ou nem está nela).
+    if (comp === undefined || (comp !== '' && comp !== '—')) continue;
+    faltando++;
+
+    const compSqlite = (p.complexidade ?? '').toString().trim();
+    try {
+      if (compSqlite) {
+        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat).
+        await updateRowByProjectId(p.id, {
+          'Complexidade': p.complexidade as string,
+          'Observações': (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : '—',
+        });
+        ressincronizados++;
+      } else if (reanalisados < maxReanalises) {
+        // Análise nunca concluiu: re-roda (analisa + sincroniza, aguardado).
+        await analisarProjetoFn({ projeto_id: p.id });
+        reanalisados++;
+      }
+    } catch (e) {
+      err('reconciliarComplexidade', `Falha ao reconciliar ${p.id}:`, e);
+    }
+  }
+
+  log('reconciliarComplexidade', `faltando=${faltando} ressincronizados=${ressincronizados} reanalisados=${reanalisados}`);
+  return { submetidos: submetidos.length, faltando, ressincronizados, reanalisados };
 }
 
 // ─── Submeter para validação ─────────────────────────────────────────────────
