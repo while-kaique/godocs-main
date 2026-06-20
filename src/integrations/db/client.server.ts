@@ -173,6 +173,14 @@ export function getProjetoById(id: string) {
   return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id]);
 }
 
+/** Projetos efetivamente submetidos (têm submitted_at). Usado pela reconciliação
+ *  da coluna "Complexidade" no Sheets — evita varrer legados sem submissão. */
+export function getProjetosSubmetidos() {
+  return queryAll<Pick<ProjetoRow, 'id' | 'complexidade' | 'observacoes' | 'submitted_at'>>(
+    'SELECT id, complexidade, observacoes, submitted_at FROM projetos WHERE submitted_at IS NOT NULL'
+  );
+}
+
 export async function getProjetoWithRelations(id: string) {
   const projeto = await queryOne<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
