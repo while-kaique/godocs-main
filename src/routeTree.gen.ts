@@ -14,6 +14,7 @@ import { Route as MeusProjetosRouteImport } from './routes/meus-projetos'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProjetoIdRouteImport } from './routes/projeto.$id'
 import { Route as EditarIdRouteImport } from './routes/editar.$id'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
 import { Route as AuthenticatedInvestigadorRouteImport } from './routes/_authenticated/investigador'
@@ -46,6 +47,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetoIdRoute = ProjetoIdRouteImport.update({
+  id: '/projeto/$id',
+  path: '/projeto/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditarIdRoute = EditarIdRouteImport.update({
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
+  '/projeto/$id': typeof ProjetoIdRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
   '/testes/': typeof AuthenticatedTestesIndexRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
+  '/projeto/$id': typeof ProjetoIdRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
   '/testes': typeof AuthenticatedTestesIndexRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated/investigador': typeof AuthenticatedInvestigadorRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
+  '/projeto/$id': typeof ProjetoIdRoute
   '/_authenticated/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/_authenticated/testes/prompts': typeof AuthenticatedTestesPromptsRoute
   '/_authenticated/testes/': typeof AuthenticatedTestesIndexRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
+    | '/projeto/$id'
     | '/testes/cenarios'
     | '/testes/prompts'
     | '/testes/'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
+    | '/projeto/$id'
     | '/testes/cenarios'
     | '/testes/prompts'
     | '/testes'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/_authenticated/investigador'
     | '/_authenticated/usuarios'
     | '/editar/$id'
+    | '/projeto/$id'
     | '/_authenticated/testes/cenarios'
     | '/_authenticated/testes/prompts'
     | '/_authenticated/testes/'
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   MeusProjetosRoute: typeof MeusProjetosRoute
   SubmeterRoute: typeof SubmeterRoute
   EditarIdRoute: typeof EditarIdRoute
+  ProjetoIdRoute: typeof ProjetoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projeto/$id': {
+      id: '/projeto/$id'
+      path: '/projeto/$id'
+      fullPath: '/projeto/$id'
+      preLoaderRoute: typeof ProjetoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/editar/$id': {
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeusProjetosRoute: MeusProjetosRoute,
   SubmeterRoute: SubmeterRoute,
   EditarIdRoute: EditarIdRoute,
+  ProjetoIdRoute: ProjetoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

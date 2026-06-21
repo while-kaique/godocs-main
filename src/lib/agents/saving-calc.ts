@@ -67,6 +67,12 @@ export function recomputarSavingFinanceiro(
   return {
     ...saving,
     linhas,
+    // Carrega o custo externo adiante no próprio objeto saving. O valor autoritativo
+    // vive em projeto.custo_externo_mensal e é passado aqui; sem persistir no saving,
+    // enriquecerMemorial (que lê saving.custo_externo_mensal) recalculava a líquida
+    // com 0 → memorial mostrava "Custo de ferramenta externa: N/A" e líquida bruta,
+    // contradizendo a coluna Saving Reais (que já abate o custo externo).
+    custo_externo_mensal: custoExternoMensal,
     economia_horas_mes: totalHoras,
     economia_reais_mes: round2(totalReaisBruto + evitadoBruto - (custoExternoMensal || 0)),
   };

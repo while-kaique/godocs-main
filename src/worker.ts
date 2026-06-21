@@ -206,7 +206,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         else if (pathname === '/api/chat/atualizar-tipos') result = await atualizarTipos(body)
         else if (pathname === '/api/chat/atualizar-metadados') result = await atualizarMetadados(body)
         else if (pathname === '/api/chat/analisar') result = await analisarProjetoFn(body)
-        else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body)
+        else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body, getEmailFromRequest(request))
         else return errorJson('Rota não encontrada', 404)
 
         // Análise automática (analisador) roda no SERVIDOR, em background, logo após

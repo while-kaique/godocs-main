@@ -19,6 +19,7 @@ import {
   upsertDocumentacao,
   getDocumentacao,
   getProjetoById,
+  getAdminByEmail,
   getProjetosSubmetidos,
   findDuplicateProjeto,
   updateProjeto,
@@ -854,6 +855,9 @@ export async function iniciarSaving(rawData: unknown) {
 
   let saving = savingVazio();
   saving.tipo_saving = data.tipo_saving;
+  // Custo externo (custo INCORRIDO pela automação) viaja no próprio objeto saving —
+  // enriquecerMemorial lê daqui para mostrar o valor e abater na líquida do memorial.
+  saving.custo_externo_mensal = data.custo_externo_mensal ?? 0;
   // Custo evitado já mensalizado entra cheio no recálculo (não divide de novo).
   saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
   saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
@@ -1311,7 +1315,7 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
 
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
-export async function submeterParaValidacao(rawData: unknown) {
+export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
@@ -1379,6 +1383,22 @@ export async function submeterParaValidacao(rawData: unknown) {
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
+  // Gate de OWNERSHIP na edição: só o autor (responsavel_email) ou um admin RPA podem
+  // reenviar um projeto já existente. Participantes (membros) só visualizam — não editam.
+  // Vale só p/ reenvio; submissão nova não tem owner anterior a proteger. Se o email do
+  // solicitante não veio (chamadas internas/cron), não bloqueia.
+  if (ehReenvio && solicitanteEmail) {
+    const alvo = solicitanteEmail.trim().toLowerCase();
+    const ehOwner = (projeto.responsavel_email ?? '').trim().toLowerCase() === alvo;
+    const ehAdmin = !!(await getAdminByEmail(solicitanteEmail));
+    if (!ehOwner && !ehAdmin) {
+      throw Object.assign(
+        new Error('Apenas o autor do projeto pode editá-lo. Para transferir a autoria, acione a equipe RPA.'),
+        { status: 403 },
+      );
+    }
+  }
 
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
