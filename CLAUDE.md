@@ -96,6 +96,8 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 **Memorial duplo (opção B):** o LLM gera memorial SEM R$ (visível ao usuário). O backend injeta valores financeiros via `enriquecerMemorial()` em `saving-calc.ts` — a versão com R$ vai para `projetos.memorial_calculo` (planilha). R$ nunca toca o LLM.
 
+**Colunas de memorial na planilha (V vs Z):** a coluna **"Memorial de Saving" (V)** recebe **só a parte de saving** (`memorialSavingLimpo` = `enriquecerMemorial(saving, undefined, ['saving'])`, com R$) — em projeto só-receita fica `—`. A coluna **"Receita Memorial" (Z)** recebe só a receita. ⚠️ Antes a V recebia o memorial **unificado** (saving+receita), então a receita vazava na coluna de saving (corrigido em `chat.functions.ts`, 2 fluxos). O `projetos.memorial_calculo` (banco) **segue unificado** — alimenta `Memorial anterior`/auditoria.
+
 **Pontual e o ÷12** — saving e receita pontual entram pelo valor cheio (NÃO dividem por 12). **Exceção: custo evitado** (coletado no formulário de saving) — cada ferramenta evitada com recorrência **pontual é mensalizada ÷12** antes de somar ao saving; mensal entra cheio.
 
 **Custo evitado (3º tópico do form de saving):** pergunta obrigatória Sim/Não abaixo de "Alguém já fazia". Se Sim → lista incremental `nome → valor → recorrência → justificativa`. O backend mensaliza, soma em `custo_evitado_reais` (entra no `saving_reais`/`ganho_total`) e persiste as colunas `custo_evitado` ('sim'/'nao'), `custo_evitado_justificativa`, `custo_evitado_itens` (JSON). No Google Sheets: a coluna **"Custo Evitado"** recebe o **VALOR R$ mensal** (`custo_evitado_reais`, '—' quando não há) — NÃO o 'sim/não'; **"Justificativa Custo Evitado"** segue igual; a **recorrência marcada** (mensal/pontual/Misto) vai na coluna **"Custo Mensal ou Pontual"** (derivada de `custo_evitado_itens`). `custo_evitado_itens` é **só no banco**. O agente não pergunta mais isso — só descreve qualitativamente, sem R$.
@@ -123,15 +125,25 @@ O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA i
 
 Harness em **`scripts/e2e/`** para validar de ponta a ponta os cálculos de saving/receita e o
 preenchimento das colunas A→AJ da planilha, fazendo submissões/edições reais contra produção e
-comparando cada coluna com o valor esperado. Útil para validar mudanças nas regras financeiras
-**antes/depois de mexer no fluxo**. Detalhes em [scripts/e2e/README.md](scripts/e2e/README.md).
+comparando cada coluna com o valor esperado. **Cartesiano amplo (~24 cenários)**: saving (custo
+evitado não/mensal/pontual/**misto** × custo externo), receita pura/pontual, saving+receita,
+complexidade (automacao/**inteligencia**/**autonomia** + cruzamentos), especial, e edições (leve,
+memorial novo, reclassificação) com bases dedicadas. Útil para validar mudanças nas regras
+financeiras **antes/depois de mexer no fluxo**. Detalhes em [scripts/e2e/README.md](scripts/e2e/README.md).
 
 ```bash
-npm run e2e:run              # roda os 10 cenários (gera runId) → .runs/<runId>.json
-npm run e2e:run -- <runId>   # runId fixo; E2E_ONLY=saving-puro roda só 1 (sanidade)
-npm run e2e:validate -- <runId>   # compara colunas da planilha × esperado (pass/fail)
+npm run e2e:run -- <runId>        # roda os cenários (E2E_ONLY=<key> roda só 1, p/ sanidade)
+npm run e2e:validate -- <runId>   # asserts determinísticos: colunas × esperado + poll da Complexidade
+npm run e2e:validate-llm -- <runId>  # LLM-juiz: audita coluna a coluna (acha o que os asserts não pegam)
 npm run e2e:cleanup -- <runId>    # remove as linhas de teste (planilha → SQLite)
+# scripts/e2e/dump.mjs <runId>    # despeja todas as colunas A→AJ de um run, p/ auditoria manual
 ```
+
+- **Duas camadas de validação:** (1) `validate.mjs` = asserts determinísticos (fórmula independente
+  + consistência planilha×API + gate de Complexidade + comparação do `Memorial anterior`); (2)
+  `validate-llm.mjs` = **LLM-juiz** ("verificação da verificação") que recebe a linha completa + a
+  ficha do cenário e sinaliza divergências semânticas que os asserts fixos não pegam (qualidade do
+  memorial, vazamento entre colunas, coerência das Observações). Achou 3 bugs reais já corrigidos.
 
 - **Pré-requisito: `E2E_COOKIE` no `.env`.** O gateway Godeploy exige **OAuth no edge para TODAS as
   rotas** (inclusive `/api/*`) — sem sessão, leva `302 → /auth/login`. Logue em

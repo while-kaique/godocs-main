@@ -12,7 +12,10 @@ import { api, toBase64 } from './lib/api.mjs';
 import { responder } from './lib/responder.mjs';
 import { buildScenarios } from './scenarios.mjs';
 
-const MAX_TURNS = 30;
+const MAX_TURNS = 40;
+// Após muitos turnos NA MESMA fase, o agente às vezes fica reperguntando (loop) —
+// força uma resposta firme de fechamento para destravar (visto no saving+receita pontual).
+const TURNS_FASE_LOOP = 12;
 
 function defaultRunId() {
   const d = new Date();
@@ -27,6 +30,8 @@ const runId = process.argv[2] || defaultRunId();
 async function drive(projetoId, scenario, initialResp, initiated) {
   let resp = initialResp;
   let turns = 0;
+  let faseAnterior = null;
+  let turnsNaFase = 0;
   while (resp && !resp.isComplete) {
     const fase = resp.fase;
     if (fase === 'saving' && scenario.saving && !initiated.saving) {
@@ -39,7 +44,13 @@ async function drive(projetoId, scenario, initialResp, initiated) {
       resp = await api.iniciarReceita({ projeto_id: projetoId, ...scenario.receita });
       continue;
     }
-    const ans = await responder(resp, scenario);
+    turnsNaFase = fase === faseAnterior ? turnsNaFase + 1 : 0;
+    faseAnterior = fase;
+    // Loop-breaker: muitos turnos na mesma fase (agente reperguntando) → fecha firme.
+    const ans =
+      turnsNaFase >= TURNS_FASE_LOOP && resp.type !== 'preview'
+        ? { content: 'Os dados já estão corretos e completos conforme informado. Não há nada a alterar — finalize esta etapa.' }
+        : await responder(resp, scenario);
     process.stdout.write(`    · [${fase}] ${resp.type} → "${String(ans.content).slice(0, 60)}"\n`);
     resp = await api.enviarMensagem({
       projeto_id: projetoId,

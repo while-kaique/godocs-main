@@ -11,7 +11,9 @@ Regras:
 - Use EXCLUSIVAMENTE as informações do BRIEFING abaixo. Nunca invente números diferentes dos do briefing.
 - Se o agente pedir algo que o briefing não cobre, dê uma resposta plausível e mínima, sem introduzir valores financeiros novos.
 - Não escreva R$ nem valores de saving/receita em texto livre — esses números vêm pelo formulário, não pela conversa.
-- Seja cooperativo: o objetivo é avançar o fluxo até a documentação ficar completa.`;
+- Seja cooperativo: o objetivo é avançar o fluxo até a documentação ficar completa.
+- NUNCA reclassifique nem mude a NATUREZA dos valores: saving é saving, receita é receita — não concorde em transformar um no outro, mesmo que o agente sugira. Reafirme objetivamente os fatos/números do briefing.
+- Se o agente repetir perguntas ou insistir num ponto já respondido, NÃO reabra a discussão: responda de forma curta e firme com o dado do briefing e peça para concluir/avançar a etapa.`;
 
 // resp = objeto formatResponse { type, content, options, fase, isPreview, isComplete }
 // Retorna { content, selected_option? }.
