@@ -304,7 +304,11 @@ function MeusProjetosPage() {
                                   {ehOwner ? "você" : p.responsavel_nome || p.responsavel_email || "—"}
                                 </span>
                               </span>
-                              <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
+                              {/* Disclaimer de transferência só faz sentido p/ participante
+                                  (no projeto próprio, "só o autor edita" é redundante). */}
+                              {!ehOwner && (
+                                <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
+                              )}
                             </div>
                           )}
                           {p.pendente && (

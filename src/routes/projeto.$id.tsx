@@ -153,7 +153,10 @@ function ProjetoReadOnlyPage() {
                     <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#a5a5b3" }}>
                       Autoria
                     </span>
-                    <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
+                    {/* Disclaimer de transferência só p/ participante (redundante no projeto próprio). */}
+                    {p.papel === "participante" && (
+                      <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
+                    )}
                   </div>
                   <p className="mt-0.5 truncate text-[14px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                     {p.responsavel_nome || p.responsavel_email}
