@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight } from "lucide-react";
+
+// Itens por página em cada filtro de "Meus Projetos".
+const PER_PAGE = 10;
 
 // Prazo para regularizar legados (editar/reenviar até deixar de constar como legado).
 const PRAZO_LEGADO = "30/06";
@@ -57,20 +61,28 @@ function fmtGanho(v: number | null): string {
 }
 
 function MeusProjetosPage() {
-  const [projetos, setProjetos] = useState<Projeto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // React Query cacheia a lista (que lê o Sheets, ~9s). staleTime de 60s: voltar da
+  // tela de visualização para cá dentro desse intervalo serve do cache — sem spinner
+  // nem nova leitura da planilha. O QueryClient é estável entre navegações SPA.
+  const { data: projetos = [], isLoading: loading, error } = useQuery({
+    queryKey: ["meus-projetos"],
+    queryFn: () => apiFetch<Projeto[]>("/api/meus-projetos"),
+    staleTime: 60_000,
+  });
+  const erro = error
+    ? (error instanceof Error ? error.message : "Erro ao carregar projetos.")
+    : null;
   // Abre em "Todos" (tudo que você submeteu ou participa). "Meus", "Participo" e
   // "Rascunhos" recortam essa lista por papel/estado.
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(1);
 
+  // Trocar de filtro volta para a primeira página.
   useEffect(() => {
-    apiFetch<Projeto[]>("/api/meus-projetos")
-      .then(setProjetos)
-      .catch((e) => setErro(e instanceof Error ? e.message : "Erro ao carregar projetos."))
-      .finally(() => setLoading(false));
-  }, []);
+    setPagina(1);
+  }, [filtro]);
 
   const grupos = useMemo(() => {
     const submetidos = projetos.filter((p) => p.status !== "rascunho");
@@ -84,6 +96,11 @@ function MeusProjetosPage() {
 
   const visiveis = grupos[filtro];
 
+  // Paginação: 10 itens por página no filtro atual.
+  const totalPaginas = Math.max(1, Math.ceil(visiveis.length / PER_PAGE));
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const pageItems = visiveis.slice((paginaSegura - 1) * PER_PAGE, paginaSegura * PER_PAGE);
+
   // Exclusão de rascunho com confirmação no próprio toast (sonner).
   function pedirExclusaoRascunho(id: string, nome: string | null) {
     toast(`Excluir o rascunho "${nome ?? "sem nome"}"?`, {
@@ -94,7 +111,9 @@ function MeusProjetosPage() {
           setExcluindo(id);
           try {
             await apiFetch(`/api/meus-projetos/${id}`, undefined, "DELETE");
-            setProjetos((ps) => ps.filter((p) => p.id !== id));
+            queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
+              (old ?? []).filter((p) => p.id !== id),
+            );
             toast.success("Rascunho excluído.");
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Erro ao excluir o rascunho.");
@@ -259,7 +278,7 @@ function MeusProjetosPage() {
 
               {visiveis.length > 0 && (
                 <div className="space-y-3">
-                  {visiveis.map((p) => {
+                  {pageItems.map((p) => {
                     const ehRascunho = p.status === "rascunho";
                     const ehOwner = p.papel === "owner";
                     return (
@@ -369,6 +388,52 @@ function MeusProjetosPage() {
                     );
                   })}
                 </div>
+              )}
+
+              {/* Paginação — só quando o filtro tem mais de uma página */}
+              {totalPaginas > 1 && (
+                <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="Paginação">
+                  <button
+                    type="button"
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                    disabled={paginaSegura <= 1}
+                    aria-label="Página anterior"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:opacity-40"
+                    style={{ background: "transparent", color: "var(--go-blue)", border: "1px solid rgba(0,89,169,0.15)" }}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((n) => {
+                    const ativo = n === paginaSegura;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPagina(n)}
+                        aria-label={`Página ${n}`}
+                        aria-current={ativo ? "page" : undefined}
+                        className="inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-[13px] font-semibold transition-all"
+                        style={
+                          ativo
+                            ? { background: "var(--go-blue)", color: "var(--go-white)" }
+                            : { background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.1)" }
+                        }
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaSegura >= totalPaginas}
+                    aria-label="Próxima página"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:opacity-40"
+                    style={{ background: "transparent", color: "var(--go-blue)", border: "1px solid rgba(0,89,169,0.15)" }}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </nav>
               )}
             </>
           )}
