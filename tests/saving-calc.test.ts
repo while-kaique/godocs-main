@@ -175,6 +175,27 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.economia_reais_mes).toBe(3377.4);
   });
 
+  it("carrega o custo externo recebido para o objeto saving retornado", () => {
+    // O custo externo autoritativo vive em projeto.custo_externo_mensal e é passado
+    // aqui — precisa viajar no saving para enriquecerMemorial lê-lo depois.
+    const out = recomputarSavingFinanceiro(
+      {
+        linhas: [
+          { cargo: "Analista Pleno", horas_antes: 40, horas_depois: 0, valor_hora: 29.9, economia_horas_mes: 40, economia_reais_mes: 1196 },
+        ],
+        economia_horas_mes: 40,
+        economia_reais_mes: 1196,
+        tipo_saving: "mensal",
+        memorial_calculo: null,
+        valor_ganho_mensal: null,
+      } as SavingColetado,
+      300,
+    );
+
+    expect(out.custo_externo_mensal).toBe(300);
+    expect(out.economia_reais_mes).toBe(896); // 1196 - 300
+  });
+
   it("ignora custo evitado ausente/nulo (objeto sem os campos)", () => {
     const out = recomputarSavingFinanceiro({
       linhas: [
@@ -280,6 +301,31 @@ describe("enriquecerMemorial — memorial interno com valores financeiros", () =
     expect(result).toContain("Serviço externo de implementação");
     expect(result).toContain("R$ 100.00/mês");
     expect(result).toContain("Economia líquida total:** R$ 3377.40");
+  });
+
+  it("reflete o custo externo no memorial mesmo quando o saving vem SEM o campo (caminho do submit)", () => {
+    // Regressão: o custo externo vive em projeto.custo_externo_mensal, não no objeto
+    // saving que o LLM ecoa. O submit chama recomputarSavingFinanceiro(saving, custo)
+    // antes de enriquecerMemorial. Sem carregar o campo adiante, o memorial mostrava
+    // "Custo de ferramenta externa: N/A" e líquida bruta — contradizendo o Saving Reais.
+    const savingDoLLM = {
+      linhas: [
+        { cargo: "Analista Pleno", horas_antes: 50, horas_depois: 10, valor_hora: 29.9, economia_horas_mes: 40, economia_reais_mes: 1196 },
+      ],
+      economia_horas_mes: 40,
+      economia_reais_mes: 1196,
+      tipo_saving: "mensal",
+      memorial_calculo: "Memorial base sem R$",
+      valor_ganho_mensal: null,
+      // sem custo_externo_mensal — como vem do estado do chat
+    } as SavingColetado;
+
+    const recomputado = recomputarSavingFinanceiro(savingDoLLM, 300);
+    const result = enriquecerMemorial(recomputado, undefined, ["saving"]);
+
+    expect(result).toContain("R$ 300.00/mês");
+    expect(result).not.toContain("Custo de ferramenta externa:** N/A");
+    expect(result).toContain("Economia líquida total:** R$ 896.00");
   });
 
   it("gera memorial com receita incremental quando tipo é receita", () => {

@@ -32,6 +32,12 @@ export type MeuProjetoItem = {
   // Legado pendente: submetido (não-rascunho) mas sem "Atualizado Em" no Sheets →
   // precisa ser editado/reenviado até o prazo para regularizar.
   pendente: boolean;
+  // Papel do usuário neste projeto: 'owner' (submeteu, pode editar) ou
+  // 'participante' (está nos membros, só visualiza).
+  papel: Papel;
+  // Autoria (para exibir nos cards e no tooltip de transferência de autoria).
+  responsavel_nome: string | null;
+  responsavel_email: string | null;
 };
 
 // Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
@@ -77,17 +83,38 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   saving_reais: number | null;
   custo_externo_mensal: number | null;
   alguem_fazia: string | null;
+  // Custo evitado: necessários para o seed da EDIÇÃO repopular a etapa de saving
+  // (sem eles a edição reabre a etapa de custo evitado em branco). 'sim'/'nao',
+  // justificativa concatenada e itens (JSON [{nome,valor,recorrencia,justificativa}]).
+  custo_evitado: string | null;
+  custo_evitado_justificativa: string | null;
+  custo_evitado_itens: string | null;
   memorial_calculo: string | null;
   documentacao: unknown | null;
   ultima_versao: VersaoSnapshot | null;
+  // Pode editar? true = owner ou admin RPA. Participante recebe false (só visualiza).
+  podeEditar: boolean;
 };
 
-function ehDono(projeto: ProjetoRow, email: string): boolean {
+// OWNER = quem submeteu (responsavel_email). Só o owner edita.
+export function ehOwner(projeto: ProjetoRow, email: string): boolean {
+  return (projeto.responsavel_email ?? '').trim().toLowerCase() === email.trim().toLowerCase();
+}
+
+// PARTICIPANTE = está na lista de membros, mas NÃO é o owner. Só visualiza.
+export function ehParticipante(projeto: ProjetoRow, email: string): boolean {
+  if (ehOwner(projeto, email)) return false;
   const alvo = email.trim().toLowerCase();
-  if ((projeto.responsavel_email ?? '').trim().toLowerCase() === alvo) return true;
   const membros = parseJson<string[]>(projeto.membros) ?? [];
   return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
+
+// Tem acesso de LEITURA (owner ou participante). Edição é só do owner (ehOwner).
+export function temAcesso(projeto: ProjetoRow, email: string): boolean {
+  return ehOwner(projeto, email) || ehParticipante(projeto, email);
+}
+
+export type Papel = 'owner' | 'participante';
 
 // "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
 function temAtualizadoEm(v: string | null | undefined): boolean {
@@ -103,7 +130,11 @@ function ehLegado(id: string): boolean {
   return id.toLowerCase().includes('legado');
 }
 
-function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: string | null): MeuProjetoItem {
+function mapItem(
+  p: ProjetoRow & { area_nome: string | null },
+  atualizadoEm: string | null,
+  papel: Papel,
+): MeuProjetoItem {
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
     id: p.id,
@@ -119,9 +150,12 @@ function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: str
     arquivos_nomes: parseJson<string[]>(p.arquivos_nomes) ?? [],
     atualizado_em: at,
     // Pendente = LEGADO (id "LEGADO-…") e sem "Atualizado Em" no Sheets → precisa ser
-    // editado/reenviado para regularizar. Projetos comuns submetidos pelo app NUNCA
-    // são pendentes (mesmo sem Atualizado Em).
-    pendente: ehLegado(p.id) && !at,
+    // editado/reenviado para regularizar. Só o OWNER pode regularizar, então um
+    // participante nunca vê o projeto como pendente (não adianta cobrá-lo).
+    pendente: papel === 'owner' && ehLegado(p.id) && !at,
+    papel,
+    responsavel_nome: p.responsavel_nome ?? null,
+    responsavel_email: p.responsavel_email ?? null,
   };
 }
 
@@ -145,8 +179,14 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // "Atualizado Em": usa o valor recém-lido da planilha; se a leitura falhou (mapa
   // vazio), cai no espelho persistido no SQLite — nunca marca tudo como pendente.
   return rows
-    .filter((p) => ehDono(p, email))
-    .map((p) => mapItem(p, atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null));
+    .filter((p) => temAcesso(p, email))
+    .map((p) =>
+      mapItem(
+        p,
+        atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null,
+        ehOwner(p, email) ? 'owner' : 'participante',
+      ),
+    );
 }
 
 /**
@@ -158,8 +198,9 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
  */
 export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
   const rows = await getProjetosByOwnerEmail(email);
+  // Só o OWNER pode regularizar um legado pendente — participante não conta.
   const count = rows
-    .filter((p) => ehDono(p, email))
+    .filter((p) => ehOwner(p, email))
     .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
     .length;
   return { count, prazo: PRAZO_LEGADO };
@@ -172,7 +213,8 @@ export async function contarPendentes(email: string): Promise<{ count: number; p
 export async function excluirRascunho(email: string, projetoId: string): Promise<{ ok: true }> {
   const p = await getProjetoById(projetoId);
   if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
-  if (!ehDono(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
+  // Só o owner exclui o próprio rascunho (participante não tem rascunho de terceiro).
+  if (!ehOwner(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
   if (p.status !== 'rascunho') {
     throw Object.assign(new Error('Apenas rascunhos podem ser excluídos.'), { status: 400 });
   }
@@ -188,11 +230,15 @@ export async function getMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  // Dono (responsável ou membro) pode abrir/editar. Admins (emails do RPA
-  // cadastrados na tabela `admins`) podem abrir/editar QUALQUER projeto.
-  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
+  // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
+  // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
+  const ehAdmin = !!(await getAdminByEmail(email));
+  if (!temAcesso(data, email) && !ehAdmin) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
+  // EDIÇÃO: só o owner (quem submeteu) ou um admin RPA. Participante só visualiza.
+  const podeEditar = ehOwner(data, email) || ehAdmin;
+  const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
 
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;
@@ -210,9 +256,10 @@ export async function getMeuProjeto(
   }
 
   // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null);
+  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null, papel);
   return {
     ...base,
+    podeEditar,
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
     ferramenta: data.ferramenta,
@@ -228,6 +275,9 @@ export async function getMeuProjeto(
     saving_reais: data.saving_reais,
     custo_externo_mensal: data.custo_externo_mensal,
     alguem_fazia: data.alguem_fazia,
+    custo_evitado: data.custo_evitado ?? null,
+    custo_evitado_justificativa: data.custo_evitado_justificativa ?? null,
+    custo_evitado_itens: data.custo_evitado_itens ?? null,
     memorial_calculo: data.memorial_calculo,
     documentacao: docConteudo,
     ultima_versao,
@@ -245,7 +295,7 @@ export async function getHistoricoMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
+  if (!temAcesso(data, email) && !(await getAdminByEmail(email))) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   const msgs = await getChatMessages(id);

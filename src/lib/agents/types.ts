@@ -77,6 +77,10 @@ export type SavingColetado = {
   custo_evitado_reais: number | null;
   custo_evitado_tipo: 'mensal' | 'pontual' | null;
   custo_evitado_descricao: string | null;
+  // Custo INCORRIDO pela automação (ferramenta/serviço externo mensal). SUBTRAI do
+  // economia_reais_mes. Fonte da verdade é projeto.custo_externo_mensal; carregado
+  // aqui por recomputarSavingFinanceiro para o memorial enriquecido refleti-lo.
+  custo_externo_mensal?: number | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -89,6 +93,7 @@ export const savingVazio = (): SavingColetado => ({
   custo_evitado_reais: null,
   custo_evitado_tipo: null,
   custo_evitado_descricao: null,
+  custo_externo_mensal: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
