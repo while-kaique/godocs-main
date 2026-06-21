@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "e2e:run": "node --experimental-strip-types scripts/e2e/run.mjs",
     "e2e:validate": "node --experimental-strip-types scripts/e2e/validate.mjs",
+    "e2e:validate-llm": "node --experimental-strip-types scripts/e2e/validate-llm.mjs",
     "e2e:cleanup": "node --experimental-strip-types scripts/e2e/cleanup.mjs"
   },
   "dependencies": {
