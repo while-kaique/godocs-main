@@ -39,13 +39,15 @@ const LEGENDA = `
 - Custo Mensal ou Pontual: recorrência do custo evitado — "Mensal", "Pontual" ou "Misto" (itens com recorrências diferentes); "—" quando não há custo evitado.
 - Saving Reais: LÍQUIDO = Horas em Reais + Custo Evitado − Custo Externo Mensal.
 - Tipo de Saving: "mensal"/"pontual"; "—" quando não há saving.
-- Memorial de Saving: memorial UNIFICADO (saving + receita) COM R$ (é a planilha de staff). Para projeto SÓ-receita, contém o memorial de receita (isso é esperado). Deve ser coerente com o projeto; não pode estar vazio quando há saving e/ou receita.
+- Memorial de Saving (V): contém SOMENTE o memorial de SAVING (com R$ — planilha de staff). O memorial de RECEITA NÃO deve aparecer aqui — ele vai SOMENTE na coluna "Receita Memorial" (Z). Em projeto SÓ-receita, V deve ser "—" (vazio). Em projeto com saving (ou saving+receita), V tem só a parte de saving.
+  ⚠️ Se V contiver conteúdo de receita (ex.: começa com "Memorial de Receita Incremental", "O que gera a receita", "Valor da receita incremental"), é divergência (média): o memorial de receita vazou para a coluna de saving.
+  ⚠️ COERÊNCIA FINANCEIRA OBRIGATÓRIA: quando há saving, a "Economia líquida total" escrita no texto DEVE bater com a coluna "Saving Reais" — refletir o custo evitado (SOMA) e o custo externo (SUBTRAI). Se "Custo Externo Mensal" > 0 mas o memorial diz "Custo de ferramenta externa: N/A" (ou não subtrai), é divergência ALTA. Idem se a "Economia líquida total" do texto ≠ "Saving Reais" da coluna.
 - Custo Externo Mensal: R$ do custo externo novo; 0 quando não há.
 - Receita Mensal: valor da receita incremental — VALOR CHEIO mesmo quando pontual (não divide). 0 quando não há receita.
 - Tipo de Receita: "mensal"/"pontual"; "—" quando não há receita.
 - Receita Memorial: memorial de receita; "—" quando não há receita.
 - Status: SEMPRE "Pendente" (regra temporária vigente — qualquer outro valor é divergência).
-- Ganho Total: métrica de gestão (saving líquido + receita ajustada). Deve ser > 0 quando há ganho.
+- Ganho Total: MÉTRICA DE GESTÃO = Saving Reais (líquido) + receita AJUSTADA. A receita NÃO entra crua: receita MENSAL é dividida por 10; receita PONTUAL é dividida por 12 e depois por 10. Exemplos: receita mensal 8000 → contribui 800 (Ganho Total = 800 se não há saving); receita pontual 24000 → contribui 200; saving 662 + receita mensal 5000 → 662 + 500 = 1162. NÃO cobre como divergência um Ganho Total que seja menor que a receita crua — isso é esperado por causa do ÷10. Só é divergência se não bater com essa fórmula.
 - Complexidade: "automacao" | "inteligencia" | "autonomia". Se a automação NÃO usa IA como funcionalidade → "automacao". Se usa IA → "inteligencia" (no mínimo) ou "autonomia" (agente que decide/age sozinho). Projeto ESPECIAL não passa pelo analisador (valor pode não refletir nada — não cobrar).
 - Diff Horas / Antes, Diff Saving / Antes: colunas MANUAIS — o sistema NUNCA escreve. Devem estar vazias/"—". Se tiverem valor escrito pelo sistema, é divergência.
 - Memorial anterior: SÓ na edição = memorial da versão imediatamente anterior. "—" em submissão nova. Numa edição, NÃO pode ser igual ao "Memorial de Saving" atual (tem que ser o anterior).
@@ -84,7 +86,9 @@ function fichaCenario(sc, result) {
   // Valores determinísticos exatos esperados (do expected.hard) — para o juiz cruzar números.
   const hard = sc.expected?.hard ?? {};
   if (Object.keys(hard).length) {
-    linhas.push(`Valores exatos esperados (colunas-chave): ` + Object.entries(hard).map(([k, v]) => `${k}=${v}`).join('; '));
+    // null no expected.hard = convenção do validate ("qualquer valor não-vazio"),
+    // NÃO "deve estar vazio". Traduz para o juiz não confundir.
+    linhas.push(`Valores exatos esperados (colunas-chave): ` + Object.entries(hard).map(([k, v]) => `${k}=${v === null ? '(qualquer valor não-vazio — NÃO é para estar vazio)' : v}`).join('; '));
   }
   return linhas.join('\n');
 }

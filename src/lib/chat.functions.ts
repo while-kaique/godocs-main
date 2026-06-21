@@ -1455,6 +1455,13 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const memorialInterno = stripMarkdown(
     enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto)
   );
+  // Coluna "Memorial de Saving" (V) recebe SÓ o memorial de saving (com R$). O memorial de
+  // receita vai SOMENTE para "Receita Memorial" (Z); em projeto só-receita, V fica "—".
+  // (memorial_calculo no banco segue sendo o unificado — usado em "Memorial anterior"/auditoria.)
+  const memorialSavingLimpo =
+    tiposProjeto.includes('saving') && saving
+      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+      : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
 
   await updateProjeto(projeto_id, {
@@ -1583,7 +1590,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
       status: 'Pendente',
       area: areaFinal ?? '—',
-      memorialLimpo: memorialInterno ?? '—',
+      memorialLimpo: memorialSavingLimpo ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
       ganhoTotalMensal,
       // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
@@ -1654,9 +1661,11 @@ export async function resyncGoogle(rawData: unknown) {
   const ganhoTotalMensal = savingMensal + receitaMensal / 10;
 
   const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
-  const memorialInterno = stripMarkdown(
-    enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto),
-  );
+  // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Receita Memorial").
+  const memorialSavingLimpo =
+    tiposProjeto.includes('saving') && saving
+      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+      : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
   const membros = parseJson<string[]>(projeto.membros) ?? [];
 
@@ -1672,7 +1681,7 @@ export async function resyncGoogle(rawData: unknown) {
     tiposProjeto,
     status: 'Pendente',
     area: projeto.area ?? '—',
-    memorialLimpo: memorialInterno ?? '—',
+    memorialLimpo: memorialSavingLimpo ?? '—',
     receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
     ganhoTotalMensal,
   });
