@@ -1,9 +1,25 @@
 # Harness E2E — validação coluna-a-coluna
 
 Exercita o fluxo de submissão/edição de ponta a ponta contra a aplicação (default:
-**produção**) cobrindo os cenários financeiros (saving puro, custo evitado mensal/pontual,
-custo externo, multi-cargo, receita pura/pontual, saving+receita, especial, edição) e
-valida cada coluna gerada na planilha (A→AJ).
+**produção**) cobrindo um cartesiano amplo das dimensões do formulário e valida cada
+coluna gerada na planilha (A→AJ). São **24 cenários** organizados em grupos:
+
+- **A — saving financeiro** (complexidade=automacao): custo evitado {não·mensal·pontual·**misto**}
+  × custo externo {não·sim} = 8 células + multi-cargo.
+- **B — receita**: pura mensal, pura pontual.
+- **C — saving+receita**: mensal; saving+custo evitado+receita pontual.
+- **D — complexidade** (classificação do analisador): `inteligencia` (IA classifica),
+  `autonomia` (agente decide/age sozinho), e os cruzamentos com receita e saving+receita.
+  O gate `tem_ia_como_funcionalidade` garante o piso: IA=Não → `automacao` (hard); IA=Sim →
+  ≠`automacao` (hard). O nível fino (inteligencia↔autonomia) é julgamento do LLM → reportado
+  como SOFT para revisão humana, junto com a coluna `Observações`.
+- **E — especial** (pula saving/receita; analisador não roda → complexidade não validada).
+- **F — edição / `Memorial anterior`**: F1 leve (recalcula horas), F2 reabre a conversa do
+  agente (`atualizar-metadados` com doc nova → memorial novo), F3 reclassificação (base
+  `automacao` + edição que adiciona IA → `inteligencia`). Cada edição usa uma **base dedicada**
+  (`baseOnly`): a edição faz UPDATE in-place na mesma linha, então a base não é validada
+  standalone (a linha reflete o estado pós-edição). O memorial pré-edição (M0) é capturado em
+  tempo de run via `GET /api/meus-projetos/:id` e comparado contra a coluna `Memorial anterior`.
 
 ## Pré-requisitos (uma vez)
 
@@ -40,7 +56,11 @@ Variáveis opcionais: `E2E_BASE_URL` (default produção), `E2E_OWNER_EMAIL`
   `submeter-validacao`. Captura o `ganho` retornado pela API.
 - **validate.mjs** — lê a planilha (`lib/sheets.mjs`, Service Account), casa por `ID Projeto`
   e compara: (1) `expected.hard` (fórmula independente — falha o teste), (2) `expected.soft`
-  (rótulos ambíguos — só reporta), (3) consistência **Ganho Total / Saving Reais planilha × API**.
+  (rótulos ambíguos — só reporta), (3) consistência **Ganho Total / Saving Reais planilha × API**,
+  (4) **Complexidade** (gate hard + nível-fino soft) e (5) **Memorial anterior** (AF == M0
+  capturado em run; M1 ≠ M0). A coluna `Complexidade` é preenchida pelo analisador em background
+  (+ cron a cada 1 min), então o validador faz **poll** (relê a planilha até ~5 min) antes de
+  comparar. Bases de edição (`baseOnly`) têm a validação standalone pulada.
 - **cleanup.mjs** — remove as linhas da planilha (deleteDimension) e depois chama o
   endpoint admin que apaga do SQLite todos os `[E2E-...]`. Ordem importa: planilha antes do
   SQLite, senão o sync reverso por dono ressuscita os projetos.
