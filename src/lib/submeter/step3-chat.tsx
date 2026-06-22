@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
+import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput, CustoEvitadoItemInput } from "./constants";
 import { ocultarReaisSaving, formatMoedaBR, parseMoedaBR } from "./constants";
 
@@ -210,7 +211,7 @@ export function SimpleMarkdown({ text, isSaving }: { text: string; isSaving: boo
    ────────────────────────────────────────────── */
 
 function cleanPreviewContent(content: string) {
-  return content
+  return normalizarMarcadoresMemorial(content)
     .replace(/\n*Essa documentação está correta\?.*$/s, "")
     .replace(/\n*Está correto\?.*$/s, "")
     .replace(/\n*Pode aprovar.*$/s, "")

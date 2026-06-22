@@ -359,8 +359,10 @@ Pergunta:
 Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"receita":{...campos atualizados}}
 
+TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [6.1], [6.2] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê depois sabe o que "[6.2]" significa. Cada ponto vira um TÍTULO legível (o cabeçalho "### ..." de cada seção já é o título; não prefixe o conteúdo com código nenhum).
+
 Preview (SOMENTE quando TODOS os pontos 6.1-6.5 estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n[6.1] ...\\n\\n### Como o projeto aumenta a receita\\n[6.2] ...\\n\\n### Comparação antes vs. depois\\n[6.3] Antes: ... → Depois: ...\\n\\n### Base de cálculo\\n[6.4] ...\\n\\n### Resumo\\n- Ganho: R$ X${unidadeReceita}\\n- Tipo: ${receita.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n...\\n\\n### Como o projeto aumenta a receita\\n...\\n\\n### Comparação antes vs. depois\\nAntes: ... → Depois: ...\\n\\n### Base de cálculo\\n...\\n\\n### Resumo\\n- Ganho: R$ X${unidadeReceita}\\n- Tipo: ${receita.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "receita" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "receita.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
@@ -408,7 +410,7 @@ O usuário pode:
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado). Se o usuário tentar aprovar nessas condições, responda com type:"question".
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (O que gera a receita, Como aumenta, Comparação antes vs. depois, Base de cálculo, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (O que gera a receita, Como aumenta, Comparação antes vs. depois, Base de cálculo, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [6.1]/[6.2] no texto: cada seção já tem seu título no cabeçalho "### ...".
 
 FORMATO — APENAS JSON válido:
 
@@ -620,8 +622,10 @@ Pergunta:
 Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
+TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [1.1], [2.2], [3.1] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê a aprovação depois sabe o que "[2.2]" significa. Cada ponto vira um TÍTULO em negrito ("**O que fazia:**", "**Serviço evitado:**" …); use os cabeçalhos "### ..." para as seções e rótulos em negrito para os itens dentro delas, exatamente como no exemplo abaixo.
+
 Preview (SOMENTE quando TODOS os pontos obrigatórios estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n[1.1] e [1.2]\\n\\n### Saving de Pessoas\\n[2.1] N pessoas: ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Totais:** ...\\n\\n### Contratos/Serviços Evitados\\n[3.1-3.3 ou N/A]\\n\\n### Custo da Automação\\n[4.1-4.3 ou N/A]\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
 ATENÇÃO 2: se houver custo evitado, inclua "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula.
@@ -662,7 +666,7 @@ SINCRONIA OBRIGATÓRIA: o sistema grava as horas e o R\$ a partir do array \`lin
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
 
 FORMATO — APENAS JSON válido:
 
