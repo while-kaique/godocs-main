@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from "@/lib/agents/saving-calc";
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, resolverValorHora } from "@/lib/agents/saving-calc";
 import type { SavingColetado, ReceitaColetada } from "@/lib/agents/types";
 
 describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", () => {
@@ -79,6 +79,44 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.linhas[0].valor_hora).toBe(29.9);
     expect(out.linhas[0].economia_horas_mes).toBe(34); // 40 - 6
     expect(out.linhas[0].economia_reais_mes).toBe(1016.6); // 34 × 29.9
+  });
+
+  // Regressão do bug do "falso zero" (projeto BoniTrack, Tifanne): o LLM gravou o
+  // cargo genérico "Analista" (sem senioridade), que não batia EXATO com nenhum
+  // label da tabela ("Analista Júnior/Pleno/Sênior") e a linha vinha sem
+  // valor_hora → valor caía para R$0 → economia_reais_mes=0 → gate de ganho-zero
+  // barrava a submissão MESMO havendo 2,5h/mês de economia real.
+  it("cargo genérico 'Analista' (sem senioridade) resolve para R$ > 0 — não zera o saving", () => {
+    const out = recomputarSavingFinanceiro({
+      linhas: [
+        {
+          cargo: "Assistente",
+          horas_antes: 0,
+          horas_depois: 11,
+          valor_hora: 13.94,
+          economia_horas_mes: 0,
+          economia_reais_mes: 0,
+        },
+        {
+          cargo: "Analista", // genérico, não casa exato com a tabela
+          horas_antes: 3.33,
+          horas_depois: 0.83,
+          valor_hora: null as unknown as number, // LLM não preencheu
+          economia_horas_mes: 2.5,
+          economia_reais_mes: null as unknown as number,
+        },
+      ],
+      economia_horas_mes: 2.5,
+      economia_reais_mes: null,
+      tipo_saving: "mensal",
+      memorial_calculo: null,
+      valor_ganho_mensal: null,
+    } as SavingColetado);
+
+    // "Analista" → família "Analista *" → menor tier (Júnior, 21.29), conservador
+    expect(out.linhas[1].valor_hora).toBe(21.29);
+    expect(out.linhas[1].economia_reais_mes).toBe(53.22); // 2.5 × 21.29 (round2 do float)
+    expect(out.economia_reais_mes).toBeGreaterThan(0); // gate de ganho-zero passa
   });
 
   it("soma múltiplas linhas e abate o custo externo mensal do total líquido", () => {
@@ -380,5 +418,29 @@ describe("enriquecerMemorial — memorial interno com valores financeiros", () =
   it("retorna string vazia quando não há saving nem receita", () => {
     const result = enriquecerMemorial(undefined, undefined, []);
     expect(result).toBe("");
+  });
+});
+
+describe("resolverValorHora — match tolerante de cargo (corrige o falso zero)", () => {
+  it("match exato pela tabela", () => {
+    expect(resolverValorHora("Analista Pleno")).toBe(29.9);
+    expect(resolverValorHora("Assistente")).toBe(13.94);
+  });
+  it("normaliza acento/caixa/espaços", () => {
+    expect(resolverValorHora("analista senior")).toBe(33.1); // "Analista Sênior"
+    expect(resolverValorHora("  ESTAGIÁRIO  ")).toBe(10.78);
+  });
+  it("cargo de família genérico → menor tier (conservador)", () => {
+    expect(resolverValorHora("Analista")).toBe(21.29); // mín entre Júnior/Pleno/Sênior
+  });
+  it("usa o valor_hora da linha quando o cargo é desconhecido", () => {
+    expect(resolverValorHora("Coordenador", 40)).toBe(40);
+  });
+  it("cargo desconhecido sem valor_hora → piso conservador (nunca R$0)", () => {
+    expect(resolverValorHora("Diretor")).toBe(10.78); // menor da tabela
+  });
+  it("cargo vazio/ausente → 0 (não há pessoa a valorar)", () => {
+    expect(resolverValorHora("")).toBe(0);
+    expect(resolverValorHora(undefined)).toBe(0);
   });
 });
