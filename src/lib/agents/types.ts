@@ -205,6 +205,11 @@ export type ProjetoContexto = {
   tipo_projeto?: 'saving' | 'receita_incremental' | null;
   tipos_projeto?: ('saving' | 'receita_incremental')[] | null;
   escopo?: 'interno' | 'externo' | null;
+  // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas
+  // reais de uma rotina que existia. 'nao' → ninguém fazia: horas_antes é o EQUIVALENTE
+  // manual estimado (o trabalho que alguém teria se a automação não existisse). O
+  // orquestrador usa isto para NÃO pedir o detalhamento de uma "rotina" inexistente.
+  alguem_fazia?: 'sim' | 'nao' | string | null;
   // Projeto especial: flag + contexto que a pessoa escreveu para explicar o impacto.
   especial?: boolean;
   contexto_especial?: string | null;

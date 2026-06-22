@@ -1488,12 +1488,17 @@ export function SubmeterPageContent({
           : parseFloat(formData.custoExterno)
         : undefined;
 
+      // No modo "ninguém fazia", horas_antes é o equivalente manual estimado e
+      // horas_depois é sempre 0 (a automação faz tudo; o campo nem aparece). Exige só
+      // o equivalente e força o "depois" a 0 — não arrasta valor antigo de uma edição
+      // de legado nem barra a linha por horas_depois vazio.
+      const ninguemFazia = formData.alguemFazia === "nao";
       const linhas = formData.linhas
-        .filter((l) => l.cargo && l.horasAntes !== "" && l.horasDepois !== "")
+        .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
         .map((l) => ({
           cargo: l.cargo,
           horas_antes: parseFloat(l.horasAntes),
-          horas_depois: parseFloat(l.horasDepois),
+          horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
         }));
 
       // Custo evitado: só envia itens válidos quando a pessoa marcou "sim". O

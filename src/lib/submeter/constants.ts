@@ -99,8 +99,10 @@ export interface CustoEvitadoItemInput {
 export interface SavingFormData {
   linhas: SavingLinhaInput[];
   // Saving: alguém já fazia/mantinha isso manualmente antes da automação?
-  // 'sim' → tabela antes+depois (economia clássica); 'nao' → só "depois"
-  // (ninguém antes; horas_antes assumido 0, então a economia de horas é 0).
+  // 'sim' → tabela antes+depois (economia clássica). 'nao' → ninguém fazia: a
+  // tabela pede o EQUIVALENTE em trabalho manual (horas/mês que levaria se alguém
+  // tivesse que fazer + cargo), gravado em horas_antes com horas_depois = 0 —
+  // saving contrafactual (o trabalho manual que a automação evita).
   alguemFazia: 'sim' | 'nao' | '';
   // Saving: a solução evitou um custo externo (ferramenta/serviço que deixou de
   // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens).

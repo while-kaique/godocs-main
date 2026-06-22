@@ -74,7 +74,8 @@ O usuário pode navegar livremente entre steps já completados sem perder o prog
   - Seção 4 — Custo da Automação: [4.1] Ferramenta, [4.2] Monitoramento, [4.3] Total (ou N/A)
   - Seção 5 — Resumo: [5.1] Economia bruta de horas, [5.2] Tipo
 - IA **insiste** até ter resposta para cada ponto. Se o usuário for raso, preenche com o que tem — mas nunca pula
-- **horas_antes = 0 é válido**: significa que ninguém fazia antes; automação faz algo novo
+- **"Ninguém fazia" (`alguem_fazia = 'nao'`) → equivalente manual**: quando o usuário marca que ninguém fazia a tarefa manualmente, o formulário NÃO pergunta mais "quem dedica tempo à automação hoje". Em vez disso pergunta **"qual seria o equivalente em trabalho manual?"** — quantas horas/mês o trabalho levaria **se alguém tivesse que fazer à mão** e qual cargo. Esse valor é gravado em **`horas_antes`** (com `horas_depois = 0`) e é **saving contrafactual legítimo** (o trabalho que a automação evita). A IA é instruída (via `ctx.alguem_fazia` no prompt do orquestrador) a **validar a estimativa** (volume × tempo), **nunca** a pedir o passo a passo de uma rotina que nunca existiu.
+- **horas_antes = 0 ainda é válido** (legado/casos especiais): significa que ninguém fazia E o trabalho não exigiria mão de obra; o ganho vem de outro lugar (entrega nova / custo evitado)
 - Monta o memorial automaticamente — usuário nunca redige
 - **Memorial duplo**: o preview mostra o memorial SEM R$. O `projetos.memorial_calculo` (planilha) recebe a versão enriquecida com R$ via `enriquecerMemorial()` (backend injeta valor/hora × economia = R$)
 
