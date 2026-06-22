@@ -5,13 +5,49 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
 
-// Prazo para regularizar legados (editar/reenviar até deixar de constar como legado).
-const PRAZO_LEGADO = "30/06";
+// Prazo para regularizar legados (editar/salvar até deixar de constar como legado).
+const PRAZO_LEGADO = "30/06/2026";
+
+// Status (espelhado do Sheets) que significa "reprovado — precisa reenviar".
+function ehReenvioSolicitado(status: string | null): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s === "reenvio pendente" || s === "rejeitado";
+}
+
+// Aviso de pendência com barra de acento à esquerda. Dois tons distintos:
+// "legado" (âmbar, regularização com prazo) e "reenvio" (vermelho, ação corretiva).
+function AvisoPendencia({
+  tone,
+  icon,
+  titulo,
+  texto,
+}: {
+  tone: "legado" | "reenvio";
+  icon: React.ReactNode;
+  titulo: string;
+  texto: string;
+}) {
+  const c =
+    tone === "legado"
+      ? { bg: "rgba(245,158,11,0.08)", bar: "#f59e0b", fg: "#b45309" }
+      : { bg: "rgba(220,38,38,0.06)", bar: "#dc2626", fg: "#b91c1c" };
+  return (
+    <div
+      className="mt-2 flex items-start gap-2 rounded-md py-1.5 pl-2.5 pr-3 text-[11px] leading-snug"
+      style={{ background: c.bg, borderLeft: `3px solid ${c.bar}`, color: c.fg }}
+    >
+      <span className="mt-px shrink-0" aria-hidden>{icon}</span>
+      <span>
+        <span className="font-bold">{titulo}</span> — {texto}
+      </span>
+    </div>
+  );
+}
 
 const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
@@ -332,12 +368,31 @@ function MeusProjetosPage() {
                               )}
                             </div>
                           )}
+                          {/* Pendência de REGULARIZAÇÃO (legado, com prazo) — âmbar */}
                           {p.pendente && (
-                            <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
-                              {ehOwner
-                                ? `⚠️ Projeto pendente — edite e reenvie até ${PRAZO_LEGADO} para regularizar.`
-                                : "⚠️ Projeto pendente de regularização — só o autor pode reenviar. Acione o autor ou a equipe RPA."}
-                            </p>
+                            <AvisoPendencia
+                              tone="legado"
+                              icon={<CalendarClock className="h-3.5 w-3.5" />}
+                              titulo="Regularização de legado"
+                              texto={
+                                ehOwner
+                                  ? `atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
+                                  : `pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
+                              }
+                            />
+                          )}
+                          {/* Pendência de REENVIO (reprovado na análise) — vermelho */}
+                          {ehReenvioSolicitado(p.status) && (
+                            <AvisoPendencia
+                              tone="reenvio"
+                              icon={<RotateCcw className="h-3.5 w-3.5" />}
+                              titulo="Reenvio solicitado"
+                              texto={
+                                ehOwner
+                                  ? "a análise apontou um ponto a ajustar. Corrija e reenvie para nova validação."
+                                  : "a análise apontou um ponto a ajustar. Só o autor pode reenviar — acione o autor ou a equipe RPA."
+                              }
+                            />
                           )}
                         </div>
 

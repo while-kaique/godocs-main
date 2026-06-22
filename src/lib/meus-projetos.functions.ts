@@ -140,12 +140,19 @@ function mapItem(
   return {
     id: p.id,
     nome: p.nome,
-    // O status reflete a coluna "Status" do Sheets (fonte da verdade), normalizado
-    // para a chave do StatusBadge (ex.: "Pendente" → "pendente"). Rascunhos e
-    // projetos ausentes na planilha (ou leitura do Sheets falhou) caem no status
-    // interno do SQLite. ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA),
-    // então projetos submetidos aparecem como "Pendente" até a regra ser encerrada.
-    status: statusSheet && statusSheet.trim() ? statusSheet.trim().toLowerCase() : p.status,
+    // O status SEMPRE vem da planilha (FONTE DA VERDADE) — nunca do SQLite.
+    // - Rascunho é estado interno do app (nunca vai ao Sheets) → mantém 'rascunho'.
+    // - Submetido: usa o "Status" do Sheets, normalizado p/ a chave do StatusBadge
+    //   ("Pendente" → "pendente"). Se o projeto NÃO está na planilha (gap de sync) ou
+    //   a leitura falhou, fica `null` → badge mostra "—" (NÃO cai no status do SQLite).
+    // ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA), então submetidos
+    // aparecem como "Pendente" até a regra ser encerrada.
+    status:
+      p.status === 'rascunho'
+        ? 'rascunho'
+        : statusSheet && statusSheet.trim()
+          ? statusSheet.trim().toLowerCase()
+          : null,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
