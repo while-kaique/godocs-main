@@ -2,6 +2,57 @@ import { CARGOS, type SavingColetado, type SavingLinha, type ReceitaColetada } f
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+const normalizarCargo = (s: string) =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+// Piso conservador: menor valor/hora da tabela. Uma hora de trabalho real NUNCA
+// vale R$0 — usá-lo como fallback evita o "falso zero" que zera o saving.
+const PISO_VALOR_HORA = Math.min(...CARGOS.map((c) => c.valor_hora));
+
+/**
+ * Resolve o valor/hora de um cargo contra a tabela CARGOS de forma tolerante às
+ * variações de rótulo que o LLM produz.
+ *
+ * ⚠️ Bug que isto corrige: a resolução era `CARGOS.find(c => c.label === cargo)`
+ * (match EXATO). Quando o LLM gravava um cargo genérico como `"Analista"` — que
+ * não bate com nenhum label da tabela (`"Analista Júnior/Pleno/Sênior"`) — e a
+ * linha vinha sem `valor_hora`, o valor caía silenciosamente para R$0. Aí
+ * `economia_reais_mes` zerava e o gate de ganho-zero (`submeterParaValidacao`)
+ * BARRAVA a submissão como "saving sem economia mensurável", MESMO havendo
+ * economia real de horas. (Caso real: projeto BoniTrack, cargo "Analista" com
+ * 2,5h/mês de economia → bloqueado indevidamente.)
+ *
+ * Ordem de resolução: (1) match exato; (2) match exato normalizado (sem
+ * acento/caixa/espaços); (3) match por família — o cargo é prefixo de um label
+ * da tabela ou vice-versa (ex.: "Analista" → "Analista *") — escolhendo o MENOR
+ * valor/hora entre os candidatos (conservador, nunca superestima); (4) o
+ * `valor_hora` já presente na linha, se > 0; (5) piso conservador da tabela.
+ *
+ * Nunca retorna 0 para um cargo informado: como o gate só barra com economia de
+ * HORAS > 0, um cargo com horas reais sempre terá R$ > 0. Tool-swaps de 0h
+ * continuam barrados (0h × qualquer valor/hora = R$0).
+ */
+export function resolverValorHora(cargo: string | undefined, valorHoraLinha?: number | null): number {
+  const raw = (cargo ?? '').trim();
+  if (raw) {
+    const exato = CARGOS.find((c) => c.label === raw);
+    if (exato) return exato.valor_hora;
+
+    const alvo = normalizarCargo(raw);
+    const normExato = CARGOS.find((c) => normalizarCargo(c.label) === alvo);
+    if (normExato) return normExato.valor_hora;
+
+    const familia = CARGOS.filter((c) => {
+      const lab = normalizarCargo(c.label);
+      return lab.startsWith(alvo) || alvo.startsWith(lab);
+    });
+    if (familia.length) return Math.min(...familia.map((c) => c.valor_hora));
+  }
+  const daLinha = Number(valorHoraLinha);
+  if (daLinha > 0) return daLinha;
+  return raw ? PISO_VALOR_HORA : 0;
+}
+
 /**
  * Re-deriva os valores em R$ do saving a partir das HORAS de cada linha × tabela
  * CARGOS. A ÚNICA fonte de verdade do dinheiro é o backend.
@@ -49,7 +100,7 @@ export function recomputarSavingFinanceiro(
 ): SavingColetado {
   const linhasRaw = Array.isArray(saving?.linhas) ? saving.linhas : [];
   const linhas: SavingLinha[] = linhasRaw.map((l) => {
-    const valorHora = CARGOS.find((c) => c.label === l.cargo)?.valor_hora ?? l.valor_hora ?? 0;
+    const valorHora = resolverValorHora(l.cargo, l.valor_hora);
     const economiaHoras = Math.max(0, (Number(l.horas_antes) || 0) - (Number(l.horas_depois) || 0));
     return {
       ...l,
