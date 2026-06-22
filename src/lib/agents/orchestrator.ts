@@ -568,6 +568,12 @@ VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas an
 - Para linhas com 0h antes E 0h depois: PRIMEIRO investigue o SAVING CONTRAFACTUAL (a tarefa precisaria de alguém se não fosse automatizada? quem e quanto tempo?). Se sim, estime as horas e preencha horas_antes (cenário 2). Só se NÃO houver mão de obra contrafactual é que não há horas a validar — aí foque no que a automação entrega e no custo evitado.
 - SAVING CONTRAFACTUAL — ao estimar as horas que alguém gastaria se fizesse a tarefa manualmente: seja realista e baseie-se em volume × tempo por item, cruzando com o contexto técnico. Registre a BASE da estimativa no memorial. NÃO infle — é uma estimativa, então reafirme os números com o usuário (mesma regra de reconciliação) e só então preencha horas_antes.
 
+SINCRONIA OBRIGATÓRIA — AS LINHAS SÃO A FONTE DE VERDADE:
+- O sistema GRAVA o saving a partir do array \`linhas\` (horas_antes/horas_depois de cada cargo), NÃO do texto do memorial. Logo, o total de horas que você ESCREVE no memorial/preview TEM que ser exatamente igual à soma de (horas_antes − horas_depois) de todas as linhas. Se o texto disser 270h e as linhas somarem 90h, o usuário vê 270 e o sistema grava 90 — ERRADO. O valor gravado é SEMPRE o valor que o usuário vê.
+- O usuário PODE corrigir/alterar qualquer dado a qualquer momento da conversa — NÃO o impeça. Apenas, quando você aceitar a mudança (depois de questionar/confirmar como já faz hoje), atualize as \`linhas\` na MESMA resposta para refletir o número final que você está mostrando.
+- MULTIPLICADORES (por loja, por colaborador, por unidade, por cliente): quando o ganho se repete por várias unidades (ex: "são 90h POR LOJA e existem 3 lojas"), embuta a multiplicação DENTRO das \`linhas\` — multiplique horas_antes/horas_depois de cada cargo pelo nº de unidades OU crie uma linha por unidade. NUNCA multiplique apenas no texto. Ex: 18h→6h por loja × 3 lojas = 54h→18h na linha daquele cargo.
+- ANTES de emitir preview/complete, confira: a soma de (horas_antes − horas_depois) das linhas é igual ao "Economia total: Xh" que aparece no memorial? Se não, ajuste as \`linhas\` até bater.
+
 CUSTO EVITADO (SEÇÃO 3):
 - Além do tempo economizado, MUITOS projetos passam a EVITAR um custo: licença cancelada, serviço externo que deixou de ser contratado, cobrança pontual de implementação que não foi mais necessária, etc.
 - O custo evitado AGORA é coletado no FORMULÁRIO (antes do chat), não por você. Se os campos \`custo_evitado_reais\`/\`custo_evitado_descricao\` JÁ vierem preenchidos no estado, NÃO pergunte de novo — apenas RECONHEÇA e descreva-o qualitativamente no memorial (o que foi evitado e a periodicidade), SEM citar R$.
@@ -638,6 +644,8 @@ O usuário pode:
 2. PEDIR AJUSTES — apontar correções.
 
 REGRA DE OURO: o "content" e o "memorial_calculo" são vistos pelo usuário — NUNCA inclua valores financeiros de saving (R$, taxa/hora, custo evitado em R$, totais). Só horas e descrições. Se ao ajustar o memorial precisar mexer no custo evitado, altere só o campo estruturado "custo_evitado_reais".
+
+SINCRONIA OBRIGATÓRIA: o sistema grava as horas e o R\$ a partir do array \`linhas\`, NÃO do texto do memorial. Se você ajustar qualquer número que aparece para o usuário (ele pode pedir correções à vontade — NÃO o impeça), atualize as \`linhas\` na MESMA resposta para que a soma de (horas_antes − horas_depois) fique IGUAL ao total que você mostra no memorial. Multiplicadores (por loja/unidade/colaborador) entram DENTRO das linhas, nunca só no texto. O valor gravado é SEMPRE o valor que o usuário vê — eles não podem divergir.
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
