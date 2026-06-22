@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
@@ -158,6 +158,37 @@ const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…"
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
+// Edição reprocessa o documento e REGERA a documentação via IA antes de reenviar —
+// passos fiéis a esse trabalho (lento) para o usuário não achar que travou.
+const LOADING_STEPS_EDITAR = [
+  "Relendo o documento…",
+  "Regerando a documentação (IA)…",
+  "Enviando para validação…",
+];
+
+// Retry de operação idempotente do backend. `atualizar-metadados` é NÃO-DESTRUTIVO
+// (regenera a doc só no fim), então retentar é seguro — cobre o timeout/cancelamento
+// intermitente que derrubava edições de LEGADO (a regeneração via LLM às vezes é cortada
+// pelo edge; nenhum legado tem doc prévia, então depende da regeneração dar certo). Só
+// retenta transitórios (rede/timeout/5xx); erro de regra (4xx) sobe na hora.
+async function apiFetchComRetry<T>(path: string, body?: unknown, tentativas = 3): Promise<T> {
+  let ultimoErro: unknown;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await apiFetch<T>(path, body);
+    } catch (e) {
+      ultimoErro = e;
+      const status = e instanceof ApiError ? e.status : 0;
+      const transitorio = status === 0 || status >= 500;
+      if (i < tentativas - 1 && transitorio) {
+        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw ultimoErro;
+}
 
 export function SubmeterPageContent({
   editProjetoId,
@@ -917,7 +948,7 @@ export function SubmeterPageContent({
           ? await Promise.all(arquivos.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })))
           : undefined;
 
-        await apiFetch("/api/chat/atualizar-metadados", {
+        await apiFetchComRetry("/api/chat/atualizar-metadados", {
           projeto_id: projetoId,
           nome_projeto: form.nomeProjeto.trim(),
           ferramenta: ferramentaEnviada,
@@ -1014,7 +1045,7 @@ export function SubmeterPageContent({
         });
       }
 
-      const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+      const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
         "/api/chat/atualizar-metadados",
         {
           projeto_id: projetoId,
@@ -1095,7 +1126,7 @@ export function SubmeterPageContent({
       if (projetoId && metaChanged) {
         setContinuando(true);
         try {
-          const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+          const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
             "/api/chat/atualizar-metadados",
             {
               projeto_id: projetoId,
@@ -1159,7 +1190,7 @@ export function SubmeterPageContent({
       const metaChanged = JSON.stringify(meta) !== JSON.stringify(agentMeta);
       if (metaChanged) {
         try {
-          await apiFetch("/api/chat/atualizar-metadados", {
+          await apiFetchComRetry("/api/chat/atualizar-metadados", {
             projeto_id: projetoId,
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
@@ -1250,7 +1281,7 @@ export function SubmeterPageContent({
       setContinuando(true);
       try {
         const meta = snapshotMeta();
-        const result = await apiFetch<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
+        const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
           "/api/chat/atualizar-metadados",
           {
             projeto_id: projetoId,
@@ -1952,7 +1983,7 @@ export function SubmeterPageContent({
                 >
                   {enviandoEspecial ? (
                     <>
-                      <CyclingText steps={LOADING_STEPS_ENVIAR_ESPECIAL} />
+                      <CyclingText steps={editProjetoId ? LOADING_STEPS_EDITAR : LOADING_STEPS_ENVIAR_ESPECIAL} />
                       <div className="go-spinner" />
                     </>
                   ) : (

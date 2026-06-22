@@ -6,13 +6,13 @@ import {
   getProjetoWithRelations,
   getProjetoById,
   getLatestVersionByProjeto,
-  getAdminByEmail,
   getChatMessages,
   excluirProjetoCascade,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
+import { isAdmin } from '@/lib/auth.functions';
 
 export type MeuProjetoItem = {
   id: string;
@@ -32,6 +32,12 @@ export type MeuProjetoItem = {
   // Legado pendente: submetido (não-rascunho) mas sem "Atualizado Em" no Sheets →
   // precisa ser editado/reenviado até o prazo para regularizar.
   pendente: boolean;
+  // Papel do usuário neste projeto: 'owner' (submeteu, pode editar) ou
+  // 'participante' (está nos membros, só visualiza).
+  papel: Papel;
+  // Autoria (para exibir nos cards e no tooltip de transferência de autoria).
+  responsavel_nome: string | null;
+  responsavel_email: string | null;
 };
 
 // Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
@@ -77,24 +83,76 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   saving_reais: number | null;
   custo_externo_mensal: number | null;
   alguem_fazia: string | null;
+  // Custo evitado: necessários para o seed da EDIÇÃO repopular a etapa de saving
+  // (sem eles a edição reabre a etapa de custo evitado em branco). 'sim'/'nao',
+  // justificativa concatenada e itens (JSON [{nome,valor,recorrencia,justificativa}]).
+  custo_evitado: string | null;
+  custo_evitado_justificativa: string | null;
+  custo_evitado_itens: string | null;
   memorial_calculo: string | null;
   documentacao: unknown | null;
   ultima_versao: VersaoSnapshot | null;
+  // Pode editar? true = owner ou admin RPA. Participante recebe false (só visualiza).
+  podeEditar: boolean;
 };
 
-function ehDono(projeto: ProjetoRow, email: string): boolean {
+// OWNER = quem submeteu (responsavel_email). Só o owner edita.
+export function ehOwner(projeto: ProjetoRow, email: string): boolean {
+  return (projeto.responsavel_email ?? '').trim().toLowerCase() === email.trim().toLowerCase();
+}
+
+// PARTICIPANTE = está na lista de membros, mas NÃO é o owner. Só visualiza.
+export function ehParticipante(projeto: ProjetoRow, email: string): boolean {
+  if (ehOwner(projeto, email)) return false;
   const alvo = email.trim().toLowerCase();
-  if ((projeto.responsavel_email ?? '').trim().toLowerCase() === alvo) return true;
   const membros = parseJson<string[]>(projeto.membros) ?? [];
   return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
 
-function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: string | null): MeuProjetoItem {
-  const at = atualizadoEm && atualizadoEm !== '—' && atualizadoEm !== '-' ? atualizadoEm : null;
+// Tem acesso de LEITURA (owner ou participante). Edição é só do owner (ehOwner).
+export function temAcesso(projeto: ProjetoRow, email: string): boolean {
+  return ehOwner(projeto, email) || ehParticipante(projeto, email);
+}
+
+export type Papel = 'owner' | 'participante';
+
+// "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
+function temAtualizadoEm(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const s = String(v).trim();
+  return s !== '' && s !== '—' && s !== '-';
+}
+
+// Projeto LEGADO? Só os ids no padrão "LEGADO-233" (importados antes do formulário)
+// contam como pendentes. Projetos submetidos pelo app têm id aleatório (hex) e NUNCA
+// são pendentes, mesmo sem "Atualizado Em" — a pendência só vale para regularizar legado.
+function ehLegado(id: string): boolean {
+  return id.toLowerCase().includes('legado');
+}
+
+function mapItem(
+  p: ProjetoRow & { area_nome: string | null },
+  atualizadoEm: string | null,
+  papel: Papel,
+  statusSheet?: string | null,
+): MeuProjetoItem {
+  const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
     id: p.id,
     nome: p.nome,
-    status: p.status,
+    // O status SEMPRE vem da planilha (FONTE DA VERDADE) — nunca do SQLite.
+    // - Rascunho é estado interno do app (nunca vai ao Sheets) → mantém 'rascunho'.
+    // - Submetido: usa o "Status" do Sheets, normalizado p/ a chave do StatusBadge
+    //   ("Pendente" → "pendente"). Se o projeto NÃO está na planilha (gap de sync) ou
+    //   a leitura falhou, fica `null` → badge mostra "—" (NÃO cai no status do SQLite).
+    // ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA), então submetidos
+    // aparecem como "Pendente" até a regra ser encerrada.
+    status:
+      p.status === 'rascunho'
+        ? 'rascunho'
+        : statusSheet && statusSheet.trim()
+          ? statusSheet.trim().toLowerCase()
+          : null,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
@@ -104,9 +162,14 @@ function mapItem(p: ProjetoRow & { area_nome: string | null }, atualizadoEm: str
     submitted_at: p.submitted_at,
     arquivos_nomes: parseJson<string[]>(p.arquivos_nomes) ?? [],
     atualizado_em: at,
-    // Pendente = submetido (não-rascunho) e sem "Atualizado Em" no Sheets (o app
-    // nunca escreveu lá → legado por regularizar).
-    pendente: p.status !== 'rascunho' && !at,
+    // Pendente = LEGADO (id "LEGADO-…") e sem "Atualizado Em" no Sheets → precisa ser
+    // editado/reenviado para regularizar. Owner E participante veem a pendência (a
+    // mensagem na UI difere por papel: só o owner pode regularizar). O selo da home
+    // (contarPendentes) segue contando só os do owner — é a lista de ações dele.
+    pendente: ehLegado(p.id) && !at,
+    papel,
+    responsavel_nome: p.responsavel_nome ?? null,
+    responsavel_email: p.responsavel_email ?? null,
   };
 }
 
@@ -116,26 +179,62 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
   // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
   const atualizadoMap = new Map<string, string>();
+  const statusMap = new Map<string, string>();
   try {
     const { rows } = await syncOwnerRowsFromSheet(email);
     for (const r of rows) {
       const id = (r['ID Projeto'] ?? '').trim().toLowerCase();
-      if (id) atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+      if (id) {
+        atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+        statusMap.set(id, (r['Status'] ?? '').trim());
+      }
     }
   } catch (e) {
     console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
   }
   const rows = await getProjetosByOwnerEmail(email);
-  // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro
+  // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
+  // "Atualizado Em"/"Status": usam o valor recém-lido da planilha (Sheets é a fonte da
+  // verdade); se a leitura falhou (mapa vazio), caem no espelho/valor do SQLite.
   return rows
-    .filter((p) => ehDono(p, email))
-    .map((p) => mapItem(p, atualizadoMap.get(p.id.toLowerCase()) ?? null));
+    .filter((p) => temAcesso(p, email))
+    .map((p) =>
+      mapItem(
+        p,
+        atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null,
+        ehOwner(p, email) ? 'owner' : 'participante',
+        statusMap.get(p.id.toLowerCase()) ?? null,
+      ),
+    );
 }
 
-/** Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o selo da home. */
-export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
-  const itens = await listarMeusProjetos(email);
-  return { count: itens.filter((i) => i.pendente).length, prazo: PRAZO_LEGADO };
+/**
+ * Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o
+ * selo da home. Conta tanto os do OWNER quanto os em que ele é PARTICIPANTE (a flag
+ * aparece para ambos).
+ *
+ * Por padrão lê SÓ do SQLite (espelho do "Atualizado Em") → instantâneo. Com
+ * `sync: true`, sincroniza do Sheets (FONTE DA VERDADE) antes de contar — usado pela
+ * home para corrigir o selo quando o SQLite ainda não tem os legados do usuário
+ * (a home chama os dois: o rápido p/ aparecer na hora, e o sync p/ ficar exato).
+ */
+export async function contarPendentes(
+  email: string,
+  opts?: { sync?: boolean },
+): Promise<{ count: number; prazo: string }> {
+  if (opts?.sync) {
+    try {
+      await syncOwnerRowsFromSheet(email);
+    } catch (e) {
+      console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
+    }
+  }
+  const rows = await getProjetosByOwnerEmail(email);
+  const count = rows
+    .filter((p) => temAcesso(p, email)) // owner OU participante
+    .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
+    .length;
+  return { count, prazo: PRAZO_LEGADO };
 }
 
 /**
@@ -145,7 +244,8 @@ export async function contarPendentes(email: string): Promise<{ count: number; p
 export async function excluirRascunho(email: string, projetoId: string): Promise<{ ok: true }> {
   const p = await getProjetoById(projetoId);
   if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
-  if (!ehDono(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
+  // Só o owner exclui o próprio rascunho (participante não tem rascunho de terceiro).
+  if (!ehOwner(p, email)) throw Object.assign(new Error('Sem permissão para excluir este projeto.'), { status: 403 });
   if (p.status !== 'rascunho') {
     throw Object.assign(new Error('Apenas rascunhos podem ser excluídos.'), { status: 400 });
   }
@@ -161,11 +261,18 @@ export async function getMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  // Dono (responsável ou membro) pode abrir/editar. Admins (emails do RPA
-  // cadastrados na tabela `admins`) podem abrir/editar QUALQUER projeto.
-  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
+  // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
+  // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
+  const ehAdmin = await isAdmin(email);
+  if (!temAcesso(data, email) && !ehAdmin) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
+  // EDIÇÃO: só o owner (quem submeteu) ou um admin RPA. Participante só visualiza —
+  // e ser participante VENCE o override de admin: um admin que também é participante
+  // do projeto NÃO edita (vê como qualquer participante). O override de admin vale só
+  // para projetos em que ele não tem papel (não é owner nem participante).
+  const podeEditar = ehOwner(data, email) || (ehAdmin && !ehParticipante(data, email));
+  const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
 
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;
@@ -182,10 +289,11 @@ export async function getMeuProjeto(
     };
   }
 
-  // Detalhe não consulta o Sheets; "Atualizado Em"/pendente não são exibidos aqui.
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, null);
+  // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
+  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null, papel);
   return {
     ...base,
+    podeEditar,
     responsavel_nome: data.responsavel_nome,
     responsavel_email: data.responsavel_email,
     ferramenta: data.ferramenta,
@@ -201,6 +309,9 @@ export async function getMeuProjeto(
     saving_reais: data.saving_reais,
     custo_externo_mensal: data.custo_externo_mensal,
     alguem_fazia: data.alguem_fazia,
+    custo_evitado: data.custo_evitado ?? null,
+    custo_evitado_justificativa: data.custo_evitado_justificativa ?? null,
+    custo_evitado_itens: data.custo_evitado_itens ?? null,
     memorial_calculo: data.memorial_calculo,
     documentacao: docConteudo,
     ultima_versao,
@@ -218,7 +329,7 @@ export async function getHistoricoMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  if (!ehDono(data, email) && !(await getAdminByEmail(email))) {
+  if (!temAcesso(data, email) && !(await isAdmin(email))) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   const msgs = await getChatMessages(id);

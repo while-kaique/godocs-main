@@ -12,7 +12,10 @@ import { api, toBase64 } from './lib/api.mjs';
 import { responder } from './lib/responder.mjs';
 import { buildScenarios } from './scenarios.mjs';
 
-const MAX_TURNS = 30;
+const MAX_TURNS = 40;
+// Após muitos turnos NA MESMA fase, o agente às vezes fica reperguntando (loop) —
+// força uma resposta firme de fechamento para destravar (visto no saving+receita pontual).
+const TURNS_FASE_LOOP = 12;
 
 function defaultRunId() {
   const d = new Date();
@@ -27,6 +30,8 @@ const runId = process.argv[2] || defaultRunId();
 async function drive(projetoId, scenario, initialResp, initiated) {
   let resp = initialResp;
   let turns = 0;
+  let faseAnterior = null;
+  let turnsNaFase = 0;
   while (resp && !resp.isComplete) {
     const fase = resp.fase;
     if (fase === 'saving' && scenario.saving && !initiated.saving) {
@@ -39,7 +44,13 @@ async function drive(projetoId, scenario, initialResp, initiated) {
       resp = await api.iniciarReceita({ projeto_id: projetoId, ...scenario.receita });
       continue;
     }
-    const ans = await responder(resp, scenario);
+    turnsNaFase = fase === faseAnterior ? turnsNaFase + 1 : 0;
+    faseAnterior = fase;
+    // Loop-breaker: muitos turnos na mesma fase (agente reperguntando) → fecha firme.
+    const ans =
+      turnsNaFase >= TURNS_FASE_LOOP && resp.type !== 'preview'
+        ? { content: 'Os dados já estão corretos e completos conforme informado. Não há nada a alterar — finalize esta etapa.' }
+        : await responder(resp, scenario);
     process.stdout.write(`    · [${fase}] ${resp.type} → "${String(ans.content).slice(0, 60)}"\n`);
     resp = await api.enviarMensagem({
       projeto_id: projetoId,
@@ -73,42 +84,84 @@ async function runNova(scenario) {
 }
 
 async function runEdicao(scenario, projetoIdExistente) {
-  // Reabre a fase de saving com os novos números e re-submete como edição.
-  const resp = await api.iniciarSaving({ projeto_id: projetoIdExistente, ...scenario.saving });
-  await drive(projetoIdExistente, scenario, resp, { saving: true, receita: false });
+  if (scenario.editVia === 'doc') {
+    // Edição PESADA: reabre a conversa do agente enviando uma documentação nova
+    // (atualizar-metadados reinicia a fase de doc) → o agente re-conversa e gera
+    // um memorial NOVO. Depois passa pela fase de saving e re-submete como edição.
+    const doc = scenario.editDoc ?? scenario.doc;
+    const reset = await api.atualizarMetadados({
+      projeto_id: projetoIdExistente,
+      docs: [{ base64: toBase64(doc), filename: 'documentacao.txt' }],
+    });
+    await drive(projetoIdExistente, scenario, reset.response, { saving: false, receita: false });
+  } else {
+    // Edição LEVE: reabre só a fase de saving com os novos números.
+    const resp = await api.iniciarSaving({ projeto_id: projetoIdExistente, ...scenario.saving });
+    await drive(projetoIdExistente, scenario, resp, { saving: true, receita: false });
+  }
   const sub = await api.submeterValidacao({ projeto_id: projetoIdExistente, modo: 'edicao' });
   return { projetoId: projetoIdExistente, ganho: sub.ganho ?? null, status: sub.status ?? null };
+}
+
+// Captura o memorial_calculo (enriquecido, COM R$ — o que vai para a coluna
+// "Memorial anterior" na próxima edição) de um projeto JÁ submetido. Tolerante a
+// falha (retorna null) — a validação do memorial é opcional por cenário.
+async function capturarMemorial(projetoId) {
+  try {
+    const p = await api.getMeuProjeto(projetoId);
+    return p?.memorial_calculo ?? null;
+  } catch (e) {
+    process.stdout.write(`    · (aviso) não capturei o memorial de ${projetoId}: ${e.message}\n`);
+    return null;
+  }
 }
 
 async function main() {
   console.log(`\n🚀 E2E run "${runId}" contra ${BASE_URL}`);
   console.log(`   Dono: ${OWNER_EMAIL}\n`);
-  const cenarios = buildScenarios(runId);
+  let cenarios = buildScenarios(runId);
+  // E2E_ONLY=key1,key2 → roda só esses cenários (útil para a sanidade).
+  const only = process.env.E2E_ONLY?.split(',').map((s) => s.trim()).filter(Boolean);
+  if (only && only.length) {
+    cenarios = cenarios.filter((c) => only.includes(c.key));
+    console.log(`   (filtro E2E_ONLY: ${only.join(', ')} → ${cenarios.length} cenário(s))`);
+  }
   const results = [];
   const idByKey = {};
+  const memorialByKey = {}; // memorial_calculo capturado logo após a submissão (M0)
 
   for (const sc of cenarios) {
-    const rotulo = sc.key + (sc.edicaoDe ? ` (edição de ${sc.edicaoDe})` : '');
+    const rotulo = sc.key + (sc.edicaoDe ? ` (edição de ${sc.edicaoDe})` : '') + (sc.baseOnly ? ' (base)' : '');
     console.log(`\n▶ ${rotulo}`);
     try {
       let out;
+      let memorialAnterior = null; // M0 — memorial antes da edição (esperado em "Memorial anterior")
+      let memorialNovo = null;     // M1 — memorial após a edição
       if (sc.edicaoDe) {
         const baseId = idByKey[sc.edicaoDe];
         if (!baseId) throw new Error(`Cenário base "${sc.edicaoDe}" não foi criado — pulei a edição.`);
+        memorialAnterior = memorialByKey[sc.edicaoDe] ?? null; // capturado quando a base submeteu
         out = await runEdicao(sc, baseId);
+        if (sc.memorialCheck) memorialNovo = await capturarMemorial(baseId);
       } else {
         out = await runNova(sc);
         idByKey[sc.key] = out.projetoId;
+        // Captura o memorial logo após submeter (serve de M0 se este cenário for base de edição).
+        if (!sc.especial) memorialByKey[sc.key] = await capturarMemorial(out.projetoId);
       }
       console.log(`  ✓ projeto_id=${out.projetoId} status=${out.status} ganho_total=${out.ganho?.ganho_total_mensal ?? '—'}`);
       results.push({
         key: sc.key, edicaoDe: sc.edicaoDe ?? null, nome: sc.nome ?? null,
-        projeto_id: out.projetoId, especial: !!sc.especial,
+        projeto_id: out.projetoId, especial: !!sc.especial, baseOnly: !!sc.baseOnly,
+        complexidade: sc.complexidade ?? null,
+        memorial_check: !!sc.memorialCheck,
+        memorial_anterior_esperado: memorialAnterior,
+        memorial_novo: memorialNovo,
         expected: sc.expected, api_ganho: out.ganho, api_status: out.status,
       });
     } catch (e) {
       console.error(`  ✗ FALHOU: ${e.message}`);
-      results.push({ key: sc.key, edicaoDe: sc.edicaoDe ?? null, error: e.message, expected: sc.expected });
+      results.push({ key: sc.key, edicaoDe: sc.edicaoDe ?? null, baseOnly: !!sc.baseOnly, error: e.message, expected: sc.expected });
     }
   }
 

@@ -5,7 +5,7 @@
  * O restante cai para os assets estáticos (a SPA React).
  */
 
-import { getCurrentUser } from '@/lib/auth.functions'
+import { getCurrentUser, isAdmin } from '@/lib/auth.functions'
 import {
   iniciarSubmissao,
   enviarMensagem,
@@ -17,6 +17,7 @@ import {
   submeterParaValidacao,
   validarProjeto,
   resyncGoogle,
+  reconciliarComplexidade,
 } from '@/lib/chat.functions'
 import {
   getAreas,
@@ -42,7 +43,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
@@ -78,8 +79,7 @@ function getEmailFromRequest(request: Request): string | null {
 async function requireAdmin(request: Request): Promise<{ email: string }> {
   const email = getEmailFromRequest(request)
   if (!email) throw Object.assign(new Error('Não autorizado'), { status: 401 })
-  const admin = await getAdminByEmail(email)
-  if (!admin) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
+  if (!(await isAdmin(email))) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
   return { email }
 }
 
@@ -140,6 +140,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await syncSheetsToSqlite())
     }
 
+    // ── Cron: reconcilia a coluna "Complexidade" da planilha ──
+    // A análise roda em background (waitUntil) e às vezes é cancelada antes de
+    // gravar a Complexidade no Sheets. Este cron repõe o que faltou (resync) ou
+    // re-roda o analisador para os que nunca foram analisados. Idempotente.
+    if (pathname === '/api/cron/reanalisar-pendentes' && method === 'POST') {
+      if (!request.headers.get('x-godeploy-cron')) {
+        return errorJson('Rota exclusiva de cron.', 403)
+      }
+      return json(await reconciliarComplexidade())
+    }
+
     // ── Meus Projetos (filtrado pelo email do header — anti-IDOR) ──
     if (pathname === '/api/meus-projetos' && method === 'GET') {
       const email = getEmailFromRequest(request)
@@ -151,7 +162,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/meus-projetos/pendentes' && method === 'GET') {
       const email = getEmailFromRequest(request)
       if (!email) return errorJson('Não autorizado.', 401)
-      return json(await contarPendentes(email))
+      const sync = url.searchParams.get('sync') === '1'
+      return json(await contarPendentes(email, { sync }))
     }
     // Excluir um RASCUNHO (ownership + só status 'rascunho').
     if (pathname.startsWith('/api/meus-projetos/') && method === 'DELETE') {
@@ -194,7 +206,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         else if (pathname === '/api/chat/atualizar-tipos') result = await atualizarTipos(body)
         else if (pathname === '/api/chat/atualizar-metadados') result = await atualizarMetadados(body)
         else if (pathname === '/api/chat/analisar') result = await analisarProjetoFn(body)
-        else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body)
+        else if (pathname === '/api/chat/submeter-validacao') result = await submeterParaValidacao(body, getEmailFromRequest(request))
         else return errorJson('Rota não encontrada', 404)
 
         // Análise automática (analisador) roda no SERVIDOR, em background, logo após
@@ -402,6 +414,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request)
       const ids = await deleteProjetosTesteE2E()
       return json({ ok: true, deletados: ids.length, ids })
+    }
+
+    // Exclui um projeto por id (cascade) — admin. Usado para remover órfãos do SQLite
+    // que não existem no Sheets (fonte da verdade), evitando que apareçam sem status
+    // em "Meus Projetos". NÃO recria: o sync só cria a partir de linhas da planilha.
+    if (pathname === '/api/admin/excluir-projeto' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ id?: string }>(request)
+      const id = (body.id ?? '').trim()
+      if (!id) return errorJson('id obrigatório', 400)
+      await excluirProjetoCascade(id)
+      return json({ ok: true, id })
     }
 
     return errorJson('Rota não encontrada', 404)

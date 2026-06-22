@@ -8,7 +8,6 @@
 // que apaga do SQLite TODOS os projetos "[E2E-..." (cascata).
 import './lib/env.mjs';
 import { readFileSync } from 'node:fs';
-import { OWNER_EMAIL } from './lib/env.mjs';
 import { api } from './lib/api.mjs';
 import { deleteRowsByProjectIds } from './lib/sheets.mjs';
 
@@ -30,7 +29,7 @@ async function main() {
   // 2) SQLite (todos os [E2E-...] — pega também órfãos de runs anteriores).
   console.log('  2/3 Removendo do SQLite (admin e2e-cleanup)…');
   try {
-    const out = await api.e2eCleanup(OWNER_EMAIL);
+    const out = await api.e2eCleanup();
     console.log(`      SQLite: ${out.deletados} projeto(s) removido(s).`);
   } catch (e) {
     console.error(`      ⚠️ Falha no e2e-cleanup (header admin pode não ser aceito pelo gateway): ${e.message}`);
@@ -39,7 +38,7 @@ async function main() {
   // 3) Confirma que o sync reverso não ressuscita.
   console.log('  3/3 Disparando sync reverso para confirmar que nada ressuscita…');
   try {
-    await api.syncSheetsNow(OWNER_EMAIL);
+    await api.syncSheetsNow();
     console.log('      sync reverso disparado.');
   } catch (e) {
     console.error(`      ⚠️ Falha ao disparar sync-sheets-now: ${e.message}`);
