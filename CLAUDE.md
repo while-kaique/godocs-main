@@ -43,6 +43,7 @@ npm run lint / format  # eslint / prettier
    echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
    ```
    Se a lista de assets não bater com o `index.html`, o site fica em tela branca (o HTML referencia `.js`/`.css` que não existem no servidor).
+10. **`git pull` antes de abrir PR** — sempre que o usuário pedir para abrir um PR, fazer `git fetch origin` + incorporar o `origin/main` na branch (merge/rebase) **antes** de subir, e rebuildar o `worker.js`/`dist` após o merge. Motivo: várias sessões mexem no repo ao mesmo tempo (regra 8) e o `main` costuma andar — abrir PR sem sincronizar gera conflito/PR desatualizado.
 
 ## Deploy rápido (Godeploy)
 
