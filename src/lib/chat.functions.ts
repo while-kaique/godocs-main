@@ -631,6 +631,32 @@ export async function iniciarSubmissao(rawData: unknown) {
   };
 }
 
+// ─── Guarda de observabilidade: memorial (texto) × linhas (gravado) ──────────
+// O backend GRAVA o saving a partir das `linhas` (recomputarSavingFinanceiro). Se
+// o LLM ajustar o TEXTO do memorial mas esquecer de atualizar as linhas (ex: "é
+// por loja × 3" só na prosa), o usuário vê um total e o sistema grava outro. Esta
+// guarda NÃO bloqueia — só registra um aviso no log quando o total declarado no
+// texto diverge do que será gravado, para rastrearmos dessincronias do LLM.
+function avisarDivergenciaMemorialLinhas(saving: SavingColetado | undefined, projetoId: string): void {
+  const memorial = saving?.memorial_calculo ?? '';
+  if (!memorial) return;
+  const totalLinhas = saving?.economia_horas_mes ?? 0;
+  // Captura todos os "Economia total ...: X h" declarados no texto.
+  const declarados = [...memorial.matchAll(/economia\s+total[^\n:]*:\s*([\d.,]+)\s*h/gi)]
+    .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')))
+    .filter((n) => Number.isFinite(n));
+  if (declarados.length === 0) return; // sem número legível no texto — não dá p/ conferir
+  const tolerancia = Math.max(0.5, totalLinhas * 0.02);
+  const bate = declarados.some((v) => Math.abs(v - totalLinhas) <= tolerancia);
+  if (!bate) {
+    console.warn(
+      `[saving-guard] ⚠ Divergência memorial×linhas no projeto ${projetoId}: ` +
+      `linhas somam ${totalLinhas}h, mas o memorial declara ${declarados.join('/')}h. ` +
+      `Valor gravado = ${totalLinhas}h (fonte: linhas). Provável dessincronia do LLM (texto ≠ estruturado).`,
+    );
+  }
+}
+
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
@@ -773,6 +799,7 @@ export async function enviarMensagem(rawData: unknown) {
         // recalcular o valor) — ver recomputarSavingFinanceiro.
         const projetoCompleto = await getProjetoById(data.projeto_id);
         doc.saving = recomputarSavingFinanceiro(resultado.saving, projetoCompleto?.custo_externo_mensal ?? 0);
+        avisarDivergenciaMemorialLinhas(doc.saving as SavingColetado, data.projeto_id);
       }
       if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
       await upsertDocumentacao(data.projeto_id, doc);
@@ -1268,6 +1295,7 @@ export async function submeterParaValidacao(rawData: unknown) {
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
     );
+    avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
@@ -1543,6 +1571,7 @@ export async function resyncGoogle(rawData: unknown) {
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
     );
+    avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
