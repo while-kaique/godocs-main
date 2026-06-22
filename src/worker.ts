@@ -43,7 +43,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
@@ -414,6 +414,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request)
       const ids = await deleteProjetosTesteE2E()
       return json({ ok: true, deletados: ids.length, ids })
+    }
+
+    // Exclui um projeto por id (cascade) — admin. Usado para remover órfãos do SQLite
+    // que não existem no Sheets (fonte da verdade), evitando que apareçam sem status
+    // em "Meus Projetos". NÃO recria: o sync só cria a partir de linhas da planilha.
+    if (pathname === '/api/admin/excluir-projeto' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ id?: string }>(request)
+      const id = (body.id ?? '').trim()
+      if (!id) return errorJson('id obrigatório', 400)
+      await excluirProjetoCascade(id)
+      return json({ ok: true, id })
     }
 
     return errorJson('Rota não encontrada', 404)
