@@ -36,7 +36,8 @@ npm run lint / format  # eslint / prettier
 5. **`routeTree.gen.ts`** — auto-gerado, não editar
 6. **Banco async** — sempre `await` e sempre passar params (mesmo `[]`)
 7. **CLAUDE.md atualizado antes de cada PR** — antes de criar um PR, verificar se as mudanças feitas exigem atualização do CLAUDE.md (novas regras, convenções alteradas, seções adicionadas/removidas). Não precisa atualizar a cada prompt — só antes de subir o PR.
-8. **Deploy Godeploy — assets dinâmicos** — o Vite gera hashes diferentes a cada `npm run build`. **NUNCA** reutilizar uma lista de assets de um build anterior. Sempre gerar a lista dinamicamente a partir do `dist/` real logo após o build:
+8. **Sempre trabalhar em worktree (uma branch por correção)** — para QUALQUER tarefa que modifique arquivos (correção, feature, refactor, ajuste de docs), criar um worktree git isolado com uma branch nova **antes** de editar, e fazer todo o trabalho lá. Motivo: é comum haver mais de uma sessão do Claude mexendo neste repo ao mesmo tempo (vários chats abertos no terminal/VSCode); editar direto na pasta principal atropela os arquivos das outras sessões. O worktree isola o checkout em disco, então cada chat trabalha numa branch própria sem conflito. Tarefas puramente de leitura/diagnóstico (sem edição) não precisam de worktree.
+9. **Deploy Godeploy — assets dinâmicos** — o Vite gera hashes diferentes a cada `npm run build`. **NUNCA** reutilizar uma lista de assets de um build anterior. Sempre gerar a lista dinamicamente a partir do `dist/` real logo após o build:
    ```bash
    # Gerar lista de assets para o updateApp
    echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
