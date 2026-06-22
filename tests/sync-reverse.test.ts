@@ -133,6 +133,40 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
     expect(p?.observacoes).toBe('Parecer revisado manualmente.');
   });
 
+  it('SINCRONIZA ownership do Sheets (Email→dono, Nome→responsável, Participantes→membros)', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'LEGADO-999',
+        'Nome Completo': 'Novo Dono',
+        Email: 'novodono@gocase.com',
+        Projeto: 'Projeto Legado X',
+        Ferramenta: 'n8n',
+        Participantes: 'c@gocase.com, d@gocase.com',
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('legado-999');
+    expect(p?.responsavel_email).toBe('novodono@gocase.com');
+    expect(p?.responsavel_nome).toBe('Novo Dono');
+    expect(JSON.parse(p!.membros as string)).toEqual(['c@gocase.com', 'd@gocase.com']);
+  });
+
+  it('Participantes vazio NÃO apaga membros existentes (vazio não apaga)', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'LEGADO-999',
+        'Nome Completo': 'Novo Dono',
+        Email: 'novodono@gocase.com',
+        Projeto: 'Projeto Legado X',
+        Ferramenta: 'n8n',
+        // sem Participantes → mantém [c, d]
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('legado-999');
+    expect(JSON.parse(p!.membros as string)).toEqual(['c@gocase.com', 'd@gocase.com']);
+  });
+
   it('mapeia "Reenvio Pendente" → rejeitado e ponto decimal "10.5"', async () => {
     mockedRead.mockResolvedValue([
       {

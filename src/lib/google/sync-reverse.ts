@@ -16,6 +16,7 @@ import {
   getProjetoById,
   insertProjetoRaw,
   updateProjeto,
+  parseJson,
   type ProjetoRow,
 } from '@/integrations/db/client.server';
 
@@ -144,15 +145,19 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
 //
 // `status` é DELIBERADAMENTE excluído: durante a validação, a planilha grava
 // sempre "Pendente" (regra TEMPORÁRIA) — sincronizar de volta rebaixaria o
-// status interno correto. responsavel_*/membros também ficam de fora (ownership
-// não deve ser sobrescrito por edição de planilha). Célula vazia nunca apaga
-// dado existente.
+// status interno correto.
+// OWNERSHIP (responsavel_email/nome + membros) AGORA SINCRONIZA do Sheets (fonte da
+// verdade): editar Email/Participantes na planilha reatribui dono/participantes no
+// GoDocs. `membros` (Participantes) é tratado fora desta tabela (precisa de parse de
+// lista). Célula vazia nunca apaga dado existente.
 const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   col: SheetColumn;
   field: keyof ProjetoRow;
   kind: 'text' | 'num';
 }> = [
   { col: 'Projeto', field: 'nome', kind: 'text' },
+  { col: 'Email', field: 'responsavel_email', kind: 'text' },
+  { col: 'Nome Completo', field: 'responsavel_nome', kind: 'text' },
   { col: 'Área', field: 'area', kind: 'text' },
   { col: 'Descrição', field: 'descricao_breve', kind: 'text' },
   { col: 'Ferramenta', field: 'ferramenta', kind: 'text' },
@@ -192,6 +197,17 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
       if (curVal != null && String(curVal).trim() === String(newVal).trim()) continue;
     }
     updates[field as string] = newVal;
+  }
+
+  // Participantes → membros (lista de e-mails → array; updateProjeto serializa em JSON).
+  // Mesma regra "vazio não apaga": Participantes vazio mantém os membros atuais.
+  const membrosSheet = parseMembros(row['Participantes']);
+  if (membrosSheet.length > 0) {
+    const membrosAtuais = parseJson<string[]>(current.membros) ?? [];
+    const mesmaLista =
+      membrosSheet.length === membrosAtuais.length &&
+      membrosSheet.every((m) => membrosAtuais.some((c) => c.toLowerCase() === m.toLowerCase()));
+    if (!mesmaLista) updates['membros'] = membrosSheet;
   }
 
   if (Object.keys(updates).length === 0) return false;
