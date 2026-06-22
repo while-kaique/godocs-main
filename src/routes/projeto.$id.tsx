@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
+import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
 import { Loader2, FileText, PencilLine, Eye } from "lucide-react";
 
 const TRANSFERIR_AUTORIA =
@@ -76,10 +78,15 @@ function ProjetoReadOnlyPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Cada memorial guarda o tipo (saving/receita) para o acento certo no render.
+  // normalizarMarcadoresMemorial troca os códigos [x.x] por títulos legíveis —
+  // cobre também memoriais legados gravados antes da mudança nos prompts.
   const memoriais = [
-    p?.documentacao?.saving?.memorial_calculo,
-    p?.documentacao?.receita?.memorial_calculo,
-  ].filter((m): m is string => !!m && m.trim() !== "");
+    { texto: p?.documentacao?.saving?.memorial_calculo, isSaving: true },
+    { texto: p?.documentacao?.receita?.memorial_calculo, isSaving: false },
+  ]
+    .filter((m): m is { texto: string; isSaving: boolean } => !!m.texto && m.texto.trim() !== "")
+    .map((m) => ({ ...m, texto: normalizarMarcadoresMemorial(m.texto) }));
 
   return (
     <div
@@ -252,13 +259,9 @@ function ProjetoReadOnlyPage() {
                     Memorial de cálculo
                   </h2>
                   {memoriais.map((m, i) => (
-                    <p
-                      key={i}
-                      className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed"
-                      style={{ color: "var(--go-text-heading)" }}
-                    >
-                      {m}
-                    </p>
+                    <div key={i} className={i > 0 ? "mt-4" : "mt-2"}>
+                      <SimpleMarkdown text={m.texto} isSaving={m.isSaving} />
+                    </div>
                   ))}
                 </section>
               )}

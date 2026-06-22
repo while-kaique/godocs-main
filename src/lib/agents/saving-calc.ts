@@ -1,4 +1,5 @@
 import { CARGOS, type SavingColetado, type SavingLinha, type ReceitaColetada } from "./types";
+import { normalizarMarcadoresMemorial } from "./memorial-format";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -150,7 +151,7 @@ export function enriquecerMemorial(
 
   // ── SAVING ──
   if (tiposProjeto.includes('saving') && saving) {
-    const memorialBase = saving.memorial_calculo ?? '';
+    const memorialBase = normalizarMarcadoresMemorial(saving.memorial_calculo ?? '');
     partes.push(memorialBase);
 
     // Recalcular financeiro a partir das horas (fonte de verdade) antes de injetar
@@ -203,7 +204,7 @@ export function enriquecerMemorial(
   // ── RECEITA ──
   if (tiposProjeto.includes('receita_incremental') && receita) {
     if (partes.length > 0) partes.push('\n---\n');
-    const memorialReceita = receita.memorial_calculo ?? '';
+    const memorialReceita = normalizarMarcadoresMemorial(receita.memorial_calculo ?? '');
     partes.push(memorialReceita);
 
     partes.push(`\n**Valor da receita incremental:** R$ ${(receita.valor_ganho_mensal ?? 0).toFixed(2)}`);
