@@ -19,7 +19,6 @@ import {
   upsertDocumentacao,
   getDocumentacao,
   getProjetoById,
-  getAdminByEmail,
   getProjetosSubmetidos,
   findDuplicateProjeto,
   updateProjeto,
@@ -41,6 +40,7 @@ import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import { stripMarkdown } from '@/lib/strip-markdown';
 import { deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
+import { isAdmin } from '@/lib/auth.functions';
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -1391,8 +1391,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   if (ehReenvio && solicitanteEmail) {
     const alvo = solicitanteEmail.trim().toLowerCase();
     const ehOwner = (projeto.responsavel_email ?? '').trim().toLowerCase() === alvo;
-    const ehAdmin = !!(await getAdminByEmail(solicitanteEmail));
-    if (!ehOwner && !ehAdmin) {
+    const ehAdmin = await isAdmin(solicitanteEmail);
+    // Ser participante (membro) vence o override de admin: quem participa só visualiza,
+    // mesmo sendo admin. O override de admin vale só p/ projetos sem papel do solicitante.
+    const ehParticipante = !ehOwner && (parseJson<string[]>(projeto.membros) ?? []).some((m) => m.trim().toLowerCase() === alvo);
+    if (!ehOwner && (!ehAdmin || ehParticipante)) {
       throw Object.assign(
         new Error('Apenas o autor do projeto pode editá-lo. Para transferir a autoria, acione a equipe RPA.'),
         { status: 403 },

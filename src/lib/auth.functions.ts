@@ -5,44 +5,36 @@ export type CurrentUser = {
   isAdmin: boolean
 }
 
-// Lista hardcoded de admins — checada em memória antes de ir ao banco.
-// Admins adicionados dinamicamente (via CRUD) continuam funcionando pelo fallback ao DB.
-const HARDCODED_ADMINS = new Set([
-  'lucas.queiroz@gocase.com',
-  'joao.gabriel@gocase.com',
-  'joaovictor.esteves@gocase.com',
-  'kaique.breno@gocase.com',
-  'luciano.cavalcante@gocase.com',
-  'luis.albuquerque@gocase.com',
-])
+// Fonte de admins (sem hardcode no código):
+//  1. ADMIN_EMAILS — lista separada por vírgula na env (bootstrap canônico, gerenciável
+//     no Godeploy sem redeploy; também é o salvo-vidas contra lockout se a tabela esvaziar).
+//  2. tabela `admins` — admins adicionados dinamicamente via CRUD (painel admin).
+// isAdmin() é a ÚNICA porta de verdade (env ∪ banco) e DEVE ser usada por TODOS os
+// checks de admin do sistema — não checar `getAdminByEmail` direto (era a causa da
+// inconsistência: alguns caminhos viam só o banco, outros a lista hardcoded).
+function envAdmins(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  )
+}
+
+/** Único ponto de verdade de admin: env ADMIN_EMAILS ∪ tabela `admins`. */
+export async function isAdmin(email: string | null | undefined): Promise<boolean> {
+  const alvo = (email ?? '').trim().toLowerCase()
+  if (!alvo) return false
+  if (envAdmins().has(alvo)) return true
+  return !!(await getAdminByEmail((email ?? '').trim()))
+}
 
 export async function getCurrentUser(request: Request): Promise<CurrentUser | null> {
   const headerName = process.env.GODEPLOY_USER_HEADER ?? 'x-godeploy-user-email'
   let email: string | null = request.headers.get(headerName) ?? null
-  console.log(`[auth.functions] headerName="${headerName}", email do header="${email}", NODE_ENV="${process.env.NODE_ENV}"`)
   if (!email && process.env.NODE_ENV === 'development') {
     email = process.env.DEV_USER_EMAIL ?? null
-    console.log(`[auth.functions] Usando DEV_USER_EMAIL="${email}"`)
   }
-  if (!email) {
-    console.log('[auth.functions] Nenhum email encontrado → retornando null')
-    return null
-  }
-
-  // Fast path: checa lista em memória (sem I/O)
-  if (HARDCODED_ADMINS.has(email)) {
-    console.log(`[auth.functions] email="${email}", admin hardcoded=true`)
-    return { email, isAdmin: true }
-  }
-
-  // Fallback: admins dinâmicos cadastrados via CRUD
-  const admin = await getAdminByEmail(email)
-  console.log(`[auth.functions] email="${email}", admin no banco=${!!admin}`)
-  return { email, isAdmin: !!admin }
-}
-
-/** Checa se um email é admin (fast path hardcoded + fallback DB). */
-export async function isAdmin(email: string): Promise<boolean> {
-  if (HARDCODED_ADMINS.has(email)) return true
-  return !!(await getAdminByEmail(email))
+  if (!email) return null
+  return { email, isAdmin: await isAdmin(email) }
 }

@@ -239,16 +239,18 @@ function MeusProjetosPage() {
                 })}
               </div>
 
-              {/* Nota do filtro "Participo": você visualiza, não edita */}
-              {filtro === "participo" && grupos.participo.length > 0 && (
+              {/* Aviso "só o autor edita" — em "Participo" e em "Todos" (quando há ao menos
+                  um projeto de participação na lista; nos demais você só visualiza). */}
+              {(filtro === "participo" || filtro === "todos") && grupos.participo.length > 0 && (
                 <div
                   className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
                   style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.12)", color: "var(--go-blue)" }}
                 >
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
-                    Você participa destes projetos, mas só o autor pode editá-los. Para transferir a autoria de
-                    um projeto, acione a equipe RPA.
+                    {filtro === "participo"
+                      ? "Você participa destes projetos, mas só o autor pode editá-los. Para transferir a autoria de um projeto, acione a equipe RPA."
+                      : "Alguns projetos abaixo são de outra pessoa (você participa) — só o autor pode editá-los; você apenas visualiza. Para transferir a autoria, acione a equipe RPA."}
                   </p>
                 </div>
               )}
@@ -332,7 +334,9 @@ function MeusProjetosPage() {
                           )}
                           {p.pendente && (
                             <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#dc2626" }}>
-                              ⚠️ Projeto pendente — edite e reenvie até {PRAZO_LEGADO} para regularizar.
+                              {ehOwner
+                                ? `⚠️ Projeto pendente — edite e reenvie até ${PRAZO_LEGADO} para regularizar.`
+                                : "⚠️ Projeto pendente de regularização — só o autor pode reenviar. Acione o autor ou a equipe RPA."}
                             </p>
                           )}
                         </div>
