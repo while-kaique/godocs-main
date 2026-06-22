@@ -210,16 +210,28 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
 
 /**
  * Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o
- * selo da home. Lê SÓ do SQLite (coluna `atualizado_em`, espelho do Sheets mantido
- * pelo sync reverso e pela submissão) — NÃO chama o Google Sheets, então é
- * instantânea. A precisão é mantida pelo cron horário, pela submissão (IDA marca na
- * hora) e pelo sync sob demanda ao abrir "Meus Projetos".
+ * selo da home. Conta tanto os do OWNER quanto os em que ele é PARTICIPANTE (a flag
+ * aparece para ambos).
+ *
+ * Por padrão lê SÓ do SQLite (espelho do "Atualizado Em") → instantâneo. Com
+ * `sync: true`, sincroniza do Sheets (FONTE DA VERDADE) antes de contar — usado pela
+ * home para corrigir o selo quando o SQLite ainda não tem os legados do usuário
+ * (a home chama os dois: o rápido p/ aparecer na hora, e o sync p/ ficar exato).
  */
-export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
+export async function contarPendentes(
+  email: string,
+  opts?: { sync?: boolean },
+): Promise<{ count: number; prazo: string }> {
+  if (opts?.sync) {
+    try {
+      await syncOwnerRowsFromSheet(email);
+    } catch (e) {
+      console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
+    }
+  }
   const rows = await getProjetosByOwnerEmail(email);
-  // Só o OWNER pode regularizar um legado pendente — participante não conta.
   const count = rows
-    .filter((p) => ehOwner(p, email))
+    .filter((p) => temAcesso(p, email)) // owner OU participante
     .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
     .length;
   return { count, prazo: PRAZO_LEGADO };

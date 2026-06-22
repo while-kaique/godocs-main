@@ -162,7 +162,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/meus-projetos/pendentes' && method === 'GET') {
       const email = getEmailFromRequest(request)
       if (!email) return errorJson('Não autorizado.', 401)
-      return json(await contarPendentes(email))
+      const sync = url.searchParams.get('sync') === '1'
+      return json(await contarPendentes(email, { sync }))
     }
     // Excluir um RASCUNHO (ownership + só status 'rascunho').
     if (pathname.startsWith('/api/meus-projetos/') && method === 'DELETE') {
