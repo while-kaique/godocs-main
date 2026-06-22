@@ -104,14 +104,23 @@ async function callOpenAI(
       await new Promise((r) => setTimeout(r, 2000));
     }
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${opts.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${opts.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (netErr) {
+      // Falha de REDE (fetch lançou): conexão caiu, reset, DNS, timeout de socket.
+      // É transitório → entra no backoff e retenta (antes, propagava na hora).
+      lastErr = netErr instanceof Error ? netErr : new Error(String(netErr));
+      errLog(`Falha de rede na chamada OpenAI (tentativa ${attempt + 1}/3): ${lastErr.message.slice(0, 80)}`);
+      continue;
+    }
 
     if (res.ok) {
       if (attempt > 0) log(`Sucesso na tentativa ${attempt + 1}.`);

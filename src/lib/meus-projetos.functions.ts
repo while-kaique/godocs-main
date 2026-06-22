@@ -140,12 +140,19 @@ function mapItem(
   return {
     id: p.id,
     nome: p.nome,
-    // O status reflete a coluna "Status" do Sheets (fonte da verdade), normalizado
-    // para a chave do StatusBadge (ex.: "Pendente" → "pendente"). Rascunhos e
-    // projetos ausentes na planilha (ou leitura do Sheets falhou) caem no status
-    // interno do SQLite. ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA),
-    // então projetos submetidos aparecem como "Pendente" até a regra ser encerrada.
-    status: statusSheet && statusSheet.trim() ? statusSheet.trim().toLowerCase() : p.status,
+    // O status SEMPRE vem da planilha (FONTE DA VERDADE) — nunca do SQLite.
+    // - Rascunho é estado interno do app (nunca vai ao Sheets) → mantém 'rascunho'.
+    // - Submetido: usa o "Status" do Sheets, normalizado p/ a chave do StatusBadge
+    //   ("Pendente" → "pendente"). Se o projeto NÃO está na planilha (gap de sync) ou
+    //   a leitura falhou, fica `null` → badge mostra "—" (NÃO cai no status do SQLite).
+    // ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA), então submetidos
+    // aparecem como "Pendente" até a regra ser encerrada.
+    status:
+      p.status === 'rascunho'
+        ? 'rascunho'
+        : statusSheet && statusSheet.trim()
+          ? statusSheet.trim().toLowerCase()
+          : null,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
@@ -203,16 +210,28 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
 
 /**
  * Contagem de projetos PENDENTES (legados sem "Atualizado Em") do usuário — p/ o
- * selo da home. Lê SÓ do SQLite (coluna `atualizado_em`, espelho do Sheets mantido
- * pelo sync reverso e pela submissão) — NÃO chama o Google Sheets, então é
- * instantânea. A precisão é mantida pelo cron horário, pela submissão (IDA marca na
- * hora) e pelo sync sob demanda ao abrir "Meus Projetos".
+ * selo da home. Conta tanto os do OWNER quanto os em que ele é PARTICIPANTE (a flag
+ * aparece para ambos).
+ *
+ * Por padrão lê SÓ do SQLite (espelho do "Atualizado Em") → instantâneo. Com
+ * `sync: true`, sincroniza do Sheets (FONTE DA VERDADE) antes de contar — usado pela
+ * home para corrigir o selo quando o SQLite ainda não tem os legados do usuário
+ * (a home chama os dois: o rápido p/ aparecer na hora, e o sync p/ ficar exato).
  */
-export async function contarPendentes(email: string): Promise<{ count: number; prazo: string }> {
+export async function contarPendentes(
+  email: string,
+  opts?: { sync?: boolean },
+): Promise<{ count: number; prazo: string }> {
+  if (opts?.sync) {
+    try {
+      await syncOwnerRowsFromSheet(email);
+    } catch (e) {
+      console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
+    }
+  }
   const rows = await getProjetosByOwnerEmail(email);
-  // Só o OWNER pode regularizar um legado pendente — participante não conta.
   const count = rows
-    .filter((p) => ehOwner(p, email))
+    .filter((p) => temAcesso(p, email)) // owner OU participante
     .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
     .length;
   return { count, prazo: PRAZO_LEGADO };
