@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { Loader2, FileText, PencilLine, Eye } from "lucide-react";
@@ -46,14 +47,8 @@ const TIPO_LABEL: Record<string, string> = {
   receita_incremental: "Receita incremental",
 };
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
-  } catch {
-    return "—";
-  }
-}
+// Aceita ISO (app) e pt-BR dd/mm/yyyy (planilha/legados) — ver @/lib/format-date.
+const fmtDate = fmtDataBR;
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (

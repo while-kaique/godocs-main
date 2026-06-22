@@ -11,6 +11,7 @@
 // são minúsculos; legados na planilha às vezes em MAIÚSCULAS).
 
 import { readAllRows, type SheetColumn, type SheetRow } from './sheets';
+import { toIsoOrNull } from '@/lib/format-date';
 import {
   getAllProjetoIds,
   getProjetoById,
@@ -104,7 +105,9 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
   const membros = parseMembros(row['Participantes']);
   const status = statusFromLabel(row['Status']);
   const dataCriacao = txt(row['Data Criação']);
-  const submittedAt = txt(row['Data Submissão']);
+  // "Data Submissão" vem em pt-BR (dd/mm/yyyy) da planilha — normaliza para ISO
+  // para o frontend formatar certo (senão `new Date()` → "Enviado em Invalid date").
+  const submittedAt = toIsoOrNull(row['Data Submissão']);
 
   await insertProjetoRaw({
     id,
