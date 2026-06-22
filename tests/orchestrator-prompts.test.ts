@@ -254,6 +254,16 @@ describe('Prompt fase saving (tipo saving)', () => {
     expect(system).toContain('ganho REAL');
   });
 
+  it('exige a composição das horas por atividade (quebra do total) como gate antes do preview', async () => {
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    // Ponto 2.2 ganhou a quebra obrigatória do total por atividade
+    expect(system).toContain('COMPOSIÇÃO DAS HORAS');
+    expect(system).toContain('que compõem');
+    // É gate: proibido gerar preview com o total sem a quebra das atividades
+    expect(system).toContain('PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra');
+  });
+
   it('inclui resumo do projeto como contexto', async () => {
     const resumo = 'O projeto automatiza o cadastro de embaixadores via Typebot.';
     await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), savingPreenchido, resumo, ['saving']);

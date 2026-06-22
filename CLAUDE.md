@@ -91,7 +91,9 @@ echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basena
 
 O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA insiste até ter resposta para cada ponto — nunca pula.
 
-**Saving (Seções 1-5):** Contexto → Saving de Pessoas (por cargo: rotina, frequência, cálculo, antes/depois) → Contratos/Serviços Evitados → Custo da Automação → Resumo
+**Saving (Seções 1-5):** Contexto → Saving de Pessoas (por cargo: rotina, frequência, cálculo, **composição das horas**, antes/depois) → Contratos/Serviços Evitados → Custo da Automação → Resumo
+
+**Composição das horas (obrigatória no ponto 2.2):** o total de horas de cada cargo NÃO pode ficar como número solto — o agente coleta e registra no memorial a **quebra do total por atividade**, cada uma com sua parcela de horas, somando exatamente o total (ex.: "160h que compõem: at-x 4h, at-y 10h, at-z 146h"). É **gate antes do preview** (proibido gerar preview com o total de um cargo sem a quebra das atividades) e vale também no caso contrafactual/"ninguém fazia" (quebra do equivalente manual estimado). Regra no `buildSavingPrompt` (`orchestrator.ts`).
 
 **Receita (Seção 6):** O que gera → Como aumenta → Antes vs. depois → Base de cálculo → Valor → Tipo
 
