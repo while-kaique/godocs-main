@@ -316,6 +316,21 @@ describe('Abertura determinística por perfil das horas (anti-pergunta-burra)', 
     expect(system).toContain('parte das linhas tem 0h antes');
     expect(system).toContain('valide a rotina manual normalmente');
   });
+
+  it('ninguém fazia (alguem_fazia="nao"): trata horas_antes como equivalente manual estimado, não rotina real', async () => {
+    // No novo modelo, "ninguém fazia" preenche horas_antes com o EQUIVALENTE manual
+    // estimado (depois = 0). Mesmo com horas_antes > 0, NÃO é uma rotina que existia.
+    const saving = mkSaving([{ cargo: 'Analista Pleno', horas_antes: 40, horas_depois: 0 }]);
+    await runOrchestrator(makeCtx({ alguem_fazia: 'nao' }), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    expect(system).toContain('EQUIVALENTE manual');
+    expect(system).toContain('VALIDAR a estimativa');
+    expect(system).toContain('saving contrafactual');
+    // Vence a detecção por horas: NÃO abre como rotina manual real (caso clássico).
+    expect(system).not.toContain('Há rotina manual real');
+    // E a seção de validação ganha a variante de estimativa (não "detalhe a rotina").
+    expect(system).toContain('NESTE PROJETO NINGUÉM FAZIA A TAREFA');
+  });
 });
 
 describe('Prompt fase receita (tipo receita_incremental)', () => {

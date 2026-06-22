@@ -455,9 +455,19 @@ DETALHES TÉCNICOS APROVADOS:
   const temCustoMonitoramento = linhas.some((l) => l.horas_antes === 0 && l.horas_depois > 0);
   const algumaParcialZero = temHorasAntes && linhas.some((l) => l.horas_antes === 0);
 
+  // Ninguém fazia a tarefa manualmente (resposta do formulário). Neste caso as
+  // horas_antes NÃO são uma rotina real — são o EQUIVALENTE manual estimado que o
+  // usuário informou (quanto tempo o trabalho levaria se alguém tivesse que fazer).
+  // Vence a detecção por horas: mesmo com horas_antes > 0, NÃO há rotina prévia a
+  // detalhar — a conversa valida a ESTIMATIVA, não uma rotina existente.
+  const ninguemFazia = ctx.alguem_fazia === 'nao';
+
   // Diretiva de abertura — é a PRIMEIRA e mais forte instrução de conduta, calculada
   // a partir das horas reais. Vence as regras genéricas de "detalhar a rotina".
-  const comoAbrir = todasZeroTotal
+  const comoAbrir = ninguemFazia
+    ? `O usuário JÁ informou no formulário que NINGUÉM fazia esta tarefa manualmente antes. As horas na tabela ("horas antes") NÃO são uma rotina que existia — são uma ESTIMATIVA do trabalho manual EQUIVALENTE: se alguém tivesse que fazer à mão, quanto tempo levaria (e qual cargo seria responsável). É TERMINANTEMENTE PROIBIDO pedir "o que a pessoa fazia", "o passo a passo da rotina", "com que frequência você fazia" ou tratar isso como uma rotina real — ela NUNCA existiu, e essa pergunta contradiz o que o usuário já informou.
+   Em vez disso, sua missão é VALIDAR a estimativa: confirme a BASE do cálculo (volume × tempo por item) e cruze com o fluxo técnico para ver se é realista; se destoar (parecer inflada ou irreal para a tarefa), aponte a discrepância e ajuste o número com o usuário. Essas horas SÃO economia legítima (saving contrafactual — o trabalho manual que a automação evita). No memorial (ponto 2.2), descreva a tarefa e registre que é um EQUIVALENTE MANUAL ESTIMADO, com a base da estimativa (ex.: "X itens/mês × Y min cada"). As "horas depois" são 0 (a automação faz tudo) — NÃO pergunte sobre monitoramento/supervisão a menos que o próprio usuário levante.`
+    : todasZeroTotal
     ? `⛔ NINGUÉM fazia esta tarefa manualmente antes (0h antes) E ninguém gasta horas com ela hoje (0h depois). NÃO EXISTE rotina manual — é TERMINANTEMENTE PROIBIDO perguntar "o que a pessoa fazia nessas 0h", "com que frequência" ou "quanto tempo levava". Essa pergunta contradiz o que o usuário JÁ informou e passa a impressão de que você não leu os dados.
    Como não há economia de horas, o ganho precisa vir de OUTRO lugar. Sua primeira mensagem deve: (a) reconhecer que a automação passou a fazer uma tarefa que ninguém fazia; (b) perguntar o que ela entrega agora que antes não era feito (qualidade, cobertura, frequência) e se a empresa deixou de pagar por alguma ferramenta/serviço (custo evitado). NÃO force um memorial de horas que não existe. Se não houver custo evitado nem ganho concreto, siga a regra anti-zero e oriente projeto especial.`
     : todasZeroAntes
@@ -476,6 +486,7 @@ Pessoas envolvidas no cálculo de saving (${linhas.length}):
 ${tabelaLinhas}
 - Economia total declarada: ${totalHoras}${unidadeHoras}
 - Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${isPontual ? 'economia ÚNICA — tarefa feita uma só vez, não se repete mensalmente' : 'recorrente todo mês'})
+- Alguém já fazia manualmente antes: ${ninguemFazia ? 'NÃO — ninguém fazia. As "horas antes" são o EQUIVALENTE manual ESTIMADO (o tempo que o trabalho levaria se alguém tivesse que fazer à mão), não uma rotina real. Valide como estimativa (volume × tempo); NUNCA peça o passo a passo de uma rotina inexistente. "Horas depois" = 0.' : 'SIM — havia trabalho manual real; valide a rotina existente normalmente.'}
 
 ⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o texto do preview são exibidos ao usuário. Eles NÃO podem conter NENHUM valor financeiro de saving (nem economia em R$, nem taxa/hora, nem custo evitado em R$, nem total em R$). Use SOMENTE horas (antes/depois/economia) e descrições qualitativas. Os valores em R$ são calculados pelo backend e injetados automaticamente na versão interna do memorial (planilha). Expor R$ ao usuário permitiria que ele manipulasse os números — é proibido.
 
@@ -551,7 +562,9 @@ ${isPontual
 
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0):
 - ATENÇÃO: as regras abaixo valem APENAS para linhas que TÊM rotina manual prévia (horas_antes > 0). Para linhas com 0h antes, NÃO se aplicam — não cobre detalhamento de rotina nem "faça a conta" de algo que ninguém fazia.
-- Para essas linhas, NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina: quais tarefas, ${isPontual ? 'quantos itens/registros, quanto tempo por item' : 'com que frequência, quanto tempo cada uma'}.
+${ninguemFazia
+  ? `- ⚠️ NESTE PROJETO NINGUÉM FAZIA A TAREFA: as horas_antes são uma ESTIMATIVA do equivalente manual, não uma rotina real. NÃO peça "detalhe a rotina" nem "o que você fazia". Em vez disso, valide a BASE da estimativa: quantos ${isPontual ? 'itens/registros e quanto tempo por item' : 'itens por mês/dia e quanto tempo cada um'}, e cruze com o fluxo técnico. A conta é a mesma; muda só o enquadramento — é o tempo que alguém GASTARIA, não que gastou.`
+  : `- Para essas linhas, NUNCA aceite as horas "de cara". O usuário DEVE detalhar a rotina: quais tarefas, ${isPontual ? 'quantos itens/registros, quanto tempo por item' : 'com que frequência, quanto tempo cada uma'}.`}
 - Faça a conta: se o usuário diz "${isPontual ? '100 registros, 3 min cada' : '50 cadastros por mês, 15 min cada'}", isso dá ~${isPontual ? '5h' : '12h'} — se a hora informada destoar, aponte a discrepância e peça para explicar.
 - Se a estimativa de alguma pessoa parecer inflada para o tipo de tarefa, questione diretamente.
 - Cruze com o contexto do projeto: se o fluxo técnico é simples (3-4 etapas), muitas horas manuais não fazem sentido. Desafie.

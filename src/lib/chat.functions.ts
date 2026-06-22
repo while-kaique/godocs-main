@@ -192,6 +192,10 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
+    // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
+    // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
+    // a passo de uma rotina inexistente).
+    alguem_fazia: (data.alguem_fazia as 'sim' | 'nao' | null) ?? null,
     especial: data.especial === 1,
     contexto_especial: data.contexto_especial ?? null,
     revisao,

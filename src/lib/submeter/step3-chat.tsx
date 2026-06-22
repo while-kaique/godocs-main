@@ -789,8 +789,10 @@ function SavingForm({
   const [linhas, setLinhas] = useState<SavingLinhaInput[]>(
     draft?.linhas ?? [{ cargo: "", horasAntes: "", horasDepois: "" }],
   );
-  // Alguém já fazia/mantinha isso manualmente antes? Define se a tabela mostra a
-  // coluna "antes" (sim) ou só "depois" (nao — ninguém antes; economia de horas = 0).
+  // Alguém já fazia/mantinha isso manualmente antes? 'sim' → tabela antes+depois
+  // (economia clássica). 'nao' → ninguém fazia: a tabela pede o EQUIVALENTE em
+  // trabalho manual (quantas horas/mês levaria se alguém tivesse que fazer + qual
+  // cargo) — esse valor vai para horasAntes (depois = 0); é saving contrafactual.
   const [alguemFazia, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.alguemFazia ?? "");
   // Custo evitado: a solução fez a empresa deixar de pagar alguma ferramenta/serviço?
   // 'sim' → lista incremental de ferramentas evitadas (nome/valor/recorrência/justificativa).
@@ -808,9 +810,10 @@ function SavingForm({
   const [valorReceita, setValorReceita] = useState(draft?.valorReceita ?? "");
   const [racionalReceita, setRacionalReceita] = useState(draft?.racionalReceita ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Guarda as horas "antes" digitadas antes de mudar para "não" (que zera o campo),
-  // para restaurar caso o usuário volte para "sim" — senão o valor pré-carregado some.
-  const horasAntesBackup = useRef<string[] | null>(null);
+  // Guarda as horas "depois" digitadas antes de mudar para "não" (modo em que o
+  // "depois" é sempre 0 — a automação faz tudo), para restaurar caso o usuário
+  // volte para "sim" — senão o valor já digitado some.
+  const horasDepoisBackup = useRef<string[] | null>(null);
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
@@ -830,8 +833,12 @@ function SavingForm({
   const linhaCompleta = (l: SavingLinhaInput) => {
     const a = num(l.horasAntes);
     const d = num(l.horasDepois);
-    const antesOk = alguemFazia === "nao" || (l.horasAntes !== "" && !isNaN(a) && a >= 0);
-    const depoisOk = l.horasDepois !== "" && !isNaN(d) && d >= 0;
+    // "antes" é sempre exigido: no modo "sim" são as horas reais antes da automação;
+    // no modo "nao" é o equivalente em trabalho manual estimado (a tarefa que ninguém
+    // fazia, mas que precisaria de alguém). "depois" só é exigido no "sim" — no "nao"
+    // a automação faz tudo (depois = 0, campo nem aparece).
+    const antesOk = l.horasAntes !== "" && !isNaN(a) && a >= 0;
+    const depoisOk = alguemFazia === "nao" || (l.horasDepois !== "" && !isNaN(d) && d >= 0);
     return l.cargo !== "" && antesOk && depoisOk;
   };
   const tabelaSavingCompleta = alguemFazia !== "" && linhas.every(linhaCompleta);
@@ -878,31 +885,34 @@ function SavingForm({
     });
   }
   function addLinha() {
-    // No modo "ninguém antes", horas antes é sempre 0 (campo nem aparece).
-    setLinhas((ls) => [...ls, { cargo: "", horasAntes: alguemFazia === "nao" ? "0" : "", horasDepois: "" }]);
+    // No modo "ninguém fazia", o "depois" é sempre 0 (a automação faz tudo; campo
+    // nem aparece) e o usuário informa só o equivalente manual em "horas antes".
+    setLinhas((ls) => [...ls, { cargo: "", horasAntes: "", horasDepois: alguemFazia === "nao" ? "0" : "" }]);
   }
   function selectTinhaAntes(v: "sim" | "nao") {
     if (v === alguemFazia) return; // já selecionado → não mexe nos valores
     setTinhaAntes(v);
     setLinhas((ls) => {
       if (v === "nao") {
-        // ninguém fazia antes → zera o campo, mas guarda o que estava lá para
-        // restaurar se o usuário voltar para "sim".
-        horasAntesBackup.current = ls.map((l) => l.horasAntes);
-        return ls.map((l) => ({ ...l, horasAntes: "0" }));
+        // ninguém fazia → o "depois" não se aplica (automação faz tudo): zera o
+        // campo, mas guarda o que estava lá para restaurar se voltar para "sim".
+        // As "horas antes" passam a representar o equivalente manual estimado —
+        // mantém o valor digitado (não zera).
+        horasDepoisBackup.current = ls.map((l) => l.horasDepois);
+        return ls.map((l) => ({ ...l, horasDepois: "0" }));
       }
-      // "sim" → restaura o valor guardado (ex: 25h pré-carregadas); na falta de
-      // backup, só limpa o "0" herdado do modo "nao" para o usuário digitar.
-      const bkp = horasAntesBackup.current;
+      // "sim" → restaura o "depois" guardado; na falta de backup, só limpa o "0"
+      // herdado do modo "nao" para o usuário digitar.
+      const bkp = horasDepoisBackup.current;
       return ls.map((l, i) => ({
         ...l,
-        horasAntes: bkp && bkp[i] != null && bkp[i] !== "0" ? bkp[i] : (l.horasAntes === "0" ? "" : l.horasAntes),
+        horasDepois: bkp && bkp[i] != null && bkp[i] !== "0" ? bkp[i] : (l.horasDepois === "0" ? "" : l.horasDepois),
       }));
     });
     setErrors((e) => {
       const n = { ...e };
       delete n.alguemFazia;
-      Object.keys(n).forEach((k) => { if (/^l\d+antes$/.test(k)) delete n[k]; });
+      Object.keys(n).forEach((k) => { if (/^l\d+depois$/.test(k)) delete n[k]; });
       return n;
     });
   }
@@ -952,12 +962,14 @@ function SavingForm({
         const a = parseFloat(l.horasAntes);
         const d = parseFloat(l.horasDepois);
         if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
-        // "antes" só é cobrado no modo "sim" (havia trabalho manual). No modo "nao"
-        // o campo nem aparece (horas_antes = 0). Aceita >= 0; o ganho líquido é
-        // calculado/clampado no backend.
-        if (alguemFazia === "sim" && (l.horasAntes === "" || isNaN(a) || a < 0))
-          errs[`l${i}antes`] = "Informe as horas";
-        if (l.horasDepois === "" || isNaN(d) || d < 0) errs[`l${i}depois`] = "Informe as horas";
+        // "antes" é exigido em ambos os modos: no "sim" são as horas reais antes da
+        // automação; no "nao" é o equivalente manual estimado. Aceita >= 0; o ganho
+        // líquido é calculado/clampado no backend.
+        if (l.horasAntes === "" || isNaN(a) || a < 0) errs[`l${i}antes`] = "Informe as horas";
+        // "depois" só é cobrado no modo "sim". No "nao" o campo nem aparece
+        // (horas_depois = 0 — a automação faz tudo).
+        if (alguemFazia === "sim" && (l.horasDepois === "" || isNaN(d) || d < 0))
+          errs[`l${i}depois`] = "Informe as horas";
       });
       // Custo evitado: pergunta obrigatória. Se "sim", cada ferramenta precisa estar completa.
       if (!temCustoEvitado) errs.temCustoEvitado = "Selecione uma opção";
@@ -1097,8 +1109,9 @@ function SavingForm({
         {/* Saving — quem trabalhava/trabalha na tarefa (só após escolher a frequência) */}
         {mostrarSecaoSaving && (
           <>
-            {/* Pergunta-chave: havia trabalho manual antes? Define se mostramos a
-                coluna "antes" (economia clássica) ou só "depois" (ninguém antes). */}
+            {/* Pergunta-chave: havia trabalho manual antes? Define se a tabela pede
+                "antes"+"depois" (economia clássica) ou só o equivalente manual
+                estimado em "horas/mês" (ninguém fazia → saving contrafactual). */}
             <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 Alguém já fazia ou mantinha isso manualmente antes? <span style={{ color: "#e53e3e" }}>*</span>
@@ -1131,7 +1144,7 @@ function SavingForm({
             {alguemFazia && (
               <div style={revelar}>
                 <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  {alguemFazia === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Quem dedica tempo à automação hoje"} <span style={{ color: "#e53e3e" }}>*</span>
+                  {alguemFazia === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Qual seria o equivalente em trabalho manual?"} <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
                   {alguemFazia === "sim" ? (
@@ -1141,8 +1154,9 @@ function SavingForm({
                     </>
                   ) : (
                     <>
-                      Ninguém fazia isso manualmente antes. Informe só as horas/mês que cada função
-                      passou a dedicar à automação agora (manutenção, exceções, acompanhamento).
+                      Ninguém fazia isso manualmente — mas <strong>se alguém tivesse que fazer</strong>, quantas
+                      horas/mês levaria e qual função seria responsável? Uma linha por função. É o trabalho
+                      manual que a automação <strong>evita</strong> (o saving).
                     </>
                   )}
                 </p>
@@ -1153,8 +1167,14 @@ function SavingForm({
                   style={{ gridTemplateColumns: alguemFazia === "nao" ? "1fr 76px 28px" : "1fr 76px 76px 28px", color: "#9a9aa8" }}
                 >
                   <span>Função</span>
-                  {alguemFazia === "sim" && <span className="text-center">Horas antes</span>}
-                  <span className="text-center">Horas depois</span>
+                  {alguemFazia === "sim" ? (
+                    <>
+                      <span className="text-center">Horas antes</span>
+                      <span className="text-center">Horas depois</span>
+                    </>
+                  ) : (
+                    <span className="text-center">Horas/mês</span>
+                  )}
                   <span />
                 </div>
 
@@ -1191,35 +1211,38 @@ function SavingForm({
                             </select>
                           </div>
 
-                          {/* Horas antes — só no modo "sim" */}
+                          {/* Horas antes (modo "sim") OU equivalente manual (modo "nao").
+                              Em ambos os casos o valor vai para horasAntes — é a base do
+                              saving (horas reais antes ou estimativa do trabalho manual). */}
+                          <input
+                            type="number" min="0" step="0.5" placeholder="40"
+                            aria-label={alguemFazia === "nao" ? "Horas por mês do equivalente manual" : "Horas por mês antes"}
+                            value={l.horasAntes}
+                            onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
+                            className="go-input w-full"
+                            style={{
+                              padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                              border: errors[`l${i}antes`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                              background: "var(--go-white)", fontSize: 13,
+                            }}
+                          />
+
+                          {/* Horas depois — só no modo "sim" (no "nao" a automação faz
+                              tudo: depois = 0, campo não aparece). */}
                           {alguemFazia === "sim" && (
                             <input
-                              type="number" min="0" step="0.5" placeholder="40"
-                              aria-label="Horas por mês antes"
-                              value={l.horasAntes}
-                              onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
+                              type="number" min="0" step="0.5" placeholder="2"
+                              aria-label="Horas por mês depois"
+                              value={l.horasDepois}
+                              onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
                               className="go-input w-full"
                               style={{
                                 padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
-                                border: errors[`l${i}antes`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                border: errors[`l${i}depois`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
                                 background: "var(--go-white)", fontSize: 13,
                               }}
                             />
                           )}
-
-                          {/* Horas depois */}
-                          <input
-                            type="number" min="0" step="0.5" placeholder="2"
-                            aria-label="Horas por mês depois"
-                            value={l.horasDepois}
-                            onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
-                            className="go-input w-full"
-                            style={{
-                              padding: "9px 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
-                              border: errors[`l${i}depois`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                              background: "var(--go-white)", fontSize: 13,
-                            }}
-                          />
 
                           {/* Remover função */}
                           {linhas.length > 1 ? (
