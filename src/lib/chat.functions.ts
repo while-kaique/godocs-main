@@ -1491,13 +1491,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // externo). Receita entra cheia e aplica ÷10 (fator de equivalência).
   // Pontual NÃO divide por 12 — valor cheio em ambos os casos.
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
-  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+  const savingMensal = savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
   const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
-  const receitaEquivalente = receitaMensal / 10;
+  const receitaEquivalente = receitaValor / 10;
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
 
@@ -1708,13 +1706,11 @@ export async function resyncGoogle(rawData: unknown) {
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
   // ganho_total_mensal — mesma fórmula do submeterParaValidacao.
+  // Saving entra cheio; receita aplica ÷10. Pontual NÃO divide por 12 (valor cheio).
   const savingReais = (saving?.economia_reais_mes as number) ?? 0;
-  const savingTipo = (saving?.tipo_saving as string) ?? 'mensal';
-  const savingMensal = savingTipo === 'pontual' ? savingReais / 12 : savingReais;
+  const savingMensal = savingReais;
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
-  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
-  const receitaMensal = receitaTipo === 'pontual' ? receitaValor / 12 : receitaValor;
-  const ganhoTotalMensal = savingMensal + receitaMensal / 10;
+  const ganhoTotalMensal = savingMensal + receitaValor / 10;
 
   const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
   // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Receita Memorial").
