@@ -158,6 +158,13 @@ const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…"
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
+// Edição reprocessa o documento e REGERA a documentação via IA antes de reenviar —
+// passos fiéis a esse trabalho (lento) para o usuário não achar que travou.
+const LOADING_STEPS_EDITAR = [
+  "Relendo o documento…",
+  "Regerando a documentação (IA)…",
+  "Enviando para validação…",
+];
 
 export function SubmeterPageContent({
   editProjetoId,
@@ -1952,7 +1959,7 @@ export function SubmeterPageContent({
                 >
                   {enviandoEspecial ? (
                     <>
-                      <CyclingText steps={LOADING_STEPS_ENVIAR_ESPECIAL} />
+                      <CyclingText steps={editProjetoId ? LOADING_STEPS_EDITAR : LOADING_STEPS_ENVIAR_ESPECIAL} />
                       <div className="go-spinner" />
                     </>
                   ) : (

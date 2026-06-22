@@ -1106,17 +1106,17 @@ export async function atualizarMetadados(rawData: unknown) {
     return { ok: true, reset: false };
   }
 
-  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. Com novos arquivos, re-extrai
-  // o texto; com reset_doc sem upload, reusa o texto já extraído (mensagem role=doc).
+  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. ⚠️ NÃO-DESTRUTIVO: fazemos
+  // TODO o trabalho que pode falhar/demorar (extração + LLM) ANTES de tocar no chat/doc
+  // existentes. Só no fim, com a nova doc pronta, fazemos a troca. Assim, se a requisição
+  // for cancelada (cliente saiu/timeout) ou o LLM falhar, o chat/doc ANTIGOS ficam
+  // intactos — antes apagávamos primeiro, então um cancelamento deixava o projeto SEM
+  // documentação e o submit seguinte quebrava com "Documentação ainda não foi gerada".
   let docTexto = '';
   if (temDocs) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
       log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-      // Só os nomes — o link do Drive (resumo da doc) é gerado em submeterParaValidacao.
-      await updateProjeto(data.projeto_id, {
-        arquivos_nomes: data.docs!.map((d) => d.filename),
-      });
     } catch (extractErr) {
       err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
       docTexto = '';
@@ -1126,15 +1126,6 @@ export async function atualizarMetadados(rawData: unknown) {
     docTexto = docMsg?.content ?? '';
     log('atualizarMetadados', `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
   }
-
-  // Limpa a conversa inteira (doc + impacto) — recomeçamos do zero.
-  await deleteChatMessagesByProjeto(data.projeto_id);
-
-  await insertChatMessage({
-    projeto_id: data.projeto_id,
-    role: 'doc',
-    content: docTexto || '(documento sem texto legível)',
-  });
 
   const ctx = await getProjetoContexto(data.projeto_id);
 
@@ -1151,14 +1142,30 @@ export async function atualizarMetadados(rawData: unknown) {
     }
   }
 
+  // Última operação que pode lançar. Se chegou aqui, a nova doc está pronta.
   const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
+  // ── TROCA (só agora) — apaga o antigo e grava o novo. Sequência curta de ops de
+  // banco, sem trabalho de rede no meio que possa ser cancelado deixando estado parcial.
+  await deleteChatMessagesByProjeto(data.projeto_id);
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'doc',
+    content: docTexto || '(documento sem texto legível)',
+  });
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
     options: resultado.type === 'options' ? resultado.options : null,
   });
+  // Nomes dos arquivos atualizados só após o sucesso da regeneração (o link do Drive
+  // é gerado depois, em submeterParaValidacao).
+  if (temDocs) {
+    await updateProjeto(data.projeto_id, {
+      arquivos_nomes: data.docs!.map((d) => d.filename),
+    });
+  }
 
   log('atualizarMetadados', `Documentação reiniciada — fase: ${resultado.fase}`);
   return { ok: true, reset: true, response: formatResponse(resultado) };
