@@ -44,9 +44,27 @@ function Home() {
   const [pendentes, setPendentes] = useState<{ count: number; prazo: string } | null>(null);
 
   useEffect(() => {
-    apiFetch<{ count: number; prazo: string }>("/api/meus-projetos/pendentes")
-      .then(setPendentes)
-      .catch(() => {});
+    let alive = true;
+    (async () => {
+      try {
+        // 1) Instantâneo (SQLite): a flag aparece já ao entrar na página.
+        const fast = await apiFetch<{ count: number; prazo: string }>("/api/meus-projetos/pendentes");
+        if (!alive) return;
+        setPendentes(fast);
+        // 2) Só se vier 0, confirma com a FONTE DA VERDADE (Sheets) — cobre o caso de o
+        // SQLite ainda não ter os legados do usuário (evita bater no Sheets à toa quando
+        // o SQLite já tem pendências).
+        if (fast.count === 0) {
+          const fresh = await apiFetch<{ count: number; prazo: string }>("/api/meus-projetos/pendentes?sync=1");
+          if (alive) setPendentes(fresh);
+        }
+      } catch {
+        // Busca silenciosa: se falhar, o selo simplesmente não aparece.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -263,7 +281,7 @@ function Home() {
               title="Meus Projetos"
               description={
                 pendentes && pendentes.count > 0
-                  ? `Você tem ${pendentes.count} projeto${pendentes.count > 1 ? "s" : ""} pendente${pendentes.count > 1 ? "s" : ""} — edite e reenvie até ${pendentes.prazo} para regularizar.`
+                  ? `Você tem ${pendentes.count} projeto${pendentes.count > 1 ? "s" : ""} pendente${pendentes.count > 1 ? "s" : ""} de regularização (até ${pendentes.prazo}). Confira em Meus Projetos.`
                   : "Visualize, edite ou reenvie seus projetos submetidos."
               }
               badge="Editar e reenviar"

@@ -279,23 +279,38 @@ describe('Abertura determinística por perfil das horas (anti-pergunta-burra)', 
     tipo_saving: 'mensal' as const,
   });
 
-  it('0h antes + 0h depois: PROÍBE perguntar sobre rotina manual e foca em entrega/custo evitado', async () => {
+  it('0h antes + 0h depois: investiga saving contrafactual ANTES de descartar horas', async () => {
     const saving = mkSaving([{ cargo: 'Estagiário', horas_antes: 0, horas_depois: 0 }]);
     await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
-    expect(system).toContain('NINGUÉM fazia esta tarefa manualmente antes');
-    expect(system).toContain('PROIBIDO');
-    expect(system).toContain('custo evitado');
+    // Não pede rotina que nunca existiu, mas NÃO conclui "sem saving" sem investigar o contrafactual
+    expect(system).toContain('SAVING CONTRAFACTUAL');
+    expect(system).toContain('precisaria ser feita por alguém');
+    expect(system).toContain('PREENCHA horas_antes');
+    expect(system).toContain('NUNCA declare "não entra como economia de horas"');
     // A diretiva de abertura precede e domina a regra genérica de validação de horas
     expect(system.indexOf('COMO ABRIR A CONVERSA')).toBeLessThan(system.indexOf('VALIDAÇÃO DE HORAS'));
   });
 
-  it('0h antes + horas depois > 0: trata como custo de monitoramento, não rotina prévia', async () => {
+  it('0h antes + horas depois > 0: investiga contrafactual e trata o depois como monitoramento', async () => {
     const saving = mkSaving([{ cargo: 'Analista Pleno', horas_antes: 0, horas_depois: 2 }]);
     await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
     const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
     expect(system).toContain('monitoramento/supervisão');
-    expect(system).toContain('PROIBIDO pedir o passo a passo');
+    expect(system).toContain('SAVING CONTRAFACTUAL');
+    expect(system).toContain('PREENCHA horas_antes');
+  });
+
+  it('inclui o cenário 2 (saving contrafactual) e a regra anti-repetição', async () => {
+    const saving = mkSaving([{ cargo: 'Estagiário', horas_antes: 0, horas_depois: 0 }]);
+    await runOrchestrator(makeCtx(), [], 'saving', documentacaoVazia(), saving, 'Resumo', ['saving']);
+    const system = capturedMessages.find(m => m.role === 'system')?.content ?? '';
+    // Cenário 2 nas REGRAS DE PREENCHIMENTO
+    expect(system).toContain('Saving contrafactual — tarefa inviável de fazer à mão');
+    expect(system).toContain('era inviável dedicar gente a fazer');
+    // Anti-repetição / reconhecer correção do usuário
+    expect(system).toContain('NÃO RE-PERGUNTE O QUE JÁ FOI RESPONDIDO');
+    expect(system).toContain('perdeu o contexto');
   });
 
   it('horas antes > 0: abre validando a rotina manual real', async () => {

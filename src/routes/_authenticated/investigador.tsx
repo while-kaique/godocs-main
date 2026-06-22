@@ -1297,6 +1297,7 @@ type EventoCustoItem = { nome?: string; valor?: number; recorrencia?: string }
 function EventBubble({ event }: { event: FormEvent }) {
   const d = (event.dados ?? {}) as Record<string, unknown>
   const voltou = d.voltou === true
+  const isAlerta = event.tipo === 'divergencia_memorial'
 
   // Título + etapa do "voltou" por tipo de evento
   const CONFIG: Record<string, { titulo: string; etapa: string }> = {
@@ -1306,6 +1307,7 @@ function EventBubble({ event }: { event: FormEvent }) {
     metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
     tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
     submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
+    divergencia_memorial: { titulo: 'Memorial × valor gravado divergem', etapa: 'Submissão' },
   }
   const cfg = CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
 
@@ -1361,11 +1363,14 @@ function EventBubble({ event }: { event: FormEvent }) {
     if (d.status) rows.push({ label: 'Status', value: String(d.status) })
     if (typeof d.ganho_total_mensal === 'number') rows.push({ label: 'Ganho total', value: `${fmtReais(d.ganho_total_mensal)}/mês` })
     if (d.reenvio === true) rows.push({ label: 'Tipo', value: 'Reenvio' })
+  } else if (event.tipo === 'divergencia_memorial') {
+    if (d.total_texto != null) rows.push({ label: 'No memorial (texto)', value: `${d.total_texto} h` })
+    if (d.total_gravado != null) rows.push({ label: 'Gravado (planilha)', value: `${d.total_gravado} h` })
   }
 
   return (
     <div className="flex justify-center px-6 py-1">
-      <div className="w-full max-w-[88%] rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50 px-3 py-2">
+      <div className={`w-full max-w-[88%] rounded-[var(--go-radius-sm)] border px-3 py-2 ${isAlerta ? 'border-[#dc2626]/40 bg-[#fef2f2]' : 'border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50'}`}>
         {voltou && (
           <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-[#b45309]">
             <ArrowLeft className="h-3 w-3" />
@@ -1373,8 +1378,10 @@ function EventBubble({ event }: { event: FormEvent }) {
           </div>
         )}
         <div className="flex items-center gap-1.5">
-          <SlidersHorizontal className="h-3 w-3 flex-shrink-0 text-[var(--go-blue)]/45" />
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--go-text-primary)]/45">
+          {isAlerta
+            ? <AlertTriangle className="h-3 w-3 flex-shrink-0 text-[#dc2626]" />
+            : <SlidersHorizontal className="h-3 w-3 flex-shrink-0 text-[var(--go-blue)]/45" />}
+          <span className={`text-[11px] font-semibold uppercase tracking-wide ${isAlerta ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/45'}`}>
             {cfg.titulo}
           </span>
         </div>

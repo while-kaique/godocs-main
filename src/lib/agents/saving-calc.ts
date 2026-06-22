@@ -2,6 +2,57 @@ import { CARGOS, type SavingColetado, type SavingLinha, type ReceitaColetada } f
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+const normalizarCargo = (s: string) =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+// Piso conservador: menor valor/hora da tabela. Uma hora de trabalho real NUNCA
+// vale R$0 — usá-lo como fallback evita o "falso zero" que zera o saving.
+const PISO_VALOR_HORA = Math.min(...CARGOS.map((c) => c.valor_hora));
+
+/**
+ * Resolve o valor/hora de um cargo contra a tabela CARGOS de forma tolerante às
+ * variações de rótulo que o LLM produz.
+ *
+ * ⚠️ Bug que isto corrige: a resolução era `CARGOS.find(c => c.label === cargo)`
+ * (match EXATO). Quando o LLM gravava um cargo genérico como `"Analista"` — que
+ * não bate com nenhum label da tabela (`"Analista Júnior/Pleno/Sênior"`) — e a
+ * linha vinha sem `valor_hora`, o valor caía silenciosamente para R$0. Aí
+ * `economia_reais_mes` zerava e o gate de ganho-zero (`submeterParaValidacao`)
+ * BARRAVA a submissão como "saving sem economia mensurável", MESMO havendo
+ * economia real de horas. (Caso real: projeto BoniTrack, cargo "Analista" com
+ * 2,5h/mês de economia → bloqueado indevidamente.)
+ *
+ * Ordem de resolução: (1) match exato; (2) match exato normalizado (sem
+ * acento/caixa/espaços); (3) match por família — o cargo é prefixo de um label
+ * da tabela ou vice-versa (ex.: "Analista" → "Analista *") — escolhendo o MENOR
+ * valor/hora entre os candidatos (conservador, nunca superestima); (4) o
+ * `valor_hora` já presente na linha, se > 0; (5) piso conservador da tabela.
+ *
+ * Nunca retorna 0 para um cargo informado: como o gate só barra com economia de
+ * HORAS > 0, um cargo com horas reais sempre terá R$ > 0. Tool-swaps de 0h
+ * continuam barrados (0h × qualquer valor/hora = R$0).
+ */
+export function resolverValorHora(cargo: string | undefined, valorHoraLinha?: number | null): number {
+  const raw = (cargo ?? '').trim();
+  if (raw) {
+    const exato = CARGOS.find((c) => c.label === raw);
+    if (exato) return exato.valor_hora;
+
+    const alvo = normalizarCargo(raw);
+    const normExato = CARGOS.find((c) => normalizarCargo(c.label) === alvo);
+    if (normExato) return normExato.valor_hora;
+
+    const familia = CARGOS.filter((c) => {
+      const lab = normalizarCargo(c.label);
+      return lab.startsWith(alvo) || alvo.startsWith(lab);
+    });
+    if (familia.length) return Math.min(...familia.map((c) => c.valor_hora));
+  }
+  const daLinha = Number(valorHoraLinha);
+  if (daLinha > 0) return daLinha;
+  return raw ? PISO_VALOR_HORA : 0;
+}
+
 /**
  * Re-deriva os valores em R$ do saving a partir das HORAS de cada linha × tabela
  * CARGOS. A ÚNICA fonte de verdade do dinheiro é o backend.
@@ -22,13 +73,34 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * PRESERVADO (não recalculado). Entra pelo valor cheio independente de ser pontual
  * ou mensal (pontual NÃO divide por 12).
  */
+/**
+ * Re-deriva o custo evitado mensal a partir dos ITENS persistidos no projeto
+ * (`custo_evitado_itens`, JSON). Fonte da verdade — usado no submit para NÃO
+ * depender do `custo_evitado_reais` que vive no estado volátil do chat (o LLM
+ * pode "esquecê-lo" em fluxos com muitos turnos, zerando o valor). Item pontual
+ * é mensalizado ÷12; mensal entra cheio. Mesma regra de `iniciarSaving`.
+ */
+export function custoEvitadoMensalFromItens(itensRaw: unknown): number {
+  let itens: Array<{ valor?: number; recorrencia?: string }> = [];
+  if (typeof itensRaw === 'string') {
+    try { itens = JSON.parse(itensRaw) || []; } catch { itens = []; }
+  } else if (Array.isArray(itensRaw)) {
+    itens = itensRaw as Array<{ valor?: number; recorrencia?: string }>;
+  }
+  const total = itens.reduce((s, it) => {
+    const v = Math.max(0, Number(it?.valor) || 0);
+    return s + (it?.recorrencia === 'pontual' ? v / 12 : v);
+  }, 0);
+  return round2(total);
+}
+
 export function recomputarSavingFinanceiro(
   saving: SavingColetado,
   custoExternoMensal = 0,
 ): SavingColetado {
   const linhasRaw = Array.isArray(saving?.linhas) ? saving.linhas : [];
   const linhas: SavingLinha[] = linhasRaw.map((l) => {
-    const valorHora = CARGOS.find((c) => c.label === l.cargo)?.valor_hora ?? l.valor_hora ?? 0;
+    const valorHora = resolverValorHora(l.cargo, l.valor_hora);
     const economiaHoras = Math.max(0, (Number(l.horas_antes) || 0) - (Number(l.horas_depois) || 0));
     return {
       ...l,
@@ -46,6 +118,12 @@ export function recomputarSavingFinanceiro(
   return {
     ...saving,
     linhas,
+    // Carrega o custo externo adiante no próprio objeto saving. O valor autoritativo
+    // vive em projeto.custo_externo_mensal e é passado aqui; sem persistir no saving,
+    // enriquecerMemorial (que lê saving.custo_externo_mensal) recalculava a líquida
+    // com 0 → memorial mostrava "Custo de ferramenta externa: N/A" e líquida bruta,
+    // contradizendo a coluna Saving Reais (que já abate o custo externo).
+    custo_externo_mensal: custoExternoMensal,
     economia_horas_mes: totalHoras,
     economia_reais_mes: round2(totalReaisBruto + evitadoBruto - (custoExternoMensal || 0)),
   };

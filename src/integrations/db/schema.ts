@@ -214,6 +214,11 @@ const MIGRATIONS = [
   // Submetidos × Edições). Forward-only: versões antigas (anteriores a esta coluna)
   // ficam com snapshot_chat NULL e caem no fallback do chat atual.
   'ALTER TABLE projeto_versions ADD COLUMN snapshot_chat TEXT',
+  // Espelho do "Atualizado Em" do Sheets (carimbo da última escrita do sistema na
+  // planilha). NULL = o app nunca sincronizou este projeto p/ o Sheets = legado
+  // pendente de regularização. Persistir no SQLite deixa a contagem de pendentes
+  // (selo da home) instantânea, sem precisar ler a planilha a cada load.
+  'ALTER TABLE projetos ADD COLUMN atualizado_em TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

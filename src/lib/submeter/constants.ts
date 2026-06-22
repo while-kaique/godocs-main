@@ -12,7 +12,7 @@ export const AREAS = [
 
 export const FERRAMENTAS = [
   "n8n", "Python", "Google Apps Script", "Claude + GoDeploy",
-  "Claude", "Outros"
+  "Claude", "Vercel", "Outros"
 ] as const;
 
 // Extensões de documentos legíveis

@@ -22,8 +22,10 @@ function getSheetConfig() {
 //
 // A ordem abaixo apenas documenta o layout atual da aba 'GoDocs' (A→AJ).
 //
-// ⚠️ "Diff Horas / Antes", "Diff Saving / Antes" e "Memorial anterior" são
-// preenchidas manualmente pela equipe — o sistema NUNCA escreve nelas.
+// ⚠️ "Diff Horas / Antes" e "Diff Saving / Antes" são preenchidas manualmente
+// pela equipe — o sistema NUNCA escreve nelas. Já "Memorial anterior" (AF) É
+// escrita pelo sistema, mas SÓ na edição: recebe o memorial_calculo da versão
+// imediatamente anterior (ver sync.ts → row['Memorial anterior']).
 export const SHEET_COLUMNS = [
   'Data Submissão',                 // A
   'ID Projeto',                     // B
@@ -56,7 +58,7 @@ export const SHEET_COLUMNS = [
   'Complexidade',                   // AC (preenchida pelo analisador)
   'Diff Horas / Antes',             // AD (manual — não escrever)
   'Diff Saving / Antes',            // AE (manual — não escrever)
-  'Memorial anterior',              // AF (manual — não escrever)
+  'Memorial anterior',              // AF (escrita pelo sistema só na edição)
   'Observações',                    // AG (preenchida pelo analisador)
   'Contexto do Projeto Especial',   // AH
   'Especial?',                      // AI

@@ -11,11 +11,13 @@
 // são minúsculos; legados na planilha às vezes em MAIÚSCULAS).
 
 import { readAllRows, type SheetColumn, type SheetRow } from './sheets';
+import { toIsoOrNull } from '@/lib/format-date';
 import {
   getAllProjetoIds,
   getProjetoById,
   insertProjetoRaw,
   updateProjeto,
+  parseJson,
   type ProjetoRow,
 } from '@/integrations/db/client.server';
 
@@ -103,7 +105,9 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
   const membros = parseMembros(row['Participantes']);
   const status = statusFromLabel(row['Status']);
   const dataCriacao = txt(row['Data Criação']);
-  const submittedAt = txt(row['Data Submissão']);
+  // "Data Submissão" vem em pt-BR (dd/mm/yyyy) da planilha — normaliza para ISO
+  // para o frontend formatar certo (senão `new Date()` → "Enviado em Invalid date").
+  const submittedAt = toIsoOrNull(row['Data Submissão']);
 
   await insertProjetoRaw({
     id,
@@ -135,6 +139,8 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     custo_evitado_justificativa: txt(row['Justificativa Custo Evitado']),
     submitted_at: submittedAt,
     validated_at: status === 'aprovado' ? submittedAt : null,
+    // Espelha "Atualizado Em": vazio nos legados → fica null → projeto pendente.
+    atualizado_em: txt(row['Atualizado Em']),
   });
 }
 
@@ -142,15 +148,19 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
 //
 // `status` é DELIBERADAMENTE excluído: durante a validação, a planilha grava
 // sempre "Pendente" (regra TEMPORÁRIA) — sincronizar de volta rebaixaria o
-// status interno correto. responsavel_*/membros também ficam de fora (ownership
-// não deve ser sobrescrito por edição de planilha). Célula vazia nunca apaga
-// dado existente.
+// status interno correto.
+// OWNERSHIP (responsavel_email/nome + membros) AGORA SINCRONIZA do Sheets (fonte da
+// verdade): editar Email/Participantes na planilha reatribui dono/participantes no
+// GoDocs. `membros` (Participantes) é tratado fora desta tabela (precisa de parse de
+// lista). Célula vazia nunca apaga dado existente.
 const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   col: SheetColumn;
   field: keyof ProjetoRow;
   kind: 'text' | 'num';
 }> = [
   { col: 'Projeto', field: 'nome', kind: 'text' },
+  { col: 'Email', field: 'responsavel_email', kind: 'text' },
+  { col: 'Nome Completo', field: 'responsavel_nome', kind: 'text' },
   { col: 'Área', field: 'area', kind: 'text' },
   { col: 'Descrição', field: 'descricao_breve', kind: 'text' },
   { col: 'Ferramenta', field: 'ferramenta', kind: 'text' },
@@ -168,6 +178,8 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   // SQLite — não é sincronizado de volta para não gravar número no campo flag.
   { col: 'Justificativa Custo Evitado', field: 'custo_evitado_justificativa', kind: 'text' },
   { col: 'Contexto do Projeto Especial', field: 'contexto_especial', kind: 'text' },
+  // Mantém o espelho do "Atualizado Em" fresco no SQLite (alimenta o selo de pendentes).
+  { col: 'Atualizado Em', field: 'atualizado_em', kind: 'text' },
 ];
 
 async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
@@ -188,6 +200,17 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
       if (curVal != null && String(curVal).trim() === String(newVal).trim()) continue;
     }
     updates[field as string] = newVal;
+  }
+
+  // Participantes → membros (lista de e-mails → array; updateProjeto serializa em JSON).
+  // Mesma regra "vazio não apaga": Participantes vazio mantém os membros atuais.
+  const membrosSheet = parseMembros(row['Participantes']);
+  if (membrosSheet.length > 0) {
+    const membrosAtuais = parseJson<string[]>(current.membros) ?? [];
+    const mesmaLista =
+      membrosSheet.length === membrosAtuais.length &&
+      membrosSheet.every((m) => membrosAtuais.some((c) => c.toLowerCase() === m.toLowerCase()));
+    if (!mesmaLista) updates['membros'] = membrosSheet;
   }
 
   if (Object.keys(updates).length === 0) return false;

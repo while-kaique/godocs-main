@@ -56,7 +56,7 @@ export const CRITERIOS_HARDCODED = [
     id: 'saving_coerente',
     nome: 'Memorial de cálculo com lógica sólida',
     descricao:
-      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente. REGRA DE REPROVAÇÃO AUTOMÁTICA (0 pontos): (1) se economia_horas_mes = 0 ou saving_reais = 0 quando há saving marcado; (2) se valor de receita incremental = 0 quando marcou receita; (3) CLASSIFICAÇÃO ERRADA: se o memorial de RECEITA INCREMENTAL descreve economia operacional (horas economizadas, custo/hora, minutos por tarefa, custo laboral reduzido) — isso é saving disfarçado de receita, configurando incoerência de classificação que deve ser apontada.',
+      'O memorial de saving/receita apresenta uma lógica de cálculo coerente: as horas antes/depois são justificadas com detalhamento da rotina manual, os valores são compatíveis com a complexidade descrita no projeto, e não há extrapolação evidente. REGRA DE REPROVAÇÃO AUTOMÁTICA (0 pontos): (1) se economia_horas_mes = 0 ou saving_reais = 0 quando há saving marcado; (2) se valor de receita incremental = 0 quando marcou receita; (3) CLASSIFICAÇÃO ERRADA: se o memorial de RECEITA INCREMENTAL descreve economia operacional (horas economizadas, custo/hora, minutos por tarefa, custo laboral reduzido) — isso é saving disfarçado de receita, configurando incoerência de classificação que deve ser apontada. RECONCILIAÇÃO FINANCEIRA (NÃO é divergência): economia_reais_mes é o valor LÍQUIDO = (R$ das horas, soma das linhas) + custo_evitado_reais − custo_externo_mensal. Portanto é NORMAL e ESPERADO que economia_reais_mes seja diferente da soma das linhas quando há custo_evitado_reais > 0 ou custo_externo_mensal > 0. NUNCA aponte essa diferença como "total consolidado divergente da soma por linha" ou inconsistência do memorial — ela é exatamente o custo evitado somado / custo externo subtraído.',
   },
   {
     id: 'ferramenta_compativel',
@@ -293,7 +293,13 @@ function buildUserMessage(
     dados.memorial_saving = {
       linhas: saving.linhas ?? [],
       economia_horas_mes: saving.economia_horas_mes ?? 0,
+      // economia_reais_mes é o LÍQUIDO = R$ das horas (soma das linhas) + custo_evitado_reais
+      // − custo_externo_mensal. Enviamos as parcelas para o analisador reconciliar e NÃO
+      // confundir a diferença (horas × líquido) com uma inconsistência do memorial.
       economia_reais_mes: saving.economia_reais_mes ?? 0,
+      custo_evitado_reais: saving.custo_evitado_reais ?? 0,
+      custo_evitado_tipo: saving.custo_evitado_tipo ?? null,
+      custo_externo_mensal: saving.custo_externo_mensal ?? 0,
       tipo_saving: saving.tipo_saving ?? null,
       memorial_calculo: saving.memorial_calculo ?? '(sem memorial)',
     };

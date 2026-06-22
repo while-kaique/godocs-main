@@ -19,6 +19,7 @@ import {
   upsertDocumentacao,
   getDocumentacao,
   getProjetoById,
+  getProjetosSubmetidos,
   findDuplicateProjeto,
   updateProjeto,
   deleteChatMessagesByProjeto,
@@ -39,6 +40,7 @@ import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
 import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
 import { stripMarkdown } from '@/lib/strip-markdown';
 import { deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
+import { isAdmin } from '@/lib/auth.functions';
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -51,8 +53,9 @@ import type {
   SavingLinha,
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
-import { recomputarSavingFinanceiro, enriquecerMemorial } from '@/lib/agents/saving-calc';
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
+import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
 import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
 
@@ -635,6 +638,38 @@ export async function iniciarSubmissao(rawData: unknown) {
   };
 }
 
+// ─── Guarda de observabilidade: memorial (texto) × linhas (gravado) ──────────
+// O backend GRAVA o saving a partir das `linhas` (recomputarSavingFinanceiro). Se
+// o LLM ajustar o TEXTO do memorial mas esquecer de atualizar as linhas (ex: "é
+// por loja × 3" só na prosa), o usuário vê um total e o sistema grava outro. Esta
+// guarda NÃO bloqueia: loga e DEVOLVE a divergência (quando há) para o chamador
+// decidir o que fazer com ela — na submissão vira um card de alerta no Investigador.
+// Compara o gravado contra o MAIOR "Economia total: X h" declarado no texto (o
+// headline), então pega o caso "270h no texto, 90h gravado". Devolve null se bate
+// ou se não há número legível no texto.
+function avisarDivergenciaMemorialLinhas(
+  saving: SavingColetado | undefined,
+  projetoId: string,
+): { totalTexto: number; totalGravado: number } | null {
+  const memorial = saving?.memorial_calculo ?? '';
+  if (!memorial) return null;
+  const totalGravado = saving?.economia_horas_mes ?? 0;
+  // Captura todos os "Economia total ...: X h" declarados no texto.
+  const declarados = [...memorial.matchAll(/economia\s+total[^\n:]*:\s*([\d.,]+)\s*h/gi)]
+    .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')))
+    .filter((n) => Number.isFinite(n));
+  if (declarados.length === 0) return null; // sem número legível — não dá p/ conferir
+  const totalTexto = Math.max(...declarados); // headline declarado no memorial
+  const tolerancia = Math.max(0.5, totalTexto * 0.02);
+  if (Math.abs(totalTexto - totalGravado) <= tolerancia) return null;
+  console.warn(
+    `[saving-guard] ⚠ Divergência memorial×linhas no projeto ${projetoId}: ` +
+    `memorial declara ${totalTexto}h, mas o gravado (linhas) é ${totalGravado}h. ` +
+    `Provável dessincronia do LLM (texto ≠ estruturado).`,
+  );
+  return { totalTexto, totalGravado };
+}
+
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
@@ -777,6 +812,7 @@ export async function enviarMensagem(rawData: unknown) {
         // recalcular o valor) — ver recomputarSavingFinanceiro.
         const projetoCompleto = await getProjetoById(data.projeto_id);
         doc.saving = recomputarSavingFinanceiro(resultado.saving, projetoCompleto?.custo_externo_mensal ?? 0);
+        avisarDivergenciaMemorialLinhas(doc.saving as SavingColetado, data.projeto_id);
       }
       if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
       await upsertDocumentacao(data.projeto_id, doc);
@@ -845,6 +881,10 @@ export async function iniciarSaving(rawData: unknown) {
     custo_evitado: data.tem_custo_evitado ?? null,
     custo_evitado_justificativa: custoEvitadoDescricao || null,
     custo_evitado_itens: JSON.stringify(itensEvitado),
+    // Persiste o custo externo (custo INCORRIDO pela automação) no projeto. Sem
+    // isto o valor só vivia em memória e se perdia: o submit relê
+    // projeto.custo_externo_mensal (null → 0) e não abatia do Saving Reais.
+    custo_externo_mensal: data.custo_externo_mensal ?? 0,
   });
 
   const ctx = await getProjetoContexto(data.projeto_id);
@@ -852,6 +892,9 @@ export async function iniciarSaving(rawData: unknown) {
 
   let saving = savingVazio();
   saving.tipo_saving = data.tipo_saving;
+  // Custo externo (custo INCORRIDO pela automação) viaja no próprio objeto saving —
+  // enriquecerMemorial lê daqui para mostrar o valor e abater na líquida do memorial.
+  saving.custo_externo_mensal = data.custo_externo_mensal ?? 0;
   // Custo evitado já mensalizado entra cheio no recálculo (não divide de novo).
   saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
   saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
@@ -1100,17 +1143,17 @@ export async function atualizarMetadados(rawData: unknown) {
     return { ok: true, reset: false };
   }
 
-  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. Com novos arquivos, re-extrai
-  // o texto; com reset_doc sem upload, reusa o texto já extraído (mensagem role=doc).
+  // 3. Arquivos mudaram (ou reset_doc) → REINICIA a doc. ⚠️ NÃO-DESTRUTIVO: fazemos
+  // TODO o trabalho que pode falhar/demorar (extração + LLM) ANTES de tocar no chat/doc
+  // existentes. Só no fim, com a nova doc pronta, fazemos a troca. Assim, se a requisição
+  // for cancelada (cliente saiu/timeout) ou o LLM falhar, o chat/doc ANTIGOS ficam
+  // intactos — antes apagávamos primeiro, então um cancelamento deixava o projeto SEM
+  // documentação e o submit seguinte quebrava com "Documentação ainda não foi gerada".
   let docTexto = '';
   if (temDocs) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
       log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
-      // Só os nomes — o link do Drive (resumo da doc) é gerado em submeterParaValidacao.
-      await updateProjeto(data.projeto_id, {
-        arquivos_nomes: data.docs!.map((d) => d.filename),
-      });
     } catch (extractErr) {
       err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
       docTexto = '';
@@ -1120,15 +1163,6 @@ export async function atualizarMetadados(rawData: unknown) {
     docTexto = docMsg?.content ?? '';
     log('atualizarMetadados', `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
   }
-
-  // Limpa a conversa inteira (doc + impacto) — recomeçamos do zero.
-  await deleteChatMessagesByProjeto(data.projeto_id);
-
-  await insertChatMessage({
-    projeto_id: data.projeto_id,
-    role: 'doc',
-    content: docTexto || '(documento sem texto legível)',
-  });
 
   const ctx = await getProjetoContexto(data.projeto_id);
 
@@ -1145,14 +1179,30 @@ export async function atualizarMetadados(rawData: unknown) {
     }
   }
 
+  // Última operação que pode lançar. Se chegou aqui, a nova doc está pronta.
   const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
 
+  // ── TROCA (só agora) — apaga o antigo e grava o novo. Sequência curta de ops de
+  // banco, sem trabalho de rede no meio que possa ser cancelado deixando estado parcial.
+  await deleteChatMessagesByProjeto(data.projeto_id);
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: 'doc',
+    content: docTexto || '(documento sem texto legível)',
+  });
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: 'assistant',
     content: JSON.stringify(resultado),
     options: resultado.type === 'options' ? resultado.options : null,
   });
+  // Nomes dos arquivos atualizados só após o sucesso da regeneração (o link do Drive
+  // é gerado depois, em submeterParaValidacao).
+  if (temDocs) {
+    await updateProjeto(data.projeto_id, {
+      arquivos_nomes: data.docs!.map((d) => d.filename),
+    });
+  }
 
   log('atualizarMetadados', `Documentação reiniciada — fase: ${resultado.fase}`);
   return { ok: true, reset: true, response: formatResponse(resultado) };
@@ -1236,21 +1286,80 @@ export async function analisarProjetoFn(rawData: unknown) {
       ? 'Pendente' // especial → sempre validação humana
       : resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
 
-    runBackground(syncUpdateToGoogle({
+    // AGUARDADO (não fire-and-forget): assim o sync da Complexidade/Observações faz
+    // parte da promise da análise. Evita o FAF aninhado que o runtime cancelava,
+    // deixando a coluna "Complexidade" vazia de forma intermitente. O cron de
+    // reconciliação (reconciliarComplexidade) é a rede de segurança para os casos em
+    // que a própria análise é cancelada antes de concluir.
+    await syncUpdateToGoogle({
       projetoId: projeto_id,
       projectName: projeto?.nome ?? '',
       complexidade: resultado.complexidade,
       observacoes: observacoes ?? '',
       status: statusLabel,
-    }));
+    });
   }
 
   return resultado;
 }
 
+// ─── Reconciliação de Complexidade/Observações (rede de segurança) ───────────
+//
+// A análise roda em background (waitUntil) após o submit e ocasionalmente é
+// CANCELADA pelo runtime antes de gravar a Complexidade na planilha — daí a coluna
+// ficar vazia "às vezes". Esta função (chamada por um cron) varre a planilha,
+// acha projetos SUBMETIDOS com "Complexidade" vazia e conserta:
+//  - se o SQLite já tem complexidade (só faltou o sync) → repõe na planilha SEM
+//    notificar o Google Chat (update direto, evita spam);
+//  - se o SQLite também não tem → re-roda o analisador (que analisa + sincroniza).
+// Idempotente: rodar repetidamente é seguro. Legados sem `submitted_at` são pulados.
+export async function reconciliarComplexidade(maxReanalises = 15) {
+  // Mapa id→Complexidade da planilha (1 leitura). Só os SUBMETIDOS no SQLite são
+  // candidatos (evita varrer ~270 legados sem submissão).
+  const rows = await readAllRows();
+  const compNaPlanilha = new Map<string, string>();
+  for (const r of rows) {
+    const id = (r['ID Projeto'] ?? '').toString().trim().toLowerCase();
+    if (id) compNaPlanilha.set(id, (r['Complexidade'] ?? '').toString().trim());
+  }
+
+  const submetidos = await getProjetosSubmetidos();
+  let ressincronizados = 0;
+  let reanalisados = 0;
+  let faltando = 0;
+
+  for (const p of submetidos) {
+    const comp = compNaPlanilha.get(String(p.id).trim().toLowerCase());
+    // Pula quem já tem complexidade não-vazia na planilha (ou nem está nela).
+    if (comp === undefined || (comp !== '' && comp !== '—')) continue;
+    faltando++;
+
+    const compSqlite = (p.complexidade ?? '').toString().trim();
+    try {
+      if (compSqlite) {
+        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat).
+        await updateRowByProjectId(p.id, {
+          'Complexidade': p.complexidade as string,
+          'Observações': (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : '—',
+        });
+        ressincronizados++;
+      } else if (reanalisados < maxReanalises) {
+        // Análise nunca concluiu: re-roda (analisa + sincroniza, aguardado).
+        await analisarProjetoFn({ projeto_id: p.id });
+        reanalisados++;
+      }
+    } catch (e) {
+      err('reconciliarComplexidade', `Falha ao reconciliar ${p.id}:`, e);
+    }
+  }
+
+  log('reconciliarComplexidade', `faltando=${faltando} ressincronizados=${ressincronizados} reanalisados=${reanalisados}`);
+  return { submetidos: submetidos.length, faltando, ressincronizados, reanalisados };
+}
+
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
-export async function submeterParaValidacao(rawData: unknown) {
+export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log('submeterParaValidacao', `projeto=${projeto_id}`);
 
@@ -1268,10 +1377,23 @@ export async function submeterParaValidacao(rawData: unknown) {
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
   // por uma versão anterior ou por um turno que não passou pelo recálculo.
   if (conteudo.saving && typeof conteudo.saving === 'object') {
+    // Re-deriva o custo evitado dos ITENS persistidos (fonte da verdade), em vez
+    // de confiar no custo_evitado_reais que vinha do estado volátil do chat (o LLM
+    // podia zerá-lo em fluxos longos — sumia o custo evitado pontual da planilha).
+    const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
+    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
     );
+    // Divergência memorial×gravado na submissão → card de alerta no Investigador.
+    const div = avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
+    if (div) {
+      await gravarEvento(projeto_id, 'divergencia_memorial', 'saving', {
+        total_texto: div.totalTexto,
+        total_gravado: div.totalGravado,
+      });
+    }
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
@@ -1313,6 +1435,25 @@ export async function submeterParaValidacao(rawData: unknown) {
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+
+  // Gate de OWNERSHIP na edição: só o autor (responsavel_email) ou um admin RPA podem
+  // reenviar um projeto já existente. Participantes (membros) só visualizam — não editam.
+  // Vale só p/ reenvio; submissão nova não tem owner anterior a proteger. Se o email do
+  // solicitante não veio (chamadas internas/cron), não bloqueia.
+  if (ehReenvio && solicitanteEmail) {
+    const alvo = solicitanteEmail.trim().toLowerCase();
+    const ehOwner = (projeto.responsavel_email ?? '').trim().toLowerCase() === alvo;
+    const ehAdmin = await isAdmin(solicitanteEmail);
+    // Ser participante (membro) vence o override de admin: quem participa só visualiza,
+    // mesmo sendo admin. O override de admin vale só p/ projetos sem papel do solicitante.
+    const ehParticipante = !ehOwner && (parseJson<string[]>(projeto.membros) ?? []).some((m) => m.trim().toLowerCase() === alvo);
+    if (!ehOwner && (!ehAdmin || ehParticipante)) {
+      throw Object.assign(
+        new Error('Apenas o autor do projeto pode editá-lo. Para transferir a autoria, acione a equipe RPA.'),
+        { status: 403 },
+      );
+    }
+  }
 
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
@@ -1369,6 +1510,13 @@ export async function submeterParaValidacao(rawData: unknown) {
   const memorialInterno = stripMarkdown(
     enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto)
   );
+  // Coluna "Memorial de Saving" (V) recebe SÓ o memorial de saving (com R$). O memorial de
+  // receita vai SOMENTE para "Receita Memorial" (Z); em projeto só-receita, V fica "—".
+  // (memorial_calculo no banco segue sendo o unificado — usado em "Memorial anterior"/auditoria.)
+  const memorialSavingLimpo =
+    tiposProjeto.includes('saving') && saving
+      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+      : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
 
   await updateProjeto(projeto_id, {
@@ -1380,6 +1528,10 @@ export async function submeterParaValidacao(rawData: unknown) {
     // submitted_at = data da PRIMEIRA submissão. No reenvio (edição) NÃO atualiza —
     // preserva "quando a pessoa submeteu" (só validated_*/Atualizado Em refletem a edição).
     ...(ehReenvio ? {} : { submitted_at: now }),
+    // A submissão SEMPRE escreve "Atualizado Em" no Sheets (IDA) → marca no SQLite na
+    // hora p/ o projeto deixar de contar como pendente (selo da home) sem esperar o
+    // sync reverso. O reverse sync depois reconcilia com o carimbo formatado da planilha.
+    atualizado_em: now,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
@@ -1493,7 +1645,7 @@ export async function submeterParaValidacao(rawData: unknown) {
       // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
       status: 'Pendente',
       area: areaFinal ?? '—',
-      memorialLimpo: memorialInterno ?? '—',
+      memorialLimpo: memorialSavingLimpo ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
       ganhoTotalMensal,
       // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
@@ -1541,12 +1693,16 @@ export async function resyncGoogle(rawData: unknown) {
   const projeto = await getProjetoById(projeto_id);
   if (!projeto) throw new Error('Projeto não encontrado.');
 
-  // Re-deriva R$ das horas (mesma rede de segurança do submit).
+  // Re-deriva R$ das horas (mesma rede de segurança do submit), incluindo o custo
+  // evitado a partir dos itens persistidos.
   if (conteudo.saving && typeof conteudo.saving === 'object') {
+    const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
+    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
     );
+    avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
   const receita = conteudo.receita as Record<string, unknown> | undefined;
@@ -1561,9 +1717,11 @@ export async function resyncGoogle(rawData: unknown) {
   const ganhoTotalMensal = savingMensal + receitaMensal / 10;
 
   const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
-  const memorialInterno = stripMarkdown(
-    enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto),
-  );
+  // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Receita Memorial").
+  const memorialSavingLimpo =
+    tiposProjeto.includes('saving') && saving
+      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+      : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
   const membros = parseJson<string[]>(projeto.membros) ?? [];
 
@@ -1579,7 +1737,7 @@ export async function resyncGoogle(rawData: unknown) {
     tiposProjeto,
     status: 'Pendente',
     area: projeto.area ?? '—',
-    memorialLimpo: memorialInterno ?? '—',
+    memorialLimpo: memorialSavingLimpo ?? '—',
     receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
     ganhoTotalMensal,
   });
