@@ -5,7 +5,7 @@
  * O restante cai para os assets estáticos (a SPA React).
  */
 
-import { getCurrentUser } from '@/lib/auth.functions'
+import { getCurrentUser, isAdmin } from '@/lib/auth.functions'
 import {
   iniciarSubmissao,
   enviarMensagem,
@@ -43,7 +43,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { getAdminByEmail, setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
@@ -79,8 +79,7 @@ function getEmailFromRequest(request: Request): string | null {
 async function requireAdmin(request: Request): Promise<{ email: string }> {
   const email = getEmailFromRequest(request)
   if (!email) throw Object.assign(new Error('Não autorizado'), { status: 401 })
-  const admin = await getAdminByEmail(email)
-  if (!admin) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
+  if (!(await isAdmin(email))) throw Object.assign(new Error('Acesso negado. Apenas administradores.'), { status: 403 })
   return { email }
 }
 

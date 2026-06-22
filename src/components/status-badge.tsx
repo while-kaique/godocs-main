@@ -24,6 +24,23 @@ const STATUS_CONFIG: Record<
     color: "var(--go-blue)",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  // Rótulos espelhados da coluna "Status" do Sheets (Meus Projetos usa o valor do
+  // Sheets normalizado em minúsculas). "Pendente" é o status gravado hoje na planilha
+  // pela regra TEMPORÁRIA, então é o que mais aparece.
+  pendente: {
+    label: "Pendente",
+    bg: "rgba(0,89,169,0.06)",
+    border: "rgba(0,89,169,0.15)",
+    color: "var(--go-blue)",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
+  "reenvio pendente": {
+    label: "Reenvio Pendente",
+    bg: "rgba(215,219,0,0.08)",
+    border: "rgba(215,219,0,0.25)",
+    color: "#8a7d00",
+    icon: <RotateCcw className="h-3.5 w-3.5" />,
+  },
   aprovado: {
     label: "Aprovado",
     bg: "rgba(34,197,94,0.06)",

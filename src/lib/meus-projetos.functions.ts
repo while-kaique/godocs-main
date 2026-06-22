@@ -6,13 +6,13 @@ import {
   getProjetoWithRelations,
   getProjetoById,
   getLatestVersionByProjeto,
-  getAdminByEmail,
   getChatMessages,
   excluirProjetoCascade,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
+import { isAdmin } from '@/lib/auth.functions';
 
 export type MeuProjetoItem = {
   id: string;
@@ -134,12 +134,18 @@ function mapItem(
   p: ProjetoRow & { area_nome: string | null },
   atualizadoEm: string | null,
   papel: Papel,
+  statusSheet?: string | null,
 ): MeuProjetoItem {
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
     id: p.id,
     nome: p.nome,
-    status: p.status,
+    // O status reflete a coluna "Status" do Sheets (fonte da verdade), normalizado
+    // para a chave do StatusBadge (ex.: "Pendente" → "pendente"). Rascunhos e
+    // projetos ausentes na planilha (ou leitura do Sheets falhou) caem no status
+    // interno do SQLite. ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA),
+    // então projetos submetidos aparecem como "Pendente" até a regra ser encerrada.
+    status: statusSheet && statusSheet.trim() ? statusSheet.trim().toLowerCase() : p.status,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
@@ -150,9 +156,10 @@ function mapItem(
     arquivos_nomes: parseJson<string[]>(p.arquivos_nomes) ?? [],
     atualizado_em: at,
     // Pendente = LEGADO (id "LEGADO-…") e sem "Atualizado Em" no Sheets → precisa ser
-    // editado/reenviado para regularizar. Só o OWNER pode regularizar, então um
-    // participante nunca vê o projeto como pendente (não adianta cobrá-lo).
-    pendente: papel === 'owner' && ehLegado(p.id) && !at,
+    // editado/reenviado para regularizar. Owner E participante veem a pendência (a
+    // mensagem na UI difere por papel: só o owner pode regularizar). O selo da home
+    // (contarPendentes) segue contando só os do owner — é a lista de ações dele.
+    pendente: ehLegado(p.id) && !at,
     papel,
     responsavel_nome: p.responsavel_nome ?? null,
     responsavel_email: p.responsavel_email ?? null,
@@ -165,19 +172,23 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
   // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
   const atualizadoMap = new Map<string, string>();
+  const statusMap = new Map<string, string>();
   try {
     const { rows } = await syncOwnerRowsFromSheet(email);
     for (const r of rows) {
       const id = (r['ID Projeto'] ?? '').trim().toLowerCase();
-      if (id) atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+      if (id) {
+        atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+        statusMap.set(id, (r['Status'] ?? '').trim());
+      }
     }
   } catch (e) {
     console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
   }
   const rows = await getProjetosByOwnerEmail(email);
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
-  // "Atualizado Em": usa o valor recém-lido da planilha; se a leitura falhou (mapa
-  // vazio), cai no espelho persistido no SQLite — nunca marca tudo como pendente.
+  // "Atualizado Em"/"Status": usam o valor recém-lido da planilha (Sheets é a fonte da
+  // verdade); se a leitura falhou (mapa vazio), caem no espelho/valor do SQLite.
   return rows
     .filter((p) => temAcesso(p, email))
     .map((p) =>
@@ -185,6 +196,7 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
         p,
         atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null,
         ehOwner(p, email) ? 'owner' : 'participante',
+        statusMap.get(p.id.toLowerCase()) ?? null,
       ),
     );
 }
@@ -232,12 +244,15 @@ export async function getMeuProjeto(
   }
   // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
   // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
-  const ehAdmin = !!(await getAdminByEmail(email));
+  const ehAdmin = await isAdmin(email);
   if (!temAcesso(data, email) && !ehAdmin) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
-  // EDIÇÃO: só o owner (quem submeteu) ou um admin RPA. Participante só visualiza.
-  const podeEditar = ehOwner(data, email) || ehAdmin;
+  // EDIÇÃO: só o owner (quem submeteu) ou um admin RPA. Participante só visualiza —
+  // e ser participante VENCE o override de admin: um admin que também é participante
+  // do projeto NÃO edita (vê como qualquer participante). O override de admin vale só
+  // para projetos em que ele não tem papel (não é owner nem participante).
+  const podeEditar = ehOwner(data, email) || (ehAdmin && !ehParticipante(data, email));
   const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
 
   const docRow = data.documentacao?.[0];
@@ -295,7 +310,7 @@ export async function getHistoricoMeuProjeto(
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
   }
-  if (!temAcesso(data, email) && !(await getAdminByEmail(email))) {
+  if (!temAcesso(data, email) && !(await isAdmin(email))) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   const msgs = await getChatMessages(id);
