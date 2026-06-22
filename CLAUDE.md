@@ -43,6 +43,7 @@ npm run lint / format  # eslint / prettier
    echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
    ```
    Se a lista de assets não bater com o `index.html`, o site fica em tela branca (o HTML referencia `.js`/`.css` que não existem no servidor).
+10. **`git pull` antes de abrir PR** — sempre que o usuário pedir para abrir um PR, fazer `git fetch origin` + incorporar o `origin/main` na branch (merge/rebase) **antes** de subir, e rebuildar o `worker.js`/`dist` após o merge. Motivo: várias sessões mexem no repo ao mesmo tempo (regra 8) e o `main` costuma andar — abrir PR sem sincronizar gera conflito/PR desatualizado.
 
 ## Deploy rápido (Godeploy)
 
@@ -91,9 +92,13 @@ echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basena
 
 O memorial de cálculo segue uma estrutura fixa com pontos obrigatórios. A IA insiste até ter resposta para cada ponto — nunca pula.
 
-**Saving (Seções 1-5):** Contexto → Saving de Pessoas (por cargo: rotina, frequência, cálculo, antes/depois) → Contratos/Serviços Evitados → Custo da Automação → Resumo
+**Saving (Seções 1-5):** Contexto → Saving de Pessoas (por cargo: rotina, frequência, cálculo, **composição das horas**, antes/depois) → Contratos/Serviços Evitados → Custo da Automação → Resumo
+
+**Composição das horas (obrigatória no ponto 2.2):** o total de horas de cada cargo NÃO pode ficar como número solto — o agente coleta e registra no memorial a **quebra do total por atividade**, cada uma com sua parcela de horas, somando exatamente o total (ex.: "160h que compõem: at-x 4h, at-y 10h, at-z 146h"). É **gate antes do preview** (proibido gerar preview com o total de um cargo sem a quebra das atividades) e vale também no caso contrafactual/"ninguém fazia" (quebra do equivalente manual estimado). Regra no `buildSavingPrompt` (`orchestrator.ts`).
 
 **Receita (Seção 6):** O que gera → Como aumenta → Antes vs. depois → Base de cálculo → Valor → Tipo
+
+**Títulos legíveis (não códigos `[x.x]`):** as numerações `[1.1]`/`[2.2]`/`[6.1]`… são o **checklist interno** do orquestrador — NÃO devem aparecer no texto do memorial (ninguém que lê a aprovação sabe o que `[2.2]` significa). Os prompts de preview (saving/receita) instruem o LLM a usar **título legível** por ponto: cabeçalho `### ...` por seção + rótulo em negrito (`**O que fazia:**`, `**Serviço evitado:**`) nos itens. Rede de segurança determinística (cobre legados e escorregões do LLM): `normalizarMarcadoresMemorial()` em `src/lib/agents/memorial-format.ts` (mapa `TITULOS_MEMORIAL`) troca qualquer `[x.y]`/intervalo `[x.y-x.z]` residual pelo título — idempotente, aplicada no `enriquecerMemorial` (planilha), na tela read-only (`projeto.$id.tsx`, que renderiza via `SimpleMarkdown`) e no preview do chat (`cleanPreviewContent`).
 
 **Memorial duplo (opção B):** o LLM gera memorial SEM R$ (visível ao usuário). O backend injeta valores financeiros via `enriquecerMemorial()` em `saving-calc.ts` — a versão com R$ vai para `projetos.memorial_calculo` (planilha). R$ nunca toca o LLM.
 

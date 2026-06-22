@@ -359,8 +359,10 @@ Pergunta:
 Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"receita":{...campos atualizados}}
 
+TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [6.1], [6.2] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê depois sabe o que "[6.2]" significa. Cada ponto vira um TÍTULO legível (o cabeçalho "### ..." de cada seção já é o título; não prefixe o conteúdo com código nenhum).
+
 Preview (SOMENTE quando TODOS os pontos 6.1-6.5 estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n[6.1] ...\\n\\n### Como o projeto aumenta a receita\\n[6.2] ...\\n\\n### Comparação antes vs. depois\\n[6.3] Antes: ... → Depois: ...\\n\\n### Base de cálculo\\n[6.4] ...\\n\\n### Resumo\\n- Ganho: R$ X${unidadeReceita}\\n- Tipo: ${receita.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n...\\n\\n### Como o projeto aumenta a receita\\n...\\n\\n### Comparação antes vs. depois\\nAntes: ... → Depois: ...\\n\\n### Base de cálculo\\n...\\n\\n### Resumo\\n- Ganho: R$ X${unidadeReceita}\\n- Tipo: ${receita.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "receita" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "receita.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
 }
@@ -408,7 +410,7 @@ O usuário pode:
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado). Se o usuário tentar aprovar nessas condições, responda com type:"question".
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (O que gera a receita, Como aumenta, Comparação antes vs. depois, Base de cálculo, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (O que gera a receita, Como aumenta, Comparação antes vs. depois, Base de cálculo, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [6.1]/[6.2] no texto: cada seção já tem seu título no cabeçalho "### ...".
 
 FORMATO — APENAS JSON válido:
 
@@ -466,7 +468,7 @@ DETALHES TÉCNICOS APROVADOS:
   // a partir das horas reais. Vence as regras genéricas de "detalhar a rotina".
   const comoAbrir = ninguemFazia
     ? `O usuário JÁ informou no formulário que NINGUÉM fazia esta tarefa manualmente antes. As horas na tabela ("horas antes") NÃO são uma rotina que existia — são uma ESTIMATIVA do trabalho manual EQUIVALENTE: se alguém tivesse que fazer à mão, quanto tempo levaria (e qual cargo seria responsável). É TERMINANTEMENTE PROIBIDO pedir "o que a pessoa fazia", "o passo a passo da rotina", "com que frequência você fazia" ou tratar isso como uma rotina real — ela NUNCA existiu, e essa pergunta contradiz o que o usuário já informou.
-   Em vez disso, sua missão é VALIDAR a estimativa: confirme a BASE do cálculo (volume × tempo por item) e cruze com o fluxo técnico para ver se é realista; se destoar (parecer inflada ou irreal para a tarefa), aponte a discrepância e ajuste o número com o usuário. Essas horas SÃO economia legítima (saving contrafactual — o trabalho manual que a automação evita). No memorial (ponto 2.2), descreva a tarefa e registre que é um EQUIVALENTE MANUAL ESTIMADO, com a base da estimativa (ex.: "X itens/mês × Y min cada"). As "horas depois" são 0 (a automação faz tudo) — NÃO pergunte sobre monitoramento/supervisão a menos que o próprio usuário levante.`
+   Em vez disso, sua missão é VALIDAR a estimativa: confirme a BASE do cálculo (volume × tempo por item) e cruze com o fluxo técnico para ver se é realista; se destoar (parecer inflada ou irreal para a tarefa), aponte a discrepância e ajuste o número com o usuário. Essas horas SÃO economia legítima (saving contrafactual — o trabalho manual que a automação evita). No memorial (ponto 2.2), descreva a tarefa e registre que é um EQUIVALENTE MANUAL ESTIMADO, com a base da estimativa (ex.: "X itens/mês × Y min cada") E a COMPOSIÇÃO das horas — a quebra do total estimado por atividade, cada uma com sua parcela de horas, somando o total (ex.: "160h que compõem: at-x 4h, at-y 10h, ..."). As "horas depois" são 0 (a automação faz tudo) — NÃO pergunte sobre monitoramento/supervisão a menos que o próprio usuário levante.`
     : todasZeroTotal
     ? `Hoje ninguém gasta horas com esta tarefa (0h antes E 0h depois na tabela). NÃO peça "o que a pessoa fazia nessas 0h" — não havia rotina existente. MAS atenção: 0h antes NÃO significa "sem economia de horas". Há DOIS casos bem diferentes e você PRECISA descobrir qual é ANTES de concluir qualquer coisa:
    (1) ⭐ SAVING CONTRAFACTUAL (muito comum) — ninguém fazia porque era INVIÁVEL dedicar uma pessoa (volume alto, trabalho repetitivo/manual), MAS se a empresa NÃO automatizasse teria de colocar alguém (ex.: um estagiário) para fazer. AQUI HÁ economia de horas: são as horas que esse profissional GASTARIA se fizesse à mão. Abra investigando isso: "se essa tarefa não fosse automatizada, ela precisaria ser feita por alguém? Quem (qual cargo) e, na sua estimativa, quanto tempo levaria?" Conduza a estimativa (volume × tempo por item) e PREENCHA horas_antes com o resultado — é saving legítimo por horas.
@@ -512,6 +514,7 @@ Para CADA pessoa/cargo listada acima, colete:
   - O que fazia manualmente: descrição da rotina/tarefa → COLETE DO USUÁRIO
   - Frequência e tempo por execução: ${isPontual ? 'quantos itens/registros e quanto tempo por item' : 'quantas vezes por mês/dia/semana e quanto tempo cada execução'} → COLETE DO USUÁRIO
   - Cálculo de horas antes: frequência × tempo = total → MONTE VOCÊ com base na resposta
+  - ⭐ COMPOSIÇÃO DAS HORAS (OBRIGATÓRIO — não pule): o total de horas desse cargo NÃO pode ficar como um número solto. Detalhe QUAIS atividades compõem esse total, cada uma com a sua parcela de horas, e as parcelas TÊM que somar exatamente o total. Se o usuário só deu o número cheio (ex.: "${isPontual ? '160h' : '160h/mês'}"), PERGUNTE o que compõe essas horas até conseguir a quebra por atividade. Registre no memorial no formato "${isPontual ? '160h que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)' : '160h/mês que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)'}". → COLETE DO USUÁRIO e MONTE VOCÊ
   - Horas depois da automação: quanto tempo ainda gasta (já tem do formulário, mas valide)
   - Economia de horas: antes − depois → CALCULE VOCÊ
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
@@ -551,7 +554,7 @@ COMO CONDUZIR:
 1. Abra exatamente conforme a diretiva "COMO ABRIR A CONVERSA" acima. Faça a primeira pergunta concreta e coerente com as horas informadas.${plural ? '\n   Como há mais de uma pessoa, valide as horas POR CARGO. Agrupe numa pergunta só as linhas do MESMO cargo (ex.: 7× "analista sênior" → UMA pergunta para o grupo, não sete). Mas trate cargos DIFERENTES separadamente — NÃO assuma que cargos distintos fazem a mesma tarefa pelo mesmo tempo só porque o usuário descreveu o processo uma vez. ANTES de perguntar, questione-se sobre qual é a função plausível de CADA cargo neste projeto (um head/gestor costuma aprovar/supervisionar; um analista executa; um estagiário apoia) — cargos de senioridades diferentes raramente fazem a mesma coisa pelo mesmo tempo. Se a tabela mostra cargos distintos com rotina e tempo idênticos, isso é justamente o que você deve QUESTIONAR (ver "PLAUSIBILIDADE ENTRE CARGOS" abaixo), não agrupar como se fossem a mesma pessoa.' : ''}
 2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
-4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) e 3.1 estão preenchidos.
+4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 6. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
 
@@ -621,8 +624,10 @@ Pergunta:
 Opções:
 {"type":"options","question":"pergunta","options":["opção 1","opção 2","opção 3"],"saving":{...campos atualizados}}
 
+TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [1.1], [2.2], [3.1] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê a aprovação depois sabe o que "[2.2]" significa. Cada ponto vira um TÍTULO em negrito ("**O que fazia:**", "**Serviço evitado:**" …); use os cabeçalhos "### ..." para as seções e rótulos em negrito para os itens dentro delas, exatamente como no exemplo abaixo.
+
 Preview (SOMENTE quando TODOS os pontos obrigatórios estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n[1.1] e [1.2]\\n\\n### Saving de Pessoas\\n[2.1] N pessoas: ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Totais:** ...\\n\\n### Contratos/Serviços Evitados\\n[3.1-3.3 ou N/A]\\n\\n### Custo da Automação\\n[4.1-4.3 ou N/A]\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Composição: Xh que compõem: atividade-a (Ah), atividade-b (Bh), ... (soma = X)\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
 ATENÇÃO 2: se houver custo evitado, inclua "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula.
@@ -663,7 +668,7 @@ SINCRONIA OBRIGATÓRIA: o sistema grava as horas e o R\$ a partir do array \`lin
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
 
 FORMATO — APENAS JSON válido:
 
