@@ -43,7 +43,7 @@ describe('savingVazio', () => {
       'economia_horas_mes', 'economia_reais_mes',
       'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
       'custo_evitado_reais', 'custo_evitado_tipo', 'custo_evitado_descricao',
-      'custo_externo_mensal', 'confirmacao_220h',
+      'custo_externo_mensal', 'jornada_base',
     ];
     expect(Object.keys(saving)).toHaveLength(11);
     expect(saving.linhas).toEqual([]);
