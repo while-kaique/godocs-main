@@ -69,13 +69,14 @@ O usuário pode navegar livremente entre steps já completados sem perder o prog
 - **Foco**: coletar pontos obrigatórios do memorial padronizado na ordem fixa
 - **Estrutura fixa do memorial de saving:**
   - Seção 1 — Contexto: [1.1] Nome do projeto, [1.2] Resumo
-  - Seção 2 — Saving de Pessoas: [2.1] Lista de pessoas, [2.2] Por pessoa (rotina, frequência, cálculo, antes/depois, economia), [2.3] Totais
+  - Seção 2 — Saving de Pessoas: [2.1] Lista de pessoas, [2.2] Por pessoa (rotina, frequência, cálculo, antes/depois, economia), [2.3] Totais, [2.4] O que mudou após a automação (**só quando economia mensal ≥ 44h** — ver abaixo)
   - Seção 3 — Contratos/Serviços Evitados: [3.1] O que, [3.2] Valor, [3.3] Rateio (ou N/A)
   - Seção 4 — Custo da Automação: [4.1] Ferramenta, [4.2] Monitoramento, [4.3] Total (ou N/A)
   - Seção 5 — Resumo: [5.1] Economia bruta de horas, [5.2] Tipo
 - IA **insiste** até ter resposta para cada ponto. Se o usuário for raso, preenche com o que tem — mas nunca pula
 - **"Ninguém fazia" (`alguem_fazia = 'nao'`) → equivalente manual**: quando o usuário marca que ninguém fazia a tarefa manualmente, o formulário NÃO pergunta mais "quem dedica tempo à automação hoje". Em vez disso pergunta **"qual seria o equivalente em trabalho manual?"** — quantas horas/mês o trabalho levaria **se alguém tivesse que fazer à mão** e qual cargo. Esse valor é gravado em **`horas_antes`** (com `horas_depois = 0`) e é **saving contrafactual legítimo** (o trabalho que a automação evita). A IA é instruída (via `ctx.alguem_fazia` no prompt do orquestrador) a **validar a estimativa** (volume × tempo), **nunca** a pedir o passo a passo de uma rotina que nunca existiu.
 - **horas_antes = 0 ainda é válido** (legado/casos especiais): significa que ninguém fazia E o trabalho não exigiria mão de obra; o ganho vem de outro lugar (entrega nova / custo evitado)
+- **Gate de economia alta — "O que mudou após a automação" (ponto 2.4)**: quando o **saving mensal** total é **≥ 44h/mês** (uma jornada CLT semanal poupada por mês), ou algum **cargo individual** ≥ 44h/mês, o orquestrador injeta a Seção 2.4 obrigatória. Esse porte de ganho só é crível se algo mudou de fato na rotina (a empresa não paga horas ociosas), então a IA é obrigada a descobrir e **registrar no memorial final** o destino **concreto** do tempo/custo liberado: realocação de função, mais volume atendido com a mesma equipe, redução de equipe / vaga não reposta / desligamento, ou **serviço/contrato cancelado**. Respostas vagas ("ganhou produtividade", "sobra tempo") são recusadas e a IA pergunta quantas vezes precisar (total + por cargo). É **gate antes do preview** e tem rede de segurança na revisão (`buildSavingPreviewPrompt` não aprova sem a seção preenchida). **Saving pontual fica de fora** (trabalho único não altera jornada permanente). Limiar: `LIMITE_ECONOMIA_ALTA = 44` em `orchestrator.ts`.
 - Monta o memorial automaticamente — usuário nunca redige
 - **Memorial duplo**: o preview mostra o memorial SEM R$. O `projetos.memorial_calculo` (planilha) recebe a versão enriquecida com R$ via `enriquecerMemorial()` (backend injeta valor/hora × economia = R$)
 
