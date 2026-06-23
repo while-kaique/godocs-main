@@ -66,3 +66,60 @@ export function normalizarMarcadoresMemorial(texto: string | null | undefined): 
     return titulo ? `**${titulo}:** ` : '';
   });
 }
+
+// Título do ponto [2.4] — a justificativa "o que mudou após a automação" que o gate
+// de economia alta (≥44h/mês) obriga. Fatiada para a coluna "Alocação Ganhos" da
+// planilha (antes ficava só dentro do memorial, difícil de inspecionar).
+const TITULO_ALOCACAO_GANHOS = TITULOS_MEMORIAL['2.4'].toLowerCase();
+
+// Extrai o TÍTULO legível de uma linha que seja cabeçalho markdown ("### Título")
+// ou rótulo em negrito no início ("**Título:** ..."). Devolve null se não for nenhum.
+function tituloDaLinha(linha: string): string | null {
+  const header = linha.match(/^\s*#{1,6}\s+(.+?)\s*:?\s*$/);
+  if (header) return header[1].trim().toLowerCase();
+  const label = linha.match(/^\s*\*\*\s*(.+?)\s*:?\s*\*\*/);
+  if (label) return label[1].trim().toLowerCase();
+  return null;
+}
+
+/**
+ * Extrai do memorial a seção "O que mudou após a automação" (ponto [2.4]) — a
+ * justificativa de como o tempo/custo liberado foi realocado. É escrita pelo agente
+ * tanto como cabeçalho de seção (`### O que mudou após a automação`) quanto, em
+ * legados, como rótulo inline (`**O que mudou após a automação:** ...`). Captura o
+ * conteúdo até o próximo cabeçalho/rótulo (= novo ponto) ou separador `---` (que
+ * antecede o bloco financeiro injetado). Devolve null quando a seção não existe
+ * (ex.: projeto sem o gate de economia alta) ou está vazia.
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial), para que o
+ * código [2.4] já tenha virado o rótulo legível.
+ */
+export function extrairAlocacaoGanhos(memorial: string | null | undefined): string | null {
+  if (!memorial) return null;
+  const linhas = memorial.split(/\r?\n/);
+
+  let inicio = -1;
+  for (let i = 0; i < linhas.length; i++) {
+    if (tituloDaLinha(linhas[i]) === TITULO_ALOCACAO_GANHOS) {
+      inicio = i;
+      break;
+    }
+  }
+  if (inicio < 0) return null;
+
+  const partes: string[] = [];
+  // Conteúdo na MESMA linha do rótulo inline ("**Título:** conteúdo aqui").
+  const inline = linhas[inicio].match(/^\s*\*\*[^*]+\*\*\s*:?\s*(.*)$/);
+  if (inline && inline[1].trim()) partes.push(inline[1].trim());
+
+  // Linhas seguintes, até o próximo ponto/seção ou o separador do bloco financeiro.
+  for (let j = inicio + 1; j < linhas.length; j++) {
+    const l = linhas[j];
+    if (tituloDaLinha(l) !== null) break;
+    if (/^\s*-{3,}\s*$/.test(l)) break;
+    partes.push(l);
+  }
+
+  const texto = partes.join('\n').trim();
+  return texto || null;
+}

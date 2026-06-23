@@ -55,6 +55,7 @@ import type {
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
+import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos } from '@/lib/agents/memorial-format';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
@@ -1186,6 +1187,12 @@ const atualizarMetadadosSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
+  // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
+  // orquestrador, espelhando iniciarSubmissao. Sem isso, a edição de um legado/
+  // projeto marcado como especial regenerava uma doc normal pelo agente — e, no
+  // caminho de reenvio direto (handleEnviarEspecial), nunca persistia documentacao,
+  // fazendo o submeter-validacao quebrar com "Documentação ainda não foi gerada".
+  especial: z.boolean().optional(),
   // Força reiniciar a documentação reusando os arquivos já enviados (sem novo upload).
   // Usado quando muda a entrada determinística do projeto especial (descrição/contexto).
   reset_doc: z.boolean().optional(),
@@ -1232,6 +1239,38 @@ export async function atualizarMetadados(rawData: unknown) {
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
     });
+  }
+
+  // 1.5. Projeto ESPECIAL (edição): espelha iniciarSubmissao — monta a doc sem
+  // nenhuma IA (buildDocEspecial) a partir da descrição + contexto especial, persiste
+  // em `documentacao`, marca chat_completo e PULA o orquestrador por completo. Cobre o
+  // caso de um legado (sem linha em `documentacao`) reenviado como especial: antes o
+  // orquestrador gerava uma doc normal e o submit seguinte quebrava com "Documentação
+  // ainda não foi gerada". Detecta `especial` pelo flag do request OU pelo estado do
+  // projeto (um projeto já marcado especial continua especial mesmo sem o flag).
+  const ctxData = await getProjetoContextoData(data.projeto_id);
+  const ehEspecial = data.especial === true || ctxData?.especial === 1;
+  if (ehEspecial) {
+    // Garante a marcação de especial no banco (cobre legado convertido em especial na
+    // edição) — alinha tipo_projeto/tipos_projeto com o que iniciarSubmissao grava.
+    await updateProjeto(data.projeto_id, {
+      especial: true,
+      tipo_projeto: 'especial',
+      tipos_projeto: ['especial'],
+    });
+    const docEspecial = buildDocEspecial({
+      nome_projeto: data.nome_projeto ?? ctxData?.nome ?? '',
+      responsavel_nome: ctxData?.responsavel_nome ?? '',
+      responsavel_email: ctxData?.responsavel_email ?? '',
+      ferramenta: data.ferramenta ?? ctxData?.ferramenta ?? '',
+      membros: data.membros ?? parseJson<string[]>(ctxData?.membros ?? null) ?? [],
+      descricao_breve: data.descricao_breve ?? ctxData?.descricao_breve ?? undefined,
+      contexto_especial: data.contexto_especial ?? ctxData?.contexto_especial ?? undefined,
+    });
+    await upsertDocumentacao(data.projeto_id, docEspecial);
+    await updateProjeto(data.projeto_id, { chat_completo: true });
+    log('atualizarMetadados', `Projeto especial ${data.projeto_id}: doc reconstruída sem IA, pronto para reenvio.`);
+    return { ok: true, reset: true };
   }
 
   // 2. Sem arquivos novos e sem pedido de reset → nada a reiniciar; o agente já vê
@@ -1613,6 +1652,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+  // "Alocação Ganhos" (coluna AK): justificativa [2.4] do gate ≥44h, fatiada do
+  // memorial do LLM (sem R$). Null quando o gate não disparou → "—" no Sheets.
+  const alocacaoGanhos = extrairAlocacaoGanhos(
+    normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
+  );
 
   await updateProjeto(projeto_id, {
     status,
@@ -1742,6 +1786,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       area: areaFinal ?? '—',
       memorialLimpo: memorialSavingLimpo ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+      alocacaoGanhos,
       ganhoTotalMensal,
       // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
       // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
@@ -1816,6 +1861,9 @@ export async function resyncGoogle(rawData: unknown) {
       ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+  const alocacaoGanhos = extrairAlocacaoGanhos(
+    normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
+  );
   const membros = parseJson<string[]>(projeto.membros) ?? [];
 
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
@@ -1832,6 +1880,7 @@ export async function resyncGoogle(rawData: unknown) {
     area: projeto.area ?? '—',
     memorialLimpo: memorialSavingLimpo ?? '—',
     receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+    alocacaoGanhos,
     ganhoTotalMensal,
   });
 

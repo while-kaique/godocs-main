@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { normalizarMarcadoresMemorial, TITULOS_MEMORIAL } from '@/lib/agents/memorial-format';
+import {
+  normalizarMarcadoresMemorial,
+  extrairAlocacaoGanhos,
+  TITULOS_MEMORIAL,
+} from '@/lib/agents/memorial-format';
 
 describe('normalizarMarcadoresMemorial', () => {
   it('troca um código no início da linha pelo título em negrito', () => {
@@ -51,5 +55,53 @@ describe('normalizarMarcadoresMemorial', () => {
       const out = normalizarMarcadoresMemorial(`[${codigo}] x`);
       expect(out).toBe(`**${TITULOS_MEMORIAL[codigo]}:** x`);
     }
+  });
+});
+
+describe('extrairAlocacaoGanhos', () => {
+  it('extrai a seção quando escrita como cabeçalho markdown (###), até o próximo cabeçalho', () => {
+    const memorial = [
+      '### Total de horas',
+      'Total: 90h/mês.',
+      '',
+      '### O que mudou após a automação',
+      'A analista foi realocada para o time de qualidade.',
+      'O setor passou a atender 2x mais volume com a mesma equipe.',
+      '',
+      '### Tipo de saving',
+      'Mensal.',
+    ].join('\n');
+    expect(extrairAlocacaoGanhos(memorial)).toBe(
+      'A analista foi realocada para o time de qualidade.\nO setor passou a atender 2x mais volume com a mesma equipe.',
+    );
+  });
+
+  it('extrai quando escrita como rótulo inline (**Título:** conteúdo) — caso legado', () => {
+    const memorial =
+      '**Total de horas:** 90h\n**O que mudou após a automação:** O serviço terceirizado foi cancelado.\n**Tipo de saving:** mensal';
+    expect(extrairAlocacaoGanhos(memorial)).toBe('O serviço terceirizado foi cancelado.');
+  });
+
+  it('para no separador --- (antes do bloco financeiro injetado)', () => {
+    const memorial =
+      '### O que mudou após a automação\nVaga não reposta após o desligamento.\n\n---\n### Detalhamento Financeiro (interno)\n- R$ ...';
+    expect(extrairAlocacaoGanhos(memorial)).toBe('Vaga não reposta após o desligamento.');
+  });
+
+  it('combina com normalizarMarcadoresMemorial (código [2.4] vira o rótulo e é extraído)', () => {
+    const bruto = '[2.3] 90h\n[2.4] A equipe assumiu novas frentes de análise.\n[5.2] mensal';
+    expect(extrairAlocacaoGanhos(normalizarMarcadoresMemorial(bruto))).toBe(
+      'A equipe assumiu novas frentes de análise.',
+    );
+  });
+
+  it('devolve null quando a seção não existe (projeto sem gate de economia alta)', () => {
+    expect(extrairAlocacaoGanhos('### Total de horas\n10h/mês.\n### Tipo de saving\nmensal')).toBeNull();
+  });
+
+  it('devolve null para memorial vazio/ausente', () => {
+    expect(extrairAlocacaoGanhos(null)).toBeNull();
+    expect(extrairAlocacaoGanhos('')).toBeNull();
+    expect(extrairAlocacaoGanhos('### O que mudou após a automação\n\n')).toBeNull();
   });
 });

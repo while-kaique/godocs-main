@@ -117,10 +117,23 @@ export function temAcesso(projeto: ProjetoRow, email: string): boolean {
 export type Papel = 'owner' | 'participante';
 
 // "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
-function temAtualizadoEm(v: string | null | undefined): boolean {
+export function temAtualizadoEm(v: string | null | undefined): boolean {
   if (!v) return false;
   const s = String(v).trim();
   return s !== '' && s !== '—' && s !== '-';
+}
+
+// Resolve o "Atualizado Em" efetivo de um projeto: prefere o carimbo da PLANILHA
+// (Sheets é a fonte da verdade) QUANDO preenchido; se a célula está vazia/ausente,
+// cai no espelho SQLite. ⚠️ Crítico logo após uma edição — o submit grava o espelho
+// SQLite na hora, mas o sync IDA para o Sheets roda em background; sem este fallback,
+// a célula ainda vazia da planilha mantinha o legado como "pendente" até o sync
+// terminar (exigia hard-refresh). Alinha com contarPendentes, que decide pelo SQLite.
+export function resolverAtualizadoEm(
+  sheetAt: string | null | undefined,
+  sqliteAt: string | null | undefined,
+): string | null {
+  return temAtualizadoEm(sheetAt) ? sheetAt! : (sqliteAt ?? null);
 }
 
 // Projeto LEGADO? Só os ids no padrão "LEGADO-233" (importados antes do formulário)
@@ -194,14 +207,16 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   }
   const rows = await getProjetosByOwnerEmail(email);
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
-  // "Atualizado Em"/"Status": usam o valor recém-lido da planilha (Sheets é a fonte da
-  // verdade); se a leitura falhou (mapa vazio), caem no espelho/valor do SQLite.
+  // "Status": usa o valor recém-lido da planilha (Sheets é a fonte da verdade).
+  // "Atualizado Em": resolverAtualizadoEm — planilha quando preenchida, senão o espelho
+  // SQLite (ver nota na função). Garante que um legado recém-editado deixe de aparecer
+  // como pendente sem esperar o sync IDA para o Sheets.
   return rows
     .filter((p) => temAcesso(p, email))
     .map((p) =>
       mapItem(
         p,
-        atualizadoMap.get(p.id.toLowerCase()) ?? p.atualizado_em ?? null,
+        resolverAtualizadoEm(atualizadoMap.get(p.id.toLowerCase()), p.atualizado_em),
         ehOwner(p, email) ? 'owner' : 'participante',
         statusMap.get(p.id.toLowerCase()) ?? null,
       ),
