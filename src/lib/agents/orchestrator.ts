@@ -424,6 +424,25 @@ Se precisa de clarificação:
 {"type":"question","content":"pergunta","receita":{...campos atuais}}`;
 }
 
+// Escopo da confirmação determinística da BASE das horas (padrão CLT 220h/mês):
+// SOMENTE rotina manual real e mensal — há linha com horas_antes > 0 que de fato
+// existia. NÃO se aplica ao saving contrafactual ("ninguém fazia" → horas estimadas)
+// nem ao pontual (total único, não mapeia para "220h no mês"). Usado tanto pelo
+// prompt (baseHorasBlock) quanto pelo gate determinístico em chat.functions.ts.
+export function aplicaConfirmacaoBaseHoras(ctx: ProjetoContexto, saving: SavingColetado): boolean {
+  const linhas = saving.linhas ?? [];
+  const ninguemFazia = ctx.alguem_fazia === 'nao';
+  const isPontual = saving.tipo_saving === 'pontual';
+  const temHorasAntes = linhas.some((l) => (l.horas_antes ?? 0) > 0);
+  return !ninguemFazia && !isPontual && temHorasAntes;
+}
+
+// Total de economia de horas (headline) — usado na pergunta da base de horas.
+export function totalEconomiaHoras(saving: SavingColetado): number {
+  const linhas = saving.linhas ?? [];
+  return saving.economia_horas_mes ?? linhas.reduce((s, l) => s + (l.economia_horas_mes ?? 0), 0);
+}
+
 export function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
   const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
@@ -464,6 +483,13 @@ DETALHES TÉCNICOS APROVADOS:
   // detalhar — a conversa valida a ESTIMATIVA, não uma rotina existente.
   const ninguemFazia = ctx.alguem_fazia === 'nao';
 
+  // Confirmação da BASE das horas (padrão CLT 220h/mês) + checagem de plausibilidade
+  // vs. capacidade real de uma pessoa. Escopo definido por aplicaConfirmacaoBaseHoras
+  // (rotina manual real e mensal). A CONFIRMAÇÃO Sim/Não em si é conduzida pelo
+  // SISTEMA (gate determinístico em chat.functions.ts) — aqui o prompt só carrega a
+  // régua de plausibilidade e instrui como reconciliar quando o sistema avisar.
+  const aplicaBaseHoras = aplicaConfirmacaoBaseHoras(ctx, saving);
+
   // Diretiva de abertura — é a PRIMEIRA e mais forte instrução de conduta, calculada
   // a partir das horas reais. Vence as regras genéricas de "detalhar a rotina".
   const comoAbrir = ninguemFazia
@@ -479,6 +505,29 @@ DETALHES TÉCNICOS APROVADOS:
       : algumaParcialZero
         ? `ATENÇÃO: parte das linhas tem 0h antes (a pessoa NÃO fazia a tarefa) e parte tem horas antes > 0. Para as linhas com 0h antes, é PROIBIDO perguntar sobre rotina manual prévia — pergunte sobre monitoramento (horas depois) ou o que passou a ser entregue. Para as linhas com horas antes > 0, valide a rotina manual normalmente. Abra pela linha que tem rotina manual real.`
         : `Há rotina manual real (horas antes > 0). Abra contextualizando em 1 frase que vamos validar as horas para montar o memorial e faça a primeira pergunta concreta sobre essa rotina (passo a passo, frequência, tempo por execução).`;
+
+  // Bloco da base de horas (220h/mês CLT) — só entra para rotina manual real e mensal.
+  // A CONFIRMAÇÃO Sim/Não é conduzida pelo SISTEMA (gate determinístico no backend),
+  // NÃO pelo LLM — aqui o prompt só carrega a régua de plausibilidade e instrui como
+  // reconciliar quando o sistema avisar (via mensagem [SISTEMA]) a resposta do usuário.
+  const baseHorasBlock = aplicaBaseHoras
+    ? `
+═══════════════════════════════════════════════════════════════════
+BASE DAS HORAS — PADRÃO CLT 220h/mês
+═══════════════════════════════════════════════════════════════════
+Todo raciocínio de horas economizadas usa SEMPRE a base de tempo ÚTIL de trabalho — NUNCA horas de calendário: 1 mês ≈ 22 dias úteis ≈ 220 horas de trabalho (jornada CLT). Logo, UMA pessoa em tempo integral tem ~220h/mês de capacidade — é IMPOSSÍVEL um único cargo economizar mais horas do que ele de fato trabalha. Use 220h/mês como régua de plausibilidade de CADA linha.
+
+CONFIRMAÇÃO DA BASE — CONDUZIDA PELO SISTEMA (você NÃO pergunta isso):
+   - O próprio sistema, automaticamente e no momento certo (logo antes do preview), pergunta ao usuário COM BOTÕES Sim/Não se as horas informadas já consideram essa base de 220h úteis/mês. NÃO faça você essa pergunta — não a inclua nas suas respostas.
+   - Quando o sistema te avisar (mensagem que começa com "[SISTEMA]") que o usuário CONFIRMOU a base, NÃO toque mais nesse assunto: se todos os pontos obrigatórios já estiverem completos, gere o PREVIEW.
+   - Quando o sistema te avisar que o usuário disse que as horas NÃO estão nessa base, RECONCILIE: explique em 1-2 frases o padrão (1 mês ≈ 22 dias úteis ≈ 220h de trabalho EFETIVO, não de calendário) e peça para o usuário reexpressar as horas nessa base (quantas horas de trabalho efetivo por mês, de fato). Quando ele reexpressar, atualize horas_antes/horas_depois das \`linhas\` na MESMA resposta (mantendo a sincronia linhas×memorial). NÃO gere preview enquanto as horas não forem reexpressas nessa base.
+
+PLAUSIBILIDADE vs. 220h — exija o detalhamento quando os números não baterem:
+   - Use 220h/mês como teto de UMA pessoa. Se a economia de algum cargo for alta ou parecer exagerada frente à capacidade real — ex.: uma única atividade consumindo ~50h/mês de uma pessoa (mais de um dia útil por semana só naquilo), ou um cargo economizando uma fração grande das 220h — NÃO aceite o número solto.
+   - EXIJA o detalhamento de COMO essas horas se acumulam: a quebra por atividade × frequência × tempo por execução que SOMA exatamente o total. Isso reforça a COMPOSIÇÃO DAS HORAS (já obrigatória) — quanto maior a fração das 220h, mais granular tem de ser a justificativa.
+   - Se a soma do detalhamento não fechar com o total informado, aponte a discrepância e ajuste com o usuário (atualizando as \`linhas\`).
+`
+    : '';
 
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo PADRONIZADO.${buildRevisaoBlock(ctx, 'saving')}
@@ -577,7 +626,7 @@ O GoDocs documenta APENAS ganhos JÁ REALIZADOS: a automação está EM PRODUÇ�
   • Se o usuário CONFIRMAR que já está em produção e os tempos "depois" foram MEDIDOS (peça a base: há quanto tempo roda e como mediram), ACEITE — e escreva o memorial em tempo PASSADO/PRESENTE ("passou a levar 30 min", "hoje leva 2h"), NUNCA em "a expectativa é"/"a projeção é".
   • Se for apenas expectativa/estimativa (a ferramenta ainda não roda ou o ganho não foi medido), NÃO gere o preview de saving. Explique que o GoDocs registra ganhos JÁ realizados e oriente a (a) voltar quando a ferramenta estiver rodando e o ganho medido, ou (b) submeter como PROJETO ESPECIAL se for caso de alto impacto e difícil mensuração. NÃO monte memorial com números projetados.
 - ESCOPO: este portão barra o "DEPOIS" projetado / a ferramenta que ainda não entrega o ganho. NÃO confunda com o "antes": o "antes" pode ser histórico real OU equivalente manual estimado (saving contrafactual — ver regras), e isso é legítimo. No contrafactual, a automação JÁ está rodando (fazendo o trabalho) — se ela ainda nem existe em produção, então é projeção e cai neste portão.
-
+${baseHorasBlock}
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0):
 - ATENÇÃO: as regras abaixo valem APENAS para linhas que TÊM rotina manual prévia (horas_antes > 0). Para linhas com 0h antes, NÃO se aplicam — não cobre detalhamento de rotina nem "faça a conta" de algo que ninguém fazia.
 ${ninguemFazia
@@ -876,7 +925,7 @@ export async function runOrchestrator(
     saving: (parsed.saving as SavingColetado) ?? saving,
     receita: (parsed.receita as ReceitaColetada) ?? receita,
     ...(type === 'options'
-      ? { question: content, options: (parsed.options as [string, string, string]) ?? ['', '', ''] }
+      ? { question: content, options: (parsed.options as string[]) ?? ['', '', ''] }
       : { content }),
   } as OrchestratorResult;
 
