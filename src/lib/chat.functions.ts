@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, totalEconomiaHoras } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -46,6 +46,7 @@ import type {
   ChatHistoryMessage,
   DocumentacaoColetada,
   DocumentacaoGerada,
+  OrchestratorResult,
   ProjetoContexto,
   ReceitaColetada,
   RevisaoContexto,
@@ -670,6 +671,40 @@ function avisarDivergenciaMemorialLinhas(
   return { totalTexto, totalGravado };
 }
 
+// ─── Gate determinístico: BASE das horas (padrão CLT 220h/mês) ───────────────
+// Garante que a confirmação Sim/Não da base de horas SEMPRE aconteça (com botões)
+// antes do 1º preview do saving, em rotina manual real e mensal (ver
+// aplicaConfirmacaoBaseHoras). O LLM NÃO pergunta isso — o backend força a pergunta
+// e interpreta a resposta. Escolha de implementação: gate determinístico (não só
+// prompt), à prova de o LLM esquecer ou previewar direto.
+
+// Pergunta padronizada da base de horas, com o total real no texto.
+function perguntaBase220(saving: SavingColetado): string {
+  const total = totalEconomiaHoras(saving);
+  const totalFmt = Number.isFinite(total) && total > 0 ? `essas ~${Math.round(total)}h/mês` : 'as horas';
+  return `Antes de eu fechar o memorial: ${totalFmt} que você informou já consideram a base de 220 horas úteis no mês (≈ 22 dias úteis, jornada CLT) — e não horas de calendário?`;
+}
+
+// Interpreta a resposta do usuário à pergunta da base. O botão envia o texto da
+// opção + o índice (1=Sim, 2=Não). Texto digitado cai no fallback por regex.
+// null = ambíguo (re-pergunta determinística).
+function interpretarRespostaBase220(content: string, selectedOption: number | null): 'sim' | 'nao' | null {
+  if (selectedOption === 1) return 'sim';
+  if (selectedOption === 2) return 'nao';
+  const t = (content ?? '').trim().toLowerCase();
+  if (!t) return null;
+  if (/^(sim|s|isso|exato|exatamente|positivo|claro|com certeza|considera[m]?|sao|s[aã]o|yes)\b/.test(t)) return 'sim';
+  if (/^(n[ãa]o|nao|n|negativo|nem|no)\b/.test(t)) return 'nao';
+  if (/\bn[ãa]o\b/.test(t)) return 'nao';
+  if (/\bsim\b/.test(t)) return 'sim';
+  return null;
+}
+
+const NUDGE_BASE220_SIM =
+  '[SISTEMA] O usuário confirmou (botão) que as horas informadas JÁ consideram a base de 220h úteis/mês. NÃO pergunte sobre isso de novo. Se todos os pontos obrigatórios do memorial já estiverem completos, gere o PREVIEW agora.';
+const NUDGE_BASE220_NAO =
+  '[SISTEMA] O usuário respondeu (botão) que as horas NÃO consideram a base de 220h úteis/mês. RECONCILIE agora: explique em 1-2 frases que a base é 1 mês ≈ 22 dias úteis ≈ 220h de trabalho efetivo (não horas de calendário) e peça para ele reexpressar as horas nessa base. Quando ele reexpressar, atualize as linhas (horas_antes/horas_depois) e o memorial. NÃO gere preview enquanto as horas não forem reexpressas nessa base.';
+
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
@@ -701,7 +736,34 @@ export async function enviarMensagem(rawData: unknown) {
   const tiposProjeto = getTiposProjeto(ctx);
   log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
 
-  const resultado = await runOrchestrator(
+  // ── GATE BASE DAS HORAS (220h/mês) — turno de RESPOSTA à pergunta ───────────
+  // Quando a confirmação está 'pendente', este turno do usuário É a resposta Sim/Não.
+  // Registramos no estado e injetamos um nudge [SISTEMA] (efêmero, não persistido)
+  // para o orquestrador prosseguir (Sim → preview) ou reconciliar (Não). Resposta
+  // ambígua → re-pergunta determinística (sem chamar o orquestrador).
+  const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
+  let reaskBase220: OrchestratorResult | null = null;
+  if (gateBaseHoras && estado.saving.confirmacao_220h === 'pendente') {
+    const resp = interpretarRespostaBase220(data.content, data.selected_option ?? null);
+    if (resp === null) {
+      log('enviarMensagem', 'Base 220h: resposta ambígua — re-perguntando (Sim/Não)');
+      reaskBase220 = {
+        type: 'options',
+        question: perguntaBase220(estado.saving),
+        options: ['Sim', 'Não'],
+        fase: 'saving',
+        coletado: estado.coletado,
+        saving: { ...estado.saving, confirmacao_220h: 'pendente' },
+        receita: estado.receita,
+      };
+    } else {
+      log('enviarMensagem', `Base 220h: usuário respondeu "${resp}"`);
+      estado.saving = { ...estado.saving, confirmacao_220h: resp };
+      history.push({ role: 'user', content: resp === 'sim' ? NUDGE_BASE220_SIM : NUDGE_BASE220_NAO });
+    }
+  }
+
+  const resultado = reaskBase220 ?? await runOrchestrator(
     ctx,
     history,
     estado.fase,
@@ -711,6 +773,12 @@ export async function enviarMensagem(rawData: unknown) {
     tiposProjeto,
     estado.receita,
   );
+
+  // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui confirmacao_220h).
+  // Re-mescla o campo gerenciado pelo backend para que ele faça round-trip no estado.
+  if (resultado.saving) {
+    resultado.saving = { ...resultado.saving, confirmacao_220h: estado.saving.confirmacao_220h ?? null };
+  }
 
   // ── SAFETY NET: memorial_calculo no objeto saving/receita ──────────────────
   // O LLM às vezes coloca o memorial apenas no campo "content" e deixa
@@ -764,6 +832,32 @@ export async function enviarMensagem(rawData: unknown) {
         });
       }
     }
+  }
+
+  // ── GATE BASE DAS HORAS (220h/mês) — força a pergunta antes do 1º preview ────
+  // Se o saving está em escopo e a base ainda NÃO foi confirmada, não deixamos o
+  // preview/complete passar: trocamos por uma pergunta Sim/Não (com botões) e
+  // mantemos a fase em 'saving'. Preserva o `saving` recém-trabalhado pelo LLM
+  // (linhas/memorial), só marcando confirmacao_220h='pendente'. (gateBaseHoras só
+  // checa fase+escopo; a condição de "ainda não confirmado" é o == null abaixo.)
+  if (
+    gateBaseHoras &&
+    estado.saving.confirmacao_220h == null &&
+    (resultado.type === 'preview' || resultado.type === 'complete')
+  ) {
+    log('enviarMensagem', '⛔ Preview/complete do saving sem confirmação da base de horas — forçando pergunta 220h (Sim/Não)');
+    const savingComFlag: SavingColetado = {
+      ...((resultado.saving ?? estado.saving) as SavingColetado),
+      confirmacao_220h: 'pendente',
+    };
+    Object.assign(resultado, {
+      type: 'options',
+      question: perguntaBase220(savingComFlag),
+      options: ['Sim', 'Não'],
+      fase: 'saving',
+      saving: savingComFlag,
+    });
+    delete (resultado as { content?: string }).content;
   }
 
   // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o

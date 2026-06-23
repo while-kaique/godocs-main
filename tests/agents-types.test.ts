@@ -43,9 +43,9 @@ describe('savingVazio', () => {
       'economia_horas_mes', 'economia_reais_mes',
       'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
       'custo_evitado_reais', 'custo_evitado_tipo', 'custo_evitado_descricao',
-      'custo_externo_mensal',
+      'custo_externo_mensal', 'confirmacao_220h',
     ];
-    expect(Object.keys(saving)).toHaveLength(10);
+    expect(Object.keys(saving)).toHaveLength(11);
     expect(saving.linhas).toEqual([]);
     for (const campo of nulos) {
       expect(saving[campo]).toBeNull();

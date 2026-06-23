@@ -81,6 +81,13 @@ export type SavingColetado = {
   // economia_reais_mes. Fonte da verdade é projeto.custo_externo_mensal; carregado
   // aqui por recomputarSavingFinanceiro para o memorial enriquecido refleti-lo.
   custo_externo_mensal?: number | null;
+  // Confirmação DETERMINÍSTICA da BASE das horas (padrão CLT 220h/mês). NÃO é
+  // setado pelo LLM — o orquestrador não o ecoa; o chat.functions o re-mescla a
+  // cada turno e força a pergunta (com botões Sim/Não) antes do 1º preview.
+  // null/ausente = ainda não perguntado · 'pendente' = pergunta feita, aguardando
+  // resposta · 'sim'/'nao' = respondido. Só vale quando aplicaConfirmacaoBaseHoras
+  // (rotina manual real e mensal — ver orchestrator.ts).
+  confirmacao_220h?: 'pendente' | 'sim' | 'nao' | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -94,6 +101,7 @@ export const savingVazio = (): SavingColetado => ({
   custo_evitado_tipo: null,
   custo_evitado_descricao: null,
   custo_externo_mensal: null,
+  confirmacao_220h: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
@@ -119,7 +127,7 @@ export const receitaVazia = (): ReceitaColetada => ({
 
 export type OrchestratorResult =
   | { type: 'question'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
-  | { type: 'options'; question: string; options: [string, string, string]; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
+  | { type: 'options'; question: string; options: string[]; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
   | { type: 'preview'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
   | { type: 'complete'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada };
 
