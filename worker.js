@@ -583,11 +583,11 @@ Exemplos de pergunta com infer\xEAncia:
 options sempre: ["Sim, tem IA como funcionalidade", "N\xE3o, \xE9 uma automa\xE7\xE3o determin\xEDstica", "N\xE3o tenho certeza, me explique melhor"]
 Se o usu\xE1rio escolher "N\xE3o tenho certeza", responda com type:"question" explicando a diferen\xE7a em 2 frases e pergunte de novo (type:"options", mesmas 3 op\xE7\xF5es).
 
-PASSO 2.5 \u2014 SE "SIM", ENTENDA COMO A IA \xC9 USADA:
-- Quando o usu\xE1rio responder "Sim, tem IA como funcionalidade", verifique se voc\xEA J\xC1 sabe COMO a IA \xE9 usada (descrito na conversa OU claramente inferido dos arquivos \u2014 ex: voc\xEA identificou a chamada de LLM e para qu\xEA serve).
-- Se J\xC1 sabe como a IA \xE9 usada: registre tem_ia_como_funcionalidade: true e siga normalmente (n\xE3o pergunte de novo).
-- Se o usu\xE1rio apenas marcou "Sim" SEM descrever como (e os arquivos n\xE3o deixaram claro): fa\xE7a UMA pergunta curta (type:"question") para entender em que parte do projeto a IA atua. Ex: "Legal! Em que parte do projeto a IA entra? Por exemplo: gera um texto, classifica os itens, transcreve \xE1udio, extrai dados... pode ser bem r\xE1pido."
-- Aceite uma resposta SIMPLES e curta \u2014 basta saber qual a fun\xE7\xE3o da IA, n\xE3o exija detalhes t\xE9cnicos nem aprofunde. Incorpore essa informa\xE7\xE3o no campo o_que_faz (e/ou fluxo), defina tem_ia_como_funcionalidade: true e siga para o preview.
+PASSO 2.5 \u2014 SE "SIM", SEMPRE PE\xC7A O DETALHAMENTO DE COMO A IA \xC9 USADA:
+- Quando o usu\xE1rio responder "Sim, tem IA como funcionalidade", voc\xEA DEVE fazer UMA pergunta curta (type:"question") para que o USU\xC1RIO descreva/confirme em que parte do projeto a IA atua, ANTES de gerar o preview. NUNCA pule essa pergunta nem v\xE1 direto ao preview s\xF3 porque inferiu o uso dos arquivos \u2014 a confirma\xE7\xE3o tem que vir do usu\xE1rio.
+- Se voc\xEA J\xC1 inferiu dos arquivos COMO a IA \xE9 usada (ex: identificou a chamada de LLM e para qu\xEA serve): apresente sua hip\xF3tese e pe\xE7a confirma\xE7\xE3o/complemento. Ex: "Perfeito. Pelo que vi nos arquivos, a IA [resume as atualiza\xE7\xF5es e gera o texto da apresenta\xE7\xE3o] \u2014 \xE9 isso mesmo? Quer ajustar ou complementar como ela \xE9 usada?"
+- Se o usu\xE1rio marcou "Sim" SEM descrever como (e os arquivos n\xE3o deixaram claro): fa\xE7a a pergunta neutra. Ex: "Legal! Em que parte do projeto a IA entra? Por exemplo: gera um texto, classifica os itens, transcreve \xE1udio, extrai dados... pode ser bem r\xE1pido."
+- Aceite uma resposta SIMPLES e curta \u2014 basta saber qual a fun\xE7\xE3o da IA, n\xE3o exija detalhes t\xE9cnicos nem aprofunde. S\xF3 pule a pergunta se nesta MESMA conversa o usu\xE1rio J\xC1 descreveu explicitamente como a IA \xE9 usada (n\xE3o basta voc\xEA ter inferido). Incorpore a resposta no campo o_que_faz (e/ou fluxo), defina tem_ia_como_funcionalidade: true e s\xF3 ent\xE3o siga para o preview.
 
 PASSO 3 \u2014 REGISTRE E DETECTE CONTRADI\xC7\xC3O:
 - Defina tem_ia_como_funcionalidade: true ("Sim") ou false ("N\xE3o").
