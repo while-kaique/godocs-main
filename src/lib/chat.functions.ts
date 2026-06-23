@@ -55,6 +55,7 @@ import type {
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
+import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos } from '@/lib/agents/memorial-format';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
@@ -1651,6 +1652,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+  // "Alocação Ganhos" (coluna AK): justificativa [2.4] do gate ≥44h, fatiada do
+  // memorial do LLM (sem R$). Null quando o gate não disparou → "—" no Sheets.
+  const alocacaoGanhos = extrairAlocacaoGanhos(
+    normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
+  );
 
   await updateProjeto(projeto_id, {
     status,
@@ -1780,6 +1786,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       area: areaFinal ?? '—',
       memorialLimpo: memorialSavingLimpo ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+      alocacaoGanhos,
       ganhoTotalMensal,
       // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
       // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
@@ -1854,6 +1861,9 @@ export async function resyncGoogle(rawData: unknown) {
       ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
+  const alocacaoGanhos = extrairAlocacaoGanhos(
+    normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
+  );
   const membros = parseJson<string[]>(projeto.membros) ?? [];
 
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
@@ -1870,6 +1880,7 @@ export async function resyncGoogle(rawData: unknown) {
     area: projeto.area ?? '—',
     memorialLimpo: memorialSavingLimpo ?? '—',
     receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+    alocacaoGanhos,
     ganhoTotalMensal,
   });
 

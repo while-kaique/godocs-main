@@ -17,6 +17,15 @@ export type LLMOptions = {
   model?: string;
 };
 
+// Timeout por tentativa de chamada ao LLM. Acima disso o proxy é considerado
+// "pendurado" — abortamos e (se houver) caímos no fallback direto. 25s cobre uma
+// geração lenta legítima sem deixar o usuário esperando indefinidamente.
+const LLM_TIMEOUT_MS = 25_000;
+
+// Modelo usado no FALLBACK (OpenAI direto, fora do proxy). gpt-5.4-mini por padrão
+// (NÃO 5.5). Override opcional via env LLM_FALLBACK_MODEL (lido em runtime).
+const DEFAULT_FALLBACK_MODEL = "gpt-5.4-mini";
+
 export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Promise<string> {
   const provider = process.env.LLM_PROVIDER ?? "openai";
   const model = opts.model ?? process.env.LLM_MODEL ?? "gpt-4.1";
@@ -27,7 +36,8 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
   // (O gate na base URL evita que TER só o token quebre as chamadas diretas.)
   const baseUrl = process.env.LLM_BASE_URL?.trim() || undefined;
   const proxyToken = process.env.API_PROXY_TOKEN?.trim() || undefined;
-  const apiKey = baseUrl && proxyToken ? proxyToken : process.env.LLM_API_KEY;
+  const usingProxy = !!(baseUrl && proxyToken);
+  const apiKey = usingProxy ? proxyToken! : process.env.LLM_API_KEY;
 
   const keyPreview = apiKey ? `${apiKey.slice(0, 12)}... (${apiKey.length} chars)` : "✗ AUSENTE";
   log(
@@ -42,18 +52,49 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
     );
   }
 
-  // `model` resolvido (opts.model ?? env) tem de VENCER o spread de opts — senão um
-  // opts.model undefined (ex: LLM_MODEL_FAST não configurado) sobrescreveria o modelo
-  // com undefined e a API responderia "you must provide a model parameter".
-  if (provider === "openai") {
-    return callOpenAI(messages, { ...opts, model, apiKey, baseUrl });
-  }
-
   if (provider === "anthropic") {
     return callAnthropic(messages, { ...opts, model, apiKey, baseUrl });
   }
 
-  throw new Error(`Provider desconhecido: ${provider}. Use "openai" ou "anthropic".`);
+  if (provider !== "openai") {
+    throw new Error(`Provider desconhecido: ${provider}. Use "openai" ou "anthropic".`);
+  }
+
+  // FALLBACK do LLM (só no modo proxy + provider openai): quando o proxy demora
+  // (>25s, abortamos) ou retorna erro de gateway, refazemos a MESMA chamada direto na
+  // OpenAI (sem proxy) com uma chave dedicada (LLM_FALLBACK) e um modelo leve
+  // (gpt-5.4-mini). Assim o usuário não vê o erro nem fica preso no "tente novamente".
+  // - Com fallback disponível, o proxy NÃO retenta gateway (gatewayRetries:0) → falha
+  //   rápido e cai no fallback (em vez de esperar ~3×25s antes de tentar o plano B).
+  // - Sem fallback, mantém a resiliência de antes (2 retries de gateway no proxy).
+  const fallbackKey = usingProxy ? process.env.LLM_FALLBACK?.trim() || undefined : undefined;
+
+  // `model` resolvido (opts.model ?? env) tem de VENCER o spread de opts — senão um
+  // opts.model undefined (ex: LLM_MODEL_FAST não configurado) sobrescreveria o modelo
+  // com undefined e a API responderia "you must provide a model parameter".
+  try {
+    return await callOpenAI(messages, {
+      ...opts,
+      model,
+      apiKey,
+      baseUrl,
+      timeoutMs: LLM_TIMEOUT_MS,
+      gatewayRetries: fallbackKey ? 0 : 2,
+    });
+  } catch (proxyErr) {
+    if (!fallbackKey) throw proxyErr;
+    const fallbackModel = process.env.LLM_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
+    const reason = proxyErr instanceof Error ? proxyErr.message.slice(0, 100) : String(proxyErr);
+    errLog(`Proxy falhou/demorou (${reason}) — fallback p/ OpenAI direto, modelo=${fallbackModel}`);
+    return await callOpenAI(messages, {
+      ...opts,
+      model: fallbackModel,
+      apiKey: fallbackKey,
+      baseUrl: undefined, // direto na api.openai.com (sem proxy)
+      timeoutMs: LLM_TIMEOUT_MS,
+      gatewayRetries: 2,
+    });
+  }
 }
 
 // Cache de parâmetros que cada modelo rejeita (ex: gpt-5.5 não aceita temperature).
@@ -69,6 +110,11 @@ async function callOpenAI(
     maxTokens?: number;
     jsonMode?: boolean;
     baseUrl?: string;
+    // Timeout por tentativa (AbortController). Ausente = sem timeout.
+    timeoutMs?: number;
+    // Quantas vezes retentar em erro de gateway/rede/timeout (com backoff de 2s).
+    // 0 = falha rápido na 1ª (usado quando há fallback a jusante). Default 2.
+    gatewayRetries?: number;
   },
 ): Promise<string> {
   // Endpoint: proxy (LLM_BASE_URL) ou OpenAI direto. Aceita base com ou sem barra final.
@@ -90,40 +136,51 @@ async function callOpenAI(
   if (known) for (const p of known) delete body[p];
 
   // Tenta a chamada; se o modelo rejeitar um parâmetro (não suportado ou valor
-  // inválido), remove-o, memoriza para as próximas chamadas e tenta de novo.
-  // Erros de gateway transitórios (502/503/520/522/524) fazem 1 retry após 2s.
-  // Mais de 1 retry seria contraproducente: cada 522 já custa ~30s de timeout do
-  // Cloudflare, então 2 tentativas falhadas + espera = mais de 60s desnecessários.
+  // inválido), remove-o, memoriza e tenta de novo NA HORA (não conta como retry de
+  // gateway — é ajuste instantâneo). Erros de gateway transitórios (502/503/520/522/
+  // 524), falha de rede e TIMEOUT (proxy pendurado > timeoutMs) entram no backoff de
+  // 2s e consomem uma das `gatewayRetries`. Esgotadas, propaga o erro (→ fallback).
   const isGatewayError = (status: number) =>
     status === 502 || status === 503 || status === 520 || status === 522 || status === 524;
 
+  let gatewayRetriesLeft = opts.gatewayRetries ?? 2;
   let lastErr: Error | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0 && lastErr) {
-      log(`Tentativa ${attempt + 1}/3 após 2s (erro anterior: ${lastErr.message.slice(0, 60)})`);
-      await new Promise((r) => setTimeout(r, 2000));
-    }
 
+  while (true) {
     let res: Response;
     try {
-      res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${opts.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+      // Timeout por tentativa: aborta o fetch se o proxy não responder a tempo.
+      const controller = new AbortController();
+      const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : null;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${opts.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (netErr) {
-      // Falha de REDE (fetch lançou): conexão caiu, reset, DNS, timeout de socket.
-      // É transitório → entra no backoff e retenta (antes, propagava na hora).
-      lastErr = netErr instanceof Error ? netErr : new Error(String(netErr));
-      errLog(`Falha de rede na chamada OpenAI (tentativa ${attempt + 1}/3): ${lastErr.message.slice(0, 80)}`);
+      // Falha de REDE ou TIMEOUT (AbortError): conexão caiu/reset/DNS, ou o proxy
+      // demorou demais e abortamos. É transitório → backoff e retenta enquanto houver
+      // gatewayRetries; senão propaga (cai no fallback direto, se configurado).
+      const aborted = netErr instanceof Error && netErr.name === "AbortError";
+      lastErr = aborted
+        ? new Error(`timeout após ${opts.timeoutMs}ms (proxy não respondeu)`)
+        : netErr instanceof Error ? netErr : new Error(String(netErr));
+      errLog(`Falha de ${aborted ? "TIMEOUT" : "rede"} na chamada OpenAI: ${lastErr.message.slice(0, 80)}`);
+      if (gatewayRetriesLeft <= 0) throw lastErr;
+      gatewayRetriesLeft--;
+      await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
 
     if (res.ok) {
-      if (attempt > 0) log(`Sucesso na tentativa ${attempt + 1}.`);
       const data = (await res.json()) as { choices: { message: { content: string } }[] };
       const content = data.choices[0].message.content;
       log(`OpenAI respondeu: ${content.slice(0, 120)}${content.length > 120 ? "..." : ""}`);
@@ -133,14 +190,12 @@ async function callOpenAI(
     const errText = await res.text();
     const dropped = res.status === 400 ? dropUnsupportedParam(body, errText) : null;
     if (dropped) {
-      // Memoriza para não repetir o erro nas próximas chamadas deste modelo
+      // Memoriza para não repetir o erro nas próximas chamadas deste modelo. Retry
+      // imediato (sem backoff, sem consumir gatewayRetries) — é ajuste de parâmetro.
       const set = unsupportedByModel.get(opts.model) ?? new Set<string>();
       set.add(dropped);
       unsupportedByModel.set(opts.model, set);
-      log(
-        `Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`,
-      );
-      lastErr = null; // reset: não é erro de gateway, é ajuste de parâmetro
+      log(`Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`);
       continue;
     }
 
@@ -152,12 +207,11 @@ async function callOpenAI(
     lastErr = new Error(`OpenAI error ${res.status}: ${errSummary}`);
 
     if (!isGatewayError(res.status)) throw lastErr; // erro definitivo, não retenta
-    // erro de gateway → loop continua com backoff
+    if (gatewayRetriesLeft <= 0) throw lastErr; // esgotou os retries → propaga (fallback)
+    gatewayRetriesLeft--;
+    log(`Erro de gateway (HTTP ${res.status}) — retry após 2s (${gatewayRetriesLeft} restantes)`);
+    await new Promise((r) => setTimeout(r, 2000));
   }
-
-  throw lastErr ?? new Error("OpenAI: falha após tentativas com parâmetros ajustados");
-
-  throw new Error("OpenAI: falha após remover parâmetros não suportados");
 }
 
 /**
