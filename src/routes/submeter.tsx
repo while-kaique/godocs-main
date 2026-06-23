@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -195,6 +196,10 @@ export function SubmeterPageContent({
   resumeDraftId,
 }: { editProjetoId?: string; resumeDraftId?: string } = {}) {
   const navigate = useNavigate();
+  // Invalida o cache de "Meus Projetos" (staleTime 60s) após submeter/reenviar, para
+  // a lista refletir o novo estado real (ex.: legado regularizado deixa de mostrar o
+  // aviso de pendência) sem exigir hard-refresh do usuário.
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   // Carrega tela de "preparando" enquanto seedamos: edição (servidor) OU
   // retomada de rascunho (localStorage ou ?retomar).
@@ -956,10 +961,14 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
+          // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
+          // submeter-validacao quebrava com "Documentação ainda não foi gerada").
+          especial: true,
           ...(docs ? { docs } : { reset_doc: true }),
         });
 
         await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId, modo: "edicao" });
+        queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
         setSubmitted(true);
         return;
       }
@@ -995,6 +1004,7 @@ export function SubmeterPageContent({
       // 2) Submete direto para a base (planilha + banco). Análise IA não se aplica.
       await apiFetch("/api/chat/submeter-validacao", { projeto_id: result.projeto_id });
 
+      queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
       setSubmitted(true);
     } catch (err) {
       console.error('[submeter] envio de projeto especial falhou:', err);
@@ -1653,6 +1663,7 @@ export function SubmeterPageContent({
     }
 
     // Submissão ok → tela de sucesso. A análise segue por trás dos panos no servidor.
+    queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
     setSubmitted(true);
     setSubmittingProject(false);
   }
