@@ -90,6 +90,13 @@ export type SavingColetado = {
   // = trabalho humano em fim de semana afirmado (base pode subir). Só vale quando
   // aplicaConfirmacaoBaseHoras (rotina manual real e mensal — ver orchestrator.ts).
   jornada_base?: 'pendente' | 'dias_uteis' | 'fim_de_semana' | null;
+  // Resolução do TETO por pessoa quando uma LINHA passa do teto (220h dias úteis /
+  // 300h com fim de semana humano). Gerenciado pelo backend (não ecoado pelo LLM).
+  // null = sem linha acima do teto, ou ainda não perguntado · 'pendente' = pergunta
+  // feita · 'multiplo' = usuário confirmou que a linha soma VÁRIAS pessoas/unidades
+  // (ex.: lojas) → linha acima do teto é legítima e liberada. Sem 'multiplo', uma
+  // linha acima do teto bloqueia o preview até ser reconciliada para ≤ teto.
+  teto_pessoa?: 'pendente' | 'multiplo' | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -104,6 +111,7 @@ export const savingVazio = (): SavingColetado => ({
   custo_evitado_descricao: null,
   custo_externo_mensal: null,
   jornada_base: null,
+  teto_pessoa: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
