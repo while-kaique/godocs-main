@@ -20,6 +20,7 @@ export const TITULOS_MEMORIAL: Record<string, string> = {
   '2.1': 'Pessoas envolvidas',
   '2.2': 'Detalhe por pessoa',
   '2.3': 'Total de horas',
+  '2.4': 'O que mudou após a automação',
   // Seção 3 — Contratos / serviços evitados
   '3.1': 'Serviço evitado',
   '3.2': 'Custo evitado',
