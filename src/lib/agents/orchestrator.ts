@@ -179,11 +179,11 @@ Exemplos de pergunta com inferência:
 options sempre: ["Sim, tem IA como funcionalidade", "Não, é uma automação determinística", "Não tenho certeza, me explique melhor"]
 Se o usuário escolher "Não tenho certeza", responda com type:"question" explicando a diferença em 2 frases e pergunte de novo (type:"options", mesmas 3 opções).
 
-PASSO 2.5 — SE "SIM", ENTENDA COMO A IA É USADA:
-- Quando o usuário responder "Sim, tem IA como funcionalidade", verifique se você JÁ sabe COMO a IA é usada (descrito na conversa OU claramente inferido dos arquivos — ex: você identificou a chamada de LLM e para quê serve).
-- Se JÁ sabe como a IA é usada: registre tem_ia_como_funcionalidade: true e siga normalmente (não pergunte de novo).
-- Se o usuário apenas marcou "Sim" SEM descrever como (e os arquivos não deixaram claro): faça UMA pergunta curta (type:"question") para entender em que parte do projeto a IA atua. Ex: "Legal! Em que parte do projeto a IA entra? Por exemplo: gera um texto, classifica os itens, transcreve áudio, extrai dados... pode ser bem rápido."
-- Aceite uma resposta SIMPLES e curta — basta saber qual a função da IA, não exija detalhes técnicos nem aprofunde. Incorpore essa informação no campo o_que_faz (e/ou fluxo), defina tem_ia_como_funcionalidade: true e siga para o preview.
+PASSO 2.5 — SE "SIM", SEMPRE PEÇA O DETALHAMENTO DE COMO A IA É USADA:
+- Quando o usuário responder "Sim, tem IA como funcionalidade", você DEVE fazer UMA pergunta curta (type:"question") para que o USUÁRIO descreva/confirme em que parte do projeto a IA atua, ANTES de gerar o preview. NUNCA pule essa pergunta nem vá direto ao preview só porque inferiu o uso dos arquivos — a confirmação tem que vir do usuário.
+- Se você JÁ inferiu dos arquivos COMO a IA é usada (ex: identificou a chamada de LLM e para quê serve): apresente sua hipótese e peça confirmação/complemento. Ex: "Perfeito. Pelo que vi nos arquivos, a IA [resume as atualizações e gera o texto da apresentação] — é isso mesmo? Quer ajustar ou complementar como ela é usada?"
+- Se o usuário marcou "Sim" SEM descrever como (e os arquivos não deixaram claro): faça a pergunta neutra. Ex: "Legal! Em que parte do projeto a IA entra? Por exemplo: gera um texto, classifica os itens, transcreve áudio, extrai dados... pode ser bem rápido."
+- Aceite uma resposta SIMPLES e curta — basta saber qual a função da IA, não exija detalhes técnicos nem aprofunde. Só pule a pergunta se nesta MESMA conversa o usuário JÁ descreveu explicitamente como a IA é usada (não basta você ter inferido). Incorpore a resposta no campo o_que_faz (e/ou fluxo), defina tem_ia_como_funcionalidade: true e só então siga para o preview.
 
 PASSO 3 — REGISTRE E DETECTE CONTRADIÇÃO:
 - Defina tem_ia_como_funcionalidade: true ("Sim") ou false ("Não").
@@ -476,6 +476,19 @@ DETALHES TÉCNICOS APROVADOS:
   const temCustoMonitoramento = linhas.some((l) => l.horas_antes === 0 && l.horas_depois > 0);
   const algumaParcialZero = temHorasAntes && linhas.some((l) => l.horas_antes === 0);
 
+  // Gate de ECONOMIA ALTA (só saving MENSAL — pontual é trabalho único, não muda
+  // jornada permanente, então fica de fora do gate). 44h/mês = uma jornada
+  // semanal CLT inteira poupada por mês: um ganho desse porte só é crível se algo
+  // mudou de verdade na rotina (realocação, mais volume, redução de equipe…). O
+  // agente é obrigado a investigar "o que mudou após a automação?" e registrar a
+  // resposta no memorial — caso contrário o número não convence. Limiar sobre o
+  // TOTAL do projeto; linhas individuais ≥44h são questionadas com mais força.
+  const LIMITE_ECONOMIA_ALTA = 44;
+  const economiaAlta = !isPontual && totalHoras >= LIMITE_ECONOMIA_ALTA;
+  const linhasIndividuaisAltas = linhas.filter((l) => l.economia_horas_mes >= LIMITE_ECONOMIA_ALTA);
+  const maiorLinhaHoras = linhas.reduce((m, l) => Math.max(m, l.economia_horas_mes), 0);
+  const pctMesUtil = Math.round((maiorLinhaHoras / 220) * 100); // 220h ≈ mês útil CLT
+
   // Ninguém fazia a tarefa manualmente (resposta do formulário). Neste caso as
   // horas_antes NÃO são uma rotina real — são o EQUIVALENTE manual estimado que o
   // usuário informou (quanto tempo o trabalho levaria se alguém tivesse que fazer).
@@ -529,6 +542,34 @@ PLAUSIBILIDADE vs. 220h — exija o detalhamento quando os números não baterem
 `
     : '';
 
+  // Bloco do gate de ECONOMIA ALTA (≥44h/mês de saving mensal). Vazio quando o
+  // gatilho não dispara. É um ponto OBRIGATÓRIO extra ([2.4]) e GATE antes do
+  // preview: o memorial final (e a planilha) precisa explicar o que mudou.
+  const detalheLinhasAltas = linhasIndividuaisAltas.length
+    ? linhasIndividuaisAltas
+        .map((l) => `${l.cargo} (${l.economia_horas_mes}h/mês — ~${Math.round((l.economia_horas_mes / 220) * 100)}% de um mês útil CLT)`)
+        .join('; ')
+    : '';
+  const blocoEconomiaAlta = economiaAlta
+    ? `
+
+═══════════════════════════════════════════════════════════════════
+SEÇÃO 2.4 — O QUE MUDOU APÓS A AUTOMAÇÃO (OBRIGATÓRIO NESTE PROJETO)
+ECONOMIA ALTA DETECTADA: o saving total declarado é de ${totalHoras}h/mês.
+Isso é MUITA hora humana liberada — 44h/mês já equivale a uma jornada semanal CLT inteira por mês, e a maior linha individual sozinha equivale a ~${pctMesUtil}% de um mês útil (220h).${detalheLinhasAltas ? ` Cargo(s) com economia individual ≥44h/mês: ${detalheLinhasAltas}.` : ''}
+Um ganho desse porte SÓ É CRÍVEL se algo mudou DE VERDADE — a empresa não paga por horas ociosas. Sua missão aqui é descobrir e REGISTRAR no memorial O QUE MUDOU concretamente, para que quem lê a aprovação se convença de que o ganho é real. NÃO aceite respostas vagas ("ganhou produtividade", "sobra tempo", "ficou mais eficiente") — exija o destino CONCRETO do tempo/custo. Faça QUANTAS perguntas forem necessárias (sobre o total e sobre cada cargo com ≥44h) até não restar ponta solta.
+
+INVESTIGUE (e registre a resposta):
+- Para onde foi o tempo liberado? Opções concretas: a pessoa assumiu outras atividades (quais?); o mesmo time passou a atender MUITO mais volume com a mesma equipe; houve realocação para outra função/área; redução de equipe / vaga não reposta / desligamento; a tarefa era feita por terceiro/serviço contratado que foi CANCELADO.
+- Se a pessoa segue no MESMO cargo e equipe sem mudança aparente: o que ela faz agora nessas horas, e isso virou mais entrega/capacidade mensurável? Se "nada mudou", então a economia declarada provavelmente está inflada — reabra a validação das horas.
+- ${linhasIndividuaisAltas.length ? 'Para CADA cargo com ≥44h/mês individuais, questione separadamente o que mudou na rotina daquela pessoa — não generalize uma resposta única para todos.' : 'Confirme que a soma das mudanças por pessoa explica o total declarado.'}
+
+REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela: (a) o destino concreto do tempo/custo liberado e (b) uma frase explícita concluindo que o ganho é válido por causa dessa mudança (ex.: "Essas Xh/mês são reais porque a pessoa foi realocada para Y / o time passou a atender Z / o serviço W foi cancelado"). Texto qualitativo, SEM R$.
+
+GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa concreta (não basta descrever a rotina antiga — precisa dizer o que mudou E por que isso valida a economia). A seção vem logo após o total de horas.
+═══════════════════════════════════════════════════════════════════`
+    : '';
+
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo PADRONIZADO.${buildRevisaoBlock(ctx, 'saving')}
 
@@ -567,6 +608,7 @@ Para CADA pessoa/cargo listada acima, colete:
   - Horas depois da automação: quanto tempo ainda gasta (já tem do formulário, mas valide)
   - Economia de horas: antes − depois → CALCULE VOCÊ
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
+[2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}
 
 SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS
 [3.1] Serviço/contrato evitado: o que seria contratado/foi cancelado → INVESTIGUE COM O USUÁRIO
@@ -603,7 +645,7 @@ COMO CONDUZIR:
 1. Abra exatamente conforme a diretiva "COMO ABRIR A CONVERSA" acima. Faça a primeira pergunta concreta e coerente com as horas informadas.${plural ? '\n   Como há mais de uma pessoa, valide as horas POR CARGO. Agrupe numa pergunta só as linhas do MESMO cargo (ex.: 7× "analista sênior" → UMA pergunta para o grupo, não sete). Mas trate cargos DIFERENTES separadamente — NÃO assuma que cargos distintos fazem a mesma tarefa pelo mesmo tempo só porque o usuário descreveu o processo uma vez. ANTES de perguntar, questione-se sobre qual é a função plausível de CADA cargo neste projeto (um head/gestor costuma aprovar/supervisionar; um analista executa; um estagiário apoia) — cargos de senioridades diferentes raramente fazem a mesma coisa pelo mesmo tempo. Se a tabela mostra cargos distintos com rotina e tempo idênticos, isso é justamente o que você deve QUESTIONAR (ver "PLAUSIBILIDADE ENTRE CARGOS" abaixo), não agrupar como se fossem a mesma pessoa.' : ''}
 2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
-4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.
+4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 6. Quando a justificativa for concreta, a conta fechar E o ganho for REAL (já em produção e medido — NÃO projetado; ver "GANHO REAL × PROJETADO" abaixo), gere o PREVIEW.
 
@@ -686,7 +728,7 @@ Opções:
 TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [1.1], [2.2], [3.1] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê a aprovação depois sabe o que "[2.2]" significa. Cada ponto vira um TÍTULO em negrito ("**O que fazia:**", "**Serviço evitado:**" …); use os cabeçalhos "### ..." para as seções e rótulos em negrito para os itens dentro delas, exatamente como no exemplo abaixo.
 
 Preview (SOMENTE quando TODOS os pontos obrigatórios estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Composição: Xh que compõem: atividade-a (Ah), atividade-b (Bh), ... (soma = X)\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Composição: Xh que compõem: atividade-a (Ah), atividade-b (Bh), ... (soma = X)\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n${economiaAlta ? '\\n### O que mudou após a automação\\n... (destino concreto do tempo/custo liberado: realocação, mais volume atendido, redução de equipe, serviço cancelado) + frase concluindo que o ganho é válido por causa disso — sem R$\\n' : ''}\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
 ATENÇÃO 2: se houver custo evitado, inclua "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula.
@@ -712,11 +754,25 @@ Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
 - Volte para a coleta (type:"question") até que haja economia de horas > 0 OU um custo evitado > 0.`
     : '';
 
+  // Rede de segurança do gate de ECONOMIA ALTA (≥44h/mês, só saving mensal): na
+  // aprovação, exige que o memorial explique CONCRETAMENTE o que mudou. O próprio
+  // LLM julga o texto (que está em MEMORIAL ATUAL) — sem heurística frágil de regex.
+  const isPontualPv = saving.tipo_saving === 'pontual';
+  const totalHorasPv = saving.economia_horas_mes ?? (saving.linhas ?? []).reduce((s, l) => s + (l.economia_horas_mes ?? 0), 0);
+  const economiaAltaPv = !isPontualPv && totalHorasPv >= 44;
+  const blocoEconomiaAltaPv = economiaAltaPv
+    ? `
+
+ATENÇÃO — ECONOMIA ALTA (≥44h/mês): este projeto declara ${totalHorasPv}h/mês de saving. O memorial SÓ pode ser aprovado se explicar CONCRETAMENTE o que mudou após a automação (a seção "### O que mudou após a automação"): para onde foi o tempo/custo liberado — realocação, mais volume atendido, redução de equipe, vaga não reposta, serviço/contrato cancelado, etc.
+- Se essa explicação NÃO existir no memorial, ou for vaga ("ganhou produtividade", "sobra tempo", "ficou mais eficiente"), NÃO aprove: responda com type:"question" pedindo o destino concreto do tempo/custo. Mesmo que o usuário diga "aprovado".
+- Só emita type:"complete" depois que o memorial deixar claro o que mudou.`
+    : '';
+
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving PADRONIZADO.
 
 MEMORIAL ATUAL:
 ${JSON.stringify(saving, null, 2)}
-${blocoValidacao}
+${blocoValidacao}${blocoEconomiaAltaPv}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
@@ -728,7 +784,7 @@ SINCRONIA OBRIGATÓRIA: o sistema grava as horas e o R\$ a partir do array \`lin
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, ${economiaAltaPv ? 'O que mudou após a automação, ' : ''}Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
 
 FORMATO — APENAS JSON válido:
 
