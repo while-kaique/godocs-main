@@ -17,6 +17,14 @@ import type {
 
 const DRAFT_KEY = "godocs:rascunho-v1";
 
+// Chave do rascunho de EDIÇÃO (um projeto já submetido sendo reeditado), por projeto.
+// Antes a edição NÃO persistia nada (o save abortava em modo edição), então recarregar
+// a página no meio de uma conversa longa perdia TUDO e a pessoa recomeçava do zero com
+// o agente. Persistir por projeto faz o reload retomar o ponto exato.
+export function editDraftKey(projetoId: string): string {
+  return `godocs:edicao-v1:${projetoId}`;
+}
+
 export type DraftSnapshot = {
   projetoId: string;
   step: number;
@@ -42,18 +50,20 @@ export type DraftSnapshot = {
   showReceitaForm: boolean;
 };
 
-export function saveDraft(snapshot: DraftSnapshot): void {
+// `key` permite separar o rascunho de submissão NOVA (default) do de EDIÇÃO (por
+// projeto, via editDraftKey). Default mantém o comportamento antigo.
+export function saveDraft(snapshot: DraftSnapshot, key: string = DRAFT_KEY): void {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot));
+    localStorage.setItem(key, JSON.stringify(snapshot));
   } catch (e) {
     // Quota cheia / localStorage indisponível — degrada silenciosamente.
     console.warn("[rascunho] não foi possível salvar o rascunho local:", e);
   }
 }
 
-export function loadDraft(): DraftSnapshot | null {
+export function loadDraft(key: string = DRAFT_KEY): DraftSnapshot | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as DraftSnapshot;
     if (!parsed?.projetoId) return null;
@@ -63,9 +73,9 @@ export function loadDraft(): DraftSnapshot | null {
   }
 }
 
-export function clearDraft(): void {
+export function clearDraft(key: string = DRAFT_KEY): void {
   try {
-    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(key);
   } catch {
     // ignore
   }

@@ -10,7 +10,7 @@ import {
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
-import { saveDraft, loadDraft, clearDraft, type DraftSnapshot } from "@/lib/submeter/draft-storage";
+import { saveDraft, loadDraft, clearDraft, editDraftKey, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
 function hasLocalDraft(): boolean {
@@ -489,9 +489,18 @@ export function SubmeterPageContent({
 
     // ── Modo edição: seed do servidor ──
     if (editProjetoId) {
+      // Rascunho de edição salvo (reload no meio da conversa)? Restaura o estado exato.
+      const editDraft = loadDraft(editDraftKey(editProjetoId));
       apiFetch<Record<string, unknown>>(`/api/meus-projetos/${editProjetoId}`)
         .then((data) => {
-          if (!cancelled) applySeed(data, editProjetoId);
+          if (cancelled) return;
+          // applySeed primeiro (traz o seed específico da edição: versão anterior,
+          // custo evitado, etc.). Se houver rascunho desta edição (reload), restaura o
+          // chat/wizard por cima — sem reiniciar a coleta do zero.
+          applySeed(data, editProjetoId);
+          if (editDraft && editDraft.projetoId === editProjetoId) {
+            rehydrateFromLocal(editDraft);
+          }
         })
         .catch((e) => {
           if (cancelled) return;
@@ -589,8 +598,9 @@ export function SubmeterPageContent({
   // modo edição, depois que o rascunho existe no servidor (projetoId), e não
   // durante o seed inicial nem após submeter.
   useEffect(() => {
-    if (editProjetoId) return;
     if (!projetoId || submitted || seedLoading) return;
+    // Persiste tanto a submissão NOVA quanto a EDIÇÃO (esta sob chave por projeto).
+    // Antes a edição não salvava nada → reload no meio da conversa perdia tudo.
     saveDraft({
       projetoId,
       step,
@@ -612,7 +622,7 @@ export function SubmeterPageContent({
       respEspecial,
       showSavingForm,
       showReceitaForm,
-    });
+    }, editProjetoId ? editDraftKey(editProjetoId) : undefined);
   }, [
     editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
     completedSteps, chatMessages, chatFase, chatComplete, agentTipos, agentMeta,
@@ -621,9 +631,11 @@ export function SubmeterPageContent({
   ]);
 
   // Ao submeter (qualquer fluxo), o rascunho deixa de existir — descarta o snapshot
-  // local para não reaparecer como rascunho "duplicado".
+  // local (da submissão nova OU da edição) para não reaparecer ao reabrir/recarregar.
   useEffect(() => {
-    if (submitted && !editProjetoId) clearDraft();
+    if (!submitted) return;
+    if (editProjetoId) clearDraft(editDraftKey(editProjetoId));
+    else clearDraft();
   }, [submitted, editProjetoId]);
 
   const updateField = useCallback(

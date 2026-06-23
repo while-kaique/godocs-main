@@ -115,6 +115,9 @@ export type SubmitSyncParams = {
   memorialLimpo: string;
   receitaMemorialLimpo: string;
   ganhoTotalMensal: number;
+  // Justificativa [2.4] "o que mudou após a automação" (gate ≥44h), fatiada do
+  // memorial → coluna "Alocação Ganhos". Vazia/null quando o gate não disparou.
+  alocacaoGanhos?: string | null;
   // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
   // Em submissão nova fica null (não há versão anterior).
   memorialAnterior?: string | null;
@@ -202,6 +205,8 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Contexto do Projeto Especial': ouTraco(p.projeto.contexto_especial),
       'Especial?': p.projeto.especial === 1 ? 'Sim' : 'Não',
       'Atualizado Em': dataSubmissao,
+      // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
+      'Alocação Ganhos': ouTraco(p.alocacaoGanhos),
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
