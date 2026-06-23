@@ -519,26 +519,32 @@ DETALHES TÉCNICOS APROVADOS:
         ? `ATENÇÃO: parte das linhas tem 0h antes (a pessoa NÃO fazia a tarefa) e parte tem horas antes > 0. Para as linhas com 0h antes, é PROIBIDO perguntar sobre rotina manual prévia — pergunte sobre monitoramento (horas depois) ou o que passou a ser entregue. Para as linhas com horas antes > 0, valide a rotina manual normalmente. Abra pela linha que tem rotina manual real.`
         : `Há rotina manual real (horas antes > 0). Abra contextualizando em 1 frase que vamos validar as horas para montar o memorial e faça a primeira pergunta concreta sobre essa rotina (passo a passo, frequência, tempo por execução).`;
 
-  // Bloco da base de horas (220h/mês CLT) — só entra para rotina manual real e mensal.
-  // A CONFIRMAÇÃO Sim/Não é conduzida pelo SISTEMA (gate determinístico no backend),
-  // NÃO pelo LLM — aqui o prompt só carrega a régua de plausibilidade e instrui como
-  // reconciliar quando o sistema avisar (via mensagem [SISTEMA]) a resposta do usuário.
+  // Bloco da base de horas (220h/mês CLT como TETO por pessoa) — só entra para rotina
+  // manual real e mensal. A confirmação (dias úteis × fim de semana) é conduzida pelo
+  // SISTEMA (gate determinístico no backend), NÃO pelo LLM. Aqui o prompt carrega: o
+  // teto de 220h por pessoa, a exceção de trabalho HUMANO em fim de semana (até 30 dias
+  // úteis), e a distinção crítica humano × automação. O sistema avisa via [SISTEMA].
   const baseHorasBlock = aplicaBaseHoras
     ? `
 ═══════════════════════════════════════════════════════════════════
-BASE DAS HORAS — PADRÃO CLT 220h/mês
+BASE DAS HORAS — PADRÃO CLT 220h/mês (TETO por pessoa)
 ═══════════════════════════════════════════════════════════════════
-Todo raciocínio de horas economizadas usa SEMPRE a base de tempo ÚTIL de trabalho — NUNCA horas de calendário: 1 mês ≈ 22 dias úteis ≈ 220 horas de trabalho (jornada CLT). Logo, UMA pessoa em tempo integral tem ~220h/mês de capacidade — é IMPOSSÍVEL um único cargo economizar mais horas do que ele de fato trabalha. Use 220h/mês como régua de plausibilidade de CADA linha.
+O saving é medido em HORAS HUMANAS economizadas, sempre sobre a base de tempo ÚTIL de trabalho — NUNCA horas de calendário: 1 mês ≈ 22 dias úteis ≈ 220 horas de trabalho (jornada CLT). Logo, UMA pessoa em tempo integral tem ~220h/mês de capacidade.
 
-CONFIRMAÇÃO DA BASE — CONDUZIDA PELO SISTEMA (você NÃO pergunta isso):
-   - O próprio sistema, automaticamente e no momento certo (logo antes do preview), pergunta ao usuário COM BOTÕES Sim/Não se as horas informadas já consideram essa base de 220h úteis/mês. NÃO faça você essa pergunta — não a inclua nas suas respostas.
-   - Quando o sistema te avisar (mensagem que começa com "[SISTEMA]") que o usuário CONFIRMOU a base, NÃO toque mais nesse assunto: se todos os pontos obrigatórios já estiverem completos, gere o PREVIEW.
-   - Quando o sistema te avisar que o usuário disse que as horas NÃO estão nessa base, RECONCILIE: explique em 1-2 frases o padrão (1 mês ≈ 22 dias úteis ≈ 220h de trabalho EFETIVO, não de calendário) e peça para o usuário reexpressar as horas nessa base (quantas horas de trabalho efetivo por mês, de fato). Quando ele reexpressar, atualize horas_antes/horas_depois das \`linhas\` na MESMA resposta (mantendo a sincronia linhas×memorial). NÃO gere preview enquanto as horas não forem reexpressas nessa base.
+⛔ TETO DE 220h POR PESSOA (regra dura): é PROIBIDO aceitar ou registrar uma economia que implique MAIS de ~220h/mês para UMA pessoa. Raciocine SEMPRE por pessoa: DESCONTE multiplicadores (× N lojas/unidades/colaboradores) — uma linha de 270h que representa 3 lojas é 90h por pessoa, e isso é OK; o teto é por INDIVÍDUO, não por linha. Se as horas de um único indivíduo passarem de ~220h/mês, por padrão o número está errado — reconcilie para baixo até caber na semana útil, A NÃO SER que a exceção de fim de semana abaixo se aplique.
 
-PLAUSIBILIDADE vs. 220h — exija o detalhamento quando os números não baterem:
-   - Use 220h/mês como teto de UMA pessoa. Se a economia de algum cargo for alta ou parecer exagerada frente à capacidade real — ex.: uma única atividade consumindo ~50h/mês de uma pessoa (mais de um dia útil por semana só naquilo), ou um cargo economizando uma fração grande das 220h — NÃO aceite o número solto.
-   - EXIJA o detalhamento de COMO essas horas se acumulam: a quebra por atividade × frequência × tempo por execução que SOMA exatamente o total. Isso reforça a COMPOSIÇÃO DAS HORAS (já obrigatória) — quanto maior a fração das 220h, mais granular tem de ser a justificativa.
-   - Se a soma do detalhamento não fechar com o total informado, aponte a discrepância e ajuste com o usuário (atualizando as \`linhas\`).
+EXCEÇÃO — TRABALHO HUMANO EM FIM DE SEMANA (a única forma de ultrapassar 220h):
+   - A base só pode subir acima de 220h se o usuário AFIRMAR que uma PESSOA de fato TRABALHA, USA ou É BENEFICIADA pelo processo nos fins de semana (sábado/domingo). É sobre o HUMANO — não sobre a automação.
+   - ⚠️ NÃO confunda "a automação roda todo dia / aos fins de semana" com "alguém trabalha aos fins de semana". Se a automação roda sábado e domingo mas NINGUÉM trabalha nem consome o resultado nesses dias, o saving é SÓ de dias úteis (teto 220h). Exemplo: um dashboard que ATUALIZA sábado e domingo mas que ninguém abre/usa no fim de semana NÃO gera saving de fim de semana — conta só a semana útil.
+   - Sinais VÁLIDOS (humano): "a equipe da loja trabalha aos sábados", "alguém abre/usa isso no domingo", "esse relatório é consumido por uma pessoa no fim de semana". Sinais que NÃO contam (ferramenta): "o sistema age todo dia", "roda 7 dias por semana", "atualiza no fim de semana".
+   - SOMENTE quando o trabalho humano em fim de semana for confirmado, a base por pessoa pode subir proporcionalmente aos dias realmente trabalhados, até no MÁXIMO 30 dias úteis/mês (~300h). Referências: 6 dias/semana (inclui sábado) ≈ 26 dias úteis ≈ 264h/mês; 7 dias/semana ≈ 30 dias úteis ≈ 300h/mês. NUNCA ultrapasse 30 dias úteis (~300h) por pessoa.
+
+CONFIRMAÇÃO — CONDUZIDA PELO SISTEMA (você NÃO pergunta isso):
+   - O próprio sistema, logo antes do preview, pergunta ao usuário COM BOTÕES — informando que a base padrão é 220h úteis/mês (22 dias úteis, seg–sex) — se alguém trabalha/usa o processo nos fins de semana. NÃO faça você essa pergunta nem a inclua nas suas respostas.
+   - Quando o sistema avisar (mensagem que começa com "[SISTEMA]") que é SÓ DIAS ÚTEIS: mantenha o TETO de 220h por pessoa; se alguma linha implicar mais que isso para um indivíduo, reconcilie para baixo ANTES do preview.
+   - Quando o sistema avisar que HÁ trabalho humano em fim de semana: VALIDE com cuidado (é mesmo uma pessoa trabalhando/usando, não só a automação? quantos dias por semana?). Confirmado, a base por pessoa pode subir até no máx. 30 dias úteis (~300h); ajuste as \`linhas\` conforme. Se, ao validar, ficar claro que é só a automação rodando, NÃO eleve — mantenha 220h e reconcilie.
+
+PLAUSIBILIDADE / DETALHAMENTO: se a economia de um cargo for alta frente à base aplicável (220h, ou até 300h com fim de semana humano confirmado), EXIJA o detalhamento de COMO as horas se acumulam (atividade × frequência × tempo por execução, somando exatamente o total) — reforça a COMPOSIÇÃO DAS HORAS (já obrigatória). Se a soma não fechar com o total, aponte a discrepância e ajuste as \`linhas\`.
 `
     : '';
 

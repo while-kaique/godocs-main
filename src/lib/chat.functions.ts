@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, totalEconomiaHoras } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -671,39 +671,40 @@ function avisarDivergenciaMemorialLinhas(
   return { totalTexto, totalGravado };
 }
 
-// ─── Gate determinístico: BASE das horas (padrão CLT 220h/mês) ───────────────
-// Garante que a confirmação Sim/Não da base de horas SEMPRE aconteça (com botões)
-// antes do 1º preview do saving, em rotina manual real e mensal (ver
-// aplicaConfirmacaoBaseHoras). O LLM NÃO pergunta isso — o backend força a pergunta
-// e interpreta a resposta. Escolha de implementação: gate determinístico (não só
-// prompt), à prova de o LLM esquecer ou previewar direto.
+// ─── Gate determinístico: JORNADA-BASE das horas (padrão CLT 220h/mês = TETO) ──
+// Garante que, em rotina manual real e mensal (ver aplicaConfirmacaoBaseHoras), o
+// chat SEMPRE indique a base de 220h úteis e pergunte (com botões), antes do 1º
+// preview, se há trabalho HUMANO em fim de semana — pois essa é a ÚNICA forma de a
+// base por pessoa passar de 220h (até no máx. 30 dias úteis/~300h). O LLM não faz
+// essa pergunta: o backend força e interpreta a resposta (gate determinístico,
+// à prova de o LLM esquecer ou previewar direto).
 
-// Pergunta padronizada da base de horas, com o total real no texto.
-function perguntaBase220(saving: SavingColetado): string {
-  const total = totalEconomiaHoras(saving);
-  const totalFmt = Number.isFinite(total) && total > 0 ? `essas ~${Math.round(total)}h/mês` : 'as horas';
-  return `Antes de eu fechar o memorial: ${totalFmt} que você informou já consideram a base de 220 horas úteis no mês (≈ 22 dias úteis, jornada CLT) — e não horas de calendário?`;
+// Pergunta padronizada: indica a base de 220h E pergunta sobre trabalho de fim de semana.
+function perguntaJornada(): string {
+  return 'Antes de eu fechar o memorial: a base padrão que eu uso é de **220h úteis por mês (22 dias úteis, seg–sex)**. Para fechar certo — alguém de fato **trabalha ou usa esse processo nos fins de semana** (uma pessoa, não apenas a automação rodando sozinha)?';
 }
 
-// Interpreta a resposta do usuário à pergunta da base. O botão envia o texto da
-// opção + o índice (1=Sim, 2=Não). Texto digitado cai no fallback por regex.
-// null = ambíguo (re-pergunta determinística).
-function interpretarRespostaBase220(content: string, selectedOption: number | null): 'sim' | 'nao' | null {
-  if (selectedOption === 1) return 'sim';
-  if (selectedOption === 2) return 'nao';
+// Opções (botões) da pergunta de jornada. Índice 1 = só dias úteis, 2 = fim de semana.
+const OPCOES_JORNADA = ['Não, só em dias úteis', 'Sim, há trabalho/uso humano no fim de semana'];
+
+// Interpreta a resposta. O botão envia o índice (1=dias úteis, 2=fim de semana).
+// Texto digitado cai no fallback por regex (negação vence — "não trabalho fim de
+// semana" = dias_uteis). null = ambíguo (re-pergunta determinística).
+function interpretarJornada(content: string, selectedOption: number | null): 'dias_uteis' | 'fim_de_semana' | null {
+  if (selectedOption === 1) return 'dias_uteis';
+  if (selectedOption === 2) return 'fim_de_semana';
   const t = (content ?? '').trim().toLowerCase();
   if (!t) return null;
-  if (/^(sim|s|isso|exato|exatamente|positivo|claro|com certeza|considera[m]?|sao|s[aã]o|yes)\b/.test(t)) return 'sim';
-  if (/^(n[ãa]o|nao|n|negativo|nem|no)\b/.test(t)) return 'nao';
-  if (/\bn[ãa]o\b/.test(t)) return 'nao';
-  if (/\bsim\b/.test(t)) return 'sim';
+  // Negação explícita vence (cobre "não, só dias úteis", "não trabalhamos fim de semana").
+  if (/\bn[ãa]o\b/.test(t) || /\b(s[óo]|somente|apenas)\s+(dias?\s*[úu]teis|semana)/.test(t) || /dias?\s*[úu]teis/.test(t)) return 'dias_uteis';
+  if (/\b(sim|s)\b/.test(t) || /(fim|final|fins)\s+de\s+semana|finais?\s+de\s+semana|s[áa]bado|domingo|\bfds\b|fim\s*de\s*sem/.test(t)) return 'fim_de_semana';
   return null;
 }
 
-const NUDGE_BASE220_SIM =
-  '[SISTEMA] O usuário confirmou (botão) que as horas informadas JÁ consideram a base de 220h úteis/mês. NÃO pergunte sobre isso de novo. Se todos os pontos obrigatórios do memorial já estiverem completos, gere o PREVIEW agora.';
-const NUDGE_BASE220_NAO =
-  '[SISTEMA] O usuário respondeu (botão) que as horas NÃO consideram a base de 220h úteis/mês. RECONCILIE agora: explique em 1-2 frases que a base é 1 mês ≈ 22 dias úteis ≈ 220h de trabalho efetivo (não horas de calendário) e peça para ele reexpressar as horas nessa base. Quando ele reexpressar, atualize as linhas (horas_antes/horas_depois) e o memorial. NÃO gere preview enquanto as horas não forem reexpressas nessa base.';
+const NUDGE_JORNADA_UTIL =
+  '[SISTEMA] O usuário confirmou (botão) que o trabalho/uso do processo é SÓ em dias úteis. Mantenha o TETO de 220h/mês por PESSOA (22 dias úteis). Se alguma linha implicar mais de ~220h/mês para UM indivíduo (descontando multiplicadores de lojas/unidades), reconcilie para baixo até caber na semana útil ANTES de gerar o preview. Se tudo já estiver dentro do teto, siga para o preview. NÃO pergunte sobre isso de novo.';
+const NUDGE_JORNADA_FIMSEMANA =
+  '[SISTEMA] O usuário afirmou (botão) que há trabalho/uso HUMANO no fim de semana. VALIDE com cuidado antes de elevar a base: confirme que é mesmo uma PESSOA que trabalha/usa/se beneficia do processo no sábado/domingo (não basta a automação rodar) e quantos dias por semana de fato. Só então a base por pessoa pode subir proporcionalmente, até no MÁXIMO 30 dias úteis/mês (~300h; 6 dias ≈ 26 dias/264h, 7 dias ≈ 30 dias/300h). Ajuste as linhas (horas_antes/horas_depois) conforme a base validada. Se, ao questionar, ficar claro que só a automação roda no fim de semana (ninguém trabalha nem consome), NÃO eleve a base — mantenha 220h e reconcilie. NÃO repita a pergunta de fim de semana.';
 
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
@@ -736,34 +737,35 @@ export async function enviarMensagem(rawData: unknown) {
   const tiposProjeto = getTiposProjeto(ctx);
   log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
 
-  // ── GATE BASE DAS HORAS (220h/mês) — turno de RESPOSTA à pergunta ───────────
-  // Quando a confirmação está 'pendente', este turno do usuário É a resposta Sim/Não.
-  // Registramos no estado e injetamos um nudge [SISTEMA] (efêmero, não persistido)
-  // para o orquestrador prosseguir (Sim → preview) ou reconciliar (Não). Resposta
-  // ambígua → re-pergunta determinística (sem chamar o orquestrador).
+  // ── GATE JORNADA-BASE (220h/mês = TETO) — turno de RESPOSTA à pergunta ───────
+  // Quando a jornada está 'pendente', este turno do usuário É a resposta (dias úteis
+  // × fim de semana). Registramos no estado e injetamos um nudge [SISTEMA] (efêmero,
+  // não persistido): dias úteis → manter teto de 220h/pessoa; fim de semana → validar
+  // trabalho humano e elevar até no máx. 30 dias. Resposta ambígua → re-pergunta
+  // determinística (sem chamar o orquestrador).
   const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
-  let reaskBase220: OrchestratorResult | null = null;
-  if (gateBaseHoras && estado.saving.confirmacao_220h === 'pendente') {
-    const resp = interpretarRespostaBase220(data.content, data.selected_option ?? null);
+  let reaskJornada: OrchestratorResult | null = null;
+  if (gateBaseHoras && estado.saving.jornada_base === 'pendente') {
+    const resp = interpretarJornada(data.content, data.selected_option ?? null);
     if (resp === null) {
-      log('enviarMensagem', 'Base 220h: resposta ambígua — re-perguntando (Sim/Não)');
-      reaskBase220 = {
+      log('enviarMensagem', 'Jornada-base: resposta ambígua — re-perguntando (dias úteis × fim de semana)');
+      reaskJornada = {
         type: 'options',
-        question: perguntaBase220(estado.saving),
-        options: ['Sim', 'Não'],
+        question: perguntaJornada(),
+        options: OPCOES_JORNADA,
         fase: 'saving',
         coletado: estado.coletado,
-        saving: { ...estado.saving, confirmacao_220h: 'pendente' },
+        saving: { ...estado.saving, jornada_base: 'pendente' },
         receita: estado.receita,
       };
     } else {
-      log('enviarMensagem', `Base 220h: usuário respondeu "${resp}"`);
-      estado.saving = { ...estado.saving, confirmacao_220h: resp };
-      history.push({ role: 'user', content: resp === 'sim' ? NUDGE_BASE220_SIM : NUDGE_BASE220_NAO });
+      log('enviarMensagem', `Jornada-base: usuário respondeu "${resp}"`);
+      estado.saving = { ...estado.saving, jornada_base: resp };
+      history.push({ role: 'user', content: resp === 'fim_de_semana' ? NUDGE_JORNADA_FIMSEMANA : NUDGE_JORNADA_UTIL });
     }
   }
 
-  const resultado = reaskBase220 ?? await runOrchestrator(
+  const resultado = reaskJornada ?? await runOrchestrator(
     ctx,
     history,
     estado.fase,
@@ -774,10 +776,10 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
-  // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui confirmacao_220h).
+  // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui jornada_base).
   // Re-mescla o campo gerenciado pelo backend para que ele faça round-trip no estado.
   if (resultado.saving) {
-    resultado.saving = { ...resultado.saving, confirmacao_220h: estado.saving.confirmacao_220h ?? null };
+    resultado.saving = { ...resultado.saving, jornada_base: estado.saving.jornada_base ?? null };
   }
 
   // ── SAFETY NET: memorial_calculo no objeto saving/receita ──────────────────
@@ -834,26 +836,27 @@ export async function enviarMensagem(rawData: unknown) {
     }
   }
 
-  // ── GATE BASE DAS HORAS (220h/mês) — força a pergunta antes do 1º preview ────
-  // Se o saving está em escopo e a base ainda NÃO foi confirmada, não deixamos o
-  // preview/complete passar: trocamos por uma pergunta Sim/Não (com botões) e
-  // mantemos a fase em 'saving'. Preserva o `saving` recém-trabalhado pelo LLM
-  // (linhas/memorial), só marcando confirmacao_220h='pendente'. (gateBaseHoras só
-  // checa fase+escopo; a condição de "ainda não confirmado" é o == null abaixo.)
+  // ── GATE JORNADA-BASE — força a pergunta antes do 1º preview ────────────────
+  // Se o saving está em escopo e a jornada ainda NÃO foi definida, não deixamos o
+  // preview/complete passar: trocamos por a pergunta (com botões) que indica a base
+  // de 220h e pergunta sobre trabalho de fim de semana, mantendo a fase em 'saving'.
+  // Preserva o `saving` recém-trabalhado pelo LLM (linhas/memorial), só marcando
+  // jornada_base='pendente'. (gateBaseHoras só checa fase+escopo; "ainda não definida"
+  // é o == null abaixo.)
   if (
     gateBaseHoras &&
-    estado.saving.confirmacao_220h == null &&
+    estado.saving.jornada_base == null &&
     (resultado.type === 'preview' || resultado.type === 'complete')
   ) {
-    log('enviarMensagem', '⛔ Preview/complete do saving sem confirmação da base de horas — forçando pergunta 220h (Sim/Não)');
+    log('enviarMensagem', '⛔ Preview/complete do saving sem a jornada-base definida — forçando pergunta (dias úteis × fim de semana)');
     const savingComFlag: SavingColetado = {
       ...((resultado.saving ?? estado.saving) as SavingColetado),
-      confirmacao_220h: 'pendente',
+      jornada_base: 'pendente',
     };
     Object.assign(resultado, {
       type: 'options',
-      question: perguntaBase220(savingComFlag),
-      options: ['Sim', 'Não'],
+      question: perguntaJornada(),
+      options: OPCOES_JORNADA,
       fase: 'saving',
       saving: savingComFlag,
     });

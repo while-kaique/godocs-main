@@ -80,11 +80,21 @@ describe('totalEconomiaHoras', () => {
 });
 
 describe('buildSavingPrompt — bloco BASE DAS HORAS', () => {
-  it('inclui o bloco e a régua 220h em rotina real mensal', () => {
+  it('inclui o bloco, a régua 220h e o TETO por pessoa em rotina real mensal', () => {
     const p = buildSavingPrompt(ctxBase(), doc, savingRotinaReal(), 'resumo');
     expect(p).toContain('BASE DAS HORAS');
     expect(p).toContain('220');
     expect(p).toContain('22 dias úteis');
+    expect(p).toContain('TETO');
+  });
+
+  it('traz a exceção de trabalho HUMANO em fim de semana e o teto de 30 dias', () => {
+    const p = buildSavingPrompt(ctxBase(), doc, savingRotinaReal(), 'resumo');
+    expect(p).toContain('fim de semana');
+    expect(p).toContain('30 dias úteis');
+    // distinção crítica humano × automação
+    expect(p.toLowerCase()).toContain('automação');
+    expect(p).toContain('300h');
   });
 
   it('a confirmação é CONDUZIDA PELO SISTEMA (o LLM não pergunta)', () => {

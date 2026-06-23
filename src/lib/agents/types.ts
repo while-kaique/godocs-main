@@ -81,13 +81,15 @@ export type SavingColetado = {
   // economia_reais_mes. Fonte da verdade é projeto.custo_externo_mensal; carregado
   // aqui por recomputarSavingFinanceiro para o memorial enriquecido refleti-lo.
   custo_externo_mensal?: number | null;
-  // Confirmação DETERMINÍSTICA da BASE das horas (padrão CLT 220h/mês). NÃO é
-  // setado pelo LLM — o orquestrador não o ecoa; o chat.functions o re-mescla a
-  // cada turno e força a pergunta (com botões Sim/Não) antes do 1º preview.
-  // null/ausente = ainda não perguntado · 'pendente' = pergunta feita, aguardando
-  // resposta · 'sim'/'nao' = respondido. Só vale quando aplicaConfirmacaoBaseHoras
-  // (rotina manual real e mensal — ver orchestrator.ts).
-  confirmacao_220h?: 'pendente' | 'sim' | 'nao' | null;
+  // Jornada-base DETERMINÍSTICA das horas. A base padrão é 220h/mês (22 dias úteis,
+  // seg–sex) e é TETO por pessoa; só sobe (até 30 dias úteis/~300h) se houver trabalho
+  // HUMANO em fim de semana confirmado. NÃO é setado pelo LLM — o orquestrador não o
+  // ecoa; o chat.functions o re-mescla a cada turno e força a pergunta (com botões)
+  // antes do 1º preview. null/ausente = ainda não perguntado · 'pendente' = pergunta
+  // feita, aguardando resposta · 'dias_uteis' = só dias úteis (teto 220h) · 'fim_de_semana'
+  // = trabalho humano em fim de semana afirmado (base pode subir). Só vale quando
+  // aplicaConfirmacaoBaseHoras (rotina manual real e mensal — ver orchestrator.ts).
+  jornada_base?: 'pendente' | 'dias_uteis' | 'fim_de_semana' | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -101,7 +103,7 @@ export const savingVazio = (): SavingColetado => ({
   custo_evitado_tipo: null,
   custo_evitado_descricao: null,
   custo_externo_mensal: null,
-  confirmacao_220h: null,
+  jornada_base: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
