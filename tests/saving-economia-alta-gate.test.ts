@@ -42,6 +42,9 @@ describe("gate de economia alta — buildSavingPrompt", () => {
     expect(prompt).toContain("124h/mês");
     // gate adicional no passo 4 do "COMO CONDUZIR"
     expect(prompt).toContain("GATE ADICIONAL");
+    // a justificativa de validade é registro obrigatório no ponto fixo [2.4]
+    expect(prompt).toContain("REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4])");
+    expect(prompt).toContain("JUSTIFICATIVA");
   });
 
   it("dispara no limiar exato de 44h", () => {

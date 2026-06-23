@@ -515,7 +515,9 @@ INVESTIGUE (e registre a resposta):
 - Se a pessoa segue no MESMO cargo e equipe sem mudança aparente: o que ela faz agora nessas horas, e isso virou mais entrega/capacidade mensurável? Se "nada mudou", então a economia declarada provavelmente está inflada — reabra a validação das horas.
 - ${linhasIndividuaisAltas.length ? 'Para CADA cargo com ≥44h/mês individuais, questione separadamente o que mudou na rotina daquela pessoa — não generalize uma resposta única para todos.' : 'Confirme que a soma das mudanças por pessoa explica o total declarado.'}
 
-GATE: é PROIBIDO gerar o preview sem este ponto preenchido de forma concreta. No memorial, isto vira a seção "### O que mudou após a automação" (texto qualitativo, SEM R$), logo após o total de horas.
+REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela: (a) o destino concreto do tempo/custo liberado e (b) uma frase explícita concluindo que o ganho é válido por causa dessa mudança (ex.: "Essas Xh/mês são reais porque a pessoa foi realocada para Y / o time passou a atender Z / o serviço W foi cancelado"). Texto qualitativo, SEM R$.
+
+GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa concreta (não basta descrever a rotina antiga — precisa dizer o que mudou E por que isso valida a economia). A seção vem logo após o total de horas.
 ═══════════════════════════════════════════════════════════════════`
     : '';
 
@@ -557,7 +559,7 @@ Para CADA pessoa/cargo listada acima, colete:
   - Horas depois da automação: quanto tempo ainda gasta (já tem do formulário, mas valide)
   - Economia de horas: antes − depois → CALCULE VOCÊ
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
-[2.4] O que mudou após a automação: OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}
+[2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}
 
 SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS
 [3.1] Serviço/contrato evitado: o que seria contratado/foi cancelado → INVESTIGUE COM O USUÁRIO
@@ -596,7 +598,7 @@ COMO CONDUZIR:
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
 4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
-6. Quando a justificativa for concreta e a conta fechar, gere o PREVIEW.
+6. Quando a justificativa for concreta, a conta fechar E o ganho for REAL (já em produção e medido — NÃO projetado; ver "GANHO REAL × PROJETADO" abaixo), gere o PREVIEW.
 
 TIPO DE SAVING — ${isPontual ? 'PONTUAL' : 'MENSAL'}:
 ${isPontual
@@ -607,6 +609,16 @@ ${isPontual
   : `Este é um saving MENSAL — a tarefa se repete todo mês.
 - As horas representam a economia POR MÊS.
 - Pergunte sobre a rotina mensal: quais tarefas, com que frequência dentro do mês, quanto tempo cada execução.`}
+
+═══════════════════════════════════════════════════════════════════
+GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes de QUALQUER preview)
+═══════════════════════════════════════════════════════════════════
+O GoDocs documenta APENAS ganhos JÁ REALIZADOS: a automação está EM PRODUÇÃO e os tempos "depois" foram MEDIDOS na prática. Ganho PROJETADO (expectativa do que a ferramenta "deve" trazer quando estiver pronta/rodando) NÃO é aceito aqui — é a primeira premissa do formulário.
+- SINAIS DE PROJEÇÃO (vigie o que o usuário escreve, sobretudo no "depois"): "a expectativa é", "a projeção é", "pretendemos", "estimamos que vai", "deve reduzir/cair", "vai cair para", "quando estiver pronto/rodando", "a nova ferramenta vai/deve", e verbos no FUTURO/CONDICIONAL para o ganho ("conseguiremos", "será gasto", "teremos disponível", "passará a"). Também é projeção quando a automação AINDA NÃO está em produção (será lançada, está em testes) ou o "depois" nunca foi medido de fato.
+- AO DETECTAR projeção, PARE e pergunte UMA vez, direto: "Essa redução de tempo JÁ está acontecendo no dia a dia e foi medida na prática, ou é uma expectativa do que a ferramenta deve trazer quando estiver rodando?"
+  • Se o usuário CONFIRMAR que já está em produção e os tempos "depois" foram MEDIDOS (peça a base: há quanto tempo roda e como mediram), ACEITE — e escreva o memorial em tempo PASSADO/PRESENTE ("passou a levar 30 min", "hoje leva 2h"), NUNCA em "a expectativa é"/"a projeção é".
+  • Se for apenas expectativa/estimativa (a ferramenta ainda não roda ou o ganho não foi medido), NÃO gere o preview de saving. Explique que o GoDocs registra ganhos JÁ realizados e oriente a (a) voltar quando a ferramenta estiver rodando e o ganho medido, ou (b) submeter como PROJETO ESPECIAL se for caso de alto impacto e difícil mensuração. NÃO monte memorial com números projetados.
+- ESCOPO: este portão barra o "DEPOIS" projetado / a ferramenta que ainda não entrega o ganho. NÃO confunda com o "antes": o "antes" pode ser histórico real OU equivalente manual estimado (saving contrafactual — ver regras), e isso é legítimo. No contrafactual, a automação JÁ está rodando (fazendo o trabalho) — se ela ainda nem existe em produção, então é projeção e cai neste portão.
 
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0):
 - ATENÇÃO: as regras abaixo valem APENAS para linhas que TÊM rotina manual prévia (horas_antes > 0). Para linhas com 0h antes, NÃO se aplicam — não cobre detalhamento de rotina nem "faça a conta" de algo que ninguém fazia.
@@ -667,11 +679,12 @@ Opções:
 TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [1.1], [2.2], [3.1] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê a aprovação depois sabe o que "[2.2]" significa. Cada ponto vira um TÍTULO em negrito ("**O que fazia:**", "**Serviço evitado:**" …); use os cabeçalhos "### ..." para as seções e rótulos em negrito para os itens dentro delas, exatamente como no exemplo abaixo.
 
 Preview (SOMENTE quando TODOS os pontos obrigatórios estiverem preenchidos):
-{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Composição: Xh que compõem: atividade-a (Ah), atividade-b (Bh), ... (soma = X)\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n${economiaAlta ? '\\n### O que mudou após a automação\\n... (destino concreto do tempo/custo liberado: realocação, mais volume atendido, redução de equipe, serviço cancelado — sem R$)\\n' : ''}\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Saving de Pessoas\\n**Pessoas envolvidas:** N pessoas — ...\\n\\n**1) Cargo**\\n- O que fazia: ...\\n- Frequência e tempo: ...\\n- Cálculo: ...\\n- Composição: Xh que compõem: atividade-a (Ah), atividade-b (Bh), ... (soma = X)\\n- Horas depois: ...\\n- Economia: ...\\n\\n(repete por pessoa)\\n\\n**Total de horas:** ...\\n${economiaAlta ? '\\n### O que mudou após a automação\\n... (destino concreto do tempo/custo liberado: realocação, mais volume atendido, redução de equipe, serviço cancelado) + frase concluindo que o ganho é válido por causa disso — sem R$\\n' : ''}\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ... (ou \\"N/A\\")\\n**Custo evitado:** ...\\n**Rateio:** ...\\n\\n### Custo da Automação\\n**Ferramenta externa:** ... (ou \\"N/A\\")\\n**Monitoramento:** ...\\n**Custo total:** ...\\n\\n### Resumo\\n- Economia total: Xh/${isPontual ? 'total' : 'mês'}\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
 ATENÇÃO 2: se houver custo evitado, inclua "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula.
-ATENÇÃO 3: NUNCA escreva valores em R$ no "content" nem no "memorial_calculo". Nada de "R$", "reais", taxa/hora ou totais financeiros — apenas horas e descrições. O custo evitado em R$ vai SÓ no campo \`custo_evitado_reais\`.`;
+ATENÇÃO 3: NUNCA escreva valores em R$ no "content" nem no "memorial_calculo". Nada de "R$", "reais", taxa/hora ou totais financeiros — apenas horas e descrições. O custo evitado em R$ vai SÓ no campo \`custo_evitado_reais\`.
+ATENÇÃO 4: o memorial descreve um ganho JÁ REALIZADO. É PROIBIDO usar linguagem de projeção no "content"/"memorial_calculo" — nada de "a expectativa é", "a projeção é", "deve reduzir/cair", "vai passar a" nem verbos no futuro para o ganho. Se o ganho foi confirmado como real (ver "GANHO REAL × PROJETADO"), descreva-o no passado/presente ("passou a levar", "hoje leva"). Se o ganho ainda for projetado, você nem deveria estar gerando preview — volte e aplique o portão.`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {
