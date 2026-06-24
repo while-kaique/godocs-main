@@ -9,6 +9,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ResultadoAnalise, CriterioResult, Complexidade } from './types';
+import { detectarAiProxy } from './extractor';
 
 const log = (...args: unknown[]) => console.log('[analyzer]', ...args);
 const err = (...args: unknown[]) => console.error('[analyzer]', ...args);
@@ -211,6 +212,13 @@ Antes de escolher a complexidade, responda objetivamente: **a AUTOMAÇÃO, quand
 
 Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
 
+## AI PROXY (governança de custo)
+
+Os metadados trazem "usa_ai_proxy_declarado" (resposta do formulário: 'sim'/'nao'/null) e "ai_proxy_detectado_na_doc" (booleano: o gateway interno ai-proxy.gogroupbr.com foi encontrado no material enviado). Compare os dois e, **se houver divergência**, registre-a em UMA frase nas Observações/resumo (NÃO altere o resultado nem a complexidade por causa disso):
+- detectado=true mas declarado='nao' (ou null): o código usa o AI Proxy mas o autor não declarou — aponte para conferência.
+- detectado=false mas declarado='sim': o autor declarou usar o AI Proxy mas não há evidência na doc — aponte para conferência.
+- Se o projeto usa IA na execução ("usa_ia"=true) mas NÃO passa pelo AI Proxy (declarado='nao' e detectado=false), registre que vale orientar a migração para o proxy interno (economia de custo). Quando declaração e detecção batem, não comente.
+
 ## FORMATO DE RESPOSTA
 
 Responda APENAS com JSON válido, exatamente neste formato.
@@ -270,6 +278,12 @@ function buildUserMessage(
       // false → sem IA como funcionalidade, processo puramente determinístico.
       // null  → não foi perguntado (submissão antiga); infira pela documentação.
       tem_ia_como_funcionalidade: conteudo.tem_ia_como_funcionalidade ?? null,
+      // Governança de IA: o usuário DECLAROU no formulário se usa o AI Proxy interno
+      // ('sim'/'nao'/null) e nós DETECTAMOS o uso do gateway (ai-proxy.gogroupbr.com)
+      // na doc enviada. Se há detecção mas a declaração foi 'nao' (ou vice-versa),
+      // sinalize a divergência nas Observações (não bloqueia).
+      usa_ai_proxy_declarado: projeto.usa_ai_proxy ?? null,
+      ai_proxy_detectado_na_doc: detectarAiProxy(docTexto),
     },
     documentacao_tecnica: {
       o_que_faz: conteudo.o_que_faz ?? '(não preenchido)',

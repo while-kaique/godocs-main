@@ -581,6 +581,29 @@ export function Step2({
         </div>
       </FormGroup>
 
+      {/* Usa AI Proxy? — governança de custo de IA (gateway interno da empresa) */}
+      <FormGroup>
+        <FormLabel
+          required
+          hint="O AI Proxy (ai-proxy.gogroupbr.com) é o gateway interno de IA da empresa, que reduz o custo das chamadas. Marque Sim se o projeto roteia chamadas de IA por ele. Marque Não se não usa IA ou usa IA sem passar pelo proxy."
+        >
+          Este projeto usa o AI Proxy?
+        </FormLabel>
+        <RadioGroup
+          name="usaAiProxy"
+          value={form.usaAiProxy}
+          onChange={(v) => {
+            updateField("usaAiProxy", v as FormData["usaAiProxy"]);
+            clearError("usaAiProxy");
+          }}
+          options={[
+            { value: "sim", label: "Sim" },
+            { value: "nao", label: "Não" },
+          ]}
+          error={errors.usaAiProxy}
+        />
+      </FormGroup>
+
       {/* Upload de arquivos */}
       <FormGroup>
         <FormLabel required>

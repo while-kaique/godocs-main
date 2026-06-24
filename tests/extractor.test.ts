@@ -1,6 +1,24 @@
 // Testes: helpers puros do extractor (normalização e divisão em lotes)
 import { describe, it, expect } from 'vitest';
-import { norm, dividirEmLotes, parseFlexivel } from '@/lib/agents/extractor';
+import { norm, dividirEmLotes, parseFlexivel, detectarAiProxy } from '@/lib/agents/extractor';
+
+describe('detectarAiProxy — auto-detecção do gateway interno de IA', () => {
+  it('detecta o host ai-proxy.gogroupbr.com no material enviado', () => {
+    expect(detectarAiProxy('const url = "https://ai-proxy.gogroupbr.com/v1/chat/completions"')).toBe(true);
+    expect(detectarAiProxy('faça um POST para AI-PROXY.GOGROUPBR.COM')).toBe(true); // case-insensitive
+    expect(
+      detectarAiProxy('await fetch("https://ai-proxy.gogroupbr.com/v1/chat/completions", { method: "POST" })'),
+    ).toBe(true);
+  });
+
+  it('NÃO detecta quando o proxy não aparece', () => {
+    expect(detectarAiProxy('chamada direta para api.openai.com')).toBe(false);
+    expect(detectarAiProxy('usa o gateway da empresa, mas sem URL')).toBe(false);
+    expect(detectarAiProxy('')).toBe(false);
+    expect(detectarAiProxy(null)).toBe(false);
+    expect(detectarAiProxy(undefined)).toBe(false);
+  });
+});
 
 describe('norm — normalização de valores do LLM', () => {
   it('converte a STRING "null" (e variações) para null real', () => {

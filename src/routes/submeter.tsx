@@ -73,6 +73,8 @@ type AgentMeta = {
   participantes: string[];
   dataCriacao: string;
   descricaoBreve: string;
+  // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
   contextoEspecial: string;
 };
@@ -298,6 +300,7 @@ export function SubmeterPageContent({
           dataCriacao: (data.data_criacao_projeto as string) ?? "",
           tipoProjeto: tiposProjeto,
           descricaoBreve: (data.descricao_breve as string) ?? "",
+          usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
         };
@@ -438,6 +441,7 @@ export function SubmeterPageContent({
           participantes: newForm.participantes,
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
+          usaAiProxy: newForm.usaAiProxy,
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
@@ -615,6 +619,7 @@ export function SubmeterPageContent({
     dataCriacao: today,
     tipoProjeto: [],
     descricaoBreve: "",
+    usaAiProxy: "",
     especial: false,
     contextoEspecial: "",
   });
@@ -711,8 +716,9 @@ export function SubmeterPageContent({
     participantes: form.participantes,
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
+    usaAiProxy: form.usaAiProxy,
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -774,6 +780,8 @@ export function SubmeterPageContent({
       }
       if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
         errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.usaAiProxy)
+        errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
         errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
@@ -929,6 +937,7 @@ export function SubmeterPageContent({
           tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
           tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
@@ -1004,6 +1013,7 @@ export function SubmeterPageContent({
           membros: form.participantes,
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
@@ -1037,6 +1047,7 @@ export function SubmeterPageContent({
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
           docs,
@@ -1108,6 +1119,7 @@ export function SubmeterPageContent({
           membros: meta.participantes,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
+          usa_ai_proxy: meta.usaAiProxy || undefined,
           contexto_especial: meta.contextoEspecial,
           docs,
         },
@@ -1189,6 +1201,7 @@ export function SubmeterPageContent({
               membros: meta.participantes,
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
+              usa_ai_proxy: meta.usaAiProxy || undefined,
               contexto_especial: meta.contextoEspecial,
               reset_doc: true,
             },
@@ -1251,6 +1264,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
           });
           setAgentMeta(meta);
         } catch (e) {
@@ -1344,6 +1358,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
             reset_doc: true,
           }
         );

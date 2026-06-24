@@ -64,6 +64,7 @@ export const SHEET_COLUMNS = [
   'Especial?',                      // AI
   'Atualizado Em',                  // AJ (carimbo da última escrita do sistema)
   'Alocação Ganhos',                // AK (justificativa [2.4] do gate ≥44h — fatiada do memorial)
+  'Usa AI Proxy',                   // AL (governança: 'Sim'/'Não' declarado no formulário)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
