@@ -44,7 +44,7 @@ import {
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
 import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
-import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho } from '@/lib/meus-projetos.functions'
+import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
@@ -171,6 +171,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!email) return errorJson('Não autorizado.', 401)
       const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
       return json(await excluirRascunho(email, id))
+    }
+    // Distribuir o poder de edição: define os editores delegados (participantes que
+    // podem editar/reenviar como o dono). Gate de ownership/cascata na função.
+    // ANTES do GET genérico abaixo (mas é POST, então sem colisão real de método).
+    if (pathname.startsWith('/api/meus-projetos/') && pathname.endsWith('/editores') && method === 'POST') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
+      const body = await readBody<{ editores?: unknown }>(request)
+      return json(await definirEditoresDelegados(email, id, body?.editores))
     }
     if (pathname.startsWith('/api/meus-projetos/') && method === 'GET') {
       const email = getEmailFromRequest(request)

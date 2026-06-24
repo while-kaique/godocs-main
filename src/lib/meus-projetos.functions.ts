@@ -8,6 +8,7 @@ import {
   getLatestVersionByProjeto,
   getChatMessages,
   excluirProjetoCascade,
+  updateProjeto,
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
@@ -32,9 +33,18 @@ export type MeuProjetoItem = {
   // Legado pendente: submetido (não-rascunho) mas sem "Atualizado Em" no Sheets →
   // precisa ser editado/reenviado até o prazo para regularizar.
   pendente: boolean;
-  // Papel do usuário neste projeto: 'owner' (submeteu, pode editar) ou
-  // 'participante' (está nos membros, só visualiza).
+  // Papel do usuário neste projeto: 'owner' (submeteu) ou 'participante' (está nos
+  // membros). NÃO determina sozinho a edição — um participante pode ser editor
+  // delegado (ver `podeEditar`).
   papel: Papel;
+  // Este usuário pode editar/reenviar o projeto? true = owner OU editor delegado.
+  // (Na lista de "Meus Projetos" só há owner/participante, então true ⟺ owner|delegado.)
+  podeEditar: boolean;
+  // Participantes do projeto (emails, caso original preservado) — usados pelo dono/
+  // editor delegado no popup de distribuição do poder de edição.
+  membros: string[];
+  // Participantes a quem o poder de edição foi delegado (subconjunto de `membros`).
+  editores_delegados: string[];
   // Autoria (para exibir nos cards e no tooltip de transferência de autoria).
   responsavel_nome: string | null;
   responsavel_email: string | null;
@@ -92,7 +102,7 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   memorial_calculo: string | null;
   documentacao: unknown | null;
   ultima_versao: VersaoSnapshot | null;
-  // Pode editar? true = owner ou admin RPA. Participante recebe false (só visualiza).
+  // Pode editar? true = owner, editor delegado, ou admin RPA (sem ser participante).
   podeEditar: boolean;
 };
 
@@ -109,9 +119,25 @@ export function ehParticipante(projeto: ProjetoRow, email: string): boolean {
   return membros.some((m) => m.trim().toLowerCase() === alvo);
 }
 
-// Tem acesso de LEITURA (owner ou participante). Edição é só do owner (ehOwner).
+// Tem acesso de LEITURA (owner ou participante). Edição é do owner OU de um editor
+// delegado (ehEditorDelegado).
 export function temAcesso(projeto: ProjetoRow, email: string): boolean {
   return ehOwner(projeto, email) || ehParticipante(projeto, email);
+}
+
+// EDITOR DELEGADO = participante (membro) a quem o dono delegou o poder de edição
+// (lista em `editores_delegados`). Pode editar/reenviar "como se fosse o dono".
+// Interseção defensiva com `membros`: se a pessoa sai de `membros` (ex.: editado no
+// Sheets), a delegação deixa de valer sozinha. O owner nunca é delegado (o poder dele
+// vem de ehOwner) — a sanitização em `definirEditoresDelegados` já o remove da lista.
+export function ehEditorDelegado(projeto: ProjetoRow, email: string): boolean {
+  if (ehOwner(projeto, email)) return false;
+  const alvo = email.trim().toLowerCase();
+  if (!alvo) return false;
+  const membros = parseJson<string[]>(projeto.membros) ?? [];
+  if (!membros.some((m) => m.trim().toLowerCase() === alvo)) return false;
+  const delegados = parseJson<string[]>(projeto.editores_delegados) ?? [];
+  return delegados.some((d) => d.trim().toLowerCase() === alvo);
 }
 
 export type Papel = 'owner' | 'participante';
@@ -147,6 +173,7 @@ function mapItem(
   p: ProjetoRow & { area_nome: string | null },
   atualizadoEm: string | null,
   papel: Papel,
+  podeEditar: boolean,
   statusSheet?: string | null,
 ): MeuProjetoItem {
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
@@ -181,6 +208,9 @@ function mapItem(
     // (contarPendentes) segue contando só os do owner — é a lista de ações dele.
     pendente: ehLegado(p.id) && !at,
     papel,
+    podeEditar,
+    membros: parseJson<string[]>(p.membros) ?? [],
+    editores_delegados: parseJson<string[]>(p.editores_delegados) ?? [],
     responsavel_nome: p.responsavel_nome ?? null,
     responsavel_email: p.responsavel_email ?? null,
   };
@@ -218,6 +248,8 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
         p,
         resolverAtualizadoEm(atualizadoMap.get(p.id.toLowerCase()), p.atualizado_em),
         ehOwner(p, email) ? 'owner' : 'participante',
+        // Na lista (só owner/participante), pode editar = owner OU editor delegado.
+        ehOwner(p, email) || ehEditorDelegado(p, email),
         statusMap.get(p.id.toLowerCase()) ?? null,
       ),
     );
@@ -268,6 +300,52 @@ export async function excluirRascunho(email: string, projetoId: string): Promise
   return { ok: true };
 }
 
+/**
+ * Define a lista de EDITORES DELEGADOS de um projeto — participantes que podem
+ * editar/reenviar como se fossem o dono. Quem pode gerenciar a lista: o dono OU um
+ * editor já delegado (cascata, conforme decidido com o usuário). A lista é sanitizada
+ * para conter apenas emails que são participantes atuais (`membros`), sem duplicatas e
+ * sem o dono (o poder do dono vem de `ehOwner`, não da lista). Persistida em
+ * `projetos.editores_delegados` (JSON). Conceito interno — não vai ao Google Sheets.
+ */
+export async function definirEditoresDelegados(
+  email: string,
+  projetoId: string,
+  editores: unknown,
+): Promise<{ ok: true; editores_delegados: string[] }> {
+  const p = await getProjetoById(projetoId);
+  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  // Gate: só quem tem poder de edição pelo círculo de participantes — dono ou editor
+  // já delegado (cascata). Admin-override NÃO gerencia delegação (não é participante).
+  if (!ehOwner(p, email) && !ehEditorDelegado(p, email)) {
+    throw Object.assign(
+      new Error('Apenas o dono ou um editor delegado pode distribuir o poder de edição.'),
+      { status: 403 },
+    );
+  }
+  if (!Array.isArray(editores)) {
+    throw Object.assign(new Error('Lista de editores inválida.'), { status: 400 });
+  }
+  // Sanitiza: só participantes atuais (membros), sem duplicatas, nunca o dono.
+  const membros = parseJson<string[]>(p.membros) ?? [];
+  const membrosLower = new Set(membros.map((m) => m.trim().toLowerCase()));
+  const ownerLower = (p.responsavel_email ?? '').trim().toLowerCase();
+  const vistos = new Set<string>();
+  const limpos: string[] = [];
+  for (const raw of editores) {
+    if (typeof raw !== 'string') continue;
+    const e = raw.trim();
+    const lower = e.toLowerCase();
+    if (!lower || lower === ownerLower) continue;
+    if (!membrosLower.has(lower)) continue; // só participantes do projeto
+    if (vistos.has(lower)) continue;
+    vistos.add(lower);
+    limpos.push(e);
+  }
+  await updateProjeto(projetoId, { editores_delegados: limpos });
+  return { ok: true, editores_delegados: limpos };
+}
+
 export async function getMeuProjeto(
   id: string,
   email: string,
@@ -282,11 +360,13 @@ export async function getMeuProjeto(
   if (!temAcesso(data, email) && !ehAdmin) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
-  // EDIÇÃO: só o owner (quem submeteu) ou um admin RPA. Participante só visualiza —
-  // e ser participante VENCE o override de admin: um admin que também é participante
-  // do projeto NÃO edita (vê como qualquer participante). O override de admin vale só
-  // para projetos em que ele não tem papel (não é owner nem participante).
-  const podeEditar = ehOwner(data, email) || (ehAdmin && !ehParticipante(data, email));
+  // EDIÇÃO: o owner (quem submeteu), um editor delegado (participante a quem o dono
+  // delegou o poder) ou um admin RPA. Participante comum só visualiza — e ser
+  // participante (não-delegado) VENCE o override de admin: um admin que também é
+  // participante do projeto NÃO edita (vê como qualquer participante). O override de
+  // admin vale só para projetos em que ele não tem papel (não é owner nem participante).
+  const podeEditar =
+    ehOwner(data, email) || ehEditorDelegado(data, email) || (ehAdmin && !ehParticipante(data, email));
   const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
 
   const docRow = data.documentacao?.[0];
@@ -305,7 +385,7 @@ export async function getMeuProjeto(
   }
 
   // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null, papel);
+  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null, papel, podeEditar);
   return {
     ...base,
     podeEditar,

@@ -219,6 +219,12 @@ const MIGRATIONS = [
   // pendente de regularização. Persistir no SQLite deixa a contagem de pendentes
   // (selo da home) instantânea, sem precisar ler a planilha a cada load.
   'ALTER TABLE projetos ADD COLUMN atualizado_em TEXT',
+  // Editores delegados (JSON array de emails). O dono pode distribuir o poder de
+  // edição a participantes específicos (membros), que passam a editar/reenviar
+  // "como se fossem o dono". Conceito INTERNO do app — NÃO existe coluna no Sheets,
+  // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
+  // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
+  'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

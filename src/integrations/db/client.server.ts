@@ -891,6 +891,9 @@ export type ProjetoRow = {
   // Espelho do "Atualizado Em" do Sheets. NULL = app nunca sincronizou p/ a planilha
   // = legado pendente (alimenta a contagem de pendentes sem ler o Sheets).
   atualizado_em: string | null;
+  // Editores delegados (JSON array de emails). Participantes a quem o dono delegou o
+  // poder de edição. Conceito interno (não vai ao Sheets). Ver meus-projetos.functions.ts.
+  editores_delegados: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
