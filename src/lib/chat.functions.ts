@@ -1146,6 +1146,25 @@ export async function iniciarSaving(rawData: unknown) {
     tiposProjeto,
   );
 
+  // Backstop determinístico — CUSTO EVITADO PURO (alguem_fazia='externo'): o ganho é
+  // 100% o custo externo eliminado, então o agente NÃO pode carimbar o preview no 1º
+  // turno sem argumentar. Se o LLM pulou a validação e já devolveu preview, trocamos
+  // por UMA pergunta obrigatória (realidade + atribuição + escopo). O turno seguinte
+  // (enviarMensagem) deixa o agente previewar já com a resposta registrada no memorial.
+  // (Prompt-only não basta — o LLM tende a pular se o contexto parece claro.)
+  if (ctx.alguem_fazia === 'externo' && resultado.type === 'preview') {
+    log('iniciarSaving', '⛔ custo evitado puro previewou no 1º turno — forçando validação (realidade/atribuição/escopo)');
+    Object.assign(resultado, {
+      type: 'question',
+      fase: 'saving',
+      content:
+        'Antes de fechar o memorial, preciso confirmar o ganho — ele vem 100% de um custo externo eliminado, então vale validar:\n' +
+        '1) Esse contrato/serviço já foi DE FATO encerrado ou reduzido na prática (não algo que ainda vai acontecer)?\n' +
+        '2) O encerramento foi por causa desta automação (ela assumiu o trabalho)?\n' +
+        '3) O que esse contrato cobria? (ex.: quantos agentes/pessoas, qual volume de atendimentos por mês)',
+    });
+  }
+
   // Evento de timeline: valores do formulário de saving. `voltou` indica reentrada
   // (a pessoa voltou à etapa para reeditar) — já havia um evento 'saving' antes.
   const savingVoltou = await hasFormEventTipo(data.projeto_id, 'saving');

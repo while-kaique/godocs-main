@@ -16,6 +16,7 @@ import type {
   SavingColetado,
 } from './types';
 import { documentacaoVazia, receitaVazia, savingVazio } from './types';
+import { descreverEsqueletoMemorial } from './memorial-format';
 
 // Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
 // **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
@@ -480,10 +481,12 @@ O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualm
 CUSTO EVITADO JÁ COLETADO NO FORMULÁRIO (não pergunte de novo, não peça R$):
 ${saving.custo_evitado_descricao ? saving.custo_evitado_descricao : '(o usuário marcou que eliminou um gasto externo — o detalhe veio nos itens do formulário)'}
 
-SUA MISSÃO (enxuta — no máximo 1 a 2 perguntas, só se necessário):
-1. CONFIRMAR que a automação realmente assumiu/substituiu o que esse contrato/serviço fazia (é coerente com o que o projeto faz?). Se o contexto técnico já deixa isso claro, NÃO pergunte — siga.
-2. CONFIRMAR que o gasto foi DE FATO eliminado/cancelado (ou reduzido) na prática — ver PORTÃO abaixo.
-3. Montar o memorial e gerar o preview.
+SUA MISSÃO — VALIDAÇÃO OBRIGATÓRIA (faça SEMPRE, mesmo que o briefing pareça claro — aqui o custo evitado é o GANHO INTEIRO do projeto, então NÃO pode ser carimbado sem argumentação):
+⛔ É PROIBIDO gerar o preview sem ANTES perguntar ao usuário e obter resposta para os 3 pontos abaixo. Faça as perguntas que faltarem (pode agrupar numa única mensagem); só depois monte o memorial.
+1. REALIDADE: esse contrato/serviço JÁ foi encerrado ou reduzido na PRÁTICA? (não "vamos cancelar" — ver PORTÃO abaixo).
+2. ATRIBUIÇÃO: o encerramento foi POR CAUSA desta automação (ela assumiu o trabalho), e não um corte por outro motivo?
+3. ESCOPO: o que esse contrato cobria, em termos concretos? (ex.: quantos agentes/pessoas, qual volume — "1 agente terceirizado, ~1.200 atendimentos/mês"). Isso dá SUBSTÂNCIA ao memorial para o validador humano cruzar com o valor.
+Registre as respostas dos 3 pontos na seção "Contratos/Serviços Evitados" do memorial. NÃO peça o valor em R$ (já veio do formulário).
 
 ═══════════════════════════════════════════════════════════════════
 GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes do preview)
@@ -494,16 +497,9 @@ O GoDocs documenta APENAS ganhos JÁ REALIZADOS. O contrato/serviço precisa JÁ
 
 ⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o preview são exibidos ao usuário e NÃO podem conter NENHUM valor em R$ (nem o valor do custo evitado). Descreva o contrato/serviço de forma QUALITATIVA (o que era, periodicidade ${isPontual ? 'pontual' : 'mensal'}). O valor em R$ vive SÓ no campo \`custo_evitado_reais\` (preenchido pelo formulário — PRESERVE, não altere).
 
-MEMORIAL PADRONIZADO (este caso — SEM "Saving de Pessoas"):
-### Contexto
-**Resumo:** 1-2 frases do que o projeto faz (use o contexto aprovado).
-### Contratos/Serviços Evitados
-**Serviço evitado:** o contrato/serviço de terceiro que a automação substituiu e que deixou de ser pago.
-**Custo evitado:** descrição qualitativa (periodicidade ${isPontual ? 'pontual' : 'mensal'}), SEM R$.
-**Rateio:** ${isPontual ? 'gasto único (pontual)' : 'gasto recorrente mensal'}.
-### Resumo
-- Ganho: custo externo eliminado (${isPontual ? 'pontual' : 'mensal'})
-- Tipo: ${saving.tipo_saving ?? 'mensal'}
+ESTRUTURA DO MEMORIAL — SEÇÕES OBRIGATÓRIAS (fonte única: MEMORIAL_ESQUELETO em memorial-format.ts):
+${descreverEsqueletoMemorial('custo_evitado')}
+(Rateio: ${isPontual ? 'gasto único — pontual' : 'gasto recorrente — mensal'}. NÃO crie seção "Saving de Pessoas" nem horas.)
 
 PRESERVE os campos do custo evitado vindos do formulário: \`custo_evitado_reais\` (número), \`custo_evitado_tipo\`, \`custo_evitado_descricao\`. NÃO os altere e NÃO preencha \`economia_reais_mes\` (o backend recalcula). Mantenha \`linhas\` = [] e \`economia_horas_mes\` = 0.
 
