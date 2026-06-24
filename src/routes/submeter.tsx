@@ -57,6 +57,8 @@ const emptyFormDraft = (): SavingFormData => ({
   temContrafactualAdicional: "",
   temCustoEvitado: "",
   custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  temCustoProjeto: "",
+  custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
@@ -348,6 +350,22 @@ export function SubmeterPageContent({
             } catch {
               custoEvitadoItens = [];
             }
+            // Custos do projeto: mesma repopulação (JSON salvo na submissão).
+            let custoProjetoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
+            try {
+              const raw = data.custo_projeto_itens;
+              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(arr)) {
+                custoProjetoItens = arr.map((it: Record<string, unknown>) => ({
+                  nome: String(it.nome ?? ""),
+                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
+                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
+                  justificativa: String(it.justificativa ?? ""),
+                }));
+              }
+            } catch {
+              custoProjetoItens = [];
+            }
             // Reconstrói a árvore do form a partir do alguem_fazia persistido:
             // 'externo' = custo evitado puro (Não → elimina Sim → sem adicional);
             // 'nao' + custo evitado = contrafactual + custo evitado (elimina Sim → adicional Sim);
@@ -383,6 +401,10 @@ export function SubmeterPageContent({
               custoEvitadoItens: custoEvitadoItens.length > 0
                 ? custoEvitadoItens
                 : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: (data.custo_projeto as "sim" | "nao" | "") ?? "",
+              custoProjetoItens: custoProjetoItens.length > 0
+                ? custoProjetoItens
+                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (data.tipo_saving as string) ?? "",
               custoExterno: String(data.custo_externo_mensal ?? ""),
               custoPeriodicidade: "mensal",
@@ -404,6 +426,8 @@ export function SubmeterPageContent({
               temContrafactualAdicional: "",
               temCustoEvitado: "",
               custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: "",
+              custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (receita.tipo_saving as string) ?? "mensal",
               custoExterno: "",
               custoPeriodicidade: "mensal",
@@ -1594,6 +1618,20 @@ export function SubmeterPageContent({
               }))
           : [];
 
+      // Custos do projeto: itens válidos quando "sim". O backend mensaliza (pontual
+      // ÷12) e SUBTRAI do saving (custo incorrido pra operar).
+      const custoProjetoItens =
+        formData.temCustoProjeto === "sim"
+          ? formData.custoProjetoItens
+              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
+              .map((it) => ({
+                nome: it.nome.trim(),
+                valor: parseMoedaBR(it.valor),
+                recorrencia: it.recorrencia as "mensal" | "pontual",
+                justificativa: it.justificativa.trim(),
+              }))
+          : [];
+
       const result = await apiFetch<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-saving",
         {
@@ -1604,6 +1642,8 @@ export function SubmeterPageContent({
           custo_externo_mensal: custoMensal,
           tem_custo_evitado: temCustoEvitadoEfetivo || undefined,
           custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
+          tem_custo_projeto: formData.temCustoProjeto || undefined,
+          custo_projeto_itens: custoProjetoItens.length ? custoProjetoItens : undefined,
         },
       );
       setShowSavingForm(false);

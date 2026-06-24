@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, resolverValorHora } from "@/lib/agents/saving-calc";
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens, resolverValorHora } from "@/lib/agents/saving-calc";
 import type { SavingColetado, ReceitaColetada } from "@/lib/agents/types";
 
 describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", () => {
@@ -24,6 +24,51 @@ describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", (
     expect(custoEvitadoMensalFromItens(null)).toBe(0);
     expect(custoEvitadoMensalFromItens("[]")).toBe(0);
     expect(custoEvitadoMensalFromItens("lixo")).toBe(0);
+  });
+});
+
+describe("custoProjetoMensalFromItens (mesma mensalização do evitado, mas ABATE)", () => {
+  it("mensal cheio, pontual ÷12, misto soma; aceita JSON string", () => {
+    expect(custoProjetoMensalFromItens([{ valor: 99.9, recorrencia: "mensal" }])).toBe(99.9);
+    expect(custoProjetoMensalFromItens([{ valor: 1200, recorrencia: "pontual" }])).toBe(100);
+    expect(custoProjetoMensalFromItens('[{"valor":120,"recorrencia":"mensal"},{"valor":1200,"recorrencia":"pontual"}]')).toBe(220);
+    expect(custoProjetoMensalFromItens(null)).toBe(0);
+  });
+});
+
+describe("recomputarSavingFinanceiro — custos do projeto SUBTRAEM do líquido", () => {
+  const base = (): SavingColetado => ({
+    linhas: [
+      { cargo: "Analista Pleno", horas_antes: 12, horas_depois: 2, valor_hora: 29.9, economia_horas_mes: 10, economia_reais_mes: 299 },
+    ],
+    economia_horas_mes: 10,
+    economia_reais_mes: null,
+    tipo_saving: "mensal",
+    memorial_calculo: null,
+    valor_ganho_mensal: null,
+  } as SavingColetado);
+
+  it("abate o custo do projeto do total líquido (horas − custo projeto)", () => {
+    const s = base();
+    s.custo_projeto_reais = 100; // já mensalizado
+    const out = recomputarSavingFinanceiro(s, 0);
+    // 10h × 29.9 = 299; − 100 (custo projeto) = 199
+    expect(out.economia_reais_mes).toBe(199);
+    expect(out.custo_projeto_reais).toBe(100);
+  });
+
+  it("compõe com custo evitado (soma) e custo externo (abate) + custo projeto (abate)", () => {
+    const s = base();
+    s.custo_evitado_reais = 50;   // soma
+    s.custo_projeto_reais = 30;   // abate
+    const out = recomputarSavingFinanceiro(s, 40); // custo externo 40 abate
+    // 299 + 50 − 40 − 30 = 279
+    expect(out.economia_reais_mes).toBe(279);
+  });
+
+  it("sem custo do projeto não altera o líquido", () => {
+    const out = recomputarSavingFinanceiro(base(), 0);
+    expect(out.economia_reais_mes).toBe(299);
   });
 });
 

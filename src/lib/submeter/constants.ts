@@ -123,6 +123,12 @@ export interface SavingFormData {
   // ramo "Não" o papel é cumprido por `eliminaGastoExterno`.
   temCustoEvitado: 'sim' | 'nao' | '';
   custoEvitadoItens: CustoEvitadoItemInput[];
+  // Saving: a solução INTERNA consome algum serviço externo PAGO para funcionar
+  // (chave de API, ElevenLabs, etc.)? 'sim' → lista de serviços (custoProjetoItens).
+  // O valor (mensalizado; pontual ÷12) SUBTRAI do saving. Mesmo formato do custo
+  // evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
+  temCustoProjeto: 'sim' | 'nao' | '';
+  custoProjetoItens: CustoEvitadoItemInput[];
   tipoSaving: 'mensal' | 'pontual' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';

@@ -95,6 +95,18 @@ export function custoEvitadoMensalFromItens(itensRaw: unknown): number {
   return round2(total);
 }
 
+/**
+ * Re-deriva o CUSTO DO PROJETO mensal a partir dos itens persistidos
+ * (`custo_projeto_itens`, JSON). Mesma mensalização do custo evitado (pontual ÷12;
+ * mensal cheio), mas o resultado SUBTRAI do líquido (custo incorrido pra operar).
+ * Fonte da verdade no submit (não depende do estado volátil do chat).
+ */
+export function custoProjetoMensalFromItens(itensRaw: unknown): number {
+  // A mensalização é idêntica à do custo evitado (pontual ÷12, mensal cheio); só
+  // muda o SINAL na composição do líquido (este abate, aquele soma).
+  return custoEvitadoMensalFromItens(itensRaw);
+}
+
 export function recomputarSavingFinanceiro(
   saving: SavingColetado,
   custoExternoMensal = 0,
@@ -115,6 +127,9 @@ export function recomputarSavingFinanceiro(
 
   // Custo evitado: entra cheio (pontual NÃO divide por 12). Negativos viram 0.
   const evitadoBruto = Math.max(0, Number(saving?.custo_evitado_reais) || 0);
+  // Custos do projeto: serviços externos pagos que a solução consome pra rodar.
+  // Já mensalizado (pontual ÷12) ao ser persistido; SUBTRAI do líquido. Negativos → 0.
+  const custoProjetoBruto = Math.max(0, Number(saving?.custo_projeto_reais) || 0);
 
   return {
     ...saving,
@@ -125,8 +140,9 @@ export function recomputarSavingFinanceiro(
     // com 0 → memorial mostrava "Custo de ferramenta externa: N/A" e líquida bruta,
     // contradizendo a coluna Saving Reais (que já abate o custo externo).
     custo_externo_mensal: custoExternoMensal,
+    custo_projeto_reais: custoProjetoBruto > 0 ? custoProjetoBruto : (saving?.custo_projeto_reais ?? null),
     economia_horas_mes: totalHoras,
-    economia_reais_mes: round2(totalReaisBruto + evitadoBruto - (custoExternoMensal || 0)),
+    economia_reais_mes: round2(totalReaisBruto + evitadoBruto - (custoExternoMensal || 0) - custoProjetoBruto),
   };
 }
 
@@ -194,6 +210,17 @@ export function enriquecerMemorial(
       partes.push(`**Custo de ferramenta externa:** R$ ${custoExterno.toFixed(2)}/mês`);
     } else {
       partes.push('**Custo de ferramenta externa:** N/A');
+    }
+
+    // Custos do projeto (serviços pagos que a solução consome pra rodar — abate)
+    const custoProjeto = Math.max(0, Number(saving.custo_projeto_reais) || 0);
+    if (custoProjeto > 0) {
+      partes.push(`**Custos do projeto:** R$ ${custoProjeto.toFixed(2)}/mês (${saving.custo_projeto_tipo ?? 'mensal'})`);
+      if (saving.custo_projeto_descricao) {
+        partes.push(`  Descrição: ${saving.custo_projeto_descricao}`);
+      }
+    } else {
+      partes.push('**Custos do projeto:** N/A');
     }
 
     // Total líquido (já inclui custo evitado e desconta custo externo)

@@ -208,6 +208,14 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
+  // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
+  // rodar (chave de API, ElevenLabs…). `custo_projeto` = 'sim'|'nao'; justificativa =
+  // texto legível; itens = JSON [{nome,valor,recorrencia,justificativa}]. O valor
+  // (mensalizado: pontual ÷12) SUBTRAI do saving_reais/ganho_total. Distinto de
+  // custo_externo_mensal (escopo externo) e de custo_evitado (que SOMA).
+  'ALTER TABLE projetos ADD COLUMN custo_projeto TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_projeto_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_projeto_itens TEXT',
   // Snapshot imutável da conversa (chat_messages) no momento de cada submissão/reenvio.
   // Os chat_messages são mutados/apagados in-place quando a pessoa volta etapas; este
   // snapshot preserva a conversa ORIGINAL de cada versão para o Investigador (abas
