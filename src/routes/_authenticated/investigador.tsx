@@ -998,6 +998,15 @@ function DetalheView({
   const selVersao = typeof sel === 'number' ? versoesAsc.find((v) => v.versao_num === sel) : undefined
   const ehReenvioSelecionado = selVersao?.acao === 'reenvio'
 
+  // Rótulo da versão atualmente exibida — usado no cabeçalho do JSON exportado.
+  const versaoLabel =
+    sel === 'atual'
+      ? 'Atual (ao vivo)'
+      : (() => {
+          const v = versoesAsc.find((x) => x.versao_num === sel)
+          return v ? rotuloVersao(v) : `v${sel}`
+        })()
+
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
       {/* Header com profundidade */}
@@ -1158,7 +1167,16 @@ function DetalheView({
       </div>
 
       <div className="mt-4">
-        {tab === 'chat' && <ChatTab messages={chatView} eventos={eventosView} todosEventos={d.form_events} />}
+        {tab === 'chat' && (
+          <ChatTab
+            messages={chatView}
+            eventos={eventosView}
+            todosEventos={d.form_events}
+            projetoNome={d.nome ?? 'Projeto sem nome'}
+            projetoId={d.id}
+            versaoLabel={versaoLabel}
+          />
+        )}
         {tab === 'api_logs' && <ApiLogsTab logs={logsView} />}
         {tab === 'dados' && <DadosTab documentacao={d.documentacao} analise={d.analise} />}
       </div>
@@ -1589,16 +1607,126 @@ type TimelineItem =
   | { type: 'message'; msg: ChatMsg; phase: PhaseGroup; key: string }
   | { type: 'event'; event: FormEvent; phase: PhaseGroup; key: string }
 
+// ── Exportação JSON enxuta do histórico de chat ──────────────────────────────
+
+type ChatExportEntry = {
+  de: 'ia' | 'user' | 'doc' | 'evento'
+  fase?: string
+  tipo?: string
+  texto: string
+  opcoes?: string[]
+  escolha?: string
+  dados?: Record<string, string>
+  itens?: string[]
+  voltou?: boolean
+}
+
+/** Serializa o timeline (mensagens + eventos) num JSON enxuto para copiar:
+ * IA com fase/tipo/texto decodificados, usuário com texto, eventos resumidos e
+ * doc apenas como marcador (sem o material extraído gigante). */
+function buildChatExport(
+  messages: ChatMsg[],
+  eventos: FormEvent[],
+  meta: { projeto: string; id: string; versao: string },
+): { projeto: string; id: string; versao: string; mensagens: ChatExportEntry[] } {
+  const combined: Array<
+    | { kind: 'message'; msg: ChatMsg; ts: number }
+    | { kind: 'event'; event: FormEvent; ts: number }
+  > = []
+  for (const m of messages) combined.push({ kind: 'message', msg: m, ts: tsToEpoch(m.created_at) })
+  for (const e of eventos) combined.push({ kind: 'event', event: e, ts: tsToEpoch(e.created_at) })
+  combined.sort((a, b) => {
+    const av = isNaN(a.ts) ? 0 : a.ts
+    const bv = isNaN(b.ts) ? 0 : b.ts
+    if (av !== bv) return av - bv
+    return (a.kind === 'event' ? 0 : 1) - (b.kind === 'event' ? 0 : 1)
+  })
+
+  const mensagens: ChatExportEntry[] = []
+  for (const it of combined) {
+    if (it.kind === 'event') {
+      const { titulo, voltou, rows, chips } = buildEventoView(it.event)
+      const entry: ChatExportEntry = { de: 'evento', tipo: it.event.tipo, texto: titulo }
+      if (rows.length > 0) {
+        const dados: Record<string, string> = {}
+        for (const r of rows) dados[r.label] = r.value
+        entry.dados = dados
+      }
+      if (chips.length > 0) entry.itens = chips
+      if (voltou) entry.voltou = true
+      mensagens.push(entry)
+      continue
+    }
+    const msg = it.msg
+    if (msg.role === 'doc') {
+      mensagens.push({ de: 'doc', texto: `[material extraído: ${(msg.content.length / 1024).toFixed(1)}kb]` })
+      continue
+    }
+    if (msg.role === 'user') {
+      mensagens.push({ de: 'user', texto: msg.content })
+      continue
+    }
+    // assistant — decodifica o JSON cru gravado no banco
+    const entry: ChatExportEntry = { de: 'ia', texto: msg.content }
+    try {
+      const parsed = JSON.parse(msg.content) as {
+        fase?: string
+        fase_origem?: string
+        type?: string
+        content?: string
+        question?: string
+      }
+      const fase = parsed.fase_origem ?? parsed.fase
+      if (fase) entry.fase = fase
+      if (parsed.type) entry.tipo = parsed.type
+      entry.texto = parsed.content ?? parsed.question ?? msg.content
+    } catch {
+      // não-JSON — mantém o conteúdo cru
+    }
+    if (Array.isArray(msg.options) && msg.options.length > 0) {
+      entry.opcoes = msg.options as string[]
+      if (msg.selected_option != null && (msg.options as string[])[msg.selected_option] != null) {
+        entry.escolha = (msg.options as string[])[msg.selected_option]
+      }
+    }
+    mensagens.push(entry)
+  }
+
+  return { projeto: meta.projeto, id: meta.id, versao: meta.versao, mensagens }
+}
+
 function ChatTab({
   messages,
   eventos,
   todosEventos,
+  projetoNome,
+  projetoId,
+  versaoLabel,
 }: {
   messages: ChatMsg[]
   eventos: FormEvent[]
   todosEventos: FormEvent[]
+  projetoNome: string
+  projetoId: string
+  versaoLabel: string
 }) {
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const [copiado, setCopiado] = useState(false)
+
+  const copiarJson = useCallback(async () => {
+    const payload = buildChatExport(messages, eventos, {
+      projeto: projetoNome,
+      id: projetoId,
+      versao: versaoLabel,
+    })
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    } catch {
+      // clipboard indisponível — silencioso
+    }
+  }, [messages, eventos, projetoNome, projetoId, versaoLabel])
 
   // Baseline do diff: para cada evento, a marcação ANTERIOR da mesma etapa em TODA a
   // história do projeto (mesmo fora da janela da versão exibida) — assim o 1º saving de
@@ -1687,21 +1815,33 @@ function ChatTab({
   }
 
   return (
-    <div className="max-h-[650px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
-      <div className="space-y-1 py-2">
-        {timeline.map((item) => {
-          if (item.type === 'divider') return <PhaseDivider key={item.key} phase={item.phase} label={item.label} />
-          if (item.type === 'event')
-            return (
-              <EventBubble
-                key={item.key}
-                event={item.event}
-                dadosAnterior={dadosAnteriorPorEvento.get(item.event.id) ?? null}
-              />
-            )
-          return <ChatBubble key={item.key} msg={item.msg} phase={item.phase} />
-        })}
-        <div ref={chatEndRef} />
+    <div>
+      <div className="mb-2 flex items-center justify-end">
+        <button
+          onClick={copiarJson}
+          title="Copiar o histórico do chat (versão exibida) em JSON enxuto"
+          className="flex items-center gap-1.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/10 bg-white px-3 py-1.5 text-xs text-[var(--go-text-primary)]/50 hover:text-[var(--go-blue)] hover:border-[var(--go-blue)]/25 transition-all"
+        >
+          {copiado ? <Check className="h-3.5 w-3.5 text-[#16a34a]" /> : <Copy className="h-3.5 w-3.5" />}
+          {copiado ? 'Copiado!' : 'Copiar JSON'}
+        </button>
+      </div>
+      <div className="max-h-[650px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+        <div className="space-y-1 py-2">
+          {timeline.map((item) => {
+            if (item.type === 'divider') return <PhaseDivider key={item.key} phase={item.phase} label={item.label} />
+            if (item.type === 'event')
+              return (
+                <EventBubble
+                  key={item.key}
+                  event={item.event}
+                  dadosAnterior={dadosAnteriorPorEvento.get(item.event.id) ?? null}
+                />
+              )
+            return <ChatBubble key={item.key} msg={item.msg} phase={item.phase} />
+          })}
+          <div ref={chatEndRef} />
+        </div>
       </div>
     </div>
   )
@@ -1805,6 +1945,31 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
   }
 
   return { rows, chips }
+}
+
+type EventoView = {
+  titulo: string
+  etapa: string
+  voltou: boolean
+  isAlerta: boolean
+  rows: Array<{ label: string; value: string }>
+  chips: string[]
+}
+
+/** Visão do evento p/ a exportação JSON do chat (Copiar JSON): título/etapa +
+ * rows e chips já como texto. Reaproveita o builder puro `linhasDoEvento`. */
+function buildEventoView(event: FormEvent): EventoView {
+  const d = (event.dados ?? {}) as Record<string, unknown>
+  const cfg = EVENT_CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
+  const { rows, chips } = linhasDoEvento(event.tipo, d)
+  return {
+    titulo: cfg.titulo,
+    etapa: cfg.etapa,
+    voltou: d.voltou === true,
+    isAlerta: event.tipo === 'divergencia_memorial',
+    rows,
+    chips: chips.map((c) => c.texto),
+  }
 }
 
 type RowMarc = EvRow & { status: DiffStatus; antes: string | null }
