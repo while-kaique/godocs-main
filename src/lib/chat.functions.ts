@@ -424,7 +424,10 @@ const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
   tipo_saving: z.enum(['mensal', 'pontual']),
   // Havia alguém fazendo/mantendo o processo manualmente antes da automação?
-  alguem_fazia: z.enum(['sim', 'nao']).optional(),
+  // 'sim' → horas reais; 'nao' → contrafactual (equivalente manual estimado);
+  // 'externo' → ninguém fazia internamente e o ganho é 100% um custo externo
+  // eliminado (SEM horas — só custo evitado). Árvore em step3-chat/constants.
+  alguem_fazia: z.enum(['sim', 'nao', 'externo']).optional(),
   linhas: z.array(z.object({
     cargo: z.string(),
     horas_antes: z.number().min(0),
@@ -809,15 +812,20 @@ export async function enviarMensagem(rawData: unknown) {
   // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
   // Mutamos o resultado direto — são objetos locais, sem risco de side-effect.
   if (resultado.type === 'complete') {
-    // Saving: economia_horas_mes NUNCA pode ser 0 ao completar
+    // Saving: NÃO pode completar sem NENHUM ganho. O ganho válido vem de horas OU
+    // de um custo evitado — então só bloqueamos quando 0h E sem custo evitado.
+    // Exceção explícita: custo evitado PURO (alguem_fazia='externo') — o ganho é o
+    // contrato cancelado (0h por design), validado no submit; não bloqueia por 0h.
     if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
       const savingRecomputado = recomputarSavingFinanceiro(resultado.saving, 0);
       const econHoras = savingRecomputado.economia_horas_mes ?? 0;
-      if (econHoras <= 0) {
-        log('enviarMensagem', `⛔ Saving com economia_horas_mes=${econHoras} — bloqueando complete, forçando question`);
+      const temCustoEvitado = (savingRecomputado.custo_evitado_reais ?? 0) > 0;
+      const custoEvitadoPuro = ctx.alguem_fazia === 'externo';
+      if (econHoras <= 0 && !temCustoEvitado && !custoEvitadoPuro) {
+        log('enviarMensagem', `⛔ Saving sem ganho (0h e sem custo evitado) — bloqueando complete, forçando question`);
         Object.assign(resultado, {
           type: 'question',
-          content: 'Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas para ser submetido. Vamos revisar: em que etapa exatamente a automação economiza tempo comparado ao processo manual?',
+          content: 'Não consigo finalizar o memorial sem nenhum ganho concreto — o projeto precisa economizar horas OU evitar um custo externo (contrato/serviço/licença). Vamos revisar: onde exatamente está o ganho?',
           fase: 'saving',
         });
       }
@@ -1022,6 +1030,16 @@ export async function iniciarSaving(rawData: unknown) {
       // Líquido: horas + custo evitado (mensalizado) − custo externo. Mesma
       // fórmula de recomputarSavingFinanceiro (que recalcula do zero no preview).
       economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno),
+    };
+  } else if (custoEvitadoMensal > 0 || (data.custo_externo_mensal ?? 0) > 0) {
+    // Custo evitado PURO (ramo "Não → elimina gasto externo? Sim", sem horas):
+    // sem linhas, o líquido vem só do custo evitado − custo externo. O submit
+    // recalcula isto de qualquer forma (recomputarSavingFinanceiro); aqui é só
+    // para o estado do chat já refletir o ganho (economia_reais_mes não-nulo).
+    saving = {
+      ...saving,
+      economia_horas_mes: 0,
+      economia_reais_mes: round2(custoEvitadoMensal - (data.custo_externo_mensal ?? 0)),
     };
   }
 
@@ -1594,12 +1612,17 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
     const tiposProjetoGate = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+    // Ganho mensurável = economia_reais_mes > 0 (já é o LÍQUIDO: horas + custo
+    // evitado − custo externo). Aceita saving SÓ de custo evitado (0h), desde que
+    // o líquido seja positivo — é o caso "contrato externo cancelado, sem horas".
+    // Bloqueia só quando NÃO há ganho algum (0h E sem custo evitado → líquido ≤ 0).
     if (tiposProjetoGate.includes('saving') &&
-        (((saving?.economia_horas_mes as number) ?? 0) <= 0 || ((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
+        (((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
       throw new Error(
-        'Não é possível submeter este projeto como saving sem economia mensurável de horas. ' +
-        'Uma troca de ferramenta que mantém a mesma rotina de trabalho não gera saving. ' +
-        'Para submeter, comprove redução concreta de horas — ou reclassifique como receita incremental ou projeto especial.'
+        'Não é possível submeter este projeto como saving sem ganho mensurável. ' +
+        'O ganho precisa vir de uma redução concreta de horas OU de um custo externo evitado ' +
+        '(contrato/serviço/licença que deixou de ser pago). Se nenhum dos dois se aplica, ' +
+        'reclassifique como receita incremental ou projeto especial.'
       );
     }
     if (tiposProjetoGate.includes('receita_incremental') &&

@@ -95,6 +95,57 @@ Não há ferramenta paga que deixou de ser usada. Não há custo de ferramenta n
     });
   }
 
+  // 1b) CUSTO EVITADO PURO (alguem_fazia='externo') — ninguém fazia internamente, um
+  // contrato externo foi cancelado, SEM horas. Valida o fix anti-dupla-contagem
+  // (caso Portal de Reembolsos): o ganho é SÓ o custo evitado, sem horas-fantasma.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'externo',
+      linhas: [],
+      tem_custo_evitado: 'sim',
+      custo_evitado_itens: [
+        { nome: 'Contrato de agente de atendimento (terceirizada)', valor: 5700, recorrencia: 'mensal', justificativa: 'Contrato mensal de atendimento terceirizado encerrado após a automação assumir o atendimento.' },
+      ],
+    };
+    const c = calcSaving(saving); // horas=0, horasReais=0, custoEvitadoMensal=5700, savingReais=5700
+    cenarios.push({
+      key: 'custo-evitado-puro',
+      nome: tag('Portal de Reembolsos (custo evitado puro)'),
+      tipos_projeto: ['saving'],
+      meta: { ...metaPadrao, ferramenta: 'Vercel', descricao_breve: 'Portal que centraliza e automatiza o atendimento de solicitações de reembolso.' },
+      doc: DOC_BASE('Portal de Reembolsos', {
+        oque: 'Centraliza as solicitações de reembolso num portal e assume o atendimento que antes era feito por um agente terceirizado.',
+        fluxo: 'O cliente consulta o status pelo portal (CPF/pedido); o painel interno conclui os reembolsos e sincroniza dados.',
+        deps: 'Supabase (Postgres, Auth, Storage), Metabase, Google Sheets, Vercel.',
+        config: 'Projeto Supabase, buckets, credenciais Metabase/Google.',
+        atencao: 'Dados expostos por link público; depende de questions específicas do Metabase.',
+      }),
+      briefing: `Projeto: Portal de Reembolsos. A automação assumiu o atendimento de reembolsos que ANTES era feito por um agente de uma empresa TERCEIRIZADA — NÃO havia ninguém INTERNO fazendo isso.
+Com o portal, o volume de contatos caiu e foi possível ENCERRAR o contrato desse agente terceirizado: um contrato MENSAL de R$5.700 que JÁ FOI cancelado na prática (não é projeção, já aconteceu).
+NÃO existe trabalho manual ADICIONAL além do que esse contrato fazia — o ganho do projeto é EXCLUSIVAMENTE esse custo evitado de R$5.700/mês.
+Se o agente perguntar se o contrato já foi cancelado: já foi, sim, encerrado de fato.
+Se perguntar se há outro trabalho manual que alguém faria à mão: não, o contrato cobria exatamente o atendimento que a automação faz hoje.
+Aprove o memorial assim que ele refletir isso (sem horas de pessoas).`,
+      saving,
+      expected: {
+        hard: {
+          // O cerne do fix: o ganho é SÓ o custo evitado (5700), nunca 7597.
+          'Custo Evitado': c.custoEvitadoMensal, // 5700
+          'Saving Reais': c.savingReais, // 5700
+          'Status': 'Pendente', 'Especial?': 'Não',
+        },
+        // 0h pode aparecer como "0" ou "—" na planilha — soft (informativo).
+        soft: {
+          'Saving Horas': c.horas, // 0
+          'Horas em Reais': c.horasReais, // 0
+          'Alguém Fazia?': 'externo',
+          'Custo Mensal ou Pontual': c.recorrLabel, 'Tipo de Saving': 'mensal',
+        },
+      },
+    });
+  }
+
   // 2) Saving + custo evitado MENSAL (entra cheio).
   {
     const saving = {
