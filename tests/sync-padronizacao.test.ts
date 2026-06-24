@@ -38,14 +38,20 @@ describe('padronizarLinha', () => {
     expect(r['Saving Horas']).toBe(30);
   });
 
-  // F4 — split carga real × escala: colunas de TEXTO (fora de COLUNAS_NUMERICAS) para
-  // que o número passe quando há split e "—" quando não há (em vez de virar 0).
-  it('"Saving Horas Real"/"Saving Horas Escalado": número quando há split, "—" quando não', () => {
+  // F4 — split carga real × escala: colunas NUMÉRICAS (horas). Número quando há split;
+  // quando não se aplica, 0 (regra: número vazio → 0, NUNCA "—").
+  it('"Saving Horas Real"/"Saving Horas Escalado" são numéricas: número quando há, 0 quando não', () => {
     const comSplit = padronizarLinha({ 'Saving Horas Real': 24, 'Saving Horas Escalado': 108 });
     expect(comSplit['Saving Horas Real']).toBe(24);
     expect(comSplit['Saving Horas Escalado']).toBe(108);
-    const semSplit = padronizarLinha({ 'Saving Horas Real': '—', 'Saving Horas Escalado': '—' });
-    expect(semSplit['Saving Horas Real']).toBe('—');
-    expect(semSplit['Saving Horas Escalado']).toBe('—');
+    const semSplit = padronizarLinha({ 'Saving Horas Real': '—', 'Saving Horas Escalado': '' });
+    expect(semSplit['Saving Horas Real']).toBe(0);
+    expect(semSplit['Saving Horas Escalado']).toBe(0);
+  });
+
+  // F5 (precursor) — "Análise Antiagente" é TEXTO: vazio → "—".
+  it('"Análise Antiagente" (texto) vazio vira "—"', () => {
+    expect(padronizarLinha({ 'Análise Antiagente': '' })['Análise Antiagente']).toBe('—');
+    expect(padronizarLinha({ 'Análise Antiagente': 'Sem ressalvas.' })['Análise Antiagente']).toBe('Sem ressalvas.');
   });
 });
