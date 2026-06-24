@@ -1636,7 +1636,7 @@ export function SubmeterPageContent({
         "/api/chat/iniciar-saving",
         {
           projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
           alguem_fazia: alguemFaziaPayload,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
@@ -1694,7 +1694,7 @@ export function SubmeterPageContent({
         "/api/chat/iniciar-receita",
         {
           projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
           valor_ganho_mensal: valorReceita,
           racional: formData.racionalReceita.trim() || undefined,
         },

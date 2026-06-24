@@ -265,8 +265,15 @@ DETALHES TÉCNICOS APROVADOS:
 - Ferramenta: ${ctx.ferramenta}`;
 
   const isPontualReceita = receita.tipo_saving === 'pontual';
+  const periodoReceita = periodoSavingInfo(receita.tipo_saving); // trimestre/semestre ou null
   const valorInformado = receita.valor_ganho_mensal != null && receita.valor_ganho_mensal > 0;
-  const unidadeReceita = isPontualReceita ? 'total' : '/mês';
+  const unidadeReceita = isPontualReceita ? 'total' : periodoReceita ? `/${periodoReceita.nome}` : '/mês';
+  // Descrição da cadência do ganho (recorrência).
+  const cadenciaReceita = isPontualReceita
+    ? 'ganho único'
+    : periodoReceita
+      ? `recorrente a cada ${periodoReceita.meses} meses (por ${periodoReceita.nome}) — valor ACUMULADO do ${periodoReceita.nome}, não mensalizado`
+      : 'recorrente todo mês';
 
   // Espelha a lógica do saving: se o usuário já informou o valor no formulário
   // determinístico, o agente DESAFIA esse número (pede evidências) em vez de
@@ -277,7 +284,7 @@ DETALHES TÉCNICOS APROVADOS:
 
   const blocoValor = valorInformado
     ? `DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte do zero):
-- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${isPontualReceita ? 'ganho único' : 'recorrente todo mês'})
+- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${cadenciaReceita})
 - Ganho de receita declarado pelo usuário: R$ ${receita.valor_ganho_mensal}${unidadeReceita}${blocoRacional}
 
 SEU OBJETIVO: VALIDAR e DESAFIAR o valor de R$ ${receita.valor_ganho_mensal}${unidadeReceita} que o usuário já informou — NÃO peça o valor de novo.
@@ -286,7 +293,7 @@ SEU OBJETIVO: VALIDAR e DESAFIAR o valor de R$ ${receita.valor_ganho_mensal}${un
 - Se, após o detalhamento, o valor justificado for diferente do declarado, atualize \`valor_ganho_mensal\` com o número correto.
 - Você ainda precisa construir o **memorial_calculo** (narrativa que fundamenta o valor) expandindo o racional curto com as respostas do usuário.`
     : `DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
-- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${isPontualReceita ? 'ganho único' : 'recorrente todo mês'})
+- Tipo de ganho: ${receita.tipo_saving ?? 'não definido'} (${cadenciaReceita})
 
 CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
 1. **valor_ganho_mensal** — Quanto de receita incremental (R$/mês ou R$ total se pontual) o projeto gera?
@@ -434,9 +441,28 @@ Se precisa de clarificação:
 export function aplicaConfirmacaoBaseHoras(ctx: ProjetoContexto, saving: SavingColetado): boolean {
   const linhas = saving.linhas ?? [];
   const ninguemFazia = ctx.alguem_fazia === 'nao' || ctx.alguem_fazia === 'externo';
-  const isPontual = saving.tipo_saving === 'pontual';
+  // SÓ saving MENSAL: a base CLT 220h/mês (e o teto por pessoa) só faz sentido sobre
+  // uma rotina medida POR MÊS. Pontual (total único) e trimestral/semestral (acumulado
+  // do período) NÃO mapeiam para "220h no mês" — ficam de fora deste gate.
+  const isMensal = saving.tipo_saving === 'mensal';
   const temHorasAntes = linhas.some((l) => (l.horas_antes ?? 0) > 0);
-  return !ninguemFazia && !isPontual && temHorasAntes;
+  return !ninguemFazia && isMensal && temHorasAntes;
+}
+
+// Cadência periódica do saving (trimestral/semestral): nome do período e nº de meses.
+// Retorna null para mensal/pontual (não-periódicos plurianuais).
+export function periodoSavingInfo(tipo: SavingColetado['tipo_saving']): { nome: 'trimestre' | 'semestre'; meses: number } | null {
+  if (tipo === 'trimestral') return { nome: 'trimestre', meses: 3 };
+  if (tipo === 'semestral') return { nome: 'semestre', meses: 6 };
+  return null;
+}
+
+// Unidade de exibição das horas conforme a cadência. Trimestral/semestral mostram o
+// ACUMULADO do período (não mensalizam) — a unidade deixa isso explícito.
+export function unidadeHorasDe(tipo: SavingColetado['tipo_saving']): string {
+  const periodo = periodoSavingInfo(tipo);
+  if (periodo) return `h/${periodo.nome}`;
+  return tipo === 'pontual' ? 'h (total único)' : 'h/mês';
 }
 
 // Total de economia de horas (headline) — usado na pergunta da base de horas.
@@ -542,7 +568,9 @@ DETALHES TÉCNICOS APROVADOS:
   const linhas = saving.linhas ?? [];
   const totalHoras = saving.economia_horas_mes ?? linhas.reduce((s, l) => s + l.economia_horas_mes, 0);
   const isPontual = saving.tipo_saving === 'pontual';
-  const unidadeHoras = isPontual ? 'h (total único)' : 'h/mês';
+  const periodo = periodoSavingInfo(saving.tipo_saving); // trimestre/semestre ou null
+  const isPeriodico = periodo !== null;
+  const unidadeHoras = unidadeHorasDe(saving.tipo_saving);
   const tabelaLinhas = linhas.length
     ? linhas
         .map((l, i) => `  ${i + 1}. ${l.cargo}: ${l.horas_antes}${unidadeHoras} antes → ${l.horas_depois}${unidadeHoras} depois (economia ${l.economia_horas_mes}${unidadeHoras})`)
@@ -569,7 +597,9 @@ DETALHES TÉCNICOS APROVADOS:
   // resposta no memorial — caso contrário o número não convence. Limiar sobre o
   // TOTAL do projeto; linhas individuais ≥44h são questionadas com mais força.
   const LIMITE_ECONOMIA_ALTA = 44;
-  const economiaAlta = !isPontual && totalHoras >= LIMITE_ECONOMIA_ALTA;
+  // Só saving MENSAL dispara o gate de economia alta (44h/MÊS). Pontual (total único)
+  // e trimestral/semestral (acumulado do período) têm outra base de comparação.
+  const economiaAlta = saving.tipo_saving === 'mensal' && totalHoras >= LIMITE_ECONOMIA_ALTA;
   const linhasIndividuaisAltas = linhas.filter((l) => l.economia_horas_mes >= LIMITE_ECONOMIA_ALTA);
   const maiorLinhaHoras = linhas.reduce((m, l) => Math.max(m, l.economia_horas_mes), 0);
   const pctMesUtil = Math.round((maiorLinhaHoras / 220) * 100); // 220h ≈ mês útil CLT
@@ -689,7 +719,13 @@ DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
 Pessoas envolvidas no cálculo de saving (${linhas.length}):
 ${tabelaLinhas}
 - Economia total declarada: ${totalHoras}${unidadeHoras}
-- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${isPontual ? 'economia ÚNICA — tarefa feita uma só vez, não se repete mensalmente' : 'recorrente todo mês'})
+- Tipo de saving: ${saving.tipo_saving ?? 'não definido'} (${
+    isPontual
+      ? 'economia ÚNICA — tarefa feita uma só vez, não se repete'
+      : isPeriodico
+        ? `recorrente a cada ${periodo!.meses} meses (uma vez por ${periodo!.nome}) — as horas são o ACUMULADO do ${periodo!.nome}, NÃO por mês; é PROIBIDO mensalizar (não divida por ${periodo!.meses})`
+        : 'recorrente todo mês'
+  })
 - Alguém já fazia manualmente antes: ${ninguemFazia ? 'NÃO — ninguém fazia. As "horas antes" são o EQUIVALENTE manual ESTIMADO (o tempo que o trabalho levaria se alguém tivesse que fazer à mão), não uma rotina real. Valide como estimativa (volume × tempo); NUNCA peça o passo a passo de uma rotina inexistente. "Horas depois" = 0.' : 'SIM — havia trabalho manual real; valide a rotina existente normalmente.'}
 
 ⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o texto do preview são exibidos ao usuário. Eles NÃO podem conter NENHUM valor financeiro de saving (nem economia em R$, nem taxa/hora, nem custo evitado em R$, nem total em R$). Use SOMENTE horas (antes/depois/economia) e descrições qualitativas. Os valores em R$ são calculados pelo backend e injetados automaticamente na versão interna do memorial (planilha). Expor R$ ao usuário permitiria que ele manipulasse os números — é proibido.
@@ -712,9 +748,9 @@ Para CADA pessoa/cargo listada acima, colete:
 [2.2] Para CADA pessoa (bloco repetido):
   - Cargo (já tem)
   - O que fazia manualmente: descrição da rotina/tarefa → COLETE DO USUÁRIO
-  - Frequência e tempo por execução: ${isPontual ? 'quantos itens/registros e quanto tempo por item' : 'quantas vezes por mês/dia/semana e quanto tempo cada execução'} → COLETE DO USUÁRIO
+  - Frequência e tempo por execução: ${isPontual ? 'quantos itens/registros e quanto tempo por item' : isPeriodico ? `quantas vezes ao longo do ${periodo!.nome} e quanto tempo cada execução (some o ACUMULADO do ${periodo!.nome} inteiro)` : 'quantas vezes por mês/dia/semana e quanto tempo cada execução'} → COLETE DO USUÁRIO
   - Cálculo de horas antes: frequência × tempo = total → MONTE VOCÊ com base na resposta
-  - ⭐ COMPOSIÇÃO DAS HORAS (OBRIGATÓRIO — não pule): o total de horas desse cargo NÃO pode ficar como um número solto. Detalhe QUAIS atividades compõem esse total, cada uma com a sua parcela de horas, e as parcelas TÊM que somar exatamente o total. Se o usuário só deu o número cheio (ex.: "${isPontual ? '160h' : '160h/mês'}"), PERGUNTE o que compõe essas horas até conseguir a quebra por atividade. Registre no memorial no formato "${isPontual ? '160h que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)' : '160h/mês que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)'}". → COLETE DO USUÁRIO e MONTE VOCÊ
+  - ⭐ COMPOSIÇÃO DAS HORAS (OBRIGATÓRIO — não pule): o total de horas desse cargo NÃO pode ficar como um número solto. Detalhe QUAIS atividades compõem esse total, cada uma com a sua parcela de horas, e as parcelas TÊM que somar exatamente o total. Se o usuário só deu o número cheio (ex.: "${isPontual ? '160h' : `160${unidadeHoras}`}"), PERGUNTE o que compõe essas horas até conseguir a quebra por atividade. Registre no memorial no formato "${isPontual ? '160h que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)' : `160${unidadeHoras} que compõem: atividade-x (4h), atividade-y (10h), atividade-z (146h)`}". → COLETE DO USUÁRIO e MONTE VOCÊ
   - ⭐ Nº DE PESSOAS POR TRÁS DO TOTAL (OBRIGATÓRIO quando a linha soma mais de uma pessoa): se o total de um cargo é a soma de VÁRIAS pessoas (ex.: 3 gerentes fazendo o mesmo processo), o memorial DEVE deixar isso EXPLÍCITO no formato "N pessoas × ~Xh cada = Yh" — NUNCA um número "geral"/agregado que se leia como UMA pessoa só. Quem revisa a aprovação tem que ver a quantidade de pessoas de cara, sem precisar abrir a conversa para descobrir se aquele total é de uma pessoa ou de um time. (O multiplicador × N pessoas entra DENTRO das \`linhas\`, não só na prosa — ver "MULTIPLICADORES" e "PLAUSIBILIDADE POR PESSOA".)
   - Horas depois da automação: quanto tempo ainda gasta (já tem do formulário, mas valide)
   - Economia de horas: antes − depois → CALCULE VOCÊ
@@ -760,12 +796,17 @@ COMO CONDUZIR:
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 6. Quando a justificativa for concreta, a conta fechar E o ganho for REAL (já em produção e medido — NÃO projetado; ver "GANHO REAL × PROJETADO" abaixo), gere o PREVIEW.
 
-TIPO DE SAVING — ${isPontual ? 'PONTUAL' : 'MENSAL'}:
+TIPO DE SAVING — ${isPontual ? 'PONTUAL' : isPeriodico ? (periodo!.nome === 'trimestre' ? 'TRIMESTRAL' : 'SEMESTRAL') : 'MENSAL'}:
 ${isPontual
   ? `Este é um saving PONTUAL — a tarefa é feita uma única vez, não se repete todo mês.
 - As horas representam o TOTAL DE HORAS que seriam gastas nessa tarefa única.
 - NUNCA pergunte "por mês" ou "com que frequência mensal". Pergunte sobre a tarefa COMO UM TODO: "Quanto tempo levaria para fazer isso manualmente do início ao fim?"
 - A validação deve focar em: "Quanto tempo a tarefa inteira levaria? Quantos itens/registros? Quanto tempo por item?"`
+  : isPeriodico
+  ? `Este é um saving ${periodo!.nome === 'trimestre' ? 'TRIMESTRAL' : 'SEMESTRAL'} — a rotina se repete a cada ${periodo!.meses} meses (uma vez por ${periodo!.nome}).
+- As horas representam o TOTAL ACUMULADO no ${periodo!.nome} inteiro, NÃO por mês. É PROIBIDO mensalizar: NÃO divida por ${periodo!.meses} — o valor cheio do ${periodo!.nome} é o que vale (a cadência fica registrada no tipo de saving).
+- Oriente o usuário a trazer o ACUMULADO do ${periodo!.nome}: "Somando todas as vezes que isso roda ao longo do ${periodo!.nome}, quantas horas no total?" Investigue quantas execuções acontecem no ${periodo!.nome} e quanto tempo cada uma.
+- NÃO trate como rotina mensal: o teto de 220h/mês por pessoa e o gate de economia alta (≥44h/mês) NÃO se aplicam aqui — a base de comparação é o ${periodo!.nome} inteiro, não o mês.`
   : `Este é um saving MENSAL — a tarefa se repete todo mês.
 - As horas representam a economia POR MÊS.
 - Pergunte sobre a rotina mensal: quais tarefas, com que frequência dentro do mês, quanto tempo cada execução.`}
@@ -869,9 +910,10 @@ Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
   // Rede de segurança do gate de ECONOMIA ALTA (≥44h/mês, só saving mensal): na
   // aprovação, exige que o memorial explique CONCRETAMENTE o que mudou. O próprio
   // LLM julga o texto (que está em MEMORIAL ATUAL) — sem heurística frágil de regex.
-  const isPontualPv = saving.tipo_saving === 'pontual';
   const totalHorasPv = saving.economia_horas_mes ?? (saving.linhas ?? []).reduce((s, l) => s + (l.economia_horas_mes ?? 0), 0);
-  const economiaAltaPv = !isPontualPv && totalHorasPv >= 44;
+  // Só saving MENSAL: o gate "o que mudou após a automação" (≥44h/MÊS) não vale para
+  // pontual nem para trimestral/semestral (cuja base é o período, não o mês).
+  const economiaAltaPv = saving.tipo_saving === 'mensal' && totalHorasPv >= 44;
   // Custo evitado PURO: há custo evitado e NÃO há horas → o memorial NÃO tem a seção
   // "Saving de Pessoas" (estrutura: Contexto, Contratos/Serviços Evitados, Resumo).
   const custoEvitadoPuroPv = semHoras && !semCustoEvitado;
@@ -982,11 +1024,12 @@ export async function runOrchestrator(
       const muitas = linhas.length > 1;
       messages.push({
         role: 'user',
-        content: `[SISTEMA] O usuário informou ${linhas.length} pessoa(s) que executavam a tarefa: ${resumoLinhas}. Economia total declarada: ${economiaHoras}h/mês, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente${muitas ? ' (validaremos as horas de cada pessoa)' : ` nessas ${economiaHoras}h`}. Sempre termine com uma pergunta.`,
+        content: `[SISTEMA] O usuário informou ${linhas.length} pessoa(s) que executavam a tarefa: ${resumoLinhas}. Economia total declarada: ${economiaHoras}${unidadeHorasDe(saving.tipo_saving)}, tipo: ${saving.tipo_saving ?? 'mensal'}. Apresente-se em UMA frase curta e faça a primeira pergunta concreta — peça para o usuário detalhar passo a passo o que era feito manualmente${muitas ? ' (validaremos as horas de cada pessoa)' : ` nessas ${economiaHoras}h`}. Sempre termine com uma pergunta.`,
       });
     } else if (fase === 'receita') {
       const temValor = receita.valor_ganho_mensal != null && receita.valor_ganho_mensal > 0;
-      const unidade = receita.tipo_saving === 'pontual' ? 'total' : '/mês';
+      const periodoRec = periodoSavingInfo(receita.tipo_saving);
+      const unidade = receita.tipo_saving === 'pontual' ? 'total' : periodoRec ? `/${periodoRec.nome}` : '/mês';
       const racionalMsg = receita.racional?.trim() ? ` O racional curto informado: "${receita.racional.trim()}".` : '';
       const oQueFazMsg = coletado.o_que_faz?.trim() ? ` O projeto faz: "${coletado.o_que_faz.trim()}".` : '';
       messages.push({

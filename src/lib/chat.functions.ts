@@ -424,7 +424,9 @@ const enviarMensagemSchema = z.object({
 
 const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
-  tipo_saving: z.enum(['mensal', 'pontual']),
+  // 'trimestral'/'semestral': rotina a cada 3/6 meses — grava o ACUMULADO do
+  // período pelo valor cheio (não mensaliza). A cadência fica no tipo_saving.
+  tipo_saving: z.enum(['mensal', 'pontual', 'trimestral', 'semestral']),
   // Havia alguém fazendo/mantendo o processo manualmente antes da automação?
   // 'sim' → horas reais; 'nao' → contrafactual (equivalente manual estimado);
   // 'externo' → ninguém fazia internamente e o ganho é 100% um custo externo
@@ -462,7 +464,7 @@ const iniciarSavingSchema = z.object({
 
 const iniciarReceitaSchema = z.object({
   projeto_id: z.string().min(1),
-  tipo_saving: z.enum(['mensal', 'pontual']),
+  tipo_saving: z.enum(['mensal', 'pontual', 'trimestral', 'semestral']),
   // Valor de receita informado pela pessoa no formulário determinístico. O agente
   // recebe esse valor pré-preenchido e o DESAFIA (em vez de coletar do zero).
   valor_ganho_mensal: z.number().min(0).optional(),

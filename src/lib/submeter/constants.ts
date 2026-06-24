@@ -129,7 +129,7 @@ export interface SavingFormData {
   // evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
   temCustoProjeto: 'sim' | 'nao' | '';
   custoProjetoItens: CustoEvitadoItemInput[];
-  tipoSaving: 'mensal' | 'pontual' | '';
+  tipoSaving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
   // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).
