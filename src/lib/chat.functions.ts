@@ -707,6 +707,40 @@ const NUDGE_JORNADA_UTIL =
 const NUDGE_JORNADA_FIMSEMANA =
   '[SISTEMA] O usuário afirmou (botão) que há trabalho/uso HUMANO no fim de semana. VALIDE com cuidado antes de elevar a base: confirme que é mesmo uma PESSOA que trabalha/usa/se beneficia do processo no sábado/domingo (não basta a automação rodar) e quantos dias por semana de fato. Só então a base por pessoa pode subir proporcionalmente, até no MÁXIMO 30 dias úteis/mês (~300h; 6 dias ≈ 26 dias/264h, 7 dias ≈ 30 dias/300h). Ajuste as linhas (horas_antes/horas_depois) conforme a base validada. Se, ao questionar, ficar claro que só a automação roda no fim de semana (ninguém trabalha nem consome), NÃO eleve a base — mantenha 220h e reconcilie. NÃO repita a pergunta de fim de semana.';
 
+// ─── Gate determinístico 2: TETO por pessoa (uma LINHA acima do teto) ────────
+// Camada de segurança DURA sobre o teto de horas. O teto por pessoa (220h dias
+// úteis / 300h com fim de semana humano) é, por prompt, só persuasão — o LLM pode
+// ceder se o usuário insistir num número impossível para uma pessoa. Aqui o backend
+// IMPEDE o preview enquanto uma linha passar do teto, A NÃO SER que o usuário
+// confirme (com botões) que a linha soma VÁRIAS pessoas/unidades (caso multiplicador
+// legítimo, ex.: várias lojas — que o sistema não consegue distinguir só pelas horas).
+function tetoPorJornada(jornada: SavingColetado['jornada_base']): number {
+  return jornada === 'fim_de_semana' ? 300 : 220;
+}
+function linhasAcimaDoTeto(linhas: SavingColetado['linhas'], cap: number) {
+  return (linhas ?? []).filter((l) => (l.horas_antes ?? 0) > cap);
+}
+function perguntaTetoPessoa(excedentes: SavingColetado['linhas'], cap: number): string {
+  const lista = (excedentes ?? []).map((l) => `${l.cargo} (${l.horas_antes}h/mês)`).join(', ');
+  return `Preciso confirmar um ponto antes de fechar: ${lista} ${(excedentes ?? []).length > 1 ? 'aparecem' : 'aparece'} acima do teto de **${cap}h/mês por pessoa** (uma pessoa não trabalha mais que isso no mês). Esse total é de **uma pessoa só** ou **representa várias pessoas/unidades** (ex.: várias lojas, vários colaboradores)?`;
+}
+const OPCOES_TETO = ['É uma pessoa só (vou corrigir as horas)', 'Representa várias pessoas/unidades (lojas, colaboradores)'];
+// Interpreta a resposta do teto. Texto primeiro (robusto p/ clique E digitação),
+// índice 1-based como apoio (frontend: 1=pessoa, 2=múltiplo). null = ambíguo.
+function interpretarTetoPessoa(content: string, selectedOption: number | null): 'pessoa' | 'multiplo' | null {
+  const t = (content ?? '').trim().toLowerCase();
+  if (/(v[áa]ri[ao]s?|m[úu]ltipl|lojas?|unidades?|colaboradores?|filia|por (loja|unidade)|cada (loja|unidade|colaborador)|equipe inteira)/.test(t)) return 'multiplo';
+  if (/(uma pessoa|uma s[óo]|s[óo] (uma|um)\b|[ée] uma pessoa|corrig|reduz|ajust)/.test(t)) return 'pessoa';
+  if (selectedOption === 2) return 'multiplo';
+  if (selectedOption === 1) return 'pessoa';
+  return null;
+}
+const NUDGE_TETO_MULTIPLO =
+  '[SISTEMA] O usuário confirmou (botão) que a(s) linha(s) acima do teto somam VÁRIAS pessoas/unidades (não uma só) — então o total é legítimo (cada pessoa fica dentro do teto). Pode prosseguir e gerar o preview se o resto estiver completo. NÃO repita essa pergunta. No memorial, registre quantas pessoas/unidades compõem essas horas.';
+function nudgeTetoPessoa(cap: number): string {
+  return `[SISTEMA] O usuário confirmou que a(s) linha(s) acima do teto é(são) de UMA pessoa só — o que é IMPOSSÍVEL, pois uma pessoa não trabalha mais que ${cap}h/mês. RECONCILIE agora: reveja volume × tempo com o usuário e ajuste horas_antes dessa(s) linha(s) para no MÁXIMO ${cap}h/mês ANTES de gerar o preview. É PROIBIDO gerar preview com uma linha acima de ${cap}h/mês para uma única pessoa.`;
+}
+
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
@@ -745,28 +779,46 @@ export async function enviarMensagem(rawData: unknown) {
   // trabalho humano e elevar até no máx. 30 dias. Resposta ambígua → re-pergunta
   // determinística (sem chamar o orquestrador).
   const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
-  let reaskJornada: OrchestratorResult | null = null;
+  let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === 'pendente') {
+    // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
     const resp = interpretarJornada(data.content, data.selected_option ?? null);
     if (resp === null) {
       log('enviarMensagem', 'Jornada-base: resposta ambígua — re-perguntando (dias úteis × fim de semana)');
-      reaskJornada = {
-        type: 'options',
-        question: perguntaJornada(),
-        options: OPCOES_JORNADA,
-        fase: 'saving',
-        coletado: estado.coletado,
-        saving: { ...estado.saving, jornada_base: 'pendente' },
-        receita: estado.receita,
+      reask = {
+        type: 'options', question: perguntaJornada(), options: OPCOES_JORNADA,
+        fase: 'saving', coletado: estado.coletado,
+        saving: { ...estado.saving, jornada_base: 'pendente' }, receita: estado.receita,
       };
     } else {
       log('enviarMensagem', `Jornada-base: usuário respondeu "${resp}"`);
       estado.saving = { ...estado.saving, jornada_base: resp };
       history.push({ role: 'user', content: resp === 'fim_de_semana' ? NUDGE_JORNADA_FIMSEMANA : NUDGE_JORNADA_UTIL });
     }
+  } else if (gateBaseHoras && estado.saving.teto_pessoa === 'pendente') {
+    // (2) Turno de resposta ao TETO por pessoa (uma pessoa só × várias unidades).
+    const cap = tetoPorJornada(estado.saving.jornada_base);
+    const resp = interpretarTetoPessoa(data.content, data.selected_option ?? null);
+    if (resp === null) {
+      log('enviarMensagem', 'Teto-pessoa: resposta ambígua — re-perguntando');
+      reask = {
+        type: 'options', question: perguntaTetoPessoa(linhasAcimaDoTeto(estado.saving.linhas, cap), cap), options: OPCOES_TETO,
+        fase: 'saving', coletado: estado.coletado,
+        saving: { ...estado.saving, teto_pessoa: 'pendente' }, receita: estado.receita,
+      };
+    } else if (resp === 'multiplo') {
+      log('enviarMensagem', 'Teto-pessoa: usuário confirmou VÁRIAS unidades — liberado');
+      estado.saving = { ...estado.saving, teto_pessoa: 'multiplo' };
+      history.push({ role: 'user', content: NUDGE_TETO_MULTIPLO });
+    } else {
+      // 'pessoa' → uma pessoa só acima do teto é impossível: reset e exige reconciliação.
+      log('enviarMensagem', 'Teto-pessoa: uma pessoa só acima do teto — exigindo reconciliação');
+      estado.saving = { ...estado.saving, teto_pessoa: null };
+      history.push({ role: 'user', content: nudgeTetoPessoa(cap) });
+    }
   }
 
-  const resultado = reaskJornada ?? await runOrchestrator(
+  const resultado = reask ?? await runOrchestrator(
     ctx,
     history,
     estado.fase,
@@ -777,10 +829,14 @@ export async function enviarMensagem(rawData: unknown) {
     estado.receita,
   );
 
-  // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui jornada_base).
-  // Re-mescla o campo gerenciado pelo backend para que ele faça round-trip no estado.
+  // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui os campos de gate).
+  // Re-mescla os campos gerenciados pelo backend para que façam round-trip no estado.
   if (resultado.saving) {
-    resultado.saving = { ...resultado.saving, jornada_base: estado.saving.jornada_base ?? null };
+    resultado.saving = {
+      ...resultado.saving,
+      jornada_base: estado.saving.jornada_base ?? null,
+      teto_pessoa: estado.saving.teto_pessoa ?? null,
+    };
   }
 
   // ── SAFETY NET: memorial_calculo no objeto saving/receita ──────────────────
@@ -862,6 +918,38 @@ export async function enviarMensagem(rawData: unknown) {
       saving: savingComFlag,
     });
     delete (resultado as { content?: string }).content;
+  }
+
+  // ── GATE TETO POR PESSOA — bloqueia preview com linha acima do teto ─────────
+  // Roda DEPOIS da jornada (que define o teto: 220h dias úteis / 300h fim de semana).
+  // Se alguma LINHA tem horas_antes acima do teto e o usuário ainda NÃO confirmou que
+  // ela soma várias pessoas/unidades, não deixa o preview/complete passar: força a
+  // pergunta (uma pessoa × várias unidades). 'multiplo' libera; senão, exige reconciliar.
+  const jornadaDefinida = estado.saving.jornada_base === 'dias_uteis' || estado.saving.jornada_base === 'fim_de_semana';
+  if (
+    gateBaseHoras &&
+    jornadaDefinida &&
+    estado.saving.teto_pessoa !== 'multiplo' &&
+    (resultado.type === 'preview' || resultado.type === 'complete')
+  ) {
+    const cap = tetoPorJornada(estado.saving.jornada_base);
+    const linhasAtuais = (resultado.saving?.linhas ?? estado.saving.linhas) as SavingColetado['linhas'];
+    const excedentes = linhasAcimaDoTeto(linhasAtuais, cap);
+    if (excedentes.length) {
+      log('enviarMensagem', `⛔ Preview do saving com linha acima do teto de ${cap}h/pessoa (${excedentes.map((l) => `${l.cargo}:${l.horas_antes}h`).join(', ')}) — forçando pergunta (uma pessoa × várias unidades)`);
+      const savingComFlag: SavingColetado = {
+        ...((resultado.saving ?? estado.saving) as SavingColetado),
+        teto_pessoa: 'pendente',
+      };
+      Object.assign(resultado, {
+        type: 'options',
+        question: perguntaTetoPessoa(excedentes, cap),
+        options: OPCOES_TETO,
+        fase: 'saving',
+        saving: savingComFlag,
+      });
+      delete (resultado as { content?: string }).content;
+    }
   }
 
   // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o
