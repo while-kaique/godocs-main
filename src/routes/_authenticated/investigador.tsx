@@ -1158,7 +1158,7 @@ function DetalheView({
       </div>
 
       <div className="mt-4">
-        {tab === 'chat' && <ChatTab messages={chatView} eventos={eventosView} />}
+        {tab === 'chat' && <ChatTab messages={chatView} eventos={eventosView} todosEventos={d.form_events} />}
         {tab === 'api_logs' && <ApiLogsTab logs={logsView} />}
         {tab === 'dados' && <DadosTab documentacao={d.documentacao} analise={d.analise} />}
       </div>
@@ -1589,8 +1589,35 @@ type TimelineItem =
   | { type: 'message'; msg: ChatMsg; phase: PhaseGroup; key: string }
   | { type: 'event'; event: FormEvent; phase: PhaseGroup; key: string }
 
-function ChatTab({ messages, eventos }: { messages: ChatMsg[]; eventos: FormEvent[] }) {
+function ChatTab({
+  messages,
+  eventos,
+  todosEventos,
+}: {
+  messages: ChatMsg[]
+  eventos: FormEvent[]
+  todosEventos: FormEvent[]
+}) {
   const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Baseline do diff: para cada evento, a marcação ANTERIOR da mesma etapa em TODA a
+  // história do projeto (mesmo fora da janela da versão exibida) — assim o 1º saving de
+  // um reenvio compara com o saving submetido antes, e remarcas dentro de uma submissão
+  // comparam com a marca anterior. Varre cronologicamente guardando o último por tipo.
+  const dadosAnteriorPorEvento = useMemo(() => {
+    const ordenados = [...todosEventos].sort((a, b) => {
+      const av = tsToEpoch(a.created_at)
+      const bv = tsToEpoch(b.created_at)
+      return (isNaN(av) ? 0 : av) - (isNaN(bv) ? 0 : bv)
+    })
+    const ultimoPorTipo = new Map<string, Record<string, unknown> | null>()
+    const mapa = new Map<string, Record<string, unknown> | null>()
+    for (const ev of ordenados) {
+      mapa.set(ev.id, ultimoPorTipo.get(ev.tipo) ?? null)
+      ultimoPorTipo.set(ev.tipo, (ev.dados ?? {}) as Record<string, unknown>)
+    }
+    return mapa
+  }, [todosEventos])
 
   // Timeline unificado: mensagens do chat + eventos determinísticos do formulário,
   // ordenados por created_at. Em empate de carimbo, o evento vem antes da mensagem
@@ -1664,7 +1691,14 @@ function ChatTab({ messages, eventos }: { messages: ChatMsg[]; eventos: FormEven
       <div className="space-y-1 py-2">
         {timeline.map((item) => {
           if (item.type === 'divider') return <PhaseDivider key={item.key} phase={item.phase} label={item.label} />
-          if (item.type === 'event') return <EventBubble key={item.key} event={item.event} />
+          if (item.type === 'event')
+            return (
+              <EventBubble
+                key={item.key}
+                event={item.event}
+                dadosAnterior={dadosAnteriorPorEvento.get(item.event.id) ?? null}
+              />
+            )
           return <ChatBubble key={item.key} msg={item.msg} phase={item.phase} />
         })}
         <div ref={chatEndRef} />
@@ -1687,31 +1721,37 @@ function tipoSavingLabel(t: unknown): string {
 type EventoLinha = { cargo?: string; horas_antes?: number; horas_depois?: number }
 type EventoCustoItem = { nome?: string; valor?: number; recorrencia?: string }
 
-/** Renderiza um evento do formulário como um cartão central, discreto e legível —
- * mostra os valores que o usuário marcou (saving mensal, horas, receita…) e, em
- * reentradas, o marcador "voltou e editou". */
-function EventBubble({ event }: { event: FormEvent }) {
-  const d = (event.dados ?? {}) as Record<string, unknown>
-  const voltou = d.voltou === true
-  const isAlerta = event.tipo === 'divergencia_memorial'
+type EvRow = { label: string; value: string }
+type EvChip = { key: string; texto: string }
 
-  // Título + etapa do "voltou" por tipo de evento
-  const CONFIG: Record<string, { titulo: string; etapa: string }> = {
-    submissao: { titulo: 'Formulário enviado (etapas 1 e 2)', etapa: 'Etapa inicial' },
-    saving: { titulo: 'Saving informado', etapa: 'Etapa de Saving' },
-    receita: { titulo: 'Receita informada', etapa: 'Etapa de Receita' },
-    metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
-    tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
-    submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
-    divergencia_memorial: { titulo: 'Memorial × valor gravado divergem', etapa: 'Submissão' },
+const EVENT_CONFIG: Record<string, { titulo: string; etapa: string }> = {
+  submissao: { titulo: 'Formulário enviado (etapas 1 e 2)', etapa: 'Etapa inicial' },
+  saving: { titulo: 'Saving informado', etapa: 'Etapa de Saving' },
+  receita: { titulo: 'Receita informada', etapa: 'Etapa de Receita' },
+  metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
+  tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
+  submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
+  divergencia_memorial: { titulo: 'Memorial × valor gravado divergem', etapa: 'Submissão' },
+}
+
+// Etapas em que comparar com a marcação anterior faz sentido (formulários remarcáveis).
+// `metadados`/`submit`/etc. registram só o que mudou naquele instante — diff entre eles confunde.
+const TIPOS_COM_DIFF = new Set(['saving', 'receita'])
+
+/** Constrói os pares label→valor e os chips (cargo/custo) de um evento — função PURA,
+ * usada tanto para o estado atual quanto para o anterior (a base do diff). */
+function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow[]; chips: EvChip[] } {
+  const rows: EvRow[] = []
+  const chips: EvChip[] = []
+  // Chave estável p/ casar chips entre versões; sufixo em duplicatas (mesmo cargo/nome).
+  const usados = new Map<string, number>()
+  const chave = (base: string) => {
+    const n = (usados.get(base) ?? 0) + 1
+    usados.set(base, n)
+    return n > 1 ? `${base}#${n}` : base
   }
-  const cfg = CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
 
-  // Constrói os pares label → valor a exibir, por tipo
-  const rows: Array<{ label: string; value: string }> = []
-  const chips: string[] = []
-
-  if (event.tipo === 'submissao') {
+  if (tipo === 'submissao') {
     if (d.escopo) rows.push({ label: 'Escopo', value: String(d.escopo) })
     if (d.ferramenta) rows.push({ label: 'Ferramenta', value: String(d.ferramenta) })
     if (Array.isArray(d.tipos_projeto) && d.tipos_projeto.length > 0) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
@@ -1719,7 +1759,7 @@ function EventBubble({ event }: { event: FormEvent }) {
     if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Arquivos', value: (d.arquivos as string[]).join(', ') })
     if (d.especial === true) rows.push({ label: 'Especial', value: 'Sim' })
-  } else if (event.tipo === 'saving') {
+  } else if (tipo === 'saving') {
     rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
     if (typeof d.economia_horas_mes === 'number') rows.push({ label: 'Economia (horas)', value: `${d.economia_horas_mes} h/mês` })
     if (typeof d.economia_reais_mes === 'number') rows.push({ label: 'Saving', value: `${fmtReais(d.economia_reais_mes)}/mês` })
@@ -1728,19 +1768,19 @@ function EventBubble({ event }: { event: FormEvent }) {
     if (d.alguem_fazia) rows.push({ label: 'Alguém fazia antes', value: d.alguem_fazia === 'sim' ? 'Sim' : 'Não' })
     if (Array.isArray(d.linhas)) {
       for (const l of d.linhas as EventoLinha[]) {
-        if (l && l.cargo != null) chips.push(`${l.cargo}: ${l.horas_antes ?? 0}h → ${l.horas_depois ?? 0}h`)
+        if (l && l.cargo != null) chips.push({ key: chave(`cargo:${l.cargo}`), texto: `${l.cargo}: ${l.horas_antes ?? 0}h → ${l.horas_depois ?? 0}h` })
       }
     }
     if (Array.isArray(d.custo_evitado_itens)) {
       for (const it of d.custo_evitado_itens as EventoCustoItem[]) {
-        if (it && it.nome != null) chips.push(`Evitado: ${it.nome} (${fmtReais(it.valor)}, ${it.recorrencia ?? '—'})`)
+        if (it && it.nome != null) chips.push({ key: chave(`evitado:${it.nome}`), texto: `Evitado: ${it.nome} (${fmtReais(it.valor)}, ${it.recorrencia ?? '—'})` })
       }
     }
-  } else if (event.tipo === 'receita') {
+  } else if (tipo === 'receita') {
     rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
     if (typeof d.valor_ganho_mensal === 'number') rows.push({ label: 'Receita', value: `${fmtReais(d.valor_ganho_mensal)}/mês` })
     if (d.racional) rows.push({ label: 'Racional', value: String(d.racional) })
-  } else if (event.tipo === 'metadados') {
+  } else if (tipo === 'metadados') {
     if (d.reset_doc === true) rows.push({ label: 'Documentação', value: 'Reiniciada' })
     const campos = (d.campos ?? {}) as Record<string, unknown>
     const CAMPO_LABELS: Record<string, string> = {
@@ -1753,22 +1793,76 @@ function EventBubble({ event }: { event: FormEvent }) {
       rows.push({ label, value: Array.isArray(v) ? (v as string[]).join(', ') : String(v) })
     }
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Novos arquivos', value: (d.arquivos as string[]).join(', ') })
-  } else if (event.tipo === 'tipos') {
+  } else if (tipo === 'tipos') {
     if (Array.isArray(d.tipos_projeto)) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
-  } else if (event.tipo === 'submit') {
+  } else if (tipo === 'submit') {
     if (d.status) rows.push({ label: 'Status', value: String(d.status) })
     if (typeof d.ganho_total_mensal === 'number') rows.push({ label: 'Ganho total', value: `${fmtReais(d.ganho_total_mensal)}/mês` })
     if (d.reenvio === true) rows.push({ label: 'Tipo', value: 'Reenvio' })
-  } else if (event.tipo === 'divergencia_memorial') {
+  } else if (tipo === 'divergencia_memorial') {
     if (d.total_texto != null) rows.push({ label: 'No memorial (texto)', value: `${d.total_texto} h` })
     if (d.total_gravado != null) rows.push({ label: 'Gravado (planilha)', value: `${d.total_gravado} h` })
   }
+
+  return { rows, chips }
+}
+
+type RowMarc = EvRow & { status: DiffStatus; antes: string | null }
+type ChipMarc = EvChip & { status: DiffStatus; antes: string | null }
+
+/** Renderiza um evento do formulário como um cartão central. Quando há uma marcação
+ * anterior da mesma etapa (`dadosAnterior`), realça o que mudou (antes→depois),
+ * deixa o que ficou igual discreto e marca novos/removidos — para a reentrada
+ * ("voltou e editou") ou o reenvio mostrarem com clareza o que foi alterado. */
+function EventBubble({ event, dadosAnterior }: { event: FormEvent; dadosAnterior?: Record<string, unknown> | null }) {
+  const d = (event.dados ?? {}) as Record<string, unknown>
+  const voltou = d.voltou === true
+  const isAlerta = event.tipo === 'divergencia_memorial'
+  const cfg = EVENT_CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
+
+  const { rows, chips } = linhasDoEvento(event.tipo, d)
+
+  // Diff só faz sentido em etapas remarcáveis e quando há base anterior.
+  const temBase = !!dadosAnterior && TIPOS_COM_DIFF.has(event.tipo)
+  const base = temBase ? linhasDoEvento(event.tipo, dadosAnterior as Record<string, unknown>) : null
+  const baseRows = new Map((base?.rows ?? []).map((r) => [r.label, r.value]))
+  const baseChips = new Map((base?.chips ?? []).map((c) => [c.key, c.texto]))
+
+  const classificarRow = (r: EvRow): RowMarc => {
+    if (!temBase) return { ...r, status: 'igual', antes: null }
+    if (!baseRows.has(r.label)) return { ...r, status: 'adicionado', antes: null }
+    const antes = baseRows.get(r.label) ?? null
+    return { ...r, status: antes === r.value ? 'igual' : 'alterado', antes }
+  }
+  const rowsAtuais: RowMarc[] = rows.map(classificarRow)
+  const rowsRemovidas: RowMarc[] = temBase
+    ? base!.rows.filter((b) => !rows.some((r) => r.label === b.label)).map((b) => ({ ...b, status: 'removido', antes: b.value }))
+    : []
+  const todasRows = [...rowsAtuais, ...rowsRemovidas]
+
+  const classificarChip = (c: EvChip): ChipMarc => {
+    if (!temBase) return { ...c, status: 'igual', antes: null }
+    if (!baseChips.has(c.key)) return { ...c, status: 'adicionado', antes: null }
+    const antes = baseChips.get(c.key) ?? null
+    return { ...c, status: antes === c.texto ? 'igual' : 'alterado', antes: antes === c.texto ? null : antes }
+  }
+  const chipsAtuais: ChipMarc[] = chips.map(classificarChip)
+  const chipsRemovidos: ChipMarc[] = temBase
+    ? base!.chips.filter((b) => !chips.some((c) => c.key === b.key)).map((b) => ({ ...b, status: 'removido', antes: b.texto }))
+    : []
+  const todosChips = [...chipsAtuais, ...chipsRemovidos]
+
+  const nMudancas = temBase
+    ? todasRows.filter((r) => r.status !== 'igual').length + todosChips.filter((c) => c.status !== 'igual').length
+    : 0
+
+  const azul = DIFF_STYLE.alterado.cor
 
   return (
     <div className="flex justify-center px-6 py-1">
       <div className={`w-full max-w-[88%] rounded-[var(--go-radius-sm)] border px-3 py-2 ${isAlerta ? 'border-[#dc2626]/40 bg-[#fef2f2]' : 'border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50'}`}>
         {voltou && (
-          <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-[#b45309]">
+          <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#f59e0b]/12 px-2 py-0.5 text-[10px] font-semibold text-[#b45309]">
             <ArrowLeft className="h-3 w-3" />
             Voltou e editou — {cfg.etapa}
           </div>
@@ -1780,24 +1874,83 @@ function EventBubble({ event }: { event: FormEvent }) {
           <span className={`text-[11px] font-semibold uppercase tracking-wide ${isAlerta ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/45'}`}>
             {cfg.titulo}
           </span>
-        </div>
-        {rows.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-            {rows.map((r, i) => (
-              <span key={i} className="text-[12px] text-[var(--go-text-primary)]/70">
-                <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>{' '}
-                <span className="font-medium">{r.value}</span>
+          {temBase && (
+            nMudancas > 0 ? (
+              <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums" style={{ color: azul, backgroundColor: `${azul}14` }}>
+                {nMudancas} {nMudancas > 1 ? 'alterações' : 'alteração'}
               </span>
-            ))}
+            ) : (
+              <span className="ml-auto text-[10px] font-medium text-[var(--go-text-primary)]/30">sem alterações</span>
+            )
+          )}
+        </div>
+        {todasRows.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            {todasRows.map((r, i) => {
+              // Sem base, ou inalterado: estilo discreto (igual ao de antes quando sem base).
+              if (!temBase || r.status === 'igual') {
+                return (
+                  <span key={i} className={`text-[12px] ${temBase ? 'text-[var(--go-text-primary)]/45' : 'text-[var(--go-text-primary)]/70'}`}>
+                    <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>{' '}
+                    <span className={temBase ? '' : 'font-medium'}>{r.value}</span>
+                  </span>
+                )
+              }
+              const st = DIFF_STYLE[r.status]
+              return (
+                <span key={i} className="inline-flex items-center gap-1 text-[12px]">
+                  <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>
+                  {r.status === 'alterado' && (
+                    <>
+                      <span className="text-[var(--go-text-primary)]/45">{r.antes}</span>
+                      <ArrowRight className="h-3 w-3 flex-shrink-0 text-[var(--go-text-primary)]/25" />
+                      <span className="font-semibold" style={{ color: st.cor }}>{r.value}</span>
+                    </>
+                  )}
+                  {r.status === 'adicionado' && (
+                    <span className="inline-flex items-center gap-1 font-semibold" style={{ color: st.cor }}>
+                      {r.value}
+                      <span className="text-[9px] font-bold uppercase tracking-wide">· novo</span>
+                    </span>
+                  )}
+                  {r.status === 'removido' && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[var(--go-text-primary)]/40 line-through">{r.value}</span>
+                      <span className="font-medium" style={{ color: st.cor }}>removido</span>
+                    </span>
+                  )}
+                </span>
+              )
+            })}
           </div>
         )}
-        {chips.length > 0 && (
+        {todosChips.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {chips.map((c, i) => (
-              <span key={i} className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[var(--go-text-primary)]/65 border border-[var(--go-blue)]/10">
-                {c}
-              </span>
-            ))}
+            {todosChips.map((c, i) => {
+              if (!temBase || c.status === 'igual') {
+                return (
+                  <span key={i} className="rounded-full border border-[var(--go-blue)]/10 bg-white px-2 py-0.5 text-[11px] text-[var(--go-text-primary)]/65">
+                    {c.texto}
+                  </span>
+                )
+              }
+              const st = DIFF_STYLE[c.status]
+              return (
+                <span
+                  key={i}
+                  title={c.status === 'alterado' && c.antes ? `Antes: ${c.antes}` : undefined}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${c.status === 'removido' ? 'line-through' : ''}`}
+                  style={{ color: st.cor, borderColor: `${st.cor}55`, backgroundColor: `${st.cor}0f` }}
+                >
+                  {c.status === 'adicionado' && <Plus className="h-2.5 w-2.5 flex-shrink-0" />}
+                  {c.status === 'removido' && <Minus className="h-2.5 w-2.5 flex-shrink-0" />}
+                  {c.texto}
+                  {c.status === 'alterado' && c.antes && (
+                    <span className="text-[10px] text-[var(--go-text-primary)]/40">(antes: {c.antes.replace(/^[^:]*:\s*/, '')})</span>
+                  )}
+                </span>
+              )
+            })}
           </div>
         )}
       </div>
