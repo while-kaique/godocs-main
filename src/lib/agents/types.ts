@@ -117,6 +117,12 @@ export type SavingColetado = {
   // gate). Null = não se aplica (ninguém fazia / custo evitado puro / pontual).
   horas_carga_real?: number | null;
   horas_escala?: number | null;
+  // Estado do GATE DETERMINÍSTICO do split (gerenciado pelo backend, não ecoado pelo
+  // LLM — re-mesclado a cada turno). null = ainda não perguntado · 'pendente' = pergunta
+  // feita, aguardando o nº da carga real · 'ok' = split capturado (horas_carga_real/
+  // horas_escala preenchidos e somando o total). O backend BLOQUEIA o preview enquanto
+  // não for 'ok' (quando aplicaSplitCargaEscala). Garante que a informação SEMPRE exista.
+  carga_escala?: 'pendente' | 'ok' | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -137,6 +143,7 @@ export const savingVazio = (): SavingColetado => ({
   teto_pessoa: null,
   horas_carga_real: null,
   horas_escala: null,
+  carga_escala: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────

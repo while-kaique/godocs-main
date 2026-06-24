@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, totalEconomiaHoras, unidadeHorasDe } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -761,6 +761,39 @@ function nudgeTetoPessoa(cap: number): string {
   return `[SISTEMA] O usuário confirmou que a(s) linha(s) acima do teto é(são) de UMA pessoa só — o que é IMPOSSÍVEL, pois uma pessoa não trabalha mais que ${cap}h/mês. RECONCILIE agora: reveja volume × tempo com o usuário e ajuste horas_antes dessa(s) linha(s) para no MÁXIMO ${cap}h/mês ANTES de gerar o preview. É PROIBIDO gerar preview com uma linha acima de ${cap}h/mês para uma única pessoa.`;
 }
 
+// ─── Gate determinístico 3: SPLIT carga real × ganho por escala ──────────────
+// Quando ALGUÉM fazia a tarefa à mão (alguem_fazia='sim') e o saving é recorrente, a
+// análise EXIGE saber quanto do total a pessoa realmente fazia (carga real) e quanto a
+// automação ampliou (escala). O prompt sozinho não garante (o LLM às vezes previewa
+// sem perguntar) — então o backend BLOQUEIA o preview e pergunta o número da carga
+// real; a escala é o resto (total − carga real). Informação SEMPRE capturada.
+function perguntaCargaEscala(total: number, unidade: string): string {
+  return `Antes de eu fechar: dessas **${total}${unidade}** economizadas, quantas a pessoa **realmente fazia à mão**, por conta própria, antes da automação? (O restante é o volume que só a automação passou a cobrir — o ganho por escala.) Me diga só esse número de horas — se a pessoa já fazia o volume todo, é o próprio total.`;
+}
+// Interpreta a resposta (número da carga real, 0..total). Aceita "tudo/todas/o total"
+// (= total, escala 0). Se vierem dois números somando ~total, o 1º é a carga real.
+// null = ambíguo (re-pergunta determinística).
+function interpretarCargaReal(content: string, total: number): number | null {
+  const t = (content ?? '').trim().toLowerCase();
+  if (!t) return null;
+  // "fazia tudo / o total / o volume todo / integralmente" (sem negação) → carga real = total.
+  if (!/\bn[ãa]o\b/.test(t) && /(tudo|todas?|o\s+total|volume\s+todo|integral|por\s+inteiro|tod[oa]\s+o\s+volume)/.test(t)) {
+    return total;
+  }
+  const nums = (t.match(/\d+(?:[.,]\d+)?/g) ?? [])
+    .map((s) => parseFloat(s.replace(/\./g, '').replace(',', '.')))
+    .filter((n) => Number.isFinite(n));
+  if (!nums.length) return null;
+  // Dois números que somam ~total → o primeiro é a carga real.
+  if (nums.length >= 2 && Math.abs(nums[0] + nums[1] - total) <= 1) return Math.min(Math.max(nums[0], 0), total);
+  // Primeiro número plausível (0..total, com folga de 0,5).
+  const cand = nums.find((n) => n >= 0 && n <= total + 0.5);
+  return cand == null ? null : Math.min(cand, total);
+}
+function nudgeCargaEscala(real: number, escala: number): string {
+  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS. Registre os dois no memorial, dentro de "Saving de Pessoas" (em horas, qualitativo), e siga para o preview. NÃO pergunte sobre isso de novo.`;
+}
+
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
@@ -799,6 +832,9 @@ export async function enviarMensagem(rawData: unknown) {
   // trabalho humano e elevar até no máx. 30 dias. Resposta ambígua → re-pergunta
   // determinística (sem chamar o orquestrador).
   const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
+  // Gate do split carga real × escala (independente do gateBaseHoras: vale também p/
+  // trimestral/semestral, onde a jornada NÃO se aplica).
+  const gateCargaEscala = estado.fase === 'saving' && aplicaSplitCargaEscala(ctx, estado.saving);
   let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === 'pendente') {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
@@ -836,6 +872,25 @@ export async function enviarMensagem(rawData: unknown) {
       estado.saving = { ...estado.saving, teto_pessoa: null };
       history.push({ role: 'user', content: nudgeTetoPessoa(cap) });
     }
+  } else if (gateCargaEscala && estado.saving.carga_escala === 'pendente') {
+    // (3) Turno de resposta ao SPLIT carga real × escala. O usuário informa o nº da
+    // carga real; a escala é o resto (total − carga real). Preenchemos os dois campos
+    // e injetamos o nudge [SISTEMA] para o LLM registrar no memorial.
+    const total = totalEconomiaHoras(estado.saving);
+    const real = interpretarCargaReal(data.content, total);
+    if (real === null) {
+      log('enviarMensagem', 'Carga×escala: resposta ambígua — re-perguntando o nº da carga real');
+      reask = {
+        type: 'question', content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
+        fase: 'saving', coletado: estado.coletado,
+        saving: { ...estado.saving, carga_escala: 'pendente' }, receita: estado.receita,
+      };
+    } else {
+      const escala = Math.round((total - real) * 100) / 100;
+      log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
+      estado.saving = { ...estado.saving, horas_carga_real: real, horas_escala: escala, carga_escala: 'ok' };
+      history.push({ role: 'user', content: nudgeCargaEscala(real, escala) });
+    }
   }
 
   const resultado = reask ?? await runOrchestrator(
@@ -858,9 +913,11 @@ export async function enviarMensagem(rawData: unknown) {
       teto_pessoa: estado.saving.teto_pessoa ?? null,
       // Split carga real × escala: o LLM às vezes omite campos já coletados num turno
       // posterior (igual ao memorial). Mantém o valor anterior quando não reenviado,
-      // para o split não sumir entre o preview e o complete.
+      // para o split não sumir entre o preview e o complete. `carga_escala` é o estado
+      // do gate determinístico (gerenciado pelo backend, nunca ecoado pelo LLM).
       horas_carga_real: resultado.saving.horas_carga_real ?? estado.saving.horas_carga_real ?? null,
       horas_escala: resultado.saving.horas_escala ?? estado.saving.horas_escala ?? null,
+      carga_escala: estado.saving.carga_escala ?? null,
     };
   }
 
@@ -979,6 +1036,40 @@ export async function enviarMensagem(rawData: unknown) {
         saving: savingComFlag,
       });
       delete (resultado as { content?: string }).content;
+    }
+  }
+
+  // ── GATE SPLIT CARGA REAL × ESCALA — informação obrigatória antes do preview ──
+  // Quando alguém fazia à mão (recorrente), a análise EXIGE o split. Roda por ÚLTIMO
+  // (após jornada/teto) e só quando o resultado ainda é preview/complete (um gate de
+  // cada vez). Se o LLM já capturou um split válido (os dois campos somando ~total),
+  // libera (marca 'ok'); senão, BLOQUEIA o preview e pergunta o nº da carga real — a
+  // escala é o resto. Garante que a informação SEMPRE exista, independente do LLM.
+  if (
+    gateCargaEscala &&
+    estado.saving.carga_escala !== 'ok' &&
+    (resultado.type === 'preview' || resultado.type === 'complete')
+  ) {
+    const savingAtual = (resultado.saving ?? estado.saving) as SavingColetado;
+    const total = totalEconomiaHoras(savingAtual);
+    const real = savingAtual.horas_carga_real;
+    const escala = savingAtual.horas_escala;
+    const splitValido =
+      total > 0 && real != null && escala != null && Math.abs((real + escala) - total) <= 1;
+    if (total <= 0) {
+      // Sem economia de horas (outro gate cuida do ganho-zero) — não força o split.
+    } else if (splitValido) {
+      log('enviarMensagem', `Carga×escala: split já capturado pelo LLM (real=${real}h, escala=${escala}h) — liberado`);
+      resultado.saving = { ...savingAtual, carga_escala: 'ok' };
+    } else {
+      log('enviarMensagem', '⛔ Preview do saving sem o split carga real × escala — forçando pergunta (nº da carga real)');
+      Object.assign(resultado, {
+        type: 'question',
+        content: perguntaCargaEscala(total, unidadeHorasDe(savingAtual.tipo_saving)),
+        fase: 'saving',
+        saving: { ...savingAtual, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null },
+      });
+      delete (resultado as { options?: unknown }).options;
     }
   }
 
