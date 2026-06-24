@@ -803,7 +803,7 @@ function SavingForm({
       ? draft.custoEvitadoItens
       : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   );
-  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
+  const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "trimestral" | "semestral" | "">(draft?.tipoSaving ?? "");
   const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
     draft?.custoPeriodicidade ?? "",
@@ -848,6 +848,12 @@ function SavingForm({
   const custoEvitadoCompleto =
     temCustoEvitado === "nao" ||
     (temCustoEvitado === "sim" && custoEvitadoItens.length > 0 && custoEvitadoItens.every(custoEvitadoItemCompleto));
+
+  // Unidade de tempo da cadência escolhida — trimestral/semestral coletam o
+  // ACUMULADO do período (não por mês). Usada nos rótulos/dicas da tabela de horas.
+  const unidadePeriodo =
+    tipoSaving === "trimestral" ? "trimestre" : tipoSaving === "semestral" ? "semestre" : "mês";
+  const horasPorPeriodo = `horas/${unidadePeriodo}`;
 
   // Gates de exibição (saving). A tabela mantém o gate atual (`alguemFazia`).
   // Custo evitado/externo: no "não" aparece já; no "sim" só após a tabela completa.
@@ -1006,7 +1012,7 @@ function SavingForm({
       alguemFazia,
       temCustoEvitado,
       custoEvitadoItens,
-      tipoSaving: tipoSaving as "mensal" | "pontual",
+      tipoSaving: tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
       valorReceita,
@@ -1078,28 +1084,60 @@ function SavingForm({
           border: "1.5px solid rgba(215,219,0,0.15)",
         }}
       >
-        {/* Tipo saving: Mensal / Pontual toggle */}
+        {/* Tipo saving: frequência. Saving → 4 opções (Mensal/Trimestral/Semestral/
+            Pontual); receita → 2 (Mensal/Pontual). Trimestral/Semestral coletam o
+            ACUMULADO do período (não mensalizam). */}
         <div>
           <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
             Frequência do {isSaving ? "saving" : "ganho"} <span style={{ color: "#e53e3e" }}>*</span>
           </label>
-          <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
-            {(["mensal", "pontual"] as const).map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => { setTipoSaving(opt); setErrors(e => { const n = { ...e }; delete n.tipoSaving; return n; }); }}
-                className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
-                style={{
-                  background: tipoSaving === opt ? "#6b6e00" : "transparent",
-                  color: tipoSaving === opt ? "#fff" : "#6b6e00",
-                  borderRight: opt === "mensal" ? "1px solid rgba(215,219,0,0.2)" : "none",
-                }}
+          {(() => {
+            const opcoes: { v: "mensal" | "trimestral" | "semestral" | "pontual"; lbl: string }[] = isSaving
+              ? [
+                  { v: "mensal", lbl: "Mensal" },
+                  { v: "trimestral", lbl: "Trimestral" },
+                  { v: "semestral", lbl: "Semestral" },
+                  { v: "pontual", lbl: "Pontual" },
+                ]
+              : [
+                  { v: "mensal", lbl: "Mensal" },
+                  { v: "pontual", lbl: "Pontual" },
+                ];
+            return (
+              <div
+                role="radiogroup"
+                aria-label={`Frequência do ${isSaving ? "saving" : "ganho"}`}
+                className={`grid gap-1.5 ${opcoes.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"}`}
               >
-                {opt === "mensal" ? "📅 Mensal" : "⚡ Pontual"}
-              </button>
-            ))}
-          </div>
+                {opcoes.map(({ v, lbl }) => {
+                  const ativo = tipoSaving === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      role="radio"
+                      aria-checked={ativo}
+                      onClick={() => { setTipoSaving(v); setErrors(e => { const n = { ...e }; delete n.tipoSaving; return n; }); }}
+                      className="py-2.5 text-[13px] font-semibold rounded-xl transition-all"
+                      style={{
+                        background: ativo ? "#6b6e00" : "transparent",
+                        color: ativo ? "#fff" : "#6b6e00",
+                        border: ativo ? "1.5px solid #6b6e00" : "1.5px solid rgba(215,219,0,0.35)",
+                      }}
+                    >
+                      {lbl}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {(tipoSaving === "trimestral" || tipoSaving === "semestral") && (
+            <p className="mt-1.5 text-[11px] leading-snug" style={{ color: "#8b8b9a", animation: "go-slide-down 0.2s ease" }}>
+              Rotina a cada {tipoSaving === "trimestral" ? "3 meses" : "6 meses"}. Informe o {isSaving ? "saving" : "ganho"}{" "}
+              <strong>acumulado do {tipoSaving === "trimestral" ? "trimestre" : "semestre"}</strong> (não por mês) — o valor cheio do período.
+            </p>
+          )}
           {errors.tipoSaving && (
             <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
               {errors.tipoSaving}
@@ -1150,13 +1188,13 @@ function SavingForm({
                 <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
                   {alguemFazia === "sim" ? (
                     <>
-                      Uma linha por função. Informe as horas/mês <strong>antes</strong> e <strong>depois</strong> da automação.
+                      Uma linha por função. Informe as {horasPorPeriodo} <strong>antes</strong> e <strong>depois</strong> da automação.
                       Se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
                     </>
                   ) : (
                     <>
-                      Ninguém fazia isso manualmente — mas <strong>se alguém tivesse que fazer</strong>, quantas
-                      horas/mês levaria e qual função seria responsável? Uma linha por função. É o trabalho
+                      Ninguém fazia isso manualmente — mas <strong>se alguém tivesse que fazer</strong>, quantas{" "}
+                      {horasPorPeriodo} levaria e qual função seria responsável? Uma linha por função. É o trabalho
                       manual que a automação <strong>evita</strong> (o saving).
                     </>
                   )}
@@ -1174,7 +1212,7 @@ function SavingForm({
                       <span className="text-center">Horas depois</span>
                     </>
                   ) : (
-                    <span className="text-center">Horas/mês</span>
+                    <span className="text-center">Horas/{unidadePeriodo}</span>
                   )}
                   <span />
                 </div>
@@ -1217,7 +1255,7 @@ function SavingForm({
                               saving (horas reais antes ou estimativa do trabalho manual). */}
                           <input
                             type="number" min="0" step="0.5" placeholder="40"
-                            aria-label={alguemFazia === "nao" ? "Horas por mês do equivalente manual" : "Horas por mês antes"}
+                            aria-label={alguemFazia === "nao" ? `Horas por ${unidadePeriodo} do equivalente manual` : `Horas por ${unidadePeriodo} antes`}
                             value={l.horasAntes}
                             onChange={(e) => updateLinha(i, { horasAntes: e.target.value })}
                             className="go-input w-full"
@@ -1233,7 +1271,7 @@ function SavingForm({
                           {alguemFazia === "sim" && (
                             <input
                               type="number" min="0" step="0.5" placeholder="2"
-                              aria-label="Horas por mês depois"
+                              aria-label={`Horas por ${unidadePeriodo} depois`}
                               value={l.horasDepois}
                               onChange={(e) => updateLinha(i, { horasDepois: e.target.value })}
                               className="go-input w-full"

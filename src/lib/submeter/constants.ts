@@ -108,7 +108,7 @@ export interface SavingFormData {
   // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens).
   temCustoEvitado: 'sim' | 'nao' | '';
   custoEvitadoItens: CustoEvitadoItemInput[];
-  tipoSaving: 'mensal' | 'pontual' | '';
+  tipoSaving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
   // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).
