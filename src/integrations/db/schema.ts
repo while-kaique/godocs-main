@@ -233,6 +233,11 @@ const MIGRATIONS = [
   // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
   // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
   'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
+  // Governança de IA: o projeto usa o AI Proxy interno (ai-proxy.gogroupbr.com)?
+  // 'sim'|'nao', resposta determinística do formulário (etapa 2). O agente de
+  // documentação faz auto-detecção do uso na doc enviada e o analisador cruza
+  // declaração × detecção. Vai para a coluna "Usa AI Proxy" do Sheets.
+  'ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

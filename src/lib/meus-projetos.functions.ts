@@ -87,6 +87,8 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   nome_projeto: string | null;
   data_criacao_projeto: string | null;
   descricao_breve: string | null;
+  // Usa o AI Proxy interno? Necessário para o seed da EDIÇÃO repopular a etapa 2.
+  usa_ai_proxy: string | null;
   contexto_especial: string | null;
   tipo_saving: string | null;
   saving_horas: number | null;
@@ -401,6 +403,7 @@ export async function getMeuProjeto(
     nome_projeto: data.nome,
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,
+    usa_ai_proxy: data.usa_ai_proxy ?? null,
     contexto_especial: data.contexto_especial,
     tipo_saving: data.tipo_saving,
     saving_horas: data.saving_horas,

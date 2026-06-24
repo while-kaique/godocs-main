@@ -58,6 +58,11 @@ export interface FormData {
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];
   descricaoBreve: string;
+  // Usa o AI Proxy (gateway interno de IA da empresa, ai-proxy.gogroupbr.com)?
+  // Governança de custo: projetos que usam IA deveriam rotear pelo proxy interno.
+  // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
+  // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;
@@ -100,12 +105,22 @@ export interface SavingFormData {
   linhas: SavingLinhaInput[];
   // Saving: alguém já fazia/mantinha isso manualmente antes da automação?
   // 'sim' → tabela antes+depois (economia clássica). 'nao' → ninguém fazia: a
-  // tabela pede o EQUIVALENTE em trabalho manual (horas/mês que levaria se alguém
-  // tivesse que fazer + cargo), gravado em horas_antes com horas_depois = 0 —
-  // saving contrafactual (o trabalho manual que a automação evita).
+  // árvore segue para `eliminaGastoExterno` (e, conforme a resposta, custo evitado
+  // puro OU equivalente manual estimado — saving contrafactual).
   alguemFazia: 'sim' | 'nao' | '';
+  // Árvore do "Não, ninguém fazia": a automação eliminou um gasto externo
+  // (contrato/serviço/licença)? 'sim' → coleta o custo evitado (o ganho); 'nao' →
+  // contrafactual (equivalente manual estimado). Só relevante quando alguemFazia==='nao'.
+  eliminaGastoExterno: 'sim' | 'nao' | '';
+  // 2c — só no ramo "Não → elimina SIM": além do gasto eliminado, há um trabalho
+  // manual ADICIONAL (que ninguém fazia e o contrato NÃO cobria)? 'sim' → também
+  // coleta horas contrafactuais distintas; 'nao' → custo evitado puro (0h, mapeia
+  // para alguem_fazia='externo' no payload). Evita a dupla contagem do mesmo trabalho.
+  temContrafactualAdicional: 'sim' | 'nao' | '';
   // Saving: a solução evitou um custo externo (ferramenta/serviço que deixou de
-  // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens).
+  // ser pago)? 'sim' → lista de ferramentas evitadas (custoEvitadoItens). No ramo
+  // "Sim, alguém fazia" é a pergunta OPCIONAL de um custo DISTINTO das horas; no
+  // ramo "Não" o papel é cumprido por `eliminaGastoExterno`.
   temCustoEvitado: 'sim' | 'nao' | '';
   custoEvitadoItens: CustoEvitadoItemInput[];
   // Saving: a solução INTERNA consome algum serviço externo PAGO para funcionar

@@ -217,6 +217,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Atualizado Em': dataSubmissao,
       // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
       'Alocação Ganhos': ouTraco(p.alocacaoGanhos),
+      // Governança: 'Sim'/'Não' declarado no formulário; "—" quando não respondido.
+      'Usa AI Proxy':
+        p.projeto.usa_ai_proxy === 'sim' ? 'Sim'
+          : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
+            : '—',
       // Custos do projeto (serviços pagos que a solução consome pra rodar — ABATE).
       'Custo do Projeto': custoProjetoReais, // numérico: 0 quando não há (padrão)
       'Justificativa Custo do Projeto': ouTraco(p.projeto.custo_projeto_justificativa),
