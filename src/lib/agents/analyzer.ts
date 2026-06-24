@@ -9,6 +9,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ResultadoAnalise, CriterioResult, Complexidade } from './types';
+import { detectarAiProxy } from './extractor';
 
 const log = (...args: unknown[]) => console.log('[analyzer]', ...args);
 const err = (...args: unknown[]) => console.error('[analyzer]', ...args);
@@ -211,6 +212,20 @@ Antes de escolher a complexidade, responda objetivamente: **a AUTOMAÇÃO, quand
 
 Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
 
+## CUSTOS DO PROJETO (cross-check declaração × documentação)
+
+O formulário coleta os "custos do projeto" — serviços externos PAGOS que a solução consome para rodar (chave de API da OpenAI, ElevenLabs, um SaaS por uso). Eles chegam em memorial_saving.custo_projeto_itens (lista declarada) e custo_projeto_reais (total mensalizado, que ABATE o ganho). Compare a declaração com os serviços pagos que aparecem em documentacao_enviada_usuario / dependencias:
+- Se a doc menciona um serviço externo claramente PAGO (ex.: ElevenLabs, OpenAI por uso, Twilio) que NÃO está na lista declarada, aponte em "Pontos de atenção"/Recomendações que o custo pode estar subestimado.
+- Se a pessoa declarou um custo que não tem respaldo na doc, sinalize para conferência.
+- Não invente valores nem altere o cálculo — apenas registre a divergência qualitativamente (o valor é determinístico, vem do formulário). Quando declaração e doc batem, não comente.
+
+## AI PROXY (governança de custo)
+
+Os metadados trazem "usa_ai_proxy_declarado" (resposta do formulário: 'sim'/'nao'/null) e "ai_proxy_detectado_na_doc" (booleano: o gateway interno ai-proxy.gogroupbr.com foi encontrado no material enviado). Compare os dois e, **se houver divergência**, registre-a em UMA frase nas Observações/resumo (NÃO altere o resultado nem a complexidade por causa disso):
+- detectado=true mas declarado='nao' (ou null): o código usa o AI Proxy mas o autor não declarou — aponte para conferência.
+- detectado=false mas declarado='sim': o autor declarou usar o AI Proxy mas não há evidência na doc — aponte para conferência.
+- Se o projeto usa IA na execução ("usa_ia"=true) mas NÃO passa pelo AI Proxy (declarado='nao' e detectado=false), registre que vale orientar a migração para o proxy interno (economia de custo). Quando declaração e detecção batem, não comente.
+
 ## FORMATO DE RESPOSTA
 
 Responda APENAS com JSON válido, exatamente neste formato.
@@ -270,6 +285,12 @@ function buildUserMessage(
       // false → sem IA como funcionalidade, processo puramente determinístico.
       // null  → não foi perguntado (submissão antiga); infira pela documentação.
       tem_ia_como_funcionalidade: conteudo.tem_ia_como_funcionalidade ?? null,
+      // Governança de IA: o usuário DECLAROU no formulário se usa o AI Proxy interno
+      // ('sim'/'nao'/null) e nós DETECTAMOS o uso do gateway (ai-proxy.gogroupbr.com)
+      // na doc enviada. Se há detecção mas a declaração foi 'nao' (ou vice-versa),
+      // sinalize a divergência nas Observações (não bloqueia).
+      usa_ai_proxy_declarado: projeto.usa_ai_proxy ?? null,
+      ai_proxy_detectado_na_doc: detectarAiProxy(docTexto),
     },
     documentacao_tecnica: {
       o_que_faz: conteudo.o_que_faz ?? '(não preenchido)',
@@ -300,6 +321,11 @@ function buildUserMessage(
       custo_evitado_reais: saving.custo_evitado_reais ?? 0,
       custo_evitado_tipo: saving.custo_evitado_tipo ?? null,
       custo_externo_mensal: saving.custo_externo_mensal ?? 0,
+      // Custos do projeto DECLARADOS no formulário (serviços externos pagos que a
+      // solução consome). Total mensalizado que ABATE + a lista de itens, para o
+      // analisador cruzar com os serviços pagos que aparecem na doc enviada.
+      custo_projeto_reais: saving.custo_projeto_reais ?? 0,
+      custo_projeto_itens: parseJson(projeto.custo_projeto_itens as string | null) ?? [],
       tipo_saving: saving.tipo_saving ?? null,
       memorial_calculo: saving.memorial_calculo ?? '(sem memorial)',
     };

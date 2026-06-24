@@ -66,7 +66,9 @@ export type SavingColetado = {
   linhas: SavingLinha[];               // detalhamento por pessoa/cargo
   economia_horas_mes: number | null;   // total: soma das linhas
   economia_reais_mes: number | null;   // total líquido (horas×cargo + custo evitado − custo externo)
-  tipo_saving: 'mensal' | 'pontual' | null;
+  // 'trimestral'/'semestral': rotina que roda a cada 3/6 meses. As horas/R$ são o
+  // ACUMULADO do período (NÃO mensalizado) — a cadência fica registrada no campo.
+  tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | null;
   memorial_calculo: string | null;
   valor_ganho_mensal: number | null;
   // Custo que o projeto passou a EVITAR (ex: serviço externo/licença que deixou de
@@ -81,6 +83,15 @@ export type SavingColetado = {
   // economia_reais_mes. Fonte da verdade é projeto.custo_externo_mensal; carregado
   // aqui por recomputarSavingFinanceiro para o memorial enriquecido refleti-lo.
   custo_externo_mensal?: number | null;
+  // CUSTOS DO PROJETO: serviços externos PAGOS que a solução INTERNA consome para
+  // funcionar (chave de API, ElevenLabs, etc.). SUBTRAEM do economia_reais_mes
+  // (mensalizado: item pontual ÷12; mensal cheio) — mesma direção do custo externo,
+  // mas independe de escopo. Coletado no FORMULÁRIO (lista incremental), não pelo
+  // agente. Distinto de custo_externo_mensal (escopo externo) e de custo_evitado
+  // (que SOMA). Carregado aqui por recomputarSavingFinanceiro para o memorial.
+  custo_projeto_reais?: number | null;
+  custo_projeto_tipo?: 'mensal' | 'pontual' | null;
+  custo_projeto_descricao?: string | null;
   // Jornada-base DETERMINÍSTICA das horas. A base padrão é 220h/mês (22 dias úteis,
   // seg–sex) e é TETO por pessoa; só sobe (até 30 dias úteis/~300h) se houver trabalho
   // HUMANO em fim de semana confirmado. NÃO é setado pelo LLM — o orquestrador não o
@@ -119,6 +130,9 @@ export const savingVazio = (): SavingColetado => ({
   custo_evitado_tipo: null,
   custo_evitado_descricao: null,
   custo_externo_mensal: null,
+  custo_projeto_reais: null,
+  custo_projeto_tipo: null,
+  custo_projeto_descricao: null,
   jornada_base: null,
   teto_pessoa: null,
   horas_carga_real: null,
@@ -128,7 +142,7 @@ export const savingVazio = (): SavingColetado => ({
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
 
 export type ReceitaColetada = {
-  tipo_saving: 'mensal' | 'pontual' | null;
+  tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | null;
   valor_ganho_mensal: number | null;
   memorial_calculo: string | null;
   // Racional curto informado pela pessoa no formulário (ex: "as estampas com IA
@@ -264,7 +278,7 @@ export type DocumentacaoGerada = {
     linhas: SavingLinha[];
     economia_horas_mes: number;
     economia_reais_mes: number;
-    tipo_saving: 'mensal' | 'pontual';
+    tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral';
     memorial_calculo: string;
   };
   gerado_em: string;

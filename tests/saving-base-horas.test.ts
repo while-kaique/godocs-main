@@ -6,6 +6,8 @@ import {
   aplicaConfirmacaoBaseHoras,
   totalEconomiaHoras,
   buildSavingPrompt,
+  unidadeHorasDe,
+  periodoSavingInfo,
 } from '@/lib/agents/orchestrator';
 import { savingVazio } from '@/lib/agents/types';
 import type { ProjetoContexto, DocumentacaoColetada, SavingColetado, SavingLinha } from '@/lib/agents/types';
@@ -118,5 +120,60 @@ describe('buildSavingPrompt — bloco BASE DAS HORAS', () => {
   it('NÃO inclui o bloco no pontual', () => {
     const p = buildSavingPrompt(ctxBase(), doc, savingRotinaReal({ tipo_saving: 'pontual' }), 'resumo');
     expect(p).not.toContain('BASE DAS HORAS');
+  });
+
+  it('NÃO inclui o bloco no trimestral/semestral (base não é o mês)', () => {
+    const t = buildSavingPrompt(ctxBase(), doc, savingRotinaReal({ tipo_saving: 'trimestral' }), 'resumo');
+    const s = buildSavingPrompt(ctxBase(), doc, savingRotinaReal({ tipo_saving: 'semestral' }), 'resumo');
+    expect(t).not.toContain('BASE DAS HORAS');
+    expect(s).not.toContain('BASE DAS HORAS');
+  });
+});
+
+describe('periodicidade trimestral/semestral', () => {
+  it('aplicaConfirmacaoBaseHoras é FALSE para trimestral e semestral mesmo com rotina real', () => {
+    expect(aplicaConfirmacaoBaseHoras(ctxBase(), savingRotinaReal({ tipo_saving: 'trimestral' }))).toBe(false);
+    expect(aplicaConfirmacaoBaseHoras(ctxBase(), savingRotinaReal({ tipo_saving: 'semestral' }))).toBe(false);
+    // sanidade: mensal segue TRUE
+    expect(aplicaConfirmacaoBaseHoras(ctxBase(), savingRotinaReal({ tipo_saving: 'mensal' }))).toBe(true);
+  });
+
+  it('periodoSavingInfo mapeia a cadência (e null para mensal/pontual)', () => {
+    expect(periodoSavingInfo('trimestral')).toEqual({ nome: 'trimestre', meses: 3 });
+    expect(periodoSavingInfo('semestral')).toEqual({ nome: 'semestre', meses: 6 });
+    expect(periodoSavingInfo('mensal')).toBeNull();
+    expect(periodoSavingInfo('pontual')).toBeNull();
+  });
+
+  it('unidadeHorasDe reflete a cadência (acumulado do período)', () => {
+    expect(unidadeHorasDe('mensal')).toBe('h/mês');
+    expect(unidadeHorasDe('trimestral')).toBe('h/trimestre');
+    expect(unidadeHorasDe('semestral')).toBe('h/semestre');
+    expect(unidadeHorasDe('pontual')).toBe('h (total único)');
+  });
+
+  it('prompt trimestral instrui o ACUMULADO do período e proíbe mensalizar', () => {
+    const p = buildSavingPrompt(ctxBase(), doc, savingRotinaReal({ tipo_saving: 'trimestral' }), 'resumo');
+    expect(p).toContain('TIPO DE SAVING — TRIMESTRAL');
+    expect(p).toContain('ACUMULADO');
+    expect(p).toContain('h/trimestre');
+    expect(p).toContain('NÃO divida por 3');
+  });
+
+  it('o gate de ECONOMIA ALTA (≥44h) NÃO dispara em trimestral, mas dispara em mensal', () => {
+    const trimestral = buildSavingPrompt(
+      ctxBase(),
+      doc,
+      savingRotinaReal({ tipo_saving: 'trimestral', economia_horas_mes: 132, linhas: [linha({ economia_horas_mes: 132 })] }),
+      'resumo',
+    );
+    const mensal = buildSavingPrompt(
+      ctxBase(),
+      doc,
+      savingRotinaReal({ tipo_saving: 'mensal', economia_horas_mes: 132, linhas: [linha({ economia_horas_mes: 132 })] }),
+      'resumo',
+    );
+    expect(trimestral).not.toContain('ECONOMIA ALTA DETECTADA');
+    expect(mensal).toContain('ECONOMIA ALTA DETECTADA');
   });
 });

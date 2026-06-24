@@ -57,6 +57,8 @@ const emptyFormDraft = (): SavingFormData => ({
   temContrafactualAdicional: "",
   temCustoEvitado: "",
   custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  temCustoProjeto: "",
+  custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
@@ -73,6 +75,8 @@ type AgentMeta = {
   participantes: string[];
   dataCriacao: string;
   descricaoBreve: string;
+  // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
   contextoEspecial: string;
 };
@@ -298,6 +302,7 @@ export function SubmeterPageContent({
           dataCriacao: (data.data_criacao_projeto as string) ?? "",
           tipoProjeto: tiposProjeto,
           descricaoBreve: (data.descricao_breve as string) ?? "",
+          usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
         };
@@ -345,6 +350,22 @@ export function SubmeterPageContent({
             } catch {
               custoEvitadoItens = [];
             }
+            // Custos do projeto: mesma repopulação (JSON salvo na submissão).
+            let custoProjetoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
+            try {
+              const raw = data.custo_projeto_itens;
+              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(arr)) {
+                custoProjetoItens = arr.map((it: Record<string, unknown>) => ({
+                  nome: String(it.nome ?? ""),
+                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
+                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
+                  justificativa: String(it.justificativa ?? ""),
+                }));
+              }
+            } catch {
+              custoProjetoItens = [];
+            }
             // Reconstrói a árvore do form a partir do alguem_fazia persistido:
             // 'externo' = custo evitado puro (Não → elimina Sim → sem adicional);
             // 'nao' + custo evitado = contrafactual + custo evitado (elimina Sim → adicional Sim);
@@ -380,6 +401,10 @@ export function SubmeterPageContent({
               custoEvitadoItens: custoEvitadoItens.length > 0
                 ? custoEvitadoItens
                 : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: (data.custo_projeto as "sim" | "nao" | "") ?? "",
+              custoProjetoItens: custoProjetoItens.length > 0
+                ? custoProjetoItens
+                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (data.tipo_saving as string) ?? "",
               custoExterno: String(data.custo_externo_mensal ?? ""),
               custoPeriodicidade: "mensal",
@@ -401,6 +426,8 @@ export function SubmeterPageContent({
               temContrafactualAdicional: "",
               temCustoEvitado: "",
               custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: "",
+              custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (receita.tipo_saving as string) ?? "mensal",
               custoExterno: "",
               custoPeriodicidade: "mensal",
@@ -438,6 +465,7 @@ export function SubmeterPageContent({
           participantes: newForm.participantes,
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
+          usaAiProxy: newForm.usaAiProxy,
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
@@ -615,6 +643,7 @@ export function SubmeterPageContent({
     dataCriacao: today,
     tipoProjeto: [],
     descricaoBreve: "",
+    usaAiProxy: "",
     especial: false,
     contextoEspecial: "",
   });
@@ -711,8 +740,9 @@ export function SubmeterPageContent({
     participantes: form.participantes,
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
+    usaAiProxy: form.usaAiProxy,
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -774,6 +804,8 @@ export function SubmeterPageContent({
       }
       if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
         errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.usaAiProxy)
+        errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
         errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
@@ -929,6 +961,7 @@ export function SubmeterPageContent({
           tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
           tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
@@ -1004,6 +1037,7 @@ export function SubmeterPageContent({
           membros: form.participantes,
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
@@ -1037,6 +1071,7 @@ export function SubmeterPageContent({
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
           docs,
@@ -1108,6 +1143,7 @@ export function SubmeterPageContent({
           membros: meta.participantes,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
+          usa_ai_proxy: meta.usaAiProxy || undefined,
           contexto_especial: meta.contextoEspecial,
           docs,
         },
@@ -1189,6 +1225,7 @@ export function SubmeterPageContent({
               membros: meta.participantes,
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
+              usa_ai_proxy: meta.usaAiProxy || undefined,
               contexto_especial: meta.contextoEspecial,
               reset_doc: true,
             },
@@ -1251,6 +1288,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
           });
           setAgentMeta(meta);
         } catch (e) {
@@ -1344,6 +1382,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
             reset_doc: true,
           }
         );
@@ -1579,16 +1618,32 @@ export function SubmeterPageContent({
               }))
           : [];
 
+      // Custos do projeto: itens válidos quando "sim". O backend mensaliza (pontual
+      // ÷12) e SUBTRAI do saving (custo incorrido pra operar).
+      const custoProjetoItens =
+        formData.temCustoProjeto === "sim"
+          ? formData.custoProjetoItens
+              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
+              .map((it) => ({
+                nome: it.nome.trim(),
+                valor: parseMoedaBR(it.valor),
+                recorrencia: it.recorrencia as "mensal" | "pontual",
+                justificativa: it.justificativa.trim(),
+              }))
+          : [];
+
       const result = await apiFetch<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-saving",
         {
           projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
           alguem_fazia: alguemFaziaPayload,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
           tem_custo_evitado: temCustoEvitadoEfetivo || undefined,
           custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
+          tem_custo_projeto: formData.temCustoProjeto || undefined,
+          custo_projeto_itens: custoProjetoItens.length ? custoProjetoItens : undefined,
         },
       );
       setShowSavingForm(false);
@@ -1639,7 +1694,7 @@ export function SubmeterPageContent({
         "/api/chat/iniciar-receita",
         {
           projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual",
+          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
           valor_ganho_mensal: valorReceita,
           racional: formData.racionalReceita.trim() || undefined,
         },

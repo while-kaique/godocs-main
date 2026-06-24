@@ -208,6 +208,14 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
+  // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
+  // rodar (chave de API, ElevenLabs…). `custo_projeto` = 'sim'|'nao'; justificativa =
+  // texto legível; itens = JSON [{nome,valor,recorrencia,justificativa}]. O valor
+  // (mensalizado: pontual ÷12) SUBTRAI do saving_reais/ganho_total. Distinto de
+  // custo_externo_mensal (escopo externo) e de custo_evitado (que SOMA).
+  'ALTER TABLE projetos ADD COLUMN custo_projeto TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_projeto_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_projeto_itens TEXT',
   // Snapshot imutável da conversa (chat_messages) no momento de cada submissão/reenvio.
   // Os chat_messages são mutados/apagados in-place quando a pessoa volta etapas; este
   // snapshot preserva a conversa ORIGINAL de cada versão para o Investigador (abas
@@ -225,6 +233,11 @@ const MIGRATIONS = [
   // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
   // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
   'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
+  // Governança de IA: o projeto usa o AI Proxy interno (ai-proxy.gogroupbr.com)?
+  // 'sim'|'nao', resposta determinística do formulário (etapa 2). O agente de
+  // documentação faz auto-detecção do uso na doc enviada e o analisador cruza
+  // declaração × detecção. Vai para a coluna "Usa AI Proxy" do Sheets.
+  'ALTER TABLE projetos ADD COLUMN usa_ai_proxy TEXT',
   // Split do saving em carga real × ganho por escala (só quando alguém fazia à mão).
   // horas_carga_real = trabalho humano de fato; horas_escala = volume incremental que
   // só a automação cobre. Somam o total (saving_horas), que continua sendo o que vira R$.

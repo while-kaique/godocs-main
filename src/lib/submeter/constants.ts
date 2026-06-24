@@ -58,6 +58,11 @@ export interface FormData {
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];
   descricaoBreve: string;
+  // Usa o AI Proxy (gateway interno de IA da empresa, ai-proxy.gogroupbr.com)?
+  // Governança de custo: projetos que usam IA deveriam rotear pelo proxy interno.
+  // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
+  // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;
@@ -118,7 +123,13 @@ export interface SavingFormData {
   // ramo "Não" o papel é cumprido por `eliminaGastoExterno`.
   temCustoEvitado: 'sim' | 'nao' | '';
   custoEvitadoItens: CustoEvitadoItemInput[];
-  tipoSaving: 'mensal' | 'pontual' | '';
+  // Saving: a solução INTERNA consome algum serviço externo PAGO para funcionar
+  // (chave de API, ElevenLabs, etc.)? 'sim' → lista de serviços (custoProjetoItens).
+  // O valor (mensalizado; pontual ÷12) SUBTRAI do saving. Mesmo formato do custo
+  // evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
+  temCustoProjeto: 'sim' | 'nao' | '';
+  custoProjetoItens: CustoEvitadoItemInput[];
+  tipoSaving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | '';
   custoExterno: string;
   custoPeriodicidade: 'mensal' | 'anual' | '';
   // Receita: ganho estimado informado pela pessoa antes do chat (o agente desafia).

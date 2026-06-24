@@ -64,8 +64,14 @@ export const SHEET_COLUMNS = [
   'Especial?',                      // AI
   'Atualizado Em',                  // AJ (carimbo da última escrita do sistema)
   'Alocação Ganhos',                // AK (justificativa [2.4] do gate ≥44h — fatiada do memorial)
-  'Saving Horas Real',              // AL (carga humana real do split; "—" se não se aplica)
-  'Saving Horas Escalado',          // AM (ganho por escala do split; "—" se não se aplica)
+  'Usa AI Proxy',                   // AL (governança: 'Sim'/'Não' declarado no formulário)
+  // Custos do projeto: serviços externos pagos que a solução consome pra rodar (ABATE).
+  'Custo do Projeto',                     // valor R$ mensal (mensalizado: pontual ÷12)
+  'Justificativa Custo do Projeto',       // detalhamento por serviço (nome/valor/recorrência/just.)
+  'Custo do Projeto Mensal ou Pontual',   // recorrência marcada (Mensal/Pontual/Misto)
+  // Split do saving (transparência): "—" quando não se aplica.
+  'Saving Horas Real',              // carga humana real do split
+  'Saving Horas Escalado',          // ganho por escala do split
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
