@@ -54,7 +54,7 @@ import type {
   SavingLinha,
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
-import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens } from '@/lib/agents/saving-calc';
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens } from '@/lib/agents/saving-calc';
 import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos } from '@/lib/agents/memorial-format';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
@@ -405,6 +405,8 @@ const iniciarSubmissaoSchema = z.object({
   tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
   tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
+  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
@@ -426,7 +428,10 @@ const iniciarSavingSchema = z.object({
   // período pelo valor cheio (não mensaliza). A cadência fica no tipo_saving.
   tipo_saving: z.enum(['mensal', 'pontual', 'trimestral', 'semestral']),
   // Havia alguém fazendo/mantendo o processo manualmente antes da automação?
-  alguem_fazia: z.enum(['sim', 'nao']).optional(),
+  // 'sim' → horas reais; 'nao' → contrafactual (equivalente manual estimado);
+  // 'externo' → ninguém fazia internamente e o ganho é 100% um custo externo
+  // eliminado (SEM horas — só custo evitado). Árvore em step3-chat/constants.
+  alguem_fazia: z.enum(['sim', 'nao', 'externo']).optional(),
   linhas: z.array(z.object({
     cargo: z.string(),
     horas_antes: z.number().min(0),
@@ -439,6 +444,17 @@ const iniciarSavingSchema = z.object({
   // mensalizada ÷12; 'mensal' entra cheia. Soma ao saving (custo_evitado_reais).
   tem_custo_evitado: z.enum(['sim', 'nao']).optional(),
   custo_evitado_itens: z.array(z.object({
+    nome: z.string(),
+    valor: z.number().min(0),
+    recorrencia: z.enum(['mensal', 'pontual']),
+    justificativa: z.string(),
+  })).optional(),
+  // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
+  // rodar (chave de API, ElevenLabs…). Lista incremental do formulário. Cada item:
+  // pontual ÷12; mensal cheio. SUBTRAI do saving (custo_projeto_reais). Distinto do
+  // custo_externo_mensal (escopo externo) e do custo_evitado (que soma).
+  tem_custo_projeto: z.enum(['sim', 'nao']).optional(),
+  custo_projeto_itens: z.array(z.object({
     nome: z.string(),
     valor: z.number().min(0),
     recorrencia: z.enum(['mensal', 'pontual']),
@@ -520,6 +536,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipo_projeto: data.especial ? 'especial' : (data.tipo_projeto ?? null),
       tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
+      usa_ai_proxy: data.usa_ai_proxy ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: 'rascunho',
@@ -540,6 +557,7 @@ export async function iniciarSubmissao(rawData: unknown) {
     data_criacao: data.data_criacao,
     tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
+    usa_ai_proxy: data.usa_ai_proxy ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
     arquivos: data.docs.map((d) => d.filename),
@@ -867,15 +885,20 @@ export async function enviarMensagem(rawData: unknown) {
   // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
   // Mutamos o resultado direto — são objetos locais, sem risco de side-effect.
   if (resultado.type === 'complete') {
-    // Saving: economia_horas_mes NUNCA pode ser 0 ao completar
+    // Saving: NÃO pode completar sem NENHUM ganho. O ganho válido vem de horas OU
+    // de um custo evitado — então só bloqueamos quando 0h E sem custo evitado.
+    // Exceção explícita: custo evitado PURO (alguem_fazia='externo') — o ganho é o
+    // contrato cancelado (0h por design), validado no submit; não bloqueia por 0h.
     if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
       const savingRecomputado = recomputarSavingFinanceiro(resultado.saving, 0);
       const econHoras = savingRecomputado.economia_horas_mes ?? 0;
-      if (econHoras <= 0) {
-        log('enviarMensagem', `⛔ Saving com economia_horas_mes=${econHoras} — bloqueando complete, forçando question`);
+      const temCustoEvitado = (savingRecomputado.custo_evitado_reais ?? 0) > 0;
+      const custoEvitadoPuro = ctx.alguem_fazia === 'externo';
+      if (econHoras <= 0 && !temCustoEvitado && !custoEvitadoPuro) {
+        log('enviarMensagem', `⛔ Saving sem ganho (0h e sem custo evitado) — bloqueando complete, forçando question`);
         Object.assign(resultado, {
           type: 'question',
-          content: 'Não consigo finalizar o memorial com economia de 0h — o projeto precisa demonstrar algum ganho concreto de horas para ser submetido. Vamos revisar: em que etapa exatamente a automação economiza tempo comparado ao processo manual?',
+          content: 'Não consigo finalizar o memorial sem nenhum ganho concreto — o projeto precisa economizar horas OU evitar um custo externo (contrato/serviço/licença). Vamos revisar: onde exatamente está o ganho?',
           fase: 'saving',
         });
       }
@@ -999,6 +1022,12 @@ export async function enviarMensagem(rawData: unknown) {
         // R$ é sempre re-derivado das horas (o LLM pode ter reajustado horas sem
         // recalcular o valor) — ver recomputarSavingFinanceiro.
         const projetoCompleto = await getProjetoById(data.projeto_id);
+        // Custos do projeto: re-deriva dos itens persistidos (fonte da verdade) para
+        // o líquido abater corretamente mesmo se o LLM não ecoou o campo no turno.
+        const custoProjetoMensal = custoProjetoMensalFromItens(projetoCompleto?.custo_projeto_itens);
+        if (resultado.saving && typeof resultado.saving === 'object') {
+          (resultado.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
+        }
         doc.saving = recomputarSavingFinanceiro(resultado.saving, projetoCompleto?.custo_externo_mensal ?? 0);
         avisarDivergenciaMemorialLinhas(doc.saving as SavingColetado, data.projeto_id);
       }
@@ -1065,6 +1094,22 @@ export async function iniciarSaving(rawData: unknown) {
       return `• ${it.nome} — R$ ${moedaBR(it.valor)} (${rec}).${just}`;
     })
     .join('\n');
+
+  // Custos do projeto: serviços externos PAGOS que a solução consome pra rodar.
+  // Mesma mensalização do custo evitado (pontual ÷12; mensal cheio), mas SUBTRAI do
+  // saving (custo incorrido pra operar). Persiste sim/não + justificativa + itens.
+  const itensProjeto = data.tem_custo_projeto === 'sim' ? (data.custo_projeto_itens ?? []) : [];
+  const custoProjetoMensal = round2(
+    itensProjeto.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
+  );
+  const custoProjetoDescricao = itensProjeto
+    .map((it) => {
+      const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
+      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : '';
+      return `• ${it.nome} — R$ ${moedaBR(it.valor)} (${rec}).${just}`;
+    })
+    .join('\n');
+
   await updateProjeto(data.projeto_id, {
     custo_evitado: data.tem_custo_evitado ?? null,
     custo_evitado_justificativa: custoEvitadoDescricao || null,
@@ -1073,6 +1118,9 @@ export async function iniciarSaving(rawData: unknown) {
     // isto o valor só vivia em memória e se perdia: o submit relê
     // projeto.custo_externo_mensal (null → 0) e não abatia do Saving Reais.
     custo_externo_mensal: data.custo_externo_mensal ?? 0,
+    custo_projeto: data.tem_custo_projeto ?? null,
+    custo_projeto_justificativa: custoProjetoDescricao || null,
+    custo_projeto_itens: JSON.stringify(itensProjeto),
   });
 
   const ctx = await getProjetoContexto(data.projeto_id);
@@ -1087,6 +1135,10 @@ export async function iniciarSaving(rawData: unknown) {
   saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
   saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
   saving.custo_evitado_descricao = custoEvitadoDescricao || null;
+  // Custos do projeto já mensalizados — SUBTRAEM no recálculo do líquido.
+  saving.custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
+  saving.custo_projeto_tipo = custoProjetoMensal > 0 ? 'mensal' : null;
+  saving.custo_projeto_descricao = custoProjetoDescricao || null;
 
   if (tiposProjeto.includes('saving') && data.linhas && data.linhas.length > 0) {
     const linhas: SavingLinha[] = data.linhas.map((l) => {
@@ -1109,9 +1161,19 @@ export async function iniciarSaving(rawData: unknown) {
       ...saving,
       linhas,
       economia_horas_mes: totalHoras,
-      // Líquido: horas + custo evitado (mensalizado) − custo externo. Mesma
-      // fórmula de recomputarSavingFinanceiro (que recalcula do zero no preview).
-      economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno),
+      // Líquido: horas + custo evitado (mensalizado) − custo externo − custos do
+      // projeto. Mesma fórmula de recomputarSavingFinanceiro (recalcula no preview).
+      economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno - custoProjetoMensal),
+    };
+  } else if (custoEvitadoMensal > 0 || (data.custo_externo_mensal ?? 0) > 0) {
+    // Custo evitado PURO (ramo "Não → elimina gasto externo? Sim", sem horas):
+    // sem linhas, o líquido vem só do custo evitado − custo externo. O submit
+    // recalcula isto de qualquer forma (recomputarSavingFinanceiro); aqui é só
+    // para o estado do chat já refletir o ganho (economia_reais_mes não-nulo).
+    saving = {
+      ...saving,
+      economia_horas_mes: 0,
+      economia_reais_mes: round2(custoEvitadoMensal - (data.custo_externo_mensal ?? 0)),
     };
   }
 
@@ -1130,6 +1192,25 @@ export async function iniciarSaving(rawData: unknown) {
     tiposProjeto,
   );
 
+  // Backstop determinístico — CUSTO EVITADO PURO (alguem_fazia='externo'): o ganho é
+  // 100% o custo externo eliminado, então o agente NÃO pode carimbar o preview no 1º
+  // turno sem argumentar. Se o LLM pulou a validação e já devolveu preview, trocamos
+  // por UMA pergunta obrigatória (realidade + atribuição + escopo). O turno seguinte
+  // (enviarMensagem) deixa o agente previewar já com a resposta registrada no memorial.
+  // (Prompt-only não basta — o LLM tende a pular se o contexto parece claro.)
+  if (ctx.alguem_fazia === 'externo' && resultado.type === 'preview') {
+    log('iniciarSaving', '⛔ custo evitado puro previewou no 1º turno — forçando validação (realidade/atribuição/escopo)');
+    Object.assign(resultado, {
+      type: 'question',
+      fase: 'saving',
+      content:
+        'Antes de fechar o memorial, preciso confirmar o ganho — ele vem 100% de um custo externo eliminado, então vale validar:\n' +
+        '1) Esse contrato/serviço já foi DE FATO encerrado ou reduzido na prática (não algo que ainda vai acontecer)?\n' +
+        '2) O encerramento foi por causa desta automação (ela assumiu o trabalho)?\n' +
+        '3) O que esse contrato cobria? (ex.: quantos agentes/pessoas, qual volume de atendimentos por mês)',
+    });
+  }
+
   // Evento de timeline: valores do formulário de saving. `voltou` indica reentrada
   // (a pessoa voltou à etapa para reeditar) — já havia um evento 'saving' antes.
   const savingVoltou = await hasFormEventTipo(data.projeto_id, 'saving');
@@ -1145,9 +1226,12 @@ export async function iniciarSaving(rawData: unknown) {
     custo_externo_mensal: data.custo_externo_mensal ?? null,
     tem_custo_evitado: data.tem_custo_evitado ?? null,
     custo_evitado_itens: itensEvitado,
+    tem_custo_projeto: data.tem_custo_projeto ?? null,
+    custo_projeto_itens: itensProjeto,
     economia_horas_mes: saving.economia_horas_mes ?? null,
     economia_reais_mes: saving.economia_reais_mes ?? null,
     custo_evitado_mensal: custoEvitadoMensal > 0 ? custoEvitadoMensal : null,
+    custo_projeto_mensal: custoProjetoMensal > 0 ? custoProjetoMensal : null,
   });
 
   await insertChatMessage({
@@ -1275,6 +1359,8 @@ const atualizarMetadadosSchema = z.object({
   membros: z.array(z.string()).optional(),
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
+  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -1305,6 +1391,7 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
@@ -1325,6 +1412,7 @@ export async function atualizarMetadados(rawData: unknown) {
         membros: data.membros ?? null,
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
+        usa_ai_proxy: data.usa_ai_proxy ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
@@ -1608,6 +1696,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // podia zerá-lo em fluxos longos — sumia o custo evitado pontual da planilha).
     const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
     (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
+    // Custos do projeto: re-deriva dos itens persistidos (fonte da verdade) e ABATE.
+    const custoProjetoMensal = custoProjetoMensalFromItens(projeto.custo_projeto_itens);
+    (conteudo.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
@@ -1691,12 +1782,17 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // Gate: bloqueia submissão com ganho zerado (skip projetos especiais)
   if (!ehEspecial) {
     const tiposProjetoGate = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+    // Ganho mensurável = economia_reais_mes > 0 (já é o LÍQUIDO: horas + custo
+    // evitado − custo externo). Aceita saving SÓ de custo evitado (0h), desde que
+    // o líquido seja positivo — é o caso "contrato externo cancelado, sem horas".
+    // Bloqueia só quando NÃO há ganho algum (0h E sem custo evitado → líquido ≤ 0).
     if (tiposProjetoGate.includes('saving') &&
-        (((saving?.economia_horas_mes as number) ?? 0) <= 0 || ((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
+        (((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
       throw new Error(
-        'Não é possível submeter este projeto como saving sem economia mensurável de horas. ' +
-        'Uma troca de ferramenta que mantém a mesma rotina de trabalho não gera saving. ' +
-        'Para submeter, comprove redução concreta de horas — ou reclassifique como receita incremental ou projeto especial.'
+        'Não é possível submeter este projeto como saving sem ganho mensurável. ' +
+        'O ganho precisa vir de uma redução concreta de horas OU de um custo externo evitado ' +
+        '(contrato/serviço/licença que deixou de ser pago). Se nenhum dos dois se aplica, ' +
+        'reclassifique como receita incremental ou projeto especial.'
       );
     }
     if (tiposProjetoGate.includes('receita_incremental') &&
@@ -1935,6 +2031,8 @@ export async function resyncGoogle(rawData: unknown) {
   if (conteudo.saving && typeof conteudo.saving === 'object') {
     const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
     (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
+    const custoProjetoMensal = custoProjetoMensalFromItens(projeto.custo_projeto_itens);
+    (conteudo.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,

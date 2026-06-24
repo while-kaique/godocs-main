@@ -31,6 +31,7 @@ const COLUNAS_NUMERICAS = new Set<SheetColumn>([
   'Custo Evitado',
   'Saving Reais',
   'Custo Externo Mensal',
+  'Custo do Projeto',
   'Receita Mensal',
   'Ganho Total',
 ]);
@@ -163,6 +164,15 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       p.projeto.custo_evitado_itens as string | null,
     );
 
+    // Custos do projeto: valor R$ mensal (mensalizado; pontual ÷12) que ABATE o
+    // saving. A recorrência marcada vai em "Custo do Projeto Mensal ou Pontual".
+    // (custoEvitadoRecorrenciaLabel é genérico: flag 'sim'/'nao' + itens JSON.)
+    const custoProjetoReais = Math.max(0, Number(p.saving?.custo_projeto_reais) || 0);
+    const custoProjetoRecorrencia = custoEvitadoRecorrenciaLabel(
+      p.projeto.custo_projeto as string | null,
+      p.projeto.custo_projeto_itens as string | null,
+    );
+
     // Link(s) dos documentos no Google Drive → coluna "URL" da planilha.
     const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);
     const urlDocs = arquivosLinks.length > 0 ? arquivosLinks.join('\n') : '—';
@@ -207,6 +217,15 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Atualizado Em': dataSubmissao,
       // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
       'Alocação Ganhos': ouTraco(p.alocacaoGanhos),
+      // Governança: 'Sim'/'Não' declarado no formulário; "—" quando não respondido.
+      'Usa AI Proxy':
+        p.projeto.usa_ai_proxy === 'sim' ? 'Sim'
+          : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
+            : '—',
+      // Custos do projeto (serviços pagos que a solução consome pra rodar — ABATE).
+      'Custo do Projeto': custoProjetoReais, // numérico: 0 quando não há (padrão)
+      'Justificativa Custo do Projeto': ouTraco(p.projeto.custo_projeto_justificativa),
+      'Custo do Projeto Mensal ou Pontual': custoProjetoRecorrencia,
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

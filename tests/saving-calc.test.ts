@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, resolverValorHora } from "@/lib/agents/saving-calc";
+import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens, resolverValorHora } from "@/lib/agents/saving-calc";
 import type { SavingColetado, ReceitaColetada } from "@/lib/agents/types";
 
 describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", () => {
@@ -24,6 +24,51 @@ describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", (
     expect(custoEvitadoMensalFromItens(null)).toBe(0);
     expect(custoEvitadoMensalFromItens("[]")).toBe(0);
     expect(custoEvitadoMensalFromItens("lixo")).toBe(0);
+  });
+});
+
+describe("custoProjetoMensalFromItens (mesma mensalização do evitado, mas ABATE)", () => {
+  it("mensal cheio, pontual ÷12, misto soma; aceita JSON string", () => {
+    expect(custoProjetoMensalFromItens([{ valor: 99.9, recorrencia: "mensal" }])).toBe(99.9);
+    expect(custoProjetoMensalFromItens([{ valor: 1200, recorrencia: "pontual" }])).toBe(100);
+    expect(custoProjetoMensalFromItens('[{"valor":120,"recorrencia":"mensal"},{"valor":1200,"recorrencia":"pontual"}]')).toBe(220);
+    expect(custoProjetoMensalFromItens(null)).toBe(0);
+  });
+});
+
+describe("recomputarSavingFinanceiro — custos do projeto SUBTRAEM do líquido", () => {
+  const base = (): SavingColetado => ({
+    linhas: [
+      { cargo: "Analista Pleno", horas_antes: 12, horas_depois: 2, valor_hora: 29.9, economia_horas_mes: 10, economia_reais_mes: 299 },
+    ],
+    economia_horas_mes: 10,
+    economia_reais_mes: null,
+    tipo_saving: "mensal",
+    memorial_calculo: null,
+    valor_ganho_mensal: null,
+  } as SavingColetado);
+
+  it("abate o custo do projeto do total líquido (horas − custo projeto)", () => {
+    const s = base();
+    s.custo_projeto_reais = 100; // já mensalizado
+    const out = recomputarSavingFinanceiro(s, 0);
+    // 10h × 29.9 = 299; − 100 (custo projeto) = 199
+    expect(out.economia_reais_mes).toBe(199);
+    expect(out.custo_projeto_reais).toBe(100);
+  });
+
+  it("compõe com custo evitado (soma) e custo externo (abate) + custo projeto (abate)", () => {
+    const s = base();
+    s.custo_evitado_reais = 50;   // soma
+    s.custo_projeto_reais = 30;   // abate
+    const out = recomputarSavingFinanceiro(s, 40); // custo externo 40 abate
+    // 299 + 50 − 40 − 30 = 279
+    expect(out.economia_reais_mes).toBe(279);
+  });
+
+  it("sem custo do projeto não altera o líquido", () => {
+    const out = recomputarSavingFinanceiro(base(), 0);
+    expect(out.economia_reais_mes).toBe(299);
   });
 });
 
@@ -272,6 +317,47 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.linhas[0].economia_reais_mes).toBe(0);
     expect(out.economia_reais_mes).toBe(0);
   });
+
+  // Custo evitado PURO (alguem_fazia='externo'): sem linhas de pessoa, o ganho é
+  // 100% o contrato externo eliminado. Foi o bug do Portal de Reembolsos — antes o
+  // caminho contrafactual somava 176h-fantasma × tarifa interna + o valor do contrato.
+  it("custo evitado PURO (sem linhas, 0h): líquido = custo evitado, horas = 0", () => {
+    const out = recomputarSavingFinanceiro({
+      linhas: [],
+      economia_horas_mes: 0,
+      economia_reais_mes: null,
+      tipo_saving: "mensal",
+      memorial_calculo: null,
+      valor_ganho_mensal: null,
+      custo_evitado_reais: 5700,
+      custo_evitado_tipo: "mensal",
+      custo_evitado_descricao: "Contrato de agente terceirizado encerrado",
+    } as SavingColetado);
+
+    expect(out.economia_horas_mes).toBe(0);
+    expect(out.economia_reais_mes).toBe(5700); // só o custo evitado, sem horas-fantasma
+  });
+
+  it("custo evitado PURO com custo externo incorrido: líquido = evitado − externo, sem horas", () => {
+    // Roda no Zapier (R$200/mês incorrido) E cancelou um contrato de R$5.700/mês.
+    const out = recomputarSavingFinanceiro(
+      {
+        linhas: [],
+        economia_horas_mes: 0,
+        economia_reais_mes: null,
+        tipo_saving: "mensal",
+        memorial_calculo: null,
+        valor_ganho_mensal: null,
+        custo_evitado_reais: 5700,
+        custo_evitado_tipo: "mensal",
+        custo_evitado_descricao: "Contrato terceirizado cancelado",
+      } as SavingColetado,
+      200,
+    );
+
+    expect(out.economia_horas_mes).toBe(0);
+    expect(out.economia_reais_mes).toBe(5500); // 5700 - 200
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -413,6 +499,30 @@ describe("enriquecerMemorial — memorial interno com valores financeiros", () =
     expect(result).toContain("R$ 10.78/h");
     // Receita
     expect(result).toContain("R$ 3000.00");
+  });
+
+  it("custo evitado PURO (sem linhas): memorial sem bloco de Pessoas, líquida = custo evitado", () => {
+    const saving: SavingColetado = {
+      linhas: [],
+      economia_horas_mes: 0,
+      economia_reais_mes: 5700,
+      tipo_saving: "mensal",
+      memorial_calculo:
+        "## Memorial de Cálculo\n\n### Contexto\nResumo do projeto.\n\n### Contratos/Serviços Evitados\nContrato terceirizado cancelado.",
+      valor_ganho_mensal: null,
+      custo_evitado_reais: 5700,
+      custo_evitado_tipo: "mensal",
+      custo_evitado_descricao: "Contrato de agente terceirizado",
+    };
+
+    const result = enriquecerMemorial(saving, undefined, ["saving"]);
+
+    // Sem horas → não cria o bloco "Pessoas (N):" nem "Total horas:".
+    expect(result).not.toContain("Pessoas (");
+    expect(result).not.toContain("Total horas:");
+    // O ganho é o custo evitado, e a líquida bate com ele.
+    expect(result).toContain("R$ 5700.00");
+    expect(result).toContain("Economia líquida total:** R$ 5700.00");
   });
 
   it("retorna string vazia quando não há saving nem receita", () => {

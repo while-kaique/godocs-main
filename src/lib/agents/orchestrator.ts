@@ -16,6 +16,7 @@ import type {
   SavingColetado,
 } from './types';
 import { documentacaoVazia, receitaVazia, savingVazio } from './types';
+import { descreverEsqueletoMemorial } from './memorial-format';
 
 // Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
 // **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
@@ -433,12 +434,13 @@ Se precisa de clarificação:
 
 // Escopo da confirmação determinística da BASE das horas (padrão CLT 220h/mês):
 // SOMENTE rotina manual real e mensal — há linha com horas_antes > 0 que de fato
-// existia. NÃO se aplica ao saving contrafactual ("ninguém fazia" → horas estimadas)
-// nem ao pontual (total único, não mapeia para "220h no mês"). Usado tanto pelo
-// prompt (baseHorasBlock) quanto pelo gate determinístico em chat.functions.ts.
+// existia. NÃO se aplica ao saving contrafactual ("ninguém fazia" → horas estimadas),
+// ao custo evitado puro ('externo' → sem horas) nem ao pontual (total único, não
+// mapeia para "220h no mês"). Usado pelo prompt (baseHorasBlock) e pelo gate
+// determinístico em chat.functions.ts.
 export function aplicaConfirmacaoBaseHoras(ctx: ProjetoContexto, saving: SavingColetado): boolean {
   const linhas = saving.linhas ?? [];
-  const ninguemFazia = ctx.alguem_fazia === 'nao';
+  const ninguemFazia = ctx.alguem_fazia === 'nao' || ctx.alguem_fazia === 'externo';
   // SÓ saving MENSAL: a base CLT 220h/mês (e o teto por pessoa) só faz sentido sobre
   // uma rotina medida POR MÊS. Pontual (total único) e trimestral/semestral (acumulado
   // do período) NÃO mapeiam para "220h no mês" — ficam de fora deste gate.
@@ -469,7 +471,90 @@ export function totalEconomiaHoras(saving: SavingColetado): number {
   return saving.economia_horas_mes ?? linhas.reduce((s, l) => s + (l.economia_horas_mes ?? 0), 0);
 }
 
+// Prompt do saving quando o ganho é 100% um CUSTO EXTERNO ELIMINADO, sem horas de
+// pessoas (alguem_fazia='externo' — ramo "ninguém fazia internamente → eliminou um
+// contrato/serviço externo, e NÃO há trabalho contrafactual adicional"). Fluxo
+// dedicado e enxuto: NÃO valida horas/rotina/base-220h/economia-alta — só confirma
+// que a automação substituiu o contrato e que ele foi DE FATO cancelado (ganho real,
+// não projetado), e monta o memorial SEM a seção "Saving de Pessoas".
+export function buildSavingCustoEvitadoPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
+  const isPontual = saving.tipo_saving === 'pontual';
+  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
+${resumoProjeto}
+
+DETALHES TÉCNICOS APROVADOS:
+- Nome: ${coletado.nome_projeto}
+- O que faz: ${coletado.o_que_faz}
+- Execução: ${coletado.execucao}
+- Fluxo: ${coletado.fluxo}
+- Ferramenta: ${ctx.ferramenta}`;
+
+  return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
+A documentação técnica já foi aprovada. Este projeto tem um perfil ESPECÍFICO de ganho.${buildRevisaoBlock(ctx, 'saving')}
+
+${detalhes}
+
+═══════════════════════════════════════════════════════════════════
+PERFIL DESTE PROJETO — CUSTO EVITADO PURO (SEM HORAS DE PESSOAS)
+═══════════════════════════════════════════════════════════════════
+O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualmente dentro da empresa; (2) a automação ELIMINOU um gasto externo (contrato/serviço/licença de terceiro que era pago); e (3) NÃO há trabalho manual ADICIONAL que alguém faria à mão. Logo, o ganho é 100% o CUSTO EXTERNO ELIMINADO — NÃO há economia de horas de pessoas a calcular.
+
+⛔ É TERMINANTEMENTE PROIBIDO:
+- Pedir "quem fazia", "quanto tempo levava", "qual a rotina", "quantas horas/mês" — NÃO há horas humanas aqui; perguntar isso contradiz o que o usuário já informou.
+- Criar uma seção "Saving de Pessoas" ou inventar horas/cargos. O array \`linhas\` DEVE ficar VAZIO.
+- Estimar um "equivalente manual" (contrafactual) — o usuário já disse que NÃO há trabalho adicional; o ganho é só o contrato eliminado.
+
+CUSTO EVITADO JÁ COLETADO NO FORMULÁRIO (não pergunte de novo, não peça R$):
+${saving.custo_evitado_descricao ? saving.custo_evitado_descricao : '(o usuário marcou que eliminou um gasto externo — o detalhe veio nos itens do formulário)'}
+
+SUA MISSÃO — VALIDAÇÃO OBRIGATÓRIA (faça SEMPRE, mesmo que o briefing pareça claro — aqui o custo evitado é o GANHO INTEIRO do projeto, então NÃO pode ser carimbado sem argumentação):
+⛔ É PROIBIDO gerar o preview sem ANTES perguntar ao usuário e obter resposta para os 3 pontos abaixo. Faça as perguntas que faltarem (pode agrupar numa única mensagem); só depois monte o memorial.
+1. REALIDADE: esse contrato/serviço JÁ foi encerrado ou reduzido na PRÁTICA? (não "vamos cancelar" — ver PORTÃO abaixo).
+2. ATRIBUIÇÃO: o encerramento foi POR CAUSA desta automação (ela assumiu o trabalho), e não um corte por outro motivo?
+3. ESCOPO: o que esse contrato cobria, em termos concretos? (ex.: quantos agentes/pessoas, qual volume — "1 agente terceirizado, ~1.200 atendimentos/mês"). Isso dá SUBSTÂNCIA ao memorial para o validador humano cruzar com o valor.
+Registre as respostas dos 3 pontos na seção "Contratos/Serviços Evitados" do memorial. NÃO peça o valor em R$ (já veio do formulário).
+
+═══════════════════════════════════════════════════════════════════
+GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes do preview)
+═══════════════════════════════════════════════════════════════════
+O GoDocs documenta APENAS ganhos JÁ REALIZADOS. O contrato/serviço precisa JÁ ter sido cancelado/reduzido na prática.
+- SINAIS DE PROJEÇÃO: "vamos cancelar", "pretendemos encerrar", "a ideia é não renovar", "quando migrarmos", verbos no futuro. Também é projeção se a automação ainda não está em produção.
+- AO DETECTAR, pergunte UMA vez: "Esse contrato/serviço JÁ foi cancelado ou reduzido na prática, ou é algo que ainda vai acontecer?" Se JÁ aconteceu → siga e escreva no passado/presente ("o contrato foi encerrado", "deixou de ser pago"). Se ainda NÃO → NÃO gere preview; oriente a voltar quando o cancelamento estiver efetivado (ou submeter como projeto especial).
+
+⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o preview são exibidos ao usuário e NÃO podem conter NENHUM valor em R$ (nem o valor do custo evitado). Descreva o contrato/serviço de forma QUALITATIVA (o que era, periodicidade ${isPontual ? 'pontual' : 'mensal'}). O valor em R$ vive SÓ no campo \`custo_evitado_reais\` (preenchido pelo formulário — PRESERVE, não altere).
+
+ESTRUTURA DO MEMORIAL — SEÇÕES OBRIGATÓRIAS (fonte única: MEMORIAL_ESQUELETO em memorial-format.ts):
+${descreverEsqueletoMemorial('custo_evitado')}
+(Rateio: ${isPontual ? 'gasto único — pontual' : 'gasto recorrente — mensal'}. NÃO crie seção "Saving de Pessoas" nem horas.)
+
+PRESERVE os campos do custo evitado vindos do formulário: \`custo_evitado_reais\` (número), \`custo_evitado_tipo\`, \`custo_evitado_descricao\`. NÃO os altere e NÃO preencha \`economia_reais_mes\` (o backend recalcula). Mantenha \`linhas\` = [] e \`economia_horas_mes\` = 0.
+
+LINGUAGEM: português brasileiro com acentuação correta. NUNCA exponha termos internos (\`custo_evitado_reais\`, \`linhas\`, \`saving\`, \`memorial_calculo\`).
+
+ESTADO ATUAL:
+${JSON.stringify(saving, null, 2)}
+
+FORMATO — APENAS JSON válido (sempre devolva o objeto \`saving\` completo):
+
+Pergunta:
+{"type":"question","content":"sua pergunta","saving":{...campos atualizados}}
+
+Preview (quando o contexto estiver confirmado e o ganho for REAL):
+{"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ...\\n**Custo evitado:** ... (sem R$)\\n**Rateio:** ...\\n\\n### Resumo\\n- Ganho: custo externo eliminado\\n- Tipo: ${saving.tipo_saving ?? 'mensal'}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "linhas":[], "economia_horas_mes":0, "memorial_calculo":"<texto do memorial — OBRIGATÓRIO>"}}
+
+Se aprovado:
+{"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais, "linhas":[], "economia_horas_mes":0}}
+
+ATENÇÃO: "memorial_calculo" dentro do "saving" é OBRIGATÓRIO no preview e no complete (copie o texto do "content" sem o "Está correto?"). NUNCA escreva R$ no "content" nem no "memorial_calculo". NUNCA use linguagem de projeção ("vai", "pretende", "a expectativa é") — o ganho é JÁ realizado.`;
+}
+
 export function buildSavingPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada, saving: SavingColetado, resumoProjeto: string): string {
+  // Custo evitado PURO (sem horas de pessoas): fluxo dedicado e enxuto — não valida
+  // horas/rotina nem aplica os gates de base-220h/economia-alta (que pressupõem horas).
+  if (ctx.alguem_fazia === 'externo') {
+    return buildSavingCustoEvitadoPrompt(ctx, coletado, saving, resumoProjeto);
+  }
+
   const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
 ${resumoProjeto}
 
@@ -604,6 +689,24 @@ INVESTIGUE (e registre a resposta):
 REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela: (a) o destino concreto do tempo/custo liberado e (b) uma frase explícita concluindo que o ganho é válido por causa dessa mudança (ex.: "Essas Xh/mês são reais porque a pessoa foi realocada para Y / o time passou a atender Z / o serviço W foi cancelado"). Texto qualitativo, SEM R$.
 
 GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa concreta (não basta descrever a rotina antiga — precisa dizer o que mudou E por que isso valida a economia). A seção vem logo após o total de horas.
+═══════════════════════════════════════════════════════════════════`
+    : '';
+
+  // Distinção HORAS × CUSTO EVITADO (anti-dupla-contagem): só aparece quando há
+  // custo evitado no estado. Como buildSavingPrompt é o fluxo COM horas (o custo
+  // evitado puro tem prompt próprio), aqui horas e custo evitado coexistem — e só
+  // podem ser somados se forem trabalhos DISTINTOS (senão é a dupla contagem que
+  // originou esta regra: o contrato terceirizado que ERA justamente aquelas horas).
+  const blocoDistincao = (saving.custo_evitado_reais ?? 0) > 0
+    ? `
+
+═══════════════════════════════════════════════════════════════════
+DISTINÇÃO OBRIGATÓRIA — HORAS × CUSTO EVITADO (anti-dupla-contagem)
+═══════════════════════════════════════════════════════════════════
+Este projeto declara economia de HORAS de pessoas E um CUSTO EXTERNO EVITADO (informado no formulário). Os dois só podem ser contados JUNTOS se representarem trabalhos DISTINTOS.
+- ⛔ Se o contrato/serviço evitado pagava JUSTAMENTE pelo trabalho que essas horas representam (é a MESMA coisa — ex.: o contrato era o terceirizado que fazia exatamente essa rotina), então contar horas + custo evitado é DUPLA CONTAGEM do mesmo ganho. Nesse caso, mantenha SÓ o custo evitado e ZERE as horas (esvazie o array \`linhas\`).
+- ✅ Conte os dois SOMENTE quando forem trabalhos DIFERENTES (ex.: o contrato cobria o atendimento, e as horas são de um relatório que ninguém fazia).
+- ANTES de gerar o preview, se ainda não estiver claro pela conversa, confirme com o usuário em UMA pergunta direta que as horas e o custo evitado são trabalhos distintos. Se forem o mesmo trabalho, reconcilie (zere as \`linhas\` e siga só com o custo evitado).
 ═══════════════════════════════════════════════════════════════════`
     : '';
 
@@ -747,7 +850,7 @@ CUSTO EVITADO (SEÇÃO 3):
 - O custo evitado AGORA é coletado no FORMULÁRIO (antes do chat), não por você. Se os campos \`custo_evitado_reais\`/\`custo_evitado_descricao\` JÁ vierem preenchidos no estado, NÃO pergunte de novo — apenas RECONHEÇA e descreva-o qualitativamente no memorial (o que foi evitado e a periodicidade), SEM citar R$.
 - NÃO altere \`custo_evitado_reais\`, \`custo_evitado_tipo\` nem \`custo_evitado_descricao\`: PRESERVE-os exatamente como vieram (são a fonte de verdade do formulário). O sistema soma o custo evitado ao saving automaticamente.
 - Isso é DIFERENTE de receita incremental (dinheiro novo entrando) e DIFERENTE de custo externo incorrido (gasto que a automação PASSOU a ter).
-- No memorial visível (content/memorial_calculo), descreva o custo evitado de forma QUALITATIVA (o que era pago, periodicidade). O valor em R$ NUNCA aparece no texto visível.
+- No memorial visível (content/memorial_calculo), descreva o custo evitado de forma QUALITATIVA (o que era pago, periodicidade). O valor em R$ NUNCA aparece no texto visível.${blocoDistincao}
 
 REGRA CRÍTICA — O SAVING NUNCA PODE SER ZERO:
 - O ganho pode vir das horas economizadas OU de um custo evitado (ou ambos).
@@ -811,6 +914,9 @@ Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
   // Só saving MENSAL: o gate "o que mudou após a automação" (≥44h/MÊS) não vale para
   // pontual nem para trimestral/semestral (cuja base é o período, não o mês).
   const economiaAltaPv = saving.tipo_saving === 'mensal' && totalHorasPv >= 44;
+  // Custo evitado PURO: há custo evitado e NÃO há horas → o memorial NÃO tem a seção
+  // "Saving de Pessoas" (estrutura: Contexto, Contratos/Serviços Evitados, Resumo).
+  const custoEvitadoPuroPv = semHoras && !semCustoEvitado;
   const blocoEconomiaAltaPv = economiaAltaPv
     ? `
 
@@ -835,7 +941,7 @@ SINCRONIA OBRIGATÓRIA: o sistema grava as horas e o R\$ a partir do array \`lin
 
 REGRA CRÍTICA: NUNCA emita type:"complete" se NÃO houver ganho — ou seja, economia_horas_mes <= 0 E custo_evitado_reais nulo/zero. Se houver economia de horas > 0 OU um custo evitado > 0, o ganho é válido. Se o usuário tentar aprovar sem nenhum ganho, responda com type:"question" explicando que o projeto precisa economizar horas ou evitar um custo para ser submetido.
 
-ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (Contexto, Saving de Pessoas, ${economiaAltaPv ? 'O que mudou após a automação, ' : ''}Contratos/Serviços Evitados, Custo da Automação, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
+ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (${custoEvitadoPuroPv ? 'Contexto, Contratos/Serviços Evitados, Resumo — este projeto é de CUSTO EVITADO PURO: NÃO tem seção "Saving de Pessoas" nem horas; NÃO invente horas/cargos nem array `linhas`' : `Contexto, Saving de Pessoas, ${economiaAltaPv ? 'O que mudou após a automação, ' : ''}Contratos/Serviços Evitados, Custo da Automação, Resumo`}). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [1.1]/[2.2]/[3.1] no texto: use os cabeçalhos "### ..." nas seções e rótulos em negrito ("**O que fazia:**", "**Serviço evitado:**") nos itens.
 
 FORMATO — APENAS JSON válido:
 

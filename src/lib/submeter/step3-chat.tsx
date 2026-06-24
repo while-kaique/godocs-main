@@ -795,12 +795,25 @@ function SavingForm({
   // trabalho manual (quantas horas/mês levaria se alguém tivesse que fazer + qual
   // cargo) — esse valor vai para horasAntes (depois = 0); é saving contrafactual.
   const [alguemFazia, setTinhaAntes] = useState<"sim" | "nao" | "">(draft?.alguemFazia ?? "");
+  // Ramo "Não, ninguém fazia": a automação eliminou um gasto externo? E, se sim, há
+  // trabalho manual ADICIONAL (contrafactual distinto)? Ver constants.ts (árvore).
+  const [eliminaGastoExterno, setEliminaGastoExterno] = useState<"sim" | "nao" | "">(draft?.eliminaGastoExterno ?? "");
+  const [temContrafactualAdicional, setTemContrafactualAdicional] = useState<"sim" | "nao" | "">(draft?.temContrafactualAdicional ?? "");
   // Custo evitado: a solução fez a empresa deixar de pagar alguma ferramenta/serviço?
   // 'sim' → lista incremental de ferramentas evitadas (nome/valor/recorrência/justificativa).
   const [temCustoEvitado, setTemCustoEvitado] = useState<"sim" | "nao" | "">(draft?.temCustoEvitado ?? "");
   const [custoEvitadoItens, setCustoEvitadoItens] = useState<CustoEvitadoItemInput[]>(
     draft?.custoEvitadoItens?.length
       ? draft.custoEvitadoItens
+      : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  );
+  // Custos do projeto: a solução INTERNA consome serviço externo PAGO pra rodar
+  // (chave de API, ElevenLabs)? 'sim' → lista incremental (mesmo formato do evitado),
+  // mas o valor ABATE o saving.
+  const [temCustoProjeto, setTemCustoProjeto] = useState<"sim" | "nao" | "">(draft?.temCustoProjeto ?? "");
+  const [custoProjetoItens, setCustoProjetoItens] = useState<CustoEvitadoItemInput[]>(
+    draft?.custoProjetoItens?.length
+      ? draft.custoProjetoItens
       : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   );
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "trimestral" | "semestral" | "">(draft?.tipoSaving ?? "");
@@ -818,8 +831,8 @@ function SavingForm({
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
-    onDraftChange?.({ linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
-  }, [linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+    onDraftChange?.({ linhas, alguemFazia, eliminaGastoExterno, temContrafactualAdicional, temCustoEvitado, custoEvitadoItens, temCustoProjeto, custoProjetoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, alguemFazia, eliminaGastoExterno, temContrafactualAdicional, temCustoEvitado, custoEvitadoItens, temCustoProjeto, custoProjetoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
@@ -842,12 +855,30 @@ function SavingForm({
     const depoisOk = alguemFazia === "nao" || (l.horasDepois !== "" && !isNaN(d) && d >= 0);
     return l.cargo !== "" && antesOk && depoisOk;
   };
-  const tabelaSavingCompleta = alguemFazia !== "" && linhas.every(linhaCompleta);
+  // ── Árvore de decisão do saving (ramos) ──
+  const isSimBranch = alguemFazia === "sim";
+  const isNaoBranch = alguemFazia === "nao";
+  // Contrafactual ADICIONAL: "Não → elimina SIM → há trabalho adicional distinto".
+  const ehAdicional = isNaoBranch && eliminaGastoExterno === "sim" && temContrafactualAdicional === "sim";
+  // A tabela de horas aparece em: SIM (reais) · Não+elimina Não (contrafactual) ·
+  // Não+elimina Sim+adicional Sim (contrafactual distinto). NÃO no custo evitado puro.
+  const precisaTabela = isSimBranch || (isNaoBranch && eliminaGastoExterno === "nao") || ehAdicional;
+  // Itens de custo evitado: ramo SIM que marcou "sim", OU ramo Não+elimina "sim".
+  const coletaCustoEvitado =
+    (isSimBranch && temCustoEvitado === "sim") || (isNaoBranch && eliminaGastoExterno === "sim");
+
   const custoEvitadoItemCompleto = (it: CustoEvitadoItemInput) =>
     it.nome.trim() !== "" && it.valor !== "" && parseMoedaBR(it.valor) > 0 && it.recorrencia !== "" && it.justificativa.trim() !== "";
-  const custoEvitadoCompleto =
-    temCustoEvitado === "nao" ||
-    (temCustoEvitado === "sim" && custoEvitadoItens.length > 0 && custoEvitadoItens.every(custoEvitadoItemCompleto));
+  const custoEvitadoItensCompletos =
+    custoEvitadoItens.length > 0 && custoEvitadoItens.every(custoEvitadoItemCompleto);
+  // Quando precisaTabela é true, alguemFazia já é "sim"/"nao" (nunca ""), então
+  // basta validar as linhas.
+  const tabelaCompleta = !precisaTabela || linhas.every(linhaCompleta);
+  const custoEvitadoCompleto = !coletaCustoEvitado || custoEvitadoItensCompletos;
+  // Custos do projeto: mesma regra de completude do custo evitado (lista incremental).
+  const custoProjetoCompleto =
+    temCustoProjeto === "nao" ||
+    (temCustoProjeto === "sim" && custoProjetoItens.length > 0 && custoProjetoItens.every(custoEvitadoItemCompleto));
 
   // Unidade de tempo da cadência escolhida — trimestral/semestral coletam o
   // ACUMULADO do período (não por mês). Usada nos rótulos/dicas da tabela de horas.
@@ -855,12 +886,51 @@ function SavingForm({
     tipoSaving === "trimestral" ? "trimestre" : tipoSaving === "semestral" ? "semestre" : "mês";
   const horasPorPeriodo = `horas/${unidadePeriodo}`;
 
-  // Gates de exibição (saving). A tabela mantém o gate atual (`alguemFazia`).
-  // Custo evitado/externo: no "não" aparece já; no "sim" só após a tabela completa.
+  // Caminho de saving completo (varia por ramo) — gate do botão e do custo externo.
+  const caminhoSavingCompleto = isSimBranch
+    ? tabelaCompleta && temCustoEvitado !== "" && custoEvitadoCompleto
+    : isNaoBranch
+      ? eliminaGastoExterno === "nao"
+        ? tabelaCompleta
+        : custoEvitadoItensCompletos && temContrafactualAdicional !== "" && tabelaCompleta
+      : false;
+
+  // Gates de exibição (saving) — revelação progressiva pela árvore.
   const mostrarSecaoSaving = isSaving && tipoSaving !== "";
-  const mostrarCustoEvitado =
-    isSaving && (alguemFazia === "nao" || (alguemFazia === "sim" && tabelaSavingCompleta));
-  const mostrarCustoFerramentaExterna = isExterno && isSaving && mostrarCustoEvitado && custoEvitadoCompleto;
+  const mostrarEliminaGastoExterno = isSaving && isNaoBranch;
+  // 2c só aparece depois de listar o custo evitado (Não → elimina SIM).
+  const mostrarContrafactualAdicional =
+    isSaving && isNaoBranch && eliminaGastoExterno === "sim" && custoEvitadoItensCompletos;
+  // Pergunta opcional de custo evitado (ramo SIM) — depois da tabela completa.
+  const mostrarCustoEvitadoPergunta = isSaving && isSimBranch && tabelaCompleta;
+  // Custos do projeto: aparecem quando o caminho de saving (tabela + custo evitado)
+  // está completo (revelação progressiva). Antes do custo de ferramenta externa.
+  const mostrarCustoProjeto = isSaving && caminhoSavingCompleto;
+  const mostrarCustoFerramentaExterna = isExterno && isSaving && caminhoSavingCompleto && custoProjetoCompleto;
+
+  // Rótulo/ajuda da tabela conforme o ramo (reais × contrafactual × adicional).
+  const tabelaLabel = isSimBranch
+    ? "Quem trabalhava (ou trabalha) nessa tarefa"
+    : ehAdicional
+      ? "Qual seria o equivalente em trabalho manual ADICIONAL?"
+      : "Qual seria o equivalente em trabalho manual?";
+  const tabelaHelp = isSimBranch ? (
+    <>
+      Uma linha por função. Informe as {horasPorPeriodo} <strong>antes</strong> e <strong>depois</strong> da automação.
+      Se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
+    </>
+  ) : ehAdicional ? (
+    <>
+      Considere <strong>apenas o trabalho adicional</strong> (fora do contrato eliminado): se alguém tivesse que
+      fazer à mão, quantas {horasPorPeriodo} levaria e qual função? Uma linha por função.
+    </>
+  ) : (
+    <>
+      Ninguém fazia isso manualmente — mas <strong>se alguém tivesse que fazer</strong>, quantas{" "}
+      {horasPorPeriodo} levaria e qual função seria responsável? Uma linha por função. É o trabalho
+      manual que a automação <strong>evita</strong> (o saving).
+    </>
+  );
 
   // Gate (receita): racional só aparece depois do valor preenchido.
   const mostrarRacionalReceita = isReceita && num(valorReceita) > 0;
@@ -871,8 +941,8 @@ function SavingForm({
     (isReceita
       ? num(valorReceita) > 0 && racionalReceita.trim().length >= 10
       : alguemFazia !== "" &&
-        tabelaSavingCompleta &&
-        custoEvitadoCompleto &&
+        caminhoSavingCompleto &&
+        custoProjetoCompleto &&
         (!isExterno || (custoExterno !== "" && num(custoExterno) >= 0 && custoPeriodicidade !== "")));
 
   // Animação padrão de entrada (slide de baixo pra cima) para cada novo tópico.
@@ -899,17 +969,17 @@ function SavingForm({
   function selectTinhaAntes(v: "sim" | "nao") {
     if (v === alguemFazia) return; // já selecionado → não mexe nos valores
     setTinhaAntes(v);
+    // Trocar de ramo zera as sub-perguntas: as do ramo "Não" (elimina/2c) e a de
+    // custo evitado do ramo "Sim". Os itens já digitados são preservados (podem ser
+    // reusados pelo outro ramo). Em "sim" volta a tabela real (antes+depois).
+    setEliminaGastoExterno("");
+    setTemContrafactualAdicional("");
+    setTemCustoEvitado("");
     setLinhas((ls) => {
       if (v === "nao") {
-        // ninguém fazia → o "depois" não se aplica (automação faz tudo): zera o
-        // campo, mas guarda o que estava lá para restaurar se voltar para "sim".
-        // As "horas antes" passam a representar o equivalente manual estimado —
-        // mantém o valor digitado (não zera).
         horasDepoisBackup.current = ls.map((l) => l.horasDepois);
         return ls.map((l) => ({ ...l, horasDepois: "0" }));
       }
-      // "sim" → restaura o "depois" guardado; na falta de backup, só limpa o "0"
-      // herdado do modo "nao" para o usuário digitar.
       const bkp = horasDepoisBackup.current;
       return ls.map((l, i) => ({
         ...l,
@@ -919,7 +989,44 @@ function SavingForm({
     setErrors((e) => {
       const n = { ...e };
       delete n.alguemFazia;
+      delete n.eliminaGastoExterno;
+      delete n.temContrafactualAdicional;
+      delete n.temCustoEvitado;
       Object.keys(n).forEach((k) => { if (/^l\d+depois$/.test(k)) delete n[k]; });
+      return n;
+    });
+  }
+  // Ramo "Não": a automação eliminou um gasto externo? 'sim' → coleta o custo evitado;
+  // 'nao' → contrafactual direto (tabela em modo equivalente manual, depois = 0).
+  function selectEliminaGastoExterno(v: "sim" | "nao") {
+    if (v === eliminaGastoExterno) return;
+    setEliminaGastoExterno(v);
+    setTemContrafactualAdicional(""); // 2c é recoletada conforme a resposta
+    if (v === "sim" && custoEvitadoItens.length === 0) {
+      setCustoEvitadoItens([{ nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+    }
+    if (v === "nao") {
+      setLinhas((ls) => ls.map((l) => ({ ...l, horasDepois: "0" })));
+    }
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.eliminaGastoExterno;
+      delete n.temContrafactualAdicional;
+      return n;
+    });
+  }
+  // 2c (só no "Não → elimina Sim"): há trabalho manual ADICIONAL distinto do contrato?
+  // 'sim' → tabela contrafactual do trabalho adicional; 'nao' → custo evitado puro (0h).
+  function selectTemContrafactualAdicional(v: "sim" | "nao") {
+    if (v === temContrafactualAdicional) return;
+    setTemContrafactualAdicional(v);
+    if (v === "sim") {
+      setLinhas((ls) => ls.map((l) => ({ ...l, horasDepois: "0" })));
+    }
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.temContrafactualAdicional;
+      Object.keys(n).forEach((k) => { if (/^l\d+/.test(k)) delete n[k]; });
       return n;
     });
   }
@@ -960,34 +1067,83 @@ function SavingForm({
     setErrors({});
   }
 
+  // ── Custos do projeto (serviços pagos que a solução consome pra rodar) ──
+  function selectTemCustoProjeto(v: "sim" | "nao") {
+    setTemCustoProjeto(v);
+    if (v === "sim" && custoProjetoItens.length === 0) {
+      setCustoProjetoItens([{ nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+    }
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.temCustoProjeto;
+      Object.keys(n).forEach((k) => { if (/^cp\d+/.test(k)) delete n[k]; });
+      return n;
+    });
+  }
+  function updateCustoProjeto(i: number, patch: Partial<CustoEvitadoItemInput>) {
+    setCustoProjetoItens((its) => its.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+    setErrors((e) => {
+      const n = { ...e };
+      delete n[`cp${i}nome`];
+      delete n[`cp${i}valor`];
+      delete n[`cp${i}recorrencia`];
+      delete n[`cp${i}justificativa`];
+      return n;
+    });
+  }
+  function addCustoProjeto() {
+    setCustoProjetoItens((its) => [...its, { nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+  }
+  function removeCustoProjeto(i: number) {
+    setCustoProjetoItens((its) => its.filter((_, idx) => idx !== i));
+    setErrors({});
+  }
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
     if (isSaving) {
       if (!alguemFazia) errs.alguemFazia = "Selecione uma opção";
-      linhas.forEach((l, i) => {
-        const a = parseFloat(l.horasAntes);
-        const d = parseFloat(l.horasDepois);
-        if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
-        // "antes" é exigido em ambos os modos: no "sim" são as horas reais antes da
-        // automação; no "nao" é o equivalente manual estimado. Aceita >= 0; o ganho
-        // líquido é calculado/clampado no backend.
-        if (l.horasAntes === "" || isNaN(a) || a < 0) errs[`l${i}antes`] = "Informe as horas";
-        // "depois" só é cobrado no modo "sim". No "nao" o campo nem aparece
-        // (horas_depois = 0 — a automação faz tudo).
-        if (alguemFazia === "sim" && (l.horasDepois === "" || isNaN(d) || d < 0))
-          errs[`l${i}depois`] = "Informe as horas";
-      });
-      // Custo evitado: pergunta obrigatória. Se "sim", cada ferramenta precisa estar completa.
-      if (!temCustoEvitado) errs.temCustoEvitado = "Selecione uma opção";
-      if (temCustoEvitado === "sim") {
-        if (custoEvitadoItens.length === 0) errs.temCustoEvitado = "Adicione ao menos uma ferramenta evitada";
+      // Ramo "Não": precisa responder "elimina gasto externo?" e, se sim, a 2c.
+      if (isNaoBranch && !eliminaGastoExterno) errs.eliminaGastoExterno = "Selecione uma opção";
+      if (isNaoBranch && eliminaGastoExterno === "sim" && !temContrafactualAdicional)
+        errs.temContrafactualAdicional = "Selecione uma opção";
+      // Tabela de horas — validada só quando o ramo a exige (não no custo evitado puro).
+      if (precisaTabela) {
+        linhas.forEach((l, i) => {
+          const a = parseFloat(l.horasAntes);
+          const d = parseFloat(l.horasDepois);
+          if (!l.cargo) errs[`l${i}cargo`] = "Selecione a função";
+          // "antes" sempre exigido (horas reais no "sim"; equivalente estimado nos
+          // ramos contrafactuais). "depois" só no "sim" — nos demais é 0 (campo oculto).
+          if (l.horasAntes === "" || isNaN(a) || a < 0) errs[`l${i}antes`] = "Informe as horas";
+          if (isSimBranch && (l.horasDepois === "" || isNaN(d) || d < 0))
+            errs[`l${i}depois`] = "Informe as horas";
+        });
+      }
+      // Custo evitado: pergunta obrigatória no ramo "Sim"; no ramo "Não" o papel é da
+      // pergunta "elimina gasto externo?". Itens validados sempre que são coletados.
+      if (isSimBranch && !temCustoEvitado) errs.temCustoEvitado = "Selecione uma opção";
+      if (coletaCustoEvitado) {
+        if (custoEvitadoItens.length === 0) errs.temCustoEvitado = "Adicione ao menos um item evitado";
         custoEvitadoItens.forEach((it, i) => {
           const v = parseMoedaBR(it.valor);
           if (!it.nome.trim()) errs[`ce${i}nome`] = "Informe o nome";
           if (it.valor === "" || v <= 0) errs[`ce${i}valor`] = "Informe o valor";
           if (!it.recorrencia) errs[`ce${i}recorrencia`] = "Selecione";
           if (!it.justificativa.trim()) errs[`ce${i}justificativa`] = "Informe a justificativa";
+        });
+      }
+      // Custos do projeto: pergunta obrigatória. Se "sim", cada serviço precisa estar completo.
+      if (!temCustoProjeto) errs.temCustoProjeto = "Selecione uma opção";
+      if (temCustoProjeto === "sim") {
+        if (custoProjetoItens.length === 0) errs.temCustoProjeto = "Adicione ao menos um serviço";
+        custoProjetoItens.forEach((it, i) => {
+          const v = parseMoedaBR(it.valor);
+          if (!it.nome.trim()) errs[`cp${i}nome`] = "Informe o nome";
+          if (it.valor === "" || v <= 0) errs[`cp${i}valor`] = "Informe o valor";
+          if (!it.recorrencia) errs[`cp${i}recorrencia`] = "Selecione";
+          if (!it.justificativa.trim()) errs[`cp${i}justificativa`] = "Informe a justificativa";
         });
       }
     }
@@ -1010,8 +1166,12 @@ function SavingForm({
     onSubmit({
       linhas,
       alguemFazia,
+      eliminaGastoExterno,
+      temContrafactualAdicional,
       temCustoEvitado,
       custoEvitadoItens,
+      temCustoProjeto,
+      custoProjetoItens,
       tipoSaving: tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -1019,6 +1179,139 @@ function SavingForm({
       racionalReceita,
     });
   }
+
+  // Lista incremental de itens de custo evitado (nome/valor/recorrência/justificativa).
+  // Renderizada em DOIS pontos da árvore (ramo "Não → elimina Sim" e ramo "Sim"
+  // opcional), por isso vive numa variável única em vez de duplicar a UI.
+  const custoEvitadoItensUI = (
+    <div className="mt-3">
+      {/* Cabeçalho (telas largas) */}
+      <div
+        className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
+        style={{ gridTemplateColumns: "1fr 96px 104px 28px", color: "#9a9aa8" }}
+      >
+        <span>Ferramenta / serviço</span>
+        <span className="text-center">Valor (R$)</span>
+        <span className="text-center">Recorrência</span>
+        <span />
+      </div>
+
+      <div className="space-y-2.5">
+        {custoEvitadoItens.map((it, i) => {
+          const linhaErro =
+            errors[`ce${i}nome`] || errors[`ce${i}valor`] ||
+            errors[`ce${i}recorrencia`] || errors[`ce${i}justificativa`];
+          return (
+            <div
+              key={i}
+              className="rounded-xl p-2.5"
+              style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+            >
+              <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 96px 104px 28px" }}>
+                {/* Nome da ferramenta */}
+                <input
+                  type="text"
+                  placeholder="Ex: Zapier"
+                  aria-label="Nome da ferramenta evitada"
+                  value={it.nome}
+                  onChange={(e) => updateCustoEvitado(i, { nome: e.target.value })}
+                  className="go-input w-full"
+                  style={{
+                    height: 38, padding: "0 10px", borderRadius: "var(--go-radius-md)",
+                    border: errors[`ce${i}nome`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                    background: "var(--go-white)", fontSize: 13,
+                  }}
+                />
+                {/* Valor — máscara de moeda BR (só dígitos → 1.234,56) */}
+                <input
+                  type="text" inputMode="numeric" placeholder="299,90"
+                  aria-label="Valor evitado"
+                  value={it.valor}
+                  onChange={(e) => updateCustoEvitado(i, { valor: formatMoedaBR(e.target.value) })}
+                  className="go-input w-full"
+                  style={{
+                    height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                    border: errors[`ce${i}valor`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                    background: "var(--go-white)", fontSize: 13,
+                  }}
+                />
+                {/* Recorrência */}
+                <select
+                  aria-label="Recorrência"
+                  value={it.recorrencia}
+                  onChange={(e) => updateCustoEvitado(i, { recorrencia: e.target.value as "mensal" | "pontual" | "" })}
+                  className="go-select w-full"
+                  style={{
+                    height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)",
+                    border: errors[`ce${i}recorrencia`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                    background: "var(--go-white)", fontSize: 13,
+                    color: it.recorrencia ? "var(--go-text-primary)" : "#8b8b9a",
+                    textAlign: "center", textAlignLast: "center",
+                  }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="mensal">Mensal</option>
+                  <option value="pontual">Pontual</option>
+                </select>
+                {/* Remover */}
+                {custoEvitadoItens.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeCustoEvitado(i)}
+                    aria-label="Remover ferramenta evitada"
+                    className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
+                    style={{ color: "#b4313b", background: "transparent" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                ) : <span />}
+              </div>
+
+              {/* Justificativa breve */}
+              <input
+                type="text"
+                placeholder="Justificativa breve (ex: substituída pelo fluxo no n8n)"
+                aria-label="Justificativa do custo evitado"
+                value={it.justificativa}
+                onChange={(e) => updateCustoEvitado(i, { justificativa: e.target.value })}
+                className="go-input mt-2 w-full"
+                style={{
+                  padding: "9px 10px", borderRadius: "var(--go-radius-md)",
+                  border: errors[`ce${i}justificativa`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                  background: "var(--go-white)", fontSize: 13,
+                }}
+              />
+
+              {linhaErro ? (
+                <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {linhaErro}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Adicionar ferramenta */}
+      <button
+        type="button"
+        onClick={addCustoEvitado}
+        className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
+        style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Adicionar item evitado
+      </button>
+    </div>
+  );
 
   return (
     <div
@@ -1179,25 +1472,96 @@ function SavingForm({
               )}
             </div>
 
-            {/* Tabela só aparece depois de responder sim/não */}
-            {alguemFazia && (
+            {/* Ramo "Não, ninguém fazia": a automação eliminou um gasto externo? */}
+            {mostrarEliminaGastoExterno && (
+              <div style={revelar}>
+                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  Essa automação eliminou um gasto externo (contrato, serviço ou licença)? <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                  Um contrato/serviço de terceiro que a empresa <strong>deixou de pagar</strong> porque a automação assumiu o trabalho
+                  (ex: um agente terceirizado, uma licença SaaS).
+                </p>
+                <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                  {([["sim", "Sim, eliminou"], ["nao", "Não eliminou"]] as const).map(([opt, lbl]) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => selectEliminaGastoExterno(opt)}
+                      className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                      style={{
+                        background: eliminaGastoExterno === opt ? "#6b6e00" : "transparent",
+                        color: eliminaGastoExterno === opt ? "#fff" : "#6b6e00",
+                        borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                      }}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {errors.eliminaGastoExterno && (
+                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                    {errors.eliminaGastoExterno}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Não → elimina SIM: lista do custo evitado (o ganho deste projeto) */}
+            {isNaoBranch && eliminaGastoExterno === "sim" && (
+              <div style={revelar}>
+                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  Qual gasto externo foi eliminado? <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                  Liste o(s) contrato(s)/serviço(s) que deixaram de ser pagos — este é o ganho do projeto.
+                </p>
+                {custoEvitadoItensUI}
+              </div>
+            )}
+
+            {/* 2c — além do gasto eliminado, há um trabalho manual ADICIONAL distinto? */}
+            {mostrarContrafactualAdicional && (
+              <div style={revelar}>
+                <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                  Além desse gasto eliminado, a automação substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse contrato NÃO cobria? <span style={{ color: "#e53e3e" }}>*</span>
+                </label>
+                <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                  Conta só se for um trabalho <strong>diferente</strong> do que o contrato já fazia — senão é o mesmo ganho contado duas vezes.
+                </p>
+                <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                  {([["nao", "Não, só o custo eliminado"], ["sim", "Sim, há trabalho adicional"]] as const).map(([opt, lbl]) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => selectTemContrafactualAdicional(opt)}
+                      className="flex-1 py-2.5 text-[12px] font-semibold transition-all"
+                      style={{
+                        background: temContrafactualAdicional === opt ? "#6b6e00" : "transparent",
+                        color: temContrafactualAdicional === opt ? "#fff" : "#6b6e00",
+                        borderRight: opt === "nao" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                      }}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {errors.temContrafactualAdicional && (
+                  <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                    {errors.temContrafactualAdicional}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tabela de horas — aparece nos ramos com horas (não no custo evitado puro) */}
+            {precisaTabela && (
               <div style={revelar}>
                 <label className="mb-1 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  {alguemFazia === "sim" ? "Quem trabalhava (ou trabalha) nessa tarefa" : "Qual seria o equivalente em trabalho manual?"} <span style={{ color: "#e53e3e" }}>*</span>
+                  {tabelaLabel} <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  {alguemFazia === "sim" ? (
-                    <>
-                      Uma linha por função. Informe as {horasPorPeriodo} <strong>antes</strong> e <strong>depois</strong> da automação.
-                      Se ninguém precisa atuar depois, deixe "horas depois" como <strong>0</strong>.
-                    </>
-                  ) : (
-                    <>
-                      Ninguém fazia isso manualmente — mas <strong>se alguém tivesse que fazer</strong>, quantas{" "}
-                      {horasPorPeriodo} levaria e qual função seria responsável? Uma linha por função. É o trabalho
-                      manual que a automação <strong>evita</strong> (o saving).
-                    </>
-                  )}
+                  {tabelaHelp}
                 </p>
 
                 {/* Cabeçalho das colunas (telas largas) */}
@@ -1329,17 +1693,17 @@ function SavingForm({
               </div>
             )}
 
-            {/* Custo evitado — a solução fez a empresa DEIXAR de pagar alguma
-                ferramenta/serviço externo? (≠ ferramenta usada pela automação)
-                No "não" aparece já; no "sim" só após a tabela estar completa. */}
-            {mostrarCustoEvitado && (
+            {/* Ramo "Sim, alguém fazia": custo evitado OPCIONAL e DISTINTO das horas.
+                (No ramo "Não", o custo evitado é coletado lá em cima, junto da
+                pergunta "elimina gasto externo?".) */}
+            {mostrarCustoEvitadoPergunta && (
             <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                A solução evitou algum custo de ferramenta ou serviço externo? <span style={{ color: "#e53e3e" }}>*</span>
+                Além das horas, a automação eliminou algum gasto externo DISTINTO (contrato/serviço/licença)? <span style={{ color: "#e53e3e" }}>*</span>
               </label>
               <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                Ferramentas ou serviços pagos que a empresa <strong>deixou de contratar</strong> por causa desta solução
-                (ex: uma licença SaaS cancelada, um serviço terceirizado eliminado).
+                Um gasto <strong>diferente</strong> do trabalho já contado nas horas acima (ex: uma licença SaaS cancelada).
+                Se o que foi eliminado é justamente o trabalho dessas horas, responda <strong>"Não"</strong>.
               </p>
               <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
                 {([["sim", "Sim, evitou"], ["nao", "Não evitou"]] as const).map(([opt, lbl]) => (
@@ -1364,25 +1728,63 @@ function SavingForm({
                 </div>
               )}
 
-              {/* Lista incremental de ferramentas evitadas */}
-              {temCustoEvitado === "sim" && (
+              {temCustoEvitado === "sim" && custoEvitadoItensUI}
+            </div>
+            )}
+
+            {/* Custos do projeto: serviços externos PAGOS que a solução consome pra rodar */}
+            {mostrarCustoProjeto && (
+            <div style={revelar}>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                A solução usa algum serviço externo pago para funcionar? <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                Serviços/APIs pagos que a automação <strong>consome para rodar</strong> (ex: chave de API da OpenAI,
+                ElevenLabs, um SaaS por uso). Esse custo é descontado do ganho. <em>Não confunda com ferramentas evitadas
+                (que somam) nem com o custo de uma solução externa que substitui a interna.</em>
+              </p>
+              <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                {([["sim", "Sim, usa"], ["nao", "Não usa"]] as const).map(([opt, lbl]) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => selectTemCustoProjeto(opt)}
+                    className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                    style={{
+                      background: temCustoProjeto === opt ? "#6b6e00" : "transparent",
+                      color: temCustoProjeto === opt ? "#fff" : "#6b6e00",
+                      borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {errors.temCustoProjeto && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.temCustoProjeto}
+                </div>
+              )}
+
+              {/* Lista incremental de serviços pagos do projeto */}
+              {temCustoProjeto === "sim" && (
                 <div className="mt-3">
                   {/* Cabeçalho (telas largas) */}
                   <div
                     className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
                     style={{ gridTemplateColumns: "1fr 96px 104px 28px", color: "#9a9aa8" }}
                   >
-                    <span>Ferramenta / serviço</span>
+                    <span>Serviço / API</span>
                     <span className="text-center">Valor (R$)</span>
                     <span className="text-center">Recorrência</span>
                     <span />
                   </div>
 
                   <div className="space-y-2.5">
-                    {custoEvitadoItens.map((it, i) => {
+                    {custoProjetoItens.map((it, i) => {
                       const linhaErro =
-                        errors[`ce${i}nome`] || errors[`ce${i}valor`] ||
-                        errors[`ce${i}recorrencia`] || errors[`ce${i}justificativa`];
+                        errors[`cp${i}nome`] || errors[`cp${i}valor`] ||
+                        errors[`cp${i}recorrencia`] || errors[`cp${i}justificativa`];
                       return (
                         <div
                           key={i}
@@ -1390,42 +1792,42 @@ function SavingForm({
                           style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
                         >
                           <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 96px 104px 28px" }}>
-                            {/* Nome da ferramenta */}
+                            {/* Nome do serviço */}
                             <input
                               type="text"
-                              placeholder="Ex: Zapier"
-                              aria-label="Nome da ferramenta evitada"
+                              placeholder="Ex: ElevenLabs"
+                              aria-label="Nome do serviço do projeto"
                               value={it.nome}
-                              onChange={(e) => updateCustoEvitado(i, { nome: e.target.value })}
+                              onChange={(e) => updateCustoProjeto(i, { nome: e.target.value })}
                               className="go-input w-full"
                               style={{
                                 height: 38, padding: "0 10px", borderRadius: "var(--go-radius-md)",
-                                border: errors[`ce${i}nome`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                border: errors[`cp${i}nome`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
                                 background: "var(--go-white)", fontSize: 13,
                               }}
                             />
                             {/* Valor — máscara de moeda BR (só dígitos → 1.234,56) */}
                             <input
-                              type="text" inputMode="numeric" placeholder="299,90"
-                              aria-label="Valor evitado"
+                              type="text" inputMode="numeric" placeholder="99,90"
+                              aria-label="Valor do serviço do projeto"
                               value={it.valor}
-                              onChange={(e) => updateCustoEvitado(i, { valor: formatMoedaBR(e.target.value) })}
+                              onChange={(e) => updateCustoProjeto(i, { valor: formatMoedaBR(e.target.value) })}
                               className="go-input w-full"
                               style={{
                                 height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
-                                border: errors[`ce${i}valor`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                border: errors[`cp${i}valor`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
                                 background: "var(--go-white)", fontSize: 13,
                               }}
                             />
                             {/* Recorrência */}
                             <select
-                              aria-label="Recorrência"
+                              aria-label="Recorrência do custo do projeto"
                               value={it.recorrencia}
-                              onChange={(e) => updateCustoEvitado(i, { recorrencia: e.target.value as "mensal" | "pontual" | "" })}
+                              onChange={(e) => updateCustoProjeto(i, { recorrencia: e.target.value as "mensal" | "pontual" | "" })}
                               className="go-select w-full"
                               style={{
                                 height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)",
-                                border: errors[`ce${i}recorrencia`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                border: errors[`cp${i}recorrencia`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
                                 background: "var(--go-white)", fontSize: 13,
                                 color: it.recorrencia ? "var(--go-text-primary)" : "#8b8b9a",
                                 textAlign: "center", textAlignLast: "center",
@@ -1436,11 +1838,11 @@ function SavingForm({
                               <option value="pontual">Pontual</option>
                             </select>
                             {/* Remover */}
-                            {custoEvitadoItens.length > 1 ? (
+                            {custoProjetoItens.length > 1 ? (
                               <button
                                 type="button"
-                                onClick={() => removeCustoEvitado(i)}
-                                aria-label="Remover ferramenta evitada"
+                                onClick={() => removeCustoProjeto(i)}
+                                aria-label="Remover serviço do projeto"
                                 className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
                                 style={{ color: "#b4313b", background: "transparent" }}
                                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
@@ -1456,14 +1858,14 @@ function SavingForm({
                           {/* Justificativa breve */}
                           <input
                             type="text"
-                            placeholder="Justificativa breve (ex: substituída pelo fluxo no n8n)"
-                            aria-label="Justificativa do custo evitado"
+                            placeholder="Justificativa breve (ex: TTS das respostas via ElevenLabs)"
+                            aria-label="Justificativa do custo do projeto"
                             value={it.justificativa}
-                            onChange={(e) => updateCustoEvitado(i, { justificativa: e.target.value })}
+                            onChange={(e) => updateCustoProjeto(i, { justificativa: e.target.value })}
                             className="go-input mt-2 w-full"
                             style={{
                               padding: "9px 10px", borderRadius: "var(--go-radius-md)",
-                              border: errors[`ce${i}justificativa`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                              border: errors[`cp${i}justificativa`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
                               background: "var(--go-white)", fontSize: 13,
                             }}
                           />
@@ -1478,10 +1880,10 @@ function SavingForm({
                     })}
                   </div>
 
-                  {/* Adicionar ferramenta */}
+                  {/* Adicionar serviço */}
                   <button
                     type="button"
-                    onClick={addCustoEvitado}
+                    onClick={addCustoProjeto}
                     className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
                     style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
@@ -1490,7 +1892,7 @@ function SavingForm({
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
-                    Adicionar ferramenta evitada
+                    Adicionar serviço
                   </button>
                 </div>
               )}

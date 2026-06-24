@@ -53,8 +53,12 @@ function SubmeterPage() {
 const emptyFormDraft = (): SavingFormData => ({
   linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
   alguemFazia: "",
+  eliminaGastoExterno: "",
+  temContrafactualAdicional: "",
   temCustoEvitado: "",
   custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  temCustoProjeto: "",
+  custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   tipoSaving: "",
   custoExterno: "",
   custoPeriodicidade: "",
@@ -71,6 +75,8 @@ type AgentMeta = {
   participantes: string[];
   dataCriacao: string;
   descricaoBreve: string;
+  // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
   contextoEspecial: string;
 };
@@ -296,6 +302,7 @@ export function SubmeterPageContent({
           dataCriacao: (data.data_criacao_projeto as string) ?? "",
           tipoProjeto: tiposProjeto,
           descricaoBreve: (data.descricao_breve as string) ?? "",
+          usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
         };
@@ -343,12 +350,60 @@ export function SubmeterPageContent({
             } catch {
               custoEvitadoItens = [];
             }
+            // Custos do projeto: mesma repopulação (JSON salvo na submissão).
+            let custoProjetoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
+            try {
+              const raw = data.custo_projeto_itens;
+              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+              if (Array.isArray(arr)) {
+                custoProjetoItens = arr.map((it: Record<string, unknown>) => ({
+                  nome: String(it.nome ?? ""),
+                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
+                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
+                  justificativa: String(it.justificativa ?? ""),
+                }));
+              }
+            } catch {
+              custoProjetoItens = [];
+            }
+            // Reconstrói a árvore do form a partir do alguem_fazia persistido:
+            // 'externo' = custo evitado puro (Não → elimina Sim → sem adicional);
+            // 'nao' + custo evitado = contrafactual + custo evitado (elimina Sim → adicional Sim);
+            // 'nao' sem custo evitado = contrafactual puro (elimina Não); 'sim' = horas reais.
+            const afRaw = (data.alguem_fazia as string) ?? "";
+            const custoEvitadoFlag = (data.custo_evitado as "sim" | "nao" | "") ?? "";
+            let alguemFaziaSnap: "sim" | "nao" | "" = "";
+            let eliminaGastoExternoSnap: "sim" | "nao" | "" = "";
+            let temContrafactualAdicionalSnap: "sim" | "nao" | "" = "";
+            let temCustoEvitadoSnap: "sim" | "nao" | "" = "";
+            if (afRaw === "externo") {
+              alguemFaziaSnap = "nao";
+              eliminaGastoExternoSnap = "sim";
+              temContrafactualAdicionalSnap = "nao";
+            } else if (afRaw === "nao") {
+              alguemFaziaSnap = "nao";
+              if (custoEvitadoFlag === "sim") {
+                eliminaGastoExternoSnap = "sim";
+                temContrafactualAdicionalSnap = linhas.length > 0 ? "sim" : "nao";
+              } else {
+                eliminaGastoExternoSnap = "nao";
+              }
+            } else if (afRaw === "sim") {
+              alguemFaziaSnap = "sim";
+              temCustoEvitadoSnap = custoEvitadoFlag;
+            }
             const savingSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: linhas.length > 0 ? linhas : [{ cargo: "", horasAntes: "", horasDepois: "" }],
-              alguemFazia: (data.alguem_fazia as string) ?? "",
-              temCustoEvitado: (data.custo_evitado as "sim" | "nao" | "") ?? "",
+              alguemFazia: alguemFaziaSnap,
+              eliminaGastoExterno: eliminaGastoExternoSnap,
+              temContrafactualAdicional: temContrafactualAdicionalSnap,
+              temCustoEvitado: temCustoEvitadoSnap,
               custoEvitadoItens: custoEvitadoItens.length > 0
                 ? custoEvitadoItens
+                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: (data.custo_projeto as "sim" | "nao" | "") ?? "",
+              custoProjetoItens: custoProjetoItens.length > 0
+                ? custoProjetoItens
                 : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (data.tipo_saving as string) ?? "",
               custoExterno: String(data.custo_externo_mensal ?? ""),
@@ -367,8 +422,12 @@ export function SubmeterPageContent({
             const receitaSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
               alguemFazia: "",
+              eliminaGastoExterno: "",
+              temContrafactualAdicional: "",
               temCustoEvitado: "",
               custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+              temCustoProjeto: "",
+              custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (receita.tipo_saving as string) ?? "mensal",
               custoExterno: "",
               custoPeriodicidade: "mensal",
@@ -406,6 +465,7 @@ export function SubmeterPageContent({
           participantes: newForm.participantes,
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
+          usaAiProxy: newForm.usaAiProxy,
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
@@ -583,6 +643,7 @@ export function SubmeterPageContent({
     dataCriacao: today,
     tipoProjeto: [],
     descricaoBreve: "",
+    usaAiProxy: "",
     especial: false,
     contextoEspecial: "",
   });
@@ -679,8 +740,9 @@ export function SubmeterPageContent({
     participantes: form.participantes,
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
+    usaAiProxy: form.usaAiProxy,
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -742,6 +804,8 @@ export function SubmeterPageContent({
       }
       if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
         errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.usaAiProxy)
+        errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
         errs.documentacao = "Selecione pelo menos um arquivo do projeto";
     }
@@ -897,6 +961,7 @@ export function SubmeterPageContent({
           tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
           tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
@@ -972,6 +1037,7 @@ export function SubmeterPageContent({
           membros: form.participantes,
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
@@ -1005,6 +1071,7 @@ export function SubmeterPageContent({
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
           docs,
@@ -1076,6 +1143,7 @@ export function SubmeterPageContent({
           membros: meta.participantes,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
+          usa_ai_proxy: meta.usaAiProxy || undefined,
           contexto_especial: meta.contextoEspecial,
           docs,
         },
@@ -1157,6 +1225,7 @@ export function SubmeterPageContent({
               membros: meta.participantes,
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
+              usa_ai_proxy: meta.usaAiProxy || undefined,
               contexto_especial: meta.contextoEspecial,
               reset_doc: true,
             },
@@ -1219,6 +1288,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
           });
           setAgentMeta(meta);
         } catch (e) {
@@ -1312,6 +1382,7 @@ export function SubmeterPageContent({
             membros: meta.participantes,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
+            usa_ai_proxy: meta.usaAiProxy || undefined,
             reset_doc: true,
           }
         );
@@ -1510,24 +1581,48 @@ export function SubmeterPageContent({
           : parseFloat(formData.custoExterno)
         : undefined;
 
-      // No modo "ninguém fazia", horas_antes é o equivalente manual estimado e
-      // horas_depois é sempre 0 (a automação faz tudo; o campo nem aparece). Exige só
-      // o equivalente e força o "depois" a 0 — não arrasta valor antigo de uma edição
-      // de legado nem barra a linha por horas_depois vazio.
-      const ninguemFazia = formData.alguemFazia === "nao";
-      const linhas = formData.linhas
-        .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
-        .map((l) => ({
-          cargo: l.cargo,
-          horas_antes: parseFloat(l.horasAntes),
-          horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
-        }));
+      // Árvore "ninguém fazia": as horas (quando existem) são contrafactuais —
+      // horas_depois é sempre 0 (a automação faz tudo). Custo evitado PURO (eliminou
+      // gasto externo, SEM trabalho adicional) NÃO tem horas → alguem_fazia='externo'
+      // e linhas vazias. Nos demais, o ganho é horas (reais no "sim", contrafactuais
+      // no "não") + custo evitado quando houver.
+      const isNaoBranch = formData.alguemFazia === "nao";
+      const custoEvitadoPuro =
+        isNaoBranch && formData.eliminaGastoExterno === "sim" && formData.temContrafactualAdicional === "nao";
+      const ninguemFazia = isNaoBranch;
+      const alguemFaziaPayload = custoEvitadoPuro ? "externo" : (formData.alguemFazia || undefined);
+      const linhas = custoEvitadoPuro
+        ? []
+        : formData.linhas
+            .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
+            .map((l) => ({
+              cargo: l.cargo,
+              horas_antes: parseFloat(l.horasAntes),
+              horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
+            }));
 
-      // Custo evitado: só envia itens válidos quando a pessoa marcou "sim". O
-      // backend mensaliza (pontual ÷12) e soma ao saving.
+      // Custo evitado coletado: no ramo "Não" pela pergunta "elimina gasto externo?";
+      // no ramo "Sim" pela pergunta opcional de custo distinto. Backend mensaliza (÷12 pontual).
+      const temCustoEvitadoEfetivo = isNaoBranch
+        ? (formData.eliminaGastoExterno === "sim" ? "sim" : "nao")
+        : (formData.temCustoEvitado || undefined);
       const custoEvitadoItens =
-        formData.temCustoEvitado === "sim"
+        temCustoEvitadoEfetivo === "sim"
           ? formData.custoEvitadoItens
+              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
+              .map((it) => ({
+                nome: it.nome.trim(),
+                valor: parseMoedaBR(it.valor),
+                recorrencia: it.recorrencia as "mensal" | "pontual",
+                justificativa: it.justificativa.trim(),
+              }))
+          : [];
+
+      // Custos do projeto: itens válidos quando "sim". O backend mensaliza (pontual
+      // ÷12) e SUBTRAI do saving (custo incorrido pra operar).
+      const custoProjetoItens =
+        formData.temCustoProjeto === "sim"
+          ? formData.custoProjetoItens
               .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
               .map((it) => ({
                 nome: it.nome.trim(),
@@ -1542,11 +1637,13 @@ export function SubmeterPageContent({
         {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
-          alguem_fazia: formData.alguemFazia || undefined,
+          alguem_fazia: alguemFaziaPayload,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
-          tem_custo_evitado: formData.temCustoEvitado || undefined,
+          tem_custo_evitado: temCustoEvitadoEfetivo || undefined,
           custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
+          tem_custo_projeto: formData.temCustoProjeto || undefined,
+          custo_projeto_itens: custoProjetoItens.length ? custoProjetoItens : undefined,
         },
       );
       setShowSavingForm(false);
