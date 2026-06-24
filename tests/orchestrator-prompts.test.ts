@@ -450,9 +450,11 @@ describe('Transições de fase', () => {
   // Regressão: JSON truncado (limite de tokens) na aprovação não pode travar a transição.
   // O resumo longo + echo de `coletado` estourava o limite, caía no fallback de recuperação
   // e a fase ficava presa em doc_preview (resumo aparecia como mensagem solta no chat).
+  // `mockResolvedValue` (não `...Once`): o truncamento por limite de tokens é persistente
+  // — re-tentar devolve o mesmo JSON cortado, então a recuperação por regex tem de cobrir.
   it('doc_preview → saving mesmo com JSON truncado (type=complete recuperado)', async () => {
     const truncado = '{"type":"complete","content":"Resumo factual do projeto que ficou cortado no meio';
-    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValue(truncado);
     const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'doc_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.type).toBe('complete');
     expect(result.fase).toBe('saving');
@@ -460,9 +462,23 @@ describe('Transições de fase', () => {
 
   it('saving_preview → completo mesmo com JSON truncado (type=complete recuperado)', async () => {
     const truncado = '{"type":"complete","content":"Memorial aprovado e cortado no meio';
-    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(truncado);
+    vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValue(truncado);
     const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.type).toBe('complete');
     expect(result.fase).toBe('completo');
+  });
+
+  // Fix: malformação TRANSITÓRIA do gateway (1 turno volta JSON inválido, o próximo
+  // volta íntegro) não pode mais virar "tente novamente" — o orquestrador re-tenta a
+  // chamada e usa a resposta válida seguinte, sem o usuário ver erro.
+  it('re-tenta quando o JSON vem inválido e usa a resposta válida do retry', async () => {
+    const invalido = '{"type":"question","content":"resposta cortada no meio sem fechar';
+    const valido = JSON.stringify({ type: 'question', content: 'Pergunta válida?', coletado: documentacaoVazia() });
+    vi.mocked((await import('@/lib/llm')).llmChat)
+      .mockResolvedValueOnce(invalido)
+      .mockResolvedValueOnce(valido);
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'algo' }], 'doc');
+    expect(result.type).toBe('question');
+    expect('content' in result ? result.content : null).toBe('Pergunta válida?');
   });
 });
