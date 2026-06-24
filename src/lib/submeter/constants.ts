@@ -58,6 +58,11 @@ export interface FormData {
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];
   descricaoBreve: string;
+  // Usa o AI Proxy (gateway interno de IA da empresa, ai-proxy.gogroupbr.com)?
+  // Governança de custo: projetos que usam IA deveriam rotear pelo proxy interno.
+  // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
+  // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
+  usaAiProxy: "sim" | "nao" | "";
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;

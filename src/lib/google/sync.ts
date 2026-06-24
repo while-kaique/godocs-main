@@ -207,6 +207,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Atualizado Em': dataSubmissao,
       // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
       'Alocação Ganhos': ouTraco(p.alocacaoGanhos),
+      // Governança: 'Sim'/'Não' declarado no formulário; "—" quando não respondido.
+      'Usa AI Proxy':
+        p.projeto.usa_ai_proxy === 'sim' ? 'Sim'
+          : p.projeto.usa_ai_proxy === 'nao' ? 'Não'
+            : '—',
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

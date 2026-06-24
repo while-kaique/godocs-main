@@ -38,6 +38,19 @@ const CAMPO_KEYS = [
   'fluxo', 'configurar_antes', 'atencao',
 ] as const;
 
+// ─── Detecção determinística de AI Proxy ────────────────────────────────────────
+// Governança: projetos que usam IA deveriam rotear pelo gateway interno
+// (ai-proxy.gogroupbr.com), que reduz o custo das chamadas. Em vez de pedir ao
+// LLM, varremos o material enviado com um regex robusto — é o "agente de
+// documentação extraindo" o uso do proxy de forma 100% confiável. O analisador
+// cruza este resultado com a resposta declarada no formulário (usa_ai_proxy).
+const AI_PROXY_RE = /ai-proxy\.gogroupbr\.com/i;
+
+/** true se o texto enviado (código/doc) referencia o AI Proxy interno. */
+export function detectarAiProxy(texto: string | null | undefined): boolean {
+  return AI_PROXY_RE.test(texto ?? '');
+}
+
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 export async function extrairCamposDocumentacao(

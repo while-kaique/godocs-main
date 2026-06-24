@@ -246,6 +246,7 @@ export type InsertProjeto = {
   especial?: boolean | null;
   contexto_especial?: string | null;
   arquivos_nomes?: string[] | null;
+  usa_ai_proxy?: string | null;
   status?: string;
 };
 
@@ -255,8 +256,8 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, especial, contexto_especial, arquivos_nomes, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -275,6 +276,7 @@ export async function insertProjeto(data: InsertProjeto) {
     data.especial ? 1 : 0,
     data.contexto_especial ?? null,
     data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
+    data.usa_ai_proxy ?? null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -883,6 +885,7 @@ export type ProjetoRow = {
   observacoes: string | null; // parecer da análise automática (staff-only)
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
+  usa_ai_proxy: string | null; // 'sim' | 'nao' — usa o AI Proxy interno (governança de custo)
   arquivos_nomes: string | null; // JSON array de nomes dos arquivos enviados no upload
   arquivos_links: string | null; // JSON array de links (webViewLink) dos arquivos no Drive
   submitted_at: string | null;

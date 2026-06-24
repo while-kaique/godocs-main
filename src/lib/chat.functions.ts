@@ -405,6 +405,8 @@ const iniciarSubmissaoSchema = z.object({
   tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
   tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
+  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
@@ -518,6 +520,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipo_projeto: data.especial ? 'especial' : (data.tipo_projeto ?? null),
       tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
+      usa_ai_proxy: data.usa_ai_proxy ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: 'rascunho',
@@ -538,6 +541,7 @@ export async function iniciarSubmissao(rawData: unknown) {
     data_criacao: data.data_criacao,
     tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
+    usa_ai_proxy: data.usa_ai_proxy ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
     arquivos: data.docs.map((d) => d.filename),
@@ -1273,6 +1277,8 @@ const atualizarMetadadosSchema = z.object({
   membros: z.array(z.string()).optional(),
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
+  // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
+  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -1303,6 +1309,7 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
+  if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
@@ -1323,6 +1330,7 @@ export async function atualizarMetadados(rawData: unknown) {
         membros: data.membros ?? null,
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
+        usa_ai_proxy: data.usa_ai_proxy ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
