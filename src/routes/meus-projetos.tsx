@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -77,6 +77,12 @@ type Projeto = {
   atualizado_em: string | null;
   pendente: boolean;
   papel: "owner" | "participante";
+  // true = owner OU editor delegado. Decide o botão "Editar" × "Visualizar" e a
+  // exibição do botão de distribuição do poder de edição.
+  podeEditar: boolean;
+  // Participantes do projeto (emails) e quais deles têm o poder de edição delegado.
+  membros: string[];
+  editores_delegados: string[];
   responsavel_nome: string | null;
   responsavel_email: string | null;
 };
@@ -89,6 +95,195 @@ const fmtDate = fmtDataBR;
 function fmtGanho(v: number | null): string {
   if (!v) return "";
   return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mês`;
+}
+
+// Popup (overlay com fundo embaçado) para o dono — ou um editor já delegado (cascata)
+// — distribuir o poder de edição entre os participantes do projeto. Cada participante
+// marcado passa a poder editar/reenviar "como se fosse o dono". Fecha no "x", no
+// backdrop e no Esc. Salva via POST /api/meus-projetos/:id/editores.
+function DistribuirEdicaoModal({
+  projeto,
+  onClose,
+  onSaved,
+}: {
+  projeto: Projeto;
+  onClose: () => void;
+  onSaved: (editores: string[]) => void;
+}) {
+  const participantes = useMemo(
+    () => projeto.membros.map((m) => m.trim()).filter(Boolean),
+    [projeto.membros],
+  );
+  // Conjunto de emails (lowercase) atualmente marcados como editores.
+  const [marcados, setMarcados] = useState<Set<string>>(
+    () => new Set(projeto.editores_delegados.map((e) => e.trim().toLowerCase())),
+  );
+  const [salvando, setSalvando] = useState(false);
+
+  // Fecha no Esc.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function toggle(email: string) {
+    const lower = email.trim().toLowerCase();
+    setMarcados((prev) => {
+      const next = new Set(prev);
+      if (next.has(lower)) next.delete(lower);
+      else next.add(lower);
+      return next;
+    });
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      // Reenvia os emails ORIGINAIS (preservando o caso) que estão marcados.
+      const editores = participantes.filter((m) => marcados.has(m.toLowerCase()));
+      const res = await apiFetch<{ editores_delegados: string[] }>(
+        `/api/meus-projetos/${projeto.id}/editores`,
+        { editores },
+        "POST",
+      );
+      onSaved(res.editores_delegados);
+      toast.success("Permissões de edição atualizadas.");
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar as permissões.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: "rgba(8,20,40,0.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Distribuir o poder de edição"
+    >
+      <div
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl"
+        style={{ background: "var(--go-white)", boxShadow: "0 24px 64px rgba(8,20,40,0.35)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-6 pt-6">
+          <div className="flex items-start gap-3">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "rgba(0,89,169,0.1)", color: "var(--go-blue)" }}
+            >
+              <Users style={{ width: 18, height: 18 }} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+                Quem pode editar
+              </h2>
+              <p className="mt-0.5 truncate text-[12px]" style={{ color: "#8b8b9a" }}>
+                {projeto.nome ?? "(sem nome)"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all hover:opacity-80"
+            style={{ background: "rgba(0,0,0,0.05)", color: "#5b5b6a" }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            Escolha quais participantes podem <span className="font-semibold">editar e reenviar</span> este
+            projeto como se fossem você. Como autor, você sempre pode editar.
+          </p>
+
+          {participantes.length === 0 ? (
+            <div
+              className="mt-4 rounded-xl px-4 py-6 text-center text-[12.5px] leading-snug"
+              style={{ background: "var(--go-cream)", color: "#8b8b9a" }}
+            >
+              Este projeto ainda não tem participantes. Adicione participantes ao editar o projeto
+              (ou na planilha) para poder distribuir o poder de edição.
+            </div>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {participantes.map((m) => {
+                const checked = marcados.has(m.toLowerCase());
+                return (
+                  <li key={m}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={checked}
+                      onClick={() => toggle(m)}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition-all"
+                      style={{
+                        background: checked ? "rgba(0,89,169,0.06)" : "var(--go-white)",
+                        border: `1px solid ${checked ? "rgba(0,89,169,0.25)" : "rgba(0,0,0,0.1)"}`,
+                      }}
+                    >
+                      <span className="min-w-0 truncate text-[13px] font-medium" style={{ color: "var(--go-text-heading)" }}>
+                        {m}
+                      </span>
+                      {/* Switch visual */}
+                      <span
+                        aria-hidden
+                        className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-all"
+                        style={{ background: checked ? "var(--go-blue)" : "rgba(0,0,0,0.18)" }}
+                      >
+                        <span
+                          className="absolute h-4 w-4 rounded-full bg-white transition-all"
+                          style={{ left: checked ? 18 : 2, top: 2 }}
+                        />
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={salvando || participantes.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
+            style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+          >
+            {salvando && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MeusProjetosPage() {
@@ -109,6 +304,15 @@ function MeusProjetosPage() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
+  // Projeto cujo popup de "distribuir poder de edição" está aberto (null = fechado).
+  const [delegando, setDelegando] = useState<Projeto | null>(null);
+
+  // Reflete a nova lista de editores delegados no cache da listagem (sem refetch).
+  function aplicarDelegacao(projetoId: string, editores: string[]) {
+    queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
+      (old ?? []).map((p) => (p.id === projetoId ? { ...p, editores_delegados: editores } : p)),
+    );
+  }
 
   // Trocar de filtro volta para a primeira página.
   useEffect(() => {
@@ -270,9 +474,10 @@ function MeusProjetosPage() {
                 })}
               </div>
 
-              {/* Aviso "só o autor edita" — em "Participo" e em "Todos" (quando há ao menos
-                  um projeto de participação na lista; nos demais você só visualiza). */}
-              {(filtro === "participo" || filtro === "todos") && grupos.participo.length > 0 && (
+              {/* Aviso "só o autor edita" — em "Participo" e em "Todos", apenas quando há
+                  participação SEM edição delegada (se o autor já delegou a edição a você,
+                  o card mostra "Editar" e o aviso não se aplica àquele projeto). */}
+              {(filtro === "participo" || filtro === "todos") && grupos.participo.some((p) => !p.podeEditar) && (
                 <div
                   className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
                   style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.12)", color: "var(--go-blue)" }}
@@ -280,8 +485,8 @@ function MeusProjetosPage() {
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
                     {filtro === "participo"
-                      ? "Você participa destes projetos, mas só o autor pode editá-los. Para transferir a autoria de um projeto, acione a equipe RPA."
-                      : "Alguns projetos abaixo são de outra pessoa (você participa) — só o autor pode editá-los; você apenas visualiza. Para transferir a autoria, acione a equipe RPA."}
+                      ? "Você participa destes projetos. Em alguns, só o autor edita — você apenas visualiza, a menos que o autor delegue a edição a você. Para transferir a autoria, acione a equipe RPA."
+                      : "Alguns projetos abaixo são de outra pessoa (você participa). Sem a edição delegada pelo autor, você só visualiza. Para transferir a autoria, acione a equipe RPA."}
                   </p>
                 </div>
               )}
@@ -314,6 +519,9 @@ function MeusProjetosPage() {
                   {pageItems.map((p) => {
                     const ehRascunho = p.status === "rascunho";
                     const ehOwner = p.papel === "owner";
+                    // Pode editar = owner ou editor delegado (na lista nunca há admin-override).
+                    // Quem pode editar também pode gerenciar a delegação (dono ou cascata).
+                    const podeEditar = p.podeEditar;
                     return (
                       <div
                         key={p.id}
@@ -356,10 +564,19 @@ function MeusProjetosPage() {
                                   {ehOwner ? "você" : p.responsavel_nome || p.responsavel_email || "—"}
                                 </span>
                               </span>
-                              {/* Disclaimer de transferência só faz sentido p/ participante
-                                  (no projeto próprio, "só o autor edita" é redundante). */}
-                              {!ehOwner && (
+                              {/* Disclaimer de transferência só p/ participante SEM edição
+                                  (no projeto próprio ou com edição delegada, é redundante). */}
+                              {!ehOwner && !podeEditar && (
                                 <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
+                              )}
+                              {/* Participante com edição delegada pelo dono. */}
+                              {!ehOwner && podeEditar && (
+                                <span
+                                  className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                >
+                                  Edição delegada
+                                </span>
                               )}
                             </div>
                           )}
@@ -370,7 +587,7 @@ function MeusProjetosPage() {
                               icon={<CalendarClock className="h-3.5 w-3.5" />}
                               titulo="Regularização de legado"
                               texto={
-                                ehOwner
+                                podeEditar
                                   ? `atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
                                   : `pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
                               }
@@ -383,7 +600,7 @@ function MeusProjetosPage() {
                               icon={<RotateCcw className="h-3.5 w-3.5" />}
                               titulo="Reenvio solicitado"
                               texto={
-                                ehOwner
+                                podeEditar
                                   ? "a análise apontou um ponto a ajustar. Corrija e reenvie para nova validação."
                                   : "a análise apontou um ponto a ajustar. Só o autor pode reenviar — acione o autor ou a equipe RPA."
                               }
@@ -416,26 +633,44 @@ function MeusProjetosPage() {
                                 {excluindo === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                               </button>
                             </>
-                          ) : ehOwner ? (
-                            <Link
-                              to="/editar/$id"
-                              params={{ id: p.id }}
-                              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                              style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                            >
-                              <PencilLine className="h-3.5 w-3.5" />
-                              Editar
-                            </Link>
                           ) : (
-                            <Link
-                              to="/projeto/$id"
-                              params={{ id: p.id }}
-                              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                              style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Visualizar
-                            </Link>
+                            <>
+                              {/* Distribuir o poder de edição — quem pode editar (dono ou editor
+                                  já delegado) gerencia quais participantes editam o projeto. */}
+                              {podeEditar && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDelegando(p)}
+                                  title="Distribuir o poder de edição"
+                                  aria-label="Distribuir o poder de edição"
+                                  className="inline-flex items-center justify-center rounded-full p-2 transition-all"
+                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                >
+                                  <Users className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {podeEditar ? (
+                                <Link
+                                  to="/editar/$id"
+                                  params={{ id: p.id }}
+                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                                  style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+                                >
+                                  <PencilLine className="h-3.5 w-3.5" />
+                                  Editar
+                                </Link>
+                              ) : (
+                                <Link
+                                  to="/projeto/$id"
+                                  params={{ id: p.id }}
+                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Visualizar
+                                </Link>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -493,6 +728,15 @@ function MeusProjetosPage() {
           )}
         </main>
       </div>
+
+      {/* Popup de distribuição do poder de edição (overlay com fundo embaçado). */}
+      {delegando && (
+        <DistribuirEdicaoModal
+          projeto={delegando}
+          onClose={() => setDelegando(null)}
+          onSaved={(editores) => aplicarDelegacao(delegando.id, editores)}
+        />
+      )}
     </div>
   );
 }
