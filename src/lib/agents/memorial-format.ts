@@ -41,6 +41,68 @@ export const TITULOS_MEMORIAL: Record<string, string> = {
   '6.6': 'Tipo',
 };
 
+// ─── Esqueleto do memorial financeiro — FONTE ÚNICA da estrutura ─────────────
+// As SEÇÕES do memorial (+ se cada uma é obrigatória/condicional/opcional por
+// perfil de ganho) são declaradas AQUI e renderizadas por descreverEsqueletoMemorial()
+// para dentro dos prompts do orquestrador (buildSaving*/buildReceita*).
+//
+// ⚠️ REGRA: ao EVOLUIR o sistema — novo perfil de ganho, nova seção/campo obrigatório,
+// nova coluna do Sheets derivada do memorial — atualize ESTE esqueleto. Ele é a FONTE
+// ÚNICA da estrutura; os prompts devem derivar dele para nunca sair de sincronia com o
+// que o validador/planilha esperam. (Migração incremental: o `custo_evitado` já deriva
+// daqui; `saving`/`receita` herdam o detalhamento inline e migram aos poucos.)
+//
+// modo: 'saving' (economia de horas, real ou contrafactual) · 'custo_evitado' (ganho
+// 100% custo externo eliminado, SEM horas — alguem_fazia='externo') · 'receita'.
+export type ModoMemorial = 'saving' | 'custo_evitado' | 'receita';
+
+export type SecaoEsqueleto = {
+  secao: string;        // cabeçalho "### ..." da seção no memorial
+  nivel: 'obrigatoria' | 'condicional' | 'opcional';
+  gatilho?: string;     // quando 'condicional'/'opcional': em que situação se aplica
+  conteudo: string;     // o que a seção deve conter (instrui o agente)
+};
+
+export const MEMORIAL_ESQUELETO: Record<ModoMemorial, SecaoEsqueleto[]> = {
+  saving: [
+    { secao: 'Contexto', nivel: 'obrigatoria', conteudo: '1-2 frases do que o projeto faz (use o que foi aprovado).' },
+    { secao: 'Saving de Pessoas', nivel: 'obrigatoria', conteudo: 'Por cargo: o que fazia, frequência×tempo, COMPOSIÇÃO das horas (quebra por atividade somando o total), horas antes/depois, economia.' },
+    { secao: 'O que mudou após a automação', nivel: 'condicional', gatilho: 'saving MENSAL ≥ 44h no total OU em algum cargo', conteudo: 'Destino concreto do tempo/custo liberado + frase concluindo a validade do ganho. Sem R$.' },
+    { secao: 'Contratos/Serviços Evitados', nivel: 'opcional', gatilho: 'há um custo externo evitado DISTINTO das horas', conteudo: 'Serviço evitado, custo evitado (qualitativo, sem R$), rateio. "N/A" quando não há.' },
+    { secao: 'Custo da Automação', nivel: 'obrigatoria', conteudo: 'Ferramenta externa, monitoramento, custo total — ou "N/A".' },
+    { secao: 'Resumo', nivel: 'obrigatoria', conteudo: 'Economia total de horas + tipo (mensal/pontual).' },
+  ],
+  custo_evitado: [
+    { secao: 'Contexto', nivel: 'obrigatoria', conteudo: '1-2 frases do que o projeto faz (use o que foi aprovado).' },
+    { secao: 'Contratos/Serviços Evitados', nivel: 'obrigatoria', conteudo: 'É o ganho ÚNICO do projeto — registre COM SUBSTÂNCIA (validado com o usuário, sem R$): (a) QUAL contrato/serviço foi evitado; (b) REALIDADE — já foi DE FATO encerrado/reduzido na prática (não "vai ser"); (c) ATRIBUIÇÃO — o encerramento é POR CAUSA desta automação; (d) ESCOPO — o que o contrato cobria (ex.: 1 agente terceirizado, ~X atendimentos/mês); rateio (mensal/pontual).' },
+    { secao: 'Resumo', nivel: 'obrigatoria', conteudo: 'Ganho = custo externo eliminado + tipo. NÃO existe seção "Saving de Pessoas" nem horas neste perfil.' },
+  ],
+  receita: [
+    { secao: 'O que gera a receita', nivel: 'obrigatoria', conteudo: 'A fonte concreta da receita incremental.' },
+    { secao: 'Como aumenta a receita', nivel: 'obrigatoria', conteudo: 'O mecanismo pelo qual o projeto aumenta a receita.' },
+    { secao: 'Antes vs. depois', nivel: 'obrigatoria', conteudo: 'Comparação concreta do antes e do depois.' },
+    { secao: 'Base de cálculo', nivel: 'obrigatoria', conteudo: 'A base de cálculo do valor declarado.' },
+    { secao: 'Resumo', nivel: 'obrigatoria', conteudo: 'Valor da receita + tipo (mensal/pontual).' },
+  ],
+};
+
+// Renderiza o esqueleto de um modo como texto para embutir no prompt do orquestrador.
+// O agente recebe a lista de seções com o nível (obrigatória/condicional/opcional) e
+// o que cada uma deve conter — derivado da FONTE ÚNICA acima.
+export function descreverEsqueletoMemorial(modo: ModoMemorial): string {
+  return MEMORIAL_ESQUELETO[modo]
+    .map((s) => {
+      const tag =
+        s.nivel === 'obrigatoria'
+          ? 'OBRIGATÓRIA'
+          : s.nivel === 'condicional'
+            ? `CONDICIONAL — ${s.gatilho}`
+            : `OPCIONAL${s.gatilho ? ` — ${s.gatilho}` : ''}`;
+      return `### ${s.secao}  [${tag}]\n${s.conteudo}`;
+    })
+    .join('\n\n');
+}
+
 // Captura um marcador [x.y] ou um intervalo [x.y-x.z] (o template de N/A usa
 // faixas como "[3.1-3.3]"). Em ambos os casos o título do PRIMEIRO código é o
 // rótulo da linha. Códigos desconhecidos são removidos para não deixar ruído.

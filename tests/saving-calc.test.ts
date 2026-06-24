@@ -272,6 +272,47 @@ describe("recomputarSavingFinanceiro — R$ derivado das horas (backend é a fon
     expect(out.linhas[0].economia_reais_mes).toBe(0);
     expect(out.economia_reais_mes).toBe(0);
   });
+
+  // Custo evitado PURO (alguem_fazia='externo'): sem linhas de pessoa, o ganho é
+  // 100% o contrato externo eliminado. Foi o bug do Portal de Reembolsos — antes o
+  // caminho contrafactual somava 176h-fantasma × tarifa interna + o valor do contrato.
+  it("custo evitado PURO (sem linhas, 0h): líquido = custo evitado, horas = 0", () => {
+    const out = recomputarSavingFinanceiro({
+      linhas: [],
+      economia_horas_mes: 0,
+      economia_reais_mes: null,
+      tipo_saving: "mensal",
+      memorial_calculo: null,
+      valor_ganho_mensal: null,
+      custo_evitado_reais: 5700,
+      custo_evitado_tipo: "mensal",
+      custo_evitado_descricao: "Contrato de agente terceirizado encerrado",
+    } as SavingColetado);
+
+    expect(out.economia_horas_mes).toBe(0);
+    expect(out.economia_reais_mes).toBe(5700); // só o custo evitado, sem horas-fantasma
+  });
+
+  it("custo evitado PURO com custo externo incorrido: líquido = evitado − externo, sem horas", () => {
+    // Roda no Zapier (R$200/mês incorrido) E cancelou um contrato de R$5.700/mês.
+    const out = recomputarSavingFinanceiro(
+      {
+        linhas: [],
+        economia_horas_mes: 0,
+        economia_reais_mes: null,
+        tipo_saving: "mensal",
+        memorial_calculo: null,
+        valor_ganho_mensal: null,
+        custo_evitado_reais: 5700,
+        custo_evitado_tipo: "mensal",
+        custo_evitado_descricao: "Contrato terceirizado cancelado",
+      } as SavingColetado,
+      200,
+    );
+
+    expect(out.economia_horas_mes).toBe(0);
+    expect(out.economia_reais_mes).toBe(5500); // 5700 - 200
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -413,6 +454,30 @@ describe("enriquecerMemorial — memorial interno com valores financeiros", () =
     expect(result).toContain("R$ 10.78/h");
     // Receita
     expect(result).toContain("R$ 3000.00");
+  });
+
+  it("custo evitado PURO (sem linhas): memorial sem bloco de Pessoas, líquida = custo evitado", () => {
+    const saving: SavingColetado = {
+      linhas: [],
+      economia_horas_mes: 0,
+      economia_reais_mes: 5700,
+      tipo_saving: "mensal",
+      memorial_calculo:
+        "## Memorial de Cálculo\n\n### Contexto\nResumo do projeto.\n\n### Contratos/Serviços Evitados\nContrato terceirizado cancelado.",
+      valor_ganho_mensal: null,
+      custo_evitado_reais: 5700,
+      custo_evitado_tipo: "mensal",
+      custo_evitado_descricao: "Contrato de agente terceirizado",
+    };
+
+    const result = enriquecerMemorial(saving, undefined, ["saving"]);
+
+    // Sem horas → não cria o bloco "Pessoas (N):" nem "Total horas:".
+    expect(result).not.toContain("Pessoas (");
+    expect(result).not.toContain("Total horas:");
+    // O ganho é o custo evitado, e a líquida bate com ele.
+    expect(result).toContain("R$ 5700.00");
+    expect(result).toContain("Economia líquida total:** R$ 5700.00");
   });
 
   it("retorna string vazia quando não há saving nem receita", () => {

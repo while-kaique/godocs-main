@@ -53,6 +53,8 @@ function SubmeterPage() {
 const emptyFormDraft = (): SavingFormData => ({
   linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
   alguemFazia: "",
+  eliminaGastoExterno: "",
+  temContrafactualAdicional: "",
   temCustoEvitado: "",
   custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   tipoSaving: "",
@@ -343,10 +345,38 @@ export function SubmeterPageContent({
             } catch {
               custoEvitadoItens = [];
             }
+            // Reconstrói a árvore do form a partir do alguem_fazia persistido:
+            // 'externo' = custo evitado puro (Não → elimina Sim → sem adicional);
+            // 'nao' + custo evitado = contrafactual + custo evitado (elimina Sim → adicional Sim);
+            // 'nao' sem custo evitado = contrafactual puro (elimina Não); 'sim' = horas reais.
+            const afRaw = (data.alguem_fazia as string) ?? "";
+            const custoEvitadoFlag = (data.custo_evitado as "sim" | "nao" | "") ?? "";
+            let alguemFaziaSnap: "sim" | "nao" | "" = "";
+            let eliminaGastoExternoSnap: "sim" | "nao" | "" = "";
+            let temContrafactualAdicionalSnap: "sim" | "nao" | "" = "";
+            let temCustoEvitadoSnap: "sim" | "nao" | "" = "";
+            if (afRaw === "externo") {
+              alguemFaziaSnap = "nao";
+              eliminaGastoExternoSnap = "sim";
+              temContrafactualAdicionalSnap = "nao";
+            } else if (afRaw === "nao") {
+              alguemFaziaSnap = "nao";
+              if (custoEvitadoFlag === "sim") {
+                eliminaGastoExternoSnap = "sim";
+                temContrafactualAdicionalSnap = linhas.length > 0 ? "sim" : "nao";
+              } else {
+                eliminaGastoExternoSnap = "nao";
+              }
+            } else if (afRaw === "sim") {
+              alguemFaziaSnap = "sim";
+              temCustoEvitadoSnap = custoEvitadoFlag;
+            }
             const savingSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: linhas.length > 0 ? linhas : [{ cargo: "", horasAntes: "", horasDepois: "" }],
-              alguemFazia: (data.alguem_fazia as string) ?? "",
-              temCustoEvitado: (data.custo_evitado as "sim" | "nao" | "") ?? "",
+              alguemFazia: alguemFaziaSnap,
+              eliminaGastoExterno: eliminaGastoExternoSnap,
+              temContrafactualAdicional: temContrafactualAdicionalSnap,
+              temCustoEvitado: temCustoEvitadoSnap,
               custoEvitadoItens: custoEvitadoItens.length > 0
                 ? custoEvitadoItens
                 : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
@@ -367,6 +397,8 @@ export function SubmeterPageContent({
             const receitaSnap: import("@/lib/submeter/constants").SavingFormData = {
               linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
               alguemFazia: "",
+              eliminaGastoExterno: "",
+              temContrafactualAdicional: "",
               temCustoEvitado: "",
               custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
               tipoSaving: (receita.tipo_saving as string) ?? "mensal",
@@ -1510,23 +1542,33 @@ export function SubmeterPageContent({
           : parseFloat(formData.custoExterno)
         : undefined;
 
-      // No modo "ninguém fazia", horas_antes é o equivalente manual estimado e
-      // horas_depois é sempre 0 (a automação faz tudo; o campo nem aparece). Exige só
-      // o equivalente e força o "depois" a 0 — não arrasta valor antigo de uma edição
-      // de legado nem barra a linha por horas_depois vazio.
-      const ninguemFazia = formData.alguemFazia === "nao";
-      const linhas = formData.linhas
-        .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
-        .map((l) => ({
-          cargo: l.cargo,
-          horas_antes: parseFloat(l.horasAntes),
-          horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
-        }));
+      // Árvore "ninguém fazia": as horas (quando existem) são contrafactuais —
+      // horas_depois é sempre 0 (a automação faz tudo). Custo evitado PURO (eliminou
+      // gasto externo, SEM trabalho adicional) NÃO tem horas → alguem_fazia='externo'
+      // e linhas vazias. Nos demais, o ganho é horas (reais no "sim", contrafactuais
+      // no "não") + custo evitado quando houver.
+      const isNaoBranch = formData.alguemFazia === "nao";
+      const custoEvitadoPuro =
+        isNaoBranch && formData.eliminaGastoExterno === "sim" && formData.temContrafactualAdicional === "nao";
+      const ninguemFazia = isNaoBranch;
+      const alguemFaziaPayload = custoEvitadoPuro ? "externo" : (formData.alguemFazia || undefined);
+      const linhas = custoEvitadoPuro
+        ? []
+        : formData.linhas
+            .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
+            .map((l) => ({
+              cargo: l.cargo,
+              horas_antes: parseFloat(l.horasAntes),
+              horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
+            }));
 
-      // Custo evitado: só envia itens válidos quando a pessoa marcou "sim". O
-      // backend mensaliza (pontual ÷12) e soma ao saving.
+      // Custo evitado coletado: no ramo "Não" pela pergunta "elimina gasto externo?";
+      // no ramo "Sim" pela pergunta opcional de custo distinto. Backend mensaliza (÷12 pontual).
+      const temCustoEvitadoEfetivo = isNaoBranch
+        ? (formData.eliminaGastoExterno === "sim" ? "sim" : "nao")
+        : (formData.temCustoEvitado || undefined);
       const custoEvitadoItens =
-        formData.temCustoEvitado === "sim"
+        temCustoEvitadoEfetivo === "sim"
           ? formData.custoEvitadoItens
               .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
               .map((it) => ({
@@ -1542,10 +1584,10 @@ export function SubmeterPageContent({
         {
           projeto_id: projetoId,
           tipo_saving: formData.tipoSaving as "mensal" | "pontual",
-          alguem_fazia: formData.alguemFazia || undefined,
+          alguem_fazia: alguemFaziaPayload,
           linhas: linhas.length ? linhas : undefined,
           custo_externo_mensal: custoMensal,
-          tem_custo_evitado: formData.temCustoEvitado || undefined,
+          tem_custo_evitado: temCustoEvitadoEfetivo || undefined,
           custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
         },
       );
