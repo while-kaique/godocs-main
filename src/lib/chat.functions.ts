@@ -1572,20 +1572,27 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
 
-  // Gate de OWNERSHIP na edição: só o autor (responsavel_email) ou um admin RPA podem
-  // reenviar um projeto já existente. Participantes (membros) só visualizam — não editam.
+  // Gate de OWNERSHIP na edição: podem reenviar um projeto já existente o autor
+  // (responsavel_email), um EDITOR DELEGADO (participante a quem o dono delegou o
+  // poder) ou um admin RPA. Participante comum (membro sem delegação) só visualiza.
   // Vale só p/ reenvio; submissão nova não tem owner anterior a proteger. Se o email do
   // solicitante não veio (chamadas internas/cron), não bloqueia.
   if (ehReenvio && solicitanteEmail) {
     const alvo = solicitanteEmail.trim().toLowerCase();
     const ehOwner = (projeto.responsavel_email ?? '').trim().toLowerCase() === alvo;
     const ehAdmin = await isAdmin(solicitanteEmail);
-    // Ser participante (membro) vence o override de admin: quem participa só visualiza,
-    // mesmo sendo admin. O override de admin vale só p/ projetos sem papel do solicitante.
-    const ehParticipante = !ehOwner && (parseJson<string[]>(projeto.membros) ?? []).some((m) => m.trim().toLowerCase() === alvo);
-    if (!ehOwner && (!ehAdmin || ehParticipante)) {
+    const membros = parseJson<string[]>(projeto.membros) ?? [];
+    const ehParticipante = !ehOwner && membros.some((m) => m.trim().toLowerCase() === alvo);
+    // Editor delegado = participante presente em `editores_delegados` (interseção com
+    // membros). Pode reenviar como se fosse o dono.
+    const delegados = parseJson<string[]>(projeto.editores_delegados) ?? [];
+    const ehEditorDelegado =
+      ehParticipante && delegados.some((d) => d.trim().toLowerCase() === alvo);
+    // Ser participante (não-delegado) vence o override de admin: quem só participa
+    // visualiza, mesmo sendo admin. O override de admin vale só p/ projetos sem papel.
+    if (!ehOwner && !ehEditorDelegado && (!ehAdmin || ehParticipante)) {
       throw Object.assign(
-        new Error('Apenas o autor do projeto pode editá-lo. Para transferir a autoria, acione a equipe RPA.'),
+        new Error('Apenas o autor ou um editor autorizado pode editar este projeto. Para transferir a autoria, acione a equipe RPA.'),
         { status: 403 },
       );
     }
