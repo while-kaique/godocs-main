@@ -34,6 +34,9 @@ const COLUNAS_NUMERICAS = new Set<SheetColumn>([
   'Custo do Projeto',
   'Receita Mensal',
   'Ganho Total',
+  // Split do saving (horas) — numéricas: vazio/não-aplicável → 0 (NÃO "—").
+  'Saving Horas Real',
+  'Saving Horas Escalado',
 ]);
 
 // Padroniza a linha ANTES de gravar: coluna numérica vazia/inválida → 0; coluna de
@@ -174,15 +177,14 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     );
 
     // Split carga real × ganho por escala (só quando alguém fazia à mão). O TOTAL
-    // ("Saving Horas") não muda — estas colunas são transparência/auditoria. Sem split
-    // (ninguém fazia / pontual / não coletado) → "—". As colunas NÃO entram em
-    // COLUNAS_NUMERICAS, então padronizarLinha mantém o número quando há e "—" quando não.
+    // ("Saving Horas") não muda — estas colunas são transparência/auditoria. São
+    // colunas NUMÉRICAS (horas): sem split (ninguém fazia / pontual / não coletado) → 0.
     const temSplit =
       p.projeto.alguem_fazia === 'sim' &&
       p.saving?.horas_carga_real != null &&
       p.saving?.horas_escala != null;
-    const savingHorasReal = temSplit ? Number(p.saving!.horas_carga_real) : '—';
-    const savingHorasEscalado = temSplit ? Number(p.saving!.horas_escala) : '—';
+    const savingHorasReal = temSplit ? Number(p.saving!.horas_carga_real) : 0;
+    const savingHorasEscalado = temSplit ? Number(p.saving!.horas_escala) : 0;
 
     // Link(s) dos documentos no Google Drive → coluna "URL" da planilha.
     const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);
@@ -237,9 +239,14 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Custo do Projeto': custoProjetoReais, // numérico: 0 quando não há (padrão)
       'Justificativa Custo do Projeto': ouTraco(p.projeto.custo_projeto_justificativa),
       'Custo do Projeto Mensal ou Pontual': custoProjetoRecorrencia,
-      // Split do saving (transparência): carga humana real × ganho por escala. "—" sem split.
+      // Split do saving (transparência): carga humana real × ganho por escala.
+      // Numéricas — 0 quando não se aplica (não "—").
       'Saving Horas Real': savingHorasReal,
       'Saving Horas Escalado': savingHorasEscalado,
+      // Análise do antiagente (F5) — TEXTO: "—" enquanto não houver análise. Quando o
+      // F5 for implementado, escreve o parecer aqui (via syncUpdateToGoogle, como a
+      // Complexidade/Observações). Por ora, garante "—" em vez de célula em branco.
+      'Análise Antiagente': ouTraco((p.projeto as { analise_antiagente?: string | null }).analise_antiagente),
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
