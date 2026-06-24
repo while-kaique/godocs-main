@@ -30,6 +30,11 @@ import {
   SlidersHorizontal,
   X,
   Calendar,
+  ArrowRight,
+  Plus,
+  Minus,
+  Equal,
+  GitCompare,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -989,6 +994,10 @@ function DetalheView({
 
   const rotuloVersao = (v: Versao) => (v.acao === 'submit_inicial' ? 'Original' : `Edição v${v.versao_num}`)
 
+  // Versão selecionada é um reenvio? → habilita o painel de comparação (antes/depois).
+  const selVersao = typeof sel === 'number' ? versoesAsc.find((v) => v.versao_num === sel) : undefined
+  const ehReenvioSelecionado = selVersao?.acao === 'reenvio'
+
   return (
     <div className="mx-auto max-w-6xl p-6 sm:p-8">
       {/* Header com profundidade */}
@@ -1119,6 +1128,9 @@ function DetalheView({
         </div>
       )}
 
+      {/* Comparação antes/depois — só quando a versão selecionada é um reenvio */}
+      {ehReenvioSelecionado && <ComparacaoEdicao versoes={versoesAsc} sel={sel as number} />}
+
       {/* Tabs */}
       <div className="mt-4 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
         {([
@@ -1172,6 +1184,390 @@ function KV({ label, value }: { label: string; value: string | null | undefined 
       <span className="text-[var(--go-text-primary)]">
         {value || <span className="text-[var(--go-text-primary)]/20 italic">—</span>}
       </span>
+    </div>
+  )
+}
+
+// ── Comparação de edição (diff antes → depois entre versões) ─────────────────
+
+type SnapRecord = Record<string, unknown>
+type DiffStatus = 'alterado' | 'adicionado' | 'removido' | 'igual'
+type CampoDiff = {
+  key: string
+  label: string
+  antes: string | null
+  depois: string | null
+  status: DiffStatus
+  long: boolean
+}
+
+/** Um valor formatado é "vazio" quando não há nada a mostrar (null, em branco ou "—"). */
+function diffVazio(s: string | null | undefined): boolean {
+  return s == null || s.trim() === '' || s.trim() === '—'
+}
+
+function diffNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+}
+
+// Formatadores por tipo de campo — recebem o snapshot inteiro (alguns dependem de
+// outro campo, ex.: o sufixo "/mês" do saving depende de tipo_saving).
+function vReais(v: unknown, sufixo = ''): string | null {
+  return typeof v === 'number' && !isNaN(v) ? `${fmtReais(v)}${sufixo}` : null
+}
+function vTexto(v: unknown): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s === '' ? null : s
+}
+function vSimNao(v: unknown): string | null {
+  if (v === 'sim') return 'Sim'
+  if (v === 'nao' || v === 'não') return 'Não'
+  return null
+}
+function vTipoSaving(v: unknown): string | null {
+  if (v === 'mensal') return 'Mensal'
+  if (v === 'pontual') return 'Pontual'
+  return null
+}
+function vEspecial(v: unknown): string | null {
+  if (v == null) return null
+  return v === 1 || v === true || v === 'sim' ? 'Sim' : 'Não'
+}
+function vLista(v: unknown): string | null {
+  if (!Array.isArray(v) || v.length === 0) return null
+  return (v as unknown[]).map(String).join(', ')
+}
+function vStatus(v: unknown): string | null {
+  const s = vTexto(v)
+  return s ? (STATUS_LABELS[s] ?? s) : null
+}
+function vCustoItens(v: unknown): string | null {
+  let arr: unknown = v
+  if (typeof v === 'string') {
+    try {
+      arr = JSON.parse(v)
+    } catch {
+      return vTexto(v)
+    }
+  }
+  if (!Array.isArray(arr) || arr.length === 0) return null
+  const linhas = (arr as EventoCustoItem[])
+    .filter((it) => it && it.nome != null)
+    .map((it) => `• ${it.nome} — ${fmtReais(it.valor)} (${it.recorrencia ?? '—'})`)
+  return linhas.length > 0 ? linhas.join('\n') : null
+}
+
+// Campos comparados, na ordem de exibição. `long` = texto extenso (abre antes/depois).
+const CAMPOS_DIFF: Array<{ key: string; label: string; get: (s: SnapRecord) => string | null; long?: boolean }> = [
+  { key: 'nome', label: 'Nome', get: (s) => vTexto(s.nome) },
+  { key: 'area', label: 'Área', get: (s) => vTexto(s.area) },
+  { key: 'ferramenta', label: 'Ferramenta', get: (s) => vTexto(s.ferramenta) },
+  { key: 'tipos_projeto', label: 'Tipos de projeto', get: (s) => vLista(s.tipos_projeto) },
+  { key: 'especial', label: 'Projeto especial', get: (s) => vEspecial(s.especial) },
+  { key: 'descricao_breve', label: 'Descrição', get: (s) => vTexto(s.descricao_breve), long: true },
+  { key: 'tipo_saving', label: 'Tipo de saving', get: (s) => vTipoSaving(s.tipo_saving) },
+  {
+    key: 'saving_horas',
+    label: 'Economia em horas',
+    get: (s) =>
+      typeof s.saving_horas === 'number' && !isNaN(s.saving_horas)
+        ? `${diffNum(s.saving_horas)} h${s.tipo_saving === 'mensal' ? '/mês' : ''}`
+        : null,
+  },
+  { key: 'saving_reais', label: 'Saving', get: (s) => vReais(s.saving_reais, s.tipo_saving === 'mensal' ? '/mês' : '') },
+  { key: 'ganho_total_mensal', label: 'Ganho total', get: (s) => vReais(s.ganho_total_mensal, '/mês') },
+  { key: 'custo_externo_mensal', label: 'Custo externo', get: (s) => vReais(s.custo_externo_mensal, '/mês') },
+  { key: 'alguem_fazia', label: 'Alguém fazia antes', get: (s) => vSimNao(s.alguem_fazia) },
+  { key: 'custo_evitado', label: 'Tem custo evitado', get: (s) => vSimNao(s.custo_evitado) },
+  { key: 'custo_evitado_justificativa', label: 'Justificativa do custo evitado', get: (s) => vTexto(s.custo_evitado_justificativa), long: true },
+  { key: 'custo_evitado_itens', label: 'Itens de custo evitado', get: (s) => vCustoItens(s.custo_evitado_itens), long: true },
+  { key: 'memorial_calculo', label: 'Memorial de cálculo', get: (s) => vTexto(s.memorial_calculo), long: true },
+  { key: 'status', label: 'Status interno', get: (s) => vStatus(s.status) },
+]
+
+/** Aceita o snapshot já parseado (objeto) ou string JSON; null se ausente/vazio. */
+function parseSnap(raw: unknown): SnapRecord | null {
+  if (!raw) return null
+  let obj: unknown = raw
+  if (typeof raw === 'string') {
+    try {
+      obj = JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  if (typeof obj !== 'object' || obj === null || Object.keys(obj as object).length === 0) return null
+  return obj as SnapRecord
+}
+
+function computarDiff(prev: SnapRecord, atual: SnapRecord): CampoDiff[] {
+  const out: CampoDiff[] = []
+  for (const c of CAMPOS_DIFF) {
+    const antes = c.get(prev)
+    const depois = c.get(atual)
+    const aVazio = diffVazio(antes)
+    const dVazio = diffVazio(depois)
+    if (aVazio && dVazio) continue // ambos sem valor → irrelevante para a auditoria
+    let status: DiffStatus
+    if (aVazio) status = 'adicionado'
+    else if (dVazio) status = 'removido'
+    else if (antes === depois) status = 'igual'
+    else status = 'alterado'
+    out.push({ key: c.key, label: c.label, antes, depois, status, long: !!c.long })
+  }
+  return out
+}
+
+// Encoding por estado de mudança — cor + ícone + rótulo (nunca só cor, p/ acessibilidade).
+const DIFF_STYLE: Record<
+  DiffStatus,
+  { label: string; cor: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }
+> = {
+  alterado: { label: 'Alterado', cor: '#0059A9', Icon: ArrowRight },
+  adicionado: { label: 'Adicionado', cor: '#6b6d00', Icon: Plus },
+  removido: { label: 'Removido', cor: '#dc2626', Icon: Minus },
+  igual: { label: 'Sem mudança', cor: '#8b8b7a', Icon: Equal },
+}
+
+/** Bloco de texto longo (antes/depois) — prosa, não monoespaçada, com rolagem. */
+function BlocoTexto({ titulo, texto, tom }: { titulo: string; texto: string | null; tom: 'antes' | 'depois' }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--go-text-primary)]/35">{titulo}</div>
+      <pre
+        className={`max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-[var(--go-radius-sm)] border p-2.5 text-[11.5px] leading-relaxed ${
+          tom === 'depois'
+            ? 'border-[var(--go-blue)]/15 bg-[var(--go-blue)]/4 text-[var(--go-text-primary)]/80'
+            : 'border-[var(--go-blue)]/8 bg-[var(--go-cream)]/50 text-[var(--go-text-primary)]/55'
+        }`}
+        style={{ scrollbarWidth: 'thin', fontFamily: 'inherit' }}
+      >
+        {texto && texto.trim() !== '' ? texto : '—'}
+      </pre>
+    </div>
+  )
+}
+
+/** Uma linha de mudança (alterado/adicionado/removido). Campos longos abrem antes×depois. */
+function LinhaDiff({ campo }: { campo: CampoDiff }) {
+  const [aberto, setAberto] = useState(false)
+  const st = DIFF_STYLE[campo.status]
+
+  if (campo.long) {
+    const resumo =
+      campo.status === 'adicionado' ? 'Texto adicionado' : campo.status === 'removido' ? 'Texto removido' : 'Texto alterado'
+    return (
+      <div className="py-0.5">
+        <button
+          onClick={() => setAberto((o) => !o)}
+          aria-expanded={aberto}
+          className="group flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1 text-left transition-colors hover:bg-[var(--go-blue)]/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)]/25"
+        >
+          <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/45">{campo.label}</span>
+          <span className="flex-1 text-[12px] font-medium" style={{ color: st.cor }}>
+            {resumo}
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 flex-shrink-0 text-[var(--go-text-primary)]/30 transition-transform ${aberto ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {aberto && (
+          <div
+            className="mt-1.5 grid grid-cols-1 gap-2 px-1.5 lg:grid-cols-2"
+            style={{ animation: 'go-slide-down 0.18s ease' }}
+          >
+            <BlocoTexto titulo="Antes" texto={campo.antes} tom="antes" />
+            <BlocoTexto titulo="Depois" texto={campo.depois} tom="depois" />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1.5 py-1">
+      <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/45">{campo.label}</span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {campo.status === 'adicionado' ? (
+          <span className="text-[12px] italic text-[var(--go-text-primary)]/30">vazio</span>
+        ) : (
+          <span
+            className={`text-[12px] text-[var(--go-text-primary)]/45 ${campo.status === 'removido' ? 'line-through' : ''}`}
+          >
+            {campo.antes}
+          </span>
+        )}
+        <ArrowRight className="h-3 w-3 flex-shrink-0 text-[var(--go-text-primary)]/25" />
+        {campo.status === 'removido' ? (
+          <span className="text-[12px] font-medium" style={{ color: st.cor }}>
+            removido
+          </span>
+        ) : (
+          <span className="text-[13px] font-semibold" style={{ color: st.cor }}>
+            {campo.depois}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Cabeçalho + linhas de um grupo de mudança (Alterado / Adicionado / Removido). */
+function GrupoDiff({ status, campos }: { status: DiffStatus; campos: CampoDiff[] }) {
+  if (campos.length === 0) return null
+  const st = DIFF_STYLE[status]
+  const Icon = st.Icon
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-1.5 px-1.5">
+        <Icon className="h-3.5 w-3.5" style={{ color: st.cor }} />
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: st.cor }}>
+          {st.label}
+        </span>
+        <span className="text-[11px] font-medium tabular-nums text-[var(--go-text-primary)]/30">· {campos.length}</span>
+      </div>
+      <div className="space-y-0.5">
+        {campos.map((c) => (
+          <LinhaDiff key={c.key} campo={c} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Painel "Comparação desta edição": para um reenvio, compara o snapshot da versão
+ * selecionada com o da versão imediatamente anterior e classifica cada campo em
+ * Alterado / Adicionado / Removido / Sem mudança. Snapshot ausente → aviso gracioso.
+ */
+function ComparacaoEdicao({ versoes, sel }: { versoes: Versao[]; sel: number }) {
+  const [mostrarIguais, setMostrarIguais] = useState(false)
+
+  const idx = versoes.findIndex((v) => v.versao_num === sel)
+  const atualV = idx >= 0 ? versoes[idx] : undefined
+  const prevV = idx > 0 ? versoes[idx - 1] : undefined
+
+  const { prevSnap, atualSnap, diffs } = useMemo(() => {
+    const a = parseSnap(atualV?.snapshot_projeto)
+    const p = parseSnap(prevV?.snapshot_projeto)
+    return { prevSnap: p, atualSnap: a, diffs: p && a ? computarDiff(p, a) : [] }
+  }, [atualV?.snapshot_projeto, prevV?.snapshot_projeto])
+
+  const rotulo = (v?: Versao) => (!v ? '—' : v.acao === 'submit_inicial' ? 'Original' : `Edição v${v.versao_num}`)
+
+  // Fallback gracioso: versão muito antiga sem snapshot de uma das pontas.
+  if (!atualV || !prevV || !atualSnap || !prevSnap) {
+    return (
+      <div className="mt-3 flex items-start gap-1.5 rounded-[var(--go-radius-sm)] bg-[#f59e0b]/8 px-3 py-2 text-[11px] text-[#b45309]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+        Comparação indisponível — o snapshot desta edição ou da versão anterior não foi registrado (versão anterior ao
+        histórico de snapshots).
+      </div>
+    )
+  }
+
+  const alterados = diffs.filter((d) => d.status === 'alterado')
+  const adicionados = diffs.filter((d) => d.status === 'adicionado')
+  const removidos = diffs.filter((d) => d.status === 'removido')
+  const iguais = diffs.filter((d) => d.status === 'igual')
+  const mudancas = alterados.length + adicionados.length + removidos.length
+
+  const resumo: Array<{ status: DiffStatus; n: number; texto: string }> = [
+    { status: 'alterado', n: alterados.length, texto: 'alterados' },
+    { status: 'adicionado', n: adicionados.length, texto: 'adicionados' },
+    { status: 'removido', n: removidos.length, texto: 'removidos' },
+    { status: 'igual', n: iguais.length, texto: 'iguais' },
+  ]
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/10 bg-white">
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-2.5 border-b border-[var(--go-blue)]/6 px-4 py-3">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/8 text-[var(--go-blue)]">
+          <GitCompare className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[13px] font-bold leading-tight text-[var(--go-text-primary)]">Comparação desta edição</h3>
+          <p className="text-[11px] text-[var(--go-text-primary)]/40">O que mudou em relação à versão anterior</p>
+        </div>
+        <div
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[var(--go-blue)]/5 px-2.5 py-1 text-[11px] font-medium text-[var(--go-blue)]"
+          title={`${rotulo(prevV)}: ${formatDateTime(prevV.created_at)}\n${rotulo(atualV)}: ${formatDateTime(atualV.created_at)}`}
+        >
+          <span>{rotulo(prevV)}</span>
+          <ArrowRight className="h-3 w-3" />
+          <span className="font-semibold">{rotulo(atualV)}</span>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {/* Resumo (thesis): contagem por tipo de mudança */}
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {resumo
+            .filter((r) => r.n > 0)
+            .map((r) => {
+              const st = DIFF_STYLE[r.status]
+              const Icon = st.Icon
+              return (
+                <span
+                  key={r.status}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ color: st.cor, backgroundColor: `${st.cor}14` }}
+                >
+                  <Icon className="h-3 w-3" />
+                  <span className="tabular-nums">{r.n}</span>
+                  <span className="font-medium">{r.texto}</span>
+                </span>
+              )
+            })}
+        </div>
+
+        {/* Mudanças */}
+        {mudancas === 0 ? (
+          <div className="rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/50 px-3 py-2.5 text-[12px] text-[var(--go-text-primary)]/45">
+            Nenhum campo monitorado mudou nesta edição — o reenvio manteve os mesmos valores.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <GrupoDiff status="alterado" campos={alterados} />
+            <GrupoDiff status="adicionado" campos={adicionados} />
+            <GrupoDiff status="removido" campos={removidos} />
+          </div>
+        )}
+
+        {/* Sem mudança — recolhido por padrão (quieto) */}
+        {iguais.length > 0 && (
+          <div className="mt-3 border-t border-[var(--go-blue)]/6 pt-2">
+            <button
+              onClick={() => setMostrarIguais((o) => !o)}
+              aria-expanded={mostrarIguais}
+              className="flex w-full items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left transition-colors hover:bg-[var(--go-blue)]/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)]/25"
+            >
+              <Equal className="h-3.5 w-3.5 text-[var(--go-text-primary)]/30" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--go-text-primary)]/40">
+                Sem mudança
+              </span>
+              <span className="text-[11px] tabular-nums text-[var(--go-text-primary)]/25">· {iguais.length}</span>
+              <ChevronDown
+                className={`ml-auto h-3.5 w-3.5 text-[var(--go-text-primary)]/25 transition-transform ${mostrarIguais ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {mostrarIguais && (
+              <div className="mt-1 space-y-0.5" style={{ animation: 'go-slide-down 0.18s ease' }}>
+                {iguais.map((c) => (
+                  <div key={c.key} className="flex flex-wrap items-baseline gap-x-2 px-1.5 py-0.5">
+                    <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/35">{c.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--go-text-primary)]/55">
+                      {c.long ? 'Texto longo, sem alteração' : c.depois}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
