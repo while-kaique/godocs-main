@@ -839,6 +839,11 @@ export async function enviarMensagem(rawData: unknown) {
       ...resultado.saving,
       jornada_base: estado.saving.jornada_base ?? null,
       teto_pessoa: estado.saving.teto_pessoa ?? null,
+      // Split carga real × escala: o LLM às vezes omite campos já coletados num turno
+      // posterior (igual ao memorial). Mantém o valor anterior quando não reenviado,
+      // para o split não sumir entre o preview e o complete.
+      horas_carga_real: resultado.saving.horas_carga_real ?? estado.saving.horas_carga_real ?? null,
+      horas_escala: resultado.saving.horas_escala ?? estado.saving.horas_escala ?? null,
     };
   }
 
@@ -1812,6 +1817,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,
     memorial_calculo: memorialInterno,
+    // Split carga real × escala (transparência → Sheets). Null quando não se aplica.
+    horas_carga_real: (saving?.horas_carga_real as number) ?? null,
+    horas_escala: (saving?.horas_escala as number) ?? null,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
     // Reenvio invalida a validação anterior (o humano precisa rever do zero).
     ...(ehReenvio ? { validated_at: null, validated_by: null } : {}),
@@ -1834,6 +1842,8 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         area: projetoAtualizado.area,
         saving_horas: projetoAtualizado.saving_horas,
         saving_reais: projetoAtualizado.saving_reais,
+        horas_carga_real: projetoAtualizado.horas_carga_real,
+        horas_escala: projetoAtualizado.horas_escala,
         tipo_saving: projetoAtualizado.tipo_saving,
         memorial_calculo: projetoAtualizado.memorial_calculo,
         ganho_total_mensal: projetoAtualizado.ganho_total_mensal,

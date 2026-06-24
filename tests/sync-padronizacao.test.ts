@@ -37,4 +37,15 @@ describe('padronizarLinha', () => {
     expect(r['Custo Externo Mensal']).toBeCloseTo(1234.56, 2);
     expect(r['Saving Horas']).toBe(30);
   });
+
+  // F4 — split carga real × escala: colunas de TEXTO (fora de COLUNAS_NUMERICAS) para
+  // que o número passe quando há split e "—" quando não há (em vez de virar 0).
+  it('"Saving Horas Real"/"Saving Horas Escalado": número quando há split, "—" quando não', () => {
+    const comSplit = padronizarLinha({ 'Saving Horas Real': 24, 'Saving Horas Escalado': 108 });
+    expect(comSplit['Saving Horas Real']).toBe(24);
+    expect(comSplit['Saving Horas Escalado']).toBe(108);
+    const semSplit = padronizarLinha({ 'Saving Horas Real': '—', 'Saving Horas Escalado': '—' });
+    expect(semSplit['Saving Horas Real']).toBe('—');
+    expect(semSplit['Saving Horas Escalado']).toBe('—');
+  });
 });

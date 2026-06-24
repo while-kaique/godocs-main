@@ -225,6 +225,12 @@ const MIGRATIONS = [
   // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
   // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
   'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
+  // Split do saving em carga real × ganho por escala (só quando alguém fazia à mão).
+  // horas_carga_real = trabalho humano de fato; horas_escala = volume incremental que
+  // só a automação cobre. Somam o total (saving_horas), que continua sendo o que vira R$.
+  // Transparência/auditoria → colunas "Saving Horas Real"/"Saving Horas Escalado" no Sheets.
+  'ALTER TABLE projetos ADD COLUMN horas_carga_real REAL',
+  'ALTER TABLE projetos ADD COLUMN horas_escala REAL',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

@@ -588,6 +588,32 @@ DETALHES TÉCNICOS APROVADOS:
   // régua de plausibilidade e instrui como reconciliar quando o sistema avisar.
   const aplicaBaseHoras = aplicaConfirmacaoBaseHoras(ctx, saving);
 
+  // CARGA REAL × GANHO POR ESCALA — só quando alguém fazia a tarefa à mão (sim) e há
+  // rotina recorrente (não pontual). Separa o que a PESSOA realmente fazia (carga real)
+  // do volume incremental que só a automação cobre (escala). O TOTAL continua sendo o
+  // saving creditado (vira R$); o split é transparência/auditoria. Prompt-enforced
+  // (qualitativo, como [2.4]) — sem gate determinístico no backend.
+  const aplicaCargaEscala = ctx.alguem_fazia === 'sim' && !isPontual && temHorasAntes;
+  const cargaEscalaBlock = aplicaCargaEscala
+    ? `
+
+═══════════════════════════════════════════════════════════════════
+CARGA REAL × GANHO POR ESCALA (OBRIGATÓRIO — separar antes do preview)
+═══════════════════════════════════════════════════════════════════
+Alguém fazia esta tarefa manualmente, então parte do total de horas economizadas é trabalho HUMANO que de fato acontecia (CARGA REAL) e parte pode ser VOLUME QUE SÓ EXISTE PORQUE A AUTOMAÇÃO ESCALOU — execuções/itens que nenhuma pessoa fazia (nem conseguiria) à mão (GANHO POR ESCALA).
+Exemplo: a pessoa rodava o processo 4×/mês (6h cada = 24h reais), mas a automação passou a rodá-lo 22×/mês (mais 18 execuções = 108h). Total de saving = 132h: 24h de carga real + 108h de ganho por escala.
+
+POR QUE SEPARAR: o total (ex.: 132h) CONTINUA sendo o saving creditado — você NÃO altera as \`linhas\` por causa disso. Mas quem audita precisa enxergar quanto era trabalho humano de fato e quanto é volume incremental da automação. Creditar "escala" como se uma pessoa gastasse aquelas horas é justamente o exagero que esta separação torna transparente.
+
+O QUE FAZER (use os números que o usuário já deu — NÃO re-pergunte tudo):
+1. Esclareça, para o conjunto do projeto: das ${totalHoras}h economizadas, quanto a(s) pessoa(s) REALMENTE faziam à mão antes (a frequência/volume que de fato executavam) e quanto a automação passou a fazer ALÉM disso (volume que ninguém fazia manualmente).
+2. Preencha no objeto \`saving\`: "horas_carga_real" (trabalho humano real) e "horas_escala" (volume incremental só da automação). As DUAS devem somar exatamente o total de economia (${totalHoras}h). Se NÃO houve escala (a automação faz o mesmo volume que a pessoa fazia), ponha "horas_escala": 0 e "horas_carga_real" igual ao total.
+3. Registre os dois números no memorial (dentro de "Saving de Pessoas"), em horas e qualitativamente — ex.: "Carga real (trabalho humano de fato): 24h; Ganho por escala (volume só da automação): 108h".
+
+GATE: é PROIBIDO gerar o preview sem "horas_carga_real" e "horas_escala" preenchidos e somando o total. Não invente — pergunte o que a pessoa realmente fazia vs. o que a automação ampliou.
+═══════════════════════════════════════════════════════════════════`
+    : '';
+
   // Diretiva de abertura — é a PRIMEIRA e mais forte instrução de conduta, calculada
   // a partir das horas reais. Vence as regras genéricas de "detalhar a rotina".
   const comoAbrir = ninguemFazia
@@ -719,7 +745,7 @@ Para CADA pessoa/cargo listada acima, colete:
   - Horas depois da automação: quanto tempo ainda gasta (já tem do formulário, mas valide)
   - Economia de horas: antes − depois → CALCULE VOCÊ
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
-[2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}
+[2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}${cargaEscalaBlock}
 
 SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS
 [3.1] Serviço/contrato evitado: o que seria contratado/foi cancelado → INVESTIGUE COM O USUÁRIO
@@ -756,7 +782,7 @@ COMO CONDUZIR:
 1. Abra exatamente conforme a diretiva "COMO ABRIR A CONVERSA" acima. Faça a primeira pergunta concreta e coerente com as horas informadas.${plural ? '\n   Como há mais de uma pessoa, valide as horas POR CARGO. Agrupe numa pergunta só as linhas do MESMO cargo (ex.: 7× "analista sênior" → UMA pergunta para o grupo, não sete). Mas trate cargos DIFERENTES separadamente — NÃO assuma que cargos distintos fazem a mesma tarefa pelo mesmo tempo só porque o usuário descreveu o processo uma vez. ANTES de perguntar, questione-se sobre qual é a função plausível de CADA cargo neste projeto (um head/gestor costuma aprovar/supervisionar; um analista executa; um estagiário apoia) — cargos de senioridades diferentes raramente fazem a mesma coisa pelo mesmo tempo. Se a tabela mostra cargos distintos com rotina e tempo idênticos, isso é justamente o que você deve QUESTIONAR (ver "PLAUSIBILIDADE ENTRE CARGOS" abaixo), não agrupar como se fossem a mesma pessoa.' : ''}
 2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
-4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}
+4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}${aplicaCargaEscala ? '\n   ⛔ GATE CARGA REAL × ESCALA: é PROIBIDO gerar o preview sem "horas_carga_real" e "horas_escala" preenchidos no objeto saving e somando o total de economia (ver bloco "CARGA REAL × GANHO POR ESCALA").' : ''}
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 6. Quando a justificativa for concreta, a conta fechar E o ganho for REAL (já em produção e medido — NÃO projetado; ver "GANHO REAL × PROJETADO" abaixo), gere o PREVIEW.
 
@@ -845,7 +871,7 @@ Preview (SOMENTE quando TODOS os pontos obrigatórios estiverem preenchidos):
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "saving" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "saving.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.
 ATENÇÃO 2: se houver custo evitado, inclua "custo_evitado_reais" (número), "custo_evitado_tipo" ("mensal" ou "pontual") e "custo_evitado_descricao" (texto). Se não houver, deixe-os null. NÃO preencha "economia_reais_mes" — o backend recalcula.
 ATENÇÃO 3: NUNCA escreva valores em R$ no "content" nem no "memorial_calculo". Nada de "R$", "reais", taxa/hora ou totais financeiros — apenas horas e descrições. O custo evitado em R$ vai SÓ no campo \`custo_evitado_reais\`.
-ATENÇÃO 4: o memorial descreve um ganho JÁ REALIZADO. É PROIBIDO usar linguagem de projeção no "content"/"memorial_calculo" — nada de "a expectativa é", "a projeção é", "deve reduzir/cair", "vai passar a" nem verbos no futuro para o ganho. Se o ganho foi confirmado como real (ver "GANHO REAL × PROJETADO"), descreva-o no passado/presente ("passou a levar", "hoje leva"). Se o ganho ainda for projetado, você nem deveria estar gerando preview — volte e aplique o portão.`;
+ATENÇÃO 4: o memorial descreve um ganho JÁ REALIZADO. É PROIBIDO usar linguagem de projeção no "content"/"memorial_calculo" — nada de "a expectativa é", "a projeção é", "deve reduzir/cair", "vai passar a" nem verbos no futuro para o ganho. Se o ganho foi confirmado como real (ver "GANHO REAL × PROJETADO"), descreva-o no passado/presente ("passou a levar", "hoje leva"). Se o ganho ainda for projetado, você nem deveria estar gerando preview — volte e aplique o portão.${aplicaCargaEscala ? '\nATENÇÃO 5: inclua "horas_carga_real" e "horas_escala" (números) no objeto "saving", somando o total de economia (ver "CARGA REAL × GANHO POR ESCALA"). São horas — NÃO R$. Registre os dois no texto do memorial (em "Saving de Pessoas").' : ''}`;
 }
 
 export function buildSavingPreviewPrompt(saving: SavingColetado): string {

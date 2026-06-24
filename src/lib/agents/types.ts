@@ -97,6 +97,15 @@ export type SavingColetado = {
   // (ex.: lojas) → linha acima do teto é legítima e liberada. Sem 'multiplo', uma
   // linha acima do teto bloqueia o preview até ser reconciliada para ≤ teto.
   teto_pessoa?: 'pendente' | 'multiplo' | null;
+  // Split do total de horas economizadas em CARGA REAL × GANHO POR ESCALA, só quando
+  // alguém fazia a tarefa manualmente (alguem_fazia='sim'). `horas_carga_real` = o que a
+  // pessoa de fato fazia à mão; `horas_escala` = volume incremental que só a automação
+  // passou a cobrir (e que nenhum humano fazia). As duas SOMAM o total (economia_horas_mes)
+  // — o TOTAL é que vira R$ (não muda); o split é só TRANSPARÊNCIA/auditoria (colunas
+  // "Saving Horas Real"/"Saving Horas Escalado" no Sheets). Preenchidos pelo LLM (prompt
+  // gate). Null = não se aplica (ninguém fazia / custo evitado puro / pontual).
+  horas_carga_real?: number | null;
+  horas_escala?: number | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -112,6 +121,8 @@ export const savingVazio = (): SavingColetado => ({
   custo_externo_mensal: null,
   jornada_base: null,
   teto_pessoa: null,
+  horas_carga_real: null,
+  horas_escala: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────

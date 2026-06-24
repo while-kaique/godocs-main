@@ -64,6 +64,8 @@ export const SHEET_COLUMNS = [
   'Especial?',                      // AI
   'Atualizado Em',                  // AJ (carimbo da última escrita do sistema)
   'Alocação Ganhos',                // AK (justificativa [2.4] do gate ≥44h — fatiada do memorial)
+  'Saving Horas Real',              // AL (carga humana real do split; "—" se não se aplica)
+  'Saving Horas Escalado',          // AM (ganho por escala do split; "—" se não se aplica)
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

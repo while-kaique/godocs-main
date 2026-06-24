@@ -163,6 +163,17 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       p.projeto.custo_evitado_itens as string | null,
     );
 
+    // Split carga real × ganho por escala (só quando alguém fazia à mão). O TOTAL
+    // ("Saving Horas") não muda — estas colunas são transparência/auditoria. Sem split
+    // (ninguém fazia / pontual / não coletado) → "—". As colunas NÃO entram em
+    // COLUNAS_NUMERICAS, então padronizarLinha mantém o número quando há e "—" quando não.
+    const temSplit =
+      p.projeto.alguem_fazia === 'sim' &&
+      p.saving?.horas_carga_real != null &&
+      p.saving?.horas_escala != null;
+    const savingHorasReal = temSplit ? Number(p.saving!.horas_carga_real) : '—';
+    const savingHorasEscalado = temSplit ? Number(p.saving!.horas_escala) : '—';
+
     // Link(s) dos documentos no Google Drive → coluna "URL" da planilha.
     const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);
     const urlDocs = arquivosLinks.length > 0 ? arquivosLinks.join('\n') : '—';
@@ -207,6 +218,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Atualizado Em': dataSubmissao,
       // Justificativa do gate ≥44h fatiada do memorial; "—" quando não houve gate.
       'Alocação Ganhos': ouTraco(p.alocacaoGanhos),
+      // Split do saving (transparência): carga humana real × ganho por escala. "—" sem split.
+      'Saving Horas Real': savingHorasReal,
+      'Saving Horas Escalado': savingHorasEscalado,
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

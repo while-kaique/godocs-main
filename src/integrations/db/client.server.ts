@@ -894,6 +894,11 @@ export type ProjetoRow = {
   // Editores delegados (JSON array de emails). Participantes a quem o dono delegou o
   // poder de edição. Conceito interno (não vai ao Sheets). Ver meus-projetos.functions.ts.
   editores_delegados: string | null;
+  // Split do saving (só quando alguem_fazia='sim'): carga humana real × ganho por escala.
+  // Somam saving_horas (o total que vira R$). Transparência → Sheets "Saving Horas Real"/
+  // "Saving Horas Escalado". Null quando não se aplica (ninguém fazia / pontual).
+  horas_carga_real: number | null;
+  horas_escala: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
