@@ -30,6 +30,11 @@ import {
   SlidersHorizontal,
   X,
   Calendar,
+  ArrowRight,
+  Plus,
+  Minus,
+  Equal,
+  GitCompare,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -989,6 +994,10 @@ function DetalheView({
 
   const rotuloVersao = (v: Versao) => (v.acao === 'submit_inicial' ? 'Original' : `Edição v${v.versao_num}`)
 
+  // Versão selecionada é um reenvio? → habilita o painel de comparação (antes/depois).
+  const selVersao = typeof sel === 'number' ? versoesAsc.find((v) => v.versao_num === sel) : undefined
+  const ehReenvioSelecionado = selVersao?.acao === 'reenvio'
+
   // Rótulo da versão atualmente exibida — usado no cabeçalho do JSON exportado.
   const versaoLabel =
     sel === 'atual'
@@ -1128,6 +1137,9 @@ function DetalheView({
         </div>
       )}
 
+      {/* Comparação antes/depois — só quando a versão selecionada é um reenvio */}
+      {ehReenvioSelecionado && <ComparacaoEdicao versoes={versoesAsc} sel={sel as number} />}
+
       {/* Tabs */}
       <div className="mt-4 flex items-center gap-1 rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/4 p-1">
         {([
@@ -1159,6 +1171,7 @@ function DetalheView({
           <ChatTab
             messages={chatView}
             eventos={eventosView}
+            todosEventos={d.form_events}
             projetoNome={d.nome ?? 'Projeto sem nome'}
             projetoId={d.id}
             versaoLabel={versaoLabel}
@@ -1189,6 +1202,390 @@ function KV({ label, value }: { label: string; value: string | null | undefined 
       <span className="text-[var(--go-text-primary)]">
         {value || <span className="text-[var(--go-text-primary)]/20 italic">—</span>}
       </span>
+    </div>
+  )
+}
+
+// ── Comparação de edição (diff antes → depois entre versões) ─────────────────
+
+type SnapRecord = Record<string, unknown>
+type DiffStatus = 'alterado' | 'adicionado' | 'removido' | 'igual'
+type CampoDiff = {
+  key: string
+  label: string
+  antes: string | null
+  depois: string | null
+  status: DiffStatus
+  long: boolean
+}
+
+/** Um valor formatado é "vazio" quando não há nada a mostrar (null, em branco ou "—"). */
+function diffVazio(s: string | null | undefined): boolean {
+  return s == null || s.trim() === '' || s.trim() === '—'
+}
+
+function diffNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+}
+
+// Formatadores por tipo de campo — recebem o snapshot inteiro (alguns dependem de
+// outro campo, ex.: o sufixo "/mês" do saving depende de tipo_saving).
+function vReais(v: unknown, sufixo = ''): string | null {
+  return typeof v === 'number' && !isNaN(v) ? `${fmtReais(v)}${sufixo}` : null
+}
+function vTexto(v: unknown): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s === '' ? null : s
+}
+function vSimNao(v: unknown): string | null {
+  if (v === 'sim') return 'Sim'
+  if (v === 'nao' || v === 'não') return 'Não'
+  return null
+}
+function vTipoSaving(v: unknown): string | null {
+  if (v === 'mensal') return 'Mensal'
+  if (v === 'pontual') return 'Pontual'
+  return null
+}
+function vEspecial(v: unknown): string | null {
+  if (v == null) return null
+  return v === 1 || v === true || v === 'sim' ? 'Sim' : 'Não'
+}
+function vLista(v: unknown): string | null {
+  if (!Array.isArray(v) || v.length === 0) return null
+  return (v as unknown[]).map(String).join(', ')
+}
+function vStatus(v: unknown): string | null {
+  const s = vTexto(v)
+  return s ? (STATUS_LABELS[s] ?? s) : null
+}
+function vCustoItens(v: unknown): string | null {
+  let arr: unknown = v
+  if (typeof v === 'string') {
+    try {
+      arr = JSON.parse(v)
+    } catch {
+      return vTexto(v)
+    }
+  }
+  if (!Array.isArray(arr) || arr.length === 0) return null
+  const linhas = (arr as EventoCustoItem[])
+    .filter((it) => it && it.nome != null)
+    .map((it) => `• ${it.nome} — ${fmtReais(it.valor)} (${it.recorrencia ?? '—'})`)
+  return linhas.length > 0 ? linhas.join('\n') : null
+}
+
+// Campos comparados, na ordem de exibição. `long` = texto extenso (abre antes/depois).
+const CAMPOS_DIFF: Array<{ key: string; label: string; get: (s: SnapRecord) => string | null; long?: boolean }> = [
+  { key: 'nome', label: 'Nome', get: (s) => vTexto(s.nome) },
+  { key: 'area', label: 'Área', get: (s) => vTexto(s.area) },
+  { key: 'ferramenta', label: 'Ferramenta', get: (s) => vTexto(s.ferramenta) },
+  { key: 'tipos_projeto', label: 'Tipos de projeto', get: (s) => vLista(s.tipos_projeto) },
+  { key: 'especial', label: 'Projeto especial', get: (s) => vEspecial(s.especial) },
+  { key: 'descricao_breve', label: 'Descrição', get: (s) => vTexto(s.descricao_breve), long: true },
+  { key: 'tipo_saving', label: 'Tipo de saving', get: (s) => vTipoSaving(s.tipo_saving) },
+  {
+    key: 'saving_horas',
+    label: 'Economia em horas',
+    get: (s) =>
+      typeof s.saving_horas === 'number' && !isNaN(s.saving_horas)
+        ? `${diffNum(s.saving_horas)} h${s.tipo_saving === 'mensal' ? '/mês' : ''}`
+        : null,
+  },
+  { key: 'saving_reais', label: 'Saving', get: (s) => vReais(s.saving_reais, s.tipo_saving === 'mensal' ? '/mês' : '') },
+  { key: 'ganho_total_mensal', label: 'Ganho total', get: (s) => vReais(s.ganho_total_mensal, '/mês') },
+  { key: 'custo_externo_mensal', label: 'Custo externo', get: (s) => vReais(s.custo_externo_mensal, '/mês') },
+  { key: 'alguem_fazia', label: 'Alguém fazia antes', get: (s) => vSimNao(s.alguem_fazia) },
+  { key: 'custo_evitado', label: 'Tem custo evitado', get: (s) => vSimNao(s.custo_evitado) },
+  { key: 'custo_evitado_justificativa', label: 'Justificativa do custo evitado', get: (s) => vTexto(s.custo_evitado_justificativa), long: true },
+  { key: 'custo_evitado_itens', label: 'Itens de custo evitado', get: (s) => vCustoItens(s.custo_evitado_itens), long: true },
+  { key: 'memorial_calculo', label: 'Memorial de cálculo', get: (s) => vTexto(s.memorial_calculo), long: true },
+  { key: 'status', label: 'Status interno', get: (s) => vStatus(s.status) },
+]
+
+/** Aceita o snapshot já parseado (objeto) ou string JSON; null se ausente/vazio. */
+function parseSnap(raw: unknown): SnapRecord | null {
+  if (!raw) return null
+  let obj: unknown = raw
+  if (typeof raw === 'string') {
+    try {
+      obj = JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  if (typeof obj !== 'object' || obj === null || Object.keys(obj as object).length === 0) return null
+  return obj as SnapRecord
+}
+
+function computarDiff(prev: SnapRecord, atual: SnapRecord): CampoDiff[] {
+  const out: CampoDiff[] = []
+  for (const c of CAMPOS_DIFF) {
+    const antes = c.get(prev)
+    const depois = c.get(atual)
+    const aVazio = diffVazio(antes)
+    const dVazio = diffVazio(depois)
+    if (aVazio && dVazio) continue // ambos sem valor → irrelevante para a auditoria
+    let status: DiffStatus
+    if (aVazio) status = 'adicionado'
+    else if (dVazio) status = 'removido'
+    else if (antes === depois) status = 'igual'
+    else status = 'alterado'
+    out.push({ key: c.key, label: c.label, antes, depois, status, long: !!c.long })
+  }
+  return out
+}
+
+// Encoding por estado de mudança — cor + ícone + rótulo (nunca só cor, p/ acessibilidade).
+const DIFF_STYLE: Record<
+  DiffStatus,
+  { label: string; cor: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }
+> = {
+  alterado: { label: 'Alterado', cor: '#0059A9', Icon: ArrowRight },
+  adicionado: { label: 'Adicionado', cor: '#6b6d00', Icon: Plus },
+  removido: { label: 'Removido', cor: '#dc2626', Icon: Minus },
+  igual: { label: 'Sem mudança', cor: '#8b8b7a', Icon: Equal },
+}
+
+/** Bloco de texto longo (antes/depois) — prosa, não monoespaçada, com rolagem. */
+function BlocoTexto({ titulo, texto, tom }: { titulo: string; texto: string | null; tom: 'antes' | 'depois' }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--go-text-primary)]/35">{titulo}</div>
+      <pre
+        className={`max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-[var(--go-radius-sm)] border p-2.5 text-[11.5px] leading-relaxed ${
+          tom === 'depois'
+            ? 'border-[var(--go-blue)]/15 bg-[var(--go-blue)]/4 text-[var(--go-text-primary)]/80'
+            : 'border-[var(--go-blue)]/8 bg-[var(--go-cream)]/50 text-[var(--go-text-primary)]/55'
+        }`}
+        style={{ scrollbarWidth: 'thin', fontFamily: 'inherit' }}
+      >
+        {texto && texto.trim() !== '' ? texto : '—'}
+      </pre>
+    </div>
+  )
+}
+
+/** Uma linha de mudança (alterado/adicionado/removido). Campos longos abrem antes×depois. */
+function LinhaDiff({ campo }: { campo: CampoDiff }) {
+  const [aberto, setAberto] = useState(false)
+  const st = DIFF_STYLE[campo.status]
+
+  if (campo.long) {
+    const resumo =
+      campo.status === 'adicionado' ? 'Texto adicionado' : campo.status === 'removido' ? 'Texto removido' : 'Texto alterado'
+    return (
+      <div className="py-0.5">
+        <button
+          onClick={() => setAberto((o) => !o)}
+          aria-expanded={aberto}
+          className="group flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1 text-left transition-colors hover:bg-[var(--go-blue)]/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)]/25"
+        >
+          <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/45">{campo.label}</span>
+          <span className="flex-1 text-[12px] font-medium" style={{ color: st.cor }}>
+            {resumo}
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 flex-shrink-0 text-[var(--go-text-primary)]/30 transition-transform ${aberto ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {aberto && (
+          <div
+            className="mt-1.5 grid grid-cols-1 gap-2 px-1.5 lg:grid-cols-2"
+            style={{ animation: 'go-slide-down 0.18s ease' }}
+          >
+            <BlocoTexto titulo="Antes" texto={campo.antes} tom="antes" />
+            <BlocoTexto titulo="Depois" texto={campo.depois} tom="depois" />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1.5 py-1">
+      <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/45">{campo.label}</span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {campo.status === 'adicionado' ? (
+          <span className="text-[12px] italic text-[var(--go-text-primary)]/30">vazio</span>
+        ) : (
+          <span
+            className={`text-[12px] text-[var(--go-text-primary)]/45 ${campo.status === 'removido' ? 'line-through' : ''}`}
+          >
+            {campo.antes}
+          </span>
+        )}
+        <ArrowRight className="h-3 w-3 flex-shrink-0 text-[var(--go-text-primary)]/25" />
+        {campo.status === 'removido' ? (
+          <span className="text-[12px] font-medium" style={{ color: st.cor }}>
+            removido
+          </span>
+        ) : (
+          <span className="text-[13px] font-semibold" style={{ color: st.cor }}>
+            {campo.depois}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Cabeçalho + linhas de um grupo de mudança (Alterado / Adicionado / Removido). */
+function GrupoDiff({ status, campos }: { status: DiffStatus; campos: CampoDiff[] }) {
+  if (campos.length === 0) return null
+  const st = DIFF_STYLE[status]
+  const Icon = st.Icon
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-1.5 px-1.5">
+        <Icon className="h-3.5 w-3.5" style={{ color: st.cor }} />
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: st.cor }}>
+          {st.label}
+        </span>
+        <span className="text-[11px] font-medium tabular-nums text-[var(--go-text-primary)]/30">· {campos.length}</span>
+      </div>
+      <div className="space-y-0.5">
+        {campos.map((c) => (
+          <LinhaDiff key={c.key} campo={c} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Painel "Comparação desta edição": para um reenvio, compara o snapshot da versão
+ * selecionada com o da versão imediatamente anterior e classifica cada campo em
+ * Alterado / Adicionado / Removido / Sem mudança. Snapshot ausente → aviso gracioso.
+ */
+function ComparacaoEdicao({ versoes, sel }: { versoes: Versao[]; sel: number }) {
+  const [mostrarIguais, setMostrarIguais] = useState(false)
+
+  const idx = versoes.findIndex((v) => v.versao_num === sel)
+  const atualV = idx >= 0 ? versoes[idx] : undefined
+  const prevV = idx > 0 ? versoes[idx - 1] : undefined
+
+  const { prevSnap, atualSnap, diffs } = useMemo(() => {
+    const a = parseSnap(atualV?.snapshot_projeto)
+    const p = parseSnap(prevV?.snapshot_projeto)
+    return { prevSnap: p, atualSnap: a, diffs: p && a ? computarDiff(p, a) : [] }
+  }, [atualV?.snapshot_projeto, prevV?.snapshot_projeto])
+
+  const rotulo = (v?: Versao) => (!v ? '—' : v.acao === 'submit_inicial' ? 'Original' : `Edição v${v.versao_num}`)
+
+  // Fallback gracioso: versão muito antiga sem snapshot de uma das pontas.
+  if (!atualV || !prevV || !atualSnap || !prevSnap) {
+    return (
+      <div className="mt-3 flex items-start gap-1.5 rounded-[var(--go-radius-sm)] bg-[#f59e0b]/8 px-3 py-2 text-[11px] text-[#b45309]">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+        Comparação indisponível — o snapshot desta edição ou da versão anterior não foi registrado (versão anterior ao
+        histórico de snapshots).
+      </div>
+    )
+  }
+
+  const alterados = diffs.filter((d) => d.status === 'alterado')
+  const adicionados = diffs.filter((d) => d.status === 'adicionado')
+  const removidos = diffs.filter((d) => d.status === 'removido')
+  const iguais = diffs.filter((d) => d.status === 'igual')
+  const mudancas = alterados.length + adicionados.length + removidos.length
+
+  const resumo: Array<{ status: DiffStatus; n: number; texto: string }> = [
+    { status: 'alterado', n: alterados.length, texto: 'alterados' },
+    { status: 'adicionado', n: adicionados.length, texto: 'adicionados' },
+    { status: 'removido', n: removidos.length, texto: 'removidos' },
+    { status: 'igual', n: iguais.length, texto: 'iguais' },
+  ]
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/10 bg-white">
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-2.5 border-b border-[var(--go-blue)]/6 px-4 py-3">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--go-radius-sm)] bg-[var(--go-blue)]/8 text-[var(--go-blue)]">
+          <GitCompare className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[13px] font-bold leading-tight text-[var(--go-text-primary)]">Comparação desta edição</h3>
+          <p className="text-[11px] text-[var(--go-text-primary)]/40">O que mudou em relação à versão anterior</p>
+        </div>
+        <div
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[var(--go-blue)]/5 px-2.5 py-1 text-[11px] font-medium text-[var(--go-blue)]"
+          title={`${rotulo(prevV)}: ${formatDateTime(prevV.created_at)}\n${rotulo(atualV)}: ${formatDateTime(atualV.created_at)}`}
+        >
+          <span>{rotulo(prevV)}</span>
+          <ArrowRight className="h-3 w-3" />
+          <span className="font-semibold">{rotulo(atualV)}</span>
+        </div>
+      </div>
+
+      <div className="p-4">
+        {/* Resumo (thesis): contagem por tipo de mudança */}
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {resumo
+            .filter((r) => r.n > 0)
+            .map((r) => {
+              const st = DIFF_STYLE[r.status]
+              const Icon = st.Icon
+              return (
+                <span
+                  key={r.status}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ color: st.cor, backgroundColor: `${st.cor}14` }}
+                >
+                  <Icon className="h-3 w-3" />
+                  <span className="tabular-nums">{r.n}</span>
+                  <span className="font-medium">{r.texto}</span>
+                </span>
+              )
+            })}
+        </div>
+
+        {/* Mudanças */}
+        {mudancas === 0 ? (
+          <div className="rounded-[var(--go-radius-sm)] bg-[var(--go-cream)]/50 px-3 py-2.5 text-[12px] text-[var(--go-text-primary)]/45">
+            Nenhum campo monitorado mudou nesta edição — o reenvio manteve os mesmos valores.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <GrupoDiff status="alterado" campos={alterados} />
+            <GrupoDiff status="adicionado" campos={adicionados} />
+            <GrupoDiff status="removido" campos={removidos} />
+          </div>
+        )}
+
+        {/* Sem mudança — recolhido por padrão (quieto) */}
+        {iguais.length > 0 && (
+          <div className="mt-3 border-t border-[var(--go-blue)]/6 pt-2">
+            <button
+              onClick={() => setMostrarIguais((o) => !o)}
+              aria-expanded={mostrarIguais}
+              className="flex w-full items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left transition-colors hover:bg-[var(--go-blue)]/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)]/25"
+            >
+              <Equal className="h-3.5 w-3.5 text-[var(--go-text-primary)]/30" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--go-text-primary)]/40">
+                Sem mudança
+              </span>
+              <span className="text-[11px] tabular-nums text-[var(--go-text-primary)]/25">· {iguais.length}</span>
+              <ChevronDown
+                className={`ml-auto h-3.5 w-3.5 text-[var(--go-text-primary)]/25 transition-transform ${mostrarIguais ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {mostrarIguais && (
+              <div className="mt-1 space-y-0.5" style={{ animation: 'go-slide-down 0.18s ease' }}>
+                {iguais.map((c) => (
+                  <div key={c.key} className="flex flex-wrap items-baseline gap-x-2 px-1.5 py-0.5">
+                    <span className="w-44 flex-shrink-0 text-[12px] text-[var(--go-text-primary)]/35">{c.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--go-text-primary)]/55">
+                      {c.long ? 'Texto longo, sem alteração' : c.depois}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -1301,12 +1698,14 @@ function buildChatExport(
 function ChatTab({
   messages,
   eventos,
+  todosEventos,
   projetoNome,
   projetoId,
   versaoLabel,
 }: {
   messages: ChatMsg[]
   eventos: FormEvent[]
+  todosEventos: FormEvent[]
   projetoNome: string
   projetoId: string
   versaoLabel: string
@@ -1328,6 +1727,25 @@ function ChatTab({
       // clipboard indisponível — silencioso
     }
   }, [messages, eventos, projetoNome, projetoId, versaoLabel])
+
+  // Baseline do diff: para cada evento, a marcação ANTERIOR da mesma etapa em TODA a
+  // história do projeto (mesmo fora da janela da versão exibida) — assim o 1º saving de
+  // um reenvio compara com o saving submetido antes, e remarcas dentro de uma submissão
+  // comparam com a marca anterior. Varre cronologicamente guardando o último por tipo.
+  const dadosAnteriorPorEvento = useMemo(() => {
+    const ordenados = [...todosEventos].sort((a, b) => {
+      const av = tsToEpoch(a.created_at)
+      const bv = tsToEpoch(b.created_at)
+      return (isNaN(av) ? 0 : av) - (isNaN(bv) ? 0 : bv)
+    })
+    const ultimoPorTipo = new Map<string, Record<string, unknown> | null>()
+    const mapa = new Map<string, Record<string, unknown> | null>()
+    for (const ev of ordenados) {
+      mapa.set(ev.id, ultimoPorTipo.get(ev.tipo) ?? null)
+      ultimoPorTipo.set(ev.tipo, (ev.dados ?? {}) as Record<string, unknown>)
+    }
+    return mapa
+  }, [todosEventos])
 
   // Timeline unificado: mensagens do chat + eventos determinísticos do formulário,
   // ordenados por created_at. Em empate de carimbo, o evento vem antes da mensagem
@@ -1412,7 +1830,14 @@ function ChatTab({
         <div className="space-y-1 py-2">
           {timeline.map((item) => {
             if (item.type === 'divider') return <PhaseDivider key={item.key} phase={item.phase} label={item.label} />
-            if (item.type === 'event') return <EventBubble key={item.key} event={item.event} />
+            if (item.type === 'event')
+              return (
+                <EventBubble
+                  key={item.key}
+                  event={item.event}
+                  dadosAnterior={dadosAnteriorPorEvento.get(item.event.id) ?? null}
+                />
+              )
             return <ChatBubble key={item.key} msg={item.msg} phase={item.phase} />
           })}
           <div ref={chatEndRef} />
@@ -1436,39 +1861,37 @@ function tipoSavingLabel(t: unknown): string {
 type EventoLinha = { cargo?: string; horas_antes?: number; horas_depois?: number }
 type EventoCustoItem = { nome?: string; valor?: number; recorrencia?: string }
 
-type EventoView = {
-  titulo: string
-  etapa: string
-  voltou: boolean
-  isAlerta: boolean
-  rows: Array<{ label: string; value: string }>
-  chips: string[]
+type EvRow = { label: string; value: string }
+type EvChip = { key: string; texto: string }
+
+const EVENT_CONFIG: Record<string, { titulo: string; etapa: string }> = {
+  submissao: { titulo: 'Formulário enviado (etapas 1 e 2)', etapa: 'Etapa inicial' },
+  saving: { titulo: 'Saving informado', etapa: 'Etapa de Saving' },
+  receita: { titulo: 'Receita informada', etapa: 'Etapa de Receita' },
+  metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
+  tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
+  submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
+  divergencia_memorial: { titulo: 'Memorial × valor gravado divergem', etapa: 'Submissão' },
 }
 
-/** Extrai do evento o título, os pares label → valor e os chips a exibir.
- * Compartilhado pelo render (EventBubble) e pela exportação JSON do chat. */
-function buildEventoView(event: FormEvent): EventoView {
-  const d = (event.dados ?? {}) as Record<string, unknown>
-  const voltou = d.voltou === true
-  const isAlerta = event.tipo === 'divergencia_memorial'
+// Etapas em que comparar com a marcação anterior faz sentido (formulários remarcáveis).
+// `metadados`/`submit`/etc. registram só o que mudou naquele instante — diff entre eles confunde.
+const TIPOS_COM_DIFF = new Set(['saving', 'receita'])
 
-  // Título + etapa do "voltou" por tipo de evento
-  const CONFIG: Record<string, { titulo: string; etapa: string }> = {
-    submissao: { titulo: 'Formulário enviado (etapas 1 e 2)', etapa: 'Etapa inicial' },
-    saving: { titulo: 'Saving informado', etapa: 'Etapa de Saving' },
-    receita: { titulo: 'Receita informada', etapa: 'Etapa de Receita' },
-    metadados: { titulo: 'Dados atualizados', etapa: 'Etapas anteriores' },
-    tipos: { titulo: 'Tipo de projeto definido', etapa: 'Tipo de projeto' },
-    submit: { titulo: 'Projeto submetido', etapa: 'Submissão' },
-    divergencia_memorial: { titulo: 'Memorial × valor gravado divergem', etapa: 'Submissão' },
+/** Constrói os pares label→valor e os chips (cargo/custo) de um evento — função PURA,
+ * usada tanto para o estado atual quanto para o anterior (a base do diff). */
+function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow[]; chips: EvChip[] } {
+  const rows: EvRow[] = []
+  const chips: EvChip[] = []
+  // Chave estável p/ casar chips entre versões; sufixo em duplicatas (mesmo cargo/nome).
+  const usados = new Map<string, number>()
+  const chave = (base: string) => {
+    const n = (usados.get(base) ?? 0) + 1
+    usados.set(base, n)
+    return n > 1 ? `${base}#${n}` : base
   }
-  const cfg = CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
 
-  // Constrói os pares label → valor a exibir, por tipo
-  const rows: Array<{ label: string; value: string }> = []
-  const chips: string[] = []
-
-  if (event.tipo === 'submissao') {
+  if (tipo === 'submissao') {
     if (d.escopo) rows.push({ label: 'Escopo', value: String(d.escopo) })
     if (d.ferramenta) rows.push({ label: 'Ferramenta', value: String(d.ferramenta) })
     if (Array.isArray(d.tipos_projeto) && d.tipos_projeto.length > 0) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
@@ -1476,7 +1899,7 @@ function buildEventoView(event: FormEvent): EventoView {
     if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Arquivos', value: (d.arquivos as string[]).join(', ') })
     if (d.especial === true) rows.push({ label: 'Especial', value: 'Sim' })
-  } else if (event.tipo === 'saving') {
+  } else if (tipo === 'saving') {
     rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
     if (typeof d.economia_horas_mes === 'number') rows.push({ label: 'Economia (horas)', value: `${d.economia_horas_mes} h/mês` })
     if (typeof d.economia_reais_mes === 'number') rows.push({ label: 'Saving', value: `${fmtReais(d.economia_reais_mes)}/mês` })
@@ -1485,19 +1908,19 @@ function buildEventoView(event: FormEvent): EventoView {
     if (d.alguem_fazia) rows.push({ label: 'Alguém fazia antes', value: d.alguem_fazia === 'sim' ? 'Sim' : 'Não' })
     if (Array.isArray(d.linhas)) {
       for (const l of d.linhas as EventoLinha[]) {
-        if (l && l.cargo != null) chips.push(`${l.cargo}: ${l.horas_antes ?? 0}h → ${l.horas_depois ?? 0}h`)
+        if (l && l.cargo != null) chips.push({ key: chave(`cargo:${l.cargo}`), texto: `${l.cargo}: ${l.horas_antes ?? 0}h → ${l.horas_depois ?? 0}h` })
       }
     }
     if (Array.isArray(d.custo_evitado_itens)) {
       for (const it of d.custo_evitado_itens as EventoCustoItem[]) {
-        if (it && it.nome != null) chips.push(`Evitado: ${it.nome} (${fmtReais(it.valor)}, ${it.recorrencia ?? '—'})`)
+        if (it && it.nome != null) chips.push({ key: chave(`evitado:${it.nome}`), texto: `Evitado: ${it.nome} (${fmtReais(it.valor)}, ${it.recorrencia ?? '—'})` })
       }
     }
-  } else if (event.tipo === 'receita') {
+  } else if (tipo === 'receita') {
     rows.push({ label: 'Tipo', value: tipoSavingLabel(d.tipo_saving) })
     if (typeof d.valor_ganho_mensal === 'number') rows.push({ label: 'Receita', value: `${fmtReais(d.valor_ganho_mensal)}/mês` })
     if (d.racional) rows.push({ label: 'Racional', value: String(d.racional) })
-  } else if (event.tipo === 'metadados') {
+  } else if (tipo === 'metadados') {
     if (d.reset_doc === true) rows.push({ label: 'Documentação', value: 'Reiniciada' })
     const campos = (d.campos ?? {}) as Record<string, unknown>
     const CAMPO_LABELS: Record<string, string> = {
@@ -1510,33 +1933,103 @@ function buildEventoView(event: FormEvent): EventoView {
       rows.push({ label, value: Array.isArray(v) ? (v as string[]).join(', ') : String(v) })
     }
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Novos arquivos', value: (d.arquivos as string[]).join(', ') })
-  } else if (event.tipo === 'tipos') {
+  } else if (tipo === 'tipos') {
     if (Array.isArray(d.tipos_projeto)) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
-  } else if (event.tipo === 'submit') {
+  } else if (tipo === 'submit') {
     if (d.status) rows.push({ label: 'Status', value: String(d.status) })
     if (typeof d.ganho_total_mensal === 'number') rows.push({ label: 'Ganho total', value: `${fmtReais(d.ganho_total_mensal)}/mês` })
     if (d.reenvio === true) rows.push({ label: 'Tipo', value: 'Reenvio' })
-  } else if (event.tipo === 'divergencia_memorial') {
+  } else if (tipo === 'divergencia_memorial') {
     if (d.total_texto != null) rows.push({ label: 'No memorial (texto)', value: `${d.total_texto} h` })
     if (d.total_gravado != null) rows.push({ label: 'Gravado (planilha)', value: `${d.total_gravado} h` })
   }
 
-  return { titulo: cfg.titulo, etapa: cfg.etapa, voltou, isAlerta, rows, chips }
+  return { rows, chips }
 }
 
-/** Renderiza um evento do formulário como um cartão central, discreto e legível —
- * mostra os valores que o usuário marcou (saving mensal, horas, receita…) e, em
- * reentradas, o marcador "voltou e editou". */
-function EventBubble({ event }: { event: FormEvent }) {
-  const { titulo, etapa, voltou, isAlerta, rows, chips } = buildEventoView(event)
+type EventoView = {
+  titulo: string
+  etapa: string
+  voltou: boolean
+  isAlerta: boolean
+  rows: Array<{ label: string; value: string }>
+  chips: string[]
+}
+
+/** Visão do evento p/ a exportação JSON do chat (Copiar JSON): título/etapa +
+ * rows e chips já como texto. Reaproveita o builder puro `linhasDoEvento`. */
+function buildEventoView(event: FormEvent): EventoView {
+  const d = (event.dados ?? {}) as Record<string, unknown>
+  const cfg = EVENT_CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
+  const { rows, chips } = linhasDoEvento(event.tipo, d)
+  return {
+    titulo: cfg.titulo,
+    etapa: cfg.etapa,
+    voltou: d.voltou === true,
+    isAlerta: event.tipo === 'divergencia_memorial',
+    rows,
+    chips: chips.map((c) => c.texto),
+  }
+}
+
+type RowMarc = EvRow & { status: DiffStatus; antes: string | null }
+type ChipMarc = EvChip & { status: DiffStatus; antes: string | null }
+
+/** Renderiza um evento do formulário como um cartão central. Quando há uma marcação
+ * anterior da mesma etapa (`dadosAnterior`), realça o que mudou (antes→depois),
+ * deixa o que ficou igual discreto e marca novos/removidos — para a reentrada
+ * ("voltou e editou") ou o reenvio mostrarem com clareza o que foi alterado. */
+function EventBubble({ event, dadosAnterior }: { event: FormEvent; dadosAnterior?: Record<string, unknown> | null }) {
+  const d = (event.dados ?? {}) as Record<string, unknown>
+  const voltou = d.voltou === true
+  const isAlerta = event.tipo === 'divergencia_memorial'
+  const cfg = EVENT_CONFIG[event.tipo] ?? { titulo: event.tipo, etapa: 'Etapa' }
+
+  const { rows, chips } = linhasDoEvento(event.tipo, d)
+
+  // Diff só faz sentido em etapas remarcáveis e quando há base anterior.
+  const temBase = !!dadosAnterior && TIPOS_COM_DIFF.has(event.tipo)
+  const base = temBase ? linhasDoEvento(event.tipo, dadosAnterior as Record<string, unknown>) : null
+  const baseRows = new Map((base?.rows ?? []).map((r) => [r.label, r.value]))
+  const baseChips = new Map((base?.chips ?? []).map((c) => [c.key, c.texto]))
+
+  const classificarRow = (r: EvRow): RowMarc => {
+    if (!temBase) return { ...r, status: 'igual', antes: null }
+    if (!baseRows.has(r.label)) return { ...r, status: 'adicionado', antes: null }
+    const antes = baseRows.get(r.label) ?? null
+    return { ...r, status: antes === r.value ? 'igual' : 'alterado', antes }
+  }
+  const rowsAtuais: RowMarc[] = rows.map(classificarRow)
+  const rowsRemovidas: RowMarc[] = temBase
+    ? base!.rows.filter((b) => !rows.some((r) => r.label === b.label)).map((b) => ({ ...b, status: 'removido', antes: b.value }))
+    : []
+  const todasRows = [...rowsAtuais, ...rowsRemovidas]
+
+  const classificarChip = (c: EvChip): ChipMarc => {
+    if (!temBase) return { ...c, status: 'igual', antes: null }
+    if (!baseChips.has(c.key)) return { ...c, status: 'adicionado', antes: null }
+    const antes = baseChips.get(c.key) ?? null
+    return { ...c, status: antes === c.texto ? 'igual' : 'alterado', antes: antes === c.texto ? null : antes }
+  }
+  const chipsAtuais: ChipMarc[] = chips.map(classificarChip)
+  const chipsRemovidos: ChipMarc[] = temBase
+    ? base!.chips.filter((b) => !chips.some((c) => c.key === b.key)).map((b) => ({ ...b, status: 'removido', antes: b.texto }))
+    : []
+  const todosChips = [...chipsAtuais, ...chipsRemovidos]
+
+  const nMudancas = temBase
+    ? todasRows.filter((r) => r.status !== 'igual').length + todosChips.filter((c) => c.status !== 'igual').length
+    : 0
+
+  const azul = DIFF_STYLE.alterado.cor
 
   return (
     <div className="flex justify-center px-6 py-1">
       <div className={`w-full max-w-[88%] rounded-[var(--go-radius-sm)] border px-3 py-2 ${isAlerta ? 'border-[#dc2626]/40 bg-[#fef2f2]' : 'border-[var(--go-blue)]/10 bg-[var(--go-cream)]/50'}`}>
         {voltou && (
-          <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-[#b45309]">
+          <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#f59e0b]/12 px-2 py-0.5 text-[10px] font-semibold text-[#b45309]">
             <ArrowLeft className="h-3 w-3" />
-            Voltou e editou — {etapa}
+            Voltou e editou — {cfg.etapa}
           </div>
         )}
         <div className="flex items-center gap-1.5">
@@ -1544,26 +2037,85 @@ function EventBubble({ event }: { event: FormEvent }) {
             ? <AlertTriangle className="h-3 w-3 flex-shrink-0 text-[#dc2626]" />
             : <SlidersHorizontal className="h-3 w-3 flex-shrink-0 text-[var(--go-blue)]/45" />}
           <span className={`text-[11px] font-semibold uppercase tracking-wide ${isAlerta ? 'text-[#dc2626]' : 'text-[var(--go-text-primary)]/45'}`}>
-            {titulo}
+            {cfg.titulo}
           </span>
-        </div>
-        {rows.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-            {rows.map((r, i) => (
-              <span key={i} className="text-[12px] text-[var(--go-text-primary)]/70">
-                <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>{' '}
-                <span className="font-medium">{r.value}</span>
+          {temBase && (
+            nMudancas > 0 ? (
+              <span className="ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums" style={{ color: azul, backgroundColor: `${azul}14` }}>
+                {nMudancas} {nMudancas > 1 ? 'alterações' : 'alteração'}
               </span>
-            ))}
+            ) : (
+              <span className="ml-auto text-[10px] font-medium text-[var(--go-text-primary)]/30">sem alterações</span>
+            )
+          )}
+        </div>
+        {todasRows.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            {todasRows.map((r, i) => {
+              // Sem base, ou inalterado: estilo discreto (igual ao de antes quando sem base).
+              if (!temBase || r.status === 'igual') {
+                return (
+                  <span key={i} className={`text-[12px] ${temBase ? 'text-[var(--go-text-primary)]/45' : 'text-[var(--go-text-primary)]/70'}`}>
+                    <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>{' '}
+                    <span className={temBase ? '' : 'font-medium'}>{r.value}</span>
+                  </span>
+                )
+              }
+              const st = DIFF_STYLE[r.status]
+              return (
+                <span key={i} className="inline-flex items-center gap-1 text-[12px]">
+                  <span className="text-[var(--go-text-primary)]/40">{r.label}:</span>
+                  {r.status === 'alterado' && (
+                    <>
+                      <span className="text-[var(--go-text-primary)]/45">{r.antes}</span>
+                      <ArrowRight className="h-3 w-3 flex-shrink-0 text-[var(--go-text-primary)]/25" />
+                      <span className="font-semibold" style={{ color: st.cor }}>{r.value}</span>
+                    </>
+                  )}
+                  {r.status === 'adicionado' && (
+                    <span className="inline-flex items-center gap-1 font-semibold" style={{ color: st.cor }}>
+                      {r.value}
+                      <span className="text-[9px] font-bold uppercase tracking-wide">· novo</span>
+                    </span>
+                  )}
+                  {r.status === 'removido' && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[var(--go-text-primary)]/40 line-through">{r.value}</span>
+                      <span className="font-medium" style={{ color: st.cor }}>removido</span>
+                    </span>
+                  )}
+                </span>
+              )
+            })}
           </div>
         )}
-        {chips.length > 0 && (
+        {todosChips.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {chips.map((c, i) => (
-              <span key={i} className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[var(--go-text-primary)]/65 border border-[var(--go-blue)]/10">
-                {c}
-              </span>
-            ))}
+            {todosChips.map((c, i) => {
+              if (!temBase || c.status === 'igual') {
+                return (
+                  <span key={i} className="rounded-full border border-[var(--go-blue)]/10 bg-white px-2 py-0.5 text-[11px] text-[var(--go-text-primary)]/65">
+                    {c.texto}
+                  </span>
+                )
+              }
+              const st = DIFF_STYLE[c.status]
+              return (
+                <span
+                  key={i}
+                  title={c.status === 'alterado' && c.antes ? `Antes: ${c.antes}` : undefined}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${c.status === 'removido' ? 'line-through' : ''}`}
+                  style={{ color: st.cor, borderColor: `${st.cor}55`, backgroundColor: `${st.cor}0f` }}
+                >
+                  {c.status === 'adicionado' && <Plus className="h-2.5 w-2.5 flex-shrink-0" />}
+                  {c.status === 'removido' && <Minus className="h-2.5 w-2.5 flex-shrink-0" />}
+                  {c.texto}
+                  {c.status === 'alterado' && c.antes && (
+                    <span className="text-[10px] text-[var(--go-text-primary)]/40">(antes: {c.antes.replace(/^[^:]*:\s*/, '')})</span>
+                  )}
+                </span>
+              )
+            })}
           </div>
         )}
       </div>

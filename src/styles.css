@@ -191,6 +191,19 @@
   40% { transform: translateY(-6px); opacity: 1; }
 }
 
+/* Acessibilidade: respeita "reduzir movimento" do sistema. Neutraliza animações
+   e transições (inclusive as definidas via style inline) sem quebrar o layout. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ══════════════════════════════════════════════
    GoGroup Form Components
    ══════════════════════════════════════════════ */
