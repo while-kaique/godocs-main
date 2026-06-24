@@ -99,6 +99,9 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   custo_evitado: string | null;
   custo_evitado_justificativa: string | null;
   custo_evitado_itens: string | null;
+  // Custos do projeto: idem custo evitado — necessários para o seed da EDIÇÃO.
+  custo_projeto: string | null;
+  custo_projeto_itens: string | null;
   memorial_calculo: string | null;
   documentacao: unknown | null;
   ultima_versao: VersaoSnapshot | null;
@@ -407,6 +410,8 @@ export async function getMeuProjeto(
     custo_evitado: data.custo_evitado ?? null,
     custo_evitado_justificativa: data.custo_evitado_justificativa ?? null,
     custo_evitado_itens: data.custo_evitado_itens ?? null,
+    custo_projeto: data.custo_projeto ?? null,
+    custo_projeto_itens: data.custo_projeto_itens ?? null,
     memorial_calculo: data.memorial_calculo,
     documentacao: docConteudo,
     ultima_versao,

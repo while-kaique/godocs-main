@@ -211,6 +211,13 @@ Antes de escolher a complexidade, responda objetivamente: **a AUTOMAÇÃO, quand
 
 Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
 
+## CUSTOS DO PROJETO (cross-check declaração × documentação)
+
+O formulário coleta os "custos do projeto" — serviços externos PAGOS que a solução consome para rodar (chave de API da OpenAI, ElevenLabs, um SaaS por uso). Eles chegam em memorial_saving.custo_projeto_itens (lista declarada) e custo_projeto_reais (total mensalizado, que ABATE o ganho). Compare a declaração com os serviços pagos que aparecem em documentacao_enviada_usuario / dependencias:
+- Se a doc menciona um serviço externo claramente PAGO (ex.: ElevenLabs, OpenAI por uso, Twilio) que NÃO está na lista declarada, aponte em "Pontos de atenção"/Recomendações que o custo pode estar subestimado.
+- Se a pessoa declarou um custo que não tem respaldo na doc, sinalize para conferência.
+- Não invente valores nem altere o cálculo — apenas registre a divergência qualitativamente (o valor é determinístico, vem do formulário). Quando declaração e doc batem, não comente.
+
 ## FORMATO DE RESPOSTA
 
 Responda APENAS com JSON válido, exatamente neste formato.
@@ -300,6 +307,11 @@ function buildUserMessage(
       custo_evitado_reais: saving.custo_evitado_reais ?? 0,
       custo_evitado_tipo: saving.custo_evitado_tipo ?? null,
       custo_externo_mensal: saving.custo_externo_mensal ?? 0,
+      // Custos do projeto DECLARADOS no formulário (serviços externos pagos que a
+      // solução consome). Total mensalizado que ABATE + a lista de itens, para o
+      // analisador cruzar com os serviços pagos que aparecem na doc enviada.
+      custo_projeto_reais: saving.custo_projeto_reais ?? 0,
+      custo_projeto_itens: parseJson(projeto.custo_projeto_itens as string | null) ?? [],
       tipo_saving: saving.tipo_saving ?? null,
       memorial_calculo: saving.memorial_calculo ?? '(sem memorial)',
     };

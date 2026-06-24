@@ -877,6 +877,9 @@ export type ProjetoRow = {
   custo_evitado: string | null; // 'sim' | 'nao' — a solução evitou custo externo?
   custo_evitado_justificativa: string | null; // texto concatenado das ferramentas evitadas
   custo_evitado_itens: string | null; // JSON [{nome,valor,recorrencia,justificativa}]
+  custo_projeto: string | null; // 'sim'|'nao' — solução consome serviço externo pago pra rodar?
+  custo_projeto_justificativa: string | null; // texto concatenado dos serviços do projeto
+  custo_projeto_itens: string | null; // JSON [{nome,valor,recorrencia,justificativa}] — ABATE
   ganho_total_mensal: number | null;
   complexidade: string | null;
   alguem_fazia: string | null; // 'sim' | 'nao' — havia trabalho manual antes

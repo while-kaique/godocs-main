@@ -803,6 +803,15 @@ function SavingForm({
       ? draft.custoEvitadoItens
       : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
   );
+  // Custos do projeto: a solução INTERNA consome serviço externo PAGO pra rodar
+  // (chave de API, ElevenLabs)? 'sim' → lista incremental (mesmo formato do evitado),
+  // mas o valor ABATE o saving.
+  const [temCustoProjeto, setTemCustoProjeto] = useState<"sim" | "nao" | "">(draft?.temCustoProjeto ?? "");
+  const [custoProjetoItens, setCustoProjetoItens] = useState<CustoEvitadoItemInput[]>(
+    draft?.custoProjetoItens?.length
+      ? draft.custoProjetoItens
+      : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
+  );
   const [tipoSaving, setTipoSaving] = useState<"mensal" | "pontual" | "">(draft?.tipoSaving ?? "");
   const [custoExterno, setCustoExterno] = useState(draft?.custoExterno ?? "");
   const [custoPeriodicidade, setCustoPeriodicidade] = useState<"mensal" | "anual" | "">(
@@ -818,8 +827,8 @@ function SavingForm({
 
   // Espelha o rascunho no pai a cada mudança, para persistir entre navegações.
   useEffect(() => {
-    onDraftChange?.({ linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
-  }, [linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
+    onDraftChange?.({ linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, temCustoProjeto, custoProjetoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita });
+  }, [linhas, alguemFazia, temCustoEvitado, custoEvitadoItens, temCustoProjeto, custoProjetoItens, tipoSaving, custoExterno, custoPeriodicidade, valorReceita, racionalReceita, onDraftChange]);
 
   const isSaving = tipoProjeto.includes("saving");
   const isReceita = !isSaving; // este form é renderizado só com tipoProjeto=["receita_incremental"]
@@ -848,13 +857,19 @@ function SavingForm({
   const custoEvitadoCompleto =
     temCustoEvitado === "nao" ||
     (temCustoEvitado === "sim" && custoEvitadoItens.length > 0 && custoEvitadoItens.every(custoEvitadoItemCompleto));
+  // Custos do projeto: mesma regra de completude do custo evitado (lista incremental).
+  const custoProjetoCompleto =
+    temCustoProjeto === "nao" ||
+    (temCustoProjeto === "sim" && custoProjetoItens.length > 0 && custoProjetoItens.every(custoEvitadoItemCompleto));
 
   // Gates de exibição (saving). A tabela mantém o gate atual (`alguemFazia`).
   // Custo evitado/externo: no "não" aparece já; no "sim" só após a tabela completa.
   const mostrarSecaoSaving = isSaving && tipoSaving !== "";
   const mostrarCustoEvitado =
     isSaving && (alguemFazia === "nao" || (alguemFazia === "sim" && tabelaSavingCompleta));
-  const mostrarCustoFerramentaExterna = isExterno && isSaving && mostrarCustoEvitado && custoEvitadoCompleto;
+  // Custos do projeto aparecem após o custo evitado estar resolvido (revelação progressiva).
+  const mostrarCustoProjeto = isSaving && mostrarCustoEvitado && custoEvitadoCompleto;
+  const mostrarCustoFerramentaExterna = isExterno && isSaving && mostrarCustoProjeto && custoProjetoCompleto;
 
   // Gate (receita): racional só aparece depois do valor preenchido.
   const mostrarRacionalReceita = isReceita && num(valorReceita) > 0;
@@ -867,6 +882,7 @@ function SavingForm({
       : alguemFazia !== "" &&
         tabelaSavingCompleta &&
         custoEvitadoCompleto &&
+        custoProjetoCompleto &&
         (!isExterno || (custoExterno !== "" && num(custoExterno) >= 0 && custoPeriodicidade !== "")));
 
   // Animação padrão de entrada (slide de baixo pra cima) para cada novo tópico.
@@ -954,6 +970,38 @@ function SavingForm({
     setErrors({});
   }
 
+  // ── Custos do projeto (serviços pagos que a solução consome pra rodar) ──
+  function selectTemCustoProjeto(v: "sim" | "nao") {
+    setTemCustoProjeto(v);
+    if (v === "sim" && custoProjetoItens.length === 0) {
+      setCustoProjetoItens([{ nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+    }
+    setErrors((e) => {
+      const n = { ...e };
+      delete n.temCustoProjeto;
+      Object.keys(n).forEach((k) => { if (/^cp\d+/.test(k)) delete n[k]; });
+      return n;
+    });
+  }
+  function updateCustoProjeto(i: number, patch: Partial<CustoEvitadoItemInput>) {
+    setCustoProjetoItens((its) => its.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+    setErrors((e) => {
+      const n = { ...e };
+      delete n[`cp${i}nome`];
+      delete n[`cp${i}valor`];
+      delete n[`cp${i}recorrencia`];
+      delete n[`cp${i}justificativa`];
+      return n;
+    });
+  }
+  function addCustoProjeto() {
+    setCustoProjetoItens((its) => [...its, { nome: "", valor: "", recorrencia: "", justificativa: "" }]);
+  }
+  function removeCustoProjeto(i: number) {
+    setCustoProjetoItens((its) => its.filter((_, idx) => idx !== i));
+    setErrors({});
+  }
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!tipoSaving) errs.tipoSaving = "Selecione a frequência";
@@ -984,6 +1032,18 @@ function SavingForm({
           if (!it.justificativa.trim()) errs[`ce${i}justificativa`] = "Informe a justificativa";
         });
       }
+      // Custos do projeto: pergunta obrigatória. Se "sim", cada serviço precisa estar completo.
+      if (!temCustoProjeto) errs.temCustoProjeto = "Selecione uma opção";
+      if (temCustoProjeto === "sim") {
+        if (custoProjetoItens.length === 0) errs.temCustoProjeto = "Adicione ao menos um serviço";
+        custoProjetoItens.forEach((it, i) => {
+          const v = parseMoedaBR(it.valor);
+          if (!it.nome.trim()) errs[`cp${i}nome`] = "Informe o nome";
+          if (it.valor === "" || v <= 0) errs[`cp${i}valor`] = "Informe o valor";
+          if (!it.recorrencia) errs[`cp${i}recorrencia`] = "Selecione";
+          if (!it.justificativa.trim()) errs[`cp${i}justificativa`] = "Informe a justificativa";
+        });
+      }
     }
     if (isExterno && isSaving) {
       if (!custoExterno || parseFloat(custoExterno) < 0) errs.custoExterno = "Informe o custo da ferramenta";
@@ -1006,6 +1066,8 @@ function SavingForm({
       alguemFazia,
       temCustoEvitado,
       custoEvitadoItens,
+      temCustoProjeto,
+      custoProjetoItens,
       tipoSaving: tipoSaving as "mensal" | "pontual",
       custoExterno,
       custoPeriodicidade: custoPeriodicidade as "mensal" | "anual" | "",
@@ -1453,6 +1515,173 @@ function SavingForm({
                       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
                     Adicionar ferramenta evitada
+                  </button>
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Custos do projeto: serviços externos PAGOS que a solução consome pra rodar */}
+            {mostrarCustoProjeto && (
+            <div style={revelar}>
+              <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                A solução usa algum serviço externo pago para funcionar? <span style={{ color: "#e53e3e" }}>*</span>
+              </label>
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                Serviços/APIs pagos que a automação <strong>consome para rodar</strong> (ex: chave de API da OpenAI,
+                ElevenLabs, um SaaS por uso). Esse custo é descontado do ganho. <em>Não confunda com ferramentas evitadas
+                (que somam) nem com o custo de uma solução externa que substitui a interna.</em>
+              </p>
+              <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
+                {([["sim", "Sim, usa"], ["nao", "Não usa"]] as const).map(([opt, lbl]) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => selectTemCustoProjeto(opt)}
+                    className="flex-1 py-2.5 text-[13px] font-semibold transition-all"
+                    style={{
+                      background: temCustoProjeto === opt ? "#6b6e00" : "transparent",
+                      color: temCustoProjeto === opt ? "#fff" : "#6b6e00",
+                      borderRight: opt === "sim" ? "1px solid rgba(215,219,0,0.2)" : "none",
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {errors.temCustoProjeto && (
+                <div className="mt-1 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                  {errors.temCustoProjeto}
+                </div>
+              )}
+
+              {/* Lista incremental de serviços pagos do projeto */}
+              {temCustoProjeto === "sim" && (
+                <div className="mt-3">
+                  {/* Cabeçalho (telas largas) */}
+                  <div
+                    className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
+                    style={{ gridTemplateColumns: "1fr 96px 104px 28px", color: "#9a9aa8" }}
+                  >
+                    <span>Serviço / API</span>
+                    <span className="text-center">Valor (R$)</span>
+                    <span className="text-center">Recorrência</span>
+                    <span />
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {custoProjetoItens.map((it, i) => {
+                      const linhaErro =
+                        errors[`cp${i}nome`] || errors[`cp${i}valor`] ||
+                        errors[`cp${i}recorrencia`] || errors[`cp${i}justificativa`];
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-xl p-2.5"
+                          style={{ background: "var(--go-white)", border: "1.5px solid rgba(215,219,0,0.18)", animation: "go-step-in 0.3s ease" }}
+                        >
+                          <div className="grid items-start gap-2.5" style={{ gridTemplateColumns: "1fr 96px 104px 28px" }}>
+                            {/* Nome do serviço */}
+                            <input
+                              type="text"
+                              placeholder="Ex: ElevenLabs"
+                              aria-label="Nome do serviço do projeto"
+                              value={it.nome}
+                              onChange={(e) => updateCustoProjeto(i, { nome: e.target.value })}
+                              className="go-input w-full"
+                              style={{
+                                height: 38, padding: "0 10px", borderRadius: "var(--go-radius-md)",
+                                border: errors[`cp${i}nome`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                              }}
+                            />
+                            {/* Valor — máscara de moeda BR (só dígitos → 1.234,56) */}
+                            <input
+                              type="text" inputMode="numeric" placeholder="99,90"
+                              aria-label="Valor do serviço do projeto"
+                              value={it.valor}
+                              onChange={(e) => updateCustoProjeto(i, { valor: formatMoedaBR(e.target.value) })}
+                              className="go-input w-full"
+                              style={{
+                                height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)", textAlign: "center",
+                                border: errors[`cp${i}valor`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                              }}
+                            />
+                            {/* Recorrência */}
+                            <select
+                              aria-label="Recorrência do custo do projeto"
+                              value={it.recorrencia}
+                              onChange={(e) => updateCustoProjeto(i, { recorrencia: e.target.value as "mensal" | "pontual" | "" })}
+                              className="go-select w-full"
+                              style={{
+                                height: 38, padding: "0 6px", borderRadius: "var(--go-radius-md)",
+                                border: errors[`cp${i}recorrencia`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                                background: "var(--go-white)", fontSize: 13,
+                                color: it.recorrencia ? "var(--go-text-primary)" : "#8b8b9a",
+                                textAlign: "center", textAlignLast: "center",
+                              }}
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="mensal">Mensal</option>
+                              <option value="pontual">Pontual</option>
+                            </select>
+                            {/* Remover */}
+                            {custoProjetoItens.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => removeCustoProjeto(i)}
+                                aria-label="Remover serviço do projeto"
+                                className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
+                                style={{ color: "#b4313b", background: "transparent" }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            ) : <span />}
+                          </div>
+
+                          {/* Justificativa breve */}
+                          <input
+                            type="text"
+                            placeholder="Justificativa breve (ex: TTS das respostas via ElevenLabs)"
+                            aria-label="Justificativa do custo do projeto"
+                            value={it.justificativa}
+                            onChange={(e) => updateCustoProjeto(i, { justificativa: e.target.value })}
+                            className="go-input mt-2 w-full"
+                            style={{
+                              padding: "9px 10px", borderRadius: "var(--go-radius-md)",
+                              border: errors[`cp${i}justificativa`] ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                              background: "var(--go-white)", fontSize: 13,
+                            }}
+                          />
+
+                          {linhaErro ? (
+                            <div className="mt-1.5 text-[11px] font-medium" style={{ color: "#e53e3e", animation: "go-slide-down 0.2s ease" }}>
+                              {linhaErro}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Adicionar serviço */}
+                  <button
+                    type="button"
+                    onClick={addCustoProjeto}
+                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-colors"
+                    style={{ color: "#6b6e00", background: "transparent", border: "1.5px dashed rgba(215,219,0,0.45)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(215,219,0,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Adicionar serviço
                   </button>
                 </div>
               )}
