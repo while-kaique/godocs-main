@@ -104,6 +104,12 @@ describe('buildSavingPrompt — bloco BASE DAS HORAS', () => {
     expect(p).not.toContain('você DEVE perguntar');
   });
 
+  it('menciona o gate de linha acima do teto (uma pessoa × várias unidades)', () => {
+    const p = buildSavingPrompt(ctxBase(), doc, savingRotinaReal(), 'resumo');
+    expect(p).toContain('LINHA ACIMA DO TETO');
+    expect(p.toLowerCase()).toContain('várias pessoas/unidades');
+  });
+
   it('NÃO inclui o bloco no contrafactual', () => {
     const p = buildSavingPrompt(ctxBase({ alguem_fazia: 'nao' }), doc, savingRotinaReal(), 'resumo');
     expect(p).not.toContain('BASE DAS HORAS');
