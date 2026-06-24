@@ -23,6 +23,8 @@ Modo **proxy** (padrão em prod): `LLM_BASE_URL` + `API_PROXY_TOKEN` roteiam par
 
 **Fallback automático** (só no modo proxy + provider `openai`): quando o proxy **demora > 25s** (timeout via `AbortController`) **ou retorna erro** (gateway/exceção), `llmChat` refaz a MESMA chamada **direto na `api.openai.com`** com a chave **`LLM_FALLBACK`** e o modelo **`gpt-5.4-mini`** (NÃO 5.5; override opcional via `LLM_FALLBACK_MODEL`). Assim o usuário não vê erro nem fica preso no "tente novamente" do chat. Com fallback configurado o proxy **falha rápido** (`gatewayRetries: 0`, sem os 3 retries lentos) → cai logo no plano B; sem `LLM_FALLBACK`, mantém a resiliência antiga (2 retries de gateway). O retry de **parâmetro não suportado** (400 `unsupported_parameter/value`, ex. `temperature` no gpt-5.x) é instantâneo e **não** consome `gatewayRetries`. ⚠️ Em prod, `LLM_FALLBACK` precisa estar nos **secrets do Godeploy** (não só no `.env` local).
 
+**Resiliência do orquestrador (`orchestrator.ts`):** além do fallback do `llm.ts`, o loop de chamada do orquestrador **re-tenta a MESMA chamada** quando a resposta vem **vazia OU com JSON inválido/truncado** (`maxRetries=2` → até 3 tentativas) — uma malformação **transitória** do gateway não vira mais "tente novamente" para o usuário (o turno seguinte costuma voltar íntegro). Esgotadas as tentativas, tenta recuperar `type`/`content` por **regex** do texto truncado; se nem isso, devolve uma **mensagem tranquilizadora** ("instabilidade momentânea… nada se perdeu") — o estado `coletado/saving/receita` segue **intacto** no resultado, então o usuário só reenvia a última mensagem.
+
 ## Comandos
 
 ```bash

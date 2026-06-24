@@ -900,7 +900,14 @@ export async function runOrchestrator(
   // em respostas simples sem tocar na qualidade da compilação da doc.
   const fastModel = process.env.LLM_MODEL_FAST || undefined;
   log(`Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}${fastModel ? `, modelo rápido: ${fastModel}` : ''}`);
-  let raw: string;
+  // Re-tenta a chamada ao LLM tanto em resposta VAZIA quanto em JSON inválido. A
+  // resposta do orquestrador carrega todo o estado (coletado/saving/receita) num
+  // único JSON grande; uma malformação/truncamento transitório do gateway quebra o
+  // parse, mas o turno seguinte costuma voltar íntegro (visto em prod: 2 turnos
+  // seguidos falharam e o 3º recuperou). Antes só re-tentávamos resposta vazia —
+  // falha de parse caía direto no fallback e o usuário via "tente novamente".
+  let raw = '';
+  let parsed: Record<string, unknown> | null = null;
   const maxRetries = 2;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -911,28 +918,26 @@ export async function runOrchestrator(
       log(`Erro no LLM: ${msg}`);
       throw new Error(`Falha na chamada ao modelo de IA: ${msg}`);
     }
-    if (raw && raw.trim().length > 0) break;
-    log(`LLM retornou vazio (tentativa ${attempt + 1}/${maxRetries + 1})${attempt < maxRetries ? ' — re-tentando...' : ''}`);
-  }
-  // @ts-expect-error — raw é atribuído dentro do loop; se todas as tentativas falharam, será ''
-  if (!raw || raw.trim().length === 0) {
-    raw = JSON.stringify({
-      type: 'question',
-      content: 'Desculpe, tive um problema ao processar. Pode repetir sua resposta?',
-      coletado,
-      saving,
-      receita,
-    });
+    if (!raw || raw.trim().length === 0) {
+      log(`LLM retornou vazio (tentativa ${attempt + 1}/${maxRetries + 1})${attempt < maxRetries ? ' — re-tentando...' : ''}`);
+      continue;
+    }
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>;
+      break;
+    } catch {
+      log(`Falha ao parsear JSON (tentativa ${attempt + 1}/${maxRetries + 1})${attempt < maxRetries ? ' — re-tentando...' : ''}`);
+    }
   }
 
   const hasSaving = tipos_projeto.includes('saving');
   const hasReceita = tipos_projeto.includes('receita_incremental');
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    log('Falha ao parsear JSON, tentando recuperar campos do texto truncado...');
+  // Todas as tentativas falharam (vazio ou JSON inválido após os retries): tenta
+  // recuperar campos do último texto truncado via regex; se nem isso, devolve uma
+  // mensagem tranquilizadora (o estado coletado/saving/receita segue intacto).
+  if (!parsed) {
+    log('Parse falhou após os retries, tentando recuperar campos do texto truncado...');
 
     // Tenta extrair campos do JSON truncado via regex
     const typeMatch = raw.match(/"type"\s*:\s*"(\w+)"/);
@@ -947,7 +952,7 @@ export async function runOrchestrator(
       if (lastResort) {
         recoveredContent = lastResort[1].replace(/"\s*,?\s*"coletado[\s\S]*$/, '').replace(/\\n/g, '\n').replace(/\\"/g, '"');
       } else {
-        recoveredContent = 'Houve um erro ao processar a resposta da IA. Por favor, tente novamente.';
+        recoveredContent = 'Tive uma instabilidade momentânea ao processar sua resposta — suas informações foram salvas e nada se perdeu. Pode reenviar a última mensagem? Se o erro persistir, tente novamente em alguns minutos.';
       }
     }
 
