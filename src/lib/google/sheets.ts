@@ -69,6 +69,9 @@ export const SHEET_COLUMNS = [
   'Custo do Projeto',                     // valor R$ mensal (mensalizado: pontual ÷12)
   'Justificativa Custo do Projeto',       // detalhamento por serviço (nome/valor/recorrência/just.)
   'Custo do Projeto Mensal ou Pontual',   // recorrência marcada (Mensal/Pontual/Misto)
+  // Split do saving (transparência): "—" quando não se aplica.
+  'Saving Horas Real',              // carga humana real do split
+  'Saving Horas Escalado',          // ganho por escala do split
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
