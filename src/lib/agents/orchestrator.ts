@@ -449,6 +449,19 @@ export function aplicaConfirmacaoBaseHoras(ctx: ProjetoContexto, saving: SavingC
   return !ninguemFazia && isMensal && temHorasAntes;
 }
 
+// Escopo do GATE do split CARGA REAL × ESCALA: quando ALGUÉM fazia a tarefa à mão
+// (alguem_fazia='sim') e o saving é recorrente (não pontual) com horas reais (>0). O
+// split (quanto a pessoa de fato fazia × quanto a automação ampliou) é informação
+// OBRIGATÓRIA de análise — por isso o backend força a pergunta (gate determinístico em
+// chat.functions.ts), não confia só no prompt. Não se aplica a contrafactual/externo
+// (sem rotina real) nem a pontual (trabalho único, sem escala). Espelha o predicado do
+// bloco no prompt (buildSavingPrompt).
+export function aplicaSplitCargaEscala(ctx: ProjetoContexto, saving: SavingColetado): boolean {
+  const isPontual = saving.tipo_saving === 'pontual';
+  const temHorasAntes = (saving.linhas ?? []).some((l) => (l.horas_antes ?? 0) > 0);
+  return ctx.alguem_fazia === 'sim' && !isPontual && temHorasAntes;
+}
+
 // Cadência periódica do saving (trimestral/semestral): nome do período e nº de meses.
 // Retorna null para mensal/pontual (não-periódicos plurianuais).
 export function periodoSavingInfo(tipo: SavingColetado['tipo_saving']): { nome: 'trimestre' | 'semestre'; meses: number } | null {
@@ -621,26 +634,26 @@ DETALHES TÉCNICOS APROVADOS:
   // CARGA REAL × GANHO POR ESCALA — só quando alguém fazia a tarefa à mão (sim) e há
   // rotina recorrente (não pontual). Separa o que a PESSOA realmente fazia (carga real)
   // do volume incremental que só a automação cobre (escala). O TOTAL continua sendo o
-  // saving creditado (vira R$); o split é transparência/auditoria. Prompt-enforced
-  // (qualitativo, como [2.4]) — sem gate determinístico no backend.
-  const aplicaCargaEscala = ctx.alguem_fazia === 'sim' && !isPontual && temHorasAntes;
+  // saving creditado (vira R$); o split é transparência/auditoria. A pergunta do nº é
+  // CONDUZIDA PELO SISTEMA (gate determinístico em chat.functions.ts), que BLOQUEIA o
+  // preview até o split existir — aqui o prompt só explica o conceito e instrui a
+  // registrar os dois números no memorial quando o [SISTEMA] avisar.
+  const aplicaCargaEscala = aplicaSplitCargaEscala(ctx, saving);
   const cargaEscalaBlock = aplicaCargaEscala
     ? `
 
 ═══════════════════════════════════════════════════════════════════
-CARGA REAL × GANHO POR ESCALA (OBRIGATÓRIO — separar antes do preview)
+CARGA REAL × GANHO POR ESCALA (informação OBRIGATÓRIA de análise)
 ═══════════════════════════════════════════════════════════════════
 Alguém fazia esta tarefa manualmente, então parte do total de horas economizadas é trabalho HUMANO que de fato acontecia (CARGA REAL) e parte pode ser VOLUME QUE SÓ EXISTE PORQUE A AUTOMAÇÃO ESCALOU — execuções/itens que nenhuma pessoa fazia (nem conseguiria) à mão (GANHO POR ESCALA).
 Exemplo: a pessoa rodava o processo 4×/mês (6h cada = 24h reais), mas a automação passou a rodá-lo 22×/mês (mais 18 execuções = 108h). Total de saving = 132h: 24h de carga real + 108h de ganho por escala.
 
 POR QUE SEPARAR: o total (ex.: 132h) CONTINUA sendo o saving creditado — você NÃO altera as \`linhas\` por causa disso. Mas quem audita precisa enxergar quanto era trabalho humano de fato e quanto é volume incremental da automação. Creditar "escala" como se uma pessoa gastasse aquelas horas é justamente o exagero que esta separação torna transparente.
 
-O QUE FAZER (use os números que o usuário já deu — NÃO re-pergunte tudo):
-1. Esclareça, para o conjunto do projeto: das ${totalHoras}h economizadas, quanto a(s) pessoa(s) REALMENTE faziam à mão antes (a frequência/volume que de fato executavam) e quanto a automação passou a fazer ALÉM disso (volume que ninguém fazia manualmente).
-2. Preencha no objeto \`saving\`: "horas_carga_real" (trabalho humano real) e "horas_escala" (volume incremental só da automação). As DUAS devem somar exatamente o total de economia (${totalHoras}h). Se NÃO houve escala (a automação faz o mesmo volume que a pessoa fazia), ponha "horas_escala": 0 e "horas_carga_real" igual ao total.
-3. Registre os dois números no memorial (dentro de "Saving de Pessoas"), em horas e qualitativamente — ex.: "Carga real (trabalho humano de fato): 24h; Ganho por escala (volume só da automação): 108h".
-
-GATE: é PROIBIDO gerar o preview sem "horas_carga_real" e "horas_escala" preenchidos e somando o total. Não invente — pergunte o que a pessoa realmente fazia vs. o que a automação ampliou.
+CONFIRMAÇÃO — CONDUZIDA PELO SISTEMA (você NÃO pergunta isso):
+   - O próprio sistema, logo antes do preview, pergunta ao usuário quantas das ${totalHoras}h economizadas a pessoa REALMENTE fazia à mão (a carga real); o restante é o ganho por escala. NÃO faça você essa pergunta nem a inclua nas suas respostas — o sistema cuida disso e calcula os dois números.
+   - Quando o sistema avisar (mensagem que começa com "[SISTEMA]") o split definido (carga real = X; ganho por escala = Y), REGISTRE os dois no memorial, dentro de "Saving de Pessoas", em horas e de forma qualitativa — ex.: "Carga real (trabalho humano de fato): 24h; Ganho por escala (volume só da automação): 108h". Os campos \`horas_carga_real\` e \`horas_escala\` já vêm preenchidos pelo sistema; mantenha-os.
+   - Se o usuário, ao detalhar a rotina, já deixar claro o split, você pode preencher \`horas_carga_real\`/\`horas_escala\` (somando o total) — mas mesmo assim a confirmação do sistema prevalece.
 ═══════════════════════════════════════════════════════════════════`
     : '';
 
@@ -818,7 +831,7 @@ COMO CONDUZIR:
 1. Abra exatamente conforme a diretiva "COMO ABRIR A CONVERSA" acima. Faça a primeira pergunta concreta e coerente com as horas informadas.${plural ? '\n   Como há mais de uma pessoa, valide as horas POR CARGO. Agrupe numa pergunta só as linhas do MESMO cargo (ex.: 7× "analista sênior" → UMA pergunta para o grupo, não sete). Mas trate cargos DIFERENTES separadamente — NÃO assuma que cargos distintos fazem a mesma tarefa pelo mesmo tempo só porque o usuário descreveu o processo uma vez. ANTES de perguntar, questione-se sobre qual é a função plausível de CADA cargo neste projeto (um head/gestor costuma aprovar/supervisionar; um analista executa; um estagiário apoia) — cargos de senioridades diferentes raramente fazem a mesma coisa pelo mesmo tempo. Se a tabela mostra cargos distintos com rotina e tempo idênticos, isso é justamente o que você deve QUESTIONAR (ver "PLAUSIBILIDADE ENTRE CARGOS" abaixo), não agrupar como se fossem a mesma pessoa.' : ''}
 2. Faça UMA pergunta por vez, focada em fatos concretos. Vá direto ao ponto.
 3. Monte o memorial_calculo conforme o usuário responde — NÃO peça para ele escrever. O memorial deve detalhar a justificativa POR PESSOA/CARGO e somar no total.
-4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}${aplicaCargaEscala ? '\n   ⛔ GATE CARGA REAL × ESCALA: é PROIBIDO gerar o preview sem "horas_carga_real" e "horas_escala" preenchidos no objeto saving e somando o total de economia (ver bloco "CARGA REAL × GANHO POR ESCALA").' : ''}
+4. ANTES de gerar o preview, confirme internamente que TODOS os pontos 2.2 (de cada pessoa) — INCLUSIVE a COMPOSIÇÃO DAS HORAS (a quebra do total por atividade, somando o total) — e 3.1 estão preenchidos. É PROIBIDO gerar o preview com o total de horas de algum cargo sem a quebra das atividades que o compõem.${economiaAlta ? '\n   ⛔ GATE ADICIONAL (economia alta ≥44h/mês): é PROIBIDO gerar o preview sem o ponto 2.4 ("O que mudou após a automação") preenchido de forma CONCRETA — o destino real do tempo/custo liberado (realocação, mais volume, redução de equipe, serviço cancelado…). Resposta vaga não conta como preenchido.' : ''}${aplicaCargaEscala ? '\n   ℹ️ CARGA REAL × ESCALA: o SISTEMA pergunta o split (carga real × ganho por escala) antes do preview e preenche "horas_carga_real"/"horas_escala" — você NÃO pergunta isso; só registra os dois números no memorial quando o [SISTEMA] avisar.' : ''}
 5. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 6. Quando a justificativa for concreta, a conta fechar E o ganho for REAL (já em produção e medido — NÃO projetado; ver "GANHO REAL × PROJETADO" abaixo), gere o PREVIEW.
 
