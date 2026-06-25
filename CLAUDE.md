@@ -261,6 +261,7 @@ npm run e2e:cleanup -- <runId>    # remove as linhas de teste (planilha → SQLi
 - Path alias: `@/*` → `./src/*`
 - shadcn/ui em `src/components/ui/` — não editar diretamente
 - Funções server-only: `.server.ts` ou importam de `integrations/db/client.server`
+- ⚠️ **NUNCA ler `process.env` em escopo de módulo (topo de arquivo importado pelo `worker.ts`).** No runtime do Godeploy `process` **não existe no momento da avaliação do módulo** (só dentro de funções, em tempo de request) — um `const X = process.env.Y` no topo lança `process is not defined` no bootstrap e **derruba o worker inteiro** (todas as rotas, incl. `/api/auth/me` → admin some). Sempre leia `process.env` **dentro de uma função** (lazy), como `auth.ts`/`gmail.ts`/`email-legados.functions.ts`. (Bug real: deploy quebrou o painel admin com `const APP_BASE_URL = process.env...` no topo.)
 - Forms: react-hook-form + zod; toasts via sonner
 - Idioma da interface: PT-BR
 - Identidade visual: `--go-blue` (#0059A9), `--go-lime` (#D7DB00), `--go-cream` (#FBF4EE), fonte Poppins

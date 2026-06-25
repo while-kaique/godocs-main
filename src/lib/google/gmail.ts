@@ -9,9 +9,14 @@ import { getGmailAccessToken } from './auth';
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 
-// Caixa impersonada (o "From" real). Override por env; default = time RPA & IA.
-const GMAIL_SENDER = process.env.GMAIL_SENDER ?? 'rpa_ia@gocase.com';
 const SENDER_NOME = 'GoDocs';
+
+// Caixa impersonada (o "From" real). Override por env; default = time RPA & IA.
+// ⚠️ Lido DENTRO da função (lazy): no runtime do worker `process` não existe no
+// momento da avaliação do módulo — acessar process.env no topo quebra o bootstrap.
+function getSender(): string {
+  return process.env.GMAIL_SENDER ?? 'rpa_ia@gocase.com';
+}
 
 // base64 de uma string UTF-8 (btoa só lida com latin1 → precisa dos bytes UTF-8).
 function base64Utf8(str: string): string {
@@ -47,8 +52,9 @@ function buildRawMessage(from: string, to: string, subject: string, html: string
 }
 
 export async function sendGmail(to: string, subject: string, html: string): Promise<void> {
-  const token = await getGmailAccessToken(GMAIL_SENDER);
-  const raw = buildRawMessage(GMAIL_SENDER, to, subject, html);
+  const sender = getSender();
+  const token = await getGmailAccessToken(sender);
+  const raw = buildRawMessage(sender, to, subject, html);
 
   const res = await fetch(GMAIL_API, {
     method: 'POST',

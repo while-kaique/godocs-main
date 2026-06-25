@@ -20,8 +20,12 @@ import { temAtualizadoEm, PRAZO_LEGADO } from '@/lib/meus-projetos.functions';
 import { sendGmail } from '@/lib/google/gmail';
 
 // URL pública do GoDocs (link "Meus Projetos" no corpo do e-mail). Override por env.
-const APP_BASE_URL = process.env.APP_BASE_URL ?? 'https://godocs.devgogroup.com';
-const LINK_MEUS_PROJETOS = `${APP_BASE_URL.replace(/\/$/, '')}/meus-projetos`;
+// ⚠️ Lido DENTRO da função (lazy): no runtime do worker `process` não existe no momento
+// da avaliação do módulo — acessar process.env no topo quebra o bootstrap do worker.
+function linkMeusProjetos(): string {
+  const base = process.env.APP_BASE_URL ?? 'https://godocs.devgogroup.com';
+  return `${base.replace(/\/$/, '')}/meus-projetos`;
+}
 
 const CHAVE_ASSUNTO = 'email_legado_assunto';
 const CHAVE_CORPO = 'email_legado_corpo';
@@ -169,7 +173,7 @@ export function renderEmailLegado(
         .join('')}</ul>`
     : '<p style="color: #6b7280;">—</p>';
 
-  const linkHtml = `<a href="${LINK_MEUS_PROJETOS}" style="display: inline-block; background: #0059A9; color: #ffffff; text-decoration: none; font-weight: 600; padding: 12px 22px; border-radius: 8px; margin: 8px 0;">Acessar Meus Projetos</a>`;
+  const linkHtml = `<a href="${linkMeusProjetos()}" style="display: inline-block; background: #0059A9; color: #ffffff; text-decoration: none; font-weight: 600; padding: 12px 22px; border-radius: 8px; margin: 8px 0;">Acessar Meus Projetos</a>`;
 
   // Corpo: escapa, converte quebras de linha em <br> e injeta os placeholders já como HTML.
   const corpoHtml = escapeHtml(template.corpo || TEMPLATE_PADRAO.corpo)
