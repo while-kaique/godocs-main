@@ -13,6 +13,11 @@ import {
   upsertConfiguracao,
   insertEmailDisparo,
   getUltimosDisparosPorEmail,
+  createEmailLote,
+  setEmailLoteTotal,
+  bumpEmailLote,
+  finalizeEmailLote,
+  getEmailLote,
   parseJson,
 } from '@/integrations/db/client.server';
 import { temAtualizadoEm, PRAZO_LEGADO } from '@/lib/meus-projetos.functions';
@@ -205,42 +210,88 @@ export function renderEmailLegado(
 
 // ─── Disparo ──────────────────────────────────────────────────────────────────
 
+export type ProgressoLote = {
+  total: number;
+  enviados: number;
+  falhas: number;
+  status: 'enviando' | 'concluido' | 'erro';
+};
+
+// Cria o lote (com o total atual de pendentes) e devolve o id para o front acompanhar
+// o progresso. O envio em si roda em background via enviarLoteLegados(adminEmail, loteId).
+export async function iniciarDisparoLegados(adminEmail: string): Promise<{ loteId: string; total: number }> {
+  const { totalPessoas } = await listarLegadosPendentes();
+  const loteId = await createEmailLote(totalPessoas, adminEmail);
+  return { loteId, total: totalPessoas };
+}
+
+// Lê o progresso de um lote (polling do front).
+export async function getProgressoLote(loteId: string): Promise<ProgressoLote | null> {
+  const lote = await getEmailLote(loteId);
+  if (!lote) return null;
+  const status = (['enviando', 'concluido', 'erro'].includes(lote.status) ? lote.status : 'enviando') as ProgressoLote['status'];
+  return { total: lote.total, enviados: lote.enviados, falhas: lote.falhas, status };
+}
+
 // Loop de envio (roda em background no worker). Re-lista os pendentes (autoritativo —
-// não confia em contagem vinda do front), renderiza por destinatário, envia via Brevo
-// e registra cada resultado em `email_disparos`. Sequencial com pequeno intervalo para
-// respeitar o rate limit do Brevo.
-export async function enviarLoteLegados(adminEmail: string): Promise<{ enviados: number; falhas: number }> {
+// não confia em contagem vinda do front), renderiza por destinatário, envia via Gmail
+// e registra cada resultado em `email_disparos`. A cada e-mail incrementa o contador do
+// lote (barra de progresso do front). Sequencial com pequeno intervalo para respeitar o
+// rate limit do Gmail.
+export async function enviarLoteLegados(
+  adminEmail: string,
+  loteId?: string,
+): Promise<{ enviados: number; falhas: number }> {
   const { recipients, template } = await listarLegadosPendentes();
   let enviados = 0;
   let falhas = 0;
 
-  for (const r of recipients) {
-    const { assunto, html } = renderEmailLegado(template, r);
-    const projetoIds = r.projetos.map((p) => p.id);
+  // Alinha o total do lote ao nº real de destinatários (a base pode ter mudado entre
+  // o clique e o início do envio em background).
+  if (loteId) {
     try {
-      await sendGmail(r.email, assunto, html);
-      enviados++;
-      await insertEmailDisparo({
-        email: r.email,
-        nome: r.nome,
-        projetoIds,
-        assunto,
-        enviadoPor: adminEmail,
-        status: 'sucesso',
-      });
+      await setEmailLoteTotal(loteId, recipients.length);
     } catch (e) {
-      falhas++;
-      await insertEmailDisparo({
-        email: r.email,
-        nome: r.nome,
-        projetoIds,
-        assunto,
-        enviadoPor: adminEmail,
-        status: 'falha',
-        erro: e instanceof Error ? e.message : String(e),
-      });
+      console.error('[enviarLoteLegados] falha ao ajustar total do lote:', e);
     }
-    await new Promise((res) => setTimeout(res, 120)); // throttle suave
+  }
+
+  try {
+    for (const r of recipients) {
+      const { assunto, html } = renderEmailLegado(template, r);
+      const projetoIds = r.projetos.map((p) => p.id);
+      try {
+        await sendGmail(r.email, assunto, html);
+        enviados++;
+        await insertEmailDisparo({
+          email: r.email,
+          nome: r.nome,
+          projetoIds,
+          assunto,
+          enviadoPor: adminEmail,
+          status: 'sucesso',
+        });
+        if (loteId) await bumpEmailLote(loteId, 'enviados');
+      } catch (e) {
+        falhas++;
+        await insertEmailDisparo({
+          email: r.email,
+          nome: r.nome,
+          projetoIds,
+          assunto,
+          enviadoPor: adminEmail,
+          status: 'falha',
+          erro: e instanceof Error ? e.message : String(e),
+        });
+        if (loteId) await bumpEmailLote(loteId, 'falhas');
+      }
+      await new Promise((res) => setTimeout(res, 120)); // throttle suave
+    }
+    if (loteId) await finalizeEmailLote(loteId, 'concluido');
+  } catch (e) {
+    // Erro inesperado fora do envio individual — marca o lote para o front não travar.
+    if (loteId) await finalizeEmailLote(loteId, 'erro').catch(() => {});
+    throw e;
   }
 
   return { enviados, falhas };

@@ -51,7 +51,8 @@ import {
   salvarTemplateEmailLegado,
   enviarLoteLegados,
   enviarEmailTeste,
-  listarLegadosPendentes,
+  iniciarDisparoLegados,
+  getProgressoLote,
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
@@ -441,17 +442,26 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await enviarEmailTeste(adminEmail)
       return json({ ok: true })
     }
-    // Dispara o lote: salva o template (se enviado), conta os destinatários e envia em
-    // background (runBackground/waitUntil) — a Response volta na hora com o nº enfileirado.
+    // Dispara o lote: salva o template (se enviado), cria o lote (com o total) e envia em
+    // background (runBackground/waitUntil) — a Response volta na hora com { loteId, total }.
+    // O front acompanha o progresso via .../email-legados/progresso/:loteId.
     if (pathname === '/api/admin/email-legados/enviar' && method === 'POST') {
       const { email: adminEmail } = await requireAdmin(request)
       const body = await readBody<{ assunto?: string; corpo?: string }>(request)
       if (body.assunto && body.corpo) {
         await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
       }
-      const { totalPessoas } = await listarLegadosPendentes()
-      runBackground(enviarLoteLegados(adminEmail))
-      return json({ ok: true, enfileirados: totalPessoas })
+      const { loteId, total } = await iniciarDisparoLegados(adminEmail)
+      runBackground(enviarLoteLegados(adminEmail, loteId))
+      return json({ ok: true, loteId, total })
+    }
+    // Progresso de um lote de disparo (polling do front).
+    if (pathname.startsWith('/api/admin/email-legados/progresso/') && method === 'GET') {
+      await requireAdmin(request)
+      const loteId = pathname.split('/').pop()!
+      const progresso = await getProgressoLote(loteId)
+      if (!progresso) return errorJson('Lote não encontrado', 404)
+      return json(progresso)
     }
 
     // ── Limpeza de projetos de TESTE E2E (admin) ──

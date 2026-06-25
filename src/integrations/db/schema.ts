@@ -187,6 +187,21 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_email_disparos_email
     ON email_disparos(email);
+
+  -- Lote de disparo (progresso). Uma linha por clique em "Enviar para X pessoas":
+  -- guarda o total e os contadores que o backend incrementa a cada envio, para o
+  -- front exibir barra de progresso + contador NN/total (polling). 'status':
+  -- 'enviando' → 'concluido' | 'erro'.
+  CREATE TABLE IF NOT EXISTS email_lotes (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    total INTEGER NOT NULL DEFAULT 0,
+    enviados INTEGER NOT NULL DEFAULT 0,
+    falhas INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'enviando',
+    iniciado_por TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

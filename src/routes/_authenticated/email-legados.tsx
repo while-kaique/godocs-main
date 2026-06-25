@@ -69,6 +69,13 @@ function EmailLegadosPage() {
   const [sending, setSending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [loteId, setLoteId] = useState<string | null>(null);
+  const [progresso, setProgresso] = useState<{
+    total: number;
+    enviados: number;
+    falhas: number;
+    status: "enviando" | "concluido" | "erro";
+  } | null>(null);
   const [expandido, setExpandido] = useState<Record<string, boolean>>({});
   const corpoRef = useRef<HTMLTextAreaElement>(null);
 
@@ -129,20 +136,61 @@ function EmailLegadosPage() {
   async function dispararLote() {
     setSending(true);
     try {
-      const r = await apiFetch<{ enfileirados: number }>("/api/admin/email-legados/enviar", {
-        assunto,
-        corpo,
-      });
+      const r = await apiFetch<{ loteId: string; total: number }>(
+        "/api/admin/email-legados/enviar",
+        { assunto, corpo },
+      );
       setConfirmOpen(false);
-      toast.success(`Disparo iniciado para ${r.enfileirados} pessoa(s). Os envios rodam em segundo plano.`);
-      // Reabre o preview em alguns segundos para refletir os selos "enviado em".
-      setTimeout(load, 6000);
+      // Abre o modal de progresso e começa a acompanhar.
+      setLoteId(r.loteId);
+      setProgresso({ total: r.total, enviados: 0, falhas: 0, status: "enviando" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao disparar os e-mails.");
     } finally {
       setSending(false);
     }
   }
+
+  function fecharProgresso() {
+    setProgresso(null);
+    setLoteId(null);
+  }
+
+  // Polling do progresso do lote enquanto está "enviando".
+  useEffect(() => {
+    if (!loteId || progresso?.status !== "enviando") return;
+    let cancel = false;
+    const timer = setInterval(async () => {
+      try {
+        const p = await apiFetch<{
+          total: number;
+          enviados: number;
+          falhas: number;
+          status: "enviando" | "concluido" | "erro";
+        }>(`/api/admin/email-legados/progresso/${loteId}`);
+        if (cancel) return;
+        setProgresso(p);
+        if (p.status !== "enviando") {
+          clearInterval(timer);
+          load(); // atualiza os selos "enviado em" na lista
+          if (p.status === "concluido") {
+            toast.success(
+              `Envio concluído: ${p.enviados} enviado(s)${p.falhas ? `, ${p.falhas} falha(s)` : ""}.`,
+            );
+          } else {
+            toast.error("O envio terminou com erro. Confira a lista.");
+          }
+        }
+      } catch {
+        /* falha de rede no poll — tenta de novo no próximo tick */
+      }
+    }, 1000);
+    return () => {
+      cancel = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loteId, progresso?.status]);
 
   function inserirVariavel(token: string) {
     const el = corpoRef.current;
@@ -412,6 +460,87 @@ function EmailLegadosPage() {
               Confirmar e enviar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de progresso do disparo (sobreposto, não fecha enquanto envia) */}
+      <Dialog
+        open={!!progresso}
+        onOpenChange={(o) => {
+          if (!o && progresso?.status !== "enviando") fecharProgresso();
+        }}
+      >
+        <DialogContent
+          className={progresso?.status === "enviando" ? "[&>button]:hidden" : undefined}
+          onEscapeKeyDown={(e) => progresso?.status === "enviando" && e.preventDefault()}
+          onInteractOutside={(e) => progresso?.status === "enviando" && e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {progresso?.status === "enviando" && <Loader2 className="h-5 w-5 animate-spin" />}
+              {progresso?.status === "concluido"
+                ? "Envio concluído"
+                : progresso?.status === "erro"
+                  ? "Envio interrompido"
+                  : "Enviando e-mails…"}
+            </DialogTitle>
+            <DialogDescription>
+              {progresso?.status === "enviando"
+                ? "Não feche esta janela até o envio terminar."
+                : "Você já pode fechar esta janela."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {progresso && (
+            <div className="space-y-3 py-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-4xl font-bold tabular-nums" style={{ color: "var(--go-blue)" }}>
+                  {String(progresso.enviados + progresso.falhas).padStart(
+                    String(progresso.total).length || 1,
+                    "0",
+                  )}
+                  <span className="text-2xl text-muted-foreground">/{progresso.total}</span>
+                </span>
+                {progresso.falhas > 0 && (
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    {progresso.falhas} falha(s)
+                  </span>
+                )}
+              </div>
+              <div
+                className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={progresso.total}
+                aria-valuenow={progresso.enviados + progresso.falhas}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width:
+                      progresso.total > 0
+                        ? `${((progresso.enviados + progresso.falhas) / progresso.total) * 100}%`
+                        : "100%",
+                    background: "var(--go-blue)",
+                  }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {progresso.status === "enviando"
+                  ? "Enviando… os e-mails saem de rpa_ia@gocase.com."
+                  : progresso.status === "concluido"
+                    ? `${progresso.enviados} e-mail(s) enviado(s) com sucesso.`
+                    : "O envio terminou com erro antes de concluir."}
+              </p>
+            </div>
+          )}
+
+          {progresso?.status !== "enviando" && (
+            <DialogFooter>
+              <Button onClick={fecharProgresso}>Fechar</Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

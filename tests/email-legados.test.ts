@@ -8,6 +8,11 @@ vi.mock('@/integrations/db/client.server', () => ({
   upsertConfiguracao: vi.fn(),
   insertEmailDisparo: vi.fn(),
   getUltimosDisparosPorEmail: vi.fn(),
+  createEmailLote: vi.fn(),
+  setEmailLoteTotal: vi.fn(),
+  bumpEmailLote: vi.fn(),
+  finalizeEmailLote: vi.fn(),
+  getEmailLote: vi.fn(),
   // parseJson é puro — mantemos a implementação real no mock.
   parseJson: (raw: string | null | undefined) => {
     if (raw == null) return null;
@@ -19,25 +24,40 @@ vi.mock('@/integrations/db/client.server', () => ({
   },
 }));
 
+vi.mock('@/lib/google/gmail', () => ({ sendGmail: vi.fn() }));
+
 import {
   getLegadosRows,
   getConfiguracao,
   getUltimosDisparosPorEmail,
+  setEmailLoteTotal,
+  bumpEmailLote,
+  finalizeEmailLote,
 } from '@/integrations/db/client.server';
+import { sendGmail } from '@/lib/google/gmail';
 import {
   renderEmailLegado,
   listarLegadosPendentes,
+  enviarLoteLegados,
   TEMPLATE_PADRAO,
 } from '@/lib/email-legados.functions';
 
 const mRows = getLegadosRows as unknown as ReturnType<typeof vi.fn>;
 const mConfig = getConfiguracao as unknown as ReturnType<typeof vi.fn>;
 const mDisparos = getUltimosDisparosPorEmail as unknown as ReturnType<typeof vi.fn>;
+const mSend = sendGmail as unknown as ReturnType<typeof vi.fn>;
+const mBump = bumpEmailLote as unknown as ReturnType<typeof vi.fn>;
+const mTotal = setEmailLoteTotal as unknown as ReturnType<typeof vi.fn>;
+const mFinalize = finalizeEmailLote as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mRows.mockReset();
   mConfig.mockReset().mockResolvedValue(undefined); // sem template salvo → usa o padrão
   mDisparos.mockReset().mockResolvedValue(new Map());
+  mSend.mockReset().mockResolvedValue(undefined);
+  mBump.mockReset();
+  mTotal.mockReset();
+  mFinalize.mockReset();
 });
 
 describe('renderEmailLegado', () => {
@@ -129,5 +149,34 @@ describe('listarLegadosPendentes', () => {
     );
     const { recipients } = await listarLegadosPendentes();
     expect(recipients[0].ultimoEnvio).toEqual({ data: '2026-06-24T10:00:00Z', status: 'sucesso' });
+  });
+});
+
+describe('enviarLoteLegados (progresso)', () => {
+  it('envia a cada destinatário, incrementa o lote e finaliza', async () => {
+    mRows.mockResolvedValue([
+      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
+      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
+    ]);
+    const r = await enviarLoteLegados('admin@x.com', 'lote-1');
+    expect(mSend).toHaveBeenCalledTimes(2);
+    expect(mTotal).toHaveBeenCalledWith('lote-1', 2);
+    expect(mBump).toHaveBeenCalledTimes(2);
+    expect(mBump).toHaveBeenCalledWith('lote-1', 'enviados');
+    expect(mFinalize).toHaveBeenCalledWith('lote-1', 'concluido');
+    expect(r).toEqual({ enviados: 2, falhas: 0 });
+  });
+
+  it('conta falha quando o envio lança e segue para o próximo', async () => {
+    mRows.mockResolvedValue([
+      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
+      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
+    ]);
+    mSend.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined);
+    const r = await enviarLoteLegados('admin@x.com', 'lote-2');
+    expect(r).toEqual({ enviados: 1, falhas: 1 });
+    expect(mBump).toHaveBeenCalledWith('lote-2', 'falhas');
+    expect(mBump).toHaveBeenCalledWith('lote-2', 'enviados');
+    expect(mFinalize).toHaveBeenCalledWith('lote-2', 'concluido');
   });
 });

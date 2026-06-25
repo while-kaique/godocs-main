@@ -773,6 +773,47 @@ export function insertEmailDisparo(input: {
   );
 }
 
+// --- Lote de disparo (progresso) ---
+
+export type EmailLoteRow = {
+  id: string;
+  total: number;
+  enviados: number;
+  falhas: number;
+  status: string; // 'enviando' | 'concluido' | 'erro'
+  iniciado_por: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export async function createEmailLote(total: number, iniciadoPor: string): Promise<string> {
+  const id = generateId();
+  await exec(
+    `INSERT INTO email_lotes (id, total, enviados, falhas, status, iniciado_por, created_at, updated_at)
+     VALUES (?, ?, 0, 0, 'enviando', ?, ?, ?)`,
+    [id, total, iniciadoPor, nowISO(), nowISO()],
+  );
+  return id;
+}
+
+export function setEmailLoteTotal(id: string, total: number) {
+  return exec('UPDATE email_lotes SET total = ?, updated_at = ? WHERE id = ?', [total, nowISO(), id]);
+}
+
+// Incrementa um contador (enviados|falhas) de forma atômica no banco.
+export function bumpEmailLote(id: string, campo: 'enviados' | 'falhas') {
+  const col = campo === 'falhas' ? 'falhas' : 'enviados';
+  return exec(`UPDATE email_lotes SET ${col} = ${col} + 1, updated_at = ? WHERE id = ?`, [nowISO(), id]);
+}
+
+export function finalizeEmailLote(id: string, status: 'concluido' | 'erro') {
+  return exec('UPDATE email_lotes SET status = ?, updated_at = ? WHERE id = ?', [status, nowISO(), id]);
+}
+
+export function getEmailLote(id: string) {
+  return queryOne<EmailLoteRow>('SELECT * FROM email_lotes WHERE id = ?', [id]);
+}
+
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
 export async function getUltimosDisparosPorEmail(): Promise<
   Map<string, { created_at: string | null; status: string }>
