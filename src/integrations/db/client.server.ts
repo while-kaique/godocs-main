@@ -806,8 +806,17 @@ export function bumpEmailLote(id: string, campo: 'enviados' | 'falhas') {
   return exec(`UPDATE email_lotes SET ${col} = ${col} + 1, updated_at = ? WHERE id = ?`, [nowISO(), id]);
 }
 
-export function finalizeEmailLote(id: string, status: 'concluido' | 'erro') {
+export function finalizeEmailLote(id: string, status: 'concluido' | 'erro' | 'cancelado') {
   return exec('UPDATE email_lotes SET status = ?, updated_at = ? WHERE id = ?', [status, nowISO(), id]);
+}
+
+// Pede o cancelamento: marca 'cancelando' (só se ainda estiver 'enviando'). O loop de
+// envio lê esse status antes de cada e-mail e para no próximo — os já enviados não voltam.
+export function requestCancelEmailLote(id: string) {
+  return exec(
+    `UPDATE email_lotes SET status = 'cancelando', updated_at = ? WHERE id = ? AND status = 'enviando'`,
+    [nowISO(), id],
+  );
 }
 
 export function getEmailLote(id: string) {

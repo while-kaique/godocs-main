@@ -33,6 +33,7 @@ import {
   setEmailLoteTotal,
   bumpEmailLote,
   finalizeEmailLote,
+  getEmailLote,
 } from '@/integrations/db/client.server';
 import { sendGmail } from '@/lib/google/gmail';
 import {
@@ -49,6 +50,7 @@ const mSend = sendGmail as unknown as ReturnType<typeof vi.fn>;
 const mBump = bumpEmailLote as unknown as ReturnType<typeof vi.fn>;
 const mTotal = setEmailLoteTotal as unknown as ReturnType<typeof vi.fn>;
 const mFinalize = finalizeEmailLote as unknown as ReturnType<typeof vi.fn>;
+const mGetLote = getEmailLote as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mRows.mockReset();
@@ -58,6 +60,7 @@ beforeEach(() => {
   mBump.mockReset();
   mTotal.mockReset();
   mFinalize.mockReset();
+  mGetLote.mockReset().mockResolvedValue(undefined); // sem pedido de cancelamento por padrão
 });
 
 describe('renderEmailLegado', () => {
@@ -164,7 +167,7 @@ describe('enviarLoteLegados (progresso)', () => {
     expect(mBump).toHaveBeenCalledTimes(2);
     expect(mBump).toHaveBeenCalledWith('lote-1', 'enviados');
     expect(mFinalize).toHaveBeenCalledWith('lote-1', 'concluido');
-    expect(r).toEqual({ enviados: 2, falhas: 0 });
+    expect(r).toEqual({ enviados: 2, falhas: 0, cancelado: false });
   });
 
   it('conta falha quando o envio lança e segue para o próximo', async () => {
@@ -174,9 +177,34 @@ describe('enviarLoteLegados (progresso)', () => {
     ]);
     mSend.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined);
     const r = await enviarLoteLegados('admin@x.com', 'lote-2');
-    expect(r).toEqual({ enviados: 1, falhas: 1 });
+    expect(r).toEqual({ enviados: 1, falhas: 1, cancelado: false });
     expect(mBump).toHaveBeenCalledWith('lote-2', 'falhas');
     expect(mBump).toHaveBeenCalledWith('lote-2', 'enviados');
     expect(mFinalize).toHaveBeenCalledWith('lote-2', 'concluido');
+  });
+
+  it('para no pedido de cancelamento e finaliza como cancelado', async () => {
+    mRows.mockResolvedValue([
+      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
+      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
+    ]);
+    // 1ª iteração: já chega com pedido de cancelamento → não envia nada.
+    mGetLote.mockResolvedValue({ status: 'cancelando' });
+    const r = await enviarLoteLegados('admin@x.com', 'lote-3');
+    expect(mSend).not.toHaveBeenCalled();
+    expect(mFinalize).toHaveBeenCalledWith('lote-3', 'cancelado');
+    expect(r).toEqual({ enviados: 0, falhas: 0, cancelado: true });
+  });
+
+  it('só envia para os e-mails selecionados (filtro)', async () => {
+    mRows.mockResolvedValue([
+      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
+      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
+    ]);
+    const r = await enviarLoteLegados('admin@x.com', 'lote-4', ['bia@x.com']);
+    expect(mSend).toHaveBeenCalledTimes(1);
+    expect(mSend).toHaveBeenCalledWith('bia@x.com', expect.any(String), expect.any(String));
+    expect(mTotal).toHaveBeenCalledWith('lote-4', 1);
+    expect(r).toEqual({ enviados: 1, falhas: 0, cancelado: false });
   });
 });

@@ -53,6 +53,7 @@ import {
   enviarEmailTeste,
   iniciarDisparoLegados,
   getProgressoLote,
+  cancelarDisparoLegados,
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
@@ -447,12 +448,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // O front acompanha o progresso via .../email-legados/progresso/:loteId.
     if (pathname === '/api/admin/email-legados/enviar' && method === 'POST') {
       const { email: adminEmail } = await requireAdmin(request)
-      const body = await readBody<{ assunto?: string; corpo?: string }>(request)
+      const body = await readBody<{ assunto?: string; corpo?: string; emails?: string[] }>(request)
       if (body.assunto && body.corpo) {
         await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
       }
-      const { loteId, total } = await iniciarDisparoLegados(adminEmail)
-      runBackground(enviarLoteLegados(adminEmail, loteId))
+      const emails = Array.isArray(body.emails) ? body.emails : undefined
+      const { loteId, total } = await iniciarDisparoLegados(adminEmail, emails)
+      runBackground(enviarLoteLegados(adminEmail, loteId, emails))
       return json({ ok: true, loteId, total })
     }
     // Progresso de um lote de disparo (polling do front).
@@ -462,6 +464,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const progresso = await getProgressoLote(loteId)
       if (!progresso) return errorJson('Lote não encontrado', 404)
       return json(progresso)
+    }
+    // Cancela um lote em andamento (o loop para no próximo e-mail).
+    if (pathname.startsWith('/api/admin/email-legados/cancelar/') && method === 'POST') {
+      await requireAdmin(request)
+      const loteId = pathname.split('/').pop()!
+      await cancelarDisparoLegados(loteId)
+      return json({ ok: true })
     }
 
     // ── Limpeza de projetos de TESTE E2E (admin) ──

@@ -210,9 +210,21 @@ por pessoa** (dedup por e-mail, case-insensitive), listando todos os projetos pe
   disparo** (`email, nome, projeto_ids JSON, assunto, enviado_por, status 'sucesso'|'falha', erro,
   created_at`). A tela mostra selo "enviado em DD/MM" por pessoa (`getUltimosDisparosPorEmail`) e exige
   **confirmação** antes de disparar; **reenvio é permitido** conscientemente. O teste para si NÃO loga.
-- **Rotas (worker, todas `requireAdmin`):** `GET /api/admin/email-legados/preview`,
-  `POST …/template`, `POST …/teste`, `POST …/enviar` (salva template + conta + dispara em background,
-  retorna `{ enfileirados }`). O botão "Atualizar da planilha" reusa `POST /api/admin/sync-sheets-now`.
+- **Seleção de destinatários:** a lista tem checkbox por pessoa (+ "Selecionar todos"); o disparo
+  envia só aos `emails` marcados — `filtrarPorEmails` faz **interseção com a lista autoritativa de
+  pendentes** (não dá pra mandar a um endereço fora dos legados pendentes). Lista vazia = todos.
+- **Progresso + cancelamento (tabela nova `email_lotes`):** ao disparar, cria um **lote**
+  (`total/enviados/falhas/status` em `email_lotes`, migração em `schema.ts`) e envia em **background**;
+  `enviarLoteLegados` **incrementa o lote a cada e-mail** (`bumpEmailLote`) e finaliza ao fim. O front
+  abre um **modal sobreposto não-fechável** com **barra de progresso + contador NN/total** (zero-pad),
+  fazendo **polling** em `GET …/progresso/:loteId` (1s). **Cancelar:** `POST …/cancelar/:loteId` marca
+  `'cancelando'`; o loop **checa o status antes de cada e-mail** e para no próximo (status final
+  `'cancelado'`) — os já enviados **não voltam**. Status do lote: `enviando→cancelando→concluido|erro|cancelado`.
+  Ao terminar (qualquer desfecho), o front recarrega a lista (atualiza os selos "enviado em").
+- **Rotas (worker, todas `requireAdmin`):** `GET …/preview`, `POST …/template`, `POST …/teste`,
+  `POST …/enviar` (salva template + cria lote + dispara em background, retorna `{ loteId, total }`),
+  `GET …/progresso/:loteId`, `POST …/cancelar/:loteId`. "Atualizar da planilha" reusa
+  `POST /api/admin/sync-sheets-now`.
 - **Idempotência:** o backend **recomputa a lista no disparo** (não confia na contagem do front).
 
 ## Testes E2E em produção (validação coluna-a-coluna)
