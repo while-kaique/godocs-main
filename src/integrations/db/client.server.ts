@@ -778,32 +778,43 @@ export function insertEmailDisparo(input: {
 export type EmailLoteRow = {
   id: string;
   total: number;
+  processados: number;
   enviados: number;
   falhas: number;
-  status: string; // 'enviando' | 'concluido' | 'erro'
+  alvos: string | null; // JSON array de e-mails alvo (congelado na criação)
+  status: string; // 'enviando' | 'cancelando' | 'concluido' | 'erro' | 'cancelado'
   iniciado_por: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
-export async function createEmailLote(total: number, iniciadoPor: string): Promise<string> {
+export async function createEmailLote(
+  total: number,
+  iniciadoPor: string,
+  alvos: string[],
+): Promise<string> {
   const id = generateId();
   await exec(
-    `INSERT INTO email_lotes (id, total, enviados, falhas, status, iniciado_por, created_at, updated_at)
-     VALUES (?, ?, 0, 0, 'enviando', ?, ?, ?)`,
-    [id, total, iniciadoPor, nowISO(), nowISO()],
+    `INSERT INTO email_lotes (id, total, processados, enviados, falhas, alvos, status, iniciado_por, created_at, updated_at)
+     VALUES (?, ?, 0, 0, 0, ?, 'enviando', ?, ?, ?)`,
+    [id, total, JSON.stringify(alvos), iniciadoPor, nowISO(), nowISO()],
   );
   return id;
 }
 
-export function setEmailLoteTotal(id: string, total: number) {
-  return exec('UPDATE email_lotes SET total = ?, updated_at = ? WHERE id = ?', [total, nowISO(), id]);
-}
-
-// Incrementa um contador (enviados|falhas) de forma atômica no banco.
-export function bumpEmailLote(id: string, campo: 'enviados' | 'falhas') {
-  const col = campo === 'falhas' ? 'falhas' : 'enviados';
-  return exec(`UPDATE email_lotes SET ${col} = ${col} + 1, updated_at = ? WHERE id = ?`, [nowISO(), id]);
+// Avança o cursor do lote: +deltaProcessados no cursor, +deltaEnviados/+deltaFalhas nos
+// contadores — tudo num UPDATE atômico (resumível: um chunk interrompido deixa o cursor
+// exatamente onde parou, sem reenviar).
+export function advanceEmailLote(
+  id: string,
+  delta: { processados?: number; enviados?: number; falhas?: number },
+) {
+  return exec(
+    `UPDATE email_lotes
+        SET processados = processados + ?, enviados = enviados + ?, falhas = falhas + ?, updated_at = ?
+      WHERE id = ?`,
+    [delta.processados ?? 0, delta.enviados ?? 0, delta.falhas ?? 0, nowISO(), id],
+  );
 }
 
 export function finalizeEmailLote(id: string, status: 'concluido' | 'erro' | 'cancelado') {

@@ -195,8 +195,10 @@ const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS email_lotes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     total INTEGER NOT NULL DEFAULT 0,
+    processados INTEGER NOT NULL DEFAULT 0,
     enviados INTEGER NOT NULL DEFAULT 0,
     falhas INTEGER NOT NULL DEFAULT 0,
+    alvos TEXT,
     status TEXT NOT NULL DEFAULT 'enviando',
     iniciado_por TEXT,
     created_at TEXT DEFAULT (datetime('now')),
@@ -279,6 +281,13 @@ const MIGRATIONS = [
   // Transparência/auditoria → colunas "Saving Horas Real"/"Saving Horas Escalado" no Sheets.
   'ALTER TABLE projetos ADD COLUMN horas_carga_real REAL',
   'ALTER TABLE projetos ADD COLUMN horas_escala REAL',
+  // Disparo de e-mail de legados em LOTES (chunks). `alvos` = JSON dos e-mails alvo
+  // (congelado na criação do lote, p/ o cursor ser estável entre chunks); `processados`
+  // = cursor (quantos já foram tratados = enviados + falhas + pulados). O envio deixou
+  // de ser um loop único em background (que o runtime matava por tempo) e passou a ser
+  // dirigido pelo front, um chunk por requisição.
+  'ALTER TABLE email_lotes ADD COLUMN alvos TEXT',
+  'ALTER TABLE email_lotes ADD COLUMN processados INTEGER NOT NULL DEFAULT 0',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
