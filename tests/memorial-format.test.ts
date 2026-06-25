@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizarMarcadoresMemorial,
   extrairAlocacaoGanhos,
+  extrairJustificativaCargaEscala,
   TITULOS_MEMORIAL,
 } from '@/lib/agents/memorial-format';
 
@@ -103,5 +104,51 @@ describe('extrairAlocacaoGanhos', () => {
     expect(extrairAlocacaoGanhos(null)).toBeNull();
     expect(extrairAlocacaoGanhos('')).toBeNull();
     expect(extrairAlocacaoGanhos('### O que mudou após a automação\n\n')).toBeNull();
+  });
+
+  it('NÃO confunde "Carga real e ganho por escala" (ponto [2.5]) com a Alocação Ganhos', () => {
+    const memorial =
+      '### O que mudou após a automação\nA analista foi realocada.\n### Carga real e ganho por escala\nCarga real: 24h; escala: 108h.';
+    expect(extrairAlocacaoGanhos(memorial)).toBe('A analista foi realocada.');
+  });
+});
+
+describe('extrairJustificativaCargaEscala', () => {
+  it('extrai a subseção (###) com cálculo e gatilhos, até o próximo cabeçalho', () => {
+    const memorial = [
+      '### Total de horas',
+      'Total: 132h/mês.',
+      '',
+      '### Carga real e ganho por escala',
+      'Carga real (trabalho humano de fato): 24h; ganho por escala: 108h.',
+      'Cálculo: rodava 4×/mês × 6h = 24h; automação passou a 22×/mês = +108h.',
+      '',
+      '### Tipo de saving',
+      'Mensal.',
+    ].join('\n');
+    expect(extrairJustificativaCargaEscala(memorial)).toBe(
+      'Carga real (trabalho humano de fato): 24h; ganho por escala: 108h.\nCálculo: rodava 4×/mês × 6h = 24h; automação passou a 22×/mês = +108h.',
+    );
+  });
+
+  it('extrai quando escrita como rótulo inline (**Título:** conteúdo)', () => {
+    const memorial =
+      '**Total de horas:** 24h\n**Carga real e ganho por escala:** A pessoa já fazia o volume todo à mão (24h), então o ganho por escala é 0.\n**Tipo de saving:** mensal';
+    expect(extrairJustificativaCargaEscala(memorial)).toBe(
+      'A pessoa já fazia o volume todo à mão (24h), então o ganho por escala é 0.',
+    );
+  });
+
+  it('combina com normalizarMarcadoresMemorial (código [2.5] vira o rótulo e é extraído)', () => {
+    const bruto = '[2.3] 132h\n[2.5] Carga real 24h, escala 108h: volume incremental da automação.\n[5.2] mensal';
+    expect(extrairJustificativaCargaEscala(normalizarMarcadoresMemorial(bruto))).toBe(
+      'Carga real 24h, escala 108h: volume incremental da automação.',
+    );
+  });
+
+  it('devolve null quando a subseção não existe (split não se aplica)', () => {
+    expect(extrairJustificativaCargaEscala('### Total de horas\n10h/mês.\n### Tipo de saving\nmensal')).toBeNull();
+    expect(extrairJustificativaCargaEscala(null)).toBeNull();
+    expect(extrairJustificativaCargaEscala('')).toBeNull();
   });
 });
