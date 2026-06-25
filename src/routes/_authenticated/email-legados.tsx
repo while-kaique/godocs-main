@@ -26,6 +26,7 @@ import {
   CalendarClock,
   ChevronDown,
   X,
+  Search,
 } from "lucide-react";
 
 type Recipient = {
@@ -81,6 +82,7 @@ function EmailLegadosPage() {
   const [expandido, setExpandido] = useState<Record<string, boolean>>({});
   // E-mails escolhidos para o disparo (default: todos). Set para toggle barato.
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [busca, setBusca] = useState("");
   const corpoRef = useRef<HTMLTextAreaElement>(null);
 
   async function load() {
@@ -106,11 +108,15 @@ function EmailLegadosPage() {
     });
   }
 
-  function toggleTodos() {
-    if (!data) return;
-    setSelecionados((s) =>
-      s.size === data.recipients.length ? new Set() : new Set(data.recipients.map((r) => r.email)),
-    );
+  // Marca/desmarca todos os destinatários da LISTA VISÍVEL (respeita o filtro de busca).
+  function toggleTodos(lista: Recipient[]) {
+    setSelecionados((s) => {
+      const n = new Set(s);
+      const todosMarcados = lista.length > 0 && lista.every((r) => n.has(r.email));
+      if (todosMarcados) lista.forEach((r) => n.delete(r.email));
+      else lista.forEach((r) => n.add(r.email));
+      return n;
+    });
   }
 
   useEffect(() => {
@@ -249,7 +255,15 @@ function EmailLegadosPage() {
   const total = data?.totalPessoas ?? 0;
   const carregando = data === null;
   const selCount = selecionados.size;
-  const todosSelecionados = !!data && data.recipients.length > 0 && selCount === data.recipients.length;
+  const buscaLower = busca.trim().toLowerCase();
+  const recipientesFiltrados = (data?.recipients ?? []).filter(
+    (r) =>
+      !buscaLower ||
+      (r.nome ?? "").toLowerCase().includes(buscaLower) ||
+      r.email.toLowerCase().includes(buscaLower),
+  );
+  const todosFiltradosSelecionados =
+    recipientesFiltrados.length > 0 && recipientesFiltrados.every((r) => selecionados.has(r.email));
   const emProgresso = progresso?.status === "enviando" || progresso?.status === "cancelando";
 
   return (
@@ -375,11 +389,11 @@ function EmailLegadosPage() {
             {!carregando && total > 0 && (
               <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
                 <Checkbox
-                  checked={todosSelecionados}
-                  onCheckedChange={toggleTodos}
-                  aria-label="Selecionar todos os destinatários"
+                  checked={todosFiltradosSelecionados}
+                  onCheckedChange={() => toggleTodos(recipientesFiltrados)}
+                  aria-label="Selecionar todos os destinatários exibidos"
                 />
-                Selecionar todos
+                {buscaLower ? "Selecionar exibidos" : "Selecionar todos"}
               </label>
             )}
           </div>
@@ -388,16 +402,43 @@ function EmailLegadosPage() {
               ? "Carregando…"
               : total === 0
                 ? "Nenhum legado pendente — todos foram regularizados."
-                : `Marque quem vai receber. ${selCount} de ${total} selecionado(s).`}
+                : `Marque quem vai receber. ${selCount} de ${total} selecionado(s)${buscaLower ? ` · ${recipientesFiltrados.length} exibido(s)` : ""}.`}
           </p>
+
+          {!carregando && total > 0 && (
+            <div className="relative mt-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome ou e-mail…"
+                className="pl-9"
+                aria-label="Buscar destinatário por nome ou e-mail"
+              />
+              {busca && (
+                <button
+                  type="button"
+                  onClick={() => setBusca("")}
+                  aria-label="Limpar busca"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
 
           <ul className="mt-4 max-h-[28rem] divide-y divide-border overflow-auto rounded-lg border border-border">
             {carregando ? (
               <li className="p-4 text-center text-sm text-muted-foreground">Carregando…</li>
             ) : total === 0 ? (
               <li className="p-4 text-center text-sm text-muted-foreground">Nada a enviar.</li>
+            ) : recipientesFiltrados.length === 0 ? (
+              <li className="p-4 text-center text-sm text-muted-foreground">
+                Nenhum resultado para "{busca}".
+              </li>
             ) : (
-              data!.recipients.map((r) => {
+              recipientesFiltrados.map((r) => {
                 const aberto = expandido[r.email] ?? false;
                 return (
                   <li key={r.email} className="px-4 py-3">
