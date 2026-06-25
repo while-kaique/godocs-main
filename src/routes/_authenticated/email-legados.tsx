@@ -91,8 +91,15 @@ function EmailLegadosPage() {
       setData(d);
       setAssunto(d.template.assunto);
       setCorpo(d.template.corpo);
-      // Seleciona todos por padrão (envio para todos os pendentes).
-      setSelecionados(new Set(d.recipients.map((r) => r.email)));
+      // Por padrão marca só quem AINDA NÃO recebeu (e as falhas, para reenvio) —
+      // quem já recebeu com sucesso entra desmarcado, evitando reenvio acidental.
+      setSelecionados(
+        new Set(
+          d.recipients
+            .filter((r) => !r.ultimoEnvio || r.ultimoEnvio.status === "falha")
+            .map((r) => r.email),
+        ),
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao carregar a lista.");
       setData({ recipients: [], totalPessoas: 0, totalProjetos: 0, template: { assunto: "", corpo: "" } });
@@ -691,12 +698,10 @@ function PreviewEmail({ assunto, corpo }: { assunto: string; corpo: string }) {
             return (
               <ul key={i} className="my-2 list-disc pl-5">
                 <li>
-                  <strong>Projeto de Exemplo</strong>{" "}
-                  <span className="text-muted-foreground">(legado-000)</span>
+                  <strong>Projeto de Exemplo</strong>
                 </li>
                 <li>
-                  <strong>Outro Projeto Pendente</strong>{" "}
-                  <span className="text-muted-foreground">(legado-001)</span>
+                  <strong>Outro Projeto Pendente</strong>
                 </li>
               </ul>
             );
