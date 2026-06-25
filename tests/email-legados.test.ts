@@ -81,9 +81,9 @@ describe('renderEmailLegado', () => {
     expect(assunto).toBe('Regularize até 30/06/2026, Maria');
     expect(html).toContain('Olá Maria!');
     expect(html).toContain('Prazo: 30/06/2026');
-    // {{projetos}} vira lista com nome + id
+    // {{projetos}} vira lista só com o NOME (o id "legado-1" não vai no e-mail)
     expect(html).toContain('Projeto A');
-    expect(html).toContain('legado-1');
+    expect(html).not.toContain('legado-1');
     expect(html).toContain('<ul');
     // {{link}} vira âncora para Meus Projetos
     expect(html).toContain('Acessar Meus Projetos');

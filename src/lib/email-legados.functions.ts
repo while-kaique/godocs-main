@@ -170,12 +170,11 @@ export function renderEmailLegado(
     .replace(/\{\{\s*prazo\s*\}\}/g, PRAZO_LEGADO)
     .trim();
 
+  // Só o NOME do projeto — o id interno ("LEGADO-233") não significa nada para quem
+  // recebe o e-mail (fica só na lista do admin).
   const projetosHtml = recipient.projetos.length
     ? `<ul style="margin: 12px 0; padding-left: 20px; line-height: 1.8; color: #1a1a1a;">${recipient.projetos
-        .map(
-          (p) =>
-            `<li><strong>${escapeHtml(p.nome?.trim() || 'Projeto sem nome')}</strong> <span style="color: #6b7280;">(${escapeHtml(p.id)})</span></li>`,
-        )
+        .map((p) => `<li><strong>${escapeHtml(p.nome?.trim() || 'Projeto sem nome')}</strong></li>`)
         .join('')}</ul>`
     : '<p style="color: #6b7280;">—</p>';
 
