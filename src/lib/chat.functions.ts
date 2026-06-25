@@ -416,9 +416,15 @@ const iniciarSubmissaoSchema = z.object({
   ).min(1).max(5000),
 });
 
+// Teto de caracteres de uma mensagem do chat. Generoso porque o usuário às vezes
+// cola um memorial inteiro reescrito para pedir ajustes (~7-8 mil chars são comuns).
+// O limite antigo (4000) rejeitava esses pastes com um ZodError cru → 500. Ver o
+// guard amigável em `enviarMensagem` (devolve 400 com mensagem legível, não crash).
+export const LIMITE_MENSAGEM_CHAT = 16000;
+
 const enviarMensagemSchema = z.object({
   projeto_id: z.string().min(1),
-  content: z.string().min(1).max(4000),
+  content: z.string().min(1).max(LIMITE_MENSAGEM_CHAT),
   selected_option: z.number().optional(),
 });
 
@@ -851,6 +857,21 @@ function derivarJustificativaCargaEscala(
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
+  // Mensagem longa demais → 400 com texto legível em vez do ZodError cru (que virava
+  // 500 e travava o usuário no "tente novamente"). Trata antes do parse para a pessoa
+  // saber exatamente o que fazer (resumir/dividir) em vez de ver um erro genérico.
+  const conteudoBruto = (rawData as { content?: unknown })?.content;
+  if (typeof conteudoBruto === 'string' && conteudoBruto.length > LIMITE_MENSAGEM_CHAT) {
+    throw Object.assign(
+      new Error(
+        `Sua mensagem é muito longa (${conteudoBruto.length.toLocaleString('pt-BR')} caracteres; ` +
+          `o limite é ${LIMITE_MENSAGEM_CHAT.toLocaleString('pt-BR')}). ` +
+          `Resuma ou divida em mais de uma mensagem.`,
+      ),
+      { status: 400 },
+    );
+  }
+
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
