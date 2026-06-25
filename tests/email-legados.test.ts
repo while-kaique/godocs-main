@@ -9,10 +9,10 @@ vi.mock('@/integrations/db/client.server', () => ({
   insertEmailDisparo: vi.fn(),
   getUltimosDisparosPorEmail: vi.fn(),
   createEmailLote: vi.fn(),
-  setEmailLoteTotal: vi.fn(),
-  bumpEmailLote: vi.fn(),
+  advanceEmailLote: vi.fn(),
   finalizeEmailLote: vi.fn(),
   getEmailLote: vi.fn(),
+  requestCancelEmailLote: vi.fn(),
   // parseJson é puro — mantemos a implementação real no mock.
   parseJson: (raw: string | null | undefined) => {
     if (raw == null) return null;
@@ -30,8 +30,8 @@ import {
   getLegadosRows,
   getConfiguracao,
   getUltimosDisparosPorEmail,
-  setEmailLoteTotal,
-  bumpEmailLote,
+  createEmailLote,
+  advanceEmailLote,
   finalizeEmailLote,
   getEmailLote,
 } from '@/integrations/db/client.server';
@@ -39,7 +39,8 @@ import { sendGmail } from '@/lib/google/gmail';
 import {
   renderEmailLegado,
   listarLegadosPendentes,
-  enviarLoteLegados,
+  iniciarDisparoLegados,
+  processarChunkLote,
   TEMPLATE_PADRAO,
 } from '@/lib/email-legados.functions';
 
@@ -47,8 +48,8 @@ const mRows = getLegadosRows as unknown as ReturnType<typeof vi.fn>;
 const mConfig = getConfiguracao as unknown as ReturnType<typeof vi.fn>;
 const mDisparos = getUltimosDisparosPorEmail as unknown as ReturnType<typeof vi.fn>;
 const mSend = sendGmail as unknown as ReturnType<typeof vi.fn>;
-const mBump = bumpEmailLote as unknown as ReturnType<typeof vi.fn>;
-const mTotal = setEmailLoteTotal as unknown as ReturnType<typeof vi.fn>;
+const mCreate = createEmailLote as unknown as ReturnType<typeof vi.fn>;
+const mAdvance = advanceEmailLote as unknown as ReturnType<typeof vi.fn>;
 const mFinalize = finalizeEmailLote as unknown as ReturnType<typeof vi.fn>;
 const mGetLote = getEmailLote as unknown as ReturnType<typeof vi.fn>;
 
@@ -57,10 +58,10 @@ beforeEach(() => {
   mConfig.mockReset().mockResolvedValue(undefined); // sem template salvo → usa o padrão
   mDisparos.mockReset().mockResolvedValue(new Map());
   mSend.mockReset().mockResolvedValue(undefined);
-  mBump.mockReset();
-  mTotal.mockReset();
+  mCreate.mockReset().mockResolvedValue('lote-x');
+  mAdvance.mockReset();
   mFinalize.mockReset();
-  mGetLote.mockReset().mockResolvedValue(undefined); // sem pedido de cancelamento por padrão
+  mGetLote.mockReset().mockResolvedValue(undefined);
 });
 
 describe('renderEmailLegado', () => {
@@ -155,56 +156,82 @@ describe('listarLegadosPendentes', () => {
   });
 });
 
-describe('enviarLoteLegados (progresso)', () => {
-  it('envia a cada destinatário, incrementa o lote e finaliza', async () => {
-    mRows.mockResolvedValue([
-      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
-      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
-    ]);
-    const r = await enviarLoteLegados('admin@x.com', 'lote-1');
+const ROWS_2 = [
+  { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
+  { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
+];
+
+describe('iniciarDisparoLegados', () => {
+  it('congela os alvos filtrados pela seleção e cria o lote', async () => {
+    mRows.mockResolvedValue(ROWS_2);
+    const r = await iniciarDisparoLegados('admin@x.com', ['bia@x.com']);
+    expect(mCreate).toHaveBeenCalledWith(1, 'admin@x.com', ['bia@x.com']);
+    expect(r).toEqual({ loteId: 'lote-x', total: 1 });
+  });
+
+  it('sem seleção, alvos = todos os pendentes', async () => {
+    mRows.mockResolvedValue(ROWS_2);
+    await iniciarDisparoLegados('admin@x.com');
+    expect(mCreate).toHaveBeenCalledWith(2, 'admin@x.com', ['ana@x.com', 'bia@x.com']);
+  });
+});
+
+describe('processarChunkLote', () => {
+  const lote = (over: Record<string, unknown> = {}) => ({
+    id: 'lote-1',
+    total: 2,
+    processados: 0,
+    enviados: 0,
+    falhas: 0,
+    alvos: JSON.stringify(['ana@x.com', 'bia@x.com']),
+    status: 'enviando',
+    ...over,
+  });
+
+  it('envia o chunk, avança o cursor e finaliza ao chegar no total', async () => {
+    mRows.mockResolvedValue(ROWS_2);
+    // 1ª leitura: início; 2ª leitura (re-read pós-chunk): cursor já no total.
+    mGetLote
+      .mockResolvedValueOnce(lote())
+      .mockResolvedValueOnce(lote({ processados: 2, enviados: 2 }));
+    const p = await processarChunkLote('admin@x.com', 'lote-1');
     expect(mSend).toHaveBeenCalledTimes(2);
-    expect(mTotal).toHaveBeenCalledWith('lote-1', 2);
-    expect(mBump).toHaveBeenCalledTimes(2);
-    expect(mBump).toHaveBeenCalledWith('lote-1', 'enviados');
+    expect(mAdvance).toHaveBeenCalledWith('lote-1', { processados: 1, enviados: 1 });
     expect(mFinalize).toHaveBeenCalledWith('lote-1', 'concluido');
-    expect(r).toEqual({ enviados: 2, falhas: 0, cancelado: false });
+    expect(p?.status).toBe('concluido');
   });
 
-  it('conta falha quando o envio lança e segue para o próximo', async () => {
-    mRows.mockResolvedValue([
-      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
-      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
-    ]);
+  it('conta falha e ainda avança o cursor', async () => {
+    mRows.mockResolvedValue(ROWS_2);
     mSend.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(undefined);
-    const r = await enviarLoteLegados('admin@x.com', 'lote-2');
-    expect(r).toEqual({ enviados: 1, falhas: 1, cancelado: false });
-    expect(mBump).toHaveBeenCalledWith('lote-2', 'falhas');
-    expect(mBump).toHaveBeenCalledWith('lote-2', 'enviados');
-    expect(mFinalize).toHaveBeenCalledWith('lote-2', 'concluido');
+    mGetLote
+      .mockResolvedValueOnce(lote())
+      .mockResolvedValueOnce(lote({ processados: 2, enviados: 1, falhas: 1 }));
+    await processarChunkLote('admin@x.com', 'lote-1');
+    expect(mAdvance).toHaveBeenCalledWith('lote-1', { processados: 1, falhas: 1 });
+    expect(mAdvance).toHaveBeenCalledWith('lote-1', { processados: 1, enviados: 1 });
+    expect(mFinalize).toHaveBeenCalledWith('lote-1', 'concluido');
   });
 
-  it('para no pedido de cancelamento e finaliza como cancelado', async () => {
-    mRows.mockResolvedValue([
-      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
-      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
-    ]);
-    // 1ª iteração: já chega com pedido de cancelamento → não envia nada.
-    mGetLote.mockResolvedValue({ status: 'cancelando' });
-    const r = await enviarLoteLegados('admin@x.com', 'lote-3');
+  it('se já foi pedido cancelamento, finaliza como cancelado sem enviar', async () => {
+    mRows.mockResolvedValue(ROWS_2);
+    mGetLote.mockResolvedValueOnce(lote({ status: 'cancelando' }));
+    const p = await processarChunkLote('admin@x.com', 'lote-1');
     expect(mSend).not.toHaveBeenCalled();
-    expect(mFinalize).toHaveBeenCalledWith('lote-3', 'cancelado');
-    expect(r).toEqual({ enviados: 0, falhas: 0, cancelado: true });
+    expect(mFinalize).toHaveBeenCalledWith('lote-1', 'cancelado');
+    expect(p?.status).toBe('cancelado');
   });
 
-  it('só envia para os e-mails selecionados (filtro)', async () => {
-    mRows.mockResolvedValue([
-      { id: 'legado-1', nome: 'P1', responsavel_nome: 'Ana', responsavel_email: 'ana@x.com', atualizado_em: null },
-      { id: 'legado-2', nome: 'P2', responsavel_nome: 'Bia', responsavel_email: 'bia@x.com', atualizado_em: null },
-    ]);
-    const r = await enviarLoteLegados('admin@x.com', 'lote-4', ['bia@x.com']);
+  it('pula alvo que não está mais pendente (editou nesse meio tempo)', async () => {
+    // alvos tem ana e bia, mas só bia segue pendente.
+    mRows.mockResolvedValue([ROWS_2[1]]);
+    mGetLote
+      .mockResolvedValueOnce(lote())
+      .mockResolvedValueOnce(lote({ processados: 2, enviados: 1 }));
+    await processarChunkLote('admin@x.com', 'lote-1');
     expect(mSend).toHaveBeenCalledTimes(1);
     expect(mSend).toHaveBeenCalledWith('bia@x.com', expect.any(String), expect.any(String));
-    expect(mTotal).toHaveBeenCalledWith('lote-4', 1);
-    expect(r).toEqual({ enviados: 1, falhas: 0, cancelado: false });
+    // ana (não pendente) só avança o cursor, sem enviados/falhas.
+    expect(mAdvance).toHaveBeenCalledWith('lote-1', { processados: 1 });
   });
 });

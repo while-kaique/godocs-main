@@ -213,18 +213,22 @@ por pessoa** (dedup por e-mail, case-insensitive), listando todos os projetos pe
 - **Seleção de destinatários:** a lista tem checkbox por pessoa (+ "Selecionar todos"); o disparo
   envia só aos `emails` marcados — `filtrarPorEmails` faz **interseção com a lista autoritativa de
   pendentes** (não dá pra mandar a um endereço fora dos legados pendentes). Lista vazia = todos.
-- **Progresso + cancelamento (tabela nova `email_lotes`):** ao disparar, cria um **lote**
-  (`total/enviados/falhas/status` em `email_lotes`, migração em `schema.ts`) e envia em **background**;
-  `enviarLoteLegados` **incrementa o lote a cada e-mail** (`bumpEmailLote`) e finaliza ao fim. O front
-  abre um **modal sobreposto não-fechável** com **barra de progresso + contador NN/total** (zero-pad),
-  fazendo **polling** em `GET …/progresso/:loteId` (1s). **Cancelar:** `POST …/cancelar/:loteId` marca
-  `'cancelando'`; o loop **checa o status antes de cada e-mail** e para no próximo (status final
-  `'cancelado'`) — os já enviados **não voltam**. Status do lote: `enviando→cancelando→concluido|erro|cancelado`.
-  Ao terminar (qualquer desfecho), o front recarrega a lista (atualiza os selos "enviado em").
+- **Progresso + cancelamento — envio em LOTES/chunks dirigido pelo front (tabela `email_lotes`):**
+  ⚠️ o envio **NÃO roda em background** — o runtime do Godeploy **mata tarefas longas de `waitUntil`**
+  (um disparo de ~76 e-mails travava por volta do 28). Em vez disso: `POST …/enviar` cria o **lote**
+  (`email_lotes`: `total/processados/enviados/falhas/alvos(JSON)/status`, migração em `schema.ts`),
+  **congelando a lista de e-mails alvo** (`alvos`) para o cursor ser estável, e retorna `{ loteId, total }`.
+  O front então chama **`POST …/chunk/:loteId` em sequência** até concluir; cada chamada (`processarChunkLote`)
+  envia os próximos `CHUNK_SIZE` (8) alvos a partir do cursor `processados`, **avançando o cursor a CADA
+  e-mail** (`advanceEmailLote`) — **resumível**: se a requisição morrer no meio, retoma exatamente de onde
+  parou, sem reenviar. O front mostra **modal sobreposto não-fechável** com barra + contador `processados/total`.
+  **Cancelar:** `POST …/cancelar/:loteId` marca `'cancelando'`; o próximo chunk finaliza como `'cancelado'`
+  (os já enviados **não voltam**). Status: `enviando→cancelando→concluido|erro|cancelado`. Ao terminar,
+  o front recarrega a lista (selos "enviado em"). `GET …/progresso/:loteId` existe para retomada/resiliência.
 - **Rotas (worker, todas `requireAdmin`):** `GET …/preview`, `POST …/template`, `POST …/teste`,
-  `POST …/enviar` (salva template + cria lote + dispara em background, retorna `{ loteId, total }`),
-  `GET …/progresso/:loteId`, `POST …/cancelar/:loteId`. "Atualizar da planilha" reusa
-  `POST /api/admin/sync-sheets-now`.
+  `POST …/enviar` (salva template + cria lote, retorna `{ loteId, total }` — **não** envia em background),
+  `POST …/chunk/:loteId` (envia o próximo lote, retorna o progresso), `GET …/progresso/:loteId`,
+  `POST …/cancelar/:loteId`. "Atualizar da planilha" reusa `POST /api/admin/sync-sheets-now`.
 - **Idempotência:** o backend **recomputa a lista no disparo** (não confia na contagem do front).
 
 ## Testes E2E em produção (validação coluna-a-coluna)

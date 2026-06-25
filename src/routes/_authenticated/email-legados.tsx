@@ -75,9 +75,10 @@ function EmailLegadosPage() {
   const [loteId, setLoteId] = useState<string | null>(null);
   const [progresso, setProgresso] = useState<{
     total: number;
+    processados: number;
     enviados: number;
     falhas: number;
-    status: "enviando" | "concluido" | "erro";
+    status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
   } | null>(null);
   const [expandido, setExpandido] = useState<Record<string, boolean>>({});
   // E-mails escolhidos para o disparo (default: todos). Set para toggle barato.
@@ -168,6 +169,49 @@ function EmailLegadosPage() {
     }
   }
 
+  type Prog = {
+    total: number;
+    processados: number;
+    enviados: number;
+    falhas: number;
+    status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
+  };
+
+  // Driver de envio em lotes: chama .../chunk em sequência até terminar. Cada chamada é
+  // curta (poucos e-mails) — não depende de tarefa em background, então não trava.
+  async function rodarChunks(id: string) {
+    let falhasSeguidas = 0;
+    for (;;) {
+      try {
+        const p = await apiFetch<Prog>(`/api/admin/email-legados/chunk/${id}`, {});
+        falhasSeguidas = 0;
+        setProgresso(p);
+        if (p.status !== "enviando" && p.status !== "cancelando") {
+          await load(); // atualiza os selos "enviado em" na lista
+          if (p.status === "concluido") {
+            toast.success(
+              `Envio concluído: ${p.enviados} enviado(s)${p.falhas ? `, ${p.falhas} falha(s)` : ""}.`,
+            );
+          } else if (p.status === "cancelado") {
+            toast(`Envio cancelado: ${p.enviados} de ${p.total} enviado(s).`);
+          } else {
+            toast.error("O envio terminou com erro. Confira a lista.");
+          }
+          return;
+        }
+      } catch (e) {
+        // Rede instável: tenta de novo (o cursor é server-side, então não reenvia).
+        falhasSeguidas++;
+        if (falhasSeguidas >= 5) {
+          toast.error("Conexão instável — o envio foi pausado. Reabra para retomar.");
+          setProgresso((p) => (p ? { ...p, status: "erro" } : p));
+          return;
+        }
+        await new Promise((res) => setTimeout(res, 1500));
+      }
+    }
+  }
+
   async function dispararLote() {
     setSending(true);
     try {
@@ -176,9 +220,9 @@ function EmailLegadosPage() {
         { assunto, corpo, emails: Array.from(selecionados) },
       );
       setConfirmOpen(false);
-      // Abre o modal de progresso e começa a acompanhar.
       setLoteId(r.loteId);
-      setProgresso({ total: r.total, enviados: 0, falhas: 0, status: "enviando" });
+      setProgresso({ total: r.total, processados: 0, enviados: 0, falhas: 0, status: "enviando" });
+      rodarChunks(r.loteId); // dispara o driver (não await — segue rodando)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao disparar os e-mails.");
     } finally {
@@ -193,7 +237,7 @@ function EmailLegadosPage() {
 
   async function cancelarEnvio() {
     if (!loteId) return;
-    // Feedback imediato; o backend confirma no próximo poll.
+    // Feedback imediato; o próximo chunk vê 'cancelando' e finaliza como 'cancelado'.
     setProgresso((p) => (p ? { ...p, status: "cancelando" } : p));
     try {
       await apiFetch(`/api/admin/email-legados/cancelar/${loteId}`, {});
@@ -201,46 +245,6 @@ function EmailLegadosPage() {
       toast.error(e instanceof Error ? e.message : "Erro ao cancelar o envio.");
     }
   }
-
-  // Polling do progresso do lote enquanto está "enviando" ou "cancelando".
-  useEffect(() => {
-    const emProgresso = progresso?.status === "enviando" || progresso?.status === "cancelando";
-    if (!loteId || !emProgresso) return;
-    let cancel = false;
-    const timer = setInterval(async () => {
-      try {
-        const p = await apiFetch<{
-          total: number;
-          enviados: number;
-          falhas: number;
-          status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
-        }>(`/api/admin/email-legados/progresso/${loteId}`);
-        if (cancel) return;
-        setProgresso(p);
-        const terminou = p.status === "concluido" || p.status === "erro" || p.status === "cancelado";
-        if (terminou) {
-          clearInterval(timer);
-          load(); // atualiza os selos "enviado em" na lista
-          if (p.status === "concluido") {
-            toast.success(
-              `Envio concluído: ${p.enviados} enviado(s)${p.falhas ? `, ${p.falhas} falha(s)` : ""}.`,
-            );
-          } else if (p.status === "cancelado") {
-            toast(`Envio cancelado: ${p.enviados} de ${p.total} enviado(s).`);
-          } else {
-            toast.error("O envio terminou com erro. Confira a lista.");
-          }
-        }
-      } catch {
-        /* falha de rede no poll — tenta de novo no próximo tick */
-      }
-    }, 1000);
-    return () => {
-      cancel = true;
-      clearInterval(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loteId, progresso?.status]);
 
   function inserirVariavel(token: string) {
     const el = corpoRef.current;
@@ -607,10 +611,7 @@ function EmailLegadosPage() {
             <div className="space-y-3 py-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-4xl font-bold tabular-nums" style={{ color: "var(--go-blue)" }}>
-                  {String(progresso.enviados + progresso.falhas).padStart(
-                    String(progresso.total).length || 1,
-                    "0",
-                  )}
+                  {String(progresso.processados).padStart(String(progresso.total).length || 1, "0")}
                   <span className="text-2xl text-muted-foreground">/{progresso.total}</span>
                 </span>
                 {progresso.falhas > 0 && (
@@ -625,14 +626,14 @@ function EmailLegadosPage() {
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={progresso.total}
-                aria-valuenow={progresso.enviados + progresso.falhas}
+                aria-valuenow={progresso.processados}
               >
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width:
                       progresso.total > 0
-                        ? `${((progresso.enviados + progresso.falhas) / progresso.total) * 100}%`
+                        ? `${(progresso.processados / progresso.total) * 100}%`
                         : "100%",
                     background: "var(--go-blue)",
                   }}

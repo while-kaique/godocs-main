@@ -49,9 +49,9 @@ import { assessDocsBackfill } from '@/lib/docs-backfill'
 import {
   getPreviewLegados,
   salvarTemplateEmailLegado,
-  enviarLoteLegados,
   enviarEmailTeste,
   iniciarDisparoLegados,
+  processarChunkLote,
   getProgressoLote,
   cancelarDisparoLegados,
 } from '@/lib/email-legados.functions'
@@ -454,10 +454,19 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       }
       const emails = Array.isArray(body.emails) ? body.emails : undefined
       const { loteId, total } = await iniciarDisparoLegados(adminEmail, emails)
-      runBackground(enviarLoteLegados(adminEmail, loteId, emails))
+      // NÃO envia em background (o runtime mata tarefas longas) — o front chama
+      // .../chunk/:loteId em sequência até concluir.
       return json({ ok: true, loteId, total })
     }
-    // Progresso de um lote de disparo (polling do front).
+    // Processa o próximo lote de e-mails (chunk) e devolve o progresso atualizado.
+    if (pathname.startsWith('/api/admin/email-legados/chunk/') && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      const loteId = pathname.split('/').pop()!
+      const progresso = await processarChunkLote(adminEmail, loteId)
+      if (!progresso) return errorJson('Lote não encontrado', 404)
+      return json(progresso)
+    }
+    // Progresso de um lote de disparo (polling/retomada do front).
     if (pathname.startsWith('/api/admin/email-legados/progresso/') && method === 'GET') {
       await requireAdmin(request)
       const loteId = pathname.split('/').pop()!

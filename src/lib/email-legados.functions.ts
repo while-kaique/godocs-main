@@ -14,8 +14,7 @@ import {
   insertEmailDisparo,
   getUltimosDisparosPorEmail,
   createEmailLote,
-  setEmailLoteTotal,
-  bumpEmailLote,
+  advanceEmailLote,
   finalizeEmailLote,
   getEmailLote,
   requestCancelEmailLote,
@@ -212,12 +211,31 @@ export function renderEmailLegado(
 
 export type ProgressoLote = {
   total: number;
+  processados: number;
   enviados: number;
   falhas: number;
   status: 'enviando' | 'cancelando' | 'concluido' | 'erro' | 'cancelado';
 };
 
 const STATUS_LOTE = ['enviando', 'cancelando', 'concluido', 'erro', 'cancelado'];
+const CHUNK_SIZE = 8; // e-mails por requisição (mantém cada chamada curta, dentro do limite)
+
+function progressoDeLote(lote: {
+  total: number;
+  processados: number;
+  enviados: number;
+  falhas: number;
+  status: string;
+}): ProgressoLote {
+  const status = (STATUS_LOTE.includes(lote.status) ? lote.status : 'enviando') as ProgressoLote['status'];
+  return {
+    total: lote.total,
+    processados: lote.processados,
+    enviados: lote.enviados,
+    falhas: lote.falhas,
+    status,
+  };
+}
 
 // Filtra os destinatários pelos e-mails escolhidos no front (interseção com a lista
 // AUTORITATIVA de pendentes — não dá pra enviar a um endereço fora dos legados pendentes).
@@ -228,106 +246,107 @@ function filtrarPorEmails(recipients: LegadoRecipient[], emails?: string[]): Leg
   return recipients.filter((r) => set.has(r.email.toLowerCase()));
 }
 
-// Cria o lote (com o total de alvos) e devolve o id para o front acompanhar o progresso.
-// `emails` opcional restringe o disparo aos destinatários escolhidos. O envio em si roda
-// em background via enviarLoteLegados(adminEmail, loteId, emails).
+// Cria o lote congelando a lista de e-mails alvo (cursor estável entre chunks). O envio
+// NÃO roda em background (o runtime mata tarefas longas) — o front chama processarChunkLote
+// em sequência até concluir.
 export async function iniciarDisparoLegados(
   adminEmail: string,
   emails?: string[],
 ): Promise<{ loteId: string; total: number }> {
   const { recipients } = await listarLegadosPendentes();
-  const alvos = filtrarPorEmails(recipients, emails);
-  const loteId = await createEmailLote(alvos.length, adminEmail);
+  const alvos = filtrarPorEmails(recipients, emails).map((r) => r.email);
+  const loteId = await createEmailLote(alvos.length, adminEmail, alvos);
   return { loteId, total: alvos.length };
 }
 
-// Lê o progresso de um lote (polling do front).
+// Lê o progresso de um lote (resiliência/retomada do front).
 export async function getProgressoLote(loteId: string): Promise<ProgressoLote | null> {
   const lote = await getEmailLote(loteId);
   if (!lote) return null;
-  const status = (STATUS_LOTE.includes(lote.status) ? lote.status : 'enviando') as ProgressoLote['status'];
-  return { total: lote.total, enviados: lote.enviados, falhas: lote.falhas, status };
+  return progressoDeLote(lote);
 }
 
-// Pede o cancelamento de um lote em andamento (o loop para no próximo e-mail).
+// Pede o cancelamento de um lote em andamento (o próximo chunk finaliza como 'cancelado').
 export async function cancelarDisparoLegados(loteId: string): Promise<void> {
   await requestCancelEmailLote(loteId);
 }
 
-// Loop de envio (roda em background no worker). Re-lista os pendentes (autoritativo —
-// não confia em contagem vinda do front), filtra pelos `emails` escolhidos, renderiza por
-// destinatário, envia via Gmail e registra cada resultado em `email_disparos`. A cada
-// e-mail incrementa o contador do lote (barra de progresso) e ANTES de cada envio checa se
-// houve pedido de cancelamento ('cancelando') — se sim, para no próximo (os já enviados
-// não voltam). Sequencial com pequeno intervalo para respeitar o rate limit do Gmail.
-export async function enviarLoteLegados(
-  adminEmail: string,
-  loteId?: string,
-  emails?: string[],
-): Promise<{ enviados: number; falhas: number; cancelado: boolean }> {
+// Processa UM chunk do lote (chamado em sequência pelo front). Envia os próximos
+// CHUNK_SIZE alvos a partir do cursor (`processados`), atualizando o cursor a CADA e-mail
+// (resumível: se a requisição morrer no meio, retoma exatamente de onde parou, sem
+// reenviar). Respeita o pedido de cancelamento. Devolve o progresso atualizado.
+export async function processarChunkLote(adminEmail: string, loteId: string): Promise<ProgressoLote | null> {
+  const lote = await getEmailLote(loteId);
+  if (!lote) return null;
+
+  // Já terminou? devolve como está.
+  if (lote.status === 'concluido' || lote.status === 'erro' || lote.status === 'cancelado') {
+    return progressoDeLote(lote);
+  }
+  // Cancelamento pedido → finaliza agora.
+  if (lote.status === 'cancelando') {
+    await finalizeEmailLote(loteId, 'cancelado');
+    return progressoDeLote({ ...lote, status: 'cancelado' });
+  }
+  // Cursor chegou ao fim → conclui.
+  if (lote.processados >= lote.total) {
+    await finalizeEmailLote(loteId, 'concluido');
+    return progressoDeLote({ ...lote, status: 'concluido' });
+  }
+
+  const alvos = parseJson<string[]>(lote.alvos) ?? [];
+  const fatia = alvos.slice(lote.processados, lote.processados + CHUNK_SIZE);
+
+  // Mapa email → recipient (nome/projetos) a partir da lista autoritativa de pendentes.
   const { recipients, template } = await listarLegadosPendentes();
-  const alvos = filtrarPorEmails(recipients, emails);
-  let enviados = 0;
-  let falhas = 0;
-  let cancelado = false;
+  const porEmail = new Map(recipients.map((r) => [r.email.toLowerCase(), r]));
 
-  // Alinha o total do lote ao nº real de alvos (a base pode ter mudado entre o clique e o
-  // início do envio em background).
-  if (loteId) {
+  for (const email of fatia) {
+    const r = porEmail.get(email.toLowerCase());
+    // Não está mais pendente (editou nesse meio tempo) → pula, só avança o cursor.
+    if (!r) {
+      await advanceEmailLote(loteId, { processados: 1 });
+      continue;
+    }
+    const { assunto, html } = renderEmailLegado(template, r);
+    const projetoIds = r.projetos.map((p) => p.id);
     try {
-      await setEmailLoteTotal(loteId, alvos.length);
+      await sendGmail(r.email, assunto, html);
+      await insertEmailDisparo({
+        email: r.email,
+        nome: r.nome,
+        projetoIds,
+        assunto,
+        enviadoPor: adminEmail,
+        status: 'sucesso',
+      });
+      await advanceEmailLote(loteId, { processados: 1, enviados: 1 });
     } catch (e) {
-      console.error('[enviarLoteLegados] falha ao ajustar total do lote:', e);
+      await insertEmailDisparo({
+        email: r.email,
+        nome: r.nome,
+        projetoIds,
+        assunto,
+        enviadoPor: adminEmail,
+        status: 'falha',
+        erro: e instanceof Error ? e.message : String(e),
+      });
+      await advanceEmailLote(loteId, { processados: 1, falhas: 1 });
     }
   }
 
-  try {
-    for (const r of alvos) {
-      // Pedido de cancelamento? Para antes de mandar o próximo.
-      if (loteId) {
-        const atual = await getEmailLote(loteId);
-        if (atual?.status === 'cancelando') {
-          cancelado = true;
-          break;
-        }
-      }
-      const { assunto, html } = renderEmailLegado(template, r);
-      const projetoIds = r.projetos.map((p) => p.id);
-      try {
-        await sendGmail(r.email, assunto, html);
-        enviados++;
-        await insertEmailDisparo({
-          email: r.email,
-          nome: r.nome,
-          projetoIds,
-          assunto,
-          enviadoPor: adminEmail,
-          status: 'sucesso',
-        });
-        if (loteId) await bumpEmailLote(loteId, 'enviados');
-      } catch (e) {
-        falhas++;
-        await insertEmailDisparo({
-          email: r.email,
-          nome: r.nome,
-          projetoIds,
-          assunto,
-          enviadoPor: adminEmail,
-          status: 'falha',
-          erro: e instanceof Error ? e.message : String(e),
-        });
-        if (loteId) await bumpEmailLote(loteId, 'falhas');
-      }
-      await new Promise((res) => setTimeout(res, 120)); // throttle suave
-    }
-    if (loteId) await finalizeEmailLote(loteId, cancelado ? 'cancelado' : 'concluido');
-  } catch (e) {
-    // Erro inesperado fora do envio individual — marca o lote para o front não travar.
-    if (loteId) await finalizeEmailLote(loteId, 'erro').catch(() => {});
-    throw e;
+  // Relê para devolver o estado atualizado e finalizar se acabou.
+  const atual = await getEmailLote(loteId);
+  if (!atual) return null;
+  if (atual.status === 'cancelando') {
+    await finalizeEmailLote(loteId, 'cancelado');
+    return progressoDeLote({ ...atual, status: 'cancelado' });
   }
-
-  return { enviados, falhas, cancelado };
+  if (atual.processados >= atual.total) {
+    await finalizeEmailLote(loteId, 'concluido');
+    return progressoDeLote({ ...atual, status: 'concluido' });
+  }
+  return progressoDeLote(atual);
 }
 
 // Envia um e-mail de teste só para o próprio admin, com dados de exemplo. Não registra
