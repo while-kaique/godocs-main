@@ -179,6 +179,42 @@ O **AI Proxy** (`ai-proxy.gogroupbr.com`) é o gateway interno de IA da empresa 
 - **Painel "Comparação desta edição" (`ComparacaoEdicao` em `investigador.tsx`)** — na `DetalheView`, quando a versão selecionada é um **reenvio** (`acao === 'reenvio'`), aparece um painel before/after que compara o `snapshot_projeto` da versão com o da **versão imediatamente anterior** (por `versao_num`) e classifica cada campo em **Alterado / Adicionado / Removido / Sem mudança** (esta última recolhida por padrão). Tudo no frontend (zero backend novo): os snapshots já vêm de `/api/admin/investigador/projetos/:id`. Campos comparados em `CAMPOS_DIFF` (nome, área, ferramenta, tipos, especial, descrição, tipo_saving, saving_horas/reais, ganho/custo externo, alguém fazia, custo evitado + justificativa + itens, memorial, status); textos longos (memorial/justificativa/itens/descrição) abrem em blocos Antes×Depois. Encoding por **rótulo + ícone + cor** (não só cor — acessível): Alterado `--go-blue`, Adicionado `#6b6d00` (dark-lime), Removido `#dc2626`, Igual cinza. Snapshot ausente numa das pontas (versão pré-snapshot) → aviso âmbar gracioso, sem quebrar.
 - **Diff nos cartões determinísticos da conversa (`EventBubble`/`ChatTab`)** — além do painel-resumo, os cartões de `form_events` na timeline do Chat (`Saving informado`, `Receita informada`) realçam **antes→depois** quando há uma **marcação anterior da MESMA etapa** para comparar. `ChatTab` recebe `todosEventos` (histórico completo) e calcula, por evento, o `dadosAnterior` = última marca do mesmo `tipo` em TODA a história (mesmo fora da janela da versão) → o 1º saving de um reenvio compara com o saving submetido antes, e remarcas dentro de uma submissão ("voltou e editou") comparam com a marca anterior. `linhasDoEvento(tipo, dados)` é o builder **puro** (rows + chips com `key` estável) reutilizado p/ atual e base; o diff classifica cada row/chip em alterado/adicionado/removido/igual (igual fica discreto). Só `saving`/`receita` entram no diff (`TIPOS_COM_DIFF`) — `metadados`/`submit`/etc. registram só o delta do instante, comparar entre eles confunde. Sem base (1ª marca, submissão direta) → cartão **idêntico ao de antes**. O selo "Voltou e editou — Etapa X" ficou mais visível (pílula âmbar) e ganhou contador "N alterações".
 
+## Cobrança de legados por e-mail (painel admin)
+
+Tela admin **`/email-legados`** ("Cobrança de legados", `src/routes/_authenticated/email-legados.tsx`,
+gate via `_authenticated`) para **disparar um e-mail de cobrança** aos donos de projetos legados ainda
+não regularizados. **Critério (fonte única, reusa `meus-projetos.functions`):** projeto com `id`
+contendo `legado` (LIKE `%legado%`) **E** `atualizado_em` vazio (`!temAtualizadoEm` — cobre `null`/``/`—`/`-`).
+**Legados já atualizados (com data) ficam de fora.** Alvo = **dono** (`responsavel_email`); **um e-mail
+por pessoa** (dedup por e-mail, case-insensitive), listando todos os projetos pendentes dela. A contagem
+é **sempre calculada ao vivo** do SQLite — nunca um número fixo.
+
+- **Envio (Gmail API via Service Account + DWD):** `sendGmail(to, subject, html)` em
+  **`src/lib/google/gmail.ts`** envia **impersonando uma caixa real @gocase.com** (`GMAIL_SENDER`,
+  default `rpa_ia@gocase.com`) — o e-mail sai de verdade do remetente (aparece nos "Enviados" dele,
+  respostas voltam pra ele). `getGmailAccessToken(sub)` (`google/auth.ts`) gera um JWT com escopo
+  `gmail.send` e `sub` = a caixa; **reusa a SA do Sheets** (`GOOGLE_SA_*`; override opcional
+  `GMAIL_SA_*`). ⚠️ **PRÉ-REQUISITO Workspace:** *domain-wide delegation* habilitada para o Client ID
+  da SA com o escopo `gmail.send` (super-admin) + Gmail API ligada no projeto Cloud — sem isso a troca
+  do JWT dá `401 unauthorized_client`. (≠ os e-mails de aprovação/rejeição, que seguem no Brevo.)
+  Lógica de negócio em **`src/lib/email-legados.functions.ts`**: `listarLegadosPendentes` (filtro +
+  dedup + junta último
+  envio), `getTemplateEmailLegado`/`salvarTemplateEmailLegado` (template editável em `configuracoes`,
+  chaves `email_legado_assunto`/`email_legado_corpo`; fallback `TEMPLATE_PADRAO`), `renderEmailLegado`
+  (substitui placeholders + shell HTML GoGroup; escapa HTML — anti-injeção), `enviarLoteLegados`
+  (loop sequencial throttled, **roda em background** via `runBackground`/`waitUntil`), `enviarEmailTeste`.
+- **Placeholders do template:** `{{nome}}`, `{{projetos}}` (vira `<ul>` nome+id), `{{prazo}}`
+  (`PRAZO_LEGADO` = 30/06/2026), `{{link}}` (botão "Acessar Meus Projetos", URL `APP_BASE_URL` →
+  default `godocs.devgogroup.com/meus-projetos`).
+- **Log `email_disparos` (tabela nova, migração em `schema.ts`):** uma linha **por destinatário por
+  disparo** (`email, nome, projeto_ids JSON, assunto, enviado_por, status 'sucesso'|'falha', erro,
+  created_at`). A tela mostra selo "enviado em DD/MM" por pessoa (`getUltimosDisparosPorEmail`) e exige
+  **confirmação** antes de disparar; **reenvio é permitido** conscientemente. O teste para si NÃO loga.
+- **Rotas (worker, todas `requireAdmin`):** `GET /api/admin/email-legados/preview`,
+  `POST …/template`, `POST …/teste`, `POST …/enviar` (salva template + conta + dispara em background,
+  retorna `{ enfileirados }`). O botão "Atualizar da planilha" reusa `POST /api/admin/sync-sheets-now`.
+- **Idempotência:** o backend **recomputa a lista no disparo** (não confia na contagem do front).
+
 ## Testes E2E em produção (validação coluna-a-coluna)
 
 Harness em **`scripts/e2e/`** para validar de ponta a ponta os cálculos de saving/receita e o

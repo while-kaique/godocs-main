@@ -167,6 +167,26 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_form_events_projeto_id
     ON form_events(projeto_id);
+
+  -- Log de disparos de e-mail de cobrança de legados pendentes (painel admin).
+  -- Uma linha POR DESTINATÁRIO POR DISPARO — registra quem recebeu, quando, por
+  -- qual admin e o resultado (sucesso/falha). Serve para mostrar "já enviado em…"
+  -- na tela e evitar disparo duplicado acidental (reenvio é permitido, mas
+  -- consciente). 'projeto_ids' = JSON dos legados pendentes incluídos no e-mail.
+  CREATE TABLE IF NOT EXISTS email_disparos (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    email TEXT NOT NULL,
+    nome TEXT,
+    projeto_ids TEXT,
+    assunto TEXT,
+    enviado_por TEXT,
+    status TEXT NOT NULL DEFAULT 'sucesso',
+    erro TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_email_disparos_email
+    ON email_disparos(email);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

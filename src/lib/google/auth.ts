@@ -1,9 +1,11 @@
 // Autenticação Google Service Account via Web Crypto API (sem deps npm).
 // Gera JWT RS256 e troca por access_token. Cache em módulo.
 
-// A Service Account é usada só para Sheets. O Drive usa OAuth de usuário
+// A Service Account é usada para Sheets e, via domain-wide delegation, para enviar
+// e-mail impersonando uma caixa @gocase.com (Gmail API). O Drive usa OAuth de usuário
 // (getDriveAccessToken) porque Service Accounts não têm cota de storage própria.
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const TOKEN_LIFETIME_SECS = 3600;
@@ -59,6 +61,7 @@ async function importPemKey(pemBase64: string): Promise<CryptoKey> {
 async function createSignedJwt(
   clientEmail: string,
   privateKey: CryptoKey,
+  opts?: { scope?: string; sub?: string },
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -67,11 +70,13 @@ async function createSignedJwt(
   const payload = base64urlEncodeString(
     JSON.stringify({
       iss: clientEmail,
-      sub: clientEmail,
+      // `sub` = quem a SA representa. Para Sheets é a própria SA; para Gmail é a
+      // caixa @gocase.com impersonada (exige domain-wide delegation no Workspace).
+      sub: opts?.sub ?? clientEmail,
       aud: TOKEN_URL,
       iat: now,
       exp: now + TOKEN_LIFETIME_SECS,
-      scope: SCOPES,
+      scope: opts?.scope ?? SCOPES,
     }),
   );
 
@@ -124,6 +129,40 @@ export async function getAccessToken(): Promise<string> {
     expiresAt: now + expires_in,
   };
 
+  return access_token;
+}
+
+// ─── Token Gmail (envio via domain-wide delegation) ──────────────────────────
+//
+// Mint de um access_token com escopo `gmail.send` impersonando `sub` (uma caixa
+// real @gocase.com, ex. rpa_ia@gocase.com). PRÉ-REQUISITO no Workspace: a
+// delegação em todo o domínio (DWD) precisa estar habilitada para o Client ID da
+// SA com o escopo gmail.send; sem isso, a troca do JWT retorna 401 unauthorized_client.
+// Reusa a chave da SA do Sheets (GOOGLE_SA_*); aceita override dedicado (GMAIL_SA_*).
+// Cache por `sub`.
+
+let _gmailCached: Map<string, { token: string; expiresAt: number }> = new Map();
+
+export async function getGmailAccessToken(sub: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+
+  const cached = _gmailCached.get(sub);
+  if (cached && cached.expiresAt > now + RENEW_MARGIN_SECS) {
+    return cached.token;
+  }
+
+  const keyBase64 = process.env.GMAIL_SA_KEY_BASE64 ?? process.env.GOOGLE_SA_KEY_BASE64;
+  const clientEmail = process.env.GMAIL_SA_CLIENT_EMAIL ?? process.env.GOOGLE_SA_CLIENT_EMAIL;
+
+  if (!keyBase64 || !clientEmail) {
+    throw new Error('GOOGLE_SA_KEY_BASE64 e GOOGLE_SA_CLIENT_EMAIL são obrigatórios para enviar e-mail via Gmail');
+  }
+
+  const privateKey = await importPemKey(keyBase64);
+  const jwt = await createSignedJwt(clientEmail, privateKey, { scope: GMAIL_SCOPE, sub });
+  const { access_token, expires_in } = await exchangeJwtForToken(jwt);
+
+  _gmailCached.set(sub, { token: access_token, expiresAt: now + expires_in });
   return access_token;
 }
 
