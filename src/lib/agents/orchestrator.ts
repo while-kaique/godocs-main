@@ -718,16 +718,22 @@ PLAUSIBILIDADE / DETALHAMENTO: se a economia de um cargo for alta frente à base
 SEÇÃO 2.4 — O QUE MUDOU APÓS A AUTOMAÇÃO (OBRIGATÓRIO NESTE PROJETO)
 ECONOMIA ALTA DETECTADA: o saving total declarado é de ${totalHoras}h/mês.
 Isso é MUITA hora humana liberada — 44h/mês já equivale a uma jornada semanal CLT inteira por mês, e a maior linha individual sozinha equivale a ~${pctMesUtil}% de um mês útil (220h).${detalheLinhasAltas ? ` Cargo(s) com economia individual ≥44h/mês: ${detalheLinhasAltas}.` : ''}
-Um ganho desse porte SÓ É CRÍVEL se algo mudou DE VERDADE — a empresa não paga por horas ociosas. Sua missão aqui é descobrir e REGISTRAR no memorial O QUE MUDOU concretamente, para que quem lê a aprovação se convença de que o ganho é real. NÃO aceite respostas vagas ("ganhou produtividade", "sobra tempo", "ficou mais eficiente") — exija o destino CONCRETO do tempo/custo. Faça QUANTAS perguntas forem necessárias (sobre o total e sobre cada cargo com ≥44h) até não restar ponta solta.
+Um ganho desse porte SÓ É CRÍVEL se algo mudou DE VERDADE — a empresa não paga por horas ociosas. Sua missão aqui é descobrir e REGISTRAR no memorial O QUE MUDOU concretamente, para que quem lê a aprovação se convença de que o ganho é real.
+⛔ NÃO aceite respostas vagas/óbvias — elas NÃO preenchem o ponto: "ganhou produtividade", "sobra tempo", "ficou mais eficiente", "o time ficou mais focado" E TAMBÉM "o tempo foi realocado para outras atividades / outras demandas / outras prioridades". Dizer que o tempo "foi para outras atividades" é ÓBVIO e não diz NADA — toda hora liberada vai para alguma coisa. A pergunta de verdade é: QUAIS atividades, e o que isso passou a entregar A MAIS? Faça QUANTAS perguntas forem necessárias (sobre o total e sobre cada cargo com ≥44h) até ter o destino NOMEADO e, sempre que possível, QUANTIFICADO.
 
-INVESTIGUE (e registre a resposta):
-- Para onde foi o tempo liberado? Opções concretas: a pessoa assumiu outras atividades (quais?); o mesmo time passou a atender MUITO mais volume com a mesma equipe; houve realocação para outra função/área; redução de equipe / vaga não reposta / desligamento; a tarefa era feita por terceiro/serviço contratado que foi CANCELADO.
-- Se a pessoa segue no MESMO cargo e equipe sem mudança aparente: o que ela faz agora nessas horas, e isso virou mais entrega/capacidade mensurável? Se "nada mudou", então a economia declarada provavelmente está inflada — reabra a validação das horas.
-- ${linhasIndividuaisAltas.length ? 'Para CADA cargo com ≥44h/mês individuais, questione separadamente o que mudou na rotina daquela pessoa — não generalize uma resposta única para todos.' : 'Confirme que a soma das mudanças por pessoa explica o total declarado.'}
+INVESTIGUE até NOMEAR e (quando der) QUANTIFICAR — registre a resposta:
+- QUAIS são, com NOME, as atividades concretas para onde o tempo foi? (ex.: "hunting e entrevistas", "atender mais clientes", "análise de crédito", "fechamento contábil"; ou ainda: o time passou a atender MUITO mais volume com a mesma equipe / realocação de função / redução de equipe-vaga não reposta / serviço terceirizado CANCELADO). Nunca aceite "outras atividades" sem o nome.
+- O QUE essas pessoas passaram a entregar A MAIS agora — de preferência com NÚMERO? Pergunte explicitamente algo como "o que vocês conseguem fazer hoje com esse tempo que antes não dava?" e busque a medida concreta (ex.: "2 a 3 entrevistas a mais por dia", "o dobro de tickets", "cada analista cobre 2 lojas a mais"). Se o usuário não tiver número, registre ao menos a nova entrega qualitativa concreta.
+- ${linhasIndividuaisAltas.length ? 'Para CADA cargo com ≥44h/mês individuais, questione separadamente o que aquela pessoa faz agora e o que entrega a mais — não generalize uma resposta única para todos.' : 'Confirme que a soma das mudanças por pessoa explica o total declarado.'}
+- Se a pessoa segue no MESMO cargo e equipe e a resposta continua "nada mudou de verdade / só sobra tempo", então a economia declarada provavelmente está inflada — reabra a validação das horas.
 
-REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela: (a) o destino concreto do tempo/custo liberado e (b) uma frase explícita concluindo que o ganho é válido por causa dessa mudança (ex.: "Essas Xh/mês são reais porque a pessoa foi realocada para Y / o time passou a atender Z / o serviço W foi cancelado"). Texto qualitativo, SEM R$.
+EXEMPLO (use como régua de qualidade):
+❌ INSUFICIENTE (vago — recusar): "o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de manter essa rotina manual." → não diz QUAIS atividades nem o ganho.
+✅ BOM (nomeado + quantificado — aceitar): "Antes, os 5 perfis lançavam o histórico do candidato e a marcação aprovado/reprovado à mão; agora isso é automático. O tempo ganho foi dedicado a hunting e entrevistas — com as horas que gastavam no preenchimento, o time hoje faz de 2 a 3 entrevistas a mais por dia."
 
-GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa concreta (não basta descrever a rotina antiga — precisa dizer o que mudou E por que isso valida a economia). A seção vem logo após o total de horas.
+REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela, no padrão do EXEMPLO BOM acima: (a) as atividades concretas NOMEADAS para onde o tempo foi e (b) o que o time passou a entregar A MAIS — com NÚMERO quando houver — concluindo que o ganho é válido por causa dessa mudança. Texto qualitativo, SEM R$.
+
+GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa CONCRETA (atividades NOMEADAS + nova entrega). Não basta descrever a rotina antiga nem dizer que "foi para outras atividades" — precisa dizer QUAIS atividades e o que mudou na entrega. A seção vem logo após o total de horas.
 ═══════════════════════════════════════════════════════════════════`
     : '';
 
@@ -959,9 +965,9 @@ Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
   const blocoEconomiaAltaPv = economiaAltaPv
     ? `
 
-ATENÇÃO — ECONOMIA ALTA (≥44h/mês): este projeto declara ${totalHorasPv}h/mês de saving. O memorial SÓ pode ser aprovado se explicar CONCRETAMENTE o que mudou após a automação (a seção "### O que mudou após a automação"): para onde foi o tempo/custo liberado — realocação, mais volume atendido, redução de equipe, vaga não reposta, serviço/contrato cancelado, etc.
-- Se essa explicação NÃO existir no memorial, ou for vaga ("ganhou produtividade", "sobra tempo", "ficou mais eficiente"), NÃO aprove: responda com type:"question" pedindo o destino concreto do tempo/custo. Mesmo que o usuário diga "aprovado".
-- Só emita type:"complete" depois que o memorial deixar claro o que mudou.`
+ATENÇÃO — ECONOMIA ALTA (≥44h/mês): este projeto declara ${totalHorasPv}h/mês de saving. O memorial SÓ pode ser aprovado se a seção "### O que mudou após a automação" NOMEAR as atividades concretas para onde o tempo foi E disser o que o time passou a entregar A MAIS (com número quando houver) — ex.: "o tempo foi para hunting e entrevistas e o time faz de 2 a 3 entrevistas a mais por dia".
+- NÃO aprove se essa seção estiver ausente OU vaga/óbvia: "ganhou produtividade", "sobra tempo", "ficou mais eficiente" E TAMBÉM "o tempo foi realocado para outras atividades" sem dizer QUAIS. Dizer que "foi para outras atividades" não preenche o ponto — toda hora liberada vai para alguma coisa. Responda com type:"question" pedindo as atividades NOMEADAS e o ganho concreto. Mesmo que o usuário diga "aprovado".
+- Só emita type:"complete" depois que a seção nomear as atividades e a nova entrega.`
     : '';
 
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving PADRONIZADO.
