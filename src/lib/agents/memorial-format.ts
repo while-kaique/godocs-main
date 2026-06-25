@@ -68,7 +68,7 @@ export const MEMORIAL_ESQUELETO: Record<ModoMemorial, SecaoEsqueleto[]> = {
   saving: [
     { secao: 'Contexto', nivel: 'obrigatoria', conteudo: '1-2 frases do que o projeto faz (use o que foi aprovado).' },
     { secao: 'Saving de Pessoas', nivel: 'obrigatoria', conteudo: 'Por cargo: o que fazia, frequência×tempo, COMPOSIÇÃO das horas (quebra por atividade somando o total), horas antes/depois, economia.' },
-    { secao: 'O que mudou após a automação', nivel: 'condicional', gatilho: 'saving MENSAL ≥ 44h no total OU em algum cargo', conteudo: 'Destino concreto do tempo/custo liberado + frase concluindo a validade do ganho. Sem R$.' },
+    { secao: 'O que mudou após a automação', nivel: 'condicional', gatilho: 'saving MENSAL ≥ 44h no total OU em algum cargo', conteudo: 'Atividades concretas NOMEADAS para onde o tempo foi (nunca "outras atividades") + o que o time passou a entregar A MAIS, com NÚMERO quando houver (ex.: "tempo foi para hunting e entrevistas → 2-3 entrevistas a mais por dia") + frase concluindo a validade do ganho. Sem R$.' },
     { secao: 'Contratos/Serviços Evitados', nivel: 'opcional', gatilho: 'há um custo externo evitado DISTINTO das horas', conteudo: 'Serviço evitado, custo evitado (qualitativo, sem R$), rateio. "N/A" quando não há.' },
     { secao: 'Custo da Automação', nivel: 'obrigatoria', conteudo: 'Ferramenta externa, monitoramento, custo total — ou "N/A".' },
     { secao: 'Resumo', nivel: 'obrigatoria', conteudo: 'Economia total de horas + tipo (mensal/pontual).' },

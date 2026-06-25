@@ -42,7 +42,7 @@ nunca ecoado pelo LLM).
 | **Jornada-base 220h** | rotina manual real **mensal** (`aplicaConfirmacaoBaseHoras`) | base CLT 220h/mês como TETO por pessoa; só sobe com trabalho HUMANO em fim de semana (≤300h) | `saving.jornada_base` |
 | **Teto por pessoa** | idem, e alguma linha > teto | linha acima do teto só passa se o usuário confirmar que soma **várias pessoas/unidades** | `saving.teto_pessoa` |
 | **Carga real × escala** | alguém fazia à mão (`'sim'`), recorrente, com horas (`aplicaSplitCargaEscala`) | separa **carga humana real** × **ganho por escala** (volume que só a automação cobre); o sistema pergunta o nº da carga real, a escala é o resto | `saving.carga_escala` |
-| **Economia alta [2.4]** | saving **mensal** ≥ 44h | exige registrar **o que mudou** (destino do tempo liberado) no memorial — gate via prompt + rede no preview | — |
+| **Economia alta [2.4]** | saving **mensal** ≥ 44h | exige registrar **o que mudou**: atividades **nomeadas** p/ onde o tempo foi (nunca "outras atividades") + o que se entrega **a mais** (com nº quando houver) — gate via prompt (com exemplo bom×ruim) + rede no preview; fatiado p/ coluna AK "Alocação Ganhos" | — |
 
 Padrão comum: predicado de escopo exportado do `orchestrator.ts`; o backend intercepta o
 preview, troca por uma pergunta (`pergunta*`), interpreta a resposta de forma determinística
