@@ -53,6 +53,7 @@ npm run lint / format  # eslint / prettier
    Se a lista de assets não bater com o `index.html`, o site fica em tela branca (o HTML referencia `.js`/`.css` que não existem no servidor).
 10. **`git pull` antes de abrir PR** — sempre que o usuário pedir para abrir um PR, fazer `git fetch origin` + incorporar o `origin/main` na branch (merge/rebase) **antes** de subir, e rebuildar o `worker.js`/`dist` após o merge. Motivo: várias sessões mexem no repo ao mesmo tempo (regra 8) e o `main` costuma andar — abrir PR sem sincronizar gera conflito/PR desatualizado.
 11. **Edições visuais → skill `frontend-design`** — para QUALQUER tarefa de UI/design (criar ou redesenhar tela, componente, layout, estilo), invocar a skill `frontend-design` **antes** de desenhar/codar e seguir suas diretrizes. Sempre respeitar a identidade visual GoGroup (`--go-blue`, `--go-lime`, `--go-cream`, Poppins) e o piso de qualidade: foco de teclado visível, `prefers-reduced-motion` respeitado, contraste/acessibilidade (estado nunca só por cor — usar rótulo/ícone também). Texto PT-BR com acentos (regra 4).
+12. **Specs de planejamento (`spec-docs/`) — consultar antes, atualizar junto** — antes de mexer em qualquer feature documentada em `spec-docs/` (ver tabela "Documentação detalhada"), **leia a spec correspondente** — em especial a seção **"Decisões fechadas que NÃO podem ser corrigidas por engano"** (são escolhas intencionais de produto/arquitetura; não "consertar" o que parece errado sem confirmar). Quando uma decisão de produto/arquitetura dessas features **mudar** (ou ao concluir uma feature pendente, ex.: F5 antiagente), **atualize a spec no MESMO PR** — status, decisão e o mapa de "onde aterrissou". As specs são documento de planejamento/decisão; NÃO substituem `docs/` nem este `CLAUDE.md`.
 
 ## Deploy rápido (Godeploy)
 
@@ -96,6 +97,7 @@ echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basena
 | [docs/agents.md](docs/agents.md) | Sistema de agentes IA: orquestrador, extrator, compilador, analisador |
 | [docs/business-rules.md](docs/business-rules.md) | Fluxo de submissão, fases do chat, cálculos de saving/receita, regras de negócio |
 | [docs/deploy.md](docs/deploy.md) | Deploy no Godeploy, env vars, checklist pré-deploy |
+| [spec-docs/](spec-docs/) | **Specs de planejamento/decisão** (não doc técnica): o que foi decidido, por quê e onde aterrissou. [SPEC_FEATURES_NOVAS.md](spec-docs/SPEC_FEATURES_NOVAS.md) cobre as 5 features de jun/2026 + etapa de auditoria, com status, PRs e decisões fechadas. Consultar/atualizar conforme a **regra 12**. |
 
 ## Memorial padronizado
 
