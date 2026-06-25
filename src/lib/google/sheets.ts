@@ -72,6 +72,11 @@ export const SHEET_COLUMNS = [
   // Split do saving (transparência) — colunas NUMÉRICAS: 0 quando não se aplica.
   'Saving Horas Real',              // carga humana real do split
   'Saving Horas Escalado',          // ganho por escala do split
+  // Justificativa do agente para o split (cálculo + gatilhos que levaram aos números
+  // acima) — coluna de TEXTO: fatiada do memorial (subseção "Carga real e ganho por
+  // escala", ponto [2.5]); "—" quando o split não se aplica. Posição resolvida por nome
+  // em runtime (fetchHeaderMap), então a ordem aqui é só documentação.
+  'Justificativa Saving Escalado e Real',
   // Análise do antiagente (crítico adversarial — F5). Coluna de TEXTO: "—" quando
   // ainda não há análise (F5 a preenche depois). Já mapeada p/ não ficar em branco.
   'Análise Antiagente',

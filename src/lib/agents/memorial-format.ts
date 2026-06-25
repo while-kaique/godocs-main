@@ -21,6 +21,7 @@ export const TITULOS_MEMORIAL: Record<string, string> = {
   '2.2': 'Detalhe por pessoa',
   '2.3': 'Total de horas',
   '2.4': 'O que mudou após a automação',
+  '2.5': 'Carga real e ganho por escala',
   // Seção 3 — Contratos / serviços evitados
   '3.1': 'Serviço evitado',
   '3.2': 'Custo evitado',
@@ -134,6 +135,11 @@ export function normalizarMarcadoresMemorial(texto: string | null | undefined): 
 // planilha (antes ficava só dentro do memorial, difícil de inspecionar).
 const TITULO_ALOCACAO_GANHOS = TITULOS_MEMORIAL['2.4'].toLowerCase();
 
+// Título do ponto [2.5] — a justificativa do split "carga real × ganho por escala"
+// (raciocínio + cálculo que levaram aos números das colunas "Saving Horas Real" /
+// "Saving Horas Escalado"). Fatiada para a coluna "Justificativa Saving Escalado e Real".
+const TITULO_CARGA_ESCALA = TITULOS_MEMORIAL['2.5'].toLowerCase();
+
 // Extrai o TÍTULO legível de uma linha que seja cabeçalho markdown ("### Título")
 // ou rótulo em negrito no início ("**Título:** ..."). Devolve null se não for nenhum.
 function tituloDaLinha(linha: string): string | null {
@@ -157,12 +163,36 @@ function tituloDaLinha(linha: string): string | null {
  * código [2.4] já tenha virado o rótulo legível.
  */
 export function extrairAlocacaoGanhos(memorial: string | null | undefined): string | null {
+  return extrairSecaoMemorial(memorial, TITULO_ALOCACAO_GANHOS);
+}
+
+/**
+ * Extrai do memorial a seção "Carga real e ganho por escala" (ponto [2.5]) — a
+ * justificativa do agente para o split: o cálculo (volume/frequência antes × depois →
+ * horas) e os gatilhos que levaram aos números gravados nas colunas "Saving Horas Real"
+ * e "Saving Horas Escalado" (inclusive o porquê de a escala ser 0, quando for o caso).
+ * Fatiada para a coluna "Justificativa Saving Escalado e Real". Mesma mecânica da
+ * "Alocação Ganhos": cabeçalho `### ...` ou rótulo inline `**...:**`, conteúdo até o
+ * próximo ponto/seção ou o separador `---`. Devolve null quando a seção não existe
+ * (ex.: split não se aplica) ou está vazia.
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial).
+ */
+export function extrairJustificativaCargaEscala(memorial: string | null | undefined): string | null {
+  return extrairSecaoMemorial(memorial, TITULO_CARGA_ESCALA);
+}
+
+// Fatia uma seção do memorial pelo seu título legível (já em minúsculas). Captura o
+// conteúdo inline do rótulo (`**Título:** aqui`) + as linhas seguintes, parando no
+// próximo ponto/seção ou no separador `---` do bloco financeiro injetado. Base comum
+// de extrairAlocacaoGanhos / extrairJustificativaCargaEscala.
+function extrairSecaoMemorial(memorial: string | null | undefined, tituloLower: string): string | null {
   if (!memorial) return null;
   const linhas = memorial.split(/\r?\n/);
 
   let inicio = -1;
   for (let i = 0; i < linhas.length; i++) {
-    if (tituloDaLinha(linhas[i]) === TITULO_ALOCACAO_GANHOS) {
+    if (tituloDaLinha(linhas[i]) === tituloLower) {
       inicio = i;
       break;
     }

@@ -122,6 +122,10 @@ export type SubmitSyncParams = {
   // Justificativa [2.4] "o que mudou após a automação" (gate ≥44h), fatiada do
   // memorial → coluna "Alocação Ganhos". Vazia/null quando o gate não disparou.
   alocacaoGanhos?: string | null;
+  // Justificativa [2.5] "carga real e ganho por escala" (cálculo + gatilhos do split),
+  // fatiada do memorial → coluna "Justificativa Saving Escalado e Real". Null quando o
+  // split não se aplica (ninguém fazia à mão / pontual / receita-pura) → "—".
+  justificativaCargaEscala?: string | null;
   // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
   // Em submissão nova fica null (não há versão anterior).
   memorialAnterior?: string | null;
@@ -243,6 +247,8 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       // Numéricas — 0 quando não se aplica (não "—").
       'Saving Horas Real': savingHorasReal,
       'Saving Horas Escalado': savingHorasEscalado,
+      // Justificativa do split (cálculo + gatilhos) — TEXTO: "—" quando não se aplica.
+      'Justificativa Saving Escalado e Real': ouTraco(p.justificativaCargaEscala),
       // Análise do antiagente (F5) — TEXTO: "—" enquanto não houver análise. Quando o
       // F5 for implementado, escreve o parecer aqui (via syncUpdateToGoogle, como a
       // Complexidade/Observações). Por ora, garante "—" em vez de célula em branco.

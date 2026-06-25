@@ -55,7 +55,7 @@ import type {
 } from '@/lib/agents/types';
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens } from '@/lib/agents/saving-calc';
-import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos } from '@/lib/agents/memorial-format';
+import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos, extrairJustificativaCargaEscala } from '@/lib/agents/memorial-format';
 import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
@@ -791,7 +791,35 @@ function interpretarCargaReal(content: string, total: number): number | null {
   return cand == null ? null : Math.min(cand, total);
 }
 function nudgeCargaEscala(real: number, escala: number): string {
-  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS. Registre os dois no memorial, dentro de "Saving de Pessoas" (em horas, qualitativo), e siga para o preview. NÃO pergunte sobre isso de novo.`;
+  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS. Registre o split no memorial numa subseção própria com o cabeçalho EXATO "### Carga real e ganho por escala" (dentro de "Saving de Pessoas"), em horas/qualitativo (SEM R$): os dois números, o cálculo quando houver (volume/frequência antes × depois → horas) e os gatilhos que levaram a esse split${escala === 0 ? ' (a pessoa já fazia o volume todo à mão, por isso o ganho por escala é 0 — explicite isso)' : ''}. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
+}
+
+// Justificativa do split carga real × escala → coluna "Justificativa Saving Escalado e
+// Real" (TEXTO). Derivada do memorial (subseção "### Carga real e ganho por escala" que
+// o agente escreve — a "análise do agente"), espelhando a "Alocação Ganhos": sem coluna
+// SQLite própria, re-extraída no resync. Quando o split SE APLICA (alguém fazia à mão e
+// os dois números existem) mas o agente não consolidou a subseção, cai num fallback
+// determinístico curto com os números — evita "—" enganoso numa linha com split real.
+// Quando o split NÃO se aplica (ninguém fazia / pontual / receita-pura) → null → "—".
+function derivarJustificativaCargaEscala(
+  saving: Record<string, unknown> | null | undefined,
+  alguemFazia: string | null | undefined,
+): string | null {
+  if (!saving) return null;
+  const doMemorial = extrairJustificativaCargaEscala(
+    normalizarMarcadoresMemorial(saving.memorial_calculo as string | null | undefined),
+  );
+  if (doMemorial) return doMemorial;
+  const real = saving.horas_carga_real as number | null | undefined;
+  const escala = saving.horas_escala as number | null | undefined;
+  if (alguemFazia === 'sim' && real != null && escala != null) {
+    const detalhe =
+      escala === 0
+        ? 'A pessoa já executava o volume completo manualmente, então não há ganho por escala.'
+        : 'O ganho por escala é o volume incremental que só a automação passou a cobrir.';
+    return `Carga real (trabalho humano de fato): ${real}h. Ganho por escala (volume só da automação): ${escala}h. ${detalhe}`;
+  }
+  return null;
 }
 
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
@@ -1946,6 +1974,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const alocacaoGanhos = extrairAlocacaoGanhos(
     normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
   );
+  // "Justificativa Saving Escalado e Real": análise do agente para o split (fatiada do
+  // memorial; fallback determinístico quando o split se aplica mas não foi consolidado).
+  const justificativaCargaEscala = derivarJustificativaCargaEscala(
+    saving as Record<string, unknown> | undefined,
+    projeto.alguem_fazia,
+  );
 
   await updateProjeto(projeto_id, {
     status,
@@ -2081,6 +2115,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       memorialLimpo: memorialSavingLimpo ?? '—',
       receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
       alocacaoGanhos,
+      justificativaCargaEscala,
       ganhoTotalMensal,
       // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
       // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
@@ -2160,6 +2195,7 @@ export async function resyncGoogle(rawData: unknown) {
   const alocacaoGanhos = extrairAlocacaoGanhos(
     normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
   );
+  const justificativaCargaEscala = derivarJustificativaCargaEscala(saving, projeto.alguem_fazia);
   const membros = parseJson<string[]>(projeto.membros) ?? [];
 
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
@@ -2177,6 +2213,7 @@ export async function resyncGoogle(rawData: unknown) {
     memorialLimpo: memorialSavingLimpo ?? '—',
     receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
     alocacaoGanhos,
+    justificativaCargaEscala,
     ganhoTotalMensal,
   });
 
