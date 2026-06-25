@@ -18,6 +18,7 @@ import { Route as ProjetoIdRouteImport } from './routes/projeto.$id'
 import { Route as EditarIdRouteImport } from './routes/editar.$id'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
 import { Route as AuthenticatedInvestigadorRouteImport } from './routes/_authenticated/investigador'
+import { Route as AuthenticatedEmailLegadosRouteImport } from './routes/_authenticated/email-legados'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
 import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
@@ -70,6 +71,12 @@ const AuthenticatedInvestigadorRoute =
     path: '/investigador',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedEmailLegadosRoute =
+  AuthenticatedEmailLegadosRouteImport.update({
+    id: '/email-legados',
+    path: '/email-legados',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -113,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -128,6 +136,7 @@ export interface FileRoutesByTo {
   '/submeter': typeof SubmeterRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -146,6 +155,7 @@ export interface FileRoutesById {
   '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
   '/_authenticated/areas': typeof AuthenticatedAreasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/_authenticated/investigador': typeof AuthenticatedInvestigadorRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -164,6 +174,7 @@ export interface FileRouteTypes {
     | '/testes'
     | '/areas'
     | '/dashboard'
+    | '/email-legados'
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/submeter'
     | '/areas'
     | '/dashboard'
+    | '/email-legados'
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
@@ -196,6 +208,7 @@ export interface FileRouteTypes {
     | '/_authenticated/testes'
     | '/_authenticated/areas'
     | '/_authenticated/dashboard'
+    | '/_authenticated/email-legados'
     | '/_authenticated/investigador'
     | '/_authenticated/usuarios'
     | '/editar/$id'
@@ -280,6 +293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvestigadorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/email-legados': {
+      id: '/_authenticated/email-legados'
+      path: '/email-legados'
+      fullPath: '/email-legados'
+      preLoaderRoute: typeof AuthenticatedEmailLegadosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -347,6 +367,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTestesRouteRoute: typeof AuthenticatedTestesRouteRouteWithChildren
   AuthenticatedAreasRoute: typeof AuthenticatedAreasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEmailLegadosRoute: typeof AuthenticatedEmailLegadosRoute
   AuthenticatedInvestigadorRoute: typeof AuthenticatedInvestigadorRoute
   AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
 }
@@ -355,6 +376,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTestesRouteRoute: AuthenticatedTestesRouteRouteWithChildren,
   AuthenticatedAreasRoute: AuthenticatedAreasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEmailLegadosRoute: AuthenticatedEmailLegadosRoute,
   AuthenticatedInvestigadorRoute: AuthenticatedInvestigadorRoute,
   AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
 }

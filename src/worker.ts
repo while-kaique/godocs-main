@@ -46,6 +46,15 @@ import {
 import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
+import {
+  getPreviewLegados,
+  salvarTemplateEmailLegado,
+  enviarLoteLegados,
+  enviarEmailTeste,
+  iniciarDisparoLegados,
+  getProgressoLote,
+  cancelarDisparoLegados,
+} from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -413,6 +422,55 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
       await requireAdmin(request)
       return json(await syncSheetsToSqlite())
+    }
+
+    // ── Cobrança de legados por e-mail (admin) ──
+    // Preview: destinatários (donos de legados pendentes, dedup por e-mail), contagem e template.
+    if (pathname === '/api/admin/email-legados/preview' && method === 'GET') {
+      await requireAdmin(request)
+      return json(await getPreviewLegados())
+    }
+    // Salva o texto editável (assunto + corpo) do e-mail de cobrança.
+    if (pathname === '/api/admin/email-legados/template' && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      const body = await readBody<{ assunto: string; corpo: string }>(request)
+      await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
+      return json({ ok: true })
+    }
+    // Envia um e-mail de teste só para o próprio admin (com dados de exemplo).
+    if (pathname === '/api/admin/email-legados/teste' && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      await enviarEmailTeste(adminEmail)
+      return json({ ok: true })
+    }
+    // Dispara o lote: salva o template (se enviado), cria o lote (com o total) e envia em
+    // background (runBackground/waitUntil) — a Response volta na hora com { loteId, total }.
+    // O front acompanha o progresso via .../email-legados/progresso/:loteId.
+    if (pathname === '/api/admin/email-legados/enviar' && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      const body = await readBody<{ assunto?: string; corpo?: string; emails?: string[] }>(request)
+      if (body.assunto && body.corpo) {
+        await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
+      }
+      const emails = Array.isArray(body.emails) ? body.emails : undefined
+      const { loteId, total } = await iniciarDisparoLegados(adminEmail, emails)
+      runBackground(enviarLoteLegados(adminEmail, loteId, emails))
+      return json({ ok: true, loteId, total })
+    }
+    // Progresso de um lote de disparo (polling do front).
+    if (pathname.startsWith('/api/admin/email-legados/progresso/') && method === 'GET') {
+      await requireAdmin(request)
+      const loteId = pathname.split('/').pop()!
+      const progresso = await getProgressoLote(loteId)
+      if (!progresso) return errorJson('Lote não encontrado', 404)
+      return json(progresso)
+    }
+    // Cancela um lote em andamento (o loop para no próximo e-mail).
+    if (pathname.startsWith('/api/admin/email-legados/cancelar/') && method === 'POST') {
+      await requireAdmin(request)
+      const loteId = pathname.split('/').pop()!
+      await cancelarDisparoLegados(loteId)
+      return json({ ok: true })
     }
 
     // ── Limpeza de projetos de TESTE E2E (admin) ──

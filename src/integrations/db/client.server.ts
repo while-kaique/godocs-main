@@ -690,6 +690,156 @@ export function updateConfiguracao(chave: string, valor: unknown, updatedBy: str
   ]);
 }
 
+// Grava uma configuração criando-a se ainda não existir (UPDATE puro não insere).
+// Usada pelo template editável do e-mail de cobrança de legados.
+export async function upsertConfiguracao(
+  chave: string,
+  valor: unknown,
+  updatedBy: string,
+  descricao?: string,
+) {
+  const now = nowISO();
+  const existente = await getConfiguracao(chave);
+  if (existente) {
+    await exec(
+      'UPDATE configuracoes SET valor = ?, updated_by = ?, updated_at = ? WHERE chave = ?',
+      [JSON.stringify(valor), updatedBy, now, chave],
+    );
+  } else {
+    await exec(
+      'INSERT INTO configuracoes (id, chave, valor, descricao, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [generateId(), chave, JSON.stringify(valor), descricao ?? null, updatedBy, now],
+    );
+  }
+}
+
+// --- E-mail: legados pendentes + log de disparos ---
+
+export type LegadoPendenteRow = {
+  id: string;
+  nome: string | null;
+  responsavel_nome: string;
+  responsavel_email: string;
+  atualizado_em: string | null;
+};
+
+// Todos os projetos LEGADO (id contém "legado"). O filtro fino "ainda não atualizado"
+// (atualizado_em vazio/—/-) é aplicado na camada de negócio com `temAtualizadoEm`,
+// mantendo a lógica de pendência em fonte única.
+export function getLegadosRows() {
+  return queryAll<LegadoPendenteRow>(
+    `SELECT id, nome, responsavel_nome, responsavel_email, atualizado_em
+       FROM projetos
+      WHERE LOWER(id) LIKE '%legado%'`,
+    [],
+  );
+}
+
+export type EmailDisparoRow = {
+  id: string;
+  email: string;
+  nome: string | null;
+  projeto_ids: string | null;
+  assunto: string | null;
+  enviado_por: string | null;
+  status: string;
+  erro: string | null;
+  created_at: string | null;
+};
+
+export function insertEmailDisparo(input: {
+  email: string;
+  nome: string | null;
+  projetoIds: string[];
+  assunto: string;
+  enviadoPor: string;
+  status: 'sucesso' | 'falha';
+  erro?: string | null;
+}) {
+  return exec(
+    `INSERT INTO email_disparos (id, email, nome, projeto_ids, assunto, enviado_por, status, erro, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      generateId(),
+      input.email,
+      input.nome,
+      JSON.stringify(input.projetoIds),
+      input.assunto,
+      input.enviadoPor,
+      input.status,
+      input.erro ?? null,
+      nowISO(),
+    ],
+  );
+}
+
+// --- Lote de disparo (progresso) ---
+
+export type EmailLoteRow = {
+  id: string;
+  total: number;
+  enviados: number;
+  falhas: number;
+  status: string; // 'enviando' | 'concluido' | 'erro'
+  iniciado_por: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export async function createEmailLote(total: number, iniciadoPor: string): Promise<string> {
+  const id = generateId();
+  await exec(
+    `INSERT INTO email_lotes (id, total, enviados, falhas, status, iniciado_por, created_at, updated_at)
+     VALUES (?, ?, 0, 0, 'enviando', ?, ?, ?)`,
+    [id, total, iniciadoPor, nowISO(), nowISO()],
+  );
+  return id;
+}
+
+export function setEmailLoteTotal(id: string, total: number) {
+  return exec('UPDATE email_lotes SET total = ?, updated_at = ? WHERE id = ?', [total, nowISO(), id]);
+}
+
+// Incrementa um contador (enviados|falhas) de forma atômica no banco.
+export function bumpEmailLote(id: string, campo: 'enviados' | 'falhas') {
+  const col = campo === 'falhas' ? 'falhas' : 'enviados';
+  return exec(`UPDATE email_lotes SET ${col} = ${col} + 1, updated_at = ? WHERE id = ?`, [nowISO(), id]);
+}
+
+export function finalizeEmailLote(id: string, status: 'concluido' | 'erro' | 'cancelado') {
+  return exec('UPDATE email_lotes SET status = ?, updated_at = ? WHERE id = ?', [status, nowISO(), id]);
+}
+
+// Pede o cancelamento: marca 'cancelando' (só se ainda estiver 'enviando'). O loop de
+// envio lê esse status antes de cada e-mail e para no próximo — os já enviados não voltam.
+export function requestCancelEmailLote(id: string) {
+  return exec(
+    `UPDATE email_lotes SET status = 'cancelando', updated_at = ? WHERE id = ? AND status = 'enviando'`,
+    [nowISO(), id],
+  );
+}
+
+export function getEmailLote(id: string) {
+  return queryOne<EmailLoteRow>('SELECT * FROM email_lotes WHERE id = ?', [id]);
+}
+
+// Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
+export async function getUltimosDisparosPorEmail(): Promise<
+  Map<string, { created_at: string | null; status: string }>
+> {
+  const rows = await queryAll<EmailDisparoRow>(
+    `SELECT email, status, created_at FROM email_disparos ORDER BY created_at DESC`,
+    [],
+  );
+  const map = new Map<string, { created_at: string | null; status: string }>();
+  for (const r of rows) {
+    const key = (r.email ?? '').trim().toLowerCase();
+    if (!key || map.has(key)) continue; // já ordenado desc → primeiro é o mais recente
+    map.set(key, { created_at: r.created_at, status: r.status });
+  }
+  return map;
+}
+
 // --- Profiles ---
 
 export function getProfiles() {

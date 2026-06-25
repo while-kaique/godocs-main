@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
-import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search, Loader2 } from "lucide-react";
+import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search, Loader2, Mail } from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
 // Expira após 5 minutos para não ficar stale indefinidamente.
@@ -79,6 +79,9 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/investigador" icon={<Search className="h-4 w-4" />}>
             Investigador
+          </NavItem>
+          <NavItem to="/email-legados" icon={<Mail className="h-4 w-4" />}>
+            Cobrança de legados
           </NavItem>
           <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
             Testes
