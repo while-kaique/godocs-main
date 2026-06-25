@@ -123,6 +123,12 @@ export type SavingColetado = {
   // horas_escala preenchidos e somando o total). O backend BLOQUEIA o preview enquanto
   // não for 'ok' (quando aplicaSplitCargaEscala). Garante que a informação SEMPRE exista.
   carga_escala?: 'pendente' | 'ok' | null;
+  // Explicação do USUÁRIO ao gate do split (o texto cru da resposta a "quantas horas a
+  // pessoa realmente fazia à mão") — capturada pelo backend no turno do gate e re-mesclada
+  // a cada turno. Alimenta a JUSTIFICATIVA do split (subseção do memorial + fallback da
+  // coluna "Justificativa Saving Escalado e Real"): é a base de "como o agente concluiu o
+  // split". Null quando ainda não respondido / não se aplica.
+  carga_escala_racional?: string | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -144,6 +150,7 @@ export const savingVazio = (): SavingColetado => ({
   horas_carga_real: null,
   horas_escala: null,
   carga_escala: null,
+  carga_escala_racional: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────

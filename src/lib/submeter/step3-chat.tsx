@@ -2081,6 +2081,13 @@ function SavingForm({
    Step 3: Chat com o Agente
    ────────────────────────────────────────────── */
 
+// Teto de caracteres de uma mensagem (espelha LIMITE_MENSAGEM_CHAT do backend em
+// chat.functions.ts). Mantido aqui porque chat.functions.ts é server-only. O contador
+// aparece a partir da zona de aviso e o envio é bloqueado acima do teto — assim a
+// pessoa nunca dispara o erro 400 do servidor sem saber o porquê.
+const LIMITE_MENSAGEM_CHAT = 16000;
+const AVISO_MENSAGEM_CHAT = Math.round(LIMITE_MENSAGEM_CHAT * 0.9);
+
 export function Step3Chat({
   messages,
   input,
@@ -2192,10 +2199,17 @@ export function Step3Chat({
   if (canEditForms && onEditReceita) editButtons.push({ key: "receita", label: bothEdits ? "Editar receita" : "Editar dados", onClick: onEditReceita });
   const hasOptions = lastMsg?.role === "assistant" && lastMsg.options && !isComplete && !showPreviewActions;
 
+  // Controle de tamanho da mensagem: bloqueia o envio acima do teto e mostra o
+  // contador a partir da zona de aviso (90%). Espelha o guard do backend.
+  const excedeuLimite = input.length > LIMITE_MENSAGEM_CHAT;
+  const mostrarContador = input.length >= AVISO_MENSAGEM_CHAT;
+  const podeEnviar =
+    input.trim().length > 0 && !loading && !isComplete && !showPreviewActions && !excedeuLimite;
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !loading && !isComplete && !showPreviewActions) {
+      if (podeEnviar) {
         onSend(input.trim());
       }
     }
@@ -2582,29 +2596,36 @@ export function Step3Chat({
               ref={inputRef}
               rows={1}
               className="go-textarea flex-1 resize-none"
-              style={{ minHeight: 42, maxHeight: 120 }}
+              style={{
+                minHeight: 42,
+                maxHeight: 120,
+                ...(excedeuLimite
+                  ? { borderColor: "#dc2626", boxShadow: "0 0 0 1px #dc2626" }
+                  : {}),
+              }}
               placeholder="Digite sua resposta..."
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
               onKeyDown={handleKeyDown}
               disabled={loading}
+              aria-invalid={excedeuLimite}
             />
             <button
               type="button"
               onClick={() => {
-                if (input.trim() && !loading) onSend(input.trim());
+                if (podeEnviar) onSend(input.trim());
               }}
-              disabled={!input.trim() || loading}
+              disabled={!podeEnviar}
               className="shrink-0 flex items-center justify-center rounded-xl transition-colors"
               style={{
                 width: 42,
                 height: 42,
-                background: input.trim() && !loading
+                background: podeEnviar
                   ? (isSavingFase ? "#7a7d00" : "var(--go-blue)")
                   : (isSavingFase ? "rgba(215,219,0,0.15)" : "rgba(0,89,169,0.1)"),
                 border: "none",
-                color: input.trim() && !loading ? "#fff" : (isSavingFase ? "rgba(215,219,0,0.5)" : "rgba(0,89,169,0.4)"),
-                cursor: input.trim() && !loading ? "pointer" : "not-allowed",
+                color: podeEnviar ? "#fff" : (isSavingFase ? "rgba(215,219,0,0.5)" : "rgba(0,89,169,0.4)"),
+                cursor: podeEnviar ? "pointer" : "not-allowed",
               }}
             >
               <svg
@@ -2622,8 +2643,21 @@ export function Step3Chat({
               </svg>
             </button>
           </div>
-          <div className="mt-1.5 text-center text-[10px]" style={{ color: "#8b8b9a" }}>
-            Enter para enviar · Shift+Enter para nova linha
+          <div className="mt-1.5 flex items-center justify-center gap-2 text-[10px]" style={{ color: "#8b8b9a" }}>
+            <span>Enter para enviar · Shift+Enter para nova linha</span>
+            {mostrarContador && (
+              <span
+                aria-live="polite"
+                style={{
+                  fontWeight: excedeuLimite ? 600 : 400,
+                  color: excedeuLimite ? "#dc2626" : "#8b8b9a",
+                }}
+              >
+                ·{" "}
+                {excedeuLimite && "Muito longa — "}
+                {input.length.toLocaleString("pt-BR")} / {LIMITE_MENSAGEM_CHAT.toLocaleString("pt-BR")}
+              </span>
+            )}
           </div>
         </div>
       )}

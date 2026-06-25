@@ -416,9 +416,15 @@ const iniciarSubmissaoSchema = z.object({
   ).min(1).max(5000),
 });
 
+// Teto de caracteres de uma mensagem do chat. Generoso porque o usuário às vezes
+// cola um memorial inteiro reescrito para pedir ajustes (~7-8 mil chars são comuns).
+// O limite antigo (4000) rejeitava esses pastes com um ZodError cru → 500. Ver o
+// guard amigável em `enviarMensagem` (devolve 400 com mensagem legível, não crash).
+export const LIMITE_MENSAGEM_CHAT = 16000;
+
 const enviarMensagemSchema = z.object({
   projeto_id: z.string().min(1),
-  content: z.string().min(1).max(4000),
+  content: z.string().min(1).max(LIMITE_MENSAGEM_CHAT),
   selected_option: z.number().optional(),
 });
 
@@ -790,17 +796,29 @@ function interpretarCargaReal(content: string, total: number): number | null {
   const cand = nums.find((n) => n >= 0 && n <= total + 0.5);
   return cand == null ? null : Math.min(cand, total);
 }
-function nudgeCargaEscala(real: number, escala: number): string {
-  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS. Registre o split no memorial numa subseção própria com o cabeçalho EXATO "### Carga real e ganho por escala" (dentro de "Saving de Pessoas"), em horas/qualitativo (SEM R$): os dois números, o cálculo quando houver (volume/frequência antes × depois → horas) e os gatilhos que levaram a esse split${escala === 0 ? ' (a pessoa já fazia o volume todo à mão, por isso o ganho por escala é 0 — explicite isso)' : ''}. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
+function nudgeCargaEscala(real: number, escala: number, racional: string): string {
+  const baseUsuario = racional?.trim()
+    ? `\nO usuário explicou assim (use ISTO como base da justificativa, sintetizando — não copie cru): «${racional.trim()}»`
+    : '';
+  const sobreEscalaZero =
+    escala === 0
+      ? ' Como o ganho por escala é 0, explique que a pessoa já fazia o volume TODO à mão (a automação não ampliou o volume, só o executou).'
+      : '';
+  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS.${baseUsuario}
+Registre o split no memorial numa subseção própria com o cabeçalho EXATO "### Carga real e ganho por escala" (dentro de "Saving de Pessoas"), em horas/qualitativo (SEM R$). Essa subseção é a JUSTIFICATIVA que vai para a planilha (coluna "Justificativa Saving Escalado e Real") — escreva 2 a 4 frases que respondam, com base no que o usuário contou:
+1) O QUE A PESSOA FAZIA ANTES e quanto desse trabalho ela REALMENTE executava à mão (a carga real).
+2) O QUE A AUTOMAÇÃO PASSOU A FAZER/COBRIR depois que escalou — o volume incremental que ninguém fazia (o ganho por escala) e POR QUE ele cresceu tanto.
+3) COMO os números foram derivados: a hora de carga real (${real}h), a hora por escala (${escala}h) e o total economizado (${real + escala}h) — mostrando o cálculo/raciocínio (volume/frequência antes × depois → horas).${sobreEscalaZero}
+NÃO escreva só a definição de "ganho por escala" (isso é óbvio) — escreva o RACIOCÍNIO concreto deste projeto. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
 }
 
 // Justificativa do split carga real × escala → coluna "Justificativa Saving Escalado e
-// Real" (TEXTO). Derivada do memorial (subseção "### Carga real e ganho por escala" que
-// o agente escreve — a "análise do agente"), espelhando a "Alocação Ganhos": sem coluna
-// SQLite própria, re-extraída no resync. Quando o split SE APLICA (alguém fazia à mão e
-// os dois números existem) mas o agente não consolidou a subseção, cai num fallback
-// determinístico curto com os números — evita "—" enganoso numa linha com split real.
-// Quando o split NÃO se aplica (ninguém fazia / pontual / receita-pura) → null → "—".
+// Real" (TEXTO). Preferimos a SUBSEÇÃO "### Carga real e ganho por escala" que o agente
+// escreve no memorial (a "análise do agente", rica — espelha a "Alocação Ganhos": sem
+// coluna SQLite, re-extraída no resync). Se o split SE APLICA (alguém fazia à mão + os dois
+// números) mas o agente não consolidou a subseção, montamos um fallback CONCRETO (não uma
+// definição genérica): antes→depois por cargo + o split + a explicação que o usuário deu ao
+// gate (carga_escala_racional). Só fica null → "—" quando o split não se aplica.
 function derivarJustificativaCargaEscala(
   saving: Record<string, unknown> | null | undefined,
   alguemFazia: string | null | undefined,
@@ -813,11 +831,25 @@ function derivarJustificativaCargaEscala(
   const real = saving.horas_carga_real as number | null | undefined;
   const escala = saving.horas_escala as number | null | undefined;
   if (alguemFazia === 'sim' && real != null && escala != null) {
-    const detalhe =
-      escala === 0
-        ? 'A pessoa já executava o volume completo manualmente, então não há ganho por escala.'
-        : 'O ganho por escala é o volume incremental que só a automação passou a cobrir.';
-    return `Carga real (trabalho humano de fato): ${real}h. Ganho por escala (volume só da automação): ${escala}h. ${detalhe}`;
+    const total = Math.round((real + escala) * 100) / 100;
+    const linhas = Array.isArray(saving.linhas) ? (saving.linhas as Array<Record<string, unknown>>) : [];
+    const antesDepois = linhas
+      .map((l) => {
+        const cargo = String(l.cargo ?? 'cargo').trim() || 'cargo';
+        const a = Number(l.horas_antes) || 0;
+        const d = Number(l.horas_depois) || 0;
+        return `${cargo} ${a}h→${d}h`;
+      })
+      .join('; ');
+    const partes = [
+      antesDepois ? `Antes × depois por cargo: ${antesDepois} (economia total ${total}h).` : `Economia total: ${total}h.`,
+      `Carga real (o que a pessoa realmente fazia à mão): ${real}h; ganho por escala (volume que só a automação passou a cobrir): ${escala}h.`,
+      escala === 0 ? 'A pessoa já executava o volume completo manualmente — a automação não ampliou o volume, só o executou.' : '',
+      (saving.carga_escala_racional as string | null | undefined)?.trim()
+        ? `Base informada pelo usuário: ${(saving.carga_escala_racional as string).trim()}`
+        : '',
+    ].filter(Boolean);
+    return partes.join(' ');
   }
   return null;
 }
@@ -825,6 +857,21 @@ function derivarJustificativaCargaEscala(
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
 export async function enviarMensagem(rawData: unknown) {
+  // Mensagem longa demais → 400 com texto legível em vez do ZodError cru (que virava
+  // 500 e travava o usuário no "tente novamente"). Trata antes do parse para a pessoa
+  // saber exatamente o que fazer (resumir/dividir) em vez de ver um erro genérico.
+  const conteudoBruto = (rawData as { content?: unknown })?.content;
+  if (typeof conteudoBruto === 'string' && conteudoBruto.length > LIMITE_MENSAGEM_CHAT) {
+    throw Object.assign(
+      new Error(
+        `Sua mensagem é muito longa (${conteudoBruto.length.toLocaleString('pt-BR')} caracteres; ` +
+          `o limite é ${LIMITE_MENSAGEM_CHAT.toLocaleString('pt-BR')}). ` +
+          `Resuma ou divida em mais de uma mensagem.`,
+      ),
+      { status: 400 },
+    );
+  }
+
   const data = enviarMensagemSchema.parse(rawData);
   log('enviarMensagem', `projeto=${data.projeto_id}`);
 
@@ -916,8 +963,18 @@ export async function enviarMensagem(rawData: unknown) {
     } else {
       const escala = Math.round((total - real) * 100) / 100;
       log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
-      estado.saving = { ...estado.saving, horas_carga_real: real, horas_escala: escala, carga_escala: 'ok' };
-      history.push({ role: 'user', content: nudgeCargaEscala(real, escala) });
+      // Guarda a EXPLICAÇÃO crua do usuário (texto da resposta ao gate) — é a base de
+      // "como o agente concluiu o split" (alimenta a subseção do memorial E o fallback
+      // da coluna de justificativa). Re-mesclada a cada turno (junto dos demais campos).
+      const racional = (data.content ?? '').trim();
+      estado.saving = {
+        ...estado.saving,
+        horas_carga_real: real,
+        horas_escala: escala,
+        carga_escala: 'ok',
+        carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
+      };
+      history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional) });
     }
   }
 
@@ -946,6 +1003,11 @@ export async function enviarMensagem(rawData: unknown) {
       horas_carga_real: resultado.saving.horas_carga_real ?? estado.saving.horas_carga_real ?? null,
       horas_escala: resultado.saving.horas_escala ?? estado.saving.horas_escala ?? null,
       carga_escala: estado.saving.carga_escala ?? null,
+      // Explicação do usuário ao gate (backend-only, nunca ecoada pelo LLM): preserva.
+      carga_escala_racional:
+        (resultado.saving.carga_escala_racional as string | null | undefined) ??
+        estado.saving.carga_escala_racional ??
+        null,
     };
   }
 
