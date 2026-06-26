@@ -279,7 +279,7 @@ Botão flutuante (FAB) azul no canto inferior direito, presente em **todas as p�
 montado em `src/routes/__root.tsx` como irmão do `<Outlet/>`). Abre um **painel ancorado estilo chat**
 onde a pessoa escolhe **Dúvida × Problema**, escreve, opcionalmente **anexa/cola/arrasta um print**, e
 envia. **Mão única (decisão D1):** o chamado **notifica um espaço dedicado do Google Chat** (Luis+Kaique
-acompanham) e o retorno acontece por fora (e-mail/Chat direto) — **não** há resposta voltando para o app.
+acompanham) e o retorno acontece por fora, **direto pelo Google Chat** — **não** há resposta voltando para o app.
 Spec de planejamento/decisão (D1–D4): [spec-docs/SPEC_WIDGET_AJUDA.md](spec-docs/SPEC_WIDGET_AJUDA.md)
 (consultar/atualizar conforme a **regra 12**).
 

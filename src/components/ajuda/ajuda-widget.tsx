@@ -3,7 +3,7 @@
 // Mão única (D1 da spec): a pessoa abre em qualquer página, escolhe DÚVIDA ou
 // PROBLEMA, escreve, opcionalmente anexa/cola/arrasta um print, e envia. O painel
 // "cresce" a partir do botão (transform-origin no canto). NÃO é um chatbot — o
-// cabeçalho deixa claro que a equipe vê e responde por e-mail. Visual derivado dos
+// cabeçalho deixa claro que a equipe responde direto pelo Google Chat. Visual derivado dos
 // tokens GoGroup (--go-blue/--go-lime/--go-white, Poppins). Ver SPEC_WIDGET_AJUDA.md.
 
 import { useEffect, useRef, useState } from "react";
@@ -157,7 +157,7 @@ export function AjudaWidget() {
         user_agent: navigator.userAgent,
         print: print ? { base64: print.base64, filename: print.filename } : undefined,
       });
-      toast.success("Enviado! A equipe vai dar uma olhada e responde por e-mail.");
+      toast.success("Enviado! A equipe vai dar uma olhada e responde direto pelo Google Chat.");
       // Reset completo só após sucesso.
       limparPrint();
       setMensagem("");
@@ -212,7 +212,7 @@ export function AjudaWidget() {
               <div className="min-w-0">
                 <h2 className="text-[16px] font-extrabold leading-tight">Precisa de ajuda?</h2>
                 <p className="mt-0.5 text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  Conte sua dúvida ou relate um problema. A equipe vê e responde por e-mail.
+                  Conte sua dúvida ou relate um problema. A equipe vê e responde direto pelo Google Chat.
                 </p>
               </div>
               <button

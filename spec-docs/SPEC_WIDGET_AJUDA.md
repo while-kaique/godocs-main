@@ -4,9 +4,11 @@
 > Versionado em `spec-docs/`. Não substitui `docs/` nem o `CLAUDE.md` — quando a feature
 > for entregue, atualizar este status + o `CLAUDE.md` (regra 12) no MESMO PR.
 >
-> **Status global (2026-06-26): ✅ IMPLEMENTADA — aguardando deploy + secret no Godeploy.**
-> Backend + frontend + testes prontos e verdes na branch `feat/widget-ajuda`. Falta só o passo
-> operacional do Luis: adicionar o secret `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` no Godeploy e deployar.
+> **Status global (2026-06-26): ✅ ENTREGUE E DEPLOYADO** (PR #160 + ajuste de copy). Em prod no
+> app `674a3710`. Secret `GOOGLE_DRIVE_FOLDER_ID_AJUDA` configurado (pasta dedicada dos prints).
+> **Pendência única do Luis:** adicionar o secret `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` no Godeploy — sem
+> ele o chamado é gravado no SQLite mas a notificação ao Chat é silenciosamente pulada (no-op).
+> **Contato de retorno = direto pelo Google Chat** (não e-mail).
 >
 > **Onde aterrissou (mapa do código):**
 > - Tabela `ajuda_chamados` → `src/integrations/db/schema.ts` (`CREATE TABLE IF NOT EXISTS`).
@@ -44,7 +46,7 @@ alternativo (ver abaixo).
 
 | # | Decisão | Escolha | Implicação |
 |---|---------|---------|------------|
-| D1 | **Direção** | **Mão única (envio)** | A pessoa envia; Luis+Kaique veem no espaço do Chat; o retorno acontece por fora (e-mail/Chat direto). **NÃO** há respostas voltando para o app. |
+| D1 | **Direção** | **Mão única (envio)** | A pessoa envia; Luis+Kaique veem no espaço do Chat; o retorno acontece por fora, **direto pelo Google Chat** (a equipe chama a pessoa no Chat). **NÃO** há respostas voltando para o app. |
 | D2 | **Categoria** | **Tipo: Dúvida × Problema** | Seletor simples (2 opções) com ícone/cor, vai destacado na mensagem do Chat. Sem nível de urgência na v1. |
 | D3 | **Anexo (print)** | **Link do Google Drive** | Reaproveita `uploadFileToDrive` (drive.ts). A mensagem do Chat traz um **link clicável** para o print — segue webhook de **texto**, sem migrar para card v2. |
 | D4 | **Registro** | **Banco (SQLite), sem painel agora** | Cada chamado é persistido (quem, quando, tipo, texto, página, link do print, status do envio). Habilita um painel admin futuro sem retrabalho. Sem tela admin na v1. |
