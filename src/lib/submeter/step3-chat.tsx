@@ -2203,8 +2203,13 @@ export function Step3Chat({
   // contador a partir da zona de aviso (90%). Espelha o guard do backend.
   const excedeuLimite = input.length > LIMITE_MENSAGEM_CHAT;
   const mostrarContador = input.length >= AVISO_MENSAGEM_CHAT;
+  // NÃO inclui !showPreviewActions: digitar texto livre enquanto um preview está na
+  // tela É o mecanismo de "Pedir ajustes" (o botão só foca o textarea, sem dispensar
+  // o preview). Bloquear o envio aqui travava o usuário — ele digitava mas não
+  // conseguia enviar nem por Enter nem pelo botão (que ficava disabled). O envio
+  // segue protegido por input não-vazio / loading / isComplete / limite.
   const podeEnviar =
-    input.trim().length > 0 && !loading && !isComplete && !showPreviewActions && !excedeuLimite;
+    input.trim().length > 0 && !loading && !isComplete && !excedeuLimite;
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
