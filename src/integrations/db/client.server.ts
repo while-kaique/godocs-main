@@ -181,6 +181,17 @@ export function getProjetosSubmetidos() {
   );
 }
 
+/** Projetos NÃO-rascunho (os que pertencem ao Sheets), com os carimbos de tempo
+ *  usados pela RECONCILIAÇÃO DE EXCLUSÃO do sync reverso: um projeto que sumiu da
+ *  planilha deve ser removido do SQLite (Sheets é a fonte da verdade do que aparece).
+ *  Rascunho (`status = 'rascunho'`) é estado interno do app e fica de fora — para a
+ *  pessoa retomar o preenchimento; nunca é tocado pela reconciliação. */
+export function getProjetosNaoRascunho() {
+  return queryAll<Pick<ProjetoRow, 'id' | 'status' | 'submitted_at' | 'updated_at'>>(
+    "SELECT id, status, submitted_at, updated_at FROM projetos WHERE status != 'rascunho'"
+  );
+}
+
 export async function getProjetoWithRelations(id: string) {
   const projeto = await queryOne<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome

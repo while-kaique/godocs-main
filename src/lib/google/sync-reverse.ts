@@ -5,6 +5,10 @@
 //      (habilita "Meus Projetos" e edição para os donos).
 //   2. Edições manuais na planilha de projetos já existentes → atualiza apenas
 //      campos seguros (diff-aware), sem apagar dados ricos do SQLite.
+//   3. Linhas APAGADAS da planilha → remove o projeto espelhado do SQLite (cascata).
+//      O Sheets é a fonte da verdade do que aparece em "Meus Projetos"; um projeto
+//      que sumiu de lá não pode continuar poluindo a tela. RASCUNHO fica de fora
+//      (estado interno do app — o SQLite é a fonte dele). Ver reconciliarExclusoes.
 //
 // Nunca propaga erros — tudo é logado via console.error e contabilizado no
 // resultado. Match por "ID Projeto" (coluna B), case-insensitive (ids do SQLite
@@ -15,8 +19,11 @@ import { toIsoOrNull } from '@/lib/format-date';
 import {
   getAllProjetoIds,
   getProjetoById,
+  getProjetosByOwnerEmail,
+  getProjetosNaoRascunho,
   insertProjetoRaw,
   updateProjeto,
+  excluirProjetoCascade,
   parseJson,
   type ProjetoRow,
 } from '@/integrations/db/client.server';
@@ -25,6 +32,7 @@ export type ReverseSyncResult = {
   total: number;
   criados: number;
   atualizados: number;
+  removidos: number;
   ignorados: number;
   erros: number;
   detalhes: string[];
@@ -218,6 +226,80 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
   return true;
 }
 
+// ─── Reconciliação de EXCLUSÃO (Sheets é a fonte da verdade do que aparece) ───
+//
+// Quando uma linha é APAGADA da planilha, o projeto espelhado no SQLite precisa
+// sumir junto — senão ele continua poluindo "Meus Projetos". Como o sync só sabia
+// criar/atualizar, o registro ficava órfão. Aqui removemos (cascata) os projetos
+// NÃO-rascunho que existem no SQLite mas não estão mais na planilha.
+//
+// Salvaguardas:
+//  • RASCUNHO nunca é tocado — é estado interno do app (o SQLite é a fonte dele,
+//    para a pessoa retomar o preenchimento); rascunho jamais vai ao Sheets.
+//  • JANELA DE CARÊNCIA: uma submissão feita pelo app nasce no SQLite e só depois
+//    (em background) é gravada na planilha. Não removemos projetos cujo último
+//    carimbo (submitted_at/updated_at) seja recente — senão mataríamos uma
+//    submissão que ainda não teve tempo de chegar ao Sheets.
+//  • O caller só chama isto quando a leitura da planilha teve SUCESSO e veio com
+//    linhas (planilha vazia/erro = suspeito → não remove nada).
+
+const CARENCIA_EXCLUSAO_MS = 60 * 60 * 1000; // 1h: protege submissão recém-feita (append em background)
+
+/** ISO (`...Z`) ou `datetime('now')` (`YYYY-MM-DD HH:MM:SS`, UTC sem Z) → epoch ms (UTC). */
+function carimboMs(v: unknown): number | null {
+  if (v == null) return null;
+  let s = String(v).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Remove do SQLite os projetos NÃO-rascunho ausentes da planilha.
+ * @param sheetIds  ids (lowercase) presentes na planilha — denominador da verdade.
+ * @param candidatos projetos do SQLite a verificar (já filtrados p/ não-rascunho).
+ * @param agora     epoch ms de referência (injetável p/ teste).
+ */
+async function reconciliarExclusoes(
+  sheetIds: Set<string>,
+  candidatos: ReadonlyArray<Pick<ProjetoRow, 'id' | 'status' | 'submitted_at' | 'updated_at'>>,
+  agora: number,
+  result: ReverseSyncResult,
+): Promise<void> {
+  for (const p of candidatos) {
+    if ((p.status ?? '') === 'rascunho') continue; // defensivo: rascunho nunca some
+    const id = p.id.toLowerCase();
+    if (sheetIds.has(id)) continue; // ainda existe na planilha → mantém
+
+    const recente = Math.max(carimboMs(p.submitted_at) ?? 0, carimboMs(p.updated_at) ?? 0);
+    if (recente && agora - recente < CARENCIA_EXCLUSAO_MS) {
+      result.detalhes.push(`${id}: ausente do Sheets, mas recente — mantido (carência)`);
+      continue;
+    }
+
+    try {
+      await excluirProjetoCascade(p.id);
+      result.removidos++;
+      result.detalhes.push(`${id}: removido (ausente do Sheets)`);
+    } catch (e) {
+      result.erros++;
+      result.detalhes.push(`${id}: falha ao remover — ${(e as Error).message}`);
+      console.error(`[sync-reverse] Erro ao remover ${id}:`, e);
+    }
+  }
+}
+
+/** Conjunto de ids (lowercase) presentes nas linhas da planilha (ignora linhas sem ID). */
+function idsDaPlanilha(rows: ReadonlyArray<SheetRow>): Set<string> {
+  const set = new Set<string>();
+  for (const row of rows) {
+    const raw = row['ID Projeto'];
+    if (raw && raw.trim()) set.add(raw.trim().toLowerCase());
+  }
+  return set;
+}
+
 // ─── Orquestrador ────────────────────────────────────────────────────────────
 
 export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
@@ -225,6 +307,7 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
     total: 0,
     criados: 0,
     atualizados: 0,
+    removidos: 0,
     ignorados: 0,
     erros: 0,
     detalhes: [],
@@ -264,9 +347,17 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
     }
   }
 
+  // Reconciliação de exclusão: projeto NÃO-rascunho que sumiu da planilha sai do
+  // SQLite. Só roda se a leitura trouxe linhas (planilha vazia = suspeito → não apaga).
+  const sheetIds = idsDaPlanilha(rows);
+  if (sheetIds.size > 0) {
+    await reconciliarExclusoes(sheetIds, await getProjetosNaoRascunho(), Date.now(), result);
+  }
+
   console.log(
     `[sync-reverse] total=${result.total} criados=${result.criados} ` +
-      `atualizados=${result.atualizados} ignorados=${result.ignorados} erros=${result.erros}`,
+      `atualizados=${result.atualizados} removidos=${result.removidos} ` +
+      `ignorados=${result.ignorados} erros=${result.erros}`,
   );
   return result;
 }
@@ -285,6 +376,7 @@ export async function syncOwnerRowsFromSheet(
     total: 0,
     criados: 0,
     atualizados: 0,
+    removidos: 0,
     ignorados: 0,
     erros: 0,
     detalhes: [],
@@ -333,9 +425,20 @@ export async function syncOwnerRowsFromSheet(
     }
   }
 
+  // Reconciliação de exclusão, escopada a ESTE dono: remove do SQLite os projetos
+  // dele que sumiram da planilha. Usa os ids do Sheet INTEIRO (não só `doDono`) —
+  // assim um projeto que apenas trocou de dono na planilha (continua existindo, mas
+  // some do recorte deste usuário) NÃO é apagado por engano. Só roda com planilha
+  // não-vazia (leitura suspeita = não apaga nada).
+  const sheetIds = idsDaPlanilha(rows);
+  if (sheetIds.size > 0) {
+    await reconciliarExclusoes(sheetIds, await getProjetosByOwnerEmail(email), Date.now(), result);
+  }
+
   console.log(
     `[sync-reverse:owner] email=${alvo} total=${result.total} criados=${result.criados} ` +
-      `atualizados=${result.atualizados} ignorados=${result.ignorados} erros=${result.erros}`,
+      `atualizados=${result.atualizados} removidos=${result.removidos} ` +
+      `ignorados=${result.ignorados} erros=${result.erros}`,
   );
   return { ...result, rows: doDono };
 }
