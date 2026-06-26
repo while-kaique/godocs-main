@@ -311,6 +311,9 @@ Spec de planejamento/decisão (D1–D4): [spec-docs/SPEC_WIDGET_AJUDA.md](spec-d
 - **UI (regra 11):** identidade GoGroup (FAB/cabeçalho `--go-blue`, enviar lime, Poppins); a11y — `Esc`
   fecha, foco volta ao FAB, `role="dialog"`+`aria-label`, estado dos cards por **ícone+check+borda**
   (não só cor), `prefers-reduced-motion` respeitado (keyframe `go-pop-in`). PT-BR com acento.
+- **Guia de replicação portátil:** [docs/widget-ajuda-replicar.md](docs/widget-ajuda-replicar.md) —
+  passo a passo (auto-suficiente) pra recriar essa caixinha em **qualquer site da empresa** com o
+  design GoGroup: tokens CSS, componente React standalone, contrato do endpoint e setup do webhook.
 
 ## Convenções rápidas
 
