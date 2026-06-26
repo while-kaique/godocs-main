@@ -27,31 +27,101 @@ import {
   ChevronDown,
   X,
   Search,
+  RotateCcw,
+  Megaphone,
+  Info,
 } from "lucide-react";
+
+// ── Segmentos (públicos) ──────────────────────────────────────────────────────
+// A tela dispara e-mails para 3 públicos distintos, cada um com sua própria lista de
+// destinatários (calculada ao vivo) e seu próprio template. O estado é distinto por
+// ícone + rótulo + acento (nunca só cor).
+type Audiencia = "legado" | "reenvio" | "todos";
+
+const SEGMENTOS: {
+  key: Audiencia;
+  label: string;
+  curto: string;
+  icon: typeof CalendarClock;
+  accent: string;
+  descricao: string;
+  projLabel: string;
+}[] = [
+  {
+    key: "legado",
+    label: "Atualização de legado",
+    curto: "Legado",
+    icon: CalendarClock,
+    accent: "var(--go-blue)",
+    descricao:
+      'Donos de projetos legados ainda não regularizados (sem data em "Atualizado Em"). Pede para revisar e salvar.',
+    projLabel: "projetos pendentes",
+  },
+  {
+    key: "reenvio",
+    label: "Reenvio pendente",
+    curto: "Reenvio",
+    icon: RotateCcw,
+    accent: "#8a7d00",
+    descricao:
+      'Projetos marcados como "Reenvio Pendente" na planilha. O e-mail inclui o motivo apontado na revisão.',
+    projLabel: "projetos a reenviar",
+  },
+  {
+    key: "todos",
+    label: "Todos os responsáveis",
+    curto: "Todos",
+    icon: Megaphone,
+    accent: "#475569",
+    descricao:
+      "Qualquer dono de projeto na planilha — comunicado geral. Nada vem marcado por padrão; selecione quem vai receber.",
+    projLabel: "projetos no total",
+  },
+];
+
+function segMeta(a: Audiencia) {
+  return SEGMENTOS.find((s) => s.key === a)!;
+}
+
+type ProjetoR = { id: string; nome: string | null; motivo?: string | null };
 
 type Recipient = {
   email: string;
   nome: string | null;
-  projetos: { id: string; nome: string | null }[];
+  projetos: ProjetoR[];
   ultimoEnvio: { data: string | null; status: string } | null;
 };
 
 type Preview = {
+  audiencia: Audiencia;
   recipients: Recipient[];
   totalPessoas: number;
   totalProjetos: number;
   template: { assunto: string; corpo: string };
 };
 
-const VARIAVEIS = [
-  { token: "{{nome}}", desc: "Nome do destinatário" },
-  { token: "{{projetos}}", desc: "Lista dos projetos pendentes da pessoa" },
-  { token: "{{prazo}}", desc: "Prazo de regularização (30/06/2026)" },
-  { token: "{{link}}", desc: 'Botão "Acessar Meus Projetos"' },
-] as const;
+// Variáveis disponíveis no template — adaptadas ao segmento ({{prazo}} só no legado; no
+// reenvio o {{projetos}} inclui o motivo).
+function variaveisDe(a: Audiencia) {
+  const base = [
+    { token: "{{nome}}", desc: "Nome do destinatário" },
+    {
+      token: "{{projetos}}",
+      desc:
+        a === "reenvio"
+          ? "Lista dos projetos com o motivo da revisão"
+          : "Lista dos projetos da pessoa",
+    },
+    { token: "{{link}}", desc: 'Botão "Acessar Meus Projetos"' },
+  ];
+  if (a === "legado") {
+    base.splice(2, 0, { token: "{{prazo}}", desc: "Prazo de regularização (30/06/2026)" });
+  }
+  return base;
+}
 
 export const Route = createFileRoute("/_authenticated/email-legados")({
-  head: () => ({ meta: [{ title: "Cobrança de legados · Hub Admin" }] }),
+  head: () => ({ meta: [{ title: "Disparo de e-mails · Hub Admin" }] }),
   component: EmailLegadosPage,
 });
 
@@ -62,10 +132,33 @@ function formatarData(iso: string | null): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+type Prog = {
+  total: number;
+  processados: number;
+  enviados: number;
+  falhas: number;
+  status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
+};
+
+// Seleção padrão por segmento: legado/reenvio = quem ainda não recebeu (ou falhou); todos =
+// nenhum (broadcast não vem marcado por engano).
+function selecaoPadrao(aud: Audiencia, recipients: Recipient[]): Set<string> {
+  if (aud === "todos") return new Set();
+  return new Set(
+    recipients
+      .filter((r) => !r.ultimoEnvio || r.ultimoEnvio.status === "falha")
+      .map((r) => r.email),
+  );
+}
+
 function EmailLegadosPage() {
-  const [data, setData] = useState<Preview | null>(null);
-  const [assunto, setAssunto] = useState("");
-  const [corpo, setCorpo] = useState("");
+  const [audiencia, setAudiencia] = useState<Audiencia>("legado");
+  // Estado por segmento (preserva edições de template e seleção ao trocar de aba).
+  const [previews, setPreviews] = useState<Partial<Record<Audiencia, Preview>>>({});
+  const [drafts, setDrafts] = useState<Partial<Record<Audiencia, { assunto: string; corpo: string }>>>({});
+  const [selByAud, setSelByAud] = useState<Partial<Record<Audiencia, Set<string>>>>({});
+  const [loadingAud, setLoadingAud] = useState<Audiencia | null>(null);
+
   const [syncing, setSyncing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -73,69 +166,77 @@ function EmailLegadosPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loteId, setLoteId] = useState<string | null>(null);
-  const [progresso, setProgresso] = useState<{
-    total: number;
-    processados: number;
-    enviados: number;
-    falhas: number;
-    status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
-  } | null>(null);
+  const [progresso, setProgresso] = useState<Prog | null>(null);
   const [expandido, setExpandido] = useState<Record<string, boolean>>({});
-  // E-mails escolhidos para o disparo (default: todos). Set para toggle barato.
-  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [busca, setBusca] = useState("");
   const corpoRef = useRef<HTMLTextAreaElement>(null);
 
-  async function load() {
+  const meta = segMeta(audiencia);
+  const data = previews[audiencia] ?? null;
+  const draft = drafts[audiencia];
+  const assunto = draft?.assunto ?? "";
+  const corpo = draft?.corpo ?? "";
+  const selecionados = selByAud[audiencia] ?? new Set<string>();
+
+  function setAssunto(v: string) {
+    setDrafts((d) => ({ ...d, [audiencia]: { assunto: v, corpo: d[audiencia]?.corpo ?? "" } }));
+  }
+  function setCorpo(v: string) {
+    setDrafts((d) => ({ ...d, [audiencia]: { assunto: d[audiencia]?.assunto ?? "", corpo: v } }));
+  }
+
+  async function load(aud: Audiencia) {
+    setLoadingAud(aud);
     try {
-      const d = await apiFetch<Preview>("/api/admin/email-legados/preview");
-      setData(d);
-      setAssunto(d.template.assunto);
-      setCorpo(d.template.corpo);
-      // Por padrão marca só quem AINDA NÃO recebeu (e as falhas, para reenvio) —
-      // quem já recebeu com sucesso entra desmarcado, evitando reenvio acidental.
-      setSelecionados(
-        new Set(
-          d.recipients
-            .filter((r) => !r.ultimoEnvio || r.ultimoEnvio.status === "falha")
-            .map((r) => r.email),
-        ),
+      const d = await apiFetch<Preview>(`/api/admin/email-legados/preview?audiencia=${aud}`);
+      setPreviews((p) => ({ ...p, [aud]: d }));
+      // Só semeia o draft na 1ª carga do segmento — não atropela edições não salvas.
+      setDrafts((dr) =>
+        dr[aud] ? dr : { ...dr, [aud]: { assunto: d.template.assunto, corpo: d.template.corpo } },
       );
+      setSelByAud((s) => ({ ...s, [aud]: selecaoPadrao(aud, d.recipients) }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao carregar a lista.");
-      setData({ recipients: [], totalPessoas: 0, totalProjetos: 0, template: { assunto: "", corpo: "" } });
+      setPreviews((p) => ({
+        ...p,
+        [aud]: { audiencia: aud, recipients: [], totalPessoas: 0, totalProjetos: 0, template: { assunto: "", corpo: "" } },
+      }));
+    } finally {
+      setLoadingAud((cur) => (cur === aud ? null : cur));
     }
   }
 
+  // Carrega o segmento ativo na 1ª vez que é aberto (lazy — evita ler o Sheets 3× no load).
+  useEffect(() => {
+    if (!previews[audiencia]) load(audiencia);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audiencia]);
+
   function toggleSelecionado(email: string) {
-    setSelecionados((s) => {
-      const n = new Set(s);
-      if (n.has(email)) n.delete(email);
-      else n.add(email);
-      return n;
+    setSelByAud((s) => {
+      const cur = new Set(s[audiencia] ?? []);
+      if (cur.has(email)) cur.delete(email);
+      else cur.add(email);
+      return { ...s, [audiencia]: cur };
     });
   }
 
   // Marca/desmarca todos os destinatários da LISTA VISÍVEL (respeita o filtro de busca).
   function toggleTodos(lista: Recipient[]) {
-    setSelecionados((s) => {
-      const n = new Set(s);
-      const todosMarcados = lista.length > 0 && lista.every((r) => n.has(r.email));
-      if (todosMarcados) lista.forEach((r) => n.delete(r.email));
-      else lista.forEach((r) => n.add(r.email));
-      return n;
+    setSelByAud((s) => {
+      const cur = new Set(s[audiencia] ?? []);
+      const todosMarcados = lista.length > 0 && lista.every((r) => cur.has(r.email));
+      if (todosMarcados) lista.forEach((r) => cur.delete(r.email));
+      else lista.forEach((r) => cur.add(r.email));
+      return { ...s, [audiencia]: cur };
     });
   }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   async function sincronizar() {
     setSyncing(true);
     try {
       await apiFetch("/api/admin/sync-sheets-now", {});
-      await load();
+      await load(audiencia);
       toast.success("Lista atualizada a partir da planilha.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao atualizar da planilha.");
@@ -147,7 +248,7 @@ function EmailLegadosPage() {
   async function salvar() {
     setSaving(true);
     try {
-      await apiFetch("/api/admin/email-legados/template", { assunto, corpo });
+      await apiFetch("/api/admin/email-legados/template", { audiencia, assunto, corpo });
       toast.success("Mensagem salva.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar a mensagem.");
@@ -159,8 +260,8 @@ function EmailLegadosPage() {
   async function enviarTeste() {
     setTesting(true);
     try {
-      await apiFetch("/api/admin/email-legados/template", { assunto, corpo });
-      await apiFetch("/api/admin/email-legados/teste", {});
+      await apiFetch("/api/admin/email-legados/template", { audiencia, assunto, corpo });
+      await apiFetch("/api/admin/email-legados/teste", { audiencia });
       toast.success("E-mail de teste enviado para você.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao enviar o teste.");
@@ -168,14 +269,6 @@ function EmailLegadosPage() {
       setTesting(false);
     }
   }
-
-  type Prog = {
-    total: number;
-    processados: number;
-    enviados: number;
-    falhas: number;
-    status: "enviando" | "cancelando" | "concluido" | "erro" | "cancelado";
-  };
 
   // Driver de envio em lotes: chama .../chunk em sequência até terminar. Cada chamada é
   // curta (poucos e-mails) — não depende de tarefa em background, então não trava.
@@ -187,7 +280,7 @@ function EmailLegadosPage() {
         falhasSeguidas = 0;
         setProgresso(p);
         if (p.status !== "enviando" && p.status !== "cancelando") {
-          await load(); // atualiza os selos "enviado em" na lista
+          await load(audiencia); // atualiza os selos "enviado em" na lista
           if (p.status === "concluido") {
             toast.success(
               `Envio concluído: ${p.enviados} enviado(s)${p.falhas ? `, ${p.falhas} falha(s)` : ""}.`,
@@ -217,7 +310,7 @@ function EmailLegadosPage() {
     try {
       const r = await apiFetch<{ loteId: string; total: number }>(
         "/api/admin/email-legados/enviar",
-        { assunto, corpo, emails: Array.from(selecionados) },
+        { audiencia, assunto, corpo, emails: Array.from(selecionados) },
       );
       setConfirmOpen(false);
       setLoteId(r.loteId);
@@ -249,7 +342,7 @@ function EmailLegadosPage() {
   function inserirVariavel(token: string) {
     const el = corpoRef.current;
     if (!el) {
-      setCorpo((c) => c + token);
+      setCorpo(corpo + token);
       return;
     }
     const start = el.selectionStart ?? corpo.length;
@@ -263,8 +356,18 @@ function EmailLegadosPage() {
     });
   }
 
+  // Navegação por seta no seletor de segmentos (a11y do role="tablist").
+  function onTabsKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const i = SEGMENTOS.findIndex((s) => s.key === audiencia);
+    const delta = e.key === "ArrowRight" ? 1 : -1;
+    const next = SEGMENTOS[(i + delta + SEGMENTOS.length) % SEGMENTOS.length];
+    setAudiencia(next.key);
+  }
+
   const total = data?.totalPessoas ?? 0;
-  const carregando = data === null;
+  const carregando = !previews[audiencia];
   const selCount = selecionados.size;
   const buscaLower = busca.trim().toLowerCase();
   const recipientesFiltrados = (data?.recipients ?? []).filter(
@@ -276,6 +379,7 @@ function EmailLegadosPage() {
   const todosFiltradosSelecionados =
     recipientesFiltrados.length > 0 && recipientesFiltrados.every((r) => selecionados.has(r.email));
   const emProgresso = progresso?.status === "enviando" || progresso?.status === "cancelando";
+  const variaveis = variaveisDe(audiencia);
 
   return (
     <div className="mx-auto max-w-6xl p-8">
@@ -283,12 +387,11 @@ function EmailLegadosPage() {
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
             <Mail className="h-7 w-7" style={{ color: "var(--go-blue)" }} />
-            Cobrança de legados
+            Disparo de e-mails
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Envia um e-mail para os <strong>donos de projetos legados</strong> que ainda não foram
-            regularizados (sem data em "Atualizado Em"). Os que já foram atualizados ficam de fora. Um
-            e-mail por pessoa, listando todos os projetos pendentes dela.
+            Escolha o público, ajuste a mensagem e dispare. Cada público tem sua própria lista e seu
+            próprio texto. Um e-mail por pessoa, agrupando todos os projetos dela.
           </p>
         </div>
         <Button variant="outline" onClick={sincronizar} disabled={syncing} className="shrink-0">
@@ -301,9 +404,65 @@ function EmailLegadosPage() {
         </Button>
       </header>
 
-      {/* Contagem — foco da tela */}
+      {/* Seletor de público (segmented control acessível) */}
       <div
-        className="mt-6 flex flex-wrap items-center gap-6 rounded-2xl px-6 py-5 text-white"
+        role="tablist"
+        aria-label="Público do disparo"
+        onKeyDown={onTabsKeyDown}
+        className="mt-6 grid gap-2 rounded-2xl border border-border bg-muted/40 p-1.5 sm:grid-cols-3"
+      >
+        {SEGMENTOS.map((s) => {
+          const ativo = s.key === audiencia;
+          const Icone = s.icon;
+          const carregadoAud = previews[s.key];
+          return (
+            <button
+              key={s.key}
+              role="tab"
+              aria-selected={ativo}
+              onClick={() => setAudiencia(s.key)}
+              tabIndex={ativo ? 0 : -1}
+              className={`relative overflow-hidden rounded-xl px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                ativo ? "bg-card shadow-sm" : "hover:bg-card/60"
+              }`}
+            >
+              {ativo && (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 top-0 h-1 rounded-t-xl"
+                  style={{ background: s.accent }}
+                />
+              )}
+              <span className="flex items-center gap-2">
+                <Icone
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: ativo ? s.accent : undefined }}
+                />
+                <span className={`text-sm ${ativo ? "font-semibold" : "font-medium text-muted-foreground"}`}>
+                  {s.label}
+                </span>
+                {carregadoAud && (
+                  <span
+                    className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+                    style={
+                      ativo
+                        ? { background: s.accent, color: "#fff" }
+                        : { background: "rgba(0,0,0,0.06)", color: "#6b7280" }
+                    }
+                  >
+                    {carregadoAud.totalPessoas}
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 px-1 text-sm text-muted-foreground">{meta.descricao}</p>
+
+      {/* Resumo — números do segmento ativo */}
+      <div
+        className="mt-4 flex flex-wrap items-center gap-6 rounded-2xl px-6 py-5 text-white"
         style={{ background: "var(--go-blue)" }}
       >
         <div>
@@ -312,7 +471,7 @@ function EmailLegadosPage() {
           </div>
           <div className="mt-1 text-sm text-white/80">
             {selCount === 1 ? "pessoa selecionada" : "pessoas selecionadas"}
-            {!carregando && ` de ${total} pendente${total === 1 ? "" : "s"}`}
+            {!carregando && ` de ${total}`}
           </div>
         </div>
         <div className="h-12 w-px bg-white/25" aria-hidden />
@@ -320,16 +479,34 @@ function EmailLegadosPage() {
           <div className="text-2xl font-semibold leading-none tabular-nums">
             {carregando ? "—" : data?.totalProjetos}
           </div>
-          <div className="mt-1 text-sm text-white/80">projetos pendentes</div>
+          <div className="mt-1 text-sm text-white/80">{meta.projLabel}</div>
         </div>
         <div className="h-12 w-px bg-white/25" aria-hidden />
-        <div className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5 text-white/80" />
-          <div>
-            <div className="text-base font-semibold leading-none">30/06/2026</div>
-            <div className="mt-1 text-sm text-white/80">prazo de regularização</div>
+        {audiencia === "legado" ? (
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-white/80" />
+            <div>
+              <div className="text-base font-semibold leading-none">30/06/2026</div>
+              <div className="mt-1 text-sm text-white/80">prazo de regularização</div>
+            </div>
           </div>
-        </div>
+        ) : audiencia === "reenvio" ? (
+          <div className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-white/80" />
+            <div>
+              <div className="text-base font-semibold leading-none">Motivo incluído</div>
+              <div className="mt-1 text-sm text-white/80">do parecer da revisão</div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-white/80" />
+            <div>
+              <div className="text-base font-semibold leading-none">Comunicado geral</div>
+              <div className="mt-1 text-sm text-white/80">a qualquer responsável</div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -337,7 +514,7 @@ function EmailLegadosPage() {
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-lg font-semibold">Mensagem</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Edite o texto enviado a todos. Use as variáveis abaixo — elas são preenchidas por
+            Edite o texto deste público. Use as variáveis abaixo — elas são preenchidas por
             destinatário.
           </p>
 
@@ -367,7 +544,7 @@ function EmailLegadosPage() {
           <div className="mt-3">
             <div className="text-xs font-medium text-muted-foreground">Variáveis (clique para inserir)</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {VARIAVEIS.map((v) => (
+              {variaveis.map((v) => (
                 <button
                   key={v.token}
                   type="button"
@@ -412,7 +589,11 @@ function EmailLegadosPage() {
             {carregando
               ? "Carregando…"
               : total === 0
-                ? "Nenhum legado pendente — todos foram regularizados."
+                ? audiencia === "legado"
+                  ? "Nenhum legado pendente — todos foram regularizados."
+                  : audiencia === "reenvio"
+                    ? 'Ninguém com status "Reenvio Pendente" na planilha agora.'
+                    : "Nenhum responsável encontrado na planilha."
                 : `Marque quem vai receber. ${selCount} de ${total} selecionado(s)${buscaLower ? ` · ${recipientesFiltrados.length} exibido(s)` : ""}.`}
           </p>
 
@@ -485,17 +666,22 @@ function EmailLegadosPage() {
                               </span>
                             ))}
                           <ChevronDown
-                            className={`h-4 w-4 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`}
+                            className={`h-4 w-4 text-muted-foreground transition-transform motion-reduce:transition-none ${aberto ? "rotate-180" : ""}`}
                           />
                         </span>
                       </button>
                     </div>
                     {aberto && (
-                      <ul className="mt-2 space-y-1 border-l-2 border-border pl-3 ml-7">
+                      <ul className="mt-2 space-y-1.5 border-l-2 border-border pl-3 ml-7">
                         {r.projetos.map((p) => (
                           <li key={p.id} className="text-sm">
                             <span className="font-medium">{p.nome ?? "Projeto sem nome"}</span>{" "}
                             <span className="text-xs text-muted-foreground">({p.id})</span>
+                            {audiencia === "reenvio" && p.motivo && (
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                Motivo: {p.motivo}
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -534,7 +720,7 @@ function EmailLegadosPage() {
               Exemplo com dados fictícios. As variáveis são preenchidas por destinatário no envio.
             </DialogDescription>
           </DialogHeader>
-          <PreviewEmail assunto={assunto} corpo={corpo} />
+          <PreviewEmail assunto={assunto} corpo={corpo} audiencia={audiencia} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>
               Fechar
@@ -549,9 +735,9 @@ function EmailLegadosPage() {
           <DialogHeader>
             <DialogTitle>Confirmar disparo</DialogTitle>
             <DialogDescription>
-              Você vai enviar este e-mail para <strong>{selCount} pessoa(s)</strong> selecionada(s)
-              {selCount < total ? ` (de ${total} pendentes)` : ""}. A ação é registrada e o envio
-              roda em segundo plano. Deseja continuar?
+              Público: <strong>{meta.label}</strong>. Você vai enviar este e-mail para{" "}
+              <strong>{selCount} pessoa(s)</strong> selecionada(s)
+              {selCount < total ? ` (de ${total})` : ""}. A ação é registrada. Deseja continuar?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -629,7 +815,7 @@ function EmailLegadosPage() {
                 aria-valuenow={progresso.processados}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-500"
+                  className="h-full rounded-full transition-all duration-500 motion-reduce:transition-none"
                   style={{
                     width:
                       progresso.total > 0
@@ -675,7 +861,15 @@ function EmailLegadosPage() {
 }
 
 // Pré-visualização leve (texto resolvido). O e-mail HTML real é o que chega no "teste para mim".
-function PreviewEmail({ assunto, corpo }: { assunto: string; corpo: string }) {
+function PreviewEmail({
+  assunto,
+  corpo,
+  audiencia,
+}: {
+  assunto: string;
+  corpo: string;
+  audiencia: Audiencia;
+}) {
   const NOME = "Maria (exemplo)";
   const PRAZO = "30/06/2026";
   const assuntoR = assunto.replace(/\{\{\s*nome\s*\}\}/g, NOME).replace(/\{\{\s*prazo\s*\}\}/g, PRAZO);
@@ -700,9 +894,19 @@ function PreviewEmail({ assunto, corpo }: { assunto: string; corpo: string }) {
               <ul key={i} className="my-2 list-disc pl-5">
                 <li>
                   <strong>Projeto de Exemplo</strong>
+                  {audiencia === "reenvio" && (
+                    <span className="block text-xs text-muted-foreground">
+                      Motivo: faltou a composição das horas do cargo Analista.
+                    </span>
+                  )}
                 </li>
                 <li>
                   <strong>Outro Projeto Pendente</strong>
+                  {audiencia === "reenvio" && (
+                    <span className="block text-xs text-muted-foreground">
+                      Motivo: revisar a base de cálculo do memorial.
+                    </span>
+                  )}
                 </li>
               </ul>
             );

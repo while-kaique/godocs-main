@@ -180,15 +180,26 @@ O **AI Proxy** (`ai-proxy.gogroupbr.com`) é o gateway interno de IA da empresa 
 - **Painel "Comparação desta edição" (`ComparacaoEdicao` em `investigador.tsx`)** — na `DetalheView`, quando a versão selecionada é um **reenvio** (`acao === 'reenvio'`), aparece um painel before/after que compara o `snapshot_projeto` da versão com o da **versão imediatamente anterior** (por `versao_num`) e classifica cada campo em **Alterado / Adicionado / Removido / Sem mudança** (esta última recolhida por padrão). Tudo no frontend (zero backend novo): os snapshots já vêm de `/api/admin/investigador/projetos/:id`. Campos comparados em `CAMPOS_DIFF` (nome, área, ferramenta, tipos, especial, descrição, tipo_saving, saving_horas/reais, ganho/custo externo, alguém fazia, custo evitado + justificativa + itens, memorial, status); textos longos (memorial/justificativa/itens/descrição) abrem em blocos Antes×Depois. Encoding por **rótulo + ícone + cor** (não só cor — acessível): Alterado `--go-blue`, Adicionado `#6b6d00` (dark-lime), Removido `#dc2626`, Igual cinza. Snapshot ausente numa das pontas (versão pré-snapshot) → aviso âmbar gracioso, sem quebrar.
 - **Diff nos cartões determinísticos da conversa (`EventBubble`/`ChatTab`)** — além do painel-resumo, os cartões de `form_events` na timeline do Chat (`Saving informado`, `Receita informada`) realçam **antes→depois** quando há uma **marcação anterior da MESMA etapa** para comparar. `ChatTab` recebe `todosEventos` (histórico completo) e calcula, por evento, o `dadosAnterior` = última marca do mesmo `tipo` em TODA a história (mesmo fora da janela da versão) → o 1º saving de um reenvio compara com o saving submetido antes, e remarcas dentro de uma submissão ("voltou e editou") comparam com a marca anterior. `linhasDoEvento(tipo, dados)` é o builder **puro** (rows + chips com `key` estável) reutilizado p/ atual e base; o diff classifica cada row/chip em alterado/adicionado/removido/igual (igual fica discreto). Só `saving`/`receita` entram no diff (`TIPOS_COM_DIFF`) — `metadados`/`submit`/etc. registram só o delta do instante, comparar entre eles confunde. Sem base (1ª marca, submissão direta) → cartão **idêntico ao de antes**. O selo "Voltou e editou — Etapa X" ficou mais visível (pílula âmbar) e ganhou contador "N alterações".
 
-## Cobrança de legados por e-mail (painel admin)
+## Disparo de e-mails (painel admin)
 
-Tela admin **`/email-legados`** ("Cobrança de legados", `src/routes/_authenticated/email-legados.tsx`,
-gate via `_authenticated`) para **disparar um e-mail de cobrança** aos donos de projetos legados ainda
-não regularizados. **Critério (fonte única, reusa `meus-projetos.functions`):** projeto com `id`
-contendo `legado` (LIKE `%legado%`) **E** `atualizado_em` vazio (`!temAtualizadoEm` — cobre `null`/``/`—`/`-`).
-**Legados já atualizados (com data) ficam de fora.** Alvo = **dono** (`responsavel_email`); **um e-mail
-por pessoa** (dedup por e-mail, case-insensitive), listando todos os projetos pendentes dela. A contagem
-é **sempre calculada ao vivo** do SQLite — nunca um número fixo.
+Tela admin **`/email-legados`** ("Disparo de e-mails", `src/routes/_authenticated/email-legados.tsx`,
+gate via `_authenticated`; rota/prefixo `email-legados` **mantidos por compat** — nasceu como "Cobrança
+de legados") para **disparar e-mails por SEGMENTO/público**. São **3 segmentos** (`Audiencia ∈
+'legado'|'reenvio'|'todos'` em `src/lib/email-legados.functions.ts`), cada um com **lista própria
+calculada ao vivo**, **template editável próprio** e **histórico de "enviado em" escopado por segmento**:
+
+- **`legado`** — donos de projetos LEGADO ainda não regularizados (id `LIKE %legado%` **E**
+  `atualizado_em` vazio, `!temAtualizadoEm`). Fonte: **SQLite** (`getLegadosRows`).
+- **`reenvio`** — quem está com **Status = "Reenvio Pendente"** na **planilha** (marcado **à mão**
+  pela equipe; o sync grava sempre "Pendente" pela regra TEMPORÁRIA, então esse status **só existe no
+  Sheets**). Fonte: **Sheets** (`readAllRows`, filtra `Status ∈ {reenvio pendente, rejeitado}`). A
+  mensagem **inclui o MOTIVO** da revisão por projeto (coluna **"Observações"** → `projetos[].motivo`,
+  renderizado como "Motivo: …" **só** neste segmento).
+- **`todos`** — broadcast: **qualquer** dono de projeto na planilha. Fonte: **Sheets** (toda linha
+  com e-mail). **Nada vem marcado por padrão** (evita disparo acidental para todos).
+
+Alvo = **dono** (`Email`/`responsavel_email`); **um e-mail por pessoa** (dedup por e-mail,
+case-insensitive, agregando os projetos dela). Contagem **sempre ao vivo** — nunca número fixo.
 
 - **Envio (Gmail API via Service Account + DWD):** `sendGmail(to, subject, html)` em
   **`src/lib/google/gmail.ts`** envia **impersonando uma caixa real @gocase.com** (`GMAIL_SENDER`,
@@ -198,39 +209,50 @@ por pessoa** (dedup por e-mail, case-insensitive), listando todos os projetos pe
   `GMAIL_SA_*`). ⚠️ **PRÉ-REQUISITO Workspace:** *domain-wide delegation* habilitada para o Client ID
   da SA com o escopo `gmail.send` (super-admin) + Gmail API ligada no projeto Cloud — sem isso a troca
   do JWT dá `401 unauthorized_client`. (≠ os e-mails de aprovação/rejeição, que seguem no Brevo.)
-  Lógica de negócio em **`src/lib/email-legados.functions.ts`**: `listarLegadosPendentes` (filtro +
-  dedup + junta último
-  envio), `getTemplateEmailLegado`/`salvarTemplateEmailLegado` (template editável em `configuracoes`,
-  chaves `email_legado_assunto`/`email_legado_corpo`; fallback `TEMPLATE_PADRAO`), `renderEmailLegado`
-  (substitui placeholders + shell HTML GoGroup; escapa HTML — anti-injeção), `enviarLoteLegados`
-  (loop sequencial throttled, **roda em background** via `runBackground`/`waitUntil`), `enviarEmailTeste`.
-- **Placeholders do template:** `{{nome}}`, `{{projetos}}` (vira `<ul>` nome+id), `{{prazo}}`
-  (`PRAZO_LEGADO` = 30/06/2026), `{{link}}` (botão "Acessar Meus Projetos", URL `APP_BASE_URL` →
-  default `godocs.devgogroup.com/meus-projetos`).
-- **Log `email_disparos` (tabela nova, migração em `schema.ts`):** uma linha **por destinatário por
-  disparo** (`email, nome, projeto_ids JSON, assunto, enviado_por, status 'sucesso'|'falha', erro,
-  created_at`). A tela mostra selo "enviado em DD/MM" por pessoa (`getUltimosDisparosPorEmail`) e exige
-  **confirmação** antes de disparar; **reenvio é permitido** conscientemente. O teste para si NÃO loga.
-- **Seleção de destinatários:** a lista tem checkbox por pessoa (+ "Selecionar todos"); o disparo
-  envia só aos `emails` marcados — `filtrarPorEmails` faz **interseção com a lista autoritativa de
-  pendentes** (não dá pra mandar a um endereço fora dos legados pendentes). Lista vazia = todos.
+  Lógica em **`src/lib/email-legados.functions.ts`**: `listarDestinatarios(audiencia)`/`getPreviewDisparo`
+  (dispatcher por segmento → `fonteLegado`/`fonteReenvio`/`fonteTodos`, dedup + junta último envio),
+  `getTemplate`/`salvarTemplate(audiencia)` (template **por segmento** em `configuracoes`, chaves
+  `email_<aud>_assunto`/`email_<aud>_corpo`; `legado` mantém as chaves antigas; fallback
+  `TEMPLATES_PADRAO[aud]`), `renderEmailDisparo(template, recipient, audiencia)` (placeholders + shell
+  HTML GoGroup; **escapa HTML** — anti-injeção; motivo só no reenvio), `iniciarDisparo` (congela payload),
+  `processarChunkLote`, `enviarEmailTeste(adminEmail, audiencia)`.
+- **Placeholders do template:** `{{nome}}`, `{{projetos}}` (vira `<ul>` só com o NOME; no `reenvio`,
+  cada item ganha "Motivo: …"), `{{prazo}}` (`PRAZO_LEGADO`=30/06/2026, **só legado**), `{{link}}`
+  (botão "Acessar Meus Projetos", URL `APP_BASE_URL` → default `godocs.devgogroup.com/meus-projetos`).
+- **Log `email_disparos` (`schema.ts`):** uma linha **por destinatário por disparo** (`email, nome,
+  projeto_ids JSON, assunto, enviado_por, status 'sucesso'|'falha', erro, **audiencia**, created_at`).
+  A tela mostra selo "enviado em DD/MM" por pessoa (`getUltimosDisparosPorEmail(audiencia)` — **escopado
+  por segmento**, o selo do reenvio não conta um envio de legado) e exige **confirmação** antes de
+  disparar; **reenvio é permitido** conscientemente. O teste para si NÃO loga.
+- **Seleção de destinatários:** checkbox por pessoa (+ "Selecionar todos" / busca por nome ou e-mail);
+  o disparo envia só aos `emails` marcados — `filtrarPorEmails` faz **interseção com a lista autoritativa
+  do segmento** (não dá pra mandar a um endereço fora dela). Lista vazia = todos. **Default de seleção
+  por segmento:** legado/reenvio = quem ainda não recebeu (ou falhou); `todos` = **nenhum**.
 - **Progresso + cancelamento — envio em LOTES/chunks dirigido pelo front (tabela `email_lotes`):**
   ⚠️ o envio **NÃO roda em background** — o runtime do Godeploy **mata tarefas longas de `waitUntil`**
-  (um disparo de ~76 e-mails travava por volta do 28). Em vez disso: `POST …/enviar` cria o **lote**
-  (`email_lotes`: `total/processados/enviados/falhas/alvos(JSON)/status`, migração em `schema.ts`),
-  **congelando a lista de e-mails alvo** (`alvos`) para o cursor ser estável, e retorna `{ loteId, total }`.
-  O front então chama **`POST …/chunk/:loteId` em sequência** até concluir; cada chamada (`processarChunkLote`)
-  envia os próximos `CHUNK_SIZE` (8) alvos a partir do cursor `processados`, **avançando o cursor a CADA
-  e-mail** (`advanceEmailLote`) — **resumível**: se a requisição morrer no meio, retoma exatamente de onde
-  parou, sem reenviar. O front mostra **modal sobreposto não-fechável** com barra + contador `processados/total`.
-  **Cancelar:** `POST …/cancelar/:loteId` marca `'cancelando'`; o próximo chunk finaliza como `'cancelado'`
-  (os já enviados **não voltam**). Status: `enviando→cancelando→concluido|erro|cancelado`. Ao terminar,
-  o front recarrega a lista (selos "enviado em"). `GET …/progresso/:loteId` existe para retomada/resiliência.
-- **Rotas (worker, todas `requireAdmin`):** `GET …/preview`, `POST …/template`, `POST …/teste`,
-  `POST …/enviar` (salva template + cria lote, retorna `{ loteId, total }` — **não** envia em background),
-  `POST …/chunk/:loteId` (envia o próximo lote, retorna o progresso), `GET …/progresso/:loteId`,
-  `POST …/cancelar/:loteId`. "Atualizar da planilha" reusa `POST /api/admin/sync-sheets-now`.
-- **Idempotência:** o backend **recomputa a lista no disparo** (não confia na contagem do front).
+  (um disparo de ~76 e-mails travava por volta do 28). `POST …/enviar` cria o **lote** congelando o
+  **segmento** (`audiencia`) e o **`payload`** (JSON `{ recipients, template }` — destinatários +
+  template no momento do disparo) + `alvos` (e-mails, p/ o cursor), e retorna `{ loteId, total }`. O
+  front chama **`POST …/chunk/:loteId` em sequência**; cada chunk (`processarChunkLote`) lê do **payload
+  congelado** (⚠️ **não relê Sheets/SQLite por chunk** → robusto e sem race com o status mudando no
+  meio; trade-off: é um mail-merge ponto-no-tempo, quem regularizar DURANTE o envio ainda recebe),
+  envia os próximos `CHUNK_SIZE` (8) a partir do cursor `processados`, **avançando o cursor a CADA
+  e-mail** (`advanceEmailLote`) — **resumível**. Modal sobreposto não-fechável com barra +
+  `processados/total`. **Cancelar:** `POST …/cancelar/:loteId` marca `'cancelando'`; o próximo chunk
+  finaliza como `'cancelado'` (os já enviados **não voltam**). Status:
+  `enviando→cancelando→concluido|erro|cancelado`. `GET …/progresso/:loteId` p/ retomada/resiliência.
+- **Rotas (worker, todas `requireAdmin`, prefixo `/api/admin/email-legados/`):** `GET …/preview?audiencia=`,
+  `POST …/template` (`{audiencia,assunto,corpo}`), `POST …/teste` (`{audiencia}`), `POST …/enviar`
+  (`{audiencia,assunto,corpo,emails}` → salva template + cria lote, retorna `{loteId,total}`),
+  `POST …/chunk/:loteId`, `GET …/progresso/:loteId`, `POST …/cancelar/:loteId`. `audiencia` é
+  saneada por `normalizarAudiencia` (default `'legado'`). "Atualizar da planilha" reusa
+  `POST /api/admin/sync-sheets-now`.
+- **Idempotência:** o backend **recomputa a lista no disparo** (congela o payload daí) — não confia na
+  contagem do front.
+- ⚠️ **Reenvio depende da coluna "Observações" e "Status" no cabeçalho do Sheets** (mapeamento por nome).
+  O segmento `reenvio` lê o **Status manual** — independente da regra TEMPORÁRIA que grava "Pendente".
+- **Spec de planejamento/decisão (D1–D6):** [spec-docs/SPEC_DISPARO_EMAILS.md](spec-docs/SPEC_DISPARO_EMAILS.md)
+  (consultar/atualizar conforme a **regra 12**).
 
 ## Testes E2E em produção (validação coluna-a-coluna)
 

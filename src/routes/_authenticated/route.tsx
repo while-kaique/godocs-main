@@ -81,7 +81,7 @@ function AuthenticatedLayout() {
             Investigador
           </NavItem>
           <NavItem to="/email-legados" icon={<Mail className="h-4 w-4" />}>
-            Cobrança de legados
+            Disparo de e-mails
           </NavItem>
           <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
             Testes

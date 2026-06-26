@@ -47,13 +47,14 @@ import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTe
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import {
-  getPreviewLegados,
-  salvarTemplateEmailLegado,
+  getPreviewDisparo,
+  salvarTemplate,
   enviarEmailTeste,
-  iniciarDisparoLegados,
+  iniciarDisparo,
   processarChunkLote,
   getProgressoLote,
-  cancelarDisparoLegados,
+  cancelarDisparo,
+  normalizarAudiencia,
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
@@ -436,38 +437,42 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await syncSheetsToSqlite())
     }
 
-    // ── Cobrança de legados por e-mail (admin) ──
-    // Preview: destinatários (donos de legados pendentes, dedup por e-mail), contagem e template.
+    // ── Disparo de e-mails por segmento (admin) ──
+    // Segmentos: 'legado' (legados pendentes, SQLite) · 'reenvio' (Status "Reenvio Pendente"
+    // no Sheets, com motivo) · 'todos' (broadcast a qualquer dono no Sheets). Cada segmento
+    // tem sua lista de destinatários e seu template. Prefixo /email-legados mantido (legado).
+    // Preview: destinatários do segmento (dedup por e-mail), contagem e template.
     if (pathname === '/api/admin/email-legados/preview' && method === 'GET') {
       await requireAdmin(request)
-      return json(await getPreviewLegados())
+      const audiencia = normalizarAudiencia(url.searchParams.get('audiencia'))
+      return json(await getPreviewDisparo(audiencia))
     }
-    // Salva o texto editável (assunto + corpo) do e-mail de cobrança.
+    // Salva o texto editável (assunto + corpo) do e-mail do segmento.
     if (pathname === '/api/admin/email-legados/template' && method === 'POST') {
       const { email: adminEmail } = await requireAdmin(request)
-      const body = await readBody<{ assunto: string; corpo: string }>(request)
-      await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
+      const body = await readBody<{ audiencia?: string; assunto: string; corpo: string }>(request)
+      await salvarTemplate(normalizarAudiencia(body.audiencia), { assunto: body.assunto, corpo: body.corpo }, adminEmail)
       return json({ ok: true })
     }
-    // Envia um e-mail de teste só para o próprio admin (com dados de exemplo).
+    // Envia um e-mail de teste só para o próprio admin (com dados de exemplo do segmento).
     if (pathname === '/api/admin/email-legados/teste' && method === 'POST') {
       const { email: adminEmail } = await requireAdmin(request)
-      await enviarEmailTeste(adminEmail)
+      const body = await readBody<{ audiencia?: string }>(request)
+      await enviarEmailTeste(adminEmail, normalizarAudiencia(body.audiencia))
       return json({ ok: true })
     }
-    // Dispara o lote: salva o template (se enviado), cria o lote (com o total) e envia em
-    // background (runBackground/waitUntil) — a Response volta na hora com { loteId, total }.
-    // O front acompanha o progresso via .../email-legados/progresso/:loteId.
+    // Dispara o lote do segmento: salva o template (se enviado), cria o lote congelando o
+    // payload (destinatários + template) e retorna { loteId, total }. O front chama
+    // .../chunk/:loteId em sequência até concluir (o runtime mata tarefas longas).
     if (pathname === '/api/admin/email-legados/enviar' && method === 'POST') {
       const { email: adminEmail } = await requireAdmin(request)
-      const body = await readBody<{ assunto?: string; corpo?: string; emails?: string[] }>(request)
+      const body = await readBody<{ audiencia?: string; assunto?: string; corpo?: string; emails?: string[] }>(request)
+      const audiencia = normalizarAudiencia(body.audiencia)
       if (body.assunto && body.corpo) {
-        await salvarTemplateEmailLegado({ assunto: body.assunto, corpo: body.corpo }, adminEmail)
+        await salvarTemplate(audiencia, { assunto: body.assunto, corpo: body.corpo }, adminEmail)
       }
       const emails = Array.isArray(body.emails) ? body.emails : undefined
-      const { loteId, total } = await iniciarDisparoLegados(adminEmail, emails)
-      // NÃO envia em background (o runtime mata tarefas longas) — o front chama
-      // .../chunk/:loteId em sequência até concluir.
+      const { loteId, total } = await iniciarDisparo(adminEmail, audiencia, emails)
       return json({ ok: true, loteId, total })
     }
     // Processa o próximo lote de e-mails (chunk) e devolve o progresso atualizado.
@@ -490,7 +495,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname.startsWith('/api/admin/email-legados/cancelar/') && method === 'POST') {
       await requireAdmin(request)
       const loteId = pathname.split('/').pop()!
-      await cancelarDisparoLegados(loteId)
+      await cancelarDisparo(loteId)
       return json({ ok: true })
     }
 
