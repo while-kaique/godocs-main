@@ -648,7 +648,7 @@ Fa\xE7a a pergunta UMA \xFAnica vez, quando os 7 campos j\xE1 estiverem completo
 
 Exemplos de pergunta com infer\xEAncia:
   - Inferiu true: "Nos arquivos enviados, identifiquei chamadas a [API de IA]. Isso confirma que o projeto usa IA como funcionalidade \u2014 ou essa parte \xE9 s\xF3 interna \xE0 constru\xE7\xE3o e n\xE3o chega ao usu\xE1rio final?"
-  - Inferiu false: "Pelos arquivos, o projeto parece ser uma automa\xE7\xE3o determin\xEDstica (sem IA no que \xE9 entregue ao usu\xE1rio). Confirma?"
+  - Inferiu false: "Pelos arquivos, o projeto parece ser uma automa\xE7\xE3o determin\xEDstica (sem IA no que \xE9 entregue ao usu\xE1rio). Esse projeto usa IA como funcionalidade?"
   - Sem infer\xEAncia: "Antes de montar a documenta\xE7\xE3o: esse projeto usa IA como funcionalidade? Por exemplo, gera\xE7\xE3o de texto, classifica\xE7\xE3o autom\xE1tica, transcri\xE7\xE3o, extra\xE7\xE3o inteligente de dados, ou qualquer outra fun\xE7\xE3o baseada em LLM \u2014 mesmo que secund\xE1ria."
 
 options sempre: ["Sim, tem IA como funcionalidade", "N\xE3o, \xE9 uma automa\xE7\xE3o determin\xEDstica", "N\xE3o tenho certeza, me explique melhor"]
