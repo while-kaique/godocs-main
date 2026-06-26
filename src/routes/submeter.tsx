@@ -1207,7 +1207,9 @@ export function SubmeterPageContent({
     // reavaliada do zero; se nada mudou, só voltamos ao chat (aceita, sem reanalisar)
     // — mesma lógica do "Editar Dados" do saving/receita.
     if (form.especial) {
-      if (projetoId && arquivosSig() !== agentArquivosSig) {
+      // `arquivos.length > 0`: mesmo guard do ramo padrão — evita o reprocesso falso da
+      // doc após reload/remontagem (arquivos File[] não sobrevivem ao localStorage).
+      if (projetoId && arquivos.length > 0 && arquivosSig() !== agentArquivosSig) {
         await reprocessarComNovosArquivos();
         return;
       }
@@ -1270,7 +1272,14 @@ export function SubmeterPageContent({
     }
 
     // Arquivos trocados → reprocessa a doc do zero (cuida da navegação e retorna).
-    if (projetoId && arquivosSig() !== agentArquivosSig) {
+    // ⚠️ Só dispara quando há arquivo NOVO de fato (`arquivos.length > 0`). Sem esse
+    // guard, após um reload/remontagem no meio da edição (recurso "reload não perde o
+    // chat"), o `agentArquivosSig` volta preenchido do rascunho, mas o `arquivos: File[]`
+    // NÃO (objetos File não serializam p/ localStorage) → `arquivosSig()` vira "" e a
+    // comparação acusava "arquivos mudaram" falsamente, forçando o reprocesso da doc e
+    // perdendo o saving já preenchido. `reprocessarComNovosArquivos` já é no-op sem
+    // arquivos, então sem o guard o "Continuar com Agente" só travava (early-return).
+    if (projetoId && arquivos.length > 0 && arquivosSig() !== agentArquivosSig) {
       await reprocessarComNovosArquivos();
       return;
     }
