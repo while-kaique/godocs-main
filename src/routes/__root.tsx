@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { AjudaWidget } from "@/components/ajuda/ajuda-widget";
 
 function NotFoundComponent() {
   return (
@@ -76,6 +77,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <AjudaWidget />
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );

@@ -56,9 +56,14 @@ function base64ToUint8Array(b64: string): Uint8Array {
 }
 
 // Upload de um arquivo via multipart/related. Retorna o webViewLink.
-export async function uploadFileToDrive(doc: DriveDoc): Promise<{ id: string; link: string }> {
+// `opts.folderId` permite gravar numa pasta diferente da padrão (ex.: o widget de
+// Ajuda usa GOOGLE_DRIVE_FOLDER_ID_AJUDA p/ não misturar prints com docs de projeto).
+export async function uploadFileToDrive(
+  doc: DriveDoc,
+  opts?: { folderId?: string },
+): Promise<{ id: string; link: string }> {
   const token = await getDriveAccessToken();
-  const folderId = getFolderId();
+  const folderId = opts?.folderId || getFolderId();
   const boundary = `godocs-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
 
   const metadata = { name: doc.filename, parents: [folderId] };
