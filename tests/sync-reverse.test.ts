@@ -8,7 +8,7 @@ import type { GoDeployDB } from '@/integrations/db/db-adapter';
 vi.mock('@/lib/google/sheets', () => ({ readAllRows: vi.fn() }));
 
 import { readAllRows } from '@/lib/google/sheets';
-import { setDb, getProjetoById } from '@/integrations/db/client.server';
+import { setDb, getProjetoById, insertProjetoRaw } from '@/integrations/db/client.server';
 import { syncSheetsToSqlite, syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 
 const mockedRead = readAllRows as unknown as ReturnType<typeof vi.fn>;
@@ -277,5 +277,94 @@ describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {
     mockedRead.mockRejectedValueOnce(new Error('500 boom'));
     const r = await syncOwnerRowsFromSheet('dono@gocase.com');
     expect(r.erros).toBe(1);
+  });
+});
+
+describe('reconciliação de EXCLUSÃO (Sheets é a fonte da verdade do que aparece)', () => {
+  // Reusa o mesmo DB module-global dos blocos acima. IDs DEL-*/FRESH-*/REASSIGNED
+  // não colidem com LEGADO-*/OWN-*. Carimbos são gravados em minúsculo p/ casar com
+  // getProjetoById (match case-sensitive), como os ids reais do app.
+  const ANTIGO = '2020-01-01T00:00:00.000Z';
+  const agoraIso = () => new Date().toISOString();
+
+  async function semear(id: string, status: string, submitted_at: string, updated_at: string) {
+    await insertProjetoRaw({
+      id,
+      responsavel_nome: 'Teste',
+      responsavel_email: 'recon@gocase.com',
+      ferramenta: 'n8n',
+      status,
+      submitted_at,
+      updated_at,
+    });
+  }
+
+  // Linha de planilha presente, só para a leitura não vir vazia (passa a guarda).
+  const LINHA_PRESENTE = {
+    'ID Projeto': 'LEGADO-999',
+    'Nome Completo': 'Fulano',
+    Email: 'novodono@gocase.com',
+    Projeto: 'Projeto Legado X',
+    Ferramenta: 'n8n',
+  };
+
+  it('remove submetido ausente da planilha (cascata); mantém rascunho e submissão recente', async () => {
+    await semear('del-old', 'em_validacao', ANTIGO, ANTIGO); // submetido antigo, sumiu do Sheets
+    await semear('draft-old', 'rascunho', ANTIGO, ANTIGO); // rascunho: SQLite é a fonte → protegido
+    await semear('fresh-submit', 'em_validacao', agoraIso(), agoraIso()); // recém-submetido → carência
+
+    mockedRead.mockResolvedValue([LINHA_PRESENTE]);
+    const r = await syncSheetsToSqlite();
+
+    expect(await getProjetoById('del-old')).toBeFalsy(); // removido (ausente do Sheets)
+    expect(await getProjetoById('draft-old')).toBeTruthy(); // rascunho intocado
+    expect(await getProjetoById('fresh-submit')).toBeTruthy(); // carência protege o append em curso
+    expect(r.removidos).toBeGreaterThanOrEqual(1);
+  });
+
+  it('planilha sem IDs válidos NÃO apaga nada (guarda contra leitura suspeita)', async () => {
+    await semear('del-old-2', 'em_validacao', ANTIGO, ANTIGO);
+    mockedRead.mockResolvedValue([{ 'Nome Completo': 'Sem ID' }]); // nenhuma linha com ID
+    const r = await syncSheetsToSqlite();
+    expect(await getProjetoById('del-old-2')).toBeTruthy(); // guarda: planilha vazia não remove
+    expect(r.removidos).toBe(0);
+  });
+
+  it('syncOwnerRowsFromSheet remove projeto do dono que sumiu da planilha', async () => {
+    await insertProjetoRaw({
+      id: 'own-del',
+      responsavel_nome: 'Dono',
+      responsavel_email: 'dono@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      submitted_at: ANTIGO,
+      updated_at: ANTIGO,
+    });
+    // Planilha tem outra linha do dono (own-1), mas NÃO own-del.
+    mockedRead.mockResolvedValue([
+      { 'ID Projeto': 'OWN-1', 'Nome Completo': 'Dono', Email: 'dono@gocase.com', Projeto: 'P', Ferramenta: 'n8n' },
+    ]);
+    const r = await syncOwnerRowsFromSheet('dono@gocase.com');
+    expect(await getProjetoById('own-del')).toBeFalsy();
+    expect(r.removidos).toBeGreaterThanOrEqual(1);
+  });
+
+  it('projeto que apenas trocou de dono na planilha NÃO é apagado (usa ids do Sheet inteiro)', async () => {
+    await insertProjetoRaw({
+      id: 'reassigned',
+      responsavel_nome: 'Old',
+      responsavel_email: 'oldowner@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      submitted_at: ANTIGO,
+      updated_at: ANTIGO,
+    });
+    // Na planilha o projeto AINDA existe, só que agora pertence a outra pessoa.
+    mockedRead.mockResolvedValue([
+      { 'ID Projeto': 'REASSIGNED', 'Nome Completo': 'New', Email: 'newowner@gocase.com', Projeto: 'P', Ferramenta: 'n8n' },
+    ]);
+    const r = await syncOwnerRowsFromSheet('oldowner@gocase.com');
+    expect(await getProjetoById('reassigned')).toBeTruthy(); // existe no Sheet (outro dono) → mantido
+    expect(r.removidos).toBe(0);
   });
 });
