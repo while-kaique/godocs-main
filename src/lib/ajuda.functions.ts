@@ -27,11 +27,11 @@ const printSchema = z.object({
 });
 
 export const ajudaSchema = z.object({
-  tipo: z.enum(['duvida', 'problema']),
+  tipo: z.enum(['duvida', 'problema', 'sugestao']),
   mensagem: z
     .string()
     .trim()
-    .min(1, 'Escreva sua dúvida ou descreva o problema.')
+    .min(1, 'Escreva sua dúvida, problema ou sugestão.')
     .max(4000, 'Mensagem muito longa (máximo 4000 caracteres).'),
   pagina_url: z.string().max(2000).optional().nullable(),
   user_agent: z.string().max(1000).optional().nullable(),

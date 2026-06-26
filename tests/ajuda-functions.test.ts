@@ -58,6 +58,11 @@ describe('ajudaSchema', () => {
   it('rejeita tipo inválido', () => {
     expect(ajudaSchema.safeParse({ tipo: 'bug', mensagem: 'oi' }).success).toBe(false);
   });
+  it('aceita os três tipos: duvida, problema, sugestao', () => {
+    for (const tipo of ['duvida', 'problema', 'sugestao'] as const) {
+      expect(ajudaSchema.safeParse({ tipo, mensagem: 'oi' }).success).toBe(true);
+    }
+  });
   it('aceita sem print', () => {
     expect(ajudaSchema.safeParse({ tipo: 'duvida', mensagem: 'oi' }).success).toBe(true);
   });

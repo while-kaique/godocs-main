@@ -16,8 +16,9 @@ describe('buildAjudaMessage', () => {
       printLink: null,
       data: '26/06/2026 14:32',
     });
-    expect(msg).toContain('Nova DÚVIDA no GoDocs');
+    expect(msg).toContain('DÚVIDA no GoDocs');
     expect(msg).not.toContain('PROBLEMA');
+    expect(msg).not.toContain('SUGESTÃO');
     expect(msg).toContain('Fulano de Tal (fulano@gocase.com)');
     expect(msg).toContain('/meus-projetos');
     expect(msg).toContain('26/06/2026 14:32');
@@ -35,10 +36,26 @@ describe('buildAjudaMessage', () => {
       printLink: 'https://drive.google.com/file/d/abc/view',
       data: '26/06/2026 15:00',
     });
-    expect(msg).toContain('Novo PROBLEMA relatado no GoDocs');
+    expect(msg).toContain('PROBLEMA / ERRO no GoDocs');
     expect(msg).not.toContain('DÚVIDA');
     expect(msg).toContain('Print:');
     expect(msg).toContain('https://drive.google.com/file/d/abc/view');
+  });
+
+  it('sugestão: cabeçalho próprio (visivelmente distinto de dúvida/problema)', () => {
+    const msg = buildAjudaMessage({
+      tipo: 'sugestao',
+      nome: 'Beltrano',
+      email: 'beltrano@gocase.com',
+      mensagem: 'Podia ter um atalho no topo.',
+      pagina: '/',
+      printLink: null,
+      data: '26/06/2026 16:00',
+    });
+    expect(msg).toContain('SUGESTÃO DE MELHORIA no GoDocs');
+    expect(msg).not.toContain('DÚVIDA');
+    expect(msg).not.toContain('PROBLEMA');
+    expect(msg).toContain('Podia ter um atalho no topo.');
   });
 
   it('página ausente vira travessão', () => {
