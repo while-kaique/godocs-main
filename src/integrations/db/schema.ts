@@ -214,7 +214,7 @@ const SCHEMA_SQL = `
     id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     usuario_email   TEXT NOT NULL,
     usuario_nome    TEXT,
-    tipo            TEXT NOT NULL DEFAULT 'duvida',    -- 'duvida' | 'problema'
+    tipo            TEXT NOT NULL DEFAULT 'duvida',    -- 'duvida' | 'problema' | 'sugestao'
     mensagem        TEXT NOT NULL,
     pagina_url      TEXT,                              -- de onde a pessoa abriu o widget
     user_agent      TEXT,

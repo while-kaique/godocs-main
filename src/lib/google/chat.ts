@@ -141,8 +141,10 @@ export function buildUpdateMessage(p: {
 // Mensagem do widget de Ajuda & Suporte. Mão única: a pessoa envia, Luis+Kaique
 // leem no espaço dedicado. O print (quando há) vai como LINK do Drive — texto plain,
 // sem card (decisão D3 da spec). A linha do print é OMITIDA quando não há anexo.
+export type TipoAjuda = 'duvida' | 'problema' | 'sugestao';
+
 export function buildAjudaMessage(p: {
-  tipo: 'duvida' | 'problema';
+  tipo: TipoAjuda;
   nome: string;
   email: string;
   mensagem: string;
@@ -150,10 +152,14 @@ export function buildAjudaMessage(p: {
   printLink?: string | null;
   data: string;
 }): string {
-  const cabecalho =
-    p.tipo === 'problema'
-      ? '\u{1F41E} *Novo PROBLEMA relatado no GoDocs*'
-      : '❓ *Nova DÚVIDA no GoDocs*';
+  // Cabeçalho BEM distinto por tipo (emoji inconfundível + rótulo MAIÚSCULO), pra
+  // bater o olho no Chat e saber na hora se é dúvida, erro ou sugestão.
+  const CABECALHO: Record<TipoAjuda, string> = {
+    duvida: '❓ *DÚVIDA no GoDocs*',
+    problema: '\u{1F41E} *PROBLEMA / ERRO no GoDocs*',
+    sugestao: '\u{1F4A1} *SUGESTÃO DE MELHORIA no GoDocs*',
+  };
+  const cabecalho = CABECALHO[p.tipo];
 
   const lines = [
     SEPARATOR,

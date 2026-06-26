@@ -47,7 +47,7 @@ alternativo (ver abaixo).
 | # | Decisão | Escolha | Implicação |
 |---|---------|---------|------------|
 | D1 | **Direção** | **Mão única (envio)** | A pessoa envia; Luis+Kaique veem no espaço do Chat; o retorno acontece por fora, **direto pelo Google Chat** (a equipe chama a pessoa no Chat). **NÃO** há respostas voltando para o app. |
-| D2 | **Categoria** | **Tipo: Dúvida × Problema** | Seletor simples (2 opções) com ícone/cor, vai destacado na mensagem do Chat. Sem nível de urgência na v1. |
+| D2 | **Categoria** | **Tipo: Dúvida · Problema/Erro · Sugestão** | Seletor de 3 opções (lista vertical, ícone + rótulo + descrição). Cada tipo tem **cabeçalho/emoji próprio** na mensagem do Chat (❓ DÚVIDA · 🐞 PROBLEMA/ERRO · 💡 SUGESTÃO) pra distinguir à primeira vista. Sem nível de urgência na v1. *(Atualizado 2026-06-26: era 2 opções; "Sugestão de melhoria" adicionada a pedido.)* |
 | D3 | **Anexo (print)** | **Link do Google Drive** | Reaproveita `uploadFileToDrive` (drive.ts). A mensagem do Chat traz um **link clicável** para o print — segue webhook de **texto**, sem migrar para card v2. |
 | D4 | **Registro** | **Banco (SQLite), sem painel agora** | Cada chamado é persistido (quem, quando, tipo, texto, página, link do print, status do envio). Habilita um painel admin futuro sem retrabalho. Sem tela admin na v1. |
 

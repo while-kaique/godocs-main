@@ -277,8 +277,10 @@ npm run e2e:cleanup -- <runId>    # remove as linhas de teste (planilha → SQLi
 
 Botão flutuante (FAB) azul no canto inferior direito, presente em **todas as páginas** (`AjudaWidget`
 montado em `src/routes/__root.tsx` como irmão do `<Outlet/>`). Abre um **painel ancorado estilo chat**
-onde a pessoa escolhe **Dúvida × Problema**, escreve, opcionalmente **anexa/cola/arrasta um print**, e
-envia. **Mão única (decisão D1):** o chamado **notifica um espaço dedicado do Google Chat** (Luis+Kaique
+onde a pessoa escolhe o tipo — **Dúvida, Problema/Erro ou Sugestão de melhoria** (`tipo` ∈
+`'duvida'|'problema'|'sugestao'`) —, escreve, opcionalmente **anexa/cola/arrasta um print**, e
+envia. Cada tipo tem **cabeçalho/emoji próprio** na mensagem do Chat (❓ DÚVIDA · 🐞 PROBLEMA / ERRO ·
+💡 SUGESTÃO DE MELHORIA — `buildAjudaMessage`), pra bater o olho e saber na hora o que é. **Mão única (decisão D1):** o chamado **notifica um espaço dedicado do Google Chat** (Luis+Kaique
 acompanham) e o retorno acontece por fora, **direto pelo Google Chat** — **não** há resposta voltando para o app.
 Spec de planejamento/decisão (D1–D4): [spec-docs/SPEC_WIDGET_AJUDA.md](spec-docs/SPEC_WIDGET_AJUDA.md)
 (consultar/atualizar conforme a **regra 12**).

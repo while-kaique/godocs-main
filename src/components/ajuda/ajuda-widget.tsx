@@ -1,7 +1,7 @@
 // Widget de Ajuda & Suporte — botão flutuante (FAB) + painel ancorado no canto.
 //
-// Mão única (D1 da spec): a pessoa abre em qualquer página, escolhe DÚVIDA ou
-// PROBLEMA, escreve, opcionalmente anexa/cola/arrasta um print, e envia. O painel
+// Mão única (D1 da spec): a pessoa abre em qualquer página, escolhe DÚVIDA,
+// PROBLEMA ou SUGESTÃO, escreve, opcionalmente anexa/cola/arrasta um print, e envia. O painel
 // "cresce" a partir do botão (transform-origin no canto). NÃO é um chatbot — o
 // cabeçalho deixa claro que a equipe responde direto pelo Google Chat. Visual derivado dos
 // tokens GoGroup (--go-blue/--go-lime/--go-white, Poppins). Ver SPEC_WIDGET_AJUDA.md.
@@ -11,6 +11,7 @@ import {
   HelpCircle,
   MessageCircleQuestion,
   Bug,
+  Lightbulb,
   Paperclip,
   Send,
   Loader2,
@@ -21,7 +22,7 @@ import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { readFileAsBase64 } from "@/lib/submeter/constants";
 
-type Tipo = "duvida" | "problema";
+type Tipo = "duvida" | "problema" | "sugestao";
 type PrintAnexo = { base64: string; filename: string; previewUrl: string };
 
 const MAX_IMG_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -30,9 +31,10 @@ const TIPOS: {
   id: Tipo;
   rotulo: string;
   descricao: string;
+  placeholder: string;
   Icone: typeof HelpCircle;
-  // Tom do chip do ícone — semântico (problema chama atenção), nunca o ÚNICO sinal
-  // do estado: a seleção também é marcada por borda + fundo + check.
+  // Tom do chip do ícone — semântico (dúvida=info, problema=erro, sugestão=ideia),
+  // nunca o ÚNICO sinal do estado: a seleção também é marcada por borda + rádio/check.
   chipBg: string;
   chipFg: string;
 }[] = [
@@ -40,6 +42,7 @@ const TIPOS: {
     id: "duvida",
     rotulo: "Dúvida",
     descricao: "Não sei como fazer algo",
+    placeholder: "Descreva sua dúvida com o máximo de detalhe…",
     Icone: MessageCircleQuestion,
     chipBg: "rgba(0,89,169,0.10)",
     chipFg: "var(--go-blue)",
@@ -48,9 +51,19 @@ const TIPOS: {
     id: "problema",
     rotulo: "Problema",
     descricao: "Algo deu errado ou travou",
+    placeholder: "O que aconteceu? Em que momento? O que você esperava?",
     Icone: Bug,
-    chipBg: "rgba(214,107,0,0.12)",
-    chipFg: "#b45309",
+    chipBg: "rgba(220,38,38,0.10)",
+    chipFg: "#dc2626",
+  },
+  {
+    id: "sugestao",
+    rotulo: "Sugestão",
+    descricao: "Uma ideia pra melhorar",
+    placeholder: "Qual a sua ideia? O que ela melhoraria no dia a dia?",
+    Icone: Lightbulb,
+    chipBg: "rgba(215,219,0,0.22)",
+    chipFg: "#6b6d00",
   },
 ];
 
@@ -212,7 +225,7 @@ export function AjudaWidget() {
               <div className="min-w-0">
                 <h2 className="text-[16px] font-extrabold leading-tight">Precisa de ajuda?</h2>
                 <p className="mt-0.5 text-[12px] leading-snug" style={{ color: "rgba(255,255,255,0.85)" }}>
-                  Conte sua dúvida ou relate um problema. A equipe vê e responde direto pelo Google Chat.
+                  Tire uma dúvida, relate um problema ou mande uma sugestão. A equipe vê e responde direto pelo Google Chat.
                 </p>
               </div>
               <button
@@ -230,8 +243,10 @@ export function AjudaWidget() {
 
             {/* Corpo */}
             <form onSubmit={enviar} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-              {/* Seletor de tipo */}
-              <div role="group" aria-label="Tipo do chamado" className="flex gap-2.5">
+              {/* Seletor de tipo — lista vertical (3 opções). Cada tom de chip é
+                  semântico; a seleção é marcada por borda + indicador rádio (forma),
+                  nunca só por cor. */}
+              <div role="group" aria-label="Tipo do chamado" className="flex flex-col gap-2">
                 {TIPOS.map(({ id, rotulo, descricao, Icone, chipBg, chipFg }) => {
                   const sel = tipo === id;
                   return (
@@ -240,34 +255,38 @@ export function AjudaWidget() {
                       type="button"
                       aria-pressed={sel}
                       onClick={() => setTipo(id)}
-                      className="relative flex flex-1 flex-col items-start gap-2 rounded-xl p-3 text-left transition-all"
+                      className="flex items-center gap-3 rounded-xl p-2.5 text-left transition-all"
                       style={{
                         border: sel ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.18)",
                         background: sel ? "rgba(0,89,169,0.05)" : "transparent",
                       }}
                     >
-                      {sel && (
-                        <span
-                          className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full"
-                          style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                        >
-                          <Check style={{ width: 11, height: 11 }} strokeWidth={3} />
-                        </span>
-                      )}
                       <span
-                        className="flex h-8 w-8 items-center justify-center rounded-full"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                         style={{ background: chipBg, color: chipFg }}
                       >
-                        <Icone style={{ width: 17, height: 17 }} />
+                        <Icone style={{ width: 18, height: 18 }} />
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span
+                          className="text-[13px] font-bold leading-tight"
+                          style={{ color: sel ? "var(--go-blue)" : "var(--go-text-primary)" }}
+                        >
+                          {rotulo}
+                        </span>
+                        <span className="text-[11px] leading-snug" style={{ color: "var(--muted-foreground)" }}>
+                          {descricao}
+                        </span>
                       </span>
                       <span
-                        className="text-[13px] font-bold leading-tight"
-                        style={{ color: sel ? "var(--go-blue)" : "var(--go-text-primary)" }}
+                        className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                        style={
+                          sel
+                            ? { background: "var(--go-blue)", color: "var(--go-white)" }
+                            : { border: "1.5px solid rgba(0,89,169,0.30)" }
+                        }
                       >
-                        {rotulo}
-                      </span>
-                      <span className="text-[11px] leading-snug" style={{ color: "var(--muted-foreground)" }}>
-                        {descricao}
+                        {sel && <Check style={{ width: 11, height: 11 }} strokeWidth={3} />}
                       </span>
                     </button>
                   );
@@ -285,11 +304,7 @@ export function AjudaWidget() {
                   className="go-textarea"
                   style={{ minHeight: 96 }}
                   maxLength={4000}
-                  placeholder={
-                    tipo === "duvida"
-                      ? "Descreva sua dúvida com o máximo de detalhe…"
-                      : "O que aconteceu? Em que momento? O que você esperava?"
-                  }
+                  placeholder={TIPOS.find((t) => t.id === tipo)?.placeholder ?? "Escreva aqui…"}
                   value={mensagem}
                   onChange={(e) => setMensagem(e.target.value)}
                   onPaste={onPaste}
