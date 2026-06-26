@@ -8,22 +8,37 @@ export function ehProjetoTesteE2E(nome: string | null | undefined): boolean {
   return typeof nome === 'string' && nome.startsWith('[E2E-');
 }
 
-export async function sendChatNotification(message: string): Promise<void> {
-  const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
+// Envia uma notificação de texto a um espaço do Google Chat. Por padrão usa o
+// webhook de PROJETOS (GOOGLE_CHAT_WEBHOOK_URL); `opts.webhookUrl` permite apontar
+// para outro espaço (ex.: o webhook do widget de Ajuda, GOOGLE_CHAT_WEBHOOK_URL_AJUDA).
+// Defensivo: sem URL → warn + no-op. Retorna `true` só quando o Chat aceitou (200),
+// para o chamador registrar o resultado (ex.: chat_status do chamado de ajuda).
+export async function sendChatNotification(
+  message: string,
+  opts?: { webhookUrl?: string },
+): Promise<boolean> {
+  const webhookUrl = opts?.webhookUrl ?? process.env.GOOGLE_CHAT_WEBHOOK_URL;
   if (!webhookUrl) {
-    console.warn('[google/chat] GOOGLE_CHAT_WEBHOOK_URL não configurada, pulando notificação');
-    return;
+    console.warn('[google/chat] webhook do Google Chat não configurado, pulando notificação');
+    return false;
   }
 
-  const resp = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: message }),
-  });
+  try {
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: message }),
+    });
 
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    console.error(`[google/chat] Falha ao enviar notificação (${resp.status}): ${body}`);
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      console.error(`[google/chat] Falha ao enviar notificação (${resp.status}): ${body}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[google/chat] Erro ao enviar notificação:', e);
+    return false;
   }
 }
 
@@ -121,4 +136,42 @@ export function buildUpdateMessage(p: {
     '',
     SEPARATOR,
   ].join('\n');
+}
+
+// Mensagem do widget de Ajuda & Suporte. Mão única: a pessoa envia, Luis+Kaique
+// leem no espaço dedicado. O print (quando há) vai como LINK do Drive — texto plain,
+// sem card (decisão D3 da spec). A linha do print é OMITIDA quando não há anexo.
+export function buildAjudaMessage(p: {
+  tipo: 'duvida' | 'problema';
+  nome: string;
+  email: string;
+  mensagem: string;
+  pagina?: string | null;
+  printLink?: string | null;
+  data: string;
+}): string {
+  const cabecalho =
+    p.tipo === 'problema'
+      ? '\u{1F41E} *Novo PROBLEMA relatado no GoDocs*'
+      : '❓ *Nova DÚVIDA no GoDocs*';
+
+  const lines = [
+    SEPARATOR,
+    '',
+    cabecalho,
+    '',
+    `\u{1F464} *De:* ${p.nome} (${p.email})`,
+    `\u{1F4C4} *Página:* ${p.pagina || '—'}`,
+    `\u{1F552} *Quando:* ${p.data}`,
+    '',
+    `\u{1F4DD} *Mensagem:*`,
+    p.mensagem,
+  ];
+
+  if (p.printLink) {
+    lines.push('', `\u{1F5BC}️ *Print:* ${p.printLink}`);
+  }
+
+  lines.push('', SEPARATOR);
+  return lines.join('\n');
 }

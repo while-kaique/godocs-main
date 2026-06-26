@@ -273,6 +273,40 @@ npm run e2e:cleanup -- <runId>    # remove as linhas de teste (planilha → SQLi
 - ⚠️ O guard de Chat mudo e o endpoint `e2e-cleanup` são **temporários** (escopo `[E2E-]`); reverter
   quando a validação por testes não for mais necessária (ver README).
 
+## Widget de Ajuda & Suporte (canal de feedback in-app)
+
+Botão flutuante (FAB) azul no canto inferior direito, presente em **todas as páginas** (`AjudaWidget`
+montado em `src/routes/__root.tsx` como irmão do `<Outlet/>`). Abre um **painel ancorado estilo chat**
+onde a pessoa escolhe **Dúvida × Problema**, escreve, opcionalmente **anexa/cola/arrasta um print**, e
+envia. **Mão única (decisão D1):** o chamado **notifica um espaço dedicado do Google Chat** (Luis+Kaique
+acompanham) e o retorno acontece por fora (e-mail/Chat direto) — **não** há resposta voltando para o app.
+Spec de planejamento/decisão (D1–D4): [spec-docs/SPEC_WIDGET_AJUDA.md](spec-docs/SPEC_WIDGET_AJUDA.md)
+(consultar/atualizar conforme a **regra 12**).
+
+- **Fluxo (`src/lib/ajuda.functions.ts`):** `criarChamadoAjuda(email, body)` valida via `ajudaSchema`
+  (zod: `tipo` enum, `mensagem` ≤4000, `print?` ≤~5 MB) → (1) sobe o print no Drive via
+  `uploadFileToDrive` em try/catch **não-fatal** (print é opcional, nunca derruba o chamado);
+  (2) persiste em `ajuda_chamados` (fonte de verdade); (3) `runBackground` notifica o Chat e grava o
+  `chat_status` ('enviado'|'falha'). O **nome** é derivado do e-mail (reusa `responsavel_nome` de um
+  projeto do usuário; fallback = e-mail). `process.env` sempre **dentro** de função (lazy).
+- **Rota:** `POST /api/ajuda` (`worker.ts`) — **autenticada, NÃO admin**, **fora** do prefixo
+  `/api/chat/` de propósito (não passa pelo dispatcher de chat nem grava `api_logs`).
+- **Google Chat:** `sendChatNotification(msg, { webhookUrl? })` foi **generalizado** — quando `webhookUrl`
+  vier, usa ela (o widget passa `GOOGLE_CHAT_WEBHOOK_URL_AJUDA`); senão mantém `GOOGLE_CHAT_WEBHOOK_URL`
+  (caminho de projetos intacto). Agora **retorna `boolean`** (true só em 200) p/ o `chat_status`.
+  Builder `buildAjudaMessage` (texto plain; o print vai como **LINK** do Drive — decisão D3, sem card).
+- **Tabela `ajuda_chamados`** (`schema.ts`, `CREATE TABLE IF NOT EXISTS` — não entra em `MIGRATIONS`):
+  `usuario_email/nome`, `tipo`, `mensagem`, `pagina_url`, `user_agent`, `print_link/filename`,
+  `chat_status`, `created_at`. **Sem painel admin na v1 (D4)** — a tabela já guarda tudo para um painel
+  futuro; a leitura do dia a dia é no espaço do Chat.
+- **Env:** `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` (webhook do espaço de suporte; placeholder no `.env.example`,
+  valor real só no `.env`/secrets — **nunca commitar a credencial**). Opcional:
+  `GOOGLE_DRIVE_FOLDER_ID_AJUDA` (pasta separada p/ os prints; default cai no `GOOGLE_DRIVE_FOLDER_ID`).
+  ⚠️ Em prod, o secret precisa estar no **Godeploy** — sem ele, o envio ao Chat é silenciosamente pulado.
+- **UI (regra 11):** identidade GoGroup (FAB/cabeçalho `--go-blue`, enviar lime, Poppins); a11y — `Esc`
+  fecha, foco volta ao FAB, `role="dialog"`+`aria-label`, estado dos cards por **ícone+check+borda**
+  (não só cor), `prefers-reduced-motion` respeitado (keyframe `go-pop-in`). PT-BR com acento.
+
 ## Convenções rápidas
 
 - Path alias: `@/*` → `./src/*`

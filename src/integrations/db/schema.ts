@@ -204,6 +204,28 @@ const SCHEMA_SQL = `
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  -- Chamados do Widget de Ajuda & Suporte (botão flutuante → painel estilo chat).
+  -- Mão única: a pessoa envia uma DÚVIDA ou relata um PROBLEMA (opcionalmente com
+  -- um print), o backend persiste aqui (fonte de verdade do registro) e notifica um
+  -- espaço dedicado do Google Chat. Sem painel admin na v1 — a tabela já guarda tudo
+  -- para habilitar um painel futuro sem retrabalho. Ver spec-docs/SPEC_WIDGET_AJUDA.md.
+  CREATE TABLE IF NOT EXISTS ajuda_chamados (
+    id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    usuario_email   TEXT NOT NULL,
+    usuario_nome    TEXT,
+    tipo            TEXT NOT NULL DEFAULT 'duvida',    -- 'duvida' | 'problema'
+    mensagem        TEXT NOT NULL,
+    pagina_url      TEXT,                              -- de onde a pessoa abriu o widget
+    user_agent      TEXT,
+    print_link      TEXT,                              -- webViewLink do Drive (se houver print)
+    print_filename  TEXT,
+    chat_status     TEXT DEFAULT 'pendente',           -- 'pendente' | 'enviado' | 'falha'
+    created_at      TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_email ON ajuda_chamados(usuario_email);
+  CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_criado ON ajuda_chamados(created_at);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

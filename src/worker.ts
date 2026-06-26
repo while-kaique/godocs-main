@@ -56,6 +56,7 @@ import {
   cancelarDisparoLegados,
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
+import { criarChamadoAjuda } from '@/lib/ajuda.functions'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -203,6 +204,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!email) return errorJson('Não autorizado.', 401)
       const id = pathname.replace('/api/chat/historico/', '').split('/')[0]
       return json(await getHistoricoMeuProjeto(id, email))
+    }
+
+    // ── Widget de Ajuda & Suporte (autenticado, NÃO admin) ──
+    // Fora do prefixo /api/chat/ de propósito: é um caminho dedicado que NÃO passa
+    // pelo dispatcher de chat nem grava api_logs. Qualquer usuário logado pode pedir
+    // ajuda. Erros de validação do schema sobem como 400 (ver criarChamadoAjuda).
+    if (pathname === '/api/ajuda' && method === 'POST') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const body = await readBody(request)
+      return json(await criarChamadoAjuda(email, body))
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──

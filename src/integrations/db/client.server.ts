@@ -845,6 +845,69 @@ export function getEmailLote(id: string) {
   return queryOne<EmailLoteRow>('SELECT * FROM email_lotes WHERE id = ?', [id]);
 }
 
+// ─── Ajuda & Suporte (widget flutuante → Google Chat) ──────────────────────
+
+export type AjudaChamadoRow = {
+  id: string;
+  usuario_email: string;
+  usuario_nome: string | null;
+  tipo: string; // 'duvida' | 'problema'
+  mensagem: string;
+  pagina_url: string | null;
+  user_agent: string | null;
+  print_link: string | null;
+  print_filename: string | null;
+  chat_status: string | null; // 'pendente' | 'enviado' | 'falha'
+  created_at: string | null;
+};
+
+// Persiste um chamado de ajuda (fonte de verdade do registro). Retorna a linha
+// gravada — o id gerado é usado para marcar o chat_status depois do envio.
+export async function insertAjudaChamado(data: {
+  usuario_email: string;
+  usuario_nome?: string | null;
+  tipo: string;
+  mensagem: string;
+  pagina_url?: string | null;
+  user_agent?: string | null;
+  print_link?: string | null;
+  print_filename?: string | null;
+  chat_status?: string;
+}): Promise<AjudaChamadoRow> {
+  const id = generateId();
+  await exec(
+    `INSERT INTO ajuda_chamados
+       (id, usuario_email, usuario_nome, tipo, mensagem, pagina_url, user_agent, print_link, print_filename, chat_status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [
+      id,
+      data.usuario_email,
+      data.usuario_nome ?? null,
+      data.tipo,
+      data.mensagem,
+      data.pagina_url ?? null,
+      data.user_agent ?? null,
+      data.print_link ?? null,
+      data.print_filename ?? null,
+      data.chat_status ?? 'pendente',
+    ],
+  );
+  return (await queryOne<AjudaChamadoRow>('SELECT * FROM ajuda_chamados WHERE id = ?', [id]))!;
+}
+
+// Atualiza o resultado do envio ao Google Chat ('enviado' | 'falha').
+export function marcarChatStatusAjuda(id: string, status: 'enviado' | 'falha') {
+  return exec('UPDATE ajuda_chamados SET chat_status = ? WHERE id = ?', [status, id]);
+}
+
+// Lista os chamados mais recentes (mira o painel admin futuro — sem tela na v1).
+export function getAjudaChamados(limit = 100) {
+  return queryAll<AjudaChamadoRow>(
+    'SELECT * FROM ajuda_chamados ORDER BY created_at DESC LIMIT ?',
+    [limit],
+  );
+}
+
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
 export async function getUltimosDisparosPorEmail(): Promise<
   Map<string, { created_at: string | null; status: string }>

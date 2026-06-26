@@ -41,6 +41,14 @@ describe('upload ao Drive', () => {
     expect(r.link).toBe('https://drive.google.com/file/d/xyz/view');
   });
 
+  it('usa o folderId passado em opts (pasta separada, ex.: prints do widget de ajuda)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResp({ id: 'a', webViewLink: 'https://drive/a' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await uploadFileToDrive({ base64: B64, filename: 'p.png' }, { folderId: 'PASTA_AJUDA' });
+    const bodyText = await (fetchMock.mock.calls[0][1].body as Blob).text();
+    expect(bodyText).toContain('"parents":["PASTA_AJUDA"]');
+  });
+
   it('uploadFileToDrive propaga erro (403 sem acesso à pasta)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(errResp(403, 'no access')));
     await expect(uploadFileToDrive({ base64: B64, filename: 'a.pdf' })).rejects.toThrow(/403/);
