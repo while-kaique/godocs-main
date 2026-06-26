@@ -125,11 +125,22 @@ export async function criarChamadoAjuda(
     printLink,
     data: agoraBR(),
   });
-  runBackground(
-    sendChatNotification(mensagemChat, {
-      webhookUrl: process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA,
-    }).then((ok) => marcarChatStatusAjuda(chamado.id, ok ? 'enviado' : 'falha')),
-  );
+  // Notifica APENAS o espaço dedicado de ajuda. Se o webhook não estiver
+  // configurado, NÃO usa o fallback de projetos do sendChatNotification — isso
+  // postaria dúvidas no grupo das submissões. Pula o envio (chamado segue gravado,
+  // chat_status fica 'pendente'); é o comportamento defensivo previsto na spec.
+  const webhookAjuda = process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
+  if (webhookAjuda) {
+    runBackground(
+      sendChatNotification(mensagemChat, { webhookUrl: webhookAjuda }).then((ok) =>
+        marcarChatStatusAjuda(chamado.id, ok ? 'enviado' : 'falha'),
+      ),
+    );
+  } else {
+    console.warn(
+      '[ajuda] GOOGLE_CHAT_WEBHOOK_URL_AJUDA não configurado — chamado gravado, Chat NÃO notificado (sem fallback p/ o grupo de projetos)',
+    );
+  }
 
   return { id: chamado.id, ok: true };
 }

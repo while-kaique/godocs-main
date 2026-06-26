@@ -1,5 +1,5 @@
 // Widget de Ajuda — schema zod, helpers de DB e o fluxo de criarChamadoAjuda.
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import BetterSqlite3 from 'better-sqlite3';
 import type { GoDeployDB } from '@/integrations/db/db-adapter';
 
@@ -21,6 +21,7 @@ import {
 } from '@/integrations/db/client.server';
 import { ajudaSchema, criarChamadoAjuda } from '@/lib/ajuda.functions';
 import { uploadFileToDrive } from '@/lib/google/drive';
+import { sendChatNotification } from '@/lib/google/chat';
 
 function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
   return {
@@ -93,7 +94,15 @@ describe('ajuda_chamados (DB async)', () => {
 });
 
 describe('criarChamadoAjuda', () => {
-  beforeEach(() => vi.clearAllMocks());
+  const ORIG_AJUDA = process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA; // padrão: não configurado
+  });
+  afterAll(() => {
+    if (ORIG_AJUDA === undefined) delete process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
+    else process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA = ORIG_AJUDA;
+  });
 
   it('persiste o chamado com o link do print e retorna { id, ok }', async () => {
     (uploadFileToDrive as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'd1', link: 'https://drive/d1' });
@@ -130,5 +139,21 @@ describe('criarChamadoAjuda', () => {
     await expect(criarChamadoAjuda('u@gocase.com', { tipo: 'duvida', mensagem: '' })).rejects.toMatchObject({
       status: 400,
     });
+  });
+
+  it('com webhook de ajuda configurado, notifica ESSE espaço (e não o de projetos)', async () => {
+    process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA = 'https://hook/ajuda';
+    await criarChamadoAjuda('u@gocase.com', { tipo: 'duvida', mensagem: 'oi' });
+    // sendChatNotification é chamado SÍNCRONO ao montar a promise do runBackground.
+    expect(sendChatNotification).toHaveBeenCalledTimes(1);
+    expect((sendChatNotification as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({
+      webhookUrl: 'https://hook/ajuda',
+    });
+  });
+
+  it('SEM webhook de ajuda, NÃO notifica (não cai no grupo de projetos)', async () => {
+    // beforeEach já removeu o env.
+    await criarChamadoAjuda('u@gocase.com', { tipo: 'duvida', mensagem: 'oi' });
+    expect(sendChatNotification).not.toHaveBeenCalled();
   });
 });
