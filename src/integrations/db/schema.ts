@@ -310,6 +310,15 @@ const MIGRATIONS = [
   // dirigido pelo front, um chunk por requisição.
   'ALTER TABLE email_lotes ADD COLUMN alvos TEXT',
   'ALTER TABLE email_lotes ADD COLUMN processados INTEGER NOT NULL DEFAULT 0',
+  // Disparo de e-mails por SEGMENTO/público (a tela deixou de ser só "cobrança de
+  // legados"): `audiencia` ∈ 'legado' | 'reenvio' | 'todos'. Tanto o lote quanto cada
+  // disparo guardam o segmento (o selo "enviado em…" é escopado por segmento). `payload`
+  // congela a lista completa de destinatários (e-mail+nome+projetos) + o template no
+  // momento da criação do lote — o chunk lê desse snapshot, sem reler o Sheets/SQLite a
+  // cada requisição (mais robusto e sem race com o status mudando no meio do envio).
+  "ALTER TABLE email_lotes ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
+  'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
+  "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

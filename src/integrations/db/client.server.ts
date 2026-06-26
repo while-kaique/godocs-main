@@ -755,6 +755,7 @@ export type EmailDisparoRow = {
   enviado_por: string | null;
   status: string;
   erro: string | null;
+  audiencia: string | null;
   created_at: string | null;
 };
 
@@ -766,10 +767,12 @@ export function insertEmailDisparo(input: {
   enviadoPor: string;
   status: 'sucesso' | 'falha';
   erro?: string | null;
+  // Segmento do disparo ('legado'|'reenvio'|'todos') — o selo "enviado em…" é por segmento.
+  audiencia?: string;
 }) {
   return exec(
-    `INSERT INTO email_disparos (id, email, nome, projeto_ids, assunto, enviado_por, status, erro, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO email_disparos (id, email, nome, projeto_ids, assunto, enviado_por, status, erro, audiencia, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       generateId(),
       input.email,
@@ -779,6 +782,7 @@ export function insertEmailDisparo(input: {
       input.enviadoPor,
       input.status,
       input.erro ?? null,
+      input.audiencia ?? 'legado',
       nowISO(),
     ],
   );
@@ -792,23 +796,30 @@ export type EmailLoteRow = {
   processados: number;
   enviados: number;
   falhas: number;
-  alvos: string | null; // JSON array de e-mails alvo (congelado na criação)
+  alvos: string | null; // JSON array de e-mails alvo (congelado na criação) — ordena o cursor
+  audiencia: string | null; // 'legado' | 'reenvio' | 'todos'
+  payload: string | null; // JSON { recipients, template } congelado na criação do lote
   status: string; // 'enviando' | 'cancelando' | 'concluido' | 'erro' | 'cancelado'
   iniciado_por: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
+// Cria o lote congelando, no momento do disparo: a ordem dos e-mails (`alvos`, p/ o cursor),
+// o segmento (`audiencia`) e o `payload` completo (destinatários + template). O chunk lê tudo
+// desse snapshot — não relê Sheets/SQLite a cada requisição.
 export async function createEmailLote(
   total: number,
   iniciadoPor: string,
   alvos: string[],
+  audiencia: string,
+  payload: unknown,
 ): Promise<string> {
   const id = generateId();
   await exec(
-    `INSERT INTO email_lotes (id, total, processados, enviados, falhas, alvos, status, iniciado_por, created_at, updated_at)
-     VALUES (?, ?, 0, 0, 0, ?, 'enviando', ?, ?, ?)`,
-    [id, total, JSON.stringify(alvos), iniciadoPor, nowISO(), nowISO()],
+    `INSERT INTO email_lotes (id, total, processados, enviados, falhas, alvos, audiencia, payload, status, iniciado_por, created_at, updated_at)
+     VALUES (?, ?, 0, 0, 0, ?, ?, ?, 'enviando', ?, ?, ?)`,
+    [id, total, JSON.stringify(alvos), audiencia, JSON.stringify(payload), iniciadoPor, nowISO(), nowISO()],
   );
   return id;
 }
@@ -909,12 +920,17 @@ export function getAjudaChamados(limit = 100) {
 }
 
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
-export async function getUltimosDisparosPorEmail(): Promise<
-  Map<string, { created_at: string | null; status: string }>
-> {
+// Escopado por SEGMENTO quando `audiencia` é informada — o selo de "reenvio" não deve
+// considerar um envio de "legado" para a mesma pessoa (são campanhas distintas). Sem
+// argumento, considera todos os segmentos (compat).
+export async function getUltimosDisparosPorEmail(
+  audiencia?: string,
+): Promise<Map<string, { created_at: string | null; status: string }>> {
   const rows = await queryAll<EmailDisparoRow>(
-    `SELECT email, status, created_at FROM email_disparos ORDER BY created_at DESC`,
-    [],
+    audiencia
+      ? `SELECT email, status, created_at FROM email_disparos WHERE audiencia = ? ORDER BY created_at DESC`
+      : `SELECT email, status, created_at FROM email_disparos ORDER BY created_at DESC`,
+    audiencia ? [audiencia] : [],
   );
   const map = new Map<string, { created_at: string | null; status: string }>();
   for (const r of rows) {
