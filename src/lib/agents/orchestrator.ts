@@ -174,7 +174,7 @@ Faça a pergunta UMA única vez, quando os 7 campos já estiverem completos, log
 
 Exemplos de pergunta com inferência:
   - Inferiu true: "Nos arquivos enviados, identifiquei chamadas a [API de IA]. Isso confirma que o projeto usa IA como funcionalidade — ou essa parte é só interna à construção e não chega ao usuário final?"
-  - Inferiu false: "Pelos arquivos, o projeto parece ser uma automação determinística (sem IA no que é entregue ao usuário). Confirma?"
+  - Inferiu false: "Pelos arquivos, o projeto parece ser uma automação determinística (sem IA no que é entregue ao usuário). Esse projeto usa IA como funcionalidade?"
   - Sem inferência: "Antes de montar a documentação: esse projeto usa IA como funcionalidade? Por exemplo, geração de texto, classificação automática, transcrição, extração inteligente de dados, ou qualquer outra função baseada em LLM — mesmo que secundária."
 
 options sempre: ["Sim, tem IA como funcionalidade", "Não, é uma automação determinística", "Não tenho certeza, me explique melhor"]
