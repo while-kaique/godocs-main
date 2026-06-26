@@ -292,8 +292,11 @@ Spec de planejamento/decisão (D1–D4): [spec-docs/SPEC_WIDGET_AJUDA.md](spec-d
 - **Rota:** `POST /api/ajuda` (`worker.ts`) — **autenticada, NÃO admin**, **fora** do prefixo
   `/api/chat/` de propósito (não passa pelo dispatcher de chat nem grava `api_logs`).
 - **Google Chat:** `sendChatNotification(msg, { webhookUrl? })` foi **generalizado** — quando `webhookUrl`
-  vier, usa ela (o widget passa `GOOGLE_CHAT_WEBHOOK_URL_AJUDA`); senão mantém `GOOGLE_CHAT_WEBHOOK_URL`
-  (caminho de projetos intacto). Agora **retorna `boolean`** (true só em 200) p/ o `chat_status`.
+  vier, usa ela; senão mantém `GOOGLE_CHAT_WEBHOOK_URL` (caminho de projetos intacto). Agora
+  **retorna `boolean`** (true só em 200) p/ o `chat_status`. ⚠️ **`criarChamadoAjuda` NÃO usa esse
+  fallback:** ele lê `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` e, se faltar, **pula o envio** em vez de cair no
+  webhook de projetos — senão as dúvidas iam parar no grupo das submissões (bug real: o secret não
+  estava no Godeploy → tudo caía no `GOOGLE_CHAT_WEBHOOK_URL`).
   Builder `buildAjudaMessage` (texto plain; o print vai como **LINK** do Drive — decisão D3, sem card).
 - **Tabela `ajuda_chamados`** (`schema.ts`, `CREATE TABLE IF NOT EXISTS` — não entra em `MIGRATIONS`):
   `usuario_email/nome`, `tipo`, `mensagem`, `pagina_url`, `user_agent`, `print_link/filename`,
