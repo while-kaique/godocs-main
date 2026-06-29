@@ -82,6 +82,13 @@ Painel admin com **3 abas**: **Submetidos** (`submitted_at != null` — abre a s
 4. **Admins dinâmicos**: tabela `admins` consultada se não hardcoded
 5. `requireAdmin()` retorna 401 (sem email) ou 403 (não admin)
 
+**Identidade da conta logada** — `getCurrentUser` resolve `{ email, name, isAdmin }` e
+`GET /api/auth/me` o expõe. O **nome** vem de um header do edge (`GODEPLOY_NAME_HEADER`,
+default `x-godeploy-user-name`); ausente/vazio → derivado do local-part do e-mail por
+`derivarNomeDeEmail` (ex.: `kaique.breno@gocase.com` → "Kaique Breno"). O formulário de
+submissão **não pergunta mais nome/e-mail** — preenche `responsavel_nome`/`responsavel_email`
+a partir do `/api/auth/me` (o e-mail do edge é a fonte de verdade do ownership).
+
 ## LLM (`llm.ts`)
 
 - Provider: `LLM_PROVIDER` (`openai` default, `anthropic`)

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
-  EMAIL_RE, ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
+  ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
@@ -648,6 +648,25 @@ export function SubmeterPageContent({
     contextoEspecial: "",
   });
 
+  // Identidade automática: nome + e-mail vêm da conta logada (Godeploy, via
+  // /api/auth/me). O formulário não pergunta mais — preenchemos `form.nome`/
+  // `form.email` UMA vez, e SÓ se estiverem vazios, para nunca sobrescrever o
+  // seed da edição (applySeed) nem o rehydrate de rascunho (ambos autoritativos
+  // e da mesma pessoa). O e-mail do edge é a fonte de verdade do ownership.
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ email: string; name: string } | null>("/api/auth/me")
+      .then((me) => {
+        if (cancelled || !me?.email) return;
+        setForm((prev) => {
+          if (prev.nome.trim() || prev.email.trim()) return prev; // não clobber
+          return { ...prev, nome: me.name ?? "", email: me.email };
+        });
+      })
+      .catch((e) => console.warn("[auth] não foi possível obter a conta logada:", e));
+    return () => { cancelled = true; };
+  }, []);
+
   // Etapa 2.5 (tipo de projeto): sub-tela entre a etapa 2 e o início do agente.
   // Só aparece na PRIMEIRA passagem (antes do agente iniciar). Em re-entradas
   // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
@@ -765,14 +784,10 @@ export function SubmeterPageContent({
         errs.prodStatus = form.escopo === "externo"
           ? "Apenas ferramentas externas já em uso podem ser submetidas"
           : "Apenas projetos em produção podem ser submetidos";
-      if (!form.nome.trim() || form.nome.trim().length < 2)
-        errs.nome = "Este campo é obrigatório";
-      else if (/[0-9]/.test(form.nome))
-        errs.nome = "O nome não pode conter números";
-      if (!EMAIL_RE.test(form.email.trim()))
-        errs.email = "Informe um e-mail válido";
-      else if (!ALLOWED_DOMAINS_RE.test(form.email.trim()))
-        errs.email = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
+      // Nome e e-mail não são mais perguntados — vêm da conta logada (Godeploy).
+      // Validamos apenas que a identidade foi detectada (caso raro de auth ausente).
+      if (!form.email.trim())
+        errs.email = "Não identificamos sua conta. Recarregue a página ou entre novamente.";
       if (form.escopo === "externo") {
         if (!form.servicoExterno.trim())
           errs.servicoExterno = "Informe o nome do serviço externo";
