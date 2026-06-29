@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSavingPrompt, aplicaSplitCargaEscala } from "@/lib/agents/orchestrator";
+import { buildSavingPrompt, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, LIMITE_ESCALA_ALTA } from "@/lib/agents/orchestrator";
 import { documentacaoVazia, savingVazio } from "@/lib/agents/types";
 import type { ProjetoContexto, SavingColetado, SavingLinha } from "@/lib/agents/types";
 
@@ -56,6 +56,61 @@ describe("aplicaSplitCargaEscala (escopo do gate)", () => {
   it("FALSE quando não há horas reais (todas 0h antes)", () => {
     const semHoras = saving({ linhas: [linha({ horas_antes: 0, horas_depois: 0, economia_horas_mes: 0 })] });
     expect(aplicaSplitCargaEscala(ctx(), semHoras)).toBe(false);
+  });
+});
+
+describe("precisaConfirmarEscala (trava de plausibilidade do split)", () => {
+  it("TRUE quando a escala fica ≥60% do total (carga real subestimada / inflada)", () => {
+    expect(precisaConfirmarEscala(1, 22)).toBe(true);   // legado-189: 1h de 22h → escala 95%
+    expect(precisaConfirmarEscala(1, 11)).toBe(true);   // legado-231: escala 91%
+    expect(precisaConfirmarEscala(6, 32)).toBe(true);   // faff95: escala 81%
+    expect(precisaConfirmarEscala(40, 100)).toBe(true); // escala exatamente 60%
+  });
+  it("FALSE quando a maior parte é carga real (escala < 60%)", () => {
+    expect(precisaConfirmarEscala(50, 100)).toBe(false); // escala 50%
+    expect(precisaConfirmarEscala(99, 100)).toBe(false); // escala 1%
+  });
+  it("o caso legítimo de escala alta (ex. 24h real / 132h total = 82%) também confirma — não bloqueia, só confere", () => {
+    expect(precisaConfirmarEscala(24, 132)).toBe(true);
+  });
+  it("FALSE quando carga real ≥ total (escala 0 — fez tudo) e em entradas inválidas", () => {
+    expect(precisaConfirmarEscala(22, 22)).toBe(false);  // fez tudo
+    expect(precisaConfirmarEscala(108.2, 107.8)).toBe(false); // f4dd86: real>total → escala 0
+    expect(precisaConfirmarEscala(0, 0)).toBe(false);    // total 0
+    expect(precisaConfirmarEscala(NaN, 100)).toBe(false);
+  });
+  it("usa o limite de 60% (LIMITE_ESCALA_ALTA)", () => {
+    expect(LIMITE_ESCALA_ALTA).toBe(0.6);
+  });
+});
+
+describe("interpretarCargaReal (resposta do usuário ao gate da carga real)", () => {
+  it('CASO REPORTADO: "100% das horas eram na mão" → carga real = total (não re-pergunta)', () => {
+    expect(interpretarCargaReal("100% das horas eram na mão", 35)).toBe(35);
+    expect(interpretarCargaReal("100% era na mão, as 35h era trabalho real, nada escalado", 35)).toBe(35);
+  });
+  it("porcentagem → fração do total (última citada vence)", () => {
+    expect(interpretarCargaReal("uns 50% na mão", 40)).toBe(20);
+    expect(interpretarCargaReal("100 por cento manual", 12)).toBe(12);
+    expect(interpretarCargaReal("não era 100%, era 50%", 40)).toBe(20);
+  });
+  it('"nada escalado / sem escala / não foi escalado" → carga real = total (escala 0)', () => {
+    expect(interpretarCargaReal("nada escalado", 18)).toBe(18);
+    expect(interpretarCargaReal("foi tudo manual, sem escala", 9)).toBe(9);
+    expect(interpretarCargaReal("não foi escalado nada", 7)).toBe(7);
+  });
+  it('"fazia tudo / o volume todo" → total; "não fazia tudo" NÃO vira total', () => {
+    expect(interpretarCargaReal("a pessoa fazia o volume todo", 50)).toBe(50);
+    expect(interpretarCargaReal("não fazia tudo", 50)).not.toBe(50);
+  });
+  it("números explícitos continuam funcionando (1 valor; 2 que somam o total)", () => {
+    expect(interpretarCargaReal("eram umas 24h", 132)).toBe(24);
+    expect(interpretarCargaReal("24h de carga real e 108 de escala", 132)).toBe(24);
+    expect(interpretarCargaReal("fazia 35", 35)).toBe(35);
+  });
+  it("ambíguo/sem sinal → null (re-pergunta determinística)", () => {
+    expect(interpretarCargaReal("não sei dizer", 30)).toBeNull();
+    expect(interpretarCargaReal("", 30)).toBeNull();
   });
 });
 

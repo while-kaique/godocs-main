@@ -119,10 +119,12 @@ export type SavingColetado = {
   horas_escala?: number | null;
   // Estado do GATE DETERMINÍSTICO do split (gerenciado pelo backend, não ecoado pelo
   // LLM — re-mesclado a cada turno). null = ainda não perguntado · 'pendente' = pergunta
-  // feita, aguardando o nº da carga real · 'ok' = split capturado (horas_carga_real/
-  // horas_escala preenchidos e somando o total). O backend BLOQUEIA o preview enquanto
-  // não for 'ok' (quando aplicaSplitCargaEscala). Garante que a informação SEMPRE exista.
-  carga_escala?: 'pendente' | 'ok' | null;
+  // feita, aguardando o nº da carga real · 'confirmar_escala' = carga real informada mas a
+  // ESCALA ficou ≥60% do total (precisaConfirmarEscala) — aguardando confirmação de
+  // plausibilidade (trava p/ dia×mês e escala inflada) · 'ok' = split capturado
+  // (horas_carga_real/horas_escala preenchidos e somando o total). O backend BLOQUEIA o
+  // preview enquanto não for 'ok' (quando aplicaSplitCargaEscala). Garante que a info exista.
+  carga_escala?: 'pendente' | 'confirmar_escala' | 'ok' | null;
   // Explicação do USUÁRIO ao gate do split (o texto cru da resposta a "quantas horas a
   // pessoa realmente fazia à mão") — capturada pelo backend no turno do gate e re-mesclada
   // a cada turno. Alimenta a JUSTIFICATIVA do split (subseção do memorial + fallback da
