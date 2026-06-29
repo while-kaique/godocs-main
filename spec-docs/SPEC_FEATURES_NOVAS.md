@@ -293,3 +293,45 @@ npm run build:worker                      # regenera o worker na base nova
 
 > Este arquivo é **untracked** no root do `main` (não commitado). Serve de bússola da próxima
 > sessão; quando os PRs forem abrindo, pode ser removido ou virar um doc em `docs/`.
+
+---
+
+## Feature adicional — Identidade automática (nome + e-mail da conta logada) · jun/2026
+
+> Decisão do dono (Kaique, 2026-06-29): remover do formulário as perguntas de **nome** e
+> **e-mail** — são redundantes com a conta autenticada — mantendo apenas **participantes**.
+
+**Problema.** O edge Godeploy já exige OAuth em **todas** as rotas e injeta
+`x-godeploy-user-email`. O worker lê isso (`getCurrentUser`) e o e-mail **já é a fonte de
+verdade do ownership** no `submeterParaValidacao(body, email)`. Mesmo assim a Etapa 1 pedia
+**Nome Completo** e **E-mail** digitados à mão — redundante e propenso a erro (e-mail divergente
+do dono real, typo no nome).
+
+**Decisão (fechada).**
+- O **e-mail do edge é a fonte de verdade** do responsável/ownership — o form nunca mais o pede.
+- **Nome:** lido de um header do edge (`GODEPLOY_NAME_HEADER`, default `x-godeploy-user-name`);
+  ausente/vazio → **derivado do local-part do e-mail** (`derivarNomeDeEmail`, Title Case). O
+  design **degrada graciosamente**: o nome aparece com ou sem header.
+- A identidade vira um bloco **read-only** ("Submetendo como…") na Etapa 1 — não há mais input
+  de nome/e-mail. Participantes seguem iguais (com validação de domínio).
+- ⚠️ O default `x-godeploy-user-name` **não foi confirmado** (não houve deploy de probe — o
+  dono optou por finalizar só o PR). Confirmar o header real num deploy futuro e, se for outro,
+  setar `GODEPLOY_NAME_HEADER` no Godeploy (sem mudar código). Até lá, o nome derivado cobre.
+
+**Onde aterrissou.**
+- `src/lib/auth.functions.ts` — `CurrentUser.name`; `getCurrentUser` lê o header de nome (lazy)
+  com fallback; novo helper puro exportado `derivarNomeDeEmail(email)`.
+- `src/worker.ts` — `/api/auth/me` passa a devolver `name` (sem mudança extra — já serializa o
+  `CurrentUser`).
+- `src/routes/submeter.tsx` — `useEffect` busca `/api/auth/me` e preenche `form.nome`/
+  `form.email` **só se vazios** (não sobrescreve seed de edição / rehydrate de rascunho);
+  validação da Etapa 1 não checa mais nome/e-mail (só exige que a identidade exista). `FormData`
+  mantém `nome`/`email` (continuam indo no payload de `iniciarSubmissao`/`atualizar-metadados`).
+- `src/lib/submeter/step1.tsx` — removidos os campos Nome/E-mail; bloco read-only de identidade
+  (a11y: ícone + texto, não só cor); fallback âmbar se a conta não for detectada.
+- Docs/env: `docs/backend.md` (Autenticação), `CLAUDE.md` (bullet "Identidade automática"),
+  `.env.example` (`GODEPLOY_NAME_HEADER`).
+
+**Verificação.** `npm run test` (458 testes) verde + `npm run build` (typecheck) limpo. Smoke em
+prod pendente do deploy (form sem perguntas de nome/e-mail; "Submetendo como…" preenchido;
+submissão grava `responsavel_nome`/`responsavel_email`; edição seeda a identidade).

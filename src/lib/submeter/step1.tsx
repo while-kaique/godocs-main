@@ -173,28 +173,49 @@ export function Step1({
 
           <SectionTitle icon="👤">Dados do Responsável</SectionTitle>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormGroup>
-              <FormLabel required>Nome Completo</FormLabel>
-              <FormInput
-                type="text"
-                placeholder="Seu nome completo"
-                value={form.nome}
-                onChange={(e) => updateField("nome", e.currentTarget.value)}
-                error={errors.nome}
-              />
-            </FormGroup>
-            <FormGroup>
-              <FormLabel required>E-mail</FormLabel>
-              <FormInput
-                type="email"
-                placeholder="seu.email@gocase.com.br"
-                value={form.email}
-                onChange={(e) => updateField("email", e.currentTarget.value)}
-                error={errors.email}
-              />
-            </FormGroup>
-          </div>
+          {/* Identidade automática: nome + e-mail vêm da conta logada (Godeploy),
+              não são mais perguntados. Bloco read-only — sinalizado por ícone +
+              texto (não só cor), respeitando a11y. */}
+          <FormGroup>
+            {form.email ? (
+              <div
+                className="flex items-center gap-3 rounded-xl px-3.5 py-3"
+                style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.15)" }}
+              >
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px]"
+                  style={{ background: "rgba(0,89,169,0.1)" }}
+                  aria-hidden="true"
+                >
+                  👤
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--go-blue)" }}>
+                    Submetendo como
+                  </div>
+                  <div className="truncate text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                    {form.nome || form.email}
+                  </div>
+                  {form.nome && (
+                    <div className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>
+                      {form.email}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-2 rounded-xl px-3.5 py-3 text-[12px] leading-relaxed"
+                style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "#8a7d00" }}
+              >
+                <span aria-hidden="true">⚠️</span>
+                <span>
+                  Não foi possível identificar sua conta automaticamente. Recarregue a página
+                  ou entre novamente; sua identidade é obtida do login da plataforma.
+                </span>
+              </div>
+            )}
+          </FormGroup>
 
           <FormGroup>
             {isExterno ? (
