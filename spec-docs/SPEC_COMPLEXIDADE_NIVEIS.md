@@ -1,6 +1,6 @@
 # SPEC — Níveis de complexidade: redefinição de AUTONOMIA (ação na última ponta)
 
-> **Status:** 📐 PLANEJAMENTO — decisões fechadas, **ainda NÃO implementado em código**.
+> **Status:** ✅ IMPLEMENTADO (branch `docs/spec-complexidade-autonomia`) — ver §13 "Onde aterrissou".
 > **Data:** 2026-06-29 · **Autores da decisão:** Lucas Queiroz (gestor) + Luis/Kaique (RPA).
 > **Origem:** slide GoGroup *"Agentes: quatro níveis cumulativos"* + conversa de alinhamento no Google Chat (Lucas × Kaique × Luis).
 > **Escopo:** muda **como o decisor (`analyzer.ts`) classifica** um projeto em `automacao` / `inteligencia` / `autonomia`. NÃO mexe em saving/receita.
@@ -240,14 +240,13 @@ Estes precisam virar texto explícito no prompt do `analyzer.ts` (substituindo/a
 
 ---
 
-## 11. Decisões em aberto (resolver no PR de implementação)
+## 11. Decisões em aberto — RESOLVIDAS na implementação (2026-06-29)
 
-- **Como capturar "ação consequente na última ponta"?**
-  - (a) **Só inferência do LLM** (`acao_autonoma` em `ResultadoAnalise`) — mais simples, mas o LLM pode cair na armadilha do dashboard;
-  - (b) **Inferência + pergunta determinística** na fase *doc* (com precedência, como `tem_ia_como_funcionalidade`) — mais robusto contra falso-autonomia, custo de um turno a mais de conversa.
-  - **Recomendação inicial:** (b), por simetria com o gate de IA e porque o gestor teme justamente o falso-positivo do dashboard. Confirmar com o time.
-- **Texto exato da pergunta** (se adotarmos (b)) — precisa separar **"age sobre o objeto do processo"** de **"só gera informação/output"** sem induzir o usuário a marcar "sim" por orgulho do projeto.
-- **Retrocompatibilidade:** submissões antigas têm o sinal de ação `null` → cair na inferência do LLM (mesma estratégia do `tem_ia_como_funcionalidade` null).
+- **Como capturar "ação consequente na última ponta"? → ESCOLHIDA a opção (a): só inferência do LLM** (`acao_autonoma` em `ResultadoAnalise`), com guardrails fortes no prompt (§6/§7) + auditoria obrigatória (§10). **NÃO** adotamos a (b) (pergunta determinística com precedência), apesar de recomendada inicialmente, pelo seguinte motivo (revisão crítica):
+  - A pergunta autorrelatada *"sua automação toma uma ação sozinha?"* é o vetor **MAIS** propenso ao falso-positivo de autonomia que o gestor teme (o dono do dashboard responde "sim, roda 24/7 e age!" — a armadilha exata da §6.1), e a precedência **travaria** essa resposta errada. Diferente do `tem_ia` (factual/verificável), a pergunta de ação é difusa e lisonjeira.
+  - **Assimetria justificada entre os dois eixos:** o eixo IA usa a pergunta determinística (confiável) — `tem_ia_como_funcionalidade`, com precedência; o eixo AÇÃO fica na inferência do LLM + auditoria (onde o autorrelato seria frágil). Se a auditoria §10 mostrar o LLM caindo no trap, adiciona-se a opção (c) — rebaixamento determinístico, só DEMOVE, nunca força-promove — sem re-arquitetura.
+- **Bug G0 corrigido junto (pré-requisito):** descobriu-se que o gate determinístico de `tem_ia_como_funcionalidade` **nunca funcionou em produção** — o sinal era coletado na fase *doc* (em `coletado`) mas a doc compilada (`DocumentacaoGerada`) o descartava, e o analisador lê `documentacao.conteudo`. Quem classificava de fato era só o `usa_ia` inferido. A correção carrega o sinal para o `conteudo` persistido (ver §13).
+- **Retrocompatibilidade:** submissões antigas têm `acao_autonoma` e `tem_ia_como_funcionalidade` `null` → caem na inferência do LLM; `normalizarComplexidade` não rebaixa com sinais `null`. Enum e coluna do Sheets inalterados (D3).
 
 ---
 
@@ -258,6 +257,19 @@ Estes precisam virar texto explícito no prompt do `analyzer.ts` (substituindo/a
 - **Subjetividade da "ação consequente":** é uma linha tênue reconhecida pelo próprio gestor; o critério "saída final = informação vs ação" (§6) é a régua para reduzir ambiguidade.
 
 ---
+
+## 13. Onde aterrissou (implementação — PR #___)
+
+> Branch `docs/spec-complexidade-autonomia` (spec + implementação no mesmo PR, regra 12). Opção (a) da §11.
+
+1. **Prompt do analisador** — `src/lib/agents/analyzer.ts`, bloco "CLASSIFICAÇÃO DE COMPLEXIDADE": reescrito com as duas perguntas (A julgamento / B fechamento do ciclo), a árvore §5 (ação primeiro), as definições §4, o conceito de "ação consequente" §6 com os **três testes desempatadores** (write-como-decisão × persistência; resolve × avisa; confirmação ANTES × override DEPOIS), os red herrings, os antipadrões §7 e os exemplos §8. Pede os campos `usa_ia` (eixo IA) e `acao_autonoma` (eixo ação).
+2. **Gate determinístico** — `analyzer.ts`: extraído para a função **pura/exportada `normalizarComplexidade`** (antes era inline em `analisarProjeto` — por isso o bug G0 passou batido). Reordenada (ação > IA): (1) rebaixa autonomia quando `acao_autonoma===false`; (2) os gates de IA só mexem em automacao↔inteligencia e **nunca** rebaixam autonomia (D1), preservando a régua do PR #94 (sem IA no runtime → automacao). `tem_ia_como_funcionalidade` (usuário) tem precedência sobre `usa_ia` (LLM). **Nunca** força-promove autonomia.
+3. **Novo sinal** — `src/lib/agents/types.ts`: `acao_autonoma?: boolean | null` em `ResultadoAnalise`.
+4. **Correção do plumbing (G0)** — `src/lib/chat.functions.ts`: na aprovação da doc (`doc_preview → saving/receita`), o `tem_ia_como_funcionalidade` coletado é carregado para o `conteudo` persistido (`upsertDocumentacao`), para o analisador enxergá-lo. Antes era descartado → gate de IA morto. Registrado em [SPEC_CORRECOES.md](SPEC_CORRECOES.md).
+5. **Registro de prompt (regra 3)** — `src/lib/testes/prompt-registry.ts` atualizado (descrição da régua de dois eixos); `prompt-inspector.tsx` renderiza do registry (sem texto próprio).
+6. **Testes (regra 2)** — `tests/analyzer-complexidade.test.ts`: asserts do prompt (árvore ação-primeiro, três testes, red herrings, exemplos) + **testes de unidade da função pura `normalizarComplexidade`** (D1 determinístico-que-age = autonomia; dashboard/alerta = automacao; IA+fila = inteligencia; confirmação pré-ação ≠ autonomia; retrocompat null; não-regressão PR#94; precedência do `tem_ia`). Suíte completa verde (468).
+7. **Sheets** — coluna "Complexidade" **inalterada** (mesmo enum, D3).
+8. **Validação retroativa (§10)** — feita na aba **`godocs_teste_retroativo`** (NÃO na aba `GoDocs` oficial; sem backfill).
 
 ## Decisões fechadas que NÃO podem ser corrigidas por engano
 

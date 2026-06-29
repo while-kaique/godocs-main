@@ -173,44 +173,61 @@ Além da justificativa completa, gere um campo "resumo": um texto curto (2-4 fra
 
 ## CLASSIFICAÇÃO DE COMPLEXIDADE
 
-Classifique o projeto em EXATAMENTE um dos 3 níveis, analisando a documentação técnica em conjunto com a descrição breve.
+Classifique o projeto em EXATAMENTE um dos 3 níveis: "automacao", "inteligencia" ou "autonomia". A classificação NÃO depende de quão sofisticado, abrangente ou impactante é o projeto — depende de DUAS propriedades do TRABALHO que a automação faz. Responda as duas perguntas abaixo SOBRE O TRABALHO (não sobre como o projeto parece) e siga a árvore.
 
-REGRA CENTRAL — DOIS CRITÉRIOS INDEPENDENTES que determinam o nível:
+**PERGUNTA A — JULGAMENTO (separa automação ↔ inteligência):** para produzir sua saída, o projeto usa IA como FUNCIONALIDADE — precisa interpretar algo aberto/ambíguo que nenhuma regra fixa escrita de antemão resolveria (gera texto, classifica conteúdo livre, transcreve, extrai sentido com LLM, recomenda)? Ou segue um caminho DETERMINÍSTICO (regras, if-else, árvore de lógica, por mais complexa que seja)?
+- O campo "tem_ia_como_funcionalidade" dos metadados é a resposta do USUÁRIO e tem PRECEDÊNCIA: **true** = usa IA como funcionalidade; **false** = determinístico (sem IA como feature); **null** (submissão antiga) = infira da documentação.
+- IA usada só para CONSTRUIR/desenvolver o projeto (Claude Code) ou para HOSPEDAR (GoDeploy) NÃO conta — só conta IA que roda DENTRO da automação, em tempo de execução.
 
-**Critério A — IA como funcionalidade:** O projeto usa IA como parte do que ENTREGA (mesmo que secundário — gera texto, classifica, transcreve, extrai dados com LLM, recomenda, etc.)? Isso é diferente de ter sido construído com ajuda de IA.
-- Se o campo "tem_ia_como_funcionalidade" dos metadados for **true**, o projeto tem IA como funcionalidade — a complexidade mínima é **"inteligencia"** (nunca "automacao").
-- Se for **false**, NÃO há IA como funcionalidade — a complexidade é **"automacao"** independentemente de qualquer outro fator.
-- Se for **null** (submissão antiga, não foi perguntado), infira pela documentação técnica.
+**PERGUNTA B — FECHAMENTO DO CICLO (define a AUTONOMIA e SOBREPÕE a Pergunta A):** quando o projeto termina, o caso está CONCLUÍDO — ele decidiu E executou a AÇÃO consequente final que um humano tomaria, atuando sobre o objeto do processo, sem um humano confirmar? Ou ele entregou um INSUMO (informação, relatório, alerta, recomendação, fila) que ainda EXIGE um humano decidir e agir?
+- Concluiu o caso sozinho (tomou a ação) → **"autonomia"** — INDEPENDENTE de usar IA ou não (a decisão por trás pode ser IA OU árvore de lógica determinística).
+- Entregou um insumo para um humano decidir → fica no nível da Pergunta A.
 
-**Critério B — papel da IA no processo (para projetos com IA como funcionalidade):** A IA apenas entrega um resultado que o humano usa, ou ela decide o rumo e age autonomamente?
+ÁRVORE DE DECISÃO (use EXATAMENTE esta ordem — a AÇÃO vem primeiro e tem precedência sobre a IA):
+1. O projeto EXECUTA uma ação consequente na última ponta, sozinho (muda o estado do mundo / atua sobre o objeto do processo sem um humano confirmar)? → **"autonomia"** (com OU sem IA). Reporte acao_autonoma=true.
+2. Senão: usa IA como FUNCIONALIDADE (gera/classifica/extrai/transcreve/recomenda) e um humano age sobre o output? → **"inteligencia"**. Reporte acao_autonoma=false.
+3. Senão: → **"automacao"** (determinístico que entrega informação/output, ou ação trivial/fixa). Reporte acao_autonoma=false.
 
-Os 3 níveis, pela ESSÊNCIA:
+DEFINIÇÃO DOS 3 NÍVEIS:
+- **"automacao"** — dispara por trigger e segue caminho DETERMINÍSTICO (mesmo com decisões/if-else). Chega até a etapa de INFORMAÇÃO/output: extrai, trata, centraliza, calcula, mostra, alerta, recomenda — e ENTREGA para um humano decidir/agir. NÃO usa IA como funcionalidade E NÃO toma a ação consequente sozinho. (Ex.: RPA que preenche planilha; dashboard de margem; n8n que move dados; alerta por regra.)
+- **"inteligencia"** — usa IA como FUNCIONALIDADE (julgamento não-trivial: gera/classifica/extrai/recomenda como parte do que entrega) — mas o HUMANO ainda conduz: abre a tela/fila/chat e age sobre o resultado. (Ex.: IA que gera documentação; IA que classifica e roteia tickets e um analista trata a fila.)
+- **"autonomia"** — toma a AÇÃO consequente na última ponta, sozinho, com pouca ou nenhuma intervenção humana. A decisão por trás pode ser IA OU lógica determinística. (Ex.: agente que recebe o chamado, decide e RESPONDE o cliente sozinho; sistema que detecta a queda de margem e TIRA os cupons do produto automaticamente — mesmo por regra, sem IA.)
 
-- **"automacao"** — processo determinístico. Dispara por trigger e segue caminho fixo/determinístico. NÃO há IA como funcionalidade do produto (ou a IA foi usada apenas para construir/auxiliar o desenvolvimento, não como feature). Ex: RPA que preenche planilha; n8n agendado que move dados; app/dashboard que organiza cadastro.
-- **"inteligencia"** — a IA é uma funcionalidade do produto. Gera, classifica, extrai, transcreve ou recomenda como parte do que o projeto ENTREGA — mas o humano ainda conduz o processo (abre a tela, age sobre o resultado). Ex: automação que gera documentação por IA; IA que classifica e roteia tickets (analista trata a fila); extração inteligente de dados que uma pessoa revisa.
-- **"autonomia"** — a IA decide o caminho E executa de ponta a ponta, com pouca ou nenhuma intervenção humana. É um agente que age sozinho. Ex: agente que recebe tarefa, decide e resolve sozinho; pipeline que processa, decide e age sem humano no meio.
+CONCEITO-CHAVE — "ação consequente na última ponta": o sistema atua sobre o OBJETO do processo / muda o estado do mundo sem um humano confirmar.
+- É ação consequente (→ autonomia): tira/aplica cupom, ajusta preço, move estoque; responde o cliente / fecha o chamado; aprova ou reprova um pagamento/pedido como DECISÃO FINAL; posta/envia/dispara algo que tem EFEITO no negócio.
+- NÃO é ação consequente (→ no máximo automação/inteligência): gerar dashboard/relatório/planilha; alerta/notificação/e-mail INFORMATIVO; recomendação/ranking/classificação que vira FILA para alguém tratar.
 
-ÁRVORE DE DECISÃO (use exatamente esta lógica, nesta ordem):
-1. **tem_ia_como_funcionalidade = false** (ou documentação deixa claro que não há IA como feature)? → **"automacao"** — fim.
-2. **tem_ia_como_funcionalidade = true** (ou documentação indica IA como feature)? → pelo menos **"inteligencia"**. Agora avalie:
-   - A IA age/executa de ponta a ponta com pouca ou nenhuma intervenção humana? → **"autonomia"**.
-   - Há humano no loop conduzindo (alguém abre tela/dashboard/formulário/chat e age sobre o resultado)? → **"inteligencia"**.
+TRÊS TESTES PARA OS CASOS DIFÍCEIS (decisivos — use-os):
+1. **Write como DECISÃO × write como PERSISTÊNCIA:** gravar num sistema (planilha, banco, ERP) só ELEVA para autonomia se o registro É a DECISÃO/desfecho de negócio (ex.: lançar a aprovação que LIBERA o pedido). Se é só ARMAZENAR um dado do fluxo (log, cache, "salvar o resultado", atualizar um status intermediário) → é persistência/MEIO, NÃO eleva.
+2. **RESOLVE × AVISA (mesma mensagem, função diferente):** responder o cliente e FECHAR o chamado é ação (autonomia); mandar um e-mail/alerta que AVISA um humano para ele resolver NÃO é (automação) — embora ambos "enviem mensagem". O que conta é se a mensagem É o desfecho ou só passa a bola.
+3. **Confirmação ANTES × override DEPOIS:** se um humano confirma/aprova ANTES de cada ação ser executada → NÃO é autonomia (inteligência se houver IA, senão automação). Se o sistema TOMA a ação por padrão e um humano apenas audita / pode reverter depois (exceções) → É autonomia.
 
-ANTIPADRÃO — ERRO COMUM, NÃO COMETA:
-- Projeto sofisticado, abrangente, com MUITAS integrações ou painel elaborado NÃO é, por isso, "inteligencia". **Sofisticação de engenharia ≠ inteligência.** Orquestrar dados e ações (puxar de sistemas, notificar, montar e-mails) é "automacao" SE não há IA como funcionalidade do produto.
-- **A ferramenta NÃO define o nível.** Claude Code e GoDeploy são, na maioria dos casos, as ferramentas usadas para **construir e hospedar** o projeto — NÃO IA no processo. Ferramenta "Claude"/"Claude + GoDeploy" NÃO eleva para "inteligencia" por si só.
-- IA usada APENAS para construir/desenvolver o projeto ("usei o Claude para escrever o código", "hospedei no GoDeploy") NÃO conta. Só conta se a IA roda **dentro da automação, em tempo de execução**.
-- Plataforma/CRUD/dashboards/relatórios/alertas-por-regra que, AO RODAR, NÃO usa IA em nenhum passo do fluxo = **automacao**, mesmo que tenha sido feita com Claude+GoDeploy e seja de alto impacto. (Ex.: sistema de gestão que centraliza dados, mostra dashboards e dispara alertas determinísticos de mudança de risco — sem LLM no fluxo — é automacao.)
+NÃO CLASSIFIQUE POR ESTES SINAIS (red herrings — ignore deliberadamente):
+- **"roda sozinho / 24/7 / por trigger"** → é OPERAÇÃO (o degrau da automação), NÃO a ação que fecha o ciclo. Um coletor que roda 24/7 e carrega um painel é AUTOMAÇÃO, por mais "sozinho" que opere.
+- **"usa IA / foi feito com Claude"** → só importa se a IA faz julgamento em runtime (Pergunta A); NUNCA define autonomia.
+- **"eliminou trabalho humano / alto impacto / muitas integrações / engenharia sofisticada"** → é SAVING/engenharia, não a natureza do trabalho. Um dashboard que ANTES era feito por muita gente e hoje por ninguém continua AUTOMAÇÃO se para na informação (o "não tem mais humano" se refere a PRODUZIR o output, não a TOMAR a ação).
+- **"tem decisão / if-else"** → decisão DETERMINÍSTICA não eleva nada — "a decisão até uma automação pode dar".
+
+ANTIPADRÕES — ERROS COMUNS, NÃO COMETA:
+- **"Automatizou até a última ponta do dashboard" ≠ autonomia.** A "última ponta" relevante é a TOMADA DE AÇÃO consequente, não o fim do pipeline de dados. Um dashboard não toma decisão E ação.
+- IA que só gera output para um humano agir = **"inteligencia"**, NUNCA "autonomia".
+- **A ferramenta NÃO define o nível.** Plataforma/CRUD/dashboard/relatório/alerta-por-regra feita com Claude+GoDeploy, que AO RODAR não usa IA e não toma ação consequente automática = **"automacao"**, por mais impactante que seja.
+- Decisão por IA NÃO é pré-requisito de autonomia, mas também não é atalho: um sistema 100% determinístico que age sozinho na ponta É autonomia; um sistema cheio de IA que só informa NÃO é.
 
 EXEMPLOS:
-- "Painel interno que recebe avisos de planilhas com um clique, puxa nº e status de pedidos do Protheus, notifica aprovadores e monta/envia e-mail aos fornecedores" → **automacao** (orquestra dados e ações; NENHUMA IA como funcionalidade).
-- "n8n que puxa todos os fluxos e gera documentação simples por IA" → **inteligencia** (IA gera o conteúdo como funcionalidade; humano consulta o resultado).
-- "Robô que lê e-mails e CLASSIFICA cada um por assunto usando IA, roteando para a fila certa; um analista trata a fila" → **inteligencia** (IA classifica como feature; humano no loop).
-- "Agente que recebe o chamado, decide a solução e responde o cliente sozinho" → **autonomia**.
+- "Dashboard de margem diária que aponta os produtos que derrubam a margem; um humano decide e age" → **automacao** (chega à informação; não tira cupom sozinho).
+- "O mesmo, mas que TIRA os cupons do produto automaticamente ao detectar a queda" → **autonomia** (ação consequente na ponta, mesmo por regra, sem IA).
+- "Painel que puxa pedidos do Protheus, notifica aprovadores e monta/envia e-mail ao fornecedor" → **automacao** (orquestra dados e INFORMA; NENHUMA IA como funcionalidade; a ação final, aprovar, é humana).
+- "n8n que puxa os fluxos e gera documentação por IA; humano consulta" → **inteligencia** (IA gera o conteúdo como funcionalidade; humano no loop).
+- "Robô que CLASSIFICA tickets por IA e roteia para a fila certa; um analista trata a fila" → **inteligencia** (IA classifica como feature; a ação é humana).
+- "Agente que recebe o chamado, decide e RESPONDE o cliente sozinho" → **autonomia**.
+- "RPA determinístico que, ao detectar a condição X, APROVA o pedido sozinho no ERP (sem IA)" → **autonomia** (ação consequente automática que é a DECISÃO final, mesmo sem IA).
 
-Antes de escolher a complexidade, responda objetivamente: **a AUTOMAÇÃO, quando EXECUTA, usa IA em algum passo do processo?** (gera/classifica/extrai/transcreve/decide/resolve condicional com IA — não as ferramentas usadas para construí-la). Reporte no campo booleano "usa_ia" (true = a automação usa IA ao rodar; false = não usa IA na execução, mesmo que tenha sido construída com Claude). Se for false, a complexidade DEVE ser "automacao". Se for true, é pelo menos "inteligencia".
+Reporte DOIS campos booleanos, além da complexidade:
+- **"usa_ia"** (Pergunta A) — a automação, quando EXECUTA, usa IA em algum passo (gera/classifica/extrai/transcreve/decide com IA — não as ferramentas usadas para construí-la)? true = usa IA no runtime; false = determinística, mesmo se construída com Claude. Se false, a complexidade NÃO pode ser "inteligencia" (será "automacao" ou, se tomar a ação consequente, "autonomia"). Se true, é pelo menos "inteligencia" (a não ser que tome a ação → "autonomia").
+- **"acao_autonoma"** (Pergunta B / passo 1 da árvore) — o projeto toma a AÇÃO consequente na última ponta sozinho, sem um humano confirmar (fecha o caso e age sobre o objeto do processo)? true = fecha o caso e age; false = entrega insumo para um humano decidir/agir. Só classifique "autonomia" quando acao_autonoma=true.
 
-Além da classificação, escreva uma justificativa curta (2-3 frases) no campo "complexidade_justificativa" explicando POR QUÊ o projeto foi classificado nesse nível. Cite evidências concretas da documentação (ex: "O projeto usa Claude para classificar tickets automaticamente, decidindo o roteamento — isso configura julgamento ativo da IA"). Se a classificação for "automacao", explique brevemente por que NÃO se enquadra em inteligência.
+Escreva também "complexidade_justificativa" (2-3 frases) citando evidência concreta da documentação. Para **"autonomia"**, a justificativa DEVE nomear a AÇÃO consequente específica que o sistema toma sozinho (ex.: "remove o cupom no e-commerce automaticamente ao detectar a queda de margem"); se não houver uma ação concreta nomeável, NÃO é autonomia. Para **"automacao"**, explique por que NÃO é inteligência (sem IA no runtime) nem autonomia (para na informação).
 
 ## CUSTOS DO PROJETO (cross-check declaração × documentação)
 
@@ -243,6 +260,7 @@ IMPORTANTE:
   "justificativa": "<texto detalhado em markdown com seções ## Pontos fortes, ## Pontos de atenção, ## Conclusão, ## Recomendações>",
   "resumo": "<2-4 frases claras resumindo o resultado para o usuário>",
   "usa_ia": true | false,
+  "acao_autonoma": true | false,
   "complexidade": "automacao" | "inteligencia" | "autonomia",
   "complexidade_justificativa": "<2-3 frases explicando por que este nível foi escolhido>",
   "criterios_hardcoded": [
@@ -342,6 +360,70 @@ function buildUserMessage(
   return `Analise criticamente a seguinte submissão de projeto de automação:\n\n${JSON.stringify(dados, null, 2)}`;
 }
 
+// ─── Normalização determinística da complexidade (dois eixos) ────────────────
+
+/**
+ * Aplica as invariantes da matriz de complexidade (SPEC_COMPLEXIDADE_NIVEIS.md, §4.1)
+ * sobre a sugestão do LLM. Dois eixos independentes:
+ *   • Eixo IA (automacao ↔ inteligencia): a resposta EXPLÍCITA do usuário
+ *     (tem_ia_como_funcionalidade) tem PRECEDÊNCIA sobre a inferência do LLM (usa_ia).
+ *   • Eixo AÇÃO (→ autonomia): autonomia EXIGE ação consequente na última ponta
+ *     (acao_autonoma) e SOBREPÕE o eixo IA — pode haver autonomia SEM IA (D1).
+ *
+ * Pura e determinística (testável). Só CORRIGE para o que é seguro:
+ *   - rebaixa uma autonomia quando acao_autonoma é EXPLICITAMENTE false (freio
+ *     anti-falso-autonomia do dashboard);
+ *   - força automacao quando não há IA (preserva a régua do PR #94);
+ *   - eleva automacao→inteligencia quando há IA.
+ * NUNCA força-promove a autonomia (evitar o falso-positivo do dashboard) e NUNCA
+ * rebaixa uma autonomia legítima por falta de IA (D1).
+ */
+export function normalizarComplexidade(input: {
+  complexidade?: Complexidade | string | null;
+  usa_ia?: boolean;
+  acao_autonoma?: boolean | null;
+  tem_ia_como_funcionalidade?: boolean | null;
+}): { complexidade: Complexidade; usa_ia: boolean | undefined; ajuste: string | null } {
+  const VALIDAS: Complexidade[] = ['automacao', 'inteligencia', 'autonomia'];
+  let complexidade: Complexidade = VALIDAS.includes(input.complexidade as Complexidade)
+    ? (input.complexidade as Complexidade)
+    : 'automacao'; // fallback conservador
+  let usa_ia = input.usa_ia;
+  const { acao_autonoma, tem_ia_como_funcionalidade: temIa } = input;
+
+  // IA EFETIVA: a resposta explícita do usuário vence a inferência do LLM; null → LLM.
+  const iaEfetiva: boolean | undefined =
+    temIa === true ? true : temIa === false ? false : usa_ia;
+
+  let ajuste: string | null = null;
+
+  // ── Eixo AÇÃO (precedência sobre IA — D1) ──
+  // Freio anti-falso-autonomia: sem ação consequente, autonomia é impossível. Só
+  // rebaixa com sinal EXPLÍCITO false; null/undefined → confia no LLM. NÃO promove
+  // a autonomia por sinal determinístico (evita o falso-positivo do dashboard).
+  if (complexidade === 'autonomia' && acao_autonoma === false) {
+    complexidade = iaEfetiva === true ? 'inteligencia' : 'automacao';
+    ajuste = `autonomia rebaixada para '${complexidade}' (acao_autonoma=false)`;
+  }
+
+  // ── Eixo IA (só mexe em automacao ↔ inteligencia; NUNCA toca autonomia — D1) ──
+  if (complexidade !== 'autonomia') {
+    if (iaEfetiva === false && complexidade !== 'automacao') {
+      complexidade = 'automacao';
+      ajuste = `rebaixada para 'automacao' (sem IA como funcionalidade)`;
+    } else if (iaEfetiva === true && complexidade === 'automacao') {
+      complexidade = 'inteligencia';
+      ajuste = `elevada para 'inteligencia' (IA como funcionalidade)`;
+    }
+  }
+
+  // Reflete a IA efetiva no usa_ia retornado (a resposta do usuário vence).
+  if (temIa === true) usa_ia = true;
+  else if (temIa === false) usa_ia = false;
+
+  return { complexidade, usa_ia, ajuste };
+}
+
 // ─── Função principal ───────────────────────────────────────────────────────
 
 export async function analisarProjeto(projetoId: string): Promise<ResultadoAnalise> {
@@ -408,30 +490,22 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
     resultado.resumo = frases.join(' ') || 'Análise concluída.';
   }
 
-  // Valida e normaliza complexidade
-  const COMPLEXIDADES_VALIDAS: Complexidade[] = ['automacao', 'inteligencia', 'autonomia'];
-  if (!resultado.complexidade || !COMPLEXIDADES_VALIDAS.includes(resultado.complexidade)) {
-    resultado.complexidade = 'automacao'; // fallback conservador
-  }
-  // Gate determinístico: o campo tem_ia_como_funcionalidade (resposta explícita
-  // do usuário no chat) tem precedência sobre o usa_ia inferido pelo LLM.
-  // IA usada só para construir/desenvolver (ex: Claude Code) NÃO conta.
-  const temIaComoFuncionalidade = (conteudo as Record<string, unknown>).tem_ia_como_funcionalidade;
-  if (temIaComoFuncionalidade === true && resultado.complexidade === 'automacao') {
-    log(`Complexidade elevada para 'inteligencia' (tem_ia_como_funcionalidade=true; LLM havia sugerido 'automacao')`);
-    resultado.complexidade = 'inteligencia';
-    resultado.usa_ia = true;
-  } else if (temIaComoFuncionalidade === false && resultado.complexidade !== 'automacao') {
-    log(`Complexidade rebaixada para 'automacao' (tem_ia_como_funcionalidade=false; LLM havia sugerido '${resultado.complexidade}')`);
-    resultado.complexidade = 'automacao';
-    resultado.usa_ia = false;
-  } else if (resultado.usa_ia === false && resultado.complexidade !== 'automacao') {
-    log(`Complexidade rebaixada para 'automacao' (usa_ia=false; LLM havia sugerido '${resultado.complexidade}')`);
-    resultado.complexidade = 'automacao';
-  } else if (resultado.usa_ia === true && resultado.complexidade === 'automacao') {
-    log(`Complexidade elevada para 'inteligencia' (usa_ia=true; LLM havia sugerido 'automacao')`);
-    resultado.complexidade = 'inteligencia';
-  }
+  // Valida e normaliza a complexidade aplicando as invariantes dos dois eixos
+  // (ação > IA — ver normalizarComplexidade e SPEC_COMPLEXIDADE_NIVEIS.md). A
+  // resposta explícita do usuário (tem_ia_como_funcionalidade, lida do conteudo
+  // persistido) tem precedência sobre o usa_ia inferido pelo LLM; a autonomia
+  // exige acao_autonoma e sobrepõe o eixo de IA (pode ser autonomia sem IA — D1).
+  const sugestaoLLM = resultado.complexidade;
+  const norm = normalizarComplexidade({
+    complexidade: resultado.complexidade,
+    usa_ia: resultado.usa_ia,
+    acao_autonoma: resultado.acao_autonoma,
+    tem_ia_como_funcionalidade: (conteudo as Record<string, unknown>)
+      .tem_ia_como_funcionalidade as boolean | null | undefined,
+  });
+  if (norm.ajuste) log(`Complexidade normalizada: ${norm.ajuste} (LLM havia sugerido '${sugestaoLLM}')`);
+  resultado.complexidade = norm.complexidade;
+  resultado.usa_ia = norm.usa_ia;
 
   // O LLM avalia todos os critérios internamente mas retorna só os mais relevantes.
   // Usamos pontuacao_total e pontuacao_maxima calculados pelo LLM (que viu todos).

@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-06-29 — Gate de complexidade por IA (`tem_ia_como_funcionalidade`) MORTO em produção
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `docs/spec-complexidade-autonomia`
+
+**Sintoma:** o gate determinístico documentado — "a resposta explícita do usuário sobre IA como
+funcionalidade tem PRECEDÊNCIA sobre o `usa_ia` inferido pelo LLM" — **nunca disparava**. Na prática,
+quem classificava a complexidade era **só** o `usa_ia` inferido; a resposta do usuário não tinha efeito.
+Achado durante a revisão da redefinição de autonomia (ver [SPEC_COMPLEXIDADE_NIVEIS.md](SPEC_COMPLEXIDADE_NIVEIS.md), G0).
+
+**Causa-raiz:** o sinal `tem_ia_como_funcionalidade` é coletado na fase *doc* e vive em `coletado`
+(estado do orquestrador / JSON do `chat_messages`). Mas, na aprovação da doc, `compilarDocumentacao`
+gera um `DocumentacaoGerada` cujo schema **não inclui** esse campo, e `upsertDocumentacao` persiste só
+esse objeto. O analisador lê `documentacao.conteudo` (`getDocumentacao`, um `SELECT *` puro) — então
+`conteudo.tem_ia_como_funcionalidade` chegava sempre `undefined → null`, e os gates de precedência
+(`analyzer.ts`) eram código morto. Os testes só checavam string do prompt — nunca exercitavam o gate
+com `conteudo` persistido real, então o bug passou batido.
+
+**Fix:** em `chat.functions.ts`, na transição `doc_preview → saving/receita`, o `tem_ia_como_funcionalidade`
+de `resultado.coletado` é carregado para o objeto persistido via `upsertDocumentacao` (spread sobre a
+doc compilada). O merge da fase `completo` relê o `conteudo` já com o sinal e o preserva. Edições passam
+pelo mesmo caminho. Legados/especiais (sem coleta) seguem `null` → inferência do LLM (retrocompat).
+
+**Onde aterrissou:** `src/lib/chat.functions.ts` (upsert da doc aprovada). Cobertura indireta pelos
+testes de `normalizarComplexidade` (precedência do `tem_ia` sobre `usa_ia`) em `tests/analyzer-complexidade.test.ts`.
+
+---
+
 ## 2026-06-29 — "Saving Horas Escalado" sempre 0 p/ contrafactual + zeros ambíguos + splits inválidos
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada, em revisão · **Branch:** `fix/split-nao-contrafactual`

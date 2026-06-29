@@ -200,10 +200,18 @@ export type ResultadoAnalise = {
   resumo: string;
   complexidade: Complexidade;
   complexidade_justificativa?: string;
-  // Gate determinístico: o LLM declara se o produto final usa IA como
-  // funcionalidade (IA usada só para construir/desenvolver NÃO conta).
-  // Se false → automacao; se true → pelo menos inteligencia.
+  // EIXO IA (automacao ↔ inteligencia): o LLM declara se o produto final usa IA como
+  // funcionalidade (IA usada só para construir/desenvolver NÃO conta). false → não pode
+  // ser inteligencia; true → pelo menos inteligencia (a não ser que tome a ação → autonomia).
+  // A resposta explícita do usuário (tem_ia_como_funcionalidade) tem PRECEDÊNCIA sobre este.
   usa_ia?: boolean;
+  // EIXO AÇÃO (→ autonomia, SOBREPÕE o eixo IA — D1): o LLM declara se o projeto toma a
+  // AÇÃO consequente na última ponta sozinho, sem um humano confirmar (fecha o caso e age
+  // sobre o objeto do processo), ou se só entrega um INSUMO para um humano decidir/agir.
+  // Só há autonomia quando true — INDEPENDENTE de usar IA (a decisão pode ser IA ou árvore
+  // de lógica determinística). null = não inferido (submissão antiga) → não rebaixa.
+  // Ver normalizarComplexidade e spec-docs/SPEC_COMPLEXIDADE_NIVEIS.md.
+  acao_autonoma?: boolean | null;
   criterios_hardcoded: CriterioResult[];
   criterios_dinamicos: CriterioResult[];
 };
