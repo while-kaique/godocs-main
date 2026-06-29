@@ -67,11 +67,18 @@ export function buildSubmitMessage(p: {
   receitaValor: number;
   tipoReceita: string;
   dataSubmissao: string;
+  // Distingue o alerta entre SUBMISSÃO nova e EDIÇÃO de um projeto já cadastrado.
+  modo: 'novo' | 'edicao';
 }): string {
+  const cabecalho =
+    p.modo === 'edicao'
+      ? '✏️ *Edição de automação – aprovação aguardando análise*'
+      : '\u{1F6A8} *Submissão de automação – aprovação aguardando análise*';
+
   const lines = [
     SEPARATOR,
     '',
-    '\u{1F6A8} *Novo fluxo de automação cadastrado – aprovação aguardando análise*',
+    cabecalho,
     '',
     `\u{1F4CC} *Projeto:* ${p.projeto}`,
     `\u{1F3F7}\uFE0F *Área:* ${p.area}`,
@@ -100,7 +107,6 @@ export function buildSubmitMessage(p: {
   lines.push(
     '',
     `\u{1F4C5} *Data da submissão:* ${p.dataSubmissao}`,
-    `\u{1F4CA} *Status atual:* Aguardando análise da IA`,
     '',
     `*Link da planilha de automações*: ${SHEETS_URL}`,
     '',
