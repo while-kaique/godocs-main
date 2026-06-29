@@ -942,6 +942,152 @@ Quando perguntado se a automação usa IA em algum passo, a resposta agora é SI
     'complexidade-autonomia-savrec': { alvo: 'autonomia', gateHard: 'nao-automacao' },
     'edicao-reclass': { alvo: 'inteligencia', gateHard: 'nao-automacao' },
   };
+  // ─── CAMPOS NOVOS (F1 AI Proxy · F2 periodicidade · F3 custo do projeto · F4 carga×escala) ───
+  // 4 demos para ver as colunas novas preenchidas na planilha. Todas com alguem_fazia='sim'
+  // (recorrente) → disparam o split carga real × escala (Saving Horas Real/Escalado).
+
+  // A) Saving TRIMESTRAL + AI Proxy (sim) + carga×escala.
+  {
+    const saving = {
+      tipo_saving: 'trimestral',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Analista Pleno', horas_antes: 84, horas_depois: 6 }],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'nf-trimestral',
+      nome: tag('Fechamento contábil trimestral'),
+      tipos_projeto: ['saving'],
+      meta: { ...metaPadrao, ferramenta: 'Claude + GoDeploy', usa_ai_proxy: 'sim', descricao_breve: 'Automação do fechamento contábil consolidado feito a cada trimestre.' },
+      doc: DOC_BASE('Fechamento Contábil Trimestral', {
+        oque: 'Consolida lançamentos e gera o fechamento contábil a cada 3 meses, usando IA para classificar lançamentos atípicos.',
+        fluxo: 'Coleta os lançamentos do ERP, classifica os atípicos com IA (via ai-proxy.gogroupbr.com) e monta o relatório trimestral.',
+        deps: 'Claude + GoDeploy, API do ERP, ai-proxy.gogroupbr.com.',
+        config: 'Credenciais do ERP e token do AI Proxy; rodar ao fim de cada trimestre.',
+        atencao: 'Lançamentos de baixa confiança vão para revisão humana.',
+      }),
+      briefing: `Projeto: automação do fechamento contábil TRIMESTRAL (roda a cada 3 meses), feita com Claude + GoDeploy. Usa IA para classificar lançamentos atípicos e SIM roteia a IA pelo AI Proxy interno (ai-proxy.gogroupbr.com).
+Frequência do saving: TRIMESTRAL. Os números são o ACUMULADO do trimestre inteiro (não por mês).
+Antes: 1 Analista Pleno gastava 84h por trimestre fazendo o fechamento manualmente. Depois: 6h por trimestre só revisando. Economia: 78h por trimestre. A pessoa já fazia isso (alguém fazia = sim). Só dias úteis (seg–sex), ninguém trabalha nisso no fim de semana.
+Carga real × escala: das horas economizadas, a pessoa REALMENTE fazia à mão cerca de 30h por trimestre; as outras ~48h são volume adicional que a automação passou a cobrir (mais contas e conferências que ninguém fazia manualmente por ser inviável).
+Não há ferramenta paga que deixou de ser usada (sem custo evitado). A automação não consome serviço externo pago para rodar (sem custo do projeto).`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Tipo de Saving': 'trimestral', 'Usa AI Proxy': 'Sim', 'Alguém Fazia?': 'sim' },
+      },
+    });
+  }
+
+  // B) Saving MENSAL + CUSTO DO PROJETO mensal (ElevenLabs) + AI Proxy (sim) + carga×escala.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Analista Júnior', horas_antes: 30, horas_depois: 2 }],
+      tem_custo_projeto: 'sim',
+      custo_projeto_itens: [
+        { nome: 'ElevenLabs (síntese de voz)', valor: 300, recorrencia: 'mensal', justificativa: 'API de voz que a automação consome para gerar os áudios de resposta.' },
+      ],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'nf-custo-projeto',
+      nome: tag('Atendimento por voz com IA'),
+      tipos_projeto: ['saving'],
+      meta: { ...metaPadrao, ferramenta: 'Claude + GoDeploy', usa_ai_proxy: 'sim', descricao_breve: 'Automação que responde solicitações internas por voz usando IA.' },
+      doc: DOC_BASE('Atendimento por Voz com IA', {
+        oque: 'Responde solicitações internas por áudio, gerando a resposta com IA e sintetizando voz via ElevenLabs.',
+        fluxo: 'Recebe a pergunta, gera a resposta com IA (via ai-proxy.gogroupbr.com), sintetiza o áudio com a API da ElevenLabs e devolve ao solicitante.',
+        deps: 'Claude + GoDeploy, ai-proxy.gogroupbr.com, ElevenLabs (API paga).',
+        config: 'Chave da ElevenLabs e token do AI Proxy.',
+        atencao: 'A ElevenLabs é cobrada por uso mensal.',
+      }),
+      briefing: `Projeto: automação de atendimento interno por VOZ, feita com Claude + GoDeploy. Usa IA e SIM roteia pelo AI Proxy interno (ai-proxy.gogroupbr.com).
+Frequência do saving: MENSAL.
+Antes: 1 Analista Júnior gastava 30h/mês respondendo as solicitações manualmente. Depois: 2h/mês supervisionando. Economia: 28h/mês. A pessoa já fazia isso (alguém fazia = sim). Só dias úteis, ninguém atua no fim de semana.
+Carga real × escala: a pessoa REALMENTE fazia à mão cerca de 12h/mês (o volume que conseguia atender); as outras ~16h/mês são volume adicional que a automação passou a cobrir (mais solicitações que antes ficavam na fila sem resposta).
+Custo do projeto: SIM — a automação consome a API da ElevenLabs (síntese de voz), que é PAGA, R$ 300 por mês (recorrência MENSAL). Esse custo abate o ganho.
+Não há ferramenta antiga que deixou de ser paga (sem custo evitado).`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Tipo de Saving': 'mensal', 'Usa AI Proxy': 'Sim', 'Custo do Projeto': 300 },
+      },
+    });
+  }
+
+  // C) Saving SEMESTRAL + AI Proxy (não) + carga×escala.
+  {
+    const saving = {
+      tipo_saving: 'semestral',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Analista Sênior', horas_antes: 110, horas_depois: 10 }],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'nf-semestral',
+      nome: tag('Revisão semestral de inventário'),
+      tipos_projeto: ['saving'],
+      meta: { ...metaPadrao, ferramenta: 'Python', usa_ai_proxy: 'nao', descricao_breve: 'Automação da revisão de inventário feita a cada semestre.' },
+      doc: DOC_BASE('Revisão Semestral de Inventário', {
+        oque: 'Cruza o inventário físico com o contábil e gera o relatório de divergências a cada 6 meses.',
+        fluxo: 'Script Python lê as planilhas de contagem, cruza com o ERP e gera o relatório semestral. Sem IA.',
+        deps: 'Python, API do ERP, planilhas de contagem.',
+        config: 'Caminho das planilhas e credenciais do ERP.',
+        atencao: 'Divergências acima de 2% vão para revisão manual.',
+      }),
+      briefing: `Projeto: automação da revisão de inventário SEMESTRAL (roda a cada 6 meses), em Python. É determinística, NÃO usa IA — portanto NÃO usa o AI Proxy.
+Frequência do saving: SEMESTRAL. Os números são o ACUMULADO do semestre inteiro.
+Antes: 1 Analista Sênior gastava 110h por semestre fazendo a revisão manualmente. Depois: 10h por semestre revisando. Economia: 100h por semestre. A pessoa já fazia isso (alguém fazia = sim). Só dias úteis, ninguém trabalha nisso no fim de semana.
+Carga real × escala: a pessoa REALMENTE fazia à mão cerca de 40h por semestre; as outras ~60h são volume que a automação passou a cobrir (conferência item a item de todo o inventário, que antes era só amostral porque ninguém dava conta de tudo).
+Não há ferramenta paga que deixou de ser usada (sem custo evitado) e a automação não consome serviço pago (sem custo do projeto).`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Tipo de Saving': 'semestral', 'Usa AI Proxy': 'Não', 'Alguém Fazia?': 'sim' },
+      },
+    });
+  }
+
+  // D) Saving MENSAL + CUSTO DO PROJETO pontual (crédito OpenAI) + AI Proxy (sim) + carga×escala.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Assistente', horas_antes: 27, horas_depois: 3 }],
+      tem_custo_projeto: 'sim',
+      custo_projeto_itens: [
+        { nome: 'Crédito inicial OpenAI API', valor: 1200, recorrencia: 'pontual', justificativa: 'Crédito único de API consumido na configuração e nos testes iniciais da automação.' },
+      ],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'nf-escala-pontual',
+      nome: tag('Triagem de e-mails com IA'),
+      tipos_projeto: ['saving'],
+      meta: { ...metaPadrao, ferramenta: 'Claude + GoDeploy', usa_ai_proxy: 'sim', descricao_breve: 'Automação que tria e classifica e-mails recebidos usando IA.' },
+      doc: DOC_BASE('Triagem de E-mails com IA', {
+        oque: 'Classifica os e-mails recebidos por assunto e prioridade usando IA e roteia para a fila certa.',
+        fluxo: 'Lê a caixa de entrada, classifica cada e-mail com IA (via ai-proxy.gogroupbr.com) e move para a pasta/fila correspondente.',
+        deps: 'Claude + GoDeploy, ai-proxy.gogroupbr.com, API de e-mail.',
+        config: 'Credenciais de e-mail e token do AI Proxy.',
+        atencao: 'E-mails ambíguos vão para uma fila de revisão.',
+      }),
+      briefing: `Projeto: automação de triagem de e-mails, feita com Claude + GoDeploy. Usa IA para classificar e SIM roteia pelo AI Proxy interno (ai-proxy.gogroupbr.com).
+Frequência do saving: MENSAL.
+Antes: 1 Assistente gastava 27h/mês triando e-mails manualmente. Depois: 3h/mês revisando a fila de ambíguos. Economia: 24h/mês. A pessoa já fazia isso (alguém fazia = sim). Só dias úteis.
+Carga real × escala: a pessoa REALMENTE triava à mão cerca de 9h/mês (o que conseguia); as outras ~15h/mês são volume que a automação passou a cobrir (todos os e-mails, inclusive os que antes ficavam sem triagem).
+Custo do projeto: SIM — houve um crédito ÚNICO (PONTUAL) de R$ 1.200 na API da OpenAI, consumido na configuração e nos testes iniciais. É um gasto pontual (uma vez só).
+Não há ferramenta antiga que deixou de ser paga (sem custo evitado).`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Tipo de Saving': 'mensal', 'Usa AI Proxy': 'Sim', 'Custo do Projeto Mensal ou Pontual': 'Pontual' },
+      },
+    });
+  }
+
   for (const c of cenarios) {
     if (c.especial) {
       c.complexidade = { alvo: 'especial', gateHard: null }; // analisador não roda p/ especial
