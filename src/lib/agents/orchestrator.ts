@@ -462,6 +462,70 @@ export function aplicaSplitCargaEscala(ctx: ProjetoContexto, saving: SavingColet
   return ctx.alguem_fazia === 'sim' && !isPontual && temHorasAntes;
 }
 
+// Quando alguém fazia à mão, parte do total pode ser "ganho por escala" (volume que a
+// pessoa NÃO fazia). Acima deste limite a escala é GRANDE demais para passar sem conferir.
+export const LIMITE_ESCALA_ALTA = 0.6; // escala ≥ 60% do total → confirmar plausibilidade
+
+// TRAVA DE PLAUSIBILIDADE do split: a carga real informada precisa de CONFIRMAÇÃO quando a
+// ESCALA resultante (total − carga real) fica ≥ 60% do total — ou seja, a MAIOR parte do
+// "ganho" seria volume que a pessoa NÃO fazia, embora `alguem_fazia='sim'`. É o sinal dos
+// erros vistos em produção: (a) confusão DIA × MÊS (o usuário dá a carga "por dia" e ela
+// vira muito menor que o total mensal — ex.: "1h/dia" lido como 1h/mês de 22h); (b) escala
+// inflada só p/ fechar o total quando o agente não consegue atribuir. NÃO bloqueia: o backend
+// pede o usuário confirmar/corrigir uma vez. (carga real ≥ total ⇒ escala 0 ⇒ nada a confirmar.)
+export function precisaConfirmarEscala(real: number, total: number): boolean {
+  if (!Number.isFinite(real) || !Number.isFinite(total) || total <= 0) return false;
+  if (real >= total) return false;
+  return (total - real) / total >= LIMITE_ESCALA_ALTA;
+}
+
+// Interpreta a resposta do usuário à pergunta da CARGA REAL (gate do split) → nº de horas
+// em [0, total], ou null (ambíguo → re-pergunta determinística). Reconhece, em ordem:
+//  (1) PORCENTAGEM do total — "100%", "50 %", "100 por cento" → fração (100% = fez tudo).
+//      Usa a ÚLTIMA % citada (cobre "não era 100%, era 50%").
+//  (2) "NADA escalado / sem escala / não escalou" → escala 0 → carga real = TOTAL (a negação
+//      aqui faz PARTE do sentido — "nada de escala" — então não cai no guard de negação abaixo).
+//  (3) "fez tudo à mão / tudo manual / volume todo / integral / tudo real" (SEM negação
+//      genérica — "não fazia tudo" NÃO casa) → carga real = total.
+//  (4) números de horas explícitos (1 valor; ou 2 que somam ~total → o 1º é a carga real).
+// Bug de origem (jun/2026): "100% das horas eram na mão" caía direto no parser de números —
+// "100" > total → rejeitado → null → o agente re-perguntava algo que o usuário JÁ respondeu.
+export function interpretarCargaReal(content: string, total: number): number | null {
+  const t = (content ?? '').trim().toLowerCase();
+  if (!t) return null;
+  const clamp = (n: number) => Math.min(Math.max(n, 0), total);
+
+  // (1) Porcentagem do total (última citada).
+  const pcts = [...t.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:%|por\s*cento)/g)];
+  if (pcts.length) {
+    const p = parseFloat(pcts[pcts.length - 1][1].replace(',', '.'));
+    if (Number.isFinite(p)) return clamp((p / 100) * total);
+  }
+
+  // (2) "Nada/sem/nenhuma escala" ou "não (foi/era) escalado" → escala 0 → carga real = total.
+  if (/(?:nada|sem|nenhum[ao]?)\s+(?:de\s+)?escal/.test(t) ||
+      /n[ãa]o\s+(?:foi\s+|é\s+|era\s+|teve\s+|houve\s+|h[áa]\s+)?escal/.test(t)) {
+    return total;
+  }
+
+  // (3) "Fez tudo à mão / tudo manual / volume todo / integral / tudo real" (sem negação).
+  if (!/\bn[ãa]o\b/.test(t) &&
+      /(tudo|todas?|o\s+total|volume\s+todo|integral|por\s+inteiro|tod[oa]\s+o\s+volume|tud[oa]\s+(?:na|à|a)\s+m[ãa]o|tud[oa]\s+manual|tud[oa]\s+(?:é\s+|era\s+)?(?:trabalho\s+)?real)/.test(t)) {
+    return total;
+  }
+
+  // (4) Números de horas explícitos.
+  const nums = (t.match(/\d+(?:[.,]\d+)?/g) ?? [])
+    .map((s) => parseFloat(s.replace(/\./g, '').replace(',', '.')))
+    .filter((n) => Number.isFinite(n));
+  if (!nums.length) return null;
+  // Dois números que somam ~total → o primeiro é a carga real.
+  if (nums.length >= 2 && Math.abs(nums[0] + nums[1] - total) <= 1) return clamp(nums[0]);
+  // Primeiro número plausível (0..total, com folga de 0,5).
+  const cand = nums.find((n) => n >= 0 && n <= total + 0.5);
+  return cand == null ? null : Math.min(cand, total);
+}
+
 // Cadência periódica do saving (trimestral/semestral): nome do período e nº de meses.
 // Retorna null para mensal/pontual (não-periódicos plurianuais).
 export function periodoSavingInfo(tipo: SavingColetado['tipo_saving']): { nome: 'trimestre' | 'semestre'; meses: number } | null {

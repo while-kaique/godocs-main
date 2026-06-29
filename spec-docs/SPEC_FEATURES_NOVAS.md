@@ -227,7 +227,10 @@ são **só transparência**. O antiagente (F5) + humano auditam o abuso.
   bloco obrigatório — separar carga real × escala antes do preview, registrar ambos no memorial.
   (Mecanismo: prompt-enforced, como `[2.4]`/composição; é qualitativo → não dá pra ser botão fixo.)
 - Sheets: 2 colunas novas (`Saving Real`/`Saving Escalado` — **criar na planilha e confirmar nome**).
-  "Saving Horas" continua o total. Em `alguem_fazia='nao'` ou sem split → "—".
+  "Saving Horas" continua o total. **Atualização 29/06/2026:** `alguem_fazia='nao'` (contrafactual)
+  passou a gravar **Real=0 / Escalado=total** (100% ganho por escala) via `derivarSplitHorasSheet`
+  (`sync.ts`); só `'externo'`/legado-sem-split-capturado/pontual ficam `0/0` (numérico). Vale daqui
+  pra frente (submissões + edições; sem backfill). Antes: `'nao'` → `0/0`. Ver `SPEC_CORRECOES.md`.
 - `sync.ts` (mapa), `getMeuProjeto`/`applySeed` (seed), `prompt-registry`, CLAUDE.md, testes.
 
 ---

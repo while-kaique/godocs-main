@@ -1,6 +1,6 @@
 // Padronização da planilha: coluna numérica vazia → 0; texto vazio → "—".
 import { describe, it, expect } from 'vitest';
-import { padronizarLinha } from '@/lib/google/sync';
+import { padronizarLinha, derivarSplitHorasSheet } from '@/lib/google/sync';
 
 describe('padronizarLinha', () => {
   it('texto vazio/null/"-"/"—" vira "—"', () => {
@@ -53,5 +53,36 @@ describe('padronizarLinha', () => {
   it('"Análise Antiagente" (texto) vazio vira "—"', () => {
     expect(padronizarLinha({ 'Análise Antiagente': '' })['Análise Antiagente']).toBe('—');
     expect(padronizarLinha({ 'Análise Antiagente': 'Sem ressalvas.' })['Análise Antiagente']).toBe('Sem ressalvas.');
+  });
+});
+
+// Derivação das colunas "Saving Horas Real"/"Saving Horas Escalado" a partir de
+// "Alguém Fazia?" + total de horas. 'nao' (contrafactual) = 100% escala (decisão 29/06/2026).
+describe('derivarSplitHorasSheet', () => {
+  it("'sim' com split capturado usa carga real × escala", () => {
+    const r = derivarSplitHorasSheet('sim', { horas_carga_real: 24, horas_escala: 108, economia_horas_mes: 132 });
+    expect(r).toEqual({ real: 24, escalado: 108 });
+  });
+
+  it("'sim' SEM split capturado (legado/pré-feature) → 0/0 (não inventa)", () => {
+    const r = derivarSplitHorasSheet('sim', { horas_carga_real: null, horas_escala: null, economia_horas_mes: 132 });
+    expect(r).toEqual({ real: 0, escalado: 0 });
+  });
+
+  it("'nao' (contrafactual) → Real=0, Escalado=total (100% escala)", () => {
+    expect(derivarSplitHorasSheet('nao', { economia_horas_mes: 140 })).toEqual({ real: 0, escalado: 140 });
+    // ignora qualquer horas_carga_real/escala que o LLM tenha deixado: o total manda.
+    const r = derivarSplitHorasSheet('nao', { horas_carga_real: 5, horas_escala: 10, economia_horas_mes: 40 });
+    expect(r).toEqual({ real: 0, escalado: 40 });
+  });
+
+  it("'nao' sem horas (total 0) → 0/0", () => {
+    expect(derivarSplitHorasSheet('nao', { economia_horas_mes: 0 })).toEqual({ real: 0, escalado: 0 });
+  });
+
+  it("'externo' (custo evitado puro) e alguemFazia ausente → 0/0", () => {
+    expect(derivarSplitHorasSheet('externo', { economia_horas_mes: 0 })).toEqual({ real: 0, escalado: 0 });
+    expect(derivarSplitHorasSheet(null, { economia_horas_mes: 50 })).toEqual({ real: 0, escalado: 0 });
+    expect(derivarSplitHorasSheet(undefined, undefined)).toEqual({ real: 0, escalado: 0 });
   });
 });

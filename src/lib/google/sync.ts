@@ -139,6 +139,30 @@ export type UpdateSyncParams = {
   status: string;
 };
 
+// ─── Split carga real × escala (derivação das colunas do Sheets) ────────────
+// Colunas NUMÉRICAS "Saving Horas Real" / "Saving Horas Escalado" (transparência/
+// auditoria — o TOTAL "Saving Horas" NÃO muda). Derivado de "Alguém Fazia?" + total:
+//  • 'sim'  (rotina humana real) → usa o split capturado pelo gate (carga real × escala).
+//  • 'nao'  (contrafactual — NINGUÉM fazia à mão) → a carga humana real é 0 e TODO o
+//    saving é volume que só a automação cobre ⇒ Real=0, Escalado=total. (Decisão de
+//    produto 29/06/2026: vale daqui pra frente — submissões novas E edições que
+//    re-sincronizam; legados antigos com 0/0 só mudam quando forem editados.)
+//  • 'externo' (custo evitado puro, 0h), 'sim' SEM split capturado (legado/pré-feature)
+//    e pontual sem split → 0/0 (sem dado medido — não inventa).
+export function derivarSplitHorasSheet(
+  alguemFazia: string | null | undefined,
+  saving: { horas_carga_real?: unknown; horas_escala?: unknown; economia_horas_mes?: unknown } | null | undefined,
+): { real: number; escalado: number } {
+  const total = Number(saving?.economia_horas_mes) || 0;
+  if (alguemFazia === 'sim' && saving?.horas_carga_real != null && saving?.horas_escala != null) {
+    return { real: Number(saving.horas_carga_real), escalado: Number(saving.horas_escala) };
+  }
+  if (alguemFazia === 'nao') {
+    return { real: 0, escalado: total };
+  }
+  return { real: 0, escalado: 0 };
+}
+
 // ─── Submit: Sheets → Chat (fire-and-forget) ────────────────────────────────
 
 export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
@@ -180,15 +204,13 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       p.projeto.custo_projeto_itens as string | null,
     );
 
-    // Split carga real × ganho por escala (só quando alguém fazia à mão). O TOTAL
-    // ("Saving Horas") não muda — estas colunas são transparência/auditoria. São
-    // colunas NUMÉRICAS (horas): sem split (ninguém fazia / pontual / não coletado) → 0.
-    const temSplit =
-      p.projeto.alguem_fazia === 'sim' &&
-      p.saving?.horas_carga_real != null &&
-      p.saving?.horas_escala != null;
-    const savingHorasReal = temSplit ? Number(p.saving!.horas_carga_real) : 0;
-    const savingHorasEscalado = temSplit ? Number(p.saving!.horas_escala) : 0;
+    // Split carga real × ganho por escala → colunas NUMÉRICAS (transparência; o TOTAL
+    // "Saving Horas" não muda). Derivado de "Alguém Fazia?" — ver derivarSplitHorasSheet:
+    // 'sim' usa o split capturado; 'nao' (contrafactual) é 100% escala (Real=0); o resto 0/0.
+    const { real: savingHorasReal, escalado: savingHorasEscalado } = derivarSplitHorasSheet(
+      p.projeto.alguem_fazia as string | null,
+      p.saving,
+    );
 
     // Link(s) dos documentos no Google Drive → coluna "URL" da planilha.
     const arquivosLinks = parseArquivosLinks(p.projeto.arquivos_links);

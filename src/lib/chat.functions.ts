@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, totalEconomiaHoras, unidadeHorasDe } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, totalEconomiaHoras, unidadeHorasDe } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -774,28 +774,37 @@ function nudgeTetoPessoa(cap: number): string {
 // sem perguntar) — então o backend BLOQUEIA o preview e pergunta o número da carga
 // real; a escala é o resto (total − carga real). Informação SEMPRE capturada.
 function perguntaCargaEscala(total: number, unidade: string): string {
-  return `Antes de eu fechar: dessas **${total}${unidade}** economizadas, quantas a pessoa **realmente fazia à mão**, por conta própria, antes da automação? (O restante é o volume que só a automação passou a cobrir — o ganho por escala.) Me diga só esse número de horas — se a pessoa já fazia o volume todo, é o próprio total.`;
+  return `Antes de eu fechar: dessas **${total}${unidade}** economizadas, quantas a pessoa **realmente fazia à mão**, por conta própria, antes da automação? (O restante é o volume que só a automação passou a cobrir — o ganho por escala.) Me diga o **total no mesmo período (${unidade})** — **não** o valor por dia. Se a pessoa já fazia o volume todo, é o próprio total (${total}${unidade}).`;
 }
-// Interpreta a resposta (número da carga real, 0..total). Aceita "tudo/todas/o total"
-// (= total, escala 0). Se vierem dois números somando ~total, o 1º é a carga real.
-// null = ambíguo (re-pergunta determinística).
-function interpretarCargaReal(content: string, total: number): number | null {
+// ── Sub-gate: CONFIRMAÇÃO de escala alta (trava de plausibilidade) ────────────
+// Quando a carga real informada deixa a ESCALA ≥60% do total (precisaConfirmarEscala),
+// o backend não fecha de cara: confirma se aquele volumão era mesmo "ninguém fazia".
+// Pega os erros de dia×mês (carga real subestimada) e de escala inflada.
+const OPCOES_CONFIRMAR_ESCALA = [
+  'Sim, esse volume extra só existe por causa da automação (ninguém fazia à mão)',
+  'Não — a pessoa fazia o volume todo à mão (a economia é toda carga real)',
+  'Informei errado (ex.: era valor por dia) — quero corrigir o número',
+];
+function perguntaConfirmarEscala(real: number, escala: number, total: number, unidade: string): string {
+  const pct = total > 0 ? Math.round((escala / total) * 100) : 0;
+  return `Só confirmando, para não inflar o número: você indicou que a pessoa fazia **${real}${unidade}** à mão, então **${escala}${unidade}** (${pct}% do total) seriam volume que **ninguém fazia** e que só passou a existir com a automação. Está certo?`;
+}
+// 1 = confirma a escala · 2 = fazia o volume todo (carga real = total) · 3 = corrigir
+// (reabre a pergunta da carga real) · null = ambíguo (re-pergunta a confirmação).
+// selectedOption é o índice 1-based do botão (z.number()), como nos gates jornada/teto.
+function interpretarConfirmacaoEscala(content: string, selectedOption: number | null): 1 | 2 | 3 | null {
+  if (selectedOption === 1) return 1;
+  if (selectedOption === 2) return 2;
+  if (selectedOption === 3) return 3;
   const t = (content ?? '').trim().toLowerCase();
   if (!t) return null;
-  // "fazia tudo / o total / o volume todo / integralmente" (sem negação) → carga real = total.
-  if (!/\bn[ãa]o\b/.test(t) && /(tudo|todas?|o\s+total|volume\s+todo|integral|por\s+inteiro|tod[oa]\s+o\s+volume)/.test(t)) {
-    return total;
-  }
-  const nums = (t.match(/\d+(?:[.,]\d+)?/g) ?? [])
-    .map((s) => parseFloat(s.replace(/\./g, '').replace(',', '.')))
-    .filter((n) => Number.isFinite(n));
-  if (!nums.length) return null;
-  // Dois números que somam ~total → o primeiro é a carga real.
-  if (nums.length >= 2 && Math.abs(nums[0] + nums[1] - total) <= 1) return Math.min(Math.max(nums[0], 0), total);
-  // Primeiro número plausível (0..total, com folga de 0,5).
-  const cand = nums.find((n) => n >= 0 && n <= total + 0.5);
-  return cand == null ? null : Math.min(cand, total);
+  if (/corrig|errad|por dia|errei|engano|me enganei/.test(t)) return 3;
+  if (/\bn[ãa]o\b|fazia (o )?(volume )?tudo|volume todo|tod[oa] (a )?carga|era tudo/.test(t)) return 2;
+  if (/\bsim\b|confirmo|correto|isso( mesmo)?|exato|t[áa] certo|certo/.test(t)) return 1;
+  return null;
 }
+// interpretarCargaReal vive em orchestrator.ts (puro/testável, junto dos predicados do
+// split). Importado no topo. Reconhece porcentagem ("100%") e "nada escalado/tudo na mão".
 function nudgeCargaEscala(real: number, escala: number, racional: string): string {
   const baseUsuario = racional?.trim()
     ? `\nO usuário explicou assim (use ISTO como base da justificativa, sintetizando — não copie cru): «${racional.trim()}»`
@@ -850,6 +859,15 @@ function derivarJustificativaCargaEscala(
         : '',
     ].filter(Boolean);
     return partes.join(' ');
+  }
+  // 'nao' (contrafactual — ninguém fazia à mão): a carga humana real é 0 e 100% do
+  // saving é ganho por escala. Espelha a coluna numérica (derivarSplitHorasSheet) com
+  // uma justificativa concreta, em vez de deixar "—" ao lado de um Escalado preenchido.
+  if (alguemFazia === 'nao') {
+    const total = Math.round((Number(saving.economia_horas_mes) || 0) * 100) / 100;
+    if (total > 0) {
+      return `Ninguém fazia esta tarefa manualmente (saving contrafactual): a carga humana real é 0h e as ${total}h economizadas são 100% ganho por escala — volume que só passou a ser tratado porque a automação assumiu um trabalho que nenhuma pessoa executava.`;
+    }
   }
   return null;
 }
@@ -962,19 +980,67 @@ export async function enviarMensagem(rawData: unknown) {
       };
     } else {
       const escala = Math.round((total - real) * 100) / 100;
-      log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
       // Guarda a EXPLICAÇÃO crua do usuário (texto da resposta ao gate) — é a base de
       // "como o agente concluiu o split" (alimenta a subseção do memorial E o fallback
       // da coluna de justificativa). Re-mesclada a cada turno (junto dos demais campos).
       const racional = (data.content ?? '').trim();
-      estado.saving = {
-        ...estado.saving,
-        horas_carga_real: real,
-        horas_escala: escala,
-        carga_escala: 'ok',
-        carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
+      if (precisaConfirmarEscala(real, total)) {
+        // TRAVA: a escala ficou ≥60% do total — não fecha de cara, confirma a plausibilidade
+        // (pega dia×mês com carga real subestimada e escala inflada). Não bloqueia, só confirma.
+        log('enviarMensagem', `Carga×escala: escala ALTA (real=${real}h, escala=${escala}h de ${total}h) — confirmando plausibilidade`);
+        estado.saving = {
+          ...estado.saving,
+          horas_carga_real: real,
+          horas_escala: escala,
+          carga_escala: 'confirmar_escala',
+          carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
+        };
+        reask = {
+          type: 'options', question: perguntaConfirmarEscala(real, escala, total, unidadeHorasDe(estado.saving.tipo_saving)),
+          options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
+          saving: { ...estado.saving }, receita: estado.receita,
+        };
+      } else {
+        log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
+        estado.saving = {
+          ...estado.saving,
+          horas_carga_real: real,
+          horas_escala: escala,
+          carga_escala: 'ok',
+          carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
+        };
+        history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional) });
+      }
+    }
+  } else if (gateCargaEscala && estado.saving.carga_escala === 'confirmar_escala') {
+    // (3b) Turno de resposta à CONFIRMAÇÃO de escala alta. 1=confirma o split · 2=a pessoa
+    // fazia o volume TODO (carga real = total, escala 0) · 3=corrigir (reabre a pergunta da
+    // carga real, reforçando "total no mês"). Resolve sempre (sem loop): ambíguo → re-pergunta.
+    const total = totalEconomiaHoras(estado.saving);
+    const realAtual = (estado.saving.horas_carga_real as number | null) ?? total;
+    const resp = interpretarConfirmacaoEscala(data.content, data.selected_option ?? null);
+    if (resp === null) {
+      const escalaAtual = Math.round((total - realAtual) * 100) / 100;
+      log('enviarMensagem', 'Carga×escala: confirmação ambígua — re-perguntando');
+      reask = {
+        type: 'options', question: perguntaConfirmarEscala(realAtual, escalaAtual, total, unidadeHorasDe(estado.saving.tipo_saving)),
+        options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
+        saving: { ...estado.saving, carga_escala: 'confirmar_escala' }, receita: estado.receita,
       };
-      history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional) });
+    } else if (resp === 3) {
+      log('enviarMensagem', 'Carga×escala: usuário vai corrigir o nº — reabrindo a pergunta da carga real');
+      estado.saving = { ...estado.saving, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null };
+      reask = {
+        type: 'question', content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
+        fase: 'saving', coletado: estado.coletado, saving: { ...estado.saving }, receita: estado.receita,
+      };
+    } else {
+      const real = resp === 2 ? total : realAtual;
+      const escala = Math.round((total - real) * 100) / 100;
+      log('enviarMensagem', `Carga×escala: confirmação resolvida (real=${real}h, escala=${escala}h, opção=${resp})`);
+      const racional = (estado.saving.carga_escala_racional as string | null | undefined)?.trim() || null;
+      estado.saving = { ...estado.saving, horas_carga_real: real, horas_escala: escala, carga_escala: 'ok', carga_escala_racional: racional };
+      history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional ?? '') });
     }
   }
 
@@ -1149,8 +1215,25 @@ export async function enviarMensagem(rawData: unknown) {
     if (total <= 0) {
       // Sem economia de horas (outro gate cuida do ganho-zero) — não força o split.
     } else if (splitValido) {
-      log('enviarMensagem', `Carga×escala: split já capturado pelo LLM (real=${real}h, escala=${escala}h) — liberado`);
-      resultado.saving = { ...savingAtual, carga_escala: 'ok' };
+      // Clamp defensivo: a carga real NÃO pode exceder o total (visto em produção — erro de
+      // extração do LLM gravava real>total). Re-deriva a escala do real saneado (soma exata).
+      const realSan = Math.min(Math.max(Number(real), 0), total);
+      const escalaSan = Math.round((total - realSan) * 100) / 100;
+      if (precisaConfirmarEscala(realSan, total)) {
+        // Split do LLM (sem passar pelo gate) com escala ≥60% → confirma plausibilidade.
+        log('enviarMensagem', `Carga×escala: split do LLM com escala ALTA (real=${realSan}h, escala=${escalaSan}h de ${total}h) — confirmando`);
+        Object.assign(resultado, {
+          type: 'options',
+          question: perguntaConfirmarEscala(realSan, escalaSan, total, unidadeHorasDe(savingAtual.tipo_saving)),
+          options: OPCOES_CONFIRMAR_ESCALA,
+          fase: 'saving',
+          saving: { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'confirmar_escala' },
+        });
+        delete (resultado as { content?: string }).content;
+      } else {
+        log('enviarMensagem', `Carga×escala: split do LLM saneado (real=${realSan}h, escala=${escalaSan}h) — liberado`);
+        resultado.saving = { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'ok' };
+      }
     } else {
       log('enviarMensagem', '⛔ Preview do saving sem o split carga real × escala — forçando pergunta (nº da carga real)');
       Object.assign(resultado, {
