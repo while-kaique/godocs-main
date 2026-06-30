@@ -10,13 +10,17 @@
 // uploadDocsToDrive NUNCA propaga erro: loga e segue, para não quebrar a submissão.
 
 import { getDriveAccessToken } from './auth';
+import { assertNaoEhDefaultDeProd } from '../env';
 
 const DEFAULT_FOLDER_ID = '1e_Fk8EhFsv_W-3A3dRpMIa2Wg1pBHem_';
 const UPLOAD_URL =
   'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink';
 
 function getFolderId(): string {
-  return process.env.GOOGLE_DRIVE_FOLDER_ID || DEFAULT_FOLDER_ID;
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || DEFAULT_FOLDER_ID;
+  // Em staging, recusa cair na pasta de produção (env faltando) → não sobe no Drive real.
+  assertNaoEhDefaultDeProd(folderId, DEFAULT_FOLDER_ID, 'GOOGLE_DRIVE_FOLDER_ID (pasta do Drive)');
+  return folderId;
 }
 
 export type DriveDoc = { base64: string; filename: string };

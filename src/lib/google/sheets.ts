@@ -1,16 +1,20 @@
 // Google Sheets API v4 — append, update e leitura de linhas.
 
 import { getAccessToken } from './auth';
+import { assertNaoEhDefaultDeProd } from '../env';
 
 const DEFAULT_SPREADSHEET_ID = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const DEFAULT_SHEET_NAME = 'GoDocs';
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 function getSheetConfig() {
-  return {
-    spreadsheetId: process.env.GOOGLE_SHEETS_ID || DEFAULT_SPREADSHEET_ID,
-    sheetName: process.env.GOOGLE_SHEETS_TAB || DEFAULT_SHEET_NAME,
-  };
+  const spreadsheetId = process.env.GOOGLE_SHEETS_ID || DEFAULT_SPREADSHEET_ID;
+  const sheetName = process.env.GOOGLE_SHEETS_TAB || DEFAULT_SHEET_NAME;
+  // Staging COMPARTILHA a mesma planilha de prod (mesmo ID, de propósito), mas
+  // grava numa ABA própria — a aba é o isolamento. Se a aba cair no default de
+  // prod (env faltando), estaríamos escrevendo na aba de PRODUÇÃO → recusa.
+  assertNaoEhDefaultDeProd(sheetName, DEFAULT_SHEET_NAME, 'GOOGLE_SHEETS_TAB (aba da planilha)');
+  return { spreadsheetId, sheetName };
 }
 
 // ─── Nomes de coluna conhecidos pelo sistema ─────────────────────────────────
