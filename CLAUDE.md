@@ -73,33 +73,9 @@ echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basena
 
 **Críticas:** assets sem prefixo `dist/` (`assets/foo.js`) · SPA fallback obrigatório · lista gerada do `dist/` real (hashes mudam). ⚠️ **Esse `appId: 674a3710` é PRODUÇÃO** — pela **regra 13**, valide no staging (`edf400b4`) ANTES.
 
-## Ambiente de Staging
+## Ambiente de Staging → [docs/staging.md](docs/staging.md) · [SPEC_STAGING.md](spec-docs/SPEC_STAGING.md)
 
-App **isolado** para validar mudanças antes de produção (**regra 13 — staging primeiro**). O **mesmo código** roda nos dois apps; o ÚNICO discriminador é a env `GODOCS_ENV` (só setada na staging). Planejamento/decisões em [spec-docs/SPEC_STAGING.md](spec-docs/SPEC_STAGING.md); runbook em [docs/staging.md](docs/staging.md).
-
-| | Produção | Staging |
-|---|---|---|
-| App Godeploy | `674a3710` (`godocs`) | **`edf400b4`** (`godocs-staging`) |
-| URL | godocs.devgogroup.com | godocs-staging.devgogroup.com |
-| Planilha | aba `GoDocs` | **mesma planilha**, aba `STAGING` |
-| Drive | pasta de prod | pasta própria (`19lFuQ7Q...`) |
-| Google Chat | webhook do time | **mudo** (sem webhook) |
-| SQLite (`env.DB`) | DB de prod | DB próprio (isolado por-app) |
-| `GODOCS_ENV` | ausente → `production` | `staging` (mostra a faixa) |
-
-**Isolamento (decisão do dono — mais leve que a SPEC original):** staging COMPARTILHA a planilha de prod, mas grava numa **aba `STAGING`** própria — a aba é o isolamento, não o arquivo. Pasta de Drive separada, Chat mudo, SQLite próprio. **Dados simulados, nunca reais.**
-
-**Guard anti-vazamento (`src/lib/env.ts`):** `assertNaoEhDefaultDeProd` — em staging, se a aba resolver pro default `GoDocs` ou a pasta do Drive pro default de prod (env de override faltando), o app **lança erro** em vez de escrever em produção. Em prod é no-op (caminho idêntico ao de hoje). A faixa visual "STAGING" (`src/components/staging-banner.tsx`, montada no `__root.tsx`) aparece quando `GET /api/config` → `{env:"staging"}`.
-
-**Deploy no staging:** mesmo fluxo do "Deploy rápido", mas `updateApp` no **appId `edf400b4`** (NUNCA `674a3710`). Os secrets de staging já incluem `GODOCS_ENV=staging`, `GOOGLE_SHEETS_TAB=STAGING` e `GOOGLE_DRIVE_FOLDER_ID` próprio — só se deploya o **código** (não precisa re-setar secret a cada deploy).
-
-**Recursos Google de staging:** criados pelo script `scripts/staging/provision-google.mjs` (`node --env-file=.env scripts/staging/provision-google.mjs`) — cria a aba `STAGING` (cabeçalho copiado de `GoDocs`) via Service Account e a pasta de Drive via OAuth `rpa_ia`. Idempotente.
-
-**E2E contra staging:** `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING E2E_ONLY=<key> npm run e2e:run -- <runId>` (rodar do `godocs-main`, que tem `.env`). ⚠️ `GOOGLE_SHEETS_TAB=STAGING` é **obrigatório** no run/validate/cleanup, senão eles leem/limpam a aba de **prod**. O cleanup só apaga linhas cujo `ID Projeto` casa com os IDs do run (tag-escopado) — não toca prod.
-
-**Crons de staging:** `sync-sheets-to-sqlite` (hora) e `sync-areas` (diário) ATIVOS; **`reanalisar-pendentes` PAUSADO** (LLM por minuto = custo) — ligar via `setCronJobEnabled` só pra testar reconciliação de Complexidade e desligar depois.
-
-**Pendente (a cargo do admin do repo — Kaique; Luis é READ):** CI no GitHub Actions (gate anti-`worker.js`-desatualizado), `deploy.mjs --env=staging|prod` (removendo o token hardcoded de `upload-deploy.mjs`), PR template + label `staging-validated`, e **branch protection na `main`** (PR + CI verde + review + gate "validado em staging"). Enquanto a trava dura não existe, a **regra 13** é a trava (convenção seguida pelo Claude).
+App **isolado** para validar antes de prod (**regra 13 — staging primeiro**). Mesmo código nos dois apps; discriminador é a env `GODOCS_ENV` (só na staging). **Prod = `674a3710` (`godocs`) · Staging = `edf400b4` (`godocs-staging`)** — deploy de staging = mesmo fluxo do "Deploy rápido" com `updateApp` no **`edf400b4`** (NUNCA `674a3710`; secrets já setados, só deploya código). Staging grava na **aba `STAGING`** (planilha de prod compartilhada), com Drive próprio, **Chat mudo** e SQLite próprio; o guard `assertNaoEhDefaultDeProd` (`src/lib/env.ts`) **lança erro** se um override de staging faltar (evita escrever em prod). **Dados simulados, nunca reais.** Runbook completo (provisionamento, secrets, E2E, crons, trava dura pendente do admin) em [docs/staging.md](docs/staging.md).
 
 ## Documentação detalhada
 
@@ -145,11 +121,9 @@ Estrutura fixa com pontos obrigatórios; a IA insiste até ter resposta para cad
   - **Custo evitado puro (`'externo'`):** `buildSavingPrompt` delega p/ `buildSavingCustoEvitadoPrompt` — não pergunta horas, memorial só Contexto → Contratos Evitados → Resumo. **Anti-dupla-contagem:** com horas **e** custo juntos, injeta bloco "DISTINÇÃO HORAS × CUSTO EVITADO" — se o contrato pagava por aquelas horas (mesmo trabalho), conta SÓ o custo e zera `linhas`. **Gate de submissão:** saving exige **`economia_reais_mes > 0`** (líquido = horas + custo evitado − custo externo); `'externo'` é exceção ao bloqueio por 0h. _(origem caso Portal de Reembolsos: contrato + horas-fantasma somados = R$ 7.597 em vez de R$ 5.700.)_
   - **Validação do custo evitado puro (o agente ARGUMENTA, não carimba):** `buildSavingCustoEvitadoPrompt` + **backstop determinístico em `iniciarSaving` (≥1 turno)** exigem validar antes do preview: **realidade** (contrato já encerrado, não "vai ser"), **atribuição** (por causa desta automação) e **escopo** (o que cobria) na seção "Contratos/Serviços Evitados". O R$ vem do form (`custo_evitado_reais`, escondido do LLM) e é conferido na validação humana.
 
-## Custo evitado, Custo do projeto e AI Proxy (form de saving / Etapa 2)
+## Custo evitado, Custo do projeto e AI Proxy → [docs/business-rules.md](docs/business-rules.md)
 
-- **Custo evitado** (na árvore do form de saving): ramo "Não → eliminou gasto externo? Sim" = coleta principal; ramo "Sim" = pergunta opcional de custo DISTINTO das horas. Lista incremental `nome → valor → recorrência → justificativa`. Backend mensaliza, soma em `custo_evitado_reais` (entra no `ganho_total`), persiste `custo_evitado`/`custo_evitado_justificativa`/`custo_evitado_itens` (JSON, só banco). Sheets: **"Custo Evitado"** = VALOR R$ mensal (`0` quando não há, numérica) · **"Justificativa Custo Evitado"** · **"Custo Mensal ou Pontual"** (recorrência derivada dos itens).
-- **Custos do projeto** (4º tópico do form de saving, Sim/Não): custo INCORRIDO p/ a solução **interna** rodar (API OpenAI, ElevenLabs, SaaS por uso). Mesmo formato/mensalização do custo evitado. **SUBTRAI** do `ganho_total` (como o custo externo) — `recomputarSavingFinanceiro` lê `saving.custo_projeto_reais`; o submit re-deriva de `projeto.custo_projeto_itens` (fonte). Persiste `custo_projeto`/`_justificativa`/`_itens` (JSON, só banco). 3 colunas: **"Custo do Projeto"** (R$ mensal, 0 quando não há) · **"Justificativa Custo do Projeto"** · **"Custo do Projeto Mensal ou Pontual"**. ⚠️ ≠ `custo_externo_mensal` (escopo externo) e ≠ `custo_evitado` (que SOMA). Escopo atual: só no form de saving; receita-pura não captura.
-- **AI Proxy** (`ai-proxy.gogroupbr.com`, gateway interno de IA): **(1)** pergunta determinística `usaAiProxy` (Etapa 2, obrigatória, `step2.tsx`) → `projetos.usa_ai_proxy`; **(2)** auto-detecção `detectarAiProxy(texto)` (`agents/extractor.ts`, regex). O **analisador** (`analyzer.ts`) cruza declarado × detectado → divergência ou IA sem proxy vai para **Observações SEM alterar status/complexidade**. Coluna **"Usa AI Proxy" (AL)** ('Sim'/'Não'/'—', valor declarado).
+3 tópicos do form de saving (Etapa 2). **Custo evitado** (gasto externo eliminado): **SOMA** em `custo_evitado_reais`/`ganho_total`. **Custo do projeto** (custo incorrido p/ a solução interna rodar — API/SaaS por uso): **SUBTRAI** do `ganho_total` (≠ `custo_externo_mensal` e ≠ custo evitado). Ambos: lista incremental, mensalizados, JSON só-banco, 3 colunas cada no Sheets. **AI Proxy** (`ai-proxy.gogroupbr.com`): pergunta determinística `usaAiProxy` (`step2.tsx`) + auto-detecção `detectarAiProxy` — o analisador cruza declarado×detectado → **Observações SEM mudar status/complexidade** (coluna "Usa AI Proxy" AL). Detalhe (colunas, persistência, fontes) em business-rules.md.
 
 ## Sync Google (Sheets + Chat + Drive) — bidirecional
 
@@ -178,37 +152,17 @@ Estrutura fixa com pontos obrigatórios; a IA insiste até ter resposta para cad
 - **`snapshot_chat`** (`projeto_versions`) — `submeterParaValidacao` congela a conversa de cada versão (`gravarVersaoProjeto`). Forward-only (versões NULL caem no chat atual); métricas/eventos por versão fatiados pela janela `[anterior, versão]`.
 - **Diffs:** painel "Comparação desta edição" (`ComparacaoEdicao`) compara o `snapshot_projeto` da versão de reenvio com a anterior (campos em `CAMPOS_DIFF`, encoding rótulo+ícone+cor, snapshot ausente → aviso âmbar). Cartões da conversa (`EventBubble`/`ChatTab`) realçam antes→depois quando há marca anterior da mesma etapa (`todosEventos`, builder puro `linhasDoEvento`); só `saving`/`receita` entram (`TIPOS_COM_DIFF`). Tudo no frontend.
 
-## Disparo de e-mails (painel admin) → [SPEC_DISPARO_EMAILS.md](spec-docs/SPEC_DISPARO_EMAILS.md) (D1–D6)
+## Disparo de e-mails (painel admin) → [SPEC_DISPARO_EMAILS.md](spec-docs/SPEC_DISPARO_EMAILS.md) (D1–D6 + como funciona)
 
-Tela admin `/email-legados` (`_authenticated`; prefixo mantido por compat) dispara e-mails por **3 segmentos** (`Audiencia ∈ 'legado'|'reenvio'|'todos'`, `src/lib/email-legados.functions.ts`), cada um com lista ao vivo, template próprio e histórico de envio escopado. Alvo = dono; 1 e-mail/pessoa (dedup). Lógica: `listarDestinatarios`/`getPreviewDisparo` (dispatcher `fonteLegado`/`fonteReenvio`/`fonteTodos`), `getTemplate`/`salvarTemplate`, `renderEmailDisparo` (escapa HTML), `iniciarDisparo`, `processarChunkLote`. Placeholders `{{nome}}`/`{{projetos}}`/`{{prazo}}`/`{{link}}`.
-
-⚠️ **Gotchas que não podem regredir:**
-- **`reenvio` lê Status MANUAL do Sheets** (`Status ∈ {reenvio pendente, rejeitado}`) — proposital e independente da regra TEMPORÁRIA que grava "Pendente"; **não** trocar por SQLite. Inclui o **motivo** por projeto (coluna "Observações" → `projetos[].motivo`).
-- **Envio em LOTES/chunks dirigido pelo FRONT** (`email_lotes`), NÃO background — o Godeploy mata `waitUntil` longo (travava ~28 de 76). `POST .../enviar` cria o lote e **congela o `payload`** (`{recipients, template, audiencia}`); o front chama `POST .../chunk/:loteId` em sequência (`CHUNK_SIZE` 8, cursor `processados`, resumível). Chunk **não relê** Sheets/SQLite (mail-merge ponto-no-tempo). Cancelar via `POST .../cancelar/:loteId`. Backend recomputa a lista no disparo (não confia no front).
-- **Gmail API via Service Account + DWD** (`sendGmail`, `google/gmail.ts`) impersona `GMAIL_SENDER` (default `rpa_ia@gocase.com`). ⚠️ Pré-requisito Workspace: domain-wide delegation com escopo `gmail.send` + Gmail API ligada — senão `401 unauthorized_client`. (≠ aprovação/rejeição, que seguem no Brevo.)
-- Rotas `/api/admin/email-legados/*` todas `requireAdmin`. Log `email_disparos` (1 linha/destinatário, com `audiencia`). ⚠️ Reenvio depende de "Status"/"Observações" no cabeçalho do Sheets.
+Tela admin `/email-legados` (`src/lib/email-legados.functions.ts`) dispara por **3 segmentos** (`Audiencia ∈ 'legado'|'reenvio'|'todos'`), cada um com lista ao vivo, template e histórico próprios; 1 e-mail/pessoa (dedup). Gotchas que **não podem regredir** (detalhe completo na spec): **(1)** `reenvio` lê **Status MANUAL do Sheets** (`reenvio pendente`/`rejeitado`) — proposital, ≠ regra TEMPORÁRIA; **não** trocar por SQLite (+ motivo da coluna "Observações"). **(2)** Envio em **LOTES/chunks dirigido pelo FRONT** (`waitUntil` longo morre no Godeploy), payload **congelado no lote** (`CHUNK_SIZE` 8, resumível, não relê fontes). **(3)** **Gmail API via Service Account + DWD** (`gmail.send`) — sem a domain-wide delegation, `401 unauthorized_client`. **(4)** Rotas `/api/admin/email-legados/*` todas `requireAdmin`.
 
 ## Testes E2E em produção → [scripts/e2e/README.md](scripts/e2e/README.md)
 
-Harness em `scripts/e2e/` valida ponta a ponta os cálculos de saving/receita e as colunas A→AS, fazendo submissões/edições reais contra prod e comparando cada coluna. ~24 cenários (custo evitado não/mensal/pontual/misto, receita, complexidade automacao/inteligencia/autonomia, especial, edições). Duas camadas: `validate.mjs` (asserts determinísticos) + `validate-llm.mjs` (LLM-juiz, "verificação da verificação"). Achou 3 bugs reais já corrigidos.
-
-```bash
-npm run e2e:run -- <runId>          # E2E_ONLY=<key> roda só 1
-npm run e2e:validate -- <runId>     # asserts: colunas × esperado + poll Complexidade
-npm run e2e:validate-llm -- <runId> # LLM-juiz
-npm run e2e:cleanup -- <runId>      # remove linhas de teste
-```
-
-⚠️ **Gotchas:** pré-requisito **`E2E_COOKIE`** no `.env` (o edge Godeploy exige OAuth p/ TODAS as rotas, incl. `/api/*`; logue em `godocs.devgogroup.com` e copie o header `cookie: SESSION=...`; expira → renove). Tag **`[E2E-<runId>]`** no nome de todo projeto de teste: filtra na planilha/Investigador, é a chave da limpeza e o **gatilho do mute de Google Chat** (`ehProjetoTesteE2E`). Roda contra a aba REAL → **limpeza: planilha primeiro, depois SQLite** (`POST /api/admin/e2e-cleanup`), senão o sync reverso ressuscita do Sheets. O guard de Chat mudo e o endpoint `e2e-cleanup` são **temporários** (reverter quando não precisar mais).
+Harness `scripts/e2e/` valida ponta a ponta saving/receita e as colunas A→AS contra prod (~24 cenários), em 2 camadas: `validate.mjs` (asserts determinísticos) + `validate-llm.mjs` (LLM-juiz). Comandos (`e2e:run`/`validate`/`validate-llm`/`cleanup`) e cenários no README. ⚠️ Gotchas: pré-requisito **`E2E_COOKIE`** no `.env` (o edge exige OAuth em TODAS as rotas, incl. `/api/*`; expira → renove); tag **`[E2E-<runId>]`** = chave da limpeza + **gatilho do mute de Chat** (`ehProjetoTesteE2E`); **limpeza: planilha ANTES do SQLite** (`POST /api/admin/e2e-cleanup`), senão o sync reverso ressuscita. Guard de Chat mudo + `e2e-cleanup` são **temporários**.
 
 ## Widget de Ajuda & Suporte → [SPEC_WIDGET_AJUDA.md](spec-docs/SPEC_WIDGET_AJUDA.md) (D1–D4) · [guia portátil](docs/widget-ajuda-replicar.md)
 
-FAB azul em todas as páginas (`AjudaWidget` em `__root.tsx`) → painel chat: a pessoa escolhe tipo (`'duvida'|'problema'|'sugestao'`, cada um com cabeçalho/emoji próprio — `buildAjudaMessage`), escreve, opcionalmente anexa print. **Mão única (D1):** notifica um espaço dedicado do Google Chat; retorno acontece por fora, não volta ao app. Fluxo `criarChamadoAjuda(email, body)` (`ajuda.functions.ts`): valida `ajudaSchema` (zod) → sobe print no Drive (try/catch não-fatal) → persiste em `ajuda_chamados` (fonte de verdade) → `runBackground` notifica o Chat. Sem painel admin na v1 (D4). UI segue identidade GoGroup + a11y (regra 11).
-
-⚠️ **Gotchas:**
-- Rota **`POST /api/ajuda`** é **autenticada, NÃO admin**, e **fora** do prefixo `/api/chat/` de propósito (não passa pelo dispatcher nem grava `api_logs`).
-- `criarChamadoAjuda` lê **`GOOGLE_CHAT_WEBHOOK_URL_AJUDA`** e, se faltar, **pula o envio** — NÃO cai no fallback `GOOGLE_CHAT_WEBHOOK_URL` do `sendChatNotification` (senão as dúvidas iam pro grupo das submissões — bug real). ⚠️ Em prod o secret precisa estar no Godeploy. Opcional `GOOGLE_DRIVE_FOLDER_ID_AJUDA`.
-- Print vai como **LINK** do Drive, sem card (D3). Tabela `ajuda_chamados` é `CREATE TABLE IF NOT EXISTS` (não entra em `MIGRATIONS`).
+FAB azul (`AjudaWidget` em `__root.tsx`) → painel chat (3 tipos: dúvida/problema/sugestão) + print opcional → notifica um Google Chat dedicado (**mão única**, D1). `criarChamadoAjuda` (`ajuda.functions.ts`) persiste em `ajuda_chamados` (fonte de verdade) e notifica em `runBackground`. Gotchas (detalhe na spec): rota **`POST /api/ajuda`** é **autenticada, NÃO admin**, e **fora** do prefixo `/api/chat/`; usa **`GOOGLE_CHAT_WEBHOOK_URL_AJUDA`** e, se faltar, **pula o envio** — NÃO cai no fallback do `sendChatNotification` (senão as dúvidas iam pro grupo das submissões — bug real); print vai como LINK do Drive; tabela `ajuda_chamados` é `CREATE TABLE IF NOT EXISTS`.
 
 ## Convenções rápidas
 

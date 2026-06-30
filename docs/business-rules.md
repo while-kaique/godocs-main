@@ -125,6 +125,30 @@ ganho_total = saving_mensal + receita_equiv
 - Salvo com markdown em `documentacao.conteudo` (para preview no chat)
 - Salvo **sem markdown** em `projetos.memorial_calculo` (para planilha) via `stripMarkdown`
 
+## Custo evitado, Custo do projeto e AI Proxy (form de saving / Etapa 2)
+
+> Detalhe migrado do `CLAUDE.md` em 2026-06-30 (o `CLAUDE.md` mantém só um resumo + ponteiro).
+
+- **Custo evitado** (na árvore do form de saving): ramo "Não → eliminou gasto externo? Sim" = coleta
+  principal; ramo "Sim" = pergunta opcional de custo DISTINTO das horas. Lista incremental
+  `nome → valor → recorrência → justificativa`. Backend mensaliza, **soma** em `custo_evitado_reais`
+  (entra no `ganho_total`), persiste `custo_evitado`/`custo_evitado_justificativa`/`custo_evitado_itens`
+  (JSON, só banco). Sheets: **"Custo Evitado"** = VALOR R$ mensal (`0` quando não há, numérica) ·
+  **"Justificativa Custo Evitado"** · **"Custo Mensal ou Pontual"** (recorrência derivada dos itens).
+- **Custos do projeto** (4º tópico do form de saving, Sim/Não): custo INCORRIDO p/ a solução **interna**
+  rodar (API OpenAI, ElevenLabs, SaaS por uso). Mesmo formato/mensalização do custo evitado. **SUBTRAI**
+  do `ganho_total` (como o custo externo) — `recomputarSavingFinanceiro` lê `saving.custo_projeto_reais`;
+  o submit re-deriva de `projeto.custo_projeto_itens` (fonte). Persiste `custo_projeto`/`_justificativa`/
+  `_itens` (JSON, só banco). 3 colunas: **"Custo do Projeto"** (R$ mensal, 0 quando não há) ·
+  **"Justificativa Custo do Projeto"** · **"Custo do Projeto Mensal ou Pontual"**. ⚠️ ≠
+  `custo_externo_mensal` (escopo externo) e ≠ `custo_evitado` (que SOMA). Escopo atual: só no form de
+  saving; receita-pura não captura.
+- **AI Proxy** (`ai-proxy.gogroupbr.com`, gateway interno de IA): **(1)** pergunta determinística
+  `usaAiProxy` (Etapa 2, obrigatória, `step2.tsx`) → `projetos.usa_ai_proxy`; **(2)** auto-detecção
+  `detectarAiProxy(texto)` (`agents/extractor.ts`, regex). O **analisador** (`analyzer.ts`) cruza
+  declarado × detectado → divergência ou IA sem proxy vai para **Observações SEM alterar
+  status/complexidade**. Coluna **"Usa AI Proxy" (AL)** ('Sim'/'Não'/'—', valor declarado).
+
 ## Regras de domínio
 
 ### Emails aceitos
