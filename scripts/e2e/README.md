@@ -2,7 +2,7 @@
 
 Exercita o fluxo de submissão/edição de ponta a ponta contra a aplicação (default:
 **produção**) cobrindo um cartesiano amplo das dimensões do formulário e valida cada
-coluna gerada na planilha (A→AJ). São **24 cenários** organizados em grupos:
+coluna gerada na planilha (A→AS). São **24 cenários** organizados em grupos:
 
 - **A — saving financeiro** (complexidade=automacao): custo evitado {não·mensal·pontual·**misto**}
   × custo externo {não·sim} = 8 células + multi-cargo.
@@ -30,6 +30,8 @@ coluna gerada na planilha (A→AJ). São **24 cenários** organizados em grupos:
    do SQLite.
 3. `.env` na raiz com `GOOGLE_SA_KEY_BASE64`, `GOOGLE_SA_CLIENT_EMAIL` (ler/limpar planilha)
    e `LLM_BASE_URL` + `API_PROXY_TOKEN` (responder). Já presentes no projeto.
+4. ⚠️ **`E2E_COOKIE`** no `.env` — o edge Godeploy exige OAuth para **TODAS** as rotas (inclusive
+   `/api/*`). Logue em `godocs.devgogroup.com` e copie o header `cookie: SESSION=...`. Expira → renove.
 
 ## Uso
 
@@ -39,11 +41,15 @@ npm run e2e:run                 # runId automático (timestamp)
 npm run e2e:run -- 20260619-1530
 
 # 2. Valida coluna-a-coluna contra a planilha
-npm run e2e:validate -- <runId>
+npm run e2e:validate -- <runId>          # asserts determinísticos + poll Complexidade
+npm run e2e:validate-llm -- <runId>      # LLM-juiz ("verificação da verificação")
 
 # 3. Limpa os dados de teste (planilha PRIMEIRO, depois SQLite)
 npm run e2e:cleanup -- <runId>
 ```
+
+Duas camadas de validação: **`validate.mjs`** (asserts determinísticos — falha o teste) +
+**`validate-llm.mjs`** (LLM-juiz, reporta divergências sutis). O harness já achou 3 bugs reais.
 
 Variáveis opcionais: `E2E_BASE_URL` (default produção), `E2E_OWNER_EMAIL`
 (default `luis.albuquerque@gocase.com`), `E2E_OWNER_NOME`.

@@ -1,8 +1,8 @@
 # SPEC — Disparo de e-mails do admin (multi-público)
 
-> Documento de **planejamento/decisão** (não doc técnica). O "como funciona" detalhado vive no
-> `CLAUDE.md` (seção "Disparo de e-mails (painel admin)") e no código. Consultar/atualizar conforme
-> a **regra 12**.
+> Documento de **planejamento/decisão** + **como funciona** (movido do `CLAUDE.md` em 2026-06-30 para
+> enxugar o arquivo de instruções; o `CLAUDE.md` mantém só um resumo + ponteiro). Consultar/atualizar
+> conforme a **regra 12**.
 
 **Status:** implementado na branch `feat/disparo-emails-multi-publico` (2026-06-26). Pendente:
 merge/deploy + criação das colunas no Sheets já cobertas (usa "Status"/"Observações" existentes).
@@ -48,6 +48,31 @@ lote/chunk/cancelamento já existente.
   acessível: ícone+rótulo+acento, foco visível, `motion-reduce`), estado por segmento (preserva
   edição/seleção ao trocar), preview com motivo. Nav label "Disparo de e-mails" em `route.tsx`.
 - Testes: `tests/email-legados.test.ts`.
+
+## Como funciona (operacional — gotchas que não podem regredir)
+
+Tela admin `/email-legados` (`_authenticated`; prefixo mantido por compat — D6) dispara por **3 segmentos**
+(`Audiencia ∈ 'legado'|'reenvio'|'todos'`, `src/lib/email-legados.functions.ts`), cada um com lista ao
+vivo, template próprio e histórico de envio escopado. Alvo = dono; **1 e-mail/pessoa** (dedup). Lógica:
+`listarDestinatarios`/`getPreviewDisparo` (dispatcher `fonteLegado`/`fonteReenvio`/`fonteTodos`),
+`getTemplate`/`salvarTemplate`, `renderEmailDisparo` (escapa HTML), `iniciarDisparo`, `processarChunkLote`.
+Placeholders `{{nome}}`/`{{projetos}}`/`{{prazo}}`/`{{link}}`.
+
+- **`reenvio` lê Status MANUAL do Sheets** (`Status ∈ {reenvio pendente, rejeitado}`) — proposital e
+  **independente da regra TEMPORÁRIA** que grava "Pendente"; **não** trocar por SQLite (D3). Inclui o
+  **motivo** por projeto (coluna "Observações" → `projetos[].motivo`).
+- **Envio em LOTES/chunks dirigido pelo FRONT** (`email_lotes`), NÃO background — o Godeploy mata
+  `waitUntil` longo (travava ~28 de 76). `POST .../enviar` cria o lote e **congela o `payload`**
+  (`{recipients, template, audiencia}`, D4); o front chama `POST .../chunk/:loteId` em sequência
+  (`CHUNK_SIZE` 8, cursor `processados`, resumível). Chunk **não relê** Sheets/SQLite (mail-merge
+  ponto-no-tempo). Cancelar via `POST .../cancelar/:loteId`. Backend recomputa a lista no disparo
+  (não confia no front).
+- **Gmail API via Service Account + DWD** (`sendGmail`, `google/gmail.ts`) impersona `GMAIL_SENDER`
+  (default `rpa_ia@gocase.com`). ⚠️ Pré-requisito Workspace: **domain-wide delegation** com escopo
+  `gmail.send` + Gmail API ligada — senão `401 unauthorized_client`. (≠ aprovação/rejeição, que seguem
+  no Brevo.)
+- Rotas `/api/admin/email-legados/*` todas `requireAdmin`. Log `email_disparos` (1 linha/destinatário,
+  com `audiencia`). ⚠️ Reenvio depende de "Status"/"Observações" no cabeçalho do Sheets.
 
 ## Pré-requisitos / dependências externas
 
