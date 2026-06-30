@@ -1649,9 +1649,20 @@ const atualizarTiposSchema = z.object({
 export async function atualizarTipos(rawData: unknown) {
   const data = atualizarTiposSchema.parse(rawData);
   log('atualizarTipos', `projeto=${data.projeto_id}, tipos=${data.tipos_projeto.join(',')}`);
+  // Escolher um tipo financeiro (saving/receita) significa que o projeto deixou de ser
+  // ESPECIAL — é aqui que o usuário declara a natureza do impacto. Zeramos a flag no
+  // mesmo ponto. Sem isso, um projeto que era especial ficava preso em especial=1: o
+  // atualizarMetadados seguinte re-forçava a flag pelo estado do banco (ctxData.especial
+  // === 1), reconstruía a doc especial e dava return antecipado, ignorando a troca de
+  // tipo — a edição "especial → saving" subia especial de novo (col. "Especial?"=Sim).
   await updateProjeto(data.projeto_id, {
     tipos_projeto: data.tipos_projeto,
     tipo_projeto: data.tipos_projeto[0],
+    especial: false,
+    // Deixou de ser especial → o contexto especial não descreve mais o projeto.
+    // Limpa para a coluna "Contexto do Projeto Especial" virar "—" (edição fidedigna
+    // ao novo tipo). ouTraco(null) → "—" no sync.
+    contexto_especial: null,
   });
   await gravarEvento(data.projeto_id, 'tipos', 'doc', {
     tipos_projeto: data.tipos_projeto,
@@ -1743,7 +1754,20 @@ export async function atualizarMetadados(rawData: unknown) {
   // ainda não foi gerada". Detecta `especial` pelo flag do request OU pelo estado do
   // projeto (um projeto já marcado especial continua especial mesmo sem o flag).
   const ctxData = await getProjetoContextoData(data.projeto_id);
-  const ehEspecial = data.especial === true || ctxData?.especial === 1;
+  // Conversão "especial → normal": quando o cliente manda `especial: false` EXPLÍCITO
+  // num projeto hoje marcado especial, essa é a troca para saving/receita feita na
+  // edição. Zera a flag aqui também (belt-and-suspenders com atualizarTipos, cobre a
+  // ordem em que metadados chega antes da troca de tipos) e NÃO toma o ramo especial.
+  if (data.especial === false && ctxData?.especial === 1) {
+    // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
+    // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
+    await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
+    log('atualizarMetadados', `Projeto ${data.projeto_id}: convertido de especial → normal (flag + contexto especial zerados).`);
+  }
+  // Detecta especial pelo flag do request OU pelo estado do projeto (um projeto já
+  // especial continua especial mesmo sem o flag — ex.: chamadas internas/cron). ⚠️ Um
+  // `especial === false` explícito QUEBRA essa stickiness (é a conversão acima).
+  const ehEspecial = data.especial === true || (data.especial !== false && ctxData?.especial === 1);
   if (ehEspecial) {
     // Garante a marcação de especial no banco (cobre legado convertido em especial na
     // edição) — alinha tipo_projeto/tipos_projeto com o que iniciarSubmissao grava.

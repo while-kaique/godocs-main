@@ -1056,7 +1056,9 @@ export function SubmeterPageContent({
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
-          especial: true,
+          // Reflete a escolha real do usuário (este handler só roda com respEspecial
+          // = "sim", então é sempre true) — nunca hardcode: ver conversão especial→normal.
+          especial: form.especial,
           ...(docs ? { docs } : { reset_doc: true }),
         });
 
@@ -1160,6 +1162,8 @@ export function SubmeterPageContent({
           descricao_breve: meta.descricaoBreve,
           usa_ai_proxy: meta.usaAiProxy || undefined,
           contexto_especial: meta.contextoEspecial,
+          // Propaga a natureza do projeto: false sinaliza conversão especial→normal.
+          especial: form.especial,
           docs,
         },
       );
@@ -1244,6 +1248,7 @@ export function SubmeterPageContent({
               descricao_breve: meta.descricaoBreve,
               usa_ai_proxy: meta.usaAiProxy || undefined,
               contexto_especial: meta.contextoEspecial,
+              especial: form.especial,
               reset_doc: true,
             },
           );
@@ -1313,6 +1318,9 @@ export function SubmeterPageContent({
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
+            // Conversão especial→normal: este ramo só roda com form.especial=false,
+            // mas mandamos o valor real para o backend zerar a flag no banco.
+            especial: form.especial,
           });
           setAgentMeta(meta);
         } catch (e) {
@@ -1407,6 +1415,7 @@ export function SubmeterPageContent({
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
+            especial: form.especial,
             reset_doc: true,
           }
         );
