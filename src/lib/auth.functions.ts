@@ -2,7 +2,26 @@ import { getAdminByEmail } from '@/integrations/db/client.server'
 
 export type CurrentUser = {
   email: string
+  name: string
   isAdmin: boolean
+}
+
+/**
+ * Deriva um nome legível a partir do local-part do e-mail, como fallback quando
+ * o gateway Godeploy não injeta um header de nome. Ex.: "kaique.breno@gocase.com"
+ * → "Kaique Breno". Versão pura/síncrona do conceito de `derivarNome` em
+ * `ajuda.functions.ts` (que consulta o banco) — aqui é só para o /api/auth/me.
+ */
+export function derivarNomeDeEmail(email: string | null | undefined): string {
+  const local = (email ?? '').split('@')[0] ?? ''
+  const nome = local
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(' ')
+  return nome || (email ?? '')
 }
 
 // Fonte de admins (sem hardcode no código):
@@ -36,5 +55,13 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
     email = process.env.DEV_USER_EMAIL ?? null
   }
   if (!email) return null
-  return { email, isAdmin: await isAdmin(email) }
+
+  // Nome da conta logada: o gateway Godeploy pode injetar um header de nome
+  // (configurável via GODEPLOY_NAME_HEADER). Se ausente/vazio, derivamos do
+  // e-mail. process.env só lido aqui (lazy) — nunca em escopo de módulo.
+  const nameHeader = process.env.GODEPLOY_NAME_HEADER ?? 'x-godeploy-user-name'
+  const nameFromHeader = request.headers.get(nameHeader)?.trim()
+  const name = nameFromHeader || derivarNomeDeEmail(email)
+
+  return { email, name, isAdmin: await isAdmin(email) }
 }
