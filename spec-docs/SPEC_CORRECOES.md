@@ -309,3 +309,47 @@ reprocessa corretamente (comportamento legítimo mantido).
   legado-194/196 com upload de arquivo).
 - Sem teste unitário novo: a lógica é inline no componente e a base de testes é node-only (sem
   testing-library/jsdom). `reprocessarComNovosArquivos` continua com o early-return defensivo.
+
+---
+
+## Sync reverso desatualizado: `especial` preso e órfão "cinza" (caso Helen)
+
+**Sintoma (2 relatos, 30/06/2026):**
+1. **Status cinza** em "Meus Projetos" — `legado-148` ("AVD Central") existia no SQLite mas
+   **não tinha linha no Sheet**; como o status na lista vem **só do Sheets**, sem linha → `null`
+   → badge cinza ("—"). Não saía nunca.
+2. **Especial preso** — `AVD Central v2` (`e4b1dcc3…`) estava `Especial?=Não` + saving completo
+   (112h) no **Sheet**, mas no **SQLite** ainda `especial=1`/`tipos_projeto=['especial']`/
+   `contexto_especial` cheio. Abria no fluxo de edição ESPECIAL errado e, ao trocar p/ não-especial
+   no form, não puxava o saving (seed dava `tipoProjeto=[]`).
+
+**Causa:**
+1. `carimboMs` (carência da `reconciliarExclusoes`) usava `Date.parse`, que lê `submitted_at`
+   pt-BR `"12/05/2026"` como **MM/DD → 5/dez/2026 (FUTURO)**. `agora − carimbo` < 0 → sempre
+   "dentro da carência de 1h" → órfão **nunca** reconciliado. Pega qualquer legado órfão com
+   `submitted_at` de **dia ≤ 12** (vira mês válido ao trocar).
+2. O sync reverso **não propagava** `especial` nem `tipos_projeto` (só `contexto_especial` estava
+   em `SAFE_UPDATE_FIELDS`, e o loop pula "—" porque `txt()→null`). O bug do "especial sticky"
+   (pré-PR #181) deixou o SQLite preso, e o Sheet dizer "Não" nunca desfazia.
+
+**Fix (`src/lib/google/sync-reverse.ts`):**
+- `carimboMs` passa a usar `parseDataFlexivel` (lê `dd/mm/yyyy` corretamente) em vez de `Date.parse`.
+- `atualizarExistente` reconcilia o tipo do projeto a partir do Sheet (fonte da verdade):
+  `parseEspecialFlag('Especial?')` (1|0|**null** p/ vazio = não mexe); ao virar **não-especial**,
+  deriva `tipos_projeto`/`tipo_projeto` de "Tipos Projeto" e **zera `contexto_especial`**; ao virar
+  especial, `tipos=['especial']`.
+
+**Onde aterrissou:**
+- `src/lib/google/sync-reverse.ts` (`carimboMs`, `parseEspecialFlag`, `atualizarExistente`).
+- `tests/sync-reverse.test.ts` — +3 casos (flip especial→não, "Especial?" vazia não apaga, órfão
+  pt-BR removido com `vi.setSystemTime`). 489 testes verdes.
+
+**Recuperação de dados (prod, via forçar sync):** `POST /api/admin/sync-sheets-now` rodou o novo
+código: `e4b1dcc3` auto-curou (`especial=0`, `tipos=['saving']`, contexto null); `legado-148` (+
+`legado-126` + 1 teste) removidos como órfãos. 0 órfãos restantes. Validado **ponta a ponta no
+staging** (criar especial → flip p/ "Não" no Sheet → sync desmarca) antes do prod (regra 13).
+
+**Notas:** decisão do dono — para a `AVD Central v2` foi só o fix de sync (não o replay completo),
+então a doc segue sem `saving.linhas`; ao reeditar, a Helen refaz o saving no chat (o flag/tipo já
+estão certos). A regra "Sheets é o banco principal; SQLite espelha em quase-tempo-real" guiou a
+escolha.
