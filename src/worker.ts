@@ -58,6 +58,7 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
+import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
 // Env do Godeploy — inclui DB (SQLite embutido) e env vars como strings
@@ -122,6 +123,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const user = await getCurrentUser(request)
       console.log('[worker] /api/auth/me resultado:', JSON.stringify(user))
       return json(user)
+    }
+
+    // ── Config pública (rótulo do ambiente) — usado pela faixa de staging ──
+    // Só expõe `env` (production/staging); nunca secrets. O bundle do SPA é
+    // idêntico nos dois apps, então o cliente descobre o ambiente por aqui.
+    if (pathname === '/api/config' && method === 'GET') {
+      return json({ env: getGodocsEnv() })
     }
 
     // ── Áreas (público — usado pelo seletor da etapa 1) ──
