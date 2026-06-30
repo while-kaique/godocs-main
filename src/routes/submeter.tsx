@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
-  ALLOWED_DOMAINS_RE, readFileAsBase64, TOKEN_BLOCK_CHARS,
+  ALLOWED_DOMAINS_RE, filesToDocs, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
@@ -947,12 +947,7 @@ export function SubmeterPageContent({
     setIniciandoChat(true);
 
     try {
-      const docs = await Promise.all(
-        arquivos.map(async (f) => ({
-          base64: await readFileAsBase64(f),
-          filename: f.name,
-        }))
-      );
+      const docs = await filesToDocs(arquivos);
 
       const ferramentaEnviada = form.escopo === "externo"
         ? form.servicoExterno.trim()
@@ -1041,9 +1036,9 @@ export function SubmeterPageContent({
 
       if (editProjetoId && projetoId) {
         // Modo edição: atualiza metadados do projeto existente, reconstrói doc especial e reenvia.
-        const docs = arquivos.length > 0
-          ? await Promise.all(arquivos.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })))
-          : undefined;
+        // filesToDocs descarta arquivos vazios; se sobrar zero doc (nada novo ou só
+        // vazios), cai no reset_doc — que reusa os arquivos já enviados sem reupload.
+        const docs = arquivos.length > 0 ? await filesToDocs(arquivos) : [];
 
         await apiFetchComRetry("/api/chat/atualizar-metadados", {
           projeto_id: projetoId,
@@ -1059,7 +1054,7 @@ export function SubmeterPageContent({
           // Reflete a escolha real do usuário (este handler só roda com respEspecial
           // = "sim", então é sempre true) — nunca hardcode: ver conversão especial→normal.
           especial: form.especial,
-          ...(docs ? { docs } : { reset_doc: true }),
+          ...(docs.length > 0 ? { docs } : { reset_doc: true }),
         });
 
         await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId, modo: "edicao" });
@@ -1068,12 +1063,7 @@ export function SubmeterPageContent({
         return;
       }
 
-      const docs = await Promise.all(
-        arquivos.map(async (f) => ({
-          base64: await readFileAsBase64(f),
-          filename: f.name,
-        }))
-      );
+      const docs = await filesToDocs(arquivos);
 
       // 1) Cria o projeto (backend monta a doc sem IA e marca chat_completo).
       const result = await apiFetch<{ projeto_id: string; especial?: boolean }>(
@@ -1135,9 +1125,7 @@ export function SubmeterPageContent({
 
     setContinuando(true);
     try {
-      const docs = await Promise.all(
-        arquivos.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name })),
-      );
+      const docs = await filesToDocs(arquivos);
       const meta = snapshotMeta();
 
       // Tipos podem ter mudado junto — persiste antes (a doc re-roteia o impacto).

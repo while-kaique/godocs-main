@@ -6,6 +6,53 @@
 
 ---
 
+## 2026-06-30 — Submissão/edição trava com `ZodError` `docs[].base64 too_small` quando há arquivo VAZIO (0 bytes)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/arquivo-vazio-base64-submissao`
+
+**Sintoma:** ao **Enviar Projeto** (reportado num projeto **especial** em edição), toast vermelho cru:
+`Erro ao enviar projeto: [ { "code": "too_small", "minimum": 1, "type": "string", "message":
+"String must contain at least 1 character(s)", "path": [ "docs", 18, "base64" ] } ]`. A pessoa fica presa.
+Confirmado em produção com **Mário Gonzaga Monteiro** (projeto "Prazo Otimizado", reenvio de edição).
+O índice (`docs[18]`) varia conforme a posição do arquivo problemático.
+
+**Causa-raiz:** um dos arquivos enviados tinha **0 bytes** (vazio — ex.: `__init__.py`, `.gitkeep`,
+config em branco, que é comum ao reenviar a **pasta inteira** do projeto). Para arquivo vazio,
+`readFileAsBase64` (`submeter/constants.ts`) faz `result.split(",")[1]` sobre `"data:...;base64,"` →
+retorna **`""`**. O backend valida cada doc com `z.object({ base64: z.string().min(1), ... })`
+(`chat.functions.ts`, schemas de `iniciar-submissao` **e** `atualizar-metadados`) → o base64 vazio
+**reprova o payload inteiro** (não só aquele arquivo) com `ZodError` → toast cru. O `addFiles` do
+`step2.tsx` validava extensão, tamanho-máximo, duplicidade e pastas ignoradas, **mas nunca o piso de
+tamanho** — arquivo de 0 bytes era aceito normalmente. Atinge submissão nova **e** edição (todos os
+caminhos montavam `docs` do mesmo jeito).
+
+**Fix — 2 camadas (causa-raiz + rede de segurança):**
+1. **`step2.tsx` (`addFiles`) barra arquivos de 0 bytes na seleção** — ramo `file.size === 0` na cadeia de
+   rejeição (junto de "sem extensão"/"formato"/"excede MB"), com contador `emptyCount`, log e
+   **toast informativo** (`"N arquivo(s) vazio(s) (0 bytes) ignorado(s) — sem conteúdo para documentar"`).
+   Arquivo vazio não tem conteúdo a documentar → descartá-lo não perde nada. É o ponto onde os arquivos
+   entram em `arquivos` (única fonte do estado).
+2. **`constants.ts` — `filesToDocs(files)` + `descartarDocsVazios(docs)`** (rede de segurança): centralizam a
+   montagem do payload `docs` e **filtram qualquer `base64 ""` remanescente** antes de enviar. Os 4 call-sites
+   de `submeter.tsx` (`handleIniciarAgente`, `handleEnviarEspecial` criação **e** edição,
+   `reprocessarComNovosArquivos`) passaram a usar `filesToDocs` (DRY + garantia uniforme). No ramo de edição
+   especial, `docs` vira `[]` quando não sobra nada → cai no `reset_doc` (reusa os arquivos já enviados, sem
+   reupload), preservando o comportamento. `readFileAsBase64` também ganhou `?? ""` (defensivo) no split.
+
+O backend permanece estrito (`base64.min(1)` é guard correto) — o conserto é client-side, para nunca
+**enviar** um doc vazio.
+
+**Onde aterrissou:** `src/lib/submeter/step2.tsx` (rejeição de 0 bytes), `src/lib/submeter/constants.ts`
+(`filesToDocs`/`descartarDocsVazios` + `?? ""`), `src/routes/submeter.tsx` (import + 4 call-sites usam
+`filesToDocs`), teste de regressão `tests/docs-vazios.test.ts` (`descartarDocsVazios`). `worker.js` não muda
+(funções client-side, tree-shaken do bundle do worker — `areas.functions.ts` só importa `AREAS`).
+
+**Recuperação (não-código):** nenhuma. Os dados do projeto do Mário estão intactos (a submissão só não
+completou); após o deploy, ao reenviar a pasta o arquivo vazio é descartado automaticamente e a submissão
+conclui. Não há backfill.
+
+---
+
 ## 2026-06-30 — Edição de projeto ESPECIAL → saving/receita não desmarcava `especial` (flag sticky de mão única)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edicao-especial-vira-normal`

@@ -390,6 +390,7 @@ export function Step2({
     const accepted: File[] = [];
     const rejected: { name: string; ext: string; reason: string; size: number }[] = [];
     let ignoredCount = 0;
+    let emptyCount = 0;
     const ignoredReasons: Record<string, number> = {};
 
     // Set de nomes já presentes (dedup O(1) em vez de varrer o array a cada arquivo)
@@ -417,6 +418,13 @@ export function Step2({
           rejected.push({ name: relPath, ext: "(sem extensão)", reason: "sem extensão", size: file.size });
         } else if (!ACCEPTED_DOC_EXT.includes(ext)) {
           rejected.push({ name: relPath, ext, reason: "extensão não suportada", size: file.size });
+        } else if (file.size === 0) {
+          // Arquivo vazio (0 bytes): readFileAsBase64 produz base64 "" e o backend
+          // rejeita o payload com ZodError ("docs[].base64" deve ter ≥1 caractere),
+          // travando a submissão inteira (ex.: pasta do projeto com __init__.py ou
+          // .gitkeep vazio). Sem conteúdo para documentar — descarta com aviso claro.
+          emptyCount++;
+          console.log(`🗑️  vazio (0 bytes), ignorado: ${relPath}`);
         } else if (file.size > MAX_FILE_MB * 1024 * 1024) {
           rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
           toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
@@ -457,10 +465,17 @@ export function Step2({
       console.warn("Extensões rejeitadas (contagem):", porExt);
     }
 
-    console.log(`📦 Resultado: ${accepted.length} aceito(s), ${ignoredCount} ignorado(s) (dev), ${rejected.length} rejeitado(s) (formato)`);
+    if (emptyCount > 0) {
+      console.warn(`🗑️ ${emptyCount} arquivo(s) vazio(s) (0 bytes) ignorado(s)`);
+    }
+
+    console.log(`📦 Resultado: ${accepted.length} aceito(s), ${ignoredCount} ignorado(s) (dev), ${emptyCount} vazio(s), ${rejected.length} rejeitado(s) (formato)`);
     console.groupEnd();
 
     // Toasts informativos
+    if (emptyCount > 0) {
+      toast.info(`${emptyCount} arquivo(s) vazio(s) (0 bytes) ignorado(s) — sem conteúdo para documentar`);
+    }
     if (ignoredCount > 0) {
       toast.info(`${ignoredCount} arquivo(s) de pastas de desenvolvimento ignorados automaticamente`);
     }
