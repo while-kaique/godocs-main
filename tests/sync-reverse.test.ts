@@ -199,6 +199,76 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
     expect(r.erros).toBe(1);
     expect(r.detalhes[0]).toContain('429');
   });
+
+  it('"Especial? = Não" no Sheet desmarca o flag, deriva tipos e limpa contexto (anti-especial-sticky)', async () => {
+    // Caso AVD Central v2 (Helen): SQLite ficou preso em especial=1 após uma
+    // edição especial→saving feita antes do fix; o Sheet (fonte da verdade) já
+    // diz "Não". O sync reverso deve reconciliar: especial=0, tipos=['saving'],
+    // contexto_especial=null (mesmo o Sheet trazendo "—", que o loop SAFE pula).
+    await insertProjetoRaw({
+      id: 'esp-flip',
+      nome: 'AVD Central v2',
+      responsavel_nome: 'Helen',
+      responsavel_email: 'helen@gocase.com',
+      ferramenta: 'Claude',
+      status: 'em_validacao',
+      especial: true,
+      contexto_especial: 'Contexto antigo de projeto especial',
+      tipo_projeto: 'especial',
+      tipos_projeto: ['especial'],
+      updated_at: new Date().toISOString(), // recente: não é tocado pela reconciliação
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'ESP-FLIP',
+        'Nome Completo': 'Helen',
+        Email: 'helen@gocase.com',
+        Projeto: 'AVD Central v2',
+        Ferramenta: 'Claude',
+        'Especial?': 'Não',
+        'Tipos Projeto': 'saving',
+        'Contexto do Projeto Especial': '—',
+      },
+    ]);
+    const r = await syncSheetsToSqlite();
+    expect(r.atualizados).toBe(1);
+
+    const p = await getProjetoById('esp-flip');
+    expect(p?.especial).toBe(0);
+    expect(p?.contexto_especial).toBeNull();
+    expect(p?.tipo_projeto).toBe('saving');
+    expect(JSON.parse(p!.tipos_projeto as string)).toEqual(['saving']);
+  });
+
+  it('"Especial?" vazia no Sheet NÃO mexe no flag especial (vazio não apaga)', async () => {
+    await insertProjetoRaw({
+      id: 'esp-keep',
+      nome: 'Projeto Especial',
+      responsavel_nome: 'Alguém',
+      responsavel_email: 'alguem@gocase.com',
+      ferramenta: 'Claude',
+      status: 'em_validacao',
+      especial: true,
+      contexto_especial: 'mantém este contexto',
+      tipo_projeto: 'especial',
+      tipos_projeto: ['especial'],
+      updated_at: new Date().toISOString(),
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'ESP-KEEP',
+        'Nome Completo': 'Alguém',
+        Email: 'alguem@gocase.com',
+        Projeto: 'Projeto Especial',
+        Ferramenta: 'Claude',
+        // sem "Especial?" → não deve forçar especial=0
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('esp-keep');
+    expect(p?.especial).toBe(1);
+    expect(p?.contexto_especial).toBe('mantém este contexto');
+  });
 });
 
 describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {
@@ -366,5 +436,23 @@ describe('reconciliação de EXCLUSÃO (Sheets é a fonte da verdade do que apar
     const r = await syncOwnerRowsFromSheet('oldowner@gocase.com');
     expect(await getProjetoById('reassigned')).toBeTruthy(); // existe no Sheet (outro dono) → mantido
     expect(r.removidos).toBe(0);
+  });
+
+  it('remove órfão com submitted_at pt-BR (dd/mm) — não confunde com data futura', async () => {
+    // submitted_at "12/05/2026" = 12 de MAIO (pt-BR). O Date.parse antigo lia como
+    // MM/DD → 5 de dezembro de 2026 (FUTURO) → carência eterna → órfão nunca saía
+    // (status cinza permanente). Com a janela em 30/06/2026, 12 de maio é passado →
+    // deve ser removido. (caso legado-148 / Helen)
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-30T12:00:00Z'));
+    try {
+      await semear('del-ptbr', 'em_validacao', '12/05/2026', '12/05/2026');
+      mockedRead.mockResolvedValue([LINHA_PRESENTE]);
+      const r = await syncSheetsToSqlite();
+      expect(await getProjetoById('del-ptbr')).toBeFalsy(); // removido (passado, ausente do Sheet)
+      expect(r.removidos).toBeGreaterThanOrEqual(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
