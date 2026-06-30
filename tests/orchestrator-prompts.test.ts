@@ -482,3 +482,48 @@ describe('Transições de fase', () => {
     expect('content' in result ? result.content : null).toBe('Pergunta válida?');
   });
 });
+
+// Regressão (legado-260): `tipo_saving` é a periodicidade escolhida no FORMULÁRIO. O LLM
+// costuma omiti-la no echo, devolver a receita como `{}`, ou usar a chave errada (`tipo`).
+// Antes o orquestrador adotava o objeto do LLM inteiro → `tipo_saving` virava null e
+// propagava → coluna "Tipo de Receita"/"Tipo de Saving" em branco no Sheets. Agora o valor
+// do formulário (estado de entrada) é preservado.
+describe('Preservação de tipo_saving (form-owned) contra erosão pelo echo do LLM', () => {
+  const llm = async () => vi.mocked((await import('@/lib/llm')).llmChat);
+
+  it('receita: LLM omite tipo_saving no echo → preserva o valor do formulário', async () => {
+    (await llm()).mockResolvedValueOnce(
+      JSON.stringify({ type: 'question', content: 'Pergunta?', receita: { valor_ganho_mensal: 15000, memorial_calculo: null } })
+    );
+    const receitaForm = { ...receitaVazia(), tipo_saving: 'mensal' as const, valor_ganho_mensal: 15000 };
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'oi' }], 'receita', documentacaoVazia(), savingVazio(), '', ['receita_incremental'], receitaForm);
+    expect(result.receita?.tipo_saving).toBe('mensal');
+  });
+
+  it('receita: LLM devolve objeto vazio {} → preserva o tipo_saving do formulário', async () => {
+    (await llm()).mockResolvedValueOnce(
+      JSON.stringify({ type: 'question', content: 'Pergunta?', receita: {} })
+    );
+    const receitaForm = { ...receitaVazia(), tipo_saving: 'trimestral' as const };
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'oi' }], 'receita', documentacaoVazia(), savingVazio(), '', ['receita_incremental'], receitaForm);
+    expect(result.receita?.tipo_saving).toBe('trimestral');
+  });
+
+  it('receita: LLM usa a chave legada `tipo` e o form perdeu o valor → recupera pelo alias', async () => {
+    (await llm()).mockResolvedValueOnce(
+      JSON.stringify({ type: 'question', content: 'Pergunta?', receita: { valor_ganho_mensal: 1489.5, tipo: 'pontual' } })
+    );
+    // estado de entrada já erodido (tipo_saving null) — só o alias `tipo` do LLM salva
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'oi' }], 'receita', documentacaoVazia(), savingVazio(), '', ['receita_incremental'], receitaVazia());
+    expect(result.receita?.tipo_saving).toBe('pontual');
+  });
+
+  it('saving: LLM omite tipo_saving no echo → preserva o valor do formulário', async () => {
+    (await llm()).mockResolvedValueOnce(
+      JSON.stringify({ type: 'question', content: 'Pergunta?', saving: { ...savingVazio(), tipo_saving: undefined } })
+    );
+    const savingForm = { ...savingVazio(), tipo_saving: 'mensal' as const };
+    const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'oi' }], 'saving', documentacaoVazia(), savingForm, '', ['saving']);
+    expect(result.saving?.tipo_saving).toBe('mensal');
+  });
+});

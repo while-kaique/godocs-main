@@ -462,6 +462,24 @@ export function aplicaSplitCargaEscala(ctx: ProjetoContexto, saving: SavingColet
   return ctx.alguem_fazia === 'sim' && !isPontual && temHorasAntes;
 }
 
+// Detecta um memorial que NÃO é de receita incremental: marcado como "não aplicável para
+// receita", escrito como um memorial de SAVING (economia operacional), ou dizendo que o caso
+// foi reclassificado como saving. Sinal do bug do legado-260 — o agente, ao concluir que o
+// ganho era saving e não receita nova, coletou saving no slot de receita e completou como
+// receita em vez de PARAR e mandar reclassificar o projeto. Usado pelos gates determinísticos
+// (chat.functions.ts) para BLOQUEAR o preview/complete e o submit de uma receita que deveria
+// ter virado saving. Conservador de propósito: um memorial de receita legítimo
+// ("## Memorial de Receita Incremental", "O que gera a receita"…) NÃO casa.
+export function receitaMemorialEhSaving(memorial: string | null | undefined): boolean {
+  const t = (memorial ?? '').toLowerCase();
+  if (!t.trim()) return false;
+  return (
+    /memorial\s+de\s+saving/.test(t) ||
+    /n[ãa]o\s+aplic[áa]vel\s+(para|à|a)\s+receita/.test(t) ||
+    /reclassificad[oa]\s+(como|para)\s+saving/.test(t)
+  );
+}
+
 // Quando alguém fazia à mão, parte do total pode ser "ganho por escala" (volume que a
 // pessoa NÃO fazia). Acima deste limite a escala é GRANDE demais para passar sem conferir.
 export const LIMITE_ESCALA_ALTA = 0.6; // escala ≥ 60% do total → confirmar plausibilidade
@@ -1246,12 +1264,27 @@ export async function runOrchestrator(
   const type = (parsed.type as string) ?? 'question';
   const content = (parsed.content as string) ?? (parsed.question as string) ?? raw;
 
+  // `tipo_saving` (a periodicidade — mensal/pontual/trimestral/semestral) é escolha do
+  // FORMULÁRIO (definida em iniciarSaving/iniciarReceita), NÃO algo que o LLM colete ou
+  // possa mudar na conversa. Mas o LLM frequentemente OMITE o campo no echo, devolve o
+  // objeto como `{}`, ou usa a chave errada (`tipo` em vez de `tipo_saving`). Como o
+  // resultado adotava o objeto ecoado pelo LLM inteiro, isso ZERAVA `tipo_saving` e o null
+  // se propagava pelo resto da conversa (extrairEstado lê sempre a última mensagem) → as
+  // colunas "Tipo de Saving"/"Tipo de Receita" saíam em branco no Sheets. Preserva o valor
+  // de entrada (form = fonte da verdade); o eco do LLM serve só de fallback, e a chave
+  // legada `tipo` é o último recurso. Ver SPEC_CORRECOES.md.
+  const savingAdotado = (parsed.saving as SavingColetado) ?? saving;
+  const receitaAdotada = (parsed.receita as ReceitaColetada) ?? receita;
+  const receitaTipoAlias = (receitaAdotada as { tipo?: ReceitaColetada['tipo_saving'] }).tipo;
   const result: OrchestratorResult = {
     type: type as OrchestratorResult['type'],
     fase,
     coletado: (parsed.coletado as DocumentacaoColetada) ?? coletado,
-    saving: (parsed.saving as SavingColetado) ?? saving,
-    receita: (parsed.receita as ReceitaColetada) ?? receita,
+    saving: { ...savingAdotado, tipo_saving: saving.tipo_saving ?? savingAdotado.tipo_saving ?? null },
+    receita: {
+      ...receitaAdotada,
+      tipo_saving: receita.tipo_saving ?? receitaAdotada.tipo_saving ?? receitaTipoAlias ?? null,
+    },
     ...(type === 'options'
       ? { question: content, options: (parsed.options as string[]) ?? ['', '', ''] }
       : { content }),
