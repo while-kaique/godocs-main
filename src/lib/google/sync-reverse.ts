@@ -15,7 +15,7 @@
 // são minúsculos; legados na planilha às vezes em MAIÚSCULAS).
 
 import { readAllRows, type SheetColumn, type SheetRow } from './sheets';
-import { toIsoOrNull } from '@/lib/format-date';
+import { toIsoOrNull, parseDataFlexivel } from '@/lib/format-date';
 import {
   getAllProjetoIds,
   getProjetoById,
@@ -90,6 +90,18 @@ function parseMembros(v: string | undefined): string[] {
 
 function parseEspecial(v: string | undefined): number {
   return (v ?? '').trim().toLowerCase().startsWith('s') ? 1 : 0;
+}
+
+/**
+ * Flag "Especial?" do Sheet → 1 | 0 | null.
+ * Diferente de `parseEspecial`, distingue célula VAZIA (null → "não mexe") de um
+ * "Não" explícito (0). Usado no sync reverso de projetos JÁ existentes para não
+ * forçar especial=0 quando a coluna está em branco (regra "vazio não apaga").
+ */
+function parseEspecialFlag(v: string | undefined): 0 | 1 | null {
+  const s = (v ?? '').trim().toLowerCase();
+  if (!s || s === '—' || s === '-') return null;
+  return s.startsWith('s') ? 1 : 0;
 }
 
 // A coluna "Custo Evitado" passou a guardar o VALOR R$ (não mais 'sim'/'não').
@@ -221,6 +233,31 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
     if (!mesmaLista) updates['membros'] = membrosSheet;
   }
 
+  // "Especial?" + "Tipos Projeto": o Sheet é a fonte da verdade do TIPO do projeto.
+  // Ficam FORA de SAFE_UPDATE_FIELDS porque precisam de parse próprio e de efeitos
+  // colaterais. Sem isto, uma edição "especial → saving/receita" deixava o SQLite
+  // preso em especial=1 / tipos_projeto=['especial'] (o flag nunca voltava do Sheet),
+  // e o projeto reabria no fluxo de edição ESPECIAL errado, sem puxar o saving já
+  // preenchido. (caso AVD Central v2 / Helen — bug do "especial sticky" pré-fix.)
+  const especialSheet = parseEspecialFlag(row['Especial?']); // 1 | 0 | null (vazio = não mexe)
+  if (especialSheet != null && especialSheet !== (current.especial ?? 0)) {
+    updates['especial'] = especialSheet;
+    if (especialSheet === 0) {
+      // Deixou de ser especial → tipos vêm de "Tipos Projeto"; contexto especial limpa.
+      // (o loop SAFE pula "—"/vazio porque txt() → null, então a limpeza é explícita.)
+      updates['contexto_especial'] = null;
+      const tipos = parseList(row['Tipos Projeto']).map((t) => t.toLowerCase());
+      if (tipos.length) {
+        updates['tipos_projeto'] = tipos;
+        updates['tipo_projeto'] = tipos[0];
+      }
+    } else {
+      // Virou especial → tipo único 'especial'.
+      updates['tipos_projeto'] = ['especial'];
+      updates['tipo_projeto'] = 'especial';
+    }
+  }
+
   if (Object.keys(updates).length === 0) return false;
   await updateProjeto(id, updates);
   return true;
@@ -245,14 +282,22 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
 
 const CARENCIA_EXCLUSAO_MS = 60 * 60 * 1000; // 1h: protege submissão recém-feita (append em background)
 
-/** ISO (`...Z`) ou `datetime('now')` (`YYYY-MM-DD HH:MM:SS`, UTC sem Z) → epoch ms (UTC). */
+/**
+ * ISO (`...Z`), `datetime('now')` (`YYYY-MM-DD HH:MM:SS`, UTC sem Z) ou data
+ * pt-BR (`dd/mm/yyyy [HH:MM:SS]`) → epoch ms (UTC).
+ *
+ * ⚠️ Usa `parseDataFlexivel` em vez de `Date.parse` porque os legados gravam
+ * `submitted_at` em pt-BR ("12/05/2026"), e `Date.parse` o interpreta como
+ * MM/DD (5 de dezembro) — um carimbo no FUTURO. Isso fazia `agora − carimbo`
+ * ficar negativo, deixando o órfão SEMPRE "dentro da carência" → nunca era
+ * reconciliado (status cinza eterno em "Meus Projetos").
+ */
 function carimboMs(v: unknown): number | null {
   if (v == null) return null;
   let s = String(v).trim();
   if (!s) return null;
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s = s.replace(' ', 'T') + 'Z';
-  const t = Date.parse(s);
-  return Number.isFinite(t) ? t : null;
+  return parseDataFlexivel(s)?.getTime() ?? null;
 }
 
 /**

@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, totalEconomiaHoras, unidadeHorasDe, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, contestaTotalCargaReal, totalEconomiaHoras, unidadeHorasDe, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -821,6 +821,20 @@ Registre o split no memorial numa subseção própria com o cabeçalho EXATO "##
 NÃO escreva só a definição de "ganho por escala" (isso é óbvio) — escreva o RACIOCÍNIO concreto deste projeto. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
 }
 
+// Nudge de ESCAPE do gate da carga real: o usuário não deu um nº claro de carga real e
+// parece estar CONTESTANDO o total (deu valor "por dia"/"por execução", disse que está
+// errado, ou não soube quantificar). Em vez de repetir a MESMA pergunta (loop reportado em
+// produção), devolvemos o controle ao orquestrador com este aviso, para o LLM RECALCULAR o
+// total a partir do que o usuário descreveu (ou ajudá-lo a quantificar). O gate de preview
+// reconduz a pergunta do split depois — a informação não se perde.
+function nudgeRecalcularCargaEscala(total: number, unidade: string): string {
+  return `[SISTEMA] O usuário NÃO informou um número claro de "carga real" — ele parece estar CONTESTANDO o total de ${total}${unidade} usado no cálculo (ex.: deu um valor "por dia"/"por execução", disse que o número está errado, ou não soube quantificar). NÃO repita a pergunta da carga real verbatim e NÃO gere o preview ainda.
+Releia a ÚLTIMA mensagem do usuário e aja:
+1) Se ele corrigiu/contestou o total (ex.: "5 min por dia para cada colaborador", "na verdade são X"), RECALCULE as horas economizadas a partir do que ele descreveu — converta para o MESMO PERÍODO do saving (ex.: minutos por dia × dias ÚTEIS no mês × nº de pessoas/colaboradores) e atualize as \`linhas\` (cargo, horas_antes, horas_depois) e o total. Se faltar algum dado para fechar o cálculo (tempo por execução, frequência, nº de pessoas ou de dias), PERGUNTE objetivamente só o que falta — uma pergunta por vez.
+2) Se ele apenas não soube quantificar, ajude-o, com uma pergunta simples, a separar o que ele REALMENTE fazia à mão antes do volume que só a automação passou a cobrir.
+Quando o total estiver correto e você for fechar, o SISTEMA reconduz a pergunta do split (carga real × escala) automaticamente — você NÃO a faz.`;
+}
+
 // Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
 // na verdade é saving, o backend bloqueia o preview/complete e devolve isto, mantendo a fase
 // em 'receita'. Manda reclassificar o projeto como Saving no formulário — em vez de submeter
@@ -982,14 +996,22 @@ export async function enviarMensagem(rawData: unknown) {
     // carga real; a escala é o resto (total − carga real). Preenchemos os dois campos
     // e injetamos o nudge [SISTEMA] para o LLM registrar no memorial.
     const total = totalEconomiaHoras(estado.saving);
-    const real = interpretarCargaReal(data.content, total);
-    if (real === null) {
-      log('enviarMensagem', 'Carga×escala: resposta ambígua — re-perguntando o nº da carga real');
-      reask = {
-        type: 'question', content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
-        fase: 'saving', coletado: estado.coletado,
-        saving: { ...estado.saving, carga_escala: 'pendente' }, receita: estado.receita,
-      };
+    // ESCAPE DO LOOP: se o usuário está CONTESTANDO o total (valor "por dia", "está
+    // errado", nº acima do total) ou não deu um nº utilizável, repetir a pergunta verbatim
+    // só recria o loop reportado em produção (o usuário corrige, o backend re-pergunta a
+    // mesma coisa). Devolvemos o controle ao orquestrador — reset do estado do gate + nudge
+    // p/ RECALCULAR/esclarecer. O gate de preview (mais abaixo) reconduz a pergunta do split
+    // quando o LLM previewar, então a informação continua garantida (não some).
+    // `contesta` tem PRECEDÊNCIA sobre interpretarCargaReal: na contestação, o parser às
+    // vezes extrai um nº plausível ("0.5h por mês" → 0.5) que NÃO é a carga real, e capturá-lo
+    // congelaria o total errado.
+    const contesta = contestaTotalCargaReal(data.content, total);
+    const real = contesta ? null : interpretarCargaReal(data.content, total);
+    if (contesta || real === null) {
+      log('enviarMensagem', `Carga×escala: ${contesta ? 'usuário contesta o total' : 'resposta sem nº de carga real'} — devolvendo ao orquestrador p/ recalcular/esclarecer`);
+      estado.saving = { ...estado.saving, carga_escala: null, horas_carga_real: null, horas_escala: null };
+      history.push({ role: 'user', content: nudgeRecalcularCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)) });
+      // reask permanece null → o orquestrador roda neste turno (vê a correção + o nudge).
     } else {
       const escala = Math.round((total - real) * 100) / 100;
       // Guarda a EXPLICAÇÃO crua do usuário (texto da resposta ao gate) — é a base de
@@ -1649,9 +1671,20 @@ const atualizarTiposSchema = z.object({
 export async function atualizarTipos(rawData: unknown) {
   const data = atualizarTiposSchema.parse(rawData);
   log('atualizarTipos', `projeto=${data.projeto_id}, tipos=${data.tipos_projeto.join(',')}`);
+  // Escolher um tipo financeiro (saving/receita) significa que o projeto deixou de ser
+  // ESPECIAL — é aqui que o usuário declara a natureza do impacto. Zeramos a flag no
+  // mesmo ponto. Sem isso, um projeto que era especial ficava preso em especial=1: o
+  // atualizarMetadados seguinte re-forçava a flag pelo estado do banco (ctxData.especial
+  // === 1), reconstruía a doc especial e dava return antecipado, ignorando a troca de
+  // tipo — a edição "especial → saving" subia especial de novo (col. "Especial?"=Sim).
   await updateProjeto(data.projeto_id, {
     tipos_projeto: data.tipos_projeto,
     tipo_projeto: data.tipos_projeto[0],
+    especial: false,
+    // Deixou de ser especial → o contexto especial não descreve mais o projeto.
+    // Limpa para a coluna "Contexto do Projeto Especial" virar "—" (edição fidedigna
+    // ao novo tipo). ouTraco(null) → "—" no sync.
+    contexto_especial: null,
   });
   await gravarEvento(data.projeto_id, 'tipos', 'doc', {
     tipos_projeto: data.tipos_projeto,
@@ -1743,7 +1776,20 @@ export async function atualizarMetadados(rawData: unknown) {
   // ainda não foi gerada". Detecta `especial` pelo flag do request OU pelo estado do
   // projeto (um projeto já marcado especial continua especial mesmo sem o flag).
   const ctxData = await getProjetoContextoData(data.projeto_id);
-  const ehEspecial = data.especial === true || ctxData?.especial === 1;
+  // Conversão "especial → normal": quando o cliente manda `especial: false` EXPLÍCITO
+  // num projeto hoje marcado especial, essa é a troca para saving/receita feita na
+  // edição. Zera a flag aqui também (belt-and-suspenders com atualizarTipos, cobre a
+  // ordem em que metadados chega antes da troca de tipos) e NÃO toma o ramo especial.
+  if (data.especial === false && ctxData?.especial === 1) {
+    // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
+    // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
+    await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
+    log('atualizarMetadados', `Projeto ${data.projeto_id}: convertido de especial → normal (flag + contexto especial zerados).`);
+  }
+  // Detecta especial pelo flag do request OU pelo estado do projeto (um projeto já
+  // especial continua especial mesmo sem o flag — ex.: chamadas internas/cron). ⚠️ Um
+  // `especial === false` explícito QUEBRA essa stickiness (é a conversão acima).
+  const ehEspecial = data.especial === true || (data.especial !== false && ctxData?.especial === 1);
   if (ehEspecial) {
     // Garante a marcação de especial no banco (cobre legado convertido em especial na
     // edição) — alinha tipo_projeto/tipos_projeto com o que iniciarSubmissao grava.

@@ -13,7 +13,7 @@ import {
   getProjetoById,
   getDocumentacao,
 } from '@/integrations/db/client.server';
-import { atualizarMetadados } from '@/lib/chat.functions';
+import { atualizarMetadados, atualizarTipos } from '@/lib/chat.functions';
 
 function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
   return {
@@ -75,5 +75,62 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
     const atualizado = await getProjetoById(projeto.id);
     expect(atualizado?.especial).toBe(1);
     expect(atualizado?.tipo_projeto).toBe('especial');
+  });
+
+  // Regressão (caso hugo.santana / oscar.filho): editar um projeto ESPECIAL, trocar o
+  // tipo para saving/receita e reenviar deve DESMARCAR especial — antes a flag era
+  // sticky de mão única (atualizarTipos não a tocava e atualizarMetadados re-forçava
+  // especial pelo estado do banco), e a edição subia "Especial?"=Sim de novo.
+  it('atualizarTipos com tipo financeiro zera a flag especial (especial → saving)', async () => {
+    const projeto = await insertProjeto({
+      responsavel_nome: 'Hugo',
+      responsavel_email: 'hugo.santana@gobeaute.com.br',
+      ferramenta: 'n8n',
+      nome: 'Projeto que era especial (Hugo)',
+      membros: [],
+      status: 'rascunho',
+      especial: true,
+      contexto_especial: 'contexto antigo de especial',
+    });
+    expect((await getProjetoById(projeto.id))?.especial).toBe(1); // pré-condição
+
+    await atualizarTipos({ projeto_id: projeto.id, tipos_projeto: ['saving'] });
+
+    const depois = await getProjetoById(projeto.id);
+    expect(depois?.especial).toBe(0);
+    expect(depois?.tipo_projeto).toBe('saving');
+    expect(JSON.parse(depois?.tipos_projeto as string)).toEqual(['saving']);
+    // Não é mais especial → o contexto especial é limpo (coluna "Contexto do Projeto
+    // Especial" vira "—" no sync). Edição fidedigna ao novo tipo.
+    expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
+  });
+
+  it('atualizarMetadados com especial:false converte especial → normal (não reconstrói doc especial)', async () => {
+    const projeto = await insertProjeto({
+      responsavel_nome: 'Oscar',
+      responsavel_email: 'oscar.filho@gocase.com',
+      ferramenta: 'n8n',
+      nome: 'Projeto especial do Oscar',
+      membros: [],
+      status: 'rascunho',
+      especial: true,
+      contexto_especial: 'contexto antigo do Oscar (alto impacto)',
+    });
+    expect((await getProjetoById(projeto.id))?.especial).toBe(1); // pré-condição
+
+    // Conversão: o cliente manda especial:false EXPLÍCITO (sem docs/reset). Deve quebrar
+    // a stickiness (ctxData.especial===1), zerar a flag e NÃO entrar no ramo especial.
+    const res = await atualizarMetadados({
+      projeto_id: projeto.id,
+      nome_projeto: 'Projeto especial do Oscar',
+      especial: false,
+    });
+
+    const depois = await getProjetoById(projeto.id);
+    expect(depois?.especial).toBe(0);
+    // Contexto especial limpo na conversão (coluna "Contexto do Projeto Especial" → "—").
+    expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
+    // reset:false = caminho normal (sem reconstrução da doc especial / sem return especial).
+    expect((res as { reset: boolean }).reset).toBe(false);
   });
 });

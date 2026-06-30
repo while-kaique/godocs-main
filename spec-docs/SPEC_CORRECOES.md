@@ -6,6 +6,111 @@
 
 ---
 
+## 2026-06-30 — Edição de projeto ESPECIAL → saving/receita não desmarcava `especial` (flag sticky de mão única)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edicao-especial-vira-normal`
+
+**Sintoma:** pessoas editavam um projeto submetido como **especial**, trocavam para **saving operacional**
+(ou receita), passavam por todo o fluxo e reenviavam — mas o projeto **voltava como especial**: a coluna
+**"Especial?" do Sheets continuava "Sim"** e internamente seguia `especial=1`. Confirmado em produção com
+`hugo.santana@gobeaute.com.br` (`legado-038`) e `oscar.filho@gocase.com` (`3d27a2e3…`). Log do Hugo:
+`16:20:52 atualizar-tipos → saving` e 3 s depois `atualizarMetadados` logando *"Projeto especial
+legado-038: doc reconstruída sem IA, pronto para reenvio"* — o backend ignorou a troca, rodou o chat
+inteiro como `tipos: especial`, e o analyzer recebeu só ~900 chars de contexto (o memorial de saving do
+Hugo **não foi capturado**; o do Oscar, com ~8000 chars, provavelmente persistiu, só preso na flag).
+
+**Causa-raiz:** a flag `especial` era **sticky de mão única** — havia caminhos que a marcavam `true`, mas
+**nenhum** que a voltasse a `false` numa edição. Dois pontos somavam:
+1. **`atualizarTipos` (`chat.functions.ts`)** gravava `tipos_projeto`/`tipo_projeto` ao trocar para
+   saving/receita, mas **não tocava em `especial`** → o projeto seguia `especial=1`.
+2. **`atualizarMetadados` (`chat.functions.ts`)** fazia `ehEspecial = data.especial === true ||
+   ctxData?.especial === 1`. Como o banco ainda dizia `especial=1`, ele **re-forçava
+   `especial=true`/`tipo_projeto='especial'`/`tipos_projeto=['especial']`, reconstruía a doc especial sem
+   IA e dava `return` antecipado** — ignorando a conversão e pulando a coleta de saving. O frontend
+   (`submeter.tsx`) ainda mandava `especial: true` fixo (handler especial) ou **nada** (fluxo normal),
+   então o backend nunca recebia o sinal de "deixou de ser especial". No submit, o status e a coluna
+   "Especial?" derivam de `projeto.especial === 1` → subia "Sim".
+
+**Fix — 3 camadas (à prova de ordem de chamada):**
+1. **`atualizarTipos` zera `especial`** ao escolher um tipo financeiro (escolher saving/receita = não-especial):
+   `updateProjeto(..., { tipos_projeto, tipo_projeto: tipos[0], especial: false })`. É o ponto onde o
+   usuário declara a natureza do impacto.
+2. **`atualizarMetadados` respeita `especial: false` EXPLÍCITO** — quebra a stickiness do `ctxData`:
+   `ehEspecial = data.especial === true || (data.especial !== false && ctxData?.especial === 1)`; e quando
+   `data.especial === false && ctxData?.especial === 1`, zera a flag no banco (belt-and-suspenders com a
+   camada 1, cobre a ordem em que metadados chega antes da troca de tipos). `especial === undefined`
+   preserva o comportamento antigo (chamadas internas/cron, legado→especial).
+3. **Frontend (`submeter.tsx`)** passa `especial: form.especial` em **todas** as chamadas de edição de
+   `atualizar-metadados` (antes umas mandavam `true` fixo, outras nada). `false` = sinal de conversão.
+
+Além da flag, a conversão **limpa `contexto_especial`** (`= null`) nos dois pontos (`atualizarTipos` e o ramo
+de conversão de `atualizarMetadados`): o contexto especial não descreve mais o projeto. Como a coluna
+**"Contexto do Projeto Especial"** (`sync.ts:254`) é `ouTraco(p.projeto.contexto_especial)`, zerar o campo a
+faz virar **"—"** — edição fidedigna ao novo tipo. _(reportado após o fix inicial: o `Especial?` virava "Não"
+mas o contexto antigo sobrevivia na coluna.)_
+
+Como a coluna "Especial?" (`sync.ts`) deriva de `projeto.especial`, zerar a flag no banco + re-sync de
+IDA já reflete **"Não"** no Sheets — sem alteração no mapeamento.
+
+**Onde aterrissou:** `src/lib/chat.functions.ts` (`atualizarTipos`, `atualizarMetadados`),
+`src/routes/submeter.tsx` (5 call-sites de `especial:`), teste de regressão em
+`tests/atualizar-metadados-especial.test.ts` (atualizarTipos zera especial; atualizarMetadados com
+`especial:false` converte sem reconstruir a doc especial).
+
+**Recuperação (não-código):** Hugo (`legado-038`) e Oscar (`3d27a2e3…`) — flag a destravar e, no caso do
+Hugo, memorial de saving a reconstruir do timeline (`chat_messages`/`form_events`/`snapshot_chat`). Sem
+backfill geral; só os dois casos reportados (decisão do dono).
+
+---
+
+## 2026-06-30 — Agente "delirando": repete a MESMA pergunta da carga real (loop no gate de saving)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/loop-carga-real-contestacao-total`
+
+**Sintoma:** vários clientes relataram, na **validação de saving**, o agente "delirando" e repetindo
+**verbatim** a mesma pergunta do split carga real × escala. Caso da captura: total calculado em
+`0.5h/mês` (a partir de "5 min por dia para cada colaborador"); o gate pergunta "dessas **0.5h/mês**,
+quantas a pessoa realmente fazia à mão?"; o usuário responde **"eu disse que era 5min por dia pra cada
+colaborador. isso não é 0.5h por mês"** (corrigindo o TOTAL) → o agente repete a pergunta IDÊNTICA.
+Usuário preso, sem saída. Recorrência de um problema "já resolvido" antes.
+
+**Causa-raiz (duas, somadas):**
+1. **O gate determinístico não tinha saída para CONTESTAÇÃO do total.** Na branch
+   `carga_escala === 'pendente'` (`chat.functions.ts`/`enviarMensagem`), quando
+   `interpretarCargaReal` devolve `null`, o backend **re-perguntava a mesma coisa SEM chamar o
+   orquestrador**. A correção do usuário (que dizia que o *total* 0.5h estava errado, não a carga
+   real) nunca chegava ao LLM que poderia recalcular → loop infinito.
+2. **`interpretarCargaReal` destruía decimais** (`orchestrator.ts`): `.replace(/\./g, '')` tratava
+   todo `.` como separador de milhar, então `"0.5"` → `"05"` → `5`, `"1.83"` → `183`. O próprio
+   agente EXIBE "0.5h/mês" com ponto — qualquer resposta com decimal já entrava quebrada (virava
+   `> total` → `null` → re-pergunta).
+
+**Fix:**
+- **(A) Parser pt-BR robusto `parseNumeroPtBR`** (`orchestrator.ts`, exportado/testável): `,` sempre
+  decimal; `.` decimal por padrão (`0.5`→0.5, `1.83`→1.83), só vira milhar quando inequívoco (vários
+  pontos, ou 1 ponto com exatamente 3 dígitos e inteiro ≠ 0 → `1.234`→1234). Usado em
+  `interpretarCargaReal`.
+- **(B) Escape do loop** (`chat.functions.ts`, branch do gate): novo predicado puro
+  `contestaTotalCargaReal` (valor "por dia"/"por execução"/min/seg, correção explícita "está
+  errado"/"não é isso", ou nº claramente acima do total) — com **precedência** sobre
+  `interpretarCargaReal`. Quando o usuário contesta (ou não dá nº usável), o backend **reseta o estado
+  do gate** (`carga_escala=null`, zera `horas_carga_real/escala`), injeta o nudge `[SISTEMA]`
+  **`nudgeRecalcularCargaEscala`** (manda o LLM RECALCULAR o total a partir do que o usuário
+  descreveu — ex.: min/dia × dias úteis × nº de pessoas — ou ajudar a quantificar) e **devolve o
+  controle ao orquestrador** em vez de repetir a pergunta. A garantia do split não se perde: o **gate
+  de preview** (mais abaixo, `carga_escala !== 'ok'`) reconduz a pergunta com o total já corrigido.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (`parseNumeroPtBR`, `contestaTotalCargaReal`,
+`interpretarCargaReal`), `src/lib/chat.functions.ts` (branch `carga_escala==='pendente'` +
+`nudgeRecalcularCargaEscala`), `tests/saving-carga-escala.test.ts` (decimais, parser, contestação).
+
+**Decisão de design:** o gate determinístico continua GARANTINDO que o split seja perguntado (via gate
+de preview), mas deixou de ser uma armadilha — quando o usuário discorda do número, o LLM volta ao
+comando para recalcular. Não há loop infinito possível: contestação/resposta-sem-nº sempre escala
+para o orquestrador; a captura determinística só ocorre quando há um nº de carga real plausível.
+
+---
+
 ## 2026-06-30 — "Tipo de Receita" (e "Tipo de Saving") em branco no Sheets — erosão de `tipo_saving` pelo echo do LLM
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/tipo-receita-preserva-form`
@@ -252,3 +357,47 @@ reprocessa corretamente (comportamento legítimo mantido).
   legado-194/196 com upload de arquivo).
 - Sem teste unitário novo: a lógica é inline no componente e a base de testes é node-only (sem
   testing-library/jsdom). `reprocessarComNovosArquivos` continua com o early-return defensivo.
+
+---
+
+## Sync reverso desatualizado: `especial` preso e órfão "cinza" (caso Helen)
+
+**Sintoma (2 relatos, 30/06/2026):**
+1. **Status cinza** em "Meus Projetos" — `legado-148` ("AVD Central") existia no SQLite mas
+   **não tinha linha no Sheet**; como o status na lista vem **só do Sheets**, sem linha → `null`
+   → badge cinza ("—"). Não saía nunca.
+2. **Especial preso** — `AVD Central v2` (`e4b1dcc3…`) estava `Especial?=Não` + saving completo
+   (112h) no **Sheet**, mas no **SQLite** ainda `especial=1`/`tipos_projeto=['especial']`/
+   `contexto_especial` cheio. Abria no fluxo de edição ESPECIAL errado e, ao trocar p/ não-especial
+   no form, não puxava o saving (seed dava `tipoProjeto=[]`).
+
+**Causa:**
+1. `carimboMs` (carência da `reconciliarExclusoes`) usava `Date.parse`, que lê `submitted_at`
+   pt-BR `"12/05/2026"` como **MM/DD → 5/dez/2026 (FUTURO)**. `agora − carimbo` < 0 → sempre
+   "dentro da carência de 1h" → órfão **nunca** reconciliado. Pega qualquer legado órfão com
+   `submitted_at` de **dia ≤ 12** (vira mês válido ao trocar).
+2. O sync reverso **não propagava** `especial` nem `tipos_projeto` (só `contexto_especial` estava
+   em `SAFE_UPDATE_FIELDS`, e o loop pula "—" porque `txt()→null`). O bug do "especial sticky"
+   (pré-PR #181) deixou o SQLite preso, e o Sheet dizer "Não" nunca desfazia.
+
+**Fix (`src/lib/google/sync-reverse.ts`):**
+- `carimboMs` passa a usar `parseDataFlexivel` (lê `dd/mm/yyyy` corretamente) em vez de `Date.parse`.
+- `atualizarExistente` reconcilia o tipo do projeto a partir do Sheet (fonte da verdade):
+  `parseEspecialFlag('Especial?')` (1|0|**null** p/ vazio = não mexe); ao virar **não-especial**,
+  deriva `tipos_projeto`/`tipo_projeto` de "Tipos Projeto" e **zera `contexto_especial`**; ao virar
+  especial, `tipos=['especial']`.
+
+**Onde aterrissou:**
+- `src/lib/google/sync-reverse.ts` (`carimboMs`, `parseEspecialFlag`, `atualizarExistente`).
+- `tests/sync-reverse.test.ts` — +3 casos (flip especial→não, "Especial?" vazia não apaga, órfão
+  pt-BR removido com `vi.setSystemTime`). 489 testes verdes.
+
+**Recuperação de dados (prod, via forçar sync):** `POST /api/admin/sync-sheets-now` rodou o novo
+código: `e4b1dcc3` auto-curou (`especial=0`, `tipos=['saving']`, contexto null); `legado-148` (+
+`legado-126` + 1 teste) removidos como órfãos. 0 órfãos restantes. Validado **ponta a ponta no
+staging** (criar especial → flip p/ "Não" no Sheet → sync desmarca) antes do prod (regra 13).
+
+**Notas:** decisão do dono — para a `AVD Central v2` foi só o fix de sync (não o replay completo),
+então a doc segue sem `saving.linhas`; ao reeditar, a Helen refaz o saving no chat (o flag/tipo já
+estão certos). A regra "Sheets é o banco principal; SQLite espelha em quase-tempo-real" guiou a
+escolha.

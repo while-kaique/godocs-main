@@ -497,6 +497,54 @@ export function precisaConfirmarEscala(real: number, total: number): boolean {
   return (total - real) / total >= LIMITE_ESCALA_ALTA;
 }
 
+// Converte um token numérico (pt-BR ou en) em Number SEM destruir o decimal. Regras:
+//  - "," é SEMPRE decimal ("0,5"→0.5; "1.234,56"→1234.56, com "." de milhar).
+//  - Só "." → DECIMAL ("0.5"→0.5; "1.83"→1.83), EXCETO quando é claramente milhar:
+//    vários pontos ("1.000.000") ou um único ponto com EXATAMENTE 3 dígitos depois e a
+//    parte inteira ≠ "0" ("1.234"→1234; "12.000"→12000; "0.123" segue decimal).
+// Bug de origem: o parser fazia `.replace(/\./g, '')` cego, transformando "0.5" em "05"=5
+// (e o próprio agente exibe "0.5h/mês" com ponto) — qualquer decimal entrava quebrado.
+export function parseNumeroPtBR(token: string): number {
+  let s = (token ?? '').trim();
+  const temVirgula = s.includes(',');
+  const pontos = (s.match(/\./g) ?? []).length;
+  if (temVirgula) {
+    s = s.replace(/\./g, '').replace(',', '.'); // vírgula decimal, ponto = milhar
+  } else if (pontos > 1) {
+    s = s.replace(/\./g, ''); // 1.000.000 → milhar
+  } else if (pontos === 1) {
+    const [int = '', frac = ''] = s.split('.');
+    if (frac.length === 3 && int !== '0' && int.length <= 3) s = s.replace(/\./g, ''); // 1.234 → 1234
+    // senão mantém o ponto como decimal (0.5, 1.83, 12.5)
+  }
+  return parseFloat(s);
+}
+
+// O usuário, em vez de informar a carga real, está CONTESTANDO o total calculado — deu um
+// valor por unidade de tempo menor que o período ("5min por dia", "por execução"), disse
+// que o número está errado, ou citou um nº claramente MAIOR que o total. Repetir a pergunta
+// da carga real nesses casos só gera o LOOP reportado em produção (o usuário corrige o total,
+// o backend re-pergunta a mesma coisa): o que falta é o LLM RECALCULAR o total. Usado pelo
+// gate (chat.functions.ts) p/ devolver o controle ao orquestrador em vez de re-perguntar.
+export function contestaTotalCargaReal(content: string, total: number): boolean {
+  const t = (content ?? '').trim().toLowerCase();
+  if (!t) return false;
+  // (a) valor por unidade MENOR que o período (dia/semana/execução) ou em min/seg — a
+  //     pergunta pede o total no período; um valor "por dia" precisa ser convertido pelo LLM.
+  if (/\bpor\s*dia\b|\/\s*dia\b|\bao\s+dia\b|di[áa]ri[ao]|\bpor\s+semana\b|\bsemanal\b|por\s+execu|por\s+rodada|cada\s+execu|\bmin\b|\d\s*min|\bminutos?\b|\bsegundos?\b/.test(t)) return true;
+  // (b) correção/contestação EXPLÍCITA do número. Só sinais FORTES — evita "não era 100%,
+  //     era 50%" (refinamento legítimo de %, que interpretarCargaReal resolve para 20).
+  if (/errad|errei|engan|na\s+verdade|incorret|n[ãa]o\s+bate|n[ãa]o\s+confere|n[ãa]o\s+[ée]\s+(?:isso|esse|essa|esses|o\s+valor)/.test(t)) return true;
+  // (c) citou um nº (NÃO-porcentagem) claramente acima do total → acha que o total deveria
+  //     ser maior. Tira as porcentagens antes ("50%"/"100 por cento" são fração do total,
+  //     não nº absoluto — interpretarCargaReal as resolve, não são contestação).
+  const semPct = t.replace(/\d+(?:[.,]\d+)?\s*(?:%|por\s*cento)/g, ' ');
+  const nums = (semPct.match(/\d[\d.,]*\d|\d/g) ?? []).map(parseNumeroPtBR).filter((n) => Number.isFinite(n));
+  const maior = nums.length ? Math.max(...nums) : null;
+  if (maior != null && total > 0 && maior > total + Math.max(1, total * 0.1)) return true;
+  return false;
+}
+
 // Interpreta a resposta do usuário à pergunta da CARGA REAL (gate do split) → nº de horas
 // em [0, total], ou null (ambíguo → re-pergunta determinística). Reconhece, em ordem:
 //  (1) PORCENTAGEM do total — "100%", "50 %", "100 por cento" → fração (100% = fez tudo).
@@ -532,9 +580,10 @@ export function interpretarCargaReal(content: string, total: number): number | n
     return total;
   }
 
-  // (4) Números de horas explícitos.
-  const nums = (t.match(/\d+(?:[.,]\d+)?/g) ?? [])
-    .map((s) => parseFloat(s.replace(/\./g, '').replace(',', '.')))
+  // (4) Números de horas explícitos. parseNumeroPtBR preserva decimais ("0.5"→0.5) e só
+  //     trata "." como milhar quando inequívoco ("1.234"→1234) — ver helper acima.
+  const nums = (t.match(/\d[\d.,]*\d|\d/g) ?? [])
+    .map(parseNumeroPtBR)
     .filter((n) => Number.isFinite(n));
   if (!nums.length) return null;
   // Dois números que somam ~total → o primeiro é a carga real.
