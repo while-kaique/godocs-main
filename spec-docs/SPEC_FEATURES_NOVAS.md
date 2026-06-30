@@ -314,9 +314,11 @@ do dono real, typo no nome).
   design **degrada graciosamente**: o nome aparece com ou sem header.
 - A identidade vira um bloco **read-only** ("Submetendo como…") na Etapa 1 — não há mais input
   de nome/e-mail. Participantes seguem iguais (com validação de domínio).
-- ⚠️ O default `x-godeploy-user-name` **não foi confirmado** (não houve deploy de probe — o
-  dono optou por finalizar só o PR). Confirmar o header real num deploy futuro e, se for outro,
-  setar `GODEPLOY_NAME_HEADER` no Godeploy (sem mudar código). Até lá, o nome derivado cobre.
+- ✅ **CONFIRMADO em deploy (probe nos headers de `/api/auth/me`, 2026-06-30):** o edge Godeploy
+  injeta **APENAS** o header de e-mail (`x-godeploy-user-email`) — **não há header de nome**
+  (nem `x-godeploy-user-name`, nem `x-forwarded-user`). Portanto **o nome é SEMPRE derivado do
+  e-mail**. A leitura de `GODEPLOY_NAME_HEADER` fica como **future-proofing**: se um dia o edge
+  passar a injetar um header de nome, basta setar essa env no Godeploy (sem mudar código).
 
 **Onde aterrissou.**
 - `src/lib/auth.functions.ts` — `CurrentUser.name`; `getCurrentUser` lê o header de nome (lazy)
@@ -332,6 +334,6 @@ do dono real, typo no nome).
 - Docs/env: `docs/backend.md` (Autenticação), `CLAUDE.md` (bullet "Identidade automática"),
   `.env.example` (`GODEPLOY_NAME_HEADER`).
 
-**Verificação.** `npm run test` (458 testes) verde + `npm run build` (typecheck) limpo. Smoke em
-prod pendente do deploy (form sem perguntas de nome/e-mail; "Submetendo como…" preenchido;
-submissão grava `responsavel_nome`/`responsavel_email`; edição seeda a identidade).
+**Status.** ✅ **Mergeada (PR #176) e LIVE em produção** (30/06/2026). `/api/auth/me` retorna
+`name`; o form não pede mais nome/e-mail e mostra "Submetendo como…". Testes verdes + `build`
+(typecheck) limpo.
