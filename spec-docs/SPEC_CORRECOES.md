@@ -43,6 +43,12 @@ Hugo **não foi capturado**; o do Oscar, com ~8000 chars, provavelmente persisti
 3. **Frontend (`submeter.tsx`)** passa `especial: form.especial` em **todas** as chamadas de edição de
    `atualizar-metadados` (antes umas mandavam `true` fixo, outras nada). `false` = sinal de conversão.
 
+Além da flag, a conversão **limpa `contexto_especial`** (`= null`) nos dois pontos (`atualizarTipos` e o ramo
+de conversão de `atualizarMetadados`): o contexto especial não descreve mais o projeto. Como a coluna
+**"Contexto do Projeto Especial"** (`sync.ts:254`) é `ouTraco(p.projeto.contexto_especial)`, zerar o campo a
+faz virar **"—"** — edição fidedigna ao novo tipo. _(reportado após o fix inicial: o `Especial?` virava "Não"
+mas o contexto antigo sobrevivia na coluna.)_
+
 Como a coluna "Especial?" (`sync.ts`) deriva de `projeto.especial`, zerar a flag no banco + re-sync de
 IDA já reflete **"Não"** no Sheets — sem alteração no mapeamento.
 

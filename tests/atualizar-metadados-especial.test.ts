@@ -100,6 +100,9 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
     expect(depois?.especial).toBe(0);
     expect(depois?.tipo_projeto).toBe('saving');
     expect(JSON.parse(depois?.tipos_projeto as string)).toEqual(['saving']);
+    // Não é mais especial → o contexto especial é limpo (coluna "Contexto do Projeto
+    // Especial" vira "—" no sync). Edição fidedigna ao novo tipo.
+    expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
   });
 
   it('atualizarMetadados com especial:false converte especial → normal (não reconstrói doc especial)', async () => {
@@ -111,6 +114,7 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
       membros: [],
       status: 'rascunho',
       especial: true,
+      contexto_especial: 'contexto antigo do Oscar (alto impacto)',
     });
     expect((await getProjetoById(projeto.id))?.especial).toBe(1); // pré-condição
 
@@ -122,7 +126,10 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
       especial: false,
     });
 
-    expect((await getProjetoById(projeto.id))?.especial).toBe(0);
+    const depois = await getProjetoById(projeto.id);
+    expect(depois?.especial).toBe(0);
+    // Contexto especial limpo na conversão (coluna "Contexto do Projeto Especial" → "—").
+    expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
     // reset:false = caminho normal (sem reconstrução da doc especial / sem return especial).
     expect((res as { reset: boolean }).reset).toBe(false);
   });

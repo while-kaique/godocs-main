@@ -1659,6 +1659,10 @@ export async function atualizarTipos(rawData: unknown) {
     tipos_projeto: data.tipos_projeto,
     tipo_projeto: data.tipos_projeto[0],
     especial: false,
+    // Deixou de ser especial → o contexto especial não descreve mais o projeto.
+    // Limpa para a coluna "Contexto do Projeto Especial" virar "—" (edição fidedigna
+    // ao novo tipo). ouTraco(null) → "—" no sync.
+    contexto_especial: null,
   });
   await gravarEvento(data.projeto_id, 'tipos', 'doc', {
     tipos_projeto: data.tipos_projeto,
@@ -1755,8 +1759,10 @@ export async function atualizarMetadados(rawData: unknown) {
   // edição. Zera a flag aqui também (belt-and-suspenders com atualizarTipos, cobre a
   // ordem em que metadados chega antes da troca de tipos) e NÃO toma o ramo especial.
   if (data.especial === false && ctxData?.especial === 1) {
-    await updateProjeto(data.projeto_id, { especial: false });
-    log('atualizarMetadados', `Projeto ${data.projeto_id}: convertido de especial → normal (flag especial zerada).`);
+    // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
+    // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
+    await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
+    log('atualizarMetadados', `Projeto ${data.projeto_id}: convertido de especial → normal (flag + contexto especial zerados).`);
   }
   // Detecta especial pelo flag do request OU pelo estado do projeto (um projeto já
   // especial continua especial mesmo sem o flag — ex.: chamadas internas/cron). ⚠️ Um
