@@ -1255,7 +1255,15 @@ export async function enviarMensagem(rawData: unknown) {
   if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
     log('enviarMensagem', 'Doc aprovada — compilando documentação...');
     const doc = await compilarDocumentacao(ctx, resultado.coletado);
-    await upsertDocumentacao(data.projeto_id, doc);
+    // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
+    // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
+    // aqui, o gate determinístico de IA do analisador nunca o enxerga (ficava sempre null)
+    // e a resposta explícita do usuário perdia a precedência. Ver SPEC_COMPLEXIDADE_NIVEIS (G0).
+    const docComSinais = {
+      ...doc,
+      tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
+    };
+    await upsertDocumentacao(data.projeto_id, docComSinais);
     log('enviarMensagem', 'Documentação compilada e salva.');
   }
 

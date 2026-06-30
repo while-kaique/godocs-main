@@ -119,11 +119,16 @@ Roda em background após submissão. Avalia qualidade da documentação + impact
 2-3 adicionais específicos do projeto (ex: "tratamento de dados sensíveis").
 
 ### Classificação de complexidade
+
+Régua de **dois eixos** sobre o TRABALHO (não pela ferramenta nem por impacto) — ver [spec-docs/SPEC_COMPLEXIDADE_NIVEIS.md](../spec-docs/SPEC_COMPLEXIDADE_NIVEIS.md):
+
 | Nível | Descrição |
 |---|---|
-| `automacao` | Sem IA significativa; RPA direto |
-| `inteligencia` | Usa IA para análise/decisão, mas requer intervenção humana |
-| `autonomia` | Elimina/reduz drasticamente intervenção humana com IA |
+| `automacao` | Determinístico: chega até a INFORMAÇÃO/output (extrai, calcula, mostra, alerta, recomenda) e entrega para um humano decidir/agir. Sem IA como funcionalidade **e** sem tomar a ação consequente. Dashboard/RPA/alerta-por-regra entram aqui, mesmo 24/7 ou de alto impacto. |
+| `inteligencia` | Usa **IA como funcionalidade** (gera/classifica/extrai/transcreve/recomenda como parte do que entrega), mas o **humano conduz**: abre a tela/fila/chat e age sobre o output. |
+| `autonomia` | Toma a **AÇÃO consequente na última ponta sozinho** (fecha o caso / atua sobre o objeto do processo, sem um humano confirmar) — **com OU sem IA** (a decisão pode ser IA ou árvore de lógica determinística). |
+
+**Eixo AÇÃO tem precedência sobre o eixo IA:** a ação na ponta vem primeiro na árvore e define a autonomia, independente de IA (revertendo o gate antigo `usa_ia===false → automacao`). Dois sinais alimentam a decisão: `usa_ia` (eixo IA — automacao↔inteligencia) e `acao_autonoma` (eixo ação — → autonomia), normalizados por `normalizarComplexidade` (função pura): rebaixa autonomia sem ação consequente, força automacao sem IA, eleva automacao→inteligencia com IA — **nunca** força-promove autonomia. A resposta explícita do usuário (`tem_ia_como_funcionalidade`, coletada na fase doc) tem precedência sobre o `usa_ia` inferido.
 
 ### Resultado
 - Aprova se ≥ 50% dos pontos
