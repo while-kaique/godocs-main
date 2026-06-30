@@ -186,12 +186,32 @@ export function readFileAsBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      const base64 = result.split(",")[1];
+      // Arquivo de 0 bytes vira "data:...;base64," → split(",")[1] === "".
+      const base64 = result.split(",")[1] ?? "";
       resolve(base64);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// Remove docs sem conteúdo (base64 vazio). Arquivos de 0 bytes produzem base64 ""
+// e o backend rejeita o payload inteiro com ZodError ("docs[].base64" exige ≥1
+// caractere). O step2 já barra arquivos vazios na seleção; este filtro é a rede de
+// segurança para qualquer arquivo que escape (caminho de edição/reprocesso, etc.).
+export function descartarDocsVazios<T extends { base64: string }>(docs: T[]): T[] {
+  return docs.filter((d) => d.base64.length > 0);
+}
+
+// Converte os arquivos selecionados no payload `docs` (base64 + nome), descartando
+// arquivos vazios para nunca enviar um base64 "" que o backend recusaria.
+export async function filesToDocs(
+  files: File[]
+): Promise<{ base64: string; filename: string }[]> {
+  const docs = await Promise.all(
+    files.map(async (f) => ({ base64: await readFileAsBase64(f), filename: f.name }))
+  );
+  return descartarDocsVazios(docs);
 }
 
 // Oculta valores financeiros de SAVING do texto exibido ao usuário (memorial/preview).
