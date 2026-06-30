@@ -6,6 +6,54 @@
 
 ---
 
+## 2026-06-30 — Agente "delirando": repete a MESMA pergunta da carga real (loop no gate de saving)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/loop-carga-real-contestacao-total`
+
+**Sintoma:** vários clientes relataram, na **validação de saving**, o agente "delirando" e repetindo
+**verbatim** a mesma pergunta do split carga real × escala. Caso da captura: total calculado em
+`0.5h/mês` (a partir de "5 min por dia para cada colaborador"); o gate pergunta "dessas **0.5h/mês**,
+quantas a pessoa realmente fazia à mão?"; o usuário responde **"eu disse que era 5min por dia pra cada
+colaborador. isso não é 0.5h por mês"** (corrigindo o TOTAL) → o agente repete a pergunta IDÊNTICA.
+Usuário preso, sem saída. Recorrência de um problema "já resolvido" antes.
+
+**Causa-raiz (duas, somadas):**
+1. **O gate determinístico não tinha saída para CONTESTAÇÃO do total.** Na branch
+   `carga_escala === 'pendente'` (`chat.functions.ts`/`enviarMensagem`), quando
+   `interpretarCargaReal` devolve `null`, o backend **re-perguntava a mesma coisa SEM chamar o
+   orquestrador**. A correção do usuário (que dizia que o *total* 0.5h estava errado, não a carga
+   real) nunca chegava ao LLM que poderia recalcular → loop infinito.
+2. **`interpretarCargaReal` destruía decimais** (`orchestrator.ts`): `.replace(/\./g, '')` tratava
+   todo `.` como separador de milhar, então `"0.5"` → `"05"` → `5`, `"1.83"` → `183`. O próprio
+   agente EXIBE "0.5h/mês" com ponto — qualquer resposta com decimal já entrava quebrada (virava
+   `> total` → `null` → re-pergunta).
+
+**Fix:**
+- **(A) Parser pt-BR robusto `parseNumeroPtBR`** (`orchestrator.ts`, exportado/testável): `,` sempre
+  decimal; `.` decimal por padrão (`0.5`→0.5, `1.83`→1.83), só vira milhar quando inequívoco (vários
+  pontos, ou 1 ponto com exatamente 3 dígitos e inteiro ≠ 0 → `1.234`→1234). Usado em
+  `interpretarCargaReal`.
+- **(B) Escape do loop** (`chat.functions.ts`, branch do gate): novo predicado puro
+  `contestaTotalCargaReal` (valor "por dia"/"por execução"/min/seg, correção explícita "está
+  errado"/"não é isso", ou nº claramente acima do total) — com **precedência** sobre
+  `interpretarCargaReal`. Quando o usuário contesta (ou não dá nº usável), o backend **reseta o estado
+  do gate** (`carga_escala=null`, zera `horas_carga_real/escala`), injeta o nudge `[SISTEMA]`
+  **`nudgeRecalcularCargaEscala`** (manda o LLM RECALCULAR o total a partir do que o usuário
+  descreveu — ex.: min/dia × dias úteis × nº de pessoas — ou ajudar a quantificar) e **devolve o
+  controle ao orquestrador** em vez de repetir a pergunta. A garantia do split não se perde: o **gate
+  de preview** (mais abaixo, `carga_escala !== 'ok'`) reconduz a pergunta com o total já corrigido.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (`parseNumeroPtBR`, `contestaTotalCargaReal`,
+`interpretarCargaReal`), `src/lib/chat.functions.ts` (branch `carga_escala==='pendente'` +
+`nudgeRecalcularCargaEscala`), `tests/saving-carga-escala.test.ts` (decimais, parser, contestação).
+
+**Decisão de design:** o gate determinístico continua GARANTINDO que o split seja perguntado (via gate
+de preview), mas deixou de ser uma armadilha — quando o usuário discorda do número, o LLM volta ao
+comando para recalcular. Não há loop infinito possível: contestação/resposta-sem-nº sempre escala
+para o orquestrador; a captura determinística só ocorre quando há um nº de carga real plausível.
+
+---
+
 ## 2026-06-30 — "Tipo de Receita" (e "Tipo de Saving") em branco no Sheets — erosão de `tipo_saving` pelo echo do LLM
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/tipo-receita-preserva-form`
