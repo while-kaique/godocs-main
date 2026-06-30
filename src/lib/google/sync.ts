@@ -333,6 +333,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         receitaValor,
         tipoReceita: ouTraco(p.receita?.tipo_saving as string | undefined),
         dataSubmissao,
+        modo: p.modo,
       });
       await sendChatNotification(message);
     } catch (chatErr) {
