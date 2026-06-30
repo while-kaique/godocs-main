@@ -1,4 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GoDocs">
   <rect width="512" height="512" rx="112" fill="#0059A9"/>
-  <path fill="#FFFFFF" fill-rule="evenodd" d="M150 140 L242 140 C322 140 370 190 370 256 C370 322 322 372 242 372 L150 372 Z M198 188 L242 188 C292 188 322 212 322 256 C322 300 292 324 242 324 L198 324 Z"/>
+  <!-- folha de documento -->
+  <path fill="#FFFFFF" d="M154 100 L300 100 L376 176 L376 394 Q376 412 358 412 L154 412 Q136 412 136 394 L136 118 Q136 100 154 100 Z"/>
+  <!-- canto dobrado (dog-ear) -->
+  <path fill="#D7DB00" d="M300 100 L376 176 L300 176 Z"/>
+  <!-- letra D -->
+  <path fill="#0059A9" fill-rule="evenodd" d="M186 168 L250 168 C312 168 348 212 348 264 C348 316 312 360 250 360 L186 360 Z M224 204 L250 204 C290 204 312 230 312 264 C312 298 290 324 250 324 L224 324 Z"/>
 </svg>
