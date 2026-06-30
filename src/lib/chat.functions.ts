@@ -31,7 +31,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, totalEconomiaHoras, unidadeHorasDe } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, totalEconomiaHoras, unidadeHorasDe, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -821,6 +821,18 @@ Registre o split no memorial numa subseção própria com o cabeçalho EXATO "##
 NÃO escreva só a definição de "ganho por escala" (isso é óbvio) — escreva o RACIOCÍNIO concreto deste projeto. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
 }
 
+// Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
+// na verdade é saving, o backend bloqueia o preview/complete e devolve isto, mantendo a fase
+// em 'receita'. Manda reclassificar o projeto como Saving no formulário — em vez de submeter
+// um saving disfarçado de receita (caso legado-260).
+const MSG_RECLASSIFICAR_RECEITA =
+  'Pelo que conversamos, este caso **não é receita incremental** (receita nova que entra na ' +
+  'empresa) — é **economia operacional (saving)**. Para registrar corretamente, volte à Etapa 2/3 ' +
+  'e troque o tipo do projeto para **Saving**; aí refazemos o cálculo como saving (horas/custos), ' +
+  'não como receita. Se você acredita que há mesmo **receita nova, recorrente e já comprovada**, ' +
+  'me diga qual produto, canal ou funcionalidade gera essa receita a mais e a base de cálculo, que ' +
+  'eu monto o memorial de receita.';
+
 // Justificativa do split carga real × escala → coluna "Justificativa Saving Escalado e
 // Real" (TEXTO). Preferimos a SUBSEÇÃO "### Carga real e ganho por escala" que o agente
 // escreve no memorial (a "análise do agente", rica — espelha a "Alocação Ganhos": sem
@@ -1134,6 +1146,33 @@ export async function enviarMensagem(rawData: unknown) {
         });
       }
     }
+  }
+
+  // ── BACKSTOP RECLASSIFICAÇÃO: receita que na verdade é SAVING não vira preview/complete ──
+  // Quando o agente conclui que "não é receita incremental" (o ganho é economia operacional,
+  // não receita nova), o certo é PARAR e mandar reclassificar o projeto como saving — não
+  // coletar saving no slot de receita e completar como se fosse receita (foi o que aconteceu no
+  // legado-260). Prompt sozinho não segura (o LLM "ajuda" e completa mesmo assim), então o
+  // backend bloqueia o preview/complete da receita quando o memorial está marcado como
+  // não-receita ("não aplicável para receita" / "## Memorial de Saving" / "reclassificado como
+  // saving") e devolve uma pergunta-guia, mantendo a fase em 'receita'. Roda também sobre o
+  // type=question (não só preview/complete): se o agente escreveu o memorial saving-shaped no
+  // objeto receita num turno qualquer, já redireciona. Ver SPEC_CORRECOES.md (legado-260).
+  if (
+    (estado.fase === 'receita' || estado.fase === 'receita_preview') &&
+    resultado.type !== 'options' &&
+    receitaMemorialEhSaving((resultado.receita?.memorial_calculo as string | null | undefined))
+  ) {
+    log('enviarMensagem', '⛔ Receita cujo memorial é saving/não-aplicável — bloqueando e pedindo reclassificação para saving');
+    Object.assign(resultado, {
+      type: 'question',
+      content: MSG_RECLASSIFICAR_RECEITA,
+      fase: 'receita',
+      // Zera o memorial saving-shaped para (a) não re-disparar o backstop no próximo turno e
+      // (b) não persistir um memorial de saving dentro do objeto receita.
+      receita: { ...((resultado.receita ?? estado.receita) as ReceitaColetada), memorial_calculo: null },
+    });
+    delete (resultado as { options?: unknown }).options;
   }
 
   // ── GATE JORNADA-BASE — força a pergunta antes do 1º preview ────────────────
@@ -2072,12 +2111,28 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         'reclassifique como receita incremental ou projeto especial.'
       );
     }
-    if (tiposProjetoGate.includes('receita_incremental') &&
-        (((receita?.valor_ganho_mensal as number) ?? 0) <= 0)) {
-      throw new Error(
-        'Não é possível submeter receita incremental com ganho de R$ 0. ' +
-        'Revise o memorial de receita antes de enviar.'
-      );
+    // Gate de COMPLETUDE da receita (último porto antes de gravar): um projeto declarado
+    // receita_incremental precisa ter a receita REALMENTE preenchida — valor > 0,
+    // periodicidade (tipo_saving) e um memorial de RECEITA (não vazio e não um memorial de
+    // saving / "não aplicável"). Pega tanto dado pela metade (tipo_saving nulo — o sintoma do
+    // legado-260) quanto receita que na verdade é saving e devia ter sido reclassificada (o
+    // backstop de enviarMensagem já barra no chat; aqui é a rede determinística final).
+    if (tiposProjetoGate.includes('receita_incremental')) {
+      const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? '').trim();
+      if (((receita?.valor_ganho_mensal as number) ?? 0) <= 0) {
+        throw new Error(
+          'Não é possível submeter receita incremental com ganho de R$ 0. ' +
+          'Revise o memorial de receita antes de enviar.'
+        );
+      }
+      if (!receita?.tipo_saving || memoReceita.length < 30 || receitaMemorialEhSaving(memoReceita)) {
+        throw new Error(
+          'Este projeto está marcado como Receita Incremental, mas a receita não está completa — ' +
+          'são obrigatórios a periodicidade, o valor e um memorial de RECEITA. Se o que foi descrito ' +
+          'é economia operacional (saving), volte à Etapa 2/3 e troque o tipo do projeto para Saving; ' +
+          'se for receita nova, conclua o memorial de receita antes de enviar.'
+        );
+      }
     }
   }
 

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AjudaWidget } from "@/components/ajuda/ajuda-widget";
+import { StagingBanner } from "@/components/staging-banner";
 
 function NotFoundComponent() {
   return (
@@ -76,6 +77,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <StagingBanner />
       <Outlet />
       <AjudaWidget />
       <Toaster richColors position="top-right" />

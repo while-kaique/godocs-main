@@ -6,6 +6,71 @@
 
 ---
 
+## 2026-06-30 — "Tipo de Receita" (e "Tipo de Saving") em branco no Sheets — erosão de `tipo_saving` pelo echo do LLM
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/tipo-receita-preserva-form`
+
+**Sintoma:** projeto `legado-260` ("Ticketsense gocase", linha 234 da planilha), editado como
+saving **e** receita, salvou com a coluna **"Tipo de Receita" = "—"** (em branco). Na auditoria, o
+`documentacao.conteudo.receita` estava `{ "valor_ganho_mensal": 1489.5, "tipo": "mensal",
+"memorial_calculo": "## Memorial de Saving ..." }` — periodicidade na chave errada (`tipo` em vez de
+`tipo_saving`) e a receita poluída com dados de saving (ver "Nota" abaixo).
+
+**Causa-raiz:** `tipo_saving` (a periodicidade mensal/pontual/tri/semestral) é uma escolha do
+**formulário** (definida em `iniciarSaving`/`iniciarReceita`), não algo que o LLM colete. Mas o
+orquestrador (`orchestrator.ts`, parse do resultado) fazia `receita: (parsed.receita) ?? receita` —
+**adotava o objeto ecoado pelo LLM inteiro**. O LLM frequentemente (a) **omite** `tipo_saving` no
+echo, (b) devolve a receita como `{}`, ou (c) usa a chave legada `tipo`. Em qualquer caso
+`tipo_saving` virava `undefined/null`, e como `extrairEstado` lê sempre a **última** mensagem do
+assistant, o null **se propagava** por todos os turnos seguintes até o `complete` → `doc.receita`
+(`chat.functions.ts:1311`) → submit → coluna "Tipo de Receita" vazia. O `saving.tipo_saving` tinha a
+**mesma** vulnerabilidade (linha gêmea), só não aparecia tanto porque o prompt de saving ecoa o campo
+com mais disciplina.
+
+**Fix:** no `orchestrator.ts`, ao montar o `result`, `tipo_saving` deixa de vir do echo do LLM e passa
+a ser **preservado do estado de entrada (form = fonte da verdade)** para saving e receita:
+`tipo_saving: <entrada>.tipo_saving ?? <echo>.tipo_saving ?? <alias tipo do echo> ?? null`. Como a
+preservação roda em **todo** turno do orquestrador (chamado por `iniciarReceita`/`iniciarSaving`/
+`enviarMensagem`), o valor do form nunca mais é zerado por um echo desleixado, e o caso `{}` também
+fica coberto (cai no valor de entrada). O alias `tipo` é rede de último recurso para estados já
+erodidos. Determinístico, sem depender do prompt.
+
+Além da erosão de `tipo_saving`, o `legado-260` revelou um problema **de produto** maior: o usuário
+**não foi barrado** ao submeter como receita mesmo depois de o agente concluir que era saving. No chat,
+o agente questionou os R$15 mil de receita (potencial não comprovado), o usuário concordou e pediu para
+reclassificar como saving — mas isso aconteceu **dentro da fase de receita**: o agente coletou o saving
+ali mesmo (1h30/dia → R$1.489,50) e completou, gravando um **"## Memorial de Saving" no slot de
+receita**. Não havia gate determinístico (a) forçando a reclassificação nem (b) checando a completude
+da receita antes do submit (o gate de "ganho zero" não pegou porque havia valor e o saving já deixava o
+total positivo). Resultado: dado pela metade + saving disfarçado de receita.
+
+**Fix — 3 camadas (todas determinísticas, no padrão dos gates de saving):**
+1. **`tipo_saving` preservado do form** (`orchestrator.ts`, montagem do `result` em `runOrchestrator`):
+   deixa de vir do echo do LLM — `tipo_saving: <entrada>.tipo_saving ?? <echo>.tipo_saving ??
+   <alias tipo do echo> ?? null`, para saving e receita. Roda em **todo** turno (chamado por
+   `iniciarReceita`/`iniciarSaving`/`enviarMensagem`), então o form nunca mais é zerado por um echo
+   desleixado, e o caso `{}` fica coberto. Alias `tipo` = rede para estados já erodidos.
+2. **Backstop de reclassificação no chat** (`enviarMensagem`): predicado puro `receitaMemorialEhSaving`
+   (`orchestrator.ts`) detecta um memorial salvo no slot de receita que é saving / "não aplicável" /
+   "reclassificado como saving". Quando bate, o backend **bloqueia o preview/complete da receita**,
+   zera o memorial saving-shaped e devolve uma pergunta-guia (`MSG_RECLASSIFICAR_RECEITA`) mandando
+   trocar o tipo do projeto para Saving — mantendo a fase em `receita`. Prompt sozinho não segurava.
+3. **Gate de completude no submit** (`submeterParaValidacao`): projeto `receita_incremental` só submete
+   com `valor_ganho_mensal > 0` **+** `tipo_saving` preenchido **+** memorial de receita não-vazio e
+   não saving-shaped (mesmo predicado). Rede determinística final.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (preservação de `tipo_saving` no `result`;
+predicado `receitaMemorialEhSaving`); `src/lib/agents/chat.functions.ts` (backstop em `enviarMensagem`;
+gate de completude em `submeterParaValidacao`; const `MSG_RECLASSIFICAR_RECEITA`); testes em
+`tests/orchestrator-prompts.test.ts` (4 — preservação de `tipo_saving`) e `tests/receita-memorial-saving.test.ts`
+(6 — o predicado); `worker.js` rebuildado.
+
+**Pendente (decisão de produto, fora deste fix):** a **correção retroativa da linha 234** do `legado-260`
+no Sheets (a receita lá é um saving deslocado — periodicidade do form = mensal). Aguarda decisão da
+equipe na validação (o projeto está "Pendente").
+
+---
+
 ## 2026-06-29 — Gate de complexidade por IA (`tem_ia_como_funcionalidade`) MORTO em produção
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `docs/spec-complexidade-autonomia`

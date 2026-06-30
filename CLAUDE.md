@@ -51,6 +51,7 @@ npm run lint / format  # eslint / prettier
 10. **`git pull` antes de abrir PR** — `git fetch origin` + incorporar `origin/main` (merge/rebase) antes de subir, e rebuildar `worker.js`/`dist` após o merge (o `main` anda por causa da regra 8).
 11. **Edições visuais → skill `frontend-design`** — para QUALQUER tarefa de UI/design, invocar a skill **antes** de codar. Respeitar identidade GoGroup (`--go-blue`, `--go-lime`, `--go-cream`, Poppins) e o piso de a11y: foco de teclado visível, `prefers-reduced-motion`, contraste, **estado nunca só por cor** (rótulo/ícone também). PT-BR com acentos (regra 4).
 12. **Specs (`spec-docs/`) — consultar antes, atualizar a CADA implementação** — toda feature/correção relevante atualiza a spec no MESMO PR. Antes de codar, leia a spec (ver `spec-docs/README.md`), em especial **"Decisões fechadas que NÃO podem ser corrigidas por engano"** (escolhas intencionais — não "consertar" sem confirmar). Ao terminar: features em `SPEC_FEATURES_NOVAS.md`, correções em `SPEC_CORRECOES.md` (sintoma → causa → fix → onde aterrissou → PR). Specs são planejamento/decisão; NÃO substituem `docs/` nem este arquivo.
+13. **Staging primeiro — NADA vai pra produção sem passar pela staging** — toda mudança de **código** que vá ser deployada DEVE ser validada no app de **staging** (`godocs-staging`) ANTES de tocar produção (`godocs`). Fluxo obrigatório: worktree (regra 8) → `npm run test && npm run build && npm run build:worker` → **deploy no STAGING** (`updateApp` no appId **`edf400b4`**) → validar no navegador e/ou E2E apontado pra staging → **só então** deploy em **produção** (`674a3710`). **NUNCA** deployar direto em prod sem o passo de staging. A staging é isolada (aba `STAGING`, pasta de Drive própria, Chat mudo, SQLite próprio) — pode testar à vontade. *(A trava dura — branch protection + CI no GitHub — fica a cargo do admin do repo; enquanto ela não existe, ESTA regra é a trava, e o Claude deve segui-la por padrão.)* Runbook na seção **Ambiente de Staging** abaixo e em [docs/staging.md](docs/staging.md).
 
 ## Deploy rápido (Godeploy)
 
@@ -70,7 +71,35 @@ curl -X POST "$UPLOAD_URL" -F "worker.js=@./worker.js" -F "index.html=@./dist/in
 echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
 ```
 
-**Críticas:** assets sem prefixo `dist/` (`assets/foo.js`) · SPA fallback obrigatório · lista gerada do `dist/` real (hashes mudam).
+**Críticas:** assets sem prefixo `dist/` (`assets/foo.js`) · SPA fallback obrigatório · lista gerada do `dist/` real (hashes mudam). ⚠️ **Esse `appId: 674a3710` é PRODUÇÃO** — pela **regra 13**, valide no staging (`edf400b4`) ANTES.
+
+## Ambiente de Staging
+
+App **isolado** para validar mudanças antes de produção (**regra 13 — staging primeiro**). O **mesmo código** roda nos dois apps; o ÚNICO discriminador é a env `GODOCS_ENV` (só setada na staging). Planejamento/decisões em [spec-docs/SPEC_STAGING.md](spec-docs/SPEC_STAGING.md); runbook em [docs/staging.md](docs/staging.md).
+
+| | Produção | Staging |
+|---|---|---|
+| App Godeploy | `674a3710` (`godocs`) | **`edf400b4`** (`godocs-staging`) |
+| URL | godocs.devgogroup.com | godocs-staging.devgogroup.com |
+| Planilha | aba `GoDocs` | **mesma planilha**, aba `STAGING` |
+| Drive | pasta de prod | pasta própria (`19lFuQ7Q...`) |
+| Google Chat | webhook do time | **mudo** (sem webhook) |
+| SQLite (`env.DB`) | DB de prod | DB próprio (isolado por-app) |
+| `GODOCS_ENV` | ausente → `production` | `staging` (mostra a faixa) |
+
+**Isolamento (decisão do dono — mais leve que a SPEC original):** staging COMPARTILHA a planilha de prod, mas grava numa **aba `STAGING`** própria — a aba é o isolamento, não o arquivo. Pasta de Drive separada, Chat mudo, SQLite próprio. **Dados simulados, nunca reais.**
+
+**Guard anti-vazamento (`src/lib/env.ts`):** `assertNaoEhDefaultDeProd` — em staging, se a aba resolver pro default `GoDocs` ou a pasta do Drive pro default de prod (env de override faltando), o app **lança erro** em vez de escrever em produção. Em prod é no-op (caminho idêntico ao de hoje). A faixa visual "STAGING" (`src/components/staging-banner.tsx`, montada no `__root.tsx`) aparece quando `GET /api/config` → `{env:"staging"}`.
+
+**Deploy no staging:** mesmo fluxo do "Deploy rápido", mas `updateApp` no **appId `edf400b4`** (NUNCA `674a3710`). Os secrets de staging já incluem `GODOCS_ENV=staging`, `GOOGLE_SHEETS_TAB=STAGING` e `GOOGLE_DRIVE_FOLDER_ID` próprio — só se deploya o **código** (não precisa re-setar secret a cada deploy).
+
+**Recursos Google de staging:** criados pelo script `scripts/staging/provision-google.mjs` (`node --env-file=.env scripts/staging/provision-google.mjs`) — cria a aba `STAGING` (cabeçalho copiado de `GoDocs`) via Service Account e a pasta de Drive via OAuth `rpa_ia`. Idempotente.
+
+**E2E contra staging:** `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING E2E_ONLY=<key> npm run e2e:run -- <runId>` (rodar do `godocs-main`, que tem `.env`). ⚠️ `GOOGLE_SHEETS_TAB=STAGING` é **obrigatório** no run/validate/cleanup, senão eles leem/limpam a aba de **prod**. O cleanup só apaga linhas cujo `ID Projeto` casa com os IDs do run (tag-escopado) — não toca prod.
+
+**Crons de staging:** `sync-sheets-to-sqlite` (hora) e `sync-areas` (diário) ATIVOS; **`reanalisar-pendentes` PAUSADO** (LLM por minuto = custo) — ligar via `setCronJobEnabled` só pra testar reconciliação de Complexidade e desligar depois.
+
+**Pendente (a cargo do admin do repo — Kaique; Luis é READ):** CI no GitHub Actions (gate anti-`worker.js`-desatualizado), `deploy.mjs --env=staging|prod` (removendo o token hardcoded de `upload-deploy.mjs`), PR template + label `staging-validated`, e **branch protection na `main`** (PR + CI verde + review + gate "validado em staging"). Enquanto a trava dura não existe, a **regra 13** é a trava (convenção seguida pelo Claude).
 
 ## Documentação detalhada
 
@@ -82,6 +111,7 @@ echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basena
 | [docs/agents.md](docs/agents.md) | Agentes IA: orquestrador, extrator, compilador, analisador |
 | [docs/business-rules.md](docs/business-rules.md) | Fluxo de submissão, fases do chat, cálculos de saving/receita |
 | [docs/deploy.md](docs/deploy.md) | Deploy no Godeploy, env vars, checklist pré-deploy |
+| [docs/staging.md](docs/staging.md) | **Ambiente de staging** (regra 13): isolamento, guard, deploy no `edf400b4`, provisionamento Google, E2E contra staging |
 | [spec-docs/](spec-docs/) | **Specs de planejamento/decisão** (o que foi decidido, por quê, onde aterrissou). Consultar/atualizar conforme a **regra 12**. |
 
 ## Memorial padronizado
