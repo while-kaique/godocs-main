@@ -45,11 +45,14 @@ describe("analyzer — prompt de classificação (régua de dois eixos: ação >
     expect(lower).toContain("eliminou trabalho humano");
   });
 
-  it("traz os três testes desempatadores (write-decisão×persistência, resolve×avisa, antes×depois)", () => {
+  it("traz os quatro testes desempatadores (write×persistência, resolve×avisa, antes×depois, quem dispara)", () => {
     expect(prompt).toContain("DECISÃO");
     expect(prompt).toContain("PERSISTÊNCIA");
     expect(prompt).toContain("RESOLVE × AVISA");
     expect(prompt).toContain("Confirmação ANTES × override DEPOIS");
+    // 4º teste — mata o falso-positivo do CRUD de aprovação (humano clica "aprovar")
+    expect(prompt).toContain("QUEM dispara a ação");
+    expect(prompt.toLowerCase()).toContain("falso-positivo");
   });
 
   it("avalia criticamente se o projeto marcado como especial é realmente especial", () => {

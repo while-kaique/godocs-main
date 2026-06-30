@@ -269,7 +269,7 @@ Estes precisam virar texto explícito no prompt do `analyzer.ts` (substituindo/a
 5. **Registro de prompt (regra 3)** — `src/lib/testes/prompt-registry.ts` atualizado (descrição da régua de dois eixos); `prompt-inspector.tsx` renderiza do registry (sem texto próprio).
 6. **Testes (regra 2)** — `tests/analyzer-complexidade.test.ts`: asserts do prompt (árvore ação-primeiro, três testes, red herrings, exemplos) + **testes de unidade da função pura `normalizarComplexidade`** (D1 determinístico-que-age = autonomia; dashboard/alerta = automacao; IA+fila = inteligencia; confirmação pré-ação ≠ autonomia; retrocompat null; não-regressão PR#94; precedência do `tem_ia`). Suíte completa verde (468).
 7. **Sheets** — coluna "Complexidade" **inalterada** (mesmo enum, D3).
-8. **Validação retroativa (§10)** — feita na aba **`godocs_teste_retroativo`** (NÃO na aba `GoDocs` oficial; sem backfill).
+8. **Validação retroativa (§10)** — harness em `scripts/retroativo/` (roda via vitest, puxa prod com `E2E_COOKIE`, escreve só na aba **`godocs_teste_retroativo`** — nunca na `GoDocs` oficial, sem backfill). **Smoke inicial** (3 submissões) pegou 1 falso-positivo de autonomia (o CRUD de aprovação "GoGroup Mobility", lido como ação autônoma) → corrigido com o **4º teste desempatador** ("QUEM dispara a ação — humano × sistema"); pós-fix os 3 voltaram a `automacao`. ⏳ **Run completo sobre a base ainda PENDENTE** (`RETRO_WRITE=1`) — fazer depois, com calma.
 
 ## Decisões fechadas que NÃO podem ser corrigidas por engano
 

@@ -194,13 +194,14 @@ DEFINIÇÃO DOS 3 NÍVEIS:
 - **"autonomia"** — toma a AÇÃO consequente na última ponta, sozinho, com pouca ou nenhuma intervenção humana. A decisão por trás pode ser IA OU lógica determinística. (Ex.: agente que recebe o chamado, decide e RESPONDE o cliente sozinho; sistema que detecta a queda de margem e TIRA os cupons do produto automaticamente — mesmo por regra, sem IA.)
 
 CONCEITO-CHAVE — "ação consequente na última ponta": o sistema atua sobre o OBJETO do processo / muda o estado do mundo sem um humano confirmar.
-- É ação consequente (→ autonomia): tira/aplica cupom, ajusta preço, move estoque; responde o cliente / fecha o chamado; aprova ou reprova um pagamento/pedido como DECISÃO FINAL; posta/envia/dispara algo que tem EFEITO no negócio.
+- É ação consequente (→ autonomia): tira/aplica cupom, ajusta preço, move estoque; responde o cliente / fecha o chamado; o PRÓPRIO sistema aprova ou reprova um pagamento/pedido sozinho como decisão final (NÃO um humano clicando "aprovar" numa tela); posta/envia/dispara algo que tem EFEITO no negócio.
 - NÃO é ação consequente (→ no máximo automação/inteligência): gerar dashboard/relatório/planilha; alerta/notificação/e-mail INFORMATIVO; recomendação/ranking/classificação que vira FILA para alguém tratar.
 
-TRÊS TESTES PARA OS CASOS DIFÍCEIS (decisivos — use-os):
+QUATRO TESTES PARA OS CASOS DIFÍCEIS (decisivos — use-os):
 1. **Write como DECISÃO × write como PERSISTÊNCIA:** gravar num sistema (planilha, banco, ERP) só ELEVA para autonomia se o registro É a DECISÃO/desfecho de negócio (ex.: lançar a aprovação que LIBERA o pedido). Se é só ARMAZENAR um dado do fluxo (log, cache, "salvar o resultado", atualizar um status intermediário) → é persistência/MEIO, NÃO eleva.
 2. **RESOLVE × AVISA (mesma mensagem, função diferente):** responder o cliente e FECHAR o chamado é ação (autonomia); mandar um e-mail/alerta que AVISA um humano para ele resolver NÃO é (automação) — embora ambos "enviem mensagem". O que conta é se a mensagem É o desfecho ou só passa a bola.
 3. **Confirmação ANTES × override DEPOIS:** se um humano confirma/aprova ANTES de cada ação ser executada → NÃO é autonomia (inteligência se houver IA, senão automação). Se o sistema TOMA a ação por padrão e um humano apenas audita / pode reverter depois (exceções) → É autonomia.
+4. **QUEM dispara a ação — humano × sistema (o falso-positivo mais comum):** se a "ação" (aprovar, mudar status, criar/editar registro) é feita por um HUMANO operando a ferramenta (clica "aprovar", muda o status numa tela, preenche um formulário), o sistema apenas REGISTRA a decisão da pessoa → automação (ou inteligência se houver IA), **NÃO autonomia**. Autonomia exige que o PRÓPRIO SISTEMA decida e execute a ação a partir do seu trigger, sem um humano acionando cada uma. ⚠️ App / CRUD / plataforma de aprovação ou gestão (fila de aprovações, mudança de status por clique, cadastro) é o caso CLÁSSICO de falso-positivo: "atualiza o status" por ação humana ≠ ação autônoma.
 
 NÃO CLASSIFIQUE POR ESTES SINAIS (red herrings — ignore deliberadamente):
 - **"roda sozinho / 24/7 / por trigger"** → é OPERAÇÃO (o degrau da automação), NÃO a ação que fecha o ciclo. Um coletor que roda 24/7 e carrega um painel é AUTOMAÇÃO, por mais "sozinho" que opere.
@@ -276,7 +277,7 @@ IMPORTANTE:
 
 // ─── User message (dados do projeto) ────────────────────────────────────────
 
-function buildUserMessage(
+export function buildUserMessage(
   projeto: Record<string, unknown>,
   conteudo: Record<string, unknown>,
   docTexto?: string | null,
