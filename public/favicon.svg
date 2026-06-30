@@ -1,20 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GoDocs">
   <rect width="512" height="512" rx="112" fill="#0059A9"/>
-
-  <!-- pasta: painel de trás (aba) -->
-  <path fill="#C3C700" d="M86 312 L86 268 Q86 250 104 250 L188 250 Q200 250 207 260 L226 288 Q232 296 242 296 L426 296 L426 312 Z"/>
-
-  <!-- sombra do documento saindo da pasta -->
-  <ellipse cx="262" cy="300" rx="116" ry="22" fill="#003a70" opacity="0.40"/>
-
-  <!-- documento branco saindo pra fora (levemente inclinado) -->
-  <g transform="rotate(-6 256 230)">
-    <rect x="168" y="112" width="180" height="240" rx="18" fill="#FFFFFF"/>
-    <path fill="#0059A9" fill-rule="evenodd" d="M206 144 L258 144 C308 144 340 180 340 228 C340 276 308 312 258 312 L206 312 Z M242 178 L258 178 C294 178 306 202 306 228 C306 254 294 278 258 278 L242 278 Z"/>
-  </g>
-
-  <!-- pasta: bolso da frente (cobre a base do doc) -->
-  <path fill="#D7DB00" d="M86 320 Q86 300 108 300 L404 300 Q426 300 426 320 L426 402 Q426 428 398 428 L114 428 Q86 428 86 402 Z"/>
-  <!-- vinco do bolso -->
-  <path stroke="#AEB200" stroke-width="6" fill="none" stroke-linecap="round" d="M118 320 L394 320"/>
+  <!-- folha de documento -->
+  <path fill="#FFFFFF" d="M154 100 L300 100 L376 176 L376 394 Q376 412 358 412 L154 412 Q136 412 136 394 L136 118 Q136 100 154 100 Z"/>
+  <!-- canto dobrado (dog-ear) -->
+  <path fill="#D7DB00" d="M300 100 L376 176 L300 176 Z"/>
+  <!-- letra D -->
+  <path fill="#0059A9" fill-rule="evenodd" d="M186 168 L250 168 C312 168 348 212 348 264 C348 316 312 360 250 360 L186 360 Z M224 204 L250 204 C290 204 312 230 312 264 C312 298 290 324 250 324 L224 324 Z"/>
 </svg>
