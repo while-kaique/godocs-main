@@ -6,6 +6,57 @@
 
 ---
 
+## 2026-06-30 — Edição de projeto ESPECIAL → saving/receita não desmarcava `especial` (flag sticky de mão única)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edicao-especial-vira-normal`
+
+**Sintoma:** pessoas editavam um projeto submetido como **especial**, trocavam para **saving operacional**
+(ou receita), passavam por todo o fluxo e reenviavam — mas o projeto **voltava como especial**: a coluna
+**"Especial?" do Sheets continuava "Sim"** e internamente seguia `especial=1`. Confirmado em produção com
+`hugo.santana@gobeaute.com.br` (`legado-038`) e `oscar.filho@gocase.com` (`3d27a2e3…`). Log do Hugo:
+`16:20:52 atualizar-tipos → saving` e 3 s depois `atualizarMetadados` logando *"Projeto especial
+legado-038: doc reconstruída sem IA, pronto para reenvio"* — o backend ignorou a troca, rodou o chat
+inteiro como `tipos: especial`, e o analyzer recebeu só ~900 chars de contexto (o memorial de saving do
+Hugo **não foi capturado**; o do Oscar, com ~8000 chars, provavelmente persistiu, só preso na flag).
+
+**Causa-raiz:** a flag `especial` era **sticky de mão única** — havia caminhos que a marcavam `true`, mas
+**nenhum** que a voltasse a `false` numa edição. Dois pontos somavam:
+1. **`atualizarTipos` (`chat.functions.ts`)** gravava `tipos_projeto`/`tipo_projeto` ao trocar para
+   saving/receita, mas **não tocava em `especial`** → o projeto seguia `especial=1`.
+2. **`atualizarMetadados` (`chat.functions.ts`)** fazia `ehEspecial = data.especial === true ||
+   ctxData?.especial === 1`. Como o banco ainda dizia `especial=1`, ele **re-forçava
+   `especial=true`/`tipo_projeto='especial'`/`tipos_projeto=['especial']`, reconstruía a doc especial sem
+   IA e dava `return` antecipado** — ignorando a conversão e pulando a coleta de saving. O frontend
+   (`submeter.tsx`) ainda mandava `especial: true` fixo (handler especial) ou **nada** (fluxo normal),
+   então o backend nunca recebia o sinal de "deixou de ser especial". No submit, o status e a coluna
+   "Especial?" derivam de `projeto.especial === 1` → subia "Sim".
+
+**Fix — 3 camadas (à prova de ordem de chamada):**
+1. **`atualizarTipos` zera `especial`** ao escolher um tipo financeiro (escolher saving/receita = não-especial):
+   `updateProjeto(..., { tipos_projeto, tipo_projeto: tipos[0], especial: false })`. É o ponto onde o
+   usuário declara a natureza do impacto.
+2. **`atualizarMetadados` respeita `especial: false` EXPLÍCITO** — quebra a stickiness do `ctxData`:
+   `ehEspecial = data.especial === true || (data.especial !== false && ctxData?.especial === 1)`; e quando
+   `data.especial === false && ctxData?.especial === 1`, zera a flag no banco (belt-and-suspenders com a
+   camada 1, cobre a ordem em que metadados chega antes da troca de tipos). `especial === undefined`
+   preserva o comportamento antigo (chamadas internas/cron, legado→especial).
+3. **Frontend (`submeter.tsx`)** passa `especial: form.especial` em **todas** as chamadas de edição de
+   `atualizar-metadados` (antes umas mandavam `true` fixo, outras nada). `false` = sinal de conversão.
+
+Como a coluna "Especial?" (`sync.ts`) deriva de `projeto.especial`, zerar a flag no banco + re-sync de
+IDA já reflete **"Não"** no Sheets — sem alteração no mapeamento.
+
+**Onde aterrissou:** `src/lib/chat.functions.ts` (`atualizarTipos`, `atualizarMetadados`),
+`src/routes/submeter.tsx` (5 call-sites de `especial:`), teste de regressão em
+`tests/atualizar-metadados-especial.test.ts` (atualizarTipos zera especial; atualizarMetadados com
+`especial:false` converte sem reconstruir a doc especial).
+
+**Recuperação (não-código):** Hugo (`legado-038`) e Oscar (`3d27a2e3…`) — flag a destravar e, no caso do
+Hugo, memorial de saving a reconstruir do timeline (`chat_messages`/`form_events`/`snapshot_chat`). Sem
+backfill geral; só os dois casos reportados (decisão do dono).
+
+---
+
 ## 2026-06-30 — "Tipo de Receita" (e "Tipo de Saving") em branco no Sheets — erosão de `tipo_saving` pelo echo do LLM
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/tipo-receita-preserva-form`
