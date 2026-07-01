@@ -5,7 +5,7 @@
 const log = (fn: string, ...args: unknown[]) => console.log(`[chat.functions/${fn}]`, ...args);
 const err = (fn: string, ...args: unknown[]) => console.error(`[chat.functions/${fn}]`, ...args);
 
-import { z } from 'zod';
+import { z } from "zod";
 import {
   insertProjeto,
   insertChatMessage,
@@ -30,18 +30,30 @@ import {
   insertAnalise,
   gravarVersaoProjeto,
   parseJson,
-} from '@/integrations/db/client.server';
-import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, contestaTotalCargaReal, totalEconomiaHoras, unidadeHorasDe, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
-import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
-import { validarDocumentacao } from '@/lib/agents/validator';
-import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
-import { enviarEmailAprovacao, enviarEmailRejeicao } from '@/lib/agents/email-agent';
-import { extractTextFromMultipleFiles } from '@/lib/extract-text.server';
-import { extrairCamposDocumentacao } from '@/lib/agents/extractor';
-import { stripMarkdown } from '@/lib/strip-markdown';
-import { deriveAreaFromEmail } from '@/lib/areas/teamguide.server';
-import { isAdmin } from '@/lib/auth.functions';
+} from "@/integrations/db/client.server";
+import { runBackground } from "@/lib/background";
+import {
+  runOrchestrator,
+  aplicaConfirmacaoBaseHoras,
+  aplicaSplitCargaEscala,
+  aplicaGateAlocacaoGanhos,
+  respostaAlocacaoVaga,
+  precisaConfirmarEscala,
+  interpretarCargaReal,
+  contestaTotalCargaReal,
+  totalEconomiaHoras,
+  unidadeHorasDe,
+  receitaMemorialEhSaving,
+} from "@/lib/agents/orchestrator";
+import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
+import { validarDocumentacao } from "@/lib/agents/validator";
+import { analisarProjeto as analisarProjetoAgent } from "@/lib/agents/analyzer";
+import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-agent";
+import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
+import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
+import { stripMarkdown } from "@/lib/strip-markdown";
+import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
+import { isAdmin } from "@/lib/auth.functions";
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -53,57 +65,61 @@ import type {
   RevisaoContexto,
   SavingColetado,
   SavingLinha,
-} from '@/lib/agents/types';
-import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
-import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens } from '@/lib/agents/saving-calc';
-import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos, extrairJustificativaCargaEscala } from '@/lib/agents/memorial-format';
-import { syncSubmitToGoogle, syncUpdateToGoogle, nowFortaleza } from '@/lib/google/sync';
-import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
-import { upsertResumoDoc } from '@/lib/google/drive';
-import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
+} from "@/lib/agents/types";
+import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from "@/lib/agents/types";
+import {
+  recomputarSavingFinanceiro,
+  enriquecerMemorial,
+  custoEvitadoMensalFromItens,
+  custoProjetoMensalFromItens,
+} from "@/lib/agents/saving-calc";
+import {
+  normalizarMarcadoresMemorial,
+  extrairAlocacaoGanhos,
+  extrairJustificativaCargaEscala,
+} from "@/lib/agents/memorial-format";
+import { syncSubmitToGoogle, syncUpdateToGoogle, nowFortaleza } from "@/lib/google/sync";
+import { readAllRows, updateRowByProjectId } from "@/lib/google/sheets";
+import { upsertResumoDoc } from "@/lib/google/drive";
+import { renderResumoDocumentacao } from "@/lib/agents/doc-render";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 // Registra um evento determinístico do formulário (valores marcados, "voltar
 // etapa") para o timeline do Investigador. NÃO-bloqueante: é observabilidade e
 // nunca deve quebrar a submissão — erros são apenas logados.
-async function gravarEvento(
-  projetoId: string,
-  tipo: string,
-  fase: string | null,
-  dados?: unknown,
-) {
+async function gravarEvento(projetoId: string, tipo: string, fase: string | null, dados?: unknown) {
   try {
     await recordFormEvent({ projeto_id: projetoId, tipo, fase, dados });
   } catch (e) {
-    err('gravarEvento', `Falha ao gravar evento '${tipo}' (não bloqueante):`, e);
+    err("gravarEvento", `Falha ao gravar evento '${tipo}' (não bloqueante):`, e);
   }
 }
 
 // Nomes amigáveis dos campos de documentação (7 campos)
 const DOC_FIELD_LABELS: Record<string, string> = {
-  nome_projeto: 'nome do projeto',
-  o_que_faz: 'o que faz',
-  execucao: 'execução',
-  dependencias: 'dependências',
-  fluxo: 'fluxo',
-  configurar_antes: 'configurar antes',
-  atencao: 'atenção/riscos',
+  nome_projeto: "nome do projeto",
+  o_que_faz: "o que faz",
+  execucao: "execução",
+  dependencias: "dependências",
+  fluxo: "fluxo",
+  configurar_antes: "configurar antes",
+  atencao: "atenção/riscos",
 };
 
 // Nomes amigáveis dos campos de saving
 const SAVING_FIELD_LABELS: Record<string, string> = {
-  linhas: 'pessoas/cargos',
-  economia_horas_mes: 'economia de horas',
-  tipo_saving: 'tipo de saving',
-  memorial_calculo: 'memorial de cálculo',
+  linhas: "pessoas/cargos",
+  economia_horas_mes: "economia de horas",
+  tipo_saving: "tipo de saving",
+  memorial_calculo: "memorial de cálculo",
 };
 
 // Nomes amigáveis dos campos de receita
 const RECEITA_FIELD_LABELS: Record<string, string> = {
-  tipo_saving: 'tipo de ganho',
-  valor_ganho_mensal: 'valor de receita',
-  memorial_calculo: 'memorial de cálculo',
+  tipo_saving: "tipo de ganho",
+  valor_ganho_mensal: "valor de receita",
+  memorial_calculo: "memorial de cálculo",
 };
 
 function progressoDocumentacao(coletado: DocumentacaoColetada): string {
@@ -112,51 +128,56 @@ function progressoDocumentacao(coletado: DocumentacaoColetada): string {
   const preenchidos = campos.filter(([, v]) => v !== null).length;
   const faltando = campos.filter(([, v]) => v === null).map(([k]) => DOC_FIELD_LABELS[k] ?? k);
   if (faltando.length === 0) return `documentação ${preenchidos}/${total} ✓ completa`;
-  return `documentação ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+  return `documentação ${preenchidos}/${total} (falta: ${faltando.join(", ")})`;
 }
 
 function progressoSaving(saving: SavingColetado): string {
   const checks: [string, boolean][] = [
-    ['pessoas/cargos', saving.linhas != null && saving.linhas.length > 0],
-    ['economia de horas', saving.economia_horas_mes != null],
-    ['tipo de saving', saving.tipo_saving != null],
-    ['memorial de cálculo', saving.memorial_calculo != null],
+    ["pessoas/cargos", saving.linhas != null && saving.linhas.length > 0],
+    ["economia de horas", saving.economia_horas_mes != null],
+    ["tipo de saving", saving.tipo_saving != null],
+    ["memorial de cálculo", saving.memorial_calculo != null],
   ];
   const total = checks.length;
   const preenchidos = checks.filter(([, ok]) => ok).length;
   const faltando = checks.filter(([, ok]) => !ok).map(([nome]) => nome);
   if (faltando.length === 0) return `memorial saving ${preenchidos}/${total} ✓ completo`;
-  return `memorial saving ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+  return `memorial saving ${preenchidos}/${total} (falta: ${faltando.join(", ")})`;
 }
 
 function progressoReceita(receita: ReceitaColetada): string {
   const checks: [string, boolean][] = [
-    ['tipo de ganho', receita.tipo_saving != null],
-    ['valor de receita', receita.valor_ganho_mensal != null],
-    ['memorial de cálculo', receita.memorial_calculo != null],
+    ["tipo de ganho", receita.tipo_saving != null],
+    ["valor de receita", receita.valor_ganho_mensal != null],
+    ["memorial de cálculo", receita.memorial_calculo != null],
   ];
   const total = checks.length;
   const preenchidos = checks.filter(([, ok]) => ok).length;
   const faltando = checks.filter(([, ok]) => !ok).map(([nome]) => nome);
   if (faltando.length === 0) return `memorial receita ${preenchidos}/${total} ✓ completo`;
-  return `memorial receita ${preenchidos}/${total} (falta: ${faltando.join(', ')})`;
+  return `memorial receita ${preenchidos}/${total} (falta: ${faltando.join(", ")})`;
 }
 
-function progressoPorFase(fase: ChatFase, coletado: DocumentacaoColetada, saving: SavingColetado, receita: ReceitaColetada): string {
+function progressoPorFase(
+  fase: ChatFase,
+  coletado: DocumentacaoColetada,
+  saving: SavingColetado,
+  receita: ReceitaColetada,
+): string {
   switch (fase) {
-    case 'doc':
-    case 'doc_preview':
+    case "doc":
+    case "doc_preview":
       return progressoDocumentacao(coletado);
-    case 'saving':
-    case 'saving_preview':
+    case "saving":
+    case "saving_preview":
       return progressoSaving(saving);
-    case 'receita':
-    case 'receita_preview':
+    case "receita":
+    case "receita_preview":
       return progressoReceita(receita);
-    case 'completo':
-      return 'fluxo completo ✓';
+    case "completo":
+      return "fluxo completo ✓";
     default:
-      return '';
+      return "";
   }
 }
 
@@ -174,12 +195,12 @@ function calcularMaterialidade(
 
 async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> {
   const data = await getProjetoContextoData(projeto_id);
-  if (!data) throw new Error('Projeto não encontrado.');
+  if (!data) throw new Error("Projeto não encontrado.");
   const docMsg = await getDocMessage(projeto_id);
 
   const tiposRaw = parseJson<string[]>(data.tipos_projeto);
   const tiposProjeto = Array.isArray(tiposRaw)
-    ? (tiposRaw as ('saving' | 'receita_incremental')[])
+    ? (tiposRaw as ("saving" | "receita_incremental")[])
     : null;
 
   const revisao = await buildRevisaoContexto(projeto_id, data);
@@ -191,17 +212,17 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     // area_nome vem do join por area_id; cai no texto p.area quando não há id mapeado.
     area: data.area_nome ?? data.area ?? null,
     membros: parseJson<string[]>(data.membros) ?? [],
-    nome_projeto: data.nome ?? '',
+    nome_projeto: data.nome ?? "",
     data_criacao: data.data_criacao_projeto ?? null,
     doc_texto: docMsg?.content ?? null,
     descricao_breve: data.descricao_breve ?? null,
-    tipo_projeto: (data.tipo_projeto as 'saving' | 'receita_incremental' | null) ?? null,
+    tipo_projeto: (data.tipo_projeto as "saving" | "receita_incremental" | null) ?? null,
     tipos_projeto: tiposProjeto,
-    escopo: (data.escopo as 'interno' | 'externo' | null) ?? null,
+    escopo: (data.escopo as "interno" | "externo" | null) ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
     // a passo de uma rotina inexistente).
-    alguem_fazia: (data.alguem_fazia as 'sim' | 'nao' | null) ?? null,
+    alguem_fazia: (data.alguem_fazia as "sim" | "nao" | null) ?? null,
     especial: data.especial === 1,
     contexto_especial: data.contexto_especial ?? null,
     revisao,
@@ -221,9 +242,7 @@ async function buildRevisaoContexto(
   const jaSubmetido = !!data.submitted_at || !!docRow?.conteudo;
   if (!jaSubmetido) return null;
 
-  const docGerada = docRow?.conteudo
-    ? parseJson<DocumentacaoGerada>(docRow.conteudo)
-    : null;
+  const docGerada = docRow?.conteudo ? parseJson<DocumentacaoGerada>(docRow.conteudo) : null;
 
   const doc = docGerada
     ? {
@@ -231,42 +250,44 @@ async function buildRevisaoContexto(
         execucao: docGerada.execucao ?? null,
         // fluxo/dependencias/atencao são estruturados; serializa em texto legível.
         fluxo: Array.isArray(docGerada.fluxo)
-          ? docGerada.fluxo.map((f, i) => `${i + 1}. ${f.etapa}: ${f.descricao}`).join('\n')
+          ? docGerada.fluxo.map((f, i) => `${i + 1}. ${f.etapa}: ${f.descricao}`).join("\n")
           : null,
         dependencias: Array.isArray(docGerada.dependencias)
-          ? docGerada.dependencias.map((d) => `${d.servico}: ${d.descricao}`).join('; ')
+          ? docGerada.dependencias.map((d) => `${d.servico}: ${d.descricao}`).join("; ")
           : null,
         configurar_antes: Array.isArray(docGerada.configurar_antes)
-          ? docGerada.configurar_antes.join('; ')
+          ? docGerada.configurar_antes.join("; ")
           : null,
         atencao: Array.isArray(docGerada.atencao)
-          ? docGerada.atencao.map((a) => `${a.titulo}: ${a.descricao}`).join('; ')
+          ? docGerada.atencao.map((a) => `${a.titulo}: ${a.descricao}`).join("; ")
           : null,
       }
     : null;
 
   const savingDoc = docGerada?.saving;
-  const saving = (savingDoc || data.memorial_calculo || data.saving_horas != null)
-    ? {
-        memorial_calculo: savingDoc?.memorial_calculo ?? data.memorial_calculo ?? null,
-        linhas: (savingDoc?.linhas ?? []).map((l) => ({
-          cargo: l.cargo,
-          horas_antes: l.horas_antes,
-          horas_depois: l.horas_depois,
-        })),
-        economia_horas_mes: savingDoc?.economia_horas_mes ?? data.saving_horas ?? null,
-        economia_reais_mes: savingDoc?.economia_reais_mes ?? data.saving_reais ?? null,
-        tipo_saving: savingDoc?.tipo_saving ?? data.tipo_saving ?? null,
-        alguem_fazia: data.alguem_fazia ?? null,
-        custo_externo_mensal: data.custo_externo_mensal ?? null,
-      }
-    : null;
+  const saving =
+    savingDoc || data.memorial_calculo || data.saving_horas != null
+      ? {
+          memorial_calculo: savingDoc?.memorial_calculo ?? data.memorial_calculo ?? null,
+          linhas: (savingDoc?.linhas ?? []).map((l) => ({
+            cargo: l.cargo,
+            horas_antes: l.horas_antes,
+            horas_depois: l.horas_depois,
+          })),
+          economia_horas_mes: savingDoc?.economia_horas_mes ?? data.saving_horas ?? null,
+          economia_reais_mes: savingDoc?.economia_reais_mes ?? data.saving_reais ?? null,
+          tipo_saving: savingDoc?.tipo_saving ?? data.tipo_saving ?? null,
+          alguem_fazia: data.alguem_fazia ?? null,
+          custo_externo_mensal: data.custo_externo_mensal ?? null,
+        }
+      : null;
 
   // O conteúdo de receita não vive em DocumentacaoGerada.saving; usa o memorial do
   // projeto como aproximação quando o tipo inclui receita.
-  const receita = data.tipo_projeto === 'receita_incremental' && data.memorial_calculo
-    ? { memorial_calculo: data.memorial_calculo, valor_ganho_mensal: data.saving_reais ?? null }
-    : null;
+  const receita =
+    data.tipo_projeto === "receita_incremental" && data.memorial_calculo
+      ? { memorial_calculo: data.memorial_calculo, valor_ganho_mensal: data.saving_reais ?? null }
+      : null;
 
   if (!doc && !saving && !receita) return null;
   return { doc, saving, receita };
@@ -282,11 +303,11 @@ type EstadoChat = {
 function extrairEstado(messages: { role: string; content: string }[]): EstadoChat {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg.role !== 'assistant') continue;
+    if (msg.role !== "assistant") continue;
     try {
       const parsed = JSON.parse(msg.content) as Partial<EstadoChat>;
       return {
-        fase: parsed.fase ?? 'doc',
+        fase: parsed.fase ?? "doc",
         coletado: parsed.coletado ?? documentacaoVazia(),
         saving: parsed.saving ?? savingVazio(),
         receita: parsed.receita ?? receitaVazia(),
@@ -295,52 +316,64 @@ function extrairEstado(messages: { role: string; content: string }[]): EstadoCha
       continue;
     }
   }
-  return { fase: 'doc', coletado: documentacaoVazia(), saving: savingVazio(), receita: receitaVazia() };
+  return {
+    fase: "doc",
+    coletado: documentacaoVazia(),
+    saving: savingVazio(),
+    receita: receitaVazia(),
+  };
 }
 
 function buildHistory(msgs: { role: string; content: string }[]): ChatHistoryMessage[] {
   return msgs
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => {
-      if (m.role === 'assistant') {
+      if (m.role === "assistant") {
         try {
           const parsed = JSON.parse(m.content) as { content?: string; question?: string };
-          return { role: 'assistant' as const, content: parsed.content ?? parsed.question ?? m.content };
+          return {
+            role: "assistant" as const,
+            content: parsed.content ?? parsed.question ?? m.content,
+          };
         } catch {
-          return { role: 'assistant' as const, content: m.content };
+          return { role: "assistant" as const, content: m.content };
         }
       }
-      return { role: 'user' as const, content: m.content };
+      return { role: "user" as const, content: m.content };
     });
 }
 
 function extrairResumoProjeto(msgs: { role: string; content: string }[]): string {
   for (let i = msgs.length - 1; i >= 0; i--) {
     const msg = msgs[i];
-    if (msg.role !== 'assistant') continue;
+    if (msg.role !== "assistant") continue;
     try {
       const parsed = JSON.parse(msg.content) as { type?: string; fase?: string; content?: string };
-      if (parsed.type === 'complete' && (parsed.fase === 'saving' || parsed.fase === 'receita') && parsed.content) {
+      if (
+        parsed.type === "complete" &&
+        (parsed.fase === "saving" || parsed.fase === "receita") &&
+        parsed.content
+      ) {
         return parsed.content;
       }
     } catch {
       continue;
     }
   }
-  return '';
+  return "";
 }
 
 function buildPhaseHistory(
   msgs: { role: string; content: string }[],
-  targetFase: 'saving' | 'receita',
+  targetFase: "saving" | "receita",
 ): ChatHistoryMessage[] {
   // 1) Marcador de transição (type:complete + fase): a conversa da fase vem depois.
   let startIdx = -1;
   for (let i = 0; i < msgs.length; i++) {
-    if (msgs[i].role !== 'assistant') continue;
+    if (msgs[i].role !== "assistant") continue;
     try {
       const parsed = JSON.parse(msgs[i].content) as { type?: string; fase?: string };
-      if (parsed.type === 'complete' && parsed.fase === targetFase) {
+      if (parsed.type === "complete" && parsed.fase === targetFase) {
         startIdx = i;
         break;
       }
@@ -353,10 +386,13 @@ function buildPhaseHistory(
   //    o histórico, sem arrastar a conversa do saving.
   if (startIdx < 0) {
     for (let i = 0; i < msgs.length; i++) {
-      if (msgs[i].role !== 'assistant') continue;
+      if (msgs[i].role !== "assistant") continue;
       try {
         const parsed = JSON.parse(msgs[i].content) as { fase?: string };
-        if (parsed.fase === targetFase) { startIdx = i - 1; break; }
+        if (parsed.fase === targetFase) {
+          startIdx = i - 1;
+          break;
+        }
       } catch {
         continue;
       }
@@ -366,26 +402,29 @@ function buildPhaseHistory(
   return buildHistory(phaseMsgs);
 }
 
-function formatResponse(resultado: ReturnType<typeof runOrchestrator> extends Promise<infer R> ? R : never) {
+function formatResponse(
+  resultado: ReturnType<typeof runOrchestrator> extends Promise<infer R> ? R : never,
+) {
   return {
     type: resultado.type,
-    content: resultado.type === 'options'
-      ? (resultado as { question: string }).question
-      : (resultado as { content: string }).content,
-    options: resultado.type === 'options' ? resultado.options : null,
+    content:
+      resultado.type === "options"
+        ? (resultado as { question: string }).question
+        : (resultado as { content: string }).content,
+    options: resultado.type === "options" ? resultado.options : null,
     fase: resultado.fase,
-    isPreview: resultado.type === 'preview',
-    isComplete: resultado.fase === 'completo',
+    isPreview: resultado.type === "preview",
+    isComplete: resultado.fase === "completo",
     coletado: resultado.coletado,
     saving: resultado.saving,
     receita: resultado.receita,
   };
 }
 
-function getTiposProjeto(ctx: ProjetoContexto): ('saving' | 'receita_incremental')[] {
+function getTiposProjeto(ctx: ProjetoContexto): ("saving" | "receita_incremental")[] {
   if (ctx.tipos_projeto && ctx.tipos_projeto.length > 0) return ctx.tipos_projeto;
   if (ctx.tipo_projeto) return [ctx.tipo_projeto];
-  return ['saving'];
+  return ["saving"];
 }
 
 // ─── Schemas de validação de entrada ────────────────────────────────────────
@@ -398,23 +437,24 @@ const iniciarSubmissaoSchema = z.object({
   // na submissão (submeterParaValidacao). Aqui o projeto nasce sem área.
   area: z.string().min(1).max(100).optional(),
   ferramenta: z.string().min(1).max(200),
-  escopo: z.enum(['interno', 'externo']).optional(),
+  escopo: z.enum(["interno", "externo"]).optional(),
   servico_externo: z.string().max(200).optional(),
   membros: z.array(z.string()).default([]),
   nome_projeto: z.string().min(1).max(200),
   data_criacao: z.string(),
-  tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
-  tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).optional(),
+  tipo_projeto: z.enum(["saving", "receita_incremental"]).optional(),
+  tipos_projeto: z.array(z.enum(["saving", "receita_incremental"])).optional(),
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
-  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
+  usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
   contexto_especial: z.string().max(2000).optional(),
-  docs: z.array(
-    z.object({ base64: z.string().min(1), filename: z.string().min(1) })
-  ).min(1).max(5000),
+  docs: z
+    .array(z.object({ base64: z.string().min(1), filename: z.string().min(1) }))
+    .min(1)
+    .max(5000),
 });
 
 // Teto de caracteres de uma mensagem do chat. Generoso porque o usuário às vezes
@@ -433,45 +473,57 @@ const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
   // 'trimestral'/'semestral': rotina a cada 3/6 meses — grava o ACUMULADO do
   // período pelo valor cheio (não mensaliza). A cadência fica no tipo_saving.
-  tipo_saving: z.enum(['mensal', 'pontual', 'trimestral', 'semestral']),
+  tipo_saving: z.enum(["mensal", "pontual", "trimestral", "semestral"]),
   // Havia alguém fazendo/mantendo o processo manualmente antes da automação?
   // 'sim' → horas reais; 'nao' → contrafactual (equivalente manual estimado);
   // 'externo' → ninguém fazia internamente e o ganho é 100% um custo externo
   // eliminado (SEM horas — só custo evitado). Árvore em step3-chat/constants.
-  alguem_fazia: z.enum(['sim', 'nao', 'externo']).optional(),
-  linhas: z.array(z.object({
-    cargo: z.string(),
-    horas_antes: z.number().min(0),
-    horas_depois: z.number().min(0),
-  })).optional(),
+  alguem_fazia: z.enum(["sim", "nao", "externo"]).optional(),
+  linhas: z
+    .array(
+      z.object({
+        cargo: z.string(),
+        horas_antes: z.number().min(0),
+        horas_depois: z.number().min(0),
+      }),
+    )
+    .optional(),
   custo_externo_mensal: z.number().min(0).optional(),
   // Custo evitado: a solução fez a empresa deixar de pagar ferramentas/serviços
   // externos? Lista incremental coletada no formulário (≠ custo_externo_mensal,
   // que é o custo INCORRIDO pela automação). Cada item entra pelo valor CHEIO
   // ('pontual' e 'mensal', sem ÷12). Soma ao saving (custo_evitado_reais).
-  tem_custo_evitado: z.enum(['sim', 'nao']).optional(),
-  custo_evitado_itens: z.array(z.object({
-    nome: z.string(),
-    valor: z.number().min(0),
-    recorrencia: z.enum(['mensal', 'pontual']),
-    justificativa: z.string(),
-  })).optional(),
+  tem_custo_evitado: z.enum(["sim", "nao"]).optional(),
+  custo_evitado_itens: z
+    .array(
+      z.object({
+        nome: z.string(),
+        valor: z.number().min(0),
+        recorrencia: z.enum(["mensal", "pontual"]),
+        justificativa: z.string(),
+      }),
+    )
+    .optional(),
   // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
   // rodar (chave de API, ElevenLabs…). Lista incremental do formulário. Cada item
   // entra pelo valor CHEIO (pontual e mensal, sem ÷12). SUBTRAI do saving
   // (custo_projeto_reais). Distinto do custo_externo_mensal (escopo externo) e do custo_evitado (que soma).
-  tem_custo_projeto: z.enum(['sim', 'nao']).optional(),
-  custo_projeto_itens: z.array(z.object({
-    nome: z.string(),
-    valor: z.number().min(0),
-    recorrencia: z.enum(['mensal', 'pontual']),
-    justificativa: z.string(),
-  })).optional(),
+  tem_custo_projeto: z.enum(["sim", "nao"]).optional(),
+  custo_projeto_itens: z
+    .array(
+      z.object({
+        nome: z.string(),
+        valor: z.number().min(0),
+        recorrencia: z.enum(["mensal", "pontual"]),
+        justificativa: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 const iniciarReceitaSchema = z.object({
   projeto_id: z.string().min(1),
-  tipo_saving: z.enum(['mensal', 'pontual', 'trimestral', 'semestral']),
+  tipo_saving: z.enum(["mensal", "pontual", "trimestral", "semestral"]),
   // Valor de receita informado pela pessoa no formulário determinístico. O agente
   // recebe esse valor pré-preenchido e o DESAFIA (em vez de coletar do zero).
   valor_ganho_mensal: z.number().min(0).optional(),
@@ -481,7 +533,7 @@ const iniciarReceitaSchema = z.object({
 
 const submeterValidacaoSchema = z.object({
   projeto_id: z.string().min(1),
-  modo: z.enum(['novo', 'edicao']).optional(),
+  modo: z.enum(["novo", "edicao"]).optional(),
 });
 
 // Monta a documentação de um projeto ESPECIAL sem nenhuma IA: usa a descrição
@@ -498,11 +550,11 @@ function buildDocEspecial(data: {
   descricao_breve?: string;
   contexto_especial?: string;
 }): DocumentacaoGerada {
-  const descricao = data.descricao_breve?.trim() ?? '';
-  const contexto = data.contexto_especial?.trim() ?? '';
+  const descricao = data.descricao_breve?.trim() ?? "";
+  const contexto = data.contexto_especial?.trim() ?? "";
   const oQueFaz =
-    [descricao, contexto].filter(Boolean).join('\n\n') ||
-    'Projeto de alto impacto e difícil mensuração — submetido para validação humana.';
+    [descricao, contexto].filter(Boolean).join("\n\n") ||
+    "Projeto de alto impacto e difícil mensuração — submetido para validação humana.";
 
   return {
     titulo: data.nome_projeto,
@@ -510,7 +562,7 @@ function buildDocEspecial(data: {
     ferramenta: data.ferramenta,
     membros: data.membros,
     o_que_faz: oQueFaz,
-    execucao: '—',
+    execucao: "—",
     dependencias: [],
     fluxo: [],
     configurar_antes: [],
@@ -523,7 +575,7 @@ function buildDocEspecial(data: {
 
 export async function iniciarSubmissao(rawData: unknown) {
   const data = iniciarSubmissaoSchema.parse(rawData);
-  log('iniciarSubmissao', `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
+  log("iniciarSubmissao", `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
 
   let projeto;
   try {
@@ -540,29 +592,33 @@ export async function iniciarSubmissao(rawData: unknown) {
       data_criacao_projeto: data.data_criacao,
       // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
       // e ignora os tipos financeiros — o fluxo não passa pelas fases de saving/receita.
-      tipo_projeto: data.especial ? 'especial' : (data.tipo_projeto ?? null),
-      tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? null),
+      tipo_projeto: data.especial ? "especial" : (data.tipo_projeto ?? null),
+      tipos_projeto: data.especial ? ["especial"] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
-      status: 'rascunho',
+      status: "rascunho",
     });
   } catch (projErr) {
-    err('iniciarSubmissao', 'Falha ao criar projeto:', projErr);
-    throw new Error(`Falha ao criar projeto: ${projErr instanceof Error ? projErr.message : 'erro desconhecido'}`);
+    err("iniciarSubmissao", "Falha ao criar projeto:", projErr);
+    throw new Error(
+      `Falha ao criar projeto: ${projErr instanceof Error ? projErr.message : "erro desconhecido"}`,
+    );
   }
-  log('iniciarSubmissao', `Projeto criado: ${projeto.id}`);
+  log("iniciarSubmissao", `Projeto criado: ${projeto.id}`);
 
   // Evento de timeline: valores determinísticos das etapas 1 e 2 (não viram chat).
-  await gravarEvento(projeto.id, 'submissao', 'doc', {
+  await gravarEvento(projeto.id, "submissao", "doc", {
     nome_projeto: data.nome_projeto,
     escopo: data.escopo ?? null,
     ferramenta: data.ferramenta,
     servico_externo: data.servico_externo ?? null,
     membros: data.membros,
     data_criacao: data.data_criacao,
-    tipos_projeto: data.especial ? ['especial'] : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
+    tipos_projeto: data.especial
+      ? ["especial"]
+      : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
     especial: data.especial ?? false,
@@ -579,19 +635,22 @@ export async function iniciarSubmissao(rawData: unknown) {
     });
   }
 
-  let docTexto = '';
+  let docTexto = "";
   try {
     docTexto = await extractTextFromMultipleFiles(data.docs);
-    log('iniciarSubmissao', `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`);
+    log(
+      "iniciarSubmissao",
+      `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`,
+    );
   } catch (extractErr) {
-    err('iniciarSubmissao', 'Erro na extração de texto:', extractErr);
-    docTexto = '';
+    err("iniciarSubmissao", "Erro na extração de texto:", extractErr);
+    docTexto = "";
   }
 
   await insertChatMessage({
     projeto_id: projeto.id,
-    role: 'doc',
-    content: docTexto || '(documento sem texto legível)',
+    role: "doc",
+    content: docTexto || "(documento sem texto legível)",
   });
 
   // ── Projeto especial: pula o agente por completo ────────────────────────────
@@ -604,7 +663,10 @@ export async function iniciarSubmissao(rawData: unknown) {
     const docEspecial = buildDocEspecial(data);
     await upsertDocumentacao(projeto.id, docEspecial);
     await updateProjeto(projeto.id, { chat_completo: true });
-    log('iniciarSubmissao', `Projeto especial ${projeto.id}: doc montada sem IA, pronto para submissão.`);
+    log(
+      "iniciarSubmissao",
+      `Projeto especial ${projeto.id}: doc montada sem IA, pronto para submissão.`,
+    );
     return { projeto_id: projeto.id, especial: true };
   }
 
@@ -629,37 +691,40 @@ export async function iniciarSubmissao(rawData: unknown) {
 
   if (docTexto || data.descricao_breve) {
     try {
-      log('iniciarSubmissao', 'Rodando extrator automático...');
-      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
-      const preenchidos = Object.values(coletadoInicial).filter(v => v !== null).length;
-      log('iniciarSubmissao', `Extrator: ${preenchidos}/7 campos preenchidos`);
+      log("iniciarSubmissao", "Rodando extrator automático...");
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || "");
+      const preenchidos = Object.values(coletadoInicial).filter((v) => v !== null).length;
+      log("iniciarSubmissao", `Extrator: ${preenchidos}/7 campos preenchidos`);
     } catch (extractorErr) {
-      err('iniciarSubmissao', 'Extrator falhou — continuando sem pré-preenchimento:', extractorErr);
+      err("iniciarSubmissao", "Extrator falhou — continuando sem pré-preenchimento:", extractorErr);
       coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
     }
   }
 
-  log('iniciarSubmissao', 'Rodando orquestrador (fase doc)...');
-  const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
+  log("iniciarSubmissao", "Rodando orquestrador (fase doc)...");
+  const resultado = await runOrchestrator(ctx, [], "doc", coletadoInicial, savingVazio());
 
   await insertChatMessage({
     projeto_id: projeto.id,
-    role: 'assistant',
+    role: "assistant",
     content: JSON.stringify(resultado),
-    options: resultado.type === 'options' ? resultado.options : null,
+    options: resultado.type === "options" ? resultado.options : null,
   });
 
-  const respContent = resultado.type === 'options'
-    ? (resultado as { question: string }).question
-    : (resultado as { content: string }).content;
-  console.log('\n┌─────────────────────────────────────────────');
+  const respContent =
+    resultado.type === "options"
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+  console.log("\n┌─────────────────────────────────────────────");
   console.log(`│ 🆕 NOVA SUBMISSÃO: "${data.nome_projeto}"`);
-  console.log(`│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + ' chars extraídos' : 'sem texto'}`);
+  console.log(
+    `│ 📄 Arquivos: ${data.docs.length} arquivo(s), ${docTexto ? docTexto.length + " chars extraídos" : "sem texto"}`,
+  );
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log(`│ 📊 Progresso: ${progressoDocumentacao(resultado.coletado)}`);
-  console.log('│ 🤖 IA:');
-  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-  console.log('└─────────────────────────────────────────────\n');
+  console.log("│ 🤖 IA:");
+  respContent.split("\n").forEach((line: string) => console.log(`│    ${line}`));
+  console.log("└─────────────────────────────────────────────\n");
 
   return {
     projeto_id: projeto.id,
@@ -680,12 +745,12 @@ function avisarDivergenciaMemorialLinhas(
   saving: SavingColetado | undefined,
   projetoId: string,
 ): { totalTexto: number; totalGravado: number } | null {
-  const memorial = saving?.memorial_calculo ?? '';
+  const memorial = saving?.memorial_calculo ?? "";
   if (!memorial) return null;
   const totalGravado = saving?.economia_horas_mes ?? 0;
   // Captura todos os "Economia total ...: X h" declarados no texto.
   const declarados = [...memorial.matchAll(/economia\s+total[^\n:]*:\s*([\d.,]+)\s*h/gi)]
-    .map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')))
+    .map((m) => Number(m[1].replace(/\./g, "").replace(",", ".")))
     .filter((n) => Number.isFinite(n));
   if (declarados.length === 0) return null; // sem número legível — não dá p/ conferir
   const totalTexto = Math.max(...declarados); // headline declarado no memorial
@@ -693,8 +758,8 @@ function avisarDivergenciaMemorialLinhas(
   if (Math.abs(totalTexto - totalGravado) <= tolerancia) return null;
   console.warn(
     `[saving-guard] ⚠ Divergência memorial×linhas no projeto ${projetoId}: ` +
-    `memorial declara ${totalTexto}h, mas o gravado (linhas) é ${totalGravado}h. ` +
-    `Provável dessincronia do LLM (texto ≠ estruturado).`,
+      `memorial declara ${totalTexto}h, mas o gravado (linhas) é ${totalGravado}h. ` +
+      `Provável dessincronia do LLM (texto ≠ estruturado).`,
   );
   return { totalTexto, totalGravado };
 }
@@ -709,30 +774,44 @@ function avisarDivergenciaMemorialLinhas(
 
 // Pergunta padronizada: indica a base de 220h E pergunta sobre trabalho de fim de semana.
 function perguntaJornada(): string {
-  return 'Antes de eu fechar o memorial: a base padrão que eu uso é de **220h úteis por mês (22 dias úteis, seg–sex)**. Para fechar certo — alguém de fato **trabalha ou usa esse processo nos fins de semana** (uma pessoa, não apenas a automação rodando sozinha)?';
+  return "Antes de eu fechar o memorial: a base padrão que eu uso é de **220h úteis por mês (22 dias úteis, seg–sex)**. Para fechar certo — alguém de fato **trabalha ou usa esse processo nos fins de semana** (uma pessoa, não apenas a automação rodando sozinha)?";
 }
 
 // Opções (botões) da pergunta de jornada. Índice 1 = só dias úteis, 2 = fim de semana.
-const OPCOES_JORNADA = ['Não, só em dias úteis', 'Sim, há trabalho/uso humano no fim de semana'];
+const OPCOES_JORNADA = ["Não, só em dias úteis", "Sim, há trabalho/uso humano no fim de semana"];
 
 // Interpreta a resposta. O botão envia o índice (1=dias úteis, 2=fim de semana).
 // Texto digitado cai no fallback por regex (negação vence — "não trabalho fim de
 // semana" = dias_uteis). null = ambíguo (re-pergunta determinística).
-function interpretarJornada(content: string, selectedOption: number | null): 'dias_uteis' | 'fim_de_semana' | null {
-  if (selectedOption === 1) return 'dias_uteis';
-  if (selectedOption === 2) return 'fim_de_semana';
-  const t = (content ?? '').trim().toLowerCase();
+function interpretarJornada(
+  content: string,
+  selectedOption: number | null,
+): "dias_uteis" | "fim_de_semana" | null {
+  if (selectedOption === 1) return "dias_uteis";
+  if (selectedOption === 2) return "fim_de_semana";
+  const t = (content ?? "").trim().toLowerCase();
   if (!t) return null;
   // Negação explícita vence (cobre "não, só dias úteis", "não trabalhamos fim de semana").
-  if (/\bn[ãa]o\b/.test(t) || /\b(s[óo]|somente|apenas)\s+(dias?\s*[úu]teis|semana)/.test(t) || /dias?\s*[úu]teis/.test(t)) return 'dias_uteis';
-  if (/\b(sim|s)\b/.test(t) || /(fim|final|fins)\s+de\s+semana|finais?\s+de\s+semana|s[áa]bado|domingo|\bfds\b|fim\s*de\s*sem/.test(t)) return 'fim_de_semana';
+  if (
+    /\bn[ãa]o\b/.test(t) ||
+    /\b(s[óo]|somente|apenas)\s+(dias?\s*[úu]teis|semana)/.test(t) ||
+    /dias?\s*[úu]teis/.test(t)
+  )
+    return "dias_uteis";
+  if (
+    /\b(sim|s)\b/.test(t) ||
+    /(fim|final|fins)\s+de\s+semana|finais?\s+de\s+semana|s[áa]bado|domingo|\bfds\b|fim\s*de\s*sem/.test(
+      t,
+    )
+  )
+    return "fim_de_semana";
   return null;
 }
 
 const NUDGE_JORNADA_UTIL =
-  '[SISTEMA] O usuário confirmou (botão) que o trabalho/uso do processo é SÓ em dias úteis. Mantenha o TETO de 220h/mês por PESSOA (22 dias úteis). Se alguma linha implicar mais de ~220h/mês para UM indivíduo (descontando multiplicadores de lojas/unidades), reconcilie para baixo até caber na semana útil ANTES de gerar o preview. Se tudo já estiver dentro do teto, siga para o preview. NÃO pergunte sobre isso de novo.';
+  "[SISTEMA] O usuário confirmou (botão) que o trabalho/uso do processo é SÓ em dias úteis. Mantenha o TETO de 220h/mês por PESSOA (22 dias úteis). Se alguma linha implicar mais de ~220h/mês para UM indivíduo (descontando multiplicadores de lojas/unidades), reconcilie para baixo até caber na semana útil ANTES de gerar o preview. Se tudo já estiver dentro do teto, siga para o preview. NÃO pergunte sobre isso de novo.";
 const NUDGE_JORNADA_FIMSEMANA =
-  '[SISTEMA] O usuário afirmou (botão) que há trabalho/uso HUMANO no fim de semana. VALIDE com cuidado antes de elevar a base: confirme que é mesmo uma PESSOA que trabalha/usa/se beneficia do processo no sábado/domingo (não basta a automação rodar) e quantos dias por semana de fato. Só então a base por pessoa pode subir proporcionalmente, até no MÁXIMO 30 dias úteis/mês (~300h; 6 dias ≈ 26 dias/264h, 7 dias ≈ 30 dias/300h). Ajuste as linhas (horas_antes/horas_depois) conforme a base validada. Se, ao questionar, ficar claro que só a automação roda no fim de semana (ninguém trabalha nem consome), NÃO eleve a base — mantenha 220h e reconcilie. NÃO repita a pergunta de fim de semana.';
+  "[SISTEMA] O usuário afirmou (botão) que há trabalho/uso HUMANO no fim de semana. VALIDE com cuidado antes de elevar a base: confirme que é mesmo uma PESSOA que trabalha/usa/se beneficia do processo no sábado/domingo (não basta a automação rodar) e quantos dias por semana de fato. Só então a base por pessoa pode subir proporcionalmente, até no MÁXIMO 30 dias úteis/mês (~300h; 6 dias ≈ 26 dias/264h, 7 dias ≈ 30 dias/300h). Ajuste as linhas (horas_antes/horas_depois) conforme a base validada. Se, ao questionar, ficar claro que só a automação roda no fim de semana (ninguém trabalha nem consome), NÃO eleve a base — mantenha 220h e reconcilie. NÃO repita a pergunta de fim de semana.";
 
 // ─── Gate determinístico 2: TETO por pessoa (uma LINHA acima do teto) ────────
 // Camada de segurança DURA sobre o teto de horas. O teto por pessoa (220h dias
@@ -741,29 +820,41 @@ const NUDGE_JORNADA_FIMSEMANA =
 // IMPEDE o preview enquanto uma linha passar do teto, A NÃO SER que o usuário
 // confirme (com botões) que a linha soma VÁRIAS pessoas/unidades (caso multiplicador
 // legítimo, ex.: várias lojas — que o sistema não consegue distinguir só pelas horas).
-function tetoPorJornada(jornada: SavingColetado['jornada_base']): number {
-  return jornada === 'fim_de_semana' ? 300 : 220;
+function tetoPorJornada(jornada: SavingColetado["jornada_base"]): number {
+  return jornada === "fim_de_semana" ? 300 : 220;
 }
-function linhasAcimaDoTeto(linhas: SavingColetado['linhas'], cap: number) {
+function linhasAcimaDoTeto(linhas: SavingColetado["linhas"], cap: number) {
   return (linhas ?? []).filter((l) => (l.horas_antes ?? 0) > cap);
 }
-function perguntaTetoPessoa(excedentes: SavingColetado['linhas'], cap: number): string {
-  const lista = (excedentes ?? []).map((l) => `${l.cargo} (${l.horas_antes}h/mês)`).join(', ');
-  return `Preciso confirmar um ponto antes de fechar: ${lista} ${(excedentes ?? []).length > 1 ? 'aparecem' : 'aparece'} acima do teto de **${cap}h/mês por pessoa** (uma pessoa não trabalha mais que isso no mês). Esse total é de **uma pessoa só** ou **representa várias pessoas/unidades** (ex.: várias lojas, vários colaboradores)?`;
+function perguntaTetoPessoa(excedentes: SavingColetado["linhas"], cap: number): string {
+  const lista = (excedentes ?? []).map((l) => `${l.cargo} (${l.horas_antes}h/mês)`).join(", ");
+  return `Preciso confirmar um ponto antes de fechar: ${lista} ${(excedentes ?? []).length > 1 ? "aparecem" : "aparece"} acima do teto de **${cap}h/mês por pessoa** (uma pessoa não trabalha mais que isso no mês). Esse total é de **uma pessoa só** ou **representa várias pessoas/unidades** (ex.: várias lojas, vários colaboradores)?`;
 }
-const OPCOES_TETO = ['É uma pessoa só (vou corrigir as horas)', 'Representa várias pessoas/unidades (lojas, colaboradores)'];
+const OPCOES_TETO = [
+  "É uma pessoa só (vou corrigir as horas)",
+  "Representa várias pessoas/unidades (lojas, colaboradores)",
+];
 // Interpreta a resposta do teto. Texto primeiro (robusto p/ clique E digitação),
 // índice 1-based como apoio (frontend: 1=pessoa, 2=múltiplo). null = ambíguo.
-function interpretarTetoPessoa(content: string, selectedOption: number | null): 'pessoa' | 'multiplo' | null {
-  const t = (content ?? '').trim().toLowerCase();
-  if (/(v[áa]ri[ao]s?|m[úu]ltipl|lojas?|unidades?|colaboradores?|filia|por (loja|unidade)|cada (loja|unidade|colaborador)|equipe inteira)/.test(t)) return 'multiplo';
-  if (/(uma pessoa|uma s[óo]|s[óo] (uma|um)\b|[ée] uma pessoa|corrig|reduz|ajust)/.test(t)) return 'pessoa';
-  if (selectedOption === 2) return 'multiplo';
-  if (selectedOption === 1) return 'pessoa';
+function interpretarTetoPessoa(
+  content: string,
+  selectedOption: number | null,
+): "pessoa" | "multiplo" | null {
+  const t = (content ?? "").trim().toLowerCase();
+  if (
+    /(v[áa]ri[ao]s?|m[úu]ltipl|lojas?|unidades?|colaboradores?|filia|por (loja|unidade)|cada (loja|unidade|colaborador)|equipe inteira)/.test(
+      t,
+    )
+  )
+    return "multiplo";
+  if (/(uma pessoa|uma s[óo]|s[óo] (uma|um)\b|[ée] uma pessoa|corrig|reduz|ajust)/.test(t))
+    return "pessoa";
+  if (selectedOption === 2) return "multiplo";
+  if (selectedOption === 1) return "pessoa";
   return null;
 }
 const NUDGE_TETO_MULTIPLO =
-  '[SISTEMA] O usuário confirmou (botão) que a(s) linha(s) acima do teto somam VÁRIAS pessoas/unidades (não uma só) — então o total é legítimo (cada pessoa fica dentro do teto). Pode prosseguir e gerar o preview se o resto estiver completo. NÃO repita essa pergunta. No memorial, registre quantas pessoas/unidades compõem essas horas.';
+  "[SISTEMA] O usuário confirmou (botão) que a(s) linha(s) acima do teto somam VÁRIAS pessoas/unidades (não uma só) — então o total é legítimo (cada pessoa fica dentro do teto). Pode prosseguir e gerar o preview se o resto estiver completo. NÃO repita essa pergunta. No memorial, registre quantas pessoas/unidades compõem essas horas.";
 function nudgeTetoPessoa(cap: number): string {
   return `[SISTEMA] O usuário confirmou que a(s) linha(s) acima do teto é(são) de UMA pessoa só — o que é IMPOSSÍVEL, pois uma pessoa não trabalha mais que ${cap}h/mês. RECONCILIE agora: reveja volume × tempo com o usuário e ajuste horas_antes dessa(s) linha(s) para no MÁXIMO ${cap}h/mês ANTES de gerar o preview. É PROIBIDO gerar preview com uma linha acima de ${cap}h/mês para uma única pessoa.`;
 }
@@ -782,25 +873,34 @@ function perguntaCargaEscala(total: number, unidade: string): string {
 // o backend não fecha de cara: confirma se aquele volumão era mesmo "ninguém fazia".
 // Pega os erros de dia×mês (carga real subestimada) e de escala inflada.
 const OPCOES_CONFIRMAR_ESCALA = [
-  'Sim, esse volume extra só existe por causa da automação (ninguém fazia à mão)',
-  'Não — a pessoa fazia o volume todo à mão (a economia é toda carga real)',
-  'Informei errado (ex.: era valor por dia) — quero corrigir o número',
+  "Sim, esse volume extra só existe por causa da automação (ninguém fazia à mão)",
+  "Não — a pessoa fazia o volume todo à mão (a economia é toda carga real)",
+  "Informei errado (ex.: era valor por dia) — quero corrigir o número",
 ];
-function perguntaConfirmarEscala(real: number, escala: number, total: number, unidade: string): string {
+function perguntaConfirmarEscala(
+  real: number,
+  escala: number,
+  total: number,
+  unidade: string,
+): string {
   const pct = total > 0 ? Math.round((escala / total) * 100) : 0;
   return `Só confirmando, para não inflar o número: você indicou que a pessoa fazia **${real}${unidade}** à mão, então **${escala}${unidade}** (${pct}% do total) seriam volume que **ninguém fazia** e que só passou a existir com a automação. Está certo?`;
 }
 // 1 = confirma a escala · 2 = fazia o volume todo (carga real = total) · 3 = corrigir
 // (reabre a pergunta da carga real) · null = ambíguo (re-pergunta a confirmação).
 // selectedOption é o índice 1-based do botão (z.number()), como nos gates jornada/teto.
-function interpretarConfirmacaoEscala(content: string, selectedOption: number | null): 1 | 2 | 3 | null {
+function interpretarConfirmacaoEscala(
+  content: string,
+  selectedOption: number | null,
+): 1 | 2 | 3 | null {
   if (selectedOption === 1) return 1;
   if (selectedOption === 2) return 2;
   if (selectedOption === 3) return 3;
-  const t = (content ?? '').trim().toLowerCase();
+  const t = (content ?? "").trim().toLowerCase();
   if (!t) return null;
   if (/corrig|errad|por dia|errei|engano|me enganei/.test(t)) return 3;
-  if (/\bn[ãa]o\b|fazia (o )?(volume )?tudo|volume todo|tod[oa] (a )?carga|era tudo/.test(t)) return 2;
+  if (/\bn[ãa]o\b|fazia (o )?(volume )?tudo|volume todo|tod[oa] (a )?carga|era tudo/.test(t))
+    return 2;
   if (/\bsim\b|confirmo|correto|isso( mesmo)?|exato|t[áa] certo|certo/.test(t)) return 1;
   return null;
 }
@@ -809,11 +909,11 @@ function interpretarConfirmacaoEscala(content: string, selectedOption: number | 
 function nudgeCargaEscala(real: number, escala: number, racional: string): string {
   const baseUsuario = racional?.trim()
     ? `\nO usuário explicou assim (use ISTO como base da justificativa, sintetizando — não copie cru): «${racional.trim()}»`
-    : '';
+    : "";
   const sobreEscalaZero =
     escala === 0
-      ? ' Como o ganho por escala é 0, explique que a pessoa já fazia o volume TODO à mão (a automação não ampliou o volume, só o executou).'
-      : '';
+      ? " Como o ganho por escala é 0, explique que a pessoa já fazia o volume TODO à mão (a automação não ampliou o volume, só o executou)."
+      : "";
   return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS.${baseUsuario}
 Registre o split no memorial numa subseção própria com o cabeçalho EXATO "### Carga real e ganho por escala" (dentro de "Saving de Pessoas"), em horas/qualitativo (SEM R$). Essa subseção é a JUSTIFICATIVA que vai para a planilha (coluna "Justificativa Saving Escalado e Real") — escreva 2 a 4 frases que respondam, com base no que o usuário contou:
 1) O QUE A PESSOA FAZIA ANTES e quanto desse trabalho ela REALMENTE executava à mão (a carga real).
@@ -836,17 +936,44 @@ Releia a ÚLTIMA mensagem do usuário e aja:
 Quando o total estiver correto e você for fechar, o SISTEMA reconduz a pergunta do split (carga real × escala) automaticamente — você NÃO a faz.`;
 }
 
+// ─── Gate determinístico 4: ALOCAÇÃO DE GANHOS (Seção 2.4 — "o que mudou") ────
+// Quando o saving MENSAL é alto (≥44h) e ALGUÉM fazia à mão (aplicaGateAlocacaoGanhos),
+// um ganho desse porte só é crível se o tempo liberado foi PRA algum lugar concreto. O
+// prompt sozinho não garante: no projeto Gostream (150h/mês) o LLM NUNCA perguntou e
+// gravou o boilerplate vago "realocado para outras atividades" — que a própria régua do
+// prompt manda RECUSAR. Então o backend GARANTE a pergunta antes do preview (a menos que
+// o LLM já tenha escrito uma Seção 2.4 concreta) e injeta a resposta do usuário como base
+// da seção. Como no split, a INFORMAÇÃO é sempre coletada, independente do LLM.
+function perguntaAlocacaoGanhos(total: number, unidade: string): string {
+  return `Antes de eu fechar: **${total}${unidade}** é bastante tempo humano liberado — e um ganho desse tamanho só se sustenta se esse tempo virou outra coisa. **Pra onde foi esse tempo?** Me diga, com NOME, as atividades concretas que o time passou a fazer (ou fazer mais) com essas horas — e, se der, o quanto isso rende a mais (ex.: "foi para hunting e entrevistas — hoje fazemos 2 a 3 entrevistas a mais por dia"). ⚠️ "Foi realocado para outras atividades" não conta: preciso saber QUAIS.`;
+}
+// Reperguntada FIRME quando a 1ª resposta veio vaga (respostaAlocacaoVaga). Roda 1x só
+// (anti-loop): a próxima resposta é aceita como está, e a rede de segurança do preview
+// (LLM-juiz) + a validação humana seguem como backstops.
+function perguntaAlocacaoGanhosFirme(total: number, unidade: string): string {
+  return `Ainda preciso do destino CONCRETO dessas ${total}${unidade} — "outras atividades / mais produtividade / sobra tempo" não me diz nada, porque toda hora liberada vai para *alguma* coisa. Me dê o NOME das atividades para onde o tempo foi (ex.: "atender mais clientes", "análise de crédito", "hunting e entrevistas", "fechamento contábil") e, se possível, o que o time entrega A MAIS hoje por causa disso — de preferência com um número.`;
+}
+// Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever a seção "### O que mudou
+// após a automação" a partir do que a PESSOA disse (não boilerplate). Espelha nudgeCargaEscala.
+function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): string {
+  const base = racional?.trim()
+    ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
+    : "";
+  return `[SISTEMA] O usuário informou PRA ONDE foi o tempo liberado dessas ${total}${unidade} economizadas.${base}
+Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva, no padrão "atividades NOMEADAS + o que o time entrega A MAIS (com número quando houver)": (a) as atividades concretas para onde o tempo foi (nunca "outras atividades") e (b) o que passou a ser entregue a mais agora, concluindo que o ganho é válido por causa dessa mudança. Se o usuário deu um número (ex.: "2-3 entrevistas a mais/dia"), inclua-o. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
+}
+
 // Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
 // na verdade é saving, o backend bloqueia o preview/complete e devolve isto, mantendo a fase
 // em 'receita'. Manda reclassificar o projeto como Saving no formulário — em vez de submeter
 // um saving disfarçado de receita (caso legado-260).
 const MSG_RECLASSIFICAR_RECEITA =
-  'Pelo que conversamos, este caso **não é receita incremental** (receita nova que entra na ' +
-  'empresa) — é **economia operacional (saving)**. Para registrar corretamente, volte à Etapa 2/3 ' +
-  'e troque o tipo do projeto para **Saving**; aí refazemos o cálculo como saving (horas/custos), ' +
-  'não como receita. Se você acredita que há mesmo **receita nova, recorrente e já comprovada**, ' +
-  'me diga qual produto, canal ou funcionalidade gera essa receita a mais e a base de cálculo, que ' +
-  'eu monto o memorial de receita.';
+  "Pelo que conversamos, este caso **não é receita incremental** (receita nova que entra na " +
+  "empresa) — é **economia operacional (saving)**. Para registrar corretamente, volte à Etapa 2/3 " +
+  "e troque o tipo do projeto para **Saving**; aí refazemos o cálculo como saving (horas/custos), " +
+  "não como receita. Se você acredita que há mesmo **receita nova, recorrente e já comprovada**, " +
+  "me diga qual produto, canal ou funcionalidade gera essa receita a mais e a base de cálculo, que " +
+  "eu monto o memorial de receita.";
 
 // Justificativa do split carga real × escala → coluna "Justificativa Saving Escalado e
 // Real" (TEXTO). Preferimos a SUBSEÇÃO "### Carga real e ganho por escala" que o agente
@@ -866,31 +993,37 @@ function derivarJustificativaCargaEscala(
   if (doMemorial) return doMemorial;
   const real = saving.horas_carga_real as number | null | undefined;
   const escala = saving.horas_escala as number | null | undefined;
-  if (alguemFazia === 'sim' && real != null && escala != null) {
+  if (alguemFazia === "sim" && real != null && escala != null) {
     const total = Math.round((real + escala) * 100) / 100;
-    const linhas = Array.isArray(saving.linhas) ? (saving.linhas as Array<Record<string, unknown>>) : [];
+    const linhas = Array.isArray(saving.linhas)
+      ? (saving.linhas as Array<Record<string, unknown>>)
+      : [];
     const antesDepois = linhas
       .map((l) => {
-        const cargo = String(l.cargo ?? 'cargo').trim() || 'cargo';
+        const cargo = String(l.cargo ?? "cargo").trim() || "cargo";
         const a = Number(l.horas_antes) || 0;
         const d = Number(l.horas_depois) || 0;
         return `${cargo} ${a}h→${d}h`;
       })
-      .join('; ');
+      .join("; ");
     const partes = [
-      antesDepois ? `Antes × depois por cargo: ${antesDepois} (economia total ${total}h).` : `Economia total: ${total}h.`,
+      antesDepois
+        ? `Antes × depois por cargo: ${antesDepois} (economia total ${total}h).`
+        : `Economia total: ${total}h.`,
       `Carga real (o que a pessoa realmente fazia à mão): ${real}h; ganho por escala (volume que só a automação passou a cobrir): ${escala}h.`,
-      escala === 0 ? 'A pessoa já executava o volume completo manualmente — a automação não ampliou o volume, só o executou.' : '',
+      escala === 0
+        ? "A pessoa já executava o volume completo manualmente — a automação não ampliou o volume, só o executou."
+        : "",
       (saving.carga_escala_racional as string | null | undefined)?.trim()
         ? `Base informada pelo usuário: ${(saving.carga_escala_racional as string).trim()}`
-        : '',
+        : "",
     ].filter(Boolean);
-    return partes.join(' ');
+    return partes.join(" ");
   }
   // 'nao' (contrafactual — ninguém fazia à mão): a carga humana real é 0 e 100% do
   // saving é ganho por escala. Espelha a coluna numérica (derivarSplitHorasSheet) com
   // uma justificativa concreta, em vez de deixar "—" ao lado de um Escalado preenchido.
-  if (alguemFazia === 'nao') {
+  if (alguemFazia === "nao") {
     const total = Math.round((Number(saving.economia_horas_mes) || 0) * 100) / 100;
     if (total > 0) {
       return `Ninguém fazia esta tarefa manualmente (saving contrafactual): a carga humana real é 0h e as ${total}h economizadas são 100% ganho por escala — volume que só passou a ser tratado porque a automação assumiu um trabalho que nenhuma pessoa executava.`;
@@ -906,11 +1039,11 @@ export async function enviarMensagem(rawData: unknown) {
   // 500 e travava o usuário no "tente novamente"). Trata antes do parse para a pessoa
   // saber exatamente o que fazer (resumir/dividir) em vez de ver um erro genérico.
   const conteudoBruto = (rawData as { content?: unknown })?.content;
-  if (typeof conteudoBruto === 'string' && conteudoBruto.length > LIMITE_MENSAGEM_CHAT) {
+  if (typeof conteudoBruto === "string" && conteudoBruto.length > LIMITE_MENSAGEM_CHAT) {
     throw Object.assign(
       new Error(
-        `Sua mensagem é muito longa (${conteudoBruto.length.toLocaleString('pt-BR')} caracteres; ` +
-          `o limite é ${LIMITE_MENSAGEM_CHAT.toLocaleString('pt-BR')}). ` +
+        `Sua mensagem é muito longa (${conteudoBruto.length.toLocaleString("pt-BR")} caracteres; ` +
+          `o limite é ${LIMITE_MENSAGEM_CHAT.toLocaleString("pt-BR")}). ` +
           `Resuma ou divida em mais de uma mensagem.`,
       ),
       { status: 400 },
@@ -918,32 +1051,35 @@ export async function enviarMensagem(rawData: unknown) {
   }
 
   const data = enviarMensagemSchema.parse(rawData);
-  log('enviarMensagem', `projeto=${data.projeto_id}`);
+  log("enviarMensagem", `projeto=${data.projeto_id}`);
 
   // Histórico montado a partir das mensagens JÁ persistidas + o novo turno do
   // usuário (ainda NÃO persistido). Só gravamos a conversa depois que o turno é
   // concluído com sucesso — assim, se a compilação da doc falhar (ver abaixo),
   // nada fica salvo pela metade e o usuário pode simplesmente tentar de novo.
-  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
 
   const estado = extrairEstado(msgs ?? []);
 
   let history: ChatHistoryMessage[];
-  let resumoProjeto = '';
-  if (estado.fase === 'saving' || estado.fase === 'saving_preview') {
-    history = buildPhaseHistory(msgs ?? [], 'saving');
+  let resumoProjeto = "";
+  if (estado.fase === "saving" || estado.fase === "saving_preview") {
+    history = buildPhaseHistory(msgs ?? [], "saving");
     resumoProjeto = extrairResumoProjeto(msgs ?? []);
-  } else if (estado.fase === 'receita' || estado.fase === 'receita_preview') {
-    history = buildPhaseHistory(msgs ?? [], 'receita');
+  } else if (estado.fase === "receita" || estado.fase === "receita_preview") {
+    history = buildPhaseHistory(msgs ?? [], "receita");
     resumoProjeto = extrairResumoProjeto(msgs ?? []);
   } else {
     history = buildHistory(msgs ?? []);
   }
-  history.push({ role: 'user', content: data.content });
+  history.push({ role: "user", content: data.content });
 
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
-  log('enviarMensagem', `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(',')}`);
+  log(
+    "enviarMensagem",
+    `Fase: ${estado.fase}, histórico: ${history.length} msgs, tipos: ${tiposProjeto.join(",")}`,
+  );
 
   // ── GATE JORNADA-BASE (220h/mês = TETO) — turno de RESPOSTA à pergunta ───────
   // Quando a jornada está 'pendente', este turno do usuário É a resposta (dias úteis
@@ -951,48 +1087,64 @@ export async function enviarMensagem(rawData: unknown) {
   // não persistido): dias úteis → manter teto de 220h/pessoa; fim de semana → validar
   // trabalho humano e elevar até no máx. 30 dias. Resposta ambígua → re-pergunta
   // determinística (sem chamar o orquestrador).
-  const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
+  const gateBaseHoras = estado.fase === "saving" && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
   // Gate do split carga real × escala (independente do gateBaseHoras: vale também p/
   // trimestral/semestral, onde a jornada NÃO se aplica).
-  const gateCargaEscala = estado.fase === 'saving' && aplicaSplitCargaEscala(ctx, estado.saving);
+  const gateCargaEscala = estado.fase === "saving" && aplicaSplitCargaEscala(ctx, estado.saving);
+  // Gate da alocação de ganhos (Seção 2.4): só saving mensal alto (≥44h) + alguém fazia à mão.
+  const gateAlocacao = estado.fase === "saving" && aplicaGateAlocacaoGanhos(ctx, estado.saving);
   let reask: OrchestratorResult | null = null;
-  if (gateBaseHoras && estado.saving.jornada_base === 'pendente') {
+  if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
     const resp = interpretarJornada(data.content, data.selected_option ?? null);
     if (resp === null) {
-      log('enviarMensagem', 'Jornada-base: resposta ambígua — re-perguntando (dias úteis × fim de semana)');
+      log(
+        "enviarMensagem",
+        "Jornada-base: resposta ambígua — re-perguntando (dias úteis × fim de semana)",
+      );
       reask = {
-        type: 'options', question: perguntaJornada(), options: OPCOES_JORNADA,
-        fase: 'saving', coletado: estado.coletado,
-        saving: { ...estado.saving, jornada_base: 'pendente' }, receita: estado.receita,
+        type: "options",
+        question: perguntaJornada(),
+        options: OPCOES_JORNADA,
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: { ...estado.saving, jornada_base: "pendente" },
+        receita: estado.receita,
       };
     } else {
-      log('enviarMensagem', `Jornada-base: usuário respondeu "${resp}"`);
+      log("enviarMensagem", `Jornada-base: usuário respondeu "${resp}"`);
       estado.saving = { ...estado.saving, jornada_base: resp };
-      history.push({ role: 'user', content: resp === 'fim_de_semana' ? NUDGE_JORNADA_FIMSEMANA : NUDGE_JORNADA_UTIL });
+      history.push({
+        role: "user",
+        content: resp === "fim_de_semana" ? NUDGE_JORNADA_FIMSEMANA : NUDGE_JORNADA_UTIL,
+      });
     }
-  } else if (gateBaseHoras && estado.saving.teto_pessoa === 'pendente') {
+  } else if (gateBaseHoras && estado.saving.teto_pessoa === "pendente") {
     // (2) Turno de resposta ao TETO por pessoa (uma pessoa só × várias unidades).
     const cap = tetoPorJornada(estado.saving.jornada_base);
     const resp = interpretarTetoPessoa(data.content, data.selected_option ?? null);
     if (resp === null) {
-      log('enviarMensagem', 'Teto-pessoa: resposta ambígua — re-perguntando');
+      log("enviarMensagem", "Teto-pessoa: resposta ambígua — re-perguntando");
       reask = {
-        type: 'options', question: perguntaTetoPessoa(linhasAcimaDoTeto(estado.saving.linhas, cap), cap), options: OPCOES_TETO,
-        fase: 'saving', coletado: estado.coletado,
-        saving: { ...estado.saving, teto_pessoa: 'pendente' }, receita: estado.receita,
+        type: "options",
+        question: perguntaTetoPessoa(linhasAcimaDoTeto(estado.saving.linhas, cap), cap),
+        options: OPCOES_TETO,
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: { ...estado.saving, teto_pessoa: "pendente" },
+        receita: estado.receita,
       };
-    } else if (resp === 'multiplo') {
-      log('enviarMensagem', 'Teto-pessoa: usuário confirmou VÁRIAS unidades — liberado');
-      estado.saving = { ...estado.saving, teto_pessoa: 'multiplo' };
-      history.push({ role: 'user', content: NUDGE_TETO_MULTIPLO });
+    } else if (resp === "multiplo") {
+      log("enviarMensagem", "Teto-pessoa: usuário confirmou VÁRIAS unidades — liberado");
+      estado.saving = { ...estado.saving, teto_pessoa: "multiplo" };
+      history.push({ role: "user", content: NUDGE_TETO_MULTIPLO });
     } else {
       // 'pessoa' → uma pessoa só acima do teto é impossível: reset e exige reconciliação.
-      log('enviarMensagem', 'Teto-pessoa: uma pessoa só acima do teto — exigindo reconciliação');
+      log("enviarMensagem", "Teto-pessoa: uma pessoa só acima do teto — exigindo reconciliação");
       estado.saving = { ...estado.saving, teto_pessoa: null };
-      history.push({ role: 'user', content: nudgeTetoPessoa(cap) });
+      history.push({ role: "user", content: nudgeTetoPessoa(cap) });
     }
-  } else if (gateCargaEscala && estado.saving.carga_escala === 'pendente') {
+  } else if (gateCargaEscala && estado.saving.carga_escala === "pendente") {
     // (3) Turno de resposta ao SPLIT carga real × escala. O usuário informa o nº da
     // carga real; a escala é o resto (total − carga real). Preenchemos os dois campos
     // e injetamos o nudge [SISTEMA] para o LLM registrar no memorial.
@@ -1009,45 +1161,71 @@ export async function enviarMensagem(rawData: unknown) {
     const contesta = contestaTotalCargaReal(data.content, total);
     const real = contesta ? null : interpretarCargaReal(data.content, total);
     if (contesta || real === null) {
-      log('enviarMensagem', `Carga×escala: ${contesta ? 'usuário contesta o total' : 'resposta sem nº de carga real'} — devolvendo ao orquestrador p/ recalcular/esclarecer`);
-      estado.saving = { ...estado.saving, carga_escala: null, horas_carga_real: null, horas_escala: null };
-      history.push({ role: 'user', content: nudgeRecalcularCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)) });
+      log(
+        "enviarMensagem",
+        `Carga×escala: ${contesta ? "usuário contesta o total" : "resposta sem nº de carga real"} — devolvendo ao orquestrador p/ recalcular/esclarecer`,
+      );
+      estado.saving = {
+        ...estado.saving,
+        carga_escala: null,
+        horas_carga_real: null,
+        horas_escala: null,
+      };
+      history.push({
+        role: "user",
+        content: nudgeRecalcularCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
+      });
       // reask permanece null → o orquestrador roda neste turno (vê a correção + o nudge).
     } else {
       const escala = Math.round((total - real) * 100) / 100;
       // Guarda a EXPLICAÇÃO crua do usuário (texto da resposta ao gate) — é a base de
       // "como o agente concluiu o split" (alimenta a subseção do memorial E o fallback
       // da coluna de justificativa). Re-mesclada a cada turno (junto dos demais campos).
-      const racional = (data.content ?? '').trim();
+      const racional = (data.content ?? "").trim();
       if (precisaConfirmarEscala(real, total)) {
         // TRAVA: a escala ficou ≥60% do total — não fecha de cara, confirma a plausibilidade
         // (pega dia×mês com carga real subestimada e escala inflada). Não bloqueia, só confirma.
-        log('enviarMensagem', `Carga×escala: escala ALTA (real=${real}h, escala=${escala}h de ${total}h) — confirmando plausibilidade`);
+        log(
+          "enviarMensagem",
+          `Carga×escala: escala ALTA (real=${real}h, escala=${escala}h de ${total}h) — confirmando plausibilidade`,
+        );
         estado.saving = {
           ...estado.saving,
           horas_carga_real: real,
           horas_escala: escala,
-          carga_escala: 'confirmar_escala',
+          carga_escala: "confirmar_escala",
           carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
         };
         reask = {
-          type: 'options', question: perguntaConfirmarEscala(real, escala, total, unidadeHorasDe(estado.saving.tipo_saving)),
-          options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
-          saving: { ...estado.saving }, receita: estado.receita,
+          type: "options",
+          question: perguntaConfirmarEscala(
+            real,
+            escala,
+            total,
+            unidadeHorasDe(estado.saving.tipo_saving),
+          ),
+          options: OPCOES_CONFIRMAR_ESCALA,
+          fase: "saving",
+          coletado: estado.coletado,
+          saving: { ...estado.saving },
+          receita: estado.receita,
         };
       } else {
-        log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
+        log(
+          "enviarMensagem",
+          `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`,
+        );
         estado.saving = {
           ...estado.saving,
           horas_carga_real: real,
           horas_escala: escala,
-          carga_escala: 'ok',
+          carga_escala: "ok",
           carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
         };
-        history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional) });
+        history.push({ role: "user", content: nudgeCargaEscala(real, escala, racional) });
       }
     }
-  } else if (gateCargaEscala && estado.saving.carga_escala === 'confirmar_escala') {
+  } else if (gateCargaEscala && estado.saving.carga_escala === "confirmar_escala") {
     // (3b) Turno de resposta à CONFIRMAÇÃO de escala alta. 1=confirma o split · 2=a pessoa
     // fazia o volume TODO (carga real = total, escala 0) · 3=corrigir (reabre a pergunta da
     // carga real, reforçando "total no mês"). Resolve sempre (sem loop): ambíguo → re-pergunta.
@@ -1056,39 +1234,125 @@ export async function enviarMensagem(rawData: unknown) {
     const resp = interpretarConfirmacaoEscala(data.content, data.selected_option ?? null);
     if (resp === null) {
       const escalaAtual = Math.round((total - realAtual) * 100) / 100;
-      log('enviarMensagem', 'Carga×escala: confirmação ambígua — re-perguntando');
+      log("enviarMensagem", "Carga×escala: confirmação ambígua — re-perguntando");
       reask = {
-        type: 'options', question: perguntaConfirmarEscala(realAtual, escalaAtual, total, unidadeHorasDe(estado.saving.tipo_saving)),
-        options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
-        saving: { ...estado.saving, carga_escala: 'confirmar_escala' }, receita: estado.receita,
+        type: "options",
+        question: perguntaConfirmarEscala(
+          realAtual,
+          escalaAtual,
+          total,
+          unidadeHorasDe(estado.saving.tipo_saving),
+        ),
+        options: OPCOES_CONFIRMAR_ESCALA,
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: { ...estado.saving, carga_escala: "confirmar_escala" },
+        receita: estado.receita,
       };
     } else if (resp === 3) {
-      log('enviarMensagem', 'Carga×escala: usuário vai corrigir o nº — reabrindo a pergunta da carga real');
-      estado.saving = { ...estado.saving, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null };
+      log(
+        "enviarMensagem",
+        "Carga×escala: usuário vai corrigir o nº — reabrindo a pergunta da carga real",
+      );
+      estado.saving = {
+        ...estado.saving,
+        carga_escala: "pendente",
+        horas_carga_real: null,
+        horas_escala: null,
+      };
       reask = {
-        type: 'question', content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
-        fase: 'saving', coletado: estado.coletado, saving: { ...estado.saving }, receita: estado.receita,
+        type: "question",
+        content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: { ...estado.saving },
+        receita: estado.receita,
       };
     } else {
       const real = resp === 2 ? total : realAtual;
       const escala = Math.round((total - real) * 100) / 100;
-      log('enviarMensagem', `Carga×escala: confirmação resolvida (real=${real}h, escala=${escala}h, opção=${resp})`);
-      const racional = (estado.saving.carga_escala_racional as string | null | undefined)?.trim() || null;
-      estado.saving = { ...estado.saving, horas_carga_real: real, horas_escala: escala, carga_escala: 'ok', carga_escala_racional: racional };
-      history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional ?? '') });
+      log(
+        "enviarMensagem",
+        `Carga×escala: confirmação resolvida (real=${real}h, escala=${escala}h, opção=${resp})`,
+      );
+      const racional =
+        (estado.saving.carga_escala_racional as string | null | undefined)?.trim() || null;
+      estado.saving = {
+        ...estado.saving,
+        horas_carga_real: real,
+        horas_escala: escala,
+        carga_escala: "ok",
+        carga_escala_racional: racional,
+      };
+      history.push({ role: "user", content: nudgeCargaEscala(real, escala, racional ?? "") });
     }
+  } else if (gateAlocacao && estado.saving.alocacao_ganhos === "pendente") {
+    // (4) Turno de resposta à ALOCAÇÃO DE GANHOS ("pra onde foi o tempo liberado"). Se a
+    // resposta vier VAGA (respostaAlocacaoVaga — a família "outras atividades/sobra tempo"),
+    // repergunta FIRME uma vez ('reperguntado'); senão captura o racional e injeta o nudge
+    // para o LLM escrever a Seção 2.4 a partir do que o usuário disse.
+    const total = totalEconomiaHoras(estado.saving);
+    const unidade = unidadeHorasDe(estado.saving.tipo_saving);
+    const racional = (data.content ?? "").trim();
+    if (respostaAlocacaoVaga(racional)) {
+      log("enviarMensagem", "Alocação de ganhos: resposta vaga — reperguntando (firme, 1x)");
+      estado.saving = {
+        ...estado.saving,
+        alocacao_ganhos: "reperguntado",
+        alocacao_ganhos_racional: racional || estado.saving.alocacao_ganhos_racional || null,
+      };
+      reask = {
+        type: "question",
+        content: perguntaAlocacaoGanhosFirme(total, unidade),
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: { ...estado.saving },
+        receita: estado.receita,
+      };
+    } else {
+      log("enviarMensagem", "Alocação de ganhos: destino informado — registrando no memorial");
+      estado.saving = {
+        ...estado.saving,
+        alocacao_ganhos: "ok",
+        alocacao_ganhos_racional: racional || null,
+      };
+      history.push({ role: "user", content: nudgeAlocacaoGanhos(total, unidade, racional) });
+    }
+  } else if (gateAlocacao && estado.saving.alocacao_ganhos === "reperguntado") {
+    // (4b) Segunda resposta após a reperguntada firme. ANTI-LOOP: aceita o que vier (mesmo
+    // ainda vago) — não repergunta uma 3ª vez. O nudge injeta o melhor racional disponível;
+    // a rede de segurança do preview (LLM-juiz) + a validação humana cobrem o resto.
+    const total = totalEconomiaHoras(estado.saving);
+    const unidade = unidadeHorasDe(estado.saving.tipo_saving);
+    const racional = (data.content ?? "").trim();
+    log("enviarMensagem", "Alocação de ganhos: 2ª resposta — aceitando (anti-loop) e registrando");
+    estado.saving = {
+      ...estado.saving,
+      alocacao_ganhos: "ok",
+      alocacao_ganhos_racional: racional || estado.saving.alocacao_ganhos_racional || null,
+    };
+    history.push({
+      role: "user",
+      content: nudgeAlocacaoGanhos(
+        total,
+        unidade,
+        racional || (estado.saving.alocacao_ganhos_racional as string) || "",
+      ),
+    });
   }
 
-  const resultado = reask ?? await runOrchestrator(
-    ctx,
-    history,
-    estado.fase,
-    estado.coletado,
-    estado.saving,
-    resumoProjeto,
-    tiposProjeto,
-    estado.receita,
-  );
+  const resultado =
+    reask ??
+    (await runOrchestrator(
+      ctx,
+      history,
+      estado.fase,
+      estado.coletado,
+      estado.saving,
+      resumoProjeto,
+      tiposProjeto,
+      estado.receita,
+    ));
 
   // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui os campos de gate).
   // Re-mescla os campos gerenciados pelo backend para que façam round-trip no estado.
@@ -1109,6 +1373,12 @@ export async function enviarMensagem(rawData: unknown) {
         (resultado.saving.carga_escala_racional as string | null | undefined) ??
         estado.saving.carga_escala_racional ??
         null,
+      // Gate da alocação de ganhos (Seção 2.4): backend-only, nunca ecoado pelo LLM.
+      alocacao_ganhos: estado.saving.alocacao_ganhos ?? null,
+      alocacao_ganhos_racional:
+        (resultado.saving.alocacao_ganhos_racional as string | null | undefined) ??
+        estado.saving.alocacao_ganhos_racional ??
+        null,
     };
   }
 
@@ -1116,19 +1386,34 @@ export async function enviarMensagem(rawData: unknown) {
   // O LLM às vezes coloca o memorial apenas no campo "content" e deixa
   // saving.memorial_calculo / receita.memorial_calculo como null no JSON.
   // Isso faz o memorial virar "-" na planilha. Extraímos do content como fallback.
-  if ((resultado.type === 'preview' || resultado.type === 'complete') && resultado.type !== 'options') {
-    const conteudoMsg = (resultado as { content?: string }).content ?? '';
-    const memorialTexto = conteudoMsg.replace(/\n+Está correto\?[\s\S]*$/, '').trim();
+  if (
+    (resultado.type === "preview" || resultado.type === "complete") &&
+    resultado.type !== "options"
+  ) {
+    const conteudoMsg = (resultado as { content?: string }).content ?? "";
+    const memorialTexto = conteudoMsg.replace(/\n+Está correto\?[\s\S]*$/, "").trim();
     if (memorialTexto.length > 50) {
-      if ((estado.fase === 'saving' || estado.fase === 'saving_preview') &&
-          resultado.saving && !resultado.saving.memorial_calculo) {
+      if (
+        (estado.fase === "saving" || estado.fase === "saving_preview") &&
+        resultado.saving &&
+        !resultado.saving.memorial_calculo
+      ) {
         resultado.saving = { ...resultado.saving, memorial_calculo: memorialTexto };
-        log('enviarMensagem', 'memorial_calculo (saving) extraído do content — LLM não populou o campo');
+        log(
+          "enviarMensagem",
+          "memorial_calculo (saving) extraído do content — LLM não populou o campo",
+        );
       }
-      if ((estado.fase === 'receita' || estado.fase === 'receita_preview') &&
-          resultado.receita && !resultado.receita.memorial_calculo) {
+      if (
+        (estado.fase === "receita" || estado.fase === "receita_preview") &&
+        resultado.receita &&
+        !resultado.receita.memorial_calculo
+      ) {
         resultado.receita = { ...resultado.receita, memorial_calculo: memorialTexto };
-        log('enviarMensagem', 'memorial_calculo (receita) extraído do content — LLM não populou o campo');
+        log(
+          "enviarMensagem",
+          "memorial_calculo (receita) extraído do content — LLM não populou o campo",
+        );
       }
     }
   }
@@ -1137,35 +1422,49 @@ export async function enviarMensagem(rawData: unknown) {
   // Mesmo com prompts instruindo a IA, o LLM pode gerar complete/preview com
   // economia ou receita zeradas. Interceptamos aqui e forçamos volta à coleta.
   // Mutamos o resultado direto — são objetos locais, sem risco de side-effect.
-  if (resultado.type === 'complete') {
+  if (resultado.type === "complete") {
     // Saving: NÃO pode completar sem NENHUM ganho. O ganho válido vem de horas OU
     // de um custo evitado — então só bloqueamos quando 0h E sem custo evitado.
     // Exceção explícita: custo evitado PURO (alguem_fazia='externo') — o ganho é o
     // contrato cancelado (0h por design), validado no submit; não bloqueia por 0h.
-    if (tiposProjeto.includes('saving') && (estado.fase === 'saving_preview' || estado.fase === 'saving')) {
+    if (
+      tiposProjeto.includes("saving") &&
+      (estado.fase === "saving_preview" || estado.fase === "saving")
+    ) {
       const savingRecomputado = recomputarSavingFinanceiro(resultado.saving, 0);
       const econHoras = savingRecomputado.economia_horas_mes ?? 0;
       const temCustoEvitado = (savingRecomputado.custo_evitado_reais ?? 0) > 0;
-      const custoEvitadoPuro = ctx.alguem_fazia === 'externo';
+      const custoEvitadoPuro = ctx.alguem_fazia === "externo";
       if (econHoras <= 0 && !temCustoEvitado && !custoEvitadoPuro) {
-        log('enviarMensagem', `⛔ Saving sem ganho (0h e sem custo evitado) — bloqueando complete, forçando question`);
+        log(
+          "enviarMensagem",
+          `⛔ Saving sem ganho (0h e sem custo evitado) — bloqueando complete, forçando question`,
+        );
         Object.assign(resultado, {
-          type: 'question',
-          content: 'Não consigo finalizar o memorial sem nenhum ganho concreto — o projeto precisa economizar horas OU evitar um custo externo (contrato/serviço/licença). Vamos revisar: onde exatamente está o ganho?',
-          fase: 'saving',
+          type: "question",
+          content:
+            "Não consigo finalizar o memorial sem nenhum ganho concreto — o projeto precisa economizar horas OU evitar um custo externo (contrato/serviço/licença). Vamos revisar: onde exatamente está o ganho?",
+          fase: "saving",
         });
       }
     }
 
     // Receita: valor_ganho_mensal NUNCA pode ser 0 ao completar
-    if (tiposProjeto.includes('receita_incremental') && (estado.fase === 'receita_preview' || estado.fase === 'receita')) {
+    if (
+      tiposProjeto.includes("receita_incremental") &&
+      (estado.fase === "receita_preview" || estado.fase === "receita")
+    ) {
       const ganho = resultado.receita?.valor_ganho_mensal ?? 0;
       if (ganho <= 0) {
-        log('enviarMensagem', `⛔ Receita com valor_ganho_mensal=${ganho} — bloqueando complete, forçando question`);
+        log(
+          "enviarMensagem",
+          `⛔ Receita com valor_ganho_mensal=${ganho} — bloqueando complete, forçando question`,
+        );
         Object.assign(resultado, {
-          type: 'question',
-          content: 'Não consigo finalizar o memorial com ganho de R$ 0 — se o projeto gera receita incremental, preciso de um valor concreto. Vamos revisar: qual é o ganho real de receita que o projeto gera?',
-          fase: 'receita',
+          type: "question",
+          content:
+            "Não consigo finalizar o memorial com ganho de R$ 0 — se o projeto gera receita incremental, preciso de um valor concreto. Vamos revisar: qual é o ganho real de receita que o projeto gera?",
+          fase: "receita",
         });
       }
     }
@@ -1182,18 +1481,24 @@ export async function enviarMensagem(rawData: unknown) {
   // type=question (não só preview/complete): se o agente escreveu o memorial saving-shaped no
   // objeto receita num turno qualquer, já redireciona. Ver SPEC_CORRECOES.md (legado-260).
   if (
-    (estado.fase === 'receita' || estado.fase === 'receita_preview') &&
-    resultado.type !== 'options' &&
-    receitaMemorialEhSaving((resultado.receita?.memorial_calculo as string | null | undefined))
+    (estado.fase === "receita" || estado.fase === "receita_preview") &&
+    resultado.type !== "options" &&
+    receitaMemorialEhSaving(resultado.receita?.memorial_calculo as string | null | undefined)
   ) {
-    log('enviarMensagem', '⛔ Receita cujo memorial é saving/não-aplicável — bloqueando e pedindo reclassificação para saving');
+    log(
+      "enviarMensagem",
+      "⛔ Receita cujo memorial é saving/não-aplicável — bloqueando e pedindo reclassificação para saving",
+    );
     Object.assign(resultado, {
-      type: 'question',
+      type: "question",
       content: MSG_RECLASSIFICAR_RECEITA,
-      fase: 'receita',
+      fase: "receita",
       // Zera o memorial saving-shaped para (a) não re-disparar o backstop no próximo turno e
       // (b) não persistir um memorial de saving dentro do objeto receita.
-      receita: { ...((resultado.receita ?? estado.receita) as ReceitaColetada), memorial_calculo: null },
+      receita: {
+        ...((resultado.receita ?? estado.receita) as ReceitaColetada),
+        memorial_calculo: null,
+      },
     });
     delete (resultado as { options?: unknown }).options;
   }
@@ -1208,18 +1513,21 @@ export async function enviarMensagem(rawData: unknown) {
   if (
     gateBaseHoras &&
     estado.saving.jornada_base == null &&
-    (resultado.type === 'preview' || resultado.type === 'complete')
+    (resultado.type === "preview" || resultado.type === "complete")
   ) {
-    log('enviarMensagem', '⛔ Preview/complete do saving sem a jornada-base definida — forçando pergunta (dias úteis × fim de semana)');
+    log(
+      "enviarMensagem",
+      "⛔ Preview/complete do saving sem a jornada-base definida — forçando pergunta (dias úteis × fim de semana)",
+    );
     const savingComFlag: SavingColetado = {
       ...((resultado.saving ?? estado.saving) as SavingColetado),
-      jornada_base: 'pendente',
+      jornada_base: "pendente",
     };
     Object.assign(resultado, {
-      type: 'options',
+      type: "options",
       question: perguntaJornada(),
       options: OPCOES_JORNADA,
-      fase: 'saving',
+      fase: "saving",
       saving: savingComFlag,
     });
     delete (resultado as { content?: string }).content;
@@ -1230,27 +1538,32 @@ export async function enviarMensagem(rawData: unknown) {
   // Se alguma LINHA tem horas_antes acima do teto e o usuário ainda NÃO confirmou que
   // ela soma várias pessoas/unidades, não deixa o preview/complete passar: força a
   // pergunta (uma pessoa × várias unidades). 'multiplo' libera; senão, exige reconciliar.
-  const jornadaDefinida = estado.saving.jornada_base === 'dias_uteis' || estado.saving.jornada_base === 'fim_de_semana';
+  const jornadaDefinida =
+    estado.saving.jornada_base === "dias_uteis" || estado.saving.jornada_base === "fim_de_semana";
   if (
     gateBaseHoras &&
     jornadaDefinida &&
-    estado.saving.teto_pessoa !== 'multiplo' &&
-    (resultado.type === 'preview' || resultado.type === 'complete')
+    estado.saving.teto_pessoa !== "multiplo" &&
+    (resultado.type === "preview" || resultado.type === "complete")
   ) {
     const cap = tetoPorJornada(estado.saving.jornada_base);
-    const linhasAtuais = (resultado.saving?.linhas ?? estado.saving.linhas) as SavingColetado['linhas'];
+    const linhasAtuais = (resultado.saving?.linhas ??
+      estado.saving.linhas) as SavingColetado["linhas"];
     const excedentes = linhasAcimaDoTeto(linhasAtuais, cap);
     if (excedentes.length) {
-      log('enviarMensagem', `⛔ Preview do saving com linha acima do teto de ${cap}h/pessoa (${excedentes.map((l) => `${l.cargo}:${l.horas_antes}h`).join(', ')}) — forçando pergunta (uma pessoa × várias unidades)`);
+      log(
+        "enviarMensagem",
+        `⛔ Preview do saving com linha acima do teto de ${cap}h/pessoa (${excedentes.map((l) => `${l.cargo}:${l.horas_antes}h`).join(", ")}) — forçando pergunta (uma pessoa × várias unidades)`,
+      );
       const savingComFlag: SavingColetado = {
         ...((resultado.saving ?? estado.saving) as SavingColetado),
-        teto_pessoa: 'pendente',
+        teto_pessoa: "pendente",
       };
       Object.assign(resultado, {
-        type: 'options',
+        type: "options",
         question: perguntaTetoPessoa(excedentes, cap),
         options: OPCOES_TETO,
-        fase: 'saving',
+        fase: "saving",
         saving: savingComFlag,
       });
       delete (resultado as { content?: string }).content;
@@ -1265,15 +1578,15 @@ export async function enviarMensagem(rawData: unknown) {
   // escala é o resto. Garante que a informação SEMPRE exista, independente do LLM.
   if (
     gateCargaEscala &&
-    estado.saving.carga_escala !== 'ok' &&
-    (resultado.type === 'preview' || resultado.type === 'complete')
+    estado.saving.carga_escala !== "ok" &&
+    (resultado.type === "preview" || resultado.type === "complete")
   ) {
     const savingAtual = (resultado.saving ?? estado.saving) as SavingColetado;
     const total = totalEconomiaHoras(savingAtual);
     const real = savingAtual.horas_carga_real;
     const escala = savingAtual.horas_escala;
     const splitValido =
-      total > 0 && real != null && escala != null && Math.abs((real + escala) - total) <= 1;
+      total > 0 && real != null && escala != null && Math.abs(real + escala - total) <= 1;
     if (total <= 0) {
       // Sem economia de horas (outro gate cuida do ganho-zero) — não força o split.
     } else if (splitValido) {
@@ -1283,26 +1596,91 @@ export async function enviarMensagem(rawData: unknown) {
       const escalaSan = Math.round((total - realSan) * 100) / 100;
       if (precisaConfirmarEscala(realSan, total)) {
         // Split do LLM (sem passar pelo gate) com escala ≥60% → confirma plausibilidade.
-        log('enviarMensagem', `Carga×escala: split do LLM com escala ALTA (real=${realSan}h, escala=${escalaSan}h de ${total}h) — confirmando`);
+        log(
+          "enviarMensagem",
+          `Carga×escala: split do LLM com escala ALTA (real=${realSan}h, escala=${escalaSan}h de ${total}h) — confirmando`,
+        );
         Object.assign(resultado, {
-          type: 'options',
-          question: perguntaConfirmarEscala(realSan, escalaSan, total, unidadeHorasDe(savingAtual.tipo_saving)),
+          type: "options",
+          question: perguntaConfirmarEscala(
+            realSan,
+            escalaSan,
+            total,
+            unidadeHorasDe(savingAtual.tipo_saving),
+          ),
           options: OPCOES_CONFIRMAR_ESCALA,
-          fase: 'saving',
-          saving: { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'confirmar_escala' },
+          fase: "saving",
+          saving: {
+            ...savingAtual,
+            horas_carga_real: realSan,
+            horas_escala: escalaSan,
+            carga_escala: "confirmar_escala",
+          },
         });
         delete (resultado as { content?: string }).content;
       } else {
-        log('enviarMensagem', `Carga×escala: split do LLM saneado (real=${realSan}h, escala=${escalaSan}h) — liberado`);
-        resultado.saving = { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'ok' };
+        log(
+          "enviarMensagem",
+          `Carga×escala: split do LLM saneado (real=${realSan}h, escala=${escalaSan}h) — liberado`,
+        );
+        resultado.saving = {
+          ...savingAtual,
+          horas_carga_real: realSan,
+          horas_escala: escalaSan,
+          carga_escala: "ok",
+        };
       }
     } else {
-      log('enviarMensagem', '⛔ Preview do saving sem o split carga real × escala — forçando pergunta (nº da carga real)');
+      log(
+        "enviarMensagem",
+        "⛔ Preview do saving sem o split carga real × escala — forçando pergunta (nº da carga real)",
+      );
       Object.assign(resultado, {
-        type: 'question',
+        type: "question",
         content: perguntaCargaEscala(total, unidadeHorasDe(savingAtual.tipo_saving)),
-        fase: 'saving',
-        saving: { ...savingAtual, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null },
+        fase: "saving",
+        saving: {
+          ...savingAtual,
+          carga_escala: "pendente",
+          horas_carga_real: null,
+          horas_escala: null,
+        },
+      });
+      delete (resultado as { options?: unknown }).options;
+    }
+  }
+
+  // ── GATE ALOCAÇÃO DE GANHOS (Seção 2.4) — força a pergunta antes do preview ──
+  // Roda por ÚLTIMO (após jornada/teto/split) e só quando o resultado ainda é preview/
+  // complete (um gate de cada vez). Se o LLM JÁ escreveu uma Seção 2.4 CONCRETA no
+  // memorial (extrairAlocacaoGanhos + !respostaAlocacaoVaga), libera direto (marca 'ok');
+  // senão BLOQUEIA e pergunta pra onde foi o tempo. Garante que a informação SEMPRE seja
+  // coletada do USUÁRIO, em vez de o LLM inventar o boilerplate vago (bug do Gostream).
+  if (
+    gateAlocacao &&
+    estado.saving.alocacao_ganhos !== "ok" &&
+    (resultado.type === "preview" || resultado.type === "complete")
+  ) {
+    const savingAtual = (resultado.saving ?? estado.saving) as SavingColetado;
+    const total = totalEconomiaHoras(savingAtual);
+    const secao = extrairAlocacaoGanhos(normalizarMarcadoresMemorial(savingAtual.memorial_calculo));
+    if (secao && !respostaAlocacaoVaga(secao)) {
+      // O LLM já produziu uma justificativa concreta — não precisa perguntar de novo.
+      log(
+        "enviarMensagem",
+        "Alocação de ganhos: Seção 2.4 concreta presente no memorial — liberado",
+      );
+      resultado.saving = { ...savingAtual, alocacao_ganhos: "ok" };
+    } else {
+      log(
+        "enviarMensagem",
+        `⛔ Preview do saving (${total}h/mês) sem a alocação de ganhos concreta — forçando pergunta (pra onde foi o tempo)`,
+      );
+      Object.assign(resultado, {
+        type: "question",
+        content: perguntaAlocacaoGanhos(total, unidadeHorasDe(savingAtual.tipo_saving)),
+        fase: "saving",
+        saving: { ...savingAtual, alocacao_ganhos: "pendente" },
       });
       delete (resultado as { options?: unknown }).options;
     }
@@ -1314,8 +1692,11 @@ export async function enviarMensagem(rawData: unknown) {
   // (mesmo após os retries internos), compilarDocumentacao lança: abortamos o
   // turno SEM persistir nada, e o usuário continua no preview podendo aprovar de
   // novo (o frontend faz rollback da mensagem e exibe o erro).
-  if ((resultado.fase === 'saving' || resultado.fase === 'receita') && estado.fase === 'doc_preview') {
-    log('enviarMensagem', 'Doc aprovada — compilando documentação...');
+  if (
+    (resultado.fase === "saving" || resultado.fase === "receita") &&
+    estado.fase === "doc_preview"
+  ) {
+    log("enviarMensagem", "Doc aprovada — compilando documentação...");
     const doc = await compilarDocumentacao(ctx, resultado.coletado);
     // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
     // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
@@ -1326,72 +1707,83 @@ export async function enviarMensagem(rawData: unknown) {
       tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
     };
     await upsertDocumentacao(data.projeto_id, docComSinais);
-    log('enviarMensagem', 'Documentação compilada e salva.');
+    log("enviarMensagem", "Documentação compilada e salva.");
   }
 
   // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'user',
+    role: "user",
     content: data.content,
     selected_option: data.selected_option ?? null,
   });
 
   // Se houve transição de fase (ex: doc_preview→saving), preserva a fase de
   // origem no JSON para que o Investigador agrupe a mensagem na fase correta.
-  const persistido = resultado.fase !== estado.fase
-    ? { ...resultado, fase_origem: estado.fase }
-    : resultado;
+  const persistido =
+    resultado.fase !== estado.fase ? { ...resultado, fase_origem: estado.fase } : resultado;
 
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'assistant',
+    role: "assistant",
     content: JSON.stringify(persistido),
-    options: resultado.type === 'options' ? resultado.options : null,
+    options: resultado.type === "options" ? resultado.options : null,
   });
 
-  if (resultado.fase === 'completo') {
-    log('enviarMensagem', 'Fluxo completo — salvando dados financeiros...');
+  if (resultado.fase === "completo") {
+    log("enviarMensagem", "Fluxo completo — salvando dados financeiros...");
     const docRow = await getDocumentacao(data.projeto_id);
 
     if (docRow) {
-      const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+      const doc = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
       const tiposProjetoCtx = getTiposProjeto(ctx);
-      if (tiposProjetoCtx.includes('saving')) {
+      if (tiposProjetoCtx.includes("saving")) {
         // R$ é sempre re-derivado das horas (o LLM pode ter reajustado horas sem
         // recalcular o valor) — ver recomputarSavingFinanceiro.
         const projetoCompleto = await getProjetoById(data.projeto_id);
         // Custos do projeto: re-deriva dos itens persistidos (fonte da verdade) para
         // o líquido abater corretamente mesmo se o LLM não ecoou o campo no turno.
-        const custoProjetoMensal = custoProjetoMensalFromItens(projetoCompleto?.custo_projeto_itens);
-        if (resultado.saving && typeof resultado.saving === 'object') {
-          (resultado.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
+        const custoProjetoMensal = custoProjetoMensalFromItens(
+          projetoCompleto?.custo_projeto_itens,
+        );
+        if (resultado.saving && typeof resultado.saving === "object") {
+          (resultado.saving as SavingColetado).custo_projeto_reais =
+            custoProjetoMensal > 0 ? custoProjetoMensal : null;
         }
-        doc.saving = recomputarSavingFinanceiro(resultado.saving, projetoCompleto?.custo_externo_mensal ?? 0);
+        doc.saving = recomputarSavingFinanceiro(
+          resultado.saving,
+          projetoCompleto?.custo_externo_mensal ?? 0,
+        );
         avisarDivergenciaMemorialLinhas(doc.saving as SavingColetado, data.projeto_id);
       }
-      if (tiposProjetoCtx.includes('receita_incremental')) doc.receita = resultado.receita;
+      if (tiposProjetoCtx.includes("receita_incremental")) doc.receita = resultado.receita;
       await upsertDocumentacao(data.projeto_id, doc);
     }
 
     await updateProjeto(data.projeto_id, { chat_completo: true });
   }
 
-  const respContent2 = resultado.type === 'options'
-    ? (resultado as { question: string }).question
-    : (resultado as { content: string }).content;
-  console.log('\n┌─────────────────────────────────────────────');
+  const respContent2 =
+    resultado.type === "options"
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+  console.log("\n┌─────────────────────────────────────────────");
   console.log(`│ 💬 TURNO DE CONVERSA`);
   console.log(`│ 🔄 Fase: ${estado.fase} → ${resultado.fase} | Tipo: ${resultado.type}`);
-  console.log(`│ 📊 Progresso: ${progressoPorFase(resultado.fase, resultado.coletado, resultado.saving, resultado.receita ?? receitaVazia())}`);
-  console.log('│ 👤 Usuário:');
-  data.content.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-  console.log('│ 🤖 IA:');
-  respContent2.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-  if (resultado.type === 'options') {
-    console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(' | ')}`);
+  console.log(
+    `│ 📊 Progresso: ${progressoPorFase(resultado.fase, resultado.coletado, resultado.saving, resultado.receita ?? receitaVazia())}`,
+  );
+  console.log("│ 👤 Usuário:");
+  data.content.split("\n").forEach((line: string) => console.log(`│    ${line}`));
+  console.log("│ 🤖 IA:");
+  respContent2.split("\n").forEach((line: string) => console.log(`│    ${line}`));
+  if (resultado.type === "options") {
+    console.log(`│ 📋 Opções: ${(resultado as { options: string[] }).options.join(" | ")}`);
   }
-  console.log('└─────────────────────────────────────────────\n');
+  console.log("└─────────────────────────────────────────────\n");
 
   return formatResponse(resultado);
 }
@@ -1400,12 +1792,12 @@ export async function enviarMensagem(rawData: unknown) {
 
 export async function iniciarSaving(rawData: unknown) {
   const data = iniciarSavingSchema.parse(rawData);
-  log('iniciarSaving', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+  log("iniciarSaving", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
   // Reinício limpo: se a pessoa voltou ao formulário determinístico e reenviou,
   // descarta a conversa anterior da fase saving (ancorada nos números antigos).
   // No primeiro início é no-op (ainda não há mensagens após o marcador).
-  await deleteChatMessagesAfterFaseMarker(data.projeto_id, 'saving');
+  await deleteChatMessagesAfterFaseMarker(data.projeto_id, "saving");
 
   // Persiste no projeto se havia trabalho manual antes (coluna mapeada no n8n/SQL).
   if (data.alguem_fazia) {
@@ -1417,37 +1809,33 @@ export async function iniciarSaving(rawData: unknown) {
   // soma ao saving. Persiste sim/não, justificativa concatenada e o detalhe (JSON)
   // no projeto (colunas mapeadas no n8n/planilha).
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  const itensEvitado = data.tem_custo_evitado === 'sim' ? (data.custo_evitado_itens ?? []) : [];
-  const custoEvitadoMensal = round2(
-    itensEvitado.reduce((s, it) => s + it.valor, 0),
-  );
+  const itensEvitado = data.tem_custo_evitado === "sim" ? (data.custo_evitado_itens ?? []) : [];
+  const custoEvitadoMensal = round2(itensEvitado.reduce((s, it) => s + it.valor, 0));
   // Justificativa do custo evitado = TODAS as informações que a pessoa preencheu
   // na etapa, uma ferramenta por linha: nome + custo (R$ + recorrência) + a
   // justificativa/explicação que ela deu. (O valor R$ TOTAL fica na coluna "Custo
   // Evitado"; aqui é o detalhamento por ferramenta.)
-  const moedaBR = (n: number) => n.toFixed(2).replace('.', ',');
+  const moedaBR = (n: number) => n.toFixed(2).replace(".", ",");
   const custoEvitadoDescricao = itensEvitado
     .map((it) => {
-      const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
-      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : '';
+      const rec = it.recorrencia === "pontual" ? "pontual" : "mensal";
+      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : "";
       return `• ${it.nome} — R$ ${moedaBR(it.valor)} (${rec}).${just}`;
     })
-    .join('\n');
+    .join("\n");
 
   // Custos do projeto: serviços externos PAGOS que a solução consome pra rodar.
   // Mesma soma do custo evitado (pontual e mensal pelo valor cheio, sem ÷12), mas
   // SUBTRAI do saving (custo incorrido pra operar). Persiste sim/não + justificativa + itens.
-  const itensProjeto = data.tem_custo_projeto === 'sim' ? (data.custo_projeto_itens ?? []) : [];
-  const custoProjetoMensal = round2(
-    itensProjeto.reduce((s, it) => s + it.valor, 0),
-  );
+  const itensProjeto = data.tem_custo_projeto === "sim" ? (data.custo_projeto_itens ?? []) : [];
+  const custoProjetoMensal = round2(itensProjeto.reduce((s, it) => s + it.valor, 0));
   const custoProjetoDescricao = itensProjeto
     .map((it) => {
-      const rec = it.recorrencia === 'pontual' ? 'pontual' : 'mensal';
-      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : '';
+      const rec = it.recorrencia === "pontual" ? "pontual" : "mensal";
+      const just = it.justificativa?.trim() ? ` ${it.justificativa.trim()}` : "";
       return `• ${it.nome} — R$ ${moedaBR(it.valor)} (${rec}).${just}`;
     })
-    .join('\n');
+    .join("\n");
 
   await updateProjeto(data.projeto_id, {
     custo_evitado: data.tem_custo_evitado ?? null,
@@ -1472,16 +1860,16 @@ export async function iniciarSaving(rawData: unknown) {
   saving.custo_externo_mensal = data.custo_externo_mensal ?? 0;
   // Custo evitado já mensalizado entra cheio no recálculo (não divide de novo).
   saving.custo_evitado_reais = custoEvitadoMensal > 0 ? custoEvitadoMensal : null;
-  saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? 'mensal' : null;
+  saving.custo_evitado_tipo = custoEvitadoMensal > 0 ? "mensal" : null;
   saving.custo_evitado_descricao = custoEvitadoDescricao || null;
   // Custos do projeto já mensalizados — SUBTRAEM no recálculo do líquido.
   saving.custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
-  saving.custo_projeto_tipo = custoProjetoMensal > 0 ? 'mensal' : null;
+  saving.custo_projeto_tipo = custoProjetoMensal > 0 ? "mensal" : null;
   saving.custo_projeto_descricao = custoProjetoDescricao || null;
 
-  if (tiposProjeto.includes('saving') && data.linhas && data.linhas.length > 0) {
+  if (tiposProjeto.includes("saving") && data.linhas && data.linhas.length > 0) {
     const linhas: SavingLinha[] = data.linhas.map((l) => {
-      const valorHora = CARGOS.find(c => c.label === l.cargo)?.valor_hora ?? 0;
+      const valorHora = CARGOS.find((c) => c.label === l.cargo)?.valor_hora ?? 0;
       const economiaHoras = Math.max(0, l.horas_antes - l.horas_depois);
       return {
         cargo: l.cargo,
@@ -1502,7 +1890,9 @@ export async function iniciarSaving(rawData: unknown) {
       economia_horas_mes: totalHoras,
       // Líquido: horas + custo evitado (mensalizado) − custo externo − custos do
       // projeto. Mesma fórmula de recomputarSavingFinanceiro (recalcula no preview).
-      economia_reais_mes: round2(totalReaisBruto + custoEvitadoMensal - custoExterno - custoProjetoMensal),
+      economia_reais_mes: round2(
+        totalReaisBruto + custoEvitadoMensal - custoExterno - custoProjetoMensal,
+      ),
     };
   } else if (custoEvitadoMensal > 0 || (data.custo_externo_mensal ?? 0) > 0) {
     // Custo evitado PURO (ramo "Não → elimina gasto externo? Sim", sem horas):
@@ -1516,7 +1906,7 @@ export async function iniciarSaving(rawData: unknown) {
     };
   }
 
-  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -1524,7 +1914,7 @@ export async function iniciarSaving(rawData: unknown) {
   const resultado = await runOrchestrator(
     ctx,
     [],
-    'saving',
+    "saving",
     estado.coletado,
     saving,
     resumoProjeto,
@@ -1537,23 +1927,26 @@ export async function iniciarSaving(rawData: unknown) {
   // por UMA pergunta obrigatória (realidade + atribuição + escopo). O turno seguinte
   // (enviarMensagem) deixa o agente previewar já com a resposta registrada no memorial.
   // (Prompt-only não basta — o LLM tende a pular se o contexto parece claro.)
-  if (ctx.alguem_fazia === 'externo' && resultado.type === 'preview') {
-    log('iniciarSaving', '⛔ custo evitado puro previewou no 1º turno — forçando validação (realidade/atribuição/escopo)');
+  if (ctx.alguem_fazia === "externo" && resultado.type === "preview") {
+    log(
+      "iniciarSaving",
+      "⛔ custo evitado puro previewou no 1º turno — forçando validação (realidade/atribuição/escopo)",
+    );
     Object.assign(resultado, {
-      type: 'question',
-      fase: 'saving',
+      type: "question",
+      fase: "saving",
       content:
-        'Antes de fechar o memorial, preciso confirmar o ganho — ele vem 100% de um custo externo eliminado, então vale validar:\n' +
-        '1) Esse contrato/serviço já foi DE FATO encerrado ou reduzido na prática (não algo que ainda vai acontecer)?\n' +
-        '2) O encerramento foi por causa desta automação (ela assumiu o trabalho)?\n' +
-        '3) O que esse contrato cobria? (ex.: quantos agentes/pessoas, qual volume de atendimentos por mês)',
+        "Antes de fechar o memorial, preciso confirmar o ganho — ele vem 100% de um custo externo eliminado, então vale validar:\n" +
+        "1) Esse contrato/serviço já foi DE FATO encerrado ou reduzido na prática (não algo que ainda vai acontecer)?\n" +
+        "2) O encerramento foi por causa desta automação (ela assumiu o trabalho)?\n" +
+        "3) O que esse contrato cobria? (ex.: quantos agentes/pessoas, qual volume de atendimentos por mês)",
     });
   }
 
   // Evento de timeline: valores do formulário de saving. `voltou` indica reentrada
   // (a pessoa voltou à etapa para reeditar) — já havia um evento 'saving' antes.
-  const savingVoltou = await hasFormEventTipo(data.projeto_id, 'saving');
-  await gravarEvento(data.projeto_id, 'saving', 'saving', {
+  const savingVoltou = await hasFormEventTipo(data.projeto_id, "saving");
+  await gravarEvento(data.projeto_id, "saving", "saving", {
     voltou: savingVoltou,
     tipo_saving: data.tipo_saving,
     alguem_fazia: data.alguem_fazia ?? null,
@@ -1575,22 +1968,28 @@ export async function iniciarSaving(rawData: unknown) {
 
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'assistant',
+    role: "assistant",
     content: JSON.stringify(resultado),
-    options: resultado.type === 'options' ? resultado.options : null,
+    options: resultado.type === "options" ? resultado.options : null,
   });
 
-  const respContent = resultado.type === 'options'
-    ? (resultado as { question: string }).question
-    : (resultado as { content: string }).content;
-  console.log('\n┌─────────────────────────────────────────────');
-  console.log(`│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}`);
-  if (data.linhas?.length) console.log(`│ 👤 Linhas: ${data.linhas.map(l => `${l.cargo} ${l.horas_antes}→${l.horas_depois}h`).join(' | ')}`);
+  const respContent =
+    resultado.type === "options"
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+  console.log("\n┌─────────────────────────────────────────────");
+  console.log(
+    `│ 💰 INÍCIO SAVING: tipos_projeto=${tiposProjeto.join(",")}, tipo_saving=${data.tipo_saving}`,
+  );
+  if (data.linhas?.length)
+    console.log(
+      `│ 👤 Linhas: ${data.linhas.map((l) => `${l.cargo} ${l.horas_antes}→${l.horas_depois}h`).join(" | ")}`,
+    );
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log(`│ 📊 Progresso: ${progressoSaving(resultado.saving)}`);
-  console.log('│ 🤖 IA:');
-  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-  console.log('└─────────────────────────────────────────────\n');
+  console.log("│ 🤖 IA:");
+  respContent.split("\n").forEach((line: string) => console.log(`│    ${line}`));
+  console.log("└─────────────────────────────────────────────\n");
 
   return formatResponse(resultado);
 }
@@ -1599,11 +1998,11 @@ export async function iniciarSaving(rawData: unknown) {
 
 export async function iniciarReceita(rawData: unknown) {
   const data = iniciarReceitaSchema.parse(rawData);
-  log('iniciarReceita', `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
+  log("iniciarReceita", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
   // Reinício limpo: se a pessoa voltou ao formulário determinístico e reenviou,
   // descarta a conversa anterior da fase receita. No primeiro início é no-op.
-  await deleteChatMessagesAfterFaseMarker(data.projeto_id, 'receita');
+  await deleteChatMessagesAfterFaseMarker(data.projeto_id, "receita");
 
   const ctx = await getProjetoContexto(data.projeto_id);
   const tiposProjeto = getTiposProjeto(ctx);
@@ -1613,7 +2012,7 @@ export async function iniciarReceita(rawData: unknown) {
   receita.valor_ganho_mensal = data.valor_ganho_mensal ?? null;
   receita.racional = data.racional?.trim() || null;
 
-  const msgs = await getChatMessagesExcludeRole(data.projeto_id, 'doc');
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
@@ -1621,7 +2020,7 @@ export async function iniciarReceita(rawData: unknown) {
   const resultado = await runOrchestrator(
     ctx,
     [],
-    'receita',
+    "receita",
     estado.coletado,
     estado.saving,
     resumoProjeto,
@@ -1630,8 +2029,8 @@ export async function iniciarReceita(rawData: unknown) {
   );
 
   // Evento de timeline: valores do formulário de receita. `voltou` = reentrada.
-  const receitaVoltou = await hasFormEventTipo(data.projeto_id, 'receita');
-  await gravarEvento(data.projeto_id, 'receita', 'receita', {
+  const receitaVoltou = await hasFormEventTipo(data.projeto_id, "receita");
+  await gravarEvento(data.projeto_id, "receita", "receita", {
     voltou: receitaVoltou,
     tipo_saving: data.tipo_saving,
     valor_ganho_mensal: data.valor_ganho_mensal ?? null,
@@ -1640,21 +2039,24 @@ export async function iniciarReceita(rawData: unknown) {
 
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'assistant',
+    role: "assistant",
     content: JSON.stringify(resultado),
-    options: resultado.type === 'options' ? resultado.options : null,
+    options: resultado.type === "options" ? resultado.options : null,
   });
 
-  const respContent = resultado.type === 'options'
-    ? (resultado as { question: string }).question
-    : (resultado as { content: string }).content;
-  console.log('\n┌─────────────────────────────────────────────');
-  console.log(`│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(',')}, tipo_saving=${data.tipo_saving}, valor=${data.valor_ganho_mensal ?? '—'}, racional=${receita.racional ?? '—'}`);
+  const respContent =
+    resultado.type === "options"
+      ? (resultado as { question: string }).question
+      : (resultado as { content: string }).content;
+  console.log("\n┌─────────────────────────────────────────────");
+  console.log(
+    `│ 📈 INÍCIO RECEITA: tipos_projeto=${tiposProjeto.join(",")}, tipo_saving=${data.tipo_saving}, valor=${data.valor_ganho_mensal ?? "—"}, racional=${receita.racional ?? "—"}`,
+  );
   console.log(`│ 🔄 Fase: ${resultado.fase} | Tipo: ${resultado.type}`);
   console.log(`│ 📊 Progresso: ${progressoReceita(resultado.receita ?? receitaVazia())}`);
-  console.log('│ 🤖 IA:');
-  respContent.split('\n').forEach((line: string) => console.log(`│    ${line}`));
-  console.log('└─────────────────────────────────────────────\n');
+  console.log("│ 🤖 IA:");
+  respContent.split("\n").forEach((line: string) => console.log(`│    ${line}`));
+  console.log("└─────────────────────────────────────────────\n");
 
   return formatResponse(resultado);
 }
@@ -1666,12 +2068,12 @@ export async function iniciarReceita(rawData: unknown) {
 
 const atualizarTiposSchema = z.object({
   projeto_id: z.string().min(1),
-  tipos_projeto: z.array(z.enum(['saving', 'receita_incremental'])).min(1),
+  tipos_projeto: z.array(z.enum(["saving", "receita_incremental"])).min(1),
 });
 
 export async function atualizarTipos(rawData: unknown) {
   const data = atualizarTiposSchema.parse(rawData);
-  log('atualizarTipos', `projeto=${data.projeto_id}, tipos=${data.tipos_projeto.join(',')}`);
+  log("atualizarTipos", `projeto=${data.projeto_id}, tipos=${data.tipos_projeto.join(",")}`);
   // Escolher um tipo financeiro (saving/receita) significa que o projeto deixou de ser
   // ESPECIAL — é aqui que o usuário declara a natureza do impacto. Zeramos a flag no
   // mesmo ponto. Sem isso, um projeto que era especial ficava preso em especial=1: o
@@ -1687,7 +2089,7 @@ export async function atualizarTipos(rawData: unknown) {
     // ao novo tipo). ouTraco(null) → "—" no sync.
     contexto_especial: null,
   });
-  await gravarEvento(data.projeto_id, 'tipos', 'doc', {
+  await gravarEvento(data.projeto_id, "tipos", "doc", {
     tipos_projeto: data.tipos_projeto,
   });
   return { ok: true };
@@ -1710,7 +2112,7 @@ const atualizarMetadadosSchema = z.object({
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
-  usa_ai_proxy: z.enum(['sim', 'nao']).optional(),
+  usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -1723,15 +2125,16 @@ const atualizarMetadadosSchema = z.object({
   // Usado quando muda a entrada determinística do projeto especial (descrição/contexto).
   reset_doc: z.boolean().optional(),
   // Se enviados, substituem os arquivos e reiniciam a documentação.
-  docs: z.array(
-    z.object({ base64: z.string().min(1), filename: z.string().min(1) })
-  ).max(5000).optional(),
+  docs: z
+    .array(z.object({ base64: z.string().min(1), filename: z.string().min(1) }))
+    .max(5000)
+    .optional(),
 });
 
 export async function atualizarMetadados(rawData: unknown) {
   const data = atualizarMetadadosSchema.parse(rawData);
   const temDocs = !!data.docs && data.docs.length > 0;
-  log('atualizarMetadados', `projeto=${data.projeto_id}, docs=${temDocs ? data.docs!.length : 0}`);
+  log("atualizarMetadados", `projeto=${data.projeto_id}, docs=${temDocs ? data.docs!.length : 0}`);
 
   // 1. Persiste os campos de texto fornecidos (o agente lê frescos no próximo turno).
   const campos: Record<string, unknown> = {};
@@ -1752,7 +2155,7 @@ export async function atualizarMetadados(rawData: unknown) {
   // houve algo relevante (campos alterados, arquivos novos ou pedido de reset).
   const metadadosReset = temDocs || !!data.reset_doc;
   if (Object.keys(campos).length > 0 || metadadosReset) {
-    await gravarEvento(data.projeto_id, 'metadados', 'doc', {
+    await gravarEvento(data.projeto_id, "metadados", "doc", {
       voltou: metadadosReset,
       reset_doc: metadadosReset,
       campos: {
@@ -1785,7 +2188,10 @@ export async function atualizarMetadados(rawData: unknown) {
     // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
     // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
     await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
-    log('atualizarMetadados', `Projeto ${data.projeto_id}: convertido de especial → normal (flag + contexto especial zerados).`);
+    log(
+      "atualizarMetadados",
+      `Projeto ${data.projeto_id}: convertido de especial → normal (flag + contexto especial zerados).`,
+    );
   }
   // Detecta especial pelo flag do request OU pelo estado do projeto (um projeto já
   // especial continua especial mesmo sem o flag — ex.: chamadas internas/cron). ⚠️ Um
@@ -1796,21 +2202,24 @@ export async function atualizarMetadados(rawData: unknown) {
     // edição) — alinha tipo_projeto/tipos_projeto com o que iniciarSubmissao grava.
     await updateProjeto(data.projeto_id, {
       especial: true,
-      tipo_projeto: 'especial',
-      tipos_projeto: ['especial'],
+      tipo_projeto: "especial",
+      tipos_projeto: ["especial"],
     });
     const docEspecial = buildDocEspecial({
-      nome_projeto: data.nome_projeto ?? ctxData?.nome ?? '',
-      responsavel_nome: ctxData?.responsavel_nome ?? '',
-      responsavel_email: ctxData?.responsavel_email ?? '',
-      ferramenta: data.ferramenta ?? ctxData?.ferramenta ?? '',
+      nome_projeto: data.nome_projeto ?? ctxData?.nome ?? "",
+      responsavel_nome: ctxData?.responsavel_nome ?? "",
+      responsavel_email: ctxData?.responsavel_email ?? "",
+      ferramenta: data.ferramenta ?? ctxData?.ferramenta ?? "",
       membros: data.membros ?? parseJson<string[]>(ctxData?.membros ?? null) ?? [],
       descricao_breve: data.descricao_breve ?? ctxData?.descricao_breve ?? undefined,
       contexto_especial: data.contexto_especial ?? ctxData?.contexto_especial ?? undefined,
     });
     await upsertDocumentacao(data.projeto_id, docEspecial);
     await updateProjeto(data.projeto_id, { chat_completo: true });
-    log('atualizarMetadados', `Projeto especial ${data.projeto_id}: doc reconstruída sem IA, pronto para reenvio.`);
+    log(
+      "atualizarMetadados",
+      `Projeto especial ${data.projeto_id}: doc reconstruída sem IA, pronto para reenvio.`,
+    );
     return { ok: true, reset: true };
   }
 
@@ -1826,19 +2235,22 @@ export async function atualizarMetadados(rawData: unknown) {
   // for cancelada (cliente saiu/timeout) ou o LLM falhar, o chat/doc ANTIGOS ficam
   // intactos — antes apagávamos primeiro, então um cancelamento deixava o projeto SEM
   // documentação e o submit seguinte quebrava com "Documentação ainda não foi gerada".
-  let docTexto = '';
+  let docTexto = "";
   if (temDocs) {
     try {
       docTexto = await extractTextFromMultipleFiles(data.docs!);
-      log('atualizarMetadados', `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`);
+      log(
+        "atualizarMetadados",
+        `Texto re-extraído de ${data.docs!.length} arquivo(s): ${docTexto.length} chars`,
+      );
     } catch (extractErr) {
-      err('atualizarMetadados', 'Erro na re-extração de texto:', extractErr);
-      docTexto = '';
+      err("atualizarMetadados", "Erro na re-extração de texto:", extractErr);
+      docTexto = "";
     }
   } else {
     const docMsg = await getDocMessage(data.projeto_id);
-    docTexto = docMsg?.content ?? '';
-    log('atualizarMetadados', `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
+    docTexto = docMsg?.content ?? "";
+    log("atualizarMetadados", `reset_doc — reusando texto já extraído: ${docTexto.length} chars`);
   }
 
   const ctx = await getProjetoContexto(data.projeto_id);
@@ -1849,29 +2261,29 @@ export async function atualizarMetadados(rawData: unknown) {
   };
   if (docTexto || ctx.descricao_breve) {
     try {
-      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || '');
+      coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || "");
     } catch (extractorErr) {
-      err('atualizarMetadados', 'Extrator falhou — seguindo sem pré-preenchimento:', extractorErr);
+      err("atualizarMetadados", "Extrator falhou — seguindo sem pré-preenchimento:", extractorErr);
       coletadoInicial = { ...documentacaoVazia(), nome_projeto: ctx.nome_projeto };
     }
   }
 
   // Última operação que pode lançar. Se chegou aqui, a nova doc está pronta.
-  const resultado = await runOrchestrator(ctx, [], 'doc', coletadoInicial, savingVazio());
+  const resultado = await runOrchestrator(ctx, [], "doc", coletadoInicial, savingVazio());
 
   // ── TROCA (só agora) — apaga o antigo e grava o novo. Sequência curta de ops de
   // banco, sem trabalho de rede no meio que possa ser cancelado deixando estado parcial.
   await deleteChatMessagesByProjeto(data.projeto_id);
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'doc',
-    content: docTexto || '(documento sem texto legível)',
+    role: "doc",
+    content: docTexto || "(documento sem texto legível)",
   });
   await insertChatMessage({
     projeto_id: data.projeto_id,
-    role: 'assistant',
+    role: "assistant",
     content: JSON.stringify(resultado),
-    options: resultado.type === 'options' ? resultado.options : null,
+    options: resultado.type === "options" ? resultado.options : null,
   });
   // Nomes dos arquivos atualizados só após o sucesso da regeneração (o link do Drive
   // é gerado depois, em submeterParaValidacao).
@@ -1881,7 +2293,7 @@ export async function atualizarMetadados(rawData: unknown) {
     });
   }
 
-  log('atualizarMetadados', `Documentação reiniciada — fase: ${resultado.fase}`);
+  log("atualizarMetadados", `Documentação reiniciada — fase: ${resultado.fase}`);
   return { ok: true, reset: true, response: formatResponse(resultado) };
 }
 
@@ -1891,7 +2303,7 @@ const analisarProjetoSchema = z.object({ projeto_id: z.string().min(1) });
 
 export async function analisarProjetoFn(rawData: unknown) {
   const { projeto_id } = analisarProjetoSchema.parse(rawData);
-  log('analisarProjeto', `projeto=${projeto_id}`);
+  log("analisarProjeto", `projeto=${projeto_id}`);
 
   const resultado = await analisarProjetoAgent(projeto_id);
 
@@ -1921,11 +2333,14 @@ export async function analisarProjetoFn(rawData: unknown) {
   // função do analisador. Grava no projeto junto com complexidade e observações,
   // para o estado ficar correto de ponta a ponta (dashboard + planilha). Vale para
   // qualquer área, inclusive RPA (o veredito pode rebaixar uma auto-aprovação).
-  const statusVeredito = resultado.resultado === 'aprovado' ? 'aprovado' : 'rejeitado';
+  const statusVeredito = resultado.resultado === "aprovado" ? "aprovado" : "rejeitado";
 
   // Buscar documentação para calcular materialidade (teto de R$ 5k/mês)
   const docRow = await getDocumentacao(projeto_id);
-  const conteudo = (parseJson<Record<string, unknown>>(docRow?.conteudo ?? '{}') ?? {}) as Record<string, unknown>;
+  const conteudo = (parseJson<Record<string, unknown>>(docRow?.conteudo ?? "{}") ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   // Teto de materialidade: projetos acima de R$ 5k/mês exigem validação humana independente do veredito.
   const TETO_MATERIALIDADE_ANALISE = 5000;
@@ -1934,12 +2349,14 @@ export async function analisarProjetoFn(rawData: unknown) {
     conteudo.receita as Record<string, unknown> | undefined,
   );
   const statusFinal = ehEspecial
-    ? 'em_validacao' // especial nunca auto-aprova/reprova — validação humana
+    ? "em_validacao" // especial nunca auto-aprova/reprova — validação humana
     : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
-      ? 'em_validacao'
+      ? "em_validacao"
       : statusVeredito;
   if (!ehEspecial && materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
-    log(`Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`);
+    log(
+      `Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`,
+    );
   }
 
   await updateProjeto(projeto_id, {
@@ -1950,7 +2367,10 @@ export async function analisarProjetoFn(rawData: unknown) {
     ...(ehEspecial ? {} : { validated_at: new Date().toISOString() }),
   });
 
-  log('analisarProjeto', `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+  log(
+    "analisarProjeto",
+    `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`,
+  );
 
   // ── Sync Google (planilha + chat) — fire-and-forget ──
   {
@@ -1960,8 +2380,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     // automática não é refletida no Sheets. O status interno (SQLite/dashboard)
     // continua correto. Reverter para 'Aprovado' quando a validação terminar.
     const statusLabel = ehEspecial
-      ? 'Pendente' // especial → sempre validação humana
-      : resultado.resultado === 'aprovado' ? 'Pendente' : (materialidadeProjeto > TETO_MATERIALIDADE_ANALISE ? 'Pendente' : 'Reenvio Pendente');
+      ? "Pendente" // especial → sempre validação humana
+      : resultado.resultado === "aprovado"
+        ? "Pendente"
+        : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
+          ? "Pendente"
+          : "Reenvio Pendente";
 
     // AGUARDADO (não fire-and-forget): assim o sync da Complexidade/Observações faz
     // parte da promise da análise. Evita o FAF aninhado que o runtime cancelava,
@@ -1970,9 +2394,9 @@ export async function analisarProjetoFn(rawData: unknown) {
     // que a própria análise é cancelada antes de concluir.
     await syncUpdateToGoogle({
       projetoId: projeto_id,
-      projectName: projeto?.nome ?? '',
+      projectName: projeto?.nome ?? "",
       complexidade: resultado.complexidade,
-      observacoes: observacoes ?? '',
+      observacoes: observacoes ?? "",
       status: statusLabel,
     });
   }
@@ -1996,8 +2420,8 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
   const rows = await readAllRows();
   const compNaPlanilha = new Map<string, string>();
   for (const r of rows) {
-    const id = (r['ID Projeto'] ?? '').toString().trim().toLowerCase();
-    if (id) compNaPlanilha.set(id, (r['Complexidade'] ?? '').toString().trim());
+    const id = (r["ID Projeto"] ?? "").toString().trim().toLowerCase();
+    if (id) compNaPlanilha.set(id, (r["Complexidade"] ?? "").toString().trim());
   }
 
   const submetidos = await getProjetosSubmetidos();
@@ -2008,16 +2432,16 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
   for (const p of submetidos) {
     const comp = compNaPlanilha.get(String(p.id).trim().toLowerCase());
     // Pula quem já tem complexidade não-vazia na planilha (ou nem está nela).
-    if (comp === undefined || (comp !== '' && comp !== '—')) continue;
+    if (comp === undefined || (comp !== "" && comp !== "—")) continue;
     faltando++;
 
-    const compSqlite = (p.complexidade ?? '').toString().trim();
+    const compSqlite = (p.complexidade ?? "").toString().trim();
     try {
       if (compSqlite) {
         // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat).
         await updateRowByProjectId(p.id, {
-          'Complexidade': p.complexidade as string,
-          'Observações': (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : '—',
+          Complexidade: p.complexidade as string,
+          Observações: (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : "—",
         });
         ressincronizados++;
       } else if (reanalisados < maxReanalises) {
@@ -2026,11 +2450,14 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
         reanalisados++;
       }
     } catch (e) {
-      err('reconciliarComplexidade', `Falha ao reconciliar ${p.id}:`, e);
+      err("reconciliarComplexidade", `Falha ao reconciliar ${p.id}:`, e);
     }
   }
 
-  log('reconciliarComplexidade', `faltando=${faltando} ressincronizados=${ressincronizados} reanalisados=${reanalisados}`);
+  log(
+    "reconciliarComplexidade",
+    `faltando=${faltando} ressincronizados=${ressincronizados} reanalisados=${reanalisados}`,
+  );
   return { submetidos: submetidos.length, faltando, ressincronizados, reanalisados };
 }
 
@@ -2038,30 +2465,35 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
 
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
-  log('submeterParaValidacao', `projeto=${projeto_id}`);
+  log("submeterParaValidacao", `projeto=${projeto_id}`);
 
   const docRow = await getDocumentacao(projeto_id);
 
-  if (!docRow) throw new Error('Documentação ainda não foi gerada. Conclua o chat primeiro.');
+  if (!docRow) throw new Error("Documentação ainda não foi gerada. Conclua o chat primeiro.");
 
-  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   const projeto = await getProjetoById(projeto_id);
 
-  if (!projeto) throw new Error('Projeto não encontrado.');
+  if (!projeto) throw new Error("Projeto não encontrado.");
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
   // por uma versão anterior ou por um turno que não passou pelo recálculo.
-  if (conteudo.saving && typeof conteudo.saving === 'object') {
+  if (conteudo.saving && typeof conteudo.saving === "object") {
     // Re-deriva o custo evitado dos ITENS persistidos (fonte da verdade), em vez
     // de confiar no custo_evitado_reais que vinha do estado volátil do chat (o LLM
     // podia zerá-lo em fluxos longos — sumia o custo evitado pontual da planilha).
     const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
-    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
+    (conteudo.saving as SavingColetado).custo_evitado_reais =
+      evitadoMensal > 0 ? evitadoMensal : null;
     // Custos do projeto: re-deriva dos itens persistidos (fonte da verdade) e ABATE.
     const custoProjetoMensal = custoProjetoMensalFromItens(projeto.custo_projeto_itens);
-    (conteudo.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
+    (conteudo.saving as SavingColetado).custo_projeto_reais =
+      custoProjetoMensal > 0 ? custoProjetoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
@@ -2069,7 +2501,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // Divergência memorial×gravado na submissão → card de alerta no Investigador.
     const div = avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
     if (div) {
-      await gravarEvento(projeto_id, 'divergencia_memorial', 'saving', {
+      await gravarEvento(projeto_id, "divergencia_memorial", "saving", {
         total_texto: div.totalTexto,
         total_gravado: div.totalGravado,
       });
@@ -2091,18 +2523,28 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // cadastrado lá), a área vira o aviso "ÁREA NÃO IDENTIFICADA". Em caso de falha
   // da API (indisponibilidade), preservamos a área já gravada para não perder o
   // dado durante uma queda transitória.
-  const AREA_NAO_IDENTIFICADA = 'ÁREA NÃO IDENTIFICADA';
+  const AREA_NAO_IDENTIFICADA = "ÁREA NÃO IDENTIFICADA";
   let areaFinal: string;
   try {
-    const areaDerivada = await deriveAreaFromEmail(projeto.responsavel_email ?? '');
+    const areaDerivada = await deriveAreaFromEmail(projeto.responsavel_email ?? "");
     areaFinal = areaDerivada ?? AREA_NAO_IDENTIFICADA;
     if (areaDerivada) {
-      log('submeterParaValidacao', `Área derivada da TeamGuide: "${areaDerivada}" (${projeto.responsavel_email})`);
+      log(
+        "submeterParaValidacao",
+        `Área derivada da TeamGuide: "${areaDerivada}" (${projeto.responsavel_email})`,
+      );
     } else {
-      log('submeterParaValidacao', `Email não encontrado na TeamGuide → "${AREA_NAO_IDENTIFICADA}" (${projeto.responsavel_email})`);
+      log(
+        "submeterParaValidacao",
+        `Email não encontrado na TeamGuide → "${AREA_NAO_IDENTIFICADA}" (${projeto.responsavel_email})`,
+      );
     }
   } catch (tgErr) {
-    err('submeterParaValidacao', 'TeamGuide indisponível ao derivar área — preservando área existente:', tgErr);
+    err(
+      "submeterParaValidacao",
+      "TeamGuide indisponível ao derivar área — preservando área existente:",
+      tgErr,
+    );
     areaFinal = projeto.area ?? AREA_NAO_IDENTIFICADA;
   }
   projeto.area = areaFinal;
@@ -2114,7 +2556,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // Reenvio: detectado quando o projeto já foi submetido antes (submitted_at preenchido)
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
-  const ehReenvio = modo === 'edicao' || !!projeto.submitted_at;
+  const ehReenvio = modo === "edicao" || !!projeto.submitted_at;
 
   // Gate de OWNERSHIP na edição: podem reenviar um projeto já existente o autor
   // (responsavel_email), um EDITOR DELEGADO (participante a quem o dono delegou o
@@ -2123,7 +2565,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // solicitante não veio (chamadas internas/cron), não bloqueia.
   if (ehReenvio && solicitanteEmail) {
     const alvo = solicitanteEmail.trim().toLowerCase();
-    const ehOwner = (projeto.responsavel_email ?? '').trim().toLowerCase() === alvo;
+    const ehOwner = (projeto.responsavel_email ?? "").trim().toLowerCase() === alvo;
     const ehAdmin = await isAdmin(solicitanteEmail);
     const membros = parseJson<string[]>(projeto.membros) ?? [];
     const ehParticipante = !ehOwner && membros.some((m) => m.trim().toLowerCase() === alvo);
@@ -2136,7 +2578,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // visualiza, mesmo sendo admin. O override de admin vale só p/ projetos sem papel.
     if (!ehOwner && !ehEditorDelegado && (!ehAdmin || ehParticipante)) {
       throw Object.assign(
-        new Error('Apenas o autor ou um editor autorizado pode editar este projeto. Para transferir a autoria, acione a equipe RPA.'),
+        new Error(
+          "Apenas o autor ou um editor autorizado pode editar este projeto. Para transferir a autoria, acione a equipe RPA.",
+        ),
         { status: 403 },
       );
     }
@@ -2149,13 +2593,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // evitado − custo externo). Aceita saving SÓ de custo evitado (0h), desde que
     // o líquido seja positivo — é o caso "contrato externo cancelado, sem horas".
     // Bloqueia só quando NÃO há ganho algum (0h E sem custo evitado → líquido ≤ 0).
-    if (tiposProjetoGate.includes('saving') &&
-        (((saving?.economia_reais_mes as number) ?? 0) <= 0)) {
+    if (tiposProjetoGate.includes("saving") && ((saving?.economia_reais_mes as number) ?? 0) <= 0) {
       throw new Error(
-        'Não é possível submeter este projeto como saving sem ganho mensurável. ' +
-        'O ganho precisa vir de uma redução concreta de horas OU de um custo externo evitado ' +
-        '(contrato/serviço/licença que deixou de ser pago). Se nenhum dos dois se aplica, ' +
-        'reclassifique como receita incremental ou projeto especial.'
+        "Não é possível submeter este projeto como saving sem ganho mensurável. " +
+          "O ganho precisa vir de uma redução concreta de horas OU de um custo externo evitado " +
+          "(contrato/serviço/licença que deixou de ser pago). Se nenhum dos dois se aplica, " +
+          "reclassifique como receita incremental ou projeto especial.",
       );
     }
     // Gate de COMPLETUDE da receita (último porto antes de gravar): um projeto declarado
@@ -2164,20 +2607,24 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // saving / "não aplicável"). Pega tanto dado pela metade (tipo_saving nulo — o sintoma do
     // legado-260) quanto receita que na verdade é saving e devia ter sido reclassificada (o
     // backstop de enviarMensagem já barra no chat; aqui é a rede determinística final).
-    if (tiposProjetoGate.includes('receita_incremental')) {
-      const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? '').trim();
+    if (tiposProjetoGate.includes("receita_incremental")) {
+      const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? "").trim();
       if (((receita?.valor_ganho_mensal as number) ?? 0) <= 0) {
         throw new Error(
-          'Não é possível submeter receita incremental com ganho de R$ 0. ' +
-          'Revise o memorial de receita antes de enviar.'
+          "Não é possível submeter receita incremental com ganho de R$ 0. " +
+            "Revise o memorial de receita antes de enviar.",
         );
       }
-      if (!receita?.tipo_saving || memoReceita.length < 30 || receitaMemorialEhSaving(memoReceita)) {
+      if (
+        !receita?.tipo_saving ||
+        memoReceita.length < 30 ||
+        receitaMemorialEhSaving(memoReceita)
+      ) {
         throw new Error(
-          'Este projeto está marcado como Receita Incremental, mas a receita não está completa — ' +
-          'são obrigatórios a periodicidade, o valor e um memorial de RECEITA. Se o que foi descrito ' +
-          'é economia operacional (saving), volte à Etapa 2/3 e troque o tipo do projeto para Saving; ' +
-          'se for receita nova, conclua o memorial de receita antes de enviar.'
+          "Este projeto está marcado como Receita Incremental, mas a receita não está completa — " +
+            "são obrigatórios a periodicidade, o valor e um memorial de RECEITA. Se o que foi descrito " +
+            "é economia operacional (saving), volte à Etapa 2/3 e troque o tipo do projeto para Saving; " +
+            "se for receita nova, conclua o memorial de receita antes de enviar.",
         );
       }
     }
@@ -2186,11 +2633,17 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // Teto de materialidade: projetos acima de R$ 5.000/mês vão sempre para validação humana.
   const TETO_MATERIALIDADE = 5000;
   const materialidade = calcularMaterialidade(saving, receita);
-  const status = ehEspecial || ehReenvio || materialidade > TETO_MATERIALIDADE
-    ? 'em_validacao'
-    : (projeto.area === 'RPA' ? 'aprovado' : 'em_validacao');
+  const status =
+    ehEspecial || ehReenvio || materialidade > TETO_MATERIALIDADE
+      ? "em_validacao"
+      : projeto.area === "RPA"
+        ? "aprovado"
+        : "em_validacao";
   if (materialidade > TETO_MATERIALIDADE) {
-    log('submeterParaValidacao', `Materialidade R$ ${Math.round(materialidade)}/mês > R$ ${TETO_MATERIALIDADE} → em_validacao (validação humana obrigatória)`);
+    log(
+      "submeterParaValidacao",
+      `Materialidade R$ ${Math.round(materialidade)}/mês > R$ ${TETO_MATERIALIDADE} → em_validacao (validação humana obrigatória)`,
+    );
   }
   const now = new Date().toISOString();
 
@@ -2202,7 +2655,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const savingMensal = savingReais;
 
   const receitaValor = (receita?.valor_ganho_mensal as number) ?? 0;
-  const receitaTipo = (receita?.tipo_saving as string) ?? 'mensal';
+  const receitaTipo = (receita?.tipo_saving as string) ?? "mensal";
   const receitaEquivalente = receitaValor / 10;
 
   const ganhoTotalMensal = savingMensal + receitaEquivalente;
@@ -2210,18 +2663,26 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // Memorial interno (planilha/SQLite): versão ENRIQUECIDA com valores financeiros (R$).
   // O LLM gera o memorial sem R$ (visível ao usuário); o backend injeta os valores
   // usando a tabela CARGOS + campos estruturados. O markdown cru fica em documentacao.conteudo.
-  const tiposProjeto = (projeto.tipos_projeto
-    ? JSON.parse(projeto.tipos_projeto as string)
-    : [projeto.tipo_projeto].filter(Boolean)) as string[];
+  const tiposProjeto = (
+    projeto.tipos_projeto
+      ? JSON.parse(projeto.tipos_projeto as string)
+      : [projeto.tipo_projeto].filter(Boolean)
+  ) as string[];
   const memorialInterno = stripMarkdown(
-    enriquecerMemorial(saving as SavingColetado | undefined, receita as ReceitaColetada | undefined, tiposProjeto)
+    enriquecerMemorial(
+      saving as SavingColetado | undefined,
+      receita as ReceitaColetada | undefined,
+      tiposProjeto,
+    ),
   );
   // Coluna "Memorial de Saving" (V) recebe SÓ o memorial de saving (com R$). O memorial de
   // receita vai SOMENTE para "Receita Memorial" (Z); em projeto só-receita, V fica "—".
   // (memorial_calculo no banco segue sendo o unificado — usado em "Memorial anterior"/auditoria.)
   const memorialSavingLimpo =
-    tiposProjeto.includes('saving') && saving
-      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+    tiposProjeto.includes("saving") && saving
+      ? stripMarkdown(
+          enriquecerMemorial(saving as SavingColetado | undefined, undefined, ["saving"]),
+        )
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
   // "Alocação Ganhos" (coluna AK): justificativa [2.4] do gate ≥44h, fatiada do
@@ -2261,7 +2722,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     ...(ehReenvio ? { validated_at: null, validated_by: null } : {}),
   });
 
-  log('submeterParaValidacao', `Status: ${status}`);
+  log("submeterParaValidacao", `Status: ${status}`);
 
   // ── Snapshot imutável de auditoria ────────────────────────────────────────────
   // Grava uma cópia do estado do projeto no momento da submissão. Não propaga
@@ -2295,7 +2756,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       const chatSnapshot = await getChatMessages(projeto_id);
       await gravarVersaoProjeto(
         projeto_id,
-        ehReenvio ? 'reenvio' : 'submit_inicial',
+        ehReenvio ? "reenvio" : "submit_inicial",
         snapshotProjeto,
         conteudo,
         projetoAtualizado.responsavel_email,
@@ -2303,7 +2764,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       );
     }
   } catch (versionErr) {
-    err('submeterParaValidacao', 'Falha ao gravar versão (não bloqueante):', versionErr);
+    err("submeterParaValidacao", "Falha ao gravar versão (não bloqueante):", versionErr);
   }
 
   // ── Resumo da documentação → UM doc no Drive (link único na coluna "URL") ──
@@ -2313,7 +2774,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   try {
     const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
     // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
-    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, 'doc');
+    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, "doc");
     const docUsuarioMsg = await getDocMessage(projeto_id);
     const md = renderResumoDocumentacao(projeto, conteudo, {
       resumoProjeto: extrairResumoProjeto(msgsResumo),
@@ -2321,27 +2782,27 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
     });
     const sanit = (x: string) =>
-      (x || '')
-        .replace(/[|/\\]+/g, '-')
-        .replace(/->|→|<>/g, '-')
-        .replace(/\s+/g, ' ')
-        .replace(/[^\w\sÀ-ÿ.\-]/g, '')
+      (x || "")
+        .replace(/[|/\\]+/g, "-")
+        .replace(/->|→|<>/g, "-")
+        .replace(/\s+/g, " ")
+        .replace(/[^\w\sÀ-ÿ.\-]/g, "")
         .trim()
-        .replace(/\s/g, '_')
+        .replace(/\s/g, "_")
         .slice(0, 80);
-    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, '')}_${sanit(projeto.nome ?? 'projeto')}_${sanit(areaFinal ?? '')}.md`;
+    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, "")}_${sanit(projeto.nome ?? "projeto")}_${sanit(areaFinal ?? "")}.md`;
     const link = await upsertResumoDoc(filename, md, linkExistente);
     if (link) {
       await updateProjeto(projeto_id, { arquivos_links: [link] });
       (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
-      log('submeterParaValidacao', `Resumo da doc salvo no Drive: ${link}`);
+      log("submeterParaValidacao", `Resumo da doc salvo no Drive: ${link}`);
     }
   } catch (driveErr) {
-    err('submeterParaValidacao', 'Falha ao salvar resumo no Drive (não bloqueante):', driveErr);
+    err("submeterParaValidacao", "Falha ao salvar resumo no Drive (não bloqueante):", driveErr);
   }
 
   // Evento de timeline: submissão/reenvio finalizado (fecha o histórico).
-  await gravarEvento(projeto_id, 'submit', 'completo', {
+  await gravarEvento(projeto_id, "submit", "completo", {
     reenvio: ehReenvio,
     status,
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
@@ -2352,30 +2813,32 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     const membros = parseJson<string[]>(projeto.membros) ?? [];
     const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
-    runBackground(syncSubmitToGoogle({
-      projetoId: projeto_id,
-      modo: ehReenvio ? 'edicao' : 'novo',
-      projeto,
-      conteudo,
-      saving,
-      receita,
-      membros,
-      tiposProjeto,
-      // TEMPORÁRIO: durante a validação da eficácia do formulário, gravamos sempre
-      // "Pendente" na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
-      // status interno (SQLite/dashboard) continua correto. Reverter para
-      // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
-      status: 'Pendente',
-      area: areaFinal ?? '—',
-      memorialLimpo: memorialSavingLimpo ?? '—',
-      receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
-      alocacaoGanhos,
-      justificativaCargaEscala,
-      ganhoTotalMensal,
-      // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
-      // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
-      memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
-    }));
+    runBackground(
+      syncSubmitToGoogle({
+        projetoId: projeto_id,
+        modo: ehReenvio ? "edicao" : "novo",
+        projeto,
+        conteudo,
+        saving,
+        receita,
+        membros,
+        tiposProjeto,
+        // TEMPORÁRIO: durante a validação da eficácia do formulário, gravamos sempre
+        // "Pendente" na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
+        // status interno (SQLite/dashboard) continua correto. Reverter para
+        // `status === 'aprovado' ? 'Aprovado' : 'Pendente'` quando a validação terminar.
+        status: "Pendente",
+        area: areaFinal ?? "—",
+        memorialLimpo: memorialSavingLimpo ?? "—",
+        receitaMemorialLimpo: receitaMemorialLimpo ?? "—",
+        alocacaoGanhos,
+        justificativaCargaEscala,
+        ganhoTotalMensal,
+        // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
+        // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
+        memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
+      }),
+    );
   }
 
   // Números finais recalculados — o cliente usa para o comparativo antes×depois
@@ -2408,22 +2871,27 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 // REMOVER quando não for mais necessário.
 export async function resyncGoogle(rawData: unknown) {
   const { projeto_id } = z.object({ projeto_id: z.string().min(1) }).parse(rawData);
-  log('resyncGoogle', `projeto=${projeto_id}`);
+  log("resyncGoogle", `projeto=${projeto_id}`);
 
   const docRow = await getDocumentacao(projeto_id);
-  if (!docRow) throw new Error('Documentação não encontrada.');
-  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+  if (!docRow) throw new Error("Documentação não encontrada.");
+  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   const projeto = await getProjetoById(projeto_id);
-  if (!projeto) throw new Error('Projeto não encontrado.');
+  if (!projeto) throw new Error("Projeto não encontrado.");
 
   // Re-deriva R$ das horas (mesma rede de segurança do submit), incluindo o custo
   // evitado a partir dos itens persistidos.
-  if (conteudo.saving && typeof conteudo.saving === 'object') {
+  if (conteudo.saving && typeof conteudo.saving === "object") {
     const evitadoMensal = custoEvitadoMensalFromItens(projeto.custo_evitado_itens);
-    (conteudo.saving as SavingColetado).custo_evitado_reais = evitadoMensal > 0 ? evitadoMensal : null;
+    (conteudo.saving as SavingColetado).custo_evitado_reais =
+      evitadoMensal > 0 ? evitadoMensal : null;
     const custoProjetoMensal = custoProjetoMensalFromItens(projeto.custo_projeto_itens);
-    (conteudo.saving as SavingColetado).custo_projeto_reais = custoProjetoMensal > 0 ? custoProjetoMensal : null;
+    (conteudo.saving as SavingColetado).custo_projeto_reais =
+      custoProjetoMensal > 0 ? custoProjetoMensal : null;
     conteudo.saving = recomputarSavingFinanceiro(
       conteudo.saving as SavingColetado,
       projeto.custo_externo_mensal ?? 0,
@@ -2443,8 +2911,10 @@ export async function resyncGoogle(rawData: unknown) {
   const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
   // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Receita Memorial").
   const memorialSavingLimpo =
-    tiposProjeto.includes('saving') && saving
-      ? stripMarkdown(enriquecerMemorial(saving as SavingColetado | undefined, undefined, ['saving']))
+    tiposProjeto.includes("saving") && saving
+      ? stripMarkdown(
+          enriquecerMemorial(saving as SavingColetado | undefined, undefined, ["saving"]),
+        )
       : null;
   const receitaMemorialLimpo = stripMarkdown(receita?.memorial_calculo as string | undefined);
   const alocacaoGanhos = extrairAlocacaoGanhos(
@@ -2456,17 +2926,17 @@ export async function resyncGoogle(rawData: unknown) {
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
   await syncSubmitToGoogle({
     projetoId: projeto_id,
-    modo: 'edicao',
+    modo: "edicao",
     projeto,
     conteudo,
     saving,
     receita,
     membros,
     tiposProjeto,
-    status: 'Pendente',
-    area: projeto.area ?? '—',
-    memorialLimpo: memorialSavingLimpo ?? '—',
-    receitaMemorialLimpo: receitaMemorialLimpo ?? '—',
+    status: "Pendente",
+    area: projeto.area ?? "—",
+    memorialLimpo: memorialSavingLimpo ?? "—",
+    receitaMemorialLimpo: receitaMemorialLimpo ?? "—",
     alocacaoGanhos,
     justificativaCargaEscala,
     ganhoTotalMensal,
@@ -2475,13 +2945,16 @@ export async function resyncGoogle(rawData: unknown) {
   // 2. Complexidade/Observações/Status (o que o analisador já havia gravado).
   await syncUpdateToGoogle({
     projetoId: projeto_id,
-    projectName: projeto.nome ?? '',
-    complexidade: projeto.complexidade ?? '',
-    observacoes: projeto.observacoes ?? '',
-    status: 'Pendente',
+    projectName: projeto.nome ?? "",
+    complexidade: projeto.complexidade ?? "",
+    observacoes: projeto.observacoes ?? "",
+    status: "Pendente",
   });
 
-  log('resyncGoogle', `OK — ${projeto.nome} (área=${projeto.area}, ganho=${Math.round(ganhoTotalMensal)})`);
+  log(
+    "resyncGoogle",
+    `OK — ${projeto.nome} (área=${projeto.area}, ganho=${Math.round(ganhoTotalMensal)})`,
+  );
   return {
     ok: true,
     projeto_id,
@@ -2515,32 +2988,41 @@ export async function resyncGoogle(rawData: unknown) {
 export async function retroativoCustosPontuais(rawData: unknown) {
   const { dry } = z.object({ dry: z.boolean().optional() }).parse(rawData ?? {});
   const modoDry = dry !== false; // default seguro: dry-run
-  log('retroativoCustosPontuais', `dry=${modoDry}`);
+  log("retroativoCustosPontuais", `dry=${modoDry}`);
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const aprox = (a: number, b: number) => Math.abs(a - b) < 0.01;
   const parseArr = (raw: unknown): Array<{ recorrencia?: string }> => {
-    const v = parseJson<Array<{ recorrencia?: string }>>(typeof raw === 'string' ? raw : JSON.stringify(raw ?? []));
+    const v = parseJson<Array<{ recorrencia?: string }>>(
+      typeof raw === "string" ? raw : JSON.stringify(raw ?? []),
+    );
     return Array.isArray(v) ? v : [];
   };
   const temItens = (raw: unknown) => parseArr(raw).length > 0;
-  const temPontualItens = (raw: unknown) => parseArr(raw).some((it) => it?.recorrencia === 'pontual');
+  const temPontualItens = (raw: unknown) =>
+    parseArr(raw).some((it) => it?.recorrencia === "pontual");
   // pt-BR → número. "234,19"→234.19; "1.500,00"→1500; sem vírgula, pontos são milhar.
   const parseValorBR = (s: string): number => {
     const t = String(s).trim();
-    return t.includes(',') ? parseFloat(t.replace(/\./g, '').replace(',', '.')) : parseFloat(t.replace(/\./g, ''));
+    return t.includes(",")
+      ? parseFloat(t.replace(/\./g, "").replace(",", "."))
+      : parseFloat(t.replace(/\./g, ""));
   };
   // Soma os itens "R$ <valor> (pontual|mensal)" da justificativa (formato gerado pelo app),
   // TODOS pelo valor CHEIO. Retorna também se há ao menos um item pontual.
-  const somaJustificativa = (just: string): { total: number; temPontual: boolean; count: number } => {
+  const somaJustificativa = (
+    just: string,
+  ): { total: number; temPontual: boolean; count: number } => {
     const re = /R\$\s*([\d.,]+)\s*\((pontual|mensal)\)/gi;
     let m: RegExpExecArray | null;
-    let total = 0, temPontual = false, count = 0;
-    while ((m = re.exec(just || '')) !== null) {
+    let total = 0,
+      temPontual = false,
+      count = 0;
+    while ((m = re.exec(just || "")) !== null) {
       const v = parseValorBR(m[1]);
       if (!isFinite(v) || v <= 0) continue;
       total += v;
-      if (m[2].toLowerCase() === 'pontual') temPontual = true;
+      if (m[2].toLowerCase() === "pontual") temPontual = true;
       count++;
     }
     return { total: round2(total), temPontual, count };
@@ -2559,13 +3041,20 @@ export async function retroativoCustosPontuais(rawData: unknown) {
     // ── CASO A: submetido pelo APP (tem itens) — re-deriva dos itens (fonte exata) ──
     if (temItens(projeto.custo_evitado_itens) || temItens(projeto.custo_projeto_itens)) {
       // Só interessa item PONTUAL — mensal sempre entrou cheio (nada muda).
-      if (!temPontualItens(projeto.custo_evitado_itens) && !temPontualItens(projeto.custo_projeto_itens)) continue;
+      if (
+        !temPontualItens(projeto.custo_evitado_itens) &&
+        !temPontualItens(projeto.custo_projeto_itens)
+      )
+        continue;
 
       const docRow = await getDocumentacao(id);
       if (!docRow) continue;
-      const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+      const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
       const saving = conteudo.saving as SavingColetado | undefined;
-      if (!saving || typeof saving !== 'object') continue;
+      if (!saving || typeof saving !== "object") continue;
 
       const oldEvitado = Math.max(0, Number(saving.custo_evitado_reais) || 0);
       const oldProjeto = Math.max(0, Number(saving.custo_projeto_reais) || 0);
@@ -2590,7 +3079,9 @@ export async function retroativoCustosPontuais(rawData: unknown) {
       const ganhoNewRound = ganhoNew > 0 ? round2(ganhoNew) : 0;
 
       projetosAfetados.push({
-        id, nome: projeto.nome, metodo: 'itens',
+        id,
+        nome: projeto.nome,
+        metodo: "itens",
         custo_evitado: { de: oldEvitado, para: newEvitado },
         custo_projeto: { de: oldProjeto, para: newProjeto },
         saving_reais: { de: oldSavingReais, para: savingReaisNew },
@@ -2606,39 +3097,58 @@ export async function retroativoCustosPontuais(rawData: unknown) {
         ganho_total_mensal: ganhoNewRound > 0 ? ganhoNewRound : null,
         memorial_calculo: memorialInterno,
       });
-      const memorialSavingLimpo = tiposProjeto.includes('saving')
-        ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ['saving']))
-        : '—';
+      const memorialSavingLimpo = tiposProjeto.includes("saving")
+        ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ["saving"]))
+        : "—";
       await updateRowByProjectId(id, {
-        'Custo Evitado': newEvitado,
-        'Custo do Projeto': newProjeto,
-        'Saving Reais': savingReaisNew,
-        'Ganho Total': ganhoNewRound,
-        'Memorial de Saving': memorialSavingLimpo,
-        'Atualizado Em': nowFortaleza(),
+        "Custo Evitado": newEvitado,
+        "Custo do Projeto": newProjeto,
+        "Saving Reais": savingReaisNew,
+        "Ganho Total": ganhoNewRound,
+        "Memorial de Saving": memorialSavingLimpo,
+        "Atualizado Em": nowFortaleza(),
       });
-      log('retroativoCustosPontuais', `[itens] aplicado ${id} (${projeto.nome}): evitado ${oldEvitado}→${newEvitado}, saving ${oldSavingReais}→${savingReaisNew}`);
+      log(
+        "retroativoCustosPontuais",
+        `[itens] aplicado ${id} (${projeto.nome}): evitado ${oldEvitado}→${newEvitado}, saving ${oldSavingReais}→${savingReaisNew}`,
+      );
       continue;
     }
 
     // ── CASO B: LEGADO sem itens — custo evitado PONTUAL ──
-    const just = projeto.custo_evitado_justificativa || '';
+    const just = projeto.custo_evitado_justificativa || "";
     // Só pontual (mensal nunca dividiu). Custo do projeto pontual em legado é raro e
     // subtrai — não dá pra tratar como "puro"; sinaliza.
-    if (temItens(projeto.custo_projeto_itens) === false && projeto.custo_projeto === 'sim' && /pontual/i.test(projeto.custo_projeto_justificativa || '')) {
-      flagged.push({ id, nome: projeto.nome, motivo: 'legado com custo do projeto pontual (subtrai) — revisar manual' });
+    if (
+      temItens(projeto.custo_projeto_itens) === false &&
+      projeto.custo_projeto === "sim" &&
+      /pontual/i.test(projeto.custo_projeto_justificativa || "")
+    ) {
+      flagged.push({
+        id,
+        nome: projeto.nome,
+        motivo: "legado com custo do projeto pontual (subtrai) — revisar manual",
+      });
     }
-    if (projeto.custo_evitado !== 'sim' || !/pontual/i.test(just)) continue;
+    if (projeto.custo_evitado !== "sim" || !/pontual/i.test(just)) continue;
 
     // "Puro": saving_reais == custo evitado ÷12 (sem horas, sem custo externo/projeto).
     const horas = Number(projeto.saving_horas) || 0;
     const custoExterno = Number(projeto.custo_externo_mensal) || 0;
-    const ehPuro = projeto.alguem_fazia === 'externo' && horas === 0 && custoExterno === 0 && projeto.custo_projeto !== 'sim';
+    const ehPuro =
+      projeto.alguem_fazia === "externo" &&
+      horas === 0 &&
+      custoExterno === 0 &&
+      projeto.custo_projeto !== "sim";
     const oldSaving = round2(Number(projeto.saving_reais) || 0);
     const oldGanho = round2(Number(projeto.ganho_total_mensal) || 0);
 
     if (!ehPuro) {
-      flagged.push({ id, nome: projeto.nome, motivo: 'legado pontual NÃO-puro (tem horas/custo externo/custo projeto) — revisar manual' });
+      flagged.push({
+        id,
+        nome: projeto.nome,
+        motivo: "legado pontual NÃO-puro (tem horas/custo externo/custo projeto) — revisar manual",
+      });
       continue;
     }
 
@@ -2647,14 +3157,20 @@ export async function retroativoCustosPontuais(rawData: unknown) {
     let newEvitado: number | null = null;
     let metodo: string | null = null;
     if (parsed.total > 0 && parsed.temPontual) {
-      newEvitado = parsed.total; metodo = 'justificativa';
+      newEvitado = parsed.total;
+      metodo = "justificativa";
     } else {
-      newEvitado = round2(oldSaving * 12); metodo = 'x12';
+      newEvitado = round2(oldSaving * 12);
+      metodo = "x12";
     }
 
     if (aprox(newEvitado, oldSaving)) continue; // já corrigido / sem ÷12
     if (newEvitado < oldSaving) {
-      flagged.push({ id, nome: projeto.nome, motivo: `valor recuperado (${newEvitado}) < atual (${oldSaving}) — revisar manual` });
+      flagged.push({
+        id,
+        nome: projeto.nome,
+        motivo: `valor recuperado (${newEvitado}) < atual (${oldSaving}) — revisar manual`,
+      });
       continue;
     }
 
@@ -2664,7 +3180,9 @@ export async function retroativoCustosPontuais(rawData: unknown) {
     const newGanho = round2(oldGanho + delta);
 
     projetosAfetados.push({
-      id, nome: projeto.nome, metodo,
+      id,
+      nome: projeto.nome,
+      metodo,
       custo_evitado: { de: oldSaving, para: newEvitado },
       custo_projeto: { de: 0, para: 0 },
       saving_reais: { de: oldSaving, para: newSaving },
@@ -2677,15 +3195,21 @@ export async function retroativoCustosPontuais(rawData: unknown) {
       ganho_total_mensal: newGanho > 0 ? newGanho : null,
     });
     await updateRowByProjectId(id, {
-      'Custo Evitado': newEvitado,
-      'Saving Reais': newSaving,
-      'Ganho Total': newGanho,
-      'Atualizado Em': nowFortaleza(),
+      "Custo Evitado": newEvitado,
+      "Saving Reais": newSaving,
+      "Ganho Total": newGanho,
+      "Atualizado Em": nowFortaleza(),
     });
-    log('retroativoCustosPontuais', `[legado:${metodo}] aplicado ${id} (${projeto.nome}): ${oldSaving}→${newSaving}`);
+    log(
+      "retroativoCustosPontuais",
+      `[legado:${metodo}] aplicado ${id} (${projeto.nome}): ${oldSaving}→${newSaving}`,
+    );
   }
 
-  log('retroativoCustosPontuais', `${modoDry ? 'DRY' : 'APLICADO'} — ${scanned} varridos, ${projetosAfetados.length} afetados, ${flagged.length} flagged`);
+  log(
+    "retroativoCustosPontuais",
+    `${modoDry ? "DRY" : "APLICADO"} — ${scanned} varridos, ${projetosAfetados.length} afetados, ${flagged.length} flagged`,
+  );
   return {
     dry: modoDry,
     total_scanned: scanned,
@@ -2703,9 +3227,11 @@ export async function validarProjeto(rawData: unknown) {
 
   const docRow = await getDocumentacao(projeto_id);
 
-  if (!docRow) throw new Error('Documentação não encontrada.');
+  if (!docRow) throw new Error("Documentação não encontrada.");
 
-  const doc = parseJson<Parameters<typeof validarDocumentacao>[0]>(docRow.conteudo) as Parameters<typeof validarDocumentacao>[0];
+  const doc = parseJson<Parameters<typeof validarDocumentacao>[0]>(docRow.conteudo) as Parameters<
+    typeof validarDocumentacao
+  >[0];
   const resultado = await validarDocumentacao(doc);
 
   await insertValidacao({
@@ -2715,18 +3241,18 @@ export async function validarProjeto(rawData: unknown) {
     criterios: resultado.criterios,
   });
 
-  const novoStatus = resultado.resultado === 'aprovado' ? 'validado' : 'rejeitado';
+  const novoStatus = resultado.resultado === "aprovado" ? "validado" : "rejeitado";
   await updateProjeto(projeto_id, { status: novoStatus, validated_at: new Date().toISOString() });
 
   try {
-    if (resultado.resultado === 'aprovado') {
+    if (resultado.resultado === "aprovado") {
       await enviarEmailAprovacao(doc, resultado);
     } else {
       await enviarEmailRejeicao(doc, resultado);
     }
     await updateValidacaoEmailEnviado(projeto_id);
   } catch (emailErr) {
-    console.error('[email-agent] Falha ao enviar email:', emailErr);
+    console.error("[email-agent] Falha ao enviar email:", emailErr);
   }
 
   return { resultado: resultado.resultado, parecer: resultado.parecer };

@@ -1,24 +1,25 @@
 // Testes: tipos e factories dos agentes
-import { describe, it, expect } from 'vitest';
-import {
-  documentacaoVazia,
-  savingVazio,
-  CARGOS,
-} from '@/lib/agents/types';
+import { describe, it, expect } from "vitest";
+import { documentacaoVazia, savingVazio, CARGOS } from "@/lib/agents/types";
 import type {
   ChatFase,
   DocumentacaoColetada,
   SavingColetado,
   OrchestratorResult,
   ProjetoContexto,
-} from '@/lib/agents/types';
+} from "@/lib/agents/types";
 
-describe('documentacaoVazia', () => {
-  it('retorna os 7 campos de documentação como null, mais tem_ia_como_funcionalidade como null', () => {
+describe("documentacaoVazia", () => {
+  it("retorna os 7 campos de documentação como null, mais tem_ia_como_funcionalidade como null", () => {
     const doc = documentacaoVazia();
     const campos: (keyof DocumentacaoColetada)[] = [
-      'nome_projeto', 'o_que_faz', 'execucao', 'dependencias',
-      'fluxo', 'configurar_antes', 'atencao',
+      "nome_projeto",
+      "o_que_faz",
+      "execucao",
+      "dependencias",
+      "fluxo",
+      "configurar_antes",
+      "atencao",
     ];
     expect(Object.keys(doc)).toHaveLength(8);
     for (const campo of campos) {
@@ -27,153 +28,181 @@ describe('documentacaoVazia', () => {
     expect(doc.tem_ia_como_funcionalidade).toBeNull();
   });
 
-  it('retorna instância nova a cada chamada (sem referência compartilhada)', () => {
+  it("retorna instância nova a cada chamada (sem referência compartilhada)", () => {
     const a = documentacaoVazia();
     const b = documentacaoVazia();
     expect(a).not.toBe(b);
-    a.nome_projeto = 'teste';
+    a.nome_projeto = "teste";
     expect(b.nome_projeto).toBeNull();
   });
 });
 
-describe('savingVazio', () => {
-  it('retorna linhas vazias e os demais campos como null', () => {
+describe("savingVazio", () => {
+  it("retorna linhas vazias e os demais campos como null", () => {
     const saving = savingVazio();
     const nulos: (keyof SavingColetado)[] = [
-      'economia_horas_mes', 'economia_reais_mes',
-      'tipo_saving', 'memorial_calculo', 'valor_ganho_mensal',
-      'custo_evitado_reais', 'custo_evitado_tipo', 'custo_evitado_descricao',
-      'custo_externo_mensal',
-      'custo_projeto_reais', 'custo_projeto_tipo', 'custo_projeto_descricao',
-      'jornada_base', 'teto_pessoa',
-      'horas_carga_real', 'horas_escala', 'carga_escala', 'carga_escala_racional',
+      "economia_horas_mes",
+      "economia_reais_mes",
+      "tipo_saving",
+      "memorial_calculo",
+      "valor_ganho_mensal",
+      "custo_evitado_reais",
+      "custo_evitado_tipo",
+      "custo_evitado_descricao",
+      "custo_externo_mensal",
+      "custo_projeto_reais",
+      "custo_projeto_tipo",
+      "custo_projeto_descricao",
+      "jornada_base",
+      "teto_pessoa",
+      "horas_carga_real",
+      "horas_escala",
+      "carga_escala",
+      "carga_escala_racional",
+      "alocacao_ganhos",
+      "alocacao_ganhos_racional",
     ];
-    expect(Object.keys(saving)).toHaveLength(19);
+    expect(Object.keys(saving)).toHaveLength(21);
     expect(saving.linhas).toEqual([]);
     for (const campo of nulos) {
       expect(saving[campo]).toBeNull();
     }
   });
 
-  it('retorna instância nova a cada chamada', () => {
+  it("retorna instância nova a cada chamada", () => {
     const a = savingVazio();
     const b = savingVazio();
     expect(a).not.toBe(b);
   });
 });
 
-describe('Tipos de fase (ChatFase)', () => {
-  it('aceita todas as fases válidas', () => {
-    const fases: ChatFase[] = ['doc', 'doc_preview', 'saving', 'saving_preview', 'receita', 'receita_preview', 'completo'];
+describe("Tipos de fase (ChatFase)", () => {
+  it("aceita todas as fases válidas", () => {
+    const fases: ChatFase[] = [
+      "doc",
+      "doc_preview",
+      "saving",
+      "saving_preview",
+      "receita",
+      "receita_preview",
+      "completo",
+    ];
     expect(fases).toHaveLength(7);
   });
 });
 
-describe('ProjetoContexto', () => {
-  it('pode ser construído com dados mínimos', () => {
+describe("ProjetoContexto", () => {
+  it("pode ser construído com dados mínimos", () => {
     const ctx: ProjetoContexto = {
-      responsavel_nome: 'Teste',
-      responsavel_email: 'teste@gocase.com',
-      area: 'RPA',
-      ferramenta: 'n8n',
+      responsavel_nome: "Teste",
+      responsavel_email: "teste@gocase.com",
+      area: "RPA",
+      ferramenta: "n8n",
       membros: [],
-      nome_projeto: 'Projeto Teste',
-      data_criacao: '2025-01-01',
+      nome_projeto: "Projeto Teste",
+      data_criacao: "2025-01-01",
       doc_texto: null,
     };
-    expect(ctx.nome_projeto).toBe('Projeto Teste');
+    expect(ctx.nome_projeto).toBe("Projeto Teste");
     expect(ctx.doc_texto).toBeNull();
     expect(ctx.membros).toEqual([]);
   });
 });
 
-describe('OrchestratorResult', () => {
-  it('tipo question tem content e fase', () => {
+describe("OrchestratorResult", () => {
+  it("tipo question tem content e fase", () => {
     const result: OrchestratorResult = {
-      type: 'question',
-      content: 'Qual a área?',
-      fase: 'doc',
+      type: "question",
+      content: "Qual a área?",
+      fase: "doc",
       coletado: documentacaoVazia(),
       saving: savingVazio(),
     };
-    expect(result.type).toBe('question');
-    expect(result.content).toBe('Qual a área?');
-    expect(result.fase).toBe('doc');
+    expect(result.type).toBe("question");
+    expect(result.content).toBe("Qual a área?");
+    expect(result.fase).toBe("doc");
   });
 
-  it('tipo options tem question + 3 opções', () => {
+  it("tipo options tem question + 3 opções", () => {
     const result: OrchestratorResult = {
-      type: 'options',
-      question: 'Escolha o cargo:',
-      options: ['Estagiário', 'Analista', 'Coordenador'],
-      fase: 'saving',
+      type: "options",
+      question: "Escolha o cargo:",
+      options: ["Estagiário", "Analista", "Coordenador"],
+      fase: "saving",
       coletado: documentacaoVazia(),
       saving: savingVazio(),
     };
-    expect(result.type).toBe('options');
+    expect(result.type).toBe("options");
     expect(result.options).toHaveLength(3);
   });
 
-  it('tipo preview tem content markdown', () => {
+  it("tipo preview tem content markdown", () => {
     const result: OrchestratorResult = {
-      type: 'preview',
-      content: '# Projeto\n\n## O que faz\nAlgo útil.',
-      fase: 'doc_preview',
+      type: "preview",
+      content: "# Projeto\n\n## O que faz\nAlgo útil.",
+      fase: "doc_preview",
       coletado: documentacaoVazia(),
       saving: savingVazio(),
     };
-    expect(result.content).toContain('# Projeto');
+    expect(result.content).toContain("# Projeto");
   });
 
-  it('tipo complete com saving preenchido', () => {
+  it("tipo complete com saving preenchido", () => {
     const saving: SavingColetado = {
       linhas: [
-        { cargo: 'Estagiário', horas_antes: 60, horas_depois: 1.7, valor_hora: 10.78, economia_horas_mes: 58.3, economia_reais_mes: 628.47 },
+        {
+          cargo: "Estagiário",
+          horas_antes: 60,
+          horas_depois: 1.7,
+          valor_hora: 10.78,
+          economia_horas_mes: 58.3,
+          economia_reais_mes: 628.47,
+        },
       ],
       economia_horas_mes: 58.3,
       economia_reais_mes: 628.47,
-      tipo_saving: 'mensal',
-      memorial_calculo: 'Detalhamento...',
+      tipo_saving: "mensal",
+      memorial_calculo: "Detalhamento...",
       valor_ganho_mensal: null,
       custo_evitado_reais: null,
       custo_evitado_tipo: null,
       custo_evitado_descricao: null,
     };
     const result: OrchestratorResult = {
-      type: 'complete',
-      content: 'Memorial aprovado!',
-      fase: 'completo',
+      type: "complete",
+      content: "Memorial aprovado!",
+      fase: "completo",
       coletado: documentacaoVazia(),
       saving,
     };
     expect(result.saving.economia_horas_mes).toBe(58.3);
-    expect(result.saving.linhas[0].cargo).toBe('Estagiário');
-    expect(result.saving.tipo_saving).toBe('mensal');
+    expect(result.saving.linhas[0].cargo).toBe("Estagiário");
+    expect(result.saving.tipo_saving).toBe("mensal");
   });
 });
 
-describe('CARGOS', () => {
-  it('contém 7 cargos com label e valor_hora', () => {
+describe("CARGOS", () => {
+  it("contém 7 cargos com label e valor_hora", () => {
     expect(CARGOS).toHaveLength(7);
     for (const cargo of CARGOS) {
-      expect(cargo).toHaveProperty('label');
-      expect(cargo).toHaveProperty('valor_hora');
-      expect(typeof cargo.valor_hora).toBe('number');
+      expect(cargo).toHaveProperty("label");
+      expect(cargo).toHaveProperty("valor_hora");
+      expect(typeof cargo.valor_hora).toBe("number");
     }
   });
 
-  it('Estagiário custa R$ 10,78/h', () => {
-    const estagiario = CARGOS.find(c => c.label === 'Estagiário');
+  it("Estagiário custa R$ 10,78/h", () => {
+    const estagiario = CARGOS.find((c) => c.label === "Estagiário");
     expect(estagiario?.valor_hora).toBe(10.78);
   });
 
-  it('Especialista+ custa R$ 55,15/h', () => {
-    const coord = CARGOS.find(c => c.label === 'Especialista+');
+  it("Especialista+ custa R$ 55,15/h", () => {
+    const coord = CARGOS.find((c) => c.label === "Especialista+");
     expect(coord?.valor_hora).toBe(55.15);
   });
 
-  it('Supervisor custa R$ 42,75/h', () => {
-    const sup = CARGOS.find(c => c.label === 'Supervisor');
+  it("Supervisor custa R$ 42,75/h", () => {
+    const sup = CARGOS.find((c) => c.label === "Supervisor");
     expect(sup?.valor_hora).toBe(42.75);
   });
 });
