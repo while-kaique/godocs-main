@@ -111,11 +111,12 @@ const MOCK_SAVING: SavingColetado = {
   tipo_saving: 'mensal',
   memorial_calculo: null,
   valor_ganho_mensal: null,
-  // Custo evitado coletado no FORMULÁRIO (não pelo agente). O backend mensaliza
-  // cada item: serviço pontual de R$ 2.700 (cobrança única) ÷12 = R$ 225/mês, que
-  // soma cheio ao economia_reais_mes. O agente apenas reconhece e descreve (sem R$).
-  custo_evitado_reais: 225,
-  custo_evitado_tipo: 'mensal',
+  // Custo evitado coletado no FORMULÁRIO (não pelo agente). O backend soma cada item
+  // pelo valor CHEIO (pontual e mensal, sem ÷12): serviço pontual de R$ 2.700 (cobrança
+  // única) entra como R$ 2.700, somando ao economia_reais_mes. O agente apenas reconhece
+  // e descreve (sem R$).
+  custo_evitado_reais: 2700,
+  custo_evitado_tipo: 'pontual',
   custo_evitado_descricao: 'Serviço externo de implementação (R$ 2700.00, pontual) — cobrança única eliminada pela automação',
 };
 

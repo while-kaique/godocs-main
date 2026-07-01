@@ -6,19 +6,19 @@ describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", (
   it("item mensal entra cheio", () => {
     expect(custoEvitadoMensalFromItens([{ valor: 240, recorrencia: "mensal" }])).toBe(240);
   });
-  it("item pontual é mensalizado ÷12", () => {
-    expect(custoEvitadoMensalFromItens([{ valor: 6000, recorrencia: "pontual" }])).toBe(500);
+  it("item pontual entra pelo valor cheio (sem ÷12)", () => {
+    expect(custoEvitadoMensalFromItens([{ valor: 6000, recorrencia: "pontual" }])).toBe(6000);
   });
-  it("misto soma mensal cheio + pontual ÷12", () => {
+  it("misto soma mensal e pontual, ambos cheios", () => {
     expect(
       custoEvitadoMensalFromItens([
         { valor: 100, recorrencia: "mensal" },
         { valor: 1200, recorrencia: "pontual" },
       ]),
-    ).toBe(200);
+    ).toBe(1300);
   });
   it("aceita JSON string (formato persistido no projeto)", () => {
-    expect(custoEvitadoMensalFromItens('[{"valor":6000,"recorrencia":"pontual"}]')).toBe(500);
+    expect(custoEvitadoMensalFromItens('[{"valor":6000,"recorrencia":"pontual"}]')).toBe(6000);
   });
   it("vazio/nulo/inválido → 0", () => {
     expect(custoEvitadoMensalFromItens(null)).toBe(0);
@@ -27,11 +27,11 @@ describe("custoEvitadoMensalFromItens (re-derivação dos itens persistidos)", (
   });
 });
 
-describe("custoProjetoMensalFromItens (mesma mensalização do evitado, mas ABATE)", () => {
-  it("mensal cheio, pontual ÷12, misto soma; aceita JSON string", () => {
+describe("custoProjetoMensalFromItens (mesma soma do evitado, mas ABATE)", () => {
+  it("mensal e pontual pelo valor cheio, misto soma; aceita JSON string", () => {
     expect(custoProjetoMensalFromItens([{ valor: 99.9, recorrencia: "mensal" }])).toBe(99.9);
-    expect(custoProjetoMensalFromItens([{ valor: 1200, recorrencia: "pontual" }])).toBe(100);
-    expect(custoProjetoMensalFromItens('[{"valor":120,"recorrencia":"mensal"},{"valor":1200,"recorrencia":"pontual"}]')).toBe(220);
+    expect(custoProjetoMensalFromItens([{ valor: 1200, recorrencia: "pontual" }])).toBe(1200);
+    expect(custoProjetoMensalFromItens('[{"valor":120,"recorrencia":"mensal"},{"valor":1200,"recorrencia":"pontual"}]')).toBe(1320);
     expect(custoProjetoMensalFromItens(null)).toBe(0);
   });
 });

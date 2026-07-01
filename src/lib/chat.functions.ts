@@ -446,8 +446,8 @@ const iniciarSavingSchema = z.object({
   custo_externo_mensal: z.number().min(0).optional(),
   // Custo evitado: a solução fez a empresa deixar de pagar ferramentas/serviços
   // externos? Lista incremental coletada no formulário (≠ custo_externo_mensal,
-  // que é o custo INCORRIDO pela automação). Cada item: recorrência 'pontual' é
-  // mensalizada ÷12; 'mensal' entra cheia. Soma ao saving (custo_evitado_reais).
+  // que é o custo INCORRIDO pela automação). Cada item entra pelo valor CHEIO
+  // ('pontual' e 'mensal', sem ÷12). Soma ao saving (custo_evitado_reais).
   tem_custo_evitado: z.enum(['sim', 'nao']).optional(),
   custo_evitado_itens: z.array(z.object({
     nome: z.string(),
@@ -456,9 +456,9 @@ const iniciarSavingSchema = z.object({
     justificativa: z.string(),
   })).optional(),
   // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
-  // rodar (chave de API, ElevenLabs…). Lista incremental do formulário. Cada item:
-  // pontual ÷12; mensal cheio. SUBTRAI do saving (custo_projeto_reais). Distinto do
-  // custo_externo_mensal (escopo externo) e do custo_evitado (que soma).
+  // rodar (chave de API, ElevenLabs…). Lista incremental do formulário. Cada item
+  // entra pelo valor CHEIO (pontual e mensal, sem ÷12). SUBTRAI do saving
+  // (custo_projeto_reais). Distinto do custo_externo_mensal (escopo externo) e do custo_evitado (que soma).
   tem_custo_projeto: z.enum(['sim', 'nao']).optional(),
   custo_projeto_itens: z.array(z.object({
     nome: z.string(),
@@ -1412,13 +1412,13 @@ export async function iniciarSaving(rawData: unknown) {
   }
 
   // Custo evitado: agrega a lista de ferramentas evitadas vinda do formulário.
-  // Mensaliza cada item (pontual ÷12; mensal cheio) → valor único que soma ao
-  // saving. Persiste sim/não, justificativa concatenada e o detalhe (JSON) no
-  // projeto (colunas mapeadas no n8n/planilha).
+  // Soma cada item pelo valor CHEIO (pontual e mensal, sem ÷12) → valor único que
+  // soma ao saving. Persiste sim/não, justificativa concatenada e o detalhe (JSON)
+  // no projeto (colunas mapeadas no n8n/planilha).
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const itensEvitado = data.tem_custo_evitado === 'sim' ? (data.custo_evitado_itens ?? []) : [];
   const custoEvitadoMensal = round2(
-    itensEvitado.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
+    itensEvitado.reduce((s, it) => s + it.valor, 0),
   );
   // Justificativa do custo evitado = TODAS as informações que a pessoa preencheu
   // na etapa, uma ferramenta por linha: nome + custo (R$ + recorrência) + a
@@ -1434,11 +1434,11 @@ export async function iniciarSaving(rawData: unknown) {
     .join('\n');
 
   // Custos do projeto: serviços externos PAGOS que a solução consome pra rodar.
-  // Mesma mensalização do custo evitado (pontual ÷12; mensal cheio), mas SUBTRAI do
-  // saving (custo incorrido pra operar). Persiste sim/não + justificativa + itens.
+  // Mesma soma do custo evitado (pontual e mensal pelo valor cheio, sem ÷12), mas
+  // SUBTRAI do saving (custo incorrido pra operar). Persiste sim/não + justificativa + itens.
   const itensProjeto = data.tem_custo_projeto === 'sim' ? (data.custo_projeto_itens ?? []) : [];
   const custoProjetoMensal = round2(
-    itensProjeto.reduce((s, it) => s + (it.recorrencia === 'pontual' ? it.valor / 12 : it.valor), 0),
+    itensProjeto.reduce((s, it) => s + it.valor, 0),
   );
   const custoProjetoDescricao = itensProjeto
     .map((it) => {

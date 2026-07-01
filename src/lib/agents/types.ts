@@ -85,7 +85,7 @@ export type SavingColetado = {
   custo_externo_mensal?: number | null;
   // CUSTOS DO PROJETO: serviços externos PAGOS que a solução INTERNA consome para
   // funcionar (chave de API, ElevenLabs, etc.). SUBTRAEM do economia_reais_mes
-  // (mensalizado: item pontual ÷12; mensal cheio) — mesma direção do custo externo,
+  // (item pontual e mensal pelo valor cheio, sem ÷12) — mesma direção do custo externo,
   // mas independe de escopo. Coletado no FORMULÁRIO (lista incremental), não pelo
   // agente. Distinto de custo_externo_mensal (escopo externo) e de custo_evitado
   // (que SOMA). Carregado aqui por recomputarSavingFinanceiro para o memorial.

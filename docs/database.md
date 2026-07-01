@@ -91,7 +91,7 @@ Entidade principal. Uma linha por projeto submetido.
 | custo_externo_mensal | REAL | Custo INCORRIDO pela automação (ferramenta usada — subtrai) |
 | custo_evitado | TEXT | sim/não — a solução evitou custo de ferramenta/serviço externo? (form de saving) |
 | custo_evitado_justificativa | TEXT | Texto concatenado das ferramentas evitadas |
-| custo_evitado_itens | TEXT | JSON `[{nome,valor,recorrencia,justificativa}]`; pontual ÷12, soma em saving_reais |
+| custo_evitado_itens | TEXT | JSON `[{nome,valor,recorrencia,justificativa}]`; pontual e mensal pelo valor cheio (sem ÷12), soma em saving_reais |
 | ganho_total_mensal | REAL | saving + receita ponderados |
 | alguem_fazia | TEXT | sim/não — tinha processo manual antes? |
 | complexidade | TEXT | automacao/inteligencia/autonomia |

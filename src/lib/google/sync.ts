@@ -186,7 +186,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     const horasEmReais =
       Math.round(linhasSaving.reduce((s, l) => s + (Number(l.economia_reais_mes) || 0), 0) * 100) / 100;
 
-    // Custo evitado: valor R$ mensal (já mensalizado; pontual ÷12) que entra no
+    // Custo evitado: valor R$ (pontual e mensal pelo valor cheio, sem ÷12) que entra no
     // saving — substitui o antigo "sim/não" na coluna. A recorrência marcada pela
     // pessoa no formulário vai em "Custo Mensal ou Pontual".
     const custoEvitadoReais = Math.max(0, Number(p.saving?.custo_evitado_reais) || 0);
@@ -195,7 +195,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       p.projeto.custo_evitado_itens as string | null,
     );
 
-    // Custos do projeto: valor R$ mensal (mensalizado; pontual ÷12) que ABATE o
+    // Custos do projeto: valor R$ (pontual e mensal pelo valor cheio, sem ÷12) que ABATE o
     // saving. A recorrência marcada vai em "Custo do Projeto Mensal ou Pontual".
     // (custoEvitadoRecorrenciaLabel é genérico: flag 'sim'/'nao' + itens JSON.)
     const custoProjetoReais = Math.max(0, Number(p.saving?.custo_projeto_reais) || 0);

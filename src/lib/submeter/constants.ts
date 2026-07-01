@@ -93,7 +93,8 @@ export interface SavingLinhaInput {
 // Uma ferramenta/serviço externo que a solução fez a empresa DEIXAR de pagar
 // (custo evitado). Distinto do `servicoExterno`/`custoExterno`, que é a ferramenta
 // USADA pela automação (custo incorrido, que subtrai). Aqui é o que foi ELIMINADO.
-// `recorrencia`: 'mensal' → entra cheio no saving; 'pontual' → valor único, ÷12.
+// `recorrencia`: 'mensal' e 'pontual' entram pelo valor CHEIO no saving (sem ÷12) — a
+// recorrência é só rótulo exibido, não altera o valor.
 export interface CustoEvitadoItemInput {
   nome: string;
   valor: string;
@@ -125,8 +126,8 @@ export interface SavingFormData {
   custoEvitadoItens: CustoEvitadoItemInput[];
   // Saving: a solução INTERNA consome algum serviço externo PAGO para funcionar
   // (chave de API, ElevenLabs, etc.)? 'sim' → lista de serviços (custoProjetoItens).
-  // O valor (mensalizado; pontual ÷12) SUBTRAI do saving. Mesmo formato do custo
-  // evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
+  // O valor (pontual e mensal pelo valor cheio, sem ÷12) SUBTRAI do saving. Mesmo formato
+  // do custo evitado, mas ABATE em vez de somar. ≠ custoExterno (que é escopo externo).
   temCustoProjeto: 'sim' | 'nao' | '';
   custoProjetoItens: CustoEvitadoItemInput[];
   tipoSaving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | '';

@@ -75,11 +75,13 @@ export function resolverValorHora(cargo: string | undefined, valorHoraLinha?: nu
  * ou mensal (pontual NÃO divide por 12).
  */
 /**
- * Re-deriva o custo evitado mensal a partir dos ITENS persistidos no projeto
+ * Re-deriva o custo evitado a partir dos ITENS persistidos no projeto
  * (`custo_evitado_itens`, JSON). Fonte da verdade — usado no submit para NÃO
  * depender do `custo_evitado_reais` que vive no estado volátil do chat (o LLM
- * pode "esquecê-lo" em fluxos com muitos turnos, zerando o valor). Item pontual
- * é mensalizado ÷12; mensal entra cheio. Mesma regra de `iniciarSaving`.
+ * pode "esquecê-lo" em fluxos com muitos turnos, zerando o valor).
+ * Item pontual entra pelo valor CHEIO (NÃO divide por 12), igual a mensal — mesma
+ * regra de saving/receita pontual e de `iniciarSaving`. _(Antes o pontual era
+ * mensalizado ÷12; decisão de produto removeu a divisão em 01/07/2026.)_
  */
 export function custoEvitadoMensalFromItens(itensRaw: unknown): number {
   let itens: Array<{ valor?: number; recorrencia?: string }> = [];
@@ -88,21 +90,19 @@ export function custoEvitadoMensalFromItens(itensRaw: unknown): number {
   } else if (Array.isArray(itensRaw)) {
     itens = itensRaw as Array<{ valor?: number; recorrencia?: string }>;
   }
-  const total = itens.reduce((s, it) => {
-    const v = Math.max(0, Number(it?.valor) || 0);
-    return s + (it?.recorrencia === 'pontual' ? v / 12 : v);
-  }, 0);
+  // Pontual e mensal entram pelo valor cheio (sem ÷12).
+  const total = itens.reduce((s, it) => s + Math.max(0, Number(it?.valor) || 0), 0);
   return round2(total);
 }
 
 /**
- * Re-deriva o CUSTO DO PROJETO mensal a partir dos itens persistidos
- * (`custo_projeto_itens`, JSON). Mesma mensalização do custo evitado (pontual ÷12;
- * mensal cheio), mas o resultado SUBTRAI do líquido (custo incorrido pra operar).
+ * Re-deriva o CUSTO DO PROJETO a partir dos itens persistidos
+ * (`custo_projeto_itens`, JSON). Mesma soma do custo evitado (pontual e mensal pelo
+ * valor cheio, sem ÷12), mas o resultado SUBTRAI do líquido (custo incorrido pra operar).
  * Fonte da verdade no submit (não depende do estado volátil do chat).
  */
 export function custoProjetoMensalFromItens(itensRaw: unknown): number {
-  // A mensalização é idêntica à do custo evitado (pontual ÷12, mensal cheio); só
+  // A soma é idêntica à do custo evitado (pontual e mensal pelo valor cheio); só
   // muda o SINAL na composição do líquido (este abate, aquele soma).
   return custoEvitadoMensalFromItens(itensRaw);
 }
@@ -128,7 +128,7 @@ export function recomputarSavingFinanceiro(
   // Custo evitado: entra cheio (pontual NÃO divide por 12). Negativos viram 0.
   const evitadoBruto = Math.max(0, Number(saving?.custo_evitado_reais) || 0);
   // Custos do projeto: serviços externos pagos que a solução consome pra rodar.
-  // Já mensalizado (pontual ÷12) ao ser persistido; SUBTRAI do líquido. Negativos → 0.
+  // Já somado (pontual e mensal pelo valor cheio) ao ser persistido; SUBTRAI do líquido. Negativos → 0.
   const custoProjetoBruto = Math.max(0, Number(saving?.custo_projeto_reais) || 0);
 
   return {

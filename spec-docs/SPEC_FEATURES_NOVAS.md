@@ -63,9 +63,11 @@ coluna de **texto** vazia → **`—`** (`COLUNAS_NUMERICAS` + `padronizarLinha`
 2. **F2 — trimestral/semestral gravam o valor CHEIO do período** (NÃO mensalizar ÷3/÷6). O
    campo `tipo_saving` carrega a cadência; quem lê interpreta. Comporta-se como o pontual no
    quesito "não dividir".
-3. **F3 — custos do projeto ABATEM o ganho** (pontual ÷12, mensal cheio). Escopo: coletado
-   **só no form de saving** → abate `saving_reais`. Projeto **receita-pura** (sem form de saving)
-   ainda **não captura** — limitação conhecida e documentada; estender se o Luis pedir.
+3. **F3 — custos do projeto ABATEM o ganho** (~~pontual ÷12, mensal cheio~~ → **atualizado em
+   01/07/2026: pontual e mensal pelo valor cheio, SEM ÷12** — ver `SPEC_CORRECOES.md`, mesma
+   mudança aplicada ao custo evitado). Escopo: coletado **só no form de saving** → abate
+   `saving_reais`. Projeto **receita-pura** (sem form de saving) ainda **não captura** — limitação
+   conhecida e documentada; estender se o Luis pedir.
 
 ---
 
@@ -124,8 +126,9 @@ ElevenLabs). 4º tópico do form de saving, espelha o custo evitado **mas ABATE*
   nome/valor/recorrência/justificativa); revelação progressiva após o custo evitado;
   validação `cp*`. `SavingFormData` em `constants.ts`.
 - Tipos: `SavingColetado.custo_projeto_reais/_tipo/_descricao` (`agents/types.ts` + `savingVazio`).
-- Cálculo (`agents/saving-calc.ts`): `custoProjetoMensalFromItens` (pontual ÷12) +
-  `recomputarSavingFinanceiro` **subtrai** `custo_projeto_reais` do líquido; bloco no memorial.
+- Cálculo (`agents/saving-calc.ts`): `custoProjetoMensalFromItens` (pontual e mensal pelo valor
+  cheio, sem ÷12 desde 01/07/2026 — ver `SPEC_CORRECOES.md`) + `recomputarSavingFinanceiro`
+  **subtrai** `custo_projeto_reais` do líquido; bloco no memorial.
 - Backend (`chat.functions.ts`): `iniciarSavingSchema` (`tem_custo_projeto`+`custo_projeto_itens`);
   `iniciarSaving` mensaliza, persiste 3 colunas, seta no `saving`, abate no líquido inline,
   `form_events`. Submit e fim-de-chat re-derivam de `projeto.custo_projeto_itens` (fonte da verdade).

@@ -100,8 +100,8 @@ Para cada linha:
 
 Custo evitado (ganho monetário além das horas — coletado no FORMULÁRIO de saving):
   Para cada ferramenta evitada (custo_evitado_itens):
-    item_mensal = recorrencia == 'pontual' ? valor / 12 : valor
-  custo_evitado_reais = sum(item_mensal)   // já mensalizado → entra cheio no recálculo
+    item_valor = valor                     // pontual e mensal pelo valor cheio (sem ÷12)
+  custo_evitado_reais = sum(item_valor)    // entra cheio no recálculo
 
 Total:
   economia_horas_mes = sum(economia_horas)
@@ -109,7 +109,7 @@ Total:
 ```
 
 - **Custo evitado** = dinheiro que a empresa DEIXOU de gastar (ferramenta/serviço externo que a solução tornou desnecessário). É saving (soma), não receita. Distinto do `custo_externo_mensal` (custo INCORRIDO pela automação, que subtrai) e do `servico_externo` (ferramenta USADA pela automação).
-- **Coletado no formulário de saving** (3º tópico, abaixo de "Alguém já fazia"): pergunta obrigatória Sim/Não; se Sim, lista incremental de ferramentas com `nome → valor → recorrência (mensal/pontual) → justificativa`. O backend (`iniciarSaving`) mensaliza cada item — **pontual ÷12**, mensal cheio — soma em `custo_evitado_reais` e persiste `custo_evitado` (sim/não), `custo_evitado_justificativa` (texto) e `custo_evitado_itens` (JSON).
+- **Coletado no formulário de saving** (3º tópico, abaixo de "Alguém já fazia"): pergunta obrigatória Sim/Não; se Sim, lista incremental de ferramentas com `nome → valor → recorrência (mensal/pontual) → justificativa`. O backend (`iniciarSaving`) soma cada item pelo **valor cheio** (pontual e mensal, **sem ÷12**) em `custo_evitado_reais` e persiste `custo_evitado` (sim/não), `custo_evitado_justificativa` (texto) e `custo_evitado_itens` (JSON). _(A recorrência marcada é só rótulo exibido; não altera mais o valor — o ÷12 do pontual foi removido em 01/07/2026.)_
 - O agente NÃO pergunta mais custo evitado (vem do form): apenas reconhece e descreve qualitativamente no memorial, sem R$ (preserva os campos estruturados).
 - **Importante**: o cálculo em R$ **nunca é exibido ao usuário** — é métrica de gestão interna. A versão do memorial salva na planilha (`projetos.memorial_calculo`) é enriquecida pelo backend com valores financeiros via `enriquecerMemorial()` — o LLM nunca gera R$ no texto visível.
 
@@ -131,12 +131,12 @@ ganho_total = saving_mensal + receita_equiv
 
 - **Custo evitado** (na árvore do form de saving): ramo "Não → eliminou gasto externo? Sim" = coleta
   principal; ramo "Sim" = pergunta opcional de custo DISTINTO das horas. Lista incremental
-  `nome → valor → recorrência → justificativa`. Backend mensaliza, **soma** em `custo_evitado_reais`
+  `nome → valor → recorrência → justificativa`. Backend **soma** pelo valor cheio (pontual e mensal, sem ÷12) em `custo_evitado_reais`
   (entra no `ganho_total`), persiste `custo_evitado`/`custo_evitado_justificativa`/`custo_evitado_itens`
   (JSON, só banco). Sheets: **"Custo Evitado"** = VALOR R$ mensal (`0` quando não há, numérica) ·
   **"Justificativa Custo Evitado"** · **"Custo Mensal ou Pontual"** (recorrência derivada dos itens).
 - **Custos do projeto** (4º tópico do form de saving, Sim/Não): custo INCORRIDO p/ a solução **interna**
-  rodar (API OpenAI, ElevenLabs, SaaS por uso). Mesmo formato/mensalização do custo evitado. **SUBTRAI**
+  rodar (API OpenAI, ElevenLabs, SaaS por uso). Mesmo formato/soma do custo evitado (pontual e mensal pelo valor cheio, sem ÷12). **SUBTRAI**
   do `ganho_total` (como o custo externo) — `recomputarSavingFinanceiro` lê `saving.custo_projeto_reais`;
   o submit re-deriva de `projeto.custo_projeto_itens` (fonte). Persiste `custo_projeto`/`_justificativa`/
   `_itens` (JSON, só banco). 3 colunas: **"Custo do Projeto"** (R$ mensal, 0 quando não há) ·
