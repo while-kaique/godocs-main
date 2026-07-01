@@ -450,21 +450,20 @@ function Investigador() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async () => {
-    try {
-      const [p, s, e] = await Promise.all([
-        apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
-        apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
-        apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
-      ])
-      setProjetos(p ?? [])
-      setStats(s ?? null)
-      setEdicoes(e ?? [])
-      setLastRefresh(new Date())
-    } catch {
-      // silencioso — mantém dados anteriores
-    } finally {
-      setLoading(false)
-    }
+    // allSettled (não all): cada endpoint é independente — se um falhar (ex.: /edicoes
+    // estourando algum limite), os outros continuam populando a tela. Com Promise.all,
+    // a rejeição de QUALQUER um caía no catch e zerava TODAS as listas (Investigador
+    // aparecia vazio mesmo com /projetos respondendo 200).
+    const [pRes, sRes, eRes] = await Promise.allSettled([
+      apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
+      apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
+      apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
+    ])
+    if (pRes.status === 'fulfilled') setProjetos(pRes.value ?? [])
+    if (sRes.status === 'fulfilled') setStats(sRes.value ?? null)
+    if (eRes.status === 'fulfilled') setEdicoes(eRes.value ?? [])
+    setLastRefresh(new Date())
+    setLoading(false)
   }, [])
 
   useEffect(() => {
