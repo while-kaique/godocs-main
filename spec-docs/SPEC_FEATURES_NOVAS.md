@@ -340,3 +340,52 @@ do dono real, typo no nome).
 **Status.** ✅ **Mergeada (PR #176) e LIVE em produção** (30/06/2026). `/api/auth/me` retorna
 `name`; o form não pede mais nome/e-mail e mostra "Submetendo como…". Testes verdes + `build`
 (typecheck) limpo.
+
+## Feature adicional — Nudge de "versão desatualizada" (version skew) · jul/2026
+
+> Decisão do dono (Kaique, 2026-07-01): oferecer recarregar quando o cliente estiver rodando
+> um build antigo. **Só botão manual — nunca recarrega sozinho** (app de formulário longo:
+> reload automático interromperia digitação/coleta).
+
+**Problema (medido nos logs de prod, 01/07).** O GoDeploy **acumula** os assets a cada deploy
+(manifesto com ~3015 arquivos; dezenas de hashes do mesmo chunk). Consequência: uma aba aberta
+há horas continua baixando os **próprios** chunks (que ainda existem → **sem 404**) e conversa
+com o worker **novo**. O cliente velho nunca "quebra" e nunca é forçado a atualizar → **version
+skew silencioso**. Amostra de ~80 min mostrou **4 builds distintos** do entry `index-*.js`
+batendo na API, **2 concorrentes nos últimos 30 min** (atual `DWTXmzVW` + um antigo `DqutV0M1`).
+Isso agrava o padrão "cliente sobrepõe servidor" (ex.: draft de edição em localStorage
+ressuscitando estágio que o servidor não tem mais).
+
+**Decisão (fechada).**
+- Detecção **100% no cliente** — **sem tocar no worker** (nenhum rebuild de `worker.js`). O
+  `index.html` é a fonte canônica do build atual: compara-se o entry `<script type="module"
+  src="/assets/index-<hash>.js">` **em execução** com o do `/index.html` recém-buscado
+  (`cache:'no-store'` + cachebust). Hash diferente → há build novo publicado.
+  - ⚠️ Escolhido em vez de expor um `buildId` no `GET /api/config`: aquele exigiria carimbar o
+    mesmo id no bundle do SPA **e** no worker (builds separados) + rebuild/deploy do worker. O
+    poll do `index.html` é mais leve e não depende de contrato servidor↔cliente.
+  - **Não dá pra confiar em 404 de chunk** para forçar reload: como os assets se acumulam, o
+    chunk velho **nunca** some. Por isso a detecção é ativa (poll), não reativa a erro.
+- **Conservador:** se qualquer lado não for legível (dev sem hash, HTML de erro do edge, offline)
+  → **não cutuca**. Em **dev** o entry é `/src/main.tsx` (sem `/assets/*.js`) → faixa nunca aparece.
+- **Cadência:** checa no mount, a cada **10 min**, e no `visibilitychange` (voltar pra aba — momento
+  mais provável de ter saído deploy). Para de checar depois de detectar (a faixa já está de pé).
+- **UX/UI:** faixa `sticky top-0` em `--go-blue` (aviso de sistema — distinta do lime da staging e
+  do vermelho de erro) + botão **Recarregar** (`location.reload()`). A11y: `role="status"`,
+  ícone + texto (nunca só cor), foco de teclado visível (ring lime), **sem animação perpétua**.
+
+**Onde aterrissou.**
+- `src/lib/version-check.ts` — puro/testável: `extractEntrySrc(html)`, `isUpdateAvailable(atual,
+  html)`, `getCurrentEntrySrc(doc?)`.
+- `src/components/atualizacao-banner.tsx` — `AtualizacaoBanner` (poll + faixa + Recarregar).
+- `src/routes/__root.tsx` — montado **acima** da `StagingBanner`.
+- `tests/version-check.test.ts` — 10 casos (extração, ordem de atributos invertida, HTML de erro,
+  mesmo/outro hash, dev → null, conservadorismo).
+
+**Não faz parte deste PR (fica pra depois).** (a) Limpeza/poda dos ~3015 assets acumulados
+(higiene de deploy — podar quebraria abas velhas; melhor migrar todo mundo pelo nudge primeiro);
+(b) o guard de fingerprint no draft de edição em localStorage (invalidar o cache local quando o
+servidor mudou) — mesma raiz "servidor manda", tratar em PR próprio.
+
+**Status.** ⏳ Implementado; testes verdes + `build` (typecheck) limpo. **Deploy pendente** (a
+pedido: sem subir ainda; quando for, regra 13 — staging `edf400b4` antes de prod).
