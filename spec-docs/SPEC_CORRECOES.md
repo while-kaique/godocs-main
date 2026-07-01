@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-07-01 — Investigador sem NENHUM projeto visível — `/edicoes` estourando o limite de 32 MiB de RPC
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/investigador-edicoes-rpc-limit`
+
+**Sintoma:** o painel **Investigador** (admin) não mostrava **nenhum** projeto — abas Submetidos e
+Abandonados vazias ("Nenhum projeto encontrado"), mesmo com projetos existindo. Nos logs de produção,
+o endpoint `GET /api/admin/investigador/edicoes` logava, em **toda** requisição:
+`[worker] GET /api/admin/investigador/edicoes: Serialized RPC arguments or return values are limited to
+32MiB, but the size of this value was: 35088590 bytes.` (**35 MB** contra o teto de 32 MiB). O endpoint
+`/projetos` em si respondia **200 OK** (15× no log) — ou seja, os dados existiam e a query de projetos
+funcionava.
+
+**Causa-raiz (dois problemas encadeados):**
+1. **Servidor** — `getAllReenvios` (`client.server.ts`) fazia `SELECT v.*` de `projeto_versions`,
+   trazendo os blobs **`snapshot_chat`** (conversa congelada inteira de cada reenvio), `snapshot_projeto`
+   e `snapshot_doc` de **todos** os reenvios pela fronteira RPC do banco async do Godeploy. A soma
+   estourava os 32 MiB → a chamada lançava → `/edicoes` falhava. `getEdicoesInvestigador` só usava esses
+   blobs para **contar mensagens** (total/usuário/IA) e ler **`status`/`ganho_total_mensal`** — nunca
+   devolvia os blobs em si. `snapshot_doc` não era usado para nada.
+2. **Frontend** — `fetchData` (`investigador.tsx`) buscava `/projetos`, `/stats` e `/edicoes` num único
+   `Promise.all`. Quando `/edicoes` rejeitava, o `Promise.all` inteiro rejeitava **antes** de qualquer
+   `setProjetos`, o `catch {}` engolia o erro em silêncio e `projetos` ficava `[]` → **toda** a tela
+   aparecia vazia por causa de **um** endpoint quebrado.
+
+**Fix (determinístico, sem migração/coluna nova):**
+1. **`getAllReenvios` para de trafegar os blobs** — troca `SELECT v.*` por colunas escalares +
+   agregações no próprio SQL: contagens de mensagem via `json_each(COALESCE(snapshot_chat,'[]'))`
+   (guarda o NULL das versões antigas → conta 0 sem erro) e `status`/`ganho_total_mensal` via
+   `json_extract(snapshot_projeto, …)`. `snapshot_doc` sai de vez. Payload passa a ser só escalar
+   (KB, não MB). `getEdicoesInvestigador` consome `msg_total`/`msg_user`/`msg_ia`/`snap_status`/
+   `snap_ganho` (não parseia mais snapshot).
+2. **`fetchData` usa `Promise.allSettled`** — cada endpoint popula seu estado independentemente; a
+   falha de um não zera os outros (defesa em profundidade — se `/edicoes` voltar a crescer, Submetidos/
+   Abandonados continuam aparecendo).
+
+**Onde aterrissou:**
+- `src/integrations/db/client.server.ts` — `getAllReenvios` reescrita (colunas escalares + `json_each`/
+  `json_extract`; novo tipo de retorno, sem `snapshot_*` crus).
+- `src/lib/investigador.functions.ts` — `getEdicoesInvestigador` consome os campos agregados.
+- `src/routes/_authenticated/investigador.tsx` — `fetchData`: `Promise.all` → `Promise.allSettled`.
+- `worker.js` rebuildado. Sem teste unitário novo (não há cobertura de `getAllReenvios`); SQL validado à
+  parte contra `better-sqlite3` (contagens + `snapshot_chat` NULL). Os 504 testes seguem verdes.
+
+**Notas / não-regressão:** as contagens `json_each`/`json_extract` foram conferidas no engine de dev
+(better-sqlite3) — json1 é padrão e o D1/GoDeployDB também suporta; **validar no staging** (`edf400b4`)
+antes de prod (regra 13) confirma o suporte no engine de produção.
+
+---
+
 ## 2026-07-01 — Custo evitado e custo do projeto PONTUAIS deixam de ser mensalizados ÷12 (entram pelo valor CHEIO)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/custos-pontuais-valor-cheio`

@@ -418,10 +418,8 @@ export async function getEdicoesInvestigador(): Promise<EdicaoInvestigador[]> {
   }
 
   return reenvios.map((v) => {
-    const chatSnap = parseJson<ChatMessageRow[]>(v.snapshot_chat) ?? []
-    const totalUser = chatSnap.filter((m) => m.role === 'user').length
-    const totalIA = chatSnap.filter((m) => m.role === 'assistant').length
-
+    // Contagens de mensagem e status/ganho já vêm agregados do SQL (json_each/
+    // json_extract) — os blobs de snapshot NÃO trafegam (ver getAllReenvios).
     const janelaInicio = v.prev_created_at ?? v.projeto_created_at ?? null
     const ini = toEpoch(janelaInicio)
     const fim = toEpoch(v.created_at)
@@ -436,7 +434,6 @@ export async function getEdicoesInvestigador(): Promise<EdicaoInvestigador[]> {
     const duracoes = logs.filter((l) => l.duration_ms != null).map((l) => l.duration_ms!)
     const mediaDuracao = duracoes.length > 0 ? Math.round(duracoes.reduce((a, b) => a + b, 0) / duracoes.length) : null
 
-    const snap = parseJson<Record<string, unknown>>(v.snapshot_projeto) ?? {}
     return {
       projeto_id: v.projeto_id,
       versao_num: v.versao_num,
@@ -447,14 +444,14 @@ export async function getEdicoesInvestigador(): Promise<EdicaoInvestigador[]> {
       ferramenta: v.ferramenta,
       created_at: v.created_at,
       janela_inicio: janelaInicio,
-      total_mensagens: chatSnap.length,
-      total_mensagens_usuario: totalUser,
-      total_mensagens_ia: totalIA,
+      total_mensagens: v.msg_total,
+      total_mensagens_usuario: v.msg_user,
+      total_mensagens_ia: v.msg_ia,
       total_erros_api: errosApi.length,
       media_duracao_api_ms: mediaDuracao,
       tem_erro: errosApi.length > 0,
-      status: (snap.status as string | null) ?? null,
-      ganho_total_mensal: (snap.ganho_total_mensal as number | null) ?? null,
+      status: v.snap_status ?? null,
+      ganho_total_mensal: v.snap_ganho ?? null,
     }
   })
 }

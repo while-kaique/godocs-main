@@ -388,9 +388,21 @@ export async function getReenvioCounts(): Promise<Map<string, number>> {
 /** Todos os reenvios (edições) com dados do projeto — alimenta a aba "Edições".
  * `prev_created_at` = carimbo da versão imediatamente anterior (limite inferior da
  * janela de tempo desta edição, usada para fatiar api_logs); cai para
- * `projeto_created_at` quando não há versão anterior. */
+ * `projeto_created_at` quando não há versão anterior.
+ *
+ * ⚠️ NÃO seleciona os blobs de snapshot (`snapshot_chat`/`_projeto`/`_doc`): a soma
+ * deles em TODOS os reenvios estourava o limite de 32 MiB de serialização RPC do
+ * Godeploy (`Serialized RPC ... limited to 32MiB`) e derrubava o endpoint `/edicoes`
+ * — que, por vir num único `Promise.all` no front, zerava também a lista de projetos
+ * do Investigador. As contagens de mensagem são computadas via `json_each` e
+ * `status`/`ganho_total_mensal` via `json_extract`, direto no SQL (payload só escalar). */
 export function getAllReenvios() {
-  return queryAll<VersionRow & {
+  return queryAll<{
+    id: string;
+    projeto_id: string;
+    versao_num: number;
+    acao: string;
+    created_at: string | null;
     nome: string | null;
     responsavel_nome: string;
     responsavel_email: string;
@@ -399,12 +411,25 @@ export function getAllReenvios() {
     area_nome: string | null;
     prev_created_at: string | null;
     projeto_created_at: string | null;
+    msg_total: number;
+    msg_user: number;
+    msg_ia: number;
+    snap_status: string | null;
+    snap_ganho: number | null;
   }>(`
-    SELECT v.*, p.nome, p.responsavel_nome, p.responsavel_email, p.ferramenta,
+    SELECT v.id, v.projeto_id, v.versao_num, v.acao, v.created_at,
+           p.nome, p.responsavel_nome, p.responsavel_email, p.ferramenta,
            p.area, a.nome AS area_nome,
            (SELECT MAX(v2.created_at) FROM projeto_versions v2
               WHERE v2.projeto_id = v.projeto_id AND v2.versao_num < v.versao_num) AS prev_created_at,
-           p.created_at AS projeto_created_at
+           p.created_at AS projeto_created_at,
+           (SELECT COUNT(*) FROM json_each(COALESCE(v.snapshot_chat, '[]'))) AS msg_total,
+           (SELECT COUNT(*) FROM json_each(COALESCE(v.snapshot_chat, '[]'))
+              WHERE json_extract(value, '$.role') = 'user') AS msg_user,
+           (SELECT COUNT(*) FROM json_each(COALESCE(v.snapshot_chat, '[]'))
+              WHERE json_extract(value, '$.role') = 'assistant') AS msg_ia,
+           json_extract(v.snapshot_projeto, '$.status') AS snap_status,
+           json_extract(v.snapshot_projeto, '$.ganho_total_mensal') AS snap_ganho
     FROM projeto_versions v
     JOIN projetos p ON v.projeto_id = p.id
     LEFT JOIN areas a ON p.area_id = a.id
