@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-07-01 — Edição de LEGADO "ressuscita" a tela de aprovação final (rascunho local sobrepõe o servidor)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edit-draft-legado-guard`
+
+**Sintoma:** um legado (`legado-141`, "Regularizações - GoGroup") foi apagado do deploy para a dona
+**reauditar do zero**. Ao reabrir `/editar/legado-141`, ela **caía de novo na etapa final de
+aprovação** — como se nada tivesse sido apagado. Apagar os registros no servidor não resolvia: ao
+reabrir, o estágio voltava.
+
+**Causa-raiz:** no modo edição (`submeter.tsx`), o seed do servidor (`applySeed`) era **sobreposto
+INCONDICIONALMENTE** por `rehydrateFromLocal(editDraft)` — o rascunho de edição salvo no
+**localStorage do navegador** (`godocs:edicao-v1:<id>`), que guarda chat/fase/previews do ponto onde
+a pessoa parou. Como o id do legado é fixo, qualquer limpeza no servidor era irrelevante: o navegador
+recolocava o estágio final por cima. O fluxo de **retomar rascunho** já fazia o certo
+(`submeter.tsx`: se `status !== 'rascunho'` → `clearDraft()`), mas o de **edição** não tinha guard.
+Mesma família do 🐞 bug aberto "Documentação ainda não foi gerada": cliente afirmando um estágio
+(`chatComplete`/`docPronta`) que o servidor nunca persistiu (legado entra por sync reverso **sem** a
+linha `documentacao`, que só é gravada na aprovação do preview).
+
+**Fix ("servidor manda"):** `deveDescartarDraftEdicao` (`draft-storage.ts`, puro/testável) — ao abrir
+a edição, só reidrata o rascunho local se for **consistente** com o servidor. Se o rascunho diz que a
+fase de doc terminou (`chatComplete` **ou** `approvedDocPreview != null`) mas o servidor **não tem doc
+persistida** (`data.documentacao == null`), **descarta** o rascunho (`clearDraft`) em vez de reidratar.
+Com o chat vazio, o caminho de re-init já existente dispara `atualizar-metadados` com `reset_doc:true`,
+que faz `deleteChatMessagesByProjeto` (limpa o chat no servidor) e recomeça a auditoria **do zero** —
+tudo **por código**, sem ação no navegador do usuário e sem cirurgia manual de dados. NÃO descarta
+rascunhos legítimos: quem está no meio da fase de doc (sem preview aprovado) e edições de projetos que
+JÁ têm doc no servidor são preservados.
+
+**Onde aterrissou:** `src/lib/submeter/draft-storage.ts` (`deveDescartarDraftEdicao`);
+`src/routes/submeter.tsx` (guard no branch de edição, antes de `rehydrateFromLocal`);
+`tests/draft-storage.test.ts` (4 casos: descarta chatComplete/preview sem doc no servidor; preserva
+reenvio normal e meio-de-doc). Mitiga também o caminho de rascunho do 🐞 bug aberto do legado
+(o endurecimento **servidor** — `submeterParaValidacao` virar 4xx claro em vez de 500 — segue pendente).
+
+---
+
 ## 2026-07-01 — Investigador sem NENHUM projeto visível — `/edicoes` estourando o limite de 32 MiB de RPC
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/investigador-edicoes-rpc-limit`
