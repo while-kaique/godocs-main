@@ -93,7 +93,7 @@ function formatDateBR(isoDate: string | null | undefined): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-function nowFortaleza(): string {
+export function nowFortaleza(): string {
   const now = new Date();
   const utcMs = now.getTime();
   const fortalezaMs = utcMs - 3 * 60 * 60 * 1000;

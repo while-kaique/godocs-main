@@ -18,6 +18,7 @@ import {
   validarProjeto,
   resyncGoogle,
   reconciliarComplexidade,
+  retroativoCustosPontuais,
 } from '@/lib/chat.functions'
 import {
   getAreas,
@@ -435,6 +436,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const projetoId = url.searchParams.get('projeto_id')
       if (!projetoId) return errorJson('Informe ?projeto_id=...', 400)
       return json(await resyncGoogle({ projeto_id: projetoId }))
+    }
+
+    // ── Retroativo: custo evitado/projeto PONTUAL sem ÷12 (admin) ──
+    // Recomputa projetos submetidos ANTES da remoção do ÷12 (SPEC_CORRECOES 01/07/2026):
+    // custo evitado/projeto pontual passa a entrar pelo valor CHEIO. Body { dry?: boolean }
+    // — dry (DEFAULT true) só relata o que mudaria; { "dry": false } aplica (SQLite +
+    // colunas afetadas do Sheets, SEM notificar o Chat). Idempotente (só toca quem tem
+    // item pontual e cujo valor de fato muda).
+    if (pathname === '/api/admin/retroativo-custos-pontuais' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ dry?: boolean }>(request)
+      return json(await retroativoCustosPontuais(body))
     }
 
     // ── Sync reverso manual (admin) ──

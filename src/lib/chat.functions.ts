@@ -20,6 +20,7 @@ import {
   getDocumentacao,
   getProjetoById,
   getProjetosSubmetidos,
+  getProjetosNaoRascunho,
   findDuplicateProjeto,
   updateProjeto,
   deleteChatMessagesByProjeto,
@@ -56,7 +57,7 @@ import type {
 import { documentacaoVazia, receitaVazia, savingVazio, CARGOS } from '@/lib/agents/types';
 import { recomputarSavingFinanceiro, enriquecerMemorial, custoEvitadoMensalFromItens, custoProjetoMensalFromItens } from '@/lib/agents/saving-calc';
 import { normalizarMarcadoresMemorial, extrairAlocacaoGanhos, extrairJustificativaCargaEscala } from '@/lib/agents/memorial-format';
-import { syncSubmitToGoogle, syncUpdateToGoogle } from '@/lib/google/sync';
+import { syncSubmitToGoogle, syncUpdateToGoogle, nowFortaleza } from '@/lib/google/sync';
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import { upsertResumoDoc } from '@/lib/google/drive';
 import { renderResumoDocumentacao } from '@/lib/agents/doc-render';
@@ -2488,6 +2489,131 @@ export async function resyncGoogle(rawData: unknown) {
     area: projeto.area,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     ganho_total_mensal: Math.round(ganhoTotalMensal * 100) / 100,
+  };
+}
+
+// ─── Retroativo: custo evitado/projeto PONTUAL sem ÷12 ──────────────────────
+// Corrige projetos submetidos ANTES da remoção do ÷12 (decisão de produto de
+// 01/07/2026, ver SPEC_CORRECOES.md): re-deriva custo_evitado_reais/custo_projeto_reais
+// dos ITENS persistidos (agora pelo valor CHEIO), reajusta saving_reais /
+// ganho_total_mensal / memorial no SQLite e atualiza SÓ as colunas afetadas no Sheets.
+//
+// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho dispara
+// UMA notificação no Google Chat por projeto (mudo no staging, mas em PROD seria spam
+// de N mensagens). Aqui escrevemos direto as colunas via updateRowByProjectId (batch
+// parcial, sem Chat).
+//
+// Idempotente: só toca projetos com item PONTUAL (único caso onde o ÷12 mudava o valor)
+// e cujo valor de fato MUDA; pula os já corretos (re-run seguro). `dry` (default TRUE)
+// só relata o que mudaria, sem escrever nada.
+export async function retroativoCustosPontuais(rawData: unknown) {
+  const { dry } = z.object({ dry: z.boolean().optional() }).parse(rawData ?? {});
+  const modoDry = dry !== false; // default seguro: dry-run
+  log('retroativoCustosPontuais', `dry=${modoDry}`);
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const aprox = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const temPontual = (raw: unknown): boolean => {
+    const itens = parseJson<Array<{ recorrencia?: string }>>(
+      typeof raw === 'string' ? raw : JSON.stringify(raw ?? []),
+    );
+    return Array.isArray(itens) && itens.some((it) => it?.recorrencia === 'pontual');
+  };
+
+  const ids = (await getProjetosNaoRascunho()).map((r) => r.id);
+  const projetosAfetados: Array<Record<string, unknown>> = [];
+  let scanned = 0;
+
+  for (const id of ids) {
+    scanned++;
+    const projeto = await getProjetoById(id);
+    if (!projeto) continue;
+    // Só interessa quem tem item PONTUAL — é o único caso onde o ÷12 alterava o valor.
+    if (!temPontual(projeto.custo_evitado_itens) && !temPontual(projeto.custo_projeto_itens)) continue;
+
+    const docRow = await getDocumentacao(id);
+    if (!docRow) continue;
+    const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+    const saving = conteudo.saving as SavingColetado | undefined;
+    if (!saving || typeof saving !== 'object') continue;
+
+    const oldEvitado = Math.max(0, Number(saving.custo_evitado_reais) || 0);
+    const oldProjeto = Math.max(0, Number(saving.custo_projeto_reais) || 0);
+    const newEvitado = custoEvitadoMensalFromItens(projeto.custo_evitado_itens); // agora CHEIO
+    const newProjeto = custoProjetoMensalFromItens(projeto.custo_projeto_itens); // agora CHEIO
+
+    // Já corrigido (re-run, ou submissão pós-fix) → pula. Garante idempotência.
+    if (aprox(oldEvitado, newEvitado) && aprox(oldProjeto, newProjeto)) continue;
+
+    const oldSavingReais = round2(Number(projeto.saving_reais) || 0);
+    const oldGanho = round2(Number(projeto.ganho_total_mensal) || 0);
+
+    // Recompute em memória (base do relatório e da aplicação). recomputarSavingFinanceiro
+    // já entra com o custo evitado cheio e abate custo externo/custo do projeto.
+    const savingRecalc = recomputarSavingFinanceiro(
+      {
+        ...saving,
+        custo_evitado_reais: newEvitado > 0 ? newEvitado : null,
+        custo_projeto_reais: newProjeto > 0 ? newProjeto : null,
+      },
+      projeto.custo_externo_mensal ?? 0,
+    );
+    const receita = conteudo.receita as ReceitaColetada | undefined;
+    const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+    const savingReaisNew = round2(Number(savingRecalc.economia_reais_mes) || 0);
+    const ganhoNew = savingReaisNew + (Number(receita?.valor_ganho_mensal) || 0) / 10;
+    const ganhoNewRound = ganhoNew > 0 ? round2(ganhoNew) : 0;
+
+    projetosAfetados.push({
+      id,
+      nome: projeto.nome,
+      custo_evitado: { de: oldEvitado, para: newEvitado },
+      custo_projeto: { de: oldProjeto, para: newProjeto },
+      saving_reais: { de: oldSavingReais, para: savingReaisNew },
+      ganho_total: { de: oldGanho, para: ganhoNewRound },
+    });
+
+    if (modoDry) continue;
+
+    // ── APLICAR ──────────────────────────────────────────────────────────────
+    // 1. SQLite: doc.saving recomputado + colunas saving_reais/ganho_total/memorial.
+    conteudo.saving = savingRecalc;
+    await upsertDocumentacao(id, conteudo);
+    const memorialInterno = enriquecerMemorial(savingRecalc, receita, tiposProjeto);
+    await updateProjeto(id, {
+      saving_reais: savingReaisNew,
+      ganho_total_mensal: ganhoNewRound > 0 ? ganhoNewRound : null,
+      memorial_calculo: memorialInterno,
+    });
+    // 2. Sheets: SÓ as colunas afetadas (batch parcial), SEM notificar o Chat.
+    //    "Memorial de Saving" (V) = só saving, com R$ re-injetado (o valor do custo
+    //    evitado no detalhamento muda). Receita/split/horas não mudam.
+    const memorialSavingLimpo = tiposProjeto.includes('saving')
+      ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ['saving']))
+      : '—';
+    await updateRowByProjectId(id, {
+      'Custo Evitado': newEvitado,
+      'Custo do Projeto': newProjeto,
+      'Saving Reais': savingReaisNew,
+      'Ganho Total': ganhoNewRound,
+      'Memorial de Saving': memorialSavingLimpo,
+      'Atualizado Em': nowFortaleza(),
+    });
+    log(
+      'retroativoCustosPontuais',
+      `aplicado ${id} (${projeto.nome}): evitado ${oldEvitado}→${newEvitado}, projeto ${oldProjeto}→${newProjeto}, saving ${oldSavingReais}→${savingReaisNew}`,
+    );
+  }
+
+  log(
+    'retroativoCustosPontuais',
+    `${modoDry ? 'DRY' : 'APLICADO'} — ${scanned} varridos, ${projetosAfetados.length} afetados`,
+  );
+  return {
+    dry: modoDry,
+    total_scanned: scanned,
+    total_afetados: projetosAfetados.length,
+    projetos: projetosAfetados,
   };
 }
 
