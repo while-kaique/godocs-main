@@ -2493,19 +2493,25 @@ export async function resyncGoogle(rawData: unknown) {
 }
 
 // ─── Retroativo: custo evitado/projeto PONTUAL sem ÷12 ──────────────────────
-// Corrige projetos submetidos ANTES da remoção do ÷12 (decisão de produto de
-// 01/07/2026, ver SPEC_CORRECOES.md): re-deriva custo_evitado_reais/custo_projeto_reais
-// dos ITENS persistidos (agora pelo valor CHEIO), reajusta saving_reais /
-// ganho_total_mensal / memorial no SQLite e atualiza SÓ as colunas afetadas no Sheets.
+// Corrige projetos preenchidos ANTES da remoção do ÷12 (decisão de produto de
+// 01/07/2026, ver SPEC_CORRECOES.md). Reajusta saving_reais/ganho_total/memorial no
+// SQLite e SÓ as colunas afetadas no Sheets. Dois caminhos:
 //
-// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho dispara
-// UMA notificação no Google Chat por projeto (mudo no staging, mas em PROD seria spam
-// de N mensagens). Aqui escrevemos direto as colunas via updateRowByProjectId (batch
-// parcial, sem Chat).
+//  • CASO A — submetido pelo APP (tem custo_evitado_itens/custo_projeto_itens): re-deriva
+//    o valor dos ITENS persistidos (agora pelo valor CHEIO) via custoEvitadoMensalFromItens
+//    e recompute o saving (fonte de verdade, exato).
+//  • CASO B — LEGADO sem itens (só existe via sync do Sheet), custo evitado PONTUAL PURO
+//    (0h, alguem_fazia='externo', sem custo externo/projeto — logo saving_reais == custo
+//    evitado ÷12): recupera o valor ORIGINAL pela justificativa ("R$ X (pontual)"; método 1)
+//    e, se não der pra parsear, cai no fallback ×12 (valor atual × 12). Legado pontual que
+//    NÃO seja puro (tem horas/custo) vai para `flagged` (revisão manual) — não arrisca.
 //
-// Idempotente: só toca projetos com item PONTUAL (único caso onde o ÷12 mudava o valor)
-// e cujo valor de fato MUDA; pula os já corretos (re-run seguro). `dry` (default TRUE)
-// só relata o que mudaria, sem escrever nada.
+// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho dispara UMA
+// notificação no Google Chat por projeto (mudo no staging, mas em PROD seria spam de N
+// mensagens). Aqui escrevemos direto via updateRowByProjectId (batch parcial, sem Chat).
+//
+// Idempotente: só toca quem de fato MUDA; pula os já corretos (re-run seguro). `dry`
+// (default TRUE) só relata (projetos + flagged), sem escrever nada.
 export async function retroativoCustosPontuais(rawData: unknown) {
   const { dry } = z.object({ dry: z.boolean().optional() }).parse(rawData ?? {});
   const modoDry = dry !== false; // default seguro: dry-run
@@ -2513,107 +2519,180 @@ export async function retroativoCustosPontuais(rawData: unknown) {
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const aprox = (a: number, b: number) => Math.abs(a - b) < 0.01;
-  const temPontual = (raw: unknown): boolean => {
-    const itens = parseJson<Array<{ recorrencia?: string }>>(
-      typeof raw === 'string' ? raw : JSON.stringify(raw ?? []),
-    );
-    return Array.isArray(itens) && itens.some((it) => it?.recorrencia === 'pontual');
+  const parseArr = (raw: unknown): Array<{ recorrencia?: string }> => {
+    const v = parseJson<Array<{ recorrencia?: string }>>(typeof raw === 'string' ? raw : JSON.stringify(raw ?? []));
+    return Array.isArray(v) ? v : [];
+  };
+  const temItens = (raw: unknown) => parseArr(raw).length > 0;
+  const temPontualItens = (raw: unknown) => parseArr(raw).some((it) => it?.recorrencia === 'pontual');
+  // pt-BR → número. "234,19"→234.19; "1.500,00"→1500; sem vírgula, pontos são milhar.
+  const parseValorBR = (s: string): number => {
+    const t = String(s).trim();
+    return t.includes(',') ? parseFloat(t.replace(/\./g, '').replace(',', '.')) : parseFloat(t.replace(/\./g, ''));
+  };
+  // Soma os itens "R$ <valor> (pontual|mensal)" da justificativa (formato gerado pelo app),
+  // TODOS pelo valor CHEIO. Retorna também se há ao menos um item pontual.
+  const somaJustificativa = (just: string): { total: number; temPontual: boolean; count: number } => {
+    const re = /R\$\s*([\d.,]+)\s*\((pontual|mensal)\)/gi;
+    let m: RegExpExecArray | null;
+    let total = 0, temPontual = false, count = 0;
+    while ((m = re.exec(just || '')) !== null) {
+      const v = parseValorBR(m[1]);
+      if (!isFinite(v) || v <= 0) continue;
+      total += v;
+      if (m[2].toLowerCase() === 'pontual') temPontual = true;
+      count++;
+    }
+    return { total: round2(total), temPontual, count };
   };
 
   const ids = (await getProjetosNaoRascunho()).map((r) => r.id);
   const projetosAfetados: Array<Record<string, unknown>> = [];
+  const flagged: Array<Record<string, unknown>> = [];
   let scanned = 0;
 
   for (const id of ids) {
     scanned++;
     const projeto = await getProjetoById(id);
     if (!projeto) continue;
-    // Só interessa quem tem item PONTUAL — é o único caso onde o ÷12 alterava o valor.
-    if (!temPontual(projeto.custo_evitado_itens) && !temPontual(projeto.custo_projeto_itens)) continue;
 
-    const docRow = await getDocumentacao(id);
-    if (!docRow) continue;
-    const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
-    const saving = conteudo.saving as SavingColetado | undefined;
-    if (!saving || typeof saving !== 'object') continue;
+    // ── CASO A: submetido pelo APP (tem itens) — re-deriva dos itens (fonte exata) ──
+    if (temItens(projeto.custo_evitado_itens) || temItens(projeto.custo_projeto_itens)) {
+      // Só interessa item PONTUAL — mensal sempre entrou cheio (nada muda).
+      if (!temPontualItens(projeto.custo_evitado_itens) && !temPontualItens(projeto.custo_projeto_itens)) continue;
 
-    const oldEvitado = Math.max(0, Number(saving.custo_evitado_reais) || 0);
-    const oldProjeto = Math.max(0, Number(saving.custo_projeto_reais) || 0);
-    const newEvitado = custoEvitadoMensalFromItens(projeto.custo_evitado_itens); // agora CHEIO
-    const newProjeto = custoProjetoMensalFromItens(projeto.custo_projeto_itens); // agora CHEIO
+      const docRow = await getDocumentacao(id);
+      if (!docRow) continue;
+      const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<string, unknown>;
+      const saving = conteudo.saving as SavingColetado | undefined;
+      if (!saving || typeof saving !== 'object') continue;
 
-    // Já corrigido (re-run, ou submissão pós-fix) → pula. Garante idempotência.
-    if (aprox(oldEvitado, newEvitado) && aprox(oldProjeto, newProjeto)) continue;
+      const oldEvitado = Math.max(0, Number(saving.custo_evitado_reais) || 0);
+      const oldProjeto = Math.max(0, Number(saving.custo_projeto_reais) || 0);
+      const newEvitado = custoEvitadoMensalFromItens(projeto.custo_evitado_itens); // CHEIO
+      const newProjeto = custoProjetoMensalFromItens(projeto.custo_projeto_itens); // CHEIO
+      if (aprox(oldEvitado, newEvitado) && aprox(oldProjeto, newProjeto)) continue; // já correto
 
-    const oldSavingReais = round2(Number(projeto.saving_reais) || 0);
+      const oldSavingReais = round2(Number(projeto.saving_reais) || 0);
+      const oldGanho = round2(Number(projeto.ganho_total_mensal) || 0);
+      const savingRecalc = recomputarSavingFinanceiro(
+        {
+          ...saving,
+          custo_evitado_reais: newEvitado > 0 ? newEvitado : null,
+          custo_projeto_reais: newProjeto > 0 ? newProjeto : null,
+        },
+        projeto.custo_externo_mensal ?? 0,
+      );
+      const receita = conteudo.receita as ReceitaColetada | undefined;
+      const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
+      const savingReaisNew = round2(Number(savingRecalc.economia_reais_mes) || 0);
+      const ganhoNew = savingReaisNew + (Number(receita?.valor_ganho_mensal) || 0) / 10;
+      const ganhoNewRound = ganhoNew > 0 ? round2(ganhoNew) : 0;
+
+      projetosAfetados.push({
+        id, nome: projeto.nome, metodo: 'itens',
+        custo_evitado: { de: oldEvitado, para: newEvitado },
+        custo_projeto: { de: oldProjeto, para: newProjeto },
+        saving_reais: { de: oldSavingReais, para: savingReaisNew },
+        ganho_total: { de: oldGanho, para: ganhoNewRound },
+      });
+      if (modoDry) continue;
+
+      conteudo.saving = savingRecalc;
+      await upsertDocumentacao(id, conteudo);
+      const memorialInterno = enriquecerMemorial(savingRecalc, receita, tiposProjeto);
+      await updateProjeto(id, {
+        saving_reais: savingReaisNew,
+        ganho_total_mensal: ganhoNewRound > 0 ? ganhoNewRound : null,
+        memorial_calculo: memorialInterno,
+      });
+      const memorialSavingLimpo = tiposProjeto.includes('saving')
+        ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ['saving']))
+        : '—';
+      await updateRowByProjectId(id, {
+        'Custo Evitado': newEvitado,
+        'Custo do Projeto': newProjeto,
+        'Saving Reais': savingReaisNew,
+        'Ganho Total': ganhoNewRound,
+        'Memorial de Saving': memorialSavingLimpo,
+        'Atualizado Em': nowFortaleza(),
+      });
+      log('retroativoCustosPontuais', `[itens] aplicado ${id} (${projeto.nome}): evitado ${oldEvitado}→${newEvitado}, saving ${oldSavingReais}→${savingReaisNew}`);
+      continue;
+    }
+
+    // ── CASO B: LEGADO sem itens — custo evitado PONTUAL ──
+    const just = projeto.custo_evitado_justificativa || '';
+    // Só pontual (mensal nunca dividiu). Custo do projeto pontual em legado é raro e
+    // subtrai — não dá pra tratar como "puro"; sinaliza.
+    if (temItens(projeto.custo_projeto_itens) === false && projeto.custo_projeto === 'sim' && /pontual/i.test(projeto.custo_projeto_justificativa || '')) {
+      flagged.push({ id, nome: projeto.nome, motivo: 'legado com custo do projeto pontual (subtrai) — revisar manual' });
+    }
+    if (projeto.custo_evitado !== 'sim' || !/pontual/i.test(just)) continue;
+
+    // "Puro": saving_reais == custo evitado ÷12 (sem horas, sem custo externo/projeto).
+    const horas = Number(projeto.saving_horas) || 0;
+    const custoExterno = Number(projeto.custo_externo_mensal) || 0;
+    const ehPuro = projeto.alguem_fazia === 'externo' && horas === 0 && custoExterno === 0 && projeto.custo_projeto !== 'sim';
+    const oldSaving = round2(Number(projeto.saving_reais) || 0);
     const oldGanho = round2(Number(projeto.ganho_total_mensal) || 0);
 
-    // Recompute em memória (base do relatório e da aplicação). recomputarSavingFinanceiro
-    // já entra com o custo evitado cheio e abate custo externo/custo do projeto.
-    const savingRecalc = recomputarSavingFinanceiro(
-      {
-        ...saving,
-        custo_evitado_reais: newEvitado > 0 ? newEvitado : null,
-        custo_projeto_reais: newProjeto > 0 ? newProjeto : null,
-      },
-      projeto.custo_externo_mensal ?? 0,
-    );
-    const receita = conteudo.receita as ReceitaColetada | undefined;
-    const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
-    const savingReaisNew = round2(Number(savingRecalc.economia_reais_mes) || 0);
-    const ganhoNew = savingReaisNew + (Number(receita?.valor_ganho_mensal) || 0) / 10;
-    const ganhoNewRound = ganhoNew > 0 ? round2(ganhoNew) : 0;
+    if (!ehPuro) {
+      flagged.push({ id, nome: projeto.nome, motivo: 'legado pontual NÃO-puro (tem horas/custo externo/custo projeto) — revisar manual' });
+      continue;
+    }
+
+    // novo valor CHEIO: método 1 (justificativa) → senão fallback ×12 (só puro).
+    const parsed = somaJustificativa(just);
+    let newEvitado: number | null = null;
+    let metodo: string | null = null;
+    if (parsed.total > 0 && parsed.temPontual) {
+      newEvitado = parsed.total; metodo = 'justificativa';
+    } else {
+      newEvitado = round2(oldSaving * 12); metodo = 'x12';
+    }
+
+    if (aprox(newEvitado, oldSaving)) continue; // já corrigido / sem ÷12
+    if (newEvitado < oldSaving) {
+      flagged.push({ id, nome: projeto.nome, motivo: `valor recuperado (${newEvitado}) < atual (${oldSaving}) — revisar manual` });
+      continue;
+    }
+
+    // Puro: saving = custo evitado; ganho mantém o delta (preserva eventual receita).
+    const newSaving = newEvitado;
+    const delta = round2(newSaving - oldSaving);
+    const newGanho = round2(oldGanho + delta);
 
     projetosAfetados.push({
-      id,
-      nome: projeto.nome,
-      custo_evitado: { de: oldEvitado, para: newEvitado },
-      custo_projeto: { de: oldProjeto, para: newProjeto },
-      saving_reais: { de: oldSavingReais, para: savingReaisNew },
-      ganho_total: { de: oldGanho, para: ganhoNewRound },
+      id, nome: projeto.nome, metodo,
+      custo_evitado: { de: oldSaving, para: newEvitado },
+      custo_projeto: { de: 0, para: 0 },
+      saving_reais: { de: oldSaving, para: newSaving },
+      ganho_total: { de: oldGanho, para: newGanho },
     });
-
     if (modoDry) continue;
 
-    // ── APLICAR ──────────────────────────────────────────────────────────────
-    // 1. SQLite: doc.saving recomputado + colunas saving_reais/ganho_total/memorial.
-    conteudo.saving = savingRecalc;
-    await upsertDocumentacao(id, conteudo);
-    const memorialInterno = enriquecerMemorial(savingRecalc, receita, tiposProjeto);
     await updateProjeto(id, {
-      saving_reais: savingReaisNew,
-      ganho_total_mensal: ganhoNewRound > 0 ? ganhoNewRound : null,
-      memorial_calculo: memorialInterno,
+      saving_reais: newSaving,
+      ganho_total_mensal: newGanho > 0 ? newGanho : null,
     });
-    // 2. Sheets: SÓ as colunas afetadas (batch parcial), SEM notificar o Chat.
-    //    "Memorial de Saving" (V) = só saving, com R$ re-injetado (o valor do custo
-    //    evitado no detalhamento muda). Receita/split/horas não mudam.
-    const memorialSavingLimpo = tiposProjeto.includes('saving')
-      ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ['saving']))
-      : '—';
     await updateRowByProjectId(id, {
       'Custo Evitado': newEvitado,
-      'Custo do Projeto': newProjeto,
-      'Saving Reais': savingReaisNew,
-      'Ganho Total': ganhoNewRound,
-      'Memorial de Saving': memorialSavingLimpo,
+      'Saving Reais': newSaving,
+      'Ganho Total': newGanho,
       'Atualizado Em': nowFortaleza(),
     });
-    log(
-      'retroativoCustosPontuais',
-      `aplicado ${id} (${projeto.nome}): evitado ${oldEvitado}→${newEvitado}, projeto ${oldProjeto}→${newProjeto}, saving ${oldSavingReais}→${savingReaisNew}`,
-    );
+    log('retroativoCustosPontuais', `[legado:${metodo}] aplicado ${id} (${projeto.nome}): ${oldSaving}→${newSaving}`);
   }
 
-  log(
-    'retroativoCustosPontuais',
-    `${modoDry ? 'DRY' : 'APLICADO'} — ${scanned} varridos, ${projetosAfetados.length} afetados`,
-  );
+  log('retroativoCustosPontuais', `${modoDry ? 'DRY' : 'APLICADO'} — ${scanned} varridos, ${projetosAfetados.length} afetados, ${flagged.length} flagged`);
   return {
     dry: modoDry,
     total_scanned: scanned,
     total_afetados: projetosAfetados.length,
+    total_flagged: flagged.length,
     projetos: projetosAfetados,
+    flagged,
   };
 }
 
