@@ -1623,7 +1623,7 @@ export function SubmeterPageContent({
             }));
 
       // Custo evitado coletado: no ramo "Não" pela pergunta "elimina gasto externo?";
-      // no ramo "Sim" pela pergunta opcional de custo distinto. Backend mensaliza (÷12 pontual).
+      // no ramo "Sim" pela pergunta opcional de custo distinto. Backend soma pelo valor cheio (pontual e mensal, sem ÷12).
       const temCustoEvitadoEfetivo = isNaoBranch
         ? (formData.eliminaGastoExterno === "sim" ? "sim" : "nao")
         : (formData.temCustoEvitado || undefined);
@@ -1639,8 +1639,8 @@ export function SubmeterPageContent({
               }))
           : [];
 
-      // Custos do projeto: itens válidos quando "sim". O backend mensaliza (pontual
-      // ÷12) e SUBTRAI do saving (custo incorrido pra operar).
+      // Custos do projeto: itens válidos quando "sim". O backend soma pelo valor cheio
+      // (pontual e mensal, sem ÷12) e SUBTRAI do saving (custo incorrido pra operar).
       const custoProjetoItens =
         formData.temCustoProjeto === "sim"
           ? formData.custoProjetoItens

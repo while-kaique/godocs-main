@@ -70,7 +70,7 @@ export const SHEET_COLUMNS = [
   'Alocação Ganhos',                // AK (justificativa [2.4] do gate ≥44h — fatiada do memorial)
   'Usa AI Proxy',                   // AL (governança: 'Sim'/'Não' declarado no formulário)
   // Custos do projeto: serviços externos pagos que a solução consome pra rodar (ABATE).
-  'Custo do Projeto',                     // valor R$ mensal (mensalizado: pontual ÷12)
+  'Custo do Projeto',                     // valor R$ (pontual e mensal pelo valor cheio, sem ÷12)
   'Justificativa Custo do Projeto',       // detalhamento por serviço (nome/valor/recorrência/just.)
   'Custo do Projeto Mensal ou Pontual',   // recorrência marcada (Mensal/Pontual/Misto)
   // Split do saving (transparência) — colunas NUMÉRICAS: 0 quando não se aplica.

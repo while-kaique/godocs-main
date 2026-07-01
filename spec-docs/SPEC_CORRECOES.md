@@ -6,6 +6,56 @@
 
 ---
 
+## 2026-07-01 — Custo evitado e custo do projeto PONTUAIS deixam de ser mensalizados ÷12 (entram pelo valor CHEIO)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/custos-pontuais-valor-cheio`
+
+**Natureza:** decisão de produto (não é bug de código). **Reverte deliberadamente** a "Exceção: custo evitado
+pontual é mensalizado ÷12" que constava no `CLAUDE.md` e foi entregue com a F3 (`SPEC_FEATURES_NOVAS.md`).
+Não é conserto por engano de uma decisão fechada — é uma mudança de regra pedida pela gestão.
+
+**Sintoma/pedido:** o **custo evitado pontual** (e, por tabela, o **custo do projeto pontual**) era dividido por
+12 antes de somar/abater no saving — divergindo de saving e receita pontuais, que sempre entraram pelo **valor
+cheio**. A gestão pediu para **remover a divisão** e tratar o pontual igual aos demais (valor cheio).
+
+**Causa (comportamento anterior):** a mensalização `recorrencia === 'pontual' ? valor / 12 : valor` vivia em
+**4 lugares**: `custoEvitadoMensalFromItens` (`saving-calc.ts`, fonte da verdade no submit/resync),
+`custoProjetoMensalFromItens` (delega ao anterior) e **inline** no `iniciarSaving` (`chat.functions.ts`, 2×:
+custo evitado e custo do projeto, na persistência ao entrar na fase de saving).
+
+**Fix:** removida a divisão por 12 nos 4 pontos — pontual passa a somar `it.valor` cheio, igual a mensal. A
+recorrência marcada (mensal/pontual) continua persistida e exibida como **rótulo** ("Custo Mensal ou Pontual"),
+mas **não altera mais o valor**. `recomputarSavingFinanceiro` já usava `custo_evitado_reais` cheio (não mudou).
+**Fora de escopo (não tocado):** custo externo ANUAL (`custoPeriodicidade === 'anual'`, `submeter.tsx`) segue
+÷12 (conversão anual→mensal, legítima); trimestral/semestral seguem valor cheio do período.
+
+**Onde aterrissou:** `src/lib/agents/saving-calc.ts` (`custoEvitadoMensalFromItens` + comentários de
+`custoProjetoMensalFromItens`/`recomputarSavingFinanceiro`), `src/lib/chat.functions.ts` (`iniciarSaving`, 2
+somas inline + comentários), comentários em `src/integrations/db/schema.ts` e `src/lib/agents/types.ts`,
+testes `tests/saving-calc.test.ts` (asserções pontuais atualizadas: 6000→6000, 1200→1200, mistos recalculados),
+docs (`CLAUDE.md`, `docs/business-rules.md`, `docs/database.md`). `worker.js` **rebuildado** (mexeu em
+server-side).
+
+**Retroativo (backfill) — `POST /api/admin/retroativo-custos-pontuais`** (`retroativoCustosPontuais`,
+`chat.functions.ts`, requireAdmin). Corrige projetos já preenchidos com o ÷12. Body `{dry?:boolean}` — **dry
+default TRUE** (só relata `{projetos, flagged, metodo}`; `dry:false` aplica). Idempotente. NÃO reusa
+`resyncGoogle`/`syncSubmitToGoogle` (dispararia 1 notificação Chat por projeto = spam em prod); escreve direto
+via `updateRowByProjectId` (batch parcial, sem Chat). Dois caminhos:
+- **CASO A** — submetido pelo app (tem `custo_evitado_itens`/`custo_projeto_itens`): re-deriva dos itens (cheio)
+  + `recomputarSavingFinanceiro` (exato); atualiza doc.saving + colunas SQLite + Sheet (Custo Evitado, Custo do
+  Projeto, Saving Reais, Ganho Total, Memorial de Saving, Atualizado Em).
+- **CASO B** — legado sem itens (só via sync do Sheet, sem doc.saving), custo evitado PONTUAL PURO (0h,
+  `alguem_fazia='externo'`, sem custo externo/projeto → `saving_reais == custo evitado ÷12`): recupera o valor
+  original da justificativa `R$ X (pontual)` (método 1) ou fallback `×12` (só puro). Legado pontual NÃO-puro ou
+  com custo do projeto pontual → `flagged` (revisão manual — não arrisca isolar).
+- Invocação: edge exige OAuth → precisa de cookie de sessão do ambiente (staging tem sessão própria; prod usa
+  `E2E_COOKIE` de `godocs.devgogroup.com`).
+
+**Validação staging (`edf400b4`):** retroativo aplicado — 2 legados corrigidos via justificativa
+(`legado-100` 264,33→3171,96; `legado-149` 19,52→234,19), 0 flagged, idempotente (re-run = 0 afetados).
+
+---
+
 ## 2026-06-30 — Submissão/edição trava com `ZodError` `docs[].base64 too_small` quando há arquivo VAZIO (0 bytes)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/arquivo-vazio-base64-submissao`

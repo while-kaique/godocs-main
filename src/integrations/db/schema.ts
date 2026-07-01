@@ -262,16 +262,16 @@ const MIGRATIONS = [
   // Custo evitado: a solução fez a empresa DEIXAR de pagar ferramentas/serviços
   // externos? `custo_evitado` = 'sim'|'nao'; `custo_evitado_justificativa` = texto
   // concatenado legível; `custo_evitado_itens` = JSON [{nome,valor,recorrencia,justificativa}].
-  // O valor (mensalizado: pontual ÷12) entra no saving_reais/ganho_total. Coletado no
-  // formulário de saving (≠ custo_externo_mensal, que é o custo INCORRIDO).
+  // O valor (pontual e mensal pelo valor cheio, sem ÷12) entra no saving_reais/ganho_total.
+  // Coletado no formulário de saving (≠ custo_externo_mensal, que é o custo INCORRIDO).
   'ALTER TABLE projetos ADD COLUMN custo_evitado TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_evitado_itens TEXT',
   // Custos do projeto: serviços externos PAGOS que a solução INTERNA consome pra
   // rodar (chave de API, ElevenLabs…). `custo_projeto` = 'sim'|'nao'; justificativa =
   // texto legível; itens = JSON [{nome,valor,recorrencia,justificativa}]. O valor
-  // (mensalizado: pontual ÷12) SUBTRAI do saving_reais/ganho_total. Distinto de
-  // custo_externo_mensal (escopo externo) e de custo_evitado (que SOMA).
+  // (pontual e mensal pelo valor cheio, sem ÷12) SUBTRAI do saving_reais/ganho_total.
+  // Distinto de custo_externo_mensal (escopo externo) e de custo_evitado (que SOMA).
   'ALTER TABLE projetos ADD COLUMN custo_projeto TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_projeto_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN custo_projeto_itens TEXT',

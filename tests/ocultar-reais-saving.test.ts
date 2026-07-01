@@ -18,12 +18,11 @@ describe("ocultarReaisSaving", () => {
       "## Memorial de Cálculo",
       "Estagiário economiza 24h/mês.",
       "O projeto evitou um serviço externo que custaria R$ 2.700 (único).",
-      "Mensalizado: R$ 2.700 ÷ 12 = R$ 225/mês.",
+      "Custo evitado (pontual, valor cheio): R$ 2.700.",
     ].join("\n");
     const out = ocultarReaisSaving(texto);
     expect(out).not.toMatch(/r\$/i);
     expect(out).not.toContain("2.700");
-    expect(out).not.toContain("225");
     expect(out).toContain("24h/mês");
     expect(out).toContain("Memorial de Cálculo");
   });
