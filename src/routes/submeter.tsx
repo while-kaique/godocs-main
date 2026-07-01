@@ -10,7 +10,7 @@ import {
   parseMoedaBR, numeroParaMoedaBR,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
-import { saveDraft, loadDraft, clearDraft, editDraftKey, type DraftSnapshot } from "@/lib/submeter/draft-storage";
+import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
 function hasLocalDraft(): boolean {
@@ -559,7 +559,19 @@ export function SubmeterPageContent({
           // chat/wizard por cima — sem reiniciar a coleta do zero.
           applySeed(data, editProjetoId);
           if (editDraft && editDraft.projetoId === editProjetoId) {
-            rehydrateFromLocal(editDraft);
+            // Servidor manda: só reidrata o rascunho local se for consistente com o
+            // servidor. Se o rascunho diz que a doc foi concluída (preview aprovado /
+            // chatComplete) mas o servidor NÃO tem doc persistida (legado que nunca
+            // teve o preview aprovado), descarta — senão a tela de aprovação final
+            // "ressuscita" sobre um projeto sem doc e trava ("Documentação ainda não
+            // foi gerada"). Descartando, o re-init abaixo (reset_doc) limpa o chat no
+            // servidor e recomeça a auditoria do zero. Ver deveDescartarDraftEdicao.
+            const serverTemDoc = data.documentacao != null;
+            if (deveDescartarDraftEdicao({ serverTemDoc, draft: editDraft })) {
+              clearDraft(editDraftKey(editProjetoId));
+            } else {
+              rehydrateFromLocal(editDraft);
+            }
           }
         })
         .catch((e) => {
