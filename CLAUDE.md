@@ -62,17 +62,23 @@ App ID `674a3710` · URL `https://godocs.devgogroup.com/`. Detalhes: [docs/deplo
 # 1. Build
 npm run test && npm run build && npm run build:worker
 
-# 2. Upload — MCP getUploadToken → uploadUrl; curl com TODOS os arquivos de dist/ + worker.js:
-curl -X POST "$UPLOAD_URL" -F "worker.js=@./worker.js" -F "index.html=@./dist/index.html" \
-  $(for f in dist/assets/*; do echo -F "\"assets/$(basename "$f")=@./$f\""; done)
+# 2. MCP getUploadToken → pegue uploadUrl (e uploadId)
+# 3. Upload + manifest — o script VARRE dist/ RECURSIVO (favicon.svg e tudo de public/
+#    entram sozinhos) + worker.js, e imprime o ASSETS_JSON pro updateApp:
+scripts/deploy-godeploy.sh "<UPLOAD_URL>"
 
-# 3. Deploy — MCP updateApp: appId 674a3710, uploadId do passo 2, entrypoint "worker.js",
-#    assetConfig { "not_found_handling": "single-page-application" }
-#    assets gerados dinamicamente (NUNCA copiar de build anterior):
-echo -n '["index.html"'; for f in dist/assets/*; do echo -n ',"assets/'"$(basename "$f")"'"'; done; echo ']'
+# 4. Deploy — MCP updateApp: appId (STAGING edf400b4 ANTES; PROD 674a3710 depois),
+#    uploadId do passo 2, entrypoint "worker.js",
+#    assetConfig { "not_found_handling": "single-page-application" },
+#    assets = o ASSETS_JSON impresso no passo 3.
 ```
 
-**Críticas:** assets sem prefixo `dist/` (`assets/foo.js`) · SPA fallback obrigatório · lista gerada do `dist/` real (hashes mudam). ⚠️ **Esse `appId: 674a3710` é PRODUÇÃO** — pela **regra 13**, valide no staging (`edf400b4`) ANTES.
+**Críticas:** ⚠️ **suba o `dist/` INTEIRO, não só `dist/assets/*`** — o Vite copia `public/`
+(ex.: `favicon.svg`) pra RAIZ do `dist/`, fora de `assets/`; varrer só `assets/*` deixa o
+favicon de fora e, com o SPA fallback, `/favicon.svg` devolve HTML → **o ícone some** (bug
+real jul/2026). Por isso o deploy usa `scripts/deploy-godeploy.sh` (lista derivada do `dist/`
+real, nunca à mão) · assets sem prefixo `dist/` (`assets/foo.js`) · SPA fallback obrigatório ·
+hashes mudam a cada build. ⚠️ **`appId: 674a3710` é PRODUÇÃO** — pela **regra 13**, valide no staging (`edf400b4`) ANTES.
 
 ## Ambiente de Staging → [docs/staging.md](docs/staging.md) · [SPEC_STAGING.md](spec-docs/SPEC_STAGING.md)
 

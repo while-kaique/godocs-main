@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-07-01 — Favicon some do deploy (upload só varria `dist/assets/*`, não a raiz do `dist/`)
+
+**PR:** _(a abrir)_ · **Status:** ✅ deployada (staging `edf400b4` + prod `674a3710`) · **Branch:** `fix/deploy-favicon-dist-root`
+
+**Sintoma:** o **favicon** (ícone da aba) sumiu do app deployado. `index.html` referencia
+`<link rel="icon" href="/favicon.svg">`, mas a aba do navegador ficava sem ícone.
+
+**Causa-raiz (processo de deploy, não código do app):** o Vite copia `public/favicon.svg` para a
+**raiz** do `dist/` (`dist/favicon.svg`), **fora** de `dist/assets/`. O runbook de deploy
+(`CLAUDE.md` / `docs/deploy.md`) montava o upload e o manifest de assets varrendo **só** `dist/assets/*`
+(`for f in dist/assets/*`). Resultado: `favicon.svg` **nunca era enviado nem registrado como asset**.
+Com o SPA fallback (`not_found_handling: single-page-application`), `GET /favicon.svg` não encontrado
+devolvia o `index.html` (HTML) em vez do SVG → o browser não usava como ícone → **favicon some**.
+Confirmado pelo `assetManifest` do app: `/favicon.svg` estava **ausente**.
+
+**Fix ("lista derivada do `dist/` real, nunca à mão"):** novo script `scripts/deploy-godeploy.sh` que
+**varre `dist/` recursivamente** (`find dist -type f`) + `worker.js`, faz o upload multipart
+(token via header `Authorization: Bearer`, não query param) e **imprime o `ASSETS_JSON`** com TODOS os
+arquivos do `dist/` para o `updateApp`. Assim, `favicon.svg` — e qualquer futuro arquivo de `public/`
+na raiz do `dist/` (ex.: `robots.txt`) — entra no deploy automaticamente, sem depender de lembrar de
+listar. Runbooks (`CLAUDE.md` "Deploy rápido" e `docs/deploy.md`) reescritos para usar o script e alertar
+contra varrer só `assets/*`.
+
+**Onde aterrissou:** `scripts/deploy-godeploy.sh` (novo); `docs/deploy.md` e `CLAUDE.md` (seção Deploy
+rápido). Validado: `assetManifest` de staging **e** prod agora contêm `/favicon.svg` (654 bytes) — antes
+ausente. (Obs.: o edge exige OAuth, então `curl` anônimo em `/favicon.svg` dá 302→login; logado, o
+browser recebe o SVG. Sem mudança de código do app — só do processo de deploy.)
+
+---
+
 ## 2026-07-01 — Edição de LEGADO "ressuscita" a tela de aprovação final (rascunho local sobrepõe o servidor)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edit-draft-legado-guard`
