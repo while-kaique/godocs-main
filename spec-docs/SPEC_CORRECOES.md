@@ -34,8 +34,25 @@ mas **não altera mais o valor**. `recomputarSavingFinanceiro` já usava `custo_
 somas inline + comentários), comentários em `src/integrations/db/schema.ts` e `src/lib/agents/types.ts`,
 testes `tests/saving-calc.test.ts` (asserções pontuais atualizadas: 6000→6000, 1200→1200, mistos recalculados),
 docs (`CLAUDE.md`, `docs/business-rules.md`, `docs/database.md`). `worker.js` **rebuildado** (mexeu em
-server-side). **Não** houve backfill: projetos já submetidos com pontual mantêm o valor gravado; re-sincronizam
-com o valor cheio só quando **editados** (o submit re-deriva de `custo_evitado_itens`/`custo_projeto_itens`).
+server-side).
+
+**Retroativo (backfill) — `POST /api/admin/retroativo-custos-pontuais`** (`retroativoCustosPontuais`,
+`chat.functions.ts`, requireAdmin). Corrige projetos já preenchidos com o ÷12. Body `{dry?:boolean}` — **dry
+default TRUE** (só relata `{projetos, flagged, metodo}`; `dry:false` aplica). Idempotente. NÃO reusa
+`resyncGoogle`/`syncSubmitToGoogle` (dispararia 1 notificação Chat por projeto = spam em prod); escreve direto
+via `updateRowByProjectId` (batch parcial, sem Chat). Dois caminhos:
+- **CASO A** — submetido pelo app (tem `custo_evitado_itens`/`custo_projeto_itens`): re-deriva dos itens (cheio)
+  + `recomputarSavingFinanceiro` (exato); atualiza doc.saving + colunas SQLite + Sheet (Custo Evitado, Custo do
+  Projeto, Saving Reais, Ganho Total, Memorial de Saving, Atualizado Em).
+- **CASO B** — legado sem itens (só via sync do Sheet, sem doc.saving), custo evitado PONTUAL PURO (0h,
+  `alguem_fazia='externo'`, sem custo externo/projeto → `saving_reais == custo evitado ÷12`): recupera o valor
+  original da justificativa `R$ X (pontual)` (método 1) ou fallback `×12` (só puro). Legado pontual NÃO-puro ou
+  com custo do projeto pontual → `flagged` (revisão manual — não arrisca isolar).
+- Invocação: edge exige OAuth → precisa de cookie de sessão do ambiente (staging tem sessão própria; prod usa
+  `E2E_COOKIE` de `godocs.devgogroup.com`).
+
+**Validação staging (`edf400b4`):** retroativo aplicado — 2 legados corrigidos via justificativa
+(`legado-100` 264,33→3171,96; `legado-149` 19,52→234,19), 0 flagged, idempotente (re-run = 0 afetados).
 
 ---
 
