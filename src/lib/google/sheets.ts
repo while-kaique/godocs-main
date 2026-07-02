@@ -24,12 +24,17 @@ function getSheetConfig() {
 // o cabeçalho REAL da planilha (linha 1), por NOME (ver `fetchHeaderMap`). Assim,
 // reordenar/inserir colunas na planilha não quebra o sync — basta o NOME bater.
 //
-// A ordem abaixo apenas documenta o layout atual da aba 'GoDocs' (A→AJ).
+// A ordem abaixo apenas documenta o layout atual da aba 'GoDocs' (A→AV). As letras
+// são só referência humana — a posição real é resolvida por NOME em runtime.
 //
 // ⚠️ "Diff Horas / Antes" e "Diff Saving / Antes" são preenchidas manualmente
-// pela equipe — o sistema NUNCA escreve nelas. Já "Memorial anterior" (AF) É
+// pela equipe — o sistema NUNCA escreve nelas. Já "Memorial anterior" (AI) É
 // escrita pelo sistema, mas SÓ na edição: recebe o memorial_calculo da versão
 // imediatamente anterior (ver sync.ts → row['Memorial anterior']).
+//
+// PAPÉIS DOS PARTICIPANTES: "Participantes" (H) guarda os COEXECUTORES; as três
+// colunas seguintes (I/J/K) guardam os demais papéis. Um participante aparece em
+// exatamente UMA das quatro. Coluna sem ninguém → "—". Ver sync.ts (derivarColunasPapeis).
 export const SHEET_COLUMNS = [
   'Data Submissão',                 // A
   'ID Projeto',                     // B
@@ -38,37 +43,40 @@ export const SHEET_COLUMNS = [
   'Nome Completo',                  // E
   'Email',                          // F
   'Projeto',                        // G
-  'Participantes',                  // H
-  'Descrição',                      // I
-  'URL',                            // J
-  'Ferramenta',                     // K
-  'Escopo',                         // L
-  'Tipos Projeto',                  // M
-  'Alguém Fazia?',                  // N
-  'Saving Horas',                   // O
-  'Horas em Reais',                 // P  (R$ das horas economizadas — bruto)
-  'Custo Evitado',                  // Q  (valor R$ mensal do custo evitado)
-  'Justificativa Custo Evitado',    // R
-  'Custo Mensal ou Pontual',        // S  (recorrência marcada no custo evitado)
-  'Saving Reais',                   // T  (líquido: horas + custo evitado − custo externo)
-  'Tipo de Saving',                 // U
-  'Memorial de Saving',             // V
-  'Custo Externo Mensal',           // W
-  'Receita Mensal',                 // X
-  'Tipo de Receita',                // Y
-  'Receita Memorial',               // Z
-  'Status',                         // AA
-  'Ganho Total',                    // AB
-  'Complexidade',                   // AC (preenchida pelo analisador)
-  'Diff Horas / Antes',             // AD (manual — não escrever)
-  'Diff Saving / Antes',            // AE (manual — não escrever)
-  'Memorial anterior',              // AF (escrita pelo sistema só na edição)
-  'Observações',                    // AG (preenchida pelo analisador)
-  'Contexto do Projeto Especial',   // AH
-  'Especial?',                      // AI
-  'Atualizado Em',                  // AJ (carimbo da última escrita do sistema)
-  'Alocação Ganhos',                // AK (justificativa [2.4] do gate ≥44h — fatiada do memorial)
-  'Usa AI Proxy',                   // AL (governança: 'Sim'/'Não' declarado no formulário)
+  'Participantes',                  // H  (participantes com papel COEXECUTOR)
+  'Planejador',                     // I  (participantes com papel Planejador)
+  'Idealizador',                    // J  (participantes com papel Idealizador)
+  'Referência técnica',             // K  (participantes com papel Referência técnica)
+  'Descrição',                      // L
+  'URL',                            // M
+  'Ferramenta',                     // N
+  'Escopo',                         // O
+  'Tipos Projeto',                  // P
+  'Alguém Fazia?',                  // Q
+  'Saving Horas',                   // R
+  'Horas em Reais',                 // S  (R$ das horas economizadas — bruto)
+  'Custo Evitado',                  // T  (valor R$ mensal do custo evitado)
+  'Justificativa Custo Evitado',    // U
+  'Custo Mensal ou Pontual',        // V  (recorrência marcada no custo evitado)
+  'Saving Reais',                   // W  (líquido: horas + custo evitado − custo externo)
+  'Tipo de Saving',                 // X
+  'Memorial de Saving',             // Y
+  'Custo Externo Mensal',           // Z
+  'Receita Mensal',                 // AA
+  'Tipo de Receita',                // AB
+  'Receita Memorial',               // AC
+  'Status',                         // AD
+  'Ganho Total',                    // AE
+  'Complexidade',                   // AF (preenchida pelo analisador)
+  'Diff Horas / Antes',             // AG (manual — não escrever)
+  'Diff Saving / Antes',            // AH (manual — não escrever)
+  'Memorial anterior',              // AI (escrita pelo sistema só na edição)
+  'Observações',                    // AJ (preenchida pelo analisador)
+  'Contexto do Projeto Especial',   // AK
+  'Especial?',                      // AL
+  'Atualizado Em',                  // AM (carimbo da última escrita do sistema)
+  'Alocação Ganhos',                // AN (justificativa [2.4] do gate ≥44h — fatiada do memorial)
+  'Usa AI Proxy',                   // AO (governança: 'Sim'/'Não' declarado no formulário)
   // Custos do projeto: serviços externos pagos que a solução consome pra rodar (ABATE).
   'Custo do Projeto',                     // valor R$ (pontual e mensal pelo valor cheio, sem ÷12)
   'Justificativa Custo do Projeto',       // detalhamento por serviço (nome/valor/recorrência/just.)

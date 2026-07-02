@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { EMAIL_RE, ALLOWED_DOMAINS_RE } from "./constants";
+import { EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE } from "./constants";
+import type { PapelParticipante } from "./constants";
 
 export function SectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
@@ -344,6 +345,177 @@ export function ChipsInput({
           {tipMessage}
         </p>
       )}
+      <FieldError message={error} />
+    </>
+  );
+}
+
+// Cor suplementar por papel. a11y: o RÓTULO em texto é sempre o sinal primário do
+// estado; a cor apenas reforça — nunca é o único indicador.
+const COR_PAPEL: Record<PapelParticipante, string> = {
+  coexecutor: "#0059A9",        // --go-blue (executor "mão na massa")
+  planejador: "#0E7490",        // cyan-700
+  idealizador: "#8A7D00",       // âmbar (mesma família do lime já usado no form)
+  referencia_tecnica: "#6D28D9", // violet-700
+};
+
+// Participantes do time + o PAPEL obrigatório de cada um. Uma linha por pessoa:
+// e-mail à esquerda, seletor de papel à direita. O papel começa vazio e é
+// obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/
+// submissor NÃO entra aqui: ele é o dono, só o time adicionado ganha papel.
+export function ParticipantesPapeisInput({
+  participantes, papeis, onAdd, onRemove, onSetPapel, error,
+}: {
+  participantes: string[];
+  papeis: Record<string, PapelParticipante | "">;
+  onAdd: (email: string) => boolean;
+  onRemove: (email: string) => void;
+  onSetPapel: (email: string, papel: PapelParticipante) => void;
+  error?: string;
+}) {
+  const [inputValue, setInputValue] = useState("");
+  const [tipMessage, setTipMessage] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function tryAdd(raw: string) {
+    const val = raw.trim().replace(/[,;]+$/, "").trim();
+    if (!val) return;
+    if (!EMAIL_RE.test(val)) {
+      setTipMessage("Insira um e-mail válido (ex: nome@gocase.com.br)");
+      return;
+    }
+    if (!ALLOWED_DOMAINS_RE.test(val)) {
+      setTipMessage("Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos");
+      return;
+    }
+    setTipMessage(null);
+    if (onAdd(val)) setInputValue("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (["Enter", " ", ",", ";", "Tab"].includes(e.key)) {
+      const val = inputValue.trim();
+      if (val) { e.preventDefault(); tryAdd(val); }
+      else if (e.key === "Enter") e.preventDefault();
+    } else if (e.key === "Backspace" && inputValue === "" && participantes.length > 0) {
+      onRemove(participantes[participantes.length - 1]);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const text = e.clipboardData.getData("text");
+    if (text && /[,;\s]/.test(text)) {
+      e.preventDefault();
+      text.split(/[,;\s]+/).forEach((p) => { if (p.trim()) tryAdd(p); });
+      setInputValue("");
+    }
+  }
+
+  const semPapel = participantes.filter((p) => !papeis[p]).length;
+
+  return (
+    <>
+      {/* Adicionar e-mail (mesmo visual do ChipsInput) */}
+      <div
+        className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
+        style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
+        onClick={() => inputRef.current?.focus()}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
+          style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
+          placeholder="exemplo@gocase.com.br"
+          value={inputValue}
+          onChange={(e) => { setInputValue(e.target.value); setTipMessage(null); }}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onBlur={() => { if (inputValue.trim()) tryAdd(inputValue.trim()); }}
+          aria-label="E-mail do participante"
+        />
+      </div>
+
+      {tipMessage && (
+        <p className="mt-1 text-[11px] font-semibold" style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}>
+          {tipMessage}
+        </p>
+      )}
+
+      {/* Uma linha por participante = e-mail + papel obrigatório */}
+      {participantes.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {participantes.map((email) => {
+            const papel = papeis[email] || "";
+            const faltando = !papel && !!error; // realça só depois de validar (avançar)
+            return (
+              <li
+                key={email}
+                className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg px-2.5 py-2"
+                style={{
+                  background: "rgba(0,89,169,0.03)",
+                  border: `1px solid ${faltando ? "rgba(220,38,38,0.4)" : "rgba(0,89,169,0.1)"}`,
+                  animation: "go-chip-in 0.15s ease",
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px]"
+                  style={{ background: "rgba(0,89,169,0.08)" }}
+                >
+                  👤
+                </span>
+                <span
+                  className="min-w-[120px] flex-1 truncate text-[12.5px] font-medium"
+                  style={{ color: "var(--go-text-heading)" }}
+                  title={email}
+                >
+                  {email}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  {papel && (
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: COR_PAPEL[papel as PapelParticipante] }}
+                    />
+                  )}
+                  <select
+                    aria-label={`Papel de ${email}`}
+                    value={papel}
+                    onChange={(e) => onSetPapel(email, e.target.value as PapelParticipante)}
+                    className="go-select !mt-0 !w-auto !max-w-[190px] !rounded-md !py-1.5 !pl-2.5 !pr-8 !text-[12px]"
+                    style={faltando ? { borderColor: "#dc2626" } : undefined}
+                  >
+                    <option value="" disabled>Selecione o papel</option>
+                    {PAPEIS_PARTICIPANTE.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(email)}
+                    aria-label={`Remover ${email}`}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0059A9]"
+                    style={{ background: "rgba(0,89,169,0.06)", color: "var(--go-blue)" }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Direção quando falta papel (âmbar). Some quando o erro vermelho aparece
+          (avançar bloqueado) para não duplicar mensagem. */}
+      {participantes.length > 0 && semPapel > 0 && !error && (
+        <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
+          {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} — escolha o papel de cada pessoa.
+        </p>
+      )}
+
       <FieldError message={error} />
     </>
   );

@@ -1,8 +1,8 @@
 import { FERRAMENTAS } from "./constants";
-import type { FormData, FieldErrors } from "./constants";
+import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
-  RadioGroup, InfoTooltip, ChipsInput,
+  RadioGroup, InfoTooltip, ParticipantesPapeisInput,
 } from "./form-components";
 
 export function Step1({
@@ -53,12 +53,20 @@ export function Step1({
   function addParticipant(email: string): boolean {
     const lower = email.toLowerCase();
     if (form.participantes.some((p) => p.toLowerCase() === lower)) return false;
+    // Papel começa vazio (obrigatório escolher) — não pré-classifica ninguém.
     updateField("participantes", [...form.participantes, email]);
     return true;
   }
 
   function removeParticipant(email: string) {
     updateField("participantes", form.participantes.filter((p) => p !== email));
+    const { [email]: _removido, ...resto } = form.participantesPapeis;
+    updateField("participantesPapeis", resto);
+  }
+
+  function setPapelParticipant(email: string, papel: PapelParticipante) {
+    updateField("participantesPapeis", { ...form.participantesPapeis, [email]: papel });
+    clearError("participantes");
   }
 
   return (
@@ -273,12 +281,14 @@ export function Step1({
             {form.emEquipe === "sim" && (
               <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
                 <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
-                  👥 E-mails dos participantes:
+                  👥 Participantes e seus papéis:
                 </label>
-                <ChipsInput
-                  chips={form.participantes}
+                <ParticipantesPapeisInput
+                  participantes={form.participantes}
+                  papeis={form.participantesPapeis}
                   onAdd={addParticipant}
                   onRemove={removeParticipant}
+                  onSetPapel={setPapelParticipant}
                   error={errors.participantes}
                 />
               </div>

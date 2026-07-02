@@ -38,6 +38,35 @@ export const TOKEN_BLOCK_CHARS = 800_000;        // ~200k tokens
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\.br)$/i;
 
+// Papel de cada PARTICIPANTE (membro do time) no projeto. NÃO se aplica ao autor/
+// submissor — ele é o dono (responsavel_email), fora da lista de participantes.
+// "Coexecutor" corresponde à coluna "Participantes" atual do Sheets (retrocompatível);
+// os demais têm colunas próprias. Um papel por pessoa (decisão de produto). A ordem
+// abaixo é a ordem exibida no seletor.
+export const PAPEIS_PARTICIPANTE = [
+  { value: "coexecutor", label: "Coexecutor" },
+  { value: "planejador", label: "Planejador" },
+  { value: "idealizador", label: "Idealizador" },
+  { value: "referencia_tecnica", label: "Referência técnica" },
+] as const;
+
+export type PapelParticipante = (typeof PAPEIS_PARTICIPANTE)[number]["value"];
+
+// Monta o mapa e-mail→papel para o payload `membros_papeis`, só com participantes
+// atuais e papéis já escolhidos (descarta vazios). O e-mail é a chave, exatamente
+// como aparece em `participantes`. Função pura — testável.
+export function montarMembrosPapeis(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): Record<string, PapelParticipante> {
+  const out: Record<string, PapelParticipante> = {};
+  for (const email of participantes) {
+    const p = papeis[email];
+    if (p) out[email] = p;
+  }
+  return out;
+}
+
 export const STEPS = [
   { id: 1, label: "Envio" },
   { id: 2, label: "Projeto" },
@@ -54,6 +83,10 @@ export interface FormData {
   servicoExterno: string;
   emEquipe: "sim" | "nao" | "";
   participantes: string[];
+  // Papel de cada participante, chaveado pelo e-mail (exatamente como aparece em
+  // `participantes`). "" = ainda não escolhido (obrigatório antes de avançar). O
+  // autor NÃO entra aqui — só os e-mails do time adicionados pelo submissor.
+  participantesPapeis: Record<string, PapelParticipante | "">;
   nomeProjeto: string;
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];

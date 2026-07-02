@@ -390,6 +390,13 @@ function getTiposProjeto(ctx: ProjetoContexto): ('saving' | 'receita_incremental
 
 // ─── Schemas de validação de entrada ────────────────────────────────────────
 
+// Mapa e-mail→papel dos participantes. Papéis válidos: coexecutor | planejador |
+// idealizador | referencia_tecnica. Opcional (projeto individual/legado → ausente).
+// O e-mail é a chave, exatamente como vem em `membros`.
+const membrosPapeisSchema = z
+  .record(z.enum(['coexecutor', 'planejador', 'idealizador', 'referencia_tecnica']))
+  .optional();
+
 const iniciarSubmissaoSchema = z.object({
   responsavel_nome: z.string().min(1).max(120),
   responsavel_email: z.string().email().max(255),
@@ -401,6 +408,7 @@ const iniciarSubmissaoSchema = z.object({
   escopo: z.enum(['interno', 'externo']).optional(),
   servico_externo: z.string().max(200).optional(),
   membros: z.array(z.string()).default([]),
+  membros_papeis: membrosPapeisSchema,
   nome_projeto: z.string().min(1).max(200),
   data_criacao: z.string(),
   tipo_projeto: z.enum(['saving', 'receita_incremental']).optional(),
@@ -536,6 +544,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       escopo: data.escopo ?? null,
       servico_externo: data.servico_externo ?? null,
       membros: data.membros,
+      membros_papeis: data.membros_papeis ?? null,
       nome: data.nome_projeto,
       data_criacao_projeto: data.data_criacao,
       // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
@@ -1707,6 +1716,7 @@ const atualizarMetadadosSchema = z.object({
   area: z.string().min(1).max(100).optional(),
   ferramenta: z.string().min(1).max(200).optional(),
   membros: z.array(z.string()).optional(),
+  membros_papeis: membrosPapeisSchema,
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
@@ -1739,6 +1749,7 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.area !== undefined) campos.area = data.area;
   if (data.ferramenta !== undefined) campos.ferramenta = data.ferramenta;
   if (data.membros !== undefined) campos.membros = data.membros;
+  if (data.membros_papeis !== undefined) campos.membros_papeis = data.membros_papeis;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
@@ -2350,6 +2361,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {
     const membros = parseJson<string[]>(projeto.membros) ?? [];
+    const membrosPapeis = parseJson<Record<string, string>>(projeto.membros_papeis) ?? {};
     const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
     runBackground(syncSubmitToGoogle({
@@ -2360,6 +2372,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       saving,
       receita,
       membros,
+      membrosPapeis,
       tiposProjeto,
       // TEMPORÁRIO: durante a validação da eficácia do formulário, gravamos sempre
       // "Pendente" na planilha — mesmo para projetos auto-aprovados (ex.: RPA). O
@@ -2452,6 +2465,7 @@ export async function resyncGoogle(rawData: unknown) {
   );
   const justificativaCargaEscala = derivarJustificativaCargaEscala(saving, projeto.alguem_fazia);
   const membros = parseJson<string[]>(projeto.membros) ?? [];
+  const membrosPapeis = parseJson<Record<string, string>>(projeto.membros_papeis) ?? {};
 
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
   await syncSubmitToGoogle({
@@ -2462,6 +2476,7 @@ export async function resyncGoogle(rawData: unknown) {
     saving,
     receita,
     membros,
+    membrosPapeis,
     tiposProjeto,
     status: 'Pendente',
     area: projeto.area ?? '—',

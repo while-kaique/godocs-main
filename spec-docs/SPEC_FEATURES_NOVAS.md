@@ -389,3 +389,53 @@ servidor mudou) — mesma raiz "servidor manda", tratar em PR próprio.
 
 **Status.** ⏳ Implementado; testes verdes + `build` (typecheck) limpo. **Deploy pendente** (a
 pedido: sem subir ainda; quando for, regra 13 — staging `edf400b4` antes de prod).
+
+## Feature adicional — Papéis dos participantes (Coexecutor/Planejador/Idealizador/Referência técnica) · jul/2026
+
+> Decisão do dono (Luis, 2026-07-02): na submissão em equipe, cada participante recebe um **papel**.
+> A coluna "Participantes" do Sheets passa a ser a de **Coexecutor** (sem renomear); três colunas
+> novas (I/J/K) guardam os demais papéis. As colunas novas são criadas **manualmente** na planilha.
+
+**Decisões fechadas (com o Luis).**
+- **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
+  · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
+  fora da lista de participantes. Só os e-mails do time adicionados ganham papel.
+- **Obriga escolher**: participante entra **sem papel** e o gate de avançar da Etapa 1 bloqueia
+  enquanto alguém estiver sem papel. (Exceção: na EDIÇÃO, membros já existentes sem papel conhecido
+  entram como **coexecutor** — semântica da coluna "Participantes" de onde vieram; novos participantes
+  começam sem papel.)
+- **Todos os papéis contam como participante** (acesso de leitura, "Participo", editor delegado):
+  `membros` = **união dos 4 papéis** — ownership/agentes/editor delegado **inalterados**.
+- **Sheets**: "Participantes" (H)=coexecutores; "Planejador"/"Idealizador"/"Referência técnica"
+  (I/J/K) os demais. Cada e-mail em **uma** coluna. Coluna sem ninguém → **"—"**. Papel
+  ausente/desconhecido → coexecutor (retrocompatível: legados com todos em "Participantes").
+
+**Onde aterrissou.**
+- `src/lib/submeter/constants.ts` — `PAPEIS_PARTICIPANTE` + tipo `PapelParticipante`;
+  `FormData.participantesPapeis` (mapa e-mail→papel); helper puro `montarMembrosPapeis`.
+- `src/lib/submeter/form-components.tsx` — novo `ParticipantesPapeisInput` (lista uma-linha-por-pessoa
+  + `<select>` de papel; a11y: `aria-label` por linha, foco visível, estado por texto+cor; nudge
+  âmbar "N sem papel"). `ChipsInput` antigo permanece (não mais usado na Etapa 1).
+- `src/lib/submeter/step1.tsx` — usa o novo componente; `setPapelParticipant`/`removeParticipant`.
+- `src/routes/submeter.tsx` — estado inicial `{}`; `applySeed` seeda papéis (fallback coexecutor);
+  `snapshotMeta`/`AgentMeta` carregam papéis (troca de papel dispara metaChanged → persiste);
+  validação da Etapa 1 exige papel; payload `membros_papeis` em iniciar-submissao + atualizar-metadados;
+  rehydrate normaliza rascunho antigo (`?? {}`).
+- Banco: `membros_papeis TEXT` (migração idempotente, `schema.ts`); `InsertProjeto`/`ProjetoRow`/
+  `insertProjeto` (`client.server.ts`). Schemas + persistência em `chat.functions.ts`
+  (`membrosPapeisSchema`). `getMeuProjeto` devolve `membros_papeis` (seed da edição).
+- Sync: `derivarColunasPapeis` (IDA, `sync.ts`) distribui nas 4 colunas; `parseParticipantesPapeis`
+  (VOLTA, `sync-reverse.ts`) reconstrói `membros`(união)+`membros_papeis`; filtro por dono checa as
+  4 colunas; `SHEET_COLUMNS` ganha os 3 nomes (`sheets.ts`).
+- Testes: `tests/participantes-papeis.test.ts` (derivarColunasPapeis + montarMembrosPapeis) +
+  caso de papéis em `tests/sync-reverse.test.ts`.
+
+**Dependência de planilha (manual, do dono).** As 3 colunas — **`Planejador`**, **`Idealizador`**,
+**`Referência técnica`** — precisam existir no cabeçalho, com **exatamente** esses nomes (caixa +
+acentos), tanto na aba **`GoDocs`** (prod) quanto na aba **`STAGING`**. Enquanto não existirem, o
+append/update **ignora** essas colunas com aviso (não quebra) e só a "Participantes"=coexecutor é
+gravada.
+
+**Status.** ⏳ Implementado; testes verdes (526) + `build`/`build:worker` OK; typecheck sem novos
+erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
+de prod; requer as 3 colunas nas abas).
