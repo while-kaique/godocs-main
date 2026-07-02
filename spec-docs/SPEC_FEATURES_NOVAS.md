@@ -390,6 +390,53 @@ servidor mudou) — mesma raiz "servidor manda", tratar em PR próprio.
 **Status.** ⏳ Implementado; testes verdes + `build` (typecheck) limpo. **Deploy pendente** (a
 pedido: sem subir ainda; quando for, regra 13 — staging `edf400b4` antes de prod).
 
+## Feature adicional — Autocomplete de participantes (busca na TeamGuide) · jul/2026
+
+> Pedido do dono (Kaique, 2026-07-02): no campo "E-mails dos participantes" (etapa 1), a cada
+> letra digitada o sistema filtra a lista total de e-mails da TeamGuide e reduz as opções, até o
+> usuário apertar **Enter** (no item marcado) ou **clicar** no e-mail — com **scroll** quando há
+> muitos resultados.
+
+**Decisões (fechadas).**
+- **Fonte:** `GET /employees/refs?unpaged=true&page=0` da TeamGuide (mesma API/token `TG_API_TOKEN`
+  das áreas) — devolve a base inteira (~440 pessoas: `name`, `contactEmail`, `position`) numa
+  chamada só. Validado ao vivo antes de codar (200, 439 itens, todos com e-mail).
+- **Filtro no FRONTEND, lista servida 1x:** o worker expõe `GET /api/participantes/sugestoes`
+  (autenticada pelo edge como toda rota) com **cache em memória de 10 min**; o cliente busca a
+  lista **uma vez** (quando "Em equipe? Sim" aparece) e filtra localmente a cada tecla — zero
+  requisição por letra digitada.
+- **Degradação suave, nunca bloqueia:** TeamGuide fora do ar → endpoint devolve `[]` (ou o cache
+  vencido, se houver) e o campo continua aceitando e-mail digitado livre (validação de domínio
+  @gocase/@gobeaute/@gogroup inalterada). O autocomplete é conveniência, não gate.
+- **Espaço deixou de ser separador universal:** no campo de participantes, espaço só "fecha" o
+  e-mail quando o texto já é um e-mail completo (`EMAIL_RE`); senão passa como texto — sem isso
+  seria impossível buscar por nome composto ("maria souza"). Vírgula/`;`/Tab/Enter seguem separando.
+- **A11y (padrão combobox):** `role="combobox"`/`listbox`/`option`, `aria-activedescendant`, item
+  ativo marcado por fundo azul + barra lime **+ selo "↵ Enter"** (estado nunca só por cor),
+  `scrollIntoView` na navegação ↑/↓, Esc fecha até a próxima digitação, `prefers-reduced-motion`
+  coberto pelo guard global do `styles.css`.
+- **Relevância:** todas as palavras da busca precisam casar (nome OU e-mail, sem acento/caixa);
+  ordena e-mail-começa-por > nome-começa-por > demais; exclui já adicionados; renderiza até 80 de
+  uma vez (rodapé "mostrando 80 de N") com rolagem (`max-h-60`).
+
+**Onde aterrissou.**
+- `src/lib/areas/teamguide.server.ts` — `listarPessoasTeamGuide()` (reusa `tgGet` com retry).
+- `src/lib/participantes.functions.ts` — `getSugestoesParticipantes()` (cache TTL 10 min).
+- `src/worker.ts` — rota `GET /api/participantes/sugestoes`.
+- `src/lib/submeter/participantes-sugestoes.ts` — `filtrarSugestoes()` (puro, testável) +
+  `useSugestoesParticipantes()` (fetch 1x com cache de módulo).
+- `src/lib/submeter/form-components.tsx` — combobox no **`ParticipantesPapeisInput`** (prop
+  `suggestions`) — reconciliado com a feature de papéis (PR #195), que substituiu o `ChipsInput`
+  na Etapa 1 no meio desta implementação; o `ChipsInput` ficou como estava (não mais usado).
+- `src/lib/submeter/step1.tsx` — carrega quando `emEquipe === 'sim'` e injeta no
+  `ParticipantesPapeisInput`.
+- `tests/participantes-sugestoes.test.ts` — 9 casos (filtro, acentos, dedup, ranking; listagem
+  TeamGuide com fetch mockado).
+
+**Status.** ⏳ Implementado; testes verdes, `build` + `build:worker` limpos, endpoint validado
+contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` antes de prod).
+
+
 ## Feature adicional — Papéis dos participantes (Coexecutor/Planejador/Idealizador/Referência técnica) · jul/2026
 
 > Decisão do dono (Luis, 2026-07-02): na submissão em equipe, cada participante recebe um **papel**.

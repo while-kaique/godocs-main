@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE } from "./constants";
 import type { PapelParticipante } from "./constants";
+import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
 
 export function SectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
@@ -249,6 +250,36 @@ export function InfoTooltip({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Realce do trecho buscado dentro de nome/e-mail da sugestão. Compara sem
+// acento/caixa; se a normalização mudar o tamanho da string (caso raro), volta
+// ao texto puro em vez de marcar no lugar errado.
+function Realce({ texto, termos }: { texto: string; termos: string[] }) {
+  const nbase = texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (nbase.length !== texto.length || termos.length === 0) return <>{texto}</>;
+  const marcado = new Array<boolean>(texto.length).fill(false);
+  for (const t of termos) {
+    if (!t) continue;
+    let i = 0;
+    while ((i = nbase.indexOf(t, i)) !== -1) {
+      for (let k = i; k < i + t.length; k++) marcado[k] = true;
+      i += t.length;
+    }
+  }
+  const partes: React.ReactNode[] = [];
+  let inicio = 0;
+  for (let i = 1; i <= texto.length; i++) {
+    if (i === texto.length || marcado[i] !== marcado[inicio]) {
+      const trecho = texto.slice(inicio, i);
+      partes.push(marcado[inicio] ? <strong key={inicio} className="font-bold">{trecho}</strong> : trecho);
+      inicio = i;
+    }
+  }
+  return <>{partes}</>;
+}
+
+// Máximo de sugestões renderizadas de uma vez (a lista rola; o resto refina digitando).
+const MAX_SUGESTOES = 80;
+
 export function ChipsInput({
   chips, onAdd, onRemove, error,
 }: {
@@ -364,7 +395,7 @@ const COR_PAPEL: Record<PapelParticipante, string> = {
 // obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/
 // submissor NÃO entra aqui: ele é o dono, só o time adicionado ganha papel.
 export function ParticipantesPapeisInput({
-  participantes, papeis, onAdd, onRemove, onSetPapel, error,
+  participantes, papeis, onAdd, onRemove, onSetPapel, error, suggestions,
 }: {
   participantes: string[];
   papeis: Record<string, PapelParticipante | "">;
@@ -372,10 +403,30 @@ export function ParticipantesPapeisInput({
   onRemove: (email: string) => void;
   onSetPapel: (email: string, papel: PapelParticipante) => void;
   error?: string;
+  suggestions?: SugestaoParticipante[];
 }) {
   const [inputValue, setInputValue] = useState("");
   const [tipMessage, setTipMessage] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false); // Esc fecha até a próxima digitação
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Autocomplete: filtra a lista da TeamGuide a cada letra (nome ou e-mail,
+  // sem acento/caixa); sem lista carregada, o campo funciona como sempre.
+  const termos = inputValue.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  const filtradas = filtrarSugestoes(suggestions ?? [], inputValue, participantes);
+  const visiveis = filtradas.slice(0, MAX_SUGESTOES);
+  const open = focused && !dismissed && inputValue.trim().length > 0 && (suggestions?.length ?? 0) > 0;
+
+  // Mantém a opção ativa à vista quando a navegação por teclado rola a lista.
+  useEffect(() => {
+    if (!open) return;
+    listRef.current
+      ?.querySelector('[data-ativa="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
 
   function tryAdd(raw: string) {
     const val = raw.trim().replace(/[,;]+$/, "").trim();
@@ -392,8 +443,44 @@ export function ParticipantesPapeisInput({
     if (onAdd(val)) setInputValue("");
   }
 
+  function escolherSugestao(email: string) {
+    setTipMessage(null);
+    if (onAdd(email)) {
+      setInputValue("");
+      setActiveIndex(0);
+    }
+    inputRef.current?.focus();
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (["Enter", " ", ",", ";", "Tab"].includes(e.key)) {
+    if (open && visiveis.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % visiveis.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + visiveis.length) % visiveis.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        escolherSugestao(visiveis[Math.min(activeIndex, visiveis.length - 1)].email);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setDismissed(true);
+        return;
+      }
+    }
+    // Espaço só separa quando o texto já é um e-mail completo — digitar um NOME
+    // ("maria souza") precisa do espaço para continuar filtrando as sugestões.
+    const separadores = EMAIL_RE.test(inputValue.trim())
+      ? ["Enter", " ", ",", ";", "Tab"]
+      : ["Enter", ",", ";", "Tab"];
+    if (separadores.includes(e.key)) {
       const val = inputValue.trim();
       if (val) { e.preventDefault(); tryAdd(val); }
       else if (e.key === "Enter") e.preventDefault();
@@ -415,25 +502,123 @@ export function ParticipantesPapeisInput({
 
   return (
     <>
-      {/* Adicionar e-mail (mesmo visual do ChipsInput) */}
-      <div
-        className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
-        style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
-        onClick={() => inputRef.current?.focus()}
-      >
-        <input
-          ref={inputRef}
-          type="text"
-          className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
-          style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
-          placeholder="exemplo@gocase.com.br"
-          value={inputValue}
-          onChange={(e) => { setInputValue(e.target.value); setTipMessage(null); }}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onBlur={() => { if (inputValue.trim()) tryAdd(inputValue.trim()); }}
-          aria-label="E-mail do participante"
-        />
+      {/* Adicionar e-mail (mesmo visual do ChipsInput) + autocomplete da TeamGuide */}
+      <div className="relative">
+        <div
+          className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
+          style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
+          onClick={() => inputRef.current?.focus()}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            // O autofill do navegador (sugestões de e-mail do Chrome) abre por cima
+            // do nosso dropdown de sugestões — desligado; a lista vem da TeamGuide.
+            autoComplete="off"
+            spellCheck={false}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls="participantes-sugestoes"
+            aria-autocomplete="list"
+            aria-activedescendant={open && visiveis.length > 0 ? `participante-sugestao-${activeIndex}` : undefined}
+            className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
+            style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
+            placeholder="Digite um nome ou e-mail…"
+            value={inputValue}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setTipMessage(null);
+              setDismissed(false);
+              setActiveIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => setFocused(true)}
+            onBlur={() => {
+              setFocused(false);
+              if (inputValue.trim()) tryAdd(inputValue.trim());
+            }}
+            aria-label="E-mail do participante"
+          />
+        </div>
+
+        {open && (
+          <div
+            className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-lg"
+            style={{
+              background: "var(--go-white)",
+              border: "1.5px solid rgba(0,89,169,0.15)",
+              boxShadow: "0 8px 24px rgba(0,89,169,0.12)",
+              animation: "go-slide-down 0.15s ease",
+            }}
+          >
+            {visiveis.length > 0 ? (
+              <>
+                <ul
+                  ref={listRef}
+                  id="participantes-sugestoes"
+                  role="listbox"
+                  aria-label="Sugestões de participantes"
+                  className="max-h-60 overflow-y-auto py-1"
+                >
+                  {visiveis.map((p, i) => {
+                    const ativa = i === activeIndex;
+                    return (
+                      <li
+                        key={p.email}
+                        id={`participante-sugestao-${i}`}
+                        role="option"
+                        aria-selected={ativa}
+                        data-ativa={ativa || undefined}
+                        className="flex cursor-pointer items-center gap-2 px-3 py-1.5"
+                        style={{
+                          background: ativa ? "rgba(0,89,169,0.08)" : "transparent",
+                          borderLeft: ativa ? "3px solid var(--go-lime)" : "3px solid transparent",
+                        }}
+                        // onMouseDown (não onClick): dispara ANTES do blur do input,
+                        // senão o blur tenta adicionar o texto parcial digitado.
+                        onMouseDown={(e) => { e.preventDefault(); escolherSugestao(p.email); }}
+                        onMouseMove={() => { if (!ativa) setActiveIndex(i); }}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+                            <Realce texto={p.nome} termos={termos} />
+                            {p.cargo && (
+                              <span className="ml-1.5 text-[11px] font-normal" style={{ color: "#8b8b9a" }}>
+                                · {p.cargo}
+                              </span>
+                            )}
+                          </span>
+                          <span className="block truncate text-[11px]" style={{ color: "var(--go-blue)" }}>
+                            <Realce texto={p.email} termos={termos} />
+                          </span>
+                        </span>
+                        {ativa && (
+                          <span
+                            aria-hidden="true"
+                            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                            style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                          >
+                            ↵ Enter
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {filtradas.length > MAX_SUGESTOES && (
+                  <p className="border-t px-3 py-1.5 text-[10px]" style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}>
+                    Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para refinar.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter para adicionar.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {tipMessage && (
