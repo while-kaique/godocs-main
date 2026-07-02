@@ -4,6 +4,7 @@ import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
   RadioGroup, InfoTooltip, ParticipantesPapeisInput,
 } from "./form-components";
+import { useSugestoesParticipantes } from "./participantes-sugestoes";
 
 export function Step1({
   form, errors, updateField, setError, clearError,
@@ -17,6 +18,10 @@ export function Step1({
   const isExterno = form.escopo === "externo";
   const escopoDefinido = form.escopo === "interno" || form.escopo === "externo";
   const prodBlocked = form.prodStatus === "dev" || form.prodStatus === "idle";
+
+  // Lista da TeamGuide para o autocomplete de participantes (carrega 1x, só
+  // quando o campo aparece; falha → campo segue aceitando e-mail digitado).
+  const sugestoesParticipantes = useSugestoesParticipantes(form.emEquipe === "sim");
 
   const prodLabel = isExterno
     ? "Essa ferramenta externa já está em uso na solução?"
@@ -290,6 +295,7 @@ export function Step1({
                   onRemove={removeParticipant}
                   onSetPapel={setPapelParticipant}
                   error={errors.participantes}
+                  suggestions={sugestoesParticipantes}
                 />
               </div>
             )}
