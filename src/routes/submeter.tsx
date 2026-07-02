@@ -7,9 +7,9 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
   ALLOWED_DOMAINS_RE, filesToDocs, TOKEN_BLOCK_CHARS,
-  parseMoedaBR, numeroParaMoedaBR,
+  parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
+import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
@@ -73,6 +73,9 @@ type AgentMeta = {
   nomeProjeto: string;
   ferramenta: string;
   participantes: string[];
+  // Papel de cada participante (e-mail→papel). Entra no meta para que trocar um
+  // papel também dispare metaChanged e seja persistido (via atualizar-metadados).
+  participantesPapeis: Record<string, string>;
   dataCriacao: string;
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
@@ -288,6 +291,20 @@ export function SubmeterPageContent({
           ferramentaOutra = ferramentaRaw.slice("Outros: ".length);
         }
 
+        // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
+        // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
+        // semântica da coluna "Participantes" de onde esses e-mails vieram. Lookup
+        // tolerante a caixa. Novos participantes adicionados na edição começam sem
+        // papel (obrigatório escolher). O autor não entra aqui.
+        const membrosPapeisSeed = (data.membros_papeis as Record<string, string>) ?? {};
+        const papeisLower: Record<string, string> = {};
+        for (const [k, v] of Object.entries(membrosPapeisSeed)) papeisLower[k.toLowerCase()] = v;
+        const participantesPapeis: FormData["participantesPapeis"] = {};
+        for (const email of membros) {
+          const p = membrosPapeisSeed[email] ?? papeisLower[email.toLowerCase()];
+          participantesPapeis[email] = (p as PapelParticipante) || "coexecutor";
+        }
+
         const newForm: FormData = {
           escopo: (data.escopo as string) ?? "interno",
           prodStatus: "sim",
@@ -298,6 +315,7 @@ export function SubmeterPageContent({
           servicoExterno: (data.servico_externo as string) ?? "",
           emEquipe: membros.length > 0 ? "sim" : "nao",
           participantes: membros,
+          participantesPapeis,
           nomeProjeto: (data.nome_projeto as string) ?? "",
           dataCriacao: (data.data_criacao_projeto as string) ?? "",
           tipoProjeto: tiposProjeto,
@@ -463,6 +481,7 @@ export function SubmeterPageContent({
               ? `Outros: ${newForm.ferramentaOutra.trim()}`
               : newForm.ferramenta,
           participantes: newForm.participantes,
+          participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
           usaAiProxy: newForm.usaAiProxy,
@@ -478,7 +497,9 @@ export function SubmeterPageContent({
   // retomada fiel de um rascunho ao atualizar/voltar à página, sem ida ao servidor.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rehydrateFromLocal = useCallback((d: DraftSnapshot) => {
-    setForm(d.form);
+    // Rascunhos salvos antes desta feature não têm `participantesPapeis` — default {}
+    // para nunca ler `undefined[email]`.
+    setForm({ ...d.form, participantesPapeis: d.form.participantesPapeis ?? {} });
     setNomesExistentes(d.nomesExistentes ?? []);
     setProjetoId(d.projetoId);
     setCompletedSteps(new Set(d.completedSteps ?? [1, 2]));
@@ -651,6 +672,7 @@ export function SubmeterPageContent({
     servicoExterno: "",
     emEquipe: "",
     participantes: [],
+    participantesPapeis: {},
     nomeProjeto: "",
     dataCriacao: today,
     tipoProjeto: [],
@@ -769,11 +791,12 @@ export function SubmeterPageContent({
     nomeProjeto: form.nomeProjeto.trim(),
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
+    participantesPapeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
     usaAiProxy: form.usaAiProxy,
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -815,6 +838,9 @@ export function SubmeterPageContent({
         const invalid = form.participantes.filter((p) => !ALLOWED_DOMAINS_RE.test(p));
         if (invalid.length > 0)
           errs.participantes = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
+        // Papel obrigatório por participante (decisão de produto: obriga escolher).
+        else if (form.participantes.some((p) => !form.participantesPapeis[p]))
+          errs.participantes = "Escolha o papel de cada participante";
       }
     }
 
@@ -976,6 +1002,7 @@ export function SubmeterPageContent({
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           // Projeto especial não envia tipos financeiros — o backend grava
@@ -1057,6 +1084,7 @@ export function SubmeterPageContent({
           nome_projeto: form.nomeProjeto.trim(),
           ferramenta: ferramentaEnviada,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
@@ -1087,6 +1115,7 @@ export function SubmeterPageContent({
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
@@ -1158,6 +1187,7 @@ export function SubmeterPageContent({
           nome_projeto: meta.nomeProjeto,
           ferramenta: meta.ferramenta,
           membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
           usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1244,6 +1274,7 @@ export function SubmeterPageContent({
               nome_projeto: meta.nomeProjeto,
               ferramenta: meta.ferramenta,
               membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
               usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1315,6 +1346,7 @@ export function SubmeterPageContent({
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1412,6 +1444,7 @@ export function SubmeterPageContent({
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,

@@ -88,6 +88,40 @@ function parseMembros(v: string | undefined): string[] {
   return parseList(v).filter((s) => s.includes('@'));
 }
 
+// Papel → coluna do Sheets. "Participantes" = coexecutor (retrocompatível: legados
+// tinham todos os membros lá). A ordem define o desempate quando um e-mail aparece
+// em mais de uma coluna (não deveria — 1 papel por pessoa): a PRIMEIRA vence.
+const COLUNA_PAPEL: ReadonlyArray<{ col: SheetColumn; papel: string }> = [
+  { col: 'Participantes', papel: 'coexecutor' },
+  { col: 'Planejador', papel: 'planejador' },
+  { col: 'Idealizador', papel: 'idealizador' },
+  { col: 'Referência técnica', papel: 'referencia_tecnica' },
+];
+
+// Lê as 4 colunas de papel → lista PLANA de participantes (dedup por caixa, base do
+// ownership) + mapa e-mail→papel. Vazio quando as 4 colunas estão vazias.
+function parseParticipantesPapeis(row: SheetRow): { membros: string[]; papeis: Record<string, string> } {
+  const membros: string[] = [];
+  const vistos = new Set<string>();
+  const papeis: Record<string, string> = {};
+  for (const { col, papel } of COLUNA_PAPEL) {
+    for (const email of parseMembros(row[col])) {
+      const chave = email.toLowerCase();
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      membros.push(email);
+      papeis[email] = papel;
+    }
+  }
+  return { membros, papeis };
+}
+
+// Assinatura canônica do mapa de papéis (chave em caixa baixa, ordenada) — comparação
+// estável e independente de ordem/caixa, p/ não gerar update espúrio a cada sync.
+function assinaturaPapeis(m: Record<string, string>): string {
+  return Object.entries(m).map(([e, p]) => `${e.toLowerCase()}=${p}`).sort().join('|');
+}
+
 function parseEspecial(v: string | undefined): number {
   return (v ?? '').trim().toLowerCase().startsWith('s') ? 1 : 0;
 }
@@ -122,7 +156,7 @@ function custoEvitadoFlag(v: string | undefined): string | null {
 async function criarLegado(id: string, row: SheetRow): Promise<void> {
   const tipos = parseList(row['Tipos Projeto']).map((t) => t.toLowerCase());
   const especial = parseEspecial(row['Especial?']);
-  const membros = parseMembros(row['Participantes']);
+  const { membros, papeis } = parseParticipantesPapeis(row);
   const status = statusFromLabel(row['Status']);
   const dataCriacao = txt(row['Data Criação']);
   // "Data Submissão" vem em pt-BR (dd/mm/yyyy) da planilha — normaliza para ISO
@@ -138,6 +172,7 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     ferramenta: txt(row['Ferramenta']) ?? '—',
     escopo: txt(row['Escopo']),
     membros: membros.length ? membros : null,
+    membros_papeis: Object.keys(papeis).length ? papeis : null,
     status,
     chat_completo: 1,
     data_criacao_projeto: dataCriacao ? dataCriacao.split(' ')[0] : null,
@@ -222,15 +257,22 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
     updates[field as string] = newVal;
   }
 
-  // Participantes → membros (lista de e-mails → array; updateProjeto serializa em JSON).
-  // Mesma regra "vazio não apaga": Participantes vazio mantém os membros atuais.
-  const membrosSheet = parseMembros(row['Participantes']);
+  // Participantes + papéis → membros (lista plana) + membros_papeis (mapa). As 4
+  // colunas de papel (Participantes=coexecutor + Planejador/Idealizador/Referência
+  // técnica) são a fonte. Mesma regra "vazio não apaga": se as 4 estiverem vazias,
+  // mantém os membros/papéis atuais.
+  const { membros: membrosSheet, papeis: papeisSheet } = parseParticipantesPapeis(row);
   if (membrosSheet.length > 0) {
     const membrosAtuais = parseJson<string[]>(current.membros) ?? [];
     const mesmaLista =
       membrosSheet.length === membrosAtuais.length &&
       membrosSheet.every((m) => membrosAtuais.some((c) => c.toLowerCase() === m.toLowerCase()));
     if (!mesmaLista) updates['membros'] = membrosSheet;
+    // Distribuição de papéis: atualiza quando muda (comparação estável por assinatura).
+    const papeisAtuais = parseJson<Record<string, string>>(current.membros_papeis) ?? {};
+    if (assinaturaPapeis(papeisAtuais) !== assinaturaPapeis(papeisSheet)) {
+      updates['membros_papeis'] = papeisSheet;
+    }
   }
 
   // "Especial?" + "Tipos Projeto": o Sheet é a fonte da verdade do TIPO do projeto.
@@ -443,7 +485,8 @@ export async function syncOwnerRowsFromSheet(
   const doDono = rows.filter((row) => {
     const responsavel = (row['Email'] ?? '').trim().toLowerCase();
     if (responsavel === alvo) return true;
-    return parseMembros(row['Participantes']).some((m) => m.toLowerCase() === alvo);
+    // Participante em QUALQUER papel (as 4 colunas), não só "Participantes".
+    return parseParticipantesPapeis(row).membros.some((m) => m.toLowerCase() === alvo);
   });
 
   const existingIds = new Set((await getAllProjetoIds()).map((x) => x.toLowerCase()));

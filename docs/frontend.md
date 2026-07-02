@@ -52,7 +52,7 @@ Arquivo mais complexo do projeto. Gerencia o fluxo de 3 etapas com navegação l
 - Responsável: nome + email (valida domínios @gocase/@gobeaute/@gogroup)
 - Área (dropdown via `/api/areas`, fallback hardcoded)
 - Ferramenta (dropdown: n8n, Python, Google Apps Script, Claude + GoDeploy, Claude, Outros)
-- Equipe/participantes (chips de email com **autocomplete da TeamGuide**: lista via `/api/participantes/sugestoes` carregada 1x quando "Em equipe? Sim", filtro local a cada tecla — nome/e-mail sem acento, ranking começa-por — dropdown com scroll, ↑/↓ + Enter ou clique; padrão ARIA combobox; espaço só separa chip quando o texto já é e-mail completo; TeamGuide fora → segue aceitando e-mail digitado. Filtro puro em `participantes-sugestoes.ts`)
+- Equipe/participantes (`ParticipantesPapeisInput`: uma linha por pessoa com papel obrigatório + **autocomplete da TeamGuide** no input de e-mail — lista via `/api/participantes/sugestoes` carregada 1x quando "Em equipe? Sim", filtro local a cada tecla (nome/e-mail sem acento, ranking começa-por), dropdown com scroll, ↑/↓ + Enter ou clique; padrão ARIA combobox; espaço só separa quando o texto já é e-mail completo; TeamGuide fora → segue aceitando e-mail digitado. Filtro puro em `participantes-sugestoes.ts`)
 
 ### Step 2 — Projeto (`step2.tsx`)
 - **Tipo**: multi-select (saving e/ou receita_incremental)
