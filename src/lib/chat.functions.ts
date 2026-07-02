@@ -429,11 +429,14 @@ function getTiposProjeto(ctx: ProjetoContexto): ("saving" | "receita_incremental
 
 // ─── Schemas de validação de entrada ────────────────────────────────────────
 
-// Mapa e-mail→papel dos participantes. Papéis válidos: coexecutor | planejador |
-// idealizador | referencia_tecnica. Opcional (projeto individual/legado → ausente).
-// O e-mail é a chave, exatamente como vem em `membros`.
+// Mapa e-mail→papel dos participantes. Papéis atuais: coexecutor("Coautor") |
+// planejador("Participante") | contribuidor("Contribuidor"). Os `value` internos
+// coexecutor/planejador foram mantidos ao renomear os rótulos. O enum aceita também os
+// LEGADOS idealizador/referencia_tecnica (feature anterior) p/ não rejeitar payload de
+// cliente com cache antigo (version skew) — no sync eles caem em "Contribuidor".
+// Opcional (projeto individual/legado → ausente). O e-mail é a chave, como em `membros`.
 const membrosPapeisSchema = z
-  .record(z.enum(['coexecutor', 'planejador', 'idealizador', 'referencia_tecnica']))
+  .record(z.enum(['coexecutor', 'planejador', 'contribuidor', 'idealizador', 'referencia_tecnica']))
   .optional();
 
 const iniciarSubmissaoSchema = z.object({

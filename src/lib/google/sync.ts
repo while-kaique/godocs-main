@@ -113,9 +113,9 @@ export type SubmitSyncParams = {
   saving: Record<string, unknown> | null | undefined;
   receita: Record<string, unknown> | null | undefined;
   membros: string[];
-  // Papel de cada membro (e-mail→papel). Distribui os membros nas 4 colunas de papel
-  // do Sheets (Participantes=coexecutor, Planejador, Idealizador, Referência técnica).
-  // Opcional: ausente/vazio → todos entram como coexecutor (retrocompatível).
+  // Papel de cada membro (e-mail→papel). Distribui os membros nas 4 colunas de papel do
+  // Sheets (Participantes=Coautor, participantes 2=Participante, Idealizador, Referência
+  // técnica). Opcional: ausente/vazio → todos entram como coexecutor (retrocompatível).
   membrosPapeis?: Record<string, string>;
   tiposProjeto: string[];
   status: 'Aprovado' | 'Pendente';
@@ -167,33 +167,50 @@ export function derivarSplitHorasSheet(
   return { real: 0, escalado: 0 };
 }
 
-// ─── Papéis dos participantes → 4 colunas do Sheets ─────────────────────────
-// Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda
-// os COEXECUTORES; Planejador/Idealizador/Referência técnica os demais. Papel
-// ausente/desconhecido cai em COEXECUTOR — retrocompatível (antes todos os membros
-// ficavam em "Participantes"). Cada e-mail entra em exatamente UMA coluna. Coluna sem
-// ninguém → '' (vira "—" no padronizarLinha). Lookup tolerante a caixa. Pura — testável.
-const PAPEIS_COLUNA = ['coexecutor', 'planejador', 'idealizador', 'referencia_tecnica'] as const;
+// ─── Papéis dos participantes → 3 colunas do Sheets ─────────────────────────
+// Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda os
+// COAUTORES (value interno `coexecutor`); "participantes 2" os PARTICIPANTES (value
+// interno `planejador`); "Contribuidor" os CONTRIBUIDORES (value interno `contribuidor`).
+// Cada e-mail entra em exatamente UMA coluna. Coluna sem ninguém → '' (vira "—" no
+// padronizarLinha). Lookup tolerante a caixa.
+// ⚠️ As CHAVES do bucket são os `value` internos (`coexecutor`/`planejador` mantidos);
+// só rótulos e nomes de coluna mudaram. Papel AUSENTE → coexecutor/"Participantes"
+// (retrocompatível: legados tinham todos em "Participantes"); papéis LEGADOS
+// `idealizador`/`referencia_tecnica` (feature anterior) → "Contribuidor". Pura — testável.
+const PAPEIS_COLUNA = ['coexecutor', 'planejador', 'contribuidor'] as const;
 export type PapelColuna = (typeof PAPEIS_COLUNA)[number];
+
+// Normaliza um papel bruto (do form ou legado) para uma das 3 colunas atuais.
+function normalizarPapelColuna(raw: string | null | undefined): PapelColuna {
+  switch ((raw ?? '').toLowerCase()) {
+    case 'planejador': return 'planejador';
+    case 'contribuidor':
+    case 'idealizador':        // legado (feature anterior) → Contribuidor
+    case 'referencia_tecnica': // legado (feature anterior) → Contribuidor
+      return 'contribuidor';
+    case 'coexecutor':
+    default:                   // ausente/desconhecido → Coautor (retrocompatível)
+      return 'coexecutor';
+  }
+}
 
 export function derivarColunasPapeis(
   membros: string[],
   papeis: Record<string, string> | null | undefined,
 ): Record<PapelColuna, string> {
   const buckets: Record<PapelColuna, string[]> = {
-    coexecutor: [], planejador: [], idealizador: [], referencia_tecnica: [],
+    coexecutor: [], planejador: [], contribuidor: [],
   };
   const porCaixaBaixa: Record<string, string> = {};
   for (const [k, v] of Object.entries(papeis ?? {})) porCaixaBaixa[k.toLowerCase()] = v;
   for (const email of membros) {
-    const papel = (papeis?.[email] ?? porCaixaBaixa[email.toLowerCase()] ?? 'coexecutor') as PapelColuna;
-    (buckets[papel] ?? buckets.coexecutor).push(email);
+    const raw = papeis?.[email] ?? porCaixaBaixa[email.toLowerCase()];
+    buckets[normalizarPapelColuna(raw)].push(email);
   }
   return {
     coexecutor: buckets.coexecutor.join(', '),
     planejador: buckets.planejador.join(', '),
-    idealizador: buckets.idealizador.join(', '),
-    referencia_tecnica: buckets.referencia_tecnica.join(', '),
+    contribuidor: buckets.contribuidor.join(', '),
   };
 }
 
@@ -263,12 +280,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Nome Completo': ouTraco(p.projeto.responsavel_nome),
       'Email': ouTraco(p.projeto.responsavel_email),
       'Projeto': ouTraco(p.projeto.nome),
-      // "Participantes" = COEXECUTORES; as 3 seguintes, os demais papéis. Coluna
-      // sem ninguém → '' → padronizarLinha grava "—".
+      // "Participantes" = Coautores; "participantes 2" = Participantes; "Contribuidor"
+      // = Contribuidores. Coluna sem ninguém → '' → padronizarLinha "—".
       'Participantes': colsPapeis.coexecutor,
-      'Planejador': colsPapeis.planejador,
-      'Idealizador': colsPapeis.idealizador,
-      'Referência técnica': colsPapeis.referencia_tecnica,
+      'participantes 2': colsPapeis.planejador,
+      'Contribuidor': colsPapeis.contribuidor,
       'Descrição': ouTraco(p.projeto.descricao_breve),
       'URL': urlDocs,
       'Ferramenta': ouTraco(p.projeto.ferramenta),

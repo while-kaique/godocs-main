@@ -292,12 +292,14 @@ const MIGRATIONS = [
   // então o sync reverso nunca toca este campo (a delegação sobrevive aos syncs).
   // Permissão efetiva = interseção com `membros` (sai de membros → perde o poder).
   'ALTER TABLE projetos ADD COLUMN editores_delegados TEXT',
-  // Papel de cada PARTICIPANTE no projeto (JSON, mapa e-mail→papel): 'coexecutor'
-  // | 'planejador' | 'idealizador' | 'referencia_tecnica'. `membros` continua sendo
-  // a lista PLANA de todos os participantes (base do ownership); este mapa só guarda
-  // o papel de cada um. Coexecutor = coluna "Participantes" do Sheets; os demais têm
-  // colunas próprias (Planejador/Idealizador/Referência técnica). NÃO se aplica ao
-  // autor (responsavel_email). Vazio/null = legado sem papéis (tratado como coexecutor).
+  // Papel de cada PARTICIPANTE no projeto (JSON, mapa e-mail→papel). 3 papéis atuais:
+  // 'coexecutor'("Coautor") | 'planejador'("Participante") | 'contribuidor'("Contribuidor").
+  // `membros` continua sendo a lista PLANA de todos os participantes (base do ownership);
+  // este mapa só guarda o papel de cada um. Colunas do Sheets: `coexecutor`→"Participantes",
+  // `planejador`→"participantes 2", `contribuidor`→"Contribuidor". Os `value` internos
+  // coexecutor/planejador foram mantidos ao renomear rótulos/colunas; os papéis legados
+  // 'idealizador'/'referencia_tecnica' (feature anterior) caem em "Contribuidor" no sync.
+  // NÃO se aplica ao autor (responsavel_email). Vazio/null = legado sem papéis (coexecutor).
   'ALTER TABLE projetos ADD COLUMN membros_papeis TEXT',
   // Governança de IA: o projeto usa o AI Proxy interno (ai-proxy.gogroupbr.com)?
   // 'sim'|'nao', resposta determinística do formulário (etapa 2). O agente de

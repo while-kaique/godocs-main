@@ -384,10 +384,9 @@ export function ChipsInput({
 // Cor suplementar por papel. a11y: o RÓTULO em texto é sempre o sinal primário do
 // estado; a cor apenas reforça — nunca é o único indicador.
 const COR_PAPEL: Record<PapelParticipante, string> = {
-  coexecutor: "#0059A9",        // --go-blue (executor "mão na massa")
-  planejador: "#0E7490",        // cyan-700
-  idealizador: "#8A7D00",       // âmbar (mesma família do lime já usado no form)
-  referencia_tecnica: "#6D28D9", // violet-700
+  coexecutor: "#0059A9",   // --go-blue — "Coautor"
+  planejador: "#0E7490",   // cyan-700 — "Participante"
+  contribuidor: "#8A7D00", // âmbar (família do lime do form) — "Contribuidor"
 };
 
 // Participantes do time + o PAPEL obrigatório de cada um. Uma linha por pessoa:
