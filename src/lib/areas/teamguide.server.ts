@@ -172,6 +172,37 @@ export async function deriveAreasFromTeamGuide(): Promise<string[]> {
   return [...bySlug.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+// ── Lista de pessoas (autocomplete de participantes) ─────────────────────────
+
+type TGEmployeeRef = {
+  id: number;
+  name: string;
+  contactEmail?: string | null;
+  position?: string | null;
+  teams?: string[];
+};
+
+export type PessoaTeamGuide = { nome: string; email: string; cargo: string | null };
+
+/**
+ * Lista todos os funcionários ativos da TeamGuide (nome, e-mail, cargo) para o
+ * autocomplete do campo de participantes. `/employees/refs?unpaged=true` devolve
+ * a base inteira numa chamada (~440 pessoas); dedup por e-mail, ordenado por nome.
+ */
+export async function listarPessoasTeamGuide(): Promise<PessoaTeamGuide[]> {
+  const token = getToken();
+  const refs = await tgGet<TGEmployeeRef[]>('/employees/refs?unpaged=true&page=0', token);
+
+  const porEmail = new Map<string, PessoaTeamGuide>();
+  for (const r of refs) {
+    const email = (r.contactEmail ?? '').trim().toLowerCase();
+    const nome = (r.name ?? '').trim();
+    if (!email || !nome || porEmail.has(email)) continue;
+    porEmail.set(email, { nome, email, cargo: (r.position ?? '').trim() || null });
+  }
+  return [...porEmail.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 // ── Resolução de área por email ──────────────────────────────────────────────
 
 // A API TeamGuide NÃO tem busca por email: `?text=` casa por NOME (recursivo na
