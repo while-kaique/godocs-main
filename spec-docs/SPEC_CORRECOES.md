@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-07-02 — Retomada de rascunho despejava o TEXTO BRUTO dos arquivos (`=== arquivo ===`) no chat
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `feat/botao-recomecar-forms`
+
+**Sintoma:** ao **retomar um rascunho** (Meus Projetos › Rascunhos › Continuar) o chat abria com o
+**conteúdo cru de um arquivo enviado** despejado como mensagem — ex.: `=== CLAUDE.md === …` (o texto
+inteiro de outro projeto usado como upload de teste). Ficava visível ao usuário. Descoberto testando o
+novo botão **"Salvar rascunho"** (que redireciona pra home e depois retoma pela lista).
+
+**Causa-raiz:** duas coisas somadas.
+1. `getHistoricoMeuProjeto` (`meus-projetos.functions.ts`) devolvia **todas** as `chat_messages` cruas —
+   inclusive `role:'doc'` (que guarda o texto concatenado dos arquivos, contexto do LLM montado em
+   `extractTextFromMultipleFiles`, `=== nome === …`) e `role:'assistant'` gravado como
+   `JSON.stringify(resultado)`. O map do frontend (`submeter.tsx`, caminho **cross-device / sem snapshot
+   local**) renderizava tudo sem filtrar nem parsear → bolha com o dump do arquivo (e, nas respostas do
+   agente, o JSON cru).
+2. O caminho servidor do resume só é usado **quando não há snapshot local** (`loadDraft()` nulo). Antes
+   era raro; o novo **"Salvar rascunho"** chama `clearDraft()` (para `/submeter` não retomar o mesmo
+   rascunho) e **passou a forçar exatamente esse caminho** — tornando o bug pré-existente fácil de
+   reproduzir.
+
+**Fix:**
+- **Backend (`getHistoricoMeuProjeto`):** filtra para **só `user`/`assistant`** (a role `'doc'` nunca sai
+  do servidor) e, para `assistant`, **parseia o JSON** devolvendo o texto de exibição
+  (`content ?? question`) + `options` + flags derivados (`isPreview = type==='preview'`,
+  `isComplete = fase==='completo'`, `fase`) — mesma semântica do `formatResponse` da ida.
+- **Frontend (`submeter.tsx`, resume cross-device):** lê os novos campos no `ChatMessage`, mantém um
+  **filtro defensivo** (só `user`/`assistant`) contra dados legados, e alinha `chatFase`/`chatComplete`
+  à última mensagem (senão a conversa retomada ficava presa na fase `doc`).
+
+**Onde aterrissou:** `src/lib/meus-projetos.functions.ts` (`getHistoricoMeuProjeto` — tipo de retorno +
+transform) e `src/routes/submeter.tsx` (map do histórico no efeito de mount). Server-side → `worker.js`
+rebuildado. Sem mudança em `chat.functions.ts` (a gravação `role:'doc'` continua — é contexto legítimo do
+LLM; o fix é **não exibir**).
+
+**Notas:** o bug afeta qualquer retomada sem snapshot local (ex.: outro navegador), não só o novo botão —
+o "Salvar rascunho" só o tornou comum. A role `'doc'` segue sendo gravada de propósito (o LLM precisa do
+texto); o conserto é puramente de **exibição/serialização ao cliente**.
+
+---
+
 ## 2026-07-01 — Gate ≥44h "O que mudou após a automação" era só prompt e escapou (projeto Gostream)
 
 **PR:** _(a abrir)_ · **Status:** 🔜 validar no staging (`edf400b4`) → prod · **Branch:** `fix/gate-alocacao-ganhos`

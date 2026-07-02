@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Loader2, Save, FolderClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
@@ -200,6 +201,112 @@ async function apiFetchComRetry<T>(path: string, body?: unknown, tentativas = 3)
   throw ultimoErro;
 }
 
+// Popup do "Salvar rascunho": ação NÃO destrutiva (guarda o projeto e sai). Informa
+// os cuidados — principalmente que rascunho NÃO vai para análise — e onde retomar.
+// Mesmo padrão de overlay + Esc; tom informativo (azul), não de alerta.
+function SalvarRascunhoModal({
+  onClose,
+  onConfirmar,
+  processando,
+}: {
+  onClose: () => void;
+  onConfirmar: () => void;
+  processando: boolean;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !processando) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, processando]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: "rgba(8,20,40,0.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
+      onClick={() => !processando && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Salvar como rascunho"
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl"
+        style={{ background: "var(--go-white)", boxShadow: "0 24px 64px rgba(8,20,40,0.35)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 px-6 pt-6">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "rgba(0,89,169,0.1)", color: "var(--go-blue)" }}
+          >
+            <FolderClock style={{ width: 18, height: 18 }} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+              Salvar como rascunho?
+            </h2>
+            <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
+              Guardamos este projeto e você começa outro.
+            </p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            Este projeto fica salvo em <span className="font-semibold">Meus Projetos › Rascunhos</span> —
+            você pode voltar e continuar de onde parou quando quiser. Antes de sair, vale saber:
+          </p>
+          <ul className="mt-3 space-y-2">
+            {[
+              "O rascunho ainda NÃO foi enviado para análise — a equipe de RPA & IA só vê o projeto depois que você concluir e clicar em enviar.",
+              "Ao sair, você volta para a tela inicial e pode começar uma nova submissão.",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+                <span
+                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "var(--go-blue)" }}
+                  aria-hidden="true"
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={processando}
+            className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-50"
+            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={processando}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-60"
+            style={{ background: "var(--go-blue)" }}
+          >
+            {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {processando ? "Salvando…" : "Salvar e sair"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SubmeterPageContent({
   editProjetoId,
   resumeDraftId,
@@ -270,6 +377,9 @@ export function SubmeterPageContent({
   // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  // "Salvar rascunho": confirmação + estado (só quando já existe rascunho no servidor).
+  const [showRascunhoConfirm, setShowRascunhoConfirm] = useState(false);
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
 
   // Aplica no estado do wizard os dados de um projeto vindos do servidor —
   // usado tanto na EDIÇÃO de um projeto submetido quanto na RETOMADA de um
@@ -633,15 +743,31 @@ export function SubmeterPageContent({
             `/api/chat/historico/${wantedId}`,
           );
           if (!cancelled && Array.isArray(hist) && hist.length > 0) {
-            setChatMessages(
-              hist.map((m) => ({
-                role: (m.role as "user" | "assistant") ?? "assistant",
-                content: String(m.content ?? ""),
-                options: (m.options as ChatMessage["options"]) ?? undefined,
-              })),
+            // Defesa em profundidade: só bolhas de conversa. O backend já filtra a
+            // role 'doc' (texto bruto dos arquivos) e parseia o JSON do assistant,
+            // mas mantemos o filtro aqui para nunca renderizar conteúdo cru vindo de
+            // dados legados/inesperados.
+            const conversa = hist.filter(
+              (m) => m.role === "user" || m.role === "assistant",
             );
-            setStep(3);
-            setCompletedSteps(new Set([1, 2, 3]));
+            const msgs: ChatMessage[] = conversa.map((m) => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: String(m.content ?? ""),
+              options: (m.options as ChatMessage["options"]) ?? undefined,
+              isPreview: Boolean(m.isPreview),
+              isComplete: Boolean(m.isComplete),
+              fase: (m.fase as ChatFase | undefined) ?? undefined,
+            }));
+            if (msgs.length > 0) {
+              setChatMessages(msgs);
+              // Coerência da UI: alinha fase/estado de conclusão à última resposta do
+              // agente (senão a conversa retomada ficava presa na fase "doc").
+              const ultima = msgs[msgs.length - 1];
+              if (ultima.fase) setChatFase(ultima.fase);
+              if (ultima.isComplete) setChatComplete(true);
+              setStep(3);
+              setCompletedSteps(new Set([1, 2, 3]));
+            }
           }
         } catch (e) {
           console.warn("[rascunho] histórico do chat indisponível:", e);
@@ -775,6 +901,20 @@ export function SubmeterPageContent({
       return next;
     });
   }, []);
+
+  // "Salvar rascunho" (só submissão nova COM rascunho no servidor): o projeto já vive
+  // como rascunho no servidor (linha `projetos` status 'rascunho', criada em
+  // iniciar-submissao; conversa e metadados persistidos ao longo do fluxo). Aqui só
+  // DESANEXAMOS a sessão local (clearDraft) — senão /submeter retomaria este rascunho
+  // em vez de começar um novo — e voltamos para a home. A retomada acontece por
+  // Meus Projetos › Rascunhos (Continuar → ?retomar=id, rehidrata do servidor).
+  function handleSalvarRascunho() {
+    setSalvandoRascunho(true);
+    // Invalida o cache da lista para o rascunho aparecer atualizado em Meus Projetos.
+    queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
+    clearDraft();
+    navigate({ to: "/" });
+  }
 
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
@@ -2004,7 +2144,25 @@ export function SubmeterPageContent({
           />
 
           <div style={{ padding: step === 3 ? "0 32px" : undefined }}>
-            <BrowserDots />
+            {/* Barra de "chrome" do card: os pontos à esquerda e, à direita, o
+                controle discreto de salvar rascunho — só em submissão nova E quando já
+                existe rascunho no servidor (projetoId; antes do agente iniciar não há
+                nada para guardar). Reaproveita a metáfora de janela dos BrowserDots. */}
+            <div className="flex items-center justify-between">
+              <BrowserDots />
+              {!editProjetoId && projetoId && (
+                <button
+                  type="button"
+                  onClick={() => setShowRascunhoConfirm(true)}
+                  className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#a0a0ad] transition-colors hover:bg-[rgba(0,89,169,0.08)] hover:text-[var(--go-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-1"
+                  aria-label="Salvar como rascunho e começar outro projeto"
+                  title="Salvar como rascunho"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Salvar rascunho</span>
+                </button>
+              )}
+            </div>
             <WizardProgress
               current={step}
               completed={completedSteps}
@@ -2226,6 +2384,13 @@ export function SubmeterPageContent({
         <PageFooter />
       </div>
 
+      {showRascunhoConfirm && (
+        <SalvarRascunhoModal
+          onClose={() => setShowRascunhoConfirm(false)}
+          onConfirmar={handleSalvarRascunho}
+          processando={salvandoRascunho}
+        />
+      )}
     </PageFrame>
   );
 }
