@@ -395,3 +395,102 @@ caminho claro no próprio formulário — o rascunho só era gerenciável em "Me
 **Status.** ✅ Implementada (só "Salvar rascunho"; "Recomeçar" removido) + fix da retomada; testes
 verdes (504) + `tsc` sem erros novos. Validada no **staging** (`edf400b4`) e promovida a **produção**
 (`674a3710`) em 2026-07-02.
+
+## Feature adicional — Nudge de "versão desatualizada" (version skew) · jul/2026
+
+> Decisão do dono (Kaique, 2026-07-01): oferecer recarregar quando o cliente estiver rodando
+> um build antigo. **Só botão manual — nunca recarrega sozinho** (app de formulário longo:
+> reload automático interromperia digitação/coleta).
+
+**Problema (medido nos logs de prod, 01/07).** O GoDeploy **acumula** os assets a cada deploy
+(manifesto com ~3015 arquivos; dezenas de hashes do mesmo chunk). Consequência: uma aba aberta
+há horas continua baixando os **próprios** chunks (que ainda existem → **sem 404**) e conversa
+com o worker **novo**. O cliente velho nunca "quebra" e nunca é forçado a atualizar → **version
+skew silencioso**. Amostra de ~80 min mostrou **4 builds distintos** do entry `index-*.js`
+batendo na API, **2 concorrentes nos últimos 30 min** (atual `DWTXmzVW` + um antigo `DqutV0M1`).
+Isso agrava o padrão "cliente sobrepõe servidor" (ex.: draft de edição em localStorage
+ressuscitando estágio que o servidor não tem mais).
+
+**Decisão (fechada).**
+- Detecção **100% no cliente** — **sem tocar no worker** (nenhum rebuild de `worker.js`). O
+  `index.html` é a fonte canônica do build atual: compara-se o entry `<script type="module"
+  src="/assets/index-<hash>.js">` **em execução** com o do `/index.html` recém-buscado
+  (`cache:'no-store'` + cachebust). Hash diferente → há build novo publicado.
+  - ⚠️ Escolhido em vez de expor um `buildId` no `GET /api/config`: aquele exigiria carimbar o
+    mesmo id no bundle do SPA **e** no worker (builds separados) + rebuild/deploy do worker. O
+    poll do `index.html` é mais leve e não depende de contrato servidor↔cliente.
+  - **Não dá pra confiar em 404 de chunk** para forçar reload: como os assets se acumulam, o
+    chunk velho **nunca** some. Por isso a detecção é ativa (poll), não reativa a erro.
+- **Conservador:** se qualquer lado não for legível (dev sem hash, HTML de erro do edge, offline)
+  → **não cutuca**. Em **dev** o entry é `/src/main.tsx` (sem `/assets/*.js`) → faixa nunca aparece.
+- **Cadência:** checa no mount, a cada **10 min**, e no `visibilitychange` (voltar pra aba — momento
+  mais provável de ter saído deploy). Para de checar depois de detectar (a faixa já está de pé).
+- **UX/UI:** faixa `sticky top-0` em `--go-blue` (aviso de sistema — distinta do lime da staging e
+  do vermelho de erro) + botão **Recarregar** (`location.reload()`). A11y: `role="status"`,
+  ícone + texto (nunca só cor), foco de teclado visível (ring lime), **sem animação perpétua**.
+
+**Onde aterrissou.**
+- `src/lib/version-check.ts` — puro/testável: `extractEntrySrc(html)`, `isUpdateAvailable(atual,
+  html)`, `getCurrentEntrySrc(doc?)`.
+- `src/components/atualizacao-banner.tsx` — `AtualizacaoBanner` (poll + faixa + Recarregar).
+- `src/routes/__root.tsx` — montado **acima** da `StagingBanner`.
+- `tests/version-check.test.ts` — 10 casos (extração, ordem de atributos invertida, HTML de erro,
+  mesmo/outro hash, dev → null, conservadorismo).
+
+**Não faz parte deste PR (fica pra depois).** (a) Limpeza/poda dos ~3015 assets acumulados
+(higiene de deploy — podar quebraria abas velhas; melhor migrar todo mundo pelo nudge primeiro);
+(b) o guard de fingerprint no draft de edição em localStorage (invalidar o cache local quando o
+servidor mudou) — mesma raiz "servidor manda", tratar em PR próprio.
+
+**Status.** ⏳ Implementado; testes verdes + `build` (typecheck) limpo. **Deploy pendente** (a
+pedido: sem subir ainda; quando for, regra 13 — staging `edf400b4` antes de prod).
+
+## Feature adicional — Papéis dos participantes (Coexecutor/Planejador/Idealizador/Referência técnica) · jul/2026
+
+> Decisão do dono (Luis, 2026-07-02): na submissão em equipe, cada participante recebe um **papel**.
+> A coluna "Participantes" do Sheets passa a ser a de **Coexecutor** (sem renomear); três colunas
+> novas (I/J/K) guardam os demais papéis. As colunas novas são criadas **manualmente** na planilha.
+
+**Decisões fechadas (com o Luis).**
+- **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
+  · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
+  fora da lista de participantes. Só os e-mails do time adicionados ganham papel.
+- **Obriga escolher**: participante entra **sem papel** e o gate de avançar da Etapa 1 bloqueia
+  enquanto alguém estiver sem papel. (Exceção: na EDIÇÃO, membros já existentes sem papel conhecido
+  entram como **coexecutor** — semântica da coluna "Participantes" de onde vieram; novos participantes
+  começam sem papel.)
+- **Todos os papéis contam como participante** (acesso de leitura, "Participo", editor delegado):
+  `membros` = **união dos 4 papéis** — ownership/agentes/editor delegado **inalterados**.
+- **Sheets**: "Participantes" (H)=coexecutores; "Planejador"/"Idealizador"/"Referência técnica"
+  (I/J/K) os demais. Cada e-mail em **uma** coluna. Coluna sem ninguém → **"—"**. Papel
+  ausente/desconhecido → coexecutor (retrocompatível: legados com todos em "Participantes").
+
+**Onde aterrissou.**
+- `src/lib/submeter/constants.ts` — `PAPEIS_PARTICIPANTE` + tipo `PapelParticipante`;
+  `FormData.participantesPapeis` (mapa e-mail→papel); helper puro `montarMembrosPapeis`.
+- `src/lib/submeter/form-components.tsx` — novo `ParticipantesPapeisInput` (lista uma-linha-por-pessoa
+  + `<select>` de papel; a11y: `aria-label` por linha, foco visível, estado por texto+cor; nudge
+  âmbar "N sem papel"). `ChipsInput` antigo permanece (não mais usado na Etapa 1).
+- `src/lib/submeter/step1.tsx` — usa o novo componente; `setPapelParticipant`/`removeParticipant`.
+- `src/routes/submeter.tsx` — estado inicial `{}`; `applySeed` seeda papéis (fallback coexecutor);
+  `snapshotMeta`/`AgentMeta` carregam papéis (troca de papel dispara metaChanged → persiste);
+  validação da Etapa 1 exige papel; payload `membros_papeis` em iniciar-submissao + atualizar-metadados;
+  rehydrate normaliza rascunho antigo (`?? {}`).
+- Banco: `membros_papeis TEXT` (migração idempotente, `schema.ts`); `InsertProjeto`/`ProjetoRow`/
+  `insertProjeto` (`client.server.ts`). Schemas + persistência em `chat.functions.ts`
+  (`membrosPapeisSchema`). `getMeuProjeto` devolve `membros_papeis` (seed da edição).
+- Sync: `derivarColunasPapeis` (IDA, `sync.ts`) distribui nas 4 colunas; `parseParticipantesPapeis`
+  (VOLTA, `sync-reverse.ts`) reconstrói `membros`(união)+`membros_papeis`; filtro por dono checa as
+  4 colunas; `SHEET_COLUMNS` ganha os 3 nomes (`sheets.ts`).
+- Testes: `tests/participantes-papeis.test.ts` (derivarColunasPapeis + montarMembrosPapeis) +
+  caso de papéis em `tests/sync-reverse.test.ts`.
+
+**Dependência de planilha (manual, do dono).** As 3 colunas — **`Planejador`**, **`Idealizador`**,
+**`Referência técnica`** — precisam existir no cabeçalho, com **exatamente** esses nomes (caixa +
+acentos), tanto na aba **`GoDocs`** (prod) quanto na aba **`STAGING`**. Enquanto não existirem, o
+append/update **ignora** essas colunas com aviso (não quebra) e só a "Participantes"=coexecutor é
+gravada.
+
+**Status.** ⏳ Implementado; testes verdes (526) + `build`/`build:worker` OK; typecheck sem novos
+erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
+de prod; requer as 3 colunas nas abas).

@@ -47,6 +47,119 @@ texto); o conserto é puramente de **exibição/serialização ao cliente**.
 
 ---
 
+## 2026-07-01 — Gate ≥44h "O que mudou após a automação" era só prompt e escapou (projeto Gostream)
+
+**PR:** _(a abrir)_ · **Status:** 🔜 validar no staging (`edf400b4`) → prod · **Branch:** `fix/gate-alocacao-ganhos`
+
+**Sintoma:** o projeto **Gostream** (`legado-152`, R&S, **150h/mês**, `alguem_fazia='sim'`) fechou o
+memorial **sem** que o usuário fosse perguntado pra onde foi o tempo liberado. A Seção 2.4 ("### O que
+mudou após a automação") existia no memorial, mas preenchida com **exatamente** o boilerplate que a régua
+manda RECUSAR: _"o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de
+manter essa rotina manual."_ Ninguém no chat viu a pergunta (confirmado puxando o `chat/historico` de prod
+com o `E2E_COOKIE`).
+
+**Causa-raiz:** o gate de economia alta (≥44h/mês) era **100% prompt** — o bloco "SEÇÃO 2.4" em
+`buildSavingPrompt` + a rede de segurança (LLM-juiz) em `buildSavingPreviewPrompt`. Diferente dos gates de
+**jornada**, **teto 220h** e **carga real × escala** (que são DETERMINÍSTICOS no backend e por isso
+dispararam), este dependia do LLM obedecer. O LLM **auto-gerou** a seção vaga e previewou sem perguntar; a
+rede de segurança do preview (também LLM) deixou passar na aprovação. Resultado: a única família de gate de
+horas altas SEM trava determinística falhou silenciosamente.
+
+**Fix (transformar em GATE DETERMINÍSTICO, nos moldes do carga×escala):**
+- **Predicado** `aplicaGateAlocacaoGanhos(ctx, saving)` (`orchestrator.ts`): `alguem_fazia==='sim'` **&&**
+  `tipo_saving==='mensal'` **&&** (total ≥ `LIMITE_ECONOMIA_ALTA(44)` OU um cargo ≥44h). Contrafactual
+  (`'nao'`) e custo evitado puro (`'externo'`) NÃO entram (não houve tempo humano REAL liberado — a Seção
+  2.4 ali segue só no prompt, sem bloqueio). Pontual/periódico fora (base ≠ mês).
+- **Estado** `saving.alocacao_ganhos` (`null`→`pendente`→`reperguntado`→`ok`) + `alocacao_ganhos_racional`
+  (resposta crua do usuário, backend-only, re-mesclada a cada turno). Em `types.ts`/`savingVazio`.
+- **Gate em `enviarMensagem` (`chat.functions.ts`):** antes do preview, se a Seção 2.4 do memorial já for
+  CONCRETA (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) → libera (`'ok'`); senão **bloqueia** e
+  pergunta `perguntaAlocacaoGanhos` ("pra onde foi o tempo? nomeie as atividades / o que entrega a mais").
+  No turno de resposta: se vier vaga (`respostaAlocacaoVaga`), **repergunta FIRME 1x** (`'reperguntado'`,
+  anti-loop); senão captura o racional e injeta o nudge `[SISTEMA]` (`nudgeAlocacaoGanhos`) p/ o LLM
+  escrever a seção a partir do que o usuário disse. Roda por ÚLTIMO (jornada→teto→split→alocação, 1/turno).
+- **`respostaAlocacaoVaga(texto)`** (`orchestrator.ts`, puro): heurística CONSERVADORA — só marca vaga se
+  curta demais OU bate em padrão vago ("realocado/outras atividades/sobra tempo/produtividade/eficiência")
+  **e** não traz nada concreto junto (nº ou destino nomeado via "para/pra …"). Na dúvida, aceita (custo do
+  falso-positivo = 1 pergunta a mais; a rede de segurança do preview + validação humana são backstops). NÃO
+  é juiz de qualidade — é só o piso p/ forçar UMA reperguntada.
+
+**Onde aterrissou:** `src/lib/agents/types.ts` (2 campos + `savingVazio`); `src/lib/agents/orchestrator.ts`
+(`LIMITE_ECONOMIA_ALTA` exportado, `aplicaGateAlocacaoGanhos`, `respostaAlocacaoVaga`); `src/lib/chat.functions.ts`
+(helpers `perguntaAlocacaoGanhos`/`…Firme`/`nudgeAlocacaoGanhos` + branches de resposta + re-merge + gate de
+preview); `tests/gate-alocacao-ganhos.test.ts` (novo, 14 casos incl. o boilerplate do Gostream);
+`tests/agents-types.test.ts` (shape 19→21). `worker.js` rebuildado. **Não muda prompt** (rule 3 N/A) — o
+bloco 2.4 do prompt segue igual; o gate é backend. 532 testes verdes.
+
+---
+
+## 2026-07-01 — Favicon some do deploy (upload só varria `dist/assets/*`, não a raiz do `dist/`)
+
+**PR:** _(a abrir)_ · **Status:** ✅ deployada (staging `edf400b4` + prod `674a3710`) · **Branch:** `fix/deploy-favicon-dist-root`
+
+**Sintoma:** o **favicon** (ícone da aba) sumiu do app deployado. `index.html` referencia
+`<link rel="icon" href="/favicon.svg">`, mas a aba do navegador ficava sem ícone.
+
+**Causa-raiz (processo de deploy, não código do app):** o Vite copia `public/favicon.svg` para a
+**raiz** do `dist/` (`dist/favicon.svg`), **fora** de `dist/assets/`. O runbook de deploy
+(`CLAUDE.md` / `docs/deploy.md`) montava o upload e o manifest de assets varrendo **só** `dist/assets/*`
+(`for f in dist/assets/*`). Resultado: `favicon.svg` **nunca era enviado nem registrado como asset**.
+Com o SPA fallback (`not_found_handling: single-page-application`), `GET /favicon.svg` não encontrado
+devolvia o `index.html` (HTML) em vez do SVG → o browser não usava como ícone → **favicon some**.
+Confirmado pelo `assetManifest` do app: `/favicon.svg` estava **ausente**.
+
+**Fix ("lista derivada do `dist/` real, nunca à mão"):** novo script `scripts/deploy-godeploy.sh` que
+**varre `dist/` recursivamente** (`find dist -type f`) + `worker.js`, faz o upload multipart
+(token via header `Authorization: Bearer`, não query param) e **imprime o `ASSETS_JSON`** com TODOS os
+arquivos do `dist/` para o `updateApp`. Assim, `favicon.svg` — e qualquer futuro arquivo de `public/`
+na raiz do `dist/` (ex.: `robots.txt`) — entra no deploy automaticamente, sem depender de lembrar de
+listar. Runbooks (`CLAUDE.md` "Deploy rápido" e `docs/deploy.md`) reescritos para usar o script e alertar
+contra varrer só `assets/*`.
+
+**Onde aterrissou:** `scripts/deploy-godeploy.sh` (novo); `docs/deploy.md` e `CLAUDE.md` (seção Deploy
+rápido). Validado: `assetManifest` de staging **e** prod agora contêm `/favicon.svg` (654 bytes) — antes
+ausente. (Obs.: o edge exige OAuth, então `curl` anônimo em `/favicon.svg` dá 302→login; logado, o
+browser recebe o SVG. Sem mudança de código do app — só do processo de deploy.)
+
+---
+
+## 2026-07-01 — Edição de LEGADO "ressuscita" a tela de aprovação final (rascunho local sobrepõe o servidor)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edit-draft-legado-guard`
+
+**Sintoma:** um legado (`legado-141`, "Regularizações - GoGroup") foi apagado do deploy para a dona
+**reauditar do zero**. Ao reabrir `/editar/legado-141`, ela **caía de novo na etapa final de
+aprovação** — como se nada tivesse sido apagado. Apagar os registros no servidor não resolvia: ao
+reabrir, o estágio voltava.
+
+**Causa-raiz:** no modo edição (`submeter.tsx`), o seed do servidor (`applySeed`) era **sobreposto
+INCONDICIONALMENTE** por `rehydrateFromLocal(editDraft)` — o rascunho de edição salvo no
+**localStorage do navegador** (`godocs:edicao-v1:<id>`), que guarda chat/fase/previews do ponto onde
+a pessoa parou. Como o id do legado é fixo, qualquer limpeza no servidor era irrelevante: o navegador
+recolocava o estágio final por cima. O fluxo de **retomar rascunho** já fazia o certo
+(`submeter.tsx`: se `status !== 'rascunho'` → `clearDraft()`), mas o de **edição** não tinha guard.
+Mesma família do 🐞 bug aberto "Documentação ainda não foi gerada": cliente afirmando um estágio
+(`chatComplete`/`docPronta`) que o servidor nunca persistiu (legado entra por sync reverso **sem** a
+linha `documentacao`, que só é gravada na aprovação do preview).
+
+**Fix ("servidor manda"):** `deveDescartarDraftEdicao` (`draft-storage.ts`, puro/testável) — ao abrir
+a edição, só reidrata o rascunho local se for **consistente** com o servidor. Se o rascunho diz que a
+fase de doc terminou (`chatComplete` **ou** `approvedDocPreview != null`) mas o servidor **não tem doc
+persistida** (`data.documentacao == null`), **descarta** o rascunho (`clearDraft`) em vez de reidratar.
+Com o chat vazio, o caminho de re-init já existente dispara `atualizar-metadados` com `reset_doc:true`,
+que faz `deleteChatMessagesByProjeto` (limpa o chat no servidor) e recomeça a auditoria **do zero** —
+tudo **por código**, sem ação no navegador do usuário e sem cirurgia manual de dados. NÃO descarta
+rascunhos legítimos: quem está no meio da fase de doc (sem preview aprovado) e edições de projetos que
+JÁ têm doc no servidor são preservados.
+
+**Onde aterrissou:** `src/lib/submeter/draft-storage.ts` (`deveDescartarDraftEdicao`);
+`src/routes/submeter.tsx` (guard no branch de edição, antes de `rehydrateFromLocal`);
+`tests/draft-storage.test.ts` (4 casos: descarta chatComplete/preview sem doc no servidor; preserva
+reenvio normal e meio-de-doc). Mitiga também o caminho de rascunho do 🐞 bug aberto do legado
+(o endurecimento **servidor** — `submeterParaValidacao` virar 4xx claro em vez de 500 — segue pendente).
+
+---
+
 ## 2026-07-01 — Investigador sem NENHUM projeto visível — `/edicoes` estourando o limite de 32 MiB de RPC
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/investigador-edicoes-rpc-limit`

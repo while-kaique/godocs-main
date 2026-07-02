@@ -113,6 +113,10 @@ export type SubmitSyncParams = {
   saving: Record<string, unknown> | null | undefined;
   receita: Record<string, unknown> | null | undefined;
   membros: string[];
+  // Papel de cada membro (e-mail→papel). Distribui os membros nas 4 colunas de papel
+  // do Sheets (Participantes=coexecutor, Planejador, Idealizador, Referência técnica).
+  // Opcional: ausente/vazio → todos entram como coexecutor (retrocompatível).
+  membrosPapeis?: Record<string, string>;
   tiposProjeto: string[];
   status: 'Aprovado' | 'Pendente';
   area: string;
@@ -163,13 +167,46 @@ export function derivarSplitHorasSheet(
   return { real: 0, escalado: 0 };
 }
 
+// ─── Papéis dos participantes → 4 colunas do Sheets ─────────────────────────
+// Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda
+// os COEXECUTORES; Planejador/Idealizador/Referência técnica os demais. Papel
+// ausente/desconhecido cai em COEXECUTOR — retrocompatível (antes todos os membros
+// ficavam em "Participantes"). Cada e-mail entra em exatamente UMA coluna. Coluna sem
+// ninguém → '' (vira "—" no padronizarLinha). Lookup tolerante a caixa. Pura — testável.
+const PAPEIS_COLUNA = ['coexecutor', 'planejador', 'idealizador', 'referencia_tecnica'] as const;
+export type PapelColuna = (typeof PAPEIS_COLUNA)[number];
+
+export function derivarColunasPapeis(
+  membros: string[],
+  papeis: Record<string, string> | null | undefined,
+): Record<PapelColuna, string> {
+  const buckets: Record<PapelColuna, string[]> = {
+    coexecutor: [], planejador: [], idealizador: [], referencia_tecnica: [],
+  };
+  const porCaixaBaixa: Record<string, string> = {};
+  for (const [k, v] of Object.entries(papeis ?? {})) porCaixaBaixa[k.toLowerCase()] = v;
+  for (const email of membros) {
+    const papel = (papeis?.[email] ?? porCaixaBaixa[email.toLowerCase()] ?? 'coexecutor') as PapelColuna;
+    (buckets[papel] ?? buckets.coexecutor).push(email);
+  }
+  return {
+    coexecutor: buckets.coexecutor.join(', '),
+    planejador: buckets.planejador.join(', '),
+    idealizador: buckets.idealizador.join(', '),
+    referencia_tecnica: buckets.referencia_tecnica.join(', '),
+  };
+}
+
 // ─── Submit: Sheets → Chat (fire-and-forget) ────────────────────────────────
 
 export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
   try {
     const dataSubmissao = nowFortaleza();
     const dataCriacao = formatDateBR(p.projeto.data_criacao_projeto);
+    // Chat notification lista TODOS os participantes (independe do papel).
     const participantes = p.membros.join(', ') || '—';
+    // Sheets: distribui os participantes nas 4 colunas por papel.
+    const colsPapeis = derivarColunasPapeis(p.membros, p.membrosPapeis);
     const tiposStr = p.tiposProjeto.join(', ') || '—';
 
     const savingHoras = (p.saving?.economia_horas_mes as number) ?? 0;
@@ -226,7 +263,12 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Nome Completo': ouTraco(p.projeto.responsavel_nome),
       'Email': ouTraco(p.projeto.responsavel_email),
       'Projeto': ouTraco(p.projeto.nome),
-      'Participantes': participantes,
+      // "Participantes" = COEXECUTORES; as 3 seguintes, os demais papéis. Coluna
+      // sem ninguém → '' → padronizarLinha grava "—".
+      'Participantes': colsPapeis.coexecutor,
+      'Planejador': colsPapeis.planejador,
+      'Idealizador': colsPapeis.idealizador,
+      'Referência técnica': colsPapeis.referencia_tecnica,
       'Descrição': ouTraco(p.projeto.descricao_breve),
       'URL': urlDocs,
       'Ferramenta': ouTraco(p.projeto.ferramenta),

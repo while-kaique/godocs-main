@@ -84,6 +84,8 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   escopo: string | null;
   servico_externo: string | null;
   membros: string[];
+  // Mapa e-mail→papel dos participantes (seed do seletor de papéis na EDIÇÃO).
+  membros_papeis: Record<string, string>;
   nome_projeto: string | null;
   data_criacao_projeto: string | null;
   descricao_breve: string | null;
@@ -400,6 +402,9 @@ export async function getMeuProjeto(
     escopo: data.escopo,
     servico_externo: data.servico_externo,
     membros: parseJson<string[]>(data.membros) ?? [],
+    // Mapa e-mail→papel para seedar o seletor de papéis na edição. {} = legado sem
+    // papéis (o form default cada membro conhecido para "coexecutor").
+    membros_papeis: parseJson<Record<string, string>>(data.membros_papeis) ?? {},
     nome_projeto: data.nome,
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,

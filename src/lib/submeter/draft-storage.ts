@@ -80,3 +80,29 @@ export function clearDraft(key: string = DRAFT_KEY): void {
     // ignore
   }
 }
+
+/**
+ * Guard "servidor manda" para o rascunho de EDIÇÃO. Retorna `true` quando o rascunho
+ * local deve ser DESCARTADO em vez de reidratado, porque ele afirma um estágio que o
+ * servidor não sustenta: a fase de documentação foi concluída no cliente (preview
+ * aprovado ou `chatComplete`) mas o servidor NÃO tem documentação persistida.
+ *
+ * É um estado impossível — típico de LEGADO que nunca teve o preview de doc aprovado
+ * (a linha `documentacao` só é gravada na aprovação). Reidratar aqui ressuscitaria a
+ * tela de aprovação final sobre um projeto sem doc: trava a submissão com
+ * "Documentação ainda não foi gerada" e impede reauditar do zero (o cliente
+ * sobrepunha o servidor incondicionalmente). Descartando, o cliente cai no caminho de
+ * re-init (`reset_doc`), que limpa o chat no servidor e recomeça a auditoria limpa.
+ *
+ * NÃO descarta rascunhos legítimos: quem está no meio da fase de doc (ainda sem
+ * preview aprovado, `chatComplete=false`) é preservado, assim como edições de projetos
+ * que JÁ têm doc no servidor (fluxo normal de reenvio).
+ */
+export function deveDescartarDraftEdicao(args: {
+  serverTemDoc: boolean;
+  draft: Pick<DraftSnapshot, "chatComplete" | "approvedDocPreview">;
+}): boolean {
+  const draftDocConcluida =
+    args.draft.chatComplete === true || args.draft.approvedDocPreview != null;
+  return draftDocConcluida && !args.serverTemDoc;
+}

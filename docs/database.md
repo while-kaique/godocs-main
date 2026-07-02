@@ -76,7 +76,8 @@ Entidade principal. Uma linha por projeto submetido.
 | ferramenta | TEXT | n8n, Python, Claude, etc. |
 | escopo | TEXT | interno/externo |
 | servico_externo | TEXT | Se escopo = externo |
-| membros | TEXT (JSON) | Array de emails |
+| membros | TEXT (JSON) | Array de emails (lista plana de TODOS os participantes — base do ownership) |
+| membros_papeis | TEXT (JSON) | Mapa email→papel: coexecutor \| planejador \| idealizador \| referencia_tecnica. Distribui os participantes nas 4 colunas de papel do Sheets. NÃO inclui o autor. |
 | status | TEXT | CHECK: rascunho, em_validacao, validado, rejeitado, aprovado |
 | chat_completo | INTEGER | 0/1 |
 | data_criacao_projeto | TEXT | |

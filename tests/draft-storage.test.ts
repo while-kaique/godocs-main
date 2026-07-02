@@ -4,6 +4,7 @@ import {
   loadDraft,
   clearDraft,
   editDraftKey,
+  deveDescartarDraftEdicao,
   type DraftSnapshot,
 } from "@/lib/submeter/draft-storage";
 
@@ -57,5 +58,37 @@ describe("draft-storage: isolamento submissão nova × edição (por projeto)", 
   it("snapshot sem projetoId é ignorado na leitura", () => {
     saveDraft({ step: 3 } as unknown as DraftSnapshot, editDraftKey("X"));
     expect(loadDraft(editDraftKey("X"))).toBeNull();
+  });
+});
+
+describe("deveDescartarDraftEdicao: servidor manda (guard do rascunho de edição)", () => {
+  const draft = (d: Partial<DraftSnapshot>) =>
+    ({ chatComplete: false, approvedDocPreview: null, ...d }) as DraftSnapshot;
+
+  it("DESCARTA quando o draft diz doc concluída (chatComplete) mas servidor sem doc", () => {
+    // Caso Juliana: legado na tela de aprovação final, sem doc persistida no servidor.
+    expect(
+      deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft({ chatComplete: true }) }),
+    ).toBe(true);
+  });
+
+  it("DESCARTA quando o draft tem preview de doc aprovado mas servidor sem doc", () => {
+    expect(
+      deveDescartarDraftEdicao({
+        serverTemDoc: false,
+        draft: draft({ approvedDocPreview: "**O que faz:** ..." }),
+      }),
+    ).toBe(true);
+  });
+
+  it("PRESERVA edição legítima: draft avançado E servidor COM doc (reenvio normal)", () => {
+    expect(
+      deveDescartarDraftEdicao({ serverTemDoc: true, draft: draft({ chatComplete: true }) }),
+    ).toBe(false);
+  });
+
+  it("PRESERVA quem está no meio da fase de doc (sem preview aprovado, chatComplete=false)", () => {
+    // Servidor ainda sem doc, mas o draft não afirma conclusão → não descarta.
+    expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: draft({}) })).toBe(false);
   });
 });

@@ -167,6 +167,34 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
     expect(JSON.parse(p!.membros as string)).toEqual(['c@gocase.com', 'd@gocase.com']);
   });
 
+  it('distribui participantes por papel nas 4 colunas (membros = união + membros_papeis)', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'LEGADO-PAPEIS',
+        'Nome Completo': 'Dona',
+        Email: 'dona@gocase.com',
+        Projeto: 'Projeto com Papéis',
+        Ferramenta: 'n8n',
+        Participantes: 'coex@gocase.com', // coexecutor (coluna retrocompatível)
+        Planejador: 'plan@gocase.com',
+        Idealizador: 'ideia@gocase.com, ideia2@gocase.com',
+        'Referência técnica': 'ref@gocase.com',
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('legado-papeis');
+    expect((JSON.parse(p!.membros as string) as string[]).sort()).toEqual(
+      ['coex@gocase.com', 'ideia2@gocase.com', 'ideia@gocase.com', 'plan@gocase.com', 'ref@gocase.com'],
+    );
+    expect(JSON.parse(p!.membros_papeis as string)).toEqual({
+      'coex@gocase.com': 'coexecutor',
+      'plan@gocase.com': 'planejador',
+      'ideia@gocase.com': 'idealizador',
+      'ideia2@gocase.com': 'idealizador',
+      'ref@gocase.com': 'referencia_tecnica',
+    });
+  });
+
   it('mapeia "Reenvio Pendente" → rejeitado e ponto decimal "10.5"', async () => {
     mockedRead.mockResolvedValue([
       {
