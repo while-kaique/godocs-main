@@ -825,15 +825,31 @@ export function SubmeterPageContent({
             `/api/chat/historico/${wantedId}`,
           );
           if (!cancelled && Array.isArray(hist) && hist.length > 0) {
-            setChatMessages(
-              hist.map((m) => ({
-                role: (m.role as "user" | "assistant") ?? "assistant",
-                content: String(m.content ?? ""),
-                options: (m.options as ChatMessage["options"]) ?? undefined,
-              })),
+            // Defesa em profundidade: só bolhas de conversa. O backend já filtra a
+            // role 'doc' (texto bruto dos arquivos) e parseia o JSON do assistant,
+            // mas mantemos o filtro aqui para nunca renderizar conteúdo cru vindo de
+            // dados legados/inesperados.
+            const conversa = hist.filter(
+              (m) => m.role === "user" || m.role === "assistant",
             );
-            setStep(3);
-            setCompletedSteps(new Set([1, 2, 3]));
+            const msgs: ChatMessage[] = conversa.map((m) => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: String(m.content ?? ""),
+              options: (m.options as ChatMessage["options"]) ?? undefined,
+              isPreview: Boolean(m.isPreview),
+              isComplete: Boolean(m.isComplete),
+              fase: (m.fase as ChatFase | undefined) ?? undefined,
+            }));
+            if (msgs.length > 0) {
+              setChatMessages(msgs);
+              // Coerência da UI: alinha fase/estado de conclusão à última resposta do
+              // agente (senão a conversa retomada ficava presa na fase "doc").
+              const ultima = msgs[msgs.length - 1];
+              if (ultima.fase) setChatFase(ultima.fase);
+              if (ultima.isComplete) setChatComplete(true);
+              setStep(3);
+              setCompletedSteps(new Set([1, 2, 3]));
+            }
           }
         } catch (e) {
           console.warn("[rascunho] histórico do chat indisponível:", e);
