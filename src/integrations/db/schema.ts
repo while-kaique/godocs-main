@@ -296,7 +296,7 @@ const MIGRATIONS = [
   // 'coexecutor'("Coautor") | 'planejador'("Participante") | 'contribuidor'("Contribuidor").
   // `membros` continua sendo a lista PLANA de todos os participantes (base do ownership);
   // este mapa só guarda o papel de cada um. Colunas do Sheets: `coexecutor`→"Participantes",
-  // `planejador`→"participantes 2", `contribuidor`→"Contribuidor". Os `value` internos
+  // `planejador`→"Participantes 2", `contribuidor`→"Contribuidor". Os `value` internos
   // coexecutor/planejador foram mantidos ao renomear rótulos/colunas; os papéis legados
   // 'idealizador'/'referencia_tecnica' (feature anterior) caem em "Contribuidor" no sync.
   // NÃO se aplica ao autor (responsavel_email). Vazio/null = legado sem papéis (coexecutor).

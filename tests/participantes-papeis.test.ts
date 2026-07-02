@@ -1,7 +1,7 @@
 // Papéis dos participantes: distribuição nas 3 colunas do Sheets (IDA) e montagem
 // do payload a partir do formulário. Funções puras.
 // Papéis atuais: coexecutor("Coautor"→"Participantes") · planejador("Participante"→
-// "participantes 2") · contribuidor("Contribuidor"→"Contribuidor"). Os `value` internos
+// "Participantes 2") · contribuidor("Contribuidor"→"Contribuidor"). Os `value` internos
 // coexecutor/planejador foram mantidos ao renomear rótulos/colunas.
 import { describe, it, expect } from 'vitest';
 import { derivarColunasPapeis } from '@/lib/google/sync';

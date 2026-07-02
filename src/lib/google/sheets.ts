@@ -33,7 +33,7 @@ function getSheetConfig() {
 // imediatamente anterior (ver sync.ts → row['Memorial anterior']).
 //
 // PAPÉIS DOS PARTICIPANTES (3): "Participantes" (H) guarda os COAUTORES (value interno
-// `coexecutor`); "participantes 2" (I) os PARTICIPANTES (value interno `planejador`);
+// `coexecutor`); "Participantes 2" (I) os PARTICIPANTES (value interno `planejador`);
 // "Contribuidor" (J) os CONTRIBUIDORES (value interno `contribuidor`). Um participante
 // aparece em exatamente UMA das três. Coluna sem ninguém → "—". Ver sync.ts
 // (derivarColunasPapeis). Papéis legados idealizador/referencia_tecnica caem em Contribuidor.
@@ -46,7 +46,7 @@ export const SHEET_COLUMNS = [
   'Email',                          // F
   'Projeto',                        // G
   'Participantes',                  // H  (papel "Coautor" — value interno coexecutor)
-  'participantes 2',                // I  (papel "Participante" — value interno planejador)
+  'Participantes 2',                // I  (papel "Participante" — value interno planejador)
   'Contribuidor',                   // J  (papel "Contribuidor" — value interno contribuidor)
   'Descrição',                      // L
   'URL',                            // M

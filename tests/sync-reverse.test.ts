@@ -176,7 +176,7 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
         Projeto: 'Projeto com Papéis',
         Ferramenta: 'n8n',
         Participantes: 'coex@gocase.com', // coexecutor/"Coautor" (coluna retrocompatível)
-        'participantes 2': 'plan@gocase.com', // planejador/"Participante" (ex-"Planejador")
+        'Participantes 2': 'plan@gocase.com', // planejador/"Participante" (ex-"Planejador")
         Contribuidor: 'contrib@gocase.com, contrib2@gocase.com',
       },
     ]);

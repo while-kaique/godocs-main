@@ -89,13 +89,13 @@ function parseMembros(v: string | undefined): string[] {
 }
 
 // Papel → coluna do Sheets (3). "Participantes" = coexecutor/"Coautor" (retrocompatível:
-// legados tinham todos os membros lá); "participantes 2" = planejador/"Participante";
+// legados tinham todos os membros lá); "Participantes 2" = planejador/"Participante";
 // "Contribuidor" = contribuidor/"Contribuidor". O `papel` é o `value` INTERNO
 // (`coexecutor`/`planejador` mantidos). A ordem define o desempate quando um e-mail
 // aparece em mais de uma coluna (não deveria — 1 papel por pessoa): a PRIMEIRA vence.
 const COLUNA_PAPEL: ReadonlyArray<{ col: SheetColumn; papel: string }> = [
   { col: 'Participantes', papel: 'coexecutor' },
-  { col: 'participantes 2', papel: 'planejador' },
+  { col: 'Participantes 2', papel: 'planejador' },
   { col: 'Contribuidor', papel: 'contribuidor' },
 ];
 
@@ -259,7 +259,7 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
   }
 
   // Participantes + papéis → membros (lista plana) + membros_papeis (mapa). As 3
-  // colunas de papel (Participantes=Coautor + participantes 2=Participante + Contribuidor)
+  // colunas de papel (Participantes=Coautor + Participantes 2=Participante + Contribuidor)
   // são a fonte. Mesma regra "vazio não apaga": se as 3 estiverem vazias, mantém os
   // membros/papéis atuais.
   const { membros: membrosSheet, papeis: papeisSheet } = parseParticipantesPapeis(row);

@@ -114,7 +114,7 @@ export type SubmitSyncParams = {
   receita: Record<string, unknown> | null | undefined;
   membros: string[];
   // Papel de cada membro (e-mail→papel). Distribui os membros nas 4 colunas de papel do
-  // Sheets (Participantes=Coautor, participantes 2=Participante, Idealizador, Referência
+  // Sheets (Participantes=Coautor, Participantes 2=Participante, Idealizador, Referência
   // técnica). Opcional: ausente/vazio → todos entram como coexecutor (retrocompatível).
   membrosPapeis?: Record<string, string>;
   tiposProjeto: string[];
@@ -169,7 +169,7 @@ export function derivarSplitHorasSheet(
 
 // ─── Papéis dos participantes → 3 colunas do Sheets ─────────────────────────
 // Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda os
-// COAUTORES (value interno `coexecutor`); "participantes 2" os PARTICIPANTES (value
+// COAUTORES (value interno `coexecutor`); "Participantes 2" os PARTICIPANTES (value
 // interno `planejador`); "Contribuidor" os CONTRIBUIDORES (value interno `contribuidor`).
 // Cada e-mail entra em exatamente UMA coluna. Coluna sem ninguém → '' (vira "—" no
 // padronizarLinha). Lookup tolerante a caixa.
@@ -280,10 +280,10 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Nome Completo': ouTraco(p.projeto.responsavel_nome),
       'Email': ouTraco(p.projeto.responsavel_email),
       'Projeto': ouTraco(p.projeto.nome),
-      // "Participantes" = Coautores; "participantes 2" = Participantes; "Contribuidor"
+      // "Participantes" = Coautores; "Participantes 2" = Participantes; "Contribuidor"
       // = Contribuidores. Coluna sem ninguém → '' → padronizarLinha "—".
       'Participantes': colsPapeis.coexecutor,
-      'participantes 2': colsPapeis.planejador,
+      'Participantes 2': colsPapeis.planejador,
       'Contribuidor': colsPapeis.contribuidor,
       'Descrição': ouTraco(p.projeto.descricao_breve),
       'URL': urlDocs,

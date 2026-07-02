@@ -445,7 +445,7 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 
 > 🔤 **REDESENHO PARA 3 PAPÉIS (Kaique, 2026-07-02):** de 4 papéis passou a **3** —
 > **Coautor**, **Participante**, **Contribuidor**. Mapeamento form → coluna do Sheets:
-> **Coautor → "Participantes"** · **Participante → "participantes 2"** (minúsculo, ex-"Planejador")
+> **Coautor → "Participantes"** · **Participante → "Participantes 2"** (ex-"Planejador")
 > · **Contribuidor → "Contribuidor"**. Os antigos **Idealizador** e **Referência técnica** foram
 > **removidos** do seletor e consolidados em **Contribuidor** (no sync os valores legados
 > `idealizador`/`referencia_tecnica` caem na coluna "Contribuidor"). ⚠️ **Os `value` internos
@@ -489,10 +489,10 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
   caso de papéis em `tests/sync-reverse.test.ts`.
 
 **Dependência de planilha (manual, do dono) — pós-redesenho 3 papéis.** As colunas de papel agora são
-**`Participantes`** (Coautor), **`participantes 2`** (minúsculo, ex-`Planejador` → Participante) e
+**`Participantes`** (Coautor), **`Participantes 2`** (ex-`Planejador` → Participante) e
 **`Contribuidor`**. Precisam existir no cabeçalho com **exatamente** esses nomes (caixa + acentos),
 tanto na aba **`GoDocs`** (prod) quanto na **`STAGING`**. Ações do dono na planilha: **(1)** renomear a
-coluna antiga **"Planejador" → "participantes 2"**; **(2)** garantir uma coluna **"Contribuidor"** (pode
+coluna antiga **"Planejador" → "Participantes 2"**; **(2)** garantir uma coluna **"Contribuidor"** (pode
 reaproveitar a antiga "Idealizador" renomeando, ou criar nova). As antigas "Idealizador"/"Referência
 técnica" saíram do código (o append/update não escreve mais nelas). Enquanto uma coluna esperada não
 existir, o append/update **ignora** com aviso (não quebra) e só as presentes são gravadas.

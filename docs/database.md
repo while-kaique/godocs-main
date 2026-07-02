@@ -77,7 +77,7 @@ Entidade principal. Uma linha por projeto submetido.
 | escopo | TEXT | interno/externo |
 | servico_externo | TEXT | Se escopo = externo |
 | membros | TEXT (JSON) | Array de emails (lista plana de TODOS os participantes — base do ownership) |
-| membros_papeis | TEXT (JSON) | Mapa email→papel: coexecutor("Coautor") \| planejador("Participante") \| contribuidor("Contribuidor"). Distribui os participantes nas 3 colunas de papel do Sheets (Participantes · participantes 2 · Contribuidor). Valores legados idealizador/referencia_tecnica → Contribuidor. NÃO inclui o autor. |
+| membros_papeis | TEXT (JSON) | Mapa email→papel: coexecutor("Coautor") \| planejador("Participante") \| contribuidor("Contribuidor"). Distribui os participantes nas 3 colunas de papel do Sheets (Participantes · Participantes 2 · Contribuidor). Valores legados idealizador/referencia_tecnica → Contribuidor. NÃO inclui o autor. |
 | status | TEXT | CHECK: rascunho, em_validacao, validado, rejeitado, aprovado |
 | chat_completo | INTEGER | 0/1 |
 | data_criacao_projeto | TEXT | |
