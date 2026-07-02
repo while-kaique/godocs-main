@@ -340,3 +340,42 @@ do dono real, typo no nome).
 **Status.** ✅ **Mergeada (PR #176) e LIVE em produção** (30/06/2026). `/api/auth/me` retorna
 `name`; o form não pede mais nome/e-mail e mostra "Submetendo como…". Testes verdes + `build`
 (typecheck) limpo.
+
+## Feature adicional — Botão "Recomeçar" no formulário de submissão · jul/2026
+
+> Pedido do dono (Kaique, 2026-07-02): um controle **pequeno e visível** no formulário que,
+> ao clicar, abre um popup "tem certeza?" listando o que será perdido e, se confirmado, **zera
+> tudo** e volta ao início.
+
+**Problema.** Quem começava uma submissão e queria recomeçar do zero (mudou de projeto, errou o
+escopo, quer descartar a conversa com o agente) não tinha um caminho claro — só apagar o rascunho
+lá em "Meus Projetos > Rascunhos" ou limpar o localStorage. Faltava um "recomeçar" no próprio form.
+
+**Decisão (fechada).**
+- **Escopo: só submissão NOVA** (`!editProjetoId`). Em **edição** de projeto já submetido o botão
+  **não aparece** — "recomeçar" não faz sentido ali (não há como zerar para branco um projeto real
+  nem criar um novo pelo fluxo de edição). Some também na **tela de sucesso** (que já tem "Submeter
+  outro projeto").
+- **Posição:** na barra de "chrome" do card (à direita dos `BrowserDots`), reaproveitando a metáfora
+  de janela já presente, em vez de flutuar um botão solto. Pequeno, cinza discreto, ícone `RotateCcw`
+  + rótulo "Recomeçar" (só ícone no mobile). Esquenta para tom de alerta no hover.
+- **Confirmação obrigatória:** popup (overlay embaçado + Esc, mesmo padrão do `DistribuirEdicaoModal`)
+  com ícone de alerta âmbar e **lista concreta** do que se perde (etapas + arquivos · conversa com o
+  agente + documentação · valores de saving/receita). Ação destrutiva em vermelho, rótulo explícito
+  "Sim, recomeçar" (a11y: estado por ícone + rótulo, nunca só cor; foco de teclado visível).
+- **Reset "de verdade":** apaga o rascunho no **servidor** (`DELETE /api/meus-projetos/:id`,
+  best-effort — evita órfão em "Rascunhos"; se falhar, o reset local segue) + `clearDraft()` local +
+  **navegação dura** para `/submeter` limpo (`window.location.assign`, descarta `?retomar` e força
+  remontagem do zero). Mesma abordagem robusta do "Submeter outro projeto", sem resetar ~30 estados
+  à mão.
+
+**Onde aterrissou.**
+- `src/routes/submeter.tsx` — `import { RotateCcw, AlertTriangle, Loader2 } from "lucide-react"`;
+  novo componente `ConfirmarRecomecoModal`; estados `showResetConfirm`/`recomecando`; handler
+  `handleRecomecar` (DELETE best-effort → `clearDraft` → `window.location.assign("/submeter")`);
+  botão na barra dos `BrowserDots` (só `!editProjetoId`); render do modal ao fim do `PageFrame`.
+- Reusa a rota existente `DELETE /api/meus-projetos/:id` (`excluirRascunho`, gate ownership +
+  só `status === 'rascunho'`) — sem mudança server-side (não regera `worker.js`).
+
+**Status.** 🚧 Implementada; testes verdes (504) + `tsc` sem erros novos. Deploy em **staging**
+(`edf400b4`) para validação manual antes de prod.

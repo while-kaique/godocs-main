@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
@@ -197,6 +198,118 @@ async function apiFetchComRetry<T>(path: string, body?: unknown, tentativas = 3)
   throw ultimoErro;
 }
 
+// Popup de confirmação do "Recomeçar" (overlay embaçado + Esc, mesmo padrão do
+// DistribuirEdicaoModal). Ação DESTRUTIVA: lista concretamente o que será perdido
+// e exige confirmação antes de zerar o formulário. Estado sinalizado por ícone +
+// rótulo (nunca só por cor). Só usado em submissão NOVA (nunca em edição).
+function ConfirmarRecomecoModal({
+  onClose,
+  onConfirmar,
+  processando,
+}: {
+  onClose: () => void;
+  onConfirmar: () => void;
+  processando: boolean;
+}) {
+  // Fecha no Esc (bloqueado enquanto processa, para não deixar meio-caminho).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !processando) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, processando]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: "rgba(8,20,40,0.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
+      onClick={() => !processando && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Recomeçar o formulário"
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl"
+        style={{ background: "var(--go-white)", boxShadow: "0 24px 64px rgba(8,20,40,0.35)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 px-6 pt-6">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "rgba(217,119,6,0.12)", color: "#b45309" }}
+          >
+            <AlertTriangle style={{ width: 18, height: 18 }} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+              Recomeçar o formulário?
+            </h2>
+            <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            Você vai <span className="font-semibold">perder tudo o que preencheu até aqui</span> e voltar
+            para o início. Isso inclui:
+          </p>
+          <ul className="mt-3 space-y-2">
+            {[
+              "As respostas das etapas e os arquivos anexados",
+              "Toda a conversa com o agente e a documentação gerada",
+              "Os valores de saving e receita informados",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+                <span
+                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "#b45309" }}
+                  aria-hidden="true"
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            Você terá que preencher tudo de novo.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={processando}
+            className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-50"
+            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={processando}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b91c1c] focus-visible:ring-offset-2 disabled:opacity-60"
+            style={{ background: "#b91c1c" }}
+          >
+            {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {processando ? "Recomeçando…" : "Sim, recomeçar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SubmeterPageContent({
   editProjetoId,
   resumeDraftId,
@@ -267,6 +380,9 @@ export function SubmeterPageContent({
   // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  // "Recomeçar": confirmação + estado de processamento do reset (só submissão nova).
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [recomecando, setRecomecando] = useState(false);
 
   // Aplica no estado do wizard os dados de um projeto vindos do servidor —
   // usado tanto na EDIÇÃO de um projeto submetido quanto na RETOMADA de um
@@ -741,6 +857,26 @@ export function SubmeterPageContent({
       return next;
     });
   }, []);
+
+  // "Recomeçar" (só submissão nova): zera TUDO e volta ao início. Apaga o rascunho
+  // do servidor (evita órfão em "Meus Projetos > Rascunhos"), descarta o snapshot
+  // local e faz navegação DURA para /submeter limpo — mesma abordagem robusta do
+  // "Submeter outro projeto" da tela de sucesso, sem depender de resetar ~30 estados
+  // à mão. A exclusão no servidor é best-effort: se falhar, o reset local segue
+  // (o rascunho vira órfão, mas o usuário não fica preso).
+  async function handleRecomecar() {
+    setRecomecando(true);
+    if (projetoId) {
+      try {
+        await apiFetch(`/api/meus-projetos/${projetoId}`, undefined, "DELETE");
+      } catch (e) {
+        console.warn("[recomeçar] não foi possível excluir o rascunho no servidor:", e);
+      }
+    }
+    clearDraft();
+    // Navegação dura para a URL limpa (descarta ?retomar e força remontagem do zero).
+    window.location.assign("/submeter");
+  }
 
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
@@ -1959,7 +2095,24 @@ export function SubmeterPageContent({
           />
 
           <div style={{ padding: step === 3 ? "0 32px" : undefined }}>
-            <BrowserDots />
+            {/* Barra de "chrome" do card: os pontos à esquerda e, à direita, o
+                controle discreto de recomeçar (só em submissão nova). Reaproveita a
+                metáfora de janela dos BrowserDots em vez de flutuar um botão solto. */}
+            <div className="flex items-center justify-between">
+              <BrowserDots />
+              {!editProjetoId && (
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#a0a0ad] transition-colors hover:bg-[rgba(185,28,28,0.07)] hover:text-[#b91c1c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-1"
+                  aria-label="Recomeçar o formulário do zero"
+                  title="Recomeçar do zero"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Recomeçar</span>
+                </button>
+              )}
+            </div>
             <WizardProgress
               current={step}
               completed={completedSteps}
@@ -2181,6 +2334,13 @@ export function SubmeterPageContent({
         <PageFooter />
       </div>
 
+      {showResetConfirm && (
+        <ConfirmarRecomecoModal
+          onClose={() => setShowResetConfirm(false)}
+          onConfirmar={handleRecomecar}
+          processando={recomecando}
+        />
+      )}
     </PageFrame>
   );
 }
