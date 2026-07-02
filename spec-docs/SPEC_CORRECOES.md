@@ -6,6 +6,52 @@
 
 ---
 
+## 2026-07-01 — Gate ≥44h "O que mudou após a automação" era só prompt e escapou (projeto Gostream)
+
+**PR:** _(a abrir)_ · **Status:** 🔜 validar no staging (`edf400b4`) → prod · **Branch:** `fix/gate-alocacao-ganhos`
+
+**Sintoma:** o projeto **Gostream** (`legado-152`, R&S, **150h/mês**, `alguem_fazia='sim'`) fechou o
+memorial **sem** que o usuário fosse perguntado pra onde foi o tempo liberado. A Seção 2.4 ("### O que
+mudou após a automação") existia no memorial, mas preenchida com **exatamente** o boilerplate que a régua
+manda RECUSAR: _"o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de
+manter essa rotina manual."_ Ninguém no chat viu a pergunta (confirmado puxando o `chat/historico` de prod
+com o `E2E_COOKIE`).
+
+**Causa-raiz:** o gate de economia alta (≥44h/mês) era **100% prompt** — o bloco "SEÇÃO 2.4" em
+`buildSavingPrompt` + a rede de segurança (LLM-juiz) em `buildSavingPreviewPrompt`. Diferente dos gates de
+**jornada**, **teto 220h** e **carga real × escala** (que são DETERMINÍSTICOS no backend e por isso
+dispararam), este dependia do LLM obedecer. O LLM **auto-gerou** a seção vaga e previewou sem perguntar; a
+rede de segurança do preview (também LLM) deixou passar na aprovação. Resultado: a única família de gate de
+horas altas SEM trava determinística falhou silenciosamente.
+
+**Fix (transformar em GATE DETERMINÍSTICO, nos moldes do carga×escala):**
+- **Predicado** `aplicaGateAlocacaoGanhos(ctx, saving)` (`orchestrator.ts`): `alguem_fazia==='sim'` **&&**
+  `tipo_saving==='mensal'` **&&** (total ≥ `LIMITE_ECONOMIA_ALTA(44)` OU um cargo ≥44h). Contrafactual
+  (`'nao'`) e custo evitado puro (`'externo'`) NÃO entram (não houve tempo humano REAL liberado — a Seção
+  2.4 ali segue só no prompt, sem bloqueio). Pontual/periódico fora (base ≠ mês).
+- **Estado** `saving.alocacao_ganhos` (`null`→`pendente`→`reperguntado`→`ok`) + `alocacao_ganhos_racional`
+  (resposta crua do usuário, backend-only, re-mesclada a cada turno). Em `types.ts`/`savingVazio`.
+- **Gate em `enviarMensagem` (`chat.functions.ts`):** antes do preview, se a Seção 2.4 do memorial já for
+  CONCRETA (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) → libera (`'ok'`); senão **bloqueia** e
+  pergunta `perguntaAlocacaoGanhos` ("pra onde foi o tempo? nomeie as atividades / o que entrega a mais").
+  No turno de resposta: se vier vaga (`respostaAlocacaoVaga`), **repergunta FIRME 1x** (`'reperguntado'`,
+  anti-loop); senão captura o racional e injeta o nudge `[SISTEMA]` (`nudgeAlocacaoGanhos`) p/ o LLM
+  escrever a seção a partir do que o usuário disse. Roda por ÚLTIMO (jornada→teto→split→alocação, 1/turno).
+- **`respostaAlocacaoVaga(texto)`** (`orchestrator.ts`, puro): heurística CONSERVADORA — só marca vaga se
+  curta demais OU bate em padrão vago ("realocado/outras atividades/sobra tempo/produtividade/eficiência")
+  **e** não traz nada concreto junto (nº ou destino nomeado via "para/pra …"). Na dúvida, aceita (custo do
+  falso-positivo = 1 pergunta a mais; a rede de segurança do preview + validação humana são backstops). NÃO
+  é juiz de qualidade — é só o piso p/ forçar UMA reperguntada.
+
+**Onde aterrissou:** `src/lib/agents/types.ts` (2 campos + `savingVazio`); `src/lib/agents/orchestrator.ts`
+(`LIMITE_ECONOMIA_ALTA` exportado, `aplicaGateAlocacaoGanhos`, `respostaAlocacaoVaga`); `src/lib/chat.functions.ts`
+(helpers `perguntaAlocacaoGanhos`/`…Firme`/`nudgeAlocacaoGanhos` + branches de resposta + re-merge + gate de
+preview); `tests/gate-alocacao-ganhos.test.ts` (novo, 14 casos incl. o boilerplate do Gostream);
+`tests/agents-types.test.ts` (shape 19→21). `worker.js` rebuildado. **Não muda prompt** (rule 3 N/A) — o
+bloco 2.4 do prompt segue igual; o gate é backend. 532 testes verdes.
+
+---
+
 ## 2026-07-01 — Favicon some do deploy (upload só varria `dist/assets/*`, não a raiz do `dist/`)
 
 **PR:** _(a abrir)_ · **Status:** ✅ deployada (staging `edf400b4` + prod `674a3710`) · **Branch:** `fix/deploy-favicon-dist-root`
