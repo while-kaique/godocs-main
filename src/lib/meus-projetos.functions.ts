@@ -432,7 +432,16 @@ export async function getMeuProjeto(
 export async function getHistoricoMeuProjeto(
   id: string,
   email: string,
-): Promise<Array<{ role: string; content: string; options: string[] | null }>> {
+): Promise<
+  Array<{
+    role: string;
+    content: string;
+    options: string[] | null;
+    isPreview: boolean;
+    isComplete: boolean;
+    fase: string | null;
+  }>
+> {
   const data = await getProjetoWithRelations(id);
   if (!data) {
     throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
@@ -441,9 +450,54 @@ export async function getHistoricoMeuProjeto(
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   const msgs = await getChatMessages(id);
-  return msgs.map((m) => ({
-    role: m.role,
-    content: m.content,
-    options: parseJson<string[]>(m.options),
-  }));
+  return (
+    msgs
+      // SÓ mensagens conversacionais. A role 'doc' guarda o TEXTO BRUTO dos arquivos
+      // enviados (contexto do LLM, `=== arquivo === …`) e NUNCA pode ser exibida nem
+      // trafegar ao cliente — na retomada sem snapshot local ela vazava como mensagem.
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => {
+        if (m.role === 'assistant') {
+          // O assistant é persistido como JSON.stringify(resultado). Extrai o texto de
+          // exibição e deriva os flags exatamente como o formatResponse faz na ida —
+          // caso contrário o cliente renderizava o JSON cru como bolha de conversa.
+          try {
+            const parsed = JSON.parse(m.content) as {
+              type?: string;
+              content?: string;
+              question?: string;
+              fase?: string;
+              options?: string[];
+            };
+            return {
+              role: 'assistant',
+              content: parsed.content ?? parsed.question ?? '',
+              options:
+                parseJson<string[]>(m.options) ??
+                (parsed.type === 'options' ? parsed.options ?? null : null),
+              isPreview: parsed.type === 'preview',
+              isComplete: parsed.fase === 'completo',
+              fase: parsed.fase ?? null,
+            };
+          } catch {
+            return {
+              role: 'assistant',
+              content: m.content,
+              options: parseJson<string[]>(m.options),
+              isPreview: false,
+              isComplete: false,
+              fase: null,
+            };
+          }
+        }
+        return {
+          role: 'user',
+          content: m.content,
+          options: null,
+          isPreview: false,
+          isComplete: false,
+          fase: null,
+        };
+      })
+  );
 }

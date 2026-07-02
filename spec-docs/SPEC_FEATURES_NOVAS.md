@@ -341,6 +341,61 @@ do dono real, typo no nome).
 `name`; o form não pede mais nome/e-mail e mostra "Submetendo como…". Testes verdes + `build`
 (typecheck) limpo.
 
+## Feature adicional — Botão "Salvar rascunho" no formulário · jul/2026
+
+> Pedido do dono (Kaique, 2026-07-02): controles **pequenos e visíveis** no formulário. Nasceram
+> DOIS botões ("Recomeçar" + "Salvar rascunho"); após validar no staging o dono decidiu **manter só
+> o "Salvar rascunho"** ("é suficiente") e **remover o "Recomeçar"**.
+
+**Problema.** Quem começava uma submissão e queria parar para submeter outro projeto depois não tinha
+caminho claro no próprio formulário — o rascunho só era gerenciável em "Meus Projetos > Rascunhos".
+
+> ⛔ **"Recomeçar" foi implementado e REMOVIDO (decisão do dono, 2026-07-02).** Era um botão destrutivo
+> (popup âmbar → `DELETE` do rascunho + `clearDraft` + `window.location.assign('/submeter')`). Ficou só
+> "Salvar rascunho". Registrado aqui para não ser reintroduzido por engano — se um dia for preciso,
+> o histórico da branch `feat/botao-recomecar-forms` tem a implementação.
+
+### "Salvar rascunho" (guardar e sair)
+
+> Pedido do dono (Kaique, 2026-07-02, mesma leva): um botão que **salva o projeto atual como
+> rascunho** e libera o usuário para submeter outro, **redirecionando para a home**, com um popup
+> informando os cuidados.
+
+**Decisão (fechada).**
+- **Escopo: só submissão nova COM rascunho no servidor** (`projetoId != null`). O rascunho
+  server-side (linha `projetos` status `'rascunho'`) só nasce em `iniciar-submissao`
+  (`handleIniciarAgente`, que exige arquivos) — **antes do agente iniciar não há o que guardar**,
+  então o botão fica **oculto** nas Etapas 1/2 pré-agente e some em edição.
+- **O projeto JÁ está parkeado no servidor** (metadados de `iniciar-submissao`/`atualizar-metadados`;
+  conversa persistida em `chat_messages` a cada turno). Por isso "salvar rascunho" **não faz POST
+  novo** — apenas **desanexa a sessão local** (`clearDraft`, senão `/submeter` retomaria este mesmo
+  rascunho em vez de começar um novo), **invalida o cache de Meus Projetos** e **navega para `/`**.
+- **Retomada:** por **Meus Projetos › Rascunhos › Continuar** (`?retomar=<id>`, rehidrata do
+  servidor via `GET /api/chat/historico/:id`). Mesma fidelidade do resume já existente.
+- **Popup informativo** (tom azul, não destrutivo) com os cuidados: **(a)** o rascunho **NÃO foi
+  enviado para análise** — a equipe só vê depois de concluir e enviar; **(b)** ao sair, volta à
+  home e pode começar outra submissão. Botão "Salvar e sair" (azul).
+- ⚠️ **Limitação aceita (igual ao resume atual):** edições de campo das Etapas 1/2 feitas *depois*
+  do agente iniciar e ainda não re-enviadas (`atualizar-metadados`), além do input de chat não
+  enviado, vivem só no localStorage — ao retomar do servidor podem não voltar. Não vale
+  over-engineer: é o mesmo teto do `?retomar` que já existe.
+
+**Onde aterrissou.**
+- `src/routes/submeter.tsx` — `import { Loader2, Save, FolderClock } from "lucide-react"`;
+  componente **`SalvarRascunhoModal`**; estados `showRascunhoConfirm`/`salvandoRascunho`; handler
+  `handleSalvarRascunho` (`invalidateQueries(['meus-projetos'])` → `clearDraft` → `navigate('/')`);
+  botão na barra dos `BrowserDots` (gate `!editProjetoId && projetoId`); render do modal ao fim do
+  `PageFrame`. **Nenhuma mudança server-side** nesta feature.
+- **Fix acoplado (retomada não vaza texto bruto):** a retomada sem snapshot local (forçada pelo
+  `clearDraft` do "Salvar rascunho") caía num caminho que despejava a role `'doc'` crua no chat.
+  Corrigido em `getHistoricoMeuProjeto` (`meus-projetos.functions.ts`, filtra `user`/`assistant` +
+  parseia o JSON do assistant) e no map do histórico no `submeter.tsx`. Detalhe em
+  `SPEC_CORRECOES.md` (2026-07-02). Server-side → `worker.js` rebuildado.
+
+**Status.** ✅ Implementada (só "Salvar rascunho"; "Recomeçar" removido) + fix da retomada; testes
+verdes (504) + `tsc` sem erros novos. Validada no **staging** (`edf400b4`) e promovida a **produção**
+(`674a3710`) em 2026-07-02.
+
 ## Feature adicional — Nudge de "versão desatualizada" (version skew) · jul/2026
 
 > Decisão do dono (Kaique, 2026-07-01): oferecer recarregar quando o cliente estiver rodando
