@@ -512,6 +512,10 @@ export function ParticipantesPapeisInput({
           <input
             ref={inputRef}
             type="text"
+            // O autofill do navegador (sugestões de e-mail do Chrome) abre por cima
+            // do nosso dropdown de sugestões — desligado; a lista vem da TeamGuide.
+            autoComplete="off"
+            spellCheck={false}
             role="combobox"
             aria-expanded={open}
             aria-controls="participantes-sugestoes"
