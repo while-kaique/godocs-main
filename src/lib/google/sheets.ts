@@ -32,9 +32,11 @@ function getSheetConfig() {
 // escrita pelo sistema, mas SÓ na edição: recebe o memorial_calculo da versão
 // imediatamente anterior (ver sync.ts → row['Memorial anterior']).
 //
-// PAPÉIS DOS PARTICIPANTES: "Participantes" (H) guarda os COEXECUTORES; as três
-// colunas seguintes (I/J/K) guardam os demais papéis. Um participante aparece em
-// exatamente UMA das quatro. Coluna sem ninguém → "—". Ver sync.ts (derivarColunasPapeis).
+// PAPÉIS DOS PARTICIPANTES (3): "Participantes" (H) guarda os COAUTORES (value interno
+// `coexecutor`); "Participantes 2" (I) os PARTICIPANTES (value interno `planejador`);
+// "Contribuidor" (J) os CONTRIBUIDORES (value interno `contribuidor`). Um participante
+// aparece em exatamente UMA das três. Coluna sem ninguém → "—". Ver sync.ts
+// (derivarColunasPapeis). Papéis legados idealizador/referencia_tecnica caem em Contribuidor.
 export const SHEET_COLUMNS = [
   'Data Submissão',                 // A
   'ID Projeto',                     // B
@@ -43,10 +45,9 @@ export const SHEET_COLUMNS = [
   'Nome Completo',                  // E
   'Email',                          // F
   'Projeto',                        // G
-  'Participantes',                  // H  (participantes com papel COEXECUTOR)
-  'Planejador',                     // I  (participantes com papel Planejador)
-  'Idealizador',                    // J  (participantes com papel Idealizador)
-  'Referência técnica',             // K  (participantes com papel Referência técnica)
+  'Participantes',                  // H  (papel "Coautor" — value interno coexecutor)
+  'Participantes 2',                // I  (papel "Participante" — value interno planejador)
+  'Contribuidor',                   // J  (papel "Contribuidor" — value interno contribuidor)
   'Descrição',                      // L
   'URL',                            // M
   'Ferramenta',                     // N

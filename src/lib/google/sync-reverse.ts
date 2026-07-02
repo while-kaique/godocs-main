@@ -88,14 +88,15 @@ function parseMembros(v: string | undefined): string[] {
   return parseList(v).filter((s) => s.includes('@'));
 }
 
-// Papel → coluna do Sheets. "Participantes" = coexecutor (retrocompatível: legados
-// tinham todos os membros lá). A ordem define o desempate quando um e-mail aparece
-// em mais de uma coluna (não deveria — 1 papel por pessoa): a PRIMEIRA vence.
+// Papel → coluna do Sheets (3). "Participantes" = coexecutor/"Coautor" (retrocompatível:
+// legados tinham todos os membros lá); "Participantes 2" = planejador/"Participante";
+// "Contribuidor" = contribuidor/"Contribuidor". O `papel` é o `value` INTERNO
+// (`coexecutor`/`planejador` mantidos). A ordem define o desempate quando um e-mail
+// aparece em mais de uma coluna (não deveria — 1 papel por pessoa): a PRIMEIRA vence.
 const COLUNA_PAPEL: ReadonlyArray<{ col: SheetColumn; papel: string }> = [
   { col: 'Participantes', papel: 'coexecutor' },
-  { col: 'Planejador', papel: 'planejador' },
-  { col: 'Idealizador', papel: 'idealizador' },
-  { col: 'Referência técnica', papel: 'referencia_tecnica' },
+  { col: 'Participantes 2', papel: 'planejador' },
+  { col: 'Contribuidor', papel: 'contribuidor' },
 ];
 
 // Lê as 4 colunas de papel → lista PLANA de participantes (dedup por caixa, base do
@@ -257,10 +258,10 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
     updates[field as string] = newVal;
   }
 
-  // Participantes + papéis → membros (lista plana) + membros_papeis (mapa). As 4
-  // colunas de papel (Participantes=coexecutor + Planejador/Idealizador/Referência
-  // técnica) são a fonte. Mesma regra "vazio não apaga": se as 4 estiverem vazias,
-  // mantém os membros/papéis atuais.
+  // Participantes + papéis → membros (lista plana) + membros_papeis (mapa). As 3
+  // colunas de papel (Participantes=Coautor + Participantes 2=Participante + Contribuidor)
+  // são a fonte. Mesma regra "vazio não apaga": se as 3 estiverem vazias, mantém os
+  // membros/papéis atuais.
   const { membros: membrosSheet, papeis: papeisSheet } = parseParticipantesPapeis(row);
   if (membrosSheet.length > 0) {
     const membrosAtuais = parseJson<string[]>(current.membros) ?? [];

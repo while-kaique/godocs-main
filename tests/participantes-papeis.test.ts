@@ -1,34 +1,42 @@
-// Papéis dos participantes: distribuição nas 4 colunas do Sheets (IDA) e montagem
+// Papéis dos participantes: distribuição nas 3 colunas do Sheets (IDA) e montagem
 // do payload a partir do formulário. Funções puras.
+// Papéis atuais: coexecutor("Coautor"→"Participantes") · planejador("Participante"→
+// "Participantes 2") · contribuidor("Contribuidor"→"Contribuidor"). Os `value` internos
+// coexecutor/planejador foram mantidos ao renomear rótulos/colunas.
 import { describe, it, expect } from 'vitest';
 import { derivarColunasPapeis } from '@/lib/google/sync';
 import { montarMembrosPapeis } from '@/lib/submeter/constants';
 
-describe('derivarColunasPapeis (membros + papéis → 4 colunas do Sheets)', () => {
+describe('derivarColunasPapeis (membros + papéis → 3 colunas do Sheets)', () => {
   it('distribui cada participante na coluna do seu papel', () => {
-    const membros = ['coex@gocase.com', 'plan@gocase.com', 'ideia@gocase.com', 'ref@gocase.com'];
+    const membros = ['coex@gocase.com', 'plan@gocase.com', 'contrib@gocase.com'];
     const papeis = {
       'coex@gocase.com': 'coexecutor',
       'plan@gocase.com': 'planejador',
-      'ideia@gocase.com': 'idealizador',
-      'ref@gocase.com': 'referencia_tecnica',
+      'contrib@gocase.com': 'contribuidor',
     };
     expect(derivarColunasPapeis(membros, papeis)).toEqual({
       coexecutor: 'coex@gocase.com',
       planejador: 'plan@gocase.com',
-      idealizador: 'ideia@gocase.com',
-      referencia_tecnica: 'ref@gocase.com',
+      contribuidor: 'contrib@gocase.com',
     });
   });
 
   it('agrupa múltiplos e-mails do mesmo papel (join por vírgula)', () => {
     const membros = ['a@gocase.com', 'b@gocase.com'];
-    const papeis = { 'a@gocase.com': 'idealizador', 'b@gocase.com': 'idealizador' };
+    const papeis = { 'a@gocase.com': 'contribuidor', 'b@gocase.com': 'contribuidor' };
     const r = derivarColunasPapeis(membros, papeis);
-    expect(r.idealizador).toBe('a@gocase.com, b@gocase.com');
+    expect(r.contribuidor).toBe('a@gocase.com, b@gocase.com');
     expect(r.coexecutor).toBe('');
     expect(r.planejador).toBe('');
-    expect(r.referencia_tecnica).toBe('');
+  });
+
+  it('papéis LEGADOS (idealizador/referencia_tecnica) caem em contribuidor', () => {
+    const membros = ['ideia@gocase.com', 'ref@gocase.com'];
+    const papeis = { 'ideia@gocase.com': 'idealizador', 'ref@gocase.com': 'referencia_tecnica' };
+    const r = derivarColunasPapeis(membros, papeis);
+    expect(r.contribuidor).toBe('ideia@gocase.com, ref@gocase.com');
+    expect(r.coexecutor).toBe('');
   });
 
   it('papel ausente/desconhecido cai em coexecutor (retrocompatível)', () => {
@@ -46,7 +54,7 @@ describe('derivarColunasPapeis (membros + papéis → 4 colunas do Sheets)', () 
 
   it('sem participantes → todas as colunas vazias (viram "—" no padronizarLinha)', () => {
     expect(derivarColunasPapeis([], {})).toEqual({
-      coexecutor: '', planejador: '', idealizador: '', referencia_tecnica: '',
+      coexecutor: '', planejador: '', contribuidor: '',
     });
   });
 });
@@ -57,11 +65,11 @@ describe('montarMembrosPapeis (formulário → payload membros_papeis)', () => {
     const papeis = {
       'a@gocase.com': 'coexecutor' as const,
       'b@gocase.com': '' as const, // ainda não escolhido → não entra
-      'c@gocase.com': 'idealizador' as const,
+      'c@gocase.com': 'contribuidor' as const,
     };
     expect(montarMembrosPapeis(participantes, papeis)).toEqual({
       'a@gocase.com': 'coexecutor',
-      'c@gocase.com': 'idealizador',
+      'c@gocase.com': 'contribuidor',
     });
   });
 

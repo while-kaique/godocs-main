@@ -40,14 +40,18 @@ export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\
 
 // Papel de cada PARTICIPANTE (membro do time) no projeto. NÃO se aplica ao autor/
 // submissor — ele é o dono (responsavel_email), fora da lista de participantes.
-// "Coexecutor" corresponde à coluna "Participantes" atual do Sheets (retrocompatível);
-// os demais têm colunas próprias. Um papel por pessoa (decisão de produto). A ordem
-// abaixo é a ordem exibida no seletor.
+// São 3 papéis. ⚠️ Os `value` internos `coexecutor`/`planejador` foram MANTIDOS de
+// propósito ao renomear os rótulos (Coautor/Participante) e as colunas do Sheets — são
+// invisíveis ao usuário e trocá-los exigiria migrar `membros_papeis`. Mapeamento de
+// exibição → coluna do Sheets: "Coautor" (`coexecutor`) → "Participantes";
+// "Participante" (`planejador`) → "Participantes 2"; "Contribuidor" (`contribuidor`)
+// → "Contribuidor". Os papéis LEGADOS `idealizador`/`referencia_tecnica` (feature
+// anterior) não são mais oferecidos; no sync caem em "Contribuidor". Um papel por
+// pessoa (decisão de produto). A ordem abaixo é a ordem exibida no seletor.
 export const PAPEIS_PARTICIPANTE = [
-  { value: "coexecutor", label: "Coexecutor" },
-  { value: "planejador", label: "Planejador" },
-  { value: "idealizador", label: "Idealizador" },
-  { value: "referencia_tecnica", label: "Referência técnica" },
+  { value: "coexecutor", label: "Coautor" },
+  { value: "planejador", label: "Participante" },
+  { value: "contribuidor", label: "Contribuidor" },
 ] as const;
 
 export type PapelParticipante = (typeof PAPEIS_PARTICIPANTE)[number]["value"];

@@ -498,6 +498,17 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > A coluna "Participantes" do Sheets passa a ser a de **Coexecutor** (sem renomear); três colunas
 > novas (I/J/K) guardam os demais papéis. As colunas novas são criadas **manualmente** na planilha.
 
+> 🔤 **REDESENHO PARA 3 PAPÉIS (Kaique, 2026-07-02):** de 4 papéis passou a **3** —
+> **Coautor**, **Participante**, **Contribuidor**. Mapeamento form → coluna do Sheets:
+> **Coautor → "Participantes"** · **Participante → "Participantes 2"** (ex-"Planejador")
+> · **Contribuidor → "Contribuidor"**. Os antigos **Idealizador** e **Referência técnica** foram
+> **removidos** do seletor e consolidados em **Contribuidor** (no sync os valores legados
+> `idealizador`/`referencia_tecnica` caem na coluna "Contribuidor"). ⚠️ **Os `value` internos
+> `coexecutor`(=Coautor)/`planejador`(=Participante) foram MANTIDOS** (invisíveis; trocá-los exigiria
+> migrar `membros_papeis`); o 3º papel usa o value novo `contribuidor`. O `membrosPapeisSchema` aceita
+> os 3 atuais **+** os 2 legados (não rejeita cliente com cache antigo — version skew).
+> **Abaixo, o texto original (4 papéis) fica como histórico; vale o redesenho acima.**
+
 **Decisões fechadas (com o Luis).**
 - **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
   · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
@@ -532,11 +543,14 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 - Testes: `tests/participantes-papeis.test.ts` (derivarColunasPapeis + montarMembrosPapeis) +
   caso de papéis em `tests/sync-reverse.test.ts`.
 
-**Dependência de planilha (manual, do dono).** As 3 colunas — **`Planejador`**, **`Idealizador`**,
-**`Referência técnica`** — precisam existir no cabeçalho, com **exatamente** esses nomes (caixa +
-acentos), tanto na aba **`GoDocs`** (prod) quanto na aba **`STAGING`**. Enquanto não existirem, o
-append/update **ignora** essas colunas com aviso (não quebra) e só a "Participantes"=coexecutor é
-gravada.
+**Dependência de planilha (manual, do dono) — pós-redesenho 3 papéis.** As colunas de papel agora são
+**`Participantes`** (Coautor), **`Participantes 2`** (ex-`Planejador` → Participante) e
+**`Contribuidor`**. Precisam existir no cabeçalho com **exatamente** esses nomes (caixa + acentos),
+tanto na aba **`GoDocs`** (prod) quanto na **`STAGING`**. Ações do dono na planilha: **(1)** renomear a
+coluna antiga **"Planejador" → "Participantes 2"**; **(2)** garantir uma coluna **"Contribuidor"** (pode
+reaproveitar a antiga "Idealizador" renomeando, ou criar nova). As antigas "Idealizador"/"Referência
+técnica" saíram do código (o append/update não escreve mais nelas). Enquanto uma coluna esperada não
+existir, o append/update **ignora** com aviso (não quebra) e só as presentes são gravadas.
 
 **Status.** ⏳ Implementado; testes verdes (526) + `build`/`build:worker` OK; typecheck sem novos
 erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
