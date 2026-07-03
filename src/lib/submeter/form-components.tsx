@@ -389,6 +389,55 @@ const COR_PAPEL: Record<PapelParticipante, string> = {
   contribuidor: "#8A7D00", // âmbar (família do lime do form) — "Contribuidor"
 };
 
+// Descrição de cada papel (chaveada pelo `value` interno) — exibida na legenda abaixo
+// do campo, para o submissor escolher o papel certo. Texto com acentuação (regra 4).
+const DESCRICAO_PAPEL: Record<PapelParticipante, string> = {
+  coexecutor:
+    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal.",
+  planejador:
+    "Apoiou diretamente na construção do projeto, executando tarefas e entregas concretas dentro de um escopo definido.",
+  contribuidor:
+    "Auxiliou o time com planejamento, decisões técnicas ou ideias, sem atuar diretamente na execução.",
+};
+
+// Legenda dos papéis: uma linha por papel com o ponto colorido (MESMA cor do seletor —
+// reforça "cor = papel"), o rótulo em negrito e a descrição. a11y: o rótulo em texto é
+// o sinal primário; o ponto só reforça (aria-hidden). Ajuda contextual — renderizada
+// abaixo do campo de participantes (só com "em equipe = sim").
+export function LegendaPapeis() {
+  return (
+    <div
+      className="mt-2.5 rounded-xl px-3.5 py-3"
+      style={{ background: "var(--go-cream)", border: "1px solid rgba(0,89,169,0.08)" }}
+    >
+      <p
+        className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.05em]"
+        style={{ color: "#8b8b9a" }}
+      >
+        O que significa cada papel
+      </p>
+      <ul className="flex flex-col gap-2">
+        {PAPEIS_PARTICIPANTE.map(({ value, label }) => (
+          <li key={value} className="flex gap-2">
+            <span
+              className="mt-[5px] h-2 w-2 shrink-0 rounded-full"
+              style={{ background: COR_PAPEL[value] }}
+              aria-hidden="true"
+            />
+            <p className="text-[12px] leading-snug" style={{ color: "#5b5b6a" }}>
+              <span className="font-bold" style={{ color: "var(--go-text-heading)" }}>
+                {label}
+              </span>
+              {" — "}
+              {DESCRICAO_PAPEL[value]}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // Participantes do time + o PAPEL obrigatório de cada um. Uma linha por pessoa:
 // e-mail à esquerda, seletor de papel à direita. O papel começa vazio e é
 // obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/

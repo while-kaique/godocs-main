@@ -509,6 +509,15 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > os 3 atuais **+** os 2 legados (não rejeita cliente com cache antigo — version skew).
 > **Abaixo, o texto original (4 papéis) fica como histórico; vale o redesenho acima.**
 
+> 📖 **Legenda dos papéis (Kaique, 2026-07-02):** abaixo do campo de participantes (Etapa 1, só com
+> "em equipe = sim") há uma **legenda** explicando o que cada papel significa — uma linha por papel
+> com o ponto colorido (mesma cor do seletor, `COR_PAPEL`), o rótulo em negrito e a descrição.
+> Componente `LegendaPapeis` + mapa `DESCRICAO_PAPEL` em `form-components.tsx`; renderizado em
+> `step1.tsx` logo após `ParticipantesPapeisInput`. Só UI (sem backend). Textos: Coautor = "Executou e
+> esteve à frente… executor ou coexecutor principal"; Participante = "Apoiou diretamente… entregas
+> concretas dentro de um escopo definido"; Contribuidor = "Auxiliou com planejamento, decisões técnicas
+> ou ideias, sem atuar diretamente na execução".
+
 **Decisões fechadas (com o Luis).**
 - **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
   · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
