@@ -113,23 +113,19 @@ export type SavingColetado = {
   // pessoa de fato fazia à mão; `horas_escala` = volume incremental que só a automação
   // passou a cobrir (e que nenhum humano fazia). As duas SOMAM o total (economia_horas_mes)
   // — o TOTAL é que vira R$ (não muda); o split é só TRANSPARÊNCIA/auditoria (colunas
-  // "Saving Horas Real"/"Saving Horas Escalado" no Sheets). Preenchidos pelo LLM (prompt
-  // gate). Null = não se aplica (ninguém fazia / custo evitado puro / pontual).
+  // "Saving Horas Real"/"Saving Horas Escalado" no Sheets). Preenchidos pelo AGENTE quando
+  // ele conduz a pergunta no chat (buildSavingPrompt); na gravação, resolverSplitCargaEscala
+  // aplica a rede conservadora (carga real = total, escala 0) se o agente não capturou. Null
+  // = não se aplica (ninguém fazia / custo evitado puro / pontual).
   horas_carga_real?: number | null;
   horas_escala?: number | null;
-  // Estado do GATE DETERMINÍSTICO do split (gerenciado pelo backend, não ecoado pelo
-  // LLM — re-mesclado a cada turno). null = ainda não perguntado · 'pendente' = pergunta
-  // feita, aguardando o nº da carga real · 'confirmar_escala' = carga real informada mas a
-  // ESCALA ficou ≥60% do total (precisaConfirmarEscala) — aguardando confirmação de
-  // plausibilidade (trava p/ dia×mês e escala inflada) · 'ok' = split capturado
-  // (horas_carga_real/horas_escala preenchidos e somando o total). O backend BLOQUEIA o
-  // preview enquanto não for 'ok' (quando aplicaSplitCargaEscala). Garante que a info exista.
+  // LEGADO — não é mais usado. Era o estado do gate DETERMINÍSTICO do split, removido em
+  // jul/2026 (o forçamento gerava loop na edição — ver SPEC_CORRECOES). O split agora é
+  // conduzido pelo agente no chat. Mantido no tipo só para não quebrar snapshots antigos.
   carga_escala?: 'pendente' | 'confirmar_escala' | 'ok' | null;
-  // Explicação do USUÁRIO ao gate do split (o texto cru da resposta a "quantas horas a
-  // pessoa realmente fazia à mão") — capturada pelo backend no turno do gate e re-mesclada
-  // a cada turno. Alimenta a JUSTIFICATIVA do split (subseção do memorial + fallback da
-  // coluna "Justificativa Saving Escalado e Real"): é a base de "como o agente concluiu o
-  // split". Null quando ainda não respondido / não se aplica.
+  // LEGADO — capturava a explicação crua do usuário ao gate determinístico (removido). Ainda
+  // lido como fallback opcional por derivarJustificativaCargaEscala; hoje fica null (o agente
+  // escreve a justificativa direto na subseção do memorial).
   carga_escala_racional?: string | null;
 };
 

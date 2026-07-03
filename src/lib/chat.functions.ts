@@ -32,7 +32,7 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import { runBackground } from '@/lib/background';
-import { runOrchestrator, aplicaConfirmacaoBaseHoras, aplicaSplitCargaEscala, precisaConfirmarEscala, interpretarCargaReal, contestaTotalCargaReal, totalEconomiaHoras, unidadeHorasDe, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
+import { runOrchestrator, aplicaConfirmacaoBaseHoras, resolverSplitCargaEscala, receitaMemorialEhSaving } from '@/lib/agents/orchestrator';
 import { compilarDocumentacao } from '@/lib/agents/doc-compiler';
 import { validarDocumentacao } from '@/lib/agents/validator';
 import { analisarProjeto as analisarProjetoAgent } from '@/lib/agents/analyzer';
@@ -769,72 +769,14 @@ function nudgeTetoPessoa(cap: number): string {
 }
 
 // ─── Gate determinístico 3: SPLIT carga real × ganho por escala ──────────────
-// Quando ALGUÉM fazia a tarefa à mão (alguem_fazia='sim') e o saving é recorrente, a
-// análise EXIGE saber quanto do total a pessoa realmente fazia (carga real) e quanto a
-// automação ampliou (escala). O prompt sozinho não garante (o LLM às vezes previewa
-// sem perguntar) — então o backend BLOQUEIA o preview e pergunta o número da carga
-// real; a escala é o resto (total − carga real). Informação SEMPRE capturada.
-function perguntaCargaEscala(total: number, unidade: string): string {
-  return `Antes de eu fechar: dessas **${total}${unidade}** economizadas, quantas a pessoa **realmente fazia à mão**, por conta própria, antes da automação? (O restante é o volume que só a automação passou a cobrir — o ganho por escala.) Me diga o **total no mesmo período (${unidade})** — **não** o valor por dia. Se a pessoa já fazia o volume todo, é o próprio total (${total}${unidade}).`;
-}
-// ── Sub-gate: CONFIRMAÇÃO de escala alta (trava de plausibilidade) ────────────
-// Quando a carga real informada deixa a ESCALA ≥60% do total (precisaConfirmarEscala),
-// o backend não fecha de cara: confirma se aquele volumão era mesmo "ninguém fazia".
-// Pega os erros de dia×mês (carga real subestimada) e de escala inflada.
-const OPCOES_CONFIRMAR_ESCALA = [
-  'Sim, esse volume extra só existe por causa da automação (ninguém fazia à mão)',
-  'Não — a pessoa fazia o volume todo à mão (a economia é toda carga real)',
-  'Informei errado (ex.: era valor por dia) — quero corrigir o número',
-];
-function perguntaConfirmarEscala(real: number, escala: number, total: number, unidade: string): string {
-  const pct = total > 0 ? Math.round((escala / total) * 100) : 0;
-  return `Só confirmando, para não inflar o número: você indicou que a pessoa fazia **${real}${unidade}** à mão, então **${escala}${unidade}** (${pct}% do total) seriam volume que **ninguém fazia** e que só passou a existir com a automação. Está certo?`;
-}
-// 1 = confirma a escala · 2 = fazia o volume todo (carga real = total) · 3 = corrigir
-// (reabre a pergunta da carga real) · null = ambíguo (re-pergunta a confirmação).
-// selectedOption é o índice 1-based do botão (z.number()), como nos gates jornada/teto.
-function interpretarConfirmacaoEscala(content: string, selectedOption: number | null): 1 | 2 | 3 | null {
-  if (selectedOption === 1) return 1;
-  if (selectedOption === 2) return 2;
-  if (selectedOption === 3) return 3;
-  const t = (content ?? '').trim().toLowerCase();
-  if (!t) return null;
-  if (/corrig|errad|por dia|errei|engano|me enganei/.test(t)) return 3;
-  if (/\bn[ãa]o\b|fazia (o )?(volume )?tudo|volume todo|tod[oa] (a )?carga|era tudo/.test(t)) return 2;
-  if (/\bsim\b|confirmo|correto|isso( mesmo)?|exato|t[áa] certo|certo/.test(t)) return 1;
-  return null;
-}
-// interpretarCargaReal vive em orchestrator.ts (puro/testável, junto dos predicados do
-// split). Importado no topo. Reconhece porcentagem ("100%") e "nada escalado/tudo na mão".
-function nudgeCargaEscala(real: number, escala: number, racional: string): string {
-  const baseUsuario = racional?.trim()
-    ? `\nO usuário explicou assim (use ISTO como base da justificativa, sintetizando — não copie cru): «${racional.trim()}»`
-    : '';
-  const sobreEscalaZero =
-    escala === 0
-      ? ' Como o ganho por escala é 0, explique que a pessoa já fazia o volume TODO à mão (a automação não ampliou o volume, só o executou).'
-      : '';
-  return `[SISTEMA] Split definido pelo usuário: CARGA REAL (trabalho humano de fato) = ${real}h; GANHO POR ESCALA (volume que só a automação cobre) = ${escala}h (somam o total economizado). Os campos horas_carga_real e horas_escala já estão preenchidos com esses valores — MANTENHA-OS.${baseUsuario}
-Registre o split no memorial numa subseção própria com o cabeçalho EXATO "### Carga real e ganho por escala" (dentro de "Saving de Pessoas"), em horas/qualitativo (SEM R$). Essa subseção é a JUSTIFICATIVA que vai para a planilha (coluna "Justificativa Saving Escalado e Real") — escreva 2 a 4 frases que respondam, com base no que o usuário contou:
-1) O QUE A PESSOA FAZIA ANTES e quanto desse trabalho ela REALMENTE executava à mão (a carga real).
-2) O QUE A AUTOMAÇÃO PASSOU A FAZER/COBRIR depois que escalou — o volume incremental que ninguém fazia (o ganho por escala) e POR QUE ele cresceu tanto.
-3) COMO os números foram derivados: a hora de carga real (${real}h), a hora por escala (${escala}h) e o total economizado (${real + escala}h) — mostrando o cálculo/raciocínio (volume/frequência antes × depois → horas).${sobreEscalaZero}
-NÃO escreva só a definição de "ganho por escala" (isso é óbvio) — escreva o RACIOCÍNIO concreto deste projeto. Depois siga para o preview. NÃO pergunte sobre isso de novo.`;
-}
-
-// Nudge de ESCAPE do gate da carga real: o usuário não deu um nº claro de carga real e
-// parece estar CONTESTANDO o total (deu valor "por dia"/"por execução", disse que está
-// errado, ou não soube quantificar). Em vez de repetir a MESMA pergunta (loop reportado em
-// produção), devolvemos o controle ao orquestrador com este aviso, para o LLM RECALCULAR o
-// total a partir do que o usuário descreveu (ou ajudá-lo a quantificar). O gate de preview
-// reconduz a pergunta do split depois — a informação não se perde.
-function nudgeRecalcularCargaEscala(total: number, unidade: string): string {
-  return `[SISTEMA] O usuário NÃO informou um número claro de "carga real" — ele parece estar CONTESTANDO o total de ${total}${unidade} usado no cálculo (ex.: deu um valor "por dia"/"por execução", disse que o número está errado, ou não soube quantificar). NÃO repita a pergunta da carga real verbatim e NÃO gere o preview ainda.
-Releia a ÚLTIMA mensagem do usuário e aja:
-1) Se ele corrigiu/contestou o total (ex.: "5 min por dia para cada colaborador", "na verdade são X"), RECALCULE as horas economizadas a partir do que ele descreveu — converta para o MESMO PERÍODO do saving (ex.: minutos por dia × dias ÚTEIS no mês × nº de pessoas/colaboradores) e atualize as \`linhas\` (cargo, horas_antes, horas_depois) e o total. Se faltar algum dado para fechar o cálculo (tempo por execução, frequência, nº de pessoas ou de dias), PERGUNTE objetivamente só o que falta — uma pergunta por vez.
-2) Se ele apenas não soube quantificar, ajude-o, com uma pergunta simples, a separar o que ele REALMENTE fazia à mão antes do volume que só a automação passou a cobrir.
-Quando o total estiver correto e você for fechar, o SISTEMA reconduz a pergunta do split (carga real × escala) automaticamente — você NÃO a faz.`;
-}
+// Split CARGA REAL × GANHO POR ESCALA: a pergunta é CONDUZIDA PELO AGENTE (prompt em
+// buildSavingPrompt, no padrão saudável da verificação de IA — opções, uma vez, aceita e
+// segue). NÃO há mais gate determinístico bloqueando o preview: isso gerava o loop reportado
+// na edição (o backend descartava o preview do LLM e re-perguntava o mesmo número à força).
+// A rede de segurança agora é NÃO-bloqueante e vive na gravação: resolverSplitCargaEscala
+// (orchestrator.ts) preenche horas_carga_real/horas_escala com o valor conservador (carga
+// real = total, escala 0) quando o agente não capturou — mantém as colunas do Sheets sem
+// travar o chat. Ver SPEC_CORRECOES (jul/2026, remoção do forçamento).
 
 // Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
 // na verdade é saving, o backend bloqueia o preview/complete e devolve isto, mantendo a fase
@@ -952,9 +894,6 @@ export async function enviarMensagem(rawData: unknown) {
   // trabalho humano e elevar até no máx. 30 dias. Resposta ambígua → re-pergunta
   // determinística (sem chamar o orquestrador).
   const gateBaseHoras = estado.fase === 'saving' && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
-  // Gate do split carga real × escala (independente do gateBaseHoras: vale também p/
-  // trimestral/semestral, onde a jornada NÃO se aplica).
-  const gateCargaEscala = estado.fase === 'saving' && aplicaSplitCargaEscala(ctx, estado.saving);
   let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === 'pendente') {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
@@ -992,92 +931,10 @@ export async function enviarMensagem(rawData: unknown) {
       estado.saving = { ...estado.saving, teto_pessoa: null };
       history.push({ role: 'user', content: nudgeTetoPessoa(cap) });
     }
-  } else if (gateCargaEscala && estado.saving.carga_escala === 'pendente') {
-    // (3) Turno de resposta ao SPLIT carga real × escala. O usuário informa o nº da
-    // carga real; a escala é o resto (total − carga real). Preenchemos os dois campos
-    // e injetamos o nudge [SISTEMA] para o LLM registrar no memorial.
-    const total = totalEconomiaHoras(estado.saving);
-    // ESCAPE DO LOOP: se o usuário está CONTESTANDO o total (valor "por dia", "está
-    // errado", nº acima do total) ou não deu um nº utilizável, repetir a pergunta verbatim
-    // só recria o loop reportado em produção (o usuário corrige, o backend re-pergunta a
-    // mesma coisa). Devolvemos o controle ao orquestrador — reset do estado do gate + nudge
-    // p/ RECALCULAR/esclarecer. O gate de preview (mais abaixo) reconduz a pergunta do split
-    // quando o LLM previewar, então a informação continua garantida (não some).
-    // `contesta` tem PRECEDÊNCIA sobre interpretarCargaReal: na contestação, o parser às
-    // vezes extrai um nº plausível ("0.5h por mês" → 0.5) que NÃO é a carga real, e capturá-lo
-    // congelaria o total errado.
-    const contesta = contestaTotalCargaReal(data.content, total);
-    const real = contesta ? null : interpretarCargaReal(data.content, total);
-    if (contesta || real === null) {
-      log('enviarMensagem', `Carga×escala: ${contesta ? 'usuário contesta o total' : 'resposta sem nº de carga real'} — devolvendo ao orquestrador p/ recalcular/esclarecer`);
-      estado.saving = { ...estado.saving, carga_escala: null, horas_carga_real: null, horas_escala: null };
-      history.push({ role: 'user', content: nudgeRecalcularCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)) });
-      // reask permanece null → o orquestrador roda neste turno (vê a correção + o nudge).
-    } else {
-      const escala = Math.round((total - real) * 100) / 100;
-      // Guarda a EXPLICAÇÃO crua do usuário (texto da resposta ao gate) — é a base de
-      // "como o agente concluiu o split" (alimenta a subseção do memorial E o fallback
-      // da coluna de justificativa). Re-mesclada a cada turno (junto dos demais campos).
-      const racional = (data.content ?? '').trim();
-      if (precisaConfirmarEscala(real, total)) {
-        // TRAVA: a escala ficou ≥60% do total — não fecha de cara, confirma a plausibilidade
-        // (pega dia×mês com carga real subestimada e escala inflada). Não bloqueia, só confirma.
-        log('enviarMensagem', `Carga×escala: escala ALTA (real=${real}h, escala=${escala}h de ${total}h) — confirmando plausibilidade`);
-        estado.saving = {
-          ...estado.saving,
-          horas_carga_real: real,
-          horas_escala: escala,
-          carga_escala: 'confirmar_escala',
-          carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
-        };
-        reask = {
-          type: 'options', question: perguntaConfirmarEscala(real, escala, total, unidadeHorasDe(estado.saving.tipo_saving)),
-          options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
-          saving: { ...estado.saving }, receita: estado.receita,
-        };
-      } else {
-        log('enviarMensagem', `Carga×escala: carga real=${real}h, escala=${escala}h (total=${total}h)`);
-        estado.saving = {
-          ...estado.saving,
-          horas_carga_real: real,
-          horas_escala: escala,
-          carga_escala: 'ok',
-          carga_escala_racional: racional || estado.saving.carga_escala_racional || null,
-        };
-        history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional) });
-      }
-    }
-  } else if (gateCargaEscala && estado.saving.carga_escala === 'confirmar_escala') {
-    // (3b) Turno de resposta à CONFIRMAÇÃO de escala alta. 1=confirma o split · 2=a pessoa
-    // fazia o volume TODO (carga real = total, escala 0) · 3=corrigir (reabre a pergunta da
-    // carga real, reforçando "total no mês"). Resolve sempre (sem loop): ambíguo → re-pergunta.
-    const total = totalEconomiaHoras(estado.saving);
-    const realAtual = (estado.saving.horas_carga_real as number | null) ?? total;
-    const resp = interpretarConfirmacaoEscala(data.content, data.selected_option ?? null);
-    if (resp === null) {
-      const escalaAtual = Math.round((total - realAtual) * 100) / 100;
-      log('enviarMensagem', 'Carga×escala: confirmação ambígua — re-perguntando');
-      reask = {
-        type: 'options', question: perguntaConfirmarEscala(realAtual, escalaAtual, total, unidadeHorasDe(estado.saving.tipo_saving)),
-        options: OPCOES_CONFIRMAR_ESCALA, fase: 'saving', coletado: estado.coletado,
-        saving: { ...estado.saving, carga_escala: 'confirmar_escala' }, receita: estado.receita,
-      };
-    } else if (resp === 3) {
-      log('enviarMensagem', 'Carga×escala: usuário vai corrigir o nº — reabrindo a pergunta da carga real');
-      estado.saving = { ...estado.saving, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null };
-      reask = {
-        type: 'question', content: perguntaCargaEscala(total, unidadeHorasDe(estado.saving.tipo_saving)),
-        fase: 'saving', coletado: estado.coletado, saving: { ...estado.saving }, receita: estado.receita,
-      };
-    } else {
-      const real = resp === 2 ? total : realAtual;
-      const escala = Math.round((total - real) * 100) / 100;
-      log('enviarMensagem', `Carga×escala: confirmação resolvida (real=${real}h, escala=${escala}h, opção=${resp})`);
-      const racional = (estado.saving.carga_escala_racional as string | null | undefined)?.trim() || null;
-      estado.saving = { ...estado.saving, horas_carga_real: real, horas_escala: escala, carga_escala: 'ok', carga_escala_racional: racional };
-      history.push({ role: 'user', content: nudgeCargaEscala(real, escala, racional ?? '') });
-    }
   }
+  // NOTA: o split CARGA REAL × ESCALA NÃO tem mais gate determinístico aqui. O agente
+  // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
+  // gravação (resolverSplitCargaEscala em submeterParaValidacao) — ver SPEC_CORRECOES.
 
   const resultado = reask ?? await runOrchestrator(
     ctx,
@@ -1098,17 +955,11 @@ export async function enviarMensagem(rawData: unknown) {
       jornada_base: estado.saving.jornada_base ?? null,
       teto_pessoa: estado.saving.teto_pessoa ?? null,
       // Split carga real × escala: o LLM às vezes omite campos já coletados num turno
-      // posterior (igual ao memorial). Mantém o valor anterior quando não reenviado,
-      // para o split não sumir entre o preview e o complete. `carga_escala` é o estado
-      // do gate determinístico (gerenciado pelo backend, nunca ecoado pelo LLM).
+      // posterior (igual ao memorial). Mantém o valor anterior quando não reenviado, para
+      // o split que o AGENTE capturou não sumir entre o preview e o complete. (A pergunta
+      // é conduzida pelo agente; a rede conservadora é aplicada na gravação.)
       horas_carga_real: resultado.saving.horas_carga_real ?? estado.saving.horas_carga_real ?? null,
       horas_escala: resultado.saving.horas_escala ?? estado.saving.horas_escala ?? null,
-      carga_escala: estado.saving.carga_escala ?? null,
-      // Explicação do usuário ao gate (backend-only, nunca ecoada pelo LLM): preserva.
-      carga_escala_racional:
-        (resultado.saving.carga_escala_racional as string | null | undefined) ??
-        estado.saving.carga_escala_racional ??
-        null,
     };
   }
 
@@ -1257,56 +1108,11 @@ export async function enviarMensagem(rawData: unknown) {
     }
   }
 
-  // ── GATE SPLIT CARGA REAL × ESCALA — informação obrigatória antes do preview ──
-  // Quando alguém fazia à mão (recorrente), a análise EXIGE o split. Roda por ÚLTIMO
-  // (após jornada/teto) e só quando o resultado ainda é preview/complete (um gate de
-  // cada vez). Se o LLM já capturou um split válido (os dois campos somando ~total),
-  // libera (marca 'ok'); senão, BLOQUEIA o preview e pergunta o nº da carga real — a
-  // escala é o resto. Garante que a informação SEMPRE exista, independente do LLM.
-  if (
-    gateCargaEscala &&
-    estado.saving.carga_escala !== 'ok' &&
-    (resultado.type === 'preview' || resultado.type === 'complete')
-  ) {
-    const savingAtual = (resultado.saving ?? estado.saving) as SavingColetado;
-    const total = totalEconomiaHoras(savingAtual);
-    const real = savingAtual.horas_carga_real;
-    const escala = savingAtual.horas_escala;
-    const splitValido =
-      total > 0 && real != null && escala != null && Math.abs((real + escala) - total) <= 1;
-    if (total <= 0) {
-      // Sem economia de horas (outro gate cuida do ganho-zero) — não força o split.
-    } else if (splitValido) {
-      // Clamp defensivo: a carga real NÃO pode exceder o total (visto em produção — erro de
-      // extração do LLM gravava real>total). Re-deriva a escala do real saneado (soma exata).
-      const realSan = Math.min(Math.max(Number(real), 0), total);
-      const escalaSan = Math.round((total - realSan) * 100) / 100;
-      if (precisaConfirmarEscala(realSan, total)) {
-        // Split do LLM (sem passar pelo gate) com escala ≥60% → confirma plausibilidade.
-        log('enviarMensagem', `Carga×escala: split do LLM com escala ALTA (real=${realSan}h, escala=${escalaSan}h de ${total}h) — confirmando`);
-        Object.assign(resultado, {
-          type: 'options',
-          question: perguntaConfirmarEscala(realSan, escalaSan, total, unidadeHorasDe(savingAtual.tipo_saving)),
-          options: OPCOES_CONFIRMAR_ESCALA,
-          fase: 'saving',
-          saving: { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'confirmar_escala' },
-        });
-        delete (resultado as { content?: string }).content;
-      } else {
-        log('enviarMensagem', `Carga×escala: split do LLM saneado (real=${realSan}h, escala=${escalaSan}h) — liberado`);
-        resultado.saving = { ...savingAtual, horas_carga_real: realSan, horas_escala: escalaSan, carga_escala: 'ok' };
-      }
-    } else {
-      log('enviarMensagem', '⛔ Preview do saving sem o split carga real × escala — forçando pergunta (nº da carga real)');
-      Object.assign(resultado, {
-        type: 'question',
-        content: perguntaCargaEscala(total, unidadeHorasDe(savingAtual.tipo_saving)),
-        fase: 'saving',
-        saving: { ...savingAtual, carga_escala: 'pendente', horas_carga_real: null, horas_escala: null },
-      });
-      delete (resultado as { options?: unknown }).options;
-    }
-  }
+  // NOTA: aqui existia o GATE SPLIT CARGA REAL × ESCALA que BLOQUEAVA o preview e
+  // re-perguntava o nº da carga real à força. Removido (jul/2026): descartar o preview
+  // do agente e repetir a mesma pergunta gerava o loop reportado na edição. Agora o
+  // agente conduz o split no chat (buildSavingPrompt) e a rede conservadora entra na
+  // gravação (resolverSplitCargaEscala em submeterParaValidacao). Ver SPEC_CORRECOES.
 
   // Aprovação da documentação (doc_preview → impacto): a compilação da doc é o
   // CERNE do produto e é feita pelo agente — NÃO há fallback. Compilamos e
@@ -2076,6 +1882,19 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     }
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
+  // Rede silenciosa do split carga real × escala: o agente conduz a pergunta no chat (não
+  // há mais gate que force), mas pode não capturar. Se o split se aplica ('sim' recorrente
+  // com horas) e não veio, assume o CONSERVADOR — carga real = total, escala 0 — para as
+  // colunas de transparência não ficarem vazias. NÃO bloqueia nada. Idempotente (só entra
+  // quando falta o split). O sync reverso horário não passa por aqui → legados ociosos ficam
+  // como estão. Ver resolverSplitCargaEscala (orchestrator.ts) e SPEC_CORRECOES.
+  if (saving) {
+    const split = resolverSplitCargaEscala(projeto.alguem_fazia, saving as SavingColetado);
+    if (split) {
+      saving.horas_carga_real = split.horas_carga_real;
+      saving.horas_escala = split.horas_escala;
+    }
+  }
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
   if (projeto.nome) {
@@ -2431,6 +2250,19 @@ export async function resyncGoogle(rawData: unknown) {
     avisarDivergenciaMemorialLinhas(conteudo.saving as SavingColetado, projeto_id);
   }
   const saving = conteudo.saving as Record<string, unknown> | undefined;
+  // Rede silenciosa do split carga real × escala: o agente conduz a pergunta no chat (não
+  // há mais gate que force), mas pode não capturar. Se o split se aplica ('sim' recorrente
+  // com horas) e não veio, assume o CONSERVADOR — carga real = total, escala 0 — para as
+  // colunas de transparência não ficarem vazias. NÃO bloqueia nada. Idempotente (só entra
+  // quando falta o split). O sync reverso horário não passa por aqui → legados ociosos ficam
+  // como estão. Ver resolverSplitCargaEscala (orchestrator.ts) e SPEC_CORRECOES.
+  if (saving) {
+    const split = resolverSplitCargaEscala(projeto.alguem_fazia, saving as SavingColetado);
+    if (split) {
+      saving.horas_carga_real = split.horas_carga_real;
+      saving.horas_escala = split.horas_escala;
+    }
+  }
   const receita = conteudo.receita as Record<string, unknown> | undefined;
 
   // ganho_total_mensal — mesma fórmula do submeterParaValidacao.

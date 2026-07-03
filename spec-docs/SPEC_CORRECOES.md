@@ -6,6 +6,62 @@
 
 ---
 
+## 2026-07-03 — Loop da pergunta "quantas horas a pessoa fazia à mão" (gate carga real × escala) na EDIÇÃO
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/loop-carga-escala-agente-conduz`
+
+**Sintoma:** usuários relataram que, ao **editar** um projeto e chegar no memorial, o chat travava
+repetindo **sem fim** a pergunta do split carga real × escala ("dessas Xh economizadas, quantas a pessoa
+realmente fazia à mão?"). Mesmo respondendo ("eu já falei", "é assim e assado que as horas funcionam", ou
+dando um valor), o agente **jogava a MESMA pergunta de novo** e nunca saía dela. Concentrado em edições.
+
+**Causa-raiz:** a pergunta era um **GATE DETERMINÍSTICO** no backend, não uma pergunta do agente. Duas
+camadas de forçamento em `chat.functions.ts`/`enviarMensagem`: (1) a branch de resposta
+(`carga_escala==='pendente'`) parseava o texto do usuário e, quando ele **contestava o total** ou não dava
+número limpo, refazia via escape (reset + nudge pro LLM recalcular); (2) o **gate de preview**
+(`carga_escala!=='ok'`) **interceptava o preview/complete que o LLM produzia e o descartava**, recolocando
+a pergunta fixa. Ou seja: por mais que o agente "raciocinasse" e tentasse seguir, um `if` do backend
+sobrepunha a saída dele e re-perguntava. O escape (fix de 30/jun, `contestaTotalCargaReal`) **delegava a
+terminação ao LLM** sem loop-breaker determinístico — e, na **edição**, o memorial pronto (linhas/total já
+fixos) **ancora** o LLM a re-previewar o MESMO total, então o gate re-perguntava indefinidamente. A
+pergunta ainda dizia "não o valor por dia", e o usuário de edição respondia "5 min por dia" → casava
+`/por dia/` no `contestaTotalCargaReal` → escape → loop.
+
+**Fix — o AGENTE conduz a pergunta (padrão saudável da verificação de "usa IA?"), sem forçamento:**
+- **Prompt (`buildSavingPrompt`, `orchestrator.ts`):** o bloco "CARGA REAL × GANHO POR ESCALA" foi
+  virado de "CONDUZIDA PELO SISTEMA — você NÃO pergunta" para **"VOCÊ conduz — pergunte 1×"**, espelhando
+  a verificação de IA (`orchestrator.ts:159`): pergunta UMA vez com `type:"options"` (["fazia o volume
+  todo à mão" → carga real=total/escala 0 · "só uma parte" → pergunta curta quanto, convertendo "por dia"
+  · "não sei" → ajuda 1x, senão conservador]); confirma plausibilidade (escala >~60%) UMA vez; e — o
+  ponto-chave — **aceita a discordância e SEGUE, NUNCA repete** a mesma pergunta (igual ao PASSO 3 da IA,
+  onde contradição é registrada e não vira loop).
+- **Backend (`chat.functions.ts`):** **removidos** o gate de preview que bloqueava/descartava o preview e
+  as branches determinísticas de resposta (`carga_escala` 'pendente'/'confirmar_escala'), mais os helpers
+  mortos (`perguntaCargaEscala`, `perguntaConfirmarEscala`, `interpretarConfirmacaoEscala`,
+  `nudgeCargaEscala`, `nudgeRecalcularCargaEscala`, `OPCOES_CONFIRMAR_ESCALA`). Em `orchestrator.ts`,
+  removidos os predicados que só serviam ao gate (`interpretarCargaReal`, `contestaTotalCargaReal`,
+  `precisaConfirmarEscala`, `parseNumeroPtBR`, `LIMITE_ESCALA_ALTA`).
+- **Rede de segurança NÃO-bloqueante (`resolverSplitCargaEscala`, `orchestrator.ts`):** como o forçamento
+  saiu, o agente pode não capturar o split. Na **gravação** (`submeterParaValidacao` e `resyncGoogle`), se
+  o split se aplica ('sim' recorrente com horas) e não veio, o backend assume o **conservador — carga real
+  = total, escala 0** ("fazia o volume todo à mão"; nunca infla escala) e preenche
+  `horas_carga_real`/`horas_escala`. Mantém as colunas "Saving Horas Real/Escalado" + a justificativa
+  preenchidas **sem travar/repetir nada no chat**. O sync reverso horário NÃO passa por aí → **legados
+  ociosos ficam como estão** (respeita a decisão 29/06 do 'nao'→0/total e do 'sim'-sem-split→0/0 no
+  `derivarSplitHorasSheet`, que **não foi alterado**).
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (bloco do prompt + `resolverSplitCargaEscala`;
+remoção dos predicados do gate), `src/lib/chat.functions.ts` (remoção do gate de preview, das branches e
+dos helpers; chamada de `resolverSplitCargaEscala` no submit/resync), `src/lib/agents/types.ts`
+(`carga_escala`/`carga_escala_racional` viram LEGADO), `src/lib/testes/prompt-registry.ts` (descrição
+atualizada), `tests/saving-carga-escala.test.ts` (testes do novo desenho + `resolverSplitCargaEscala`).
+
+**Decisão de design:** a pergunta deixou de ser uma armadilha determinística e passou a ser conduzida pelo
+agente como qualquer outra pergunta saudável (opções, uma vez, aceita e segue). A garantia do DADO (não do
+diálogo) migrou para uma rede conservadora na gravação — o chat nunca mais trava por causa do split.
+
+---
+
 ## 2026-07-01 — Investigador sem NENHUM projeto visível — `/edicoes` estourando o limite de 32 MiB de RPC
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/investigador-edicoes-rpc-limit`
