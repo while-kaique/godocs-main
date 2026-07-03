@@ -53,16 +53,36 @@ export function filtrarSugestoes(
 let pessoasCache: SugestaoParticipante[] | null = null;
 let pessoasPromise: Promise<SugestaoParticipante[]> | null = null;
 
+// GET com RETRY curto. O endpoint às vezes cai num erro TRANSITÓRIO de infra do
+// Godeploy no cold start ("Internal error while starting up Durable Object storage
+// caused object to be reset") que devolve 502 em QUALQUER rota de API — não é o
+// handler (esta rota nem toca o env.DB). Como recupera em 1-2 tentativas, re-tentamos
+// no cliente com backoff curto antes de desistir; assim a lista aparece sozinha.
+async function buscarSugestoesComRetry(): Promise<SugestaoParticipante[]> {
+  const MAX = 3;
+  let ultimoErro: unknown;
+  for (let tentativa = 1; tentativa <= MAX; tentativa++) {
+    try {
+      const lista = await apiFetch<SugestaoParticipante[]>("/api/participantes/sugestoes");
+      return Array.isArray(lista) ? lista : [];
+    } catch (err) {
+      ultimoErro = err;
+      if (tentativa < MAX) await new Promise((r) => setTimeout(r, 400 * tentativa));
+    }
+  }
+  throw ultimoErro;
+}
+
 async function carregarPessoas(): Promise<SugestaoParticipante[]> {
   if (pessoasCache) return pessoasCache;
   if (!pessoasPromise) {
-    pessoasPromise = apiFetch<SugestaoParticipante[]>("/api/participantes/sugestoes")
+    pessoasPromise = buscarSugestoesComRetry()
       .then((lista) => {
-        pessoasCache = Array.isArray(lista) ? lista : [];
+        pessoasCache = lista;
         return pessoasCache;
       })
       .catch(() => {
-        pessoasPromise = null; // permite nova tentativa num próximo mount
+        pessoasPromise = null; // esgotou os retries → permite nova tentativa num próximo mount
         return [];
       });
   }

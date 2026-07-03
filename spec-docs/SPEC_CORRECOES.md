@@ -14,26 +14,34 @@
 dinâmica da TeamGuide — só aparecia o erro de validação "Insira um e-mail válido". E não havia nenhum
 sinal de que a lista estava sendo carregada (parecia quebrado).
 
-**Causa-raiz:** o dropdown só abria quando `suggestions.length > 0` (`ParticipantesPapeisInput`), e a lista
-da TeamGuide (`GET /api/participantes/sugestoes`, ~1 chamada, mas cold start do worker ≈1s) só COMEÇAVA a
-carregar quando o usuário marcava "em equipe = sim". Quem digitava logo em seguida caía na janela em que a
-lista ainda era `[]` → dropdown fechado → o `onBlur`/Enter chamava `tryAdd("kai")` → falhava o `EMAIL_RE`
-→ erro de validação. Sem estado de "carregando", a lista vazia era indistinguível de "quebrado".
+**Causa-raiz (DUAS somadas):**
+1. **Infra (a de verdade):** `GET /api/participantes/sugestoes` caía, de forma **intermitente**, num erro de
+   plataforma do Godeploy no cold start — `Internal error while starting up Durable Object storage caused
+   object to be reset` → **502**. Nos logs, o mesmo erro batia em `/api/config` e `/api/auth/me` no MESMO
+   instante: é o Durable Object que respalda o `env.DB` falhando ao subir, atingindo **TODAS** as rotas de
+   API (esta rota nem toca o banco) — **não** é o handler, e não dá pra capturar no código. Recupera sozinho
+   em 1-2 tentativas (às 17:03 o `/api/config` já voltava `ok`). Nessa janela, a lista vinha vazia.
+2. **UX que escondia a falha:** o dropdown só abria com `suggestions.length > 0` e a lista só começava a
+   carregar ao marcar "em equipe = sim". Sem estado de "carregando", uma lista vazia (por 502 ou por ainda
+   estar carregando) era indistinguível de "quebrado": quem digitava caía no `onBlur`→`tryAdd("kai")` →
+   falha do `EMAIL_RE` → "Insira um e-mail válido".
 
-**Fix (frontend, sem tocar server):**
-- **Velocidade — prefetch:** `prefetchSugestoesParticipantes()` dispara o fetch já no MOUNT da Etapa 1
-  (antes de marcar "em equipe"), então a lista costuma estar pronta quando o usuário digita. Reusa o
-  cache/promise de módulo (idempotente) + o cache de 10 min do servidor (`getSugestoesParticipantes`).
-- **Feedback — `loading`:** `useSugestoesParticipantes` passou a devolver `{ pessoas, loading }`. O
-  dropdown agora abre também enquanto `loadingSuggestions` (não só com sugestões) e mostra uma linha
-  SUTIL "Buscando e-mails na Team Guide…" com 3 pontinhos go-blue (mesmo vocabulário do chat, `go-bounce`,
-  neutralizado sob `prefers-reduced-motion` pelo CSS global), `role="status"`/`aria-live` para leitores.
-- Degradação suave intacta: fetch falha → lista vazia → "Ninguém encontrado…" e o campo segue aceitando
-  e-mail digitado.
+**Fix (frontend, sem tocar server — o 502 é infra, não código):**
+- **Retry no cliente:** `buscarSugestoesComRetry` tenta o endpoint até 3× com backoff (400/800ms) antes de
+  desistir — um 502 transitório do DO se auto-cura sozinho. Esgotado, reseta a promise (nova chance no
+  próximo mount) e degrada suave (lista vazia, campo segue aceitando e-mail digitado).
+- **Velocidade — prefetch:** `prefetchSugestoesParticipantes()` dispara o fetch (com retry) já no MOUNT da
+  Etapa 1 (antes de marcar "em equipe"), então a lista costuma estar pronta quando o usuário digita. Reusa
+  cache/promise de módulo (idempotente) + cache de 10 min do servidor (`getSugestoesParticipantes`).
+- **Feedback — `loading`:** `useSugestoesParticipantes` devolve `{ pessoas, loading }`. O dropdown abre
+  também enquanto `loadingSuggestions` e mostra uma linha SUTIL "Buscando e-mails na Team Guide…" (3
+  pontinhos go-blue, `go-bounce`, neutralizado sob `prefers-reduced-motion`; `role="status"`/`aria-live`).
 
-**Onde aterrissou:** `src/lib/submeter/participantes-sugestoes.ts` (`prefetch…` + hook devolve `loading`),
-`src/lib/submeter/step1.tsx` (prefetch no mount + passa `loadingSuggestions`), `src/lib/submeter/form-components.tsx`
-(`ParticipantesPapeisInput`: abre no load + linha "buscando…"). Sem rebuild de server obrigatório (só frontend).
+**Onde aterrissou:** `src/lib/submeter/participantes-sugestoes.ts` (retry + `prefetch…` + hook devolve
+`loading`), `src/lib/submeter/step1.tsx` (prefetch no mount + passa `loadingSuggestions`),
+`src/lib/submeter/form-components.tsx` (`ParticipantesPapeisInput`: abre no load + linha "buscando…").
+Só frontend. ⚠️ O erro de DO no cold start é da PLATAFORMA (mais frequente na staging, "fria"); se persistir
+em prod, é caso de abrir com o time do Godeploy — não é bug do app.
 
 ---
 
