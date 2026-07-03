@@ -13,12 +13,39 @@ O `dist/` é gitignored e rebuildado no deploy. O `worker.js` é commitado — r
 
 ## Regras de upload (Godeploy)
 
+### Suba o `dist/` INTEIRO (recursivo), não só `assets/`
+O upload deve incluir **todo** o conteúdo de `dist/`, não apenas `dist/assets/*`. O Vite
+copia os arquivos de `public/` para a **raiz** do `dist/` (`favicon.svg`, e futuros
+`robots.txt`, etc.) — eles ficam **fora** de `dist/assets/`. Se o comando só varrer
+`dist/assets/*`, esses arquivos nunca sobem: com o SPA fallback ligado, `/favicon.svg`
+não encontrado devolve o `index.html` (HTML), o browser não usa como ícone e o **favicon
+some**. _(bug real jul/2026.)_
+
+⚠️ **Nunca mantenha a lista de arquivos à mão.** Use o script `scripts/deploy-godeploy.sh`,
+que deriva upload **e** manifest do `dist/` real (ver "Deploy via script" abaixo).
+
 ### Paths sem prefixo `dist/`
 Os arquivos de `dist/` devem ser enviados **SEM** o prefixo `dist/` no path:
 
 ```
-✅ Correto:  -F "index.html=@./dist/index.html"  -F "assets/foo.js=@./dist/assets/foo.js"
+✅ Correto:  -F "index.html=@./dist/index.html"  -F "favicon.svg=@./dist/favicon.svg"  -F "assets/foo.js=@./dist/assets/foo.js"
 ❌ Errado:   -F "dist/index.html=@./dist/index.html"
+```
+
+### Deploy via script (recomendado)
+```bash
+# 1. Build
+npm run test && npm run build && npm run build:worker
+
+# 2. MCP getUploadToken -> pegue uploadUrl (e uploadId)
+# 3. Upload + manifest (varre dist/ recursivo, favicon incluído):
+scripts/deploy-godeploy.sh "<UPLOAD_URL>"
+#    -> imprime ASSETS_JSON=[...] com TODOS os arquivos do dist/
+
+# 4. MCP updateApp: appId (STAGING edf400b4 ANTES; PROD 674a3710 depois — regra 13),
+#    uploadId do passo 2, entrypoint "worker.js",
+#    assetConfig { "not_found_handling": "single-page-application" },
+#    assets = o ASSETS_JSON do passo 3.
 ```
 
 ### SPA fallback obrigatório

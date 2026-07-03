@@ -249,6 +249,9 @@ export type InsertProjeto = {
   escopo?: string | null;
   servico_externo?: string | null;
   membros?: string[];
+  // Papel de cada membro (e-mail→papel). Serializado em JSON. `membros` continua
+  // sendo a lista plana de todos (base do ownership); este mapa só guarda o papel.
+  membros_papeis?: Record<string, string> | null;
   nome?: string | null;
   data_criacao_projeto?: string | null;
   tipo_projeto?: string | null;
@@ -266,9 +269,9 @@ export async function insertProjeto(data: InsertProjeto) {
   const now = nowISO();
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
-      escopo, servico_externo, membros, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
+      escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -279,6 +282,7 @@ export async function insertProjeto(data: InsertProjeto) {
     data.escopo ?? null,
     data.servico_externo ?? null,
     data.membros ? JSON.stringify(data.membros) : null,
+    data.membros_papeis ? JSON.stringify(data.membros_papeis) : null,
     data.nome ?? null,
     data.data_criacao_projeto ?? null,
     data.tipo_projeto ?? null,
@@ -1140,7 +1144,8 @@ export type ProjetoRow = {
   ferramenta: string;
   escopo: string | null;
   servico_externo: string | null;
-  membros: string | null; // JSON string
+  membros: string | null; // JSON string (lista plana de todos os participantes)
+  membros_papeis: string | null; // JSON string (mapa e-mail→papel)
   status: string | null;
   chat_completo: number | null;
   data_criacao_projeto: string | null;

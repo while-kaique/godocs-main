@@ -2,7 +2,14 @@
 
 // ─── Fases do chat ──────────────────────────────────────────────────────────
 
-export type ChatFase = 'doc' | 'doc_preview' | 'saving' | 'saving_preview' | 'receita' | 'receita_preview' | 'completo';
+export type ChatFase =
+  | "doc"
+  | "doc_preview"
+  | "saving"
+  | "saving_preview"
+  | "receita"
+  | "receita_preview"
+  | "completo";
 
 // ─── Agente 1: Documentação técnica (6 seções do template) ───────────────────
 
@@ -39,16 +46,16 @@ export const documentacaoVazia = (): DocumentacaoColetada => ({
 // ─── Tabela de cargos (source of truth) ────────────────────────────────────
 
 export const CARGOS = [
-  { label: 'Estagiário', valor_hora: 10.78 },
-  { label: 'Assistente', valor_hora: 13.94 },
-  { label: 'Analista Júnior', valor_hora: 21.29 },
-  { label: 'Analista Pleno', valor_hora: 29.90 },
-  { label: 'Analista Sênior', valor_hora: 33.10 },
-  { label: 'Supervisor', valor_hora: 42.75 },
-  { label: 'Especialista+', valor_hora: 55.15 },
+  { label: "Estagiário", valor_hora: 10.78 },
+  { label: "Assistente", valor_hora: 13.94 },
+  { label: "Analista Júnior", valor_hora: 21.29 },
+  { label: "Analista Pleno", valor_hora: 29.9 },
+  { label: "Analista Sênior", valor_hora: 33.1 },
+  { label: "Supervisor", valor_hora: 42.75 },
+  { label: "Especialista+", valor_hora: 55.15 },
 ] as const;
 
-export type CargoLabel = typeof CARGOS[number]['label'];
+export type CargoLabel = (typeof CARGOS)[number]["label"];
 
 // ─── Agente 2: Memorial de saving ───────────────────────────────────────────
 
@@ -57,18 +64,18 @@ export type SavingLinha = {
   cargo: string;
   horas_antes: number;
   horas_depois: number;
-  valor_hora: number;          // derivado do cargo (tabela CARGOS)
-  economia_horas_mes: number;  // horas_antes - horas_depois
-  economia_reais_mes: number;  // economia_horas_mes * valor_hora
+  valor_hora: number; // derivado do cargo (tabela CARGOS)
+  economia_horas_mes: number; // horas_antes - horas_depois
+  economia_reais_mes: number; // economia_horas_mes * valor_hora
 };
 
 export type SavingColetado = {
-  linhas: SavingLinha[];               // detalhamento por pessoa/cargo
-  economia_horas_mes: number | null;   // total: soma das linhas
-  economia_reais_mes: number | null;   // total líquido (horas×cargo + custo evitado − custo externo)
+  linhas: SavingLinha[]; // detalhamento por pessoa/cargo
+  economia_horas_mes: number | null; // total: soma das linhas
+  economia_reais_mes: number | null; // total líquido (horas×cargo + custo evitado − custo externo)
   // 'trimestral'/'semestral': rotina que roda a cada 3/6 meses. As horas/R$ são o
   // ACUMULADO do período (NÃO mensalizado) — a cadência fica registrada no campo.
-  tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | null;
+  tipo_saving: "mensal" | "pontual" | "trimestral" | "semestral" | null;
   memorial_calculo: string | null;
   valor_ganho_mensal: number | null;
   // Custo que o projeto passou a EVITAR (ex: serviço externo/licença que deixou de
@@ -77,7 +84,7 @@ export type SavingColetado = {
   // não pelo formulário. Distingue-se do custo_externo_mensal (custo INCORRIDO, que
   // subtrai). Os três campos juntos viabilizam a auditoria do cálculo.
   custo_evitado_reais: number | null;
-  custo_evitado_tipo: 'mensal' | 'pontual' | null;
+  custo_evitado_tipo: "mensal" | "pontual" | null;
   custo_evitado_descricao: string | null;
   // Custo INCORRIDO pela automação (ferramenta/serviço externo mensal). SUBTRAI do
   // economia_reais_mes. Fonte da verdade é projeto.custo_externo_mensal; carregado
@@ -90,7 +97,7 @@ export type SavingColetado = {
   // agente. Distinto de custo_externo_mensal (escopo externo) e de custo_evitado
   // (que SOMA). Carregado aqui por recomputarSavingFinanceiro para o memorial.
   custo_projeto_reais?: number | null;
-  custo_projeto_tipo?: 'mensal' | 'pontual' | null;
+  custo_projeto_tipo?: "mensal" | "pontual" | null;
   custo_projeto_descricao?: string | null;
   // Jornada-base DETERMINÍSTICA das horas. A base padrão é 220h/mês (22 dias úteis,
   // seg–sex) e é TETO por pessoa; só sobe (até 30 dias úteis/~300h) se houver trabalho
@@ -100,14 +107,14 @@ export type SavingColetado = {
   // feita, aguardando resposta · 'dias_uteis' = só dias úteis (teto 220h) · 'fim_de_semana'
   // = trabalho humano em fim de semana afirmado (base pode subir). Só vale quando
   // aplicaConfirmacaoBaseHoras (rotina manual real e mensal — ver orchestrator.ts).
-  jornada_base?: 'pendente' | 'dias_uteis' | 'fim_de_semana' | null;
+  jornada_base?: "pendente" | "dias_uteis" | "fim_de_semana" | null;
   // Resolução do TETO por pessoa quando uma LINHA passa do teto (220h dias úteis /
   // 300h com fim de semana humano). Gerenciado pelo backend (não ecoado pelo LLM).
   // null = sem linha acima do teto, ou ainda não perguntado · 'pendente' = pergunta
   // feita · 'multiplo' = usuário confirmou que a linha soma VÁRIAS pessoas/unidades
   // (ex.: lojas) → linha acima do teto é legítima e liberada. Sem 'multiplo', uma
   // linha acima do teto bloqueia o preview até ser reconciliada para ≤ teto.
-  teto_pessoa?: 'pendente' | 'multiplo' | null;
+  teto_pessoa?: "pendente" | "multiplo" | null;
   // Split do total de horas economizadas em CARGA REAL × GANHO POR ESCALA, só quando
   // alguém fazia a tarefa manualmente (alguem_fazia='sim'). `horas_carga_real` = o que a
   // pessoa de fato fazia à mão; `horas_escala` = volume incremental que só a automação
@@ -122,11 +129,30 @@ export type SavingColetado = {
   // LEGADO — não é mais usado. Era o estado do gate DETERMINÍSTICO do split, removido em
   // jul/2026 (o forçamento gerava loop na edição — ver SPEC_CORRECOES). O split agora é
   // conduzido pelo agente no chat. Mantido no tipo só para não quebrar snapshots antigos.
-  carga_escala?: 'pendente' | 'confirmar_escala' | 'ok' | null;
+  carga_escala?: "pendente" | "confirmar_escala" | "ok" | null;
   // LEGADO — capturava a explicação crua do usuário ao gate determinístico (removido). Ainda
   // lido como fallback opcional por derivarJustificativaCargaEscala; hoje fica null (o agente
   // escreve a justificativa direto na subseção do memorial).
   carga_escala_racional?: string | null;
+  // Estado do GATE DETERMINÍSTICO da "Alocação de Ganhos" (Seção 2.4 — "O que mudou
+  // após a automação"): quando o saving MENSAL é alto (≥44h) e ALGUÉM fazia à mão
+  // (alguem_fazia='sim'), o backend GARANTE que o usuário seja perguntado PRA ONDE foi
+  // o tempo liberado / o que o time entrega A MAIS — em vez de deixar o LLM inventar o
+  // boilerplate vago "foi realocado para outras atividades" (bug do projeto Gostream,
+  // jul/2026). Gerenciado pelo backend (não ecoado pelo LLM — re-mesclado a cada turno).
+  // null = ainda não perguntado (o backend força a pergunta antes do preview, A NÃO SER
+  // que o LLM já tenha escrito uma seção 2.4 CONCRETA — aí libera direto) · 'pendente' =
+  // pergunta feita, aguardando resposta · 'reperguntado' = a 1ª resposta veio vaga e o
+  // backend repergou 1x (anti-loop: a próxima resposta é aceita) · 'ok' = destino
+  // capturado. O backend BLOQUEIA o preview enquanto não for 'ok' (quando
+  // aplicaGateAlocacaoGanhos). Espelha o gate de carga×escala.
+  alocacao_ganhos?: "pendente" | "reperguntado" | "ok" | null;
+  // Resposta do USUÁRIO ao gate da alocação de ganhos (texto cru de "pra onde foi o
+  // tempo liberado") — capturada pelo backend no turno do gate e re-mesclada a cada
+  // turno. Injetada no nudge [SISTEMA] para o LLM escrever a seção "### O que mudou após
+  // a automação" a partir do que o usuário DE FATO disse (não boilerplate). Null quando
+  // ainda não respondido / não se aplica.
+  alocacao_ganhos_racional?: string | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -149,12 +175,14 @@ export const savingVazio = (): SavingColetado => ({
   horas_escala: null,
   carga_escala: null,
   carga_escala_racional: null,
+  alocacao_ganhos: null,
+  alocacao_ganhos_racional: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
 
 export type ReceitaColetada = {
-  tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral' | null;
+  tipo_saving: "mensal" | "pontual" | "trimestral" | "semestral" | null;
   valor_ganho_mensal: number | null;
   memorial_calculo: string | null;
   // Racional curto informado pela pessoa no formulário (ex: "as estampas com IA
@@ -173,10 +201,39 @@ export const receitaVazia = (): ReceitaColetada => ({
 // ─── Resultados do orquestrador ─────────────────────────────────────────────
 
 export type OrchestratorResult =
-  | { type: 'question'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
-  | { type: 'options'; question: string; options: string[]; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
-  | { type: 'preview'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada }
-  | { type: 'complete'; content: string; fase: ChatFase; coletado: DocumentacaoColetada; saving: SavingColetado; receita?: ReceitaColetada };
+  | {
+      type: "question";
+      content: string;
+      fase: ChatFase;
+      coletado: DocumentacaoColetada;
+      saving: SavingColetado;
+      receita?: ReceitaColetada;
+    }
+  | {
+      type: "options";
+      question: string;
+      options: string[];
+      fase: ChatFase;
+      coletado: DocumentacaoColetada;
+      saving: SavingColetado;
+      receita?: ReceitaColetada;
+    }
+  | {
+      type: "preview";
+      content: string;
+      fase: ChatFase;
+      coletado: DocumentacaoColetada;
+      saving: SavingColetado;
+      receita?: ReceitaColetada;
+    }
+  | {
+      type: "complete";
+      content: string;
+      fase: ChatFase;
+      coletado: DocumentacaoColetada;
+      saving: SavingColetado;
+      receita?: ReceitaColetada;
+    };
 
 // ─── Agente Analisador ──────────────────────────────────────────────────────
 
@@ -186,10 +243,10 @@ export type CriterioResult = {
   justificativa: string;
 };
 
-export type Complexidade = 'automacao' | 'inteligencia' | 'autonomia';
+export type Complexidade = "automacao" | "inteligencia" | "autonomia";
 
 export type ResultadoAnalise = {
-  resultado: 'aprovado' | 'rejeitado';
+  resultado: "aprovado" | "rejeitado";
   pontuacao_total: number;
   pontuacao_maxima: number;
   justificativa: string;
@@ -215,7 +272,7 @@ export type ResultadoAnalise = {
 // ─── Mensagem de chat ───────────────────────────────────────────────────────
 
 export type ChatHistoryMessage = {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 };
 
@@ -265,14 +322,14 @@ export type ProjetoContexto = {
   data_criacao: string | null;
   doc_texto: string | null;
   descricao_breve?: string | null;
-  tipo_projeto?: 'saving' | 'receita_incremental' | null;
-  tipos_projeto?: ('saving' | 'receita_incremental')[] | null;
-  escopo?: 'interno' | 'externo' | null;
+  tipo_projeto?: "saving" | "receita_incremental" | null;
+  tipos_projeto?: ("saving" | "receita_incremental")[] | null;
+  escopo?: "interno" | "externo" | null;
   // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas
   // reais de uma rotina que existia. 'nao' → ninguém fazia: horas_antes é o EQUIVALENTE
   // manual estimado (o trabalho que alguém teria se a automação não existisse). O
   // orquestrador usa isto para NÃO pedir o detalhamento de uma "rotina" inexistente.
-  alguem_fazia?: 'sim' | 'nao' | string | null;
+  alguem_fazia?: "sim" | "nao" | string | null;
   // Projeto especial: flag + contexto que a pessoa escreveu para explicar o impacto.
   especial?: boolean;
   contexto_especial?: string | null;
@@ -298,7 +355,7 @@ export type DocumentacaoGerada = {
     linhas: SavingLinha[];
     economia_horas_mes: number;
     economia_reais_mes: number;
-    tipo_saving: 'mensal' | 'pontual' | 'trimestral' | 'semestral';
+    tipo_saving: "mensal" | "pontual" | "trimestral" | "semestral";
     memorial_calculo: string;
   };
   gerado_em: string;

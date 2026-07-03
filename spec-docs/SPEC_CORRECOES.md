@@ -62,6 +62,192 @@ diálogo) migrou para uma rede conservadora na gravação — o chat nunca mais 
 
 ---
 
+## 2026-07-03 — Autocomplete de participantes cortado pela borda do card (só ~4 sugestões visíveis)
+
+**PR:** #202 · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/dropdown-participantes-corte`
+
+**Sintoma:** no campo **"E-mails dos participantes"** (Etapa 1, `ParticipantesPapeisInput`), ao digitar um nome genérico como **"Lucas"** a lista de sugestões da TeamGuide fica grande, mas aparecia **cortada** — só ~4 pessoas visíveis, com cara de espremido. A lista rolava internamente, mas o container ficava truncado na borda inferior do formulário.
+
+**Causa-raiz:** o dropdown era `position: absolute` dentro do campo, e o **card central do formulário** (`submeter.tsx`, `<div ref={formCardRef} className="relative overflow-hidden …">`) tem **`overflow-hidden`** — necessário para o slide entre etapas e para arredondar a barra de gradiente do topo. Como o campo de participantes é o **último** da Etapa 1, a lista estourava a borda inferior do card e era **clipada por esse `overflow-hidden` ancestral**, não pela própria `max-h-60`.
+
+**Fix (`src/lib/submeter/form-components.tsx`, `ParticipantesPapeisInput`):** o dropdown passou a ser renderizado num **portal no `<body>`** (`createPortal`) em **`position: fixed`**, ancorado à caixa do input — escapa do `overflow-hidden` e flutua acima de tudo. Um `useEffect` mede a caixa (`getBoundingClientRect`), calcula `left`/`width` e decide **abrir para baixo (padrão) ou para cima** quando não cabe embaixo e há mais espaço acima; `maxHeight` adaptativo (132–288px) conforme o espaço livre na janela, com scroll interno. Reposiciona em `scroll`(capture)/`resize` enquanto aberto. Mantido tudo do resto: estilo GoGroup, realce do termo, navegação por teclado (↑↓/Enter/Esc), `aria-*`, rodapé "Mostrando N de M" e a animação `go-slide-down` (neutralizada pelo global `prefers-reduced-motion`).
+
+**Onde aterrissou:** `src/lib/submeter/form-components.tsx` (só frontend — **sem** rebuild de `worker.js`). Sem novos testes (mudança puramente de layout/posicionamento); `npm run test` (552) e `npm run build` verdes.
+
+---
+
+## 2026-07-02 — LEGADO especial→saving voltava a especial: sync reverso re-forçava `especial=1` da planilha (caso Hugo/legado-038, 2ª recorrência)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `worktree-fix-sync-reverso-legado-especial-conversao`
+
+**Sintoma:** `hugo.santana@gobeaute.com.br` editou o legado **`legado-038` ("Base Custos - Gobeaute")** de **especial → saving**, preencheu o saving completo (6h40/mês, `Especialista+`) e submeteu — mas o projeto **caiu como especial DE NOVO** (pela 2ª vez). No SQLite: `tipos_projeto=['especial']`, `documentacao.saving=null` (a doc especial reconstruída **apagou** o saving). Nos logs, todos os turnos do chat de saving dele registravam `tipos: especial`.
+
+**Causa-raiz:** é a **variante LEGADO** do bug "especial sticky" — o app-fix de 30/06 ([entrada abaixo](#2026-06-30--edição-de-projeto-especial--savingreceita-não-desmarcava-especial-sticky)) funciona, mas **não segura para legados**. `atualizarTipos` zera `especial` no SQLite **no ato** da conversão, porém a célula **"Especial?" da planilha só vira "Não" no SUBMIT**. Entre a conversão e o submit, o **cron horário de sync reverso** (`syncSheetsToSqlite` → `atualizarExistente`, `sync-reverse.ts`) lia a coluna **"Especial?"=Sim** ainda stale e **re-forçava `especial=1`/`tipos_projeto=['especial']`** — atropelando a conversão em andamento. O resto do chat rodava com `especial=1`, o `atualizarMetadados` (ramo especial) reconstruía a doc especial e o saving se perdia. Recorre para **qualquer legado especial editado para saving/receita** que sofra um sync reverso antes de submeter.
+
+**Fix (`sync-reverse.ts`, `atualizarExistente`):** no sentido **"Especial?"=Sim → especial=1**, guardamos com `jaConvertidoParaFinanceiro(current)` — se o SQLite **já tem `tipos_projeto` não-especial** (saving/receita, gravado por `atualizarTipos`), a "Sim" da planilha é tratada como **STALE** e **não re-forçamos** especial (será corrigida para "Não" no próximo submit). O sentido oposto **"Não" → especial=0** (fix da Helen, anti-sticky) segue **aplicado incondicionalmente**. Guard estreito: um SQLite não-financeiro por deriva (`tipos=['especial']`) ainda é reconciliado para especial normalmente.
+
+**Onde aterrissou:** `src/lib/google/sync-reverse.ts` (helper `jaConvertidoParaFinanceiro` + reestrutura do bloco "Especial?"; cobre `syncSheetsToSqlite` **e** `syncOwnerRowsFromSheet`, que reusam `atualizarExistente`). Server-side → `worker.js` rebuildado. Testes: `tests/sync-reverse.test.ts` (+2 — "Sim não clobber conversão financeira" e "guard estreito: Sim ainda re-força quando não-financeiro").
+
+**Recuperação do legado-038 (feita antes do fix, 02/07):** replay do pipeline real (admin+cookie prod) — `atualizar-tipos([saving])` → `iniciar-saving` (linha `Especialista+`, 6h40/mês→0h, mensal, alguém fazia=sim, tudo à mão/escala 0, sem custo evitado/externo, `valor_hora=R$55,15` → **R$367,67/mês**) → gates (composição, jornada=dias úteis) → aprovar preview → `submeter-validacao(edicao)`. Depois `resyncGoogle` (escrita AWAITED do Sheet: "Especial?"=Não + saving) e `sync-sheets-now` (reverse sync manteve `tipos=['saving']`, provando o loop quebrado). Números vieram dos `form_events`/logs (form dizia 10h; ele corrigiu p/ 6h40 no chat — usado o 6h40 final).
+
+**Nota:** trade-off aceito — uma conversão in-app **abandonada** (converteu p/ saving mas nunca submeteu) mantém `saving` no SQLite mesmo com a planilha ainda "Sim"; resolve-se no submit. Alternativa considerada (escrever "Não" no Sheet no ato do `atualizarTipos`, ida awaited) ficou de fora para manter o PR cirúrgico.
+
+---
+
+## 2026-07-02 — Retomada de rascunho despejava o TEXTO BRUTO dos arquivos (`=== arquivo ===`) no chat
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `feat/botao-recomecar-forms`
+
+**Sintoma:** ao **retomar um rascunho** (Meus Projetos › Rascunhos › Continuar) o chat abria com o
+**conteúdo cru de um arquivo enviado** despejado como mensagem — ex.: `=== CLAUDE.md === …` (o texto
+inteiro de outro projeto usado como upload de teste). Ficava visível ao usuário. Descoberto testando o
+novo botão **"Salvar rascunho"** (que redireciona pra home e depois retoma pela lista).
+
+**Causa-raiz:** duas coisas somadas.
+1. `getHistoricoMeuProjeto` (`meus-projetos.functions.ts`) devolvia **todas** as `chat_messages` cruas —
+   inclusive `role:'doc'` (que guarda o texto concatenado dos arquivos, contexto do LLM montado em
+   `extractTextFromMultipleFiles`, `=== nome === …`) e `role:'assistant'` gravado como
+   `JSON.stringify(resultado)`. O map do frontend (`submeter.tsx`, caminho **cross-device / sem snapshot
+   local**) renderizava tudo sem filtrar nem parsear → bolha com o dump do arquivo (e, nas respostas do
+   agente, o JSON cru).
+2. O caminho servidor do resume só é usado **quando não há snapshot local** (`loadDraft()` nulo). Antes
+   era raro; o novo **"Salvar rascunho"** chama `clearDraft()` (para `/submeter` não retomar o mesmo
+   rascunho) e **passou a forçar exatamente esse caminho** — tornando o bug pré-existente fácil de
+   reproduzir.
+
+**Fix:**
+- **Backend (`getHistoricoMeuProjeto`):** filtra para **só `user`/`assistant`** (a role `'doc'` nunca sai
+  do servidor) e, para `assistant`, **parseia o JSON** devolvendo o texto de exibição
+  (`content ?? question`) + `options` + flags derivados (`isPreview = type==='preview'`,
+  `isComplete = fase==='completo'`, `fase`) — mesma semântica do `formatResponse` da ida.
+- **Frontend (`submeter.tsx`, resume cross-device):** lê os novos campos no `ChatMessage`, mantém um
+  **filtro defensivo** (só `user`/`assistant`) contra dados legados, e alinha `chatFase`/`chatComplete`
+  à última mensagem (senão a conversa retomada ficava presa na fase `doc`).
+
+**Onde aterrissou:** `src/lib/meus-projetos.functions.ts` (`getHistoricoMeuProjeto` — tipo de retorno +
+transform) e `src/routes/submeter.tsx` (map do histórico no efeito de mount). Server-side → `worker.js`
+rebuildado. Sem mudança em `chat.functions.ts` (a gravação `role:'doc'` continua — é contexto legítimo do
+LLM; o fix é **não exibir**).
+
+**Notas:** o bug afeta qualquer retomada sem snapshot local (ex.: outro navegador), não só o novo botão —
+o "Salvar rascunho" só o tornou comum. A role `'doc'` segue sendo gravada de propósito (o LLM precisa do
+texto); o conserto é puramente de **exibição/serialização ao cliente**.
+
+---
+
+## 2026-07-01 — Gate ≥44h "O que mudou após a automação" era só prompt e escapou (projeto Gostream)
+
+**PR:** _(a abrir)_ · **Status:** 🔜 validar no staging (`edf400b4`) → prod · **Branch:** `fix/gate-alocacao-ganhos`
+
+**Sintoma:** o projeto **Gostream** (`legado-152`, R&S, **150h/mês**, `alguem_fazia='sim'`) fechou o
+memorial **sem** que o usuário fosse perguntado pra onde foi o tempo liberado. A Seção 2.4 ("### O que
+mudou após a automação") existia no memorial, mas preenchida com **exatamente** o boilerplate que a régua
+manda RECUSAR: _"o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de
+manter essa rotina manual."_ Ninguém no chat viu a pergunta (confirmado puxando o `chat/historico` de prod
+com o `E2E_COOKIE`).
+
+**Causa-raiz:** o gate de economia alta (≥44h/mês) era **100% prompt** — o bloco "SEÇÃO 2.4" em
+`buildSavingPrompt` + a rede de segurança (LLM-juiz) em `buildSavingPreviewPrompt`. Diferente dos gates de
+**jornada**, **teto 220h** e **carga real × escala** (que são DETERMINÍSTICOS no backend e por isso
+dispararam), este dependia do LLM obedecer. O LLM **auto-gerou** a seção vaga e previewou sem perguntar; a
+rede de segurança do preview (também LLM) deixou passar na aprovação. Resultado: a única família de gate de
+horas altas SEM trava determinística falhou silenciosamente.
+
+**Fix (transformar em GATE DETERMINÍSTICO, nos moldes do carga×escala):**
+- **Predicado** `aplicaGateAlocacaoGanhos(ctx, saving)` (`orchestrator.ts`): `alguem_fazia==='sim'` **&&**
+  `tipo_saving==='mensal'` **&&** (total ≥ `LIMITE_ECONOMIA_ALTA(44)` OU um cargo ≥44h). Contrafactual
+  (`'nao'`) e custo evitado puro (`'externo'`) NÃO entram (não houve tempo humano REAL liberado — a Seção
+  2.4 ali segue só no prompt, sem bloqueio). Pontual/periódico fora (base ≠ mês).
+- **Estado** `saving.alocacao_ganhos` (`null`→`pendente`→`reperguntado`→`ok`) + `alocacao_ganhos_racional`
+  (resposta crua do usuário, backend-only, re-mesclada a cada turno). Em `types.ts`/`savingVazio`.
+- **Gate em `enviarMensagem` (`chat.functions.ts`):** antes do preview, se a Seção 2.4 do memorial já for
+  CONCRETA (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) → libera (`'ok'`); senão **bloqueia** e
+  pergunta `perguntaAlocacaoGanhos` ("pra onde foi o tempo? nomeie as atividades / o que entrega a mais").
+  No turno de resposta: se vier vaga (`respostaAlocacaoVaga`), **repergunta FIRME 1x** (`'reperguntado'`,
+  anti-loop); senão captura o racional e injeta o nudge `[SISTEMA]` (`nudgeAlocacaoGanhos`) p/ o LLM
+  escrever a seção a partir do que o usuário disse. Roda por ÚLTIMO (jornada→teto→split→alocação, 1/turno).
+- **`respostaAlocacaoVaga(texto)`** (`orchestrator.ts`, puro): heurística CONSERVADORA — só marca vaga se
+  curta demais OU bate em padrão vago ("realocado/outras atividades/sobra tempo/produtividade/eficiência")
+  **e** não traz nada concreto junto (nº ou destino nomeado via "para/pra …"). Na dúvida, aceita (custo do
+  falso-positivo = 1 pergunta a mais; a rede de segurança do preview + validação humana são backstops). NÃO
+  é juiz de qualidade — é só o piso p/ forçar UMA reperguntada.
+
+**Onde aterrissou:** `src/lib/agents/types.ts` (2 campos + `savingVazio`); `src/lib/agents/orchestrator.ts`
+(`LIMITE_ECONOMIA_ALTA` exportado, `aplicaGateAlocacaoGanhos`, `respostaAlocacaoVaga`); `src/lib/chat.functions.ts`
+(helpers `perguntaAlocacaoGanhos`/`…Firme`/`nudgeAlocacaoGanhos` + branches de resposta + re-merge + gate de
+preview); `tests/gate-alocacao-ganhos.test.ts` (novo, 14 casos incl. o boilerplate do Gostream);
+`tests/agents-types.test.ts` (shape 19→21). `worker.js` rebuildado. **Não muda prompt** (rule 3 N/A) — o
+bloco 2.4 do prompt segue igual; o gate é backend. 532 testes verdes.
+
+---
+
+## 2026-07-01 — Favicon some do deploy (upload só varria `dist/assets/*`, não a raiz do `dist/`)
+
+**PR:** _(a abrir)_ · **Status:** ✅ deployada (staging `edf400b4` + prod `674a3710`) · **Branch:** `fix/deploy-favicon-dist-root`
+
+**Sintoma:** o **favicon** (ícone da aba) sumiu do app deployado. `index.html` referencia
+`<link rel="icon" href="/favicon.svg">`, mas a aba do navegador ficava sem ícone.
+
+**Causa-raiz (processo de deploy, não código do app):** o Vite copia `public/favicon.svg` para a
+**raiz** do `dist/` (`dist/favicon.svg`), **fora** de `dist/assets/`. O runbook de deploy
+(`CLAUDE.md` / `docs/deploy.md`) montava o upload e o manifest de assets varrendo **só** `dist/assets/*`
+(`for f in dist/assets/*`). Resultado: `favicon.svg` **nunca era enviado nem registrado como asset**.
+Com o SPA fallback (`not_found_handling: single-page-application`), `GET /favicon.svg` não encontrado
+devolvia o `index.html` (HTML) em vez do SVG → o browser não usava como ícone → **favicon some**.
+Confirmado pelo `assetManifest` do app: `/favicon.svg` estava **ausente**.
+
+**Fix ("lista derivada do `dist/` real, nunca à mão"):** novo script `scripts/deploy-godeploy.sh` que
+**varre `dist/` recursivamente** (`find dist -type f`) + `worker.js`, faz o upload multipart
+(token via header `Authorization: Bearer`, não query param) e **imprime o `ASSETS_JSON`** com TODOS os
+arquivos do `dist/` para o `updateApp`. Assim, `favicon.svg` — e qualquer futuro arquivo de `public/`
+na raiz do `dist/` (ex.: `robots.txt`) — entra no deploy automaticamente, sem depender de lembrar de
+listar. Runbooks (`CLAUDE.md` "Deploy rápido" e `docs/deploy.md`) reescritos para usar o script e alertar
+contra varrer só `assets/*`.
+
+**Onde aterrissou:** `scripts/deploy-godeploy.sh` (novo); `docs/deploy.md` e `CLAUDE.md` (seção Deploy
+rápido). Validado: `assetManifest` de staging **e** prod agora contêm `/favicon.svg` (654 bytes) — antes
+ausente. (Obs.: o edge exige OAuth, então `curl` anônimo em `/favicon.svg` dá 302→login; logado, o
+browser recebe o SVG. Sem mudança de código do app — só do processo de deploy.)
+
+---
+
+## 2026-07-01 — Edição de LEGADO "ressuscita" a tela de aprovação final (rascunho local sobrepõe o servidor)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada · **Branch:** `fix/edit-draft-legado-guard`
+
+**Sintoma:** um legado (`legado-141`, "Regularizações - GoGroup") foi apagado do deploy para a dona
+**reauditar do zero**. Ao reabrir `/editar/legado-141`, ela **caía de novo na etapa final de
+aprovação** — como se nada tivesse sido apagado. Apagar os registros no servidor não resolvia: ao
+reabrir, o estágio voltava.
+
+**Causa-raiz:** no modo edição (`submeter.tsx`), o seed do servidor (`applySeed`) era **sobreposto
+INCONDICIONALMENTE** por `rehydrateFromLocal(editDraft)` — o rascunho de edição salvo no
+**localStorage do navegador** (`godocs:edicao-v1:<id>`), que guarda chat/fase/previews do ponto onde
+a pessoa parou. Como o id do legado é fixo, qualquer limpeza no servidor era irrelevante: o navegador
+recolocava o estágio final por cima. O fluxo de **retomar rascunho** já fazia o certo
+(`submeter.tsx`: se `status !== 'rascunho'` → `clearDraft()`), mas o de **edição** não tinha guard.
+Mesma família do 🐞 bug aberto "Documentação ainda não foi gerada": cliente afirmando um estágio
+(`chatComplete`/`docPronta`) que o servidor nunca persistiu (legado entra por sync reverso **sem** a
+linha `documentacao`, que só é gravada na aprovação do preview).
+
+**Fix ("servidor manda"):** `deveDescartarDraftEdicao` (`draft-storage.ts`, puro/testável) — ao abrir
+a edição, só reidrata o rascunho local se for **consistente** com o servidor. Se o rascunho diz que a
+fase de doc terminou (`chatComplete` **ou** `approvedDocPreview != null`) mas o servidor **não tem doc
+persistida** (`data.documentacao == null`), **descarta** o rascunho (`clearDraft`) em vez de reidratar.
+Com o chat vazio, o caminho de re-init já existente dispara `atualizar-metadados` com `reset_doc:true`,
+que faz `deleteChatMessagesByProjeto` (limpa o chat no servidor) e recomeça a auditoria **do zero** —
+tudo **por código**, sem ação no navegador do usuário e sem cirurgia manual de dados. NÃO descarta
+rascunhos legítimos: quem está no meio da fase de doc (sem preview aprovado) e edições de projetos que
+JÁ têm doc no servidor são preservados.
+
+**Onde aterrissou:** `src/lib/submeter/draft-storage.ts` (`deveDescartarDraftEdicao`);
+`src/routes/submeter.tsx` (guard no branch de edição, antes de `rehydrateFromLocal`);
+`tests/draft-storage.test.ts` (4 casos: descarta chatComplete/preview sem doc no servidor; preserva
+reenvio normal e meio-de-doc). Mitiga também o caminho de rascunho do 🐞 bug aberto do legado
+(o endurecimento **servidor** — `submeterParaValidacao` virar 4xx claro em vez de 500 — segue pendente).
+
+---
+
 ## 2026-07-01 — Investigador sem NENHUM projeto visível — `/edicoes` estourando o limite de 32 MiB de RPC
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/investigador-edicoes-rpc-limit`
