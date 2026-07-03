@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-07-03 — Autocomplete de participantes não mostrava a lista da TeamGuide + sem feedback de carregando
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/autocomplete-participantes-lento`
+
+**Sintoma:** no campo "Participantes e seus papéis" (Etapa 1), digitar um nome ("kai") NÃO abria a lista
+dinâmica da TeamGuide — só aparecia o erro de validação "Insira um e-mail válido". E não havia nenhum
+sinal de que a lista estava sendo carregada (parecia quebrado).
+
+**Causa-raiz:** o dropdown só abria quando `suggestions.length > 0` (`ParticipantesPapeisInput`), e a lista
+da TeamGuide (`GET /api/participantes/sugestoes`, ~1 chamada, mas cold start do worker ≈1s) só COMEÇAVA a
+carregar quando o usuário marcava "em equipe = sim". Quem digitava logo em seguida caía na janela em que a
+lista ainda era `[]` → dropdown fechado → o `onBlur`/Enter chamava `tryAdd("kai")` → falhava o `EMAIL_RE`
+→ erro de validação. Sem estado de "carregando", a lista vazia era indistinguível de "quebrado".
+
+**Fix (frontend, sem tocar server):**
+- **Velocidade — prefetch:** `prefetchSugestoesParticipantes()` dispara o fetch já no MOUNT da Etapa 1
+  (antes de marcar "em equipe"), então a lista costuma estar pronta quando o usuário digita. Reusa o
+  cache/promise de módulo (idempotente) + o cache de 10 min do servidor (`getSugestoesParticipantes`).
+- **Feedback — `loading`:** `useSugestoesParticipantes` passou a devolver `{ pessoas, loading }`. O
+  dropdown agora abre também enquanto `loadingSuggestions` (não só com sugestões) e mostra uma linha
+  SUTIL "Buscando e-mails na Team Guide…" com 3 pontinhos go-blue (mesmo vocabulário do chat, `go-bounce`,
+  neutralizado sob `prefers-reduced-motion` pelo CSS global), `role="status"`/`aria-live` para leitores.
+- Degradação suave intacta: fetch falha → lista vazia → "Ninguém encontrado…" e o campo segue aceitando
+  e-mail digitado.
+
+**Onde aterrissou:** `src/lib/submeter/participantes-sugestoes.ts` (`prefetch…` + hook devolve `loading`),
+`src/lib/submeter/step1.tsx` (prefetch no mount + passa `loadingSuggestions`), `src/lib/submeter/form-components.tsx`
+(`ParticipantesPapeisInput`: abre no load + linha "buscando…"). Sem rebuild de server obrigatório (só frontend).
+
+---
+
 ## 2026-07-03 — Loop da pergunta "quantas horas a pessoa fazia à mão" (gate carga real × escala) na EDIÇÃO
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/loop-carga-escala-agente-conduz`

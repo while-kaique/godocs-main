@@ -69,14 +69,38 @@ async function carregarPessoas(): Promise<SugestaoParticipante[]> {
   return pessoasPromise;
 }
 
-/** Carrega a lista de pessoas quando `enabled` vira true (1x por página). */
-export function useSugestoesParticipantes(enabled: boolean): SugestaoParticipante[] {
+/**
+ * Aquece a lista ANTES de o usuário precisar dela (ex.: ao montar a Etapa 1, antes
+ * de marcar "em equipe"). Fire-and-forget: só dispara o fetch para o cache já estar
+ * pronto quando o autocomplete abrir — a lista da TeamGuide costuma levar ~1s no
+ * cold start do worker. Idempotente (reusa o cache/promise de módulo).
+ */
+export function prefetchSugestoesParticipantes(): void {
+  void carregarPessoas();
+}
+
+/**
+ * Carrega a lista de pessoas quando `enabled` vira true (1x por página) e informa se
+ * ainda está carregando — para o autocomplete mostrar um "buscando…" sutil em vez de
+ * parecer que não há sugestões. Se o prefetch já encheu o cache, entrega na hora.
+ */
+export function useSugestoesParticipantes(
+  enabled: boolean,
+): { pessoas: SugestaoParticipante[]; loading: boolean } {
   const [pessoas, setPessoas] = useState<SugestaoParticipante[]>(pessoasCache ?? []);
+  const [loading, setLoading] = useState(false);
   useEffect(() => {
-    if (!enabled || pessoasCache) return;
+    if (!enabled) return;
+    // Cache já pronto (fetch anterior ou prefetch): entrega e não mostra "carregando".
+    if (pessoasCache) { setPessoas(pessoasCache); return; }
     let vivo = true;
-    carregarPessoas().then((lista) => { if (vivo) setPessoas(lista); });
+    setLoading(true);
+    carregarPessoas().then((lista) => {
+      if (!vivo) return;
+      setPessoas(lista);
+      setLoading(false);
+    });
     return () => { vivo = false; };
   }, [enabled]);
-  return pessoas;
+  return { pessoas, loading };
 }
