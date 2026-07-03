@@ -518,6 +518,18 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > concretas dentro de um escopo definido"; Contribuidor = "Auxiliou com planejamento, decisões técnicas
 > ou ideias, sem atuar diretamente na execução".
 
+> 🔎 **Log dos papéis no Investigador (Kaique, 2026-07-02):** o timeline do Investigador (aba "Chat")
+> passa a exibir os PAPÉIS dos participantes nos eventos **"Formulário enviado"** (`submissao`) e
+> **"Dados atualizados"** (`metadados`), como uma linha **"Participantes e papéis"**: `email (Coautor),
+> email2 (Participante), …`. **Abordagem aditiva/não-destrutiva (sensível ao banco):** o backend só
+> acrescenta a chave `membros_papeis` ao JSON `dados` dos dois `gravarEvento` (`chat.functions.ts`) — a
+> coluna `form_events.dados` já existe (**sem migração**), a regra **append-only** do `form_events`
+> é preservada e `gravarEvento` segue não-bloqueante. **Retrocompatível:** eventos antigos sem
+> `membros_papeis` renderizam a linha "Membros" simples de antes. No front (`investigador.tsx`):
+> helper puro `formatarPapeisEvento` + mapa `PAPEL_LABEL_INVESTIGADOR` (value→rótulo, com os legados
+> `idealizador`/`referencia_tecnica` → "Contribuidor"); `linhasDoEvento` troca "Membros" por
+> "Participantes e papéis" quando há papéis (submissao e metadados). `worker.js` rebuildado.
+
 **Decisões fechadas (com o Luis).**
 - **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
   · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),

@@ -627,6 +627,10 @@ export async function iniciarSubmissao(rawData: unknown) {
     ferramenta: data.ferramenta,
     servico_externo: data.servico_externo ?? null,
     membros: data.membros,
+    // Papéis dos participantes (mapa e-mail→papel) — observabilidade no timeline do
+    // Investigador. Campo NOVO dentro do JSON `dados` (sem migração); eventos antigos
+    // simplesmente não o têm e o Investigador cai na linha "Membros" simples.
+    membros_papeis: data.membros_papeis ?? null,
     data_criacao: data.data_criacao,
     tipos_projeto: data.especial
       ? ["especial"]
@@ -2177,6 +2181,8 @@ export async function atualizarMetadados(rawData: unknown) {
         area: data.area ?? null,
         ferramenta: data.ferramenta ?? null,
         membros: data.membros ?? null,
+        // Papéis dos participantes (mapa e-mail→papel) — ver nota no evento "submissao".
+        membros_papeis: data.membros_papeis ?? null,
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
