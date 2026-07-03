@@ -1766,9 +1766,15 @@ export function SubmeterPageContent({
       const temReceita = form.tipoProjeto.includes("receita_incremental");
       if (editProjetoId) {
         // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
-        // abre o formulário de receita; senão, vai para a revisão final.
+        // abre o formulário de receita; senão, vai para a revisão final — MAS só quando o
+        // memorial de saving JÁ foi aprovado (approvedSavingPreview). Sem preview aprovado
+        // (ex.: projeto convertido especial→saving cujo chat de saving parou numa pergunta,
+        // sem gerar memorial), NÃO marca a conversa como concluída: cai no chat da fase de
+        // saving (a pergunta pendente) para o memorial ser concluído. Antes marcava
+        // chatComplete direto e o botão "Enviar" aparecia sem memorial → 500 "sem ganho
+        // mensurável" mascarado por toast genérico (caso "Supply Lojas <> Estoque CDs").
         if (temReceita) openReceitaForm();
-        else setChatComplete(true);
+        else if (approvedSavingPreview !== null) setChatComplete(true);
       } else if (temReceita && approvedSavingPreview !== null) {
         // Fluxo "ambos": o usuário reabriu o saving (ex.: via "Voltar ao saving" da
         // receita) e não mudou nada. Como o saving já foi aprovado, volta ao
@@ -1953,6 +1959,27 @@ export function SubmeterPageContent({
      fica disponível depois em "Meus Projetos". */
   async function handleSubmitProjeto() {
     if (!projetoId) return;
+
+    // Rede de segurança (defesa em profundidade): o botão "Enviar" só deveria aparecer
+    // com o memorial aprovado, mas se algum caminho marcar a conversa como concluída sem
+    // preview (ex.: handoff doc→saving + reload), barramos aqui com orientação clara em
+    // vez de deixar o servidor devolver 500 "sem ganho mensurável". Especial não tem
+    // memorial financeiro, então não se aplica.
+    if (!form.especial) {
+      if (form.tipoProjeto.includes("saving") && approvedSavingPreview === null) {
+        toast.error("Conclua o memorial de saving no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        setChatComplete(false);
+        openSavingForm();
+        return;
+      }
+      if (form.tipoProjeto.includes("receita_incremental") && approvedReceitaPreview === null) {
+        toast.error("Conclua o memorial de receita no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        setChatComplete(false);
+        openReceitaForm();
+        return;
+      }
+    }
+
     setSubmittingProject(true);
 
     // Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
@@ -1971,7 +1998,9 @@ export function SubmeterPageContent({
       if (msg.includes("Já existe um projeto submetido")) {
         toast.warning(msg, { duration: 8000 });
       } else {
-        toast.error("Erro ao enviar projeto. Tente novamente.");
+        // Mostra a mensagem REAL do servidor (orienta a ação — ex.: "sem ganho
+        // mensurável, conclua o memorial") em vez do genérico que prendia o usuário.
+        toast.error(msg ? `Erro ao enviar projeto: ${msg}` : "Erro ao enviar projeto. Tente novamente.");
       }
       setSubmittingProject(false);
       return;

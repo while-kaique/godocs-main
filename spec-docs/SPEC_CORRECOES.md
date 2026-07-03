@@ -45,6 +45,44 @@ em prod, é caso de abrir com o time do Godeploy — não é bug do app.
 
 ---
 
+## 2026-07-03 — "Enviar para Triagem" liberado sem memorial de saving aprovado (edição especial→saving) → 500 "sem ganho mensurável" mascarado
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/enviar-sem-memorial-saving`
+
+**Sintoma:** autor de projeto (caso real "Supply Lojas <> Estoque CDs" / Juan Silva, prod 03/07) edita e recebe
+o toast genérico *"Erro ao enviar projeto. Tente novamente."* — preso. Nos `api_logs` do Investigador:
+**6× `submeter-validacao` HTTP 500** com *"Não é possível submeter este projeto como saving sem ganho
+mensurável"*. Não é o bug de LEGADO doc-ausente (ID hex, doc existe) nem o de base64 vazio.
+
+**Causa-raiz:** o botão "Enviar para Triagem" (`FinalReview`, `step3-chat.tsx`) é gated **só** por
+`chatComplete` — **não** exige o preview de memorial de saving aprovado. O **seed** (`submeter.tsx`,
+`applySeed`) já liga `chatComplete` só quando `saving.memorial_calculo` existe; mas o **atalho de "reenviou
+o formulário de saving sem mudar nada" no modo edição** (`handleSavingFormSubmit`) fazia
+`setChatComplete(true)` **sem** essa checagem. Fluxo do caso: projeto ESPECIAL → na edição foi **convertido
+para saving** (`atualizar-tipos`), doc re-aprovada (handoff doc→saving já liga `chatComplete`), form de
+saving enviado (Assistente 75h→6h) → o agente fez a **pergunta do gate de composição** (memorial NÃO
+gerado); ao **reabrir o form ("Editar dados") e reenviar igual**, o atalho marcou a conversa como concluída
+→ botão "Enviar" apareceu com `documentacao.conteudo.saving` ausente → o gate do servidor
+(`submeterParaValidacao`) leu `economia_reais_mes` ausente = 0 e lançou o 500. O cliente mascarava a
+mensagem real. Reproduzido de forma determinística no staging (mesmo erro + mesma pergunta do gate).
+
+**Fix (client-only — sem `worker.js`; o gate do servidor já barra corretamente):**
+- **(a)** `handleSavingFormSubmit`: no atalho de reenvio idêntico da edição, só `setChatComplete(true)` se
+  `approvedSavingPreview !== null` (espelha o guard que o ramo do fluxo "ambos" já tinha); sem preview
+  aprovado, cai no chat da fase de saving (a pergunta pendente) para o memorial ser concluído.
+- **(b)** `handleSubmitProjeto` (defesa em profundidade): antes de enviar, se o projeto não é especial e
+  falta `approvedSavingPreview` (saving) ou `approvedReceitaPreview` (receita), barra com toast orientando a
+  concluir o memorial e reabre o formulário — em vez de deixar o servidor devolver 500.
+- **(c)** `handleSubmitProjeto` (catch): mostra a **mensagem real** do servidor
+  (`Erro ao enviar projeto: <msg>`) em vez do genérico "Tente novamente" — orienta a ação se algo escapar.
+- **(nota)** o seed de `approvedSavingPreview` a partir do memorial salvo já existe no `main` (necessário
+  para (a)/(b) não quebrarem a edição legítima de quem não mexe no saving).
+
+**Onde aterrissou:** `src/routes/submeter.tsx` (`handleSavingFormSubmit`, `handleSubmitProjeto`).
+Testes: 534 passando. Sem mudança server-side.
+
+---
+
 ## 2026-07-03 — Loop da pergunta "quantas horas a pessoa fazia à mão" (gate carga real × escala) na EDIÇÃO
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/loop-carga-escala-agente-conduz`
