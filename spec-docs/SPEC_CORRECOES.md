@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-07-03 — Autocomplete de participantes não mostrava a lista da TeamGuide + sem feedback de carregando
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/autocomplete-participantes-lento`
+
+**Sintoma:** no campo "Participantes e seus papéis" (Etapa 1), digitar um nome ("kai") NÃO abria a lista
+dinâmica da TeamGuide — só aparecia o erro de validação "Insira um e-mail válido". E não havia nenhum
+sinal de que a lista estava sendo carregada (parecia quebrado).
+
+**Causa-raiz (DUAS somadas):**
+1. **Infra (a de verdade):** `GET /api/participantes/sugestoes` caía, de forma **intermitente**, num erro de
+   plataforma do Godeploy no cold start — `Internal error while starting up Durable Object storage caused
+   object to be reset` → **502**. Nos logs, o mesmo erro batia em `/api/config` e `/api/auth/me` no MESMO
+   instante: é o Durable Object que respalda o `env.DB` falhando ao subir, atingindo **TODAS** as rotas de
+   API (esta rota nem toca o banco) — **não** é o handler, e não dá pra capturar no código. Recupera sozinho
+   em 1-2 tentativas (às 17:03 o `/api/config` já voltava `ok`). Nessa janela, a lista vinha vazia.
+2. **UX que escondia a falha:** o dropdown só abria com `suggestions.length > 0` e a lista só começava a
+   carregar ao marcar "em equipe = sim". Sem estado de "carregando", uma lista vazia (por 502 ou por ainda
+   estar carregando) era indistinguível de "quebrado": quem digitava caía no `onBlur`→`tryAdd("kai")` →
+   falha do `EMAIL_RE` → "Insira um e-mail válido".
+
+**Fix (frontend, sem tocar server — o 502 é infra, não código):**
+- **Retry no cliente:** `buscarSugestoesComRetry` tenta o endpoint até 3× com backoff (400/800ms) antes de
+  desistir — um 502 transitório do DO se auto-cura sozinho. Esgotado, reseta a promise (nova chance no
+  próximo mount) e degrada suave (lista vazia, campo segue aceitando e-mail digitado).
+- **Velocidade — prefetch:** `prefetchSugestoesParticipantes()` dispara o fetch (com retry) já no MOUNT da
+  Etapa 1 (antes de marcar "em equipe"), então a lista costuma estar pronta quando o usuário digita. Reusa
+  cache/promise de módulo (idempotente) + cache de 10 min do servidor (`getSugestoesParticipantes`).
+- **Feedback — `loading`:** `useSugestoesParticipantes` devolve `{ pessoas, loading }`. O dropdown abre
+  também enquanto `loadingSuggestions` e mostra uma linha SUTIL "Buscando e-mails na Team Guide…" (3
+  pontinhos go-blue, `go-bounce`, neutralizado sob `prefers-reduced-motion`; `role="status"`/`aria-live`).
+
+**Onde aterrissou:** `src/lib/submeter/participantes-sugestoes.ts` (retry + `prefetch…` + hook devolve
+`loading`), `src/lib/submeter/step1.tsx` (prefetch no mount + passa `loadingSuggestions`),
+`src/lib/submeter/form-components.tsx` (`ParticipantesPapeisInput`: abre no load + linha "buscando…").
+Só frontend. ⚠️ O erro de DO no cold start é da PLATAFORMA (mais frequente na staging, "fria"); se persistir
+em prod, é caso de abrir com o time do Godeploy — não é bug do app.
+
+---
+
 ## 2026-07-03 — Loop da pergunta "quantas horas a pessoa fazia à mão" (gate carga real × escala) na EDIÇÃO
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/loop-carga-escala-agente-conduz`

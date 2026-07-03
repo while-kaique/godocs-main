@@ -1,10 +1,11 @@
+import { useEffect } from "react";
 import { FERRAMENTAS } from "./constants";
 import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
   RadioGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
 } from "./form-components";
-import { useSugestoesParticipantes } from "./participantes-sugestoes";
+import { useSugestoesParticipantes, prefetchSugestoesParticipantes } from "./participantes-sugestoes";
 
 export function Step1({
   form, errors, updateField, setError, clearError,
@@ -21,7 +22,11 @@ export function Step1({
 
   // Lista da TeamGuide para o autocomplete de participantes (carrega 1x, só
   // quando o campo aparece; falha → campo segue aceitando e-mail digitado).
-  const sugestoesParticipantes = useSugestoesParticipantes(form.emEquipe === "sim");
+  const { pessoas: sugestoesParticipantes, loading: sugestoesLoading } =
+    useSugestoesParticipantes(form.emEquipe === "sim");
+  // Aquece a lista assim que a Etapa 1 monta — antes mesmo de marcar "em equipe" —
+  // para o autocomplete já estar pronto quando o usuário começar a digitar.
+  useEffect(() => { prefetchSugestoesParticipantes(); }, []);
 
   const prodLabel = isExterno
     ? "Essa ferramenta externa já está em uso na solução?"
@@ -296,6 +301,7 @@ export function Step1({
                   onSetPapel={setPapelParticipant}
                   error={errors.participantes}
                   suggestions={sugestoesParticipantes}
+                  loadingSuggestions={sugestoesLoading}
                 />
                 <LegendaPapeis />
               </div>

@@ -443,7 +443,7 @@ export function LegendaPapeis() {
 // obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/
 // submissor NÃO entra aqui: ele é o dono, só o time adicionado ganha papel.
 export function ParticipantesPapeisInput({
-  participantes, papeis, onAdd, onRemove, onSetPapel, error, suggestions,
+  participantes, papeis, onAdd, onRemove, onSetPapel, error, suggestions, loadingSuggestions,
 }: {
   participantes: string[];
   papeis: Record<string, PapelParticipante | "">;
@@ -452,6 +452,9 @@ export function ParticipantesPapeisInput({
   onSetPapel: (email: string, papel: PapelParticipante) => void;
   error?: string;
   suggestions?: SugestaoParticipante[];
+  // A lista da TeamGuide ainda está chegando — mostra um "buscando…" sutil no
+  // dropdown em vez de o campo parecer sem sugestões (ou soltar erro de validação).
+  loadingSuggestions?: boolean;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [tipMessage, setTipMessage] = useState<string | null>(null);
@@ -474,7 +477,9 @@ export function ParticipantesPapeisInput({
   const termos = inputValue.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
   const filtradas = filtrarSugestoes(suggestions ?? [], inputValue, participantes);
   const visiveis = filtradas.slice(0, MAX_SUGESTOES);
-  const open = focused && !dismissed && inputValue.trim().length > 0 && (suggestions?.length ?? 0) > 0;
+  // Abre com sugestões OU enquanto a lista carrega (para mostrar o "buscando…").
+  const temDigitacao = focused && !dismissed && inputValue.trim().length > 0;
+  const open = temDigitacao && ((suggestions?.length ?? 0) > 0 || !!loadingSuggestions);
 
   // Mantém a opção ativa à vista quando a navegação por teclado rola a lista.
   useEffect(() => {
@@ -712,6 +717,27 @@ export function ParticipantesPapeisInput({
                   </p>
                 )}
               </>
+            ) : loadingSuggestions ? (
+              // Micro-indicador sutil: 3 pontinhos go-blue (mesmo vocabulário do chat),
+              // neutralizados sob prefers-reduced-motion pelo CSS global. role="status"
+              // + aria-live para leitores de tela anunciarem o carregamento.
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center gap-2 px-3 py-2.5 text-[11px]"
+                style={{ color: "#8b8b9a" }}
+              >
+                <span aria-hidden="true" className="flex items-center gap-1">
+                  {[0, 0.2, 0.4].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: "var(--go-blue)", opacity: 0.5, animation: `go-bounce 1.2s ease-in-out ${delay}s infinite` }}
+                    />
+                  ))}
+                </span>
+                Buscando e-mails na Team Guide…
+              </div>
             ) : (
               <p className="px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
                 Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter para adicionar.
