@@ -558,135 +558,28 @@ export function receitaMemorialEhSaving(memorial: string | null | undefined): bo
   );
 }
 
-// Quando alguém fazia à mão, parte do total pode ser "ganho por escala" (volume que a
-// pessoa NÃO fazia). Acima deste limite a escala é GRANDE demais para passar sem conferir.
-export const LIMITE_ESCALA_ALTA = 0.6; // escala ≥ 60% do total → confirmar plausibilidade
-
-// TRAVA DE PLAUSIBILIDADE do split: a carga real informada precisa de CONFIRMAÇÃO quando a
-// ESCALA resultante (total − carga real) fica ≥ 60% do total — ou seja, a MAIOR parte do
-// "ganho" seria volume que a pessoa NÃO fazia, embora `alguem_fazia='sim'`. É o sinal dos
-// erros vistos em produção: (a) confusão DIA × MÊS (o usuário dá a carga "por dia" e ela
-// vira muito menor que o total mensal — ex.: "1h/dia" lido como 1h/mês de 22h); (b) escala
-// inflada só p/ fechar o total quando o agente não consegue atribuir. NÃO bloqueia: o backend
-// pede o usuário confirmar/corrigir uma vez. (carga real ≥ total ⇒ escala 0 ⇒ nada a confirmar.)
-export function precisaConfirmarEscala(real: number, total: number): boolean {
-  if (!Number.isFinite(real) || !Number.isFinite(total) || total <= 0) return false;
-  if (real >= total) return false;
-  return (total - real) / total >= LIMITE_ESCALA_ALTA;
-}
-
-// Converte um token numérico (pt-BR ou en) em Number SEM destruir o decimal. Regras:
-//  - "," é SEMPRE decimal ("0,5"→0.5; "1.234,56"→1234.56, com "." de milhar).
-//  - Só "." → DECIMAL ("0.5"→0.5; "1.83"→1.83), EXCETO quando é claramente milhar:
-//    vários pontos ("1.000.000") ou um único ponto com EXATAMENTE 3 dígitos depois e a
-//    parte inteira ≠ "0" ("1.234"→1234; "12.000"→12000; "0.123" segue decimal).
-// Bug de origem: o parser fazia `.replace(/\./g, '')` cego, transformando "0.5" em "05"=5
-// (e o próprio agente exibe "0.5h/mês" com ponto) — qualquer decimal entrava quebrado.
-export function parseNumeroPtBR(token: string): number {
-  let s = (token ?? "").trim();
-  const temVirgula = s.includes(",");
-  const pontos = (s.match(/\./g) ?? []).length;
-  if (temVirgula) {
-    s = s.replace(/\./g, "").replace(",", "."); // vírgula decimal, ponto = milhar
-  } else if (pontos > 1) {
-    s = s.replace(/\./g, ""); // 1.000.000 → milhar
-  } else if (pontos === 1) {
-    const [int = "", frac = ""] = s.split(".");
-    if (frac.length === 3 && int !== "0" && int.length <= 3) s = s.replace(/\./g, ""); // 1.234 → 1234
-    // senão mantém o ponto como decimal (0.5, 1.83, 12.5)
-  }
-  return parseFloat(s);
-}
-
-// O usuário, em vez de informar a carga real, está CONTESTANDO o total calculado — deu um
-// valor por unidade de tempo menor que o período ("5min por dia", "por execução"), disse
-// que o número está errado, ou citou um nº claramente MAIOR que o total. Repetir a pergunta
-// da carga real nesses casos só gera o LOOP reportado em produção (o usuário corrige o total,
-// o backend re-pergunta a mesma coisa): o que falta é o LLM RECALCULAR o total. Usado pelo
-// gate (chat.functions.ts) p/ devolver o controle ao orquestrador em vez de re-perguntar.
-export function contestaTotalCargaReal(content: string, total: number): boolean {
-  const t = (content ?? "").trim().toLowerCase();
-  if (!t) return false;
-  // (a) valor por unidade MENOR que o período (dia/semana/execução) ou em min/seg — a
-  //     pergunta pede o total no período; um valor "por dia" precisa ser convertido pelo LLM.
-  if (
-    /\bpor\s*dia\b|\/\s*dia\b|\bao\s+dia\b|di[áa]ri[ao]|\bpor\s+semana\b|\bsemanal\b|por\s+execu|por\s+rodada|cada\s+execu|\bmin\b|\d\s*min|\bminutos?\b|\bsegundos?\b/.test(
-      t,
-    )
-  )
-    return true;
-  // (b) correção/contestação EXPLÍCITA do número. Só sinais FORTES — evita "não era 100%,
-  //     era 50%" (refinamento legítimo de %, que interpretarCargaReal resolve para 20).
-  if (
-    /errad|errei|engan|na\s+verdade|incorret|n[ãa]o\s+bate|n[ãa]o\s+confere|n[ãa]o\s+[ée]\s+(?:isso|esse|essa|esses|o\s+valor)/.test(
-      t,
-    )
-  )
-    return true;
-  // (c) citou um nº (NÃO-porcentagem) claramente acima do total → acha que o total deveria
-  //     ser maior. Tira as porcentagens antes ("50%"/"100 por cento" são fração do total,
-  //     não nº absoluto — interpretarCargaReal as resolve, não são contestação).
-  const semPct = t.replace(/\d+(?:[.,]\d+)?\s*(?:%|por\s*cento)/g, " ");
-  const nums = (semPct.match(/\d[\d.,]*\d|\d/g) ?? [])
-    .map(parseNumeroPtBR)
-    .filter((n) => Number.isFinite(n));
-  const maior = nums.length ? Math.max(...nums) : null;
-  if (maior != null && total > 0 && maior > total + Math.max(1, total * 0.1)) return true;
-  return false;
-}
-
-// Interpreta a resposta do usuário à pergunta da CARGA REAL (gate do split) → nº de horas
-// em [0, total], ou null (ambíguo → re-pergunta determinística). Reconhece, em ordem:
-//  (1) PORCENTAGEM do total — "100%", "50 %", "100 por cento" → fração (100% = fez tudo).
-//      Usa a ÚLTIMA % citada (cobre "não era 100%, era 50%").
-//  (2) "NADA escalado / sem escala / não escalou" → escala 0 → carga real = TOTAL (a negação
-//      aqui faz PARTE do sentido — "nada de escala" — então não cai no guard de negação abaixo).
-//  (3) "fez tudo à mão / tudo manual / volume todo / integral / tudo real" (SEM negação
-//      genérica — "não fazia tudo" NÃO casa) → carga real = total.
-//  (4) números de horas explícitos (1 valor; ou 2 que somam ~total → o 1º é a carga real).
-// Bug de origem (jun/2026): "100% das horas eram na mão" caía direto no parser de números —
-// "100" > total → rejeitado → null → o agente re-perguntava algo que o usuário JÁ respondeu.
-export function interpretarCargaReal(content: string, total: number): number | null {
-  const t = (content ?? "").trim().toLowerCase();
-  if (!t) return null;
-  const clamp = (n: number) => Math.min(Math.max(n, 0), total);
-
-  // (1) Porcentagem do total (última citada).
-  const pcts = [...t.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:%|por\s*cento)/g)];
-  if (pcts.length) {
-    const p = parseFloat(pcts[pcts.length - 1][1].replace(",", "."));
-    if (Number.isFinite(p)) return clamp((p / 100) * total);
-  }
-
-  // (2) "Nada/sem/nenhuma escala" ou "não (foi/era) escalado" → escala 0 → carga real = total.
-  if (
-    /(?:nada|sem|nenhum[ao]?)\s+(?:de\s+)?escal/.test(t) ||
-    /n[ãa]o\s+(?:foi\s+|é\s+|era\s+|teve\s+|houve\s+|h[áa]\s+)?escal/.test(t)
-  ) {
-    return total;
-  }
-
-  // (3) "Fez tudo à mão / tudo manual / volume todo / integral / tudo real" (sem negação).
-  if (
-    !/\bn[ãa]o\b/.test(t) &&
-    /(tudo|todas?|o\s+total|volume\s+todo|integral|por\s+inteiro|tod[oa]\s+o\s+volume|tud[oa]\s+(?:na|à|a)\s+m[ãa]o|tud[oa]\s+manual|tud[oa]\s+(?:é\s+|era\s+)?(?:trabalho\s+)?real)/.test(
-      t,
-    )
-  ) {
-    return total;
-  }
-
-  // (4) Números de horas explícitos. parseNumeroPtBR preserva decimais ("0.5"→0.5) e só
-  //     trata "." como milhar quando inequívoco ("1.234"→1234) — ver helper acima.
-  const nums = (t.match(/\d[\d.,]*\d|\d/g) ?? [])
-    .map(parseNumeroPtBR)
-    .filter((n) => Number.isFinite(n));
-  if (!nums.length) return null;
-  // Dois números que somam ~total → o primeiro é a carga real.
-  if (nums.length >= 2 && Math.abs(nums[0] + nums[1] - total) <= 1) return clamp(nums[0]);
-  // Primeiro número plausível (0..total, com folga de 0,5).
-  const cand = nums.find((n) => n >= 0 && n <= total + 0.5);
-  return cand == null ? null : Math.min(cand, total);
+// Rede silenciosa do split carga real × escala (backstop pós-remoção do gate determinístico
+// que FORÇAVA a pergunta no chat — ver SPEC_CORRECOES). O agente agora conduz a pergunta
+// conversacionalmente (padrão da verificação de IA), então pode não capturar o split. Quando
+// o split SE APLICA (alguém fazia à mão, recorrente, com total > 0) mas o agente não preencheu
+// horas_carga_real/horas_escala, assumimos o valor CONSERVADOR — carga real = total, escala = 0
+// ("a pessoa fazia o volume todo à mão"; NUNCA infla o ganho por escala). Assim as colunas de
+// transparência do Sheets ficam preenchidas sem travar nem repetir nada no chat. Aplicado na
+// gravação (submeterParaValidacao), NÃO no sync — legados não-editados seguem 0/0. Retorna null
+// quando o split não se aplica (deixa o saving como está). O predicado espelha aplicaSplitCargaEscala.
+export function resolverSplitCargaEscala(
+  alguemFazia: string | null | undefined,
+  saving: SavingColetado,
+): { horas_carga_real: number; horas_escala: number } | null {
+  const isPontual = saving.tipo_saving === "pontual";
+  const temHorasAntes = (saving.linhas ?? []).some((l) => (l.horas_antes ?? 0) > 0);
+  if (alguemFazia !== "sim" || isPontual || !temHorasAntes) return null;
+  const total = totalEconomiaHoras(saving);
+  if (total <= 0) return null;
+  const real = saving.horas_carga_real;
+  const escala = saving.horas_escala;
+  if (real != null && escala != null) return { horas_carga_real: Number(real), horas_escala: Number(escala) };
+  return { horas_carga_real: total, horas_escala: 0 };
 }
 
 // Cadência periódica do saving (trimestral/semestral): nome do período e nº de meses.
@@ -878,26 +771,33 @@ DETALHES TÉCNICOS APROVADOS:
   // CARGA REAL × GANHO POR ESCALA — só quando alguém fazia a tarefa à mão (sim) e há
   // rotina recorrente (não pontual). Separa o que a PESSOA realmente fazia (carga real)
   // do volume incremental que só a automação cobre (escala). O TOTAL continua sendo o
-  // saving creditado (vira R$); o split é transparência/auditoria. A pergunta do nº é
-  // CONDUZIDA PELO SISTEMA (gate determinístico em chat.functions.ts), que BLOQUEIA o
-  // preview até o split existir — aqui o prompt só explica o conceito e instrui a
-  // registrar os dois números no memorial quando o [SISTEMA] avisar.
+  // saving creditado (vira R$); o split é transparência/auditoria. VOCÊ (o agente) conduz
+  // esta pergunta — no MESMO padrão saudável da verificação de IA: UMA vez, com opções
+  // clicáveis, aceitando a resposta e SEGUINDO (nunca repetindo). NÃO é mais um gate
+  // determinístico que bloqueia o preview (isso gerava loop na edição). Se o agente não
+  // capturar, o backend assume o valor conservador na gravação (resolverSplitCargaEscala).
   const aplicaCargaEscala = aplicaSplitCargaEscala(ctx, saving);
   const cargaEscalaBlock = aplicaCargaEscala
     ? `
 
 ═══════════════════════════════════════════════════════════════════
-CARGA REAL × GANHO POR ESCALA (informação OBRIGATÓRIA de análise)
+CARGA REAL × GANHO POR ESCALA (VOCÊ conduz — pergunte 1× antes do preview)
 ═══════════════════════════════════════════════════════════════════
 Alguém fazia esta tarefa manualmente, então parte do total de horas economizadas é trabalho HUMANO que de fato acontecia (CARGA REAL) e parte pode ser VOLUME QUE SÓ EXISTE PORQUE A AUTOMAÇÃO ESCALOU — execuções/itens que nenhuma pessoa fazia (nem conseguiria) à mão (GANHO POR ESCALA).
 Exemplo: a pessoa rodava o processo 4×/mês (6h cada = 24h reais), mas a automação passou a rodá-lo 22×/mês (mais 18 execuções = 108h). Total de saving = 132h: 24h de carga real + 108h de ganho por escala.
 
 POR QUE SEPARAR: o total (ex.: 132h) CONTINUA sendo o saving creditado — você NÃO altera as \`linhas\` por causa disso. Mas quem audita precisa enxergar quanto era trabalho humano de fato e quanto é volume incremental da automação. Creditar "escala" como se uma pessoa gastasse aquelas horas é justamente o exagero que esta separação torna transparente.
 
-CONFIRMAÇÃO — CONDUZIDA PELO SISTEMA (você NÃO pergunta isso):
-   - O próprio sistema, logo antes do preview, pergunta ao usuário quantas das ${totalHoras}h economizadas a pessoa REALMENTE fazia à mão (a carga real); o restante é o ganho por escala. NÃO faça você essa pergunta nem a inclua nas suas respostas — o sistema cuida disso e calcula os dois números.
-   - Quando o sistema avisar (mensagem que começa com "[SISTEMA]") o split definido (carga real = X; ganho por escala = Y), os campos \`horas_carga_real\` e \`horas_escala\` já vêm preenchidos pelo sistema — mantenha-os — e você REGISTRA o split no memorial numa subseção PRÓPRIA com o cabeçalho exato "### Carga real e ganho por escala" (dentro da Seção 2 "Saving de Pessoas"). Essa subseção é a JUSTIFICATIVA que será extraída para a planilha (coluna "Justificativa Saving Escalado e Real") e PRECISA ter substância — 2 a 4 frases, com base no que o USUÁRIO contou na conversa, respondendo: **(a) o que a pessoa fazia ANTES e quanto desse trabalho ela REALMENTE executava à mão** (a carga real); **(b) o que a automação passou a FAZER/COBRIR depois que escalou** — o volume incremental que ninguém fazia (o ganho por escala) e por que ele cresceu tanto; **(c) COMO os números foram derivados** — a hora de carga real, a hora por escala e o total economizado, mostrando o cálculo/raciocínio (volume/frequência ANTES × DEPOIS → horas, ex.: "rodava 4×/mês × 6h = 24h reais; automação passou a 22×/mês = +18 execuções = 108h de escala; total 132h"). Se o ganho por escala for 0 (a pessoa já fazia o volume TODO à mão), explicite que a automação não ampliou o volume, só o executou. É **PROIBIDO** escrever só a definição genérica de "ganho por escala" (que é volume incremental — isso é óbvio e inútil): escreva o RACIOCÍNIO concreto DESTE projeto. NÃO use R$ aqui (só horas/qualitativo).
-   - Se o usuário, ao detalhar a rotina, já deixar claro o split, você pode preencher \`horas_carga_real\`/\`horas_escala\` (somando o total) E já escrever a subseção "### Carga real e ganho por escala" — mas mesmo assim a confirmação do sistema prevalece.
+COMO CONDUZIR (padrão saudável — igual à verificação de IA; NUNCA repita nem trave):
+PASSO 1 — SE JÁ ESTIVER CLARO, NÃO PERGUNTE: se o usuário, ao detalhar a rotina, já deixou explícito quanto ele REALMENTE fazia à mão × quanto é volume que só a automação passou a cobrir, apenas preencha \`horas_carga_real\`/\`horas_escala\` (somando ${totalHoras}${unidadeHoras}) e escreva a subseção — pule direto ao registro. Só pergunte se ainda não estiver claro E \`horas_carga_real\` ainda estiver vazio.
+PASSO 2 — PERGUNTE UMA ÚNICA VEZ, logo antes do preview, com type:"options":
+   Pergunta (adapte a linguagem): "Dessas ${totalHoras}${unidadeHoras} economizadas, quanto a pessoa REALMENTE já fazia à mão antes da automação? O resto é volume que só a automação passou a cobrir."
+   options: ["Ela já fazia esse volume todo à mão", "Ela fazia só uma parte — o resto a automação passou a cobrir", "Não sei estimar / me ajuda"]
+   - "volume todo" → \`horas_carga_real\` = ${totalHoras}, \`horas_escala\` = 0.
+   - "só uma parte" → faça UMA pergunta curta (type:"question") pedindo quantas ${unidadeHoras} (no MESMO período) ela fazia à mão; o resto é escala. Aceite uma resposta simples. Se ela vier "por dia"/"por execução", CONVERTA para o período (× dias úteis × nº de pessoas) antes de fixar — NÃO devolva a mesma pergunta.
+   - "não sei" → ajude com 1 pergunta simples; se ainda assim não vier número, assuma o CONSERVADOR (carga real = ${totalHoras}, escala = 0) e siga.
+PASSO 3 — PLAUSIBILIDADE, sem travar: se a escala resultante ficar acima de ~60% do total, confirme UMA vez ("então a maior parte é volume que ninguém fazia à mão — confere?") e ACEITE a resposta. Isso pega confusão dia×mês. NUNCA repita a mesma pergunta: se o usuário disser que já respondeu, ou contestar o total, incorpore o que ele disse (recalcule/ajuste) e SIGA para o preview — exatamente como na verificação de IA, onde a discordância é aceita e não vira loop.
+PASSO 4 — REGISTRE no memorial numa subseção PRÓPRIA com o cabeçalho exato "### Carga real e ganho por escala" (dentro da Seção 2 "Saving de Pessoas"). Essa subseção é a JUSTIFICATIVA que vai para a planilha (coluna "Justificativa Saving Escalado e Real") e PRECISA ter substância — 2 a 4 frases, com base no que o USUÁRIO contou: **(a) o que a pessoa fazia ANTES e quanto REALMENTE executava à mão** (a carga real); **(b) o que a automação passou a COBRIR ao escalar** (o volume incremental) e por que cresceu; **(c) COMO os números foram derivados** (volume/frequência ANTES × DEPOIS → horas, ex.: "rodava 4×/mês × 6h = 24h reais; automação passou a 22×/mês = +18 execuções = 108h de escala; total 132h"). Se a escala for 0 (fazia o volume TODO à mão), explicite que a automação não ampliou o volume, só o executou. É **PROIBIDO** escrever só a definição genérica de "ganho por escala": escreva o RACIOCÍNIO concreto DESTE projeto. NÃO use R$ aqui (só horas/qualitativo).
 ═══════════════════════════════════════════════════════════════════`
     : "";
 
