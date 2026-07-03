@@ -238,6 +238,17 @@ const SAFE_UPDATE_FIELDS: ReadonlyArray<{
   { col: 'Atualizado Em', field: 'atualizado_em', kind: 'text' },
 ];
 
+// Um projeto convertido de especial → financeiro no app tem, no SQLite, tipos_projeto
+// com um tipo NÃO-especial (saving/receita), gravado por atualizarTipos no ato da
+// conversão. Serve para o sync reverso NÃO re-forçar especial a partir de uma célula
+// "Especial?"=Sim que ainda não foi atualizada na planilha (ela só vira "Não" no submit).
+function jaConvertidoParaFinanceiro(current: ProjetoRow): boolean {
+  const tipos = (parseJson<string[]>(current.tipos_projeto) ?? []).map((t) =>
+    String(t).trim().toLowerCase(),
+  );
+  return tipos.length > 0 && !tipos.includes('especial');
+}
+
 async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
   const current = await getProjetoById(id);
   if (!current) return false;
@@ -284,21 +295,30 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
   // preenchido. (caso AVD Central v2 / Helen — bug do "especial sticky" pré-fix.)
   const especialSheet = parseEspecialFlag(row['Especial?']); // 1 | 0 | null (vazio = não mexe)
   if (especialSheet != null && especialSheet !== (current.especial ?? 0)) {
-    updates['especial'] = especialSheet;
     if (especialSheet === 0) {
       // Deixou de ser especial → tipos vêm de "Tipos Projeto"; contexto especial limpa.
       // (o loop SAFE pula "—"/vazio porque txt() → null, então a limpeza é explícita.)
+      // Aplica SEMPRE — é o sentido que corrige o "especial sticky" (caso Helen).
+      updates['especial'] = 0;
       updates['contexto_especial'] = null;
       const tipos = parseList(row['Tipos Projeto']).map((t) => t.toLowerCase());
       if (tipos.length) {
         updates['tipos_projeto'] = tipos;
         updates['tipo_projeto'] = tipos[0];
       }
-    } else {
+    } else if (!jaConvertidoParaFinanceiro(current)) {
       // Virou especial → tipo único 'especial'.
+      updates['especial'] = 1;
       updates['tipos_projeto'] = ['especial'];
       updates['tipo_projeto'] = 'especial';
     }
+    // else: a planilha diz "Sim", mas o SQLite JÁ foi convertido para saving/receita no
+    // app. A conversão (atualizarTipos) zera especial no ato; a célula "Especial?" só
+    // vira "Não" no submit. Entre a conversão e o submit, este cron horário lia "Sim" e
+    // re-forçava especial=1 — reconstruindo a doc especial e APAGANDO o saving em
+    // andamento (caso Hugo/legado-038, 2ª recorrência do bug). Tratamos a "Sim" como
+    // STALE e não mexemos; o próximo submit do usuário grava "Não" na planilha. Só afeta
+    // o sentido "Sim → especial"; "Não → não-especial" (fix da Helen) segue aplicado.
   }
 
   if (Object.keys(updates).length === 0) return false;

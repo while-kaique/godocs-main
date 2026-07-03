@@ -295,6 +295,74 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
     expect(p?.especial).toBe(1);
     expect(p?.contexto_especial).toBe('mantém este contexto');
   });
+
+  it('"Especial? = Sim" no Sheet NÃO re-força especial quando o SQLite já converteu p/ saving (anti-clobber da conversão in-app)', async () => {
+    // Caso Hugo (legado-038): o usuário editou um legado especial → saving no app.
+    // atualizarTipos zerou especial e gravou tipos=['saving'] no SQLite; mas a célula
+    // "Especial?" da planilha só vira "Não" no SUBMIT. Se este cron rodar ANTES do
+    // submit, a "Sim" (stale) NÃO pode re-forçar especial=1 — isso atropelava a
+    // conversão em andamento (reconstruía a doc especial e apagava o saving).
+    await insertProjetoRaw({
+      id: 'legado-conv',
+      nome: 'Base Custos',
+      responsavel_nome: 'Hugo',
+      responsavel_email: 'hugo@gobeaute.com.br',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      especial: false, // já convertido no app
+      contexto_especial: null,
+      tipo_projeto: 'saving',
+      tipos_projeto: ['saving'],
+      updated_at: new Date().toISOString(),
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'LEGADO-CONV',
+        'Nome Completo': 'Hugo',
+        Email: 'hugo@gobeaute.com.br',
+        Projeto: 'Base Custos',
+        Ferramenta: 'n8n',
+        'Especial?': 'Sim', // planilha ainda diz "Sim" (só vira "Não" no submit)
+        'Tipos Projeto': 'especial',
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('legado-conv');
+    expect(p?.especial).toBe(0); // NÃO re-forçado
+    expect(JSON.parse(p!.tipos_projeto as string)).toEqual(['saving']); // conversão preservada
+  });
+
+  it('"Especial? = Sim" AINDA re-força especial quando o SQLite NÃO é financeiro (guard é estreito)', async () => {
+    // Prova que o anti-clobber só protege conversões financeiras: um SQLite não-especial
+    // por deriva (especial=0 mas tipos=['especial']) volta a ser especial pela planilha.
+    await insertProjetoRaw({
+      id: 'esp-drift',
+      nome: 'Projeto Deriva',
+      responsavel_nome: 'Alguém',
+      responsavel_email: 'drift@gocase.com',
+      ferramenta: 'Claude',
+      status: 'em_validacao',
+      especial: false,
+      contexto_especial: null,
+      tipo_projeto: 'especial',
+      tipos_projeto: ['especial'], // não-financeiro → guard não protege
+      updated_at: new Date().toISOString(),
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'ESP-DRIFT',
+        'Nome Completo': 'Alguém',
+        Email: 'drift@gocase.com',
+        Projeto: 'Projeto Deriva',
+        Ferramenta: 'Claude',
+        'Especial?': 'Sim',
+      },
+    ]);
+    await syncSheetsToSqlite();
+    const p = await getProjetoById('esp-drift');
+    expect(p?.especial).toBe(1); // re-forçado (sentido Sim → especial intacto)
+    expect(JSON.parse(p!.tipos_projeto as string)).toEqual(['especial']);
+  });
 });
 
 describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {

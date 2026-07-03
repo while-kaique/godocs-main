@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-07-02 — LEGADO especial→saving voltava a especial: sync reverso re-forçava `especial=1` da planilha (caso Hugo/legado-038, 2ª recorrência)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `worktree-fix-sync-reverso-legado-especial-conversao`
+
+**Sintoma:** `hugo.santana@gobeaute.com.br` editou o legado **`legado-038` ("Base Custos - Gobeaute")** de **especial → saving**, preencheu o saving completo (6h40/mês, `Especialista+`) e submeteu — mas o projeto **caiu como especial DE NOVO** (pela 2ª vez). No SQLite: `tipos_projeto=['especial']`, `documentacao.saving=null` (a doc especial reconstruída **apagou** o saving). Nos logs, todos os turnos do chat de saving dele registravam `tipos: especial`.
+
+**Causa-raiz:** é a **variante LEGADO** do bug "especial sticky" — o app-fix de 30/06 ([entrada abaixo](#2026-06-30--edição-de-projeto-especial--savingreceita-não-desmarcava-especial-sticky)) funciona, mas **não segura para legados**. `atualizarTipos` zera `especial` no SQLite **no ato** da conversão, porém a célula **"Especial?" da planilha só vira "Não" no SUBMIT**. Entre a conversão e o submit, o **cron horário de sync reverso** (`syncSheetsToSqlite` → `atualizarExistente`, `sync-reverse.ts`) lia a coluna **"Especial?"=Sim** ainda stale e **re-forçava `especial=1`/`tipos_projeto=['especial']`** — atropelando a conversão em andamento. O resto do chat rodava com `especial=1`, o `atualizarMetadados` (ramo especial) reconstruía a doc especial e o saving se perdia. Recorre para **qualquer legado especial editado para saving/receita** que sofra um sync reverso antes de submeter.
+
+**Fix (`sync-reverse.ts`, `atualizarExistente`):** no sentido **"Especial?"=Sim → especial=1**, guardamos com `jaConvertidoParaFinanceiro(current)` — se o SQLite **já tem `tipos_projeto` não-especial** (saving/receita, gravado por `atualizarTipos`), a "Sim" da planilha é tratada como **STALE** e **não re-forçamos** especial (será corrigida para "Não" no próximo submit). O sentido oposto **"Não" → especial=0** (fix da Helen, anti-sticky) segue **aplicado incondicionalmente**. Guard estreito: um SQLite não-financeiro por deriva (`tipos=['especial']`) ainda é reconciliado para especial normalmente.
+
+**Onde aterrissou:** `src/lib/google/sync-reverse.ts` (helper `jaConvertidoParaFinanceiro` + reestrutura do bloco "Especial?"; cobre `syncSheetsToSqlite` **e** `syncOwnerRowsFromSheet`, que reusam `atualizarExistente`). Server-side → `worker.js` rebuildado. Testes: `tests/sync-reverse.test.ts` (+2 — "Sim não clobber conversão financeira" e "guard estreito: Sim ainda re-força quando não-financeiro").
+
+**Recuperação do legado-038 (feita antes do fix, 02/07):** replay do pipeline real (admin+cookie prod) — `atualizar-tipos([saving])` → `iniciar-saving` (linha `Especialista+`, 6h40/mês→0h, mensal, alguém fazia=sim, tudo à mão/escala 0, sem custo evitado/externo, `valor_hora=R$55,15` → **R$367,67/mês**) → gates (composição, jornada=dias úteis) → aprovar preview → `submeter-validacao(edicao)`. Depois `resyncGoogle` (escrita AWAITED do Sheet: "Especial?"=Não + saving) e `sync-sheets-now` (reverse sync manteve `tipos=['saving']`, provando o loop quebrado). Números vieram dos `form_events`/logs (form dizia 10h; ele corrigiu p/ 6h40 no chat — usado o 6h40 final).
+
+**Nota:** trade-off aceito — uma conversão in-app **abandonada** (converteu p/ saving mas nunca submeteu) mantém `saving` no SQLite mesmo com a planilha ainda "Sim"; resolve-se no submit. Alternativa considerada (escrever "Não" no Sheet no ato do `atualizarTipos`, ida awaited) ficou de fora para manter o PR cirúrgico.
+
+---
+
 ## 2026-07-02 — Retomada de rascunho despejava o TEXTO BRUTO dos arquivos (`=== arquivo ===`) no chat
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `feat/botao-recomecar-forms`
