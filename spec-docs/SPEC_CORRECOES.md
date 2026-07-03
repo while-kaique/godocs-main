@@ -8,7 +8,7 @@
 
 ## 2026-07-03 — Autocomplete de participantes cortado pela borda do card (só ~4 sugestões visíveis)
 
-**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/dropdown-participantes-corte`
+**PR:** #202 · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/dropdown-participantes-corte`
 
 **Sintoma:** no campo **"E-mails dos participantes"** (Etapa 1, `ParticipantesPapeisInput`), ao digitar um nome genérico como **"Lucas"** a lista de sugestões da TeamGuide fica grande, mas aparecia **cortada** — só ~4 pessoas visíveis, com cara de espremido. A lista rolava internamente, mas o container ficava truncado na borda inferior do formulário.
 
