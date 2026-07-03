@@ -460,6 +460,14 @@ export function ParticipantesPapeisInput({
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // O dropdown é renderizado via portal no <body> em position:fixed. O card do
+  // formulário tem overflow-hidden (slide entre etapas + barra de gradiente), o que
+  // cortava a lista quando ela passava da borda do card — só apareciam ~4 pessoas.
+  // No portal ela flutua acima de tudo e usa toda a altura disponível na tela.
+  const [coords, setCoords] = useState<
+    { left: number; width: number; top?: number; bottom?: number; dropUp: boolean; maxHeight: number } | null
+  >(null);
 
   // Autocomplete: filtra a lista da TeamGuide a cada letra (nome ou e-mail,
   // sem acento/caixa); sem lista carregada, o campo funciona como sempre.
@@ -475,6 +483,43 @@ export function ParticipantesPapeisInput({
       ?.querySelector('[data-ativa="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
+
+  // Ancora o dropdown flutuante ao campo: mede a caixa do input e decide se abre
+  // para baixo (padrão) ou para cima (quando não cabe embaixo e há mais espaço em
+  // cima). Reposiciona ao rolar/redimensionar enquanto está aberto.
+  useEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+    const reposicionar = () => {
+      const el = boxRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const GAP = 6; // respiro entre o campo e a lista
+      const MARGEM = 12; // respiro até a borda da janela
+      const espacoAbaixo = window.innerHeight - r.bottom - GAP - MARGEM;
+      const espacoAcima = r.top - GAP - MARGEM;
+      const dropUp = espacoAbaixo < 200 && espacoAcima > espacoAbaixo;
+      const disponivel = dropUp ? espacoAcima : espacoAbaixo;
+      const maxHeight = Math.max(132, Math.min(288, disponivel));
+      setCoords({
+        left: r.left,
+        width: r.width,
+        dropUp,
+        maxHeight,
+        top: dropUp ? undefined : r.bottom + GAP,
+        bottom: dropUp ? window.innerHeight - r.top + GAP : undefined,
+      });
+    };
+    reposicionar();
+    window.addEventListener("scroll", reposicionar, true);
+    window.addEventListener("resize", reposicionar);
+    return () => {
+      window.removeEventListener("scroll", reposicionar, true);
+      window.removeEventListener("resize", reposicionar);
+    };
+  }, [open, visiveis.length, filtradas.length]);
 
   function tryAdd(raw: string) {
     const val = raw.trim().replace(/[,;]+$/, "").trim();
@@ -553,6 +598,7 @@ export function ParticipantesPapeisInput({
       {/* Adicionar e-mail (mesmo visual do ChipsInput) + autocomplete da TeamGuide */}
       <div className="relative">
         <div
+          ref={boxRef}
           className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
           style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
           onClick={() => inputRef.current?.focus()}
@@ -590,16 +636,21 @@ export function ParticipantesPapeisInput({
           />
         </div>
 
-        {open && (
-          <div
-            className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-lg"
-            style={{
-              background: "var(--go-white)",
-              border: "1.5px solid rgba(0,89,169,0.15)",
-              boxShadow: "0 8px 24px rgba(0,89,169,0.12)",
-              animation: "go-slide-down 0.15s ease",
-            }}
-          >
+        {open && coords &&
+          createPortal(
+            <div
+              className="fixed z-[60] overflow-hidden rounded-lg"
+              style={{
+                left: coords.left,
+                top: coords.top,
+                bottom: coords.bottom,
+                width: coords.width,
+                background: "var(--go-white)",
+                border: "1.5px solid rgba(0,89,169,0.15)",
+                boxShadow: "0 12px 32px rgba(0,89,169,0.18)",
+                animation: "go-slide-down 0.15s ease",
+              }}
+            >
             {visiveis.length > 0 ? (
               <>
                 <ul
@@ -607,7 +658,8 @@ export function ParticipantesPapeisInput({
                   id="participantes-sugestoes"
                   role="listbox"
                   aria-label="Sugestões de participantes"
-                  className="max-h-60 overflow-y-auto py-1"
+                  className="overflow-y-auto py-1"
+                  style={{ maxHeight: coords.maxHeight }}
                 >
                   {visiveis.map((p, i) => {
                     const ativa = i === activeIndex;
@@ -665,8 +717,9 @@ export function ParticipantesPapeisInput({
                 Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter para adicionar.
               </p>
             )}
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
       </div>
 
       {tipMessage && (
