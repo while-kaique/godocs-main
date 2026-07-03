@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-07-03 — Autocomplete de participantes cortado pela borda do card (só ~4 sugestões visíveis)
+
+**PR:** #202 · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/dropdown-participantes-corte`
+
+**Sintoma:** no campo **"E-mails dos participantes"** (Etapa 1, `ParticipantesPapeisInput`), ao digitar um nome genérico como **"Lucas"** a lista de sugestões da TeamGuide fica grande, mas aparecia **cortada** — só ~4 pessoas visíveis, com cara de espremido. A lista rolava internamente, mas o container ficava truncado na borda inferior do formulário.
+
+**Causa-raiz:** o dropdown era `position: absolute` dentro do campo, e o **card central do formulário** (`submeter.tsx`, `<div ref={formCardRef} className="relative overflow-hidden …">`) tem **`overflow-hidden`** — necessário para o slide entre etapas e para arredondar a barra de gradiente do topo. Como o campo de participantes é o **último** da Etapa 1, a lista estourava a borda inferior do card e era **clipada por esse `overflow-hidden` ancestral**, não pela própria `max-h-60`.
+
+**Fix (`src/lib/submeter/form-components.tsx`, `ParticipantesPapeisInput`):** o dropdown passou a ser renderizado num **portal no `<body>`** (`createPortal`) em **`position: fixed`**, ancorado à caixa do input — escapa do `overflow-hidden` e flutua acima de tudo. Um `useEffect` mede a caixa (`getBoundingClientRect`), calcula `left`/`width` e decide **abrir para baixo (padrão) ou para cima** quando não cabe embaixo e há mais espaço acima; `maxHeight` adaptativo (132–288px) conforme o espaço livre na janela, com scroll interno. Reposiciona em `scroll`(capture)/`resize` enquanto aberto. Mantido tudo do resto: estilo GoGroup, realce do termo, navegação por teclado (↑↓/Enter/Esc), `aria-*`, rodapé "Mostrando N de M" e a animação `go-slide-down` (neutralizada pelo global `prefers-reduced-motion`).
+
+**Onde aterrissou:** `src/lib/submeter/form-components.tsx` (só frontend — **sem** rebuild de `worker.js`). Sem novos testes (mudança puramente de layout/posicionamento); `npm run test` (552) e `npm run build` verdes.
+
+---
+
 ## 2026-07-02 — LEGADO especial→saving voltava a especial: sync reverso re-forçava `especial=1` da planilha (caso Hugo/legado-038, 2ª recorrência)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `worktree-fix-sync-reverso-legado-especial-conversao`
