@@ -2,7 +2,7 @@ import { FERRAMENTAS } from "./constants";
 import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
-  RadioGroup, InfoTooltip, ParticipantesPapeisInput,
+  RadioGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
 } from "./form-components";
 import { useSugestoesParticipantes } from "./participantes-sugestoes";
 
@@ -297,6 +297,7 @@ export function Step1({
                   error={errors.participantes}
                   suggestions={sugestoesParticipantes}
                 />
+                <LegendaPapeis />
               </div>
             )}
           </FormGroup>
