@@ -1877,6 +1877,40 @@ const EVENT_CONFIG: Record<string, { titulo: string; etapa: string }> = {
 // `metadados`/`submit`/etc. registram só o que mudou naquele instante — diff entre eles confunde.
 const TIPOS_COM_DIFF = new Set(['saving', 'receita'])
 
+// Rótulo de exibição de cada papel de participante (value interno → nome). Inclui os
+// LEGADOS idealizador/referencia_tecnica (feature anterior) mapeados para "Contribuidor",
+// como no sync. Valor desconhecido cai no próprio valor cru (nunca quebra).
+const PAPEL_LABEL_INVESTIGADOR: Record<string, string> = {
+  coexecutor: 'Coautor',
+  planejador: 'Participante',
+  contribuidor: 'Contribuidor',
+  idealizador: 'Contribuidor',
+  referencia_tecnica: 'Contribuidor',
+}
+
+/** Formata o mapa e-mail→papel como "email (Coautor), email2 (Participante)". Ordena
+ * pela lista `membros` quando disponível (ordem estável), depois os demais. Retorna null
+ * quando não há papéis (eventos antigos, projeto individual) — o chamador cai na lista
+ * simples de "Membros". Defensivo: aceita `unknown` e nunca lança. */
+function formatarPapeisEvento(papeisRaw: unknown, membrosRaw: unknown): string | null {
+  if (!papeisRaw || typeof papeisRaw !== 'object' || Array.isArray(papeisRaw)) return null
+  const papeis = papeisRaw as Record<string, unknown>
+  const emails = Object.keys(papeis)
+  if (emails.length === 0) return null
+  const ordem = Array.isArray(membrosRaw) ? (membrosRaw as unknown[]).map(String) : []
+  const ordenados = [
+    ...ordem.filter((e) => e in papeis),
+    ...emails.filter((e) => !ordem.includes(e)),
+  ]
+  return ordenados
+    .map((email) => {
+      const raw = String(papeis[email] ?? '')
+      const label = PAPEL_LABEL_INVESTIGADOR[raw] ?? raw ?? '?'
+      return `${email} (${label})`
+    })
+    .join(', ')
+}
+
 /** Constrói os pares label→valor e os chips (cargo/custo) de um evento — função PURA,
  * usada tanto para o estado atual quanto para o anterior (a base do diff). */
 function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow[]; chips: EvChip[] } {
@@ -1895,7 +1929,10 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
     if (d.ferramenta) rows.push({ label: 'Ferramenta', value: String(d.ferramenta) })
     if (Array.isArray(d.tipos_projeto) && d.tipos_projeto.length > 0) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
     if (d.servico_externo) rows.push({ label: 'Serviço externo', value: String(d.servico_externo) })
-    if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
+    // Participantes: se houver papéis, mostra "email (Papel)"; senão a lista simples.
+    const papeisSub = formatarPapeisEvento(d.membros_papeis, d.membros)
+    if (papeisSub) rows.push({ label: 'Participantes e papéis', value: papeisSub })
+    else if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Arquivos', value: (d.arquivos as string[]).join(', ') })
     if (d.especial === true) rows.push({ label: 'Especial', value: 'Sim' })
   } else if (tipo === 'saving') {
@@ -1922,8 +1959,9 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
   } else if (tipo === 'metadados') {
     if (d.reset_doc === true) rows.push({ label: 'Documentação', value: 'Reiniciada' })
     const campos = (d.campos ?? {}) as Record<string, unknown>
+    // `membros` é tratado à parte (com papéis, quando houver); os demais campos no loop.
     const CAMPO_LABELS: Record<string, string> = {
-      nome: 'Nome', area: 'Área', ferramenta: 'Ferramenta', membros: 'Membros',
+      nome: 'Nome', area: 'Área', ferramenta: 'Ferramenta',
       data_criacao: 'Data', descricao_breve: 'Descrição', contexto_especial: 'Contexto especial',
     }
     for (const [k, label] of Object.entries(CAMPO_LABELS)) {
@@ -1931,6 +1969,10 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
       if (v == null) continue
       rows.push({ label, value: Array.isArray(v) ? (v as string[]).join(', ') : String(v) })
     }
+    // Participantes: se houver papéis, "email (Papel)"; senão a lista simples de membros.
+    const papeisMeta = formatarPapeisEvento(campos.membros_papeis, campos.membros)
+    if (papeisMeta) rows.push({ label: 'Participantes e papéis', value: papeisMeta })
+    else if (Array.isArray(campos.membros) && (campos.membros as unknown[]).length > 0) rows.push({ label: 'Membros', value: (campos.membros as string[]).join(', ') })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Novos arquivos', value: (d.arquivos as string[]).join(', ') })
   } else if (tipo === 'tipos') {
     if (Array.isArray(d.tipos_projeto)) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })
