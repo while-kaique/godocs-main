@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
@@ -294,6 +295,119 @@ function DistribuirEdicaoModal({
   );
 }
 
+// Modal de confirmação ao DESCONTINUAR um projeto — mesmo padrão do alerta de
+// "projeto especial" do formulário (overlay com blur + alertdialog centralizado).
+// Fecha no "x"/backdrop/Esc; confirmar dispara a ação. Substitui a confirmação antiga
+// que vinha num toast do canto superior.
+function ConfirmDescontinuarModal({
+  nome,
+  onConfirmar,
+  onCancelar,
+}: {
+  nome: string | null;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+}) {
+  // Fecha no Esc (hook chamado antes de qualquer return — regras de hooks).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancelar();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancelar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      onClick={onCancelar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        animation: "go-fade-in-up 0.25s ease both",
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="descontinuar-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          background: "var(--go-white)",
+          borderRadius: "var(--go-radius, 16px)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          overflow: "hidden",
+          animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both",
+        }}
+      >
+        {/* Faixa de alerta */}
+        <div
+          className="flex items-center gap-2.5 px-5 py-3.5"
+          style={{ background: "rgba(245,158,11,0.12)", borderBottom: "1.5px solid rgba(245,158,11,0.25)" }}
+        >
+          <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden>⚠️</span>
+          <span
+            id="descontinuar-modal-title"
+            className="text-[14px] font-extrabold"
+            style={{ color: "#92600a", letterSpacing: "-0.01em" }}
+          >
+            Descontinuar projeto
+          </span>
+        </div>
+
+        {/* Corpo */}
+        <div className="px-5 py-4">
+          <p className="text-[13px] leading-relaxed" style={{ color: "var(--go-text-heading)" }}>
+            Tem certeza que deseja marcar{" "}
+            <strong>{nome ? `"${nome}"` : "este projeto"}</strong> como{" "}
+            <strong style={{ color: "#b45309" }}>descontinuado</strong>?
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--go-text-muted, #6b6b7a)" }}>
+            Os pontos no <strong>GoMoon</strong> deixarão de contar para este projeto e ele
+            não será mais considerado um projeto ativo. Você pode reativá-lo depois.
+          </p>
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-col-reverse gap-2.5 px-5 pb-5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold transition-colors"
+            style={{
+              background: "transparent",
+              color: "var(--go-text-muted, #6b6b7a)",
+              border: "1.5px solid rgba(0,0,0,0.12)",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold text-white transition-colors"
+            style={{ background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }}
+          >
+            Sim, descontinuar
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function MeusProjetosPage() {
   const queryClient = useQueryClient();
   // React Query cacheia a lista (que lê o Sheets, ~9s). staleTime de 60s: voltar da
@@ -316,6 +430,8 @@ function MeusProjetosPage() {
   const [pagina, setPagina] = useState(1);
   // Projeto cujo popup de "distribuir poder de edição" está aberto (null = fechado).
   const [delegando, setDelegando] = useState<Projeto | null>(null);
+  // Projeto cujo modal de confirmação de "descontinuar" está aberto (null = fechado).
+  const [confirmarDescontinuar, setConfirmarDescontinuar] = useState<Projeto | null>(null);
 
   // Reflete a nova lista de editores delegados no cache da listagem (sem refetch).
   function aplicarDelegacao(projetoId: string, editores: string[]) {
@@ -353,16 +469,6 @@ function MeusProjetosPage() {
     } finally {
       setDescontinuando(null);
     }
-  }
-
-  // Confirmação no próprio toast antes de descontinuar (reativar é direto).
-  function pedirDescontinuar(id: string, nome: string | null) {
-    toast(`Marcar "${nome ?? "sem nome"}" como descontinuado?`, {
-      description:
-        "A automação deixa de contar como pendência e o projeto aparece como Descontinuado. Você pode reativar depois.",
-      action: { label: "Descontinuar", onClick: () => enviarDescontinuar(id, true) },
-      cancel: { label: "Cancelar", onClick: () => {} },
-    });
   }
 
   // Trocar de filtro volta para a primeira página.
@@ -720,7 +826,7 @@ function MeusProjetosPage() {
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => pedirDescontinuar(p.id, p.nome)}
+                                    onClick={() => setConfirmarDescontinuar(p)}
                                     disabled={descontinuando === p.id}
                                     title="Descontinuar projeto"
                                     aria-label="Descontinuar projeto"
@@ -817,6 +923,19 @@ function MeusProjetosPage() {
           projeto={delegando}
           onClose={() => setDelegando(null)}
           onSaved={(editores) => aplicarDelegacao(delegando.id, editores)}
+        />
+      )}
+
+      {/* Modal de confirmação ao descontinuar (mesmo padrão do alerta de especial). */}
+      {confirmarDescontinuar && (
+        <ConfirmDescontinuarModal
+          nome={confirmarDescontinuar.nome}
+          onCancelar={() => setConfirmarDescontinuar(null)}
+          onConfirmar={() => {
+            const alvo = confirmarDescontinuar;
+            setConfirmarDescontinuar(null);
+            enviarDescontinuar(alvo.id, true);
+          }}
         />
       )}
     </div>
