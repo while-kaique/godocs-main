@@ -659,7 +659,7 @@ function MeusProjetosPage() {
                           )}
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                           <StatusBadge status={p.status} />
                           {ehRascunho ? (
                             <>
@@ -693,11 +693,12 @@ function MeusProjetosPage() {
                                   type="button"
                                   onClick={() => setDelegando(p)}
                                   title="Distribuir o poder de edição"
-                                  aria-label="Distribuir o poder de edição"
-                                  className="inline-flex items-center justify-center rounded-full p-2 transition-all"
+                                  aria-label="Quem pode editar"
+                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
                                   style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
                                 >
                                   <Users className="h-3.5 w-3.5" />
+                                  Quem pode editar
                                 </button>
                               )}
                               {/* Descontinuar / Reativar — quem pode editar arquiva o projeto
@@ -710,10 +711,11 @@ function MeusProjetosPage() {
                                     disabled={descontinuando === p.id}
                                     title="Reativar projeto"
                                     aria-label="Reativar projeto"
-                                    className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
                                     style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
                                   >
                                     {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                                    Reativar
                                   </button>
                                 ) : (
                                   <button
@@ -722,10 +724,11 @@ function MeusProjetosPage() {
                                     disabled={descontinuando === p.id}
                                     title="Descontinuar projeto"
                                     aria-label="Descontinuar projeto"
-                                    className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
                                     style={{ background: "rgba(100,116,139,0.1)", color: "#475569" }}
                                   >
                                     {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+                                    Descontinuar
                                   </button>
                                 ))}
                               {podeEditar ? (
