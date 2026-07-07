@@ -4,6 +4,7 @@ import {
   RotateCcw,
   XCircle,
   FileText,
+  Archive,
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<
@@ -61,6 +62,15 @@ const STATUS_CONFIG: Record<
     border: "rgba(215,219,0,0.25)",
     color: "#8a7d00",
     icon: <RotateCcw className="h-3.5 w-3.5" />,
+  },
+  // Projeto arquivado/aposentado: cinza-ardósia (distinto do cinza de "Rascunho", e o
+  // ícone Archive não deixa o estado depender só da cor). Não conta como pendência.
+  descontinuado: {
+    label: "Descontinuado",
+    bg: "rgba(100,116,139,0.1)",
+    border: "rgba(100,116,139,0.3)",
+    color: "#475569",
+    icon: <Archive className="h-3.5 w-3.5" />,
   },
 };
 

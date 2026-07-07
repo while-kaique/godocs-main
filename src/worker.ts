@@ -46,7 +46,7 @@ import {
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
 import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
-import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados } from '@/lib/meus-projetos.functions'
+import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados, descontinuarProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import {
   getPreviewDisparo,
@@ -207,6 +207,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
       const body = await readBody<{ editores?: unknown }>(request)
       return json(await definirEditoresDelegados(email, id, body?.editores))
+    }
+    // Marcar/desmarcar como DESCONTINUADO (deixa de contar como pendência). Gate de
+    // ownership/edição na função. ANTES do GET genérico abaixo (POST, sem colisão).
+    if (pathname.startsWith('/api/meus-projetos/') && pathname.endsWith('/descontinuar') && method === 'POST') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const id = pathname.replace('/api/meus-projetos/', '').split('/')[0]
+      const body = await readBody<{ descontinuar?: unknown }>(request)
+      return json(await descontinuarProjeto(email, id, body?.descontinuar === true))
     }
     if (pathname.startsWith('/api/meus-projetos/') && method === 'GET') {
       const email = getEmailFromRequest(request)

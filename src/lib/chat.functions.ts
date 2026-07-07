@@ -2451,6 +2451,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // hora p/ o projeto deixar de contar como pendente (selo da home) sem esperar o
     // sync reverso. O reverse sync depois reconcilia com o carimbo formatado da planilha.
     atualizado_em: now,
+    // Reenviar/submeter REATIVA o projeto: se estava descontinuado, volta a ser ativo
+    // (e a IDA abaixo grava "Pendente" na coluna Status, saindo de "Descontinuado").
+    descontinuado: 0,
     saving_horas: (saving?.economia_horas_mes as number) ?? null,
     saving_reais: (saving?.economia_reais_mes as number) ?? null,
     tipo_saving: (saving?.tipo_saving as string) ?? null,

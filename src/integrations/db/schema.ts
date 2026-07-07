@@ -312,6 +312,12 @@ const MIGRATIONS = [
   // Transparência/auditoria → colunas "Saving Horas Real"/"Saving Horas Escalado" no Sheets.
   'ALTER TABLE projetos ADD COLUMN horas_carga_real REAL',
   'ALTER TABLE projetos ADD COLUMN horas_escala REAL',
+  // Projeto DESCONTINUADO (marcado pelo dono/editor em "Meus Projetos"): a automação
+  // não roda mais. Deixa de contar como pendência (regularização de legado / reenvio)
+  // e o badge vira "Descontinuado". 1 = descontinuado; 0 = ativo. É a FONTE DA VERDADE
+  // no app (o "Status" do Sheets não volta pelo sync reverso — regra TEMPORÁRIA grava
+  // sempre "Pendente"); a IDA reflete "Descontinuado" na coluna Status da planilha.
+  'ALTER TABLE projetos ADD COLUMN descontinuado INTEGER DEFAULT 0',
   // Disparo de e-mail de legados em LOTES (chunks). `alvos` = JSON dos e-mails alvo
   // (congelado na criação do lote, p/ o cursor ser estável entre chunks); `processados`
   // = cursor (quantos já foram tratados = enviados + falhas + pulados). O envio deixou

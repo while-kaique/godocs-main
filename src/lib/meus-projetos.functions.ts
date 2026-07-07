@@ -13,6 +13,7 @@ import {
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
+import { updateRowByProjectId } from '@/lib/google/sheets';
 import { isAdmin } from '@/lib/auth.functions';
 
 export type MeuProjetoItem = {
@@ -33,6 +34,9 @@ export type MeuProjetoItem = {
   // Legado pendente: submetido (não-rascunho) mas sem "Atualizado Em" no Sheets →
   // precisa ser editado/reenviado até o prazo para regularizar.
   pendente: boolean;
+  // Projeto descontinuado (a automação não roda mais): badge "Descontinuado" e não
+  // conta mais como pendência. Alternado pelo dono/editor no card.
+  descontinuado: boolean;
   // Papel do usuário neste projeto: 'owner' (submeteu) ou 'participante' (está nos
   // membros). NÃO determina sozinho a edição — um participante pode ser editor
   // delegado (ver `podeEditar`).
@@ -194,12 +198,17 @@ function mapItem(
     //   a leitura falhou, fica `null` → badge mostra "—" (NÃO cai no status do SQLite).
     // ⚠️ Hoje o Sheets grava sempre "Pendente" (regra TEMPORÁRIA), então submetidos
     // aparecem como "Pendente" até a regra ser encerrada.
+    // Descontinuado tem precedência sobre o Sheets: a flag no SQLite é a fonte da
+    // verdade (o "Status" do Sheets não volta pelo sync reverso), então o badge reflete
+    // "Descontinuado" na hora, mesmo que a escrita na planilha tenha atrasado/falhado.
     status:
       p.status === 'rascunho'
         ? 'rascunho'
-        : statusSheet && statusSheet.trim()
-          ? statusSheet.trim().toLowerCase()
-          : null,
+        : p.descontinuado === 1
+          ? 'descontinuado'
+          : statusSheet && statusSheet.trim()
+            ? statusSheet.trim().toLowerCase()
+            : null,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
@@ -213,7 +222,9 @@ function mapItem(
     // editado/reenviado para regularizar. Owner E participante veem a pendência (a
     // mensagem na UI difere por papel: só o owner pode regularizar). O selo da home
     // (contarPendentes) segue contando só os do owner — é a lista de ações dele.
-    pendente: ehLegado(p.id) && !at,
+    // Descontinuado deixa de contar como pendência de regularização.
+    pendente: ehLegado(p.id) && !at && p.descontinuado !== 1,
+    descontinuado: p.descontinuado === 1,
     papel,
     podeEditar,
     membros: parseJson<string[]>(p.membros) ?? [],
@@ -286,7 +297,8 @@ export async function contarPendentes(
   const rows = await getProjetosByOwnerEmail(email);
   const count = rows
     .filter((p) => temAcesso(p, email)) // owner OU participante
-    .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em))
+    // Descontinuado sai da contagem — a automação não roda mais, não há o que regularizar.
+    .filter((p) => ehLegado(p.id) && !temAtualizadoEm(p.atualizado_em) && p.descontinuado !== 1)
     .length;
   return { count, prazo: PRAZO_LEGADO };
 }
@@ -305,6 +317,55 @@ export async function excluirRascunho(email: string, projetoId: string): Promise
   }
   await excluirProjetoCascade(projetoId);
   return { ok: true };
+}
+
+/**
+ * Marca (ou desmarca) um projeto como DESCONTINUADO — a automação não roda mais.
+ * Um projeto descontinuado deixa de contar como pendência (regularização de legado /
+ * reenvio) e o badge vira "Descontinuado".
+ *
+ * A flag `descontinuado` no SQLite é a FONTE DA VERDADE (o "Status" do Sheets não volta
+ * pelo sync reverso — a regra TEMPORÁRIA grava sempre "Pendente"). Além da flag, grava
+ * "Descontinuado" na coluna Status da planilha para refletir na visão de quem acompanha
+ * o Sheets; reativar grava "Pendente" (o valor da regra TEMPORÁRIA). A escrita no Sheets
+ * é best-effort: se falhar, a flag no SQLite já governa o app.
+ *
+ * Gate = quem pode editar o projeto (dono, editor delegado ou admin RPA sem ser
+ * participante), igual ao gate de edição em getMeuProjeto. Rascunho não pode ser
+ * descontinuado (nem existe na planilha).
+ */
+export async function descontinuarProjeto(
+  email: string,
+  projetoId: string,
+  descontinuar: boolean,
+): Promise<{ ok: true; descontinuado: boolean }> {
+  const p = await getProjetoById(projetoId);
+  if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 });
+  const ehAdmin = await isAdmin(email);
+  const podeEditar =
+    ehOwner(p, email) || ehEditorDelegado(p, email) || (ehAdmin && !ehParticipante(p, email));
+  if (!podeEditar) {
+    throw Object.assign(
+      new Error('Apenas o autor, um editor delegado ou a equipe RPA pode descontinuar este projeto.'),
+      { status: 403 },
+    );
+  }
+  if (p.status === 'rascunho') {
+    throw Object.assign(new Error('Rascunhos não podem ser descontinuados.'), { status: 400 });
+  }
+
+  await updateProjeto(projetoId, { descontinuado: descontinuar ? 1 : 0 });
+
+  // Reflete na planilha (fonte que o time acompanha na aba). Reativar grava "Pendente"
+  // — o valor que a regra TEMPORÁRIA usa hoje para todos os submetidos. Best-effort: a
+  // flag no SQLite já governa o app, então falha aqui não trava a ação do usuário.
+  try {
+    await updateRowByProjectId(projetoId, { Status: descontinuar ? 'Descontinuado' : 'Pendente' });
+  } catch (e) {
+    console.error('[descontinuarProjeto] falha ao gravar Status no Sheets:', e);
+  }
+
+  return { ok: true, descontinuado: descontinuar };
 }
 
 /**

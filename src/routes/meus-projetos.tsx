@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -18,6 +18,12 @@ const PRAZO_LEGADO = "30/06/2026";
 function ehReenvioSolicitado(status: string | null): boolean {
   const s = (status ?? "").toLowerCase();
   return s === "reenvio pendente" || s === "rejeitado";
+}
+
+// Replica no cliente a regra de pendência do servidor (legado sem "Atualizado Em") —
+// usada para restaurar o aviso âmbar ao REATIVAR um projeto, sem precisar refetch.
+function ehLegadoPendente(p: { id: string; atualizado_em: string | null }): boolean {
+  return p.id.toLowerCase().includes("legado") && !p.atualizado_em;
 }
 
 // Aviso de pendência com barra de acento à esquerda. Dois tons distintos:
@@ -76,6 +82,8 @@ type Projeto = {
   arquivos_nomes: string[];
   atualizado_em: string | null;
   pendente: boolean;
+  // Projeto descontinuado (a automação não roda mais) — badge "Descontinuado", sem aviso.
+  descontinuado: boolean;
   papel: "owner" | "participante";
   // true = owner OU editor delegado. Decide o botão "Editar" × "Visualizar" e a
   // exibição do botão de distribuição do poder de edição.
@@ -303,6 +311,8 @@ function MeusProjetosPage() {
   // "Rascunhos" recortam essa lista por papel/estado.
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  // Id do projeto cuja ação de descontinuar/reativar está em andamento (spinner no botão).
+  const [descontinuando, setDescontinuando] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
   // Projeto cujo popup de "distribuir poder de edição" está aberto (null = fechado).
   const [delegando, setDelegando] = useState<Projeto | null>(null);
@@ -312,6 +322,47 @@ function MeusProjetosPage() {
     queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
       (old ?? []).map((p) => (p.id === projetoId ? { ...p, editores_delegados: editores } : p)),
     );
+  }
+
+  // Reflete no cache o novo estado de "descontinuado" (sem refetch — a lista lê o
+  // Sheets, ~9s). Descontinuar zera a pendência e vira badge "Descontinuado"; reativar
+  // volta a "Pendente" e restaura o aviso de legado quando for o caso.
+  function aplicarDescontinuado(id: string, desc: boolean) {
+    queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
+      (old ?? []).map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              descontinuado: desc,
+              status: desc ? "descontinuado" : "pendente",
+              pendente: desc ? false : ehLegadoPendente(p),
+            }
+          : p,
+      ),
+    );
+  }
+
+  async function enviarDescontinuar(id: string, desc: boolean) {
+    setDescontinuando(id);
+    try {
+      await apiFetch(`/api/meus-projetos/${id}/descontinuar`, { descontinuar: desc }, "POST");
+      aplicarDescontinuado(id, desc);
+      toast.success(desc ? "Projeto marcado como descontinuado." : "Projeto reativado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao atualizar o projeto.");
+    } finally {
+      setDescontinuando(null);
+    }
+  }
+
+  // Confirmação no próprio toast antes de descontinuar (reativar é direto).
+  function pedirDescontinuar(id: string, nome: string | null) {
+    toast(`Marcar "${nome ?? "sem nome"}" como descontinuado?`, {
+      description:
+        "A automação deixa de contar como pendência e o projeto aparece como Descontinuado. Você pode reativar depois.",
+      action: { label: "Descontinuar", onClick: () => enviarDescontinuar(id, true) },
+      cancel: { label: "Cancelar", onClick: () => {} },
+    });
   }
 
   // Trocar de filtro volta para a primeira página.
@@ -649,6 +700,34 @@ function MeusProjetosPage() {
                                   <Users className="h-3.5 w-3.5" />
                                 </button>
                               )}
+                              {/* Descontinuar / Reativar — quem pode editar arquiva o projeto
+                                  (para de contar como pendência) ou o traz de volta. */}
+                              {podeEditar &&
+                                (p.descontinuado ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => enviarDescontinuar(p.id, false)}
+                                    disabled={descontinuando === p.id}
+                                    title="Reativar projeto"
+                                    aria-label="Reativar projeto"
+                                    className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                                    style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                  >
+                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => pedirDescontinuar(p.id, p.nome)}
+                                    disabled={descontinuando === p.id}
+                                    title="Descontinuar projeto"
+                                    aria-label="Descontinuar projeto"
+                                    className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                                    style={{ background: "rgba(100,116,139,0.1)", color: "#475569" }}
+                                  >
+                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+                                  </button>
+                                ))}
                               {podeEditar ? (
                                 <Link
                                   to="/editar/$id"
