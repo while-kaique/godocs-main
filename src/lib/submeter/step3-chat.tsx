@@ -379,6 +379,8 @@ function CollapsiblePreviewCard({
   expanded,
   onToggle,
   isSaving,
+  onRefazer,
+  refazerDisabled,
 }: {
   title: string;
   icon: string;
@@ -389,6 +391,10 @@ function CollapsiblePreviewCard({
   expanded: boolean;
   onToggle: () => void;
   isSaving: boolean;
+  // Quando presente, mostra um botão "Refazer" no cabeçalho do card — reabre o
+  // formulário determinístico da fase financeira sem tocar na documentação.
+  onRefazer?: () => void;
+  refazerDisabled?: boolean;
 }) {
   const cleanContent = isSaving
     ? ocultarReaisSaving(cleanPreviewContent(content))
@@ -402,13 +408,15 @@ function CollapsiblePreviewCard({
         background: "var(--go-white)",
       }}
     >
-      <button
-        type="button"
-        onClick={onToggle}
+      <div
         className="flex w-full items-center justify-between px-4 py-3 transition-colors"
         style={{ background: expanded ? accentBg : "transparent" }}
       >
-        <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
           <span className="text-base">{icon}</span>
           <span
             className="text-[12px] font-bold uppercase tracking-[0.06em]"
@@ -426,22 +434,62 @@ function CollapsiblePreviewCard({
           >
             Aprovado
           </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-2 pl-2">
+          {onRefazer && (
+            <button
+              type="button"
+              onClick={onRefazer}
+              disabled={refazerDisabled}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all"
+              style={{
+                background: `${accentColor}14`,
+                border: `1.5px solid ${accentColor}40`,
+                color: accentColor,
+                cursor: refazerDisabled ? "not-allowed" : "pointer",
+                opacity: refazerDisabled ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (refazerDisabled) return;
+                e.currentTarget.style.background = `${accentColor}24`;
+                e.currentTarget.style.borderColor = `${accentColor}66`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = `${accentColor}14`;
+                e.currentTarget.style.borderColor = `${accentColor}40`;
+              }}
+              title="Refazer o memorial financeiro — reabre o formulário de cargos e valores (a documentação é mantida)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              Refazer
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? "Recolher" : "Expandir"}
+            className="flex shrink-0 items-center"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={accentColor}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="transition-transform"
+              style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
         </div>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={accentColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="transition-transform"
-          style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+      </div>
 
       {expanded && (
         <div
@@ -725,6 +773,8 @@ function FinalReview({
           expanded={expandedSaving}
           onToggle={() => setExpandedSaving((v) => !v)}
           isSaving={true}
+          onRefazer={onReiniciarMemorial}
+          refazerDisabled={submitting}
         />
       )}
 
@@ -739,6 +789,10 @@ function FinalReview({
           expanded={expandedReceita}
           onToggle={() => setExpandedReceita((v) => !v)}
           isSaving={true}
+          // Só-receita (sem card de saving): o "Refazer" mora aqui. Quando há saving,
+          // o reset começa pelo saving, então o botão fica no card de saving.
+          onRefazer={approvedSavingPreview ? undefined : onReiniciarMemorial}
+          refazerDisabled={submitting}
         />
       )}
 
@@ -757,47 +811,6 @@ function FinalReview({
           <span>Enviar para Triagem</span>
         )}
       </button>
-
-      {/* Escape para refazer o memorial financeiro sem recomeçar tudo. Só aparece
-          quando há memorial financeiro (o pai não passa o callback p/ especial).
-          Acento financeiro (lime) + ícone de "voltar/refazer" — distinto do lápis de
-          "editar" e do botão azul de enviar (estado nunca só por cor). */}
-      {onReiniciarMemorial && (
-        <div className="mt-3 flex flex-col items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onReiniciarMemorial}
-            disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold transition-all"
-            style={{
-              background: "rgba(215,219,0,0.08)",
-              border: "1.5px solid rgba(215,219,0,0.25)",
-              color: "#6b6e00",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.5 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (submitting) return;
-              e.currentTarget.style.background = "rgba(215,219,0,0.16)";
-              e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(215,219,0,0.08)";
-              e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
-            }}
-            title="Reabre o formulário de cargos, horas e valores para refazer o memorial financeiro"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-            Refazer memorial financeiro
-          </button>
-          <span className="text-center text-[10.5px]" style={{ color: "#8b8b9a" }}>
-            Volta ao formulário de cargos e valores. A documentação técnica é mantida.
-          </span>
-        </div>
-      )}
     </div>
   );
 }
