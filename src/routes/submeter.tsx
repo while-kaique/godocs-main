@@ -995,8 +995,8 @@ export function SubmeterPageContent({
       } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
-      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
-        errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
+        errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
       if (!form.usaAiProxy)
         errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
