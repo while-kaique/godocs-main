@@ -576,3 +576,29 @@ existir, o append/update **ignora** com aviso (não quebra) e só as presentes s
 **Status.** ⏳ Implementado; testes verdes (526) + `build`/`build:worker` OK; typecheck sem novos
 erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
 de prod; requer as 3 colunas nas abas).
+
+## Feature adicional — Alerta do Google Chat enxuto para projeto especial · jul/2026
+
+**Motivação.** O alerta de submissão no Google Chat (`buildSubmitMessage`, `src/lib/google/chat.ts`)
+era único para todo projeto. Projeto **especial** pula o analisador e vai direto à avaliação humana —
+não tem saving/receita/escopo/tipos financeiros — então o alerta trazia linhas sempre zero/irrelevantes
+(`Saving estimado 0h`, `R$ 0,00`, `Escopo: —`, `Tipos: especial`) e **não** mostrava a justificativa do
+porquê o projeto é especial (`contexto_especial`), que é justamente o que o avaliador precisa ler.
+
+**O que mudou.** `buildSubmitMessage` recebe dois campos opcionais — `especial?: boolean` e
+`contextoEspecial?: string`. Quando `especial` é `true`, desvia para `buildEspecialMessage` (mesmo
+arquivo), que monta um alerta enxuto:
+- **Mantém** os metadados que fazem sentido: Projeto, Área, Ferramenta, Solicitante, E-mail,
+  Participantes, Descrição, Data da submissão, link da planilha.
+- **Omite** Escopo, Tipos, Saving (horas/R$/tipo) e Receita — irrelevantes ao caso.
+- **Destaca** a justificativa: bloco `⭐ Por que é um projeto especial:` com o `contexto_especial`
+  (traço `—` quando vazio, nunca linha em branco).
+- Cabeçalho próprio: `⭐ Projeto especial – avaliação humana necessária` (ou `✏️ Edição de projeto
+  especial …` no modo edição).
+
+**Onde aterrissou.** `src/lib/google/chat.ts` (`buildSubmitMessage` + novo `buildEspecialMessage`);
+caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
+`contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
+
+**Status.** ⏳ Implementado; testes verdes + `build:worker` OK. **Deploy pendente** (regra 13 —
+staging `edf400b4` antes de prod).
