@@ -1781,6 +1781,11 @@ export function SubmeterPageContent({
         // formulário de receita — senão cairia num chat vazio (as mensagens da fase
         // de saving foram limpas na transição para a receita).
         openReceitaForm();
+      } else if (!temReceita && approvedSavingPreview !== null) {
+        // Submissão nova, só saving: o usuário reabriu o formulário (ex.: via "Refazer"
+        // na revisão final) e não mudou nada → volta à revisão final, simétrico à edição.
+        // Só quando o memorial já foi aprovado (mesma guarda do ramo de edição).
+        setChatComplete(true);
       }
       // Demais casos: cai no chat da fase de saving exatamente onde estava.
       return;
