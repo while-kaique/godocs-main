@@ -642,6 +642,7 @@ function FinalReview({
   approvedReceitaPreview,
   onSubmit,
   submitting,
+  onReiniciarMemorial,
   versaoAnterior,
   novoResumo,
 }: {
@@ -650,6 +651,7 @@ function FinalReview({
   approvedReceitaPreview?: string | null;
   onSubmit: () => void;
   submitting: boolean;
+  onReiniciarMemorial?: () => void;
   versaoAnterior?: VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -755,6 +757,47 @@ function FinalReview({
           <span>Enviar para Triagem</span>
         )}
       </button>
+
+      {/* Escape para refazer o memorial financeiro sem recomeçar tudo. Só aparece
+          quando há memorial financeiro (o pai não passa o callback p/ especial).
+          Acento financeiro (lime) + ícone de "voltar/refazer" — distinto do lápis de
+          "editar" e do botão azul de enviar (estado nunca só por cor). */}
+      {onReiniciarMemorial && (
+        <div className="mt-3 flex flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onReiniciarMemorial}
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold transition-all"
+            style={{
+              background: "rgba(215,219,0,0.08)",
+              border: "1.5px solid rgba(215,219,0,0.25)",
+              color: "#6b6e00",
+              cursor: submitting ? "not-allowed" : "pointer",
+              opacity: submitting ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (submitting) return;
+              e.currentTarget.style.background = "rgba(215,219,0,0.16)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(215,219,0,0.08)";
+              e.currentTarget.style.borderColor = "rgba(215,219,0,0.25)";
+            }}
+            title="Reabre o formulário de cargos, horas e valores para refazer o memorial financeiro"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Refazer memorial financeiro
+          </button>
+          <span className="text-center text-[10.5px]" style={{ color: "#8b8b9a" }}>
+            Volta ao formulário de cargos e valores. A documentação técnica é mantida.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2121,6 +2164,7 @@ export function Step3Chat({
   savingFormVoltarLabel,
   onReceitaFormVoltar,
   receitaFormVoltarLabel,
+  onReiniciarMemorial,
   versaoAnterior,
   novoResumo,
 }: {
@@ -2162,6 +2206,9 @@ export function Step3Chat({
   savingFormVoltarLabel?: string;
   onReceitaFormVoltar?: () => void;
   receitaFormVoltarLabel?: string;
+  // Refazer o memorial financeiro a partir da revisão final (reabre o formulário
+  // de cargos/horas/valores). Ausente quando não há memorial financeiro (especial).
+  onReiniciarMemorial?: () => void;
   versaoAnterior?: import("@/lib/meus-projetos.functions").VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -2585,6 +2632,7 @@ export function Step3Chat({
           approvedReceitaPreview={approvedReceitaPreview}
           onSubmit={onSubmit}
           submitting={submitting}
+          onReiniciarMemorial={onReiniciarMemorial}
           versaoAnterior={versaoAnterior}
           novoResumo={novoResumo}
         />
