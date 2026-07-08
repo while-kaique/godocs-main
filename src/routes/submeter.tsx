@@ -2,15 +2,16 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Loader2, Save, FolderClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
   ALLOWED_DOMAINS_RE, filesToDocs, TOKEN_BLOCK_CHARS,
-  parseMoedaBR, numeroParaMoedaBR,
+  parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData } from "@/lib/submeter/constants";
-import { saveDraft, loadDraft, clearDraft, editDraftKey, type DraftSnapshot } from "@/lib/submeter/draft-storage";
+import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
+import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
 function hasLocalDraft(): boolean {
@@ -73,6 +74,9 @@ type AgentMeta = {
   nomeProjeto: string;
   ferramenta: string;
   participantes: string[];
+  // Papel de cada participante (e-mail→papel). Entra no meta para que trocar um
+  // papel também dispare metaChanged e seja persistido (via atualizar-metadados).
+  participantesPapeis: Record<string, string>;
   dataCriacao: string;
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
@@ -197,6 +201,112 @@ async function apiFetchComRetry<T>(path: string, body?: unknown, tentativas = 3)
   throw ultimoErro;
 }
 
+// Popup do "Salvar rascunho": ação NÃO destrutiva (guarda o projeto e sai). Informa
+// os cuidados — principalmente que rascunho NÃO vai para análise — e onde retomar.
+// Mesmo padrão de overlay + Esc; tom informativo (azul), não de alerta.
+function SalvarRascunhoModal({
+  onClose,
+  onConfirmar,
+  processando,
+}: {
+  onClose: () => void;
+  onConfirmar: () => void;
+  processando: boolean;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !processando) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, processando]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: "rgba(8,20,40,0.45)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
+      onClick={() => !processando && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Salvar como rascunho"
+    >
+      <div
+        className="relative flex w-full max-w-md flex-col overflow-hidden rounded-2xl"
+        style={{ background: "var(--go-white)", boxShadow: "0 24px 64px rgba(8,20,40,0.35)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 px-6 pt-6">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "rgba(0,89,169,0.1)", color: "var(--go-blue)" }}
+          >
+            <FolderClock style={{ width: 18, height: 18 }} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+              Salvar como rascunho?
+            </h2>
+            <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
+              Guardamos este projeto e você começa outro.
+            </p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            Este projeto fica salvo em <span className="font-semibold">Meus Projetos › Rascunhos</span> —
+            você pode voltar e continuar de onde parou quando quiser. Antes de sair, vale saber:
+          </p>
+          <ul className="mt-3 space-y-2">
+            {[
+              "O rascunho ainda NÃO foi enviado para análise — a equipe de RPA & IA só vê o projeto depois que você concluir e clicar em enviar.",
+              "Ao sair, você volta para a tela inicial e pode começar uma nova submissão.",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+                <span
+                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "var(--go-blue)" }}
+                  aria-hidden="true"
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={processando}
+            className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-50"
+            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={processando}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-2 disabled:opacity-60"
+            style={{ background: "var(--go-blue)" }}
+          >
+            {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {processando ? "Salvando…" : "Salvar e sair"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SubmeterPageContent({
   editProjetoId,
   resumeDraftId,
@@ -267,6 +377,9 @@ export function SubmeterPageContent({
   // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  // "Salvar rascunho": confirmação + estado (só quando já existe rascunho no servidor).
+  const [showRascunhoConfirm, setShowRascunhoConfirm] = useState(false);
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
 
   // Aplica no estado do wizard os dados de um projeto vindos do servidor —
   // usado tanto na EDIÇÃO de um projeto submetido quanto na RETOMADA de um
@@ -288,6 +401,20 @@ export function SubmeterPageContent({
           ferramentaOutra = ferramentaRaw.slice("Outros: ".length);
         }
 
+        // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
+        // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
+        // semântica da coluna "Participantes" de onde esses e-mails vieram. Lookup
+        // tolerante a caixa. Novos participantes adicionados na edição começam sem
+        // papel (obrigatório escolher). O autor não entra aqui.
+        const membrosPapeisSeed = (data.membros_papeis as Record<string, string>) ?? {};
+        const papeisLower: Record<string, string> = {};
+        for (const [k, v] of Object.entries(membrosPapeisSeed)) papeisLower[k.toLowerCase()] = v;
+        const participantesPapeis: FormData["participantesPapeis"] = {};
+        for (const email of membros) {
+          const p = membrosPapeisSeed[email] ?? papeisLower[email.toLowerCase()];
+          participantesPapeis[email] = (p as PapelParticipante) || "coexecutor";
+        }
+
         const newForm: FormData = {
           escopo: (data.escopo as string) ?? "interno",
           prodStatus: "sim",
@@ -298,6 +425,7 @@ export function SubmeterPageContent({
           servicoExterno: (data.servico_externo as string) ?? "",
           emEquipe: membros.length > 0 ? "sim" : "nao",
           participantes: membros,
+          participantesPapeis,
           nomeProjeto: (data.nome_projeto as string) ?? "",
           dataCriacao: (data.data_criacao_projeto as string) ?? "",
           tipoProjeto: tiposProjeto,
@@ -463,6 +591,7 @@ export function SubmeterPageContent({
               ? `Outros: ${newForm.ferramentaOutra.trim()}`
               : newForm.ferramenta,
           participantes: newForm.participantes,
+          participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
           usaAiProxy: newForm.usaAiProxy,
@@ -478,7 +607,9 @@ export function SubmeterPageContent({
   // retomada fiel de um rascunho ao atualizar/voltar à página, sem ida ao servidor.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rehydrateFromLocal = useCallback((d: DraftSnapshot) => {
-    setForm(d.form);
+    // Rascunhos salvos antes desta feature não têm `participantesPapeis` — default {}
+    // para nunca ler `undefined[email]`.
+    setForm({ ...d.form, participantesPapeis: d.form.participantesPapeis ?? {} });
     setNomesExistentes(d.nomesExistentes ?? []);
     setProjetoId(d.projetoId);
     setCompletedSteps(new Set(d.completedSteps ?? [1, 2]));
@@ -559,7 +690,19 @@ export function SubmeterPageContent({
           // chat/wizard por cima — sem reiniciar a coleta do zero.
           applySeed(data, editProjetoId);
           if (editDraft && editDraft.projetoId === editProjetoId) {
-            rehydrateFromLocal(editDraft);
+            // Servidor manda: só reidrata o rascunho local se for consistente com o
+            // servidor. Se o rascunho diz que a doc foi concluída (preview aprovado /
+            // chatComplete) mas o servidor NÃO tem doc persistida (legado que nunca
+            // teve o preview aprovado), descarta — senão a tela de aprovação final
+            // "ressuscita" sobre um projeto sem doc e trava ("Documentação ainda não
+            // foi gerada"). Descartando, o re-init abaixo (reset_doc) limpa o chat no
+            // servidor e recomeça a auditoria do zero. Ver deveDescartarDraftEdicao.
+            const serverTemDoc = data.documentacao != null;
+            if (deveDescartarDraftEdicao({ serverTemDoc, draft: editDraft })) {
+              clearDraft(editDraftKey(editProjetoId));
+            } else {
+              rehydrateFromLocal(editDraft);
+            }
           }
         })
         .catch((e) => {
@@ -600,15 +743,31 @@ export function SubmeterPageContent({
             `/api/chat/historico/${wantedId}`,
           );
           if (!cancelled && Array.isArray(hist) && hist.length > 0) {
-            setChatMessages(
-              hist.map((m) => ({
-                role: (m.role as "user" | "assistant") ?? "assistant",
-                content: String(m.content ?? ""),
-                options: (m.options as ChatMessage["options"]) ?? undefined,
-              })),
+            // Defesa em profundidade: só bolhas de conversa. O backend já filtra a
+            // role 'doc' (texto bruto dos arquivos) e parseia o JSON do assistant,
+            // mas mantemos o filtro aqui para nunca renderizar conteúdo cru vindo de
+            // dados legados/inesperados.
+            const conversa = hist.filter(
+              (m) => m.role === "user" || m.role === "assistant",
             );
-            setStep(3);
-            setCompletedSteps(new Set([1, 2, 3]));
+            const msgs: ChatMessage[] = conversa.map((m) => ({
+              role: m.role === "user" ? "user" : "assistant",
+              content: String(m.content ?? ""),
+              options: (m.options as ChatMessage["options"]) ?? undefined,
+              isPreview: Boolean(m.isPreview),
+              isComplete: Boolean(m.isComplete),
+              fase: (m.fase as ChatFase | undefined) ?? undefined,
+            }));
+            if (msgs.length > 0) {
+              setChatMessages(msgs);
+              // Coerência da UI: alinha fase/estado de conclusão à última resposta do
+              // agente (senão a conversa retomada ficava presa na fase "doc").
+              const ultima = msgs[msgs.length - 1];
+              if (ultima.fase) setChatFase(ultima.fase);
+              if (ultima.isComplete) setChatComplete(true);
+              setStep(3);
+              setCompletedSteps(new Set([1, 2, 3]));
+            }
           }
         } catch (e) {
           console.warn("[rascunho] histórico do chat indisponível:", e);
@@ -639,6 +798,7 @@ export function SubmeterPageContent({
     servicoExterno: "",
     emEquipe: "",
     participantes: [],
+    participantesPapeis: {},
     nomeProjeto: "",
     dataCriacao: today,
     tipoProjeto: [],
@@ -742,6 +902,20 @@ export function SubmeterPageContent({
     });
   }, []);
 
+  // "Salvar rascunho" (só submissão nova COM rascunho no servidor): o projeto já vive
+  // como rascunho no servidor (linha `projetos` status 'rascunho', criada em
+  // iniciar-submissao; conversa e metadados persistidos ao longo do fluxo). Aqui só
+  // DESANEXAMOS a sessão local (clearDraft) — senão /submeter retomaria este rascunho
+  // em vez de começar um novo — e voltamos para a home. A retomada acontece por
+  // Meus Projetos › Rascunhos (Continuar → ?retomar=id, rehidrata do servidor).
+  function handleSalvarRascunho() {
+    setSalvandoRascunho(true);
+    // Invalida o cache da lista para o rascunho aparecer atualizado em Meus Projetos.
+    queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
+    clearDraft();
+    navigate({ to: "/" });
+  }
+
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
   /* ── Metadados do agente: snapshot + detecção de mudança ── */
@@ -757,11 +931,12 @@ export function SubmeterPageContent({
     nomeProjeto: form.nomeProjeto.trim(),
     ferramenta: computeFerramenta(),
     participantes: form.participantes,
+    participantesPapeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
     usaAiProxy: form.usaAiProxy,
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -803,6 +978,9 @@ export function SubmeterPageContent({
         const invalid = form.participantes.filter((p) => !ALLOWED_DOMAINS_RE.test(p));
         if (invalid.length > 0)
           errs.participantes = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
+        // Papel obrigatório por participante (decisão de produto: obriga escolher).
+        else if (form.participantes.some((p) => !form.participantesPapeis[p]))
+          errs.participantes = "Escolha o papel de cada participante";
       }
     }
 
@@ -817,8 +995,8 @@ export function SubmeterPageContent({
       } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
-      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
-        errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
+        errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
       if (!form.usaAiProxy)
         errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
@@ -964,6 +1142,7 @@ export function SubmeterPageContent({
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           // Projeto especial não envia tipos financeiros — o backend grava
@@ -1045,6 +1224,7 @@ export function SubmeterPageContent({
           nome_projeto: form.nomeProjeto.trim(),
           ferramenta: ferramentaEnviada,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
@@ -1075,6 +1255,7 @@ export function SubmeterPageContent({
           escopo: form.escopo as "interno" | "externo",
           servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
           membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           nome_projeto: form.nomeProjeto.trim(),
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
@@ -1146,6 +1327,7 @@ export function SubmeterPageContent({
           nome_projeto: meta.nomeProjeto,
           ferramenta: meta.ferramenta,
           membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
           usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1232,6 +1414,7 @@ export function SubmeterPageContent({
               nome_projeto: meta.nomeProjeto,
               ferramenta: meta.ferramenta,
               membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
               usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1303,6 +1486,7 @@ export function SubmeterPageContent({
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1400,6 +1584,7 @@ export function SubmeterPageContent({
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
             membros: meta.participantes,
+          membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
@@ -1581,9 +1766,15 @@ export function SubmeterPageContent({
       const temReceita = form.tipoProjeto.includes("receita_incremental");
       if (editProjetoId) {
         // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
-        // abre o formulário de receita; senão, vai para a revisão final.
+        // abre o formulário de receita; senão, vai para a revisão final — MAS só quando o
+        // memorial de saving JÁ foi aprovado (approvedSavingPreview). Sem preview aprovado
+        // (ex.: projeto convertido especial→saving cujo chat de saving parou numa pergunta,
+        // sem gerar memorial), NÃO marca a conversa como concluída: cai no chat da fase de
+        // saving (a pergunta pendente) para o memorial ser concluído. Antes marcava
+        // chatComplete direto e o botão "Enviar" aparecia sem memorial → 500 "sem ganho
+        // mensurável" mascarado por toast genérico (caso "Supply Lojas <> Estoque CDs").
         if (temReceita) openReceitaForm();
-        else setChatComplete(true);
+        else if (approvedSavingPreview !== null) setChatComplete(true);
       } else if (temReceita && approvedSavingPreview !== null) {
         // Fluxo "ambos": o usuário reabriu o saving (ex.: via "Voltar ao saving" da
         // receita) e não mudou nada. Como o saving já foi aprovado, volta ao
@@ -1790,6 +1981,27 @@ export function SubmeterPageContent({
      fica disponível depois em "Meus Projetos". */
   async function handleSubmitProjeto() {
     if (!projetoId) return;
+
+    // Rede de segurança (defesa em profundidade): o botão "Enviar" só deveria aparecer
+    // com o memorial aprovado, mas se algum caminho marcar a conversa como concluída sem
+    // preview (ex.: handoff doc→saving + reload), barramos aqui com orientação clara em
+    // vez de deixar o servidor devolver 500 "sem ganho mensurável". Especial não tem
+    // memorial financeiro, então não se aplica.
+    if (!form.especial) {
+      if (form.tipoProjeto.includes("saving") && approvedSavingPreview === null) {
+        toast.error("Conclua o memorial de saving no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        setChatComplete(false);
+        openSavingForm();
+        return;
+      }
+      if (form.tipoProjeto.includes("receita_incremental") && approvedReceitaPreview === null) {
+        toast.error("Conclua o memorial de receita no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        setChatComplete(false);
+        openReceitaForm();
+        return;
+      }
+    }
+
     setSubmittingProject(true);
 
     // Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
@@ -1808,7 +2020,9 @@ export function SubmeterPageContent({
       if (msg.includes("Já existe um projeto submetido")) {
         toast.warning(msg, { duration: 8000 });
       } else {
-        toast.error("Erro ao enviar projeto. Tente novamente.");
+        // Mostra a mensagem REAL do servidor (orienta a ação — ex.: "sem ganho
+        // mensurável, conclua o memorial") em vez do genérico que prendia o usuário.
+        toast.error(msg ? `Erro ao enviar projeto: ${msg}` : "Erro ao enviar projeto. Tente novamente.");
       }
       setSubmittingProject(false);
       return;
@@ -1981,7 +2195,25 @@ export function SubmeterPageContent({
           />
 
           <div style={{ padding: step === 3 ? "0 32px" : undefined }}>
-            <BrowserDots />
+            {/* Barra de "chrome" do card: os pontos à esquerda e, à direita, o
+                controle discreto de salvar rascunho — só em submissão nova E quando já
+                existe rascunho no servidor (projetoId; antes do agente iniciar não há
+                nada para guardar). Reaproveita a metáfora de janela dos BrowserDots. */}
+            <div className="flex items-center justify-between">
+              <BrowserDots />
+              {!editProjetoId && projetoId && (
+                <button
+                  type="button"
+                  onClick={() => setShowRascunhoConfirm(true)}
+                  className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-[#a0a0ad] transition-colors hover:bg-[rgba(0,89,169,0.08)] hover:text-[var(--go-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--go-blue)] focus-visible:ring-offset-1"
+                  aria-label="Salvar como rascunho e começar outro projeto"
+                  title="Salvar como rascunho"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Salvar rascunho</span>
+                </button>
+              )}
+            </div>
             <WizardProgress
               current={step}
               completed={completedSteps}
@@ -2212,6 +2444,13 @@ export function SubmeterPageContent({
         <PageFooter />
       </div>
 
+      {showRascunhoConfirm && (
+        <SalvarRascunhoModal
+          onClose={() => setShowRascunhoConfirm(false)}
+          onConfirmar={handleSalvarRascunho}
+          processando={salvandoRascunho}
+        />
+      )}
     </PageFrame>
   );
 }

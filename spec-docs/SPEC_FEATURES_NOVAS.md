@@ -340,3 +340,265 @@ do dono real, typo no nome).
 **Status.** ✅ **Mergeada (PR #176) e LIVE em produção** (30/06/2026). `/api/auth/me` retorna
 `name`; o form não pede mais nome/e-mail e mostra "Submetendo como…". Testes verdes + `build`
 (typecheck) limpo.
+
+## Feature adicional — Botão "Salvar rascunho" no formulário · jul/2026
+
+> Pedido do dono (Kaique, 2026-07-02): controles **pequenos e visíveis** no formulário. Nasceram
+> DOIS botões ("Recomeçar" + "Salvar rascunho"); após validar no staging o dono decidiu **manter só
+> o "Salvar rascunho"** ("é suficiente") e **remover o "Recomeçar"**.
+
+**Problema.** Quem começava uma submissão e queria parar para submeter outro projeto depois não tinha
+caminho claro no próprio formulário — o rascunho só era gerenciável em "Meus Projetos > Rascunhos".
+
+> ⛔ **"Recomeçar" foi implementado e REMOVIDO (decisão do dono, 2026-07-02).** Era um botão destrutivo
+> (popup âmbar → `DELETE` do rascunho + `clearDraft` + `window.location.assign('/submeter')`). Ficou só
+> "Salvar rascunho". Registrado aqui para não ser reintroduzido por engano — se um dia for preciso,
+> o histórico da branch `feat/botao-recomecar-forms` tem a implementação.
+
+### "Salvar rascunho" (guardar e sair)
+
+> Pedido do dono (Kaique, 2026-07-02, mesma leva): um botão que **salva o projeto atual como
+> rascunho** e libera o usuário para submeter outro, **redirecionando para a home**, com um popup
+> informando os cuidados.
+
+**Decisão (fechada).**
+- **Escopo: só submissão nova COM rascunho no servidor** (`projetoId != null`). O rascunho
+  server-side (linha `projetos` status `'rascunho'`) só nasce em `iniciar-submissao`
+  (`handleIniciarAgente`, que exige arquivos) — **antes do agente iniciar não há o que guardar**,
+  então o botão fica **oculto** nas Etapas 1/2 pré-agente e some em edição.
+- **O projeto JÁ está parkeado no servidor** (metadados de `iniciar-submissao`/`atualizar-metadados`;
+  conversa persistida em `chat_messages` a cada turno). Por isso "salvar rascunho" **não faz POST
+  novo** — apenas **desanexa a sessão local** (`clearDraft`, senão `/submeter` retomaria este mesmo
+  rascunho em vez de começar um novo), **invalida o cache de Meus Projetos** e **navega para `/`**.
+- **Retomada:** por **Meus Projetos › Rascunhos › Continuar** (`?retomar=<id>`, rehidrata do
+  servidor via `GET /api/chat/historico/:id`). Mesma fidelidade do resume já existente.
+- **Popup informativo** (tom azul, não destrutivo) com os cuidados: **(a)** o rascunho **NÃO foi
+  enviado para análise** — a equipe só vê depois de concluir e enviar; **(b)** ao sair, volta à
+  home e pode começar outra submissão. Botão "Salvar e sair" (azul).
+- ⚠️ **Limitação aceita (igual ao resume atual):** edições de campo das Etapas 1/2 feitas *depois*
+  do agente iniciar e ainda não re-enviadas (`atualizar-metadados`), além do input de chat não
+  enviado, vivem só no localStorage — ao retomar do servidor podem não voltar. Não vale
+  over-engineer: é o mesmo teto do `?retomar` que já existe.
+
+**Onde aterrissou.**
+- `src/routes/submeter.tsx` — `import { Loader2, Save, FolderClock } from "lucide-react"`;
+  componente **`SalvarRascunhoModal`**; estados `showRascunhoConfirm`/`salvandoRascunho`; handler
+  `handleSalvarRascunho` (`invalidateQueries(['meus-projetos'])` → `clearDraft` → `navigate('/')`);
+  botão na barra dos `BrowserDots` (gate `!editProjetoId && projetoId`); render do modal ao fim do
+  `PageFrame`. **Nenhuma mudança server-side** nesta feature.
+- **Fix acoplado (retomada não vaza texto bruto):** a retomada sem snapshot local (forçada pelo
+  `clearDraft` do "Salvar rascunho") caía num caminho que despejava a role `'doc'` crua no chat.
+  Corrigido em `getHistoricoMeuProjeto` (`meus-projetos.functions.ts`, filtra `user`/`assistant` +
+  parseia o JSON do assistant) e no map do histórico no `submeter.tsx`. Detalhe em
+  `SPEC_CORRECOES.md` (2026-07-02). Server-side → `worker.js` rebuildado.
+
+**Status.** ✅ Implementada (só "Salvar rascunho"; "Recomeçar" removido) + fix da retomada; testes
+verdes (504) + `tsc` sem erros novos. Validada no **staging** (`edf400b4`) e promovida a **produção**
+(`674a3710`) em 2026-07-02.
+
+## Feature adicional — Nudge de "versão desatualizada" (version skew) · jul/2026
+
+> Decisão do dono (Kaique, 2026-07-01): oferecer recarregar quando o cliente estiver rodando
+> um build antigo. **Só botão manual — nunca recarrega sozinho** (app de formulário longo:
+> reload automático interromperia digitação/coleta).
+
+**Problema (medido nos logs de prod, 01/07).** O GoDeploy **acumula** os assets a cada deploy
+(manifesto com ~3015 arquivos; dezenas de hashes do mesmo chunk). Consequência: uma aba aberta
+há horas continua baixando os **próprios** chunks (que ainda existem → **sem 404**) e conversa
+com o worker **novo**. O cliente velho nunca "quebra" e nunca é forçado a atualizar → **version
+skew silencioso**. Amostra de ~80 min mostrou **4 builds distintos** do entry `index-*.js`
+batendo na API, **2 concorrentes nos últimos 30 min** (atual `DWTXmzVW` + um antigo `DqutV0M1`).
+Isso agrava o padrão "cliente sobrepõe servidor" (ex.: draft de edição em localStorage
+ressuscitando estágio que o servidor não tem mais).
+
+**Decisão (fechada).**
+- Detecção **100% no cliente** — **sem tocar no worker** (nenhum rebuild de `worker.js`). O
+  `index.html` é a fonte canônica do build atual: compara-se o entry `<script type="module"
+  src="/assets/index-<hash>.js">` **em execução** com o do `/index.html` recém-buscado
+  (`cache:'no-store'` + cachebust). Hash diferente → há build novo publicado.
+  - ⚠️ Escolhido em vez de expor um `buildId` no `GET /api/config`: aquele exigiria carimbar o
+    mesmo id no bundle do SPA **e** no worker (builds separados) + rebuild/deploy do worker. O
+    poll do `index.html` é mais leve e não depende de contrato servidor↔cliente.
+  - **Não dá pra confiar em 404 de chunk** para forçar reload: como os assets se acumulam, o
+    chunk velho **nunca** some. Por isso a detecção é ativa (poll), não reativa a erro.
+- **Conservador:** se qualquer lado não for legível (dev sem hash, HTML de erro do edge, offline)
+  → **não cutuca**. Em **dev** o entry é `/src/main.tsx` (sem `/assets/*.js`) → faixa nunca aparece.
+- **Cadência:** checa no mount, a cada **10 min**, e no `visibilitychange` (voltar pra aba — momento
+  mais provável de ter saído deploy). Para de checar depois de detectar (a faixa já está de pé).
+- **UX/UI:** faixa `sticky top-0` em `--go-blue` (aviso de sistema — distinta do lime da staging e
+  do vermelho de erro) + botão **Recarregar** (`location.reload()`). A11y: `role="status"`,
+  ícone + texto (nunca só cor), foco de teclado visível (ring lime), **sem animação perpétua**.
+
+**Onde aterrissou.**
+- `src/lib/version-check.ts` — puro/testável: `extractEntrySrc(html)`, `isUpdateAvailable(atual,
+  html)`, `getCurrentEntrySrc(doc?)`.
+- `src/components/atualizacao-banner.tsx` — `AtualizacaoBanner` (poll + faixa + Recarregar).
+- `src/routes/__root.tsx` — montado **acima** da `StagingBanner`.
+- `tests/version-check.test.ts` — 10 casos (extração, ordem de atributos invertida, HTML de erro,
+  mesmo/outro hash, dev → null, conservadorismo).
+
+**Não faz parte deste PR (fica pra depois).** (a) Limpeza/poda dos ~3015 assets acumulados
+(higiene de deploy — podar quebraria abas velhas; melhor migrar todo mundo pelo nudge primeiro);
+(b) o guard de fingerprint no draft de edição em localStorage (invalidar o cache local quando o
+servidor mudou) — mesma raiz "servidor manda", tratar em PR próprio.
+
+**Status.** ⏳ Implementado; testes verdes + `build` (typecheck) limpo. **Deploy pendente** (a
+pedido: sem subir ainda; quando for, regra 13 — staging `edf400b4` antes de prod).
+
+## Feature adicional — Autocomplete de participantes (busca na TeamGuide) · jul/2026
+
+> Pedido do dono (Kaique, 2026-07-02): no campo "E-mails dos participantes" (etapa 1), a cada
+> letra digitada o sistema filtra a lista total de e-mails da TeamGuide e reduz as opções, até o
+> usuário apertar **Enter** (no item marcado) ou **clicar** no e-mail — com **scroll** quando há
+> muitos resultados.
+
+**Decisões (fechadas).**
+- **Fonte:** `GET /employees/refs?unpaged=true&page=0` da TeamGuide (mesma API/token `TG_API_TOKEN`
+  das áreas) — devolve a base inteira (~440 pessoas: `name`, `contactEmail`, `position`) numa
+  chamada só. Validado ao vivo antes de codar (200, 439 itens, todos com e-mail).
+- **Filtro no FRONTEND, lista servida 1x:** o worker expõe `GET /api/participantes/sugestoes`
+  (autenticada pelo edge como toda rota) com **cache em memória de 10 min**; o cliente busca a
+  lista **uma vez** (quando "Em equipe? Sim" aparece) e filtra localmente a cada tecla — zero
+  requisição por letra digitada.
+- **Degradação suave, nunca bloqueia:** TeamGuide fora do ar → endpoint devolve `[]` (ou o cache
+  vencido, se houver) e o campo continua aceitando e-mail digitado livre (validação de domínio
+  @gocase/@gobeaute/@gogroup inalterada). O autocomplete é conveniência, não gate.
+- **Espaço deixou de ser separador universal:** no campo de participantes, espaço só "fecha" o
+  e-mail quando o texto já é um e-mail completo (`EMAIL_RE`); senão passa como texto — sem isso
+  seria impossível buscar por nome composto ("maria souza"). Vírgula/`;`/Tab/Enter seguem separando.
+- **A11y (padrão combobox):** `role="combobox"`/`listbox`/`option`, `aria-activedescendant`, item
+  ativo marcado por fundo azul + barra lime **+ selo "↵ Enter"** (estado nunca só por cor),
+  `scrollIntoView` na navegação ↑/↓, Esc fecha até a próxima digitação, `prefers-reduced-motion`
+  coberto pelo guard global do `styles.css`.
+- **Relevância:** todas as palavras da busca precisam casar (nome OU e-mail, sem acento/caixa);
+  ordena e-mail-começa-por > nome-começa-por > demais; exclui já adicionados; renderiza até 80 de
+  uma vez (rodapé "mostrando 80 de N") com rolagem (`max-h-60`).
+
+**Onde aterrissou.**
+- `src/lib/areas/teamguide.server.ts` — `listarPessoasTeamGuide()` (reusa `tgGet` com retry).
+- `src/lib/participantes.functions.ts` — `getSugestoesParticipantes()` (cache TTL 10 min).
+- `src/worker.ts` — rota `GET /api/participantes/sugestoes`.
+- `src/lib/submeter/participantes-sugestoes.ts` — `filtrarSugestoes()` (puro, testável) +
+  `useSugestoesParticipantes()` (fetch 1x com cache de módulo).
+- `src/lib/submeter/form-components.tsx` — combobox no **`ParticipantesPapeisInput`** (prop
+  `suggestions`) — reconciliado com a feature de papéis (PR #195), que substituiu o `ChipsInput`
+  na Etapa 1 no meio desta implementação; o `ChipsInput` ficou como estava (não mais usado).
+- `src/lib/submeter/step1.tsx` — carrega quando `emEquipe === 'sim'` e injeta no
+  `ParticipantesPapeisInput`.
+- `tests/participantes-sugestoes.test.ts` — 9 casos (filtro, acentos, dedup, ranking; listagem
+  TeamGuide com fetch mockado).
+
+**Status.** ⏳ Implementado; testes verdes, `build` + `build:worker` limpos, endpoint validado
+contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` antes de prod).
+
+
+## Feature adicional — Papéis dos participantes (Coexecutor/Planejador/Idealizador/Referência técnica) · jul/2026
+
+> Decisão do dono (Luis, 2026-07-02): na submissão em equipe, cada participante recebe um **papel**.
+> A coluna "Participantes" do Sheets passa a ser a de **Coexecutor** (sem renomear); três colunas
+> novas (I/J/K) guardam os demais papéis. As colunas novas são criadas **manualmente** na planilha.
+
+> 🔤 **REDESENHO PARA 3 PAPÉIS (Kaique, 2026-07-02):** de 4 papéis passou a **3** —
+> **Coautor**, **Participante**, **Contribuidor**. Mapeamento form → coluna do Sheets:
+> **Coautor → "Participantes"** · **Participante → "Participantes 2"** (ex-"Planejador")
+> · **Contribuidor → "Contribuidor"**. Os antigos **Idealizador** e **Referência técnica** foram
+> **removidos** do seletor e consolidados em **Contribuidor** (no sync os valores legados
+> `idealizador`/`referencia_tecnica` caem na coluna "Contribuidor"). ⚠️ **Os `value` internos
+> `coexecutor`(=Coautor)/`planejador`(=Participante) foram MANTIDOS** (invisíveis; trocá-los exigiria
+> migrar `membros_papeis`); o 3º papel usa o value novo `contribuidor`. O `membrosPapeisSchema` aceita
+> os 3 atuais **+** os 2 legados (não rejeita cliente com cache antigo — version skew).
+> **Abaixo, o texto original (4 papéis) fica como histórico; vale o redesenho acima.**
+
+> 📖 **Legenda dos papéis (Kaique, 2026-07-02):** abaixo do campo de participantes (Etapa 1, só com
+> "em equipe = sim") há uma **legenda** explicando o que cada papel significa — uma linha por papel
+> com o ponto colorido (mesma cor do seletor, `COR_PAPEL`), o rótulo em negrito e a descrição.
+> Componente `LegendaPapeis` + mapa `DESCRICAO_PAPEL` em `form-components.tsx`; renderizado em
+> `step1.tsx` logo após `ParticipantesPapeisInput`. Só UI (sem backend). Textos: Coautor = "Executou e
+> esteve à frente… executor ou coexecutor principal"; Participante = "Apoiou diretamente… entregas
+> concretas dentro de um escopo definido"; Contribuidor = "Auxiliou com planejamento, decisões técnicas
+> ou ideias, sem atuar diretamente na execução".
+
+> 🔎 **Log dos papéis no Investigador (Kaique, 2026-07-02):** o timeline do Investigador (aba "Chat")
+> passa a exibir os PAPÉIS dos participantes nos eventos **"Formulário enviado"** (`submissao`) e
+> **"Dados atualizados"** (`metadados`), como uma linha **"Participantes e papéis"**: `email (Coautor),
+> email2 (Participante), …`. **Abordagem aditiva/não-destrutiva (sensível ao banco):** o backend só
+> acrescenta a chave `membros_papeis` ao JSON `dados` dos dois `gravarEvento` (`chat.functions.ts`) — a
+> coluna `form_events.dados` já existe (**sem migração**), a regra **append-only** do `form_events`
+> é preservada e `gravarEvento` segue não-bloqueante. **Retrocompatível:** eventos antigos sem
+> `membros_papeis` renderizam a linha "Membros" simples de antes. No front (`investigador.tsx`):
+> helper puro `formatarPapeisEvento` + mapa `PAPEL_LABEL_INVESTIGADOR` (value→rótulo, com os legados
+> `idealizador`/`referencia_tecnica` → "Contribuidor"); `linhasDoEvento` troca "Membros" por
+> "Participantes e papéis" quando há papéis (submissao e metadados). `worker.js` rebuildado.
+
+**Decisões fechadas (com o Luis).**
+- **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
+  · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
+  fora da lista de participantes. Só os e-mails do time adicionados ganham papel.
+- **Obriga escolher**: participante entra **sem papel** e o gate de avançar da Etapa 1 bloqueia
+  enquanto alguém estiver sem papel. (Exceção: na EDIÇÃO, membros já existentes sem papel conhecido
+  entram como **coexecutor** — semântica da coluna "Participantes" de onde vieram; novos participantes
+  começam sem papel.)
+- **Todos os papéis contam como participante** (acesso de leitura, "Participo", editor delegado):
+  `membros` = **união dos 4 papéis** — ownership/agentes/editor delegado **inalterados**.
+- **Sheets**: "Participantes" (H)=coexecutores; "Planejador"/"Idealizador"/"Referência técnica"
+  (I/J/K) os demais. Cada e-mail em **uma** coluna. Coluna sem ninguém → **"—"**. Papel
+  ausente/desconhecido → coexecutor (retrocompatível: legados com todos em "Participantes").
+
+**Onde aterrissou.**
+- `src/lib/submeter/constants.ts` — `PAPEIS_PARTICIPANTE` + tipo `PapelParticipante`;
+  `FormData.participantesPapeis` (mapa e-mail→papel); helper puro `montarMembrosPapeis`.
+- `src/lib/submeter/form-components.tsx` — novo `ParticipantesPapeisInput` (lista uma-linha-por-pessoa
+  + `<select>` de papel; a11y: `aria-label` por linha, foco visível, estado por texto+cor; nudge
+  âmbar "N sem papel"). `ChipsInput` antigo permanece (não mais usado na Etapa 1).
+- `src/lib/submeter/step1.tsx` — usa o novo componente; `setPapelParticipant`/`removeParticipant`.
+- `src/routes/submeter.tsx` — estado inicial `{}`; `applySeed` seeda papéis (fallback coexecutor);
+  `snapshotMeta`/`AgentMeta` carregam papéis (troca de papel dispara metaChanged → persiste);
+  validação da Etapa 1 exige papel; payload `membros_papeis` em iniciar-submissao + atualizar-metadados;
+  rehydrate normaliza rascunho antigo (`?? {}`).
+- Banco: `membros_papeis TEXT` (migração idempotente, `schema.ts`); `InsertProjeto`/`ProjetoRow`/
+  `insertProjeto` (`client.server.ts`). Schemas + persistência em `chat.functions.ts`
+  (`membrosPapeisSchema`). `getMeuProjeto` devolve `membros_papeis` (seed da edição).
+- Sync: `derivarColunasPapeis` (IDA, `sync.ts`) distribui nas 4 colunas; `parseParticipantesPapeis`
+  (VOLTA, `sync-reverse.ts`) reconstrói `membros`(união)+`membros_papeis`; filtro por dono checa as
+  4 colunas; `SHEET_COLUMNS` ganha os 3 nomes (`sheets.ts`).
+- Testes: `tests/participantes-papeis.test.ts` (derivarColunasPapeis + montarMembrosPapeis) +
+  caso de papéis em `tests/sync-reverse.test.ts`.
+
+**Dependência de planilha (manual, do dono) — pós-redesenho 3 papéis.** As colunas de papel agora são
+**`Participantes`** (Coautor), **`Participantes 2`** (ex-`Planejador` → Participante) e
+**`Contribuidor`**. Precisam existir no cabeçalho com **exatamente** esses nomes (caixa + acentos),
+tanto na aba **`GoDocs`** (prod) quanto na **`STAGING`**. Ações do dono na planilha: **(1)** renomear a
+coluna antiga **"Planejador" → "Participantes 2"**; **(2)** garantir uma coluna **"Contribuidor"** (pode
+reaproveitar a antiga "Idealizador" renomeando, ou criar nova). As antigas "Idealizador"/"Referência
+técnica" saíram do código (o append/update não escreve mais nelas). Enquanto uma coluna esperada não
+existir, o append/update **ignora** com aviso (não quebra) e só as presentes são gravadas.
+
+**Status.** ⏳ Implementado; testes verdes (526) + `build`/`build:worker` OK; typecheck sem novos
+erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
+de prod; requer as 3 colunas nas abas).
+
+## Feature adicional — Alerta do Google Chat enxuto para projeto especial · jul/2026
+
+**Motivação.** O alerta de submissão no Google Chat (`buildSubmitMessage`, `src/lib/google/chat.ts`)
+era único para todo projeto. Projeto **especial** pula o analisador e vai direto à avaliação humana —
+não tem saving/receita/escopo/tipos financeiros — então o alerta trazia linhas sempre zero/irrelevantes
+(`Saving estimado 0h`, `R$ 0,00`, `Escopo: —`, `Tipos: especial`) e **não** mostrava a justificativa do
+porquê o projeto é especial (`contexto_especial`), que é justamente o que o avaliador precisa ler.
+
+**O que mudou.** `buildSubmitMessage` recebe dois campos opcionais — `especial?: boolean` e
+`contextoEspecial?: string`. Quando `especial` é `true`, desvia para `buildEspecialMessage` (mesmo
+arquivo), que monta um alerta enxuto:
+- **Mantém** os metadados que fazem sentido: Projeto, Área, Ferramenta, Solicitante, E-mail,
+  Participantes, Descrição, Data da submissão, link da planilha.
+- **Omite** Escopo, Tipos, Saving (horas/R$/tipo) e Receita — irrelevantes ao caso.
+- **Destaca** a justificativa: bloco `⭐ Por que é um projeto especial:` com o `contexto_especial`
+  (traço `—` quando vazio, nunca linha em branco).
+- Cabeçalho próprio: `⭐ Projeto especial – avaliação humana necessária` (ou `✏️ Edição de projeto
+  especial …` no modo edição).
+
+**Onde aterrissou.** `src/lib/google/chat.ts` (`buildSubmitMessage` + novo `buildEspecialMessage`);
+caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
+`contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
+
+**Status.** ⏳ Implementado; testes verdes + `build:worker` OK. **Deploy pendente** (regra 13 —
+staging `edf400b4` antes de prod).

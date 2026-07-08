@@ -37,6 +37,7 @@ import {
   getUsuarios,
 } from '@/lib/admin.functions'
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
+import { getSugestoesParticipantes } from '@/lib/participantes.functions'
 import { syncSheetsToSqlite } from '@/lib/google/sync-reverse'
 import {
   getProjetosInvestigador,
@@ -136,6 +137,11 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ── Áreas (público — usado pelo seletor da etapa 1) ──
     if (pathname === '/api/areas' && method === 'GET') {
       return json(await getAreasPublicas())
+    }
+
+    // ── Sugestões de participantes (autocomplete da etapa 1; lista da TeamGuide) ──
+    if (pathname === '/api/participantes/sugestoes' && method === 'GET') {
+      return json(await getSugestoesParticipantes())
     }
 
     // ── Cron: sincroniza áreas da TeamGuide (chamado pela plataforma Godeploy) ──

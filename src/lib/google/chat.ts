@@ -69,7 +69,18 @@ export function buildSubmitMessage(p: {
   dataSubmissao: string;
   // Distingue o alerta entre SUBMISSÃO nova e EDIÇÃO de um projeto já cadastrado.
   modo: 'novo' | 'edicao';
+  // Projeto especial: pula o analisador e vai direto para avaliação humana. Não tem
+  // saving/receita/escopo/tipos financeiros — o alerta correspondente OMITE essas
+  // linhas (seriam sempre zero/irrelevantes) e destaca a justificativa do porquê é
+  // especial (`contextoEspecial`). Ver buildEspecialMessage.
+  especial?: boolean;
+  contextoEspecial?: string;
 }): string {
+  // Projeto especial → alerta enxuto, sem os campos financeiros que não se aplicam.
+  if (p.especial) {
+    return buildEspecialMessage(p);
+  }
+
   const cabecalho =
     p.modo === 'edicao'
       ? '✏️ *Edição de automação – aprovação aguardando análise*'
@@ -112,6 +123,59 @@ export function buildSubmitMessage(p: {
     '',
     SEPARATOR,
   );
+
+  return lines.join('\n');
+}
+
+// Alerta de projeto ESPECIAL. Projetos especiais não têm saving/receita/escopo/tipos
+// financeiros (pulam o analisador e vão direto à avaliação humana), então o alerta
+// omite essas linhas — que seriam sempre zero/irrelevantes — e destaca a justificativa
+// do porquê o projeto é especial. Mantém os metadados que fazem sentido (projeto, área,
+// ferramenta, solicitante, participantes, descrição, data).
+function buildEspecialMessage(p: {
+  projeto: string;
+  area: string;
+  ferramenta: string;
+  nomeCompleto: string;
+  email: string;
+  participantes: string;
+  descricao: string;
+  dataSubmissao: string;
+  contextoEspecial?: string;
+  modo: 'novo' | 'edicao';
+}): string {
+  const cabecalho =
+    p.modo === 'edicao'
+      ? '✏️ *Edição de projeto especial – avaliação humana necessária*'
+      : '\u{2B50} *Projeto especial – avaliação humana necessária*';
+
+  const contexto = (p.contextoEspecial ?? '').trim() || '—';
+
+  const lines = [
+    SEPARATOR,
+    '',
+    cabecalho,
+    '',
+    `\u{1F4CC} *Projeto:* ${p.projeto}`,
+    `\u{1F3F7}️ *Área:* ${p.area}`,
+    `\u{1F6E0}️ *Ferramenta:* ${p.ferramenta}`,
+    '',
+    `\u{1F464} *Solicitante:* ${p.nomeCompleto}`,
+    `\u{1F4E7} *E-mail:* ${p.email}`,
+    `\u{1F465} *Participantes:* ${p.participantes || '—'}`,
+    '',
+    `\u{1F4DD} *Descrição resumida:*`,
+    p.descricao,
+    '',
+    `\u{2B50} *Por que é um projeto especial:*`,
+    contexto,
+    '',
+    `\u{1F4C5} *Data da submissão:* ${p.dataSubmissao}`,
+    '',
+    `*Link da planilha de automações*: ${SHEETS_URL}`,
+    '',
+    SEPARATOR,
+  ];
 
   return lines.join('\n');
 }

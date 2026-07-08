@@ -39,6 +39,7 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | GET | `/api/areas` | Nenhuma | Lista áreas (formulador) |
+| GET | `/api/participantes/sugestoes` | OAuth (edge) | Lista pessoas da TeamGuide (`/employees/refs?unpaged=true`, ~440) para o autocomplete de participantes; cache em memória 10 min; falha → `[]` (campo segue aceitando e-mail livre) |
 | POST | `/api/admin/areas/sync` | Admin | Sincroniza áreas do TeamGuide |
 | POST | `/api/cron/sync-areas` | Header `X-Godeploy-Cron` | Cron diário + limpeza api_logs >30d |
 | POST | `/api/cron/sync-sheets-to-sqlite` | Header `X-Godeploy-Cron` | Cron **horário**: sync reverso Sheets → SQLite (cria legados faltantes + reflete edições manuais em campos seguros) |
