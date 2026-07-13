@@ -622,3 +622,66 @@ depender da planilha.
 
 **Status.** ⏳ Implementado; testes verdes (537) + `build`/`build:worker` OK. Deploy em
 staging (`edf400b4`) primeiro (regra 13).
+
+---
+
+## Feature adicional — Alerta do Google Chat enxuto para projeto especial · jul/2026
+
+**Motivação.** O alerta de submissão no Google Chat (`buildSubmitMessage`, `src/lib/google/chat.ts`)
+era único para todo projeto. Projeto **especial** pula o analisador e vai direto à avaliação humana —
+não tem saving/receita/escopo/tipos financeiros — então o alerta trazia linhas sempre zero/irrelevantes
+(`Saving estimado 0h`, `R$ 0,00`, `Escopo: —`, `Tipos: especial`) e **não** mostrava a justificativa do
+porquê o projeto é especial (`contexto_especial`), que é justamente o que o avaliador precisa ler.
+
+**O que mudou.** `buildSubmitMessage` recebe dois campos opcionais — `especial?: boolean` e
+`contextoEspecial?: string`. Quando `especial` é `true`, desvia para `buildEspecialMessage` (mesmo
+arquivo), que monta um alerta enxuto:
+- **Mantém** os metadados que fazem sentido: Projeto, Área, Ferramenta, Solicitante, E-mail,
+  Participantes, Descrição, Data da submissão, link da planilha.
+- **Omite** Escopo, Tipos, Saving (horas/R$/tipo) e Receita — irrelevantes ao caso.
+- **Destaca** a justificativa: bloco `⭐ Por que é um projeto especial:` com o `contexto_especial`
+  (traço `—` quando vazio, nunca linha em branco).
+- Cabeçalho próprio: `⭐ Projeto especial – avaliação humana necessária` (ou `✏️ Edição de projeto
+  especial …` no modo edição).
+
+**Onde aterrissou.** `src/lib/google/chat.ts` (`buildSubmitMessage` + novo `buildEspecialMessage`);
+caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
+`contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
+
+**Status.** ⏳ Implementado; testes verdes + `build:worker` OK. **Deploy pendente** (regra 13 —
+staging `edf400b4` antes de prod).
+
+## Feature adicional — Botão "Refazer" o memorial financeiro na revisão final · jul/2026
+
+**Motivação.** Na tela final ("Enviar para Triagem") a pessoa só conseguia mexer na
+**documentação** (mandando um arquivo/informação nova, que reprocessa a doc). O **memorial
+financeiro** já aprovado ficava travado: para trocar cargos/horas/valores era preciso recomeçar
+a submissão do zero. Faltava um caminho para refazer **só** o memorial, preservando a doc.
+
+**O que mudou.** Um botão **"Refazer"** no cabeçalho do card do memorial financeiro aprovado da
+revisão final (`FinalReview`/`CollapsiblePreviewCard`, `step3-chat.tsx`). Reabre o formulário
+determinístico da fase financeira **pré-preenchido** (cargos/horas/custos, ou receita) sem tocar
+na documentação. Fica no card **Memorial de Saving**; em projeto **só-receita** (sem card de
+saving), fica no card **Memorial de Receita**. Card de documentação **não** recebe o botão
+(resetar doc = recomeçar, decisão de produto). Projeto **especial** (sem memorial financeiro)
+não recebe o botão.
+
+- **Handler** `handleReiniciarMemorial` (`submeter.tsx`): sai da revisão final
+  (`setChatComplete(false)`) e chama `openSavingForm()` (ou `openReceitaForm()` no só-receita),
+  que recoloca o snapshot já enviado (`savingSubmitted`/`receitaSubmitted`). Gate: só quando há
+  memorial financeiro (`!especial && (saving || receita)`), **independente de ser edição** — vale
+  igual na **submissão nova** e na **edição** (mesmo `FinalReview`).
+- **Reenvio do formulário:** se mudar algo, a fase financeira reinicia (invalida o preview
+  antigo, como no "Editar dados"); se **não** mudar nada, volta direto à revisão final — agora
+  **simétrico** nos dois fluxos (o ramo `!editProjetoId && !temReceita && approvedSavingPreview`
+  de `handleSavingFormSubmit` passou a marcar `chatComplete=true`; antes só a edição fazia isso).
+
+**Onde aterrissou.** `src/routes/submeter.tsx` (`handleReiniciarMemorial`, prop
+`onReiniciarMemorial` no `Step3Chat`, ramo de reenvio-sem-mudança em `handleSavingFormSubmit`);
+`src/lib/submeter/step3-chat.tsx` (`onReiniciarMemorial` encadeado até `FinalReview`; prop
+`onRefazer`/`refazerDisabled` no `CollapsiblePreviewCard`, cabeçalho refatorado de `<button>`
+único para container com toggle + ação, mantendo a11y — foco de teclado, `aria-label` no
+chevron, estado por ícone+rótulo). Sem mudança de backend/worker.
+
+**Status.** ✅ Implementado; **538 testes verdes** + `build`/`build:worker` OK; **validado na
+staging** (`edf400b4`) e **deployado em produção** (`674a3710`, `godocs.devgogroup.com`).

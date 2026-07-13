@@ -392,6 +392,10 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         tipoReceita: ouTraco(p.receita?.tipo_saving as string | undefined),
         dataSubmissao,
         modo: p.modo,
+        // Projeto especial → alerta enxuto (sem saving/receita/escopo/tipos) + a
+        // justificativa do porquê é especial. buildSubmitMessage desvia sozinho.
+        especial: p.projeto.especial === 1,
+        contextoEspecial: (p.projeto.contexto_especial as string | null) ?? undefined,
       });
       await sendChatNotification(message);
     } catch (chatErr) {

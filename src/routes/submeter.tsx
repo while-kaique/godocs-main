@@ -995,8 +995,8 @@ export function SubmeterPageContent({
       } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
         errs.dataCriacao = "A data não pode ser no futuro";
       }
-      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 20)
-        errs.descricaoBreve = "Descreva o contexto em pelo menos 20 caracteres";
+      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
+        errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
       if (!form.usaAiProxy)
         errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
       if (arquivos.length === 0 && nomesExistentes.length === 0)
@@ -1781,6 +1781,11 @@ export function SubmeterPageContent({
         // formulário de receita — senão cairia num chat vazio (as mensagens da fase
         // de saving foram limpas na transição para a receita).
         openReceitaForm();
+      } else if (!temReceita && approvedSavingPreview !== null) {
+        // Submissão nova, só saving: o usuário reabriu o formulário (ex.: via "Refazer"
+        // na revisão final) e não mudou nada → volta à revisão final, simétrico à edição.
+        // Só quando o memorial já foi aprovado (mesma guarda do ramo de edição).
+        setChatComplete(true);
       }
       // Demais casos: cai no chat da fase de saving exatamente onde estava.
       return;
@@ -1952,6 +1957,28 @@ export function SubmeterPageContent({
     setFormDraft(receitaSubmitted ?? formDraft ?? emptyFormDraft());
     setShowReceitaForm(true);
   }
+
+  /* ── Refazer o memorial financeiro a partir da revisão final ──────────────────
+     Na tela "Enviar para Triagem" a pessoa só conseguia mexer na documentação
+     (mandando um arquivo/informação nova, que reprocessa a doc). O memorial
+     financeiro já aprovado ficava travado — para trocar cargos/horas/valores era
+     preciso recomeçar tudo. Este atalho reabre o formulário determinístico da fase
+     financeira (cargos, horas, custos ou receita) SEM tocar na documentação: sai da
+     revisão final (`chatComplete=false`) e recoloca o snapshot já enviado, pronto
+     para editar. Ao reenviar o formulário, `handleSavingFormSubmit`/`...Receita`
+     reiniciam a fase (invalidando o preview antigo) ou, se nada mudou, devolvem à
+     revisão final. Só faz sentido quando existe memorial financeiro: projeto
+     especial (sem saving/receita) não recebe o botão. */
+  function handleReiniciarMemorial() {
+    if (chatLoading || submittingProject) return;
+    const temSaving = form.tipoProjeto.includes("saving");
+    const temReceita = form.tipoProjeto.includes("receita_incremental");
+    if (!temSaving && !temReceita) return;
+    setChatComplete(false);
+    if (temSaving) openSavingForm();
+    else openReceitaForm();
+  }
+
   /* ── Enviar projeto ──────────────────────────────────────────────────────────
      A análise automática (analisador) NÃO roda mais no cliente: o servidor a
      dispara em background ao submeter (ver worker.ts → ctx.waitUntil). Assim a
@@ -2299,6 +2326,15 @@ export function SubmeterPageContent({
                     form.tipoProjeto.includes("saving")
                       ? "Editar saving"
                       : "Editar tipo"
+                  }
+                  // Refazer memorial financeiro na revisão final. Só para projeto
+                  // com saving/receita (especial não tem memorial financeiro).
+                  onReiniciarMemorial={
+                    !form.especial &&
+                    (form.tipoProjeto.includes("saving") ||
+                      form.tipoProjeto.includes("receita_incremental"))
+                      ? handleReiniciarMemorial
+                      : undefined
                   }
                   versaoAnterior={versaoAnterior}
                   novoResumo={{

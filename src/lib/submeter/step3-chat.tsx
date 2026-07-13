@@ -379,6 +379,8 @@ function CollapsiblePreviewCard({
   expanded,
   onToggle,
   isSaving,
+  onRefazer,
+  refazerDisabled,
 }: {
   title: string;
   icon: string;
@@ -389,6 +391,10 @@ function CollapsiblePreviewCard({
   expanded: boolean;
   onToggle: () => void;
   isSaving: boolean;
+  // Quando presente, mostra um botão "Refazer" no cabeçalho do card — reabre o
+  // formulário determinístico da fase financeira sem tocar na documentação.
+  onRefazer?: () => void;
+  refazerDisabled?: boolean;
 }) {
   const cleanContent = isSaving
     ? ocultarReaisSaving(cleanPreviewContent(content))
@@ -402,13 +408,15 @@ function CollapsiblePreviewCard({
         background: "var(--go-white)",
       }}
     >
-      <button
-        type="button"
-        onClick={onToggle}
+      <div
         className="flex w-full items-center justify-between px-4 py-3 transition-colors"
         style={{ background: expanded ? accentBg : "transparent" }}
       >
-        <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
           <span className="text-base">{icon}</span>
           <span
             className="text-[12px] font-bold uppercase tracking-[0.06em]"
@@ -426,22 +434,62 @@ function CollapsiblePreviewCard({
           >
             Aprovado
           </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-2 pl-2">
+          {onRefazer && (
+            <button
+              type="button"
+              onClick={onRefazer}
+              disabled={refazerDisabled}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-all"
+              style={{
+                background: `${accentColor}14`,
+                border: `1.5px solid ${accentColor}40`,
+                color: accentColor,
+                cursor: refazerDisabled ? "not-allowed" : "pointer",
+                opacity: refazerDisabled ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (refazerDisabled) return;
+                e.currentTarget.style.background = `${accentColor}24`;
+                e.currentTarget.style.borderColor = `${accentColor}66`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = `${accentColor}14`;
+                e.currentTarget.style.borderColor = `${accentColor}40`;
+              }}
+              title="Refazer o memorial financeiro — reabre o formulário de cargos e valores (a documentação é mantida)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+              </svg>
+              Refazer
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? "Recolher" : "Expandir"}
+            className="flex shrink-0 items-center"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={accentColor}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="transition-transform"
+              style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
         </div>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={accentColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="transition-transform"
-          style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+      </div>
 
       {expanded && (
         <div
@@ -642,6 +690,7 @@ function FinalReview({
   approvedReceitaPreview,
   onSubmit,
   submitting,
+  onReiniciarMemorial,
   versaoAnterior,
   novoResumo,
 }: {
@@ -650,6 +699,7 @@ function FinalReview({
   approvedReceitaPreview?: string | null;
   onSubmit: () => void;
   submitting: boolean;
+  onReiniciarMemorial?: () => void;
   versaoAnterior?: VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -723,6 +773,8 @@ function FinalReview({
           expanded={expandedSaving}
           onToggle={() => setExpandedSaving((v) => !v)}
           isSaving={true}
+          onRefazer={onReiniciarMemorial}
+          refazerDisabled={submitting}
         />
       )}
 
@@ -737,6 +789,10 @@ function FinalReview({
           expanded={expandedReceita}
           onToggle={() => setExpandedReceita((v) => !v)}
           isSaving={true}
+          // Só-receita (sem card de saving): o "Refazer" mora aqui. Quando há saving,
+          // o reset começa pelo saving, então o botão fica no card de saving.
+          onRefazer={approvedSavingPreview ? undefined : onReiniciarMemorial}
+          refazerDisabled={submitting}
         />
       )}
 
@@ -2121,6 +2177,7 @@ export function Step3Chat({
   savingFormVoltarLabel,
   onReceitaFormVoltar,
   receitaFormVoltarLabel,
+  onReiniciarMemorial,
   versaoAnterior,
   novoResumo,
 }: {
@@ -2162,6 +2219,9 @@ export function Step3Chat({
   savingFormVoltarLabel?: string;
   onReceitaFormVoltar?: () => void;
   receitaFormVoltarLabel?: string;
+  // Refazer o memorial financeiro a partir da revisão final (reabre o formulário
+  // de cargos/horas/valores). Ausente quando não há memorial financeiro (especial).
+  onReiniciarMemorial?: () => void;
   versaoAnterior?: import("@/lib/meus-projetos.functions").VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -2585,6 +2645,7 @@ export function Step3Chat({
           approvedReceitaPreview={approvedReceitaPreview}
           onSubmit={onSubmit}
           submitting={submitting}
+          onReiniciarMemorial={onReiniciarMemorial}
           versaoAnterior={versaoAnterior}
           novoResumo={novoResumo}
         />
