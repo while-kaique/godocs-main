@@ -577,6 +577,54 @@ existir, o append/update **ignora** com aviso (não quebra) e só as presentes s
 erros (baseline pré-existente inalterado). **Deploy pendente** (regra 13 — staging `edf400b4` antes
 de prod; requer as 3 colunas nas abas).
 
+---
+
+## Feature adicional — Descontinuar projeto (jul/2026)
+
+**Pedido.** Em "Meus Projetos", o dono precisa poder marcar um projeto como
+**"Descontinuado"** (a automação não roda mais). Ao marcar: o status na planilha vira
+"Descontinuado" (já é opção da lista suspensa) e o projeto **para de contar** para os
+avisos de pendência.
+
+**Decisão de arquitetura.** O status flui só num sentido (SQLite→Sheets, hoje sempre
+"Pendente" pela regra TEMPORÁRIA) e o **sync reverso EXCLUI status** — então o "Status"
+do Sheets nunca volta ao SQLite. Por isso a fonte da verdade de "descontinuado" é uma
+**coluna própria no SQLite** (`projetos.descontinuado` INTEGER 0/1), não o Status do
+Sheets. Isso mantém a contagem de pendências (que lê SQLite, rápido) correta sem
+depender da planilha.
+
+**Como funciona.**
+- **Backend** `descontinuarProjeto(email, id, descontinuar)` (`meus-projetos.functions.ts`):
+  gate = quem pode editar (dono, editor delegado ou admin RPA não-participante, igual ao
+  `getMeuProjeto`); rascunho → 400 (não existe na planilha). Grava a flag e reflete
+  **"Descontinuado"** na coluna Status do Sheets via `updateRowByProjectId` (best-effort —
+  a flag no SQLite já governa o app). Reativar grava **"Pendente"** (valor da regra
+  TEMPORÁRIA). Rota `POST /api/meus-projetos/:id/descontinuar` (body `{ descontinuar }`).
+- **Para de contar / badge:** `contarPendentes` e `mapItem.pendente` excluem
+  `descontinuado===1`; `mapItem.status` dá **precedência** à flag (badge "Descontinuado"
+  na hora, mesmo se a escrita no Sheets atrasar/falhar). Badge cinza-ardósia + ícone
+  `Archive` (`StatusBadge`) — estado nunca só por cor.
+- **Reativação:** botão "Reativar" no card **ou** reenviar o projeto — `submeterParaValidacao`
+  zera a flag (`descontinuado: 0`) e a IDA volta a gravar "Pendente".
+- **Sync reverso reconhece o dropdown:** marcar "Descontinuado" manualmente na planilha
+  liga a flag (`criarLegado` + `atualizarExistente`, `sync-reverse.ts`) — **mão única**:
+  não desmarca pela planilha porque a IDA grava sempre "Pendente" (ambíguo). Reativar é
+  ação do app. A coluna `descontinuado` é INTERNA (fora de `SAFE_UPDATE_FIELDS`).
+- **Frontend** (`meus-projetos.tsx`): botão `Archive` (confirmação no toast) / `RotateCcw`
+  (reativar direto), só para quem pode editar, em projetos submetidos. Atualização
+  otimista do cache (sem refetch da lista, que lê o Sheets ~9s).
+
+**Testes.** `tests/sync-reverse.test.ts` ganhou o bloco "reconhecimento de Descontinuado"
+(cria legado descontinuado · promove ativo→descontinuado · NÃO reativa por "Pendente").
+
+**Dependência de planilha.** Nenhuma coluna nova no Sheets — só usa o valor
+**"Descontinuado"** (já existente) da lista suspensa da coluna **Status**.
+
+**Status.** ⏳ Implementado; testes verdes (537) + `build`/`build:worker` OK. Deploy em
+staging (`edf400b4`) primeiro (regra 13).
+
+---
+
 ## Feature adicional — Alerta do Google Chat enxuto para projeto especial · jul/2026
 
 **Motivação.** O alerta de submissão no Google Chat (`buildSubmitMessage`, `src/lib/google/chat.ts`)

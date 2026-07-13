@@ -1181,6 +1181,10 @@ export type ProjetoRow = {
   // Editores delegados (JSON array de emails). Participantes a quem o dono delegou o
   // poder de edição. Conceito interno (não vai ao Sheets). Ver meus-projetos.functions.ts.
   editores_delegados: string | null;
+  // Projeto descontinuado (a automação não roda mais). 1 = descontinuado; 0/null = ativo.
+  // Marcado pelo dono/editor em "Meus Projetos"; para de contar como pendência. FONTE DA
+  // VERDADE no app (o Status do Sheets não volta pelo sync reverso). Ver meus-projetos.functions.ts.
+  descontinuado: number | null;
   // Split do saving (só quando alguem_fazia='sim'): carga humana real × ganho por escala.
   // Somam saving_horas (o total que vira R$). Transparência → Sheets "Saving Horas Real"/
   // "Saving Horas Escalado". Null quando não se aplica (ninguém fazia / pontual).

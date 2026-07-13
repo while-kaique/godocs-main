@@ -550,3 +550,76 @@ describe('reconciliação de EXCLUSÃO (Sheets é a fonte da verdade do que apar
     }
   });
 });
+
+describe('reconhecimento de "Descontinuado" (Sheets → SQLite)', () => {
+  // Reusa o DB module-global. IDs DESC-* não colidem com os blocos acima.
+
+  it('cria legado marcado "Descontinuado" com a flag ligada', async () => {
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'DESC-1',
+        'Nome Completo': 'Dona',
+        Email: 'desc@gocase.com',
+        Projeto: 'Projeto Descontinuado',
+        Ferramenta: 'n8n',
+        Status: 'Descontinuado',
+      },
+    ]);
+    const r = await syncSheetsToSqlite();
+    expect(r.criados).toBeGreaterThanOrEqual(1);
+    expect((await getProjetoById('desc-1'))?.descontinuado).toBe(1);
+  });
+
+  it('promove projeto ativo a descontinuado quando a planilha marca "Descontinuado" (mão única)', async () => {
+    await insertProjetoRaw({
+      id: 'desc-promote',
+      nome: 'Ativo',
+      responsavel_nome: 'Alguém',
+      responsavel_email: 'promote@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      descontinuado: 0,
+      updated_at: new Date().toISOString(),
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'DESC-PROMOTE',
+        'Nome Completo': 'Alguém',
+        Email: 'promote@gocase.com',
+        Projeto: 'Ativo',
+        Ferramenta: 'n8n',
+        Status: 'Descontinuado',
+      },
+    ]);
+    const r = await syncSheetsToSqlite();
+    expect(r.atualizados).toBeGreaterThanOrEqual(1);
+    expect((await getProjetoById('desc-promote'))?.descontinuado).toBe(1);
+  });
+
+  it('NÃO reativa pela planilha — Status "Pendente" (IDA sempre grava isso) mantém a flag', async () => {
+    // Reativar é ação do app (limpa a flag). Como a IDA grava sempre "Pendente" (regra
+    // TEMPORÁRIA), "Pendente" é ambíguo e não pode desmarcar um descontinuado.
+    await insertProjetoRaw({
+      id: 'desc-keep',
+      nome: 'Descontinuado',
+      responsavel_nome: 'Alguém',
+      responsavel_email: 'keepdesc@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      descontinuado: 1,
+      updated_at: new Date().toISOString(),
+    });
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'DESC-KEEP',
+        'Nome Completo': 'Alguém',
+        Email: 'keepdesc@gocase.com',
+        Projeto: 'Descontinuado',
+        Ferramenta: 'n8n',
+        Status: 'Pendente',
+      },
+    ]);
+    await syncSheetsToSqlite();
+    expect((await getProjetoById('desc-keep'))?.descontinuado).toBe(1);
+  });
+});

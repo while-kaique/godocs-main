@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -18,6 +19,12 @@ const PRAZO_LEGADO = "30/06/2026";
 function ehReenvioSolicitado(status: string | null): boolean {
   const s = (status ?? "").toLowerCase();
   return s === "reenvio pendente" || s === "rejeitado";
+}
+
+// Replica no cliente a regra de pendência do servidor (legado sem "Atualizado Em") —
+// usada para restaurar o aviso âmbar ao REATIVAR um projeto, sem precisar refetch.
+function ehLegadoPendente(p: { id: string; atualizado_em: string | null }): boolean {
+  return p.id.toLowerCase().includes("legado") && !p.atualizado_em;
 }
 
 // Aviso de pendência com barra de acento à esquerda. Dois tons distintos:
@@ -76,6 +83,8 @@ type Projeto = {
   arquivos_nomes: string[];
   atualizado_em: string | null;
   pendente: boolean;
+  // Projeto descontinuado (a automação não roda mais) — badge "Descontinuado", sem aviso.
+  descontinuado: boolean;
   papel: "owner" | "participante";
   // true = owner OU editor delegado. Decide o botão "Editar" × "Visualizar" e a
   // exibição do botão de distribuição do poder de edição.
@@ -286,6 +295,119 @@ function DistribuirEdicaoModal({
   );
 }
 
+// Modal de confirmação ao DESCONTINUAR um projeto — mesmo padrão do alerta de
+// "projeto especial" do formulário (overlay com blur + alertdialog centralizado).
+// Fecha no "x"/backdrop/Esc; confirmar dispara a ação. Substitui a confirmação antiga
+// que vinha num toast do canto superior.
+function ConfirmDescontinuarModal({
+  nome,
+  onConfirmar,
+  onCancelar,
+}: {
+  nome: string | null;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+}) {
+  // Fecha no Esc (hook chamado antes de qualquer return — regras de hooks).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancelar();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancelar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      onClick={onCancelar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        animation: "go-fade-in-up 0.25s ease both",
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="descontinuar-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          background: "var(--go-white)",
+          borderRadius: "var(--go-radius, 16px)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          overflow: "hidden",
+          animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both",
+        }}
+      >
+        {/* Faixa de alerta */}
+        <div
+          className="flex items-center gap-2.5 px-5 py-3.5"
+          style={{ background: "rgba(245,158,11,0.12)", borderBottom: "1.5px solid rgba(245,158,11,0.25)" }}
+        >
+          <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden>⚠️</span>
+          <span
+            id="descontinuar-modal-title"
+            className="text-[14px] font-extrabold"
+            style={{ color: "#92600a", letterSpacing: "-0.01em" }}
+          >
+            Descontinuar projeto
+          </span>
+        </div>
+
+        {/* Corpo */}
+        <div className="px-5 py-4">
+          <p className="text-[13px] leading-relaxed" style={{ color: "var(--go-text-heading)" }}>
+            Tem certeza que deseja marcar{" "}
+            <strong>{nome ? `"${nome}"` : "este projeto"}</strong> como{" "}
+            <strong style={{ color: "#b45309" }}>descontinuado</strong>?
+          </p>
+          <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--go-text-muted, #6b6b7a)" }}>
+            Os pontos no <strong>GoMoon</strong> deixarão de contar para este projeto e ele
+            não será mais considerado um projeto ativo. Você pode reativá-lo depois.
+          </p>
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-col-reverse gap-2.5 px-5 pb-5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold transition-colors"
+            style={{
+              background: "transparent",
+              color: "var(--go-text-muted, #6b6b7a)",
+              border: "1.5px solid rgba(0,0,0,0.12)",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold text-white transition-colors"
+            style={{ background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }}
+          >
+            Sim, descontinuar
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function MeusProjetosPage() {
   const queryClient = useQueryClient();
   // React Query cacheia a lista (que lê o Sheets, ~9s). staleTime de 60s: voltar da
@@ -303,15 +425,50 @@ function MeusProjetosPage() {
   // "Rascunhos" recortam essa lista por papel/estado.
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  // Id do projeto cuja ação de descontinuar/reativar está em andamento (spinner no botão).
+  const [descontinuando, setDescontinuando] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
   // Projeto cujo popup de "distribuir poder de edição" está aberto (null = fechado).
   const [delegando, setDelegando] = useState<Projeto | null>(null);
+  // Projeto cujo modal de confirmação de "descontinuar" está aberto (null = fechado).
+  const [confirmarDescontinuar, setConfirmarDescontinuar] = useState<Projeto | null>(null);
 
   // Reflete a nova lista de editores delegados no cache da listagem (sem refetch).
   function aplicarDelegacao(projetoId: string, editores: string[]) {
     queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
       (old ?? []).map((p) => (p.id === projetoId ? { ...p, editores_delegados: editores } : p)),
     );
+  }
+
+  // Reflete no cache o novo estado de "descontinuado" (sem refetch — a lista lê o
+  // Sheets, ~9s). Descontinuar zera a pendência e vira badge "Descontinuado"; reativar
+  // volta a "Pendente" e restaura o aviso de legado quando for o caso.
+  function aplicarDescontinuado(id: string, desc: boolean) {
+    queryClient.setQueryData<Projeto[]>(["meus-projetos"], (old) =>
+      (old ?? []).map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              descontinuado: desc,
+              status: desc ? "descontinuado" : "pendente",
+              pendente: desc ? false : ehLegadoPendente(p),
+            }
+          : p,
+      ),
+    );
+  }
+
+  async function enviarDescontinuar(id: string, desc: boolean) {
+    setDescontinuando(id);
+    try {
+      await apiFetch(`/api/meus-projetos/${id}/descontinuar`, { descontinuar: desc }, "POST");
+      aplicarDescontinuado(id, desc);
+      toast.success(desc ? "Projeto marcado como descontinuado." : "Projeto reativado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao atualizar o projeto.");
+    } finally {
+      setDescontinuando(null);
+    }
   }
 
   // Trocar de filtro volta para a primeira página.
@@ -608,7 +765,7 @@ function MeusProjetosPage() {
                           )}
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                           <StatusBadge status={p.status} />
                           {ehRascunho ? (
                             <>
@@ -642,13 +799,44 @@ function MeusProjetosPage() {
                                   type="button"
                                   onClick={() => setDelegando(p)}
                                   title="Distribuir o poder de edição"
-                                  aria-label="Distribuir o poder de edição"
-                                  className="inline-flex items-center justify-center rounded-full p-2 transition-all"
+                                  aria-label="Quem pode editar"
+                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
                                   style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
                                 >
                                   <Users className="h-3.5 w-3.5" />
+                                  Quem pode editar
                                 </button>
                               )}
+                              {/* Descontinuar / Reativar — quem pode editar arquiva o projeto
+                                  (para de contar como pendência) ou o traz de volta. */}
+                              {podeEditar &&
+                                (p.descontinuado ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => enviarDescontinuar(p.id, false)}
+                                    disabled={descontinuando === p.id}
+                                    title="Reativar projeto"
+                                    aria-label="Reativar projeto"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
+                                    style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                  >
+                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                                    Reativar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmarDescontinuar(p)}
+                                    disabled={descontinuando === p.id}
+                                    title="Descontinuar projeto"
+                                    aria-label="Descontinuar projeto"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
+                                    style={{ background: "rgba(100,116,139,0.1)", color: "#475569" }}
+                                  >
+                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+                                    Descontinuar
+                                  </button>
+                                ))}
                               {podeEditar ? (
                                 <Link
                                   to="/editar/$id"
@@ -735,6 +923,19 @@ function MeusProjetosPage() {
           projeto={delegando}
           onClose={() => setDelegando(null)}
           onSaved={(editores) => aplicarDelegacao(delegando.id, editores)}
+        />
+      )}
+
+      {/* Modal de confirmação ao descontinuar (mesmo padrão do alerta de especial). */}
+      {confirmarDescontinuar && (
+        <ConfirmDescontinuarModal
+          nome={confirmarDescontinuar.nome}
+          onCancelar={() => setConfirmarDescontinuar(null)}
+          onConfirmar={() => {
+            const alvo = confirmarDescontinuar;
+            setConfirmarDescontinuar(null);
+            enviarDescontinuar(alvo.id, true);
+          }}
         />
       )}
     </div>

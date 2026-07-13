@@ -127,6 +127,11 @@ function parseEspecial(v: string | undefined): number {
   return (v ?? '').trim().toLowerCase().startsWith('s') ? 1 : 0;
 }
 
+/** A coluna "Status" (dropdown do Sheets) marca o projeto como DESCONTINUADO? */
+function ehStatusDescontinuado(v: string | undefined): boolean {
+  return (v ?? '').trim().toLowerCase() === 'descontinuado';
+}
+
 /**
  * Flag "Especial?" do Sheet → 1 | 0 | null.
  * Diferente de `parseEspecial`, distingue célula VAZIA (null → "não mexe") de um
@@ -193,6 +198,8 @@ async function criarLegado(id: string, row: SheetRow): Promise<void> {
     contexto_especial: txt(row['Contexto do Projeto Especial']),
     custo_evitado: custoEvitadoFlag(row['Custo Evitado']),
     custo_evitado_justificativa: txt(row['Justificativa Custo Evitado']),
+    // Legado marcado "Descontinuado" na planilha nasce descontinuado no SQLite.
+    descontinuado: ehStatusDescontinuado(row['Status']) ? 1 : 0,
     submitted_at: submittedAt,
     validated_at: status === 'aprovado' ? submittedAt : null,
     // Espelha "Atualizado Em": vazio nos legados → fica null → projeto pendente.
@@ -319,6 +326,15 @@ async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
     // andamento (caso Hugo/legado-038, 2ª recorrência do bug). Tratamos a "Sim" como
     // STALE e não mexemos; o próximo submit do usuário grava "Não" na planilha. Só afeta
     // o sentido "Sim → especial"; "Não → não-especial" (fix da Helen) segue aplicado.
+  }
+
+  // "Descontinuado" (dropdown do Sheets) → flag no SQLite. Promoção de MÃO ÚNICA: o app
+  // grava "Descontinuado" na planilha ao descontinuar (a flag SQLite é a fonte da
+  // verdade), mas marcar manualmente na planilha também precisa refletir aqui. NÃO
+  // desmarca pela planilha — a IDA grava sempre "Pendente" (regra TEMPORÁRIA), então
+  // "Pendente" é ambíguo (≠ "reativado"); reativar é ação do app (que limpa a flag).
+  if (ehStatusDescontinuado(row['Status']) && current.descontinuado !== 1) {
+    updates['descontinuado'] = 1;
   }
 
   if (Object.keys(updates).length === 0) return false;
