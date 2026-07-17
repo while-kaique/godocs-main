@@ -37,7 +37,8 @@ no card, e o número **nem trafega** ao client — fechando a brecha do INV-02, 
 - **T3 ✅** — 562 testes verdes; `npm run build` + `npm run build:worker` OK; `worker.js` recomitado
   (server-side, regra 1). Smoke: `#16a34a` (cor do badge) ausente do bundle servido; `worker.js` serve
   `ganho_total_mensal:null`. Conformidade (contexto fresco): **conforme (0.97)**, 0 achados.
-- **T4 ⏳** — deploy staging (`edf400b4`) → validar no navegador → prod (`674a3710`). Pendente.
+- **T4 ✅** — deploy staging (`edf400b4`, @17:24) → prod (`674a3710`, @17:30) em 2026-07-17, mesmo
+  artefato byte-idêntico (chunk `meus-projetos-CuERBQ-j.js` confirmado nos dois manifestos). Aprovado por Luis.
 
 ### Tarefas
 - **T1 — Server: não serializar o valor.** Em `mapItem` (`meus-projetos.functions.ts:215`), trocar

@@ -8,7 +8,8 @@
 Projetos"), branch `feat/ocultar-valor-meus-projetos`. **T1** `mapItem` devolve `ganho_total_mensal: null`
 (não trafega ao client) + teste unitário `meus-projetos-ganho-oculto.test.ts`. **T2** badge + `fmtGanho`
 removidos. **T3** 562 testes verdes, `build`+`build:worker` OK, `worker.js` recomitado. Conformidade
-(contexto fresco): **conforme (0.97)**. **Falta só T4** — validar em staging → prod (regra 13).
+(contexto fresco): **conforme (0.97)**. **T4 ✅ DEPLOYADO** staging (`edf400b4`) + **prod (`674a3710`)**
+em 2026-07-17. **Falta só:** abrir PR p/ o `main` (regra 10: `git pull origin main` + rebuild antes).
 
 _(Antes desta: 2026-07-17 (código) — Fase 1 implementada, branch `feat/edicao-etapa1-participantes`, T1–T3
 + R1/R2 feitos e deployados na STAGING; T4 = limitação. **Falta só o T5** — validação no navegador da
@@ -24,12 +25,10 @@ _(Executados recentes: [ocultar-valor-meus-projetos](plans/ocultar-valor-meus-pr
 ✅ executado — resta a validação T5 em staging/prod, ver "Frente NOVA"/pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Deploy da branch `feat/ocultar-valor-meus-projetos` na STAGING (`edf400b4`) → validar → prod (regra 13).**
-Fluxo: `git checkout feat/ocultar-valor-meus-projetos` → `npm run test && npm run build && npm run build:worker`
-→ `scripts/deploy-godeploy.sh "<UPLOAD_TOKEN>"` → `updateApp` no **`edf400b4`** → no navegador logado da
-staging (hard-refresh em `/meus-projetos`): **card sem badge de R$** e **Network sem o número**
-(`/api/meus-projetos` traz `ganho_total_mensal: null`) → só então **prod `674a3710`**. Antes do PR/merge:
-`git pull origin main` + rebuild `worker.js`/`dist` (regra 10). Branch já commitada (código + docs desta sessão).
+**Abrir o PR da branch `feat/ocultar-valor-meus-projetos` para o `main`.** Já DEPLOYADO em staging+prod
+(2026-07-17); resta só integrar ao `main`. Antes do PR (regra 10): `git fetch origin` + incorporar
+`origin/main` (merge/rebase) + rebuildar `worker.js`/`dist` após o merge. PR como `LuisEduardo100`
+(conta WRITER — ver memória `gh-pr-conta-writer`), restaurar a conta depois. Branch já commitada.
 
 ### Pendência paralela (Fase 1, não é código) — validação STAGING (regra 13, T5) e então prod
 ✅ **Staging DEPLOYADO 2026-07-17: SPA com T1–T3 (@14:58) + refinamento R1/R2 (@15:20)** no app `edf400b4`
