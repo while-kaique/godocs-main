@@ -15,4 +15,5 @@
 ## Planos
 | Plano | Status | Resumo (1 linha) |
 |---|---|---|
-| [edicao-etapa1-participantes](edicao-etapa1-participantes.md) | executado (2026-07-17) | Etapa 1 (participantes + papéis) editável na edição — T1–T3 feitos, T4 limitação, T5 (staging) pendente |
+| [edicao-etapa1-participantes](edicao-etapa1-participantes.md) | executado (2026-07-17) | Etapa 1 (participantes + papéis) editável na edição — T1–T3 + R1/R2 feitos+staging, T4 limitação, T5 validação/prod pendente |
+| [ocultar-valor-meus-projetos](ocultar-valor-meus-projetos.md) ◀ próximo | rascunho (2026-07-17) | Tirar o badge de valor R$ dos cards de "Meus Projetos" (INV-02) |

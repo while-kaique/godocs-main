@@ -38,3 +38,7 @@ T5** — validar em staging antes de prod (regra 13). NÃO commitado em prod/sta
 
 **Pendências (não bloqueiam código, bloqueiam T5):** colunas "Participantes 2"/"Contribuidor" no header do Sheets.
 **Perguntas em aberto:** ver `docs/open-questions.md` (nenhuma).
+
+**Frente NOVA capturada (ADR-028, a planejar):** ocultar o valor R$ dos cards de "Meus Projetos" — plano-rascunho
+em [docs/plans/ocultar-valor-meus-projetos.md](plans/ocultar-valor-meus-projetos.md). Ponto exato mapeado
+(`meus-projetos.tsx:708-712`). Rodar `/ggsd:plan` numa sessão nova para aprovar antes de codar.
