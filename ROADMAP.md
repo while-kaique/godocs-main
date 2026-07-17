@@ -6,8 +6,9 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 1 — Etapa 1 editável (participantes no novo modelo)
-**Próximo:** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
+**Fase atual:** Fase 2 — ocultar o R$ dos cards de "Meus Projetos" (planejada + especificada ✅; a codar)
+**Próximo:** rodar `/ggsd:code` p/ implementar `docs/plans/ocultar-valor-meus-projetos.md` (aprovado)
+**Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
 
@@ -22,6 +23,16 @@ com o Sheets (fonte da verdade).
 - **DoD:** dono/delegado edita participantes+papéis na edição; reenvio persiste `membros`/`membros_papeis`
   e escreve as 3 colunas de papel no Sheets sem duplicar linha nem regredir ownership; testes verdes; validado
   em staging.
+
+## Fase 2 — "Meus Projetos" não exibe o valor R$ ao dono 🟡
+Tirar o badge de valor R$ dos cards de "Meus Projetos" (esconder p/ todos, client-only) e parar de
+serializar `ganho_total_mensal` ao client (defesa em profundidade) — fecha a brecha do INV-02. Cálculo,
+SQLite e Sheets inalterados; admin segue vendo no investigador.
+- ✅ Planejar (`docs/plans/ocultar-valor-meus-projetos.md` — aprovado 2026-07-17).
+- ✅ Especificar (EARS RF-108…111 no `SPEC.md §4` + reforço INV-02).
+- ⬜ Implementar (T1 server `null` + teste · T2 remover badge · T3 build:worker · T4 staging→prod).
+- **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
+  intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
 ## Backlog
 - ⬜ (a cultivar conforme surgirem pedidos)

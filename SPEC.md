@@ -73,6 +73,23 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   participantes/papéis, ENTÃO O SISTEMA DEVE persistir a alteração sem resetar a documentação já gerada.
   _(Se a implementação não for trivial, vira limitação registrada — a doc do especial pode ser reavaliada.)_
 
+### Fase 2 — "Meus Projetos" não exibe o valor R$ ao dono
+> Plano: `docs/plans/ocultar-valor-meus-projetos.md`. Decisão (Luis, 2026-07-17): esconder para **todos**
+> nessa tela (inclusive admin) e **não serializar** o número ao client. Reforça o INV-02 e, indo um degrau
+> além (cobre também receita), estabelece a regra "a tela Meus Projetos não mostra R$ ao dono". Afeta
+> **apenas** a tela "Meus Projetos" — o investigador (admin) segue exibindo o financeiro.
+
+- **RF-108** — ENQUANTO qualquer usuário (dono, participante ou admin) visualiza a lista "Meus Projetos",
+  O SISTEMA DEVE não exibir nenhum valor em R$ (ganho, saving ou receita) nos cards de projeto.
+- **RF-109** — QUANDO a API de "Meus Projetos" serializa um projeto ao client (lista e detalhe/seed de
+  edição), O SISTEMA DEVE devolver `ganho_total_mensal` como `null`, de modo que o número não trafegue ao
+  navegador (não legível no payload/Network).
+- **RF-110** — SE o usuário é admin e acessa o painel **investigador**, ENTÃO O SISTEMA DEVE continuar
+  exibindo o ganho/financeiro — esta regra afeta somente a tela "Meus Projetos".
+- **RF-111** — QUANDO o valor deixa de ser exibido/serializado, O SISTEMA DEVE manter inalterados o cálculo
+  de `ganho_total_mensal`, sua persistência no SQLite e o sync com o Google Sheets (o valor real continua no
+  banco e na planilha).
+
 ## 5. Invariantes (regras que nunca podem quebrar)
 > Destilados do `CLAUDE.md` (que continua sendo o detalhe). Cada um tem ponto de verdade + guarda.
 
@@ -80,8 +97,9 @@ local (reflexo/cache) via sync bidirecional; a submissão também notifica o Goo
   - Ponto de verdade: `submeterParaValidacao(body, email)` (gate 403) + `podeEditar` em `meus-projetos.functions.ts`.
   - Guarda: `tests/ownership*.test.ts`.
 - **INV-02 — R$ de saving nunca toca o LLM e o submissor nunca vê o financeiro de saving.**
-  - Ponto de verdade: memorial duplo (LLM sem R$; `enriquecerMemorial()` injeta R$) + `ocultarReaisSaving`.
-  - Guarda: `tests/saving-calc*.test.ts`, testes de prompt.
+  - Ponto de verdade: memorial duplo (LLM sem R$; `enriquecerMemorial()` injeta R$) + `ocultarReaisSaving`;
+    na tela "Meus Projetos", `mapItem` devolve `ganho_total_mensal: null` (RF-108/109 — nem exibe nem serializa).
+  - Guarda: `tests/saving-calc*.test.ts`, testes de prompt, teste de `mapItem` (`ganho_total_mensal === null`).
 - **INV-03 — Horas são a fonte da verdade do saving (`linhas`); o total do memorial bate com a soma das linhas.**
   - Ponto de verdade: `recomputarSavingFinanceiro` / `avisarDivergenciaMemorialLinhas`.
   - Guarda: `tests/saving-calc*.test.ts`.

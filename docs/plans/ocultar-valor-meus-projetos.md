@@ -1,39 +1,63 @@
 # Plano — Ocultar o valor (R$) do projeto nos cards de "Meus Projetos"
-**Status:** rascunho (a aprovar via /ggsd:plan) — capturado 2026-07-17 (ADR-028 captura-e-adia)
+**Status:** ✅ aprovado (Luis, 2026-07-17)
 
-**Pedido (Luis):** na tela **"Meus Projetos"**, remover a exibição do **valor em R$** do projeto no card
-(badge verde tipo "R$ 1.020,00/mês"). O usuário não deve ver o valor financeiro ali.
+**Objetivo:** na tela "Meus Projetos", o dono (e qualquer usuário) deixa de ver o valor R$ do projeto
+no card, e o número **nem trafega** ao client — fechando a brecha do INV-02, sem tocar cálculo/Sheets.
 
-## Contexto do código (varredura read-only 2026-07-17)
-- O badge de valor é renderizado em **`src/routes/meus-projetos.tsx:708-712`**:
-  ```tsx
-  {p.ganho_total_mensal != null && p.ganho_total_mensal > 0 && (
-    <span className="font-semibold" style={{ color: "#16a34a" }}>
-      {fmtGanho(p.ganho_total_mensal)}
-    </span>
-  )}
-  ```
-- Formatador `fmtGanho` em **`meus-projetos.tsx:106`** → `"R$ …/mês"`.
-- O dado vem de `p.ganho_total_mensal`, servido por `listarMeusProjetos`/`mapItem`
-  (`src/lib/meus-projetos.functions.ts:26/73/215`).
-- ⚠️ Alinha com **INV-02** (submissor não vê o financeiro de saving) — hoje há uma brecha: o card mostra
-  `ganho_total_mensal` (que inclui saving/receita) na visão do próprio dono.
+## Decisões fechadas (via /ggsd:plan, Luis, 2026-07-17)
+1. **Esconder para TODOS** nessa tela (client-only), inclusive admin. _(Admin continua vendo o R$ no
+   **investigador**, que usa funções próprias — fora deste escopo.)_
+2. **Não serializar:** `mapItem` devolve `ganho_total_mensal: null` — o número não chega ao navegador
+   (defesa em profundidade; não dá pra ler no devtools/Network).
 
-## Decisões a confirmar no /ggsd:plan (perguntar ao Luis)
-1. **Esconder para TODOS** nessa tela, ou **só para não-admin** (admin/equipe RPA continua vendo)?
-   _(a tela é a visão do dono; INV-02 sugere esconder do submissor. Provável: esconder para todos os
-   não-admin; admin talvez mantenha.)_
-2. Some **só o badge de R$** (mantém área + data + status) — confirmar que nada mais exibe R$ no card.
-3. Verificar se o valor aparece em **outro lugar** da mesma tela (ex.: tooltip, filtro, aba) e no
-   `/projeto/$id` read-only (a tela read-only já esconde R$ de saving — conferir receita/ganho_total).
+## Contexto do código (varredura read-only confirmada 2026-07-17)
+- Badge de valor: **`src/routes/meus-projetos.tsx:708-712`** (`p.ganho_total_mensal > 0` → `fmtGanho`).
+  É o **único** ponto da tela que usa `ganho_total_mensal` (grep confirma).
+- Origem do dado: `mapItem` (**`src/lib/meus-projetos.functions.ts:215`**), compartilhado por
+  `listarMeusProjetos` (lista) e `getMeuProjeto` (detalhe/seed de edição).
+- **Seguro nular em `mapItem`:**
+  - `submeter.tsx:96` só **declara** o campo no tipo do seed — nunca lê/computa (grep confirma).
+  - `/projeto/$id` read-only já esconde R$ ("visão do cliente", `projeto.$id.tsx:252`).
+  - **Investigador** usa `investigador.functions.ts` (não passa por `mapItem`) → admin segue vendo.
+  - Banco/Sheets/analyzer usam o valor persistido (`chat.functions.ts`, `sync-reverse.ts`) — intactos.
+  - **Nenhum teste** referencia `ganho_total_mensal` (grep em `tests/`).
+- Invariante: **INV-02** (`SPEC.md:82`) — o submissor não vê o financeiro de saving. Hoje o card vaza
+  `ganho_total_mensal` (saving + receita) ao dono. _(Nota: esconder TODO R$ vai um degrau além do
+  INV-02, que fala só de saving — vira regra da tela "Meus Projetos": dono não vê R$ ali.)_
 
-## Escopo provável (client-only)
-- Remover/gate o bloco `meus-projetos.tsx:708-712` (e talvez parar de enviar `ganho_total_mensal` ao client
-  em `meus-projetos.functions.ts` se a decisão for esconder de todos — evita vazar o número no payload).
-- Se for "só não-admin": usar o `isAdmin` já disponível na tela (conferir como `meus-projetos.tsx` sabe se é
-  admin).
-- **Guarda:** smoke — card sem o R$; teste se `mapItem`/serialização mudar. Staging antes de prod (regra 13).
+### Tarefas
+- **T1 — Server: não serializar o valor.** Em `mapItem` (`meus-projetos.functions.ts:215`), trocar
+  `ganho_total_mensal: p.ganho_total_mensal` por `ganho_total_mensal: null`, com comentário curto
+  citando INV-02 e a decisão "esconder p/ todos" (por que o número não trafega ao client).
+  (guarda: teste unitário novo em `tests/` afirma que `mapItem(...).ganho_total_mensal === null`.)
+- **T2 — Front: remover o badge.** Apagar o bloco `meus-projetos.tsx:708-712` (fica morto com o campo
+  sempre `null`, mas remover explicita a intenção e limpa `fmtGanho` se ficar sem uso — conferir
+  `fmtGanho` em `meus-projetos.tsx:104` e remover se órfão).
+  (guarda: `npm run build` compila sem “declarado e não usado”; smoke visual — card sem R$.)
+- **T3 — Testes + build.** `npm run test` verde (incl. o novo teste do T1). **Sem `build:worker`**
+  necessário? ⚠️ `meus-projetos.functions.ts` é server-side (importado pelo `worker.ts`) → **rodar
+  `npm run build:worker` e commitar o `worker.js`** (regra 1).
+- **T4 — Staging antes de prod (regra 13).** Deploy no `edf400b4`, validar no navegador (card sem R$;
+  Network sem o número) → só então prod `674a3710`.
 
-## Fronteiras
-- Não mexer no cálculo de ganho nem no Sheets; é só exibição (e, no máximo, não serializar o campo ao client).
-- Não alterar a visão do **investigador/admin** fora do que a decisão 1 definir.
+### Critérios de aceitação
+1. O card de "Meus Projetos" **não exibe** nenhum valor em R$ (nem badge verde), para qualquer usuário.
+2. A resposta de `/api/meus-projetos` (lista e detalhe) traz `ganho_total_mensal: null` — o número não
+   aparece no payload/Network.
+3. **Admin continua vendo** o ganho no **investigador** (não regrediu — funções separadas).
+4. Cálculo de ganho, persistência no SQLite e sync com o Sheets **inalterados** (o valor real segue no
+   banco e na planilha).
+5. `npm run test` verde; `npm run build` e `npm run build:worker` OK; `worker.js` commitado.
+6. Validado em **staging** antes de prod.
+
+### Fronteiras (não exceder)
+- **Não** mexer no cálculo de `ganho_total_mensal` (`chat.functions.ts`), no sync (`sync.ts`/
+  `sync-reverse.ts`) nem no Sheets.
+- **Não** alterar a visão do **investigador/admin** nem o `/projeto/$id` (já esconde R$).
+- **Não** mexer em ownership/edição/filtros — só a exibição e a serialização do valor.
+
+### Blast-radius
+Arquivos: `src/lib/meus-projetos.functions.ts` (mapItem), `src/routes/meus-projetos.tsx` (badge) ·
+Dependentes: `listarMeusProjetos`/`getMeuProjeto` (o campo vira `null` p/ ambos; seed de edição não o
+usa) · Invariantes: **INV-02** (reforçado; e cria a regra "Meus Projetos não exibe R$ ao dono") ·
+Confiança: **alta** (BAIXO) — 2 arquivos, ponto único, sem teste dependente, verificações feitas.
