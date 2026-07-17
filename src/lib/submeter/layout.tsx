@@ -93,14 +93,14 @@ export function WizardProgress({
   current,
   completed,
   onStepClick,
-  editMode,
 }: {
   current: number;
   completed: Set<number>;
   onStepClick: (n: number) => void;
-  editMode?: boolean;
 }) {
-  const visibleSteps = editMode ? STEPS.filter((s) => s.id !== 1) : STEPS;
+  // As 3 etapas aparecem sempre — inclusive na edição, onde a Etapa 1 (participantes/
+  // papéis) passou a ser editável (RF-100). A edição apenas "aterrissa" na Etapa 2.
+  const visibleSteps = STEPS;
   return (
     <div className="mb-8 flex items-start justify-center px-2">
       {visibleSteps.map((s, idx) => {

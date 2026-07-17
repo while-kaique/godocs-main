@@ -77,6 +77,62 @@ export const STEPS = [
   { id: 3, label: "Agente" },
 ];
 
+// Validação pura da Etapa 1 (Envio). Retorna o mapa de erros por campo (vazio = ok).
+// `modoEdicao` RELAXA os campos de "projeto legado" (escopo/status/ferramenta/serviço
+// externo): um legado que só quer corrigir participantes/papéis pode não tê-los
+// preenchidos, e não deve travar (D2/RF-103). Fora da edição (submissão NOVA), a
+// validação é a completa de sempre (RF-106). Identidade (e-mail da conta detectado) e
+// participantes/papéis são exigidos nos DOIS modos (RF-101/RF-102). Função pura — testável.
+export function validarEtapa1(
+  form: FormData,
+  opts: { modoEdicao: boolean },
+): FieldErrors {
+  const errs: FieldErrors = {};
+  const { modoEdicao } = opts;
+
+  // Identidade sempre exigida — a conta logada precisa ter sido detectada (caso raro
+  // de auth ausente). Nome e e-mail não são mais perguntados; vêm da conta (Godeploy).
+  if (!form.email.trim())
+    errs.email = "Não identificamos sua conta. Recarregue a página ou entre novamente.";
+
+  // Campos do projeto (escopo/status/ferramenta) só travam na submissão NOVA. Em
+  // edição, um legado pode não tê-los preenchidos — não bloqueia (D2/RF-103).
+  if (!modoEdicao) {
+    if (!form.escopo)
+      errs.escopo = "Selecione se a solução é interna ou externa";
+    if (!form.prodStatus)
+      errs.prodStatus = "Selecione o status do projeto";
+    else if (form.prodStatus !== "sim")
+      errs.prodStatus =
+        form.escopo === "externo"
+          ? "Apenas ferramentas externas já em uso podem ser submetidas"
+          : "Apenas projetos em produção podem ser submetidos";
+    if (form.escopo === "externo") {
+      if (!form.servicoExterno.trim())
+        errs.servicoExterno = "Informe o nome do serviço externo";
+    } else {
+      if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
+      if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
+        errs.ferramentaOutra = "Especifique a ferramenta utilizada";
+    }
+  }
+
+  // Participantes e papéis — exigidos SEMPRE quando "em equipe = sim" (nova e edição).
+  if (!form.emEquipe) errs.emEquipe = "Selecione uma opção";
+  if (form.emEquipe === "sim" && form.participantes.length === 0)
+    errs.participantes = "Informe ao menos um e-mail de participante";
+  if (form.emEquipe === "sim" && form.participantes.length > 0) {
+    const invalid = form.participantes.filter((p) => !ALLOWED_DOMAINS_RE.test(p));
+    if (invalid.length > 0)
+      errs.participantes = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
+    // Papel obrigatório por participante (decisão de produto: obriga escolher).
+    else if (form.participantes.some((p) => !form.participantesPapeis[p]))
+      errs.participantes = "Escolha o papel de cada participante";
+  }
+
+  return errs;
+}
+
 export interface FormData {
   escopo: "interno" | "externo" | "";
   prodStatus: "sim" | "dev" | "idle" | "";

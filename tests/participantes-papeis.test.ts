@@ -79,3 +79,39 @@ describe('montarMembrosPapeis (formulário → payload membros_papeis)', () => {
     expect(montarMembrosPapeis(participantes, papeis)).toEqual({ 'a@gocase.com': 'planejador' });
   });
 });
+
+// T3/RF-104: editar SÓ participantes/papéis precisa disparar `metaChanged`
+// (submeter.tsx compara JSON.stringify de {participantes, participantesPapeis} entre o
+// seed `agentMeta` e o `snapshotMeta`, ambos normalizados por `montarMembrosPapeis`).
+// Este teste guarda a comparação "apples-to-apples": mudança dispara, "sem mudança" não.
+describe('metaChanged por participantes/papéis (edição participante-only)', () => {
+  // Assinatura idêntica à comparada em submeter.tsx (só a parte de participantes).
+  const sig = (participantes: string[], papeis: Record<string, 'coexecutor' | 'planejador' | 'contribuidor' | ''>) =>
+    JSON.stringify({ participantes, participantesPapeis: montarMembrosPapeis(participantes, papeis) });
+
+  const membros = ['a@gocase.com', 'b@gocase.com'];
+  const papeisSeed = { 'a@gocase.com': 'coexecutor' as const, 'b@gocase.com': 'contribuidor' as const };
+  const seed = sig(membros, papeisSeed);
+
+  it('edição sem alteração NÃO dispara metaChanged (evita reprocesso falso)', () => {
+    expect(sig(membros, papeisSeed)).toBe(seed);
+  });
+
+  it('trocar o papel de um participante dispara metaChanged', () => {
+    const depois = sig(membros, { ...papeisSeed, 'b@gocase.com': 'planejador' });
+    expect(depois).not.toBe(seed);
+  });
+
+  it('adicionar um participante dispara metaChanged', () => {
+    const depois = sig(
+      [...membros, 'c@gocase.com'],
+      { ...papeisSeed, 'c@gocase.com': 'coexecutor' },
+    );
+    expect(depois).not.toBe(seed);
+  });
+
+  it('remover um participante dispara metaChanged', () => {
+    const depois = sig(['a@gocase.com'], { 'a@gocase.com': 'coexecutor' });
+    expect(depois).not.toBe(seed);
+  });
+});

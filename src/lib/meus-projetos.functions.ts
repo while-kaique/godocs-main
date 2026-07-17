@@ -180,7 +180,7 @@ function ehLegado(id: string): boolean {
   return id.toLowerCase().includes('legado');
 }
 
-function mapItem(
+export function mapItem(
   p: ProjetoRow & { area_nome: string | null },
   atualizadoEm: string | null,
   papel: Papel,
@@ -212,7 +212,11 @@ function mapItem(
     tipos_projeto: parseJson<string[]>(p.tipos_projeto) ?? [],
     especial: p.especial === 1,
     area_nome: p.area_nome ?? p.area ?? null,
-    ganho_total_mensal: p.ganho_total_mensal,
+    // INV-02 + decisão /ggsd:plan (Luis, 2026-07-17): "Meus Projetos" NÃO expõe o R$ do
+    // projeto ao dono (nem a qualquer usuário). Devolvemos `null` para o número não trafegar
+    // ao client (defesa em profundidade — não dá para ler no devtools/Network). O valor real
+    // segue no SQLite/Sheets; o admin continua vendo o ganho no investigador (funções próprias).
+    ganho_total_mensal: null,
     created_at: p.created_at,
     updated_at: p.updated_at,
     submitted_at: p.submitted_at,
