@@ -1,6 +1,7 @@
 # Plano — Etapa 1 editável na tela de edição (participantes + papéis)
-**Status:** ✅ aprovado (refinamento pós-staging, Luis 2026-07-17) — fatia inicial (T1–T3) já executada; em curso o
-**Refinamento R1/R2** abaixo, aprovado pelo Luis via seletor após validar a staging.
+**Status:** ✅ executado (2026-07-17) — T1–T3 + Refinamento R1/R2 implementados e DEPLOYADOS na staging
+(commits `ee9d3ed`, `e2b0e05`; staging `edf400b4` @15:20). T4 = limitação registrada. Falta só a validação no
+navegador (Luis) + o pré-req das colunas, e então prod. T5 em curso.
 
 ## Refinamento pós-validação em staging (2026-07-17) — APROVADO (Luis, via seletor)
 Ao validar a staging, o Luis pediu dois ajustes (decisões registradas por `AskUserQuestion`):

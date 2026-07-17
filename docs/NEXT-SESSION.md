@@ -13,14 +13,14 @@ compila; sem `build:worker` (nada server-side). Verificação de conformidade: `
 T5** — validar em staging antes de prod (regra 13). NÃO commitado em prod/staging ainda; só na branch.
 
 ## Plano ativo
-**→ [docs/plans/edicao-etapa1-participantes.md](plans/edicao-etapa1-participantes.md)** · Status: ✅ aprovado
-(refinamento R1/R2 pós-staging, Luis 2026-07-17). Fatia T1–T3 já executada; em curso o refinamento aprovado:
-R1 (edição abre na Etapa 1) + R2 (Etapa 1 na edição = participantes-only, demais campos read-only).
+**→ [docs/plans/edicao-etapa1-participantes.md](plans/edicao-etapa1-participantes.md)** · Status: ✅ executado
+(T1–T3 + refinamento R1/R2). Só resta a validação T5 (navegador/staging) + prod — não é um novo `/ggsd:plan`.
 
 ## Próximo passo (setado)
 **Concluir a validação em STAGING (regra 13, T5) e então prod.**
-✅ **Staging DEPLOYADO em 2026-07-17 ~14:58** (app `edf400b4`, `updateApp` status active; SPA novo com a Etapa 1
-editável). Falta a **validação no navegador** (Luis) + o **pré-req das colunas**:
+✅ **Staging DEPLOYADO 2026-07-17: SPA com T1–T3 (@14:58) + refinamento R1/R2 (@15:20)** no app `edf400b4`
+(R1: edição abre na Etapa 1; R2: dados do projeto read-only, só participantes/papéis editáveis). Falta a
+**validação no navegador** (Luis, hard-refresh) + o **pré-req das colunas**:
 1. ⚠️ **Pré-requisito operacional (Luis):** criar as colunas **"Participantes 2"** e **"Contribuidor"** no
    cabeçalho das abas **STAGING** e **GoDocs (prod)** — sem elas a IDA ignora com aviso e os papéis
    Participante/Contribuidor nunca chegam ao Sheets (perda real). **Coautor** já grava ("Participantes").
