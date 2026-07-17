@@ -17,15 +17,18 @@ T5** — validar em staging antes de prod (regra 13). NÃO commitado em prod/sta
 está **executado** (T1–T3). O próximo passo é **operacional/validação** (T5 staging), não um novo `/ggsd:plan`.
 
 ## Próximo passo (setado)
-**Validar o round-trip em STAGING (regra 13, T5)** e então prod:
+**Concluir a validação em STAGING (regra 13, T5) e então prod.**
+✅ **Staging DEPLOYADO em 2026-07-17 ~14:58** (app `edf400b4`, `updateApp` status active; SPA novo com a Etapa 1
+editável). Falta a **validação no navegador** (Luis) + o **pré-req das colunas**:
 1. ⚠️ **Pré-requisito operacional (Luis):** criar as colunas **"Participantes 2"** e **"Contribuidor"** no
-   cabeçalho das abas **GoDocs (prod)** e **STAGING** — sem elas a IDA ignora com aviso e os papéis
-   Participante/Contribuidor nunca chegam ao Sheets (perda real).
-2. `npm run test && npm run build && npm run build:worker` → deploy no **staging `edf400b4`** (fluxo do
-   "Deploy rápido"). _(Nada server-side mudou nesta sessão, mas o deploy de staging leva o SPA novo.)_
-3. Editar participantes/papéis de um projeto de teste **e** de um "legado" simulado; conferir as **3 colunas**
-   de papel no Sheets, que a linha **não duplica** (UPDATE in-place por ID) e o reflexo no site após o sync.
-4. Só então deploy em **prod `674a3710`**.
+   cabeçalho das abas **STAGING** e **GoDocs (prod)** — sem elas a IDA ignora com aviso e os papéis
+   Participante/Contribuidor nunca chegam ao Sheets (perda real). **Coautor** já grava ("Participantes").
+   _(Status ao pausar: aguardando o Luis confirmar se já criou as colunas na aba STAGING.)_
+2. No navegador logado da staging: hard-refresh em `/editar/$id` → conferir os **3 passos** (aparece "1 ENVIO"),
+   navegar à Etapa 1, editar participantes/papéis, voltar à 2 e reenviar.
+3. Conferir as **3 colunas** de papel no Sheets (aba STAGING), que a linha **não duplica** (UPDATE in-place por
+   ID) e o reflexo no site após o sync.
+4. Só então deploy em **prod `674a3710`** (mesmo fluxo: `deploy-godeploy.sh "<UPLOAD_TOKEN>"` → `updateApp`).
 
 ## Como retomar
 1. Ler este handoff + `ROADMAP.md` + `docs/plans/edicao-etapa1-participantes.md` (seção "Resultado da sessão").
