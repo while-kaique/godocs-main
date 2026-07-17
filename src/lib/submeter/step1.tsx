@@ -8,13 +8,17 @@ import {
 import { useSugestoesParticipantes, prefetchSugestoesParticipantes } from "./participantes-sugestoes";
 
 export function Step1({
-  form, errors, updateField, setError, clearError,
+  form, errors, updateField, setError, clearError, readOnlyProjeto,
 }: {
   form: FormData;
   errors: FieldErrors;
   updateField: <K extends keyof FormData>(key: K, value: FormData[K]) => void;
   setError: (key: string, msg: string) => void;
   clearError: (key: string) => void;
+  // Edição: os dados do projeto (escopo/status/ferramenta) viram REFERÊNCIA read-only;
+  // só participantes/papéis (e o toggle "em equipe") permanecem editáveis. A submissão
+  // NOVA não passa esta prop → formulário completo editável, comportamento inalterado.
+  readOnlyProjeto?: boolean;
 }) {
   const isExterno = form.escopo === "externo";
   const escopoDefinido = form.escopo === "interno" || form.escopo === "externo";
@@ -79,6 +83,145 @@ export function Step1({
     clearError("participantes");
   }
 
+  // Bloco de identidade (autor) — read-only, comum aos dois modos. A conta logada
+  // (Godeploy) preenche nome + e-mail; sinalizado por ícone + texto (não só cor).
+  const blocoIdentidade = (
+    <FormGroup>
+      {form.email ? (
+        <div
+          className="flex items-center gap-3 rounded-xl px-3.5 py-3"
+          style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.15)" }}
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px]"
+            style={{ background: "rgba(0,89,169,0.1)" }}
+            aria-hidden="true"
+          >
+            👤
+          </span>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--go-blue)" }}>
+              Submetendo como
+            </div>
+            <div className="truncate text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+              {form.nome || form.email}
+            </div>
+            {form.nome && (
+              <div className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>
+                {form.email}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-2 rounded-xl px-3.5 py-3 text-[12px] leading-relaxed"
+          style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "#8a7d00" }}
+        >
+          <span aria-hidden="true">⚠️</span>
+          <span>
+            Não foi possível identificar sua conta automaticamente. Recarregue a página
+            ou entre novamente; sua identidade é obtida do login da plataforma.
+          </span>
+        </div>
+      )}
+    </FormGroup>
+  );
+
+  // Bloco de participantes + papéis — EDITÁVEL nos dois modos (é o foco da edição).
+  const blocoParticipantes = (
+    <FormGroup>
+      <FormLabel required>Projeto desenvolvido em equipe?</FormLabel>
+      <RadioGroup
+        name="emEquipe"
+        value={form.emEquipe}
+        onChange={(v) => updateField("emEquipe", v as FormData["emEquipe"])}
+        error={errors.emEquipe}
+        options={[
+          { value: "sim", label: "👥 Sim, em equipe" },
+          { value: "nao", label: "👤 Não, individual" },
+        ]}
+      />
+      {form.emEquipe === "sim" && (
+        <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
+          <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
+            👥 Participantes e seus papéis:
+          </label>
+          <ParticipantesPapeisInput
+            participantes={form.participantes}
+            papeis={form.participantesPapeis}
+            onAdd={addParticipant}
+            onRemove={removeParticipant}
+            onSetPapel={setPapelParticipant}
+            error={errors.participantes}
+            suggestions={sugestoesParticipantes}
+            loadingSuggestions={sugestoesLoading}
+          />
+          <LegendaPapeis />
+        </div>
+      )}
+    </FormGroup>
+  );
+
+  // ── Modo EDIÇÃO: dados do projeto como referência read-only; foco em participantes ──
+  if (readOnlyProjeto) {
+    const escopoLabel =
+      form.escopo === "externo" ? "Externa" : form.escopo === "interno" ? "Interna" : "—";
+    const statusLabel =
+      form.prodStatus === "sim"
+        ? isExterno ? "Em uso" : "Em produção"
+        : form.prodStatus === "dev"
+          ? isExterno ? "Em configuração" : "Em desenvolvimento"
+          : form.prodStatus === "idle"
+            ? "Pronto, sem uso"
+            : "—";
+    const ferramentaLabel = isExterno
+      ? (form.servicoExterno || "—")
+      : form.ferramenta === "Outros"
+        ? (form.ferramentaOutra || "Outros")
+        : (form.ferramenta || "—");
+    const linhasProjeto = [
+      { rotulo: "Escopo", valor: escopoLabel },
+      { rotulo: isExterno ? "Serviço externo" : "Ferramenta", valor: ferramentaLabel },
+      { rotulo: "Status", valor: statusLabel },
+    ];
+
+    return (
+      <div>
+        <div
+          className="relative mb-6 rounded-xl p-4"
+          style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.15)" }}
+        >
+          <div
+            className="mb-3 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ color: "var(--go-blue)" }}
+          >
+            <span aria-hidden="true">🔒</span> Dados do projeto · somente leitura
+          </div>
+          <dl className="flex flex-col gap-2.5">
+            {linhasProjeto.map((it) => (
+              <div key={it.rotulo} className="flex items-baseline justify-between gap-3">
+                <dt className="shrink-0 text-[11px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+                  {it.rotulo}
+                </dt>
+                <dd className="truncate text-right text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                  {it.valor}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-[11px] leading-relaxed" style={{ color: "#8b8b9a" }}>
+            Na edição, estes dados ficam fixos. Aqui você ajusta os participantes e seus papéis.
+          </p>
+        </div>
+
+        {blocoIdentidade}
+        {blocoParticipantes}
+      </div>
+    );
+  }
+
+  // ── Modo SUBMISSÃO NOVA: formulário completo editável (comportamento inalterado) ──
   return (
     <div>
       {/* ── Gate de Escopo ── */}
@@ -194,46 +337,7 @@ export function Step1({
           {/* Identidade automática: nome + e-mail vêm da conta logada (Godeploy),
               não são mais perguntados. Bloco read-only — sinalizado por ícone +
               texto (não só cor), respeitando a11y. */}
-          <FormGroup>
-            {form.email ? (
-              <div
-                className="flex items-center gap-3 rounded-xl px-3.5 py-3"
-                style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.15)" }}
-              >
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[15px]"
-                  style={{ background: "rgba(0,89,169,0.1)" }}
-                  aria-hidden="true"
-                >
-                  👤
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--go-blue)" }}>
-                    Submetendo como
-                  </div>
-                  <div className="truncate text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-                    {form.nome || form.email}
-                  </div>
-                  {form.nome && (
-                    <div className="truncate text-[11px]" style={{ color: "#8b8b9a" }}>
-                      {form.email}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
-                className="flex items-center gap-2 rounded-xl px-3.5 py-3 text-[12px] leading-relaxed"
-                style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "#8a7d00" }}
-              >
-                <span aria-hidden="true">⚠️</span>
-                <span>
-                  Não foi possível identificar sua conta automaticamente. Recarregue a página
-                  ou entre novamente; sua identidade é obtida do login da plataforma.
-                </span>
-              </div>
-            )}
-          </FormGroup>
+          {blocoIdentidade}
 
           <FormGroup>
             {isExterno ? (
@@ -276,37 +380,7 @@ export function Step1({
               )}
           </FormGroup>
 
-          <FormGroup>
-            <FormLabel required>Projeto desenvolvido em equipe?</FormLabel>
-            <RadioGroup
-              name="emEquipe"
-              value={form.emEquipe}
-              onChange={(v) => updateField("emEquipe", v as FormData["emEquipe"])}
-              error={errors.emEquipe}
-              options={[
-                { value: "sim", label: "👥 Sim, em equipe" },
-                { value: "nao", label: "👤 Não, individual" },
-              ]}
-            />
-            {form.emEquipe === "sim" && (
-              <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
-                <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
-                  👥 Participantes e seus papéis:
-                </label>
-                <ParticipantesPapeisInput
-                  participantes={form.participantes}
-                  papeis={form.participantesPapeis}
-                  onAdd={addParticipant}
-                  onRemove={removeParticipant}
-                  onSetPapel={setPapelParticipant}
-                  error={errors.participantes}
-                  suggestions={sugestoesParticipantes}
-                  loadingSuggestions={sugestoesLoading}
-                />
-                <LegendaPapeis />
-              </div>
-            )}
-          </FormGroup>
+          {blocoParticipantes}
         </div>
       )}
     </div>

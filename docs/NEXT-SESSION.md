@@ -13,8 +13,9 @@ compila; sem `build:worker` (nada server-side). Verificação de conformidade: `
 T5** — validar em staging antes de prod (regra 13). NÃO commitado em prod/staging ainda; só na branch.
 
 ## Plano ativo
-**→ nenhum plano de código ativo.** O plano [edicao-etapa1-participantes](plans/edicao-etapa1-participantes.md)
-está **executado** (T1–T3). O próximo passo é **operacional/validação** (T5 staging), não um novo `/ggsd:plan`.
+**→ [docs/plans/edicao-etapa1-participantes.md](plans/edicao-etapa1-participantes.md)** · Status: ✅ aprovado
+(refinamento R1/R2 pós-staging, Luis 2026-07-17). Fatia T1–T3 já executada; em curso o refinamento aprovado:
+R1 (edição abre na Etapa 1) + R2 (Etapa 1 na edição = participantes-only, demais campos read-only).
 
 ## Próximo passo (setado)
 **Concluir a validação em STAGING (regra 13, T5) e então prod.**

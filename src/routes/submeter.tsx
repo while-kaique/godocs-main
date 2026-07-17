@@ -598,7 +598,9 @@ export function SubmeterPageContent({
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
-        setStep(2);
+        // R1 (refinamento pós-staging): a edição ABRE na Etapa 1 (participantes/papéis
+        // são o foco). As Etapas 1 e 2 já contam como alcançadas (clicáveis no topo).
+        setStep(1);
         // Etapa 3 ainda não foi percorrida nesta sessão — não marcar como concluída.
         setCompletedSteps(new Set([1, 2]));
   }, []);
@@ -2205,6 +2207,7 @@ export function SubmeterPageContent({
                     updateField={updateField}
                     setError={setError}
                     clearError={clearError}
+                    readOnlyProjeto={!!editProjetoId}
                   />
                 </div>
               </StepAnimation>

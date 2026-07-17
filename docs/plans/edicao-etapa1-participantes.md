@@ -1,5 +1,20 @@
 # Plano — Etapa 1 editável na tela de edição (participantes + papéis)
-**Status:** ✅ executado (2026-07-17) — T1–T3 implementados; T4 registrado como limitação; T5 (staging) pendente.
+**Status:** ✅ aprovado (refinamento pós-staging, Luis 2026-07-17) — fatia inicial (T1–T3) já executada; em curso o
+**Refinamento R1/R2** abaixo, aprovado pelo Luis via seletor após validar a staging.
+
+## Refinamento pós-validação em staging (2026-07-17) — APROVADO (Luis, via seletor)
+Ao validar a staging, o Luis pediu dois ajustes (decisões registradas por `AskUserQuestion`):
+- **R1 — Landing na Etapa 1:** a edição deve **abrir na Etapa 1** (Envio), e não aterrissar na Etapa 2 (revoga
+  a decisão T1d original). Muda `applySeed` `setStep(2)` → `setStep(1)` (`submeter.tsx`).
+- **R2 — Etapa 1 na edição = participantes-only:** os campos de projeto (**escopo, status, ferramenta/serviço
+  externo**) viram **REFERÊNCIA read-only**; só **"em equipe" + participantes/papéis** ficam editáveis. Novo
+  prop `readOnlyProjeto` no `Step1` (`step1.tsx`), passado só na edição por `submeter.tsx`. Submissão NOVA
+  inalterada (sem o prop → formulário completo). Reusa o padrão read-only já existente no arquivo (card
+  "Submetendo como": `--go-blue`, ícone+rótulo, a11y — estado não só por cor).
+- **Fronteiras do refinamento:** só client (`step1.tsx`/`submeter.tsx`); sem server-side, sem `build:worker`,
+  sem tocar dados/sync. Validação (T2/`validarEtapa1`) já não exige os campos read-only em edição → coerente.
+- **Guarda:** smoke em staging (abre na Etapa 1; escopo/status/ferramenta cinza/read-only; participantes
+  editáveis; submissão nova segue com o form completo). Re-deploy staging → prod.
 
 > **Resultado da sessão de código (2026-07-17):**
 > - **T1** — Etapa 1 navegável na edição: `layout.tsx` mostra os 3 passos sempre (removido `editMode`);
