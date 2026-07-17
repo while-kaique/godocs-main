@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 
 import {
-  ALLOWED_DOMAINS_RE, filesToDocs, TOKEN_BLOCK_CHARS,
-  parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis,
+  filesToDocs, TOKEN_BLOCK_CHARS,
+  parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, validarEtapa1,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -948,41 +948,10 @@ export function SubmeterPageContent({
 
   /* ── Validation ── */
   function validateStep(n: number): boolean {
-    const errs: FieldErrors = {};
-
-    if (n === 1) {
-      if (!form.escopo)
-        errs.escopo = "Selecione se a solução é interna ou externa";
-      if (!form.prodStatus)
-        errs.prodStatus = "Selecione o status do projeto";
-      else if (form.prodStatus !== "sim")
-        errs.prodStatus = form.escopo === "externo"
-          ? "Apenas ferramentas externas já em uso podem ser submetidas"
-          : "Apenas projetos em produção podem ser submetidos";
-      // Nome e e-mail não são mais perguntados — vêm da conta logada (Godeploy).
-      // Validamos apenas que a identidade foi detectada (caso raro de auth ausente).
-      if (!form.email.trim())
-        errs.email = "Não identificamos sua conta. Recarregue a página ou entre novamente.";
-      if (form.escopo === "externo") {
-        if (!form.servicoExterno.trim())
-          errs.servicoExterno = "Informe o nome do serviço externo";
-      } else {
-        if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
-        if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
-          errs.ferramentaOutra = "Especifique a ferramenta utilizada";
-      }
-      if (!form.emEquipe) errs.emEquipe = "Selecione uma opção";
-      if (form.emEquipe === "sim" && form.participantes.length === 0)
-        errs.participantes = "Informe ao menos um e-mail de participante";
-      if (form.emEquipe === "sim" && form.participantes.length > 0) {
-        const invalid = form.participantes.filter((p) => !ALLOWED_DOMAINS_RE.test(p));
-        if (invalid.length > 0)
-          errs.participantes = "Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos";
-        // Papel obrigatório por participante (decisão de produto: obriga escolher).
-        else if (form.participantes.some((p) => !form.participantesPapeis[p]))
-          errs.participantes = "Escolha o papel de cada participante";
-      }
-    }
+    // Etapa 1 (Envio): validação pura extraída. Em edição, relaxa os campos de
+    // projeto legado (escopo/status/ferramenta) mas mantém identidade + participantes/
+    // papéis (D2/RF-103); submissão nova segue com a validação cheia (RF-106).
+    const errs: FieldErrors = n === 1 ? validarEtapa1(form, { modoEdicao: !!editProjetoId }) : {};
 
     if (n === 2) {
       // O tipo de projeto (saving/receita/especial) passou para a Etapa 2.5.
@@ -1021,14 +990,13 @@ export function SubmeterPageContent({
   }
 
   function handleBack() {
-    // Em modo edição começa na etapa 2 — não volta para a 1.
-    if (editProjetoId && step <= 2) return;
+    // A edição "aterrissa" na Etapa 2, mas a Etapa 1 (participantes/papéis) é
+    // navegável: o "Voltar" da Etapa 2 leva à 1 tanto na submissão nova quanto na edição.
     if (step > 1) goToStep(step - 1, "back");
   }
 
   function handleStepClick(target: number) {
-    // Em modo edição a etapa 1 não é acessível.
-    if (editProjetoId && target === 1) return;
+    // A Etapa 1 é clicável no topo (submissão nova e edição), desde que já alcançada.
     if (!completedSteps.has(target) || target === step) return;
     // Ir para a etapa 3 com o agente já iniciado: usa o mesmo fluxo do botão
     // "Continuar com Agente" para detectar troca de tipo (saving ↔ receita) e
@@ -2223,7 +2191,6 @@ export function SubmeterPageContent({
               current={step}
               completed={completedSteps}
               onStepClick={handleStepClick}
-              editMode={!!editProjetoId}
             />
           </div>
 
@@ -2359,7 +2326,7 @@ export function SubmeterPageContent({
                 type="button"
                 onClick={showEtapa25 ? () => setShowEtapa25(false) : handleBack}
                 className="go-btn-back"
-                style={{ visibility: (step === 1 || (editProjetoId && step === 2 && !showEtapa25)) ? "hidden" : "visible" }}
+                style={{ visibility: step === 1 ? "hidden" : "visible" }}
               >
                 &larr; Voltar
               </button>

@@ -1,5 +1,26 @@
 # Plano — Etapa 1 editável na tela de edição (participantes + papéis)
-**Status:** ✅ aprovado (Luis, 2026-07-17)
+**Status:** ✅ executado (2026-07-17) — T1–T3 implementados; T4 registrado como limitação; T5 (staging) pendente.
+
+> **Resultado da sessão de código (2026-07-17):**
+> - **T1** — Etapa 1 navegável na edição: `layout.tsx` mostra os 3 passos sempre (removido `editMode`);
+>   guards `handleBack`/`handleStepClick` relaxados; "Voltar" visível na Etapa 2 da edição; landing na Etapa 2
+>   preservado. Submissão nova inalterada (RF-106).
+> - **T2** — validação da Etapa 1 extraída para `validarEtapa1(form, {modoEdicao})` (pura, em `constants.ts`) e
+>   ligada em `validateStep`. Em edição relaxa `escopo`/`prodStatus`/`ferramenta` (RF-103); nova mantém
+>   validação cheia (comportamento idêntico ao inline anterior). Testes: `tests/validacao-etapa1.test.ts`.
+> - **T3** — persistência participante-only já correta (seed `agentMeta` e `snapshotMeta` normalizam ambos por
+>   `montarMembrosPapeis`, apples-to-apples) → sem mudança de código; teste de guarda em `participantes-papeis.test.ts`.
+> - **T4 (RF-107) — LIMITAÇÃO REGISTRADA (não implementado):** em `atualizarMetadados` o ramo especial
+>   (`ehEspecial`, `chat.functions.ts:1928`) **sempre** reconstrói a doc via `buildDocEspecial` e retorna
+>   `{reset:true}`, **ignorando `reset_doc`** (o flag só vale no caminho NÃO-especial, `:1956`). Exentar de
+>   verdade a edição participante-only exigiria mudança **server-side** (fora das Fronteiras/blast-radius +
+>   `build:worker`). Como a doc do especial é **determinística** (derivada de descrição/contexto/membros),
+>   "resetar" a regenera idêntica, sem perda real → decisão: não implementar.
+> - Sem tocar server-side (só `submeter.tsx`/`layout.tsx`/`constants.ts` + testes) → `build:worker` desnecessário
+>   (INV-06). 561 testes verdes; `npm run build` compila. Verificação de conformidade: `diverge-baixa` (0.9).
+> - **T5 pendente:** round-trip em staging (regra 13) + pré-requisito operacional das colunas (abaixo).
+
+**Status original:** ✅ aprovado (Luis, 2026-07-17)
 
 **Objetivo:** Tornar a **Etapa 1** (participantes + papéis: Coautor · Participante · Contribuidor) visível e
 navegável na tela de edição (`/editar/$id`), para donos/editores delegados — **inclusive projetos legados** —
