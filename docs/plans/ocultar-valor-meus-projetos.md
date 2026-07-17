@@ -1,5 +1,7 @@
 # Plano — Ocultar o valor (R$) do projeto nos cards de "Meus Projetos"
-**Status:** ✅ aprovado (Luis, 2026-07-17)
+**Status:** executado (2026-07-17) — T1–T3 codados na branch `feat/ocultar-valor-meus-projetos`;
+562 testes verdes, `build`+`build:worker` OK, `worker.js` recomitado, conformidade **conforme (0.97)**.
+**Falta só T4** (validação em staging → prod, regra 13). _(aprovado por Luis, 2026-07-17)_
 
 **Objetivo:** na tela "Meus Projetos", o dono (e qualquer usuário) deixa de ver o valor R$ do projeto
 no card, e o número **nem trafega** ao client — fechando a brecha do INV-02, sem tocar cálculo/Sheets.
@@ -24,6 +26,18 @@ no card, e o número **nem trafega** ao client — fechando a brecha do INV-02, 
 - Invariante: **INV-02** (`SPEC.md:82`) — o submissor não vê o financeiro de saving. Hoje o card vaza
   `ganho_total_mensal` (saving + receita) ao dono. _(Nota: esconder TODO R$ vai um degrau além do
   INV-02, que fala só de saving — vira regra da tela "Meus Projetos": dono não vê R$ ali.)_
+
+### Resultado da sessão (código, 2026-07-17)
+- **T1 ✅** — `mapItem` (`meus-projetos.functions.ts:216`) devolve `ganho_total_mensal: null` (comentário
+  citando INV-02 + decisão). `mapItem` foi **exportado** (era `function` local) p/ o teste. Guarda:
+  `tests/meus-projetos-ganho-oculto.test.ts` afirma `mapItem(...).ganho_total_mensal === null` mesmo com
+  o banco em `661.8` (TDD red→green).
+- **T2 ✅** — badge removido (`meus-projetos.tsx`, ex-708-712) + `fmtGanho` removido (ficou órfão, grep 0).
+  Tipo `ganho_total_mensal: number | null` no `.tsx` mantido (o campo segue no payload, agora `null`).
+- **T3 ✅** — 562 testes verdes; `npm run build` + `npm run build:worker` OK; `worker.js` recomitado
+  (server-side, regra 1). Smoke: `#16a34a` (cor do badge) ausente do bundle servido; `worker.js` serve
+  `ganho_total_mensal:null`. Conformidade (contexto fresco): **conforme (0.97)**, 0 achados.
+- **T4 ⏳** — deploy staging (`edf400b4`) → validar no navegador → prod (`674a3710`). Pendente.
 
 ### Tarefas
 - **T1 — Server: não serializar o valor.** Em `mapItem` (`meus-projetos.functions.ts:215`), trocar

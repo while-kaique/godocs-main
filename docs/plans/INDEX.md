@@ -16,4 +16,4 @@
 | Plano | Status | Resumo (1 linha) |
 |---|---|---|
 | [edicao-etapa1-participantes](edicao-etapa1-participantes.md) | executado (2026-07-17) | Etapa 1 (participantes + papéis) editável na edição — T1–T3 + R1/R2 feitos+staging, T4 limitação, T5 validação/prod pendente |
-| [ocultar-valor-meus-projetos](ocultar-valor-meus-projetos.md) ◀ ativo | ✅ aprovado (2026-07-17) | Tirar o badge de valor R$ dos cards de "Meus Projetos" — esconder p/ todos + não serializar (INV-02) |
+| [ocultar-valor-meus-projetos](ocultar-valor-meus-projetos.md) | executado (2026-07-17) | Tirar o badge de valor R$ dos cards de "Meus Projetos" — esconder p/ todos + não serializar (INV-02); T1–T3 codados, falta T4 staging→prod |

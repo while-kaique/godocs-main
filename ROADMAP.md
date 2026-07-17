@@ -6,8 +6,8 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 2 — ocultar o R$ dos cards de "Meus Projetos" (planejada + especificada ✅; a codar)
-**Próximo:** rodar `/ggsd:code` p/ implementar `docs/plans/ocultar-valor-meus-projetos.md` (aprovado)
+**Fase atual:** Fase 2 — ocultar o R$ dos cards de "Meus Projetos" (T1–T3 codados ✅; falta validar staging→prod)
+**Próximo:** deploy da branch `feat/ocultar-valor-meus-projetos` na **staging** (`edf400b4`) → validar (card sem R$; Network sem o número) → prod (`674a3710`) — regra 13
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
@@ -30,7 +30,9 @@ serializar `ganho_total_mensal` ao client (defesa em profundidade) — fecha a b
 SQLite e Sheets inalterados; admin segue vendo no investigador.
 - ✅ Planejar (`docs/plans/ocultar-valor-meus-projetos.md` — aprovado 2026-07-17).
 - ✅ Especificar (EARS RF-108…111 no `SPEC.md §4` + reforço INV-02).
-- ⬜ Implementar (T1 server `null` + teste · T2 remover badge · T3 build:worker · T4 staging→prod).
+- ✅ Implementar (T1 server `null` + teste · T2 remover badge · T3 `build:worker`) — branch
+  `feat/ocultar-valor-meus-projetos`, 562 testes verdes, conformidade conforme (0.97).
+- 🟡 Validar em **staging** antes de prod (T4, regra 13).
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 

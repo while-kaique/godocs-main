@@ -101,11 +101,6 @@ type Filtro = "todos" | "meus" | "participo" | "rascunhos";
 // Aceita ISO (app) e pt-BR dd/mm/yyyy (planilha/legados) — ver @/lib/format-date.
 const fmtDate = fmtDataBR;
 
-function fmtGanho(v: number | null): string {
-  if (!v) return "";
-  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mês`;
-}
-
 // Popup (overlay com fundo embaçado) para o dono — ou um editor já delegado (cascata)
 // — distribuir o poder de edição entre os participantes do projeto. Cada participante
 // marcado passa a poder editar/reenviar "como se fosse o dono". Fecha no "x", no
@@ -705,11 +700,9 @@ function MeusProjetosPage() {
                           </div>
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]" style={{ color: "#8b8b9a" }}>
                             {p.area_nome && <span>{p.area_nome}</span>}
-                            {p.ganho_total_mensal != null && p.ganho_total_mensal > 0 && (
-                              <span className="font-semibold" style={{ color: "#16a34a" }}>
-                                {fmtGanho(p.ganho_total_mensal)}
-                              </span>
-                            )}
+                            {/* Valor R$ do projeto NÃO é exibido aqui (INV-02 + decisão
+                                /ggsd:plan 2026-07-17): dono/usuário não vê o financeiro em
+                                "Meus Projetos". O campo vem `null` do server (mapItem). */}
                             <span>{p.submitted_at ? `Enviado em ${fmtDate(p.submitted_at)}` : `Criado em ${fmtDate(p.created_at)}`}</span>
                           </div>
                           {/* Autoria + tooltip de transferência (não em rascunho — é seu) */}

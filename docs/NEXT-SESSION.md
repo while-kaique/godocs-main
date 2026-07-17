@@ -4,29 +4,32 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-17 (planejamento + spec) — **planejada e especificada** a Fase 2 (ocultar o R$
-dos cards de "Meus Projetos"). Plano `docs/plans/ocultar-valor-meus-projetos.md` **✅ aprovado** (decisões:
-esconder p/ TODOS, client-only + `mapItem` devolve `null` — não trafega ao client). SPEC cristalizada:
-RF-108…111 no `SPEC.md §4 (Fase 2)` + reforço no INV-02. Só docs (nenhum código — Gate D). **Nada codado
-ainda** — a implementação é da próxima sessão via `/ggsd:code`.
+**Última sessão:** 2026-07-17 (código) — **implementada** a Fase 2 (ocultar o R$ dos cards de "Meus
+Projetos"), branch `feat/ocultar-valor-meus-projetos`. **T1** `mapItem` devolve `ganho_total_mensal: null`
+(não trafega ao client) + teste unitário `meus-projetos-ganho-oculto.test.ts`. **T2** badge + `fmtGanho`
+removidos. **T3** 562 testes verdes, `build`+`build:worker` OK, `worker.js` recomitado. Conformidade
+(contexto fresco): **conforme (0.97)**. **Falta só T4** — validar em staging → prod (regra 13).
 
 _(Antes desta: 2026-07-17 (código) — Fase 1 implementada, branch `feat/edicao-etapa1-participantes`, T1–T3
 + R1/R2 feitos e deployados na STAGING; T4 = limitação. **Falta só o T5** — validação no navegador da
 staging + prod; bloqueado pelo pré-req das colunas "Participantes 2"/"Contribuidor" no Sheets, ver abaixo.)_
 
 ## Plano ativo
-**→ [docs/plans/ocultar-valor-meus-projetos.md](plans/ocultar-valor-meus-projetos.md)** · Status: ✅ aprovado
-(Luis, 2026-07-17) — esconder o R$ dos cards de "Meus Projetos" p/ todos + não serializar (INV-02).
-Decisões fechadas via /ggsd:plan (esconder p/ todos, client-only + `mapItem` devolve `null`).
+**Nenhum plano `aprovado` pendente de código.** A Fase 2 (`ocultar-valor-meus-projetos`) está
+**executada** (T1–T3, branch `feat/ocultar-valor-meus-projetos`) — falta só o **deploy** (T4, não é
+`/ggsd:plan`/`/ggsd:code`). Próxima frente de código nova → `/ggsd:plan` primeiro.
 
-_(Anterior: [edicao-etapa1-participantes](plans/edicao-etapa1-participantes.md) ✅ executado — resta só a
-validação T5 em staging/prod, ver "Frente NOVA"/pré-req das colunas abaixo; não é um novo `/ggsd:plan`.)_
+_(Executados recentes: [ocultar-valor-meus-projetos](plans/ocultar-valor-meus-projetos.md) ✅ executado
+2026-07-17 (falta T4 staging→prod); [edicao-etapa1-participantes](plans/edicao-etapa1-participantes.md)
+✅ executado — resta a validação T5 em staging/prod, ver "Frente NOVA"/pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Rodar `/ggsd:code` numa sessão nova para implementar o plano aprovado `ocultar-valor-meus-projetos`**
-(T1 server: `mapItem`→`ganho_total_mensal: null` + teste; T2 front: remover badge `meus-projetos.tsx:708-712`;
-T3 `test`+`build`+**`build:worker`** e commitar `worker.js` — é server-side; T4 staging→prod, regra 13).
-Trabalhar em **worktree/branch nova** (regra 8). Blast-radius BAIXO (2 arquivos, ponto único).
+**Deploy da branch `feat/ocultar-valor-meus-projetos` na STAGING (`edf400b4`) → validar → prod (regra 13).**
+Fluxo: `git checkout feat/ocultar-valor-meus-projetos` → `npm run test && npm run build && npm run build:worker`
+→ `scripts/deploy-godeploy.sh "<UPLOAD_TOKEN>"` → `updateApp` no **`edf400b4`** → no navegador logado da
+staging (hard-refresh em `/meus-projetos`): **card sem badge de R$** e **Network sem o número**
+(`/api/meus-projetos` traz `ganho_total_mensal: null`) → só então **prod `674a3710`**. Antes do PR/merge:
+`git pull origin main` + rebuild `worker.js`/`dist` (regra 10). Branch já commitada (código + docs desta sessão).
 
 ### Pendência paralela (Fase 1, não é código) — validação STAGING (regra 13, T5) e então prod
 ✅ **Staging DEPLOYADO 2026-07-17: SPA com T1–T3 (@14:58) + refinamento R1/R2 (@15:20)** no app `edf400b4`
