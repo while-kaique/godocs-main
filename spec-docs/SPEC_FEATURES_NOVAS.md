@@ -685,3 +685,63 @@ chevron, estado por ícone+rótulo). Sem mudança de backend/worker.
 
 **Status.** ✅ Implementado; **538 testes verdes** + `build`/`build:worker` OK; **validado na
 staging** (`edf400b4`) e **deployado em produção** (`674a3710`, `godocs.devgogroup.com`).
+
+## Feature adicional — Remover arquivo já enviado + processar doc em background (Etapa 2) · jul/2026
+
+Duas melhorias na Etapa 2 do `/submeter` (arquivos). Plano: `docs/plans/remover-arquivo-e-doc-background.md`.
+
+**F1 — Remover de verdade um arquivo já enviado.** O box "Arquivos enviados anteriormente"
+(`step2.tsx`) listava os nomes **sem** como removê-los: quem subia um arquivo e o removia via ✕
+da árvore via o nome "voltar" no box amarelo, sem saída (o arquivo "ficava na memória").
+- **UI:** cada item do box ganhou um **✕** (`onRemoverExistente`, sempre visível, `aria-label`,
+  foco de teclado, estado por ícone+rótulo). Copy adaptativa: padrão = "texto reaproveitado";
+  após remover = aviso pedindo re-upload. Box some quando esvazia → aviso avulso orienta.
+- **Estado:** `handleRemoverExistente` (`submeter.tsx`) tira o nome de `nomesExistentes` +
+  liga `docExistenteInvalidado` (persistido no `DraftSnapshot` → sobrevive ao reload).
+- **Regra (decisão fechada — Opção A):** o servidor guarda a documentação como **um `doc`
+  concatenado** (`chat.functions.ts`, `insertChatMessage role:"doc"`), **não por arquivo**, e o
+  cliente não retém os `File` antigos → **não há como regenerar de um subconjunto**. Logo remover
+  um arquivo já enviado **invalida** a doc e **exige re-upload** dos que se quer manter (para 1
+  arquivo, o caso comum, é transparente). `validarEtapa2` (função pura em `constants.ts`) bloqueia
+  o "Continuar" quando `docExistenteInvalidado && sem upload novo`. A flag é limpa quando a doc é
+  regenerada (`handleIniciarAgente`/`reprocessarComNovosArquivos`/background). **NÃO** foi feita a
+  Opção B (guardar texto por-arquivo no servidor) — fora de escopo.
+
+**F2 — Processar a documentação em segundo plano ao subir arquivos.** Antes, toda a extração +
+geração da doc (`iniciar-submissao`: `extractTextFromMultipleFiles` + extrator + orquestrador,
+tudo LLM) só rodava no clique "Analisar com Agente" (Etapa 2→3), com o usuário esperando.
+- **Disparo (gatilho ENXUTO — "adiantar o background"):** um efeito com **debounce (~800ms)** chama
+  `iniciar-submissao` em background quando `!editProjetoId && arquivos.length>0 && !projetoId &&
+  camposMinimosDocProntos(form)` e a assinatura (arquivos+meta) mudou. ⚠️ `camposMinimosDocProntos`
+  exige **só escopo + nome (Etapa 1)** — deliberadamente **NÃO** espera `descricaoBreve≥60` nem
+  `usaAiProxy` (campos da Etapa 2 que a pessoa digita/responde por último). Com o gatilho no fim da
+  Etapa 2, o background não tinha folga para terminar antes do clique em avançar e a pessoa esperava
+  o processamento inteiro num spinner (feedback do Luis, 22/07). Enxuto, o disparo acontece assim que
+  o **arquivo é anexado**, dando ao processamento o tempo em que ela preenche o resto. O texto do
+  documento é o input principal do extrator; a descrição é sinal secundário e chega ao servidor via
+  `atualizar-metadados` ao avançar. **Trade-off aceito:** o extrator pode rodar antes de a descrição
+  final estar pronta (qualidade de pré-preenchimento levemente menor), e quem avançar em ~2-3s ainda
+  pode pegar o fim do processamento no spinner (mitigado, não eliminado). Dedup por `bgSigRef` +
+  `bgInFlightRef`; cria o rascunho **uma vez**. Status discreto no `step2` (`bgStatus`:
+  processando/pronto/erro) — **não** bloqueia a navegação.
+- **Sem tipo/especial:** o background roda a **fase de doc** SEM `tipos`/`especial` (definidos na
+  Etapa 2.5, não afetam a documentação). O backend reusa `iniciar-submissao` **sem alteração**.
+- **Idempotência da Etapa 2.5 (evita projeto DUPLICADO):** quando o background já criou o projeto,
+  o botão não-especial já vira "Continuar com Agente" (`handleContinuarAgente`, que sincroniza
+  tipos/meta e navega). Para a janela em que o disparo ainda está **em voo**, `handleIniciarAgente`
+  aguarda `bgPromiseRef` e delega via flag `pendingContinuar` (um render depois, com `projetoId`
+  fresco no estado — evita ler o valor stale logo após o `setProjetoId`). `handleEnviarEspecial`
+  (submissão nova), se o background já criou um projeto não-especial, **converte** via
+  `atualizar-metadados {especial:true, reset_doc:true}` (que monta `buildDocEspecial` sem IA +
+  `chat_completo`) em vez de recriar.
+- **Escopo:** só **submissão NOVA** (`!editProjetoId`) — a edição mantém o caminho próprio de
+  reprocesso (mais frágil, BUG ABERTO de legado; não regride). Sem mudança de backend/worker.
+
+**Onde aterrissou.** `src/lib/submeter/step2.tsx` (✕ no box + `bgStatus`), `src/routes/submeter.tsx`
+(`docExistenteInvalidado`, `handleRemoverExistente`, `dispararDocBackground` + efeitos, guardas de
+idempotência em `handleIniciarAgente`/`handleEnviarEspecial`), `src/lib/submeter/constants.ts`
+(`validarEtapa2` + `camposMinimosDocProntos` puras), `src/lib/submeter/draft-storage.ts`
+(`docExistenteInvalidado` no snapshot). Testes: `tests/validacao-etapa2.test.ts`.
+
+**Status.** ✅ Implementado; **576 testes verdes** + `build`/`build:worker` OK. ⏳ Pendente:
+validar na **staging** (`edf400b4`) e deployar em **produção** (`674a3710`).

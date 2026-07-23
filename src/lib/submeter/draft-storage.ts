@@ -30,6 +30,10 @@ export type DraftSnapshot = {
   step: number;
   form: FormData;
   nomesExistentes: string[];
+  // O usuário removeu um arquivo já enviado → a doc anterior não pode ser reaproveitada
+  // (servidor guarda texto concatenado, não por arquivo). Persistido para o reload manter
+  // a exigência de re-upload. Ausente em rascunhos antigos → default false.
+  docExistenteInvalidado?: boolean;
   completedSteps: number[];
   chatMessages: ChatMessage[];
   chatFase: ChatFase;

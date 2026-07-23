@@ -300,6 +300,9 @@ export function Step2({
   arquivos,
   setArquivos,
   nomesExistentes,
+  onRemoverExistente,
+  docExistenteInvalidado,
+  bgStatus,
 }: {
   form: FormData;
   errors: FieldErrors;
@@ -308,6 +311,9 @@ export function Step2({
   arquivos: File[];
   setArquivos: (files: File[]) => void;
   nomesExistentes?: string[];
+  onRemoverExistente?: (nome: string) => void;
+  docExistenteInvalidado?: boolean;
+  bgStatus?: "idle" | "processando" | "pronto" | "erro";
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -640,7 +646,10 @@ export function Step2({
           </span>
         </div>
 
-        {/* Arquivos anteriores — exibidos apenas no modo edição quando ainda não há novos */}
+        {/* Arquivos anteriores — exibidos apenas quando ainda não há novos.
+            Cada item tem um ✕ para remover de verdade (some da lista e do rascunho).
+            Como o servidor guarda a documentação como um texto único (não por arquivo),
+            remover invalida a doc: exige re-subir os arquivos que se quer manter. */}
         {arquivos.length === 0 && nomesExistentes && nomesExistentes.length > 0 && (
           <div
             className="mb-3 rounded-lg p-3 text-[12px] leading-relaxed"
@@ -649,12 +658,43 @@ export function Step2({
             <span className="font-semibold" style={{ color: "#8a7d00" }}>📎 Arquivos enviados anteriormente:</span>
             <ul className="mt-1.5 space-y-0.5 pl-2" style={{ color: "#8b8b9a" }}>
               {nomesExistentes.map((n) => (
-                <li key={n} className="truncate">· {n}</li>
+                <li key={n} className="group flex items-center justify-between gap-2">
+                  <span className="min-w-0 flex-1 truncate">· {n}</span>
+                  {onRemoverExistente && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoverExistente(n)}
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#dc2626]"
+                      style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", border: "none" }}
+                      title={`Remover ${n}`}
+                      aria-label={`Remover ${n}`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
-            <p className="mt-2" style={{ color: "#8b8b9a" }}>
-              O texto já extraído será reaproveitado. Suba novos arquivos abaixo para substituir ou adicionar.
-            </p>
+            {docExistenteInvalidado ? (
+              <p className="mt-2 font-semibold" style={{ color: "#8a7d00" }}>
+                ⚠️ Você removeu arquivo(s). Suba novamente os arquivos que deseja manter — a documentação
+                será regerada a partir deles.
+              </p>
+            ) : (
+              <p className="mt-2" style={{ color: "#8b8b9a" }}>
+                O texto já extraído será reaproveitado. Suba novos arquivos abaixo para substituir ou adicionar.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Aviso quando TODOS os anteriores foram removidos (box acima some) — orienta o re-upload */}
+        {arquivos.length === 0 && docExistenteInvalidado && (!nomesExistentes || nomesExistentes.length === 0) && (
+          <div
+            className="mb-3 rounded-lg p-3 text-[12px] font-semibold leading-relaxed"
+            style={{ background: "rgba(215,219,0,0.07)", border: "1px solid rgba(215,219,0,0.3)", color: "#8a7d00" }}
+          >
+            ⚠️ Documentação anterior descartada. Suba os arquivos que deseja documentar para continuar.
           </div>
         )}
 
@@ -753,6 +793,33 @@ export function Step2({
         </div>
 
         <FieldError message={errors.documentacao} />
+
+        {/* Status do processamento em segundo plano — não bloqueia a navegação.
+            A doc começa a ser analisada assim que os arquivos são subidos, para a
+            Etapa 3 abrir sem espera. Estado nunca só por cor: ícone + rótulo. */}
+        {arquivos.length > 0 && bgStatus && bgStatus !== "idle" && (
+          <div
+            className="mt-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+            style={
+              bgStatus === "pronto"
+                ? { background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.22)", color: "#16a34a" }
+                : bgStatus === "erro"
+                  ? { background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.15)", color: "var(--go-blue)" }
+                  : { background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.15)", color: "var(--go-blue)" }
+            }
+            role="status"
+            aria-live="polite"
+          >
+            {bgStatus === "processando" && (
+              <>
+                <span className="go-spinner" style={{ width: 12, height: 12 }} />
+                Analisando a documentação em segundo plano — pode continuar preenchendo.
+              </>
+            )}
+            {bgStatus === "pronto" && <>✅ Documentação analisada — pode avançar sem espera.</>}
+            {bgStatus === "erro" && <>ℹ️ A análise vai rodar quando você avançar para o chat.</>}
+          </div>
+        )}
 
         {/* Árvore de arquivos */}
         {arquivos.length > 0 && (
