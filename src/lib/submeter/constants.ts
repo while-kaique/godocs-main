@@ -133,6 +133,59 @@ export function validarEtapa1(
   return errs;
 }
 
+// Validação pura da Etapa 2 (Dados do Projeto). Retorna o mapa de erros por campo.
+// `hojeISO` é injetado (não usa `Date` interno) para ser testável. Regra de arquivos:
+// - sem arquivos novos E sem existentes → exige selecionar ao menos um;
+// - sem arquivos novos MAS existentes invalidados (o usuário removeu algum já enviado) →
+//   exige re-upload, porque o servidor guarda a doc como texto único concatenado (não por
+//   arquivo) e não há como regenerar de um subconjunto. Função pura — testável.
+export function validarEtapa2(
+  form: FormData,
+  opts: {
+    arquivosCount: number;
+    nomesExistentesCount: number;
+    docExistenteInvalidado: boolean;
+    hojeISO: string;
+  },
+): FieldErrors {
+  const errs: FieldErrors = {};
+  const { arquivosCount, nomesExistentesCount, docExistenteInvalidado, hojeISO } = opts;
+
+  if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
+    errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
+  if (!form.dataCriacao) {
+    errs.dataCriacao = "Informe a data de criação";
+  } else if (form.dataCriacao < "2024-01-01") {
+    errs.dataCriacao = "A data mínima é 01/01/2024";
+  } else if (form.dataCriacao > hojeISO) {
+    errs.dataCriacao = "A data não pode ser no futuro";
+  }
+  if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
+    errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
+  if (!form.usaAiProxy) errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
+
+  if (arquivosCount === 0 && nomesExistentesCount === 0) {
+    errs.documentacao = "Selecione pelo menos um arquivo do projeto";
+  } else if (arquivosCount === 0 && docExistenteInvalidado) {
+    errs.documentacao =
+      "Você removeu arquivo(s) enviado(s) antes. Suba novamente os arquivos que deseja manter para regenerar a documentação.";
+  }
+
+  return errs;
+}
+
+// Campos mínimos para começar a gerar a documentação em segundo plano (fase de doc):
+// Etapa 1 concluída (escopo) + nome ≥3 + contexto ≥60 + AI Proxy respondido. Não inclui
+// tipo/especial (Etapa 2.5), que não afetam a fase de doc. Função pura — testável.
+export function camposMinimosDocProntos(form: FormData): boolean {
+  return (
+    !!form.escopo &&
+    form.nomeProjeto.trim().length >= 3 &&
+    form.descricaoBreve.trim().length >= 60 &&
+    !!form.usaAiProxy
+  );
+}
+
 export interface FormData {
   escopo: "interno" | "externo" | "";
   prodStatus: "sim" | "dev" | "idle" | "";

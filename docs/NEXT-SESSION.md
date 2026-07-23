@@ -16,9 +16,7 @@ _(Antes desta: 2026-07-17 (código) — Fase 1 implementada, branch `feat/edicao
 staging + prod; bloqueado pelo pré-req das colunas "Participantes 2"/"Contribuidor" no Sheets, ver abaixo.)_
 
 ## Plano ativo
-**Nenhum plano `aprovado` pendente de código.** A Fase 2 (`ocultar-valor-meus-projetos`) está
-**executada** (T1–T3, branch `feat/ocultar-valor-meus-projetos`) — falta só o **deploy** (T4, não é
-`/ggsd:plan`/`/ggsd:code`). Próxima frente de código nova → `/ggsd:plan` primeiro.
+**→ [docs/plans/remover-arquivo-e-doc-background.md](plans/remover-arquivo-e-doc-background.md)** · Status: ✅ aprovado (Luis, 2026-07-22)
 
 _(Executados recentes: [ocultar-valor-meus-projetos](plans/ocultar-valor-meus-projetos.md) ✅ executado
 2026-07-17 (falta T4 staging→prod); [edicao-etapa1-participantes](plans/edicao-etapa1-participantes.md)

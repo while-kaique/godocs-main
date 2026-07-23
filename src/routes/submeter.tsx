@@ -9,6 +9,7 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 import {
   filesToDocs, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, validarEtapa1,
+  validarEtapa2, camposMinimosDocProntos,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -323,6 +324,10 @@ export function SubmeterPageContent({
     !!editProjetoId || !!resumeDraftId || hasLocalDraft(),
   );
   const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
+  // O usuário removeu um arquivo já enviado (box "Arquivos enviados anteriormente").
+  // Como o servidor guarda a doc como texto único concatenado (não por arquivo), não dá
+  // para regenerar de um subconjunto → exige re-upload dos que quer manter (Opção A).
+  const [docExistenteInvalidado, setDocExistenteInvalidado] = useState(false);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [submitted, setSubmitted] = useState(false);
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -352,6 +357,20 @@ export function SubmeterPageContent({
   // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
   const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
+  // F2 — processamento da doc em segundo plano (só submissão nova). Ao subir arquivos na
+  // Etapa 2, disparamos iniciar-submissao em background para a Etapa 3 abrir sem espera.
+  const [bgStatus, setBgStatus] = useState<"idle" | "processando" | "pronto" | "erro">("idle");
+  // Assinatura (arquivos+meta) já processada/em processamento — evita disparo duplicado.
+  const bgSigRef = useRef<string>("");
+  // Promise do disparo em voo — os botões da Etapa 2.5 aguardam antes de navegar.
+  // Resolve com o projeto_id criado (sucesso) ou null (falha → cai no fluxo síncrono).
+  const bgPromiseRef = useRef<Promise<string | null> | null>(null);
+  const bgInFlightRef = useRef(false);
+  const bgDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sinaliza que o background já criou o projeto e a Etapa 2.5 (não-especial) deve delegar
+  // ao fluxo de re-entrada (handleContinuarAgente) no PRÓXIMO render — com projetoId fresco
+  // no estado, evitando ler o valor stale logo após o setProjetoId do background.
+  const [pendingContinuar, setPendingContinuar] = useState(false);
   // Projeto especial: envio direto (cria projeto + submete), pulando o agente.
   const [enviandoEspecial, setEnviandoEspecial] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
@@ -613,6 +632,7 @@ export function SubmeterPageContent({
     // para nunca ler `undefined[email]`.
     setForm({ ...d.form, participantesPapeis: d.form.participantesPapeis ?? {} });
     setNomesExistentes(d.nomesExistentes ?? []);
+    setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
     setProjetoId(d.projetoId);
     setCompletedSteps(new Set(d.completedSteps ?? [1, 2]));
     setChatMessages(d.chatMessages ?? []);
@@ -848,6 +868,7 @@ export function SubmeterPageContent({
       step,
       form,
       nomesExistentes,
+      docExistenteInvalidado,
       completedSteps: [...completedSteps],
       chatMessages,
       chatFase,
@@ -867,6 +888,7 @@ export function SubmeterPageContent({
     }, editProjetoId ? editDraftKey(editProjetoId) : undefined);
   }, [
     editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
+    docExistenteInvalidado,
     completedSteps, chatMessages, chatFase, chatComplete, agentTipos, agentMeta,
     agentArquivosSig, approvedDocPreview, approvedSavingPreview, approvedReceitaPreview,
     savingSubmitted, receitaSubmitted, formDraft, respEspecial, showSavingForm, showReceitaForm,
@@ -894,6 +916,19 @@ export function SubmeterPageContent({
 
   const setError = useCallback((key: string, msg: string) => {
     setErrors((prev) => ({ ...prev, [key]: msg }));
+  }, []);
+
+  // Remove de verdade um arquivo do box "Arquivos enviados anteriormente": some da lista
+  // (e do rascunho persistido) e marca a doc como invalidada — o "Continuar" vai exigir
+  // re-upload dos arquivos que se quer manter (o servidor não regenera subconjunto).
+  const handleRemoverExistente = useCallback((nome: string) => {
+    setNomesExistentes((prev) => prev.filter((n) => n !== nome));
+    setDocExistenteInvalidado(true);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.documentacao;
+      return next;
+    });
   }, []);
 
   const clearError = useCallback((key: string) => {
@@ -948,30 +983,120 @@ export function SubmeterPageContent({
       .join("|");
   }, [arquivos]);
 
+  /* ── F2: processamento da documentação em segundo plano ──────────────────────
+     Ao subir arquivos na Etapa 2 (submissão nova), disparamos iniciar-submissao em
+     background para a Etapa 3 abrir sem espera. Roda a fase de DOC (sem tipo/especial,
+     definidos na Etapa 2.5 — o backend não precisa deles p/ documentar). Cria o rascunho
+     UMA vez; depois disso o botão da 2.5 vira "Continuar com Agente" (handleContinuarAgente),
+     que sincroniza tipos/meta e navega. Resolve com o projeto_id (ou null em falha). */
+  const dispararDocBackground = useCallback((): Promise<string | null> => {
+    const sig = `${arquivosSig()}::${JSON.stringify(snapshotMeta())}`;
+    bgSigRef.current = sig;
+    bgInFlightRef.current = true;
+    setBgStatus("processando");
+    const run: Promise<string | null> = (async () => {
+      try {
+        const docs = await filesToDocs(arquivos);
+        const ferramentaEnviada = form.escopo === "externo"
+          ? form.servicoExterno.trim()
+          : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
+            ? `Outros: ${form.ferramentaOutra.trim()}`
+            : form.ferramenta;
+        const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
+          "/api/chat/iniciar-submissao",
+          {
+            responsavel_nome: form.nome.trim(),
+            responsavel_email: form.email.trim(),
+            ferramenta: ferramentaEnviada,
+            escopo: form.escopo as "interno" | "externo",
+            servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
+            membros: form.participantes,
+            membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
+            nome_projeto: form.nomeProjeto.trim(),
+            data_criacao: form.dataCriacao,
+            // SEM tipos/especial: a fase de doc não depende deles; a Etapa 2.5 os define
+            // depois (handleContinuarAgente sincroniza; especial converte via metadados).
+            descricao_breve: form.descricaoBreve.trim() || undefined,
+            usa_ai_proxy: form.usaAiProxy || undefined,
+            docs,
+          },
+        );
+        setProjetoId(result.projeto_id);
+        setNomesExistentes(arquivos.map((f) => f.name));
+        setAgentTipos([]);
+        setAgentMeta(snapshotMeta());
+        setAgentArquivosSig(arquivosSig());
+        setChatMessages([{
+          role: "assistant",
+          content: result.response.content,
+          options: result.response.options ?? undefined,
+          isComplete: result.response.isComplete,
+          isPreview: result.response.isPreview,
+          fase: result.response.fase,
+        }]);
+        setChatFase(result.response.fase ?? "doc");
+        if (result.response.isComplete) setChatComplete(true);
+        setDocExistenteInvalidado(false);
+        setBgStatus("pronto");
+        return result.projeto_id;
+      } catch (e) {
+        console.warn("[submeter] processamento em background falhou (seguirá no Continuar):", e);
+        bgSigRef.current = ""; // libera novo disparo (e o fluxo síncrono cria normalmente)
+        setBgStatus("erro");
+        return null;
+      } finally {
+        bgInFlightRef.current = false;
+      }
+    })();
+    bgPromiseRef.current = run;
+    return run;
+  }, [arquivos, form, arquivosSig, snapshotMeta]);
+
+  // Dispara o background (debounced) quando os arquivos e os campos mínimos estão prontos.
+  // Só submissão NOVA (!editProjetoId) e só enquanto o projeto não existe (cria 1 vez).
+  useEffect(() => {
+    if (editProjetoId || projetoId) return;
+    if (arquivos.length === 0) return;
+    if (docExistenteInvalidado) return;
+    if (!camposMinimosDocProntos(form)) return;
+    if (bgInFlightRef.current) return;
+    const charsEstimados = arquivos.reduce((a, f) => a + f.size, 0) + form.descricaoBreve.length;
+    if (charsEstimados > TOKEN_BLOCK_CHARS) return;
+    const sig = `${arquivosSig()}::${JSON.stringify(snapshotMeta())}`;
+    if (bgSigRef.current === sig) return;
+    if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current);
+    bgDebounceRef.current = setTimeout(() => { void dispararDocBackground(); }, 800);
+    return () => { if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current); };
+  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground]);
+
+  // Após o background criar o projeto, a Etapa 2.5 (não-especial) delega ao fluxo de
+  // re-entrada num render com projetoId JÁ no estado (evita ler o valor stale).
+  // handleContinuarAgente é redefinida a cada render (não memoizada); incluí-la nas deps
+  // faria o efeito rodar todo render à toa — o guard já garante disparo único.
+  useEffect(() => {
+    if (pendingContinuar && projetoId && !continuando) {
+      setPendingContinuar(false);
+      void handleContinuarAgente();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingContinuar, projetoId, continuando]);
+
   /* ── Validation ── */
   function validateStep(n: number): boolean {
     // Etapa 1 (Envio): validação pura extraída. Em edição, relaxa os campos de
     // projeto legado (escopo/status/ferramenta) mas mantém identidade + participantes/
     // papéis (D2/RF-103); submissão nova segue com a validação cheia (RF-106).
-    const errs: FieldErrors = n === 1 ? validarEtapa1(form, { modoEdicao: !!editProjetoId }) : {};
+    let errs: FieldErrors = n === 1 ? validarEtapa1(form, { modoEdicao: !!editProjetoId }) : {};
 
     if (n === 2) {
-      // O tipo de projeto (saving/receita/especial) passou para a Etapa 2.5.
-      if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
-        errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
-      if (!form.dataCriacao) {
-        errs.dataCriacao = "Informe a data de criação";
-      } else if (form.dataCriacao < "2024-01-01") {
-        errs.dataCriacao = "A data mínima é 01/01/2024";
-      } else if (form.dataCriacao > new Date().toISOString().split("T")[0]) {
-        errs.dataCriacao = "A data não pode ser no futuro";
-      }
-      if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
-        errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
-      if (!form.usaAiProxy)
-        errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
-      if (arquivos.length === 0 && nomesExistentes.length === 0)
-        errs.documentacao = "Selecione pelo menos um arquivo do projeto";
+      // O tipo de projeto (saving/receita/especial) passou para a Etapa 2.5. Validação
+      // pura extraída (constants.ts): campos + regra de arquivos/existentes/invalidado.
+      errs = validarEtapa2(form, {
+        arquivosCount: arquivos.length,
+        nomesExistentesCount: nomesExistentes.length,
+        docExistenteInvalidado,
+        hojeISO: new Date().toISOString().split("T")[0],
+      });
     }
 
     setErrors(errs);
@@ -1075,6 +1200,18 @@ export function SubmeterPageContent({
       return;
     }
 
+    // F2: o background já criou (ou está criando) o projeto → NÃO recria (evita duplicado).
+    // Aguarda o disparo em voo; se produziu um projeto, delega ao fluxo de re-entrada
+    // (handleContinuarAgente via pendingContinuar, com projetoId fresco no estado).
+    if (bgPromiseRef.current) {
+      setIniciandoChat(true);
+      let bgId: string | null = null;
+      try { bgId = await bgPromiseRef.current; } catch { bgId = null; }
+      setIniciandoChat(false);
+      if (bgId) { setPendingContinuar(true); return; }
+      // background falhou (bgId null) → segue a criação síncrona normal abaixo.
+    }
+
     if (arquivos.length === 0) return;
 
     // Trava do orçamento de tokens: bloqueia se o conteúdo estimado estourar.
@@ -1132,6 +1269,7 @@ export function SubmeterPageContent({
       // reload, mas os nomes são persistidos no rascunho e exibidos na etapa 2 ao
       // retomar (a pessoa vê o que já enviou, sem precisar reenviar para visualizar).
       setNomesExistentes(arquivos.map((f) => f.name));
+      setDocExistenteInvalidado(false);
       setAgentTipos(form.especial ? [] : form.tipoProjeto);
       setAgentMeta(snapshotMeta());
       setAgentArquivosSig(arquivosSig());
@@ -1208,6 +1346,37 @@ export function SubmeterPageContent({
         });
 
         await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId, modo: "edicao" });
+        queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
+        setSubmitted(true);
+        return;
+      }
+
+      // F2: o background criou um projeto NÃO-especial para ESTA submissão nova. Em vez de
+      // recriar (duplicado), CONVERTE em especial via atualizar-metadados (o backend monta
+      // buildDocEspecial sem IA e marca chat_completo — ver ramo `ehEspecial`) e submete.
+      // Aguarda o disparo em voo para pegar o id real (evita ler projetoId stale).
+      let bgIdEspecial: string | null = null;
+      if (bgPromiseRef.current) {
+        try { bgIdEspecial = await bgPromiseRef.current; } catch { bgIdEspecial = null; }
+      }
+      const existenteId = bgIdEspecial ?? projetoId;
+      if (existenteId) {
+        await apiFetchComRetry("/api/chat/atualizar-metadados", {
+          projeto_id: existenteId,
+          nome_projeto: form.nomeProjeto.trim(),
+          ferramenta: ferramentaEnviada,
+          membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
+          data_criacao: form.dataCriacao,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
+          contexto_especial: form.contextoEspecial.trim(),
+          // A doc especial é montada da descrição + contexto (sem IA); não precisa reenviar
+          // arquivos. reset_doc garante a substituição da doc gerada pelo background.
+          especial: true,
+          reset_doc: true,
+        });
+        await apiFetch("/api/chat/submeter-validacao", { projeto_id: existenteId });
         queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
         setSubmitted(true);
         return;
@@ -1312,6 +1481,7 @@ export function SubmeterPageContent({
       setAgentMeta(meta);
       setAgentArquivosSig(arquivosSig());
       setAgentTipos(form.tipoProjeto);
+      setDocExistenteInvalidado(false);
       setShowTransition(false);
       setShowSavingForm(false);
       setShowReceitaForm(false);
@@ -2222,6 +2392,9 @@ export function SubmeterPageContent({
                   arquivos={arquivos}
                   setArquivos={setArquivos}
                   nomesExistentes={nomesExistentes}
+                  onRemoverExistente={handleRemoverExistente}
+                  docExistenteInvalidado={docExistenteInvalidado}
+                  bgStatus={bgStatus}
                 />
               </StepAnimation>
             )}
