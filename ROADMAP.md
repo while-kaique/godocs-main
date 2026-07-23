@@ -6,8 +6,8 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 2 concluída ✅ e deployada (staging+prod, 2026-07-17). Nenhuma fase de código em aberto.
-**Próximo:** abrir PR da branch `feat/ocultar-valor-meus-projetos` p/ o `main` (após `git pull origin main` + rebuild, regra 10) — ou próxima frente via `/ggsd:plan`
+**Fase atual:** correção `aceitar-zip-submissao` — código ✅ (branch `fix/aceitar-zip-submissao`), pendente deploy staging→prod.
+**Próximo:** deploy no STAGING (`edf400b4`) → validar upload de `.zip` no navegador → PROD (`674a3710`) → PR (regra 13).
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
