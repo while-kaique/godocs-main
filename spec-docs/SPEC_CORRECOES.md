@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-07-22 — Upload de `.zip` barrado como "extensão não suportada" na Etapa 2 (caso Rafael Lobo)
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/aceitar-zip-submissao` · **Plano:** [docs/plans/aceitar-zip-submissao.md](../docs/plans/aceitar-zip-submissao.md)
+
+**Sintoma:** ao anexar arquivos na Etapa 2 (documentação), o usuário recebia "extensão não suportada" e o
+arquivo era descartado. Caso real: **Rafael Lobo** (`rafael@gocase.com`). Ele contornou subindo um arquivo
+solto (`page.tsx`), mas o instinto natural — compactar a pasta do projeto num `.zip` — não funcionava.
+
+**Causa-raiz:** o gate de upload aceita só uma **whitelist fixa** de extensões (`ACCEPTED_DOC_EXT` em
+`src/lib/submeter/constants.ts`) e `.zip` não estava nela. A rejeição é **100% client-side** (`step2.tsx`,
+função `addFiles`, ~linha 419) — o arquivo é descartado no navegador **antes** de qualquer chamada ao
+servidor, então **não há trilha nos logs de prod** (confirmado: os logs só mostraram a submissão bem-sucedida
+com `page.tsx`; o feedback de rejeição era um `toast.info` cinza, fácil de não perceber).
+
+**Fix (client-side, sem tocar no servidor — decisão de produto: aceitar .zip):**
+- **Novo módulo `src/lib/submeter/unzip.ts`** — descompacta `.zip` no navegador com **`fflate`** (async, não
+  trava a UI). `expandirZips(File[])` expande cada `.zip` em seus arquivos internos; funções puras `ehZip`,
+  `entradaZipVira` (descarta diretórios, vazios, `.DS_Store`, `__MACOSX/`). Cada arquivo interno vira um `File`
+  com `webkitRelativePath` = caminho interno. Teto `MAX_ZIP_MB = 50` por `.zip`.
+- **Hook em `addFiles` (`step2.tsx`)** — antes do loop de análise, se há `.zip` na entrada, chama
+  `expandirZips` e substitui a lista. **Todo o resto do pipeline é reusado sem mudança:** o filtro de
+  `node_modules`/pastas de dev, a whitelist de extensão (arquivos internos inválidos seguem rejeitados), o
+  descarte de vazios, o dedup e o orçamento de tokens (~200k) valem naturalmente sobre os arquivos extraídos.
+- **`accept` do input + texto de ajuda** — `.zip` adicionado ao seletor e à linha "Aceita: …".
+- **Por que no cliente e não no worker:** `addFiles` é o funil único; expandir ali reaproveita todos os
+  filtros e o gate de tokens que já existem client-side. No worker exigiria reimplementá-los e o gate de
+  tokens ficaria cego (zip = 1 blob → risco de estourar o corte de 200k em silêncio).
+
+**Onde aterrissou:** `src/lib/submeter/unzip.ts` (novo), `src/lib/submeter/step2.tsx` (hook + accept + texto),
+`tests/unzip.test.ts` (novo, 15 casos), `package.json` (+`fflate ^0.8.3`, zero-deps). Sem `build:worker`
+(mudança client-only). Suíte: 577 verdes.
+
+**Fronteiras (fora do escopo):** não amplia a whitelist para imagens/planilhas/`.rar`/`.7z`; sem nested-zip
+(zip dentro de zip é tratado como arquivo `.zip` interno e ignorado); sem mudança server-side.
+
+---
+
 ## 2026-07-03 — Autocomplete de participantes não mostrava a lista da TeamGuide + sem feedback de carregando
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/autocomplete-participantes-lento`

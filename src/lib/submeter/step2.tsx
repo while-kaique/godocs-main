@@ -10,6 +10,7 @@ import {
   TOKEN_BLOCK_CHARS,
 } from "./constants";
 import type { FormData, FieldErrors } from "./constants";
+import { expandirZips, ehZip, MAX_ZIP_MB } from "./unzip";
 import {
   SectionTitle,
   FormGroup,
@@ -387,7 +388,26 @@ export function Step2({
   const yieldToBrowser = () => new Promise<void>((r) => setTimeout(r, 0));
 
   async function addFiles(incoming: FileList | File[]) {
-    const list = Array.from(incoming);
+    let list = Array.from(incoming);
+
+    // Descompacta .zip no CLIENTE: cada arquivo interno vira um File e passa pelo
+    // mesmo pipeline abaixo (ignora node_modules/pastas de dev, whitelist de extensão,
+    // vazios, dedup, orçamento de tokens). Assim, subir "projeto.zip" funciona.
+    if (list.some((f) => ehZip(f.name))) {
+      setProcessing({ fase: "Descompactando .zip", current: 0, total: list.length });
+      await yieldToBrowser();
+      const { files, zipsExpandidos, arquivosExtraidos, grandes, falharam } = await expandirZips(list);
+      list = files;
+      if (zipsExpandidos > 0) {
+        toast.info(`${zipsExpandidos} arquivo(s) .zip descompactado(s) — ${arquivosExtraidos} arquivo(s) extraído(s) para análise`);
+      }
+      if (grandes.length > 0) {
+        toast.error(`.zip acima de ${MAX_ZIP_MB}MB ignorado(s): ${grandes.join(", ")}`);
+      }
+      if (falharam.length > 0) {
+        toast.error(`Não consegui abrir o(s) .zip: ${falharam.join(", ")} (arquivo corrompido?)`);
+      }
+    }
 
     // Mostra o spinner antes de qualquer trabalho pesado (browser pinta a tela)
     setProcessing({ fase: "Analisando arquivos", current: 0, total: list.length });
@@ -639,7 +659,7 @@ export function Step2({
           Pode enviar a pasta inteira do projeto (com subpastas) ou os documentos.
           <br />
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
-            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · máx. {MAX_FILE_MB}MB por arquivo
+            Aceita: código ({ACCEPTED_CODE_EXT.join(" ")}) · docs (PDF, DOCX, TXT, MD) · <strong>.zip</strong> (descompactado automaticamente) · máx. {MAX_FILE_MB}MB por arquivo
           </span>
           <span className="mt-1 block" style={{ color: "#8b8b9a" }}>
             💡 Sem limite de arquivos — <strong>node_modules</strong>, <strong>.git</strong>, <strong>dist</strong> e afins são ignorados. O único limite é ~200k tokens de conteúdo (a barra abaixo avisa se passar).
@@ -719,7 +739,7 @@ export function Step2({
             ref={fileInputRef}
             type="file"
             multiple
-            accept={ACCEPTED_DOC_EXT.join(",")}
+            accept={[...ACCEPTED_DOC_EXT, ".zip"].join(",")}
             className="hidden"
             onChange={(e) => {
               const files = e.target.files;
