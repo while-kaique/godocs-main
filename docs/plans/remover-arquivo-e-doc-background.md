@@ -1,6 +1,6 @@
 # Plano — Remover arquivo enviado + processar doc em background (Etapa 2 do /submeter)
 
-**Status:** ✅ aprovado (Luis, 2026-07-22)
+**Status:** 🟡 executado — código+testes+staging (falta validação humana na staging → prod → PR) (2026-07-22)
 
 **Objetivo:** Na Etapa 2 do formulário de submissão, (1) permitir remover de verdade um arquivo já
 enviado (hoje "fica na memória") e (2) começar a processar a documentação em segundo plano assim que os

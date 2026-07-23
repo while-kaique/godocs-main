@@ -16,7 +16,12 @@ _(Antes desta: 2026-07-17 (código) — Fase 1 implementada, branch `feat/edicao
 staging + prod; bloqueado pelo pré-req das colunas "Participantes 2"/"Contribuidor" no Sheets, ver abaixo.)_
 
 ## Plano ativo
-**→ [docs/plans/remover-arquivo-e-doc-background.md](plans/remover-arquivo-e-doc-background.md)** · Status: ✅ aprovado (Luis, 2026-07-22)
+**Nenhum plano `aprovado` pendente de código.** `remover-arquivo-e-doc-background` está
+**🟡 executado** (F1 remover arquivo enviado + F2 doc em background — branch
+`feat/remover-arquivo-e-doc-background`, commit `31990b4`, 576 testes verdes, **staging
+`edf400b4` deployada**). **Próximo passo:** validação humana na staging
+(https://godocs-staging.devgogroup.com/) → deploy **prod `674a3710`** → `git pull`/rebase
+`origin/main` + rebuild → **PR**. Não é `/ggsd:code`/`/ggsd:plan` (é validação + deploy + PR).
 
 _(Executados recentes: [ocultar-valor-meus-projetos](plans/ocultar-valor-meus-projetos.md) ✅ executado
 2026-07-17 (falta T4 staging→prod); [edicao-etapa1-participantes](plans/edicao-etapa1-participantes.md)
