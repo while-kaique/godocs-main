@@ -710,11 +710,20 @@ da árvore via o nome "voltar" no box amarelo, sem saída (o arquivo "ficava na 
 **F2 — Processar a documentação em segundo plano ao subir arquivos.** Antes, toda a extração +
 geração da doc (`iniciar-submissao`: `extractTextFromMultipleFiles` + extrator + orquestrador,
 tudo LLM) só rodava no clique "Analisar com Agente" (Etapa 2→3), com o usuário esperando.
-- **Disparo:** um efeito com **debounce (~800ms)** chama `iniciar-submissao` em background quando
-  `!editProjetoId && arquivos.length>0 && !projetoId && camposMinimosDocProntos(form)` (nome≥3,
-  contexto≥60, AI Proxy respondido — Etapa 1 já concluída) e a assinatura (arquivos+meta) mudou.
-  Dedup por `bgSigRef` + `bgInFlightRef`; cria o rascunho **uma vez**. Status discreto no `step2`
-  (`bgStatus`: processando/pronto/erro) — **não** bloqueia a navegação.
+- **Disparo (gatilho ENXUTO — "adiantar o background"):** um efeito com **debounce (~800ms)** chama
+  `iniciar-submissao` em background quando `!editProjetoId && arquivos.length>0 && !projetoId &&
+  camposMinimosDocProntos(form)` e a assinatura (arquivos+meta) mudou. ⚠️ `camposMinimosDocProntos`
+  exige **só escopo + nome (Etapa 1)** — deliberadamente **NÃO** espera `descricaoBreve≥60` nem
+  `usaAiProxy` (campos da Etapa 2 que a pessoa digita/responde por último). Com o gatilho no fim da
+  Etapa 2, o background não tinha folga para terminar antes do clique em avançar e a pessoa esperava
+  o processamento inteiro num spinner (feedback do Luis, 22/07). Enxuto, o disparo acontece assim que
+  o **arquivo é anexado**, dando ao processamento o tempo em que ela preenche o resto. O texto do
+  documento é o input principal do extrator; a descrição é sinal secundário e chega ao servidor via
+  `atualizar-metadados` ao avançar. **Trade-off aceito:** o extrator pode rodar antes de a descrição
+  final estar pronta (qualidade de pré-preenchimento levemente menor), e quem avançar em ~2-3s ainda
+  pode pegar o fim do processamento no spinner (mitigado, não eliminado). Dedup por `bgSigRef` +
+  `bgInFlightRef`; cria o rascunho **uma vez**. Status discreto no `step2` (`bgStatus`:
+  processando/pronto/erro) — **não** bloqueia a navegação.
 - **Sem tipo/especial:** o background roda a **fase de doc** SEM `tipos`/`especial` (definidos na
   Etapa 2.5, não afetam a documentação). O backend reusa `iniciar-submissao` **sem alteração**.
 - **Idempotência da Etapa 2.5 (evita projeto DUPLICADO):** quando o background já criou o projeto,

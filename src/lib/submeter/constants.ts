@@ -175,15 +175,18 @@ export function validarEtapa2(
 }
 
 // Campos mínimos para começar a gerar a documentação em segundo plano (fase de doc):
-// Etapa 1 concluída (escopo) + nome ≥3 + contexto ≥60 + AI Proxy respondido. Não inclui
+// só o que o servidor PRECISA para criar o projeto e extrair o texto do documento —
+// Etapa 1 concluída (escopo) + nome ≥3. Deliberadamente NÃO exige `descricaoBreve` nem
+// `usaAiProxy` (ambos da Etapa 2): são os campos que a pessoa digita/responde por último e,
+// se estivessem no gatilho, o background só arrancaria no fim da Etapa 2 — sem folga para
+// terminar antes do clique em avançar (a demora que a pessoa sentia ao ir para o agente).
+// Com o gatilho enxuto, o disparo acontece assim que o arquivo é anexado (o efeito checa
+// `arquivos.length > 0` à parte), dando ao processamento o tempo em que a pessoa preenche o
+// resto. O texto do documento é o input principal do extrator; a descrição é sinal
+// secundário e chega ao servidor via `atualizar-metadados` ao avançar. Não inclui
 // tipo/especial (Etapa 2.5), que não afetam a fase de doc. Função pura — testável.
 export function camposMinimosDocProntos(form: FormData): boolean {
-  return (
-    !!form.escopo &&
-    form.nomeProjeto.trim().length >= 3 &&
-    form.descricaoBreve.trim().length >= 60 &&
-    !!form.usaAiProxy
-  );
+  return !!form.escopo && form.nomeProjeto.trim().length >= 3;
 }
 
 export interface FormData {

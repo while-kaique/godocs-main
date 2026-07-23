@@ -104,7 +104,7 @@ describe('validarEtapa2 — regra de arquivos (F1)', () => {
   });
 });
 
-describe('camposMinimosDocProntos — gatilho do background (F2)', () => {
+describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)', () => {
   it('form completo → pronto', () => {
     expect(camposMinimosDocProntos(baseForm())).toBe(true);
   });
@@ -117,11 +117,14 @@ describe('camposMinimosDocProntos — gatilho do background (F2)', () => {
     expect(camposMinimosDocProntos(baseForm({ nomeProjeto: 'ab' }))).toBe(false);
   });
 
-  it('contexto curto → não pronto', () => {
-    expect(camposMinimosDocProntos(baseForm({ descricaoBreve: 'curto' }))).toBe(false);
+  // "Adiantar o background": o gatilho deliberadamente NÃO espera pelos campos da Etapa 2
+  // (descrição e AI Proxy), que a pessoa digita/responde por último — assim o processamento
+  // arranca assim que o arquivo é anexado, com folga para terminar antes do clique em avançar.
+  it('descrição ainda curta, mas Etapa 1 pronta → PRONTO (não segura o disparo)', () => {
+    expect(camposMinimosDocProntos(baseForm({ descricaoBreve: 'curto' }))).toBe(true);
   });
 
-  it('AI Proxy não respondido → não pronto', () => {
-    expect(camposMinimosDocProntos(baseForm({ usaAiProxy: '' }))).toBe(false);
+  it('AI Proxy ainda não respondido, mas Etapa 1 pronta → PRONTO (não segura o disparo)', () => {
+    expect(camposMinimosDocProntos(baseForm({ usaAiProxy: '' }))).toBe(true);
   });
 });

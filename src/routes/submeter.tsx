@@ -1052,7 +1052,12 @@ export function SubmeterPageContent({
     return run;
   }, [arquivos, form, arquivosSig, snapshotMeta]);
 
-  // Dispara o background (debounced) quando os arquivos e os campos mínimos estão prontos.
+  // Dispara o background (debounced) assim que HÁ arquivo anexado e a Etapa 1 está pronta
+  // (`camposMinimosDocProntos` = escopo + nome; NÃO espera descrição/AI Proxy da Etapa 2 —
+  // ver a função). Arrancar cedo dá ao processamento a folga em que a pessoa preenche o
+  // resto da Etapa 2, para terminar antes do clique em avançar. `snapshotMeta()` entra na
+  // `sig`, mas, como o efeito sai cedo quando `projetoId` já existe, o disparo é único: os
+  // campos digitados depois seguem via `atualizar-metadados` ao avançar (handleContinuarAgente).
   // Só submissão NOVA (!editProjetoId) e só enquanto o projeto não existe (cria 1 vez).
   useEffect(() => {
     if (editProjetoId || projetoId) return;
