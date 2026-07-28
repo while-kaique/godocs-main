@@ -48,8 +48,28 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**→ [docs/plans/loadings-dashboard-admin.md](plans/loadings-dashboard-admin.md)** · Status: ✅ **aprovado**
-(Luis, 2026-07-28) — pronto para `/ggsd:code`
+**→ [docs/plans/perguntas-agente-recorrencia-evidencia.md](plans/perguntas-agente-recorrencia-evidencia.md)** ·
+Status: ✅ **aprovado (Luis, 2026-07-28)** — T1 executado; pronto para `/ggsd:code` (ordem: **A1** taxonomia de
+impacto + anti-loop no juiz do preview · **A2** materialidade nos gates · **T2** régua do Rafa em paralelo ·
+**T4** fluxo de coleta). **Barrar submissão está FORA em definitivo.**
+
+_[loadings-dashboard-admin](plans/loadings-dashboard-admin.md) saiu de ativo: **✅ executado** (commit
+`3b93c65` em `feat/loadings-dashboard-admin`), resta só o **T6 operacional** — staging → prod → PR._
+
+### Sessão de código 2026-07-28 (loadings do /dashboard) — o que ficou
+Codados T1–T5: **SWR** em `lerPlanilha` (cache vencido volta na hora + revalidação em `runBackground`,
+single-flight preservado, `revalidando` no payload) · **auth em `sessionStorage`** (`src/lib/auth-cache.ts`,
+TTL 5 min, revalidação em background) · **prefetch** da planilha em paralelo ao `/api/auth/me`
+(`src/lib/dashboard-prefetch.ts`) · **skeleton** (`components/dashboard/skeleton-linhas.tsx`) com filas
+visíveis e chip "Atualizando em segundo plano". **658 testes verdes** (+38), `worker.js` recomitado, spec
+**D9/D10** + `CLAUDE.md` (gotchas 3 e 7).
+O revisor de qualidade em contexto fresco pegou **1 ALTA já corrigida**: a correção da linha no cache era
+apagada pela revalidação em voo → o status recém-decidido voltava atrás por até 60 s. Corrigido com patch
+por projeto reaplicado nas leituras iniciadas antes da escrita + guarda de época/sequência; `?refresh=1`
+não herda leitura em voo; `STALE_MAX_MS` (10× TTL) volta a bloquear se o Sheets falhar; prefetch com teto
+de 15 s. Conformidade: `diverge-baixa` (nada fora das Fronteiras).
+⚠️ **`CLAUDE.md` está em ~45k chars** (limite recomendado 40k, já estava 44,2k no `main`) — vale uma sessão
+de enxugamento.
 
 Melhorar os **loadings do `/dashboard`** (pedido do Luis em 2026-07-28, escopo escolhido por ele): SWR no
 servidor · cache de auth em `sessionStorage` · leitura em paralelo com o auth · skeleton. **Cache em SQLite
@@ -75,98 +95,13 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Codar o plano [`loadings-dashboard-admin`](plans/loadings-dashboard-admin.md) com `/ggsd:code`** — worktree
-novo sobre a branch **`feat/dashboard-admin-sheets`** (regra 8; os arquivos tocados não existem no `main`
-ainda). Ordem: T1 (SWR no servidor) → T2 (auth em `sessionStorage`) → T3 (paralelizar) → T4 (skeleton, com a
-skill `frontend-design` antes) → T5 (testes + `build:worker`) → T6 (spec + staging → prod).
+**T6 do plano dos loadings (operacional, não é código):** na branch `feat/loadings-dashboard-admin`
+(worktree `.claude/worktrees/loadings-dashboard-admin`, commit `3b93c65`) → `git fetch origin` + incorporar
+`origin/main` → `npm run test && npm run build && npm run build:worker` → deploy no **STAGING `edf400b4`**
+(`scripts/deploy-godeploy.sh`, lista de assets derivada do `dist/` real) → **validar no navegador** (reload não
+deve mostrar "Verificando permissões"; skeleton em vez de spinner; as duas chamadas em paralelo na aba Network;
+mudar um status e conferir que ele NÃO volta atrás depois de ~1 min) → **PROD `674a3710`** → PR (regras 13 e 10).
+Depois disso, a frente das **perguntas do agente** (plano ativo) com `/ggsd:code`.
 
-⚠️ **Existem DOIS planos aprovados** — este e o `perguntas-agente-recorrencia-evidencia` (frente paralela, T1
-já executado). Não são bloqueantes entre si; a escolha de qual atacar primeiro é do Luis. Se for o de
-perguntas, a ordem recomendada lá é **A1** (taxonomia de impacto + anti-loop no juiz do preview) e **A2**
-(materialidade nos gates), com **T2** (régua dos 3 critérios) em paralelo para ele levar ao Rafa.
-
-⚠️ **`E2E_COOKIE` renovado no `.env` nesta sessão — expira 30/07/2026 22:41 UTC.** Os 24 JSONs de conversa
-estão no scratchpad da sessão (volátil); refazer a coleta depois disso exige cookie novo.
-
-🐞 **Pendência colateral achada (fora do escopo da frente):** `GET /api/admin/investigador/projetos` está
-**quebrado em prod** — HTTP 503 Cloudflare `1102` (worker sem recursos), porque
-`investigador.functions.ts:225-226` chama `getChatMessages` dentro do loop para **todos os 605 projetos**
-(N+1). A aba de projetos do Investigador não abre. Mesmo gênero do bug de jul/2026 na aba Edições, mas por
-CPU/tempo em vez do teto de RPC. Merece plano próprio.
-
-### ✅ RESOLVIDO em 2026-07-28 — o que era "próximo passo ANTERIOR"
-A branch `feat/dashboard-admin-sheets` **foi deployada no staging `edf400b4`, validada pelo Luis no navegador
-e depois em prod `674a3710`** (mesmos artefatos/hashes), e enviada ao remoto (`990250e`). O MCP do Godeploy
-voltou a estar conectado. **Só falta abrir o PR:** o `gh pr create` é recusado pelo **classificador de
-permissões local** (não é falta de permissão no GitHub) — corpo pronto, conta `gh` já em `LuisEduardo100`
-(memória `gh-pr-conta-writer`). Se o `main` andar antes do PR, **rebasear e rebuildar** (regras 10 e 9 — os
-hashes do Vite mudam a cada build).
-
-**✅ ATUALIZAÇÃO (fim da sessão):** o **PR [#214](https://github.com/while-kaique/godocs-main/pull/214) FOI
-ABERTO** (2.426 adições / 22 arquivos, `MERGEABLE`/`CLEAN`, repo **sem CI**). A branch de docs
-`docs/plano-loadings-dashboard-admin` (`5ad1116`) também foi enviada. **Falta MERGEAR o #214** — o
-`gh pr merge` é recusado pelo **classificador de permissões local** (não é o GitHub; a conta
-`LuisEduardo100` tem WRITE e o `create` passou). Mergear pelo botão do GitHub ou o Luis roda
-`! gh pr merge 214 --repo while-kaique/godocs-main --merge`. ⚠️ **Enquanto não mergear, o `main` fica ATRÁS
-da prod** — um deploy feito a partir do `main` reverteria a tela de triagem.
-⚠️ Conta `gh` ficou em `LuisEduardo100`; restaurar com `gh auth switch --user rpaiagogroup`.
-
-⚠️ **O `docs/NEXT-SESSION.md` DENTRO da branch `feat/dashboard-admin-sheets` continua desatualizado** (ainda
-descreve deploy e admin como bloqueados). O gate de plano recusou editá-lo por estar fora da allowlist
-`docs/**` da raiz — corrigir num handoff rodado de dentro daquele worktree.
-
-### Roteiro de validação da staging (já executado — mantido como referência)
-1. `/dashboard` **não mostra nenhum rascunho** e o status de cada linha é o da coluna "Status" (vazio → "—").
-2. Buscar por parte do nome do projeto **e** por autor — filtra na tecla, ignora acento; `/` foca, `Esc` limpa.
-3. Filas de status (Pendente · Em validação · Reenvio pendente · Aprovado · Reprovado · Descontinuado ·
-   Sem status) com contagem coerente; paginação e ordenação por Projeto/Autor/Ganho/Enviado.
-4. Clicar numa linha → ficha com descrição e **todas** as colunas preenchidas; memoriais nos `<details>`.
-5. Mudar o status + escrever um motivo → confere na aba **STAGING**: "Status" e "Observações" gravados,
-   linha **não duplicada**, e **"Atualizado Em" INTACTA** (é o guard mais importante — aquela coluna é o
-   carimbo do sistema que regulariza legado).
-
-### ✅ Desbloqueado em 2026-07-28 (era "Tentado e BLOQUEADO")
-1. **Deploy no staging + prod:** ✅ feito (ver acima). O MCP do Godeploy voltou.
-2. **Admin para `bruno.bezerra@gocase.com` em prod E staging:** ✅ feito via secret **`ADMIN_EMAILS`** nos dois
-   apps (`674a3710` e `edf400b4`) — secrets **rotacionam sem redeploy**. Depois, `luiza.rios@gocase.com`
-   também recebeu acesso, **só em prod** (foi o pedido). Lista atual do secret = as 5 antigas + Bruno + Luiza;
-   `.env` local sincronizado. ⚠️ **O valor do secret não pode ser lido de volta** pelo MCP, então a lista foi
-   reconstruída a partir do `.env` — se alguém tiver adicionado um e-mail direto no secret sem passar pelo
-   `.env`, ele foi perdido. ⚠️ **Admin não é granular:** libera TODAS as telas do grupo `_authenticated`
-   (dashboard, investigador, email-legados, areas, usuarios, testes) + override de edição de projeto alheio.
-3. **Achado (frente NOVA, a planejar):** **não existe tela para gerenciar admins** — os endpoints
-   `/api/admin/admins` (GET/POST/remove) existem mas **nenhum componente os consome**, e o link
-   **"Configurações"** da sidebar (`_authenticated/route.tsx`) aponta para **`/configuracoes`, que NÃO tem
-   arquivo de rota** (link morto). Hoje só dá para virar admin via `ADMIN_EMAILS`. Rodar `/ggsd:plan` antes
-   de codar (tela de admins e/ou consertar o link).
-
-### ⚠️ Pendência que precisa de decisão do Luis (bloqueia o uso em prod, não o deploy)
-**Os valores do dropdown da coluna "Status".** A tela grava `Pendente` · `Em validação` · `Aprovado` ·
-`Reenvio Pendente` · `Reprovado` · `Descontinuado` (constante `STATUS_GRAVAVEIS`, um lugar só, em
-`src/lib/dashboard-admin.functions.ts`). **"Reprovado" é palpite** — o código só conhecia `rejeitado`.
-Escrever um texto fora do dropdown funciona, mas deixa a célula marcada como inválida para quem abre a
-planilha. Confirmar os valores reais e ajustar a constante (+ `STATUS_TRIAGEM` no front e
-`STATUS_FROM_LABEL` no sync reverso, se mudar).
-
-### Pendência paralela (Fase 1, não é código) — colunas de papel no Sheets
-⚠️ Criar **"Participantes 2"** e **"Contribuidor"** no cabeçalho das abas **STAGING** e **GoDocs (prod)** —
-sem elas a IDA ignora com aviso e os papéis Participante/Contribuidor nunca chegam à fonte da verdade
-("Coautor" já grava). Bloqueia o T5 de `edicao-etapa1-participantes`.
-
-## Como retomar
-1. Ler este handoff + `docs/plans/dashboard-admin-sheets.md` + `spec-docs/SPEC_DASHBOARD_ADMIN.md` (D1–D8).
-2. No `CLAUDE.md`: seção **"Dashboard do admin = triagem"** (os 6 gotchas que não podem regredir) +
-   "Ambiente de Staging" (regra 13).
-3. Entrar no worktree `.claude/worktrees/dashboard-admin-sheets` (branch `feat/dashboard-admin-sheets`).
-
-**Notas de ambiente desta sessão:**
-- ⚠️ **`fflate` estava no `package.json` do main mas NÃO instalado** no `node_modules` da raiz → `npm run
-  build` quebrava em `src/lib/submeter/unzip.ts` e 15 testes de unzip nem rodavam. Resolvido com
-  `npm install` na raiz (605 → 620 testes).
-- ⚠️ **Gate GGSD × worktree:** o `plan-gate.sh` só trata como `docs/**` os caminhos da **raiz** — `docs/`
-  dentro do worktree conta como código. Escrever o plano na **raiz** destrava as edições **dentro** do
-  worktree (regra 8 preservada); editar `docs/` do worktree exige `cp` via Bash.
-- ⚠️ **`CLAUDE.md` está em 44,2 KB** (já estava em 43,9 KB antes desta sessão), acima do teto de 40 KB que
-  o Claude Code avisa. Vale um passe de enxugamento (mover detalhe para `docs/`/`spec-docs/`).
-
-**Perguntas em aberto:** ver `docs/open-questions.md` (nenhuma).
+⚠️ **PR #214 (dashboard de triagem) foi MERGEADO** no `main` (`e878bc1`) nesta sessão; o worktree
+`dashboard-admin-sheets` e a branch local foram removidos.

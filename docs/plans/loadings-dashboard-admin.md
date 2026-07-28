@@ -1,5 +1,29 @@
 # Plano — Loadings do /dashboard do admin
-**Status:** ✅ aprovado (Luis, 2026-07-28)
+**Status:** ✅ executado (2026-07-28) — T1–T5 na branch `feat/loadings-dashboard-admin` (commit `3b93c65`); **falta o T6 operacional**: staging `edf400b4` → validar no navegador → prod `674a3710` → PR (regras 13 e 10)
+
+> **Nota de implementação (desvio consciente do T2):** os helpers `lerAuthCache`/`gravarAuthCache`/
+> `limparAuthCache` foram para um **módulo novo `src/lib/auth-cache.ts`** em vez de ficarem em
+> `_authenticated/route.tsx` — o arquivo de rota não é importável em Vitest sem harness de React/router, e o
+> plano exige teste do helper puro. O `route.tsx` só consome.
+>
+> **Nota de base:** o PR #214 (`feat/dashboard-admin-sheets`) foi **mergeado no `main`** (`e878bc1`) antes
+> desta sessão, então o worktree saiu do **`main`**, como a "Nota operacional" previa.
+>
+> **Sem harness de render** (o projeto não tem `@testing-library`): o smoke do T4 é feito sobre o FONTE em
+> `tests/dashboard-loadings-ui.test.ts` (skeleton usado, spinner removido, estado anunciado em texto,
+> `aria-hidden` + `motion-reduce`, fiação do prefetch/cache de auth). Docs/spec (T6) atualizados:
+> `spec-docs/SPEC_DASHBOARD_ADMIN.md` (D9/D10 + fora-de-escopo) e `CLAUDE.md` (gotchas 3 e 7).
+>
+> **Revisores de contexto fresco:** conformidade = `diverge-baixa` (nada fora das Fronteiras); qualidade =
+> `bloqueio` com 1 achado **ALTA** — a correção da linha no cache era apagada pela revalidação em voo, então
+> o status recém-gravado voltava atrás por até 60 s. **Tratado** (patch reaplicado + guarda de época/sequência
+> + `refresh` não herda leitura em voo + `STALE_MAX_MS` + teto de idade no prefetch), com 4 testes novos em
+> `tests/dashboard-swr-escrita.test.ts`. **658 testes verdes** (620 → +38).
+>
+> **Sugestões NÃO aplicadas (registradas de propósito):** revalidação do auth que descobre acesso revogado
+> não invalida a tela já aberta (só a próxima navegação; as chamadas de dados já dão 403) · `readAllRows` sem
+> `AbortSignal`/timeout (pré-existente) · sem `idade_ms`/`erro_revalidacao` no payload para a tela dizer a
+> idade real do dado velho.
 
 **Objetivo:** Tirar a espera percebida do `/dashboard`: ninguém mais bloqueia em "Verificando permissões" nem
 em "Lendo a planilha…" por causa de cache vencido ou de fila indiana entre auth e leitura — mantendo a
