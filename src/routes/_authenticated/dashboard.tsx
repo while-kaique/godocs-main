@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
+import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
 import { STATUS_TRIAGEM, pilulaDe, corDaRegua } from '@/components/dashboard/status-triagem';
 import {
   filtrarPorTermo,
@@ -37,6 +38,7 @@ import {
   type Direcao,
 } from '@/components/dashboard/tabela-utils';
 import { apiFetch } from '@/lib/api-client';
+import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
@@ -51,6 +53,7 @@ type Listagem = {
   total: number;
   lidoEm: string;
   doCache: boolean;
+  revalidando: boolean;
 };
 
 const TAMANHOS = [25, 50, 100] as const;
@@ -87,9 +90,14 @@ function Dashboard() {
     else setCarregando(true);
     setErro(null);
     try {
-      const d = await apiFetch<Listagem>(
-        `/api/admin/dashboard/projetos${refresh ? '?refresh=1' : ''}`,
-      );
+      // O `beforeLoad` do layout admin já disparou esta leitura em paralelo com o auth
+      // (ver `dashboard-prefetch.ts`). Se a promise existe, consome; senão, pede agora.
+      const prefetchado = refresh ? null : consumirPrefetchDashboard<Listagem>();
+      const d =
+        (prefetchado ? await prefetchado : null) ??
+        (await apiFetch<Listagem>(
+          `/api/admin/dashboard/projetos${refresh ? '?refresh=1' : ''}`,
+        ));
       setDados(d);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível ler a planilha.');
@@ -208,6 +216,17 @@ function Dashboard() {
               })}
             </span>
           )}
+          {/* SWR: a lista já está na tela e a planilha está sendo relida no servidor.
+              Ícone + texto (nunca só cor) e sem bloquear nada. */}
+          {dados?.revalidando && !atualizando && (
+            <span
+              className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+              aria-live="polite"
+            >
+              <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+              Atualizando em segundo plano
+            </span>
+          )}
           <Button variant="outline" onClick={() => carregar(true)} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             Atualizar
@@ -232,13 +251,15 @@ function Dashboard() {
           ativa={filtro === 'todos'}
           cor="var(--go-blue)"
           rotulo="Todos"
-          contagem={projetos.length}
+          contagem={carregando ? null : projetos.length}
           onClick={() => setFiltro('todos')}
         />
         {STATUS_TRIAGEM.map((s) => {
           const n = contagemPilula[s.chave] ?? 0;
-          // Fila vazia só aparece se estiver selecionada — a faixa fica legível.
-          if (n === 0 && filtro !== s.chave) return null;
+          // Enquanto carrega, TODAS as filas aparecem com contagem "—": a faixa já tem a
+          // silhueta final e o clique funciona (o filtro é local). Depois, fila vazia só
+          // aparece se estiver selecionada — a faixa fica legível.
+          if (!carregando && n === 0 && filtro !== s.chave) return null;
           const Icone = s.icon;
           return (
             <PilulaFiltro
@@ -246,7 +267,7 @@ function Dashboard() {
               ativa={filtro === s.chave}
               cor={s.cor}
               rotulo={s.curto}
-              contagem={n}
+              contagem={carregando ? null : n}
               icone={<Icone className="h-3.5 w-3.5" />}
               onClick={() => setFiltro(s.chave)}
             />
@@ -281,10 +302,20 @@ function Dashboard() {
             </button>
           )}
         </div>
+        {/* Também é o anúncio de carregamento: as linhas-fantasma são `aria-hidden`,
+            então quem usa leitor de tela ouve o estado por aqui. */}
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          <strong className="font-semibold tabular-nums text-foreground">{filtrados.length}</strong>{' '}
-          {filtrados.length === 1 ? 'projeto' : 'projetos'}
-          {filtrados.length !== projetos.length && ` de ${projetos.length}`}
+          {carregando ? (
+            'Lendo a planilha…'
+          ) : (
+            <>
+              <strong className="font-semibold tabular-nums text-foreground">
+                {filtrados.length}
+              </strong>{' '}
+              {filtrados.length === 1 ? 'projeto' : 'projetos'}
+              {filtrados.length !== projetos.length && ` de ${projetos.length}`}
+            </>
+          )}
         </p>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           Por página
@@ -341,12 +372,7 @@ function Dashboard() {
             </thead>
             <tbody>
               {carregando ? (
-                <tr>
-                  <td colSpan={8} className="p-10 text-center text-sm text-muted-foreground">
-                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                    Lendo a planilha…
-                  </td>
-                </tr>
+                <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-10 text-center text-sm text-muted-foreground">
@@ -501,7 +527,8 @@ function PilulaFiltro({
   ativa: boolean;
   cor: string;
   rotulo: string;
-  contagem: number;
+  /** `null` = ainda carregando: mostra "—" em vez de um 0 que parece fila vazia. */
+  contagem: number | null;
   icone?: React.ReactNode;
   onClick: () => void;
 }) {
@@ -527,7 +554,7 @@ function PilulaFiltro({
           color: ativa ? '#fff' : 'var(--muted-foreground)',
         }}
       >
-        {contagem}
+        {contagem ?? '—'}
       </span>
     </button>
   );
