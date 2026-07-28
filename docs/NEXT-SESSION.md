@@ -102,6 +102,15 @@ permissões local** (não é falta de permissão no GitHub) — corpo pronto, co
 (memória `gh-pr-conta-writer`). Se o `main` andar antes do PR, **rebasear e rebuildar** (regras 10 e 9 — os
 hashes do Vite mudam a cada build).
 
+**✅ ATUALIZAÇÃO (fim da sessão):** o **PR [#214](https://github.com/while-kaique/godocs-main/pull/214) FOI
+ABERTO** (2.426 adições / 22 arquivos, `MERGEABLE`/`CLEAN`, repo **sem CI**). A branch de docs
+`docs/plano-loadings-dashboard-admin` (`5ad1116`) também foi enviada. **Falta MERGEAR o #214** — o
+`gh pr merge` é recusado pelo **classificador de permissões local** (não é o GitHub; a conta
+`LuisEduardo100` tem WRITE e o `create` passou). Mergear pelo botão do GitHub ou o Luis roda
+`! gh pr merge 214 --repo while-kaique/godocs-main --merge`. ⚠️ **Enquanto não mergear, o `main` fica ATRÁS
+da prod** — um deploy feito a partir do `main` reverteria a tela de triagem.
+⚠️ Conta `gh` ficou em `LuisEduardo100`; restaurar com `gh auth switch --user rpaiagogroup`.
+
 ⚠️ **O `docs/NEXT-SESSION.md` DENTRO da branch `feat/dashboard-admin-sheets` continua desatualizado** (ainda
 descreve deploy e admin como bloqueados). O gate de plano recusou editá-lo por estar fora da allowlist
 `docs/**` da raiz — corrigir num handoff rodado de dentro daquele worktree.
