@@ -31,6 +31,22 @@ extra** → 4), com o juiz do preview mandando recusar _"mesmo que o usuário di
 anti-loop**; **A2** — os gates **ignoram materialidade** (`897df986` economiza **0,05h/mês** e recebe o gate
 das 220h/fim de semana), contra a regra que o próprio prompt já tem. **Nenhum código alterado.**
 
+**Última sessão (2026-07-28, operação + planejamento):** fechou o **T8 do dashboard** e abriu a frente dos
+**loadings**. (a) `feat/dashboard-admin-sheets` deployada no **staging `edf400b4`**, validada no navegador pelo
+Luis e depois em **prod `674a3710`** — mesmos artefatos/hashes nos dois; branch no remoto (`990250e`); **o PR
+não foi aberto** porque o `gh pr create` é bloqueado pelo classificador de permissões local (corpo pronto,
+conta `gh` em `LuisEduardo100`). (b) **Admin concedido via secret `ADMIN_EMAILS`** (rotaciona sem redeploy):
+`bruno.bezerra@gocase.com` em prod **e** staging, `luiza.rios@gocase.com` em prod; `.env` sincronizado.
+⚠️ Registrado que **admin não é granular** — dá acesso a TODAS as telas do grupo `_authenticated`
+(dashboard, investigador, email-legados, areas, usuarios, testes) + override de edição. (c) O relato "**só 1
+descontinuado**" **não era bug**: a tela lê 100% do Sheets. Medido via Service Account — aba **GoDocs**
+478 Aprovado / 40 Pendente / 15 Reenvio Pendente / **11 Descontinuado** (544 linhas com ID); aba **STAGING**
+287 / 32 / 23 / **1** (343 linhas), ou seja a staging é uma **cópia antiga**. De quebra: a coluna "Status"
+está em **posições diferentes** nas duas abas (índice 29 vs 30) e o mapeamento por nome absorveu.
+⚠️ **Dado novo para a decisão do dropdown:** `Reprovado` e `Em validação` **não existem em nenhuma das 887
+linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente · Descontinuado. (d) Planejada e
+**aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
+
 ## Plano ativo
 **→ [docs/plans/loadings-dashboard-admin.md](plans/loadings-dashboard-admin.md)** · Status: ✅ **aprovado**
 (Luis, 2026-07-28) — pronto para `/ggsd:code`
@@ -59,11 +75,15 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Decidir com o Luis entre (a) aprovar o plano `perguntas-agente-recorrencia-evidencia` como está e (b)
-escrever primeiro a proposta de régua dos 3 critérios (T2) com os casos reais medidos, para ele levar ao
-Rafa.** Recomendação: **(b)** — a régua sai forte agora que há caso real de aprovado/reprovado, e ela é
-pré-requisito de qualquer código que encoste nos critérios. **A1 e A2 não dependem da régua** e podem virar
-a primeira fatia de código assim que o plano for aprovado.
+**Codar o plano [`loadings-dashboard-admin`](plans/loadings-dashboard-admin.md) com `/ggsd:code`** — worktree
+novo sobre a branch **`feat/dashboard-admin-sheets`** (regra 8; os arquivos tocados não existem no `main`
+ainda). Ordem: T1 (SWR no servidor) → T2 (auth em `sessionStorage`) → T3 (paralelizar) → T4 (skeleton, com a
+skill `frontend-design` antes) → T5 (testes + `build:worker`) → T6 (spec + staging → prod).
+
+⚠️ **Existem DOIS planos aprovados** — este e o `perguntas-agente-recorrencia-evidencia` (frente paralela, T1
+já executado). Não são bloqueantes entre si; a escolha de qual atacar primeiro é do Luis. Se for o de
+perguntas, a ordem recomendada lá é **A1** (taxonomia de impacto + anti-loop no juiz do preview) e **A2**
+(materialidade nos gates), com **T2** (régua dos 3 critérios) em paralelo para ele levar ao Rafa.
 
 ⚠️ **`E2E_COOKIE` renovado no `.env` nesta sessão — expira 30/07/2026 22:41 UTC.** Os 24 JSONs de conversa
 estão no scratchpad da sessão (volátil); refazer a coleta depois disso exige cookie novo.
@@ -74,16 +94,19 @@ estão no scratchpad da sessão (volátil); refazer a coleta depois disso exige 
 (N+1). A aba de projetos do Investigador não abre. Mesmo gênero do bug de jul/2026 na aba Edições, mas por
 CPU/tempo em vez do teto de RPC. Merece plano próprio.
 
-### Próximo passo ANTERIOR (segue valendo, outra branch)
-**Deployar a branch `feat/dashboard-admin-sheets` no STAGING (`edf400b4`) e validar o novo `/dashboard` no
-navegador** — só então prod (`674a3710`) e PR. ⚠️ **O MCP do Godeploy NÃO estava conectado na sessão**, por
-isso o deploy não foi feito: reconectar o MCP (`getUploadToken` → `scripts/deploy-godeploy.sh
-"<UPLOAD_TOKEN>"` → `updateApp` no `edf400b4`) ou o Luis roda o script. Artefatos já buildados na branch
-(`dist/` + `worker.js` do commit `5ef927a`); se houver merge com `origin/main` antes do PR, **rebuildar**
-(regra 10) — os hashes do Vite mudam a cada build (regra 9). PR como `LuisEduardo100` (conta WRITER — ver
-memória `gh-pr-conta-writer`).
+### ✅ RESOLVIDO em 2026-07-28 — o que era "próximo passo ANTERIOR"
+A branch `feat/dashboard-admin-sheets` **foi deployada no staging `edf400b4`, validada pelo Luis no navegador
+e depois em prod `674a3710`** (mesmos artefatos/hashes), e enviada ao remoto (`990250e`). O MCP do Godeploy
+voltou a estar conectado. **Só falta abrir o PR:** o `gh pr create` é recusado pelo **classificador de
+permissões local** (não é falta de permissão no GitHub) — corpo pronto, conta `gh` já em `LuisEduardo100`
+(memória `gh-pr-conta-writer`). Se o `main` andar antes do PR, **rebasear e rebuildar** (regras 10 e 9 — os
+hashes do Vite mudam a cada build).
 
-### O que validar na staging (roteiro curto)
+⚠️ **O `docs/NEXT-SESSION.md` DENTRO da branch `feat/dashboard-admin-sheets` continua desatualizado** (ainda
+descreve deploy e admin como bloqueados). O gate de plano recusou editá-lo por estar fora da allowlist
+`docs/**` da raiz — corrigir num handoff rodado de dentro daquele worktree.
+
+### Roteiro de validação da staging (já executado — mantido como referência)
 1. `/dashboard` **não mostra nenhum rascunho** e o status de cada linha é o da coluna "Status" (vazio → "—").
 2. Buscar por parte do nome do projeto **e** por autor — filtra na tecla, ignora acento; `/` foca, `Esc` limpa.
 3. Filas de status (Pendente · Em validação · Reenvio pendente · Aprovado · Reprovado · Descontinuado ·
@@ -93,18 +116,15 @@ memória `gh-pr-conta-writer`).
    linha **não duplicada**, e **"Atualizado Em" INTACTA** (é o guard mais importante — aquela coluna é o
    carimbo do sistema que regulariza legado).
 
-### ⛔ Tentado nesta sessão e BLOQUEADO (2026-07-28, 2ª rodada)
-1. **Deploy no staging:** o Luis pediu; **não foi possível** — o **MCP do Godeploy não está conectado** na
-   sessão (`getUploadToken`/`updateApp` inexistentes; conferido 2×). Artefatos prontos na branch. Reconectar
-   o MCP e rodar o bloco do "Próximo passo" acima.
-2. **Dar admin a `bruno.bezerra@gocase.com` em prod E staging:** o Luis pediu; **não foi possível**. Tentei
-   `GET /api/admin/admins` em prod com o `E2E_COOKIE` do `.env` → **HTTP 302** (cookie expirado, o edge
-   redireciona pro OAuth). **Caminho recomendado (resolve os 2 ambientes, sem tela):** acrescentar o e-mail
-   ao secret **`ADMIN_EMAILS`** nos apps `674a3710` **e** `edf400b4` →
-   `joao.gabriel@gocase.com,joaovictor.esteves@gocase.com,kaique.breno@gocase.com,luciano.cavalcante@gocase.com,bruno.bezerra@gocase.com`.
-   Alternativa (só onde houver sessão de admin, sem redeploy): `POST /api/admin/admins`
-   `{"email":"bruno.bezerra@gocase.com","nome":"Bruno Bezerra"}` — pelo console do navegador logado, ou
-   renovar o `E2E_COOKIE` no `.env` e o Claude dispara.
+### ✅ Desbloqueado em 2026-07-28 (era "Tentado e BLOQUEADO")
+1. **Deploy no staging + prod:** ✅ feito (ver acima). O MCP do Godeploy voltou.
+2. **Admin para `bruno.bezerra@gocase.com` em prod E staging:** ✅ feito via secret **`ADMIN_EMAILS`** nos dois
+   apps (`674a3710` e `edf400b4`) — secrets **rotacionam sem redeploy**. Depois, `luiza.rios@gocase.com`
+   também recebeu acesso, **só em prod** (foi o pedido). Lista atual do secret = as 5 antigas + Bruno + Luiza;
+   `.env` local sincronizado. ⚠️ **O valor do secret não pode ser lido de volta** pelo MCP, então a lista foi
+   reconstruída a partir do `.env` — se alguém tiver adicionado um e-mail direto no secret sem passar pelo
+   `.env`, ele foi perdido. ⚠️ **Admin não é granular:** libera TODAS as telas do grupo `_authenticated`
+   (dashboard, investigador, email-legados, areas, usuarios, testes) + override de edição de projeto alheio.
 3. **Achado (frente NOVA, a planejar):** **não existe tela para gerenciar admins** — os endpoints
    `/api/admin/admins` (GET/POST/remove) existem mas **nenhum componente os consome**, e o link
    **"Configurações"** da sidebar (`_authenticated/route.tsx`) aponta para **`/configuracoes`, que NÃO tem

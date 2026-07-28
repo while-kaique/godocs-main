@@ -6,8 +6,10 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** correção `aceitar-zip-submissao` — código ✅ (branch `fix/aceitar-zip-submissao`), pendente deploy staging→prod.
-**Próximo:** deploy no STAGING (`edf400b4`) → validar upload de `.zip` no navegador → PROD (`674a3710`) → PR (regra 13).
+**Fase atual:** Fase 4 — **loadings do `/dashboard`** (plano ✅ aprovado, código não começou). A Fase 3
+(dashboard = triagem) está em **staging + prod**, faltando só o PR. `aceitar-zip-submissao` ✅ mergeada (PR #213).
+**Próximo:** codar a Fase 4 com `/ggsd:code` (worktree sobre `feat/dashboard-admin-sheets`) — e abrir o PR da Fase 3.
+**⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
@@ -36,5 +38,45 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
+## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
+status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
+paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
+- ✅ Planejar (`docs/plans/dashboard-admin-sheets.md` — aprovado 2026-07-28; escopo escolhido pelo Luis:
+  write-back de status incluído + tabela densa).
+- ✅ Implementar (T1 backend com cache single-flight · T2 `admin_status_log` · T3 3 rotas `requireAdmin` ·
+  T4 tela reescrita · T5 `StatusBadge`/sync reverso · T6 29 testes · T7 spec+docs) — branch
+  `feat/dashboard-admin-sheets`, commit `5ef927a`, 620 testes verdes, `worker.js` recomitado.
+- ✅ **T8 (quase todo) — deploy staging (`edf400b4`) → validado no navegador pelo Luis → prod (`674a3710`)**
+  em 2026-07-28, com os MESMOS artefatos/hashes nos dois. Branch enviada ao remoto (`990250e`).
+- 🟡 **Falta só abrir o PR** — `gh pr create` foi bloqueado pelo **classificador de permissões local**
+  (não é falta de permissão no GitHub); corpo pronto, conta `gh` em `LuisEduardo100`.
+- ⬜ Confirmar os valores do **dropdown da coluna "Status"** e ajustar `STATUS_GRAVAVEIS` se preciso.
+  **Medido em 2026-07-28:** `Reprovado` e `Em validação` **não existem em nenhuma das 887 linhas** das abas
+  `GoDocs` + `STAGING`; os 4 valores reais em uso são Aprovado · Pendente · Reenvio Pendente · Descontinuado.
+  Decisão de produto do Luis.
+- **DoD:** nenhum rascunho na lista; status sempre o do Sheets; busca por projeto/autor responde na tecla;
+  filas com contagem correta; ficha mostra todas as colunas preenchidas; mudar status grava "Status"
+  (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
+  staging antes de prod.
+
+**Próximo:** abrir o PR da `feat/dashboard-admin-sheets` (staging e prod já deployados).
+
+## Fase 4 — Loadings do `/dashboard` do admin 🟡
+Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,
+mas a causa é **serialização** — o `beforeLoad` bloqueia em "Verificando permissões" e só depois o `useEffect`
+lê a planilha; o cache do servidor é in-memory sem revalidação em background, e o de auth também.
+- ✅ Planejar (`docs/plans/loadings-dashboard-admin.md` — aprovado 2026-07-28; escopo escolhido pelo Luis:
+  itens 1+2+3+4, **cache em SQLite FORA**).
+- ⬜ Implementar T1 (SWR no servidor, cobre também a ficha) · T2 (auth em `sessionStorage`) · T3 (paralelizar
+  auth × planilha) · T4 (skeleton) · T5 (testes + `build:worker`) · T6 (spec + staging → prod).
+- **DoD:** cache vencido responde na hora com revalidação em background; reload/navegação entre telas admin
+  não mostra "Verificando permissões"; as duas requisições saem em paralelo no 1º acesso; skeleton interativo
+  no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
+- **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
+
 ## Backlog
-- ⬜ (a cultivar conforme surgirem pedidos)
+- ⬜ Tela de gestão de admins (endpoints `/api/admin/admins` existem, ninguém consome; link "Configurações"
+  da sidebar aponta para `/configuracoes`, rota inexistente). Hoje só via `ADMIN_EMAILS`.
+- ⬜ 🐞 `GET /api/admin/investigador/projetos` **quebrado em prod** (503 Cloudflare 1102): N+1 em
+  `investigador.functions.ts:225-226` chama `getChatMessages` para todos os 605 projetos. Merece plano próprio.
