@@ -66,6 +66,9 @@ const STATUS_FROM_LABEL: Record<string, string> = {
   aprovado: 'aprovado',
   'reenvio pendente': 'rejeitado',
   rejeitado: 'rejeitado',
+  // Rótulo gravado pela triagem no dashboard do admin — mesmo destino interno que
+  // "rejeitado" (o CHECK do schema não tem 'reprovado').
+  reprovado: 'rejeitado',
   pendente: 'em_validacao',
   validado: 'validado',
   'em validação': 'em_validacao',

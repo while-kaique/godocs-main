@@ -948,6 +948,54 @@ export function getAjudaChamados(limit = 100) {
   );
 }
 
+// ── Auditoria da triagem (dashboard do admin) ────────────────────────────────
+
+export type AdminStatusLogRow = {
+  id: string;
+  projeto_id: string;
+  projeto_nome: string | null;
+  status_anterior: string | null;
+  status_novo: string;
+  observacoes: string | null;
+  admin_email: string;
+  created_at: string | null;
+};
+
+// Registra uma mudança de status feita no dashboard. A escrita que vale acontece no
+// Google Sheets (fonte de verdade do status); a planilha não guarda autoria, então esta
+// linha é a única resposta para "quem aprovou este projeto, quando e por quê".
+export async function insertAdminStatusLog(data: {
+  projeto_id: string;
+  projeto_nome?: string | null;
+  status_anterior?: string | null;
+  status_novo: string;
+  observacoes?: string | null;
+  admin_email: string;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO admin_status_log
+       (id, projeto_id, projeto_nome, status_anterior, status_novo, observacoes, admin_email, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [
+      generateId(),
+      data.projeto_id,
+      data.projeto_nome ?? null,
+      data.status_anterior ?? null,
+      data.status_novo,
+      data.observacoes ?? null,
+      data.admin_email,
+    ],
+  );
+}
+
+// Histórico de status de um projeto (mais recente primeiro) — exibido no detalhe.
+export function getAdminStatusLogs(projetoId: string, limit = 20) {
+  return queryAll<AdminStatusLogRow>(
+    'SELECT * FROM admin_status_log WHERE LOWER(projeto_id) = LOWER(?) ORDER BY created_at DESC LIMIT ?',
+    [projetoId, limit],
+  );
+}
+
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
 // Escopado por SEGMENTO quando `audiencia` é informada — o selo de "reenvio" não deve
 // considerar um envio de "legado" para a mesma pessoa (são campanhas distintas). Sem

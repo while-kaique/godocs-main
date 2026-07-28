@@ -226,6 +226,26 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_email ON ajuda_chamados(usuario_email);
   CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_criado ON ajuda_chamados(created_at);
+
+  -- Auditoria da triagem feita no dashboard do admin: quem mudou o "Status" de um
+  -- projeto na planilha, de → para, com que motivo e quando. A escrita acontece no
+  -- Google Sheets (fonte de verdade do status) e a planilha não guarda autoria — sem
+  -- esta tabela, "quem aprovou este projeto?" não tem resposta. Só registro: nada aqui
+  -- alimenta a UI de status, e o sync reverso não lê esta tabela.
+  -- Ver spec-docs/SPEC_DASHBOARD_ADMIN.md.
+  CREATE TABLE IF NOT EXISTS admin_status_log (
+    id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id      TEXT NOT NULL,
+    projeto_nome    TEXT,
+    status_anterior TEXT,                              -- null quando a célula estava vazia
+    status_novo     TEXT NOT NULL,
+    observacoes     TEXT,                              -- motivo gravado na coluna "Observações"
+    admin_email     TEXT NOT NULL,
+    created_at      TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_status_log_projeto ON admin_status_log(projeto_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_status_log_criado ON admin_status_log(created_at);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

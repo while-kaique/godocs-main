@@ -36,5 +36,25 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
+## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
+status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
+paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
+- ✅ Planejar (`docs/plans/dashboard-admin-sheets.md` — aprovado 2026-07-28; escopo escolhido pelo Luis:
+  write-back de status incluído + tabela densa).
+- ✅ Implementar (T1 backend com cache single-flight · T2 `admin_status_log` · T3 3 rotas `requireAdmin` ·
+  T4 tela reescrita · T5 `StatusBadge`/sync reverso · T6 29 testes · T7 spec+docs) — branch
+  `feat/dashboard-admin-sheets`, commit `5ef927a`, 620 testes verdes, `worker.js` recomitado.
+- 🟡 **T8 — deploy staging (`edf400b4`) → validar no navegador → prod (`674a3710`) → PR** (regras 13/10).
+  Bloqueio operacional: MCP do Godeploy não conectado na sessão.
+- ⬜ Confirmar os valores do **dropdown da coluna "Status"** ("Reprovado" é palpite) e ajustar
+  `STATUS_GRAVAVEIS` se preciso.
+- **DoD:** nenhum rascunho na lista; status sempre o do Sheets; busca por projeto/autor responde na tecla;
+  filas com contagem correta; ficha mostra todas as colunas preenchidas; mudar status grava "Status"
+  (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
+  staging antes de prod.
+
+**Próximo:** deployar `feat/dashboard-admin-sheets` no staging e validar o novo `/dashboard`.
+
 ## Backlog
 - ⬜ (a cultivar conforme surgirem pedidos)
