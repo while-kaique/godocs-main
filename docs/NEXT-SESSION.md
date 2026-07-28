@@ -32,10 +32,22 @@ anti-loop**; **A2** — os gates **ignoram materialidade** (`897df986` economiza
 das 220h/fim de semana), contra a regra que o próprio prompt já tem. **Nenhum código alterado.**
 
 ## Plano ativo
-**→ [docs/plans/perguntas-agente-recorrencia-evidencia.md](plans/perguntas-agente-recorrencia-evidencia.md)**
-· Status: **rascunho — NÃO aprovado** (o Luis pediu para medir antes de aprovar; a medição está feita, a
-decisão dele ficou pendente no fim da sessão). **A fase de código vai recusar executar enquanto for
-rascunho** (RF-03).
+**→ [docs/plans/loadings-dashboard-admin.md](plans/loadings-dashboard-admin.md)** · Status: ✅ **aprovado**
+(Luis, 2026-07-28) — pronto para `/ggsd:code`
+
+Melhorar os **loadings do `/dashboard`** (pedido do Luis em 2026-07-28, escopo escolhido por ele): SWR no
+servidor · cache de auth em `sessionStorage` · leitura em paralelo com o auth · skeleton. **Cache em SQLite
+ficou FORA por decisão dele** (não reintroduzir SQLite no caminho de leitura). Sai de um worktree sobre a
+branch `feat/dashboard-admin-sheets` (os arquivos não existem no `main` ainda).
+
+**⚠️ Frente PARALELA, não sobrescrita —
+[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** · Status:
+✅ **aprovado (Luis, 2026-07-28)** — T1 já executado; **pronto para `/ggsd:code`**. Escopo ampliado por ele
+no fim da sessão: além das perguntas, entra o **fluxo de coleta** (T4 — onde cada informação deve ser
+colhida: formulário × conversa × já sabido), e **barrar submissão está FORA em definitivo** (se voltar,
+exige plano próprio). Ordem de ataque: **A1** (taxonomia de impacto + anti-loop no juiz do preview) e **A2**
+(materialidade nos gates) primeiro — não dependem da régua do Rafa; **T2** (régua) em paralelo, para ele levar. Não é bloqueada por este plano nem o
+bloqueia — as duas coexistem (ADR-026). **A fase de código recusa executar qualquer plano em rascunho** (RF-03).
 
 _(Antes desta:)_ **Nenhum plano `aprovado` pendente de código.** [`dashboard-admin-sheets`](plans/dashboard-admin-sheets.md)
 está **✅ executado** (T1–T7). **Falta o T8, que não é código:** deploy no **STAGING `edf400b4`** → validar

@@ -1,11 +1,18 @@
 # Plano — Perguntas do agente: cortar redundância e coletar recorrência / contrafactual / rastreabilidade
 
-**Status:** rascunho
+**Status:** ✅ aprovado (Luis, 2026-07-28)
 
-**Objetivo:** Medir, com conversas reais, onde o agente repete pergunta e quantos turnos custa cada
-submissão; propor a régua dos 3 critérios do Rafa (recorrência · contrafactual · rastreabilidade) para
-aprovação humana; e desenhar a reescrita que embute esses 3 critérios **reduzindo** o total de perguntas.
-Esta fatia **não altera prompt nem código** — entrega diagnóstico, régua e desenho.
+**Objetivo:** Melhorar as **perguntas dos agentes** e o **fluxo de submissão/coleta** para que ele colha de
+fato a informação que importa — sem repetir pergunta e sem cansar quem preenche. Inclui: medir onde o agente
+repete (feito), propor a régua dos 3 critérios do Rafa (recorrência · contrafactual · rastreabilidade) para
+aprovação humana, e desenhar a reescrita que embute esses critérios **reduzindo** o total de perguntas,
+decidindo **onde cada informação deve ser colhida** (formulário determinístico × conversa). Esta fatia
+**não altera prompt nem código** — entrega diagnóstico, régua e desenho.
+
+> **Decisão firme do Luis (28/07/2026, reafirmada):** **barrar submissão está FORA — em definitivo, não
+> "por enquanto".** Nada nesta frente pode virar gate de elegibilidade, recusa de projeto ou filtro de
+> mérito. O trabalho é **qualidade de pergunta e de fluxo de coleta**. Se em alguma sessão futura a ideia
+> de barrar voltar, ela precisa de um plano PRÓPRIO e de decisão nova — não entra por dentro desta.
 
 ## Contexto — por que não é "gate que barra"
 
@@ -138,6 +145,22 @@ depende de régua nenhuma (é só respeitar a materialidade que o prompt já man
   _(guarda: para cada um dos 9 blocos e dos 4 gates, o desenho diz explicitamente "mantém / funde em X /
   morre porque Y" — nenhum pode ficar sem destino, e "morre" exige dizer qual caso real o originou e por que
   deixou de precisar de turno próprio)_
+
+- **T4 — Desenho do FLUXO de coleta: onde cada informação deve ser colhida** (spec, sem código).
+  Ampliação pedida pelo Luis: o problema não é só o texto da pergunta, é o **lugar** dela. Hoje a Etapa 2
+  colhe cargos/horas/custos em formulário determinístico, a fase doc colhe trigger/dependências/riscos em
+  conversa, e a fase saving **volta a perguntar frequência e volume** — e os 4 gates entram no fim, quando o
+  usuário já espera terminar (achados A2/A5). Especificar, informação por informação:
+  **(a)** o que é **objetivo e fechado** (frequência, nº de execuções, nº de pessoas, dias da semana, onde
+  verificar) → **formulário/opções**, 1 clique, sem turno de conversa e sem risco de o LLM reformular;
+  **(b)** o que é **narrativo** (a rotina, o contrafactual, o que mudou) → **conversa**, onde a pergunta
+  aberta rende; **(c)** o que **já é sabido** (do form, do extrator, do turno anterior) → **nunca vira
+  pergunta**, só confirmação embutida no preview que o usuário já aprova (é o caso da verificação de IA, A4);
+  **(d)** a **ordem** — o que precisa vir antes para não gerar retrabalho de pergunta (ex.: a jornada só
+  importa se alguma linha se aproximar do teto, então perguntar antes é desperdício em 15 de 24 casos).
+  _(guarda: cada informação da lista tem destino declarado — form / conversa / já sabido — e o desenho mostra
+  a contagem de turnos ANTES e DEPOIS por cenário, no mínimo: saving mensal simples, saving alto ≥44h,
+  contrafactual, custo evitado puro, receita e especial)_
 
 ### Critérios de aceitação
 
