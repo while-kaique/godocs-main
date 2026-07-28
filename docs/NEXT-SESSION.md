@@ -16,7 +16,13 @@ _(Antes desta: 2026-07-17 (código) — Fase 1 implementada, branch `feat/edicao
 staging + prod; bloqueado pelo pré-req das colunas "Participantes 2"/"Contribuidor" no Sheets, ver abaixo.)_
 
 ## Plano ativo
-**Nenhum plano `aprovado` pendente de código.** [`aceitar-zip-submissao`](plans/aceitar-zip-submissao.md)
+**[`dashboard-admin-sheets`](plans/dashboard-admin-sheets.md) — Status: aprovado (2026-07-28).** Dashboard do
+admin vira a tela de triagem sobre a **planilha** (hoje lê SQLite → mostra rascunho e status errado): busca
+instantânea por projeto/autor, filtro por status com contagem, paginação, overlay de detalhe com todas as
+colunas e **mudança de status gravando no Sheets** (+ auditoria `admin_status_log`). Escopo confirmado com o
+Luis (write-back incluído · tabela densa). T1–T8 no plano.
+
+_(Anterior: nenhum plano aprovado pendente.)_ [`aceitar-zip-submissao`](plans/aceitar-zip-submissao.md)
 está **executado** (código T1–T5, branch `fix/aceitar-zip-submissao`, 577 testes verdes, conformidade
 "conforme"). **Próximo passo:** deploy no STAGING (`edf400b4`) → validar upload de `.zip` no navegador →
 deploy em PROD (`674a3710`) → PR (regra 13). Nova frente de código → `/ggsd:plan` primeiro.
