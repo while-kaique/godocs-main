@@ -53,8 +53,9 @@ Status: ✅ **aprovado (Luis, 2026-07-28)** — T1 executado; pronto para `/ggsd
 impacto + anti-loop no juiz do preview · **A2** materialidade nos gates · **T2** régua do Rafa em paralelo ·
 **T4** fluxo de coleta). **Barrar submissão está FORA em definitivo.**
 
-_[loadings-dashboard-admin](plans/loadings-dashboard-admin.md) saiu de ativo: **✅ executado** (commit
-`3b93c65` em `feat/loadings-dashboard-admin`), resta só o **T6 operacional** — staging → prod → PR._
+_[loadings-dashboard-admin](plans/loadings-dashboard-admin.md) saiu de ativo: **✅ CONCLUÍDO** — T1–T5 no commit
+`3b93c65` e o **T6 fechado em 2026-07-28**: staging validada → **prod `674a3710`** → **PR #215 mergeado**
+(`main` = `ad64895`). Nada pendente nessa frente._
 
 ### Sessão de código 2026-07-28 (loadings do /dashboard) — o que ficou
 Codados T1–T5: **SWR** em `lerPlanilha` (cache vencido volta na hora + revalidação em `runBackground`,
@@ -95,13 +96,19 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**T6 do plano dos loadings (operacional, não é código):** na branch `feat/loadings-dashboard-admin`
-(worktree `.claude/worktrees/loadings-dashboard-admin`, commit `3b93c65`) → `git fetch origin` + incorporar
-`origin/main` → `npm run test && npm run build && npm run build:worker` → deploy no **STAGING `edf400b4`**
-(`scripts/deploy-godeploy.sh`, lista de assets derivada do `dist/` real) → **validar no navegador** (reload não
-deve mostrar "Verificando permissões"; skeleton em vez de spinner; as duas chamadas em paralelo na aba Network;
-mudar um status e conferir que ele NÃO volta atrás depois de ~1 min) → **PROD `674a3710`** → PR (regras 13 e 10).
-Depois disso, a frente das **perguntas do agente** (plano ativo) com `/ggsd:code`.
+**Frente das perguntas do agente** — abrir com `/ggsd:code` sobre o plano ativo
+[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md), na ordem já
+aprovada: **A1** (taxonomia de impacto — o gate da alocação precisa aceitar "menos custo", não só "mais saída"
+— + anti-loop no juiz do preview) · **A2** (materialidade nos gates) · **T2** (régua do Rafa) · **T4** (fluxo
+de coleta). **Barrar submissão está FORA em definitivo.** Worktree novo a partir do `main` (`ad64895`).
+
+✅ **T6 dos loadings encerrado em 2026-07-28:** branch já estava 0 atrás do `origin/main`; 658 testes + `build`
++ `build:worker` verdes (`worker.js` inalterado); **staging `edf400b4`** validada no navegador pelo Luis;
+**prod `674a3710`** com os mesmos artefatos (`index-D76hNGpt.js` conferido no `index.html` de prod via
+`E2E_COOKIE`); **PR #215 mergeado** → `main` = `ad64895`, espelhando prod.
+⚠️ Gotchas do deploy que custaram tempo: `scripts/deploy-godeploy.sh` recebe o **TOKEN** como 1º argumento (URL
+com `?token=` → **401**) e o `uploadId` é **single-use** (novo `getUploadToken` entre staging e prod).
+Nesta sessão `gh pr create`/`gh pr merge` **funcionaram** — o bloqueio local do classificador não se repetiu.
 
 ⚠️ **PR #214 (dashboard de triagem) foi MERGEADO** no `main` (`e878bc1`) nesta sessão; o worktree
 `dashboard-admin-sheets` e a branch local foram removidos.

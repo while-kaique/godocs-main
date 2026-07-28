@@ -1,5 +1,5 @@
 # Plano — Loadings do /dashboard do admin
-**Status:** ✅ executado (2026-07-28) — T1–T5 na branch `feat/loadings-dashboard-admin` (commit `3b93c65`); **falta o T6 operacional**: staging `edf400b4` → validar no navegador → prod `674a3710` → PR (regras 13 e 10)
+**Status:** ✅ **CONCLUÍDO (2026-07-28)** — T1–T5 na branch `feat/loadings-dashboard-admin` (commit `3b93c65`) e **T6 fechado**: staging `edf400b4` deployada e validada no navegador pelo Luis → **prod `674a3710`** com os mesmos artefatos (`index-D76hNGpt.js`) → **PR #215 mergeado** (`main` = `ad64895`). Nada pendente.
 
 > **Nota de implementação (desvio consciente do T2):** os helpers `lerAuthCache`/`gravarAuthCache`/
 > `limparAuthCache` foram para um **módulo novo `src/lib/auth-cache.ts`** em vez de ficarem em
@@ -89,9 +89,12 @@ Três agravantes:
   linha-fantasma)
 - **T5 — Testes + build** (regras 1 e 2): `npm run test` verde (620 + novos), `npm run build`,
   `npm run build:worker` e **`worker.js` recomitado** (T1 é server-side).
-- **T6 — Spec + docs + deploy** (regras 12 e 13): atualizar `spec-docs/SPEC_DASHBOARD_ADMIN.md` (nova decisão
-  de cache/SWR + o que continua proibido) e o gotcha do `CLAUDE.md` se necessário; deploy **staging
-  `edf400b4`** → validar no navegador → **prod `674a3710`** → PR.
+- **T6 — Spec + docs + deploy** (regras 12 e 13) — ✅ **feito**: `spec-docs/SPEC_DASHBOARD_ADMIN.md` (D9/D10) +
+  gotchas do `CLAUDE.md`; **staging `edf400b4`** → validada no navegador → **prod `674a3710`** → **PR #215
+  mergeado**. Gotchas da execução, para a próxima vez: `scripts/deploy-godeploy.sh` recebe o **TOKEN** como 1º
+  argumento (passar a URL com `?token=` dá **401**); o `uploadId` é **single-use** — precisa de um
+  `getUploadToken` novo entre staging e prod; e conferir asset em prod por `curl` dá **302** (OAuth do edge),
+  então use o `E2E_COOKIE` do `.env` para ler o `index.html` e comparar o hash do entry.
 
 ### Critérios de aceitação
 1. Com o cache do servidor **vencido**, a resposta de `/api/admin/dashboard/projetos` volta **imediatamente**
