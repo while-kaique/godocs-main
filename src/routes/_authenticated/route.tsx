@@ -1,19 +1,56 @@
 import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
 import type { CurrentUser } from "@/lib/auth.functions";
+import { lerAuthCache, gravarAuthCache, limparAuthCache, AUTH_CACHE_MS } from "@/lib/auth-cache";
+import { iniciarPrefetchDashboard } from "@/lib/dashboard-prefetch";
 import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search, Loader2, Mail } from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
-// Expira após 5 minutos para não ficar stale indefinidamente.
+// Dois níveis: memória (mais rápido, morre no reload) e `sessionStorage` (sobrevive ao
+// reload e à navegação, morre ao fechar o navegador — ver `lib/auth-cache.ts`). Sem o 2º
+// nível, todo F5 numa tela admin voltava para "Verificando permissões...".
+// O gate real é server-side (`requireAdmin` em toda `/api/admin/*`); aqui só se decide o
+// que a SPA pinta enquanto revalida.
 let cachedUser: CurrentUser | null = null;
 let cachedAt = 0;
-const AUTH_CACHE_MS = 5 * 60 * 1000;
+
+/** Revalida o auth em segundo plano para o cache não fixar permissão revogada. */
+function revalidarAuth() {
+  void (async () => {
+    try {
+      const r = await fetch("/api/auth/me");
+      const u: CurrentUser | null = r.ok ? ((await r.json()) as CurrentUser | null) : null;
+      if (u?.isAdmin) {
+        cachedUser = u;
+        cachedAt = Date.now();
+        gravarAuthCache(u);
+      } else {
+        cachedUser = null;
+        cachedAt = 0;
+        limparAuthCache();
+      }
+    } catch {
+      // Rede instável não deve derrubar quem já está com a tela aberta.
+    }
+  })();
+}
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async () => {
-    // Se já autenticou recentemente, usa o cache
-    if (cachedUser && Date.now() - cachedAt < AUTH_CACHE_MS) {
-      console.log("[_authenticated] usando auth cacheado:", cachedUser.email);
-      return { user: cachedUser };
+  beforeLoad: async ({ location }) => {
+    // A leitura da planilha do dashboard não depende do veredito do auth (o servidor
+    // exige admin de qualquer jeito), então começa AGORA, em paralelo — era fila indiana:
+    // esperava o auth e só então pedia os ~2 s de planilha.
+    if (location.pathname.startsWith("/dashboard")) iniciarPrefetchDashboard();
+
+    // Se já autenticou recentemente, usa o cache (memória → sessionStorage)
+    const doCache = cachedUser && Date.now() - cachedAt < AUTH_CACHE_MS ? cachedUser : null;
+    const daSessao = doCache ?? lerAuthCache<CurrentUser>();
+    if (daSessao?.isAdmin) {
+      if (!doCache) {
+        cachedUser = daSessao;
+        cachedAt = Date.now();
+      }
+      revalidarAuth();
+      return { user: daSessao };
     }
 
     console.log("[_authenticated] beforeLoad — chamando /api/auth/me...");
@@ -24,16 +61,19 @@ export const Route = createFileRoute("/_authenticated")({
     if (!user) {
       console.log("[_authenticated] user=null → redirecionando para /");
       cachedUser = null;
+      limparAuthCache();
       throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     if (!user.isAdmin) {
       console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
       cachedUser = null;
+      limparAuthCache();
       throw redirect({ to: "/", search: { acesso_negado: true } });
     }
     console.log("[_authenticated] Auth OK — admin:", user.email);
     cachedUser = user;
     cachedAt = Date.now();
+    gravarAuthCache(user);
     return { user };
   },
   pendingComponent: AuthLoadingScreen,

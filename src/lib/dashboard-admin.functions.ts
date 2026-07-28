@@ -15,12 +15,14 @@
  *   na planilha não quebra a tela (mesma garantia de `google/sheets.ts`).
  *
  * Custo: uma leitura de planilha é lenta (~1–3 s). Por isso há cache curto em memória
- * com *single-flight* (N admins carregando ao mesmo tempo = 1 leitura), e a mudança de
- * status corrige a linha no cache em vez de reler tudo.
+ * com *single-flight* (N admins carregando ao mesmo tempo = 1 leitura), **revalidação em
+ * background** quando o cache vence (ver `lerPlanilha`), e a mudança de status corrige a
+ * linha no cache em vez de reler tudo.
  */
 import { z } from 'zod';
 import { readAllRows, updateRowByProjectId, type SheetRow } from '@/lib/google/sheets';
 import { parseDataFlexivel } from '@/lib/format-date';
+import { runBackground } from '@/lib/background';
 import { insertAdminStatusLog, getAdminStatusLogs } from '@/integrations/db/client.server';
 
 // ─── Status ──────────────────────────────────────────────────────────────────
@@ -133,6 +135,8 @@ export type ListagemDashboard = {
   total: number;
   lidoEm: string; // ISO — quando a planilha foi lida (o cache pode servir leitura anterior)
   doCache: boolean;
+  /** Dado servido do cache enquanto uma releitura acontece em background (SWR). */
+  revalidando: boolean;
 };
 
 export type DetalheDashboard = {
@@ -152,41 +156,130 @@ export type DetalheDashboard = {
 // ─── Cache com single-flight ─────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 60_000;
+/**
+ * Teto de idade do dado velho. Enquanto o Sheets falha, a revalidação não repõe nada e o
+ * cache continua servindo — passado esse teto é melhor voltar a BLOQUEAR (e propagar o
+ * erro) do que deixar a triagem decidir status sobre uma planilha de horas atrás.
+ */
+const STALE_MAX_MS = 10 * CACHE_TTL_MS;
 
 type Cache = { rows: SheetRow[]; lidoEm: number };
 let cache: Cache | null = null;
 let leituraEmCurso: Promise<Cache> | null = null;
+/** Incrementado por `invalidarCacheDashboard()`: leitura em voo de uma era anterior não instala. */
+let epoca = 0;
+/** Sequência das leituras: impede uma leitura mais VELHA sobrescrever o resultado de outra mais nova. */
+let seqLeitura = 0;
+let seqInstalada = 0;
 
 /**
- * Lê a planilha respeitando o cache. `refresh` força a releitura (botão "Atualizar").
- * Enquanto uma leitura está em curso, chamadas concorrentes esperam a MESMA promise —
- * três admins abrindo a tela juntos geram uma requisição ao Sheets, não três.
+ * Escritas já confirmadas na planilha, por projeto. Existem porque a escrita e a
+ * revalidação correm juntas: `definirStatusProjeto` grava no Sheets e corrige a linha no
+ * cache, mas uma releitura que COMEÇOU antes da escrita traz a célula antiga e, ao
+ * instalar, apagaria a correção — o status recém-decidido "voltava atrás" por até 60 s.
+ * Toda leitura reaplica os patches carimbados depois do seu início.
  */
-async function lerPlanilha(refresh: boolean): Promise<{ cache: Cache; doCache: boolean }> {
-  if (!refresh && cache && Date.now() - cache.lidoEm < CACHE_TTL_MS) {
-    return { cache, doCache: true };
+type Patch = { valores: Record<string, string>; at: number };
+const patchesEscritos = new Map<string, Patch>();
+
+function registrarPatch(projetoId: string, valores: Record<string, string>) {
+  patchesEscritos.set(projetoId.trim().toLowerCase(), { valores, at: Date.now() });
+  // Patch mais velho que o teto de stale já foi lido do Sheets por qualquer leitura viva.
+  const limite = Date.now() - STALE_MAX_MS;
+  for (const [k, v] of patchesEscritos) if (v.at < limite) patchesEscritos.delete(k);
+}
+
+/** Reaplica nas linhas novas as escritas que aterrissaram DEPOIS do início desta leitura. */
+function reaplicarPatches(rows: SheetRow[], inicioLeitura: number) {
+  for (const [id, patch] of patchesEscritos) {
+    if (patch.at < inicioLeitura) continue;
+    const linha = acharLinha(rows, id) as Record<string, string> | undefined;
+    if (!linha) continue;
+    for (const [col, val] of Object.entries(patch.valores)) linha[col] = val;
   }
-  if (!refresh && leituraEmCurso) {
-    return { cache: await leituraEmCurso, doCache: true };
-  }
+}
+
+/**
+ * Dispara (ou reaproveita) a leitura real da planilha. *Single-flight*: enquanto uma
+ * leitura está em curso, todo mundo compartilha a MESMA promise — três admins abrindo a
+ * tela juntos geram uma requisição ao Sheets, não três.
+ *
+ * Falha NÃO envenena o cache: o `cache` anterior fica intacto e a próxima chamada tenta
+ * de novo (é o que mantém a tela viva quando o Sheets dá 503).
+ */
+function iniciarLeitura(forcar = false): Promise<Cache> {
+  // `forcar` = pedido explícito de dado fresco (`?refresh=1`): não pode herdar uma
+  // revalidação que começou ANTES do clique, senão o botão "Atualizar" devolve um
+  // snapshot anterior à edição manual que a pessoa acabou de fazer na planilha.
+  if (leituraEmCurso && !forcar) return leituraEmCurso;
+  const epocaInicio = epoca;
+  const seq = ++seqLeitura;
+  const inicio = Date.now();
   const promessa = (async () => {
     const rows = await readAllRows();
     const novo: Cache = { rows, lidoEm: Date.now() };
-    cache = novo;
+    reaplicarPatches(rows, inicio);
+    // Não instala se o cache foi invalidado no meio (era anterior) nem se uma leitura
+    // mais NOVA já instalou o resultado dela.
+    if (epocaInicio === epoca && seq >= seqInstalada) {
+      cache = novo;
+      seqInstalada = seq;
+    }
     return novo;
   })();
   leituraEmCurso = promessa;
-  try {
-    return { cache: await promessa, doCache: false };
-  } finally {
-    if (leituraEmCurso === promessa) leituraEmCurso = null;
+  // O finally roda mesmo em erro; o `catch` vazio evita "unhandled rejection" quando
+  // ninguém está esperando esta promise (caminho de revalidação em background).
+  void promessa
+    .catch(() => undefined)
+    .finally(() => {
+      if (leituraEmCurso === promessa) leituraEmCurso = null;
+    });
+  return promessa;
+}
+
+/**
+ * Lê a planilha respeitando o cache, em modo **stale-while-revalidate**.
+ *
+ * A leitura custa ~1,5–2,5 s. Com TTL simples, o primeiro admin que chegasse depois do
+ * vencimento pagava a leitura inteira — a espera aparecia "do nada" a cada minuto. Agora:
+ * - cache **fresco** → devolve na hora;
+ * - cache **vencido** → devolve o dado VELHO na hora e revalida em background
+ *   (`runBackground` → `ctx.waitUntil`, obrigatório no Godeploy para a promise não ser
+ *   cancelada quando a Response retorna). `revalidando: true` avisa a UI;
+ * - **sem cache** (isolate frio) ou `refresh` explícito → aí sim bloqueia.
+ *
+ * Servir dado de até ~1 min de idade é aceitável para triagem, e a escrita de status já
+ * corrige a linha no cache — quem acabou de mudar o status vê o valor novo na hora.
+ */
+async function lerPlanilha(
+  refresh: boolean,
+): Promise<{ cache: Cache; doCache: boolean; revalidando: boolean }> {
+  if (refresh) {
+    return { cache: await iniciarLeitura(true), doCache: false, revalidando: false };
   }
+  if (cache) {
+    const idade = Date.now() - cache.lidoEm;
+    if (idade < CACHE_TTL_MS) return { cache, doCache: true, revalidando: leituraEmCurso != null };
+    if (idade < STALE_MAX_MS) {
+      const jaEmCurso = leituraEmCurso != null;
+      const promessa = iniciarLeitura();
+      if (!jaEmCurso) runBackground(promessa);
+      return { cache, doCache: true, revalidando: true };
+    }
+    // Velho demais (revalidação falhando há muito): volta a bloquear e propaga o erro.
+    return { cache: await iniciarLeitura(), doCache: false, revalidando: false };
+  }
+  return { cache: await iniciarLeitura(), doCache: false, revalidando: false };
 }
 
 /** Descarta o cache (botão de atualizar força pelo `refresh`; usado também nos testes). */
 export function invalidarCacheDashboard() {
   cache = null;
   leituraEmCurso = null;
+  patchesEscritos.clear();
+  seqInstalada = 0;
+  epoca += 1; // leitura em voo desta era não instala mais nada
 }
 
 // ─── Mapeamento ──────────────────────────────────────────────────────────────
@@ -250,7 +343,7 @@ export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<stri
 // ─── API ─────────────────────────────────────────────────────────────────────
 
 export async function listarProjetosDashboard(refresh = false): Promise<ListagemDashboard> {
-  const { cache: c, doCache } = await lerPlanilha(refresh);
+  const { cache: c, doCache, revalidando } = await lerPlanilha(refresh);
   const projetos = c.rows
     .map(mapResumo)
     .filter((p): p is ProjetoDashboardResumo => p != null)
@@ -262,6 +355,7 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     total: projetos.length,
     lidoEm: new Date(c.lidoEm).toISOString(),
     doCache,
+    revalidando,
   };
 }
 
@@ -346,9 +440,12 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
 
   // Corrige a linha no cache em vez de reler a planilha inteira: a tela reflete a
   // mudança na hora e a próxima leitura real acontece no TTL normal.
+  const valores: Record<string, string> = { Status: status };
+  if (observacoes !== undefined) valores['Observações'] = observacoes.trim();
   const mutavel = linha as Record<string, string>;
-  mutavel['Status'] = status;
-  if (observacoes !== undefined) mutavel['Observações'] = observacoes.trim();
+  Object.assign(mutavel, valores);
+  // Sobrevive a uma releitura que começou antes desta escrita (ver `patchesEscritos`).
+  registrarPatch(projeto_id, valores);
 
   try {
     await insertAdminStatusLog({
