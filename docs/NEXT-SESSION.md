@@ -46,6 +46,24 @@ memória `gh-pr-conta-writer`).
    linha **não duplicada**, e **"Atualizado Em" INTACTA** (é o guard mais importante — aquela coluna é o
    carimbo do sistema que regulariza legado).
 
+### ⛔ Tentado nesta sessão e BLOQUEADO (2026-07-28, 2ª rodada)
+1. **Deploy no staging:** o Luis pediu; **não foi possível** — o **MCP do Godeploy não está conectado** na
+   sessão (`getUploadToken`/`updateApp` inexistentes; conferido 2×). Artefatos prontos na branch. Reconectar
+   o MCP e rodar o bloco do "Próximo passo" acima.
+2. **Dar admin a `bruno.bezerra@gocase.com` em prod E staging:** o Luis pediu; **não foi possível**. Tentei
+   `GET /api/admin/admins` em prod com o `E2E_COOKIE` do `.env` → **HTTP 302** (cookie expirado, o edge
+   redireciona pro OAuth). **Caminho recomendado (resolve os 2 ambientes, sem tela):** acrescentar o e-mail
+   ao secret **`ADMIN_EMAILS`** nos apps `674a3710` **e** `edf400b4` →
+   `joao.gabriel@gocase.com,joaovictor.esteves@gocase.com,kaique.breno@gocase.com,luciano.cavalcante@gocase.com,bruno.bezerra@gocase.com`.
+   Alternativa (só onde houver sessão de admin, sem redeploy): `POST /api/admin/admins`
+   `{"email":"bruno.bezerra@gocase.com","nome":"Bruno Bezerra"}` — pelo console do navegador logado, ou
+   renovar o `E2E_COOKIE` no `.env` e o Claude dispara.
+3. **Achado (frente NOVA, a planejar):** **não existe tela para gerenciar admins** — os endpoints
+   `/api/admin/admins` (GET/POST/remove) existem mas **nenhum componente os consome**, e o link
+   **"Configurações"** da sidebar (`_authenticated/route.tsx`) aponta para **`/configuracoes`, que NÃO tem
+   arquivo de rota** (link morto). Hoje só dá para virar admin via `ADMIN_EMAILS`. Rodar `/ggsd:plan` antes
+   de codar (tela de admins e/ou consertar o link).
+
 ### ⚠️ Pendência que precisa de decisão do Luis (bloqueia o uso em prod, não o deploy)
 **Os valores do dropdown da coluna "Status".** A tela grava `Pendente` · `Em validação` · `Aprovado` ·
 `Reenvio Pendente` · `Reprovado` · `Descontinuado` (constante `STATUS_GRAVAVEIS`, um lugar só, em
