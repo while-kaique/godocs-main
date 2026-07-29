@@ -354,6 +354,27 @@ const MIGRATIONS = [
   "ALTER TABLE email_lotes ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
   'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
   "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
+  // ─── Critério de projeto (régua de recorrência · contrafactual · rastreabilidade) ──
+  // Perguntas determinísticas da Etapa 2 (padrão `usa_ai_proxy`). NÃO barram a
+  // submissão — alimentam a classificação do analisador.
+  // `ponteiro_movido`: lista separada por ';' com os ponteiros que o projeto moveu
+  // ('custo'|'receita'|'kpi'|'nenhum'); 'nenhum' é resposta VÁLIDA (sinal forte).
+  // `ponteiro_evidencia`: onde isso é verificável (relatório/sistema/base) —
+  // é o critério de RASTREABILIDADE. `contrafactual_reclamacao`: se desligar hoje,
+  // quem reclama e o que piora.
+  'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
+  'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',
+  // Classificação de ELEGIBILIDADE decidida pelo analisador ("isto é projeto?"),
+  // independente do veredito de pontuação: 'claro_sim'|'claro_nao'|'zona_cinzenta'.
+  // A justificativa é SEMPRE preenchida (fallback determinístico) → coluna
+  // "Classificação" do Sheets. `motivo_reprovacao` só existe em 'claro_nao' (nunca
+  // reprova sem motivo) → coluna "Motivo Reprovado". O discriminador da reprovação é
+  // ESTA coluna, não o CHECK de projetos.status (que segue rascunho|em_validacao|
+  // validado|rejeitado|aprovado — trocá-lo exigiria rebuild da tabela).
+  'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

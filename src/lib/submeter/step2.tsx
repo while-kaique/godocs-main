@@ -8,6 +8,7 @@ import {
   MAX_FILES,
   TOKEN_WARN_CHARS,
   TOKEN_BLOCK_CHARS,
+  PONTEIROS_MOVIDOS,
 } from "./constants";
 import type { FormData, FieldErrors } from "./constants";
 import { expandirZips, ehZip, MAX_ZIP_MB } from "./unzip";
@@ -18,6 +19,7 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
+  CardCheckboxGroup,
 } from "./form-components";
 
 // ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
@@ -643,6 +645,91 @@ export function Step2({
           ]}
           error={errors.usaAiProxy}
         />
+      </FormGroup>
+
+      {/* ─── Critério de projeto: ponteiro movido + rastreabilidade ─────────
+          Nenhuma resposta aqui BARRA a submissão ("Nenhum / ainda não sei" passa) —
+          elas alimentam a classificação do analisador depois do envio. */}
+      <FormGroup>
+        <FormLabel
+          required
+          hint="O impacto não precisa ser dinheiro: horas, erro, retrabalho, prazo, fraude e risco valem igual. Marque todos que se aplicam."
+        >
+          Este projeto moveu sensivelmente o ponteiro de quê?
+        </FormLabel>
+        <CardCheckboxGroup
+          options={PONTEIROS_MOVIDOS}
+          value={form.ponteiroMovido}
+          onChange={(next) => {
+            // "Nenhum / ainda não sei" é mutuamente exclusivo com os ponteiros concretos:
+            // marcá-lo limpa os outros; marcar um concreto desmarca o "nenhum".
+            const marcouNenhumAgora =
+              next.includes("nenhum") && !form.ponteiroMovido.includes("nenhum");
+            const limpo = (
+              marcouNenhumAgora ? ["nenhum"] : next.filter((v) => v !== "nenhum")
+            ) as FormData["ponteiroMovido"];
+            updateField("ponteiroMovido", limpo);
+            clearError("ponteiroMovido");
+            // Sem ponteiro concreto a evidência não se aplica — limpa o erro pendente.
+            if (limpo.every((v) => v === "nenhum")) clearError("ponteiroEvidencia");
+          }}
+          error={errors.ponteiroMovido}
+        />
+
+        {/* Evidência (rastreabilidade) — só quando há ponteiro concreto marcado */}
+        {form.ponteiroMovido.some((p) => p !== "nenhum") && (
+          <div className="mt-3" style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
+            <FormLabel
+              required
+              hint="Nomeie onde alguém pode abrir e conferir o número: um relatório, um painel, um sistema ou uma base."
+            >
+              Onde isso pode ser verificado?
+            </FormLabel>
+            <FormInput
+              type="text"
+              placeholder="Ex: painel “Conciliação diária” no Metabase · relatório de horas do Protheus · base pedidos_cancelados"
+              value={form.ponteiroEvidencia}
+              onChange={(e) => {
+                updateField("ponteiroEvidencia", e.currentTarget.value);
+                clearError("ponteiroEvidencia");
+              }}
+              error={errors.ponteiroEvidencia}
+              maxLength={300}
+            />
+          </div>
+        )}
+      </FormGroup>
+
+      {/* Contrafactual — "se desligar hoje, quem reclama e o que piora?" */}
+      <FormGroup>
+        <FormLabel
+          required
+          hint="Se a automação parasse hoje sem avisar ninguém, quem sentiria falta e o que voltaria a dar trabalho ou a dar errado?"
+        >
+          Se desligar isso hoje, quem reclama — e o que piora?
+        </FormLabel>
+        <textarea
+          className={cn(
+            "go-input w-full resize-none rounded-lg p-3 text-sm leading-relaxed",
+            errors.contrafactualReclamacao && "!border-[#dc2626]"
+          )}
+          style={{
+            minHeight: 72,
+            border: "1.5px solid rgba(0,89,169,0.18)",
+            background: "var(--go-white)",
+            color: "var(--go-text-heading)",
+            outline: "none",
+            transition: "border-color 0.15s",
+          }}
+          placeholder="Ex: O time de Fiscal reclama no mesmo dia — o fechamento volta a ser feito à mão em 2 planilhas e atrasa a entrega para a contabilidade."
+          value={form.contrafactualReclamacao}
+          onChange={(e) => {
+            updateField("contrafactualReclamacao", e.currentTarget.value);
+            clearError("contrafactualReclamacao");
+          }}
+          maxLength={600}
+        />
+        <FieldError message={errors.contrafactualReclamacao} />
       </FormGroup>
 
       {/* Upload de arquivos */}

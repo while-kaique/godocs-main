@@ -30,6 +30,9 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     tipoProjeto: [],
     descricaoBreve: 'x'.repeat(60),
     usaAiProxy: 'sim',
+    ponteiroMovido: ['custo'],
+    ponteiroEvidencia: 'Relatório de conciliação no Metabase',
+    contrafactualReclamacao: 'O time financeiro reclama e o fechamento atrasa.',
     especial: false,
     contextoEspecial: '',
     ...over,
@@ -126,5 +129,72 @@ describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)
 
   it('AI Proxy ainda não respondido, mas Etapa 1 pronta → PRONTO (não segura o disparo)', () => {
     expect(camposMinimosDocProntos(baseForm({ usaAiProxy: '' }))).toBe(true);
+  });
+});
+
+// ── Critério de projeto: perguntas determinísticas (T1) ──────────────────────
+// Invariante central: obrigatório RESPONDER ≠ barrar a submissão. "Nenhum / ainda não
+// sei" é resposta válida — a reprovação é pós-envio, decidida pelo analisador.
+describe('validarEtapa2 — critério de projeto', () => {
+  it('exige selecionar ao menos um ponteiro', () => {
+    const errs = validarEtapa2(baseForm({ ponteiroMovido: [] }), opts());
+    expect(errs.ponteiroMovido).toBeTruthy();
+  });
+
+  it('"Nenhum / ainda não sei" PASSA e não exige evidência (não barra submissão)', () => {
+    const errs = validarEtapa2(
+      baseForm({ ponteiroMovido: ['nenhum'], ponteiroEvidencia: '' }),
+      opts(),
+    );
+    expect(errs.ponteiroMovido).toBeUndefined();
+    expect(errs.ponteiroEvidencia).toBeUndefined();
+  });
+
+  it.each([['custo'], ['receita'], ['kpi'], ['custo', 'kpi']])(
+    'ponteiro concreto %j exige a evidência (rastreabilidade)',
+    (...ponteiros) => {
+      const errs = validarEtapa2(
+        baseForm({
+          ponteiroMovido: ponteiros as FormData['ponteiroMovido'],
+          ponteiroEvidencia: '',
+        }),
+        opts(),
+      );
+      expect(errs.ponteiroEvidencia).toBeTruthy();
+    },
+  );
+
+  it('evidência muito curta bloqueia', () => {
+    const errs = validarEtapa2(baseForm({ ponteiroEvidencia: 'ERP' }), opts());
+    expect(errs.ponteiroEvidencia).toBeTruthy();
+  });
+
+  it('exige o contrafactual (quem reclama / o que piora)', () => {
+    expect(validarEtapa2(baseForm({ contrafactualReclamacao: '' }), opts()).contrafactualReclamacao)
+      .toBeTruthy();
+    expect(
+      validarEtapa2(baseForm({ contrafactualReclamacao: 'ninguém' }), opts())
+        .contrafactualReclamacao,
+    ).toBeTruthy();
+  });
+
+  it('nenhum + contrafactual respondido passa inteiro (caminho do "não sei")', () => {
+    const errs = validarEtapa2(
+      baseForm({
+        ponteiroMovido: ['nenhum'],
+        ponteiroEvidencia: '',
+        contrafactualReclamacao: 'O time de CX teria que voltar a conferir na mão.',
+      }),
+      opts(),
+    );
+    expect(errs).toEqual({});
+  });
+
+  it('as perguntas novas NÃO entram no gatilho do processamento em background', () => {
+    expect(
+      camposMinimosDocProntos(
+        baseForm({ ponteiroMovido: [], ponteiroEvidencia: '', contrafactualReclamacao: '' }),
+      ),
+    ).toBe(true);
   });
 });

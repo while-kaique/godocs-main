@@ -6,11 +6,13 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 4 — **loadings do `/dashboard`** (plano ✅ aprovado, código não começou). A Fase 3
-(dashboard = triagem) está em **staging + prod**, faltando só o PR. `aceitar-zip-submissao` ✅ mergeada (PR #213).
-**Próximo:** codar a Fase 4 com `/ggsd:code` (worktree sobre `feat/dashboard-admin-sheets`) — e abrir o PR da Fase 3.
-**⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
-**Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
+**Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
+`feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
+**Próximo:** validar a Fase 5 no **staging `edf400b4`** → **prod `674a3710`** → PR — e **calibrar a régua com
+o Rafa antes de produção** (reprovar projeto é visível ao autor).
+**⚠️ Frente paralela pendente de código:** `perguntas-agente-recorrencia-evidencia` (A1 — o gate da alocação
+precisa aceitar "menos custo" · A2 — materialidade nos gates).
+**Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — as colunas "Participantes 2"/"Contribuidor" já existem no Sheets
 
 ---
 
@@ -38,7 +40,7 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
-## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+## Fase 3 — Dashboard do admin = triagem sobre a planilha ✅
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
@@ -62,18 +64,37 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
 
 **Próximo:** abrir o PR da `feat/dashboard-admin-sheets` (staging e prod já deployados).
 
-## Fase 4 — Loadings do `/dashboard` do admin 🟡
+## Fase 4 — Loadings do `/dashboard` do admin ✅
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,
 mas a causa é **serialização** — o `beforeLoad` bloqueia em "Verificando permissões" e só depois o `useEffect`
 lê a planilha; o cache do servidor é in-memory sem revalidação em background, e o de auth também.
 - ✅ Planejar (`docs/plans/loadings-dashboard-admin.md` — aprovado 2026-07-28; escopo escolhido pelo Luis:
   itens 1+2+3+4, **cache em SQLite FORA**).
-- ⬜ Implementar T1 (SWR no servidor, cobre também a ficha) · T2 (auth em `sessionStorage`) · T3 (paralelizar
-  auth × planilha) · T4 (skeleton) · T5 (testes + `build:worker`) · T6 (spec + staging → prod).
+- ✅ Implementado T1–T5 (commit `3b93c65`) e **T6 fechado em 2026-07-28**: staging validada → prod
+  `674a3710` → **PR #215 mergeado** (`main` = `ad64895`). Nada pendente.
 - **DoD:** cache vencido responde na hora com revalidação em background; reload/navegação entre telas admin
   não mostra "Verificando permissões"; as duas requisições saem em paralelo no 1º acesso; skeleton interativo
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
+
+## Fase 5 — Critério de projeto: elegibilidade, classificação e reprovação com motivo 🟡
+Pedido da gestão (Rafa, caso da **nuvem de palavras**): apertar o que conta como projeto pela régua
+**recorrência · contrafactual · rastreabilidade** — sem barrar o formulário.
+- ✅ Planejar (`docs/plans/criterios-projeto-classificacao.md` — aprovado 2026-07-29).
+- ✅ Implementar T1–T7 (2026-07-29): perguntas da Etapa 2 · seção "Processo alterado" no memorial ·
+  classificação em 3 níveis + `normalizarClassificacao`/`decidirStatusSubmissao` (puras) · 3 colunas do
+  Sheets + espelho SQLite + reconciliação · motivos na triagem do `/dashboard` · motivo visível ao autor ·
+  régua de 1 página + `spec-docs/SPEC_CRITERIOS_PROJETO.md`. **723 testes verdes.**
+- ⬜ **Calibrar a régua com o Rafa** (gate humano — reprovar projeto é visível ao autor).
+- ⬜ Validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação) → **prod `674a3710`** → PR.
+- **DoD:** "nuvem de palavras" sai `Reprovado` com motivo; saving recorrente com indicador segue `Pendente`
+  sem mudança; ganho sem fonte vira `Zona cinzenta`/`Em validação`; a coluna `Classificação` nunca fica
+  vazia; ninguém é reprovado sem motivo; especial nunca reprova automático; `Observações` e `Motivo Reenvio`
+  intactas pelo sistema; contagem de perguntas por submissão não piora.
+- **Fronteira:** barrar submissão no formulário fica **FORA em definitivo**; a régua de complexidade e a
+  rota de projeto especial não foram tocadas; legados não recebem backfill de `Classificação`.
+
+**Próximo:** calibrar a régua com o Rafa e validar no staging.
 
 ## Backlog
 - ⬜ Tela de gestão de admins (endpoints `/api/admin/admins` existem, ninguém consome; link "Configurações"

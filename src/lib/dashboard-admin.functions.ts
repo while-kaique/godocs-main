@@ -406,10 +406,23 @@ const statusSchema = z.object({
   // Motivo da revisão: vai para a coluna "Observações", que é o texto que o disparo de
   // e-mails de reenvio manda para o dono. `undefined` = não mexer na célula.
   observacoes: z.string().max(4000).optional(),
+  // Motivos em COLUNA PRÓPRIA (não sequestram "Observações", que é o parecer usado pelo
+  // disparo de e-mails): `motivo_reenvio` acompanha "Reenvio Pendente" e `motivo_reprovado`
+  // acompanha "Reprovado", sobrepondo o motivo escrito pelo analisador.
+  // `undefined` = não mexer na célula.
+  motivo_reenvio: z.string().max(4000).optional(),
+  motivo_reprovado: z.string().max(4000).optional(),
 });
 
 /** Colunas que este módulo escreve — o teste garante que a lista não cresce por descuido. */
-export const COLUNAS_ESCRITAS = ['Status', 'Observações'] as const;
+export const COLUNAS_ESCRITAS = [
+  'Status',
+  'Observações',
+  // Motivos da triagem humana. "Motivo Reenvio" é escrita SÓ aqui (o sistema nunca a
+  // toca); "Motivo Reprovado" também é escrita pelo analisador e a triagem sobrepõe.
+  'Motivo Reenvio',
+  'Motivo Reprovado',
+] as const;
 
 /**
  * Grava o status na planilha (a fonte de verdade da triagem) e registra quem mudou.
@@ -424,7 +437,8 @@ export const COLUNAS_ESCRITAS = ['Status', 'Observações'] as const;
  * `descontinuado` do projeto.
  */
 export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
-  const { projeto_id, status, observacoes } = statusSchema.parse(raw);
+  const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado } =
+    statusSchema.parse(raw);
 
   const { cache: c } = await lerPlanilha(false);
   const linha = acharLinha(c.rows, projeto_id);
@@ -435,6 +449,8 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   const statusAnterior = texto(linha['Status']);
   const updates: Partial<Record<(typeof COLUNAS_ESCRITAS)[number], string>> = { Status: status };
   if (observacoes !== undefined) updates['Observações'] = observacoes.trim();
+  if (motivo_reenvio !== undefined) updates['Motivo Reenvio'] = motivo_reenvio.trim();
+  if (motivo_reprovado !== undefined) updates['Motivo Reprovado'] = motivo_reprovado.trim();
 
   await updateRowByProjectId(projeto_id, updates);
 
@@ -442,6 +458,8 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   // mudança na hora e a próxima leitura real acontece no TTL normal.
   const valores: Record<string, string> = { Status: status };
   if (observacoes !== undefined) valores['Observações'] = observacoes.trim();
+  if (motivo_reenvio !== undefined) valores['Motivo Reenvio'] = motivo_reenvio.trim();
+  if (motivo_reprovado !== undefined) valores['Motivo Reprovado'] = motivo_reprovado.trim();
   const mutavel = linha as Record<string, string>;
   Object.assign(mutavel, valores);
   // Sobrevive a uma releitura que começou antes desta escrita (ver `patchesEscritos`).
@@ -453,7 +471,11 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
       projeto_nome: texto(linha['Projeto']),
       status_anterior: statusAnterior,
       status_novo: status,
-      observacoes: observacoes?.trim() || null,
+      // A auditoria guarda o texto que justificou a mudança: o parecer, se houver, ou
+      // o motivo digitado no modal (reprovação/reenvio) — para o log não ficar mudo
+      // quando o admin usa só a coluna de motivo.
+      observacoes:
+        observacoes?.trim() || motivo_reprovado?.trim() || motivo_reenvio?.trim() || null,
       admin_email: adminEmail,
     });
   } catch (e) {

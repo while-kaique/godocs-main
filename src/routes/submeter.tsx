@@ -82,6 +82,11 @@ type AgentMeta = {
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
   usaAiProxy: "sim" | "nao" | "";
+  // Critério de projeto (Etapa 2). `ponteiroMovido` viaja SERIALIZADO (lista ';') para a
+  // comparação de metaChanged ser estável — é o mesmo formato gravado no SQLite/Sheets.
+  ponteiroMovido: string;
+  ponteiroEvidencia: string;
+  contrafactualReclamacao: string;
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
   contextoEspecial: string;
 };
@@ -450,6 +455,12 @@ export function SubmeterPageContent({
           tipoProjeto: tiposProjeto,
           descricaoBreve: (data.descricao_breve as string) ?? "",
           usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
+          ponteiroMovido: ((data.ponteiro_movido as string) ?? "")
+            .split(";")
+            .map((v) => v.trim())
+            .filter(Boolean) as FormData["ponteiroMovido"],
+          ponteiroEvidencia: (data.ponteiro_evidencia as string) ?? "",
+          contrafactualReclamacao: (data.contrafactual_reclamacao as string) ?? "",
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
         };
@@ -614,6 +625,9 @@ export function SubmeterPageContent({
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
           usaAiProxy: newForm.usaAiProxy,
+          ponteiroMovido: newForm.ponteiroMovido.join(";"),
+          ponteiroEvidencia: newForm.ponteiroEvidencia.trim(),
+          contrafactualReclamacao: newForm.contrafactualReclamacao.trim(),
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
@@ -826,6 +840,9 @@ export function SubmeterPageContent({
     tipoProjeto: [],
     descricaoBreve: "",
     usaAiProxy: "",
+    ponteiroMovido: [],
+    ponteiroEvidencia: "",
+    contrafactualReclamacao: "",
     especial: false,
     contextoEspecial: "",
   });
@@ -972,8 +989,11 @@ export function SubmeterPageContent({
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
     usaAiProxy: form.usaAiProxy,
+    ponteiroMovido: form.ponteiroMovido.join(";"),
+    ponteiroEvidencia: form.ponteiroEvidencia.trim(),
+    contrafactualReclamacao: form.contrafactualReclamacao.trim(),
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.ponteiroMovido, form.ponteiroEvidencia, form.contrafactualReclamacao, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -1018,6 +1038,9 @@ export function SubmeterPageContent({
             // depois (handleContinuarAgente sincroniza; especial converte via metadados).
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
+            ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+            ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
+            contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
             docs,
           },
         );
@@ -1263,6 +1286,9 @@ export function SubmeterPageContent({
           tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
+          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
+          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
@@ -1341,6 +1367,9 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
+          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
+          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
@@ -1375,6 +1404,9 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
+          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
+          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // A doc especial é montada da descrição + contexto (sem IA); não precisa reenviar
           // arquivos. reset_doc garante a substituição da doc gerada pelo background.
@@ -1404,6 +1436,9 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
+          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
+          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
           docs,
@@ -1475,6 +1510,9 @@ export function SubmeterPageContent({
           data_criacao: meta.dataCriacao,
           descricao_breve: meta.descricaoBreve,
           usa_ai_proxy: meta.usaAiProxy || undefined,
+          ponteiro_movido: meta.ponteiroMovido || undefined,
+          ponteiro_evidencia: meta.ponteiroEvidencia || undefined,
+          contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
           contexto_especial: meta.contextoEspecial,
           // Propaga a natureza do projeto: false sinaliza conversão especial→normal.
           especial: form.especial,
@@ -1563,6 +1601,9 @@ export function SubmeterPageContent({
               data_criacao: meta.dataCriacao,
               descricao_breve: meta.descricaoBreve,
               usa_ai_proxy: meta.usaAiProxy || undefined,
+              ponteiro_movido: meta.ponteiroMovido || undefined,
+              ponteiro_evidencia: meta.ponteiroEvidencia || undefined,
+              contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
               contexto_especial: meta.contextoEspecial,
               especial: form.especial,
               reset_doc: true,
@@ -1635,6 +1676,9 @@ export function SubmeterPageContent({
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
+            ponteiro_movido: meta.ponteiroMovido || undefined,
+            ponteiro_evidencia: meta.ponteiroEvidencia || undefined,
+            contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
             // Conversão especial→normal: este ramo só roda com form.especial=false,
             // mas mandamos o valor real para o backend zerar a flag no banco.
             especial: form.especial,
@@ -1733,6 +1777,9 @@ export function SubmeterPageContent({
             data_criacao: meta.dataCriacao,
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
+            ponteiro_movido: meta.ponteiroMovido || undefined,
+            ponteiro_evidencia: meta.ponteiroEvidencia || undefined,
+            contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
             especial: form.especial,
             reset_doc: true,
           }

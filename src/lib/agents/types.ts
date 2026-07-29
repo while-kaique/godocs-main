@@ -265,9 +265,22 @@ export type ResultadoAnalise = {
   // de lógica determinística). null = não inferido (submissão antiga) → não rebaixa.
   // Ver normalizarComplexidade e spec-docs/SPEC_COMPLEXIDADE_NIVEIS.md.
   acao_autonoma?: boolean | null;
+  // ─── Critério de projeto ("isto é projeto?") — independente do veredito ────
+  // Classificação de ELEGIBILIDADE pela régua de recorrência · contrafactual ·
+  // rastreabilidade. Não substitui `resultado` (que é pontuação/qualidade):
+  //  • 'claro_sim'      → segue o fluxo normal;
+  //  • 'zona_cinzenta'  → validação humana;
+  //  • 'claro_nao'      → reprovado (única exceção à regra TEMPORÁRIA do "Pendente").
+  // A justificativa é SEMPRE preenchida (há fallback determinístico) e o motivo só
+  // existe em 'claro_nao' — nunca se reprova sem explicar. Ver normalizarClassificacao.
+  classificacao_avaliacao?: ClassificacaoAvaliacao | string | null;
+  classificacao_justificativa?: string | null;
+  motivo_reprovacao?: string | null;
   criterios_hardcoded: CriterioResult[];
   criterios_dinamicos: CriterioResult[];
 };
+
+export type ClassificacaoAvaliacao = "claro_sim" | "claro_nao" | "zona_cinzenta";
 
 // ─── Mensagem de chat ───────────────────────────────────────────────────────
 

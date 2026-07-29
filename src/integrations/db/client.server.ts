@@ -176,8 +176,24 @@ export function getProjetoById(id: string) {
 /** Projetos efetivamente submetidos (têm submitted_at). Usado pela reconciliação
  *  da coluna "Complexidade" no Sheets — evita varrer legados sem submissão. */
 export function getProjetosSubmetidos() {
-  return queryAll<Pick<ProjetoRow, 'id' | 'complexidade' | 'observacoes' | 'submitted_at'>>(
-    'SELECT id, complexidade, observacoes, submitted_at FROM projetos WHERE submitted_at IS NOT NULL'
+  return queryAll<
+    Pick<
+      ProjetoRow,
+      | 'id'
+      | 'complexidade'
+      | 'observacoes'
+      | 'submitted_at'
+      // Classificação de elegibilidade: a reconciliação (cron) repõe a coluna
+      // "Classificação"/"Motivo Reprovado" quando a análise em background é cancelada
+      // antes do sync — mesma rede de segurança da Complexidade.
+      | 'classificacao_avaliacao'
+      | 'classificacao_justificativa'
+      | 'motivo_reprovacao'
+    >
+  >(
+    `SELECT id, complexidade, observacoes, submitted_at,
+            classificacao_avaliacao, classificacao_justificativa, motivo_reprovacao
+       FROM projetos WHERE submitted_at IS NOT NULL`
   );
 }
 
@@ -261,6 +277,10 @@ export type InsertProjeto = {
   contexto_especial?: string | null;
   arquivos_nomes?: string[] | null;
   usa_ai_proxy?: string | null;
+  // Critério de projeto (Etapa 2) — ver ProjetoRow/schema.ts.
+  ponteiro_movido?: string | null;
+  ponteiro_evidencia?: string | null;
+  contrafactual_reclamacao?: string | null;
   status?: string;
 };
 
@@ -270,8 +290,9 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(`
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
-      descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
+      ponteiro_movido, ponteiro_evidencia, contrafactual_reclamacao, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -292,6 +313,9 @@ export async function insertProjeto(data: InsertProjeto) {
     data.contexto_especial ?? null,
     data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
     data.usa_ai_proxy ?? null,
+    data.ponteiro_movido ?? null,
+    data.ponteiro_evidencia ?? null,
+    data.contrafactual_reclamacao ?? null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -1218,6 +1242,15 @@ export type ProjetoRow = {
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   usa_ai_proxy: string | null; // 'sim' | 'nao' — usa o AI Proxy interno (governança de custo)
+  // Critério de projeto — respostas determinísticas da Etapa 2 (não barram submissão).
+  ponteiro_movido: string | null; // lista ';' de 'custo'|'receita'|'kpi'|'nenhum'
+  ponteiro_evidencia: string | null; // onde verificar (rastreabilidade)
+  contrafactual_reclamacao: string | null; // se desligar hoje, quem reclama / o que piora
+  // Classificação de elegibilidade do analisador ("isto é projeto?"). A justificativa é
+  // SEMPRE preenchida; o motivo só existe em 'claro_nao'. Ver normalizarClassificacao.
+  classificacao_avaliacao: string | null; // 'claro_sim' | 'claro_nao' | 'zona_cinzenta'
+  classificacao_justificativa: string | null;
+  motivo_reprovacao: string | null;
   arquivos_nomes: string | null; // JSON array de nomes dos arquivos enviados no upload
   arquivos_links: string | null; // JSON array de links (webViewLink) dos arquivos no Drive
   submitted_at: string | null;

@@ -164,6 +164,21 @@ export function validarEtapa2(
     errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
   if (!form.usaAiProxy) errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
 
+  // ── Critério de projeto — obrigatório RESPONDER, mas nenhuma resposta BARRA ──
+  // "Nenhum / ainda não sei" é resposta válida e passa (a reprovação é pós-envio, no
+  // analisador). O que se exige é que a pessoa responda algo.
+  if (!form.ponteiroMovido || form.ponteiroMovido.length === 0) {
+    errs.ponteiroMovido = "Selecione ao menos uma opção (ou “Nenhum / ainda não sei”)";
+  } else {
+    // Evidência (rastreabilidade) só é exigida quando há ponteiro concreto marcado.
+    const temPonteiroConcreto = form.ponteiroMovido.some((p) => p !== "nenhum");
+    if (temPonteiroConcreto && form.ponteiroEvidencia.trim().length < 10)
+      errs.ponteiroEvidencia =
+        "Diga onde isso pode ser verificado (nome do relatório, sistema ou base)";
+  }
+  if (form.contrafactualReclamacao.trim().length < 15)
+    errs.contrafactualReclamacao = "Descreva em uma frase quem reclama e o que piora";
+
   if (arquivosCount === 0 && nomesExistentesCount === 0) {
     errs.documentacao = "Selecione pelo menos um arquivo do projeto";
   } else if (arquivosCount === 0 && docExistenteInvalidado) {
@@ -212,10 +227,56 @@ export interface FormData {
   // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
   // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
   usaAiProxy: "sim" | "nao" | "";
+  // ─── Critério de projeto (recorrência · contrafactual · rastreabilidade) ───
+  // Ponteiros que o projeto moveu. `'nenhum'` é resposta VÁLIDA e passa (nada aqui
+  // barra a submissão) — só vira sinal forte para a classificação do analisador.
+  // Marcar 'nenhum' é mutuamente exclusivo com os outros três.
+  ponteiroMovido: PonteiroMovido[];
+  // Onde o ganho pode ser verificado (relatório/sistema/base) — RASTREABILIDADE.
+  // Obrigatório só quando há ponteiro concreto marcado (custo/receita/kpi).
+  ponteiroEvidencia: string;
+  // "Se desligar isso hoje, quem reclama — e o que piora?" — CONTRAFACTUAL.
+  contrafactualReclamacao: string;
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;
 }
+
+// Ponteiros de impacto do projeto. O impacto NÃO precisa ser receita — custo e KPI da
+// área valem igual. 'nenhum' = "não moveu / ainda não sei" (resposta válida).
+export type PonteiroMovido = "custo" | "receita" | "kpi" | "nenhum";
+
+export const PONTEIROS_MOVIDOS: {
+  value: PonteiroMovido;
+  title: string;
+  desc: string;
+  icon: string;
+}[] = [
+  {
+    value: "custo",
+    icon: "💸",
+    title: "Custo",
+    desc: "Reduziu gasto: horas de trabalho, hora extra, headcount, contrato ou licença que deixou de ser paga.",
+  },
+  {
+    value: "receita",
+    icon: "📈",
+    title: "Receita",
+    desc: "Aumentou faturamento: mais vendas, menos perda de pedido, ticket maior, recuperação de carrinho.",
+  },
+  {
+    value: "kpi",
+    icon: "🎯",
+    title: "KPI da área",
+    desc: "Melhorou um indicador do time sem passar por R$: taxa de erro, retrabalho, prazo/SLA, fraude ou risco evitado.",
+  },
+  {
+    value: "nenhum",
+    icon: "🤔",
+    title: "Nenhum / ainda não sei",
+    desc: "Resposta válida — não bloqueia o envio. A equipe de RPA avalia junto com você depois.",
+  },
+];
 
 export interface FieldErrors {
   [key: string]: string;

@@ -1,6 +1,9 @@
 # Plano — Critério de projeto: perguntas-chave + classificação da avaliação + reprovação com motivo
 
-**Status:** ✅ **aprovado (Luis, 2026-07-29)** — pronto para `/ggsd:code`
+**Status:** ✅ **executado (2026-07-29)** — T1–T7 codados, 723 testes verdes, `build` + `build:worker` OK.
+Falta o que **não é código**: validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação) →
+**prod `674a3710`** → PR. ⚠️ **A régua (T7) deve ser calibrada com o Rafa antes de produção** — reprovar
+projeto é visível ao autor. Spec: [`spec-docs/SPEC_CRITERIOS_PROJETO.md`](../../spec-docs/SPEC_CRITERIOS_PROJETO.md).
 **Blast-radius: ALTO** (formulário + orquestrador + analisador + sync + dashboard)
 
 ## Contexto

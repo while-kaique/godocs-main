@@ -44,7 +44,10 @@ import {
 } from "@/lib/agents/orchestrator";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
 import { validarDocumentacao } from "@/lib/agents/validator";
-import { analisarProjeto as analisarProjetoAgent } from "@/lib/agents/analyzer";
+import {
+  analisarProjeto as analisarProjetoAgent,
+  decidirStatusSubmissao,
+} from "@/lib/agents/analyzer";
 import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-agent";
 import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
@@ -75,7 +78,12 @@ import {
   extrairAlocacaoGanhos,
   extrairJustificativaCargaEscala,
 } from "@/lib/agents/memorial-format";
-import { syncSubmitToGoogle, syncUpdateToGoogle, nowFortaleza } from "@/lib/google/sync";
+import {
+  syncSubmitToGoogle,
+  syncUpdateToGoogle,
+  nowFortaleza,
+  derivarClassificacaoSheet,
+} from "@/lib/google/sync";
 import { readAllRows, updateRowByProjectId } from "@/lib/google/sheets";
 import { upsertResumoDoc } from "@/lib/google/drive";
 import { renderResumoDocumentacao } from "@/lib/agents/doc-render";
@@ -455,6 +463,12 @@ const iniciarSubmissaoSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  // Critério de projeto (Etapa 2): ponteiro movido (lista ';'), onde verificar
+  // (rastreabilidade) e o contrafactual. Nenhum deles barra a submissão — alimentam a
+  // classificação de elegibilidade do analisador.
+  ponteiro_movido: z.string().max(200).optional(),
+  ponteiro_evidencia: z.string().max(300).optional(),
+  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
@@ -605,6 +619,9 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipos_projeto: data.especial ? ["especial"] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
+      ponteiro_movido: data.ponteiro_movido ?? null,
+      ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+      contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: "rascunho",
@@ -634,6 +651,9 @@ export async function iniciarSubmissao(rawData: unknown) {
       : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
+    ponteiro_movido: data.ponteiro_movido ?? null,
+    ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
     arquivos: data.docs.map((d) => d.filename),
@@ -1838,6 +1858,12 @@ const atualizarMetadadosSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  // Critério de projeto (Etapa 2): ponteiro movido (lista ';'), onde verificar
+  // (rastreabilidade) e o contrafactual. Nenhum deles barra a submissão — alimentam a
+  // classificação de elegibilidade do analisador.
+  ponteiro_movido: z.string().max(200).optional(),
+  ponteiro_evidencia: z.string().max(300).optional(),
+  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -1871,6 +1897,10 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
+  if (data.ponteiro_movido !== undefined) campos.ponteiro_movido = data.ponteiro_movido;
+  if (data.ponteiro_evidencia !== undefined) campos.ponteiro_evidencia = data.ponteiro_evidencia;
+  if (data.contrafactual_reclamacao !== undefined)
+    campos.contrafactual_reclamacao = data.contrafactual_reclamacao;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
@@ -1894,6 +1924,9 @@ export async function atualizarMetadados(rawData: unknown) {
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
+        ponteiro_movido: data.ponteiro_movido ?? null,
+        ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+        contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
@@ -2076,11 +2109,26 @@ export async function analisarProjetoFn(rawData: unknown) {
     conteudo.saving as Record<string, unknown> | undefined,
     conteudo.receita as Record<string, unknown> | undefined,
   );
-  const statusFinal = ehEspecial
-    ? "em_validacao" // especial nunca auto-aprova/reprova — validação humana
-    : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
-      ? "em_validacao"
-      : statusVeredito;
+  // Régua de CRITÉRIO DE PROJETO ("isto é projeto?") — independente da pontuação.
+  // `claro_nao` VENCE o veredito (reprova); `zona_cinzenta` manda para validação
+  // humana; `claro_sim` deixa o fluxo atual decidir. As invariantes (nunca reprova sem
+  // motivo, especial nunca reprova, materialidade alta → humana) já foram aplicadas por
+  // normalizarClassificacao dentro do analisador.
+  const classificacao = resultado.classificacao_avaliacao ?? null;
+  const { status: statusFinal, statusSheet } = decidirStatusSubmissao({
+    classificacao,
+    ehEspecial,
+    materialidade: materialidadeProjeto,
+    vereditoAprovado: resultado.resultado === "aprovado",
+    tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
+  });
+  const reprovadoPorCriterio = statusSheet === "Reprovado";
+  if (reprovadoPorCriterio) {
+    log(
+      "analisarProjeto",
+      `Classificação 'claro_nao' → status rejeitado/Reprovado (analisador havia retornado '${statusVeredito}')`,
+    );
+  }
   if (!ehEspecial && materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
     log(
       `Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`,
@@ -2091,6 +2139,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     complexidade: resultado.complexidade,
     observacoes,
     status: statusFinal,
+    // Espelho da classificação de elegibilidade (padrão complexidade/observacoes): serve
+    // ao resync, à reconciliação e à ficha do /dashboard. `motivo_reprovacao` volta a
+    // null quando o reenvio deixa de ser reprovado.
+    classificacao_avaliacao: resultado.classificacao_avaliacao ?? null,
+    classificacao_justificativa: resultado.classificacao_justificativa ?? null,
+    motivo_reprovacao: resultado.motivo_reprovacao ?? null,
     // Especial não é "validado" pelo analisador — quem valida é o humano; não carimba validated_at.
     ...(ehEspecial ? {} : { validated_at: new Date().toISOString() }),
   });
@@ -2107,13 +2161,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     // pelo analisador também vão como "Pendente" na planilha — a aprovação
     // automática não é refletida no Sheets. O status interno (SQLite/dashboard)
     // continua correto. Reverter para 'Aprovado' quando a validação terminar.
-    const statusLabel = ehEspecial
-      ? "Pendente" // especial → sempre validação humana
-      : resultado.resultado === "aprovado"
-        ? "Pendente"
-        : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
-          ? "Pendente"
-          : "Reenvio Pendente";
+    // ⚠️ ÚNICA EXCEÇÃO à regra TEMPORÁRIA (decisão D1, 29/07/2026): classificação
+    // 'claro_nao' grava "Reprovado" — reprovar por não ser projeto é informação que
+    // precisa chegar ao autor. Todo o resto continua "Pendente".
+    // O rótulo vem da MESMA função pura que decidiu o status interno (não duplicar a
+    // precedência aqui — foi assim que os dois já divergiram no passado).
+    const statusLabel = statusSheet;
 
     // AGUARDADO (não fire-and-forget): assim o sync da Complexidade/Observações faz
     // parte da promise da análise. Evita o FAF aninhado que o runtime cancelava,
@@ -2126,6 +2179,11 @@ export async function analisarProjetoFn(rawData: unknown) {
       complexidade: resultado.complexidade,
       observacoes: observacoes ?? "",
       status: statusLabel,
+      // Colunas "Classificação" (sempre com texto) e "Motivo Reprovado". A
+      // "Motivo Reenvio" é MANUAL — o sistema nunca a escreve.
+      classificacao: resultado.classificacao_avaliacao ?? null,
+      classificacaoJustificativa: resultado.classificacao_justificativa ?? null,
+      motivoReprovacao: resultado.motivo_reprovacao ?? null,
     });
   }
 
@@ -2147,9 +2205,15 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
   // candidatos (evita varrer ~270 legados sem submissão).
   const rows = await readAllRows();
   const compNaPlanilha = new Map<string, string>();
+  // "Classificação" tem a MESMA fragilidade da Complexidade (a análise em background
+  // pode ser cancelada antes do sync) — a mesma rede de segurança vale para ela.
+  const classifNaPlanilha = new Map<string, string>();
   for (const r of rows) {
     const id = (r["ID Projeto"] ?? "").toString().trim().toLowerCase();
-    if (id) compNaPlanilha.set(id, (r["Complexidade"] ?? "").toString().trim());
+    if (id) {
+      compNaPlanilha.set(id, (r["Complexidade"] ?? "").toString().trim());
+      classifNaPlanilha.set(id, (r["Classificação"] ?? "").toString().trim());
+    }
   }
 
   const submetidos = await getProjetosSubmetidos();
@@ -2158,19 +2222,38 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
   let faltando = 0;
 
   for (const p of submetidos) {
-    const comp = compNaPlanilha.get(String(p.id).trim().toLowerCase());
-    // Pula quem já tem complexidade não-vazia na planilha (ou nem está nela).
-    if (comp === undefined || (comp !== "" && comp !== "—")) continue;
+    const chave = String(p.id).trim().toLowerCase();
+    const comp = compNaPlanilha.get(chave);
+    const classif = classifNaPlanilha.get(chave);
+    const vazio = (v: string | undefined) => v === "" || v === "—";
+    // Pula quem nem está na planilha, ou que já tem Complexidade E Classificação.
+    if (comp === undefined) continue;
+    if (!vazio(comp) && !vazio(classif)) continue;
     faltando++;
 
     const compSqlite = (p.complexidade ?? "").toString().trim();
+    const classifSqlite = (p.classificacao_avaliacao ?? "").toString().trim();
     try {
-      if (compSqlite) {
-        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat).
-        await updateRowByProjectId(p.id, {
-          Complexidade: p.complexidade as string,
-          Observações: (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : "—",
-        });
+      if (compSqlite || classifSqlite) {
+        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat). Cada
+        // coluna só é escrita se houver dado no SQLite — nunca sobrescreve com vazio.
+        const celulas: Record<string, string> = {};
+        if (compSqlite) {
+          celulas.Complexidade = compSqlite;
+          celulas.Observações = (p.observacoes as string | null)?.trim()
+            ? (p.observacoes as string)
+            : "—";
+        }
+        if (classifSqlite) {
+          celulas["Classificação"] = derivarClassificacaoSheet(
+            classifSqlite,
+            p.classificacao_justificativa as string | null,
+          );
+          celulas["Motivo Reprovado"] = (p.motivo_reprovacao as string | null)?.trim()
+            ? (p.motivo_reprovacao as string)
+            : "—";
+        }
+        await updateRowByProjectId(p.id, celulas);
         ressincronizados++;
       } else if (reanalisados < maxReanalises) {
         // Análise nunca concluiu: re-roda (analisa + sincroniza, aguardado).

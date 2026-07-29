@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
-import { Loader2, FileText, PencilLine, Eye } from "lucide-react";
+import { Loader2, FileText, PencilLine, Eye, Ban, RotateCcw } from "lucide-react";
 
 const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
@@ -42,6 +42,11 @@ type Detalhes = {
   descricao_breve: string | null;
   contexto_especial: string | null;
   documentacao: { saving?: Memorial; receita?: Memorial } | null;
+  // Motivo da reprovação (analisador ou triagem) — o autor precisa ver o PORQUÊ, não só
+  // o selo "Reprovado". Vem do espelho SQLite nesta tela (que não lê o Sheets): uma
+  // sobreposição feita na triagem aparece aqui após o próximo resync.
+  motivo_reprovado: string | null;
+  motivo_reenvio: string | null;
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -187,6 +192,35 @@ function ProjetoReadOnlyPage() {
                   )}
                 </div>
               </div>
+
+              {/* Reprovação / pedido de reenvio COM O MOTIVO — reprovar sem explicar
+                  deixa o autor sem saída. Estado nunca só por cor: ícone + rótulo. */}
+              {(p.motivo_reprovado || p.motivo_reenvio) && (
+                <div
+                  className="rounded-xl p-4 text-[12.5px] leading-relaxed"
+                  style={
+                    p.motivo_reprovado
+                      ? { background: "rgba(71,85,105,0.07)", borderLeft: "3px solid #475569", color: "#334155" }
+                      : { background: "rgba(220,38,38,0.06)", borderLeft: "3px solid #dc2626", color: "#b91c1c" }
+                  }
+                >
+                  <p className="flex items-center gap-1.5 font-bold">
+                    {p.motivo_reprovado ? (
+                      <>
+                        <Ban className="h-3.5 w-3.5" aria-hidden /> Projeto reprovado
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reenvio solicitado
+                      </>
+                    )}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap">
+                    <span className="font-semibold">Motivo:</span>{" "}
+                    {p.motivo_reprovado ?? p.motivo_reenvio}
+                  </p>
+                </div>
+              )}
 
               {/* Metadados */}
               <div

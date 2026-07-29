@@ -172,6 +172,96 @@ export function CheckboxGroup({
   );
 }
 
+/**
+ * Multisseleção em CARDS (checkbox lateral + título + descrição), empilhados. É o
+ * padrão visual acordado para opção QUE TEM DESCRIÇÃO — opção com explicação nunca é
+ * texto solto (o `CheckboxGroup` acima é a variante compacta, sem descrição longa).
+ * Extraído da Etapa 2.5 (tipos de projeto), que agora consome este componente — a
+ * marcação era duplicada.
+ * A11y: o estado NÃO é só cor — o "check" aparece/desaparece e o título fica em
+ * negrito; o foco de teclado tem anel visível (o input é sr-only + peer).
+ */
+export function CardCheckboxGroup({
+  options, value, onChange, error,
+}: {
+  options: { value: string; title: string; desc?: string; icon?: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  error?: string;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2.5">
+        {options.map((opt) => {
+          const checked = value.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer select-none items-center gap-3 rounded-xl p-3.5 transition-all duration-150"
+              style={{
+                background: checked ? "rgba(0,89,169,0.05)" : "var(--go-white)",
+                border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.15)",
+                boxShadow: checked ? "0 0 0 3px rgba(0,89,169,0.08)" : "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={checked}
+                onChange={() =>
+                  onChange(
+                    checked ? value.filter((x) => x !== opt.value) : [...value, opt.value],
+                  )
+                }
+              />
+              {/* Indicador do checkbox — o "check" só aparece quando marcado */}
+              <span
+                aria-hidden="true"
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150 peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
+                style={{
+                  background: checked ? "var(--go-blue)" : "var(--go-white)",
+                  border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.3)",
+                }}
+              >
+                {checked && (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ animation: "go-step-in 0.15s ease" }}
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              {/* Título + descrição da opção */}
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                  {opt.icon ? `${opt.icon} ` : ""}{opt.title}
+                </span>
+                {opt.desc && (
+                  <span
+                    className="mt-1 block text-[11.5px] leading-relaxed"
+                    style={{ color: "var(--go-text-muted, #6b6b7a)" }}
+                  >
+                    {opt.desc}
+                  </span>
+                )}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </>
+  );
+}
+
 export function InfoTooltip({ children }: { children: React.ReactNode }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);

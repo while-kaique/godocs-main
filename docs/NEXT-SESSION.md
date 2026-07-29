@@ -4,7 +4,31 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-29 (planejamento) — nova frente, pedida pelo Luis: **apertar o critério de
+**Última sessão:** 2026-07-29 (código) — **executado o plano do critério de projeto** (T1–T7), branch
+`feat/criterios-projeto-classificacao` (worktree `.claude/worktrees/criterios-projeto`, criada de
+`origin/main` `ad64895` + merge). Entregue: **(T1)** 2 perguntas determinísticas na Etapa 2 — *"moveu o
+ponteiro de quê?"* (cards multi: Custo · Receita · KPI · **Nenhum/ainda não sei**, que **passa**), *"onde
+isso pode ser verificado?"* (rastreabilidade, obrigatória só com ponteiro concreto) e *"se desligar hoje,
+quem reclama?"*; **(T2)** seção obrigatória **"Processo alterado"** no `MEMORIAL_ESQUELETO` (3 modos) +
+instrução anti-redundância nos prompts (não pergunta quando a doc já traz a magnitude, máx. 1 pergunta);
+**(T3)** o analisador classifica **claro sim / zona cinzenta / claro não** com justificativa SEMPRE, via as
+funções PURAS `normalizarClassificacao` (nunca reprova sem motivo · especial nunca reprova · >R$5k → zona
+cinzenta · fallback da justificativa) e `decidirStatusSubmissao` (status interno **e** rótulo do Sheets no
+mesmo lugar); **(T4)** 3 colunas por NOME (`Classificação` · `Motivo Reprovado` · **`Motivo Reenvio`, que o
+sistema NUNCA escreve**) + 6 colunas SQLite + o cron de reconciliação repondo `Classificação` vazia;
+**(T5)** modal de triagem do `/dashboard` grava os motivos em coluna própria, **sem tocar `Observações`**;
+**(T6)** o **autor vê o motivo** (aviso "Projeto reprovado" no card de Meus Projetos + bloco em
+`/projeto/$id`); **(T7)** régua de 1 página para o Rafa + `spec-docs/SPEC_CRITERIOS_PROJETO.md` (D1–D10).
+**723 testes verdes** (+65), `build` + `build:worker` OK (`worker.js` recomitado), `CLAUDE.md`/`docs/`
+atualizados (entrando enxugando: o bullet de carga×escala e o de alocação de ganhos foram condensados).
+De quebra, **reuso em vez de duplicação**: o card de checkbox foi extraído da Etapa 2.5 para
+`CardCheckboxGroup` e agora serve às duas telas.
+⚠️ **Os 3 cabeçalhos foram conferidos na planilha** em 29/07: `GoDocs` já tinha as colunas; a aba `STAGING`
+**não** tinha e o Luis as criou na hora (as duas abas agora com 51 colunas, grafia idêntica).
+⚠️ **Revisores de contexto fresco NÃO rodaram** — decisão do Luis nesta sessão (as instruções da sessão
+restringem subagentes); a revisão do diff (30 arquivos) acontece na validação em staging.
+
+_(Antes desta:)_ **2026-07-29 (planejamento)** — nova frente, pedida pelo Luis: **apertar o critério de
 projeto** (o pedido do Rafa, caso da **nuvem de palavras**). Plano ✅ **aprovado** em
 [`docs/plans/criterios-projeto-classificacao.md`](plans/criterios-projeto-classificacao.md). Escopo: (a) **2
 perguntas determinísticas na Etapa 2** — "moveu sensivelmente o ponteiro de custo/receita/KPI?" + "onde isso
@@ -66,9 +90,9 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 
 ## Plano ativo
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
-Status: ✅ **aprovado (Luis, 2026-07-29)** — pronto para `/ggsd:code`, na ordem **T1 → T7**.
-Critério de projeto: perguntas-chave na Etapa 2 + classificação em 3 níveis no analisador + reprovação com
-motivo nas colunas novas. **Barrar submissão segue FORA em definitivo** (a reprovação é pós-envio).
+Status: ✅ **executado (2026-07-29)** — código completo (T1–T7). **O que falta não é código:** validar no
+**staging `edf400b4`** → **prod `674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção
+(reprovar projeto é visível ao autor). **Barrar submissão segue FORA em definitivo.**
 
 **⚠️ Frente PARALELA, não sobrescrita — [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** ·
 Status: ✅ **aprovado (Luis, 2026-07-28)**, T1 executado, **ainda pendente de código**: **A1** (o gate da
@@ -120,31 +144,29 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Executar o plano [criterios-projeto-classificacao](plans/criterios-projeto-classificacao.md)** com
-`/ggsd:code`, T1 → T7. Worktree novo a partir de **`origin/main` (`ad64895`)** — a branch atual
-`docs/plano-loadings-dashboard-admin` é **só de docs e está ATRÁS do main** (o `/dashboard` de triagem e o
-`dashboard-admin.functions.ts` **não existem** nela; só no `main`).
+**Validar `feat/criterios-projeto-classificacao` no STAGING (`edf400b4`) e depois promover** — regra 13.
+Nesta ordem:
+1. **Calibrar a régua com o Rafa** — [`docs/criterios-projeto-recorrencia-evidencia.md`](criterios-projeto-recorrencia-evidencia.md).
+   É o gate humano que o plano de 28/07 exigia; reprovar projeto é visível ao autor. Pode rodar em paralelo
+   com o staging, mas **não** vai a prod sem o OK dele.
+2. **Deploy no staging `edf400b4`** (fluxo do "Deploy rápido"; ⚠️ o `scripts/deploy-godeploy.sh` recebe o
+   **TOKEN**, não a URL, e o `uploadId` é **single-use** — novo `getUploadToken` entre staging e prod).
+3. **Validar os 3 cenários** dos critérios de aceitação, na aba `STAGING`: (a) submissão tipo "nuvem de
+   palavras" → `Classificação = "Claro não — …"`, `Status = Reprovado`, `Motivo Reprovado` preenchido;
+   (b) saving recorrente com indicador nomeado → `Claro sim` + `Status = Pendente` (nada mudou para ele);
+   (c) ganho real sem fonte verificável → `Zona cinzenta` + `Em validação`. Conferir que **nenhuma outra
+   coluna mudou** e que `Observações` fica intacta ao gravar motivo pelo `/dashboard`.
+4. **Prod `674a3710`** + `gh pr create` (conta **`LuisEduardo100`**, que tem WRITE; `rpaiagogroup` é READ).
 
-**Antes de escrever a primeira linha, nesta ordem:**
-1. **Conferir a grafia exata** dos 3 cabeçalhos novos (`Classificação`, `Motivo Reprovado`, `Motivo Reenvio`)
-   nas abas **`GoDocs`** e **`STAGING`** — o Luis já criou as colunas, mas o mapeamento é **por nome** e um
-   acento diferente faz a coluna ser **ignorada com aviso**, silenciosamente. As duas abas já divergem em
-   posição de coluna.
-2. Ler o plano ativo inteiro + a seção **"Decisões fechadas que NÃO podem ser corrigidas por engano"**
-   (`spec-docs/`, regra 12).
-3. Invocar a skill **`frontend-design`** antes da UI da Etapa 2 e do modal de triagem (regra 11).
-
-**Ordem sugerida de execução:** T4 (colunas/sync — desbloqueia a verificação) → T1 (Etapa 2) → T3 (analisador
-+ `normalizarClassificacao`) → T2 (memorial/agente) → T5 (`/dashboard`) → T6 (motivo visível ao autor — **é
-julgamento do Claude, confirmar com o Luis se mantém**) → T7 (régua de 1 página pro Rafa).
-
-**2 pontos de atenção que o Luis já conhece e não devem ser "corrigidos" por engano:**
-- **Não** encerrar a regra TEMPORÁRIA do `Pendente` (decisão D1: a única exceção é `claro_nao → Reprovado`).
-- **Não** mexer no `CHECK` de `projetos.status` (exigiria rebuild da tabela); o discriminador da reprovação é a
-  coluna nova `classificacao_avaliacao`.
-- ⚠️ A régua do Rafa tinha **gate humano** no plano de 28/07 ("nenhum código encosta na régua antes do OK
-  dele"). O Luis mandou codar; a régua sai no mesmo PR (T7) e **deve ser calibrada com o Rafa antes do deploy
-  em produção** — reprovar projeto é visível ao autor.
+**Pendências conhecidas (não bloqueiam o staging):**
+- **Harness E2E** (`scripts/e2e/`) valida A→AS e ainda **não** cobre as 3 colunas novas.
+- Projetos **legados** ficam com `Classificação = "—"` até serem reanalisados — **sem backfill** (decisão
+  implícita: o cron só repõe o que o SQLite tem).
+- Frente **paralela** [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md):
+  **A1** (o gate da alocação precisa aceitar "menos custo" — a taxonomia de impacto do T3 é reaproveitável)
+  e **A2** (materialidade nos gates) seguem pendentes de código.
+- ⚠️ `CLAUDE.md` em **~45,7k chars** (limite recomendado 40k; entrou +0,6k líquido nesta sessão, já com dois
+  bullets condensados). Continua valendo uma sessão de enxugamento.
 
 ✅ **T6 dos loadings encerrado em 2026-07-28:** branch já estava 0 atrás do `origin/main`; 658 testes + `build`
 + `build:worker` verdes (`worker.js` inalterado); **staging `edf400b4`** validada no navegador pelo Luis;

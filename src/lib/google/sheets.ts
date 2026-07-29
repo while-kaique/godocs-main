@@ -93,6 +93,18 @@ export const SHEET_COLUMNS = [
   // Análise do antiagente (crítico adversarial — F5). Coluna de TEXTO: "—" quando
   // ainda não há análise (F5 a preenche depois). Já mapeada p/ não ficar em branco.
   'Análise Antiagente',
+  // ─── Critério de projeto (recorrência · contrafactual · rastreabilidade) ────
+  // ⚠️ "Motivo Reenvio" é MANUAL — preenchida pela TRIAGEM humana no /dashboard; o
+  // sync do sistema NUNCA a escreve (mesmo tratamento das colunas de Diff). Está
+  // mapeada aqui só para o /dashboard poder gravá-la por nome.
+  'Motivo Reenvio',
+  // Motivo da reprovação: escrito pelo sistema quando a classificação é "claro não"
+  // (nunca reprova sem motivo) e sobreponível pela triagem. "—" quando não se aplica.
+  'Motivo Reprovado',
+  // Classificação de elegibilidade + justificativa, SEMPRE preenchida pelo sistema
+  // ("Claro sim — …" / "Claro não — …" / "Zona cinzenta — …"). Edição manual desta
+  // coluna é sobrescrita na próxima submissão/resync.
+  'Classificação',
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
