@@ -4,7 +4,24 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-28 (código) — **`/dashboard` do admin virou a tela de triagem sobre a PLANILHA**,
+**Última sessão:** 2026-07-29 (planejamento) — nova frente, pedida pelo Luis: **apertar o critério de
+projeto** (o pedido do Rafa, caso da **nuvem de palavras**). Plano ✅ **aprovado** em
+[`docs/plans/criterios-projeto-classificacao.md`](plans/criterios-projeto-classificacao.md). Escopo: (a) **2
+perguntas determinísticas na Etapa 2** — "moveu sensivelmente o ponteiro de custo/receita/KPI?" + "onde isso
+pode ser verificado?" (rastreabilidade, que hoje **não existe** em lugar nenhum) e "se desligar hoje, quem
+reclama e o que piora?" (contrafactual); (b) **"que processo mudou e quanto?"** vira seção obrigatória do
+`MEMORIAL_ESQUELETO`, perguntada pelo **agente** só quando a doc não traz a magnitude; (c) o **analisador
+classifica** em **claro sim / claro não / zona cinzenta**, **sempre** explicando o porquê, com
+`normalizarClassificacao()` puro (nunca reprova sem motivo; especial nunca reprova automático; >R$5k → zona
+cinzenta); (d) `claro não` grava **`Reprovado`** na coluna Status — **única exceção** à regra TEMPORÁRIA do
+"Pendente", que continua valendo para todo o resto; (e) 3 colunas **já criadas pelo Luis** na planilha
+(`Classificação` sempre preenchida · `Motivo Reprovado` · `Motivo Reenvio`, esta **só humana**); (f) modal de
+triagem do `/dashboard` grava os motivos em coluna própria, **sem tocar em `Observações`** (que o disparo de
+e-mails usa). **Barrar submissão continua FORA em definitivo** — a reprovação é pós-envio, no analisador.
+Achado que economiza trabalho: **`Reprovado` já existe** em `STATUS_GRAVAVEIS` e no `StatusBadge` (PR #214), e
+**`usa_ai_proxy` é o padrão exato a clonar** para as perguntas novas da Etapa 2. **Nenhum código alterado.**
+
+_(Antes desta:)_ **2026-07-28 (código)** — **`/dashboard` do admin virou a tela de triagem sobre a PLANILHA**,
 branch `feat/dashboard-admin-sheets`, commit `5ef927a`. A tela lia o **SQLite** (`getProjetos` →
 `getProjetosWithArea`) e por isso mostrava **rascunho** e um **status que não é fonte de verdade** (o sync
 reverso exclui `status` de propósito). Agora lê `readAllRows()`. Entregue: busca instantânea
@@ -48,10 +65,17 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**→ [docs/plans/perguntas-agente-recorrencia-evidencia.md](plans/perguntas-agente-recorrencia-evidencia.md)** ·
-Status: ✅ **aprovado (Luis, 2026-07-28)** — T1 executado; pronto para `/ggsd:code` (ordem: **A1** taxonomia de
-impacto + anti-loop no juiz do preview · **A2** materialidade nos gates · **T2** régua do Rafa em paralelo ·
-**T4** fluxo de coleta). **Barrar submissão está FORA em definitivo.**
+**→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
+Status: ✅ **aprovado (Luis, 2026-07-29)** — pronto para `/ggsd:code`, na ordem **T1 → T7**.
+Critério de projeto: perguntas-chave na Etapa 2 + classificação em 3 níveis no analisador + reprovação com
+motivo nas colunas novas. **Barrar submissão segue FORA em definitivo** (a reprovação é pós-envio).
+
+**⚠️ Frente PARALELA, não sobrescrita — [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** ·
+Status: ✅ **aprovado (Luis, 2026-07-28)**, T1 executado, **ainda pendente de código**: **A1** (o gate da
+alocação precisa aceitar "menos custo", não só "mais saída" — + anti-loop no juiz do preview) · **A2**
+(materialidade nos gates) · **T4** (fluxo de coleta). Coexiste com o plano ativo (ADR-026) e é **adjacente**:
+a taxonomia de impacto escrita no T3 do plano ativo deve ser reaproveitável pelo A1. O **T2** (régua do Rafa)
+foi **absorvido** pelo T7 do plano ativo — não fazer duas vezes.
 
 _[loadings-dashboard-admin](plans/loadings-dashboard-admin.md) saiu de ativo: **✅ CONCLUÍDO** — T1–T5 no commit
 `3b93c65` e o **T6 fechado em 2026-07-28**: staging validada → **prod `674a3710`** → **PR #215 mergeado**
@@ -96,11 +120,31 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Frente das perguntas do agente** — abrir com `/ggsd:code` sobre o plano ativo
-[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md), na ordem já
-aprovada: **A1** (taxonomia de impacto — o gate da alocação precisa aceitar "menos custo", não só "mais saída"
-— + anti-loop no juiz do preview) · **A2** (materialidade nos gates) · **T2** (régua do Rafa) · **T4** (fluxo
-de coleta). **Barrar submissão está FORA em definitivo.** Worktree novo a partir do `main` (`ad64895`).
+**Executar o plano [criterios-projeto-classificacao](plans/criterios-projeto-classificacao.md)** com
+`/ggsd:code`, T1 → T7. Worktree novo a partir de **`origin/main` (`ad64895`)** — a branch atual
+`docs/plano-loadings-dashboard-admin` é **só de docs e está ATRÁS do main** (o `/dashboard` de triagem e o
+`dashboard-admin.functions.ts` **não existem** nela; só no `main`).
+
+**Antes de escrever a primeira linha, nesta ordem:**
+1. **Conferir a grafia exata** dos 3 cabeçalhos novos (`Classificação`, `Motivo Reprovado`, `Motivo Reenvio`)
+   nas abas **`GoDocs`** e **`STAGING`** — o Luis já criou as colunas, mas o mapeamento é **por nome** e um
+   acento diferente faz a coluna ser **ignorada com aviso**, silenciosamente. As duas abas já divergem em
+   posição de coluna.
+2. Ler o plano ativo inteiro + a seção **"Decisões fechadas que NÃO podem ser corrigidas por engano"**
+   (`spec-docs/`, regra 12).
+3. Invocar a skill **`frontend-design`** antes da UI da Etapa 2 e do modal de triagem (regra 11).
+
+**Ordem sugerida de execução:** T4 (colunas/sync — desbloqueia a verificação) → T1 (Etapa 2) → T3 (analisador
++ `normalizarClassificacao`) → T2 (memorial/agente) → T5 (`/dashboard`) → T6 (motivo visível ao autor — **é
+julgamento do Claude, confirmar com o Luis se mantém**) → T7 (régua de 1 página pro Rafa).
+
+**2 pontos de atenção que o Luis já conhece e não devem ser "corrigidos" por engano:**
+- **Não** encerrar a regra TEMPORÁRIA do `Pendente` (decisão D1: a única exceção é `claro_nao → Reprovado`).
+- **Não** mexer no `CHECK` de `projetos.status` (exigiria rebuild da tabela); o discriminador da reprovação é a
+  coluna nova `classificacao_avaliacao`.
+- ⚠️ A régua do Rafa tinha **gate humano** no plano de 28/07 ("nenhum código encosta na régua antes do OK
+  dele"). O Luis mandou codar; a régua sai no mesmo PR (T7) e **deve ser calibrada com o Rafa antes do deploy
+  em produção** — reprovar projeto é visível ao autor.
 
 ✅ **T6 dos loadings encerrado em 2026-07-28:** branch já estava 0 atrás do `origin/main`; 658 testes + `build`
 + `build:worker` verdes (`worker.js` inalterado); **staging `edf400b4`** validada no navegador pelo Luis;
