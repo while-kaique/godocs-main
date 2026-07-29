@@ -9,7 +9,7 @@ SPA React com TanStack Router (file-based routing). Entry point: `src/main.tsx` 
 | `/` | `routes/index.tsx` | Público | Home com 3 cards de ação (Submeter, Editar, Reenviar) |
 | `/submeter` | `routes/submeter.tsx` | Público | Formulário 3 etapas + chat IA (página mais complexa) |
 | `/auth` | `routes/auth.tsx` | Público | Redireciona para `/dashboard` |
-| `/dashboard` | `_authenticated/dashboard.tsx` | Admin/Leader | Projetos submetidos |
+| `/dashboard` | `_authenticated/dashboard.tsx` | Admin/Leader | **Triagem** — projetos da planilha: busca, filas de status, paginação, ficha em overlay + mudança de status (ver `spec-docs/SPEC_DASHBOARD_ADMIN.md`) |
 | `/usuarios` | `_authenticated/usuarios.tsx` | Admin Master | CRUD de usuários com roles e áreas |
 | `/areas` | `_authenticated/areas.tsx` | Admin Master | CRUD áreas + botão sync TeamGuide |
 | `/investigador` | `_authenticated/investigador.tsx` | Admin Master | 3 abas — **Submetidos** (submissão original), **Edições** (1 linha por reenvio, com chat/API/métricas da edição), **Abandonados** (rascunho parado > 1h). Detalhe tem seletor de versão (Original/Edição/Atual); o histórico do chat intercala os valores marcados no formulário (`form_events`) e o marcador "Voltou e editou". Polling 8s |

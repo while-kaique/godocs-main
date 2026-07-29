@@ -36,6 +36,11 @@ import {
   updateConfiguracao,
   getUsuarios,
 } from '@/lib/admin.functions'
+import {
+  listarProjetosDashboard,
+  getProjetoDashboard,
+  definirStatusProjeto,
+} from '@/lib/dashboard-admin.functions'
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
 import { getSugestoesParticipantes } from '@/lib/participantes.functions'
 import { syncSheetsToSqlite } from '@/lib/google/sync-reverse'
@@ -371,6 +376,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request)
       const id = pathname.split('/').pop()!
       return json(await getProjetoDetalhes(id))
+    }
+
+    // ── Dashboard do admin (triagem sobre a PLANILHA, não o SQLite) ──
+    // Ver src/lib/dashboard-admin.functions.ts: a listagem vem de readAllRows() porque
+    // o "Status" que vale é o da coluna do Sheets. `?refresh=1` fura o cache de 60s.
+    if (pathname === '/api/admin/dashboard/projetos' && method === 'GET') {
+      await requireAdmin(request)
+      const refresh = url.searchParams.get('refresh') === '1'
+      return json(await listarProjetosDashboard(refresh))
+    }
+    if (pathname.startsWith('/api/admin/dashboard/projetos/') && method === 'GET') {
+      await requireAdmin(request)
+      const id = decodeURIComponent(pathname.split('/').pop()!)
+      return json(await getProjetoDashboard(id))
+    }
+    if (pathname === '/api/admin/dashboard/status' && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await definirStatusProjeto(body, adminEmail))
     }
 
     if (pathname === '/api/admin/usuarios' && method === 'GET') {

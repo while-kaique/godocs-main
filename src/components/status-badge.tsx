@@ -35,6 +35,15 @@ const STATUS_CONFIG: Record<
     color: "var(--go-blue)",
     icon: <Clock className="h-3.5 w-3.5" />,
   },
+  // Rótulo que a triagem grava pelo dashboard do admin quando pede a correção antes
+  // mesmo de analisar ("Em validação" = alguém está olhando agora).
+  "em validação": {
+    label: "Em validação",
+    bg: "rgba(0,89,169,0.06)",
+    border: "rgba(0,89,169,0.15)",
+    color: "var(--go-blue)",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
   "reenvio pendente": {
     label: "Reenvio Pendente",
     bg: "rgba(215,219,0,0.08)",
@@ -62,6 +71,15 @@ const STATUS_CONFIG: Record<
     border: "rgba(215,219,0,0.25)",
     color: "#8a7d00",
     icon: <RotateCcw className="h-3.5 w-3.5" />,
+  },
+  // Recusado de vez (≠ "Reenvio Pendente", que espera correção): vermelho + XCircle,
+  // para não depender da cor. Gravado pela triagem no dashboard do admin.
+  reprovado: {
+    label: "Reprovado",
+    bg: "rgba(220,38,38,0.06)",
+    border: "rgba(220,38,38,0.2)",
+    color: "#dc2626",
+    icon: <XCircle className="h-3.5 w-3.5" />,
   },
   // Projeto arquivado/aposentado: cinza-ardósia (distinto do cinza de "Rascunho", e o
   // ícone Archive não deixa o estado depender só da cor). Não conta como pendência.

@@ -47,8 +47,11 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 ### Admin (todas requerem `requireAdmin`)
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/admin/projetos` | Lista projetos com área |
+| GET | `/api/admin/projetos` | Lista projetos com área (**SQLite** — usado pelo resto do admin) |
 | GET | `/api/admin/projetos/:id` | Detalhes completos (chat + doc + validações) |
+| GET | `/api/admin/dashboard/projetos` | **Triagem** — lista da **PLANILHA** (`readAllRows`), campos de tabela + índice de busca + contagem por status. `?refresh=1` fura o cache de 60 s |
+| GET | `/api/admin/dashboard/projetos/:id` | Linha inteira da planilha (todas as células preenchidas) + histórico de status. Sai do mesmo cache |
+| POST | `/api/admin/dashboard/status` | Grava "Status" (+"Observações") na planilha e audita em `admin_status_log`. **Nunca** escreve "Atualizado Em" |
 | GET/POST | `/api/admin/usuarios` | CRUD de usuários |
 | POST | `/api/admin/users` | Cria usuário (profile + roles + leader_areas) |
 | POST | `/api/admin/users/delete` | Remove usuário (impede auto-deleção) |
