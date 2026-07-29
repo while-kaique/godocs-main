@@ -189,3 +189,22 @@ formulário chegava aos prompts por **whitelist manual**, e só a fase de doc in
 4. Frente **paralela** [`perguntas-agente-recorrencia-evidencia`](../docs/plans/perguntas-agente-recorrencia-evidencia.md):
    **A1** (o gate da alocação precisa aceitar "menos custo" — a taxonomia de impacto escrita aqui é
    reaproveitável) e **A2** (materialidade nos gates) seguem pendentes de código.
+
+## D11 — Gate determinístico do `[1.3]`/`[1.4]`: **DECIDIDO — fazer** (2026-07-29)
+
+A **pendência 3** ("o prompt segura sozinho?") foi resolvida **com medição**, não por opinião: 7 conversas
+na staging (runs `stg-ctx-01`/`stg-ctx-02`) mostraram o agente acertando os comportamentos **3, 4 e 5**
+(aceita "não sei" **sem inventar fonte**; não repete; não pergunta o que já sabe — **1,8–2,7 perguntas por
+submissão** contra a baseline de 6,4) e **falhando os 1 e 2**: no modo **receita** o memorial fecha sem a
+seção `Processo alterado` (as 2 rodadas) e sem `Ponteiro movido e onde verificar` (1 rodada); no
+**custo evitado puro** o `[1.4]` sai pela metade (`**Ponteiro movido:** custo externo eliminado.`, sem o
+"onde verificar") nas 2 rodadas. Pela régua do roteiro → **gate**, versão barata (extrai antes do preview;
+ausente/vaga → bloqueia e pergunta **1× só**, depois segue; clona `alocacao_ganhos`). Detalhe e evidência:
+[`docs/roteiro-validacao-criterios.md`](../docs/roteiro-validacao-criterios.md) · tarefa **T8** em
+[`docs/plans/criterios-projeto-classificacao.md`](../docs/plans/criterios-projeto-classificacao.md).
+
+⚠️ **O que essa medição NÃO cobriu:** o lado do **analisador** (`Classificação` / `Reprovado` /
+`Motivo Reprovado`). Nos 7 projetos a coluna saiu `—` porque a análise **morre antes de gravar** na staging
+(timeout de 25s no proxy → fallback → `waitUntil` cancelado), com a `Complexidade` vazia junto — **não é
+bug do código de classificação**, é o modo de falha já conhecido, e na staging o cron `reanalisar-pendentes`
+**não dispara**. Os critérios de aceitação **1 a 4** do plano continuam **sem evidência**.

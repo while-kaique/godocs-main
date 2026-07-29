@@ -54,3 +54,45 @@ de falha silencioso.
 
 ⚠️ **Pré-requisito:** rodar **depois** do bloco `buildRespostasFormulario` — validar um agente cego
 ao contrafactual mediria o prompt errado.
+
+---
+
+## RESULTADO — executado em 2026-07-29 (staging `edf400b4`, runs `stg-ctx-01` + `stg-ctx-02`)
+
+**7 conversas** medidas via E2E (`E2E_ONLY=saving-puro,custo-evitado-puro,receita-pura[,especial]`,
+`GOOGLE_SHEETS_TAB=STAGING`) + `scripts/e2e/inspect-perguntas.mjs`.
+
+| Ponto | Veredito | Evidência |
+|---|---|---|
+| **1** — `[1.4]` existe | ❌ **falhou 1×** | ausente no `receita-pura` do `stg-ctx-02` (presente no `stg-ctx-01`) |
+| **2** — fonte nomeada | ❌ **falhou 2×** | `custo-evitado-puro` gravou só a metade da seção — `**Ponteiro movido:** custo externo eliminado.`, **sem** o "onde verificar" — nas DUAS rodadas |
+| **3** — aceita "não sei" e registra | ✅ | `saving-puro`/`stg-ctx-01`: _"não foi informada uma planilha, relatório ou base específica com nome próprio para conferência"_ — **não inventou fonte** |
+| **4** — não repete | ✅ | 0 repetições de (a)/(b) em 7 conversas |
+| **5** — não pergunta o já sabido | ✅ | **0** perguntas de ponteiro — deduziu do contrafactual/doc, como projetado |
+| `[1.3]` no modo receita (cenário 8) | ❌ **falhou 2×** | ausente no `receita-pura` nas duas rodadas |
+| Perguntas/submissão | ✅ | **1,8–2,7** contra baseline de **6,4** — as duas seções novas não engordaram o funil |
+
+O `especial` (`stg-ctx-02`) sai sem as duas seções **por construção** (pula o chat, não tem memorial
+financeiro) — não conta como falha.
+
+### Decisão (Luis, 2026-07-29): **FAZER O GATE**
+Pela própria regra acima (ponto 1 falhando ainda que 1×), na versão barata: extrair as seções antes do
+preview; concreta → libera; ausente/vaga → **bloqueia e pergunta 1× só**, depois segue. Clonar
+`alocacao_ganhos` em `enviarMensagem`. O modo **receita** é o caso reprodutível — começar por ele.
+
+### ⚠️ Achados de método (não repetir o erro)
+1. **O `inspect-perguntas.mjs` mentia** — lia `{messages:[…]}` com `content` em JSON, mas
+   `/api/chat/historico/:id` devolve **array achatado** com `content` em **texto puro** e
+   `options`/`fase`/`isPreview` como campos irmãos. Reportava **0 pergunta e 0 memorial em toda
+   conversa** — falso negativo silencioso que levava à conclusão oposta ("o agente não faz nada").
+   Corrigido nesta sessão.
+2. **O ponto 3 foi validado sem humano no navegador** — ao contrário do que o handoff supunha: o
+   respondedor do E2E se esquivou por conta própria ("não há nome de planilha para citar") e o agente
+   registrou a ausência honestamente.
+3. **O lado do ANALISADOR segue SEM validação** (`Classificação`, `Reprovado`, `Motivo Reprovado`):
+   nos 7 projetos a coluna saiu `—` porque a análise **morre antes de gravar**, não por bug do código
+   novo. Log da staging, idêntico nos 7: `[llm] Falha de TIMEOUT … 25000ms (proxy não respondeu)` →
+   `fallback p/ OpenAI direto` → **`waitUntil() tasks did not complete … have been cancelled`**.
+   `Complexidade` fica vazia junto — é o modo de falha conhecido. A rede seria o cron
+   `reanalisar-pendentes`, mas na staging ele estava **disabled**; habilitado às 17:02 (`ejrje7my8g4c`),
+   continuou `last=never` com o `next` escorregando — **o cron de 1 min não dispara na staging**.

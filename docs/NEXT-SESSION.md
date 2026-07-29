@@ -4,18 +4,51 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-> **▶ PRÓXIMO PASSO:** rodar **`node scripts/e2e/inspect-perguntas.mjs stg-ctx-01`** (com
-> `E2E_BASE_URL=https://godocs-staging.devgogroup.com`) para ler as perguntas do run E2E que ficou **em voo**
-> no fim da sessão — se o run não completou, redisparar (comando na seção "E2E" abaixo). Depois: os cenários
-> **manuais** do [`roteiro`](roteiro-validacao-criterios.md) que o E2E não cobre (o ponto 3 — responder "não
-> sei onde conferir" e ver se o agente **inventa** fonte) → decidir o gate do `[1.4]` → prod `674a3710` → PR,
-> com a régua calibrada com o Rafa. ⚠️ **Limpar o run:** `npm run e2e:cleanup -- stg-ctx-01` (planilha ANTES
-> do SQLite, senão o sync reverso ressuscita as linhas).
+> **▶ PRÓXIMO PASSO:** `/ggsd:code` — implementar o **gate determinístico do `[1.3]`/`[1.4]`**
+> (**decidido pelo Luis em 2026-07-29**, com a evidência da staging): antes do preview, extrair as duas
+> seções do memorial; concretas → libera; ausente/vaga → **bloqueia e pergunta 1× só**, depois segue.
+> Clonar `alocacao_ganhos` em `enviarMensagem` (~30 linhas). **Começar pelo modo receita**, que é o caso
+> reprodutível. Depois: destravar a validação do ANALISADOR (ver "bloqueio" abaixo) → prod `674a3710` → PR.
 
-## STAGING JÁ DEPLOYADA (2026-07-29 16:40) — commit `53e8ef8`
+## Sessão de 2026-07-29 (4ª rodada) — a validação em staging RODOU: o agente passa em 3 de 5, e o gate foi decidido
 
-`edf400b4` (`godocs-staging.devgogroup.com`) está com o código do contexto do formulário. Prod `674a3710`
-**intacta** (segue sem a feature inteira). Testes/build/`worker.js` refeitos antes do upload.
+Branch `feat/criterios-projeto-classificacao`. **739 testes verdes** (baseline conferido, nada de produto
+mudou). Único código tocado: **`scripts/e2e/inspect-perguntas.mjs`** (ferramenta de diagnóstico).
+
+**7 conversas** contra a staging (runs `stg-ctx-01` + `stg-ctx-02`, o 2º com o cenário `especial`).
+Resultado completo, com evidência por ponto, em
+[`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) (seção "RESULTADO"). Em resumo:
+pontos **3, 4 e 5 ✅** (aceita "não sei" **sem inventar fonte** · zero repetição · **zero** pergunta de
+ponteiro — deduz do contrafactual, como projetado, com **1,8–2,7 perguntas/submissão** contra a baseline
+de 6,4); pontos **1 e 2 ❌** — o `receita-pura` fecha **sem o `[1.3]`** (as 2 rodadas) e **sem o `[1.4]`**
+(1 rodada), e o `custo-evitado-puro` grava só metade do `[1.4]` (`**Ponteiro movido:** custo externo
+eliminado.`, sem o "onde verificar") nas 2 rodadas. Pela regra de decisão do roteiro → **fazer o gate**.
+
+⚠️ **O inspetor de perguntas estava MENTINDO** — lia `{messages:[…]}` com `content` em JSON, mas
+`/api/chat/historico/:id` devolve **array achatado** com `content` em **texto puro** (`options`/`fase`/
+`isPreview` são campos irmãos). Reportava **0 pergunta e 0 memorial em TODA conversa**: um falso negativo
+silencioso que levava à conclusão oposta ("o agente ignora as seções"). Corrigido e comentado no arquivo.
+**Lição:** instrumentação que só produz zeros é suspeita — confira contra o payload cru antes de concluir.
+
+### ⛔ BLOQUEIO da próxima rodada — o ANALISADOR nunca foi validado (e não é bug do código novo)
+Nos 7 projetos a coluna `Classificação` saiu **`—`** e a `Complexidade` **vazia**. Causa, idêntica nos 7
+no log da staging: `[llm] Falha de TIMEOUT … 25000ms (proxy não respondeu)` → `fallback p/ OpenAI direto`
+→ **`waitUntil() tasks did not complete … have been cancelled`**. A análise morre antes de gravar; o
+código de classificação (T3/T4) **não chega a rodar**. A rede seria o cron `reanalisar-pendentes`, que na
+staging estava **`disabled`** — habilitei (`ejrje7my8g4c`, 17:02) e ele **continuou `last=never`**, com o
+`next` escorregando: **o cron de 1 minuto não dispara na staging**. ⚠️ **Deixei o cron LIGADO** — decidir
+se fica. Sem destravar isto, os critérios de aceitação **1 a 4** do plano (nuvem de palavras →
+`Reprovado` + motivo; `Classificação` nunca vazia) seguem **sem nenhuma evidência** e **não se pode ir a prod**.
+Caminhos: (a) fazer a análise aterrissar no próprio request (o fallback não cabe em 25s + `waitUntil`);
+(b) fazer o cron disparar na staging; (c) validar o analisador por teste/local em vez de staging.
+
+### Limpeza pendente
+Linhas `[E2E-stg-ctx-01]` e `[E2E-stg-ctx-02]` na aba **STAGING** (7 projetos). O SQLite é limpo em bloco
+pelo endpoint (pega todo `[E2E-…`), mas as linhas da planilha precisam sair:
+`npm run e2e:cleanup -- stg-ctx-01` e `… stg-ctx-02` (**planilha ANTES do SQLite**, senão o sync reverso
+ressuscita). ⚠️ **`E2E_COOKIE` expira 30/07/2026 22:41 UTC** — renove antes da próxima rodada.
+
+## STAGING deployada em 2026-07-29 16:40 — commit `53e8ef8` (prod `674a3710` intacta)
 
 ### E2E contra a staging — o que aprendi (reusável)
 

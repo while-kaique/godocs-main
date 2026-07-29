@@ -50,23 +50,25 @@ for (const r of run.results) {
     continue;
   }
 
-  const msgs = hist.messages ?? hist.chat_messages ?? [];
+  // ⚠️ O endpoint devolve um ARRAY JÁ ACHATADO de mensagens — não `{messages:[...]}` — e o
+  // `content` é TEXTO PURO, com `options`/`fase`/`isPreview`/`isComplete` como campos irmãos
+  // (não um JSON `{type,content}` como o orquestrador devolve na rota de chat). Ler como JSON
+  // fazia toda conversa reportar 0 pergunta e 0 memorial — falso negativo silencioso.
+  const msgs = Array.isArray(hist) ? hist : (hist.messages ?? hist.chat_messages ?? []);
   const perguntas = [];
   let memorial = '';
   for (const m of msgs) {
     if (m.role !== 'assistant') continue;
-    let p;
-    try {
-      p = JSON.parse(m.content);
-    } catch {
-      continue;
+    const texto = String(m.content ?? '').replace(/\s+/g, ' ');
+    const fase = m.fase ?? '—';
+    // O memorial vive nos previews das fases financeiras (`saving_preview`/`receita_preview`).
+    if (m.isPreview && /###\s*(Contexto|O que gera)/i.test(texto)) memorial = String(m.content);
+    // Pergunta = turno do agente que não é preview/fechamento e que de fato pergunta
+    // (termina em "?" ou traz opções para clicar).
+    if (m.isPreview || m.isComplete) continue;
+    if ((m.options?.length ?? 0) > 0 || /\?\s*$/.test(texto)) {
+      perguntas.push({ fase, texto });
     }
-    if (p.type === 'question' || p.type === 'options') {
-      perguntas.push({ fase: p.fase ?? '—', texto: String(p.content ?? '').replace(/\s+/g, ' ') });
-    }
-    // O memorial vive no preview/complete das fases financeiras.
-    const mem = p.saving?.memorial_calculo ?? p.receita?.memorial_calculo;
-    if (mem) memorial = mem;
   }
 
   conversas++;
@@ -89,7 +91,8 @@ for (const r of run.results) {
   console.log(`    perguntas de magnitude:${daMagnitude.length}`);
   for (const q of perguntas) console.log(`      [${q.fase}] ${q.texto.slice(0, 160)}`);
   if (memorial) {
-    const secao = memorial.match(/#+\s*Ponteiro movido[^#]*/i);
+    // O agente grava o [1.4] como rótulo em negrito dentro de "### Contexto", não como heading.
+    const secao = memorial.match(/\*\*Ponteiro movido[^*]*\*\*[^\n]*/i) ?? memorial.match(/#+\s*Ponteiro movido[^#]*/i);
     if (secao) console.log(`    ── seção [1.4] gravada:\n       ${secao[0].replace(/\s+/g, ' ').slice(0, 400)}`);
   }
 }

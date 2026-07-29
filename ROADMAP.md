@@ -8,14 +8,14 @@
 
 **Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
 `feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** staging `edf400b4` **já deployada** com o `53e8ef8` (2026-07-29 16:40) — ler o resultado do run
-E2E `stg-ctx-01` com `scripts/e2e/inspect-perguntas.mjs`, rodar os cenários **manuais** do
-`docs/roteiro-validacao-criterios.md` (o ponto 3 não é automatizável), decidir o gate do `[1.4]` →
-**prod `674a3710`** → PR — **calibrando a régua com o Rafa antes de produção** (reprovar projeto é visível ao
-autor). ⚠️ Limpar o run: `npm run e2e:cleanup -- stg-ctx-01`.
-**⚠️ Frente paralela pendente de código:** `perguntas-agente-recorrencia-evidencia` (A1 — o gate da alocação
-precisa aceitar "menos custo" · A2 — materialidade nos gates).
-**Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — as colunas "Participantes 2"/"Contribuidor" já existem no Sheets
+**Próximo:** **codar o gate determinístico do `[1.3]`/`[1.4]`** (T8 do plano — **decidido em 2026-07-29**
+com a evidência das 7 conversas na staging: o agente passa em 3 dos 5 comportamentos, mas o modo **receita**
+fecha sem o `[1.3]` e o **custo evitado** grava só metade do `[1.4]`). Em seguida, **destravar a validação do
+analisador**, hoje **bloqueada**: na staging a análise morre antes de gravar (timeout de 25s no proxy →
+fallback → `waitUntil` cancelado) e o cron `reanalisar-pendentes` **não dispara**, então `Classificação`/
+`Reprovado`/`Motivo Reprovado` seguem **sem evidência** — os critérios de aceitação 1 a 4 do plano dependem
+disso e **não se vai a prod sem eles**. Só então **prod `674a3710`** → PR — **calibrando a régua com o Rafa
+antes de produção** (reprovar projeto é visível ao autor).
 
 ---
 

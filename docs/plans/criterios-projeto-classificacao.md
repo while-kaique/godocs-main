@@ -272,3 +272,18 @@ implementar 2× e perder no ramo especial; e, com o funil corrigido, mover **nã
 
 **Validação:** o roteiro dos 8 cenários + os 5 comportamentos observáveis do `[1.4]` + a regra de decisão do
 gate estão em [`docs/roteiro-validacao-criterios.md`](../roteiro-validacao-criterios.md).
+
+## T8 — Gate determinístico do `[1.3]`/`[1.4]` (decidido em 2026-07-29, com evidência)
+
+A validação em staging mostrou o prompt **não** segurando as duas seções: `receita-pura` fecha sem o
+`[1.3]` (2/2 rodadas) e sem o `[1.4]` (1/2); `custo-evitado-puro` grava só metade do `[1.4]` (2/2).
+Pela regra de decisão do roteiro ("ponto 1 falhando, mesmo 1× em 8 → fazer o gate") o Luis **confirmou
+o gate**, na versão barata:
+
+- Antes do preview, **extrair** as duas seções do memorial (helpers puros, no estilo de
+  `extrairAlocacaoGanhos`); **concretas → libera**.
+- Ausente/vaga → **bloqueia o preview e pergunta 1× só**, depois **segue** (anti-loop — a lição do
+  split carga×escala, que travou a edição). Clonar `alocacao_ganhos` em `enviarMensagem`, ~30 linhas.
+- **Começar pelo modo receita** (o caso reprodutível) e cobrir o `custo_evitado` (metade da seção).
+- Testes: os helpers de extração + o predicado do gate + o anti-loop, isolados.
+- ⚠️ Não transformar em gate os pontos 4/5 — eles **passaram**, e o roteiro avisa que gate ali pioraria.
