@@ -149,7 +149,12 @@ Nesta ordem:
 1. **Calibrar a régua com o Rafa** — [`docs/criterios-projeto-recorrencia-evidencia.md`](criterios-projeto-recorrencia-evidencia.md).
    É o gate humano que o plano de 28/07 exigia; reprovar projeto é visível ao autor. Pode rodar em paralelo
    com o staging, mas **não** vai a prod sem o OK dele.
-2. **Deploy no staging `edf400b4`** (fluxo do "Deploy rápido"; ⚠️ o `scripts/deploy-godeploy.sh` recebe o
+2. ✅ **FEITO (29/07/2026, 13:55) — deploy no staging `edf400b4`** com o bundle `index-IxZZkvb_.js`
+   (conferido no `index.html` servido; `/favicon.svg` = 200 `image/svg+xml`). Prod NÃO foi tocado.
+   Falta só o Luis validar no navegador: Etapa 2 (as 2 perguntas + "Nenhum" avançando) → 3 submissões dos
+   critérios de aceitação na aba `STAGING` → seção "Processo alterado" no memorial → motivo no `/dashboard`
+   com `Observações` intacta → aviso do motivo em Meus Projetos e `/projeto/$id`.
+   _(Runbook original, se precisar redeployar:)_ **deploy no staging `edf400b4`** (fluxo do "Deploy rápido"; ⚠️ o `scripts/deploy-godeploy.sh` recebe o
    **TOKEN**, não a URL, e o `uploadId` é **single-use** — novo `getUploadToken` entre staging e prod).
 3. **Validar os 3 cenários** dos critérios de aceitação, na aba `STAGING`: (a) submissão tipo "nuvem de
    palavras" → `Classificação = "Claro não — …"`, `Status = Reprovado`, `Motivo Reprovado` preenchido;
