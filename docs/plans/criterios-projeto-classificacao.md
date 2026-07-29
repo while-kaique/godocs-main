@@ -247,3 +247,28 @@ Dependentes: harness **E2E** (`scripts/e2e/`, valida A→AS — 3 colunas novas)
 `reenvio` lê `Status` + `Observações` **manuais** do Sheets) · sync reverso (as 3 fora de `SAFE_UPDATE_FIELDS`).
 Invariantes tocados: `MEMORIAL_ESQUELETO` como fonte única · mapeamento do Sheets **por nome** · memorial sem
 R$ visível ao usuário · `worker.js` commitado · staging antes de prod.
+
+## R3 — contexto do formulário chega ao agente (2026-07-29, commit `53e8ef8`)
+
+Achado ao conferir o que o agente de fato recebe: o ponto `[1.4]` era **cego ao contrafactual**.
+`contrafactual_afetados`/`contrafactual_reclamacao` eram gravados e lidos **só pelo analisador** — não
+existiam em `ProjetoContexto` nem no `SELECT` de `getProjetoContextoData`. Causa de fundo: o contexto do
+formulário chegava aos prompts por **whitelist manual de 14 campos**, e só a fase de doc injetava a descrição
+breve. Havia **dois canais** para o agente — o financeiro (`SavingColetado`, parâmetro próprio, completo) e o
+de contexto (a whitelist) — com os campos "antes do chat" divididos entre eles por acidente.
+
+- **`buildRespostasFormulario(ctx)`** — fonte única do bloco de formulário nos **4** prompts (doc · saving ·
+  receita · custo evitado). ⚠️ Campo novo no form entra AÍ + em `ProjetoContexto`/`getProjetoContexto`/
+  `getProjetoContextoData`; nunca solto num prompt.
+- **`buildDetalhesAprovados`** — fonte única do bloco herdado pelas 3 fases financeiras (era copiado nas
+  três) + `dependencias`/`configurar_antes`/`atencao`, de onde sai a fonte do `[1.4]`.
+- **`[1.4]`** deduz o ponteiro do contrafactual em vez de perguntar; propõe a fonte que a doc já nomeia.
+- **739 testes verdes** (`tests/contexto-formulario-agente.test.ts`, 13). `worker.js` rebuildado.
+
+**Decisão registrada (não reabrir sem motivo novo):** **"quem reclama" NÃO muda de tela.** Mover para a Etapa
+2.5 ou para depois da doc foi considerado e recusado — a **Etapa 2 é o único ponto por onde TODOS os projetos
+passam** (depois dela o fluxo abre em saving / receita / especial-que-pula-o-chat), então mover custaria
+implementar 2× e perder no ramo especial; e, com o funil corrigido, mover **não compra nada**.
+
+**Validação:** o roteiro dos 8 cenários + os 5 comportamentos observáveis do `[1.4]` + a regra de decisão do
+gate estão em [`docs/roteiro-validacao-criterios.md`](../roteiro-validacao-criterios.md).

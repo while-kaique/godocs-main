@@ -4,10 +4,51 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-> **▶ PRÓXIMO PASSO:** validar no **staging** (`https://godocs-staging.devgogroup.com/`) o fluxo refinado do
-> critério de projeto — submeter um projeto novo e conferir (a) o **agente pedindo o ponteiro movido + onde
-> verificar** no chat, e (b) o seletor **pessoa/time** em "quem reclama" na Etapa 2 — e os 3 cenários dos
-> critérios de aceitação; **depois** prod `674a3710` → PR, com a régua calibrada com o Rafa.
+> **▶ PRÓXIMO PASSO:** **deployar no staging `edf400b4`** (o commit `53e8ef8` NÃO está lá) e rodar os **8
+> cenários** de [`docs/roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md), conferindo os 5
+> comportamentos do `[1.4]` e contando as perguntas contra a baseline de **6,4/submissão**; a regra de
+> decisão do gate do `[1.4]` (pendência 3) sai desse resultado. **Depois** prod `674a3710` → PR, com a régua
+> calibrada com o Rafa.
+
+## Sessão de 2026-07-29 (código, 3ª rodada) — o contexto do formulário chega ao agente
+
+Branch `feat/criterios-projeto-classificacao`, commit **`53e8ef8`**, **739 testes verdes** (13 novos),
+`worker.js` rebuildado. **Nada deployado** — staging e prod seguem em `b6485e4`.
+
+**O defeito que a sessão fechou.** O ponto `[1.4]` nasceu **cego ao contrafactual**:
+`contrafactual_afetados`/`contrafactual_reclamacao` eram gravados e lidos **só pelo analisador** — não
+existiam em `ProjetoContexto` nem no `SELECT` de `getProjetoContextoData`. O agente pedia o ponteiro sem
+saber o que a pessoa respondera duas telas antes. Causa de fundo, achada ao investigar: o contexto do
+formulário chegava aos prompts por **whitelist manual de 14 campos**, e só a fase de doc injetava a
+descrição breve — havia **dois canais** para o agente (o financeiro, `SavingColetado`, sempre completo; e o
+de contexto, a whitelist), com os campos "antes do chat" divididos entre eles por acidente.
+
+- **`buildRespostasFormulario(ctx)`** (`orchestrator.ts`, pura) — **FONTE ÚNICA** do bloco "RESPOSTAS QUE O
+  AUTOR JÁ DEU NO FORMULÁRIO", nos **4** prompts (doc · saving · receita · custo evitado): descrição,
+  contrafactual (quem + o que piora), escopo/serviço externo, AI Proxy + as regras "nunca pergunte de novo"
+  e "aponte contradição em vez de escolher em silêncio". Vazio → bloco omitido inteiro.
+  ⚠️ **Campo novo no formulário entra AÍ** + em `ProjetoContexto`/`getProjetoContexto`/
+  `getProjetoContextoData` — nunca solto num prompt (foi assim que o contrafactual ficou órfão).
+- **`buildDetalhesAprovados`** — fonte única do bloco que as 3 fases financeiras herdam da doc (era copiado
+  literalmente nas três) + `dependencias`/`configurar_antes`/`atencao`, que é onde os **sistemas nomeados**
+  (Metabase, Protheus, base X) aparecem — matéria-prima do "onde alguém confere" do `[1.4]`.
+- **`[1.4]` parte do que já existe:** deduz o ponteiro do contrafactual e **não pergunta** quando dá para
+  deduzir; **propõe** a fonte que a doc já nomeia em vez de perguntar em aberto. Efeito esperado: as duas
+  perguntas novas custam **+0 a +1** em vez de +0 a +3.
+- **Decisão registrada — a pergunta NÃO se move de tela.** O Luis considerou mover "quem reclama" para a
+  Etapa 2.5 e depois para depois da doc; ambas recusadas com motivo: a **Etapa 2 é o único ponto por onde
+  TODOS os projetos passam** (depois dela o fluxo abre em saving / receita / especial-que-pula-o-chat), então
+  mover custaria implementar 2× e perder no ramo especial — e, com o funil corrigido, mover **não compra
+  nada**, porque o campo nunca foi invisível por causa da tela. ⚠️ Não reabrir sem motivo novo.
+- **Testes:** `tests/contexto-formulario-agente.test.ts` (13) — as 4 fases recebem o contrafactual, rótulo
+  pessoa×time, valor legado sem prefixo não derruba a tela, seções vazias não viram `"null"`.
+- **Roteiro de validação:** `docs/roteiro-validacao-criterios.md` — define o que é "o agente acerta **sem
+  trava**" (5 comportamentos observáveis, com o ponto 1 sendo o mais grave porque falha em SILÊNCIO), os 8
+  cenários e a **regra de decisão** do gate.
+
+⚠️ Os **5 erros de `tsc`** (`chat.functions.ts:1214/2955`, `submeter.tsx:446/566/589`) são **pré-existentes**
+— conferido com `git stash`. Não foram tocados.
+⚠️ **`CLAUDE.md` em 46,6k chars** (limite recomendado 40k; já estava em 44,6k) — enxugamento em PR próprio.
 
 **Última sessão:** 2026-07-29 (código, 2ª rodada) — **refinamento pós-staging do critério de projeto**
 (pedido do Luis depois de ver a Etapa 2 na staging), branch `feat/criterios-projeto-classificacao`, commit
@@ -70,6 +111,9 @@ por pessoa, alocação ≥44h), que vivem em `chat.functions.ts` e descartam o p
    travou a edição). ~1 extrator + 1 estado + ~30 linhas em `enviarMensagem`. **Faz sentido no MESMO passo da
    recorrência** (mesmo trecho de `chat.functions.ts`). ⚠️ Decidir **depois** do staging: a validação mostra
    com que frequência o agente acerta **sem** gate — se acertar sempre, o gate cai de prioridade.
+   ✅ **A pendência 1 (o agente não recebia o contrafactual) foi RESOLVIDA** no commit `53e8ef8`. A 3 segue
+   aberta, mas agora tem **critério de decisão escrito** (os 5 comportamentos + a regra) em
+   [`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) — não é mais julgamento no ato.
 
 ⚠️ **`CLAUDE.md` desta branch está em ~44,6k chars** (limite recomendado 40k) — vale um enxugamento em PR
 próprio; a seção do critério de projeto já foi escrita condensada.
@@ -161,11 +205,13 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 ## Plano ativo
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
 Status: ✅ **executado (2026-07-29)** — código completo (T1–T7) **+ refinamento R1/R2 pós-staging** (ponteiro
-movido migrado para o agente · "quem reclama" por seleção pessoa/time da Team Guide), commit `b6485e4`, 726
-testes verdes, staging redeployado. **O que falta não é código:** **validar no staging `edf400b4`** (os 3
-cenários da régua **+ o fluxo novo**: o agente pedindo o ponteiro no chat e o seletor pessoa/time na Etapa 2)
-→ **prod `674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção (reprovar projeto é visível
-ao autor). **Barrar submissão segue FORA em definitivo**; **não reintroduzir os cards de ponteiro na Etapa 2**.
+movido migrado para o agente · "quem reclama" por seleção pessoa/time da Team Guide) **+ R3: o contexto do
+formulário chega aos 4 prompts** (`buildRespostasFormulario`, commit `53e8ef8`), **739 testes verdes**.
+**O que falta não é código:** **deployar `53e8ef8` no staging `edf400b4`** (lá ainda está o `b6485e4`) e
+rodar os **8 cenários** de [`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) → **prod
+`674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção (reprovar projeto é visível ao autor).
+**Barrar submissão segue FORA em definitivo** · **não reintroduzir os cards de ponteiro na Etapa 2** ·
+**"quem reclama" NÃO se move de tela** (a Etapa 2 é o único ponto por onde todos os projetos passam).
 
 **⚠️ Frente PARALELA, não sobrescrita — [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** ·
 Status: ✅ **aprovado (Luis, 2026-07-28)**, T1 executado, **ainda pendente de código**: **A1** (o gate da

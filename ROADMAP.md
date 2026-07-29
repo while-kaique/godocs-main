@@ -8,9 +8,10 @@
 
 **Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
 `feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** validar no **staging `edf400b4`** o fluxo refinado (agente pedindo o ponteiro no chat + seletor
-pessoa/time em "quem reclama") e os 3 cenários da régua → **prod `674a3710`** → PR — **calibrando a régua com
-o Rafa antes de produção** (reprovar projeto é visível ao autor).
+**Próximo:** **deployar `53e8ef8` no staging `edf400b4`** (lá ainda está o `b6485e4`) e rodar os **8 cenários**
+de `docs/roteiro-validacao-criterios.md` — que definem o que é "o agente acerta sem trava" e a regra de
+decisão do gate do `[1.4]` → **prod `674a3710`** → PR — **calibrando a régua com o Rafa antes de produção**
+(reprovar projeto é visível ao autor).
 **⚠️ Frente paralela pendente de código:** `perguntas-agente-recorrencia-evidencia` (A1 — o gate da alocação
 precisa aceitar "menos custo" · A2 — materialidade nos gates).
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — as colunas "Participantes 2"/"Contribuidor" já existem no Sheets
@@ -92,9 +93,16 @@ Pedido da gestão (Rafa, caso da **nuvem de palavras**): apertar o que conta com
   pessoa, aceita "não sei onde conferir" → zona cinzenta, nunca reprovação automática); e **"quem reclama"
   virou seleção da Team Guide** com filtro dinâmico **pessoa OU time/área inteiro** (`AfetadosInput`, coluna
   `contrafactual_afetados`), só "o que piora" segue texto livre. **726 testes verdes**, staging redeployado.
+- ✅ **Contexto do formulário chega ao agente (2026-07-29, commit `53e8ef8`):** o `[1.4]` era **cego ao
+  contrafactual** — os campos da Etapa 2 nem eram lidos do banco para o agente. `buildRespostasFormulario`
+  virou a **fonte única** do bloco de formulário nos 4 prompts; `buildDetalhesAprovados` idem para a doc
+  herdada pelas fases financeiras (+ `dependencias`/`configurar_antes`/`atencao`, de onde sai a fonte do
+  `[1.4]`); o `[1.4]` passou a deduzir o ponteiro em vez de perguntar. **739 testes verdes.**
+  ⚠️ Decidido: **"quem reclama" NÃO muda de tela** — a Etapa 2 é o único ponto por onde todos os projetos
+  passam (depois dela o fluxo abre em saving/receita/especial).
 - ⬜ **Calibrar a régua com o Rafa** (gate humano — reprovar projeto é visível ao autor).
-- 🟡 Validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação **+ o fluxo novo**: o agente
-  pedindo o ponteiro no chat e o seletor pessoa/time da Etapa 2) → **prod `674a3710`** → PR.
+- 🟡 Validar no **staging `edf400b4`** pelos **8 cenários** de `docs/roteiro-validacao-criterios.md` (que
+  também fixam a regra de decisão do gate do `[1.4]`) → **prod `674a3710`** → PR.
 - **DoD:** "nuvem de palavras" sai `Reprovado` com motivo; saving recorrente com indicador segue `Pendente`
   sem mudança; ganho sem fonte vira `Zona cinzenta`/`Em validação`; a coluna `Classificação` nunca fica
   vazia; ninguém é reprovado sem motivo; especial nunca reprova automático; `Observações` e `Motivo Reenvio`
