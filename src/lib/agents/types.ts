@@ -338,6 +338,19 @@ export type ProjetoContexto = {
   tipo_projeto?: "saving" | "receita_incremental" | null;
   tipos_projeto?: ("saving" | "receita_incremental")[] | null;
   escopo?: "interno" | "externo" | null;
+  // Serviço externo contratado (só quando escopo === 'externo').
+  servico_externo?: string | null;
+  // ⚠️ TUDO que o autor preenche ANTES do chat precisa chegar aqui — este objeto é o
+  // ÚNICO canal de contexto do formulário para os prompts (o financeiro viaja à parte,
+  // em SavingColetado/ReceitaColetada). Campo que não estiver nomeado neste tipo é
+  // INVISÍVEL para o agente. Renderizados juntos por buildRespostasFormulario().
+  // Contrafactual (Etapa 2): "pessoa:a@x;b@y" | "time:Fiscal;CX" + o que piora.
+  // Insumo direto do ponto [1.4] do memorial (ponteiro movido) — o agente parte daqui
+  // em vez de perguntar do zero.
+  contrafactual_afetados?: string | null;
+  contrafactual_reclamacao?: string | null;
+  // Governança: o projeto usa o AI Proxy interno? ('sim' | 'nao')
+  usa_ai_proxy?: string | null;
   // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas
   // reais de uma rotina que existia. 'nao' → ninguém fazia: horas_antes é o EQUIVALENTE
   // manual estimado (o trabalho que alguém teria se a automação não existisse). O

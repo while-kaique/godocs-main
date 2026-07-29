@@ -81,6 +81,12 @@ const MOCK_CTX: ProjetoContexto = {
   tipo_projeto: 'saving',
   tipos_projeto: ['saving'],
   escopo: 'interno',
+  // Respostas da Etapa 2 — exercitam o bloco buildRespostasFormulario no inspector.
+  // O contrafactual é o insumo do ponto [1.4] (ponteiro movido) do memorial.
+  contrafactual_afetados: 'time:Comercial;Financeiro',
+  contrafactual_reclamacao:
+    'O time comercial volta a montar o relatório à mão toda manhã e perde a primeira hora do dia.',
+  usa_ai_proxy: 'nao',
 };
 
 // Contexto idêntico ao MOCK_CTX, mas em modo EDIÇÃO (com documentação anterior).

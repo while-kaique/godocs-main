@@ -17,6 +17,9 @@ import type {
 } from "./types";
 import { documentacaoVazia, receitaVazia, savingVazio } from "./types";
 import { descreverEsqueletoMemorial } from "./memorial-format";
+// Parser canônico do contrafactual ("pessoa:a@x;b@y" | "time:Fiscal") — mesmo helper puro
+// que o formulário usa para serializar, para não haver duas leituras do formato.
+import { desserializarAfetados } from "@/lib/submeter/constants";
 
 // Guia de formatação do preview — o renderizador suporta ##, ###, listas (- e 1.),
 // **negrito** e parágrafos. As quebras de linha devem ser "\n" literais no JSON.
@@ -93,6 +96,86 @@ COMO AGIR NA EDIÇÃO:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
+// ─── Respostas do formulário (o que o autor preencheu ANTES do chat) ────────
+
+// FONTE ÚNICA do contexto de formulário para TODOS os prompts (doc, saving, receita,
+// custo evitado). Antes cada prompt escolhia à mão o que mostrar: só a fase de doc
+// injetava a descrição breve, e o contrafactual da Etapa 2 não chegava a prompt NENHUM
+// — o agente perguntava o ponteiro do [1.4] sem saber que a pessoa já havia respondido,
+// duas telas antes, quem sentiria falta e o que piora.
+//
+// ⚠️ Campo NOVO no formulário → renderize AQUI (e nomeie em ProjetoContexto +
+// getProjetoContexto). Não volte a injetar campo solto direto no prompt: foi assim que o
+// contrafactual ficou órfão. O bloco é omitido inteiro quando não há nada preenchido.
+export function buildRespostasFormulario(ctx: ProjetoContexto): string {
+  const linhas: string[] = [];
+
+  const descricao = ctx.descricao_breve?.trim();
+  if (descricao) linhas.push(`- Descrição do projeto (palavras do autor): "${descricao}"`);
+
+  const { tipo, lista } = desserializarAfetados(ctx.contrafactual_afetados);
+  if (lista.length > 0) {
+    const rotulo = tipo === "time" ? "Times/áreas que sentiriam falta" : "Pessoas que sentiriam falta";
+    linhas.push(`- ${rotulo}: ${lista.join(", ")}`);
+  }
+  const piora = ctx.contrafactual_reclamacao?.trim();
+  if (piora) linhas.push(`- O que piora se a automação for desligada hoje: "${piora}"`);
+
+  if (ctx.escopo === "externo") {
+    const servico = ctx.servico_externo?.trim();
+    linhas.push(
+      `- Escopo: solução EXTERNA contratada${servico ? ` (${servico})` : ""} — não foi construída internamente`,
+    );
+  } else if (ctx.escopo === "interno") {
+    linhas.push("- Escopo: solução construída INTERNAMENTE");
+  }
+
+  if (ctx.usa_ai_proxy === "sim" || ctx.usa_ai_proxy === "nao") {
+    linhas.push(
+      `- Usa o AI Proxy interno (gateway de IA da empresa): ${ctx.usa_ai_proxy === "sim" ? "sim" : "não"}`,
+    );
+  }
+
+  if (linhas.length === 0) return "";
+
+  return `RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (antes desta conversa):
+${linhas.join("\n")}
+
+⚠️ COMO USAR ESTAS RESPOSTAS:
+- NUNCA pergunte de novo o que já está aqui — é a pessoa se repetindo, e ela percebe.
+- Use como PONTO DE PARTIDA, não como texto a copiar: aprofunde o que estiver vago.
+- Se algo que a pessoa disser na conversa CONTRADIZER o que está aqui, aponte a diferença
+  com franqueza e pergunte qual vale — não escolha em silêncio.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+`;
+}
+
+// Contexto que as fases FINANCEIRAS herdam da fase de documentação. Fonte única das 3
+// (saving, custo evitado, receita) — antes o bloco era copiado literalmente nas três.
+//
+// ⚠️ `dependencias`, `configurar_antes` e `atencao` entram porque são onde os SISTEMAS
+// NOMEADOS aparecem (Metabase, Protheus, a base X) — matéria-prima do ponto [1.4] ("onde
+// alguém confere o número"). Sem elas o agente pergunta uma fonte que a doc já nomeava.
+export function buildDetalhesAprovados(
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+  resumoProjeto: string,
+): string {
+  const opcional = (rotulo: string, valor: string | null) =>
+    valor && valor.trim() ? `\n- ${rotulo}: ${valor.trim()}` : "";
+
+  return `RESUMO DO PROJETO (contexto da etapa anterior):
+${resumoProjeto}
+
+DETALHES TÉCNICOS APROVADOS:
+- Nome: ${coletado.nome_projeto}
+- O que faz: ${coletado.o_que_faz}
+- Execução: ${coletado.execucao}
+- Fluxo: ${coletado.fluxo}${opcional("Dependências", coletado.dependencias)}${opcional("Configurar antes", coletado.configurar_antes)}${opcional("Pontos de atenção", coletado.atencao)}
+- Ferramenta: ${ctx.ferramenta}`;
+}
+
 // ─── System prompts por fase ────────────────────────────────────────────────
 
 export function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColetada): string {
@@ -106,11 +189,7 @@ export function buildDocPrompt(ctx: ProjetoContexto, coletado: DocumentacaoColet
     .filter(([, v]) => v === null)
     .map(([k]) => k);
 
-  const descricaoSection = ctx.descricao_breve?.trim()
-    ? `DESCRIÇÃO BREVE DO PROJETO (fornecida pelo usuário):\n"${ctx.descricao_breve.trim()}"\n\n`
-    : "";
-
-  return `${descricaoSection}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.${buildRevisaoBlock(ctx, "doc")}
+  return `${buildRespostasFormulario(ctx)}Você é o assistente de documentação de projetos de automação (RPA & IA) do GoGroup.${buildRevisaoBlock(ctx, "doc")}
 
 SITUAÇÃO ATUAL:
 O sistema analisou automaticamente os arquivos enviados pelo usuário e extraiu os campos abaixo.
@@ -269,15 +348,7 @@ export function buildReceitaPrompt(
   receita: ReceitaColetada,
   resumoProjeto: string,
 ): string {
-  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
-${resumoProjeto}
-
-DETALHES TÉCNICOS APROVADOS:
-- Nome: ${coletado.nome_projeto}
-- O que faz: ${coletado.o_que_faz}
-- Execução: ${coletado.execucao}
-- Fluxo: ${coletado.fluxo}
-- Ferramenta: ${ctx.ferramenta}`;
+  const detalhes = buildDetalhesAprovados(ctx, coletado, resumoProjeto);
 
   const isPontualReceita = receita.tipo_saving === "pontual";
   const periodoReceita = periodoSavingInfo(receita.tipo_saving); // trimestre/semestre ou null
@@ -321,7 +392,7 @@ CAMPOS QUE VOCÊ PRECISA COLETAR VIA CONVERSA:
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é construir o memorial de receita incremental PADRONIZADO — quanto de receita nova esse projeto gera.${buildRevisaoBlock(ctx, "receita")}
 
-${detalhes}
+${buildRespostasFormulario(ctx)}${detalhes}
 
 ${blocoValor}
 
@@ -355,8 +426,8 @@ SEÇÃO 1 — CONTEXTO
 
 [1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
   COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) Pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
-  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome.
+  a) PRIMEIRO olhe as RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (quem sentiria falta + o que piora se desligar): muitas vezes elas JÁ dizem qual ponteiro é ("volta a conferir 400 notas à mão" → custo/horas; "pedido sai errado" → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite a resposta dela como base e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
   c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
   ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
 
@@ -630,20 +701,12 @@ export function buildSavingCustoEvitadoPrompt(
   resumoProjeto: string,
 ): string {
   const isPontual = saving.tipo_saving === "pontual";
-  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
-${resumoProjeto}
-
-DETALHES TÉCNICOS APROVADOS:
-- Nome: ${coletado.nome_projeto}
-- O que faz: ${coletado.o_que_faz}
-- Execução: ${coletado.execucao}
-- Fluxo: ${coletado.fluxo}
-- Ferramenta: ${ctx.ferramenta}`;
+  const detalhes = buildDetalhesAprovados(ctx, coletado, resumoProjeto);
 
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica já foi aprovada. Este projeto tem um perfil ESPECÍFICO de ganho.${buildRevisaoBlock(ctx, "saving")}
 
-${detalhes}
+${buildRespostasFormulario(ctx)}${detalhes}
 
 ═══════════════════════════════════════════════════════════════════
 PERFIL DESTE PROJETO — CUSTO EVITADO PURO (SEM HORAS DE PESSOAS)
@@ -711,15 +774,7 @@ export function buildSavingPrompt(
     return buildSavingCustoEvitadoPrompt(ctx, coletado, saving, resumoProjeto);
   }
 
-  const detalhes = `RESUMO DO PROJETO (contexto da etapa anterior):
-${resumoProjeto}
-
-DETALHES TÉCNICOS APROVADOS:
-- Nome: ${coletado.nome_projeto}
-- O que faz: ${coletado.o_que_faz}
-- Execução: ${coletado.execucao}
-- Fluxo: ${coletado.fluxo}
-- Ferramenta: ${ctx.ferramenta}`;
+  const detalhes = buildDetalhesAprovados(ctx, coletado, resumoProjeto);
 
   const linhas = saving.linhas ?? [];
   const totalHoras =
@@ -917,7 +972,7 @@ Este projeto declara economia de HORAS de pessoas E um CUSTO EXTERNO EVITADO (in
   return `Você é o assistente de análise de ganhos financeiros de projetos de automação do GoGroup.
 A documentação técnica do projeto já foi aprovada. Agora seu objetivo é VALIDAR as horas informadas e construir o memorial de cálculo PADRONIZADO.${buildRevisaoBlock(ctx, "saving")}
 
-${detalhes}
+${buildRespostasFormulario(ctx)}${detalhes}
 
 DADOS JÁ DEFINIDOS PELO USUÁRIO (NÃO pergunte sobre eles):
 Pessoas envolvidas no cálculo de saving (${linhas.length}):
@@ -950,8 +1005,8 @@ SEÇÃO 1 — CONTEXTO
 
 [1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
   COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) Pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
-  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome.
+  a) PRIMEIRO olhe as RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (quem sentiria falta + o que piora se desligar): muitas vezes elas JÁ dizem qual ponteiro é ("volta a conferir 400 notas à mão" → custo/horas; "pedido sai errado" → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite a resposta dela como base e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
   c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
   ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
 

@@ -224,6 +224,14 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     tipo_projeto: (data.tipo_projeto as "saving" | "receita_incremental" | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as "interno" | "externo" | null) ?? null,
+    servico_externo: data.servico_externo ?? null,
+    // ⚠️ Respostas do formulário que o agente PRECISA ver (renderizadas por
+    // buildRespostasFormulario). O contrafactual é o insumo do ponto [1.4] do memorial:
+    // sem ele o agente pergunta o ponteiro do zero, ignorando o que a pessoa já
+    // respondeu na Etapa 2. Campo novo no formulário → nomeie AQUI também.
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
+    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
+    usa_ai_proxy: data.usa_ai_proxy ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
     // a passo de uma rotina inexistente).

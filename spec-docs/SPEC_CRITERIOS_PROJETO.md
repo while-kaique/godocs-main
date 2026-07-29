@@ -94,6 +94,32 @@ souber onde conferir, **registra exatamente isso** e SEGUE — nunca inventa fon
 para a triagem: puxa para `zona_cinzenta`, **não** para reprovação automática). Anti-redundância e
 anti-loop iguais aos da seção `1.3`: se a doc aprovada já traz ponteiro + fonte, escreve sem perguntar.
 
+### 3.2b Contexto do formulário → prompts (`buildRespostasFormulario`)
+
+O `[1.4]` nasceu **cego ao contrafactual**: `contrafactual_afetados`/`contrafactual_reclamacao` eram
+gravados e lidos **só pelo analisador** — não existiam em `ProjetoContexto`, então o agente perguntava
+o ponteiro sem saber o que a pessoa respondera duas telas antes. Causa de fundo: o contexto do
+formulário chegava aos prompts por **whitelist manual**, e só a fase de doc injetava a descrição breve.
+
+- **`buildRespostasFormulario(ctx)`** (`orchestrator.ts`, pura) = **FONTE ÚNICA** do bloco "RESPOSTAS
+  QUE O AUTOR JÁ DEU NO FORMULÁRIO", injetado nos **4** prompts (doc · saving · receita · custo
+  evitado). Renderiza descrição breve, contrafactual (quem + o que piora), escopo/serviço externo e AI
+  Proxy, com as regras "nunca pergunte de novo" e "aponte contradição em vez de escolher em silêncio".
+  Vazio → bloco omitido inteiro. ⚠️ **Campo novo no formulário → renderize AQUI** e nomeie em
+  `ProjetoContexto` + `getProjetoContexto` + `getProjetoContextoData`; não voltar a injetar campo solto
+  em um prompt (foi assim que o contrafactual ficou órfão).
+- **`buildDetalhesAprovados(ctx, coletado, resumo)`** — fonte única do bloco que as 3 fases financeiras
+  herdam da doc (era copiado literalmente nas três). Passou a incluir `dependencias`,
+  `configurar_antes` e `atencao`: são onde os **sistemas nomeados** (Metabase, Protheus, base X)
+  aparecem — matéria-prima do "onde alguém confere" do `[1.4]`.
+- **`[1.4]` passou a partir do que já existe:** (a) deduz o ponteiro do contrafactual e **não pergunta**
+  quando dá para deduzir; (b) **propõe** a fonte que a doc já nomeia em vez de perguntar em aberto.
+- ⚠️ Dois canais chegam ao agente e **não** se confundem: o financeiro (`SavingColetado`/
+  `ReceitaColetada`, parâmetro próprio, sempre completo) e o de contexto (`ProjetoContexto`, a
+  whitelist). O defeito vinha de campos "antes do chat" divididos entre os dois por acidente.
+- Testes: `tests/contexto-formulario-agente.test.ts` (13) — as 4 fases recebem o contrafactual, rótulo
+  pessoa×time, valor legado sem prefixo não derruba, seções vazias não viram `"null"`.
+
 ### 3.3 Analisador — classificação em 3 níveis
 
 - Bloco de prompt **"RÉGUA DE CRITÉRIO DE PROJETO"** (`agents/analyzer.ts`): os 3 critérios, a taxonomia de
@@ -155,8 +181,10 @@ anti-loop iguais aos da seção `1.3`: se a doc aprovada já traz ponteiro + fon
 ## 5. Pendências
 
 1. **Calibrar a régua com o Rafa** antes do deploy em produção (fronteira `claro_nao` × `zona_cinzenta`).
-2. Validar em **staging (`edf400b4`)** os 3 cenários (nuvem de palavras → Reprovado · saving recorrente →
-   Claro sim/Pendente · ganho sem fonte → Zona cinzenta) e conferir que **nenhuma outra coluna mudou**.
+2. Validar em **staging (`edf400b4`)** pelo roteiro de 8 cenários —
+   [`docs/roteiro-validacao-criterios.md`](../docs/roteiro-validacao-criterios.md), que também define o
+   que conta como "o agente acerta sem trava" e a regra de decisão do gate do `[1.4]` (pendência 3).
+   Conferir que **nenhuma outra coluna mudou**.
 3. **Harness E2E** (`scripts/e2e/`) valida colunas A→AS — as 3 novas ainda não estão nos asserts.
 4. Frente **paralela** [`perguntas-agente-recorrencia-evidencia`](../docs/plans/perguntas-agente-recorrencia-evidencia.md):
    **A1** (o gate da alocação precisa aceitar "menos custo" — a taxonomia de impacto escrita aqui é
