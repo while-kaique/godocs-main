@@ -26,10 +26,18 @@ O sistema não colhia rastreabilidade nem contrafactual de forma estruturada, e 
   explicar bem explicado o porquê da classificação, independente de qual for"_). A coluna `Classificação`
   nunca fica vazia — há fallback determinístico quando o LLM não devolve texto.
 - **D4 — Barrar submissão no formulário continua FORA, em definitivo.** A reprovação é **pós-envio**.
-  As 3 perguntas novas da Etapa 2 são de resposta **obrigatória**, mas **nenhuma resposta barra**:
-  "Nenhum / ainda não sei" passa e vira sinal forte para o analisador.
-- **D5 — Onde perguntar.** Ponteiro movido + onde verificar + contrafactual → **Etapa 2** (formulário
-  determinístico). "Que processo mudou e quanto" → **agente** (seção do memorial).
+  As perguntas da Etapa 2 são de resposta **obrigatória**, mas **nenhuma resposta barra** — o que a pessoa
+  responde vira sinal para o analisador, não trava.
+- **D5 — Onde perguntar (REVISADO 29/07/2026, pós-staging).** Só o **contrafactual** fica no formulário
+  (Etapa 2); **ponteiro movido + onde verificar saíram do form e passaram para o AGENTE**, junto de "que
+  processo mudou e quanto". Motivo: rastreabilidade não se resolve com checkbox — o racional ("moveu de
+  fato um ponteiro? onde isso se confere?") precisa ser construído **junto com a pessoa**, argumentando.
+  ⚠️ Não reintroduzir os cards de ponteiro na Etapa 2.
+- **D5b — "Quem reclama" é seleção, não texto livre (29/07/2026).** Quem sentiria falta é escolhido na
+  **Team Guide** (mesma fonte do autocomplete de participantes da Etapa 1), com filtro **dinâmico**:
+  por **pessoa** (autocomplete nome/e-mail) **ou** por **time/área** inteiro (`GET /api/areas`) — quando o
+  impacto é do time todo, não se marca pessoa por pessoa. Trocar o tipo limpa a lista. Só o "o que piora"
+  segue texto livre.
 - **D6 — 3 colunas novas na planilha**, criadas à mão pelo Luis nas abas `GoDocs` **e** `STAGING`:
   `Motivo Reenvio` (**só humano** — o sistema NUNCA escreve, como as colunas de Diff) ·
   `Motivo Reprovado` (sistema + triagem) · `Classificação` (sistema, sempre com texto).
@@ -47,24 +55,29 @@ O sistema não colhia rastreabilidade nem contrafactual de forma estruturada, e 
 
 ## 3. Onde aterrissou
 
-### 3.1 Etapa 2 — 2 perguntas determinísticas (padrão `usa_ai_proxy`)
+### 3.1 Etapa 2 — contrafactual (pergunta determinística, padrão `usa_ai_proxy`)
 
 | Pergunta | Campo | Coluna SQLite |
 |---|---|---|
-| "Este projeto moveu sensivelmente o ponteiro de quê?" (cards multi: Custo · Receita · KPI da área · Nenhum/ainda não sei) | `form.ponteiroMovido` | `ponteiro_movido` (lista `;`) |
-| "Onde isso pode ser verificado?" (só quando há ponteiro concreto) | `form.ponteiroEvidencia` | `ponteiro_evidencia` |
-| "Se desligar isso hoje, quem reclama — e o que piora?" | `form.contrafactualReclamacao` | `contrafactual_reclamacao` |
+| "Se desligar isso hoje, quem reclama?" (toggle **Pessoas específicas** / **Um time/área inteiro** → chips) | `form.contrafactualAfetadosTipo` + `form.contrafactualAfetados` | `contrafactual_afetados` (`"pessoa:a@x;b@y"` \| `"time:Fiscal;CX"`) |
+| "E o que piora?" (texto livre, ≥15 caracteres) | `form.contrafactualReclamacao` | `contrafactual_reclamacao` |
 
-- UI: `src/lib/submeter/step2.tsx` · validação pura em `validarEtapa2` (`submeter/constants.ts`) ·
-  opções em `PONTEIROS_MOVIDOS`.
-- **"Nenhum" é mutuamente exclusivo** com os 3 ponteiros concretos e dispensa a evidência.
+- UI: `AfetadosInput` (`submeter/form-components.tsx`) em `step2.tsx` · validação pura em `validarEtapa2`
+  (`submeter/constants.ts`) · serialização pura `serializarAfetados`/`desserializarAfetados` (round-trip
+  testado; valor legado/sem prefixo → `pessoa` + lista vazia, nunca derruba a tela).
+- Fontes: pessoas de `GET /api/participantes/sugestoes` (hook `useSugestoesParticipantes`, **cache de
+  módulo** — não refaz o fetch da Etapa 1) · times de `GET /api/areas` (`areas-sugestoes.ts`). Falha em
+  qualquer uma → o campo segue usável (o modo pessoa aceita e-mail digitado).
+- **Reuso:** o posicionamento do dropdown por portal foi extraído para o hook `useDropdownAnchor` e agora
+  serve ao autocomplete da Etapa 1 **e** ao da Etapa 2 (a lógica era a mesma, ~40 linhas duplicadas).
+- ⚠️ **`ponteiro_movido` / `ponteiro_evidencia` são colunas LEGADO**: existem pelos projetos submetidos
+  enquanto a pergunta ficava no formulário (janela de staging). **Nada as escreve mais**; o analisador as
+  lê só quando vierem preenchidas.
 - As perguntas **não** entram em `camposMinimosDocProntos` — o processamento da doc em background continua
   disparando assim que o arquivo é anexado.
-- **Reuso:** o card de checkbox (checkbox lateral + título + descrição) foi **extraído** da Etapa 2.5 para
-  `CardCheckboxGroup` (`submeter/form-components.tsx`) e agora serve às duas telas — a marcação era
-  duplicada. Feedback registrado: opção com descrição **nunca** é texto solto.
+- `CardCheckboxGroup` (extraído da Etapa 2.5) permanece como componente canônico de "opção com descrição".
 
-### 3.2 Agente — seção "Processo alterado"
+### 3.2 Agente — seções "Processo alterado" e "Ponteiro movido e onde verificar"
 
 `MEMORIAL_ESQUELETO` (`agents/memorial-format.ts`, **fonte única**) ganhou a seção **obrigatória nos 3
 modos** (`saving`, `custo_evitado`, `receita`) + código `1.3` em `TITULOS_MEMORIAL`. Os prompts
@@ -72,6 +85,14 @@ modos** (`saving`, `custo_evitado`, `receita`) + código `1.3` em `TITULOS_MEMOR
 processo **e** a magnitude, o agente escreve a seção **sem perguntar**; só pergunta quando falta a
 magnitude, no **máximo 1 pergunta**. (Baseline de 6,4 perguntas/submissão não deve piorar —
 `docs/analise-perguntas-agente.md`.)
+
+**Ponteiro movido e onde verificar** (`1.4`, obrigatória nos 3 modos) é a **RASTREABILIDADE**, agora
+conduzida pelo agente: pergunta 1× com `type:"options"` qual ponteiro moveu (custo · receita · KPI da área
+— erro, retrabalho, prazo/SLA, fraude/risco) e 1× **onde alguém abre e confere** o número (relatório,
+painel, sistema ou base **nomeados**; "no sistema" é vago). O agente **argumenta junto** e, se a pessoa não
+souber onde conferir, **registra exatamente isso** e SEGUE — nunca inventa fonte nem trava (sinal legítimo
+para a triagem: puxa para `zona_cinzenta`, **não** para reprovação automática). Anti-redundância e
+anti-loop iguais aos da seção `1.3`: se a doc aprovada já traz ponteiro + fonte, escreve sem perguntar.
 
 ### 3.3 Analisador — classificação em 3 níveis
 

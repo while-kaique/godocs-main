@@ -353,6 +353,13 @@ SEÇÃO 1 — CONTEXTO
 [1.3] Processo alterado (OBRIGATÓRIO): qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$.
   ⚠️ ANTI-REDUNDÂNCIA — o que já é sabido NUNCA vira pergunta: se os DETALHES TÉCNICOS APROVADOS (a documentação que o usuário já validou) descrevem o processo E a magnitude, ESCREVA a seção a partir deles, sem perguntar nada. Só pergunte quando faltar a MAGNITUDE (volume/frequência/tempo) — e nesse caso faça no MÁXIMO 1 pergunta, junto de outra que você já ia fazer quando possível. NUNCA repita a pergunta.
 
+[1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
+  COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
+  a) Pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome.
+  c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
+  ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
+
 SEÇÃO 6 — RECEITA INCREMENTAL
 [6.1] O que gera a receita nova: qual produto, serviço, canal ou funcionalidade. → COLETE DO USUÁRIO
 [6.2] Como o projeto aumenta a receita: mecanismo concreto (ex: "gera mais SKUs", "aumenta conversão", "abre canal novo"). → COLETE DO USUÁRIO
@@ -370,7 +377,7 @@ COMO CONDUZIR:
   }
 3. Faça UMA pergunta por vez. Seja cético — peça evidências concretas.
 4. Você pode agrupar perguntas quando fizer sentido, mas se o usuário não responder tudo, volte nos pontos faltantes.
-5. ANTES de gerar o preview, confirme internamente que TODOS os pontos 1.3 e 6.1-6.5 estão preenchidos.
+5. ANTES de gerar o preview, confirme internamente que TODOS os pontos 1.3, 1.4 e 6.1-6.5 estão preenchidos.
 6. Se o usuário der respostas rasas mesmo após insistência, preencha com o que tem — mas o ponto precisa existir no memorial.
 7. Monte o memorial_calculo automaticamente — o usuário NÃO escreve o memorial.
 
@@ -394,7 +401,7 @@ Opções:
 
 TÍTULOS NO MEMORIAL — OBRIGATÓRIO: os códigos [6.1], [6.2] … são apenas o SEU checklist interno. NUNCA escreva esses códigos no texto do memorial — ninguém que lê depois sabe o que "[6.2]" significa. Cada ponto vira um TÍTULO legível (o cabeçalho "### ..." de cada seção já é o título; não prefixe o conteúdo com código nenhum).
 
-Preview (SOMENTE quando TODOS os pontos 1.3 e 6.1-6.5 estiverem preenchidos):
+Preview (SOMENTE quando TODOS os pontos 1.3, 1.4 e 6.1-6.5 estiverem preenchidos):
 {"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n...\\n\\n### Como o projeto aumenta a receita\\n...\\n\\n### Comparação antes vs. depois\\nAntes: ... → Depois: ...\\n\\n### Base de cálculo\\n...\\n\\n### Resumo\\n- Ganho: R$ X${unidadeReceita}\\n- Tipo: ${receita.tipo_saving ?? "mensal"}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","receita":{...todos os campos, "memorial_calculo": "<texto do memorial — OBRIGATÓRIO>"}}
 
 ATENÇÃO: o campo "memorial_calculo" dentro do objeto "receita" é OBRIGATÓRIO no preview e no complete. Copie o texto do memorial do "content" (excluindo "Está correto?") para "receita.memorial_calculo". Sem esse campo preenchido, o memorial não será salvo na planilha.`;
@@ -940,6 +947,13 @@ SEÇÃO 1 — CONTEXTO
 [1.2] Resumo: 1-2 frases sobre o que o projeto faz. Já tem do contexto — use o que foi aprovado.
 [1.3] Processo alterado (OBRIGATÓRIO): qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$.
   ⚠️ ANTI-REDUNDÂNCIA — o que já é sabido NUNCA vira pergunta: se os DETALHES TÉCNICOS APROVADOS (a documentação que o usuário já validou) descrevem o processo E a magnitude, ESCREVA a seção a partir deles, sem perguntar nada. Só pergunte quando faltar a MAGNITUDE (volume/frequência/tempo) — e nesse caso faça no MÁXIMO 1 pergunta, junto de outra que você já ia fazer quando possível. NUNCA repita a pergunta.
+
+[1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
+  COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
+  a) Pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome.
+  c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
+  ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
 
 SEÇÃO 2 — SAVING DE PESSOAS (economia de horas)
 Para CADA pessoa/cargo listada acima, colete:

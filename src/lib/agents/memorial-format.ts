@@ -17,6 +17,7 @@ export const TITULOS_MEMORIAL: Record<string, string> = {
   '1.1': 'Projeto',
   '1.2': 'Resumo',
   '1.3': 'Processo alterado',
+  '1.4': 'Ponteiro movido e onde verificar',
   // Seção 2 — Saving de pessoas
   '2.1': 'Pessoas envolvidas',
   '2.2': 'Detalhe por pessoa',
@@ -69,6 +70,7 @@ export const MEMORIAL_ESQUELETO: Record<ModoMemorial, SecaoEsqueleto[]> = {
   saving: [
     { secao: 'Contexto', nivel: 'obrigatoria', conteudo: '1-2 frases do que o projeto faz (use o que foi aprovado).' },
     { secao: 'Processo alterado', nivel: 'obrigatoria', conteudo: 'Qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$. ⚠️ Se a documentação técnica JÁ APROVADA descreve o processo e a magnitude, escreva a seção a partir dela — NÃO pergunte de novo.' },
+    { secao: 'Ponteiro movido e onde verificar', nivel: 'obrigatoria', conteudo: 'QUAL ponteiro o projeto moveu de fato — custo · receita · KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e ONDE alguém pode abrir e conferir esse número (relatório, painel, sistema ou base NOMEADOS). Sem R$. É a RASTREABILIDADE da régua de critério de projeto: construa o racional COM o usuário; se ele não souber onde conferir, registre isso explicitamente em vez de inventar uma fonte.' },
     { secao: 'Saving de Pessoas', nivel: 'obrigatoria', conteudo: 'Por cargo: o que fazia, frequência×tempo, COMPOSIÇÃO das horas (quebra por atividade somando o total), horas antes/depois, economia.' },
     { secao: 'O que mudou após a automação', nivel: 'condicional', gatilho: 'saving MENSAL ≥ 44h no total OU em algum cargo', conteudo: 'Atividades concretas NOMEADAS para onde o tempo foi (nunca "outras atividades") + o que o time passou a entregar A MAIS, com NÚMERO quando houver (ex.: "tempo foi para hunting e entrevistas → 2-3 entrevistas a mais por dia") + frase concluindo a validade do ganho. Sem R$.' },
     { secao: 'Contratos/Serviços Evitados', nivel: 'opcional', gatilho: 'há um custo externo evitado DISTINTO das horas', conteudo: 'Serviço evitado, custo evitado (qualitativo, sem R$), rateio. "N/A" quando não há.' },
@@ -78,11 +80,13 @@ export const MEMORIAL_ESQUELETO: Record<ModoMemorial, SecaoEsqueleto[]> = {
   custo_evitado: [
     { secao: 'Contexto', nivel: 'obrigatoria', conteudo: '1-2 frases do que o projeto faz (use o que foi aprovado).' },
     { secao: 'Processo alterado', nivel: 'obrigatoria', conteudo: 'Qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$. ⚠️ Se a documentação técnica JÁ APROVADA descreve o processo e a magnitude, escreva a seção a partir dela — NÃO pergunte de novo.' },
+    { secao: 'Ponteiro movido e onde verificar', nivel: 'obrigatoria', conteudo: 'QUAL ponteiro o projeto moveu de fato — custo · receita · KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e ONDE alguém pode abrir e conferir esse número (relatório, painel, sistema ou base NOMEADOS). Sem R$. É a RASTREABILIDADE da régua de critério de projeto: construa o racional COM o usuário; se ele não souber onde conferir, registre isso explicitamente em vez de inventar uma fonte.' },
     { secao: 'Contratos/Serviços Evitados', nivel: 'obrigatoria', conteudo: 'É o ganho ÚNICO do projeto — registre COM SUBSTÂNCIA (validado com o usuário, sem R$): (a) QUAL contrato/serviço foi evitado; (b) REALIDADE — já foi DE FATO encerrado/reduzido na prática (não "vai ser"); (c) ATRIBUIÇÃO — o encerramento é POR CAUSA desta automação; (d) ESCOPO — o que o contrato cobria (ex.: 1 agente terceirizado, ~X atendimentos/mês); rateio (mensal/pontual).' },
     { secao: 'Resumo', nivel: 'obrigatoria', conteudo: 'Ganho = custo externo eliminado + tipo. NÃO existe seção "Saving de Pessoas" nem horas neste perfil.' },
   ],
   receita: [
     { secao: 'Processo alterado', nivel: 'obrigatoria', conteudo: 'Qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$. ⚠️ Se a documentação técnica JÁ APROVADA descreve o processo e a magnitude, escreva a seção a partir dela — NÃO pergunte de novo.' },
+    { secao: 'Ponteiro movido e onde verificar', nivel: 'obrigatoria', conteudo: 'QUAL ponteiro o projeto moveu de fato — custo · receita · KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e ONDE alguém pode abrir e conferir esse número (relatório, painel, sistema ou base NOMEADOS). Sem R$. É a RASTREABILIDADE da régua de critério de projeto: construa o racional COM o usuário; se ele não souber onde conferir, registre isso explicitamente em vez de inventar uma fonte.' },
     { secao: 'O que gera a receita', nivel: 'obrigatoria', conteudo: 'A fonte concreta da receita incremental.' },
     { secao: 'Como aumenta a receita', nivel: 'obrigatoria', conteudo: 'O mecanismo pelo qual o projeto aumenta a receita.' },
     { secao: 'Antes vs. depois', nivel: 'obrigatoria', conteudo: 'Comparação concreta do antes e do depois.' },

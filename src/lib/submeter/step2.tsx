@@ -8,7 +8,6 @@ import {
   MAX_FILES,
   TOKEN_WARN_CHARS,
   TOKEN_BLOCK_CHARS,
-  PONTEIROS_MOVIDOS,
 } from "./constants";
 import type { FormData, FieldErrors } from "./constants";
 import { expandirZips, ehZip, MAX_ZIP_MB } from "./unzip";
@@ -19,8 +18,10 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
-  CardCheckboxGroup,
+  AfetadosInput,
 } from "./form-components";
+import { useSugestoesParticipantes } from "./participantes-sugestoes";
+import { useAreas } from "./areas-sugestoes";
 
 // ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
 
@@ -320,6 +321,12 @@ export function Step2({
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Fontes do seletor de "quem reclama" (contrafactual): pessoas e times da Team Guide.
+  // A lista de pessoas é a MESMA do autocomplete da Etapa 1 (cache de módulo — não
+  // refaz o fetch); as áreas vêm de /api/areas. Falha em qualquer uma → o campo segue
+  // usável (pessoa aceita e-mail digitado).
+  const { pessoas: sugestoesPessoas, loading: sugestoesLoading } = useSugestoesParticipantes(true);
+  const { areas, loading: areasLoading } = useAreas(true);
   const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
   // Pastas expandidas na árvore (por caminho). Vazio = tudo recolhido.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -647,66 +654,43 @@ export function Step2({
         />
       </FormGroup>
 
-      {/* ─── Critério de projeto: ponteiro movido + rastreabilidade ─────────
-          Nenhuma resposta aqui BARRA a submissão ("Nenhum / ainda não sei" passa) —
-          elas alimentam a classificação do analisador depois do envio. */}
+      {/* ─── Contrafactual — "se desligar isso hoje, quem reclama e o que piora?"
+          Nenhuma resposta aqui BARRA a submissão: ela alimenta a classificação do
+          analisador depois do envio. O PONTEIRO movido (custo/receita/KPI + onde
+          verificar) NÃO é mais pergunta de formulário — o agente conduz a pergunta e
+          constrói o racional junto com a pessoa na fase do memorial. */}
       <FormGroup>
         <FormLabel
           required
-          hint="O impacto não precisa ser dinheiro: horas, erro, retrabalho, prazo, fraude e risco valem igual. Marque todos que se aplicam."
+          hint="Se a automação parasse hoje sem avisar ninguém, quem sentiria falta? Escolha pessoas específicas ou o time/área inteiro."
         >
-          Este projeto moveu sensivelmente o ponteiro de quê?
+          Se desligar isso hoje, quem reclama?
         </FormLabel>
-        <CardCheckboxGroup
-          options={PONTEIROS_MOVIDOS}
-          value={form.ponteiroMovido ?? []}
-          onChange={(next) => {
-            // "Nenhum / ainda não sei" é mutuamente exclusivo com os ponteiros concretos:
-            // marcá-lo limpa os outros; marcar um concreto desmarca o "nenhum".
-            const marcouNenhumAgora =
-              next.includes("nenhum") && !(form.ponteiroMovido ?? []).includes("nenhum");
-            const limpo = (
-              marcouNenhumAgora ? ["nenhum"] : next.filter((v) => v !== "nenhum")
-            ) as FormData["ponteiroMovido"];
-            updateField("ponteiroMovido", limpo);
-            clearError("ponteiroMovido");
-            // Sem ponteiro concreto a evidência não se aplica — limpa o erro pendente.
-            if (limpo.every((v) => v === "nenhum")) clearError("ponteiroEvidencia");
+        <AfetadosInput
+          tipo={form.contrafactualAfetadosTipo || "pessoa"}
+          lista={form.contrafactualAfetados ?? []}
+          onChangeTipo={(t) => {
+            updateField("contrafactualAfetadosTipo", t);
+            clearError("contrafactualAfetados");
           }}
-          error={errors.ponteiroMovido}
+          onChangeLista={(v) => {
+            updateField("contrafactualAfetados", v);
+            clearError("contrafactualAfetados");
+          }}
+          error={errors.contrafactualAfetados}
+          suggestions={sugestoesPessoas}
+          loadingSuggestions={sugestoesLoading}
+          areas={areas}
+          loadingAreas={areasLoading}
         />
-
-        {/* Evidência (rastreabilidade) — só quando há ponteiro concreto marcado */}
-        {(form.ponteiroMovido ?? []).some((p) => p !== "nenhum") && (
-          <div className="mt-3" style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
-            <FormLabel
-              required
-              hint="Nomeie onde alguém pode abrir e conferir o número: um relatório, um painel, um sistema ou uma base."
-            >
-              Onde isso pode ser verificado?
-            </FormLabel>
-            <FormInput
-              type="text"
-              placeholder="Ex: painel “Conciliação diária” no Metabase · relatório de horas do Protheus · base pedidos_cancelados"
-              value={form.ponteiroEvidencia}
-              onChange={(e) => {
-                updateField("ponteiroEvidencia", e.currentTarget.value);
-                clearError("ponteiroEvidencia");
-              }}
-              error={errors.ponteiroEvidencia}
-              maxLength={300}
-            />
-          </div>
-        )}
       </FormGroup>
 
-      {/* Contrafactual — "se desligar hoje, quem reclama e o que piora?" */}
       <FormGroup>
         <FormLabel
           required
-          hint="Se a automação parasse hoje sem avisar ninguém, quem sentiria falta e o que voltaria a dar trabalho ou a dar errado?"
+          hint="O que voltaria a dar trabalho, a atrasar ou a dar errado se a automação parasse."
         >
-          Se desligar isso hoje, quem reclama — e o que piora?
+          E o que piora?
         </FormLabel>
         <textarea
           className={cn(
@@ -721,7 +705,7 @@ export function Step2({
             outline: "none",
             transition: "border-color 0.15s",
           }}
-          placeholder="Ex: O time de Fiscal reclama no mesmo dia — o fechamento volta a ser feito à mão em 2 planilhas e atrasa a entrega para a contabilidade."
+          placeholder="Ex: o fechamento volta a ser feito à mão em 2 planilhas e atrasa a entrega para a contabilidade."
           value={form.contrafactualReclamacao}
           onChange={(e) => {
             updateField("contrafactualReclamacao", e.currentTarget.value);

@@ -254,8 +254,8 @@ Os metadados trazem "usa_ai_proxy_declarado" (resposta do formulário: 'sim'/'na
 Além do veredito de qualidade acima, você deve julgar a **ELEGIBILIDADE** da submissão: isto é um **projeto de automação** ou é uma **peça única sem evidência**? Este julgamento é INDEPENDENTE da pontuação e usa 3 critérios:
 
 1. **RECORRÊNCIA** — a solução **roda de novo** sem alguém pedir (agendada, por evento, em uso contínuo) ou é reusada de forma sistemática? Uma entrega feita UMA vez, sob encomenda, que ninguém executa novamente, NÃO tem recorrência. ⚠️ Projeto **PONTUAL legítimo** existe (uma migração/limpeza de base que rodou uma vez e resolveu um problema real e mensurável) — o que reprova é a peça única **sem efeito duradouro nem evidência**.
-2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O campo \`contrafactual_reclamacao\` traz a resposta do autor. "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto.
-3. **RASTREABILIDADE** — existe um **indicador nomeado** que mudou, verificável em um **relatório, sistema ou base** que se possa abrir e conferir? Os campos \`ponteiro_movido\` (custo/receita/KPI, ou "nenhum") e \`ponteiro_evidencia\` (onde verificar) trazem a resposta do autor; a seção "Processo alterado" do memorial traz o que mudou e quanto.
+2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O autor respondeu no formulário QUEM sentiria falta (\`contrafactual_afetados\` — pessoas específicas ou um time/área inteiro, escolhidos na Team Guide) e O QUE piora (\`contrafactual_reclamacao\`). "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto; um time inteiro nomeado é sinal forte a favor.
+3. **RASTREABILIDADE** — existe um **indicador nomeado** que mudou, verificável em um **relatório, sistema ou base** que se possa abrir e conferir? Isso NÃO vem do formulário: quem coleta é o AGENTE, na seção **"Ponteiro movido e onde verificar"** do memorial (qual ponteiro — custo/receita/KPI — e onde conferir), junto da seção **"Processo alterado"** (o que mudou e quanto). Seção ausente (submissão antiga) ou registrando que o autor não sabe onde conferir → rastreabilidade NÃO comprovada, o que puxa para **zona_cinzenta** — não para reprovação automática. Os campos \`ponteiro_movido\`/\`ponteiro_evidencia\` só existem em submissões da época em que a pergunta ficava no formulário; quando vierem preenchidos, valem como resposta do autor.
 
 **O impacto NÃO precisa ser receita.** Vale qualquer ganho recorrente e verificável desta taxonomia: **horas** de trabalho humano · **custo** (headcount, hora extra, contrato/licença) · **erro** (taxa de falha, retrabalho) · **fraude/risco** evitado · **prazo/SLA** (tempo de ciclo) · **receita**. Um projeto que só reduz erro, sem tocar em R$, é projeto legítimo.
 
@@ -345,12 +345,16 @@ export function buildUserMessage(
       usa_ai_proxy_declarado: projeto.usa_ai_proxy ?? null,
       ai_proxy_detectado_na_doc: detectarAiProxy(docTexto),
       // ─── Critério de projeto (régua de elegibilidade) ───────────────────
-      // Respostas determinísticas da Etapa 2. "nenhum" em ponteiro_movido é resposta
-      // VÁLIDA (não barra a submissão), mas é sinal FORTE para a classificação.
-      // null = submissão anterior à feature → infira da documentação, não penalize.
+      // Contrafactual: respostas determinísticas da Etapa 2 (quem sentiria falta —
+      // pessoas ou times da Team Guide — e o que piora). Não barram a submissão, mas
+      // são sinal FORTE. null = submissão anterior à feature → infira da documentação,
+      // não penalize. A RASTREABILIDADE vem do memorial (seção "Ponteiro movido e onde
+      // verificar", escrita pelo agente), não daqui; ponteiro_movido/ponteiro_evidencia
+      // são LEGADO (só existem em submissões da época da pergunta no formulário).
+      contrafactual_afetados: projeto.contrafactual_afetados ?? null,
+      contrafactual_reclamacao: projeto.contrafactual_reclamacao ?? null,
       ponteiro_movido: projeto.ponteiro_movido ?? null,
       ponteiro_evidencia: projeto.ponteiro_evidencia ?? null,
-      contrafactual_reclamacao: projeto.contrafactual_reclamacao ?? null,
     },
     documentacao_tecnica: {
       o_que_faz: conteudo.o_que_faz ?? '(não preenchido)',

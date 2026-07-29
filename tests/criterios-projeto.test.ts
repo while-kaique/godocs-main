@@ -85,6 +85,27 @@ describe('MEMORIAL_ESQUELETO — Processo alterado', () => {
     }
   });
 
+  it.each(['saving', 'custo_evitado', 'receita'] as const)(
+    'o modo %s declara "Ponteiro movido e onde verificar" como obrigatória (rastreabilidade veio do form para o AGENTE)',
+    (modo) => {
+      const secao = MEMORIAL_ESQUELETO[modo].find(
+        (s) => s.secao === 'Ponteiro movido e onde verificar',
+      );
+      expect(secao).toBeDefined();
+      expect(secao!.nivel).toBe('obrigatoria');
+      // Constrói o racional com a pessoa e aceita "não sei onde conferir" sem inventar fonte.
+      expect(secao!.conteudo).toMatch(/COM o usuário/i);
+      expect(secao!.conteudo).toMatch(/não souber onde conferir/i);
+    },
+  );
+
+  it('o ponteiro tem título legível no checklist (1.4)', () => {
+    expect(TITULOS_MEMORIAL['1.4']).toBe('Ponteiro movido e onde verificar');
+    expect(normalizarMarcadoresMemorial('[1.4] custo — painel de conciliação')).toBe(
+      '**Ponteiro movido e onde verificar:** custo — painel de conciliação',
+    );
+  });
+
   it('tem título legível no checklist (1.3) — os códigos nunca aparecem no texto', () => {
     expect(TITULOS_MEMORIAL['1.3']).toBe('Processo alterado');
     expect(normalizarMarcadoresMemorial('[1.3] mudou o fechamento diário')).toBe(

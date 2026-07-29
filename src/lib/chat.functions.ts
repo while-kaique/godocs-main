@@ -463,11 +463,10 @@ const iniciarSubmissaoSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
-  // Critério de projeto (Etapa 2): ponteiro movido (lista ';'), onde verificar
-  // (rastreabilidade) e o contrafactual. Nenhum deles barra a submissão — alimentam a
-  // classificação de elegibilidade do analisador.
-  ponteiro_movido: z.string().max(200).optional(),
-  ponteiro_evidencia: z.string().max(300).optional(),
+  // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
+  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
+  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  contrafactual_afetados: z.string().max(1200).optional(),
   contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
@@ -619,8 +618,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipos_projeto: data.especial ? ["especial"] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
-      ponteiro_movido: data.ponteiro_movido ?? null,
-      ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+      contrafactual_afetados: data.contrafactual_afetados ?? null,
       contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
@@ -651,8 +649,7 @@ export async function iniciarSubmissao(rawData: unknown) {
       : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
-    ponteiro_movido: data.ponteiro_movido ?? null,
-    ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
     contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
@@ -1858,11 +1855,10 @@ const atualizarMetadadosSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
-  // Critério de projeto (Etapa 2): ponteiro movido (lista ';'), onde verificar
-  // (rastreabilidade) e o contrafactual. Nenhum deles barra a submissão — alimentam a
-  // classificação de elegibilidade do analisador.
-  ponteiro_movido: z.string().max(200).optional(),
-  ponteiro_evidencia: z.string().max(300).optional(),
+  // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
+  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
+  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  contrafactual_afetados: z.string().max(1200).optional(),
   contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
@@ -1897,8 +1893,8 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
-  if (data.ponteiro_movido !== undefined) campos.ponteiro_movido = data.ponteiro_movido;
-  if (data.ponteiro_evidencia !== undefined) campos.ponteiro_evidencia = data.ponteiro_evidencia;
+  if (data.contrafactual_afetados !== undefined)
+    campos.contrafactual_afetados = data.contrafactual_afetados;
   if (data.contrafactual_reclamacao !== undefined)
     campos.contrafactual_reclamacao = data.contrafactual_reclamacao;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
@@ -1924,8 +1920,7 @@ export async function atualizarMetadados(rawData: unknown) {
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
-        ponteiro_movido: data.ponteiro_movido ?? null,
-        ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+        contrafactual_afetados: data.contrafactual_afetados ?? null,
         contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },

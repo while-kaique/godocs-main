@@ -277,9 +277,8 @@ export type InsertProjeto = {
   contexto_especial?: string | null;
   arquivos_nomes?: string[] | null;
   usa_ai_proxy?: string | null;
-  // Critério de projeto (Etapa 2) — ver ProjetoRow/schema.ts.
-  ponteiro_movido?: string | null;
-  ponteiro_evidencia?: string | null;
+  // Contrafactual (Etapa 2) — ver ProjetoRow/schema.ts.
+  contrafactual_afetados?: string | null;
   contrafactual_reclamacao?: string | null;
   status?: string;
 };
@@ -291,8 +290,8 @@ export async function insertProjeto(data: InsertProjeto) {
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
-      ponteiro_movido, ponteiro_evidencia, contrafactual_reclamacao, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contrafactual_afetados, contrafactual_reclamacao, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -313,8 +312,7 @@ export async function insertProjeto(data: InsertProjeto) {
     data.contexto_especial ?? null,
     data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
     data.usa_ai_proxy ?? null,
-    data.ponteiro_movido ?? null,
-    data.ponteiro_evidencia ?? null,
+    data.contrafactual_afetados ?? null,
     data.contrafactual_reclamacao ?? null,
     data.status ?? 'rascunho',
     now,
@@ -1242,10 +1240,14 @@ export type ProjetoRow = {
   especial: number | null; // 1 = projeto especial (altíssimo impacto, validação humana)
   contexto_especial: string | null; // descrição do contexto do projeto especial (etapa 2.5)
   usa_ai_proxy: string | null; // 'sim' | 'nao' — usa o AI Proxy interno (governança de custo)
-  // Critério de projeto — respostas determinísticas da Etapa 2 (não barram submissão).
-  ponteiro_movido: string | null; // lista ';' de 'custo'|'receita'|'kpi'|'nenhum'
-  ponteiro_evidencia: string | null; // onde verificar (rastreabilidade)
-  contrafactual_reclamacao: string | null; // se desligar hoje, quem reclama / o que piora
+  // Contrafactual — resposta determinística da Etapa 2 (não barra submissão).
+  // "pessoa:a@x.com;b@y.com" | "time:Fiscal;CX" — quem sentiria falta (Team Guide).
+  contrafactual_afetados: string | null;
+  contrafactual_reclamacao: string | null; // o que piora se desligar hoje
+  // ⚠️ LEGADO: a rastreabilidade (ponteiro movido + onde verificar) saiu do formulário e
+  // hoje é conduzida pelo AGENTE no memorial. Nada escreve mais estas duas colunas.
+  ponteiro_movido: string | null;
+  ponteiro_evidencia: string | null;
   // Classificação de elegibilidade do analisador ("isto é projeto?"). A justificativa é
   // SEMPRE preenchida; o motivo só existe em 'claro_nao'. Ver normalizarClassificacao.
   classificacao_avaliacao: string | null; // 'claro_sim' | 'claro_nao' | 'zona_cinzenta'

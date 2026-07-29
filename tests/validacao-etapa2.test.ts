@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import {
   validarEtapa2,
   camposMinimosDocProntos,
+  serializarAfetados,
+  desserializarAfetados,
   type FormData,
 } from '@/lib/submeter/constants';
 
@@ -30,9 +32,9 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     tipoProjeto: [],
     descricaoBreve: 'x'.repeat(60),
     usaAiProxy: 'sim',
-    ponteiroMovido: ['custo'],
-    ponteiroEvidencia: 'Relatório de conciliação no Metabase',
-    contrafactualReclamacao: 'O time financeiro reclama e o fechamento atrasa.',
+    contrafactualAfetadosTipo: 'pessoa',
+    contrafactualAfetados: ['maria@gocase.com'],
+    contrafactualReclamacao: 'O fechamento volta a ser feito à mão e atrasa.',
     especial: false,
     contextoEspecial: '',
     ...over,
@@ -132,69 +134,76 @@ describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)
   });
 });
 
-// ── Critério de projeto: perguntas determinísticas (T1) ──────────────────────
-// Invariante central: obrigatório RESPONDER ≠ barrar a submissão. "Nenhum / ainda não
-// sei" é resposta válida — a reprovação é pós-envio, decidida pelo analisador.
-describe('validarEtapa2 — critério de projeto', () => {
-  it('exige selecionar ao menos um ponteiro', () => {
-    const errs = validarEtapa2(baseForm({ ponteiroMovido: [] }), opts());
-    expect(errs.ponteiroMovido).toBeTruthy();
+// ── Contrafactual: pergunta determinística da Etapa 2 ───────────────────────
+// Invariante central: obrigatório RESPONDER ≠ barrar a submissão (a reprovação é
+// pós-envio, decidida pelo analisador). O PONTEIRO movido saiu do formulário — quem
+// pergunta e constrói o racional é o AGENTE, na seção do memorial.
+describe('validarEtapa2 — contrafactual (quem reclama / o que piora)', () => {
+  it('exige ao menos uma pessoa quando o filtro é por pessoa', () => {
+    const errs = validarEtapa2(baseForm({ contrafactualAfetados: [] }), opts());
+    expect(errs.contrafactualAfetados).toMatch(/pessoa/i);
   });
 
-  it('"Nenhum / ainda não sei" PASSA e não exige evidência (não barra submissão)', () => {
+  it('exige ao menos um time quando o filtro é por time', () => {
     const errs = validarEtapa2(
-      baseForm({ ponteiroMovido: ['nenhum'], ponteiroEvidencia: '' }),
+      baseForm({ contrafactualAfetadosTipo: 'time', contrafactualAfetados: [] }),
       opts(),
     );
-    expect(errs.ponteiroMovido).toBeUndefined();
-    expect(errs.ponteiroEvidencia).toBeUndefined();
+    expect(errs.contrafactualAfetados).toMatch(/time/i);
   });
 
-  it.each([['custo'], ['receita'], ['kpi'], ['custo', 'kpi']])(
-    'ponteiro concreto %j exige a evidência (rastreabilidade)',
-    (...ponteiros) => {
-      const errs = validarEtapa2(
-        baseForm({
-          ponteiroMovido: ponteiros as FormData['ponteiroMovido'],
-          ponteiroEvidencia: '',
-        }),
-        opts(),
-      );
-      expect(errs.ponteiroEvidencia).toBeTruthy();
-    },
-  );
-
-  it('evidência muito curta bloqueia', () => {
-    const errs = validarEtapa2(baseForm({ ponteiroEvidencia: 'ERP' }), opts());
-    expect(errs.ponteiroEvidencia).toBeTruthy();
-  });
-
-  it('exige o contrafactual (quem reclama / o que piora)', () => {
-    expect(validarEtapa2(baseForm({ contrafactualReclamacao: '' }), opts()).contrafactualReclamacao)
-      .toBeTruthy();
-    expect(
-      validarEtapa2(baseForm({ contrafactualReclamacao: 'ninguém' }), opts())
-        .contrafactualReclamacao,
-    ).toBeTruthy();
-  });
-
-  it('nenhum + contrafactual respondido passa inteiro (caminho do "não sei")', () => {
+  it('um time inteiro selecionado passa (não precisa marcar pessoa por pessoa)', () => {
     const errs = validarEtapa2(
-      baseForm({
-        ponteiroMovido: ['nenhum'],
-        ponteiroEvidencia: '',
-        contrafactualReclamacao: 'O time de CX teria que voltar a conferir na mão.',
-      }),
+      baseForm({ contrafactualAfetadosTipo: 'time', contrafactualAfetados: ['Fiscal'] }),
       opts(),
     );
     expect(errs).toEqual({});
   });
 
-  it('as perguntas novas NÃO entram no gatilho do processamento em background', () => {
+  it('exige descrever o que piora (frase curta demais bloqueia)', () => {
+    expect(validarEtapa2(baseForm({ contrafactualReclamacao: '' }), opts()).contrafactualReclamacao)
+      .toBeTruthy();
+    expect(
+      validarEtapa2(baseForm({ contrafactualReclamacao: 'nada' }), opts())
+        .contrafactualReclamacao,
+    ).toBeTruthy();
+  });
+
+  it('NÃO exige mais nada sobre ponteiro/evidência (saiu do formulário)', () => {
+    const errs = validarEtapa2(baseForm(), opts());
+    expect(errs).toEqual({});
+    expect(Object.keys(errs)).not.toContain('ponteiroMovido');
+  });
+
+  it('a pergunta nova NÃO entra no gatilho do processamento em background', () => {
     expect(
       camposMinimosDocProntos(
-        baseForm({ ponteiroMovido: [], ponteiroEvidencia: '', contrafactualReclamacao: '' }),
+        baseForm({ contrafactualAfetados: [], contrafactualReclamacao: '' }),
       ),
     ).toBe(true);
+  });
+});
+
+// ── Serialização dos afetados (banco ↔ formulário) ──────────────────────────
+describe('serializarAfetados / desserializarAfetados', () => {
+  it('faz o round-trip de pessoas e de times', () => {
+    for (const [tipo, lista] of [
+      ['pessoa', ['a@gocase.com', 'b@gocase.com']],
+      ['time', ['Fiscal', 'CX']],
+    ] as const) {
+      const bruto = serializarAfetados(tipo, [...lista]);
+      expect(desserializarAfetados(bruto)).toEqual({ tipo, lista: [...lista] });
+    }
+  });
+
+  it('lista vazia → string vazia (nada é gravado)', () => {
+    expect(serializarAfetados('time', [])).toBe('');
+    expect(serializarAfetados('pessoa', ['  '])).toBe('');
+  });
+
+  it('valor ausente/legado desserializa para pessoa + lista vazia', () => {
+    expect(desserializarAfetados(null)).toEqual({ tipo: 'pessoa', lista: [] });
+    expect(desserializarAfetados('')).toEqual({ tipo: 'pessoa', lista: [] });
+    expect(desserializarAfetados('lixo-sem-prefixo')).toEqual({ tipo: 'pessoa', lista: [] });
   });
 });

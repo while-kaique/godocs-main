@@ -103,9 +103,8 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   descricao_breve: string | null;
   // Usa o AI Proxy interno? Necessário para o seed da EDIÇÃO repopular a etapa 2.
   usa_ai_proxy: string | null;
-  // Critério de projeto (Etapa 2) — a edição precisa seedar as 3 respostas.
-  ponteiro_movido: string | null;
-  ponteiro_evidencia: string | null;
+  // Contrafactual (Etapa 2) — a edição precisa seedar as 2 respostas.
+  contrafactual_afetados: string | null;
   contrafactual_reclamacao: string | null;
   contexto_especial: string | null;
   tipo_saving: string | null;
@@ -504,8 +503,7 @@ export async function getMeuProjeto(
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
-    ponteiro_movido: data.ponteiro_movido ?? null,
-    ponteiro_evidencia: data.ponteiro_evidencia ?? null,
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
     contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     contexto_especial: data.contexto_especial,
     tipo_saving: data.tipo_saving,

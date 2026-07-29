@@ -355,16 +355,19 @@ const MIGRATIONS = [
   'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
   "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
   // ─── Critério de projeto (régua de recorrência · contrafactual · rastreabilidade) ──
-  // Perguntas determinísticas da Etapa 2 (padrão `usa_ai_proxy`). NÃO barram a
-  // submissão — alimentam a classificação do analisador.
-  // `ponteiro_movido`: lista separada por ';' com os ponteiros que o projeto moveu
-  // ('custo'|'receita'|'kpi'|'nenhum'); 'nenhum' é resposta VÁLIDA (sinal forte).
-  // `ponteiro_evidencia`: onde isso é verificável (relatório/sistema/base) —
-  // é o critério de RASTREABILIDADE. `contrafactual_reclamacao`: se desligar hoje,
-  // quem reclama e o que piora.
+  // O CONTRAFACTUAL é pergunta determinística da Etapa 2 (padrão `usa_ai_proxy`) e NÃO
+  // barra a submissão — alimenta a classificação do analisador:
+  // `contrafactual_afetados`: quem sentiria falta, serializado como
+  // "pessoa:a@x.com;b@y.com" ou "time:Fiscal;CX" (escolhido na Team Guide — pessoas OU
+  // times inteiros); `contrafactual_reclamacao`: o que piora se desligar hoje.
+  // ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são LEGADO: a RASTREABILIDADE (que ponteiro
+  // moveu + onde verificar) saiu do formulário e passou a ser conduzida pelo AGENTE, na
+  // seção "Ponteiro movido e onde verificar" do memorial. As colunas ficam pelos projetos
+  // submetidos enquanto a pergunta existia no form; nada as escreve mais.
   'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
   'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
   'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_afetados TEXT',
   // Classificação de ELEGIBILIDADE decidida pelo analisador ("isto é projeto?"),
   // independente do veredito de pontuação: 'claro_sim'|'claro_nao'|'zona_cinzenta'.
   // A justificativa é SEMPRE preenchida (fallback determinístico) → coluna
