@@ -31,6 +31,28 @@ coletada (D5 da spec revisado + D5b novo):
   compartilhado agora pelos autocompletes das Etapas 1 e 2 (eram ~40 linhas duplicadas).
 ⚠️ **Ainda não validado no navegador** — o fluxo do agente pedindo o ponteiro só aparece no chat.
 ⚠️ **Prod (`674a3710`) e PR não foram tocados** nesta rodada, por decisão de fechamento de sessão.
+### Análise de fechamento (29/07, sem código) — onde cada informação deve ser colhida
+O Luis perguntou se o **"o que piora"** deveria ser determinístico na Etapa 2 ou ir para o agente. Conclusão:
+**manter determinístico**, porque a régua é assimétrica — no **ponteiro** o valor está na **argumentação**
+("no sistema" não é resposta; alguém tem de empurrar → agente), no **contrafactual** o valor está na
+**presença** (frase que o analisador e a triagem leem inteira → form garante que existe). Depender de prompt
+para o critério que reprova já falhou 2× neste repo (Seção 2.4 dos ≥44h; loop do split carga×escala). Além
+disso "quem reclama" + "o que piora" são o MESMO pensamento — separar quebra o par e gasta turno contra a
+métrica de 6,4 perguntas/submissão.
+
+**Duas pendências que saíram dessa análise (nenhuma codada):**
+1. **O agente não recebe o contrafactual.** Verificado: o `orchestrator.ts` só vê `descricao_breve` + a doc
+   (as ocorrências de "contrafactual" lá são do *saving contrafactual*, outro conceito). Fraqueza da escolha
+   acima: texto livre em form atrai linha preguiçosa e **ninguém cobra**. Arranjo proposto — **o form garante
+   que existe, o agente garante que presta**: injetar `contrafactual_afetados`/`contrafactual_reclamacao` no
+   contexto do memorial e aprofundar **1× SÓ se vago**, calando quando concreto (~1 campo no ctx + 3 linhas
+   de prompt).
+2. **RECORRÊNCIA — o 1º critério da régua — não é perguntada em lugar nenhum.** Nem form, nem agente: o
+   analisador **infere** do "Execução/trigger" da doc + do "já está em produção?" da Etapa 1. É justamente o
+   critério que reprova a **nuvem de palavras**, e é o único dos três por inferência — doc bem escrita fura.
+   **Recomendação:** pergunta determinística de **1 clique** na Etapa 2 ("com que frequência roda hoje:
+   agendado · por evento · sob demanda · rodou uma vez") — é **fato, não julgamento**, e fecha a régua.
+
 ⚠️ **`CLAUDE.md` desta branch está em ~44,6k chars** (limite recomendado 40k) — vale um enxugamento em PR
 próprio; a seção do critério de projeto já foi escrita condensada.
 
