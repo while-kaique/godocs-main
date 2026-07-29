@@ -40,6 +40,18 @@ para o critério que reprova já falhou 2× neste repo (Seção 2.4 dos ≥44h; 
 disso "quem reclama" + "o que piora" são o MESMO pensamento — separar quebra o par e gasta turno contra a
 métrica de 6,4 perguntas/submissão.
 
+**Como a conferência dos pontos `[1.3]`/`[1.4]` acontece hoje: SÓ AUTOCONFERÊNCIA DO LLM (sem trava).**
+Verificado em código: as duas fases (`orchestrator.ts:940` saving · `:347` receita) só dizem *"você NÃO pode
+gerar o preview sem ter resposta para TODOS os pontos"*, e a receita ainda lista *"confirme internamente que
+TODOS os pontos 1.3, 1.4 e 6.1-6.5 estão preenchidos"*. O esqueleto declara as duas seções como obrigatórias
+(no modo `custo_evitado` ele é renderizado literalmente; saving/receita ainda inline). A única rede
+determinística é **depois do fato**: `normalizarMarcadoresMemorial` troca o `[1.4]` residual pelo título, e o
+**analisador** puxa para **zona cinzenta** quando a seção falta ou diz "não sei onde conferir". Ou seja:
+**se o agente pular o `[1.4]`, NADA bloqueia o preview** — ao contrário dos gates com dente (jornada, teto
+por pessoa, alocação ≥44h), que vivem em `chat.functions.ts` e descartam o preview do LLM.
+⚠️ Prompt sozinho já falhou 2× aqui (Gostream/Seção 2.4 · custo evitado puro, que exigiu backstop em
+`iniciarSaving`) — é a mesma classe de risco.
+
 **Duas pendências que saíram dessa análise (nenhuma codada):**
 1. **O agente não recebe o contrafactual.** Verificado: o `orchestrator.ts` só vê `descricao_breve` + a doc
    (as ocorrências de "contrafactual" lá são do *saving contrafactual*, outro conceito). Fraqueza da escolha
@@ -52,6 +64,12 @@ métrica de 6,4 perguntas/submissão.
    critério que reprova a **nuvem de palavras**, e é o único dos três por inferência — doc bem escrita fura.
    **Recomendação:** pergunta determinística de **1 clique** na Etapa 2 ("com que frequência roda hoje:
    agendado · por evento · sob demanda · rodou uma vez") — é **fato, não julgamento**, e fecha a régua.
+3. **Gate opcional do `[1.4]` (só com o ok do Luis).** Clonar o padrão que funcionou (`alocacao_ganhos`) na
+   versão barata: antes do preview, extrair a seção do ponteiro; nomeia fonte → **libera**; falta ou é vaga
+   ("no sistema"/"no ERP") → **bloqueia e pergunta 1× SÓ**, depois segue (anti-loop, lição do split que
+   travou a edição). ~1 extrator + 1 estado + ~30 linhas em `enviarMensagem`. **Faz sentido no MESMO passo da
+   recorrência** (mesmo trecho de `chat.functions.ts`). ⚠️ Decidir **depois** do staging: a validação mostra
+   com que frequência o agente acerta **sem** gate — se acertar sempre, o gate cai de prioridade.
 
 ⚠️ **`CLAUDE.md` desta branch está em ~44,6k chars** (limite recomendado 40k) — vale um enxugamento em PR
 próprio; a seção do critério de projeto já foi escrita condensada.
