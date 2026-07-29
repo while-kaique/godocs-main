@@ -172,11 +172,11 @@ export function validarEtapa2(
   } else {
     // Evidência (rastreabilidade) só é exigida quando há ponteiro concreto marcado.
     const temPonteiroConcreto = form.ponteiroMovido.some((p) => p !== "nenhum");
-    if (temPonteiroConcreto && form.ponteiroEvidencia.trim().length < 10)
+    if (temPonteiroConcreto && (form.ponteiroEvidencia ?? "").trim().length < 10)
       errs.ponteiroEvidencia =
         "Diga onde isso pode ser verificado (nome do relatório, sistema ou base)";
   }
-  if (form.contrafactualReclamacao.trim().length < 15)
+  if ((form.contrafactualReclamacao ?? "").trim().length < 15)
     errs.contrafactualReclamacao = "Descreva em uma frase quem reclama e o que piora";
 
   if (arquivosCount === 0 && nomesExistentesCount === 0) {

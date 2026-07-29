@@ -659,12 +659,12 @@ export function Step2({
         </FormLabel>
         <CardCheckboxGroup
           options={PONTEIROS_MOVIDOS}
-          value={form.ponteiroMovido}
+          value={form.ponteiroMovido ?? []}
           onChange={(next) => {
             // "Nenhum / ainda não sei" é mutuamente exclusivo com os ponteiros concretos:
             // marcá-lo limpa os outros; marcar um concreto desmarca o "nenhum".
             const marcouNenhumAgora =
-              next.includes("nenhum") && !form.ponteiroMovido.includes("nenhum");
+              next.includes("nenhum") && !(form.ponteiroMovido ?? []).includes("nenhum");
             const limpo = (
               marcouNenhumAgora ? ["nenhum"] : next.filter((v) => v !== "nenhum")
             ) as FormData["ponteiroMovido"];
@@ -677,7 +677,7 @@ export function Step2({
         />
 
         {/* Evidência (rastreabilidade) — só quando há ponteiro concreto marcado */}
-        {form.ponteiroMovido.some((p) => p !== "nenhum") && (
+        {(form.ponteiroMovido ?? []).some((p) => p !== "nenhum") && (
           <div className="mt-3" style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
             <FormLabel
               required

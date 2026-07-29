@@ -625,7 +625,7 @@ export function SubmeterPageContent({
           dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
           usaAiProxy: newForm.usaAiProxy,
-          ponteiroMovido: newForm.ponteiroMovido.join(";"),
+          ponteiroMovido: (newForm.ponteiroMovido ?? []).join(";"),
           ponteiroEvidencia: newForm.ponteiroEvidencia.trim(),
           contrafactualReclamacao: newForm.contrafactualReclamacao.trim(),
           contextoEspecial: newForm.contextoEspecial.trim(),
@@ -644,7 +644,17 @@ export function SubmeterPageContent({
   const rehydrateFromLocal = useCallback((d: DraftSnapshot) => {
     // Rascunhos salvos antes desta feature não têm `participantesPapeis` — default {}
     // para nunca ler `undefined[email]`.
-    setForm({ ...d.form, participantesPapeis: d.form.participantesPapeis ?? {} });
+    // ⚠️ Rascunho SALVO ANTES de um campo novo existir não tem a chave — espalhar o
+    // objeto cru deixa o campo `undefined` e qualquer `.join()/.some()` derruba a tela
+    // inteira (bug real: /submeter em branco com "This page didn't load"). Todo campo
+    // novo precisa de default aqui, como o `participantesPapeis`.
+    setForm({
+      ...d.form,
+      participantesPapeis: d.form.participantesPapeis ?? {},
+      ponteiroMovido: d.form.ponteiroMovido ?? [],
+      ponteiroEvidencia: d.form.ponteiroEvidencia ?? "",
+      contrafactualReclamacao: d.form.contrafactualReclamacao ?? "",
+    });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
     setProjetoId(d.projetoId);
@@ -989,7 +999,7 @@ export function SubmeterPageContent({
     dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
     usaAiProxy: form.usaAiProxy,
-    ponteiroMovido: form.ponteiroMovido.join(";"),
+    ponteiroMovido: (form.ponteiroMovido ?? []).join(";"),
     ponteiroEvidencia: form.ponteiroEvidencia.trim(),
     contrafactualReclamacao: form.contrafactualReclamacao.trim(),
     contextoEspecial: form.contextoEspecial.trim(),
@@ -1038,7 +1048,7 @@ export function SubmeterPageContent({
             // depois (handleContinuarAgente sincroniza; especial converte via metadados).
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
-            ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+            ponteiro_movido: (form.ponteiroMovido ?? []).join(";") || undefined,
             ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
             contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
             docs,
@@ -1286,7 +1296,7 @@ export function SubmeterPageContent({
           tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
-          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_movido: (form.ponteiroMovido ?? []).join(";") || undefined,
           ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
           contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: form.especial || undefined,
@@ -1367,7 +1377,7 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
-          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_movido: (form.ponteiroMovido ?? []).join(";") || undefined,
           ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
           contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
@@ -1404,7 +1414,7 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
-          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_movido: (form.ponteiroMovido ?? []).join(";") || undefined,
           ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
           contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
@@ -1436,7 +1446,7 @@ export function SubmeterPageContent({
           data_criacao: form.dataCriacao,
           descricao_breve: form.descricaoBreve.trim() || undefined,
           usa_ai_proxy: form.usaAiProxy || undefined,
-          ponteiro_movido: form.ponteiroMovido.join(";") || undefined,
+          ponteiro_movido: (form.ponteiroMovido ?? []).join(";") || undefined,
           ponteiro_evidencia: form.ponteiroEvidencia.trim() || undefined,
           contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: true,
