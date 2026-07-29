@@ -8,7 +8,8 @@
 
 **Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
 `feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** validar a Fase 5 no **staging `edf400b4`** → **prod `674a3710`** → PR — e **calibrar a régua com
+**Próximo:** validar no **staging `edf400b4`** o fluxo refinado (agente pedindo o ponteiro no chat + seletor
+pessoa/time em "quem reclama") e os 3 cenários da régua → **prod `674a3710`** → PR — **calibrando a régua com
 o Rafa antes de produção** (reprovar projeto é visível ao autor).
 **⚠️ Frente paralela pendente de código:** `perguntas-agente-recorrencia-evidencia` (A1 — o gate da alocação
 precisa aceitar "menos custo" · A2 — materialidade nos gates).
@@ -85,8 +86,15 @@ Pedido da gestão (Rafa, caso da **nuvem de palavras**): apertar o que conta com
   classificação em 3 níveis + `normalizarClassificacao`/`decidirStatusSubmissao` (puras) · 3 colunas do
   Sheets + espelho SQLite + reconciliação · motivos na triagem do `/dashboard` · motivo visível ao autor ·
   régua de 1 página + `spec-docs/SPEC_CRITERIOS_PROJETO.md`. **723 testes verdes.**
+- ✅ **Refinamento pós-staging (2026-07-29, pedido do Luis):** o **ponteiro movido + onde verificar SAÍRAM do
+  formulário** e passaram para o **agente** (seção obrigatória `[1.4]` "Ponteiro movido e onde verificar" nos 3
+  modos do `MEMORIAL_ESQUELETO` — pergunta 1× qual ponteiro, 1× onde se confere, constrói o racional COM a
+  pessoa, aceita "não sei onde conferir" → zona cinzenta, nunca reprovação automática); e **"quem reclama"
+  virou seleção da Team Guide** com filtro dinâmico **pessoa OU time/área inteiro** (`AfetadosInput`, coluna
+  `contrafactual_afetados`), só "o que piora" segue texto livre. **726 testes verdes**, staging redeployado.
 - ⬜ **Calibrar a régua com o Rafa** (gate humano — reprovar projeto é visível ao autor).
-- ⬜ Validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação) → **prod `674a3710`** → PR.
+- 🟡 Validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação **+ o fluxo novo**: o agente
+  pedindo o ponteiro no chat e o seletor pessoa/time da Etapa 2) → **prod `674a3710`** → PR.
 - **DoD:** "nuvem de palavras" sai `Reprovado` com motivo; saving recorrente com indicador segue `Pendente`
   sem mudança; ganho sem fonte vira `Zona cinzenta`/`Em validação`; a coluna `Classificação` nunca fica
   vazia; ninguém é reprovado sem motivo; especial nunca reprova automático; `Observações` e `Motivo Reenvio`
@@ -94,7 +102,8 @@ Pedido da gestão (Rafa, caso da **nuvem de palavras**): apertar o que conta com
 - **Fronteira:** barrar submissão no formulário fica **FORA em definitivo**; a régua de complexidade e a
   rota de projeto especial não foram tocadas; legados não recebem backfill de `Classificação`.
 
-**Próximo:** calibrar a régua com o Rafa e validar no staging.
+**Próximo:** validar no staging o fluxo refinado (ponteiro no agente + seletor pessoa/time) e calibrar a
+régua com o Rafa.
 
 ## Backlog
 - ⬜ Tela de gestão de admins (endpoints `/api/admin/admins` existem, ninguém consome; link "Configurações"

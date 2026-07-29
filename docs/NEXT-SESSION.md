@@ -4,7 +4,37 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-29 (código) — **executado o plano do critério de projeto** (T1–T7), branch
+> **▶ PRÓXIMO PASSO:** validar no **staging** (`https://godocs-staging.devgogroup.com/`) o fluxo refinado do
+> critério de projeto — submeter um projeto novo e conferir (a) o **agente pedindo o ponteiro movido + onde
+> verificar** no chat, e (b) o seletor **pessoa/time** em "quem reclama" na Etapa 2 — e os 3 cenários dos
+> critérios de aceitação; **depois** prod `674a3710` → PR, com a régua calibrada com o Rafa.
+
+**Última sessão:** 2026-07-29 (código, 2ª rodada) — **refinamento pós-staging do critério de projeto**
+(pedido do Luis depois de ver a Etapa 2 na staging), branch `feat/criterios-projeto-classificacao`, commit
+`b6485e4`, **726 testes verdes**, staging `edf400b4` redeployado. Duas mudanças de **onde** a informação é
+coletada (D5 da spec revisado + D5b novo):
+- **O ponteiro movido saiu do formulário e virou trabalho do AGENTE.** Os cards "moveu o ponteiro de quê?" e
+  o campo "onde isso pode ser verificado?" foram removidos da Etapa 2; entrou a seção obrigatória **`[1.4]`
+  "Ponteiro movido e onde verificar"** no `MEMORIAL_ESQUELETO` (3 modos) + condução no `orchestrator.ts`: o
+  agente pergunta **1×** qual ponteiro moveu (`type:"options"`) e **1×** onde alguém abre e confere,
+  **constrói o racional junto com a pessoa**, e se ela não souber onde conferir **registra isso e segue**
+  (→ zona cinzenta, **nunca** reprovação automática); não pergunta se a doc aprovada já responde.
+  ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são colunas **LEGADO** — nada mais as escreve; **não
+  reintroduzir os cards de ponteiro na Etapa 2**.
+- **"Se desligar isso hoje, quem reclama?" virou seleção da Team Guide**, com filtro **dinâmico**: pessoa
+  (autocomplete nome/e-mail, mesma lista da Etapa 1 — cache de módulo, sem refetch) **ou** time/área inteiro
+  (`GET /api/areas`), para não marcar pessoa por pessoa quando o impacto é do time todo. Novo
+  `AfetadosInput` + coluna `contrafactual_afetados` (`"pessoa:a@x;b@y"` | `"time:Fiscal;CX"`) com
+  serialização pura testada. Só **"E o que piora?"** segue texto livre (premissa que assumi: o texto do
+  "o que piora" continua, porque é o sinal do contrafactual — se o Luis quiser cortar, é 1 linha).
+- **Reuso:** o posicionamento do dropdown por portal foi extraído para o hook **`useDropdownAnchor`**,
+  compartilhado agora pelos autocompletes das Etapas 1 e 2 (eram ~40 linhas duplicadas).
+⚠️ **Ainda não validado no navegador** — o fluxo do agente pedindo o ponteiro só aparece no chat.
+⚠️ **Prod (`674a3710`) e PR não foram tocados** nesta rodada, por decisão de fechamento de sessão.
+⚠️ **`CLAUDE.md` desta branch está em ~44,6k chars** (limite recomendado 40k) — vale um enxugamento em PR
+próprio; a seção do critério de projeto já foi escrita condensada.
+
+_(Antes desta:)_ **2026-07-29 (código, 1ª rodada)** — **executado o plano do critério de projeto** (T1–T7), branch
 `feat/criterios-projeto-classificacao` (worktree `.claude/worktrees/criterios-projeto`, criada de
 `origin/main` `ad64895` + merge). Entregue: **(T1)** 2 perguntas determinísticas na Etapa 2 — *"moveu o
 ponteiro de quê?"* (cards multi: Custo · Receita · KPI · **Nenhum/ainda não sei**, que **passa**), *"onde
@@ -90,9 +120,12 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 
 ## Plano ativo
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
-Status: ✅ **executado (2026-07-29)** — código completo (T1–T7). **O que falta não é código:** validar no
-**staging `edf400b4`** → **prod `674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção
-(reprovar projeto é visível ao autor). **Barrar submissão segue FORA em definitivo.**
+Status: ✅ **executado (2026-07-29)** — código completo (T1–T7) **+ refinamento R1/R2 pós-staging** (ponteiro
+movido migrado para o agente · "quem reclama" por seleção pessoa/time da Team Guide), commit `b6485e4`, 726
+testes verdes, staging redeployado. **O que falta não é código:** **validar no staging `edf400b4`** (os 3
+cenários da régua **+ o fluxo novo**: o agente pedindo o ponteiro no chat e o seletor pessoa/time na Etapa 2)
+→ **prod `674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção (reprovar projeto é visível
+ao autor). **Barrar submissão segue FORA em definitivo**; **não reintroduzir os cards de ponteiro na Etapa 2**.
 
 **⚠️ Frente PARALELA, não sobrescrita — [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** ·
 Status: ✅ **aprovado (Luis, 2026-07-28)**, T1 executado, **ainda pendente de código**: **A1** (o gate da

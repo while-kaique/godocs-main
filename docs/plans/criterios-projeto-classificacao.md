@@ -1,9 +1,30 @@
 # Plano — Critério de projeto: perguntas-chave + classificação da avaliação + reprovação com motivo
 
-**Status:** ✅ **executado (2026-07-29)** — T1–T7 codados, 723 testes verdes, `build` + `build:worker` OK.
-Falta o que **não é código**: validar no **staging `edf400b4`** (os 3 cenários dos critérios de aceitação) →
-**prod `674a3710`** → PR. ⚠️ **A régua (T7) deve ser calibrada com o Rafa antes de produção** — reprovar
-projeto é visível ao autor. Spec: [`spec-docs/SPEC_CRITERIOS_PROJETO.md`](../../spec-docs/SPEC_CRITERIOS_PROJETO.md).
+**Status:** ✅ **executado (2026-07-29)** — T1–T7 codados **+ refinamento R1/R2 pós-staging no mesmo dia**
+(pedido do Luis, ver abaixo), **726 testes verdes**, `build` + `build:worker` OK, staging `edf400b4`
+redeployado. Falta o que **não é código**: validar no staging (os 3 cenários dos critérios de aceitação
+**+ o fluxo novo**) → **prod `674a3710`** → PR. ⚠️ **A régua (T7) deve ser calibrada com o Rafa antes de
+produção** — reprovar projeto é visível ao autor.
+
+### R1/R2 — refinamento pós-staging (29/07/2026, commit `b6485e4`)
+Depois de ver a Etapa 2 na staging, o Luis mudou **onde** duas coisas são coletadas (D5 da spec revisado):
+- **R1 — o ponteiro sai do formulário e vai para o AGENTE.** Os cards "moveu o ponteiro de quê?" e o campo
+  "onde isso pode ser verificado?" foram **removidos** da Etapa 2. No lugar: seção obrigatória
+  **`[1.4]` "Ponteiro movido e onde verificar"** no `MEMORIAL_ESQUELETO` (3 modos) + condução no
+  `orchestrator.ts` — pergunta **1×** qual ponteiro moveu (`type:"options"`: custo · receita · KPI da área ·
+  ainda não sei) e **1×** onde alguém abre e confere (relatório/painel/base **nomeados**), **argumenta o
+  racional junto com a pessoa** e, se ela não souber onde conferir, **registra exatamente isso e segue** —
+  nunca inventa fonte nem trava. Motivo: rastreabilidade não se resolve com checkbox. O analisador passou a
+  ler a rastreabilidade do memorial; seção ausente ou "não sei" → **zona cinzenta**, nunca reprovação
+  automática. ⚠️ `ponteiro_movido`/`ponteiro_evidencia` viraram colunas **LEGADO** (nada mais as escreve).
+- **R2 — "quem reclama" vira seleção, não texto livre.** Novo `AfetadosInput` com filtro **dinâmico**:
+  **pessoa** (autocomplete nome/e-mail, mesma lista da Etapa 1 — cache de módulo, sem refetch) ou
+  **time/área inteiro** (`GET /api/areas`), para não marcar pessoa por pessoa quando o impacto é do time
+  todo. Persiste em `contrafactual_afetados` (`"pessoa:a@x;b@y"` | `"time:Fiscal;CX"`) com
+  `serializarAfetados`/`desserializarAfetados` puras (round-trip testado; valor legado não derruba a tela).
+  Só **"E o que piora?"** segue texto livre (≥15 chars).
+- **Reuso:** o posicionamento do dropdown por portal foi extraído para o hook **`useDropdownAnchor`**, agora
+  compartilhado pelos autocompletes das Etapas 1 e 2 (eram ~40 linhas duplicadas). Spec: [`spec-docs/SPEC_CRITERIOS_PROJETO.md`](../../spec-docs/SPEC_CRITERIOS_PROJETO.md).
 **Blast-radius: ALTO** (formulário + orquestrador + analisador + sync + dashboard)
 
 ## Contexto
