@@ -8,10 +8,11 @@
 
 **Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
 `feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** **deployar `53e8ef8` no staging `edf400b4`** (lá ainda está o `b6485e4`) e rodar os **8 cenários**
-de `docs/roteiro-validacao-criterios.md` — que definem o que é "o agente acerta sem trava" e a regra de
-decisão do gate do `[1.4]` → **prod `674a3710`** → PR — **calibrando a régua com o Rafa antes de produção**
-(reprovar projeto é visível ao autor).
+**Próximo:** staging `edf400b4` **já deployada** com o `53e8ef8` (2026-07-29 16:40) — ler o resultado do run
+E2E `stg-ctx-01` com `scripts/e2e/inspect-perguntas.mjs`, rodar os cenários **manuais** do
+`docs/roteiro-validacao-criterios.md` (o ponto 3 não é automatizável), decidir o gate do `[1.4]` →
+**prod `674a3710`** → PR — **calibrando a régua com o Rafa antes de produção** (reprovar projeto é visível ao
+autor). ⚠️ Limpar o run: `npm run e2e:cleanup -- stg-ctx-01`.
 **⚠️ Frente paralela pendente de código:** `perguntas-agente-recorrencia-evidencia` (A1 — o gate da alocação
 precisa aceitar "menos custo" · A2 — materialidade nos gates).
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — as colunas "Participantes 2"/"Contribuidor" já existem no Sheets

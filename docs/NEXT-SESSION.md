@@ -4,11 +4,38 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-> **▶ PRÓXIMO PASSO:** **deployar no staging `edf400b4`** (o commit `53e8ef8` NÃO está lá) e rodar os **8
-> cenários** de [`docs/roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md), conferindo os 5
-> comportamentos do `[1.4]` e contando as perguntas contra a baseline de **6,4/submissão**; a regra de
-> decisão do gate do `[1.4]` (pendência 3) sai desse resultado. **Depois** prod `674a3710` → PR, com a régua
-> calibrada com o Rafa.
+> **▶ PRÓXIMO PASSO:** rodar **`node scripts/e2e/inspect-perguntas.mjs stg-ctx-01`** (com
+> `E2E_BASE_URL=https://godocs-staging.devgogroup.com`) para ler as perguntas do run E2E que ficou **em voo**
+> no fim da sessão — se o run não completou, redisparar (comando na seção "E2E" abaixo). Depois: os cenários
+> **manuais** do [`roteiro`](roteiro-validacao-criterios.md) que o E2E não cobre (o ponto 3 — responder "não
+> sei onde conferir" e ver se o agente **inventa** fonte) → decidir o gate do `[1.4]` → prod `674a3710` → PR,
+> com a régua calibrada com o Rafa. ⚠️ **Limpar o run:** `npm run e2e:cleanup -- stg-ctx-01` (planilha ANTES
+> do SQLite, senão o sync reverso ressuscita as linhas).
+
+## STAGING JÁ DEPLOYADA (2026-07-29 16:40) — commit `53e8ef8`
+
+`edf400b4` (`godocs-staging.devgogroup.com`) está com o código do contexto do formulário. Prod `674a3710`
+**intacta** (segue sem a feature inteira). Testes/build/`worker.js` refeitos antes do upload.
+
+### E2E contra a staging — o que aprendi (reusável)
+
+- **O `E2E_COOKIE` do `.env` FUNCIONA na staging** — o cookie do edge vale para o domínio todo
+  (`/api/auth/me` → 200 nos dois hosts). Não precisa de cookie separado. (Expira 30/07/2026 22:41 UTC.)
+- Comando: `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING
+  E2E_ONLY=saving-puro,custo-evitado-puro,receita-pura npm run e2e:run -- <runId>` — **`E2E_ONLY`** filtra
+  cenários (não gasta os 24) e **`GOOGLE_SHEETS_TAB=STAGING`** faz o validador ler a aba certa.
+- ⚠️ **O E2E NÃO valida as mudanças do agente.** Ele confere as **colunas da planilha**; as perguntas vivem
+  nas `chat_messages`. Como o `[1.3]`/`[1.4]` são prompt-only, **passar no E2E não prova** que o agente
+  cumpriu as seções. Daí o **`scripts/e2e/inspect-perguntas.mjs`** (novo): lê o JSON do run, busca
+  `/api/chat/historico/:id` de cada projeto e reporta perguntas por fase · seções `[1.3]`/`[1.4]` presentes
+  no memorial · ponteiro/fonte perguntados >1× (anti-loop) · a seção `[1.4]` como foi gravada · média contra
+  a baseline de 6,4. Cobre 4 dos 5 comportamentos do roteiro.
+- ⚠️ **O ponto 3 do roteiro (o agente inventa fonte?) NÃO é automatizável assim** — o respondedor do E2E é um
+  LLM que tende a cooperar e dar uma fonte plausível. Precisa de humano no navegador respondendo "não sei".
+- **Logs:** MCP `getAppLogs` no `edf400b4` mostra request + `console.log` do worker (útil p/ erro/exceção),
+  **não** as perguntas do agente.
+
+**Última sessão:** 2026-07-29 (3ª rodada) — o contexto do formulário passou a chegar aos 4 prompts
 
 ## Sessão de 2026-07-29 (código, 3ª rodada) — o contexto do formulário chega ao agente
 
