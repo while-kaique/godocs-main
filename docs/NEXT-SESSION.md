@@ -4,7 +4,57 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30 (código, avulsa — fora do plano ativo) — pedido direto do Luis:
+**Última sessão:** 2026-07-30 (validação em staging — critério de projeto) — pedido do Luis: **validar por
+E2E na staging que o agente pergunta o que o planejamento definiu, antes de levar TUDO a produção**.
+
+**✅ O GATE T8 FUNCIONOU — os 2 cenários que falhavam na rodada de 29/07 passaram** (run `stg-crit-01`,
+staging `edf400b4`, `inspect-perguntas.mjs`):
+
+| Cenário | 29/07 (só prompt) | 30/07 (com o gate T8) |
+|---|---|---|
+| `custo-evitado-puro` | ❌ `[1.4]` gravada **pela metade** (só `**Ponteiro movido:** custo externo`, sem o "onde verificar") nas 2 rodadas | ✅ `[1.3]` **e** `[1.4]` completas — ponteiro (custo externo do contrato) **+** onde conferir (histórico de cancelamento/faturamento + Portal) |
+| `receita-pura` | ❌ `[1.3]` **ausente**; `[1.4]` ausente numa das rodadas | ✅ `[1.3]` **e** `[1.4]` presentes |
+
+Mais: **0 repetição** de pergunta de ponteiro/fonte · **2,5 perguntas/submissão** (baseline de prod **6,4**)
+— as seções novas **não engordaram o funil**. E o comportamento 3 (o mais importante) se manteve: no
+`receita-pura` o agente **registrou a ausência da fonte em vez de inventar uma** — _"O briefing não informou
+relatório, painel, sistema ou base específica para conferência desse número"_ → vira **zona cinzenta**, nunca
+reprovação automática. ⚠️ **A decisão do PREFIXO se provou load-bearing**: o agente gravou o título como
+`### Ponteiro movido e conferência` (não o título exato) — com casamento por título exato o gate teria lido
+`null` e reperguntado à toa. **Não "corrigir" o prefixo.**
+
+**Também verificado nesta sessão:** (a) a staging roda **exatamente** `staging/criterios-coautor` — o entry
+`index-CLeuBaiL.js` do `/index.html` ao vivo bate com o `dist/` local (é assim que se confere qual branch
+está no ar, ver a armadilha do deploy que apagou a Etapa 2); (b) **761 testes verdes** na branch de
+integração, que já contém **todo** o `origin/main` (`ad64895`) — é superset limpo para prod; (c) as 3 colunas
+do critério (`Classificação` · `Motivo Reprovado` · `Motivo Reenvio`) **existem no cabeçalho das DUAS abas**,
+`STAGING` **e** `GoDocs` — o pré-requisito de prod está cumprido (mapeamento é por nome; nome errado é
+ignorado com aviso silencioso).
+
+**2 buracos do harness E2E corrigidos** (commitados na branch de integração) — os dois faziam o teste medir a
+coisa errada: **(1)** o `metaPadrao` **nunca enviava** `contrafactual_afetados`/`contrafactual_reclamacao`, as
+perguntas-chave da Etapa 2 — sem elas o agente roda **cego ao contrafactual**, exatamente o cenário que o
+roteiro manda não medir (é `buildRespostasFormulario` que as entrega aos 4 prompts); **(2)** **nenhum cenário
+cobria `claro_nao`** — o único caminho que grava **"Reprovado"** na planilha e o que mais precisa de
+validação, porque o autor vê. Criado o cenário **`criterio-claro-nao`** (nuvem de palavras: rodou 1×, sem
+recorrência, ninguém reclama, materialidade minúscula de propósito — acima de R$5k/mês o invariante de
+`normalizarClassificacao` rebaixa para zona cinzenta e o teste não provaria nada).
+
+⚠️ **O lado do ANALISADOR (item 2 do pedido) segue SEM validação** — pelo mesmo motivo de 29/07, não por bug
+do código novo: a análise morre no `waitUntil` (timeout de 25s do proxy → fallback OpenAI → *tasks
+cancelled*) e o cron de 1 min **não dispara na staging**. A rota de destrave existe
+(`POST /api/admin/reanalisar-pendentes`, `requireAdmin`, idempotente) e **foi chamada**, mas devolveu **500 por
+cota do Google Sheets** (`ReadRequestsPerMinutePerUser`, 60/min — estourada pelas minhas próprias leituras da
+planilha + o run). **É transitório: esperar ~1 min e repetir.** A causa-raiz do `waitUntil` continua aberta
+(decisão do Luis entre aterrissar a análise no request do submit ou disparar do front em lotes).
+
+⚠️ **Divergência de escopo registrada:** o pedido do Luis listou **3** perguntas para o **formulário**
+("que processo mudou e quanto" · "moveu ponteiro de custo/receita/KPI" · "se desligar hoje quem reclama").
+Pela decisão de **29/07** só o **contrafactual** ficou na Etapa 2 ("quem reclama" + "o que piora"); as outras
+duas são conduzidas pelo **agente** no chat e é isso que o gate T8 cobre — foi assim que validei. Se o Luis
+quiser as três **no form**, é mudança nova e precisa ser dita **antes** do deploy de prod.
+
+_(Antes desta:)_ **2026-07-30 (código, avulsa — fora do plano ativo)** — pedido direto do Luis:
 **Coautor único por projeto**. Cada projeto tem **1 autor** (o submissor/dono, que não escolhe papel) e
 **no máximo 1 Coautor** (`coexecutor`); Participante e Contribuidor seguem **sem limite**. Implementação
 **100% cliente** (nada de schema, sync ou colunas do Sheets — `derivarColunasPapeis` continua aceitando
@@ -145,7 +195,36 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**PRIMEIRO — pergunta aberta ao Luis, sem resposta ainda (30/07):** o staging hoje carrega **duas** frentes
+**Fechar a validação do critério e levar as DUAS frentes a produção** (o Luis respondeu a pergunta que estava
+aberta: quer **prod recebendo todas as mudanças**, depois de validar o critério por E2E na staging). O lado do
+**agente já está validado** (tabela no topo). Falta, nesta ordem:
+
+1. **Terminar o run `stg-crit-02`** (`receita-pura` + `custo-evitado-puro`) — ficou **em voo** no fim da
+   sessão, preso num vai-e-vem longo da fase **doc** do `receita-pura` (o respondedor do E2E responde "não
+   está no briefing" e o agente repergunta; pode bater no `MAX_TURNS`). Log em
+   `.../scratchpad/e2e-stg-crit-02.log`. ⚠️ **Não é bloqueio da validação** — o `stg-crit-01` já cobriu os
+   dois cenários com sucesso; se o `stg-crit-02` estourar turnos, isso é achado do **respondedor**, não do
+   produto.
+2. **Rodar o run 2 com os campos novos** (o harness já foi corrigido e commitado):
+   `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING
+   E2E_ONLY=criterio-claro-nao,receita-pura npm run e2e:run -- stg-crit-03` — este é o que valida o
+   **item 2 do pedido** (classificação em 3) e o caminho **`claro_nao` → "Reprovado" + Motivo Reprovado**.
+3. **Destravar o analisador:** esperar ~1 min (cota do Sheets) e repetir
+   `POST /api/admin/reanalisar-pendentes`; depois ler `Classificação`/`Motivo Reprovado`/`Status` na aba
+   `STAGING` (script pronto em `.../scratchpad/read-criterio.mjs`).
+4. **Limpar** os projetos de teste: `npm run e2e:cleanup -- stg-crit-01` (e `stg-crit-02`/`stg-crit-03`)
+   — **planilha ANTES do SQLite**, senão o sync reverso ressuscita.
+5. **Prod `674a3710`** com a branch de integração `staging/criterios-coautor` (já é superset do `main`):
+   `npm run test && npm run build && npm run build:worker` → `scripts/deploy-godeploy.sh <TOKEN>` → `updateApp`.
+   ⚠️ `getUploadToken` novo (o `uploadId` é single-use) e o script recebe o **TOKEN**, não a URL.
+6. **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`).
+
+⚠️ **Antes do passo 5, ver a divergência de escopo das 3 perguntas do formulário** registrada no bloco da
+última sessão — se o Luis quiser as três **no form** (e não duas no agente), isso muda o que vai a prod.
+⚠️ **Gate humano ainda de pé:** a régua do Rafa (T7) **deve ser calibrada com ele antes do deploy em
+produção** — reprovar projeto é visível ao autor.
+
+_(Resolvido — era o "PRIMEIRO" desta seção:)_ o staging hoje carrega **duas** frentes
 (Coautor único, já validado + critério de projeto, ainda **não** validado por ele). Decidir com ele:
 **(1)** subir a prod **só o Coautor único** (`feat/coautor-unico` rebaseada no `main`) e abrir o PR dela,
 deixando o critério de projeto só no staging; ou **(2)** esperar a validação do critério de projeto e subir as
