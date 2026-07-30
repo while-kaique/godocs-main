@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, AFETADO_TIPOS } from "./constants";
+import {
+  EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR,
+  coautoresSelecionados, AFETADO_TIPOS,
+} from "./constants";
 import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
 
@@ -545,7 +548,7 @@ const COR_PAPEL: Record<PapelParticipante, string> = {
 // do campo, para o submissor escolher o papel certo. Texto com acentuação (regra 4).
 const DESCRICAO_PAPEL: Record<PapelParticipante, string> = {
   coexecutor:
-    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal.",
+    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal. Apenas 1 por projeto.",
   planejador:
     "Apoiou diretamente na construção do projeto, executando tarefas e entregas concretas dentro de um escopo definido.",
   contribuidor:
@@ -707,6 +710,16 @@ export function ParticipantesPapeisInput({
   }
 
   const semPapel = participantes.filter((p) => !papeis[p]).length;
+
+  // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quando alguém já é
+  // Coautor, a opção SAI da lista dos outros — nada de opção morta na tela. Quem já é o
+  // Coautor mantém a opção (precisa dela para exibir o papel atual e poder trocar); a
+  // ausência é explicada pela nota abaixo da lista.
+  const coautores = coautoresSelecionados(participantes, papeis);
+  const papeisDisponiveis = (email: string) =>
+    PAPEIS_PARTICIPANTE.filter(
+      (p) => p.value !== PAPEL_COAUTOR || coautores.length === 0 || coautores[0] === email,
+    );
 
   return (
     <>
@@ -910,7 +923,7 @@ export function ParticipantesPapeisInput({
                     style={faltando ? { borderColor: "#dc2626" } : undefined}
                   >
                     <option value="" disabled>Selecione o papel</option>
-                    {PAPEIS_PARTICIPANTE.map((p) => (
+                    {papeisDisponiveis(email).map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
                   </select>
@@ -935,6 +948,19 @@ export function ParticipantesPapeisInput({
       {participantes.length > 0 && semPapel > 0 && !error && (
         <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
           {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} — escolha o papel de cada pessoa.
+        </p>
+      )}
+
+      {/* Regra do Coautor único — informativa (ícone + texto, nunca só cor). Aparece
+          quando há mais de uma pessoa e ainda não há erro vermelho na tela. */}
+      {participantes.length > 1 && !error && (
+        <p className="mt-1.5 flex items-start gap-1 text-[11px]" style={{ color: "#8b8b9a" }}>
+          <span aria-hidden="true">ℹ️</span>
+          <span>
+            {coautores.length === 1
+              ? "O papel de Coautor já está definido — os demais entram como Participante ou Contribuidor."
+              : "Cada projeto tem 1 autor (você) e no máximo 1 Coautor."}
+          </span>
         </p>
       )}
 

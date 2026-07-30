@@ -56,6 +56,37 @@ export const PAPEIS_PARTICIPANTE = [
 
 export type PapelParticipante = (typeof PAPEIS_PARTICIPANTE)[number]["value"];
 
+// Papel "Coautor" — ÚNICO por projeto (decisão de produto 30/07/2026): cada projeto tem
+// 1 autor (o submissor/dono) e no máximo 1 Coautor. Os demais participantes ficam como
+// "Participante" ou "Contribuidor". O seletor desabilita "Coautor" para os outros quando
+// alguém já o tem, e `validarEtapa1` bloqueia o avanço se vierem 2+ (caso de legado
+// importado do Sheets com vários na coluna "Participantes" — o usuário reclassifica).
+export const PAPEL_COAUTOR: PapelParticipante = "coexecutor";
+
+// E-mails (dentro de `participantes`) marcados como Coautor. Função pura — testável.
+export function coautoresSelecionados(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): string[] {
+  return participantes.filter((email) => papeis[email] === PAPEL_COAUTOR);
+}
+
+// Aplica a regra do Coautor único a um mapa de papéis que veio de FORA do formulário
+// (seed da edição / rascunho): mantém o PRIMEIRO Coautor da lista e LIMPA o papel dos
+// demais (string vazia) — não promove ninguém por conta própria; o usuário escolhe
+// (o form já exige papel de todos). Sem 2+ Coautores, devolve o mapa como está.
+// Função pura — testável.
+export function limitarCoautorUnico(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): Record<string, PapelParticipante | ""> {
+  const coautores = coautoresSelecionados(participantes, papeis);
+  if (coautores.length <= 1) return papeis;
+  const out = { ...papeis };
+  for (const email of coautores.slice(1)) out[email] = "";
+  return out;
+}
+
 // Monta o mapa e-mail→papel para o payload `membros_papeis`, só com participantes
 // atuais e papéis já escolhidos (descarta vazios). O e-mail é a chave, exatamente
 // como aparece em `participantes`. Função pura — testável.
@@ -128,6 +159,10 @@ export function validarEtapa1(
     // Papel obrigatório por participante (decisão de produto: obriga escolher).
     else if (form.participantes.some((p) => !form.participantesPapeis[p]))
       errs.participantes = "Escolha o papel de cada participante";
+    // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor).
+    else if (coautoresSelecionados(form.participantes, form.participantesPapeis).length > 1)
+      errs.participantes =
+        "Só é possível ter 1 Coautor por projeto — deixe os demais como Participante ou Contribuidor";
   }
 
   return errs;

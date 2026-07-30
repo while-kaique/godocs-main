@@ -10,6 +10,7 @@ import {
   filesToDocs, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, validarEtapa1,
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
+  limitarCoautorUnico,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -433,11 +434,15 @@ export function SubmeterPageContent({
         const membrosPapeisSeed = (data.membros_papeis as Record<string, string>) ?? {};
         const papeisLower: Record<string, string> = {};
         for (const [k, v] of Object.entries(membrosPapeisSeed)) papeisLower[k.toLowerCase()] = v;
-        const participantesPapeis: FormData["participantesPapeis"] = {};
+        const participantesPapeisBruto: FormData["participantesPapeis"] = {};
         for (const email of membros) {
           const p = membrosPapeisSeed[email] ?? papeisLower[email.toLowerCase()];
-          participantesPapeis[email] = (p as PapelParticipante) || "coexecutor";
+          participantesPapeisBruto[email] = (p as PapelParticipante) || "coexecutor";
         }
+        // Coautor é único por projeto: projeto antigo/legado pode trazer vários da coluna
+        // "Participantes" — mantém o primeiro e deixa os demais sem papel para o usuário
+        // reclassificar (a validação da Etapa 1 exige papel de todos).
+        const participantesPapeis = limitarCoautorUnico(membros, participantesPapeisBruto);
 
         // Contrafactual: a lista de afetados é gravada serializada ("pessoa:a@x;b@y").
         const afetadosSeed = desserializarAfetados(data.contrafactual_afetados as string | null);
