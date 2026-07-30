@@ -4,7 +4,67 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30 (validação em staging — critério de projeto) — pedido do Luis: **validar por
+**Última sessão:** 2026-07-30 (validação em staging, parte 2 — **achou e corrigiu um bug crítico; prod NÃO
+foi deployado**). O deploy de prod estava aprovado pelo Luis ("subir tudo, calibrar a régua do Rafa depois",
+escopo do form mantido como validado), mas foi **parado por um achado** que ele não conhecia.
+
+## 🐞 LOOP DE RECONCILIAÇÃO QUE ESTOURAVA A COTA DO SHEETS — corrigido, commit `cb8d677`
+**Regressão da própria branch do critério** (⚠️ `origin/main` está LIMPO — `classifNaPlanilha` não existe
+lá; prod nunca teve o bug). Em `reconciliarComplexidade` (`chat.functions.ts`) a coluna nova
+`Classificação` fez o critério de "já está pronto" virar `Complexidade preenchida E Classificação
+preenchida` — **impossível de satisfazer** para projeto ANTIGO: tem Complexidade na planilha,
+`Classificação` vazia (coluna nova) e **nada** de classificação no SQLite, então o cron escrevia só a
+Complexidade (que já estava lá), a Classificação seguia vazia e ele voltava no minuto seguinte. **Para
+sempre.** Medido nos logs da staging: **109 projetos distintos, 693 tentativas em 7 rodadas (~99 leituras
+de cabeçalho por minuto)** contra a cota de **60 leituras/min** do Sheets.
+
+**Danos reais observados** (e que iriam a prod): **707 erros 429**; o **append da submissão do run 3
+morreu** (`[google/sync] Falha ao inserir na planilha: 429`) → o projeto **nunca chegou à planilha**; e,
+passada a **carência de 1h**, `reconciliarExclusoes` **apagaria o projeto do SQLite** — perda silenciosa.
+⚠️ A cota é do **mesmo projeto GCP da produção** (`398963590019`), então a staging estava **degradando o
+Sheets de prod**; o cron da staging foi pausado durante o diagnóstico e **religado** após o fix.
+
+**Fix:** a decisão virou a função **pura** `decidirReconciliacaoPlanilha` — só age quando há algo
+**realmente gravável** (coluna vazia na planilha **E** dado no SQLite) ou quando cabe re-análise (SQLite
+vazio nas duas pontas); nada a fazer → não conta como pendente e **não gera leitura**. **8 testes de
+convergência** (`tests/reconciliacao-convergencia.test.ts`), incluindo estabilidade da 2ª passada.
+**769 testes verdes**, `build` + `build:worker` OK, `worker.js` recomitado, **staging redeployada 15:03**.
+✅ **PROVA no ar:** `POST /api/admin/reanalisar-pendentes` → `{"submetidos":569,"faltando":0,
+"ressincronizados":0,"reanalisados":0}` em **15,8s** e **HTTP 200** (antes: ~109/rodada e HTTP 500).
+
+## 🐞 2º gap ACHADO e NÃO corrigido (decisão do Luis: fora deste fix)
+**`resyncGoogle` não recupera linha ausente:** ele usa `modo: "edicao"` → `updateRowByProjectId`; se a
+linha não existe na planilha, **não acha nada, não faz nada e ainda devolve `ok:true`**. Ou seja: quando o
+append da IDA falha (cota/transiente), **não existe caminho de recuperação** e o projeto é purgado após 1h.
+Fix sugerido: cair para **append** quando a linha não existe, em vez de no-op silencioso.
+
+## ✅ Validado nesta sessão (lado do AGENTE, item 1 do pedido)
+O `stg-crit-02` (que ficou em voo na sessão anterior) **fechou com sucesso** nos 2 cenários — e o
+`receita-pura` **não** estourou os 40 turnos, o risco que o handoff anterior apontava. Rodou **no worktree**,
+logo **com** as 2 correções do harness. A ficha do `/dashboard` confirma no memorial gravado as duas seções
+novas (`Processo alterado` + `Ponteiro movido e onde verificar`) e o **comportamento 3** intacto: _"Não foi
+informado no briefing um relatório, painel, sistema ou base específica para conferência desse número;
+portanto, a ausência de fonte nomeada fica registrada explicitamente, **sem inventar referência**"_.
+
+## ⚠️ Ainda NÃO validado: `claro_nao → "Reprovado"` (item 2 do pedido)
+O cenário novo `criterio-claro-nao` **rodou e submeteu** (`f97856f5…`, ganho R$27,88/mês, 40 turnos não
+estourados) — mas a linha **não chegou na planilha** por causa do bug acima, então o caminho da reprovação
+**não pôde ser conferido**. Com o fix no ar, **basta re-rodar o cenário**. O analisador em si **funciona**:
+os 2 projetos do `stg-crit-02` têm `complexidade` gravada no SQLite (`autonomia`/`automacao`) — o que
+falhava era só a escrita na planilha.
+
+## 🧭 Descobertas de método que economizam tempo na próxima sessão
+- ⚠️ **A staging tem `GOOGLE_SHEETS_ID` PRÓPRIO** (secret separado) — **não** é a "planilha de prod
+  compartilhada" que o `CLAUDE.md` descreve. Ler a planilha da staging com o `.env` local (ID de prod) dá
+  **0 linhas** e parece bug do produto. **Caminho certo:** `GET /api/admin/dashboard/projetos` (listagem) e
+  **`GET /api/admin/dashboard/projetos/:id`** (a **linha INTEIRA**, é onde `Classificação`/`Motivo
+  Reprovado` aparecem). O `read-criterio.mjs` do scratchpad **mede a planilha errada** — corrigir ou largar.
+- O cron `reanalisar-pendentes` **dispara sim na staging** (o handoff anterior dizia que não) — ele
+  devolvia **500 por cota**, não silêncio.
+- `/api/admin/investigador/projetos` **não** expõe `classificacao_avaliacao`; `/api/meus-projetos` expõe
+  `motivo_reprovado`/`motivo_reenvio` em **snake_case**.
+
+_(Antes desta:)_ **2026-07-30 (validação em staging — critério de projeto)** — pedido do Luis: **validar por
 E2E na staging que o agente pergunta o que o planejamento definiu, antes de levar TUDO a produção**.
 
 **✅ O GATE T8 FUNCIONOU — os 2 cenários que falhavam na rodada de 29/07 passaram** (run `stg-crit-01`,
@@ -195,6 +255,30 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
+**→ Re-rodar o cenário `criterio-claro-nao` na staging (agora que o loop está corrigido) para fechar a
+última validação — o caminho `claro_nao → "Reprovado" + Motivo Reprovado` — e só então prod + PR.**
+
+```bash
+cd .claude/worktrees/staging-criterios-coautor
+E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING \
+  E2E_ONLY=criterio-claro-nao npm run e2e:run -- stg-crit-04
+# conferir a linha INTEIRA (NÃO use o read-criterio.mjs — ele lê a planilha de PROD):
+curl -H "Cookie: $E2E_COOKIE" \
+  https://godocs-staging.devgogroup.com/api/admin/dashboard/projetos/<ID>
+# esperado: Status "Reprovado" · Classificação preenchida · Motivo Reprovado preenchido
+```
+Se o analisador não gravar (waitUntil), destravar com `POST /api/admin/reanalisar-pendentes` — que agora
+responde em ~16s e **não** estoura mais a cota.
+
+**Depois, na ordem:** (1) limpar os runs — `npm run e2e:cleanup -- stg-crit-01` (e `02`/`03`/`04`),
+**planilha ANTES do SQLite**; (2) **prod `674a3710`** com a `staging/criterios-coautor` (já superset do
+`main`; `getUploadToken` novo — `uploadId` é single-use — e o script recebe o **TOKEN**, não a URL);
+(3) **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`). ⚠️ **A régua do Rafa vai a prod sem
+calibração** (decisão dele nesta sessão: "subir tudo, calibrar depois") — **reprovar projeto é visível ao
+autor**, então avisar o Rafa logo após o deploy. ⚠️ Considerar levar junto o **fix do `resyncGoogle`**
+(2º gap acima): sem ele, um append que falhe segue irrecuperável.
+
+### _(Passos da sessão anterior — o que sobrou deles)_
 **Fechar a validação do critério e levar as DUAS frentes a produção** (o Luis respondeu a pergunta que estava
 aberta: quer **prod recebendo todas as mudanças**, depois de validar o critério por E2E na staging). O lado do
 **agente já está validado** (tabela no topo). Falta, nesta ordem:

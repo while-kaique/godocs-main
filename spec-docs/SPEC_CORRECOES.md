@@ -6,6 +6,58 @@
 
 ---
 
+## 2026-07-30 — Cron de reconciliação entrava em LOOP e estourava a cota do Google Sheets
+
+**Sintoma.** Na staging, tudo que toca o Sheets começou a falhar com **429
+`RESOURCE_EXHAUSTED`** (`ReadRequestsPerMinutePerUser`, 60/min): **707 erros** na janela de log,
+o cron `POST /api/cron/reanalisar-pendentes` devolvendo **500** de forma contínua, e — o pior — o
+**append de IDA de uma submissão nova falhando** (`[google/sync] Falha ao inserir na planilha:
+Sheets header read falhou (429)`), deixando o projeto **fora da planilha**. Como
+`reconciliarExclusoes` remove do SQLite todo projeto não-rascunho ausente do Sheet depois da
+**carência de 1h**, o desfecho era **perda silenciosa da submissão**. ⚠️ A cota é do **mesmo
+projeto GCP da produção** (`398963590019`), então a staging estava **degradando o Sheets de prod**.
+
+**Causa-raiz.** Regressão introduzida pela própria feature do critério de projeto (a coluna nova
+`Classificação`) em `reconciliarComplexidade` (`chat.functions.ts`). O critério de "já está
+pronto, pula" passou a ser `!vazio(Complexidade) && !vazio(Classificação)` — **impossível de
+satisfazer** para projeto ANTIGO: ele tem `Complexidade` preenchida na planilha, `Classificação`
+vazia (coluna nova) e **nenhuma** `classificacao_avaliacao` no SQLite. O ramo de resync exigia só
+`compSqlite || classifSqlite`, então entrava, escrevia **apenas** Complexidade/Observações (que já
+estavam lá), a `Classificação` continuava vazia — e no minuto seguinte o mesmo projeto se
+qualificava outra vez. **Para sempre.** Cada iteração custa uma leitura de cabeçalho
+(`updateRowByProjectId` → `fetchHeaderMap`). Medido: **109 projetos distintos, 693 tentativas em 7
+rodadas (~99 leituras/min)** contra a cota de 60/min — ou seja, o cron consumia a cota **inteira**
+sozinho, permanentemente. O teto `maxReanalises = 15` **não** protegia: ele limita só as
+re-análises, e o caminho percorrido era o de **resync**, que era ilimitado.
+
+**Fix.** A decisão de o que fazer com cada projeto saiu do meio do loop e virou a função **pura**
+`decidirReconciliacaoPlanilha` (exportada de `chat.functions.ts`), que devolve
+`{ acao: 'nada' | 'resync' | 'reanalisar', colunas }`. A regra que garante **convergência**: só age
+quando existe algo **realmente gravável** — coluna **vazia na planilha** *e* dado correspondente
+**no SQLite** — ou quando cabe re-análise (SQLite vazio nas **duas** pontas). Nada a fazer →
+`'nada'`, o projeto **não** conta como pendente e **não gera leitura**. De quebra, para de
+reescrever coluna que já estava preenchida. `'—'` conta como vazio (é o que o sync grava sem dado).
+
+**Onde aterrissou.** `src/lib/chat.functions.ts` (função pura nova + loop de
+`reconciliarComplexidade` reescrito para consumi-la) · `tests/reconciliacao-convergencia.test.ts`
+(**8 testes**, incluindo o caso exato do loop e a **estabilidade da 2ª passada**) · `worker.js`
+recomitado. **769 testes verdes.** Commit `cb8d677` na branch `staging/criterios-coautor`.
+
+**Status.** ✅ Corrigido e **deployado na staging** (`edf400b4`, 30/07 15:03). **Prova no ar:**
+`POST /api/admin/reanalisar-pendentes` → `{"submetidos":569,"faltando":0,"ressincronizados":0,
+"reanalisados":0}` em **15,8s**, **HTTP 200** (antes: ~109 por rodada e HTTP 500). ⚠️ **`origin/main`
+nunca teve o bug** (`classifNaPlanilha` não existe lá) — **produção esteve limpa**; o único dano em
+prod foi o colateral da cota compartilhada. **Ainda não mergeado**; vai a prod junto do critério.
+
+**Gap ADJACENTE, achado e NÃO corrigido** (decisão do Luis: fora deste fix): **`resyncGoogle` não
+recupera linha ausente.** Ele chama `syncSubmitToGoogle` com `modo: "edicao"` →
+`updateRowByProjectId`; se a linha **não existe** na planilha, não acha nada, **não faz nada** e
+ainda devolve **`ok:true`**. Logo, quando o append da IDA falha (cota/transiente), **não há caminho
+de recuperação** — e o projeto é purgado depois da carência. Fix sugerido: **append** quando a linha
+não existe, em vez de no-op silencioso.
+
+---
+
 ## 2026-07-22 — Upload de `.zip` barrado como "extensão não suportada" na Etapa 2 (caso Rafael Lobo)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/aceitar-zip-submissao` · **Plano:** [docs/plans/aceitar-zip-submissao.md](../docs/plans/aceitar-zip-submissao.md)

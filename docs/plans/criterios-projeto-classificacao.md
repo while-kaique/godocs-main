@@ -1,6 +1,15 @@
 # Plano — Critério de projeto: perguntas-chave + classificação da avaliação + reprovação com motivo
 
-**Status:** ✅ **aprovado (Luis, 2026-07-29)** — pronto para `/ggsd:code`
+**Status:** 🟡 **CODADO (T1–T8) e na STAGING; NÃO em prod, NÃO mergeado** — branch de integração
+`staging/criterios-coautor` (= critério + coautor único + o fix do loop, `cb8d677`), 769 testes verdes.
+**Validado na staging:** o lado do **agente** (gate T8 + as 2 seções novas do memorial + o comportamento de
+registrar a ausência de fonte em vez de inventar). **Falta validar:** o caminho
+**`claro_nao` → "Reprovado" + Motivo Reprovado** (o cenário `criterio-claro-nao` rodou, mas a linha não
+chegou à planilha por causa do loop de reconciliação — **corrigido em 30/07**, basta re-rodar).
+⚠️ **A régua do Rafa (T7) vai a prod SEM calibração** — decisão do Luis em 30/07 ("subir tudo, calibrar
+depois"); reprovar projeto é **visível ao autor**, então avisá-lo logo após o deploy.
+⚠️ **Escopo confirmado pelo Luis em 30/07:** ficam **2** perguntas no agente + **contrafactual** na Etapa 2
+(NÃO as 3 no formulário) — foi assim que a validação foi feita.
 **Blast-radius: ALTO** (formulário + orquestrador + analisador + sync + dashboard)
 
 ## Contexto

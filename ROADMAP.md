@@ -11,8 +11,12 @@
 `/dashboard`) ✅ **CONCLUÍDA** (PR #215, `main` `ad64895`); Fase 3 (dashboard = triagem) ✅ mergeada (PR #214).
 `aceitar-zip-submissao` ✅ mergeada (PR #213). **Avulso 30/07:** **Coautor único por projeto** ✅ codado
 (`feat/coautor-unico`) e **validado no staging** — falta prod + PR.
-**Próximo:** decidir com o Luis se a prod recebe **só** o Coautor único agora ou espera a validação do
-critério de projeto; depois validar o critério de projeto no staging.
+**Avulso 30/07 (parte 2):** achado e **corrigido** um **loop de reconciliação que estourava a cota do
+Google Sheets** (`cb8d677`) — fazia submissão nova não chegar à planilha e ser purgada do SQLite após 1h;
+prod nunca teve o bug, mas a staging degradava o Sheets de prod (mesma cota GCP). Staging redeployada.
+**Próximo:** re-rodar o cenário `criterio-claro-nao` na staging para fechar a validação do caminho
+`claro_nao → "Reprovado"`; então limpar os runs E2E, deployar **prod `674a3710`** com
+`staging/criterios-coautor` (critério + coautor + fix) e abrir o PR com `/ggsd:ship`.
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existem na branch do critério).
 **⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
