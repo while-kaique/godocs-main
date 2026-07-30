@@ -8,13 +8,14 @@
 
 **Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
 `feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** **codar o gate determinístico do `[1.3]`/`[1.4]`** (T8 do plano — **decidido em 2026-07-29**
-com a evidência das 7 conversas na staging: o agente passa em 3 dos 5 comportamentos, mas o modo **receita**
-fecha sem o `[1.3]` e o **custo evitado** grava só metade do `[1.4]`). Em seguida, **destravar a validação do
-analisador**, hoje **bloqueada**: na staging a análise morre antes de gravar (timeout de 25s no proxy →
-fallback → `waitUntil` cancelado) e o cron `reanalisar-pendentes` **não dispara**, então `Classificação`/
-`Reprovado`/`Motivo Reprovado` seguem **sem evidência** — os critérios de aceitação 1 a 4 do plano dependem
-disso e **não se vai a prod sem eles**. Só então **prod `674a3710`** → PR — **calibrando a régua com o Rafa
+**Próximo:** **validar o gate do `[1.3]`/`[1.4]`** — ele foi ✅ **codado em 2026-07-30** (`9ce9b09`, 752
+testes verdes) mas **nada foi deployado**: o MCP do GoDeploy está sem autenticação. Sequência: `/mcp` →
+deploy na **staging `edf400b4`** → E2E dos 3 cenários + `inspect-perguntas.mjs` (pontos 1 e 2 do roteiro
+devem virar ✅) → **`POST /api/admin/reanalisar-pendentes`** (rota nova, `requireAdmin`) para medir enfim
+`Classificação`/`Reprovado`/`Motivo Reprovado` — o cron de 1 min **não dispara na staging**, e sem essa
+evidência os critérios de aceitação 1 a 4 seguem em aberto e **não se vai a prod**. ⚠️ A causa-raiz do
+`waitUntil` cancelado (timeout de 25s do proxy + fallback) continua **aberta** — decisão pendente entre
+aterrissar a análise no request do submit ou disparar `/api/chat/analisar` pelo front. Só então **prod `674a3710`** → PR — **calibrando a régua com o Rafa
 antes de produção** (reprovar projeto é visível ao autor).
 
 ---

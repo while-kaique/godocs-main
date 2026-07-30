@@ -273,7 +273,13 @@ implementar 2× e perder no ramo especial; e, com o funil corrigido, mover **nã
 **Validação:** o roteiro dos 8 cenários + os 5 comportamentos observáveis do `[1.4]` + a regra de decisão do
 gate estão em [`docs/roteiro-validacao-criterios.md`](../roteiro-validacao-criterios.md).
 
-## T8 — Gate determinístico do `[1.3]`/`[1.4]` (decidido em 2026-07-29, com evidência)
+## T8 — Gate determinístico do `[1.3]`/`[1.4]` — ✅ **CODADO em 2026-07-30** (commit `9ce9b09`)
+
+> **Estado:** implementado exatamente como decidido abaixo (helpers puros + estado `criterio_secoes` em
+> saving E receita + pergunta 1× só), 752 testes verdes, `worker.js` rebuildado. **Falta validar:** deploy
+> na staging + E2E — travado na autenticação do MCP GoDeploy. Detalhe: `spec-docs/SPEC_CRITERIOS_PROJETO.md` §3.2c.
+
+### Decisão original (2026-07-29, com evidência)
 
 A validação em staging mostrou o prompt **não** segurando as duas seções: `receita-pura` fecha sem o
 `[1.3]` (2/2 rodadas) e sem o `[1.4]` (1/2); `custo-evitado-puro` grava só metade do `[1.4]` (2/2).

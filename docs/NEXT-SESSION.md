@@ -4,11 +4,54 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-> **▶ PRÓXIMO PASSO:** `/ggsd:code` — implementar o **gate determinístico do `[1.3]`/`[1.4]`**
-> (**decidido pelo Luis em 2026-07-29**, com a evidência da staging): antes do preview, extrair as duas
-> seções do memorial; concretas → libera; ausente/vaga → **bloqueia e pergunta 1× só**, depois segue.
-> Clonar `alocacao_ganhos` em `enviarMensagem` (~30 linhas). **Começar pelo modo receita**, que é o caso
-> reprodutível. Depois: destravar a validação do ANALISADOR (ver "bloqueio" abaixo) → prod `674a3710` → PR.
+> **▶ PRÓXIMO PASSO:** **autenticar o MCP do GoDeploy** (`/mcp` → "claude.ai GoDeploy") e então
+> **deployar `9ce9b09` na STAGING `edf400b4`** → re-rodar o E2E dos 3 cenários + `inspect-perguntas.mjs`
+> (os pontos 1 e 2 do roteiro devem virar ✅) → chamar **`POST /api/admin/reanalisar-pendentes`** para
+> finalmente medir `Classificação`/`Reprovado`/`Motivo Reprovado` → limpar as linhas `[E2E-…]` da aba
+> STAGING → **prod `674a3710`** → PR. **Nada foi deployado nesta sessão.**
+
+## Sessão de 2026-07-30 (código) — o gate do `[1.3]`/`[1.4]` foi CODADO; falta validar
+
+Branch `feat/criterios-projeto-classificacao`, commit **`9ce9b09`**, **752 testes verdes** (13 novos),
+`build` + `build:worker` OK, `worker.js` recomitado. **Nada deployado** — staging e prod seguem em
+`53e8ef8`/`b6485e4`.
+
+**1. Gate determinístico das seções do critério (T8 do plano — o que a validação de 29/07 mandou fazer):**
+- `extrairProcessoAlterado` / `extrairPonteiroMovido` (`memorial-format.ts`). ⚠️ O `[1.4]` casa por
+  **PREFIXO** (`"ponteiro movido"`), não por título exato: senão a meia-seção
+  `**Ponteiro movido:** custo externo eliminado.` voltaria `null` e ficaria **indistinguível da ausência
+  total** — que é exatamente o que o gate precisa julgar.
+- Predicados puros `secaoProcessoVaga` / `secaoPonteiroVaga` (`orchestrator.ts`): ausente, curta
+  (`MIN_SECAO_CRITERIO` = 60) ou **sem nenhuma pista de onde conferir**. ⚠️ **Decisão fechada:** o gate
+  **NÃO** julga se a fonte foi bem NOMEADA ("no sistema" × "no Metabase") — a regex erraria e puniria quem
+  respondeu honestamente "não sei onde conferir", que é o **ponto 3** do roteiro e **passou** em staging.
+  Essa camada fica com o prompt e o analisador (zona cinzenta).
+- Estado **`criterio_secoes`** (`null`→`pendente`→`ok`) em **`SavingColetado` E `ReceitaColetada`**,
+  backend-only, re-mesclado a cada turno. ⚠️ Sem o re-merge do lado da **receita** o `'ok'` se perderia
+  (o LLM não ecoa o campo) e a pergunta voltaria — o **loop** que a lição do split carga×escala proibiu.
+- **ANTI-LOOP:** pergunta **1× só**; a resposta seguinte é sempre aceita e vira nudge `[SISTEMA]`. Roda
+  **por último** (jornada → teto → alocação → critério) e só sobre `preview`/`complete`.
+- Testes: `tests/gate-criterio-secoes.test.ts` (13) — inclui a meia-seção, o memorial legado com códigos
+  `[1.3]`/`[1.4]` e o caso que **não pode** bloquear (o "não sei onde conferir" honesto).
+
+**2. Bloqueio do ANALISADOR — destravado só para VALIDAR:** rota **`POST /api/admin/reanalisar-pendentes`**
+(`requireAdmin`), mesmo trabalho do cron `reanalisar-pendentes` porém sob demanda (o cron de 1 min **não
+dispara na staging**). Repõe `Complexidade`/`Classificação` ou re-roda o analisador; idempotente
+(`reconciliarComplexidade`). ⚠️ **A causa-raiz segue ABERTA** — a análise ainda morre no `waitUntil`
+(timeout de 25s do proxy + fallback). As 2 saídas desenhadas e **NÃO** implementadas, decisão do Luis:
+(a) aterrissar a análise no próprio request do submit (o usuário passa a esperar ~40s);
+(b) o FRONT disparar `/api/chat/analisar` após o submit, no padrão do disparo de e-mails em lotes
+(precisa de guarda de idempotência, senão analisa 2× e paga 2× o LLM).
+
+⚠️ **Travado no deploy:** o MCP `claude.ai GoDeploy` está **sem autenticação** nesta sessão — o Claude não
+consegue chamar `getUploadToken`/`updateApp`. O operador precisa rodar `/mcp` e autenticar.
+
+⚠️ **`E2E_COOKIE` expira 30/07/2026 22:41 UTC** (ainda válido às 13:30 UTC de 30/07) — renove se a próxima
+rodada passar disso. **Limpeza pendente** (de 29/07): linhas `[E2E-stg-ctx-01]`/`[E2E-stg-ctx-02]` na aba
+STAGING — `npm run e2e:cleanup -- stg-ctx-01` e `… stg-ctx-02` (**planilha ANTES do SQLite**).
+
+⚠️ Os **5 erros de `tsc`** seguem **pré-existentes** (`chat.functions.ts` + 3 em `submeter.tsx`) — nenhum
+erro novo foi introduzido.
 
 ## Sessão de 2026-07-29 (4ª rodada) — a validação em staging RODOU: o agente passa em 3 de 5, e o gate foi decidido
 
