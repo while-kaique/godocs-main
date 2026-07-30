@@ -4,8 +4,40 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30 (validação em staging, parte 2 — **achou e corrigiu um bug crítico; prod NÃO
-foi deployado**). O deploy de prod estava aprovado pelo Luis ("subir tudo, calibrar a régua do Rafa depois",
+**Última sessão:** 2026-07-30 (validação em staging, parte 3 + planejamento — **prod continua NÃO deployado**).
+Fechou a validação que faltava e o resultado **abriu uma frente nova**: o caminho da reprovação não dispara.
+
+## ✅ O fix da cota se sustentou sob submissão real (`stg-crit-05`)
+Re-rodado o cenário `criterio-claro-nao` no worktree `staging-criterios-coautor` → projeto
+`35155594eafce787b872b598b7d96945` (R$ 27,88, 2h, pontual). **A linha CHEGOU na planilha** — era exatamente
+o que falhava antes (`429` no append + purga após a carência de 1h). `POST /api/admin/reanalisar-pendentes`
+devolveu `{"submetidos":570,"faltando":1,"reanalisados":1}` em **38s / HTTP 200** (antes: ~109 projetos por
+rodada e HTTP 500). `Complexidade` = `automacao`, coluna **`Classificação` gravada** com justificativa, e as
+2 seções novas do memorial (`Processo alterado` · `Ponteiro movido e onde verificar`) presentes.
+
+## 🐞 A RÉGUA NÃO REPROVA O CASO QUE A MOTIVOU — plano aprovado, código pendente
+O veredito do cenário foi **zona cinzenta**, não `claro_nao`: Status "Pendente" e `Motivo Reprovado` vazio —
+**correto para zona cinzenta**, mas significa que o caminho da reprovação segue sem exercício real e, em
+prod, tende a **nunca disparar**. E o cenário é a **nuvem de palavras**, o caso do Rafa que motivou a frente
+inteira e que está escrito como few-shot de `claro_nao` no próprio prompt (`analyzer.ts:265`).
+
+A justificativa gravada entrega as 2 causas: _"a recorrência não está bem sustentada… o autor afirma que
+nada piora e que ninguém pediu de novo; **por outro lado, há um indicador de uso e um resultado verificável
+no material do evento**, então não é caso de claro_nao"_. Ou seja: **(1)** o analisador aceitou o
+**entregável** (o slide) como **rastreabilidade** — prova que a peça foi feita, não que um ponteiro mudou; e
+**(2)** o "use com PARCIMÔNIA / na dúvida SEMPRE zona_cinzenta" absorveu um caso em que **recorrência E
+contrafactual falharam juntos**, que a própria regra já mandava reprovar. Parte disso é artefato do
+respondedor do E2E (ele inventou uma evidência plausível), mas **não tudo** — a régua cedeu mesmo com o
+contrafactual negado. A `SPEC_CRITERIOS_PROJETO.md` já listava _"régua a calibrar com o Rafa antes de
+produção"_ como pendência: é esta.
+
+⚠️ **A parte determinística está OK** e não é o problema: `claro_nao → rejeitado + "Reprovado"` tem teste
+(AC1 em `tests/criterios-classificacao.test.ts`) e a escrita das colunas foi provada ao vivo. O que falta é
+o LLM **chegar** a `claro_nao`. **Decisão do Luis nesta sessão: calibrar ANTES de prod** (revê o "subir tudo,
+calibrar depois" de mais cedo, agora que se sabe que a reprovação pode nunca disparar) — e **levar o fix do
+`resyncGoogle` junto**. Plano aprovado: ver "Plano ativo".
+
+_(Contexto da sessão anterior:)_ **2026-07-30, parte 2** (validação em staging — **achou e corrigiu um bug crítico**). O deploy de prod estava aprovado pelo Luis ("subir tudo, calibrar a régua do Rafa depois",
 escopo do form mantido como validado), mas foi **parado por um achado** que ele não conhecia.
 
 ## 🐞 LOOP DE RECONCILIAÇÃO QUE ESTOURAVA A COTA DO SHEETS — corrigido, commit `cb8d677`
@@ -198,6 +230,13 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
+**→ [docs/plans/calibragem-regua-criterio-e-resync-append.md](plans/calibragem-regua-criterio-e-resync-append.md)** ·
+Status: ✅ aprovado (Luis, 2026-07-30)
+Calibrar a régua do `claro_nao` (na staging o caso-âncora da nuvem de palavras saiu **zona cinzenta**) +
+fazer o `resyncGoogle` recuperar linha ausente por **append**. São as 2 pendências antes de levar a
+`staging/criterios-coautor` a produção.
+
+**Plano anterior (a frente que este destrava)**
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
 Status: ✅ aprovado (Luis, 2026-07-29) e **CODADO** na branch `feat/criterios-projeto-classificacao`
 (T1–T8, até `9ce9b09`/`28cdb01`) — **no staging, ainda NÃO validado pelo Luis nem em prod**; era essa branch
@@ -255,28 +294,30 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**→ Re-rodar o cenário `criterio-claro-nao` na staging (agora que o loop está corrigido) para fechar a
-última validação — o caminho `claro_nao → "Reprovado" + Motivo Reprovado` — e só então prod + PR.**
+**→ Codar o plano aprovado com `/ggsd:code`: T1–T3 (calibrar a régua do `claro_nao`, só prompt) e
+T4–T5 (`resyncGoogle` recupera linha ausente por append), na branch `staging/criterios-coautor`.**
 
 ```bash
-cd .claude/worktrees/staging-criterios-coautor
-E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING \
-  E2E_ONLY=criterio-claro-nao npm run e2e:run -- stg-crit-04
-# conferir a linha INTEIRA (NÃO use o read-criterio.mjs — ele lê a planilha de PROD):
-curl -H "Cookie: $E2E_COOKIE" \
-  https://godocs-staging.devgogroup.com/api/admin/dashboard/projetos/<ID>
-# esperado: Status "Reprovado" · Classificação preenchida · Motivo Reprovado preenchido
+cd .claude/worktrees/staging-criterios-coautor   # a branch que está NO AR na staging
+# T1-T3: src/lib/agents/analyzer.ts (régua) · T4: src/lib/google/sheets.ts · T5: src/lib/google/sync.ts
+npm run test && npm run build && npm run build:worker   # + comitar worker.js (regra 1)
 ```
-Se o analisador não gravar (waitUntil), destravar com `POST /api/admin/reanalisar-pendentes` — que agora
-responde em ~16s e **não** estoura mais a cota.
-
-**Depois, na ordem:** (1) limpar os runs — `npm run e2e:cleanup -- stg-crit-01` (e `02`/`03`/`04`),
-**planilha ANTES do SQLite**; (2) **prod `674a3710`** com a `staging/criterios-coautor` (já superset do
-`main`; `getUploadToken` novo — `uploadId` é single-use — e o script recebe o **TOKEN**, não a URL);
-(3) **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`). ⚠️ **A régua do Rafa vai a prod sem
-calibração** (decisão dele nesta sessão: "subir tudo, calibrar depois") — **reprovar projeto é visível ao
-autor**, então avisar o Rafa logo após o deploy. ⚠️ Considerar levar junto o **fix do `resyncGoogle`**
-(2º gap acima): sem ele, um append que falhe segue irrecuperável.
+**Depois, na ordem:** (1) **T6 — deploy no staging `edf400b4`** e re-rodar o cenário, esperando agora
+**Status "Reprovado" · Classificação "Claro não…" · Motivo Reprovado preenchido**:
+```bash
+E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING \
+  E2E_ONLY=criterio-claro-nao npm run e2e:run -- stg-crit-06
+curl -H "Cookie: $E2E_COOKIE" \
+  https://godocs-staging.devgogroup.com/api/admin/dashboard/projetos/<ID>   # a linha INTEIRA
+```
+⚠️ **NÃO use o `read-criterio.mjs`** do scratchpad — ele lê a planilha de **PROD** (a staging tem
+`GOOGLE_SHEETS_ID` próprio). Analisador não gravou (waitUntil)? `POST /api/admin/reanalisar-pendentes`
+(~38s, não estoura mais a cota). (2) **limpar os runs** — `npm run e2e:cleanup -- stg-crit-05` (e `01`/`02`/
+`03`, e o `04` que ficou parcial de um run abortado), **planilha ANTES do SQLite**, senão o sync reverso
+ressuscita. (3) **prod `674a3710`** (`getUploadToken` novo — `uploadId` é **single-use** — e o script recebe
+o **TOKEN**, não a URL). (4) **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`).
+⚠️ **Avisar o Rafa logo após o deploy:** reprovar projeto é **visível ao autor** (D10), e a régua vai ao ar
+recém-calibrada, sem rodada de calibração com ele.
 
 ### _(Passos da sessão anterior — o que sobrou deles)_
 **Fechar a validação do critério e levar as DUAS frentes a produção** (o Luis respondeu a pergunta que estava

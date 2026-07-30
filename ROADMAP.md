@@ -14,9 +14,15 @@
 **Avulso 30/07 (parte 2):** achado e **corrigido** um **loop de reconciliação que estourava a cota do
 Google Sheets** (`cb8d677`) — fazia submissão nova não chegar à planilha e ser purgada do SQLite após 1h;
 prod nunca teve o bug, mas a staging degradava o Sheets de prod (mesma cota GCP). Staging redeployada.
-**Próximo:** re-rodar o cenário `criterio-claro-nao` na staging para fechar a validação do caminho
-`claro_nao → "Reprovado"`; então limpar os runs E2E, deployar **prod `674a3710`** com
-`staging/criterios-coautor` (critério + coautor + fix) e abrir o PR com `/ggsd:ship`.
+**Avulso 30/07 (parte 3):** o cenário `criterio-claro-nao` foi re-rodado e **a linha chegou na planilha**
+(o fix da cota se sustentou), mas o analisador classificou **zona cinzenta** — ou seja, a régua **não reprova
+a nuvem de palavras**, o caso que motivou a Fase 5. Plano ✅ **aprovado** para calibrar a régua (só prompt:
+entregável ≠ indicador · recorrência+contrafactual falhando = `claro_nao`) **+** fechar o gap do
+`resyncGoogle` (linha ausente → append). **Nenhum código alterado nesta sessão.**
+**Próximo:** codar o plano `calibragem-regua-criterio-e-resync-append` (T1–T5) na branch
+`staging/criterios-coautor`; então T6 (staging + re-rodar o cenário esperando "Reprovado"), limpar os runs
+E2E, deployar **prod `674a3710`** e abrir o PR com `/ggsd:ship` — avisando o **Rafa** no deploy, porque a
+reprovação é visível ao autor.
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existem na branch do critério).
 **⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
@@ -84,6 +90,29 @@ lê a planilha; o cache do servidor é in-memory sem revalidação em background
   não mostra "Verificando permissões"; as duas requisições saem em paralelo no 1º acesso; skeleton interativo
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
+
+## Fase 5 — Critério de projeto: "isto é projeto?" 🟡
+Pedido da gestão (Rafa) após submissões que não deveriam ter entrado — o caso-símbolo é a **nuvem de
+palavras** gerada uma vez para uma apresentação. Régua de 3 critérios (**recorrência · contrafactual ·
+rastreabilidade**; o impacto não precisa ser receita) julgando **elegibilidade**, separada da pontuação de
+qualidade. **Barrar submissão está FORA em definitivo** — a reprovação é pós-envio.
+- ✅ Planejar (`docs/plans/criterios-projeto-classificacao.md` — aprovado 2026-07-29) e **codar T1–T8**
+  (`feat/criterios-projeto-classificacao`, integrada em `staging/criterios-coautor`).
+- ✅ Validado na staging: o lado do **agente** (as 2 seções novas do memorial + o contrafactual da Etapa 2) e
+  a **escrita das colunas** (`Classificação` sempre preenchida).
+- 🟡 **A régua não reprova o caso que a motivou** — o cenário `criterio-claro-nao` saiu **zona cinzenta**:
+  o analisador aceitou o **entregável** ("dá pra conferir no slide") como rastreabilidade, e o "use com
+  PARCIMÔNIA" absorveu um caso em que **recorrência e contrafactual falharam juntos**. Plano ✅ aprovado:
+  `docs/plans/calibragem-regua-criterio-e-resync-append.md` (T1–T3, só prompt).
+- ⬜ Junto: **`resyncGoogle` recupera linha ausente** por append (T4–T5) — sem isso, um append que falhe é
+  irrecuperável e o projeto é purgado após a carência de 1h.
+- ⬜ T6 staging → prod `674a3710` → PR (`/ggsd:ship`), **avisando o Rafa** no deploy.
+- **DoD:** o cenário fecha com Status **"Reprovado"** + `Classificação` "Claro não…" + `Motivo Reprovado`
+  legível pelo autor; nenhum outro cenário muda de classificação; os guards de `normalizarClassificacao`
+  intactos (sem motivo → zona cinzenta · especial nunca reprova · > R$ 5k → zona cinzenta); nenhuma leitura
+  adicional do Sheets.
+- **Fronteira:** nada de **promoção determinística** para `claro_nao` — a normalização só **rebaixa** (D9);
+  a calibração é de **prompt**. A régua vai a prod recém-calibrada, sem rodada com o Rafa.
 
 ## Backlog
 - ⬜ Tela de gestão de admins (endpoints `/api/admin/admins` existem, ninguém consome; link "Configurações"
