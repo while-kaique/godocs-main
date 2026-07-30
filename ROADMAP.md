@@ -6,9 +6,15 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 4 — **loadings do `/dashboard`** (plano ✅ aprovado, código não começou). A Fase 3
-(dashboard = triagem) está em **staging + prod**, faltando só o PR. `aceitar-zip-submissao` ✅ mergeada (PR #213).
-**Próximo:** codar a Fase 4 com `/ggsd:code` (worktree sobre `feat/dashboard-admin-sheets`) — e abrir o PR da Fase 3.
+**Fase atual:** Fase 5 — **critério de projeto** (plano ✅ aprovado, **codado** em
+`feat/criterios-projeto-classificacao`, no staging, ainda **não validado nem em prod**). Fase 4 (loadings do
+`/dashboard`) ✅ **CONCLUÍDA** (PR #215, `main` `ad64895`); Fase 3 (dashboard = triagem) ✅ mergeada (PR #214).
+`aceitar-zip-submissao` ✅ mergeada (PR #213). **Avulso 30/07:** **Coautor único por projeto** ✅ codado
+(`feat/coautor-unico`) e **validado no staging** — falta prod + PR.
+**Próximo:** decidir com o Luis se a prod recebe **só** o Coautor único agora ou espera a validação do
+critério de projeto; depois validar o critério de projeto no staging.
+⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
+um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existem na branch do critério).
 **⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
