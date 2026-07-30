@@ -4,40 +4,68 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 4 (**código** — plano da calibragem executado; **prod continua NÃO deployado**).
+**Última sessão:** 2026-07-30, parte 5 — **frente do critério de projeto FECHADA**: T6 validado na staging,
+**prod `674a3710` deployado** e **PR #216 mergeado** (`main` = `39deaf9`).
 
-## ✅ Calibragem da régua + recuperação de linha ausente — CODADAS (`44d5b48`, branch `staging/criterios-coautor`)
-**T1–T5 e T7 fechados.** A calibração é **só de prompt** (`analyzer.ts`): o **entregável não conta como
-indicador** ("dá pra conferir no slide" prova que a peça foi feita, não que um ponteiro mudou; indicador é
-**métrica** que se abra hoje numa fonte nomeada e se compare **antes × depois**, e única evidência = entregável
-→ rastreabilidade **não comprovada**); o **par que reprova** ficou declarado (recorrência falha **E**
-contrafactual negado → `claro_nao`, sem salvação pela existência do entregável); o "na dúvida → zona_cinzenta"
-**permanece** com a **exceção** para a falha simultânea; e a âncora da nuvem de palavras foi reforçada com a
-variante que enganou o analisador. `normalizarClassificacao` **não foi tocada** (D9 intacto — segue só rebaixando).
-**Recuperação da IDA:** `updateRowByProjectId` → `Promise<boolean>` (`false` **só** em "ID não encontrado"; o
-abort por cabeçalho sem "ID Projeto" devolve `true`, senão apendar duplicaria) + `syncSubmitToGoogle` cai para
-`appendRow` com `Data Submissão` (decisor puro `deveRecuperarPorAppend`), **zero leitura extra** do Sheets.
-**783 testes verdes** (769 baseline + 14; red autorado em contexto fresco, nenhum teste enfraquecido),
-`build` + `build:worker` OK, `worker.js` recomitado. Revisores: conformidade **conforme** (0,87) ·
-qualidade **sugestoes** — a baixa foi corrigida (o log da falha passou a sair da **etapa** real, não do modo).
+> **▶ PRÓXIMO PASSO (3 humanos + 1 técnico):**
+> 1. **Avisar o Rafa** — a reprovação automática está em prod e o **motivo é visível ao autor** (D10). A
+>    **calibração da régua com ele** segue pendente (agora pós-deploy).
+> 2. **Limpar as 15 linhas `[E2E-…]` da planilha da STAGING** — **não dá pelo script como está**: a planilha da
+>    staging é **arquivo próprio** cujo `GOOGLE_SHEETS_ID` é **secret do app** (o `.env` local tem o de prod).
+>    Com o ID em mão: `GOOGLE_SHEETS_ID=<id-staging> node --experimental-strip-types scripts/e2e/cleanup.mjs <runId>`
+>    (**planilha ANTES do SQLite**). IDs listados abaixo.
+> 3. **Causa-raiz do analisador morrendo no `waitUntil`** segue **aberta** — hoje o destrave é
+>    `POST /api/admin/reanalisar-pendentes` (40–70s). Precisa de plano próprio (`/ggsd:plan`).
+> 4. `CLAUDE.md` está em **~48k chars**, acima do teto de 40k — vale uma poda.
 
-## ⏳ T6 PARCIAL — é AQUI que a próxima sessão começa
-- Staging `edf400b4` **redeployada 15:47** com este código.
-- A pedido do Luis (ele copiou a aba de prod para a `STAGING` para ter dados atuais), rodei
-  `POST /api/admin/sync-sheets-now`: **567 linhas, 0 criados, 3 removidos, 1 erro** — timeout de Durable Object
-  no `35155594…` (o projeto do `stg-crit-05`, que estava sendo removido). ⚠️ A aba `STAGING` agora tem dado
-  **real** de produção, contra a regra de "dados simulados" — decisão do Luis, registrada.
-- O `E2E_ONLY=criterio-claro-nao` **ficou em voo** quando a sessão fechou (sem saída no log). **Refazer o run**
-  e conferir a linha em `GET /api/admin/dashboard/projetos/:id`: esperado **Status "Reprovado" ·
-  Classificação começando por "Claro não" · Motivo Reprovado não vazio** (critério de aceitação 1).
-  Se **qualquer outro cenário** virar `claro_nao`, o plano manda **parar e reavaliar**.
+## ✅ Critério de projeto — EM PRODUÇÃO (PR #216 mergeado, `main` `39deaf9`)
+A calibração da régua (**só prompt**, `analyzer.ts`) foi provada ao vivo na staging: o cenário
+`criterio-claro-nao` (a **nuvem de palavras**, o caso do Rafa que motivou a frente) fechou em **Status
+"Reprovado"**, `Classificação` = _"Claro não — a recorrência falha… o contrafactual também falha… **a
+rastreabilidade do artefato existe, mas não compensa a falta do par**"_ e **`Motivo Reprovado`** legível, com
+caminho de volta pro autor. Os dois furos diagnosticados na parte 3 fecharam: o **entregável** deixou de valer
+como rastreabilidade e a **falha simultânea** (recorrência **e** contrafactual) virou exceção declarada ao
+"na dúvida → zona_cinzenta". `normalizarClassificacao` **intacta** (segue só rebaixando — D9).
 
-## ⚠️ Riscos/pendências que viajam com esta frente
-- **Risco médio ACEITO** (revisão de qualidade, decisão do Luis: registrar, não codar): `false` = "não achei o
-  ID" **≠** "a linha nunca existiu" — ID mexido à mão na planilha (ou append in-flight) pode gerar **2ª linha**
-  em vez de no-op. Auto-limitante (o append de recuperação grava o `ID Projeto`). Detalhe em `SPEC_CORRECOES.md`.
-- **Avisar o Rafa no deploy** — reprovação é visível ao autor (D10).
-- `CLAUDE.md` está em **47,9k chars**, acima do teto de 40k (já estava antes desta sessão) — vale uma poda.
+**Guarda de falso-positivo passou** (run `20260730-1300`, staging): `saving-puro` → **Claro sim** ·
+`custo-evitado-puro` → **Claro sim** · `complexidade-autonomia` → **Claro sim** · `receita-pura` →
+**Zona cinzenta**. **Nenhum** cenário legítimo virou `claro_nao`. 783 testes, `build` + `build:worker` OK,
+prod conferido (entry servido = build novo, favicon 200, `/api/auth/me` OK).
+
+## ⚠️ ARMADILHA que custou 3 projetos de teste EM PRODUÇÃO — ler antes de rodar E2E
+`scripts/e2e/lib/env.mjs` resolve o `.env` em `../../../.env` e, **quando não acha, cai em PROD**
+(`https://godocs.devgogroup.com`). **Worktree não tem `.env`** → dois runs foram pra produção e submeteram 3
+projetos `[E2E-20260730-1256]` na planilha real (removidos com `cleanup.mjs`, planilha antes do SQLite; prod
+voltou a **0** linhas E2E e 563 no total). **Sempre** exportar explicitamente:
+
+```bash
+export E2E_BASE_URL=https://godocs-staging.devgogroup.com
+export E2E_COOKIE=$(grep '^E2E_COOKIE=' /home/notebook/godocs-main/.env | sed 's/^E2E_COOKIE=//')
+```
+
+…e **conferir a linha `🚀 E2E run … contra <URL>`** antes de deixar rodar. Corolário: **nunca** pipar o run
+pra `tail` — a saída fica presa e o run **parece morto enquanto está submetendo**.
+
+## 🐞 Achado pré-existente (NÃO investigar como bug novo)
+`saving-multicargo` estoura os **40 turnos** em loop de repergunta da **Seção 2.4** quando o respondedor do
+E2E não tem o dado ("o briefing não detalha"). **Falha idêntica no código de prod**, sem a frente — não é
+regressão. O gate determinístico da 2.4 tem anti-loop; quem repergunta sem limite é a rede LLM-juiz do
+`buildSavingPreviewPrompt`.
+
+## 🧹 Linhas `[E2E-…]` a remover da planilha da STAGING (15)
+`d8ba3c3e8744ae84b969700ac757171b` · `ec2563e8f6ea9c5d25997765e32d97a8` · `dc17203497483353a6d232f46da60a79` ·
+`0db1fc6f734db2a17ae455b539fce365` · `1f2355c3dd0e30843b73125ff3238fa3` · `35155594eafce787b872b598b7d96945` ·
+`e67a44f3b4fb1dc1b1464c7408f80cfa` · `565aebd32a41f5a50064bef308de6817` · `a35cd24e885d088b43068347400e2dc7` ·
+`993b3741bad60bd43da5f1518ec2b6f3` · `ef85becf58e866e62e88a672f6c6a176` · `8eef40970185448a2509572ed734c812` ·
+`fccdeceedad244127c29df30a80d75b1` · `c8de6939bcfdf5ba35847bad4f8b2447` · `f688432cf4628579cff8b3686c52e9f8`
+
+⚠️ A aba `STAGING` recebeu **cópia de dados reais de prod** (decisão do Luis, 30/07) — contra a regra de
+"dados simulados". Vale considerar repovoar com dado sintético.
+
+## ⚠️ Risco médio ACEITO que viaja com a frente
+`false` = "não achei o ID" **≠** "a linha nunca existiu": ID mexido à mão na planilha (ou append in-flight)
+pode gerar **2ª linha** em vez de no-op no fallback de recuperação da IDA. Auto-limitante (o append grava o
+`ID Projeto`). Detalhe em `spec-docs/SPEC_CORRECOES.md`.
 
 ## ✅ O fix da cota se sustentou sob submissão real (`stg-crit-05`)
 Re-rodado o cenário `criterio-claro-nao` no worktree `staging-criterios-coautor` → projeto

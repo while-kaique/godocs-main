@@ -1,5 +1,5 @@
 # Plano — Calibrar a régua do critério (`claro_nao`) + recuperação de linha ausente no `resyncGoogle`
-**Status:** ✅ **executado** (2026-07-30) — T1–T5 e T7 codados na branch `staging/criterios-coautor` (commit `44d5b48`); **T6 PARCIAL**: staging redeployada, E2E `criterio-claro-nao` ficou em voo ao fim da sessão.
+**Status:** ✅ **CONCLUÍDO** (2026-07-30) — T1–T7 codados (`44d5b48`) e **T6 validado na staging**: o cenário `criterio-claro-nao` fecha em Status "Reprovado" + `Classificação` "Claro não…" + `Motivo Reprovado` legível, e a guarda de falso-positivo passou (3 "Claro sim", 1 zona cinzenta, nenhum legítimo reprovado). **Prod `674a3710` deployado** e **PR #216 mergeado** (`main` `39deaf9`).
 
 **Objetivo:** fazer o `claro_nao` disparar no caso-âncora que motivou a frente (nuvem de palavras) sem
 afrouxar a proteção contra reprovação injusta, e fechar o gap em que um append perdido fica
