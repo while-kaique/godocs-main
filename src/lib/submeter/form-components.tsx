@@ -601,12 +601,15 @@ export function ParticipantesPapeisInput({
 
   const semPapel = participantes.filter((p) => !papeis[p]).length;
 
-  // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quem já é o Coautor
-  // mantém a opção habilitada (para poder trocar de papel); para os outros ela fica
-  // indisponível enquanto o papel estiver ocupado.
+  // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quando alguém já é
+  // Coautor, a opção SAI da lista dos outros — nada de opção morta na tela. Quem já é o
+  // Coautor mantém a opção (precisa dela para exibir o papel atual e poder trocar); a
+  // ausência é explicada pela nota abaixo da lista.
   const coautores = coautoresSelecionados(participantes, papeis);
-  const coautorTomadoPorOutro = (email: string) =>
-    coautores.length > 0 && coautores[0] !== email;
+  const papeisDisponiveis = (email: string) =>
+    PAPEIS_PARTICIPANTE.filter(
+      (p) => p.value !== PAPEL_COAUTOR || coautores.length === 0 || coautores[0] === email,
+    );
 
   return (
     <>
@@ -810,19 +813,8 @@ export function ParticipantesPapeisInput({
                     style={faltando ? { borderColor: "#dc2626" } : undefined}
                   >
                     <option value="" disabled>Selecione o papel</option>
-                    {PAPEIS_PARTICIPANTE.map((p) => (
-                      <option
-                        key={p.value}
-                        value={p.value}
-                        // Coautor é único por projeto: fica indisponível para quem ainda
-                        // não o tem quando outra pessoa já foi marcada como Coautor.
-                        disabled={p.value === PAPEL_COAUTOR && coautorTomadoPorOutro(email)}
-                      >
-                        {p.label}
-                        {p.value === PAPEL_COAUTOR && coautorTomadoPorOutro(email)
-                          ? " (já definido)"
-                          : ""}
-                      </option>
+                    {papeisDisponiveis(email).map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
                   </select>
                   <button

@@ -538,9 +538,10 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > **(a)** helpers puros em `submeter/constants.ts` — `PAPEL_COAUTOR`, `coautoresSelecionados()` e
 > `limitarCoautorUnico()`; **(b)** `validarEtapa1` bloqueia o avanço da Etapa 1 com 2+ Coautores
 > (mensagem "Só é possível ter 1 Coautor por projeto…"), nos dois modos (submissão nova e edição);
-> **(c)** no seletor (`ParticipantesPapeisInput`), a opção **Coautor** fica `disabled` + sufixo
-> "(já definido)" para quem não a tem quando outra pessoa já é Coautor — quem É o Coautor mantém a
-> opção habilitada, para poder trocar de papel; **(d)** nota informativa (ícone + texto, nunca só cor)
+> **(c)** no seletor (`ParticipantesPapeisInput`), a opção **Coautor** SAI da lista dos demais
+> quando alguém já é Coautor (`papeisDisponiveis(email)` — nada de opção morta/desabilitada na tela;
+> decisão do Luis, 30/07/2026); quem É o Coautor mantém a opção, para exibir o papel atual e poder
+> trocar; **(d)** nota informativa (ícone + texto, nunca só cor) — é ela que EXPLICA a ausência
 > abaixo da lista e "Apenas 1 por projeto" na descrição do papel na `LegendaPapeis`.
 > ⚠️ **Legado/edição:** um projeto antigo (ou legado importado do Sheets, onde a coluna
 > "Participantes" pode ter vários e-mails) traria vários Coautores no seed — `applySeed`
