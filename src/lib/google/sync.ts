@@ -196,6 +196,19 @@ export function derivarClassificacaoSheet(
   return just ? `${rotulo} — ${just}` : rotulo;
 }
 
+// ─── Decisor da IDA: recuperar linha ausente por append ─────────────────────
+// `updateRowByProjectId` devolve `false` SÓ quando o "ID Projeto" não existe na
+// planilha (linha ausente, ex.: o append da 1ª submissão morreu por cota). Nesse
+// caso a edição cai para append em vez de virar no-op silencioso. Qualquer outro
+// retorno (`true`, ou `undefined` de um chamador/mock antigo) → NÃO apenda, para
+// não duplicar linha existente. Pura — testável sem tocar o Sheets.
+export function deveRecuperarPorAppend(
+  modo: 'novo' | 'edicao',
+  linhaAtualizada: boolean | undefined,
+): boolean {
+  return modo === 'edicao' && linhaAtualizada === false;
+}
+
 // ─── Papéis dos participantes → 3 colunas do Sheets ─────────────────────────
 // Distribui os membros (lista plana) nas colunas por papel. "Participantes" guarda os
 // COAUTORES (value interno `coexecutor`); "Participantes 2" os PARTICIPANTES (value
@@ -392,19 +405,33 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // Padroniza antes de gravar: numérico vazio → 0; texto vazio → "—".
     const rowPadronizada = padronizarLinha(row);
 
-    // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
-    // — só dá pra editar um projeto que já está na planilha. Nova: append.
+    // Edição: atualiza a linha existente (match por ID Projeto) — nunca duplica.
+    // Nova: append. ⚠️ RECUPERAÇÃO: se a linha não existe mais na planilha (o
+    // append da 1ª submissão falhou por cota/transiente), o update não tem onde
+    // aterrissar e o projeto desaparecia em silêncio — e a `reconciliarExclusoes`
+    // o purgava do SQLite depois da carência de 1h. Nesse caso caímos para append.
+    // ⚠️ `etapa` existe para o LOG não mentir: sem ela, uma falha do append de
+    // RECUPERAÇÃO era reportada como "Falha ao atualizar" (o rótulo saía do
+    // `modo`), apontando o caminho errado num incidente de cota.
+    let etapa: 'atualizar' | 'recuperar (append)' | 'inserir' =
+      p.modo === 'edicao' ? 'atualizar' : 'inserir';
     try {
       if (p.modo === 'edicao') {
-        await updateRowByProjectId(p.projetoId, rowPadronizada);
+        const linhaAtualizada = await updateRowByProjectId(p.projetoId, rowPadronizada);
+        if (deveRecuperarPorAppend(p.modo, linhaAtualizada)) {
+          etapa = 'recuperar (append)';
+          console.warn(
+            `[google/sync] RECUPERAÇÃO: linha do projeto "${p.projetoId}" não existe na planilha — criando por append.`,
+          );
+          // A linha está sendo CRIADA agora, então "Data Submissão" entra (o ramo
+          // normal de edição a omite de propósito, para preservar a data original).
+          await appendRow(padronizarLinha({ ...row, 'Data Submissão': dataSubmissao }));
+        }
       } else {
         await appendRow(rowPadronizada);
       }
     } catch (sheetsErr) {
-      console.error(
-        `[google/sync] Falha ao ${p.modo === 'edicao' ? 'atualizar' : 'inserir'} na planilha:`,
-        sheetsErr,
-      );
+      console.error(`[google/sync] Falha ao ${etapa} na planilha:`, sheetsErr);
     }
 
     // 2. Notificação Google Chat (mudo para projetos de teste E2E)

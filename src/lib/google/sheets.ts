@@ -245,10 +245,19 @@ export async function readAllRows(): Promise<SheetRow[]> {
 // resolvidas por NOME a partir do cabeçalho real — robusto a reordenação.
 // Atualiza apenas as colunas informadas; as demais (inclusive manuais) ficam
 // intactas.
+//
+// Retorno: `false` SOMENTE no caminho "ID Projeto não encontrado na planilha" —
+// isto é, a linha não existe e há uma recuperação possível (o chamador pode cair
+// para `appendRow`, como faz a IDA em `google/sync.ts`). Todos os outros
+// desfechos devolvem `true` = "nada a recuperar": sucesso, nenhuma coluna
+// gravável, e também o abort por cabeçalho sem a coluna "ID Projeto" (aí não se
+// pode afirmar que a linha falta, e apendar arriscaria duplicar). O retorno é
+// ADITIVO — os chamadores que o ignoram seguem com o comportamento de antes.
+// ⚠️ Nenhuma leitura extra do Sheets: a busca do ID já acontecia aqui.
 export async function updateRowByProjectId(
   projetoId: string,
   updates: Partial<Record<SheetColumn, string | number>>,
-): Promise<void> {
+): Promise<boolean> {
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
@@ -257,7 +266,7 @@ export async function updateRowByProjectId(
   const idCol = letterByName['ID Projeto'];
   if (!idCol) {
     console.warn('[google/sheets] Coluna "ID Projeto" não encontrada no cabeçalho — update abortado.');
-    return;
+    return true; // sem a coluna do ID não se afirma que a linha falta → nada a recuperar
   }
 
   // 1. Ler a coluna do ID para achar o número da linha.
@@ -290,7 +299,7 @@ export async function updateRowByProjectId(
 
   if (rowNumber === -1) {
     console.warn(`[google/sheets] ID Projeto "${projetoId}" não encontrado na planilha para update`);
-    return;
+    return false; // linha ausente — o chamador pode recuperar por append
   }
 
   // 2. Montar ranges/valores para o batch update (coluna resolvida por nome).
@@ -308,7 +317,7 @@ export async function updateRowByProjectId(
     });
   }
 
-  if (data.length === 0) return;
+  if (data.length === 0) return true; // a linha existe; só não havia coluna gravável
 
   // 3. Batch update.
   const batchUrl = `${BASE_URL}/${spreadsheetId}/values:batchUpdate`;
@@ -325,4 +334,6 @@ export async function updateRowByProjectId(
     const text = await batchResp.text();
     throw new Error(`Sheets batch update falhou (${batchResp.status}): ${text}`);
   }
+
+  return true; // linha encontrada e atualizada
 }

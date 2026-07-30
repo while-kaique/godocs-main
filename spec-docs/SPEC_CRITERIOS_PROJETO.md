@@ -3,8 +3,8 @@
 > **Documento de planejamento/decisão.** Decisões fechadas com o Luis em **2026-07-29**.
 > Plano de execução: [`docs/plans/criterios-projeto-classificacao.md`](../docs/plans/criterios-projeto-classificacao.md).
 > Régua para a gestão: [`docs/criterios-projeto-recorrencia-evidencia.md`](../docs/criterios-projeto-recorrencia-evidencia.md).
-> Status: ✅ **implementado** (código + testes + build) · ⏳ validação em staging → prod · ⏳ **régua a
-> calibrar com o Rafa antes de produção** (reprovar projeto é visível ao autor).
+> Status: ✅ **implementado** (código + testes + build) · ⏳ validação em staging → prod · ✅ **régua
+> calibrada em 2026-07-30** (ver D12) — ⏳ **avisar o Rafa no deploy** (reprovar projeto é visível ao autor).
 
 ## 1. Problema
 
@@ -246,3 +246,53 @@ a análise ainda pode morrer no `waitUntil` (timeout de 25s do proxy + fallback)
 **não** implementadas: (a) aterrissar a análise no próprio request do submit (custo: o usuário espera);
 (b) o FRONT disparar `/api/chat/analisar` logo após o submit, no padrão do disparo de e-mails em lotes
 (custo: risco de análise duplicada, precisaria de guarda de idempotência).
+
+## D12 — Calibração da régua do `claro_nao`: **FEITA — só prompt** (2026-07-30)
+
+**O que a validação em staging mostrou.** O cenário E2E `criterio-claro-nao` (`stg-crit-05`, projeto
+`35155594…`) — que é exatamente o **caso-âncora da nuvem de palavras**, escrito como few-shot de
+`claro_nao` no próprio prompt — submeteu, chegou na planilha e saiu **zona cinzenta**: Status "Pendente" e
+`Motivo Reprovado` vazio. Comportamento **correto para zona cinzenta**, mas significava que o caminho da
+reprovação seguia sem exercício real e, em produção, tenderia a **nunca disparar**. A justificativa gravada
+expôs as duas causas: _"a recorrência não está bem sustentada… **por outro lado, há um indicador de uso e um
+resultado verificável no material do evento**, então não é caso de claro_nao"_.
+
+1. **O entregável foi aceito como rastreabilidade.** "Dá pra conferir no slide" prova que a peça foi feita —
+   não que um ponteiro mudou. O prompt não distinguia as duas coisas.
+2. **O "use com PARCIMÔNIA" venceu a própria regra.** A regra do `claro_nao` já era _"falha evidente em
+   recorrência **E** em rastreabilidade/contrafactual"_ e aqui **recorrência e contrafactual falharam
+   juntos** — mas o "na dúvida escolha SEMPRE zona_cinzenta", sem exceção declarada, absorveu o caso.
+
+**A calibração (`analyzer.ts`, seção "RÉGUA DE CRITÉRIO DE PROJETO"):**
+
+- **Critério 3 (rastreabilidade)** ganhou a negação explícita: **o próprio entregável NÃO conta como
+  indicador** ("dá pra conferir no slide", "o arquivo gerado está lá", "o material do evento mostra o
+  resultado" provam a existência do artefato, não o movimento de um ponteiro). Indicador é uma **métrica**
+  (horas · custo · taxa de erro/retrabalho · prazo/SLA · receita) que se abra **hoje** num relatório,
+  sistema ou base nomeados e se compare **antes × depois**. Única evidência = o entregável → rastreabilidade
+  **não comprovada**, tratada como ausente.
+- **O par que reprova ficou declarado:** recorrência falha (rodou uma vez, sob encomenda, peça única) **E**
+  contrafactual negado (nada piora, ninguém reclama, ninguém pediu de novo) → **claro_nao**, **sem buscar
+  salvação** numa evidência de que o entregável existiu.
+- **O "na dúvida → zona_cinzenta" PERMANECE**, com **uma exceção** declarada: não se aplica quando esses
+  dois critérios falham **juntos**.
+- **Exemplo-âncora reforçado:** a nuvem de palavras segue `claro_nao` **mesmo que** o autor diga que o
+  resultado dá pra ver no slide.
+
+⚠️ **Fronteira preservada — a calibração é SÓ de prompt.** `normalizarClassificacao` continua apenas
+**rebaixando** (D9: sem motivo → zona cinzenta · especial nunca reprova · materialidade > R$ 5k/mês → zona
+cinzenta) e **nunca promove** para `claro_nao`: forçar reprovação no código exigiria fabricar o
+`motivo_reprovacao`, que é texto visível ao autor. A parte determinística **já estava OK** e não era o
+problema (`claro_nao → rejeitado + "Reprovado"` tem teste e foi provado ao vivo na staging) — o que faltava
+era o LLM **chegar** a `claro_nao`.
+
+**Risco aceito:** apertar o `claro_nao` aumenta a chance de reprovar projeto legítimo, e o autor vê o motivo
+(D10). Mitigações: o par exigido é estreito; "SIMPLICIDADE NÃO REPROVA" permanece no prompt; a triagem
+humana sobrepõe no `/dashboard`; e o **Rafa deve ser avisado no deploy**. Se a revalidação mostrar qualquer
+outro cenário virando `claro_nao`, a frente para e reavalia.
+
+**Guardas:** `tests/regua-criterio-calibracao.test.ts` (7 asserções de conteúdo do prompt: negação do
+entregável, definição de métrica/fonte/antes × depois, par declarado, exceção do "na dúvida", âncora
+reforçada) + re-rodada do cenário `criterio-claro-nao` na staging.
+**Onde aterrissou:** `src/lib/agents/analyzer.ts` · `src/lib/testes/prompt-registry.ts` ·
+plano [`docs/plans/calibragem-regua-criterio-e-resync-append.md`](../docs/plans/calibragem-regua-criterio-e-resync-append.md).

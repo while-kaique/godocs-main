@@ -903,3 +903,54 @@ staging** (criar especial → flip p/ "Não" no Sheet → sync desmarca) antes d
 então a doc segue sem `saving.linhas`; ao reeditar, a Helen refaz o saving no chat (o flag/tipo já
 estão certos). A regra "Sheets é o banco principal; SQLite espelha em quase-tempo-real" guiou a
 escolha.
+
+---
+
+## `resyncGoogle`/edição não recuperava linha ausente da planilha — append perdido ficava irrecuperável (30/07/2026)
+
+**Sintoma.** Quando o **append da IDA** falha de vez (cota `429`/transiente), o projeto existe no SQLite mas
+**não existe na planilha**. Qualquer tentativa de conserto pelo caminho normal — reenvio, edição,
+`resyncGoogle` — usa `modo: 'edicao'` → `updateRowByProjectId`, que **não acha a linha, não faz nada e ainda
+devolve sucesso** (`ok: true`). Não havia caminho de recuperação: passada a **carência de 1h**,
+`reconciliarExclusoes` **purgava o projeto do SQLite** — perda silenciosa. Achado durante a validação em
+staging do fix da cota (`cb8d677`), que produziu exatamente esse estado num projeto real do run.
+
+**Causa.** `updateRowByProjectId` (`google/sheets.ts`) tratava "ID Projeto não encontrado" como um
+`console.warn` + `return` **void**: o chamador não tinha como distinguir "atualizei" de "não havia o que
+atualizar". E `syncSubmitToGoogle` (`google/sync.ts`) só apendava no `modo === 'novo'`.
+
+**Fix.**
+- `updateRowByProjectId` passa a devolver `Promise<boolean>`: **`false` SOMENTE no caminho "ID não
+  encontrado"** (linha ausente, recuperável). Todo o resto → `true` = "nada a recuperar", **inclusive o abort
+  por cabeçalho sem a coluna "ID Projeto"** — sem a coluna do ID não se pode afirmar que a linha falta, e
+  apendar arriscaria **duplicar**. Mudança **ADITIVA**: os 8 chamadores atuais ignoram o retorno e seguem
+  idênticos. ⚠️ **Zero leitura extra do Sheets** — a busca do ID já acontecia ali (requisito duro: a cota de
+  60 leituras/min é compartilhada com produção).
+- `syncSubmitToGoogle`, no `modo === 'edicao'`, quando o update reporta linha ausente, **cai para
+  `appendRow`** (decisor puro `deveRecuperarPorAppend`), logando como **RECUPERAÇÃO** e incluindo
+  **`Data Submissão`** (a linha está sendo criada agora; o ramo normal de edição omite essa coluna de
+  propósito, para preservar a data original).
+
+**Onde aterrissou:** `src/lib/google/sheets.ts` (`updateRowByProjectId`) ·
+`src/lib/google/sync.ts` (`deveRecuperarPorAppend` + ramo de edição) ·
+`tests/sheets-update-linha-ausente.test.ts` (retorno `true`/`false` + guarda de "nenhuma leitura adicional":
+no máximo 2 GETs no caminho de update) · `tests/sync-recuperacao-linha-ausente.test.ts` (apenda com
+`Data Submissão`; **não** apenda quando a linha existe — nunca duplica; `'novo'` segue só com append).
+Plano: [`docs/plans/calibragem-regua-criterio-e-resync-append.md`](../docs/plans/calibragem-regua-criterio-e-resync-append.md).
+
+**Risco aceito e registrado.** O fallback vale para todo `modo === 'edicao'`, então um reenvio pode
+**recriar** uma linha que um admin apagou **de propósito** — e apagar do Sheets é justamente como se remove
+um projeto. Janela estreita (a `reconciliarExclusoes` purga o projeto do SQLite em 1h) e o usuário de fato
+reenviou. A alternativa (checar existência antes) custaria uma leitura por sync, contra a cota.
+
+⚠️ **Variante do mesmo risco, apontada pela revisão de qualidade (severidade média, NÃO tratada):** `false`
+significa _"não casei o ID na coluna"_, não _"a linha nunca existiu"_. Se a linha **existe** mas o ID foi
+mexido à mão (apóstrofo/aspas à frente, ID trocado, linha movida de aba) — plausível numa planilha onde
+legados entram manualmente — a edição passa a **criar uma 2ª linha** para o mesmo projeto, onde antes era
+no-op; o mesmo vale para um append da 1ª submissão ainda **in-flight** num `waitUntil` concorrente.
+**Mitigações que já existem:** o append de recuperação grava o `ID Projeto`, então a edição seguinte encontra
+a linha (é **auto-limitante** — não vira uma linha por edição); o log sai como `RECUPERAÇÃO` com o id, e a
+falha é rotulada pela **etapa** real (`atualizar` · `recuperar (append)` · `inserir`), não pelo modo. Cercos
+desenhados e **não** implementados (custo × benefício, decisão de produto): condicionar o append a o SQLite
+confirmar que a linha nunca aterrissou (`atualizado_em` ausente) ou marcar a linha recuperada para a triagem
+do `/dashboard` detectar duplicata.
