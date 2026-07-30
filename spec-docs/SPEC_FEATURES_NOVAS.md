@@ -530,6 +530,24 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > `idealizador`/`referencia_tecnica` → "Contribuidor"); `linhasDoEvento` troca "Membros" por
 > "Participantes e papéis" quando há papéis (submissao e metadados). `worker.js` rebuildado.
 
+> 👤 **COAUTOR ÚNICO POR PROJETO (Luis, 2026-07-30):** cada projeto tem **1 autor** (o submissor/dono,
+> `responsavel_email`, que não escolhe papel) e **no máximo 1 Coautor** (`coexecutor`). Não é possível
+> marcar 2+ pessoas como Coautor; os demais participantes ficam como **Participante** ou
+> **Contribuidor** (esses seguem SEM limite). Implementação (só cliente — nenhuma mudança de schema,
+> sync ou colunas do Sheets; `derivarColunasPapeis` continua aceitando lista, para legados):
+> **(a)** helpers puros em `submeter/constants.ts` — `PAPEL_COAUTOR`, `coautoresSelecionados()` e
+> `limitarCoautorUnico()`; **(b)** `validarEtapa1` bloqueia o avanço da Etapa 1 com 2+ Coautores
+> (mensagem "Só é possível ter 1 Coautor por projeto…"), nos dois modos (submissão nova e edição);
+> **(c)** no seletor (`ParticipantesPapeisInput`), a opção **Coautor** fica `disabled` + sufixo
+> "(já definido)" para quem não a tem quando outra pessoa já é Coautor — quem É o Coautor mantém a
+> opção habilitada, para poder trocar de papel; **(d)** nota informativa (ícone + texto, nunca só cor)
+> abaixo da lista e "Apenas 1 por projeto" na descrição do papel na `LegendaPapeis`.
+> ⚠️ **Legado/edição:** um projeto antigo (ou legado importado do Sheets, onde a coluna
+> "Participantes" pode ter vários e-mails) traria vários Coautores no seed — `applySeed`
+> (`submeter.tsx`) aplica `limitarCoautorUnico`, **mantendo o primeiro** e **limpando o papel dos
+> demais** (não promove ninguém por conta própria); a validação então exige que o usuário
+> reclassifique. Testes: `tests/validacao-etapa1.test.ts`.
+
 **Decisões fechadas (com o Luis).**
 - **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
   · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
