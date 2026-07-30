@@ -190,17 +190,59 @@ export function extrairJustificativaCargaEscala(memorial: string | null | undefi
   return extrairSecaoMemorial(memorial, TITULO_CARGA_ESCALA);
 }
 
+// Títulos dos pontos [1.3] e [1.4] — as duas seções da régua de CRITÉRIO DE PROJETO
+// ("Processo alterado" e "Ponteiro movido e onde verificar"). Fatiadas pelo gate
+// determinístico do critério (chat.functions.ts) para decidir se o agente de fato as
+// escreveu antes de liberar o preview.
+const TITULO_PROCESSO_ALTERADO = TITULOS_MEMORIAL['1.3'].toLowerCase();
+// PREFIXO (não título exato) — ver extrairPonteiroMovido.
+const PREFIXO_PONTEIRO_MOVIDO = 'ponteiro movido';
+
+/**
+ * Extrai do memorial a seção "Processo alterado" (ponto [1.3]) — o que mudou na rotina,
+ * como era antes, como é agora e a MAGNITUDE. Mesma mecânica das demais extrações
+ * (cabeçalho `### ...` ou rótulo inline `**...:**`).
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial).
+ */
+export function extrairProcessoAlterado(memorial: string | null | undefined): string | null {
+  return extrairSecaoMemorial(memorial, TITULO_PROCESSO_ALTERADO);
+}
+
+/**
+ * Extrai do memorial a seção "Ponteiro movido e onde verificar" (ponto [1.4]).
+ *
+ * ⚠️ Casa por PREFIXO ("ponteiro movido…"), não por título exato: na validação em staging
+ * o agente gravou a METADE da seção sob o rótulo curto `**Ponteiro movido:**` (sem o "e
+ * onde verificar"). Casar só o título exato devolveria `null` e a meia-seção seria
+ * indistinguível da ausência total — precisamos ENXERGÁ-LA para julgar o conteúdo.
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial).
+ */
+export function extrairPonteiroMovido(memorial: string | null | undefined): string | null {
+  return extrairSecaoMemorial(memorial, PREFIXO_PONTEIRO_MOVIDO, { prefixo: true });
+}
+
 // Fatia uma seção do memorial pelo seu título legível (já em minúsculas). Captura o
 // conteúdo inline do rótulo (`**Título:** aqui`) + as linhas seguintes, parando no
 // próximo ponto/seção ou no separador `---` do bloco financeiro injetado. Base comum
-// de extrairAlocacaoGanhos / extrairJustificativaCargaEscala.
-function extrairSecaoMemorial(memorial: string | null | undefined, tituloLower: string): string | null {
+// de extrairAlocacaoGanhos / extrairJustificativaCargaEscala / extrairProcessoAlterado /
+// extrairPonteiroMovido. `prefixo: true` casa títulos que COMEÇAM com o texto dado
+// (para variantes abreviadas escritas pelo agente).
+function extrairSecaoMemorial(
+  memorial: string | null | undefined,
+  tituloLower: string,
+  opts?: { prefixo?: boolean },
+): string | null {
   if (!memorial) return null;
   const linhas = memorial.split(/\r?\n/);
 
+  const casa = (t: string | null) =>
+    t !== null && (opts?.prefixo ? t.startsWith(tituloLower) : t === tituloLower);
+
   let inicio = -1;
   for (let i = 0; i < linhas.length; i++) {
-    if (tituloDaLinha(linhas[i]) === tituloLower) {
+    if (casa(tituloDaLinha(linhas[i]))) {
       inicio = i;
       break;
     }

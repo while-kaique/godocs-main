@@ -153,6 +153,13 @@ export type SavingColetado = {
   // a automação" a partir do que o usuário DE FATO disse (não boilerplate). Null quando
   // ainda não respondido / não se aplica.
   alocacao_ganhos_racional?: string | null;
+  // Estado do GATE DETERMINÍSTICO do CRITÉRIO DE PROJETO (seções [1.3] "Processo alterado"
+  // e [1.4] "Ponteiro movido e onde verificar" — a rastreabilidade da régua). Backend-only
+  // (não ecoado pelo LLM; re-mesclado a cada turno). null = ainda não verificado · 'pendente'
+  // = o preview foi bloqueado e a pergunta foi feita · 'ok' = seções presentes e concretas
+  // (ou já respondidas pelo usuário). ANTI-LOOP: pergunta UMA vez só — a resposta seguinte
+  // vira nudge [SISTEMA] e o fluxo segue. Ver SPEC_CRITERIOS_PROJETO.
+  criterio_secoes?: "pendente" | "ok" | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -177,6 +184,7 @@ export const savingVazio = (): SavingColetado => ({
   carga_escala_racional: null,
   alocacao_ganhos: null,
   alocacao_ganhos_racional: null,
+  criterio_secoes: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
@@ -189,6 +197,10 @@ export type ReceitaColetada = {
   // vendem esse valor por mês"). Serve de ponto de partida — o agente o desafia e
   // aprofunda para montar o memorial_calculo.
   racional: string | null;
+  // Gate determinístico do CRITÉRIO DE PROJETO no modo RECEITA — mesma semântica do campo
+  // homônimo em SavingColetado (o `receita-pura` foi justamente o caso reprodutível da
+  // validação em staging). Backend-only, re-mesclado a cada turno.
+  criterio_secoes?: "pendente" | "ok" | null;
 };
 
 export const receitaVazia = (): ReceitaColetada => ({
@@ -196,6 +208,7 @@ export const receitaVazia = (): ReceitaColetada => ({
   valor_ganho_mensal: null,
   memorial_calculo: null,
   racional: null,
+  criterio_secoes: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────

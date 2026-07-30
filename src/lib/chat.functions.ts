@@ -37,6 +37,8 @@ import {
   aplicaConfirmacaoBaseHoras,
   aplicaGateAlocacaoGanhos,
   respostaAlocacaoVaga,
+  secaoProcessoVaga,
+  secaoPonteiroVaga,
   resolverSplitCargaEscala,
   totalEconomiaHoras,
   unidadeHorasDe,
@@ -77,6 +79,8 @@ import {
   normalizarMarcadoresMemorial,
   extrairAlocacaoGanhos,
   extrairJustificativaCargaEscala,
+  extrairProcessoAlterado,
+  extrairPonteiroMovido,
 } from "@/lib/agents/memorial-format";
 import {
   syncSubmitToGoogle,
@@ -934,6 +938,52 @@ function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): 
 Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva, no padrão "atividades NOMEADAS + o que o time entrega A MAIS (com número quando houver)": (a) as atividades concretas para onde o tempo foi (nunca "outras atividades") e (b) o que passou a ser entregue a mais agora, concluindo que o ganho é válido por causa dessa mudança. Se o usuário deu um número (ex.: "2-3 entrevistas a mais/dia"), inclua-o. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
 }
 
+// ─── Gate determinístico 5: CRITÉRIO DE PROJETO (seções [1.3] e [1.4]) ───────
+// "Processo alterado" e "Ponteiro movido e onde verificar" são OBRIGATÓRIAS nos 3 modos do
+// MEMORIAL_ESQUELETO — são a RASTREABILIDADE da régua de critério (SPEC_CRITERIOS_PROJETO).
+// O prompt sozinho não segurou (validação em staging 29/07/2026: o `receita-pura` fechou sem
+// a [1.3] nas 2 rodadas; o `custo-evitado-puro` gravou só a metade da [1.4] nas 2), e a falha
+// é SILENCIOSA — o analisador lê a ausência como rastreabilidade não comprovada e o autor cai
+// em triagem manual injusta. Então o backend confere as seções antes do preview e, se faltar,
+// pergunta UMA vez (anti-loop: a resposta seguinte é sempre aceita e vira nudge [SISTEMA]).
+function perguntaCriterioSecoes(faltaProcesso: boolean, faltaPonteiro: boolean): string {
+  const pedidos: string[] = [];
+  if (faltaProcesso) {
+    pedidos.push(
+      "**(a) que processo mudou e o quanto** — qual rotina era feita antes, como ela é hoje e o tamanho disso (volume, frequência, tempo);",
+    );
+  }
+  if (faltaPonteiro) {
+    pedidos.push(
+      "**(b) qual ponteiro isso moveu e onde dá pra conferir** — custo, receita ou um KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e em qual relatório, painel, sistema ou base (com NOME) alguém abriria pra ver esse número.",
+    );
+  }
+  return `Antes de eu fechar o memorial, falta o essencial da régua de projeto:\n\n${pedidos.join(
+    "\n",
+  )}\n\nSe você não souber onde esse número pode ser conferido, tudo bem — me diga isso mesmo, que eu registro a ausência em vez de inventar uma fonte.`;
+}
+// Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever as seções faltantes a
+// partir do que a PESSOA disse (e do que a doc já traz), com os cabeçalhos EXATOS.
+function nudgeCriterioSecoes(
+  faltaProcesso: boolean,
+  faltaPonteiro: boolean,
+  racional: string,
+): string {
+  const secoes = [
+    faltaProcesso
+      ? '"### Processo alterado" (qual rotina mudou, como era ANTES, como é AGORA e a MAGNITUDE — volume/frequência/tempo, sem R$)'
+      : "",
+    faltaPonteiro
+      ? '"### Ponteiro movido e onde verificar" (QUAL ponteiro — custo · receita · KPI da área — e ONDE alguém confere esse número, com o relatório/painel/sistema/base NOMEADO; se o usuário não souber, registre a ausência explicitamente, sem inventar fonte)'
+      : "",
+  ].filter(Boolean);
+  const base = racional.trim()
+    ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
+    : "";
+  return `[SISTEMA] O usuário respondeu sobre o critério de projeto (processo alterado / ponteiro movido).${base}
+Escreva agora, no memorial, a(s) seção(ões) com o cabeçalho EXATO: ${secoes.join(" e ")}. Use também o que a documentação técnica já aprovada traz. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
+}
+
 // Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
 // na verdade é saving, o backend bloqueia o preview/complete e devolve isto, mantendo a fase
 // em 'receita'. Manda reclassificar o projeto como Saving no formulário — em vez de submeter
@@ -1061,6 +1111,21 @@ export async function enviarMensagem(rawData: unknown) {
   const gateBaseHoras = estado.fase === "saving" && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
   // Gate da alocação de ganhos (Seção 2.4): só saving mensal alto (≥44h) + alguém fazia à mão.
   const gateAlocacao = estado.fase === "saving" && aplicaGateAlocacaoGanhos(ctx, estado.saving);
+  // Gate do CRITÉRIO DE PROJETO (seções [1.3]/[1.4]): vale nas DUAS famílias de fase
+  // financeira (saving — incluindo custo evitado puro — e receita), porque as duas seções
+  // são obrigatórias nos 3 modos do MEMORIAL_ESQUELETO.
+  const faseCriterio: "saving" | "receita" | null =
+    estado.fase === "saving" || estado.fase === "saving_preview"
+      ? "saving"
+      : estado.fase === "receita" || estado.fase === "receita_preview"
+        ? "receita"
+        : null;
+  const criterioAtual =
+    faseCriterio === "saving"
+      ? (estado.saving.criterio_secoes ?? null)
+      : faseCriterio === "receita"
+        ? (estado.receita.criterio_secoes ?? null)
+        : null;
   let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
@@ -1165,6 +1230,35 @@ export async function enviarMensagem(rawData: unknown) {
         racional || (estado.saving.alocacao_ganhos_racional as string) || "",
       ),
     });
+  } else if (faseCriterio && criterioAtual === "pendente") {
+    // (5) Turno de RESPOSTA ao gate do critério de projeto ([1.3]/[1.4]). ANTI-LOOP: aceita
+    // o que vier — inclusive "não sei onde conferir", que é resposta legítima (vira zona
+    // cinzenta no analisador, nunca reprovação automática). Marca 'ok' e injeta o nudge
+    // [SISTEMA] com o texto do usuário para o LLM escrever as seções faltantes.
+    const memorialAtual =
+      faseCriterio === "saving"
+        ? estado.saving.memorial_calculo
+        : estado.receita.memorial_calculo;
+    const normalizado = normalizarMarcadoresMemorial(memorialAtual);
+    const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
+    const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
+    const racional = (data.content ?? "").trim();
+    log("enviarMensagem", `Critério de projeto (${faseCriterio}): resposta recebida — registrando`);
+    if (faseCriterio === "saving") {
+      estado.saving = { ...estado.saving, criterio_secoes: "ok" };
+    } else {
+      estado.receita = { ...estado.receita, criterio_secoes: "ok" };
+    }
+    history.push({
+      role: "user",
+      // Se, por algum motivo, as duas seções já estiverem presentes, pedimos as duas mesmo
+      // assim seria ruído — nesse caso o nudge cobre o [1.4], que é o ponto mais frágil.
+      content: nudgeCriterioSecoes(
+        faltaProcesso,
+        faltaPonteiro || !faltaProcesso,
+        racional,
+      ),
+    });
   }
   // NOTA: o split CARGA REAL × ESCALA NÃO tem mais gate determinístico aqui. O agente
   // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
@@ -1202,6 +1296,17 @@ export async function enviarMensagem(rawData: unknown) {
         (resultado.saving.alocacao_ganhos_racional as string | null | undefined) ??
         estado.saving.alocacao_ganhos_racional ??
         null,
+      // Gate do critério de projeto ([1.3]/[1.4]): backend-only, nunca ecoado pelo LLM.
+      criterio_secoes: estado.saving.criterio_secoes ?? null,
+    };
+  }
+  // Mesmo re-merge no lado da RECEITA — sem isto o 'ok' do gate do critério se perderia a
+  // cada turno (o LLM não ecoa o campo) e a pergunta voltaria: o loop que a lição do split
+  // carga×escala mandou nunca repetir.
+  if (resultado.receita) {
+    resultado.receita = {
+      ...resultado.receita,
+      criterio_secoes: estado.receita.criterio_secoes ?? null,
     };
   }
 
@@ -1430,6 +1535,49 @@ export async function enviarMensagem(rawData: unknown) {
         content: perguntaAlocacaoGanhos(total, unidadeHorasDe(savingAtual.tipo_saving)),
         fase: "saving",
         saving: { ...savingAtual, alocacao_ganhos: "pendente" },
+      });
+      delete (resultado as { options?: unknown }).options;
+    }
+  }
+
+  // ── GATE CRITÉRIO DE PROJETO ([1.3]/[1.4]) — força a pergunta antes do preview ──
+  // Roda por ÚLTIMO, depois de todos os gates de saving, e só quando o resultado AINDA é
+  // preview/complete (um gate por turno). Vale para saving (inclusive custo evitado puro) e
+  // para receita. Se as duas seções já estão escritas e com substância, libera direto
+  // (marca 'ok'); senão bloqueia e pergunta UMA vez só (anti-loop) — na volta, o turno de
+  // resposta acima marca 'ok' aconteça o que acontecer.
+  if (
+    faseCriterio &&
+    criterioAtual !== "ok" &&
+    (resultado.type === "preview" || resultado.type === "complete")
+  ) {
+    const alvo = (
+      faseCriterio === "saving"
+        ? (resultado.saving ?? estado.saving)
+        : (resultado.receita ?? estado.receita)
+    ) as { memorial_calculo?: string | null };
+    const normalizado = normalizarMarcadoresMemorial(alvo.memorial_calculo);
+    const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
+    const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
+    if (!faltaProcesso && !faltaPonteiro) {
+      log("enviarMensagem", `Critério de projeto (${faseCriterio}): seções [1.3]/[1.4] presentes — liberado`);
+      if (faseCriterio === "saving" && resultado.saving) {
+        resultado.saving = { ...resultado.saving, criterio_secoes: "ok" };
+      } else if (faseCriterio === "receita" && resultado.receita) {
+        resultado.receita = { ...resultado.receita, criterio_secoes: "ok" };
+      }
+    } else {
+      log(
+        "enviarMensagem",
+        `⛔ Preview de ${faseCriterio} sem as seções do critério (processo: ${faltaProcesso ? "faltando" : "ok"}, ponteiro: ${faltaPonteiro ? "faltando" : "ok"}) — forçando pergunta`,
+      );
+      Object.assign(resultado, {
+        type: "question",
+        content: perguntaCriterioSecoes(faltaProcesso, faltaPonteiro),
+        fase: faseCriterio,
+        ...(faseCriterio === "saving"
+          ? { saving: { ...(resultado.saving ?? estado.saving), criterio_secoes: "pendente" } }
+          : { receita: { ...(resultado.receita ?? estado.receita), criterio_secoes: "pendente" } }),
       });
       delete (resultado as { options?: unknown }).options;
     }

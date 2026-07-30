@@ -497,6 +497,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await syncSheetsToSqlite())
     }
 
+    // ── Reconciliação da análise sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/reanalisar-pendentes, sem o header de cron:
+    // repõe "Complexidade"/"Classificação" que a análise em background não chegou a
+    // gravar (ou re-roda o analisador de quem nunca foi analisado). Existe porque o
+    // cron de 1 min NÃO dispara na STAGING (conferido em 29/07/2026: habilitado às
+    // 17:02, seguiu `last=never`) — sem esta rota não há como validar o lado do
+    // analisador (Classificação/Reprovado/Motivo) fora de produção. Idempotente.
+    if (pathname === '/api/admin/reanalisar-pendentes' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await reconciliarComplexidade())
+    }
+
     // ── Disparo de e-mails por segmento (admin) ──
     // Segmentos: 'legado' (legados pendentes, SQLite) · 'reenvio' (Status "Reenvio Pendente"
     // no Sheets, com motivo) · 'todos' (broadcast a qualquer dono no Sheets). Cada segmento

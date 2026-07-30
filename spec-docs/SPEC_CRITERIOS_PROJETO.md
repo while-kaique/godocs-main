@@ -94,6 +94,30 @@ souber onde conferir, **registra exatamente isso** e SEGUE — nunca inventa fon
 para a triagem: puxa para `zona_cinzenta`, **não** para reprovação automática). Anti-redundância e
 anti-loop iguais aos da seção `1.3`: se a doc aprovada já traz ponteiro + fonte, escreve sem perguntar.
 
+### 3.2c Gate determinístico do `[1.3]`/`[1.4]` (D11 — implementado 2026-07-30)
+
+O prompt sozinho **não segurou** (evidência da staging, D11). O backend agora confere as duas seções
+**antes de liberar o preview**, nas duas famílias de fase financeira (`saving`/`saving_preview` — inclusive
+custo evitado puro — e `receita`/`receita_preview`):
+
+- **Extração** (`memorial-format.ts`): `extrairProcessoAlterado` e `extrairPonteiroMovido`, sobre o memorial
+  já normalizado. ⚠️ O `[1.4]` casa por **PREFIXO** (`"ponteiro movido"`), não por título exato: o agente
+  gravou a metade da seção sob o rótulo curto `**Ponteiro movido:**`, e casar exato devolveria `null` —
+  a meia-seção ficaria **indistinguível da ausência total**, que é o que se quer julgar.
+- **Predicados puros** (`orchestrator.ts`): `secaoProcessoVaga` (ausente ou < `MIN_SECAO_CRITERIO` = 60
+  chars) e `secaoPonteiroVaga` (ausente, curta, ou **sem nenhuma pista de onde conferir**).
+  ⚠️ **Decisão fechada:** o gate **NÃO** julga se a fonte foi bem NOMEADA ("no sistema" × "no Metabase") —
+  a regex distinguiria mal e puniria quem respondeu honestamente "não sei onde conferir", que é
+  comportamento CORRETO (ponto 3 do roteiro, aprovado em staging: vira zona cinzenta, nunca reprovação
+  automática). Essa camada fica com o prompt e o analisador.
+- **Estado** `criterio_secoes` (`null` → `'pendente'` → `'ok'`) em **`SavingColetado` E `ReceitaColetada`**,
+  backend-only, re-mesclado a cada turno (`enviarMensagem`) — sem o re-merge do lado da RECEITA o `'ok'` se
+  perderia e a pergunta voltaria: o **loop** que a lição do split carga×escala mandou nunca repetir.
+- **ANTI-LOOP:** pergunta **UMA vez só**. O turno de resposta marca `'ok'` aconteça o que acontecer e injeta
+  nudge `[SISTEMA]` com o texto do usuário para o LLM escrever a(s) seção(ões) faltante(s).
+- Roda **por último**, depois de todos os gates de saving (jornada → teto → alocação) e só quando o
+  resultado ainda é `preview`/`complete` — um gate por turno.
+
 ### 3.2b Contexto do formulário → prompts (`buildRespostasFormulario`)
 
 O `[1.4]` nasceu **cego ao contrafactual**: `contrafactual_afetados`/`contrafactual_reclamacao` eram
@@ -177,6 +201,10 @@ formulário chegava aos prompts por **whitelist manual**, e só a fase de doc in
 - `tests/validacao-etapa2.test.ts` — as 3 perguntas novas, com o caso central: **"Nenhum / ainda não sei"
   passa**.
 - `tests/dashboard-admin.test.ts` — motivos em coluna própria **sem tocar** `Observações`/`Atualizado Em`.
+- `tests/gate-criterio-secoes.test.ts` — o gate do `[1.3]`/`[1.4]`: extração das seções (incl. a
+  **meia-seção** do custo evitado puro e o memorial legado com códigos `[1.3]`/`[1.4]`), os predicados
+  (ausente/curta/sem pista → bloqueia; ponteiro + fonte nomeada → passa) e o caso que **não pode** bloquear:
+  o "não sei onde conferir" registrado honestamente.
 
 ## 5. Pendências
 
@@ -208,3 +236,13 @@ ausente/vaga → bloqueia e pergunta **1× só**, depois segue; clona `alocacao_
 (timeout de 25s no proxy → fallback → `waitUntil` cancelado), com a `Complexidade` vazia junto — **não é
 bug do código de classificação**, é o modo de falha já conhecido, e na staging o cron `reanalisar-pendentes`
 **não dispara**. Os critérios de aceitação **1 a 4** do plano continuam **sem evidência**.
+
+**Destravado em 2026-07-30:** rota **`POST /api/admin/reanalisar-pendentes`** (`requireAdmin`) — o MESMO
+trabalho do cron `reanalisar-pendentes`, sob demanda e sem o header `x-godeploy-cron`. Repõe
+`Complexidade`/`Classificação` que a análise em background não gravou, ou re-roda o analisador de quem
+nunca foi analisado (`reconciliarComplexidade`, idempotente). É o que torna o lado do analisador
+**validável na staging**; em produção vira também uma alavanca manual. ⚠️ **A causa-raiz continua aberta** —
+a análise ainda pode morrer no `waitUntil` (timeout de 25s do proxy + fallback). As opções desenhadas e
+**não** implementadas: (a) aterrissar a análise no próprio request do submit (custo: o usuário espera);
+(b) o FRONT disparar `/api/chat/analisar` logo após o submit, no padrão do disparo de e-mails em lotes
+(custo: risco de análise duplicada, precisaria de guarda de idempotência).

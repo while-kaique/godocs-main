@@ -622,6 +622,46 @@ export function respostaAlocacaoVaga(texto: string | null | undefined): boolean 
   return !(temNumero || temDestinoNomeado);
 }
 
+// ─── Gate determinístico do CRITÉRIO DE PROJETO (seções [1.3] e [1.4]) ───────
+// As seções "Processo alterado" e "Ponteiro movido e onde verificar" são OBRIGATÓRIAS no
+// MEMORIAL_ESQUELETO dos 3 modos (saving · custo evitado · receita) — são a rastreabilidade
+// da régua de critério (SPEC_CRITERIOS_PROJETO). Só o prompt NÃO segurou: na validação em
+// staging (29/07/2026, runs stg-ctx-01/02) o `receita-pura` fechou SEM a `[1.3]` nas duas
+// rodadas e sem a `[1.4]` numa delas, e o `custo-evitado-puro` gravou só a METADE da `[1.4]`
+// ("**Ponteiro movido:** custo externo eliminado.", sem o onde-verificar) nas duas. A falha é
+// SILENCIOSA: nada bloqueia, e o analisador lê a ausência como rastreabilidade não comprovada
+// → o autor cai em triagem manual injusta. Daí o gate (decisão do Luis, 29/07/2026).
+//
+// Piso mínimo de texto para uma seção contar como escrita (abaixo disso é rótulo sem
+// substância, como a meia-seção observada em staging).
+export const MIN_SECAO_CRITERIO = 60;
+
+// Pistas de ONDE o número pode ser conferido. Inclui os registros nomeáveis (relatório,
+// painel, base, sistema, planilha, extrato, fatura, contrato…) E as formas de REGISTRAR a
+// ausência ("não sabe / não foi informado onde conferir") — porque aceitar "não sei onde
+// conferir" e anotar isso é comportamento CORRETO (ponto 3 do roteiro, que já passou em
+// staging): vira zona cinzenta no analisador, nunca reprovação automática.
+const PISTA_ONDE_VERIFICAR =
+  /onde|conferi|verific|acompanh|rastrea|relat[óo]ri|painel|dashboard|planilha|sistema|base\b|banco de dados|metabase|erp|protheus|sheets?|extrato|fatura|contrato|nota fiscal|log\b|ticket|chamado|indicador|kpi|m[ée]trica|n[ãa]o soube|n[ãa]o sabe|n[ãa]o foi informad|sem fonte|n[ãa]o h[áa] (uma )?fonte/i;
+
+// A seção [1.3] "Processo alterado" está ausente ou sem substância?
+export function secaoProcessoVaga(texto: string | null | undefined): boolean {
+  const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  return t.length < MIN_SECAO_CRITERIO;
+}
+
+// A seção [1.4] "Ponteiro movido e onde verificar" está ausente ou pela metade?
+// CONSERVADOR de propósito (o custo de um falso positivo é UMA pergunta a mais, e o gate
+// pergunta uma vez só): bloqueia quando a seção não existe, é curta demais, ou não traz
+// NENHUMA pista do onde-verificar. NÃO julga se a fonte foi bem NOMEADA ("no sistema" ×
+// "no Metabase") — distinguir isso por regex geraria falso positivo em quem respondeu
+// honestamente "não sei onde conferir"; essa camada fica com o prompt e o analisador.
+export function secaoPonteiroVaga(texto: string | null | undefined): boolean {
+  const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  if (t.length < MIN_SECAO_CRITERIO) return true;
+  return !PISTA_ONDE_VERIFICAR.test(t);
+}
+
 // Detecta um memorial que NÃO é de receita incremental: marcado como "não aplicável para
 // receita", escrito como um memorial de SAVING (economia operacional), ou dizendo que o caso
 // foi reclassificado como saving. Sinal do bug do legado-260 — o agente, ao concluir que o
