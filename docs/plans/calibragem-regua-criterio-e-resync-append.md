@@ -1,5 +1,5 @@
 # Plano — Calibrar a régua do critério (`claro_nao`) + recuperação de linha ausente no `resyncGoogle`
-**Status:** ✅ aprovado (Luis, 2026-07-30)
+**Status:** ✅ **executado** (2026-07-30) — T1–T5 e T7 codados na branch `staging/criterios-coautor` (commit `44d5b48`); **T6 PARCIAL**: staging redeployada, E2E `criterio-claro-nao` ficou em voo ao fim da sessão.
 
 **Objetivo:** fazer o `claro_nao` disparar no caso-âncora que motivou a frente (nuvem de palavras) sem
 afrouxar a proteção contra reprovação injusta, e fechar o gap em que um append perdido fica

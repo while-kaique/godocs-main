@@ -4,8 +4,40 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30 (validação em staging, parte 3 + planejamento — **prod continua NÃO deployado**).
-Fechou a validação que faltava e o resultado **abriu uma frente nova**: o caminho da reprovação não dispara.
+**Última sessão:** 2026-07-30, parte 4 (**código** — plano da calibragem executado; **prod continua NÃO deployado**).
+
+## ✅ Calibragem da régua + recuperação de linha ausente — CODADAS (`44d5b48`, branch `staging/criterios-coautor`)
+**T1–T5 e T7 fechados.** A calibração é **só de prompt** (`analyzer.ts`): o **entregável não conta como
+indicador** ("dá pra conferir no slide" prova que a peça foi feita, não que um ponteiro mudou; indicador é
+**métrica** que se abra hoje numa fonte nomeada e se compare **antes × depois**, e única evidência = entregável
+→ rastreabilidade **não comprovada**); o **par que reprova** ficou declarado (recorrência falha **E**
+contrafactual negado → `claro_nao`, sem salvação pela existência do entregável); o "na dúvida → zona_cinzenta"
+**permanece** com a **exceção** para a falha simultânea; e a âncora da nuvem de palavras foi reforçada com a
+variante que enganou o analisador. `normalizarClassificacao` **não foi tocada** (D9 intacto — segue só rebaixando).
+**Recuperação da IDA:** `updateRowByProjectId` → `Promise<boolean>` (`false` **só** em "ID não encontrado"; o
+abort por cabeçalho sem "ID Projeto" devolve `true`, senão apendar duplicaria) + `syncSubmitToGoogle` cai para
+`appendRow` com `Data Submissão` (decisor puro `deveRecuperarPorAppend`), **zero leitura extra** do Sheets.
+**783 testes verdes** (769 baseline + 14; red autorado em contexto fresco, nenhum teste enfraquecido),
+`build` + `build:worker` OK, `worker.js` recomitado. Revisores: conformidade **conforme** (0,87) ·
+qualidade **sugestoes** — a baixa foi corrigida (o log da falha passou a sair da **etapa** real, não do modo).
+
+## ⏳ T6 PARCIAL — é AQUI que a próxima sessão começa
+- Staging `edf400b4` **redeployada 15:47** com este código.
+- A pedido do Luis (ele copiou a aba de prod para a `STAGING` para ter dados atuais), rodei
+  `POST /api/admin/sync-sheets-now`: **567 linhas, 0 criados, 3 removidos, 1 erro** — timeout de Durable Object
+  no `35155594…` (o projeto do `stg-crit-05`, que estava sendo removido). ⚠️ A aba `STAGING` agora tem dado
+  **real** de produção, contra a regra de "dados simulados" — decisão do Luis, registrada.
+- O `E2E_ONLY=criterio-claro-nao` **ficou em voo** quando a sessão fechou (sem saída no log). **Refazer o run**
+  e conferir a linha em `GET /api/admin/dashboard/projetos/:id`: esperado **Status "Reprovado" ·
+  Classificação começando por "Claro não" · Motivo Reprovado não vazio** (critério de aceitação 1).
+  Se **qualquer outro cenário** virar `claro_nao`, o plano manda **parar e reavaliar**.
+
+## ⚠️ Riscos/pendências que viajam com esta frente
+- **Risco médio ACEITO** (revisão de qualidade, decisão do Luis: registrar, não codar): `false` = "não achei o
+  ID" **≠** "a linha nunca existiu" — ID mexido à mão na planilha (ou append in-flight) pode gerar **2ª linha**
+  em vez de no-op. Auto-limitante (o append de recuperação grava o `ID Projeto`). Detalhe em `SPEC_CORRECOES.md`.
+- **Avisar o Rafa no deploy** — reprovação é visível ao autor (D10).
+- `CLAUDE.md` está em **47,9k chars**, acima do teto de 40k (já estava antes desta sessão) — vale uma poda.
 
 ## ✅ O fix da cota se sustentou sob submissão real (`stg-crit-05`)
 Re-rodado o cenário `criterio-claro-nao` no worktree `staging-criterios-coautor` → projeto
@@ -230,8 +262,13 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
+**Nenhum plano aprovado em aberto.** O último foi **executado** (T1–T5 e T7):
 **→ [docs/plans/calibragem-regua-criterio-e-resync-append.md](plans/calibragem-regua-criterio-e-resync-append.md)** ·
-Status: ✅ aprovado (Luis, 2026-07-30)
+Status: ✅ **executado** (2026-07-30, `44d5b48`) — **T6 parcial**, ver acima. O próximo passo é **validação +
+deploy**, não código novo: conferir o E2E na staging → prod `674a3710` → PR. Se aparecer código novo (ex.: cercar
+o risco médio do append), passa por `/ggsd:plan` primeiro.
+
+_(Escopo original do plano, para referência:)_
 Calibrar a régua do `claro_nao` (na staging o caso-âncora da nuvem de palavras saiu **zona cinzenta**) +
 fazer o `resyncGoogle` recuperar linha ausente por **append**. São as 2 pendências antes de levar a
 `staging/criterios-coautor` a produção.

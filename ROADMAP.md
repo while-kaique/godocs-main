@@ -19,7 +19,7 @@ prod nunca teve o bug, mas a staging degradava o Sheets de prod (mesma cota GCP)
 a nuvem de palavras**, o caso que motivou a Fase 5. Plano ✅ **aprovado** para calibrar a régua (só prompt:
 entregável ≠ indicador · recorrência+contrafactual falhando = `claro_nao`) **+** fechar o gap do
 `resyncGoogle` (linha ausente → append). **Nenhum código alterado nesta sessão.**
-**Próximo:** codar o plano `calibragem-regua-criterio-e-resync-append` (T1–T5) na branch
+**Próximo:** conferir o resultado do E2E `criterio-claro-nao` na staging (o run ficou em voo) e, se vier `Status "Reprovado"` + `Classificação` + `Motivo Reprovado`, deployar a `staging/criterios-coautor` em **prod `674a3710`** e abrir o PR.
 `staging/criterios-coautor`; então T6 (staging + re-rodar o cenário esperando "Reprovado"), limpar os runs
 E2E, deployar **prod `674a3710`** e abrir o PR com `/ggsd:ship` — avisando o **Rafa** no deploy, porque a
 reprovação é visível ao autor.
