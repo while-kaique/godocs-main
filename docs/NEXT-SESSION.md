@@ -290,16 +290,17 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**Nenhum plano aprovado em aberto.** O último foi **executado** (T1–T5 e T7):
-**→ [docs/plans/calibragem-regua-criterio-e-resync-append.md](plans/calibragem-regua-criterio-e-resync-append.md)** ·
-Status: ✅ **executado** (2026-07-30, `44d5b48`) — **T6 parcial**, ver acima. O próximo passo é **validação +
-deploy**, não código novo: conferir o E2E na staging → prod `674a3710` → PR. Se aparecer código novo (ex.: cercar
-o risco médio do append), passa por `/ggsd:plan` primeiro.
+**Nenhum plano ativo.** Os dois planos da frente do critério estão **concluídos e em produção**
+(`calibragem-regua-criterio-e-resync-append` + `criterios-projeto-classificacao`, PR #216 mergeado,
+`main` `39deaf9`). O que sobrou dela é **humano**: avisar o Rafa e **calibrar a régua com ele** usando casos
+reais — reprovar projeto é visível ao autor (D10).
 
-_(Escopo original do plano, para referência:)_
-Calibrar a régua do `claro_nao` (na staging o caso-âncora da nuvem de palavras saiu **zona cinzenta**) +
-fazer o `resyncGoogle` recuperar linha ausente por **append**. São as 2 pendências antes de levar a
-`staging/criterios-coautor` a produção.
+Frentes candidatas à próxima sessão, nenhuma planejada ainda (entram por `/ggsd:plan`):
+- **causa-raiz do analisador morrendo no `waitUntil`** — hoje mitigado pelo cron de 1 min em prod
+  (`reanalisar-pendentes`, conferido ativo e 200), que em troca **pressiona a cota do Sheets** (60 leituras/min
+  compartilhadas com a staging). Caminho quente de submissão: não mexer sem plano;
+- **poda do `CLAUDE.md`** (~48k chars, teto 40k);
+- **repovoar a aba `STAGING` com dado sintético** (ela recebeu cópia de dados reais de prod).
 
 **Plano anterior (a frente que este destrava)**
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·

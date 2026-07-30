@@ -6,26 +6,23 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 5 — **critério de projeto** (plano ✅ aprovado, **codado** em
-`feat/criterios-projeto-classificacao`, no staging, ainda **não validado nem em prod**). Fase 4 (loadings do
-`/dashboard`) ✅ **CONCLUÍDA** (PR #215, `main` `ad64895`); Fase 3 (dashboard = triagem) ✅ mergeada (PR #214).
-`aceitar-zip-submissao` ✅ mergeada (PR #213). **Avulso 30/07:** **Coautor único por projeto** ✅ codado
-(`feat/coautor-unico`) e **validado no staging** — falta prod + PR.
-**Avulso 30/07 (parte 2):** achado e **corrigido** um **loop de reconciliação que estourava a cota do
-Google Sheets** (`cb8d677`) — fazia submissão nova não chegar à planilha e ser purgada do SQLite após 1h;
-prod nunca teve o bug, mas a staging degradava o Sheets de prod (mesma cota GCP). Staging redeployada.
-**Avulso 30/07 (parte 3):** o cenário `criterio-claro-nao` foi re-rodado e **a linha chegou na planilha**
-(o fix da cota se sustentou), mas o analisador classificou **zona cinzenta** — ou seja, a régua **não reprova
-a nuvem de palavras**, o caso que motivou a Fase 5. Plano ✅ **aprovado** para calibrar a régua (só prompt:
-entregável ≠ indicador · recorrência+contrafactual falhando = `claro_nao`) **+** fechar o gap do
-`resyncGoogle` (linha ausente → append). **Nenhum código alterado nesta sessão.**
-**Próximo:** conferir o resultado do E2E `criterio-claro-nao` na staging (o run ficou em voo) e, se vier `Status "Reprovado"` + `Classificação` + `Motivo Reprovado`, deployar a `staging/criterios-coautor` em **prod `674a3710`** e abrir o PR.
-`staging/criterios-coautor`; então T6 (staging + re-rodar o cenário esperando "Reprovado"), limpar os runs
-E2E, deployar **prod `674a3710`** e abrir o PR com `/ggsd:ship` — avisando o **Rafa** no deploy, porque a
-reprovação é visível ao autor.
+**Fase atual:** **nenhuma em aberto** — Fase 5 (**critério de projeto**) ✅ **CONCLUÍDA** em 2026-07-30:
+staging validada, prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). Fase 4 (loadings do
+`/dashboard`) ✅ (PR #215); Fase 3 (dashboard = triagem) ✅ (PR #214); `aceitar-zip-submissao` ✅ (PR #213).
+O **Coautor único por projeto** e o fix do **loop de reconciliação que estourava a cota do Sheets** (`cb8d677`)
+foram a produção **dentro do PR #216**.
+
+**Pendência HUMANA da Fase 5:** avisar o **Rafa** (a reprovação é visível ao autor — D10) e **calibrar a régua
+com ele** usando casos reais, agora pós-deploy.
+
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
-um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existem na branch do critério).
-**⚠️ Dois planos aprovados em paralelo:** este e `perguntas-agente-recorrencia-evidencia`; a ordem é escolha do Luis.
+um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
+⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
+`E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
+
+**Próximo:** avisar o Rafa e calibrar a régua com ele (humano). Frentes candidatas, nenhuma planejada:
+causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
+Sheets) · poda do `CLAUDE.md` (~48k, teto 40k) · repovoar a aba `STAGING` com dado sintético.
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
@@ -91,7 +88,7 @@ lê a planilha; o cache do servidor é in-memory sem revalidação em background
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
 
-## Fase 5 — Critério de projeto: "isto é projeto?" 🟡
+## Fase 5 — Critério de projeto: "isto é projeto?" ✅
 Pedido da gestão (Rafa) após submissões que não deveriam ter entrado — o caso-símbolo é a **nuvem de
 palavras** gerada uma vez para uma apresentação. Régua de 3 critérios (**recorrência · contrafactual ·
 rastreabilidade**; o impacto não precisa ser receita) julgando **elegibilidade**, separada da pontuação de
@@ -100,13 +97,18 @@ qualidade. **Barrar submissão está FORA em definitivo** — a reprovação é 
   (`feat/criterios-projeto-classificacao`, integrada em `staging/criterios-coautor`).
 - ✅ Validado na staging: o lado do **agente** (as 2 seções novas do memorial + o contrafactual da Etapa 2) e
   a **escrita das colunas** (`Classificação` sempre preenchida).
-- 🟡 **A régua não reprova o caso que a motivou** — o cenário `criterio-claro-nao` saiu **zona cinzenta**:
-  o analisador aceitou o **entregável** ("dá pra conferir no slide") como rastreabilidade, e o "use com
-  PARCIMÔNIA" absorveu um caso em que **recorrência e contrafactual falharam juntos**. Plano ✅ aprovado:
-  `docs/plans/calibragem-regua-criterio-e-resync-append.md` (T1–T3, só prompt).
-- ⬜ Junto: **`resyncGoogle` recupera linha ausente** por append (T4–T5) — sem isso, um append que falhe é
-  irrecuperável e o projeto é purgado após a carência de 1h.
-- ⬜ T6 staging → prod `674a3710` → PR (`/ggsd:ship`), **avisando o Rafa** no deploy.
+- ✅ **Régua calibrada e PROVADA ao vivo** (só prompt, `analyzer.ts`): o cenário `criterio-claro-nao` fecha em
+  Status **"Reprovado"** + `Classificação` _"Claro não — a recorrência falha… o contrafactual também falha… a
+  rastreabilidade do artefato existe, mas não compensa a falta do par"_ + `Motivo Reprovado` legível. O
+  **entregável** deixou de valer como rastreabilidade e a **falha simultânea** virou exceção declarada ao
+  "na dúvida → zona_cinzenta". `normalizarClassificacao` intacta (segue só rebaixando — D9).
+- ✅ **Guarda de falso-positivo passou:** `saving-puro`/`custo-evitado-puro`/`complexidade-autonomia` →
+  **Claro sim**; `receita-pura` → **zona cinzenta**; nenhum legítimo virou `claro_nao`.
+- ✅ **`resyncGoogle` recupera linha ausente** por append (sem leitura extra do Sheets).
+- ✅ T6 staging → **prod `674a3710`** → **PR #216 mergeado**. 783 testes verdes.
+- 🐞 Achado **pré-existente** (não é regressão): `saving-multicargo` estoura 40 turnos no loop de repergunta da
+  Seção 2.4 quando o respondedor não tem o dado — falha idêntica no código de prod.
+- ⬜ **Pendência humana:** avisar o Rafa + calibrar a régua com ele.
 - **DoD:** o cenário fecha com Status **"Reprovado"** + `Classificação` "Claro não…" + `Motivo Reprovado`
   legível pelo autor; nenhum outro cenário muda de classificação; os guards de `normalizarClassificacao`
   intactos (sem motivo → zona cinzenta · especial nunca reprova · > R$ 5k → zona cinzenta); nenhuma leitura
