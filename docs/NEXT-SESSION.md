@@ -4,10 +4,17 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 5 — **frente do critério de projeto FECHADA**: T6 validado na staging,
-**prod `674a3710` deployado** e **PR #216 mergeado** (`main` = `39deaf9`).
+**Última sessão:** 2026-07-30, parte 6 — **diagnóstico, sem código**: inventário do que o agente pergunta
+hoje (pós-#216), prestação de contas da frente das perguntas e **escopo fechado da próxima fatia** (A1 +
+jornada preguiçosa). Ver a seção "Sessão de 2026-07-30 (parte 6)" abaixo.
 
-> **▶ PRÓXIMO PASSO (3 humanos + 1 técnico):**
+> **▶ PRÓXIMO PASSO:** **`/ggsd:plan` da fatia A1 + jornada preguiçosa** (escopo fechado abaixo; falta só o
+> Luis confirmar o limiar de 176h). A worktree já existe e está **vazia**:
+> `.claude/worktrees/fix-gates-a1a2`, branch `fix/gate-alocacao-taxonomia-e-materialidade`, criada a partir
+> de `origin/main` (`39deaf9`). ⚠️ **O hook `plan-gate` recusa qualquer edição de código** enquanto
+> `## Plano ativo` não apontar um plano com `Status: aprovado` — foi o que barrou esta sessão.
+
+> **▶ Pendências da frente anterior (3 humanas + 1 técnica), ainda válidas:**
 > 1. **Avisar o Rafa** — a reprovação automática está em prod e o **motivo é visível ao autor** (D10). A
 >    **calibração da régua com ele** segue pendente (agora pós-deploy).
 > 2. **Limpar as 15 linhas `[E2E-…]` da planilha da STAGING** — **não dá pelo script como está**: a planilha da
@@ -17,6 +24,52 @@
 > 3. **Causa-raiz do analisador morrendo no `waitUntil`** segue **aberta** — hoje o destrave é
 >    `POST /api/admin/reanalisar-pendentes` (40–70s). Precisa de plano próprio (`/ggsd:plan`).
 > 4. `CLAUDE.md` está em **~48k chars**, acima do teto de 40k — vale uma poda.
+
+## Sessão de 2026-07-30 (parte 6) — o que o agente pergunta hoje, e o que ainda falta podar
+
+**Nenhum código alterado** (o `plan-gate` recusou — ver Próximo passo). Sessão de leitura sobre
+`origin/main` `39deaf9`, não sobre o doc de 28/07 — a diferença importa, porque o `#216` mexeu nas perguntas.
+
+**1. Inventário do que a pessoa é perguntada HOJE** (levantado do código, não do baseline velho):
+- **Form** — Etapa 1: equipe + papel por participante (Coautor único). Etapa 2: nome · data · contexto de
+  negócio · AI Proxy · **"se desligar isso hoje, quem reclama?"** (pessoa/time da Team Guide) · **"e o que
+  piora?"** · arquivos. Etapa 2 financeira: "alguém já fazia?" → horas antes/depois · recorrência · custo
+  evitado · custo do projeto.
+- **Chat/doc** — só os campos que o extrator não tirou do código, + "usa IA como funcionalidade?" e, se sim,
+  "em que parte a IA entra?" (2 turnos, sempre).
+- **Chat/memorial** — as duas seções novas do critério: **`[1.3]` Processo alterado** e **`[1.4]` Ponteiro
+  movido e onde verificar**, nos 3 modos, com gate determinístico anti-loop (`perguntaCriterioSecoes`).
+- **Gates de sistema** — jornada/220h → teto por pessoa → split carga×escala → alocação de ganhos.
+
+**2. Prestação de contas da frente [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md):**
+**T1** ✅ (baseline) · **T2** ✅ (virou o plano do critério e foi executado inteiro, PR #216) ·
+**T3 e T4 ABERTOS**. Confirmado **no código do `main`**, não presumido: `orchestrator.ts` segue exigindo
+_"o QUE passaram a entregar A MAIS"_ e o juiz do preview segue mandando recusar **sem contador anti-loop**;
+`aplicaConfirmacaoBaseHoras` e `aplicaSplitCargaEscala` seguem disparando com qualquer `horas_antes > 0`.
+
+**3. Achado desta sessão — o gate da jornada não tem consequência própria** (`chat.functions.ts:1435-1490`):
+a única coisa que a resposta faz é definir o `cap` do gate do teto (`tetoPorJornada`: 220h dias úteis / até
+~300h com trabalho humano no fim de semana). Com o maior cargo em 12h/mês, a resposta é **inerte** — o teto
+nunca é atingido nos dois cenários. É por isso que ele disparou em 15 de 24 conversas sem mudar nada.
+
+**4. Escopo fechado da próxima fatia (decisões do Luis nesta sessão):**
+- **A1 — taxonomia de destino do ganho + anti-loop.** Constante única `TAXONOMIA_DESTINO_GANHO` consumida
+  pelos **3** lugares (bloco 2.4 do `buildSavingPrompt`, juiz do `buildSavingPreviewPrompt`, perguntas do
+  gate em `chat.functions.ts`): aceitar **mais entrega · menos custo · menos erro/retrabalho ·
+  menos risco/fraude · menos prazo** — _"a mesma entrega com um time menor"_ passa a ser resposta **válida e
+  completa**. O juiz do preview ganha limite de **1 recusa** (hoje não tem — daí as 13 perguntas
+  pós-preview). ⚠️ `respostaAlocacaoVaga` **já aceita** "redução de 3 auxiliares" (não bate no regex vago):
+  o defeito é 100% de **prompt**, não do predicado — não "consertar" o predicado por engano.
+- **Jornada preguiçosa** — só perguntar quando alguma linha tem `horas_antes` **≥ 176h/mês** (80% do teto;
+  a margem cobre o usuário corrigir as horas para cima no meio da conversa). **⏳ falta o Luis confirmar o
+  número.**
+- **Split carga×escala fica COMO ESTÁ** — decisão explícita do Luis nesta sessão. Não mexer.
+- **Fundir jornada + teto numa pergunta só ficou FORA** desta fatia (é o T3 estrutural; foi assim que nasceu
+  o loop do split). Reavaliar **depois de re-medir**.
+- ⚠️ **Re-medir antes de podar mais:** o baseline de **6,4 perguntas/submissão** é de **28/07, ANTES** do
+  #216 — que somou `[1.3]`/`[1.4]` **e** passou a injetar o contrafactual e a doc aprovada em todos os
+  prompts (`buildRespostasFormulario`). O saldo é desconhecido; rodar o mesmo script sobre as submissões
+  pós-#216 custa pouco.
 
 ## ✅ Critério de projeto — EM PRODUÇÃO (PR #216 mergeado, `main` `39deaf9`)
 A calibração da régua (**só prompt**, `analyzer.ts`) foi provada ao vivo na staging: o cenário
@@ -290,7 +343,15 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**Nenhum plano ativo.** Os dois planos da frente do critério estão **concluídos e em produção**
+**Nenhum plano ativo** — e é justamente o que **trava a próxima sessão**: o hook `plan-gate` recusa editar
+código sem um plano com `Status: aprovado` apontado aqui. **Próximo é planejar a fatia A1 + jornada
+preguiçosa com `/ggsd:plan`** (escopo já fechado na "Sessão de 2026-07-30 (parte 6)"), dentro da frente
+[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) — cujo **T3** a
+prevê, mas **como spec sem código**: o plano novo precisa declarar que esta fatia **implementa** A1 + o
+limiar da jornada, deixando os itens estruturais (registro de "já respondido", orçamento de perguntas,
+fusão dos 4 gates, T4) para depois da re-medição.
+
+Os dois planos da frente do critério estão **concluídos e em produção**
 (`calibragem-regua-criterio-e-resync-append` + `criterios-projeto-classificacao`, PR #216 mergeado,
 `main` `39deaf9`). O que sobrou dela é **humano**: avisar o Rafa e **calibrar a régua com ele** usando casos
 reais — reprovar projeto é visível ao autor (D10).

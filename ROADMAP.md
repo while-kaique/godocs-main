@@ -15,6 +15,13 @@ foram a produção **dentro do PR #216**.
 **Pendência HUMANA da Fase 5:** avisar o **Rafa** (a reprovação é visível ao autor — D10) e **calibrar a régua
 com ele** usando casos reais, agora pós-deploy.
 
+**Fase 6 (candidata, escopo fechado em 2026-07-30, ainda SEM plano):** **perguntas do agente — fatia A1 +
+jornada preguiçosa**. A régua do critério entrou (Fase 5), mas a **poda** das perguntas antigas não: o gate
+da alocação ainda **recusa "menos custo"** (o caso real da redução de 3 auxiliares levou 5 reperguntas) e o
+gate da jornada dispara sem consequência em 15 de 24 conversas. Detalhe e decisões em
+`docs/NEXT-SESSION.md` ("Sessão de 2026-07-30 (parte 6)").
+**Próximo:** `/ggsd:plan` dessa fatia — sem plano aprovado, o `plan-gate` recusa qualquer edição de código.
+
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
