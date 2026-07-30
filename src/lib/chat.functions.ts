@@ -2341,6 +2341,56 @@ export async function analisarProjetoFn(rawData: unknown) {
   return resultado;
 }
 
+/**
+ * Decide o que a reconciliação deve fazer com UM projeto, a partir do que está na
+ * planilha e do que o SQLite tem para oferecer. Pura de propósito: é o invariante de
+ * CONVERGÊNCIA do cron e precisa ser testável sem banco nem Sheets.
+ *
+ * ⚠️ REGRESSÃO REAL (30/07/2026) que este desenho impede — não reintroduzir:
+ * quando a coluna "Classificação" entrou, o critério de "já está pronto" passou a ser
+ * `Complexidade preenchida E Classificação preenchida`. Só que um projeto ANTIGO tem
+ * Complexidade na planilha, Classificação vazia (coluna nova) e NADA de classificação
+ * no SQLite — logo o cron o reprocessava, escrevia só a Complexidade (que já estava
+ * lá), a Classificação continuava vazia e ele voltava no minuto seguinte. Para sempre.
+ * Medido na staging: 109 projetos × ~1 leitura de cabeçalho por minuto contra a cota de
+ * 60 leituras/min do Sheets → cota permanentemente estourada, appends de submissões
+ * novas falhando com 429 e projeto purgado do SQLite após a carência de 1h.
+ *
+ * A regra que corrige: só age quando existe algo REALMENTE gravável (coluna vazia na
+ * planilha E dado correspondente no SQLite) ou quando cabe uma re-análise (o SQLite não
+ * tem nem complexidade nem classificação). Nada a fazer → `'nada'`, e o projeto NÃO
+ * conta como pendente.
+ */
+export function decidirReconciliacaoPlanilha(args: {
+  /** Célula "Complexidade" da planilha (`undefined` = projeto não está na planilha). */
+  comp: string | undefined
+  /** Célula "Classificação" da planilha. */
+  classif: string | undefined
+  /** `projetos.complexidade` no SQLite. */
+  compSqlite: string
+  /** `projetos.classificacao_avaliacao` no SQLite. */
+  classifSqlite: string
+}): { acao: 'nada' | 'resync' | 'reanalisar'; colunas: Array<'complexidade' | 'classificacao'> } {
+  const { comp, classif, compSqlite, classifSqlite } = args
+  const nada = { acao: 'nada' as const, colunas: [] }
+  // Fora da planilha: a reconciliação não inventa linha (quem faz append é a IDA).
+  if (comp === undefined) return nada
+  const vazio = (v: string | undefined) => v === undefined || v === '' || v === '—'
+
+  const colunas: Array<'complexidade' | 'classificacao'> = []
+  if (vazio(comp) && compSqlite) colunas.push('complexidade')
+  if (vazio(classif) && classifSqlite) colunas.push('classificacao')
+  if (colunas.length) return { acao: 'resync', colunas }
+
+  // Sem nada para repor: só vale re-analisar se o SQLite está vazio nas DUAS pontas e
+  // ao menos uma das colunas da planilha está esperando dado.
+  const faltaNaPlanilha = vazio(comp) || vazio(classif)
+  if (faltaNaPlanilha && !compSqlite && !classifSqlite) {
+    return { acao: 'reanalisar', colunas: [] }
+  }
+  return nada
+}
+
 // ─── Reconciliação de Complexidade/Observações (rede de segurança) ───────────
 //
 // A análise roda em background (waitUntil) após o submit e ocasionalmente é
@@ -2351,6 +2401,10 @@ export async function analisarProjetoFn(rawData: unknown) {
 //    notificar o Google Chat (update direto, evita spam);
 //  - se o SQLite também não tem → re-roda o analisador (que analisa + sincroniza).
 // Idempotente: rodar repetidamente é seguro. Legados sem `submitted_at` são pulados.
+//
+// ⚠️ A decisão de O QUE fazer com cada projeto é a função PURA
+// `decidirReconciliacaoPlanilha` — leia o comentário dela antes de mexer: é ali que
+// mora a garantia de que o cron CONVERGE (não repete o mesmo projeto para sempre).
 export async function reconciliarComplexidade(maxReanalises = 15) {
   // Mapa id→Complexidade da planilha (1 leitura). Só os SUBMETIDOS no SQLite são
   // candidatos (evita varrer ~270 legados sem submissão).
@@ -2374,28 +2428,31 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
 
   for (const p of submetidos) {
     const chave = String(p.id).trim().toLowerCase();
-    const comp = compNaPlanilha.get(chave);
-    const classif = classifNaPlanilha.get(chave);
-    const vazio = (v: string | undefined) => v === "" || v === "—";
-    // Pula quem nem está na planilha, ou que já tem Complexidade E Classificação.
-    if (comp === undefined) continue;
-    if (!vazio(comp) && !vazio(classif)) continue;
-    faltando++;
-
     const compSqlite = (p.complexidade ?? "").toString().trim();
     const classifSqlite = (p.classificacao_avaliacao ?? "").toString().trim();
+    // A decisão (e a garantia de convergência) mora na função pura — ver o comentário
+    // dela: reprocessar quem não tem nada a receber foi o loop que estourou a cota.
+    const { acao, colunas } = decidirReconciliacaoPlanilha({
+      comp: compNaPlanilha.get(chave),
+      classif: classifNaPlanilha.get(chave),
+      compSqlite,
+      classifSqlite,
+    });
+    if (acao === "nada") continue;
+    faltando++;
+
     try {
-      if (compSqlite || classifSqlite) {
-        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat). Cada
-        // coluna só é escrita se houver dado no SQLite — nunca sobrescreve com vazio.
+      if (acao === "resync") {
+        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat). Escreve
+        // APENAS as colunas que estão vazias na planilha e têm dado no SQLite.
         const celulas: Record<string, string> = {};
-        if (compSqlite) {
+        if (colunas.includes("complexidade")) {
           celulas.Complexidade = compSqlite;
           celulas.Observações = (p.observacoes as string | null)?.trim()
             ? (p.observacoes as string)
             : "—";
         }
-        if (classifSqlite) {
+        if (colunas.includes("classificacao")) {
           celulas["Classificação"] = derivarClassificacaoSheet(
             classifSqlite,
             p.classificacao_justificativa as string | null,
