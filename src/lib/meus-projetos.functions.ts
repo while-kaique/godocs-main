@@ -52,6 +52,14 @@ export type MeuProjetoItem = {
   // Autoria (para exibir nos cards e no tooltip de transferência de autoria).
   responsavel_nome: string | null;
   responsavel_email: string | null;
+  // Motivos que o AUTOR precisa ver quando o projeto é reprovado/devolvido. Vêm das
+  // colunas próprias do Sheets (nunca de "Observações", que é parecer de staff):
+  // "Motivo Reprovado" (analisador ou triagem) e "Motivo Reenvio" (só triagem humana).
+  // null = não se aplica. Na LISTA vêm da planilha (inclui a sobreposição da triagem);
+  // no DETALHE (`/projeto/$id`, que não lê o Sheets) o motivo da reprovação vem do
+  // espelho SQLite — uma sobreposição manual só aparece lá após o próximo resync.
+  motivo_reprovado: string | null;
+  motivo_reenvio: string | null;
 };
 
 // Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
@@ -95,6 +103,9 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   descricao_breve: string | null;
   // Usa o AI Proxy interno? Necessário para o seed da EDIÇÃO repopular a etapa 2.
   usa_ai_proxy: string | null;
+  // Contrafactual (Etapa 2) — a edição precisa seedar as 2 respostas.
+  contrafactual_afetados: string | null;
+  contrafactual_reclamacao: string | null;
   contexto_especial: string | null;
   tipo_saving: string | null;
   saving_horas: number | null;
@@ -186,7 +197,13 @@ export function mapItem(
   papel: Papel,
   podeEditar: boolean,
   statusSheet?: string | null,
+  motivos?: { reprovado?: string | null; reenvio?: string | null },
 ): MeuProjetoItem {
+  // Célula vazia / "—" / "-" → null (o card simplesmente não mostra o bloco).
+  const motivo = (v: string | null | undefined): string | null => {
+    const t = (v ?? '').trim();
+    return t === '' || t === '—' || t === '-' ? null : t;
+  };
   const at = temAtualizadoEm(atualizadoEm) ? atualizadoEm : null;
   return {
     id: p.id,
@@ -235,6 +252,10 @@ export function mapItem(
     editores_delegados: parseJson<string[]>(p.editores_delegados) ?? [],
     responsavel_nome: p.responsavel_nome ?? null,
     responsavel_email: p.responsavel_email ?? null,
+    // Motivo da reprovação: preferimos o texto da planilha (pode ter sido sobreposto na
+    // triagem) e caímos no espelho SQLite escrito pelo analisador.
+    motivo_reprovado: motivo(motivos?.reprovado) ?? motivo(p.motivo_reprovacao),
+    motivo_reenvio: motivo(motivos?.reenvio),
   };
 }
 
@@ -245,6 +266,8 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
   const atualizadoMap = new Map<string, string>();
   const statusMap = new Map<string, string>();
+  const motivoReprovadoMap = new Map<string, string>();
+  const motivoReenvioMap = new Map<string, string>();
   try {
     const { rows } = await syncOwnerRowsFromSheet(email);
     for (const r of rows) {
@@ -252,6 +275,8 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
       if (id) {
         atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
         statusMap.set(id, (r['Status'] ?? '').trim());
+        motivoReprovadoMap.set(id, (r['Motivo Reprovado'] ?? '').trim());
+        motivoReenvioMap.set(id, (r['Motivo Reenvio'] ?? '').trim());
       }
     }
   } catch (e) {
@@ -273,6 +298,10 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
         // Na lista (só owner/participante), pode editar = owner OU editor delegado.
         ehOwner(p, email) || ehEditorDelegado(p, email),
         statusMap.get(p.id.toLowerCase()) ?? null,
+        {
+          reprovado: motivoReprovadoMap.get(p.id.toLowerCase()) ?? null,
+          reenvio: motivoReenvioMap.get(p.id.toLowerCase()) ?? null,
+        },
       ),
     );
 }
@@ -474,6 +503,8 @@ export async function getMeuProjeto(
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
+    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     contexto_especial: data.contexto_especial,
     tipo_saving: data.tipo_saving,
     saving_horas: data.saving_horas,

@@ -97,6 +97,12 @@ Entidade principal. Uma linha por projeto submetido.
 | alguem_fazia | TEXT | sim/não — tinha processo manual antes? |
 | complexidade | TEXT | automacao/inteligencia/autonomia |
 | observacoes | TEXT | Parecer da análise (staff-only) |
+| ponteiro_movido | TEXT | Critério de projeto (Etapa 2): lista `;` de `custo`/`receita`/`kpi`/`nenhum` |
+| ponteiro_evidencia | TEXT | Onde o ganho é verificável (rastreabilidade) |
+| contrafactual_reclamacao | TEXT | "Se desligar hoje, quem reclama e o que piora" |
+| classificacao_avaliacao | TEXT | Elegibilidade do analisador: `claro_sim`/`claro_nao`/`zona_cinzenta` |
+| classificacao_justificativa | TEXT | Porquê da classificação (SEMPRE preenchida) |
+| motivo_reprovacao | TEXT | Motivo legível ao autor — só em `claro_nao` |
 | submitted_at, validated_at | TEXT | |
 | validated_by | TEXT | Email do admin |
 | created_at, updated_at | TEXT | |
@@ -193,6 +199,8 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `complexidade` TEXT em `projetos`
 - RENAME `tinha_pessoa_antes` → `alguem_fazia` em `projetos`
 - ADD `observacoes` TEXT em `projetos`
+- ADD `ponteiro_movido` / `ponteiro_evidencia` / `contrafactual_reclamacao` TEXT em `projetos` (critério de projeto — Etapa 2)
+- ADD `classificacao_avaliacao` / `classificacao_justificativa` / `motivo_reprovacao` TEXT em `projetos` (classificação do analisador). ⚠️ O `CHECK` de `projetos.status` NÃO muda — o discriminador da reprovação é `classificacao_avaliacao`
 - ADD `especial` INTEGER DEFAULT 0 em `projetos`
 - ADD `contexto_especial` TEXT em `projetos`
 - ADD `arquivos_nomes` TEXT em `projetos` (JSON — nomes dos arquivos)

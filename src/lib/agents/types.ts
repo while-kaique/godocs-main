@@ -153,6 +153,13 @@ export type SavingColetado = {
   // a automação" a partir do que o usuário DE FATO disse (não boilerplate). Null quando
   // ainda não respondido / não se aplica.
   alocacao_ganhos_racional?: string | null;
+  // Estado do GATE DETERMINÍSTICO do CRITÉRIO DE PROJETO (seções [1.3] "Processo alterado"
+  // e [1.4] "Ponteiro movido e onde verificar" — a rastreabilidade da régua). Backend-only
+  // (não ecoado pelo LLM; re-mesclado a cada turno). null = ainda não verificado · 'pendente'
+  // = o preview foi bloqueado e a pergunta foi feita · 'ok' = seções presentes e concretas
+  // (ou já respondidas pelo usuário). ANTI-LOOP: pergunta UMA vez só — a resposta seguinte
+  // vira nudge [SISTEMA] e o fluxo segue. Ver SPEC_CRITERIOS_PROJETO.
+  criterio_secoes?: "pendente" | "ok" | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -177,6 +184,7 @@ export const savingVazio = (): SavingColetado => ({
   carga_escala_racional: null,
   alocacao_ganhos: null,
   alocacao_ganhos_racional: null,
+  criterio_secoes: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
@@ -189,6 +197,10 @@ export type ReceitaColetada = {
   // vendem esse valor por mês"). Serve de ponto de partida — o agente o desafia e
   // aprofunda para montar o memorial_calculo.
   racional: string | null;
+  // Gate determinístico do CRITÉRIO DE PROJETO no modo RECEITA — mesma semântica do campo
+  // homônimo em SavingColetado (o `receita-pura` foi justamente o caso reprodutível da
+  // validação em staging). Backend-only, re-mesclado a cada turno.
+  criterio_secoes?: "pendente" | "ok" | null;
 };
 
 export const receitaVazia = (): ReceitaColetada => ({
@@ -196,6 +208,7 @@ export const receitaVazia = (): ReceitaColetada => ({
   valor_ganho_mensal: null,
   memorial_calculo: null,
   racional: null,
+  criterio_secoes: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────
@@ -265,9 +278,22 @@ export type ResultadoAnalise = {
   // de lógica determinística). null = não inferido (submissão antiga) → não rebaixa.
   // Ver normalizarComplexidade e spec-docs/SPEC_COMPLEXIDADE_NIVEIS.md.
   acao_autonoma?: boolean | null;
+  // ─── Critério de projeto ("isto é projeto?") — independente do veredito ────
+  // Classificação de ELEGIBILIDADE pela régua de recorrência · contrafactual ·
+  // rastreabilidade. Não substitui `resultado` (que é pontuação/qualidade):
+  //  • 'claro_sim'      → segue o fluxo normal;
+  //  • 'zona_cinzenta'  → validação humana;
+  //  • 'claro_nao'      → reprovado (única exceção à regra TEMPORÁRIA do "Pendente").
+  // A justificativa é SEMPRE preenchida (há fallback determinístico) e o motivo só
+  // existe em 'claro_nao' — nunca se reprova sem explicar. Ver normalizarClassificacao.
+  classificacao_avaliacao?: ClassificacaoAvaliacao | string | null;
+  classificacao_justificativa?: string | null;
+  motivo_reprovacao?: string | null;
   criterios_hardcoded: CriterioResult[];
   criterios_dinamicos: CriterioResult[];
 };
+
+export type ClassificacaoAvaliacao = "claro_sim" | "claro_nao" | "zona_cinzenta";
 
 // ─── Mensagem de chat ───────────────────────────────────────────────────────
 
@@ -325,6 +351,19 @@ export type ProjetoContexto = {
   tipo_projeto?: "saving" | "receita_incremental" | null;
   tipos_projeto?: ("saving" | "receita_incremental")[] | null;
   escopo?: "interno" | "externo" | null;
+  // Serviço externo contratado (só quando escopo === 'externo').
+  servico_externo?: string | null;
+  // ⚠️ TUDO que o autor preenche ANTES do chat precisa chegar aqui — este objeto é o
+  // ÚNICO canal de contexto do formulário para os prompts (o financeiro viaja à parte,
+  // em SavingColetado/ReceitaColetada). Campo que não estiver nomeado neste tipo é
+  // INVISÍVEL para o agente. Renderizados juntos por buildRespostasFormulario().
+  // Contrafactual (Etapa 2): "pessoa:a@x;b@y" | "time:Fiscal;CX" + o que piora.
+  // Insumo direto do ponto [1.4] do memorial (ponteiro movido) — o agente parte daqui
+  // em vez de perguntar do zero.
+  contrafactual_afetados?: string | null;
+  contrafactual_reclamacao?: string | null;
+  // Governança: o projeto usa o AI Proxy interno? ('sim' | 'nao')
+  usa_ai_proxy?: string | null;
   // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas
   // reais de uma rotina que existia. 'nao' → ninguém fazia: horas_antes é o EQUIVALENTE
   // manual estimado (o trabalho que alguém teria se a automação não existisse). O

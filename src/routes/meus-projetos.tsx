@@ -7,13 +7,20 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive, Ban } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
 
 // Prazo para regularizar legados (editar/salvar até deixar de constar como legado).
 const PRAZO_LEGADO = "30/06/2026";
+
+// Status (espelhado do Sheets) que significa "não é projeto pela régua de critério" —
+// decidido pelo analisador (classificação "claro não") ou pela triagem humana. É
+// DIFERENTE de "reenvio solicitado": aqui não há o que corrigir e reenviar por padrão.
+function ehReprovado(status: string | null): boolean {
+  return (status ?? "").toLowerCase() === "reprovado";
+}
 
 // Status (espelhado do Sheets) que significa "reprovado — precisa reenviar".
 function ehReenvioSolicitado(status: string | null): boolean {
@@ -34,16 +41,22 @@ function AvisoPendencia({
   icon,
   titulo,
   texto,
+  motivo,
 }: {
-  tone: "legado" | "reenvio";
+  tone: "legado" | "reenvio" | "reprovado";
   icon: React.ReactNode;
   titulo: string;
   texto: string;
+  // Motivo escrito pelo analisador ou pela triagem — o autor precisa ver o PORQUÊ, não
+  // só o selo. Ausente (legado/análise antiga) → o aviso aparece sem o bloco.
+  motivo?: string | null;
 }) {
   const c =
     tone === "legado"
       ? { bg: "rgba(245,158,11,0.08)", bar: "#f59e0b", fg: "#b45309" }
-      : { bg: "rgba(220,38,38,0.06)", bar: "#dc2626", fg: "#b91c1c" };
+      : tone === "reprovado"
+        ? { bg: "rgba(71,85,105,0.07)", bar: "#475569", fg: "#334155" }
+        : { bg: "rgba(220,38,38,0.06)", bar: "#dc2626", fg: "#b91c1c" };
   return (
     <div
       className="mt-2 flex items-start gap-2 rounded-md py-1.5 pl-2.5 pr-3 text-[11px] leading-snug"
@@ -52,6 +65,11 @@ function AvisoPendencia({
       <span className="mt-px shrink-0" aria-hidden>{icon}</span>
       <span>
         <span className="font-bold">{titulo}</span> — {texto}
+        {motivo && (
+          <span className="mt-1 block whitespace-pre-wrap opacity-90">
+            <span className="font-semibold">Motivo:</span> {motivo}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -94,6 +112,10 @@ type Projeto = {
   editores_delegados: string[];
   responsavel_nome: string | null;
   responsavel_email: string | null;
+  // Motivos vindos das colunas próprias do Sheets — o autor vê o PORQUÊ da reprovação
+  // ou do pedido de reenvio (nunca de "Observações", que é parecer interno de staff).
+  motivo_reprovado: string | null;
+  motivo_reenvio: string | null;
 };
 
 type Filtro = "todos" | "meus" | "participo" | "rascunhos";
@@ -743,6 +765,18 @@ function MeusProjetosPage() {
                               }
                             />
                           )}
+                          {/* REPROVADO pela régua de critério de projeto — cinza-ardósia.
+                              Copy NÃO se mistura com o reenvio: aqui a análise concluiu
+                              que a entrega não se sustenta como projeto. */}
+                          {ehReprovado(p.status) && (
+                            <AvisoPendencia
+                              tone="reprovado"
+                              icon={<Ban className="h-3.5 w-3.5" />}
+                              titulo="Projeto reprovado"
+                              texto="a análise concluiu que esta entrega não se enquadra como projeto pelos critérios de recorrência e evidência. Se discordar, fale com a equipe RPA."
+                              motivo={p.motivo_reprovado}
+                            />
+                          )}
                           {/* Pendência de REENVIO (reprovado na análise) — vermelho */}
                           {ehReenvioSolicitado(p.status) && (
                             <AvisoPendencia
@@ -754,6 +788,7 @@ function MeusProjetosPage() {
                                   ? "a análise apontou um ponto a ajustar. Corrija e reenvie para nova validação."
                                   : "a análise apontou um ponto a ajustar. Só o autor pode reenviar — acione o autor ou a equipe RPA."
                               }
+                              motivo={p.motivo_reenvio}
                             />
                           )}
                         </div>

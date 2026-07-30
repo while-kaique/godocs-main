@@ -130,6 +130,22 @@ Régua de **dois eixos** sobre o TRABALHO (não pela ferramenta nem por impacto)
 
 **Eixo AÇÃO tem precedência sobre o eixo IA:** a ação na ponta vem primeiro na árvore e define a autonomia, independente de IA (revertendo o gate antigo `usa_ia===false → automacao`). Dois sinais alimentam a decisão: `usa_ia` (eixo IA — automacao↔inteligencia) e `acao_autonoma` (eixo ação — → autonomia), normalizados por `normalizarComplexidade` (função pura): rebaixa autonomia sem ação consequente, força automacao sem IA, eleva automacao→inteligencia com IA — **nunca** força-promove autonomia. A resposta explícita do usuário (`tem_ia_como_funcionalidade`, coletada na fase doc) tem precedência sobre o `usa_ia` inferido.
 
+### Classificação de CRITÉRIO DE PROJETO (elegibilidade — "isto é projeto?")
+
+Julgamento **independente** da pontuação, pela régua **recorrência · contrafactual · rastreabilidade** — ver
+[spec-docs/SPEC_CRITERIOS_PROJETO.md](../spec-docs/SPEC_CRITERIOS_PROJETO.md) e a
+[régua para a gestão](criterios-projeto-recorrencia-evidencia.md). Entradas: as 3 respostas determinísticas
+da Etapa 2 (`ponteiro_movido` · `ponteiro_evidencia` · `contrafactual_reclamacao`) + a seção "Processo
+alterado" do memorial. Saída: `classificacao_avaliacao` ∈ `claro_sim` | `zona_cinzenta` | `claro_nao`,
+`classificacao_justificativa` (**sempre**) e `motivo_reprovacao` (só na reprovação, escrito para o AUTOR ler).
+
+`normalizarClassificacao` (pura) rebaixa para `zona_cinzenta` quando a reprovação vem **sem motivo**, quando
+o projeto é **especial**, quando a materialidade passa de **R$ 5k/mês** ou quando o valor é inválido — e
+preenche a justificativa por fallback (a coluna `Classificação` nunca fica vazia). `decidirStatusSubmissao`
+(pura) resolve o status interno **e** o rótulo da coluna Status juntos: `claro_nao` → `rejeitado` +
+**"Reprovado"** (única exceção à regra TEMPORÁRIA do "Pendente"); `zona_cinzenta` → `em_validacao`;
+`claro_sim` → fluxo atual. **Simplicidade não reprova** e a triagem humana sobrepõe tudo no `/dashboard`.
+
 ### Resultado
 - Aprova se ≥ 50% dos pontos
 - Postura: **tende a aprovar** (plataforma existe para registrar, não barrar)

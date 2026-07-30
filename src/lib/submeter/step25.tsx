@@ -7,6 +7,7 @@ import {
   FormGroup,
   FormLabel,
   FieldError,
+  CardCheckboxGroup,
 } from "./form-components";
 
 /* Opções de tipo de projeto padrão (saving / receita) — cards selecionáveis. */
@@ -161,73 +162,20 @@ export function Etapa25({
               Este projeto gera saving operacional, receita incremental ou ambos?
             </div>
 
-            <div className="flex flex-col gap-2.5">
-              {TIPOS_PROJETO.map((opt) => {
-                const checked = form.tipoProjeto.includes(opt.value);
-                return (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer select-none items-center gap-3 rounded-xl p-3.5 transition-all duration-150"
-                    style={{
-                      background: checked ? "rgba(0,89,169,0.05)" : "var(--go-white)",
-                      border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.15)",
-                      boxShadow: checked ? "0 0 0 3px rgba(0,89,169,0.08)" : "none",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      className="peer sr-only"
-                      checked={checked}
-                      onChange={() => {
-                        const next = checked
-                          ? form.tipoProjeto.filter((x) => x !== opt.value)
-                          : [...form.tipoProjeto, opt.value];
-                        updateField("tipoProjeto", next as FormData["tipoProjeto"]);
-                        clearError("tipoProjeto");
-                      }}
-                    />
-                    {/* Indicador do checkbox — o "check" só aparece quando marcado */}
-                    <span
-                      aria-hidden="true"
-                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150 peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
-                      style={{
-                        background: checked ? "var(--go-blue)" : "var(--go-white)",
-                        border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.3)",
-                      }}
-                    >
-                      {checked && (
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          strokeWidth="3.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ animation: "go-step-in 0.15s ease" }}
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </span>
-                    {/* Título + explicação das próximas etapas */}
-                    <span className="min-w-0">
-                      <span className="block text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-                        {opt.icon} {opt.title}
-                      </span>
-                      <span
-                        className="mt-1 block text-[11.5px] leading-relaxed"
-                        style={{ color: "var(--go-text-muted, #6b6b7a)" }}
-                      >
-                        {opt.desc}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            <FieldError message={errors.tipoProjeto} />
+            <CardCheckboxGroup
+              options={TIPOS_PROJETO.map((o) => ({
+                value: o.value,
+                title: o.title,
+                desc: o.desc,
+                icon: o.icon,
+              }))}
+              value={form.tipoProjeto}
+              onChange={(next) => {
+                updateField("tipoProjeto", next as FormData["tipoProjeto"]);
+                clearError("tipoProjeto");
+              }}
+              error={errors.tipoProjeto}
+            />
           </FormGroup>
         </div>
       )}

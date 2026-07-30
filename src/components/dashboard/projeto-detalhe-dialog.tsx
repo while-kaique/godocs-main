@@ -104,6 +104,11 @@ const GRUPOS: Grupo[] = [
     colunas: [
       'Status',
       'Complexidade',
+      // Régua de critério de projeto: a classificação vem SEMPRE com a justificativa;
+      // os motivos explicam a reprovação (analisador/triagem) e o pedido de reenvio.
+      'Classificação',
+      'Motivo Reprovado',
+      'Motivo Reenvio',
       'Observações',
       'Alocação Ganhos',
       'Justificativa Saving Escalado e Real',
@@ -183,10 +188,16 @@ export function ProjetoDetalheDialog({
   const [erro, setErro] = useState<string | null>(null);
   const [statusEscolhido, setStatusEscolhido] = useState<string>('');
   const [observacoes, setObservacoes] = useState('');
+  // Motivos em coluna própria (nunca sequestram "Observações", que é o parecer usado
+  // pelo disparo de e-mails de reenvio).
+  const [motivoReenvio, setMotivoReenvio] = useState('');
+  const [motivoReprovado, setMotivoReprovado] = useState('');
   const [salvando, setSalvando] = useState(false);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
   const obsOriginal = useRef('');
+  const motivoReenvioOriginal = useRef('');
+  const motivoReprovadoOriginal = useRef('');
 
   const id = projeto?.id ?? null;
 
@@ -203,6 +214,12 @@ export function ProjetoDetalheDialog({
         const obs = d.campos['Observações'] ?? '';
         obsOriginal.current = obs;
         setObservacoes(obs);
+        const mReenvio = d.campos['Motivo Reenvio'] ?? '';
+        const mReprovado = d.campos['Motivo Reprovado'] ?? '';
+        motivoReenvioOriginal.current = mReenvio;
+        motivoReprovadoOriginal.current = mReprovado;
+        setMotivoReenvio(mReenvio);
+        setMotivoReprovado(mReprovado);
         setStatusEscolhido(d.campos['Status'] ?? '');
       })
       .catch((e: Error) => vivo && setErro(e.message))
@@ -216,13 +233,19 @@ export function ProjetoDetalheDialog({
     if (!projeto || !statusEscolhido) return;
     setSalvando(true);
     const obsMudou = observacoes !== obsOriginal.current;
+    const reenvioMudou = motivoReenvio !== motivoReenvioOriginal.current;
+    const reprovadoMudou = motivoReprovado !== motivoReprovadoOriginal.current;
     try {
       await apiFetch('/api/admin/dashboard/status', {
         projeto_id: projeto.id,
         status: statusEscolhido,
         ...(obsMudou ? { observacoes } : {}),
+        ...(reenvioMudou ? { motivo_reenvio: motivoReenvio } : {}),
+        ...(reprovadoMudou ? { motivo_reprovado: motivoReprovado } : {}),
       });
       obsOriginal.current = observacoes;
+      motivoReenvioOriginal.current = motivoReenvio;
+      motivoReprovadoOriginal.current = motivoReprovado;
       onStatusSalvo(projeto.id, statusEscolhido, obsMudou ? observacoes : undefined);
       toast.success(`Status salvo na planilha: ${statusEscolhido}`);
     } catch (e) {
@@ -242,6 +265,14 @@ export function ProjetoDetalheDialog({
   const outras = Object.keys(campos).filter((k) => !usados.has(k));
   const statusMudou = detalhe != null && statusEscolhido !== (campos['Status'] ?? '');
   const obsMudou = detalhe != null && observacoes !== obsOriginal.current;
+  const motivosMudaram =
+    detalhe != null &&
+    (motivoReenvio !== motivoReenvioOriginal.current ||
+      motivoReprovado !== motivoReprovadoOriginal.current);
+  // Campo de motivo aparece conforme a decisão: reenvio pede o que corrigir; reprovação
+  // pede o porquê (e sobrepõe o motivo escrito pelo analisador).
+  const pedeMotivoReenvio = statusEscolhido === 'Reenvio Pendente';
+  const pedeMotivoReprovado = statusEscolhido === 'Reprovado';
 
   return (
     <Dialog open={projeto != null} onOpenChange={(aberto) => !aberto && onFechar()}>
@@ -330,13 +361,45 @@ export function ProjetoDetalheDialog({
                   />
                 </label>
               </div>
+
+              {/* Motivo em COLUNA PRÓPRIA, conforme a decisão. Não toca "Observações":
+                  aquele texto é o parecer que o disparo de e-mails usa. O autor VÊ estes
+                  motivos na tela do projeto dele — escreva para ele ler. */}
+              {(pedeMotivoReenvio || pedeMotivoReprovado) && (
+                <label className="mt-3 block">
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    {pedeMotivoReprovado
+                      ? 'Motivo da reprovação — vai para a coluna "Motivo Reprovado" e é o que o autor vê (sobrepõe o motivo do analisador)'
+                      : 'Motivo do reenvio — vai para a coluna "Motivo Reenvio" e é o que o autor vê'}
+                  </span>
+                  <textarea
+                    value={pedeMotivoReprovado ? motivoReprovado : motivoReenvio}
+                    onChange={(e) =>
+                      pedeMotivoReprovado
+                        ? setMotivoReprovado(e.target.value)
+                        : setMotivoReenvio(e.target.value)
+                    }
+                    rows={2}
+                    placeholder={
+                      pedeMotivoReprovado
+                        ? 'Ex.: entrega executada uma única vez, sem indicador verificável — não se enquadra como projeto recorrente.'
+                        : 'Ex.: projeto parado, em manutenção; reenviar depois de aplicar as correções.'
+                    }
+                    className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </label>
+              )}
+
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={salvarStatus} disabled={salvando || (!statusMudou && !obsMudou)}>
+                <Button
+                  onClick={salvarStatus}
+                  disabled={salvando || (!statusMudou && !obsMudou && !motivosMudaram)}
+                >
                   {salvando ? <Loader2 className="animate-spin" /> : <Save />}
                   Salvar na planilha
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  {statusMudou || obsMudou
+                  {statusMudou || obsMudou || motivosMudaram
                     ? 'Há mudanças não salvas.'
                     : 'Nada mudou desde a última leitura.'}
                 </span>

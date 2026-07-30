@@ -283,6 +283,46 @@ describe('definirStatusProjeto', () => {
     expect(Object.keys(mockUpdateRow.mock.calls[0]![1])).toEqual(['Status']);
   });
 
+  // ── Motivos da triagem em COLUNA PRÓPRIA (critério de projeto) ──────────────
+  it('grava "Motivo Reenvio" em coluna própria, SEM tocar "Observações"', async () => {
+    await definirStatusProjeto(
+      {
+        projeto_id: 'legado-148',
+        status: 'Reenvio Pendente',
+        motivo_reenvio: 'projeto parado, em manutenção; reenviar com os fixes',
+      },
+      'admin@gocase.com',
+    );
+    const escritas = mockUpdateRow.mock.calls[0]![1] as Record<string, string>;
+    expect(escritas['Motivo Reenvio']).toBe('projeto parado, em manutenção; reenviar com os fixes');
+    expect(Object.keys(escritas)).not.toContain('Observações');
+    expect(Object.keys(escritas)).not.toContain('Atualizado Em');
+  });
+
+  it('grava "Motivo Reprovado" em coluna própria (sobrepõe o do analisador)', async () => {
+    await definirStatusProjeto(
+      {
+        projeto_id: 'legado-148',
+        status: 'Reprovado',
+        motivo_reprovado: 'entrega única, sem indicador verificável',
+      },
+      'admin@gocase.com',
+    );
+    const escritas = mockUpdateRow.mock.calls[0]![1] as Record<string, string>;
+    expect(escritas['Motivo Reprovado']).toBe('entrega única, sem indicador verificável');
+    expect(Object.keys(escritas)).not.toContain('Observações');
+  });
+
+  it('a auditoria registra o motivo quando não há parecer em "Observações"', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Reprovado', motivo_reprovado: 'sem recorrência' },
+      'admin@gocase.com',
+    );
+    expect(mockInsertLog).toHaveBeenCalledWith(
+      expect.objectContaining({ observacoes: 'sem recorrência' }),
+    );
+  });
+
   it('recusa status fora da lista gravável', async () => {
     await expect(
       definirStatusProjeto({ projeto_id: 'legado-148', status: 'Inventado' }, 'a@b.com'),

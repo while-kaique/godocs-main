@@ -141,6 +141,13 @@ export type UpdateSyncParams = {
   complexidade: string;
   observacoes: string;
   status: string;
+  // Classificação de elegibilidade do analisador → coluna "Classificação" (SEMPRE
+  // com texto) e "Motivo Reprovado". `undefined` = não escreve a célula (usado pelo
+  // resync, onde o append/update anterior já gravou as duas a partir do projeto).
+  // ⚠️ "Motivo Reenvio" NUNCA é escrita aqui — é manual (triagem humana).
+  classificacao?: string | null;
+  classificacaoJustificativa?: string | null;
+  motivoReprovacao?: string | null;
 };
 
 // ─── Split carga real × escala (derivação das colunas do Sheets) ────────────
@@ -165,6 +172,41 @@ export function derivarSplitHorasSheet(
     return { real: 0, escalado: total };
   }
   return { real: 0, escalado: 0 };
+}
+
+// ─── Classificação de elegibilidade → coluna "Classificação" ────────────────
+// Rótulos legíveis dos 3 níveis decididos pelo analisador ("isto é projeto?").
+export const CLASSIFICACAO_LABEL: Record<string, string> = {
+  claro_sim: 'Claro sim',
+  claro_nao: 'Claro não',
+  zona_cinzenta: 'Zona cinzenta',
+};
+
+// Monta a célula da coluna "Classificação": "<Rótulo> — <justificativa>". A
+// justificativa é SEMPRE esperada (o analisador tem fallback determinístico); sem
+// ela, grava só o rótulo. Classificação ausente/desconhecida (legado, ou análise
+// que ainda não rodou) → "—" (o analisador sobrescreve quando concluir). Pura.
+export function derivarClassificacaoSheet(
+  classificacao: string | null | undefined,
+  justificativa: string | null | undefined,
+): string {
+  const rotulo = CLASSIFICACAO_LABEL[(classificacao ?? '').trim()];
+  if (!rotulo) return '—';
+  const just = (justificativa ?? '').trim();
+  return just ? `${rotulo} — ${just}` : rotulo;
+}
+
+// ─── Decisor da IDA: recuperar linha ausente por append ─────────────────────
+// `updateRowByProjectId` devolve `false` SÓ quando o "ID Projeto" não existe na
+// planilha (linha ausente, ex.: o append da 1ª submissão morreu por cota). Nesse
+// caso a edição cai para append em vez de virar no-op silencioso. Qualquer outro
+// retorno (`true`, ou `undefined` de um chamador/mock antigo) → NÃO apenda, para
+// não duplicar linha existente. Pura — testável sem tocar o Sheets.
+export function deveRecuperarPorAppend(
+  modo: 'novo' | 'edicao',
+  linhaAtualizada: boolean | undefined,
+): boolean {
+  return modo === 'edicao' && linhaAtualizada === false;
 }
 
 // ─── Papéis dos participantes → 3 colunas do Sheets ─────────────────────────
@@ -333,6 +375,15 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       // F5 for implementado, escreve o parecer aqui (via syncUpdateToGoogle, como a
       // Complexidade/Observações). Por ora, garante "—" em vez de célula em branco.
       'Análise Antiagente': ouTraco((p.projeto as { analise_antiagente?: string | null }).analise_antiagente),
+      // Critério de projeto: classificação de elegibilidade + motivo da reprovação.
+      // No append a análise ainda não rodou → "—"; o analisador sobrescreve as duas
+      // via syncUpdateToGoogle. ⚠️ "Motivo Reenvio" NÃO entra aqui: é MANUAL (triagem
+      // humana no /dashboard), como as colunas de Diff — o sistema nunca a escreve.
+      'Classificação': derivarClassificacaoSheet(
+        p.projeto.classificacao_avaliacao as string | null | undefined,
+        p.projeto.classificacao_justificativa as string | null | undefined,
+      ),
+      'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
@@ -354,19 +405,33 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // Padroniza antes de gravar: numérico vazio → 0; texto vazio → "—".
     const rowPadronizada = padronizarLinha(row);
 
-    // Edição: atualiza a linha existente (match por ID Projeto). Nunca faz append
-    // — só dá pra editar um projeto que já está na planilha. Nova: append.
+    // Edição: atualiza a linha existente (match por ID Projeto) — nunca duplica.
+    // Nova: append. ⚠️ RECUPERAÇÃO: se a linha não existe mais na planilha (o
+    // append da 1ª submissão falhou por cota/transiente), o update não tem onde
+    // aterrissar e o projeto desaparecia em silêncio — e a `reconciliarExclusoes`
+    // o purgava do SQLite depois da carência de 1h. Nesse caso caímos para append.
+    // ⚠️ `etapa` existe para o LOG não mentir: sem ela, uma falha do append de
+    // RECUPERAÇÃO era reportada como "Falha ao atualizar" (o rótulo saía do
+    // `modo`), apontando o caminho errado num incidente de cota.
+    let etapa: 'atualizar' | 'recuperar (append)' | 'inserir' =
+      p.modo === 'edicao' ? 'atualizar' : 'inserir';
     try {
       if (p.modo === 'edicao') {
-        await updateRowByProjectId(p.projetoId, rowPadronizada);
+        const linhaAtualizada = await updateRowByProjectId(p.projetoId, rowPadronizada);
+        if (deveRecuperarPorAppend(p.modo, linhaAtualizada)) {
+          etapa = 'recuperar (append)';
+          console.warn(
+            `[google/sync] RECUPERAÇÃO: linha do projeto "${p.projetoId}" não existe na planilha — criando por append.`,
+          );
+          // A linha está sendo CRIADA agora, então "Data Submissão" entra (o ramo
+          // normal de edição a omite de propósito, para preservar a data original).
+          await appendRow(padronizarLinha({ ...row, 'Data Submissão': dataSubmissao }));
+        }
       } else {
         await appendRow(rowPadronizada);
       }
     } catch (sheetsErr) {
-      console.error(
-        `[google/sync] Falha ao ${p.modo === 'edicao' ? 'atualizar' : 'inserir'} na planilha:`,
-        sheetsErr,
-      );
+      console.error(`[google/sync] Falha ao ${etapa} na planilha:`, sheetsErr);
     }
 
     // 2. Notificação Google Chat (mudo para projetos de teste E2E)
@@ -412,12 +477,24 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
   try {
     // 1. Update na planilha (match por ID Projeto — estável e único)
     try {
-      await updateRowByProjectId(p.projetoId, padronizarLinha({
+      const cells: Partial<Record<SheetColumn, string | number>> = {
         'Complexidade': p.complexidade,
         'Observações': p.observacoes,
         'Status': p.status,
         'Atualizado Em': nowFortaleza(),
-      }));
+      };
+      // Classificação de elegibilidade: só escreve quando o chamador a informou
+      // (o analisador). `undefined` preserva o que já está na planilha — o resync
+      // já a regrava pelo append/update. ⚠️ "Motivo Reenvio" nunca entra (manual).
+      if (p.classificacao !== undefined) {
+        cells['Classificação'] = derivarClassificacaoSheet(p.classificacao, p.classificacaoJustificativa);
+      }
+      if (p.motivoReprovacao !== undefined) {
+        // Vazio/null → "—" (padronizarLinha): limpa o motivo quando o projeto deixa
+        // de ser reprovado num reenvio.
+        cells['Motivo Reprovado'] = p.motivoReprovacao ?? '';
+      }
+      await updateRowByProjectId(p.projetoId, padronizarLinha(cells));
     } catch (sheetsErr) {
       console.error('[google/sync] Falha ao update na planilha:', sheetsErr);
     }

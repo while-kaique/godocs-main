@@ -149,6 +149,16 @@ ganho_total = saving_mensal + receita_equiv
   declarado × detectado → divergência ou IA sem proxy vai para **Observações SEM alterar
   status/complexidade**. Coluna **"Usa AI Proxy" (AL)** ('Sim'/'Não'/'—', valor declarado).
 
+- **Critério de projeto (elegibilidade)** → [spec-docs/SPEC_CRITERIOS_PROJETO.md](../spec-docs/SPEC_CRITERIOS_PROJETO.md) ·
+  [régua para a gestão](criterios-projeto-recorrencia-evidencia.md): a Etapa 2 pergunta *"moveu o ponteiro de
+  quê?"* (`ponteiro_movido`, cards multi — **"Nenhum / ainda não sei" é resposta VÁLIDA e passa**), *"onde
+  isso pode ser verificado?"* (`ponteiro_evidencia`, obrigatória só com ponteiro concreto) e *"se desligar
+  hoje, quem reclama?"* (`contrafactual_reclamacao`). Nenhuma delas **barra** a submissão. Depois do envio o
+  **analisador** classifica em `claro_sim`/`zona_cinzenta`/`claro_nao` (sempre com justificativa) e
+  `claro_nao` grava **"Reprovado"** na coluna Status — única exceção à regra TEMPORÁRIA do "Pendente" —
+  com `Motivo Reprovado` visível ao autor. Invariantes em `normalizarClassificacao` e precedência de status
+  em `decidirStatusSubmissao` (ambas puras, `analyzer.ts`).
+
 ## Regras de domínio
 
 ### Emails aceitos

@@ -18,7 +18,10 @@ import {
   FormInput,
   FieldError,
   RadioGroup,
+  AfetadosInput,
 } from "./form-components";
+import { useSugestoesParticipantes } from "./participantes-sugestoes";
+import { useAreas } from "./areas-sugestoes";
 
 // ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
 
@@ -318,6 +321,12 @@ export function Step2({
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Fontes do seletor de "quem reclama" (contrafactual): pessoas e times da Team Guide.
+  // A lista de pessoas é a MESMA do autocomplete da Etapa 1 (cache de módulo — não
+  // refaz o fetch); as áreas vêm de /api/areas. Falha em qualquer uma → o campo segue
+  // usável (pessoa aceita e-mail digitado).
+  const { pessoas: sugestoesPessoas, loading: sugestoesLoading } = useSugestoesParticipantes(true);
+  const { areas, loading: areasLoading } = useAreas(true);
   const [processing, setProcessing] = useState<null | { fase: string; current: number; total: number }>(null);
   // Pastas expandidas na árvore (por caminho). Vazio = tudo recolhido.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -643,6 +652,68 @@ export function Step2({
           ]}
           error={errors.usaAiProxy}
         />
+      </FormGroup>
+
+      {/* ─── Contrafactual — "se desligar isso hoje, quem reclama e o que piora?"
+          Nenhuma resposta aqui BARRA a submissão: ela alimenta a classificação do
+          analisador depois do envio. O PONTEIRO movido (custo/receita/KPI + onde
+          verificar) NÃO é mais pergunta de formulário — o agente conduz a pergunta e
+          constrói o racional junto com a pessoa na fase do memorial. */}
+      <FormGroup>
+        <FormLabel
+          required
+          hint="Se a automação parasse hoje sem avisar ninguém, quem sentiria falta? Escolha pessoas específicas ou o time/área inteiro."
+        >
+          Se desligar isso hoje, quem reclama?
+        </FormLabel>
+        <AfetadosInput
+          tipo={form.contrafactualAfetadosTipo || "pessoa"}
+          lista={form.contrafactualAfetados ?? []}
+          onChangeTipo={(t) => {
+            updateField("contrafactualAfetadosTipo", t);
+            clearError("contrafactualAfetados");
+          }}
+          onChangeLista={(v) => {
+            updateField("contrafactualAfetados", v);
+            clearError("contrafactualAfetados");
+          }}
+          error={errors.contrafactualAfetados}
+          suggestions={sugestoesPessoas}
+          loadingSuggestions={sugestoesLoading}
+          areas={areas}
+          loadingAreas={areasLoading}
+        />
+      </FormGroup>
+
+      <FormGroup>
+        <FormLabel
+          required
+          hint="O que voltaria a dar trabalho, a atrasar ou a dar errado se a automação parasse."
+        >
+          E o que piora?
+        </FormLabel>
+        <textarea
+          className={cn(
+            "go-input w-full resize-none rounded-lg p-3 text-sm leading-relaxed",
+            errors.contrafactualReclamacao && "!border-[#dc2626]"
+          )}
+          style={{
+            minHeight: 72,
+            border: "1.5px solid rgba(0,89,169,0.18)",
+            background: "var(--go-white)",
+            color: "var(--go-text-heading)",
+            outline: "none",
+            transition: "border-color 0.15s",
+          }}
+          placeholder="Ex: o fechamento volta a ser feito à mão em 2 planilhas e atrasa a entrega para a contabilidade."
+          value={form.contrafactualReclamacao}
+          onChange={(e) => {
+            updateField("contrafactualReclamacao", e.currentTarget.value);
+            clearError("contrafactualReclamacao");
+          }}
+          maxLength={600}
+        />
+        <FieldError message={errors.contrafactualReclamacao} />
       </FormGroup>
 
       {/* Upload de arquivos */}

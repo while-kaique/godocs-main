@@ -8,7 +8,12 @@ import {
   getDocMessage,
   parseJson,
 } from '@/integrations/db/client.server';
-import type { ResultadoAnalise, CriterioResult, Complexidade } from './types';
+import type {
+  ResultadoAnalise,
+  CriterioResult,
+  Complexidade,
+  ClassificacaoAvaliacao,
+} from './types';
 import { detectarAiProxy } from './extractor';
 
 const log = (...args: unknown[]) => console.log('[analyzer]', ...args);
@@ -244,6 +249,34 @@ Os metadados trazem "usa_ai_proxy_declarado" (resposta do formulário: 'sim'/'na
 - detectado=false mas declarado='sim': o autor declarou usar o AI Proxy mas não há evidência na doc — aponte para conferência.
 - Se o projeto usa IA na execução ("usa_ia"=true) mas NÃO passa pelo AI Proxy (declarado='nao' e detectado=false), registre que vale orientar a migração para o proxy interno (economia de custo). Quando declaração e detecção batem, não comente.
 
+## RÉGUA DE CRITÉRIO DE PROJETO ("isto é um projeto?") — CLASSIFICAÇÃO OBRIGATÓRIA
+
+Além do veredito de qualidade acima, você deve julgar a **ELEGIBILIDADE** da submissão: isto é um **projeto de automação** ou é uma **peça única sem evidência**? Este julgamento é INDEPENDENTE da pontuação e usa 3 critérios:
+
+1. **RECORRÊNCIA** — a solução **roda de novo** sem alguém pedir (agendada, por evento, em uso contínuo) ou é reusada de forma sistemática? Uma entrega feita UMA vez, sob encomenda, que ninguém executa novamente, NÃO tem recorrência. ⚠️ Projeto **PONTUAL legítimo** existe (uma migração/limpeza de base que rodou uma vez e resolveu um problema real e mensurável) — o que reprova é a peça única **sem efeito duradouro nem evidência**.
+2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O autor respondeu no formulário QUEM sentiria falta (\`contrafactual_afetados\` — pessoas específicas ou um time/área inteiro, escolhidos na Team Guide) e O QUE piora (\`contrafactual_reclamacao\`). "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto; um time inteiro nomeado é sinal forte a favor.
+3. **RASTREABILIDADE** — existe um **indicador nomeado** que mudou, verificável em um **relatório, sistema ou base** que se possa abrir e conferir? Isso NÃO vem do formulário: quem coleta é o AGENTE, na seção **"Ponteiro movido e onde verificar"** do memorial (qual ponteiro — custo/receita/KPI — e onde conferir), junto da seção **"Processo alterado"** (o que mudou e quanto). Seção ausente (submissão antiga) ou registrando que o autor não sabe onde conferir → rastreabilidade NÃO comprovada, o que puxa para **zona_cinzenta** — não para reprovação automática. Os campos \`ponteiro_movido\`/\`ponteiro_evidencia\` só existem em submissões da época em que a pergunta ficava no formulário; quando vierem preenchidos, valem como resposta do autor.
+   ⚠️ **O próprio entregável NÃO conta como indicador.** "Dá pra conferir no slide", "o arquivo gerado está lá", "o material do evento mostra o resultado" provam apenas que a **peça foi produzida** — provam a existência do artefato, não que um ponteiro se moveu. Indicador é uma **métrica** (horas de trabalho · custo · taxa de erro/retrabalho · prazo/SLA · receita) que se abra **hoje** num relatório, sistema ou base nomeados e que se possa comparar **antes × depois**. Quando a **única evidência** oferecida é o entregável produzido (o slide, o arquivo, o material), a rastreabilidade **não está comprovada** — trate-a como ausente.
+
+**O impacto NÃO precisa ser receita.** Vale qualquer ganho recorrente e verificável desta taxonomia: **horas** de trabalho humano · **custo** (headcount, hora extra, contrato/licença) · **erro** (taxa de falha, retrabalho) · **fraude/risco** evitado · **prazo/SLA** (tempo de ciclo) · **receita**. Um projeto que só reduz erro, sem tocar em R$, é projeto legítimo.
+
+⚠️ **SIMPLICIDADE NÃO REPROVA.** Projeto simples, pequeno ou feito em pouco tempo é BEM-VINDO — a plataforma existe para registrar automações do dia a dia. O que reprova é **falta de recorrência** + **falta de evidência**, nunca o tamanho, a sofisticação ou o valor baixo. Um script de 20 linhas que roda todo dia e economiza 2h/mês é **claro_sim**.
+
+EXEMPLOS-ÂNCORA (calibração):
+- "Nuvem de palavras gerada uma vez a partir de respostas de uma pesquisa, para uma apresentação" → **claro_nao** (não roda de novo, ninguém reclama se sumir, nenhum indicador verificável). Foi aprendizado/artefato, não projeto. Segue **claro_nao** **mesmo que** o autor diga que "o resultado dá pra ver no slide" ou que o material da apresentação comprova a entrega: isso mostra que a peça foi feita, não que um ponteiro mudou.
+- "Cronômetro/planilha feita para medir uma atividade numa ocasião" → **claro_nao** (peça única, sem indicador).
+- "Robô que fecha a conciliação todo dia 1º e derrubou o retrabalho do time" → **claro_sim** (recorrente; se desligar, o fechamento atrasa; verificável no relatório de conciliação).
+- "Automação em produção há 3 meses, o autor descreve o ganho, mas não sabe dizer onde conferir" → **zona_cinzenta** (recorrência sim, rastreabilidade não).
+
+REGRAS DA CLASSIFICAÇÃO:
+- **"claro_sim"** — os 3 critérios se sustentam (ou 2 se sustentam e o terceiro é claramente inferível da documentação).
+- **"claro_nao"** — falha **evidente** em recorrência **E** em rastreabilidade/contrafactual: é peça única sem efeito duradouro nem indicador. Use com PARCIMÔNIA — só quando a submissão não se sustenta como projeto.
+- **"claro_nao" — o par que reprova, declarado:** quando a **recorrência** falha (a entrega rodou uma vez, sob encomenda, é peça única e ninguém a executa de novo) **E** o **contrafactual** é negado (o autor indica que nada piora, ninguém reclama ou ninguém pediu de novo), a classificação é **claro_nao** — **sem buscar salvação** numa evidência de que o entregável existiu (o slide, o arquivo, o material). Os dois critérios que sustentam "isto é um projeto" falharam juntos; a rastreabilidade do artefato não os repõe.
+- **"zona_cinzenta"** — qualquer dúvida razoável, incluindo: falta só a rastreabilidade; o autor respondeu "nenhum / ainda não sei" no ponteiro mas descreve um ganho plausível; a evidência é vaga. **Na dúvida entre claro_nao e zona_cinzenta, escolha SEMPRE zona_cinzenta** (a triagem humana decide) — com UMA **exceção** declarada: isso **não se aplica** quando recorrência e contrafactual falham **juntos** (o par acima), caso em que a classificação correta é **claro_nao**.
+- **A justificativa é OBRIGATÓRIA em TODOS os casos**, inclusive "claro_sim": 2 a 4 frases dizendo **qual critério passou e qual falhou, e por quê**, citando o que o autor respondeu. Nunca escreva algo genérico como "atende aos critérios".
+- Em **"claro_nao"**, escreva também \`motivo_reprovacao\`: um texto **legível pelo AUTOR** (ele vai ver), respeitoso e concreto, dizendo o que faltou e o que ele pode fazer (ex.: "Esta entrega foi executada uma única vez e não há um indicador verificável de mudança. Se a rotina passar a rodar de forma recorrente — ou se você puder apontar o relatório onde o ganho aparece — submeta novamente."). SEM motivo, a reprovação é rebaixada automaticamente para zona cinzenta.
+- Projeto marcado como **ESPECIAL** nunca é reprovado por esta régua (a rota especial existe exatamente para impacto real de difícil mensuração) — classifique-o como "zona_cinzenta" e explique.
+
 ## FORMATO DE RESPOSTA
 
 Responda APENAS com JSON válido, exatamente neste formato.
@@ -264,6 +297,9 @@ IMPORTANTE:
   "acao_autonoma": true | false,
   "complexidade": "automacao" | "inteligencia" | "autonomia",
   "complexidade_justificativa": "<2-3 frases explicando por que este nível foi escolhido>",
+  "classificacao_avaliacao": "claro_sim" | "claro_nao" | "zona_cinzenta",
+  "classificacao_justificativa": "<OBRIGATÓRIO em todos os casos: 2-4 frases dizendo qual critério (recorrência/contrafactual/rastreabilidade) passou ou falhou e por quê>",
+  "motivo_reprovacao": "<só quando classificacao_avaliacao='claro_nao': texto legível PELO AUTOR dizendo o que faltou e o que fazer; nos outros casos, null>",
   "criterios_hardcoded": [
     ...apenas os mais relevantes entre os 10 fixos (max 4 aprovados + max 4 reprovados)...
     {"criterio": "Nome legível do critério", "pontos": 0 | 1, "justificativa": "<explicação>"}
@@ -310,6 +346,17 @@ export function buildUserMessage(
       // sinalize a divergência nas Observações (não bloqueia).
       usa_ai_proxy_declarado: projeto.usa_ai_proxy ?? null,
       ai_proxy_detectado_na_doc: detectarAiProxy(docTexto),
+      // ─── Critério de projeto (régua de elegibilidade) ───────────────────
+      // Contrafactual: respostas determinísticas da Etapa 2 (quem sentiria falta —
+      // pessoas ou times da Team Guide — e o que piora). Não barram a submissão, mas
+      // são sinal FORTE. null = submissão anterior à feature → infira da documentação,
+      // não penalize. A RASTREABILIDADE vem do memorial (seção "Ponteiro movido e onde
+      // verificar", escrita pelo agente), não daqui; ponteiro_movido/ponteiro_evidencia
+      // são LEGADO (só existem em submissões da época da pergunta no formulário).
+      contrafactual_afetados: projeto.contrafactual_afetados ?? null,
+      contrafactual_reclamacao: projeto.contrafactual_reclamacao ?? null,
+      ponteiro_movido: projeto.ponteiro_movido ?? null,
+      ponteiro_evidencia: projeto.ponteiro_evidencia ?? null,
     },
     documentacao_tecnica: {
       o_que_faz: conteudo.o_que_faz ?? '(não preenchido)',
@@ -425,6 +472,128 @@ export function normalizarComplexidade(input: {
   return { complexidade, usa_ia, ajuste };
 }
 
+// ─── Normalização determinística da classificação de elegibilidade ───────────
+
+/** Teto de materialidade (R$/mês) acima do qual a decisão é sempre humana. */
+export const TETO_MATERIALIDADE_CLASSIFICACAO = 5000;
+
+const CLASSIFICACOES_VALIDAS: ClassificacaoAvaliacao[] = ['claro_sim', 'claro_nao', 'zona_cinzenta'];
+
+// Texto usado quando o LLM não devolve justificativa. A coluna "Classificação" NUNCA
+// pode ficar sem texto (decisão D4) — e o rótulo já é prefixado na célula do Sheets,
+// então o fallback não o repete.
+const JUSTIFICATIVA_FALLBACK: Record<ClassificacaoAvaliacao, string> = {
+  claro_sim:
+    'O analisador não detalhou a justificativa desta classificação; nenhum impedimento de recorrência, contrafactual ou rastreabilidade foi apontado na análise.',
+  claro_nao:
+    'O analisador não detalhou a justificativa desta classificação; ver o motivo da reprovação registrado para este projeto.',
+  zona_cinzenta:
+    'O analisador não detalhou a justificativa desta classificação, então a submissão foi encaminhada para a triagem humana decidir sobre os critérios de recorrência, contrafactual e rastreabilidade.',
+};
+
+/**
+ * Aplica as invariantes da régua de critério de projeto sobre a sugestão do LLM.
+ * PURA e determinística (testável isolada) — espelho de `normalizarComplexidade`.
+ *
+ * Invariantes (todas rebaixam para 'zona_cinzenta', o desfecho conservador = decisão
+ * humana; NUNCA promovem uma reprovação):
+ *   1. `claro_nao` SEM motivo não-vazio → nunca se reprova sem explicar ao autor;
+ *   2. projeto ESPECIAL → nunca reprova automático (a rota especial existe justamente
+ *      para impacto real de difícil mensuração e não pode ser atropelada por esta régua);
+ *   3. materialidade > R$ 5k/mês → decisão humana (mesma régua que já força em_validacao);
+ *   4. valor ausente/inválido → fallback conservador.
+ * E a justificativa é SEMPRE preenchida (fallback determinístico), porque a coluna
+ * "Classificação" nunca pode ficar sem texto.
+ *
+ * ⚠️ Os guards 2 e 3 agem APENAS sobre `claro_nao` — um projeto claramente elegível não
+ * é rebaixado por ser especial nem por valer muito (o gate de materialidade age no
+ * STATUS, em analisarProjetoFn, não na régua de elegibilidade).
+ */
+export function normalizarClassificacao(input: {
+  classificacao?: ClassificacaoAvaliacao | string | null;
+  justificativa?: string | null;
+  motivo?: string | null;
+  especial?: boolean | null;
+  materialidade?: number | null;
+  tetoMaterialidade?: number;
+}): {
+  classificacao: ClassificacaoAvaliacao;
+  justificativa: string;
+  motivo: string | null;
+  ajuste: string | null;
+} {
+  const bruto = (input.classificacao ?? '').toString().trim().toLowerCase();
+  let classificacao: ClassificacaoAvaliacao = CLASSIFICACOES_VALIDAS.includes(
+    bruto as ClassificacaoAvaliacao,
+  )
+    ? (bruto as ClassificacaoAvaliacao)
+    : 'zona_cinzenta'; // fallback conservador (nunca reprova por engano)
+
+  const motivoLimpo = (input.motivo ?? '').trim();
+  const teto = input.tetoMaterialidade ?? TETO_MATERIALIDADE_CLASSIFICACAO;
+  let ajuste: string | null = null;
+
+  if (classificacao === 'claro_nao') {
+    if (!motivoLimpo) {
+      classificacao = 'zona_cinzenta';
+      ajuste = "reprovação sem motivo → rebaixada para 'zona_cinzenta' (nunca reprova sem explicar)";
+    } else if (input.especial) {
+      classificacao = 'zona_cinzenta';
+      ajuste = "projeto especial → 'zona_cinzenta' (especial nunca reprova automático)";
+    } else if ((input.materialidade ?? 0) > teto) {
+      classificacao = 'zona_cinzenta';
+      ajuste = `materialidade acima de R$ ${teto}/mês → 'zona_cinzenta' (decisão humana)`;
+    }
+  }
+
+  // O motivo só existe na reprovação — não vaza texto de reprovação para projeto aprovado.
+  const motivo = classificacao === 'claro_nao' ? motivoLimpo : null;
+
+  const justificativa = (input.justificativa ?? '').trim() || JUSTIFICATIVA_FALLBACK[classificacao];
+
+  return { classificacao, justificativa, motivo, ajuste };
+}
+
+// ─── Precedência de status (interno × coluna Status do Sheets) ───────────────
+
+export type StatusSheet = 'Pendente' | 'Reprovado' | 'Reenvio Pendente';
+
+/**
+ * Decide o status INTERNO (SQLite/dashboard) e o rótulo da coluna "Status" do Sheets a
+ * partir da classificação de elegibilidade + os gates que já existiam. PURA.
+ *
+ * Precedência (de cima para baixo):
+ *   1. `claro_nao`      → rejeitado / **"Reprovado"** — VENCE o veredito de pontuação e é a
+ *      ÚNICA exceção à regra TEMPORÁRIA que grava "Pendente" para todo o resto (D1).
+ *      (Combinações impossíveis — especial ou materialidade alta — já foram rebaixadas
+ *      por normalizarClassificacao; a ordem aqui é defesa em profundidade.)
+ *   2. projeto especial → em_validacao / "Pendente" (validação 100% humana);
+ *   3. `zona_cinzenta`  → em_validacao / "Pendente";
+ *   4. materialidade > teto → em_validacao / "Pendente";
+ *   5. senão → o veredito do analisador (aprovado → "Pendente" pela regra TEMPORÁRIA;
+ *      rejeitado → "Reenvio Pendente").
+ */
+export function decidirStatusSubmissao(input: {
+  classificacao?: ClassificacaoAvaliacao | string | null;
+  ehEspecial: boolean;
+  materialidade: number;
+  vereditoAprovado: boolean;
+  tetoMaterialidade?: number;
+}): { status: 'aprovado' | 'rejeitado' | 'em_validacao'; statusSheet: StatusSheet } {
+  const teto = input.tetoMaterialidade ?? TETO_MATERIALIDADE_CLASSIFICACAO;
+  const classificacao = (input.classificacao ?? '').toString().trim().toLowerCase();
+
+  if (classificacao === 'claro_nao' && !input.ehEspecial) {
+    return { status: 'rejeitado', statusSheet: 'Reprovado' };
+  }
+  if (input.ehEspecial) return { status: 'em_validacao', statusSheet: 'Pendente' };
+  if (classificacao === 'zona_cinzenta') return { status: 'em_validacao', statusSheet: 'Pendente' };
+  if (input.materialidade > teto) return { status: 'em_validacao', statusSheet: 'Pendente' };
+  return input.vereditoAprovado
+    ? { status: 'aprovado', statusSheet: 'Pendente' } // TEMPORÁRIO: aprovado vai "Pendente"
+    : { status: 'rejeitado', statusSheet: 'Reenvio Pendente' };
+}
+
 // ─── Função principal ───────────────────────────────────────────────────────
 
 export async function analisarProjeto(projetoId: string): Promise<ResultadoAnalise> {
@@ -508,13 +677,37 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   resultado.complexidade = norm.complexidade;
   resultado.usa_ia = norm.usa_ia;
 
+  // Normaliza a classificação de elegibilidade ("isto é projeto?") aplicando as
+  // invariantes da régua: nunca reprova sem motivo, especial nunca reprova automático,
+  // materialidade alta vira decisão humana e a justificativa NUNCA fica vazia.
+  const savingConteudo = conteudo.saving as Record<string, unknown> | undefined;
+  const receitaConteudo = conteudo.receita as Record<string, unknown> | undefined;
+  const materialidade =
+    ((savingConteudo?.economia_reais_mes as number) ?? 0) +
+    ((receitaConteudo?.valor_ganho_mensal as number) ?? 0);
+  const classif = normalizarClassificacao({
+    classificacao: resultado.classificacao_avaliacao,
+    justificativa: resultado.classificacao_justificativa,
+    motivo: resultado.motivo_reprovacao,
+    especial: projeto.especial === 1,
+    materialidade,
+  });
+  if (classif.ajuste) {
+    log(
+      `Classificação normalizada: ${classif.ajuste} (LLM havia sugerido '${resultado.classificacao_avaliacao}')`,
+    );
+  }
+  resultado.classificacao_avaliacao = classif.classificacao;
+  resultado.classificacao_justificativa = classif.justificativa;
+  resultado.motivo_reprovacao = classif.motivo;
+
   // O LLM avalia todos os critérios internamente mas retorna só os mais relevantes.
   // Usamos pontuacao_total e pontuacao_maxima calculados pelo LLM (que viu todos).
   // Validação básica: garante que os valores existem.
   if (typeof resultado.pontuacao_total !== 'number') resultado.pontuacao_total = 0;
   if (typeof resultado.pontuacao_maxima !== 'number') resultado.pontuacao_maxima = 1;
 
-  log(`Análise concluída: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`);
+  log(`Análise concluída: ${resultado.resultado} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade}, classificacao=${resultado.classificacao_avaliacao})`);
 
   return resultado;
 }

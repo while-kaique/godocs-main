@@ -354,6 +354,30 @@ const MIGRATIONS = [
   "ALTER TABLE email_lotes ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
   'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
   "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
+  // ─── Critério de projeto (régua de recorrência · contrafactual · rastreabilidade) ──
+  // O CONTRAFACTUAL é pergunta determinística da Etapa 2 (padrão `usa_ai_proxy`) e NÃO
+  // barra a submissão — alimenta a classificação do analisador:
+  // `contrafactual_afetados`: quem sentiria falta, serializado como
+  // "pessoa:a@x.com;b@y.com" ou "time:Fiscal;CX" (escolhido na Team Guide — pessoas OU
+  // times inteiros); `contrafactual_reclamacao`: o que piora se desligar hoje.
+  // ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são LEGADO: a RASTREABILIDADE (que ponteiro
+  // moveu + onde verificar) saiu do formulário e passou a ser conduzida pelo AGENTE, na
+  // seção "Ponteiro movido e onde verificar" do memorial. As colunas ficam pelos projetos
+  // submetidos enquanto a pergunta existia no form; nada as escreve mais.
+  'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
+  'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_afetados TEXT',
+  // Classificação de ELEGIBILIDADE decidida pelo analisador ("isto é projeto?"),
+  // independente do veredito de pontuação: 'claro_sim'|'claro_nao'|'zona_cinzenta'.
+  // A justificativa é SEMPRE preenchida (fallback determinístico) → coluna
+  // "Classificação" do Sheets. `motivo_reprovacao` só existe em 'claro_nao' (nunca
+  // reprova sem motivo) → coluna "Motivo Reprovado". O discriminador da reprovação é
+  // ESTA coluna, não o CHECK de projetos.status (que segue rascunho|em_validacao|
+  // validado|rejeitado|aprovado — trocá-lo exigiria rebuild da tabela).
+  'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

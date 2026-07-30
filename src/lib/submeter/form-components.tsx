@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE } from "./constants";
-import type { PapelParticipante } from "./constants";
+import {
+  EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR,
+  coautoresSelecionados, AFETADO_TIPOS,
+} from "./constants";
+import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
 
 export function SectionTitle({ icon, children }: { icon: string; children: React.ReactNode }) {
@@ -172,6 +175,96 @@ export function CheckboxGroup({
   );
 }
 
+/**
+ * Multisseleção em CARDS (checkbox lateral + título + descrição), empilhados. É o
+ * padrão visual acordado para opção QUE TEM DESCRIÇÃO — opção com explicação nunca é
+ * texto solto (o `CheckboxGroup` acima é a variante compacta, sem descrição longa).
+ * Extraído da Etapa 2.5 (tipos de projeto), que agora consome este componente — a
+ * marcação era duplicada.
+ * A11y: o estado NÃO é só cor — o "check" aparece/desaparece e o título fica em
+ * negrito; o foco de teclado tem anel visível (o input é sr-only + peer).
+ */
+export function CardCheckboxGroup({
+  options, value, onChange, error,
+}: {
+  options: { value: string; title: string; desc?: string; icon?: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  error?: string;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2.5">
+        {options.map((opt) => {
+          const checked = value.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer select-none items-center gap-3 rounded-xl p-3.5 transition-all duration-150"
+              style={{
+                background: checked ? "rgba(0,89,169,0.05)" : "var(--go-white)",
+                border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.15)",
+                boxShadow: checked ? "0 0 0 3px rgba(0,89,169,0.08)" : "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={checked}
+                onChange={() =>
+                  onChange(
+                    checked ? value.filter((x) => x !== opt.value) : [...value, opt.value],
+                  )
+                }
+              />
+              {/* Indicador do checkbox — o "check" só aparece quando marcado */}
+              <span
+                aria-hidden="true"
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-150 peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
+                style={{
+                  background: checked ? "var(--go-blue)" : "var(--go-white)",
+                  border: checked ? "1.5px solid var(--go-blue)" : "1.5px solid rgba(0,89,169,0.3)",
+                }}
+              >
+                {checked && (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ animation: "go-step-in 0.15s ease" }}
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              {/* Título + descrição da opção */}
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                  {opt.icon ? `${opt.icon} ` : ""}{opt.title}
+                </span>
+                {opt.desc && (
+                  <span
+                    className="mt-1 block text-[11.5px] leading-relaxed"
+                    style={{ color: "var(--go-text-muted, #6b6b7a)" }}
+                  >
+                    {opt.desc}
+                  </span>
+                )}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </>
+  );
+}
+
 export function InfoTooltip({ children }: { children: React.ReactNode }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
@@ -279,6 +372,68 @@ function Realce({ texto, termos }: { texto: string; termos: string[] }) {
 
 // Máximo de sugestões renderizadas de uma vez (a lista rola; o resto refina digitando).
 const MAX_SUGESTOES = 80;
+
+type CoordsDropdown = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  dropUp: boolean;
+  maxHeight: number;
+};
+
+/**
+ * Ancora um dropdown flutuante (renderizado por portal no <body>, position:fixed) ao
+ * campo medido por `boxRef`: decide se abre para baixo (padrão) ou para cima (quando não
+ * cabe embaixo e há mais espaço em cima) e reposiciona ao rolar/redimensionar.
+ *
+ * O portal é necessário porque o card do formulário tem `overflow-hidden` (slide entre
+ * etapas), o que cortava a lista na borda do card. Compartilhado pelo autocomplete de
+ * participantes (Etapa 1) e pelo de afetados (Etapa 2) — a lógica era a mesma.
+ */
+function useDropdownAnchor(
+  open: boolean,
+  boxRef: React.RefObject<HTMLDivElement | null>,
+  deps: unknown[] = [],
+): CoordsDropdown | null {
+  const [coords, setCoords] = useState<CoordsDropdown | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+    const reposicionar = () => {
+      const el = boxRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const GAP = 6; // respiro entre o campo e a lista
+      const MARGEM = 12; // respiro até a borda da janela
+      const espacoAbaixo = window.innerHeight - r.bottom - GAP - MARGEM;
+      const espacoAcima = r.top - GAP - MARGEM;
+      const dropUp = espacoAbaixo < 200 && espacoAcima > espacoAbaixo;
+      const disponivel = dropUp ? espacoAcima : espacoAbaixo;
+      setCoords({
+        left: r.left,
+        width: r.width,
+        dropUp,
+        maxHeight: Math.max(132, Math.min(288, disponivel)),
+        top: dropUp ? undefined : r.bottom + GAP,
+        bottom: dropUp ? window.innerHeight - r.top + GAP : undefined,
+      });
+    };
+    reposicionar();
+    window.addEventListener("scroll", reposicionar, true);
+    window.addEventListener("resize", reposicionar);
+    return () => {
+      window.removeEventListener("scroll", reposicionar, true);
+      window.removeEventListener("resize", reposicionar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, boxRef, ...deps]);
+
+  return coords;
+}
 
 export function ChipsInput({
   chips, onAdd, onRemove, error,
@@ -393,7 +548,7 @@ const COR_PAPEL: Record<PapelParticipante, string> = {
 // do campo, para o submissor escolher o papel certo. Texto com acentuação (regra 4).
 const DESCRICAO_PAPEL: Record<PapelParticipante, string> = {
   coexecutor:
-    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal.",
+    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal. Apenas 1 por projeto.",
   planejador:
     "Apoiou diretamente na construção do projeto, executando tarefas e entregas concretas dentro de um escopo definido.",
   contribuidor:
@@ -464,13 +619,6 @@ export function ParticipantesPapeisInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  // O dropdown é renderizado via portal no <body> em position:fixed. O card do
-  // formulário tem overflow-hidden (slide entre etapas + barra de gradiente), o que
-  // cortava a lista quando ela passava da borda do card — só apareciam ~4 pessoas.
-  // No portal ela flutua acima de tudo e usa toda a altura disponível na tela.
-  const [coords, setCoords] = useState<
-    { left: number; width: number; top?: number; bottom?: number; dropUp: boolean; maxHeight: number } | null
-  >(null);
 
   // Autocomplete: filtra a lista da TeamGuide a cada letra (nome ou e-mail,
   // sem acento/caixa); sem lista carregada, o campo funciona como sempre.
@@ -489,42 +637,7 @@ export function ParticipantesPapeisInput({
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
-  // Ancora o dropdown flutuante ao campo: mede a caixa do input e decide se abre
-  // para baixo (padrão) ou para cima (quando não cabe embaixo e há mais espaço em
-  // cima). Reposiciona ao rolar/redimensionar enquanto está aberto.
-  useEffect(() => {
-    if (!open) {
-      setCoords(null);
-      return;
-    }
-    const reposicionar = () => {
-      const el = boxRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const GAP = 6; // respiro entre o campo e a lista
-      const MARGEM = 12; // respiro até a borda da janela
-      const espacoAbaixo = window.innerHeight - r.bottom - GAP - MARGEM;
-      const espacoAcima = r.top - GAP - MARGEM;
-      const dropUp = espacoAbaixo < 200 && espacoAcima > espacoAbaixo;
-      const disponivel = dropUp ? espacoAcima : espacoAbaixo;
-      const maxHeight = Math.max(132, Math.min(288, disponivel));
-      setCoords({
-        left: r.left,
-        width: r.width,
-        dropUp,
-        maxHeight,
-        top: dropUp ? undefined : r.bottom + GAP,
-        bottom: dropUp ? window.innerHeight - r.top + GAP : undefined,
-      });
-    };
-    reposicionar();
-    window.addEventListener("scroll", reposicionar, true);
-    window.addEventListener("resize", reposicionar);
-    return () => {
-      window.removeEventListener("scroll", reposicionar, true);
-      window.removeEventListener("resize", reposicionar);
-    };
-  }, [open, visiveis.length, filtradas.length]);
+  const coords = useDropdownAnchor(open, boxRef, [visiveis.length, filtradas.length]);
 
   function tryAdd(raw: string) {
     const val = raw.trim().replace(/[,;]+$/, "").trim();
@@ -597,6 +710,16 @@ export function ParticipantesPapeisInput({
   }
 
   const semPapel = participantes.filter((p) => !papeis[p]).length;
+
+  // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quando alguém já é
+  // Coautor, a opção SAI da lista dos outros — nada de opção morta na tela. Quem já é o
+  // Coautor mantém a opção (precisa dela para exibir o papel atual e poder trocar); a
+  // ausência é explicada pela nota abaixo da lista.
+  const coautores = coautoresSelecionados(participantes, papeis);
+  const papeisDisponiveis = (email: string) =>
+    PAPEIS_PARTICIPANTE.filter(
+      (p) => p.value !== PAPEL_COAUTOR || coautores.length === 0 || coautores[0] === email,
+    );
 
   return (
     <>
@@ -800,7 +923,7 @@ export function ParticipantesPapeisInput({
                     style={faltando ? { borderColor: "#dc2626" } : undefined}
                   >
                     <option value="" disabled>Selecione o papel</option>
-                    {PAPEIS_PARTICIPANTE.map((p) => (
+                    {papeisDisponiveis(email).map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
                   </select>
@@ -826,6 +949,343 @@ export function ParticipantesPapeisInput({
         <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
           {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} — escolha o papel de cada pessoa.
         </p>
+      )}
+
+      {/* Regra do Coautor único — informativa (ícone + texto, nunca só cor). Aparece
+          quando há mais de uma pessoa e ainda não há erro vermelho na tela. */}
+      {participantes.length > 1 && !error && (
+        <p className="mt-1.5 flex items-start gap-1 text-[11px]" style={{ color: "#8b8b9a" }}>
+          <span aria-hidden="true">ℹ️</span>
+          <span>
+            {coautores.length === 1
+              ? "O papel de Coautor já está definido — os demais entram como Participante ou Contribuidor."
+              : "Cada projeto tem 1 autor (você) e no máximo 1 Coautor."}
+          </span>
+        </p>
+      )}
+
+      <FieldError message={error} />
+    </>
+  );
+}
+
+// ── Quem sentiria falta se a automação parasse (contrafactual, Etapa 2) ──────
+// Mesma fonte do autocomplete da Etapa 1 (Team Guide), com um seletor DINÂMICO: por
+// PESSOA (autocomplete nome/e-mail → chips) ou por TIME/ÁREA (select das áreas → chips),
+// para não obrigar a marcar pessoa por pessoa quando o impacto é do time inteiro.
+// Trocar o tipo limpa a lista (uma resposta não se mistura com a outra).
+// a11y: o tipo escolhido é dito por rótulo em texto (não só cor); o dropdown tem
+// combobox/listbox, navegação por setas, Esc e foco visível.
+export function AfetadosInput({
+  tipo, lista, onChangeTipo, onChangeLista, error,
+  suggestions, loadingSuggestions, areas, loadingAreas,
+}: {
+  tipo: AfetadoTipo;
+  lista: string[];
+  onChangeTipo: (t: AfetadoTipo) => void;
+  onChangeLista: (v: string[]) => void;
+  error?: string;
+  suggestions?: SugestaoParticipante[];
+  loadingSuggestions?: boolean;
+  areas?: { nome: string }[];
+  loadingAreas?: boolean;
+}) {
+  const [inputValue, setInputValue] = useState("");
+  const [tipMessage, setTipMessage] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  const termos = inputValue.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  const filtradas = filtrarSugestoes(suggestions ?? [], inputValue, lista);
+  const visiveis = filtradas.slice(0, MAX_SUGESTOES);
+  const open =
+    tipo === "pessoa" &&
+    focused &&
+    !dismissed &&
+    inputValue.trim().length > 0 &&
+    ((suggestions?.length ?? 0) > 0 || !!loadingSuggestions);
+  const coords = useDropdownAnchor(open, boxRef, [visiveis.length, filtradas.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.querySelector('[data-ativa="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  function adicionar(valor: string): boolean {
+    const val = valor.trim();
+    if (!val) return false;
+    if (lista.some((x) => x.toLowerCase() === val.toLowerCase())) return false;
+    onChangeLista([...lista, val]);
+    return true;
+  }
+
+  function tryAdd(raw: string) {
+    const val = raw.trim().replace(/[,;]+$/, "").trim();
+    if (!val) return;
+    if (!EMAIL_RE.test(val)) {
+      setTipMessage("Escolha alguém da lista ou digite um e-mail válido (ex: nome@gocase.com.br)");
+      return;
+    }
+    if (!ALLOWED_DOMAINS_RE.test(val)) {
+      setTipMessage("Apenas e-mails @gocase, @gobeaute ou @gogroup são permitidos");
+      return;
+    }
+    setTipMessage(null);
+    if (adicionar(val)) setInputValue("");
+  }
+
+  function escolherSugestao(email: string) {
+    setTipMessage(null);
+    if (adicionar(email)) {
+      setInputValue("");
+      setActiveIndex(0);
+    }
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (open && visiveis.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % visiveis.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + visiveis.length) % visiveis.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        escolherSugestao(visiveis[Math.min(activeIndex, visiveis.length - 1)].email);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setDismissed(true);
+        return;
+      }
+    }
+    // Espaço só separa quando o texto já é um e-mail completo (digitar um NOME precisa
+    // do espaço para continuar filtrando).
+    const separadores = EMAIL_RE.test(inputValue.trim())
+      ? ["Enter", " ", ",", ";", "Tab"]
+      : ["Enter", ",", ";", "Tab"];
+    if (separadores.includes(e.key)) {
+      const val = inputValue.trim();
+      if (val) { e.preventDefault(); tryAdd(val); }
+      else if (e.key === "Enter") e.preventDefault();
+    }
+  }
+
+  const areasDisponiveis = (areas ?? []).filter(
+    (a) => !lista.some((x) => x.toLowerCase() === a.nome.toLowerCase()),
+  );
+
+  return (
+    <>
+      {/* Tipo do filtro: pessoa ou time inteiro */}
+      <RadioGroup
+        name="contrafactualAfetadosTipo"
+        value={tipo}
+        onChange={(v) => {
+          const novo = v as AfetadoTipo;
+          if (novo === tipo) return;
+          onChangeTipo(novo);
+          onChangeLista([]); // uma resposta não se mistura com a outra
+          setInputValue("");
+          setTipMessage(null);
+        }}
+        options={AFETADO_TIPOS}
+      />
+
+      <div className="mt-2.5">
+        {tipo === "pessoa" ? (
+          <div className="relative">
+            <div
+              ref={boxRef}
+              className="flex min-h-[42px] items-center rounded-lg px-2 py-1 transition-colors cursor-text"
+              style={{ background: "var(--go-white)", border: "1.5px solid rgba(215, 219, 0, 0.35)" }}
+              onClick={() => inputRef.current?.focus()}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                role="combobox"
+                aria-expanded={open}
+                aria-controls="afetados-sugestoes"
+                aria-autocomplete="list"
+                aria-activedescendant={open && visiveis.length > 0 ? `afetado-sugestao-${activeIndex}` : undefined}
+                className="min-w-[160px] flex-1 border-none bg-transparent px-1 py-1 text-sm outline-none"
+                style={{ fontFamily: "'Poppins', sans-serif", color: "var(--go-text-primary)" }}
+                placeholder="Digite um nome ou e-mail…"
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  setTipMessage(null);
+                  setDismissed(false);
+                  setActiveIndex(0);
+                }}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setFocused(true)}
+                onBlur={() => {
+                  setFocused(false);
+                  if (inputValue.trim()) tryAdd(inputValue.trim());
+                }}
+                aria-label="Pessoa que sentiria falta"
+              />
+            </div>
+
+            {open && coords &&
+              createPortal(
+                <div
+                  className="fixed z-[60] overflow-hidden rounded-lg"
+                  style={{
+                    left: coords.left,
+                    top: coords.top,
+                    bottom: coords.bottom,
+                    width: coords.width,
+                    background: "var(--go-white)",
+                    border: "1.5px solid rgba(0,89,169,0.15)",
+                    boxShadow: "0 12px 32px rgba(0,89,169,0.18)",
+                    animation: "go-slide-down 0.15s ease",
+                  }}
+                >
+                  {visiveis.length > 0 ? (
+                    <>
+                      <ul
+                        ref={listRef}
+                        id="afetados-sugestoes"
+                        role="listbox"
+                        aria-label="Sugestões de pessoas"
+                        className="overflow-y-auto py-1"
+                        style={{ maxHeight: coords.maxHeight }}
+                      >
+                        {visiveis.map((p, i) => {
+                          const ativa = i === activeIndex;
+                          return (
+                            <li
+                              key={p.email}
+                              id={`afetado-sugestao-${i}`}
+                              role="option"
+                              aria-selected={ativa}
+                              data-ativa={ativa || undefined}
+                              className="flex cursor-pointer items-center gap-2 px-3 py-1.5"
+                              style={{
+                                background: ativa ? "rgba(0,89,169,0.08)" : "transparent",
+                                borderLeft: ativa ? "3px solid var(--go-lime)" : "3px solid transparent",
+                              }}
+                              onMouseDown={(e) => { e.preventDefault(); escolherSugestao(p.email); }}
+                              onMouseMove={() => { if (!ativa) setActiveIndex(i); }}
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[13px] font-semibold" style={{ color: "var(--go-text-primary)" }}>
+                                  <Realce texto={p.nome} termos={termos} />
+                                  {p.cargo && (
+                                    <span className="ml-1.5 text-[11px] font-normal" style={{ color: "#8b8b9a" }}>
+                                      · {p.cargo}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="block truncate text-[11px]" style={{ color: "var(--go-blue)" }}>
+                                  <Realce texto={p.email} termos={termos} />
+                                </span>
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {filtradas.length > MAX_SUGESTOES && (
+                        <p className="border-t px-3 py-1.5 text-[10px]" style={{ color: "#8b8b9a", borderColor: "rgba(0,89,169,0.08)" }}>
+                          Mostrando {MAX_SUGESTOES} de {filtradas.length} — continue digitando para refinar.
+                        </p>
+                      )}
+                    </>
+                  ) : loadingSuggestions ? (
+                    <div role="status" aria-live="polite" className="flex items-center gap-2 px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                      <span aria-hidden="true" className="flex items-center gap-1">
+                        {[0, 0.2, 0.4].map((delay) => (
+                          <span
+                            key={delay}
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ background: "var(--go-blue)", opacity: 0.5, animation: `go-bounce 1.2s ease-in-out ${delay}s infinite` }}
+                          />
+                        ))}
+                      </span>
+                      Buscando pessoas na Team Guide…
+                    </div>
+                  ) : (
+                    <p className="px-3 py-2.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                      Ninguém encontrado na Team Guide — digite o e-mail completo e pressione Enter.
+                    </p>
+                  )}
+                </div>,
+                document.body,
+              )}
+          </div>
+        ) : (
+          <FormSelect
+            aria-label="Time ou área que sentiria falta"
+            value=""
+            onChange={(e) => {
+              const nome = e.currentTarget.value;
+              if (nome) adicionar(nome);
+            }}
+          >
+            <option value="">
+              {loadingAreas
+                ? "Carregando times da Team Guide…"
+                : areasDisponiveis.length === 0
+                  ? "Nenhum time disponível"
+                  : "Selecione o time/área…"}
+            </option>
+            {areasDisponiveis.map((a) => (
+              <option key={a.nome} value={a.nome}>{a.nome}</option>
+            ))}
+          </FormSelect>
+        )}
+      </div>
+
+      {tipMessage && (
+        <p className="mt-1 text-[11px] font-semibold" style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}>
+          {tipMessage}
+        </p>
+      )}
+
+      {/* Selecionados — chips com remoção */}
+      {lista.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {lista.map((item) => (
+            <li
+              key={item}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold"
+              style={{
+                background: "rgba(0,89,169,0.06)",
+                border: "1px solid rgba(0,89,169,0.18)",
+                color: "var(--go-blue)",
+                animation: "go-chip-in 0.15s ease",
+              }}
+            >
+              <span aria-hidden="true">{tipo === "time" ? "👥" : "👤"}</span>
+              <span className="max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap">{item}</span>
+              <button
+                type="button"
+                onClick={() => onChangeLista(lista.filter((x) => x !== item))}
+                aria-label={`Remover ${item}`}
+                className="flex h-[16px] w-[16px] items-center justify-center rounded-full text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0059A9]"
+                style={{ background: "rgba(0,89,169,0.1)", border: "none", color: "inherit" }}
+              >
+                &times;
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       <FieldError message={error} />
