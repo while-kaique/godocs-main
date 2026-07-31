@@ -4,12 +4,26 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 9 — **T7 da fatia A1 fechado: staging validada, prod deployado, repo
-sincronizado**. A1 está **completa** (T1–T7) e **em produção**; os 2 PRs pendentes do repo foram abertos
-(**#217** código, **#218** docs) e o `gh pr merge` foi **bloqueado pelo classificador de permissões**.
-Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
+**Última sessão:** 2026-07-31 — **sessão de OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
+(lógica da classificação de elegibilidade · projeto da Nyara que **desapareceu** de "Meus Projetos" ·
+**dupla contagem de R$ 161.913,78** no Sucesso.AI da Maria) e **1 correção aplicada em prod** (planilha +
+SQLite). Ver "Sessão de 2026-07-31" abaixo.
 
-> **▶ PRÓXIMO PASSO — nenhuma frente de CÓDIGO aberta (decisão do Luis, 2026-07-30).** O GoDocs está com o
+> **▶ PRÓXIMO PASSO — varrer o Drive × planilha para achar outros projetos purgados como o da Nyara**
+> (read-only, sem código: comparar os arquivos da pasta `1e_Fk8…` contra os IDs/nomes da aba `GoDocs`) **e
+> decidir a recuperação dela** — reenvio pela app ou recriação manual da linha a partir da doc do Drive.
+> É perda de dado **silenciosa**: some das duas fontes sem aviso, e só reclamação do autor revela.
+> **Candidato a frente de CÓDIGO** (exige `/ggsd:plan`): **gate anti-dupla-contagem `custo evitado × receita`**
+> — hoje o único bloco anti-dupla-contagem compara *horas × custo evitado*, e a fase de receita **não relê**
+> os itens do custo evitado; foi exatamente o buraco do Sucesso.AI.
+
+## Plano ativo
+**Nenhum** — nenhum plano em `aprovado` esperando execução (todos os de `docs/plans/INDEX.md` estão
+concluídos/executados, e o `perguntas-agente-recorrencia-evidencia` segue 🟡 parcial com T3/T4 abertos por
+decisão do Luis). O próximo passo desta sessão é **operacional** (varredura Drive × planilha), não precisa de
+plano. Voltar a codar → `/ggsd:plan` primeiro (candidato: gate anti-dupla-contagem `custo evitado × receita`).
+
+> **Contexto de código herdado — nenhuma frente aberta (decisão do Luis, 2026-07-30).** O GoDocs está com o
 > backlog de implementação **zerado por ora**: a fatia A1 fechou (PRs #217/#218 mergeados; staging, prod e
 > `main` sincronizados) e o **A2 foi DESCARTADO** — ver abaixo. O que resta é **humano**: (1) alinhar com o
 > **Bruno** as 2 pendências de decisão da seção seguinte (onde as perguntas-chave de critério vivem · a
@@ -45,6 +59,102 @@ entregues no **PR #216**, não nesta sessão; a A1/PR #217 é a fatia seguinte):
 
 **Não-azuis, seguem abertos:** % participante 75→50 · % contribuidor 50→25 · rotina com lideranças
 (discutir zona cinzenta + relatório de inconsistências).
+
+## Sessão de 2026-07-31 — operação em produção: 3 diagnósticos + 1 correção de dado
+
+**Sessão sem mudança de código.** Nenhum arquivo de `src/` tocado, nenhum deploy. O que mudou foi **dado
+de produção** (planilha + SQLite) e estes docs.
+
+### 1. Como a coluna "Classificação" decide (só explicação, nada mexido)
+Duas camadas. O **LLM** julga por 3 critérios (recorrência · contrafactual · rastreabilidade) e o prompt
+(`analyzer.ts:252-278`) dá o desfecho: `claro_sim` = os 3 se sustentam (ou 2 + o 3º inferível) · `claro_nao`
+= falha **evidente** em recorrência **E** rastreabilidade/contrafactual, "com PARCIMÔNIA" · `zona_cinzenta`
+= **default de qualquer dúvida**, com a **exceção declarada** do par recorrência+contrafactual falhando
+junto (foi o que passou a reprovar a nuvem de palavras). Depois, `normalizarClassificacao` (pura,
+`analyzer.ts:512`) **só rebaixa** — nunca promove — e age **apenas sobre `claro_nao`**: sem motivo → cinzenta
+· especial → cinzenta · materialidade > R$ 5k/mês → cinzenta · valor inválido → cinzenta.
+⚠️ **O `motivo_reprovacao` é escrito pelo próprio agente**, não por um humano: sai no mesmo JSON, e o prompt
+avisa o LLM da consequência de omiti-lo. O guard só pega o caso em que ele **desobedece o formato**.
+
+### 2. Nyara Sato — "Consulta fiscal - IE e IM" desapareceu de "Meus Projetos" (ABERTO)
+**Ela está certa: o projeto existiu e sumiu.** Não está na planilha (571 linhas), não está no SQLite de prod
+(635 linhas, incl. os 64 rascunhos), nem como participante. A **única prova sobrevivente** é a doc no Drive:
+`2026-07-29_180014_Consulta_fiscal_-_IE_e_IM_FINANÇAS.md` (id `1MZeuSJWJhXvjgqGKHNQErq9bnLJZkP5a`, 46 KB,
+pasta de prod `1e_Fk8…`), com "Responsável: Nyara Sato" e a documentação inteira — **submissão em 29/07/2026
+às 15:00** (18:00 UTC, carimbo no nome do arquivo).
+
+**Mecanismo** (o modo de falha já documentado no `CLAUDE.md` → Sync Google): o append da IDA morreu → a linha
+nunca nasceu na planilha → passada a **carência de 1h**, a `reconciliarExclusoes` purgou do SQLite em cascata.
+O guard `deveRecuperarPorAppend` só age **numa edição/reenvio** — ela nunca reeditou, o purge chegou primeiro.
+⚠️ **A causa do append falhado NÃO foi confirmada** (cota `429` é hipótese): o log do Godeploy só guarda ~3h
+(janela lida: 31/07 14:34→17:17 UTC) e a submissão foi anteontem.
+
+**Aberto:** (a) decidir recuperação — reenvio dela (a doc do Drive acelera a Etapa 2) **ou** recriar a linha
+na planilha e deixar o sync reverso importar; o **memorial financeiro não está na doc**, tem de vir dela de
+novo. (b) **varrer Drive × planilha** para achar outras vítimas — é o próximo passo desta sessão.
+
+### 3. Maria Ponciano / Sucesso.AI — dupla contagem de R$ 161.913,78 (CORRIGIDO em prod)
+Projeto `110f199139399ccd797af95aee10f165`, **linha 385** da aba `GoDocs`. O **mesmo dinheiro** estava dos
+dois lados: os itens *"Ressarcimento das transportadoras"* (R$ 55.864,38) e *"Receita retida em reenvio"*
+(R$ 106.049,40) no **custo evitado** E somados na **Receita Mensal** (R$ 161.913,78 = exatamente os dois).
+
+**Por que "não atualizou":** no reenvio de 29/07 ela **só reabriu a etapa de receita**. Os `form_events` do dia
+são `tipos` (16:30) → `receita` (16:34) → `submit` (16:57) — **nenhum evento `saving`**. O formulário só grava o
+que é reaberto, então os 4 itens do custo evitado foram reenviados idênticos. **Não foi falha de sync:** a v3
+gravou, `Atualizado Em` avançou, as colunas de receita nasceram certas. Trilha das 3 versões: v1 (08/07) 381h
+/R$ 5.311,14 → v2 (22/07) custo evitado puro R$ 174.238,10 → v3 (29/07) + receita.
+
+**O agente detectou e avisou** (16:36): _"os R$ 55.864,38 são ressarcimento/cobrança de transportadora — isso
+é saving operacional, não receita incremental… confirme se devo excluir"_. Ela **reafirmou** que era receita e
+ele aceitou — comportamento previsto (argumenta 1×, aceita a discordância). **Ponto cego real:** o bloco
+anti-dupla-contagem só compara *horas × custo evitado*; **não existe checagem custo evitado × receita**, e a
+fase de receita não relê os itens do custo evitado.
+
+**Correção aplicada** (5 células via Service Account + `POST /api/admin/sync-sheets-now` → `atualizados:1,
+removidos:0`):
+
+| Coluna | Antes | Depois |
+|---|---|---|
+| Custo Evitado (T385) | R$ 174.238,10 | **R$ 12.324,32** |
+| Saving Reais (W385) | R$ 174.238,10 | **R$ 12.324,32** |
+| Ganho Total (AE385) | R$ 190.429,48 | **R$ 28.515,70** |
+| Justificativa Custo Evitado (U385) | 4 itens | 2 itens |
+| Memorial de Saving (Y385) | totais de 174.238,10 | 12.324,32 |
+
+Intocadas: Receita Mensal, Receita Memorial, Tipo de Receita, Status, Observações, Atualizado Em, Saving
+Horas, `Alguém Fazia?`. Verificado nas 3 camadas (planilha, SQLite, dashboard com `?refresh=1`).
+
+⚠️ **RESÍDUO ABERTO — a correção é reversível por acidente:** `projetos.custo_evitado_itens` (JSON só-banco)
+**ainda tem os 4 itens** — não está em `SAFE_UPDATE_FIELDS` e não tem coluna no Sheets, então o sync reverso
+não o alcança. **Se ela reeditar, o form seeda os 4 de volta e o custo evitado retorna a R$ 174.238,10.**
+Fechar exige ela remover os 2 itens no form (recomendado, sem código) ou um endpoint admin novo.
+
+⚠️ **Sem nota de correção nas células** (decisão do Luis, 31/07): a primeira versão da correção gravou uma
+nota datada em U385/Y385 explicando a remoção dos 2 itens — **foi retirada**. O histórico da correção mora
+NESTE doc e na memória, **nunca no texto que a gestão lê na planilha**.
+
+⚠️ Também aberto: `Alguém Fazia?` = "sim" na planilha, mas o estado do saving é `alguem_fazia:'externo'` desde
+a v2 — as **381h/mês** da Assistente da v1 (R$ 5.311,14) viraram 0h e não aparecem em lugar nenhum.
+
+**Não é bug (para não "consertar" por engano):** `Ganho Total` **não é a soma** — receita entra com **÷10**
+("fator de equivalência"), igual nos dois caminhos (`submeterParaValidacao` e `resyncGoogle`, `chat.functions.ts`).
+
+**Varredura feita:** dos 11 projetos com receita > 0, **9** têm saving e receita juntos, mas **só o Sucesso.AI**
+tinha sobreposição de valores. Nenhuma outra vítima deste padrão.
+
+### 4. GoProduct (Emanuele Correia) — MESMA falha da Nyara, pega a tempo e RECUPERADO
+O `sync-sheets-now` da correção acima devolveu `"85d3a9d728fdb909f0b2b290d37b7d88: ausente do Sheets, mas
+recente — mantido (carência)"`: **GoProduct** (PRODUTO), submetido **31/07 16:36** local, estava no SQLite e
+**não** na planilha — o mesmo append morto que purgou o projeto da Nyara, ainda **dentro da carência de 1h**.
+Recuperado com `GET /api/admin/resync-google?projeto_id=…`, que desde o PR #216 **cai para append** quando a
+linha não existe: **apendado na linha 574**, Status "Pendente". Sem isso, o projeto seria purgado em ~20 min.
+⚠️ **Isto confirma que a falha NÃO é evento isolado da Nyara** — é recorrente e silenciosa. Reforça o próximo
+passo (varredura Drive × planilha) e sugere uma segunda frente: **detecção automática** do SQLite-sem-linha
+(o `reconciliarExclusoes` já sabe quem está nesse estado — hoje só loga a carência e depois apaga).
+
+### Artefatos desta sessão (scratchpad, não versionados)
+`sheets-lib.mjs` (acesso mínimo ao Sheets por Service Account) · `fix-sucesso.mjs` (dry-run por default,
+`--apply` grava) · **`backup-sucesso-row.json`** (linha 385 inteira antes da edição — reversível célula a célula).
 
 ## Sessão de 2026-07-30 (parte 9) — T7 da A1: staging → prod → repo
 
