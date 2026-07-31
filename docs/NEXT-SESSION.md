@@ -19,6 +19,20 @@ Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 > **(c) piso `respostaAlocacaoVaga`** — recusa resposta que MISTURA destino válido com filler (1 repergunta).
 > Qualquer uma delas começa com `/ggsd:plan`.
 
+## ⏳ Pendentes de DECISÃO do Luis — cobrança do Bruno (chat, 2026-07-30)
+
+Conferência dos pontos **em azul** da mensagem do chefe contra o código **em produção** (os azuis foram
+entregues no **PR #216**, não nesta sessão; a A1/PR #217 é a fatia seguinte):
+
+| Ponto do Bruno | Estado real | Pendência |
+|---|---|---|
+| 1) perguntas-chave de critério **no forms** | ✅ as 3 existem, mas só *"se desligar hoje quem reclama?"* está **no formulário** (Etapa 2). *"que processo mudou e quanto"* e *"moveu ponteiro de custo/receita/KPI"* são conduzidas pelo **AGENTE** (seções `[1.3]`/`[1.4]`) — decisão **R1 do Luis, 29/07**: rastreabilidade não se resolve com checkbox | **DECIDIR:** manter no agente (como está) ou levar para o formulário como ele escreveu. ⚠️ Voltar aos cards de ponteiro na Etapa 2 é explicitamente proibido hoje no `CLAUDE.md` |
+| 2) classificar avaliação em 3 | ✅ `claro_sim`/`zona_cinzenta`/`claro_nao` em prod, calibrado (a nuvem de palavras **é reprovada**), `claro_nao` → "Reprovado" + Motivo | nenhuma (só a pendência humana: calibrar com o Rafa) |
+| 3) máx. **1 coautor** *(exceção projetos especiais)* | ✅ limite implementado (`coautoresSelecionados`/`limitarCoautorUnico`, `constants.ts`) — ⚠️ **SEM a exceção para projeto especial** e a trava é **client-side** (o sync reverso ainda pode trazer 2+ coautores num legado) | **ESPECIFICAR a exceção** antes de codar; decidir se precisa de trava server-side |
+
+**Não-azuis, seguem abertos:** % participante 75→50 · % contribuidor 50→25 · rotina com lideranças
+(discutir zona cinzenta + relatório de inconsistências).
+
 ## Sessão de 2026-07-30 (parte 9) — T7 da A1: staging → prod → repo
 
 **O que rodou:**
