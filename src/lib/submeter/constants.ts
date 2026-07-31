@@ -56,6 +56,37 @@ export const PAPEIS_PARTICIPANTE = [
 
 export type PapelParticipante = (typeof PAPEIS_PARTICIPANTE)[number]["value"];
 
+// Papel "Coautor" — ÚNICO por projeto (decisão de produto 30/07/2026): cada projeto tem
+// 1 autor (o submissor/dono) e no máximo 1 Coautor. Os demais participantes ficam como
+// "Participante" ou "Contribuidor". O seletor desabilita "Coautor" para os outros quando
+// alguém já o tem, e `validarEtapa1` bloqueia o avanço se vierem 2+ (caso de legado
+// importado do Sheets com vários na coluna "Participantes" — o usuário reclassifica).
+export const PAPEL_COAUTOR: PapelParticipante = "coexecutor";
+
+// E-mails (dentro de `participantes`) marcados como Coautor. Função pura — testável.
+export function coautoresSelecionados(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): string[] {
+  return participantes.filter((email) => papeis[email] === PAPEL_COAUTOR);
+}
+
+// Aplica a regra do Coautor único a um mapa de papéis que veio de FORA do formulário
+// (seed da edição / rascunho): mantém o PRIMEIRO Coautor da lista e LIMPA o papel dos
+// demais (string vazia) — não promove ninguém por conta própria; o usuário escolhe
+// (o form já exige papel de todos). Sem 2+ Coautores, devolve o mapa como está.
+// Função pura — testável.
+export function limitarCoautorUnico(
+  participantes: string[],
+  papeis: Record<string, PapelParticipante | "">,
+): Record<string, PapelParticipante | ""> {
+  const coautores = coautoresSelecionados(participantes, papeis);
+  if (coautores.length <= 1) return papeis;
+  const out = { ...papeis };
+  for (const email of coautores.slice(1)) out[email] = "";
+  return out;
+}
+
 // Monta o mapa e-mail→papel para o payload `membros_papeis`, só com participantes
 // atuais e papéis já escolhidos (descarta vazios). O e-mail é a chave, exatamente
 // como aparece em `participantes`. Função pura — testável.
@@ -128,6 +159,10 @@ export function validarEtapa1(
     // Papel obrigatório por participante (decisão de produto: obriga escolher).
     else if (form.participantes.some((p) => !form.participantesPapeis[p]))
       errs.participantes = "Escolha o papel de cada participante";
+    // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor).
+    else if (coautoresSelecionados(form.participantes, form.participantesPapeis).length > 1)
+      errs.participantes =
+        "Só é possível ter 1 Coautor por projeto — deixe os demais como Participante ou Contribuidor";
   }
 
   return errs;
@@ -163,6 +198,20 @@ export function validarEtapa2(
   if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
     errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
   if (!form.usaAiProxy) errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
+
+  // ── Contrafactual ("se desligar hoje") — obrigatório RESPONDER, nada BARRA ──
+  // O PONTEIRO movido (custo/receita/KPI + onde verificar) NÃO é mais pergunta de
+  // formulário: quem conduz é o AGENTE, que constrói o racional junto com a pessoa e
+  // escreve a seção "Ponteiro movido e onde verificar" do memorial. Aqui fica só o
+  // contrafactual — QUEM sente falta (pessoas ou times, da Team Guide) e O QUE piora.
+  if (!form.contrafactualAfetados || form.contrafactualAfetados.length === 0) {
+    errs.contrafactualAfetados =
+      form.contrafactualAfetadosTipo === "time"
+        ? "Selecione ao menos um time/área que sentiria falta"
+        : "Selecione ao menos uma pessoa que sentiria falta";
+  }
+  if ((form.contrafactualReclamacao ?? "").trim().length < 15)
+    errs.contrafactualReclamacao = "Descreva em uma frase o que piora se a automação parar";
 
   if (arquivosCount === 0 && nomesExistentesCount === 0) {
     errs.documentacao = "Selecione pelo menos um arquivo do projeto";
@@ -212,9 +261,53 @@ export interface FormData {
   // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
   // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
   usaAiProxy: "sim" | "nao" | "";
+  // ─── Contrafactual ("se desligar isso hoje, quem reclama e o que piora?") ───
+  // QUEM sente falta é escolhido na Team Guide (mesma fonte do autocomplete da Etapa 1),
+  // dinamicamente por PESSOA ou por TIME/ÁREA — quando o impacto é de um time inteiro,
+  // não se marca pessoa por pessoa. `tipo` decide qual seletor aparece; a lista guarda
+  // e-mails (pessoa) ou nomes de área (time). A RASTREABILIDADE (ponteiro movido + onde
+  // verificar) NÃO vem mais do formulário — é conduzida pelo agente no memorial.
+  contrafactualAfetadosTipo: AfetadoTipo;
+  contrafactualAfetados: string[];
+  // O que piora se a automação parar hoje (uma frase) — CONTRAFACTUAL.
+  contrafactualReclamacao: string;
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;
+}
+
+// Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área
+// inteiro (evita marcar pessoa por pessoa quando o impacto é do time todo).
+export type AfetadoTipo = "pessoa" | "time";
+
+export const AFETADO_TIPOS: { value: AfetadoTipo; label: string }[] = [
+  { value: "pessoa", label: "👤 Pessoas específicas" },
+  { value: "time", label: "👥 Um time/área inteiro" },
+];
+
+// Serialização das duas respostas para o banco (e para a comparação de metaChanged):
+// "pessoa:a@x.com;b@y.com". Puras — testáveis isoladas.
+export function serializarAfetados(tipo: AfetadoTipo, lista: string[]): string {
+  const limpa = lista.map((v) => v.trim()).filter(Boolean);
+  return limpa.length ? `${tipo}:${limpa.join(";")}` : "";
+}
+
+export function desserializarAfetados(bruto: string | null | undefined): {
+  tipo: AfetadoTipo;
+  lista: string[];
+} {
+  const txt = (bruto ?? "").trim();
+  const sep = txt.indexOf(":");
+  const tipo: AfetadoTipo = txt.slice(0, sep) === "time" ? "time" : "pessoa";
+  const lista =
+    sep < 0
+      ? []
+      : txt
+          .slice(sep + 1)
+          .split(";")
+          .map((v) => v.trim())
+          .filter(Boolean);
+  return { tipo, lista };
 }
 
 export interface FieldErrors {

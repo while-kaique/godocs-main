@@ -50,11 +50,20 @@ ${corpo.atencao}
 export function buildScenarios(runId) {
   const tag = (t) => `[E2E-${runId}] ${t}`;
 
+  // ⚠️ `contrafactual_afetados` + `contrafactual_reclamacao` são as perguntas-chave do
+  // critério de projeto coletadas na Etapa 2 (quem reclama se desligar hoje / o que piora).
+  // Elas precisam VIAJAR no payload: é `buildRespostasFormulario` (orchestrator.ts) que as
+  // entrega aos 4 prompts, e é delas que o agente deduz o ponteiro do [1.4] em vez de
+  // perguntar. Rodar o harness sem elas mede um agente cego ao contrafactual — o cenário
+  // errado. Formato do afetados: "time:A;B" ou "pessoa:a@x;b@y" (ver desserializarAfetados).
   const metaPadrao = {
     ferramenta: 'n8n',
     escopo: 'interno',
     membros: [],
     data_criacao: '2026-06-10',
+    contrafactual_afetados: 'time:Fiscal;Financeiro',
+    contrafactual_reclamacao:
+      'O time Fiscal volta a conferir nota por nota à mão e o fechamento atrasa dois dias.',
   };
 
   const cenarios = [];
@@ -412,6 +421,63 @@ RECEITA: gera R$5000/mês de receita incremental recorrente (50 reativações co
       expected: {
         hard: { 'Status': 'Pendente', 'Especial?': 'Sim' },
         soft: { 'Contexto do Projeto Especial': '(preenchido)' },
+      },
+    });
+  }
+
+  // 10) Critério de projeto — CLARO NÃO (o caso da "nuvem de palavras" que originou a régua).
+  // Peça única, sem recorrência, sem ponteiro de custo/receita/KPI, ninguém reclama se
+  // desligar. É o ÚNICO caminho que grava "Reprovado" na coluna Status (exceção à regra
+  // TEMPORÁRIA do "Pendente") — e o que mais precisa de validação antes de ir a prod, porque
+  // a reprovação é visível ao autor. Materialidade minúscula de propósito: acima de
+  // R$5k/mês o invariante de `normalizarClassificacao` rebaixa para zona_cinzenta.
+  // Status/Classificação ficam em SOFT: dependem do analisador, que roda em background.
+  {
+    const saving = {
+      tipo_saving: 'pontual',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Assistente', horas_antes: 2, horas_depois: 0 }],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'criterio-claro-nao',
+      nome: tag('Nuvem de palavras do evento interno'),
+      tipos_projeto: ['saving'],
+      meta: {
+        ...metaPadrao,
+        ferramenta: 'Python',
+        descricao_breve: 'Script que gerou uma nuvem de palavras para o slide de encerramento do evento interno.',
+        // Contrafactual VAZIO de propósito: ninguém reclama, nada piora. É o sinal central
+        // do "claro não" — sobrescreve o padrão preenchido do metaPadrao.
+        contrafactual_afetados: '',
+        contrafactual_reclamacao: 'Nada piora. Foi usado uma vez, no slide final, e ninguém pediu de novo.',
+      },
+      doc: DOC_BASE('Nuvem de Palavras', {
+        oque: 'Gera uma imagem de nuvem de palavras a partir das respostas de um formulário.',
+        fluxo: 'Script Python lê o CSV exportado do formulário e salva um PNG.',
+        deps: 'Python, wordcloud, matplotlib.',
+        config: 'Rodar o script apontando para o CSV.',
+        atencao: 'Rodou uma única vez, para o evento de 2026.',
+      }),
+      briefing: `Projeto: nuvem de palavras para o slide de encerramento do evento interno.
+Rodou UMA ÚNICA VEZ, para aquele evento. NÃO é recorrente e não há previsão de rodar de novo.
+Alguém fazia antes? Alguém montaria a imagem à mão no PowerPoint: cerca de 2 horas, uma vez só (PONTUAL).
+NÃO move custo, NÃO move receita e NÃO move KPI de área nenhuma.
+Se desligar hoje, NINGUÉM reclama — ninguém depende disso, era um slide.
+Se o agente perguntar qual ponteiro moveu: nenhum, foi estético, para o slide.
+Se perguntar onde conferir: não há relatório nem painel onde isso apareça.
+Aprove o memorial assim que ele refletir isso, sem inventar impacto.`,
+      saving,
+      expected: {
+        hard: { 'Especial?': 'Não' },
+        soft: {
+          'Saving Horas': c.horas,
+          'Tipo de Saving': 'pontual',
+          // O desfecho do critério — conferido também pela leitura direta da planilha.
+          'Status': 'Reprovado',
+          'Classificação': '(claro_nao, com justificativa)',
+          'Motivo Reprovado': '(preenchido)',
+        },
       },
     });
   }

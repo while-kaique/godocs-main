@@ -30,16 +30,14 @@ auxiliares".
 `TAXONOMIA_DESTINO_GANHO` como fonte única dos 5 destinos + anti-loop determinístico no juiz do preview.
 **T7 fechado:** staging `edf400b4` validada ponta a ponta com o cenário-âncora (agente pergunta **1×**,
 "3 vagas não repostas / mesma entrega com time menor" **aceita de primeira**, sem reinterrogação no preview,
-seção gravada, coluna AK preenchida, 160h/R$2.230,40) → prod `674a3710` deployado → **PR #217** aberto
-(merge bloqueado pelo classificador de permissões).
+seção gravada, coluna AK preenchida, 160h/R$2.230,40) → prod `674a3710` deployado → **PR #217 mergeado**.
 ⚠️ Registrado na execução: o piso `respostaAlocacaoVaga` ainda marca como vaga a resposta que **mistura**
 destino válido com filler ("o time menor dá conta com essa otimização") — custo de **1 repergunta**, e
 alinhá-lo é **fatia própria** (fronteira deste plano).
 ⚠️ **Achado novo do T7 (fatia própria):** com contexto suficiente na doc, o agente **auto-preenche** a
 Seção 2.4 **sem perguntar** e **inventa** o destino ("menos prazo/menos retrabalho" que ninguém disse) — o
 atalho heurístico do gate libera porque a seção nomeia *algum* destino. Rede restante: validação humana.
-**Próximo:** **mergear os PRs #217 (código) e #218 (docs)** — o código já está em prod, o `main` é que está
-um passo atrás. Depois, escolher a próxima fatia: **A2** (gates ignoram materialidade) ou o **auto-preenchimento
+**Próximo:** escolher a próxima fatia: **A2** (gates ignoram materialidade) ou o **auto-preenchimento
 da Seção 2.4** achado no T7.
 
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
@@ -47,9 +45,9 @@ um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na bra
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
 `E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
 
-**Próximo:** **mergear os PRs #217 (fatia A1, código) e #218 (handoffs/planos, docs)** — staging e prod já
-deployados; o `main` é o único passo atrás. Depois, a próxima fatia da Fase 6: **A2** (gates ignoram
-materialidade — 0,05h/mês leva o gate das 220h) ou o **auto-preenchimento da Seção 2.4** achado no T7.
+**Próximo:** a próxima fatia da Fase 6 — **A2** (gates ignoram materialidade — 0,05h/mês leva o gate das
+220h) ou o **auto-preenchimento da Seção 2.4** achado no T7. Staging, prod e `main` estão sincronizados
+(PRs #217 e #218 mergeados).
 Em paralelo, humano: avisar o Rafa e
 calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
 causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do

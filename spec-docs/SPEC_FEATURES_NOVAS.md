@@ -530,6 +530,25 @@ contra a TeamGuide real no dev server. Deploy: regra 13 (staging `edf400b4` ante
 > `idealizador`/`referencia_tecnica` → "Contribuidor"); `linhasDoEvento` troca "Membros" por
 > "Participantes e papéis" quando há papéis (submissao e metadados). `worker.js` rebuildado.
 
+> 👤 **COAUTOR ÚNICO POR PROJETO (Luis, 2026-07-30):** cada projeto tem **1 autor** (o submissor/dono,
+> `responsavel_email`, que não escolhe papel) e **no máximo 1 Coautor** (`coexecutor`). Não é possível
+> marcar 2+ pessoas como Coautor; os demais participantes ficam como **Participante** ou
+> **Contribuidor** (esses seguem SEM limite). Implementação (só cliente — nenhuma mudança de schema,
+> sync ou colunas do Sheets; `derivarColunasPapeis` continua aceitando lista, para legados):
+> **(a)** helpers puros em `submeter/constants.ts` — `PAPEL_COAUTOR`, `coautoresSelecionados()` e
+> `limitarCoautorUnico()`; **(b)** `validarEtapa1` bloqueia o avanço da Etapa 1 com 2+ Coautores
+> (mensagem "Só é possível ter 1 Coautor por projeto…"), nos dois modos (submissão nova e edição);
+> **(c)** no seletor (`ParticipantesPapeisInput`), a opção **Coautor** SAI da lista dos demais
+> quando alguém já é Coautor (`papeisDisponiveis(email)` — nada de opção morta/desabilitada na tela;
+> decisão do Luis, 30/07/2026); quem É o Coautor mantém a opção, para exibir o papel atual e poder
+> trocar; **(d)** nota informativa (ícone + texto, nunca só cor) — é ela que EXPLICA a ausência
+> abaixo da lista e "Apenas 1 por projeto" na descrição do papel na `LegendaPapeis`.
+> ⚠️ **Legado/edição:** um projeto antigo (ou legado importado do Sheets, onde a coluna
+> "Participantes" pode ter vários e-mails) traria vários Coautores no seed — `applySeed`
+> (`submeter.tsx`) aplica `limitarCoautorUnico`, **mantendo o primeiro** e **limpando o papel dos
+> demais** (não promove ninguém por conta própria); a validação então exige que o usuário
+> reclassifique. Testes: `tests/validacao-etapa1.test.ts`.
+
 **Decisões fechadas (com o Luis).**
 - **4 papéis**, um por pessoa (seletor por participante): `coexecutor · planejador · idealizador
   · referencia_tecnica`. O **autor/submissor NÃO** se classifica — é o dono (`responsavel_email`),
@@ -745,3 +764,20 @@ idempotência em `handleIniciarAgente`/`handleEnviarEspecial`), `src/lib/submete
 
 **Status.** ✅ Implementado; **576 testes verdes** + `build`/`build:worker` OK. ⏳ Pendente:
 validar na **staging** (`edf400b4`) e deployar em **produção** (`674a3710`).
+
+## Feature adicional — Critério de projeto: classificação da avaliação + reprovação com motivo · jul/2026
+
+**Spec própria (completa):** [`SPEC_CRITERIOS_PROJETO.md`](SPEC_CRITERIOS_PROJETO.md) · régua para a gestão
+em [`docs/criterios-projeto-recorrencia-evidencia.md`](../docs/criterios-projeto-recorrencia-evidencia.md) ·
+plano em [`docs/plans/criterios-projeto-classificacao.md`](../docs/plans/criterios-projeto-classificacao.md).
+
+Resumo: o analisador passou a julgar **elegibilidade** ("isto é projeto?") além da qualidade, pela régua de
+**recorrência · contrafactual · rastreabilidade** (pedido do Rafa, caso da nuvem de palavras). A Etapa 2
+ganhou 2 perguntas determinísticas (**ponteiro movido** + **onde verificar** + **contrafactual**), o
+memorial ganhou a seção obrigatória **"Processo alterado"** (que o agente NÃO pergunta quando a doc já traz
+a magnitude) e a planilha ganhou 3 colunas (`Classificação` sempre preenchida · `Motivo Reprovado` ·
+`Motivo Reenvio`, esta **só humana**). `claro_nao` → status **`Reprovado`** (única exceção à regra
+TEMPORÁRIA do "Pendente"), com motivo que **o autor vê**. Invariantes na função pura
+`normalizarClassificacao`: nunca reprova sem motivo · especial nunca reprova automático · materialidade
+> R$ 5k/mês vira decisão humana · justificativa nunca vazia. **Barrar submissão continua FORA** — a
+reprovação é pós-envio e a triagem humana sobrepõe tudo.

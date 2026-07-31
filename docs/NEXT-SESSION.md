@@ -9,8 +9,8 @@ sincronizado**. A1 está **completa** (T1–T7) e **em produção**; os 2 PRs pe
 (**#217** código, **#218** docs) e o `gh pr merge` foi **bloqueado pelo classificador de permissões**.
 Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 
-> **▶ PRÓXIMO PASSO:** **mergear os PRs #217 e #218** (o código já está em prod; só o `main` está atrás) e
-> **escolher a próxima fatia** — candidatas, nenhuma planejada: **(a) A2** — os gates ignoram materialidade
+> **▶ PRÓXIMO PASSO:** **escolher a próxima fatia** (PRs #217 e #218 mergeados — staging, prod e `main`
+> sincronizados) — candidatas, nenhuma planejada: **(a) A2** — os gates ignoram materialidade
 > (`aplicaConfirmacaoBaseHoras`/`aplicaSplitCargaEscala` disparam com qualquer `horas_antes > 0`, então
 > 0,05h/mês leva o gate das 220h); **(b) auto-preenchimento da Seção 2.4** — achado novo do T7: com contexto
 > suficiente na doc o agente escreve o destino do ganho **sem perguntar** e **inventa** ("menos prazo / menos
@@ -42,8 +42,8 @@ Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 4. **Prod `674a3710` deployado** depois da staging (regra 13); os dois ambientes servem o mesmo entry
    `index-CzawDJZX.js`, conferido via `GET /` com cookie.
 5. **Repo sincronizado:** `fix/gate-alocacao-taxonomia-e-materialidade` e
-   `docs/plano-loadings-dashboard-admin` empurradas; PRs **#217** e **#218** abertos. **O merge foi bloqueado
-   pelo classificador de permissões** (`gh pr merge` e até `gh pr list --json` recusados) — pendente do operador.
+   `docs/plano-loadings-dashboard-admin` empurradas; PRs **#217** e **#218** abertos e **mergeados** (o `gh pr merge` foi barrado pelo classificador na 1ª
+   tentativa e liberado pelo operador; a #218 exigiu resolver conflito de docs contra o `main` do #216).
 
 **Armadilhas encontradas (para não repetir):**
 - ⚠️ **`E2E_COOKIE` expirado dá 302 em staging E prod** e o harness morre no 1º POST com "sessão não

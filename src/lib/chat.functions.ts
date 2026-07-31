@@ -37,6 +37,9 @@ import {
   aplicaConfirmacaoBaseHoras,
   aplicaGateAlocacaoGanhos,
   respostaAlocacaoVaga,
+  TAXONOMIA_DESTINO_GANHO,
+  secaoProcessoVaga,
+  secaoPonteiroVaga,
   resolverSplitCargaEscala,
   totalEconomiaHoras,
   unidadeHorasDe,
@@ -44,7 +47,10 @@ import {
 } from "@/lib/agents/orchestrator";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
 import { validarDocumentacao } from "@/lib/agents/validator";
-import { analisarProjeto as analisarProjetoAgent } from "@/lib/agents/analyzer";
+import {
+  analisarProjeto as analisarProjetoAgent,
+  decidirStatusSubmissao,
+} from "@/lib/agents/analyzer";
 import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-agent";
 import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
@@ -74,8 +80,15 @@ import {
   normalizarMarcadoresMemorial,
   extrairAlocacaoGanhos,
   extrairJustificativaCargaEscala,
+  extrairProcessoAlterado,
+  extrairPonteiroMovido,
 } from "@/lib/agents/memorial-format";
-import { syncSubmitToGoogle, syncUpdateToGoogle, nowFortaleza } from "@/lib/google/sync";
+import {
+  syncSubmitToGoogle,
+  syncUpdateToGoogle,
+  nowFortaleza,
+  derivarClassificacaoSheet,
+} from "@/lib/google/sync";
 import { readAllRows, updateRowByProjectId } from "@/lib/google/sheets";
 import { upsertResumoDoc } from "@/lib/google/drive";
 import { renderResumoDocumentacao } from "@/lib/agents/doc-render";
@@ -216,6 +229,14 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     tipo_projeto: (data.tipo_projeto as "saving" | "receita_incremental" | null) ?? null,
     tipos_projeto: tiposProjeto,
     escopo: (data.escopo as "interno" | "externo" | null) ?? null,
+    servico_externo: data.servico_externo ?? null,
+    // ⚠️ Respostas do formulário que o agente PRECISA ver (renderizadas por
+    // buildRespostasFormulario). O contrafactual é o insumo do ponto [1.4] do memorial:
+    // sem ele o agente pergunta o ponteiro do zero, ignorando o que a pessoa já
+    // respondeu na Etapa 2. Campo novo no formulário → nomeie AQUI também.
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
+    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
+    usa_ai_proxy: data.usa_ai_proxy ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
     // a passo de uma rotina inexistente).
@@ -455,6 +476,11 @@ const iniciarSubmissaoSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
+  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
+  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  contrafactual_afetados: z.string().max(1200).optional(),
+  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
@@ -605,6 +631,8 @@ export async function iniciarSubmissao(rawData: unknown) {
       tipos_projeto: data.especial ? ["especial"] : (data.tipos_projeto ?? null),
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
+      contrafactual_afetados: data.contrafactual_afetados ?? null,
+      contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: "rascunho",
@@ -634,6 +662,8 @@ export async function iniciarSubmissao(rawData: unknown) {
       : (data.tipos_projeto ?? (data.tipo_projeto ? [data.tipo_projeto] : [])),
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
+    contrafactual_afetados: data.contrafactual_afetados ?? null,
+    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
     arquivos: data.docs.map((d) => d.filename),
@@ -890,23 +920,79 @@ function nudgeTetoPessoa(cap: number): string {
 // prompt manda RECUSAR. Então o backend GARANTE a pergunta antes do preview (a menos que
 // o LLM já tenha escrito uma Seção 2.4 concreta) e injeta a resposta do usuário como base
 // da seção. Como no split, a INFORMAÇÃO é sempre coletada, independente do LLM.
-function perguntaAlocacaoGanhos(total: number, unidade: string): string {
-  return `Antes de eu fechar: **${total}${unidade}** é bastante tempo humano liberado — e um ganho desse tamanho só se sustenta se esse tempo virou outra coisa. **Pra onde foi esse tempo?** Me diga, com NOME, as atividades concretas que o time passou a fazer (ou fazer mais) com essas horas — e, se der, o quanto isso rende a mais (ex.: "foi para hunting e entrevistas — hoje fazemos 2 a 3 entrevistas a mais por dia"). ⚠️ "Foi realocado para outras atividades" não conta: preciso saber QUAIS.`;
+// ⚠️ Os 3 textos abaixo consomem TAXONOMIA_DESTINO_GANHO (orchestrator.ts) — a régua NÃO
+// se redigita aqui. Antes, cada um repetia o par "atividades NOMEADAS **E** o que o time
+// entrega A MAIS", que recusava a resposta certa quando o ganho é MENOS CUSTO (equipe
+// menor / vaga não reposta / contrato cancelado). Exportados para o teste da fonte única.
+export function perguntaAlocacaoGanhos(total: number, unidade: string): string {
+  return `Antes de eu fechar: **${total}${unidade}** é bastante tempo humano liberado — e um ganho desse tamanho só se sustenta se esse tempo virou outra coisa. **Pra onde foi esse tempo?** Me diga o destino CONCRETO, com nome. Qualquer um destes serve — inclusive equipe menor, que já é ganho por si só:
+
+${TAXONOMIA_DESTINO_GANHO}`;
 }
 // Reperguntada FIRME quando a 1ª resposta veio vaga (respostaAlocacaoVaga). Roda 1x só
 // (anti-loop): a próxima resposta é aceita como está, e a rede de segurança do preview
 // (LLM-juiz) + a validação humana seguem como backstops.
-function perguntaAlocacaoGanhosFirme(total: number, unidade: string): string {
-  return `Ainda preciso do destino CONCRETO dessas ${total}${unidade} — "outras atividades / mais produtividade / sobra tempo" não me diz nada, porque toda hora liberada vai para *alguma* coisa. Me dê o NOME das atividades para onde o tempo foi (ex.: "atender mais clientes", "análise de crédito", "hunting e entrevistas", "fechamento contábil") e, se possível, o que o time entrega A MAIS hoje por causa disso — de preferência com um número.`;
+export function perguntaAlocacaoGanhosFirme(total: number, unidade: string): string {
+  return `Ainda preciso do destino CONCRETO dessas ${total}${unidade} — "outras atividades / mais produtividade / sobra tempo" não me diz nada, porque toda hora liberada vai para *alguma* coisa. Me diga em qual destes destinos o ganho se encaixa e qual foi ele, com nome:
+
+${TAXONOMIA_DESTINO_GANHO}`;
 }
 // Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever a seção "### O que mudou
 // após a automação" a partir do que a PESSOA disse (não boilerplate). Espelha nudgeCargaEscala.
-function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): string {
+export function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): string {
   const base = racional?.trim()
     ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
     : "";
   return `[SISTEMA] O usuário informou PRA ONDE foi o tempo liberado dessas ${total}${unidade} economizadas.${base}
-Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva, no padrão "atividades NOMEADAS + o que o time entrega A MAIS (com número quando houver)": (a) as atividades concretas para onde o tempo foi (nunca "outras atividades") e (b) o que passou a ser entregue a mais agora, concluindo que o ganho é válido por causa dessa mudança. Se o usuário deu um número (ex.: "2-3 entrevistas a mais/dia"), inclua-o. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
+Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva o destino CONCRETO que o usuário deu (nunca "outras atividades"), deixando claro em qual dos destinos abaixo ele se encaixa, e conclua que o ganho é válido por causa dessa mudança. Se o usuário deu um número, inclua-o; se o destino é **menos custo** (equipe menor, vaga não reposta, contrato cancelado), registre assim mesmo — a entrega fica IGUAL e está correto. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.
+
+${TAXONOMIA_DESTINO_GANHO}`;
+}
+
+// ─── Gate determinístico 5: CRITÉRIO DE PROJETO (seções [1.3] e [1.4]) ───────
+// "Processo alterado" e "Ponteiro movido e onde verificar" são OBRIGATÓRIAS nos 3 modos do
+// MEMORIAL_ESQUELETO — são a RASTREABILIDADE da régua de critério (SPEC_CRITERIOS_PROJETO).
+// O prompt sozinho não segurou (validação em staging 29/07/2026: o `receita-pura` fechou sem
+// a [1.3] nas 2 rodadas; o `custo-evitado-puro` gravou só a metade da [1.4] nas 2), e a falha
+// é SILENCIOSA — o analisador lê a ausência como rastreabilidade não comprovada e o autor cai
+// em triagem manual injusta. Então o backend confere as seções antes do preview e, se faltar,
+// pergunta UMA vez (anti-loop: a resposta seguinte é sempre aceita e vira nudge [SISTEMA]).
+function perguntaCriterioSecoes(faltaProcesso: boolean, faltaPonteiro: boolean): string {
+  const pedidos: string[] = [];
+  if (faltaProcesso) {
+    pedidos.push(
+      "**(a) que processo mudou e o quanto** — qual rotina era feita antes, como ela é hoje e o tamanho disso (volume, frequência, tempo);",
+    );
+  }
+  if (faltaPonteiro) {
+    pedidos.push(
+      "**(b) qual ponteiro isso moveu e onde dá pra conferir** — custo, receita ou um KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e em qual relatório, painel, sistema ou base (com NOME) alguém abriria pra ver esse número.",
+    );
+  }
+  return `Antes de eu fechar o memorial, falta o essencial da régua de projeto:\n\n${pedidos.join(
+    "\n",
+  )}\n\nSe você não souber onde esse número pode ser conferido, tudo bem — me diga isso mesmo, que eu registro a ausência em vez de inventar uma fonte.`;
+}
+// Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever as seções faltantes a
+// partir do que a PESSOA disse (e do que a doc já traz), com os cabeçalhos EXATOS.
+function nudgeCriterioSecoes(
+  faltaProcesso: boolean,
+  faltaPonteiro: boolean,
+  racional: string,
+): string {
+  const secoes = [
+    faltaProcesso
+      ? '"### Processo alterado" (qual rotina mudou, como era ANTES, como é AGORA e a MAGNITUDE — volume/frequência/tempo, sem R$)'
+      : "",
+    faltaPonteiro
+      ? '"### Ponteiro movido e onde verificar" (QUAL ponteiro — custo · receita · KPI da área — e ONDE alguém confere esse número, com o relatório/painel/sistema/base NOMEADO; se o usuário não souber, registre a ausência explicitamente, sem inventar fonte)'
+      : "",
+  ].filter(Boolean);
+  const base = racional.trim()
+    ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
+    : "";
+  return `[SISTEMA] O usuário respondeu sobre o critério de projeto (processo alterado / ponteiro movido).${base}
+Escreva agora, no memorial, a(s) seção(ões) com o cabeçalho EXATO: ${secoes.join(" e ")}. Use também o que a documentação técnica já aprovada traz. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
 }
 
 // Mensagem do BACKSTOP de reclassificação (gate determinístico do item 3): quando a receita
@@ -1036,6 +1122,21 @@ export async function enviarMensagem(rawData: unknown) {
   const gateBaseHoras = estado.fase === "saving" && aplicaConfirmacaoBaseHoras(ctx, estado.saving);
   // Gate da alocação de ganhos (Seção 2.4): só saving mensal alto (≥44h) + alguém fazia à mão.
   const gateAlocacao = estado.fase === "saving" && aplicaGateAlocacaoGanhos(ctx, estado.saving);
+  // Gate do CRITÉRIO DE PROJETO (seções [1.3]/[1.4]): vale nas DUAS famílias de fase
+  // financeira (saving — incluindo custo evitado puro — e receita), porque as duas seções
+  // são obrigatórias nos 3 modos do MEMORIAL_ESQUELETO.
+  const faseCriterio: "saving" | "receita" | null =
+    estado.fase === "saving" || estado.fase === "saving_preview"
+      ? "saving"
+      : estado.fase === "receita" || estado.fase === "receita_preview"
+        ? "receita"
+        : null;
+  const criterioAtual =
+    faseCriterio === "saving"
+      ? (estado.saving.criterio_secoes ?? null)
+      : faseCriterio === "receita"
+        ? (estado.receita.criterio_secoes ?? null)
+        : null;
   let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
@@ -1121,8 +1222,11 @@ export async function enviarMensagem(rawData: unknown) {
     }
   } else if (gateAlocacao && estado.saving.alocacao_ganhos === "reperguntado") {
     // (4b) Segunda resposta após a reperguntada firme. ANTI-LOOP: aceita o que vier (mesmo
-    // ainda vago) — não repergunta uma 3ª vez. O nudge injeta o melhor racional disponível;
-    // a rede de segurança do preview (LLM-juiz) + a validação humana cobrem o resto.
+    // ainda vago) — não repergunta uma 3ª vez. O nudge injeta o melhor racional disponível.
+    // ⚠️ A partir daqui a rede restante é a VALIDAÇÃO HUMANA: o LLM-juiz do preview NÃO
+    // interroga mais este ponto — `buildSavingPreviewPrompt` suprime o bloco de economia
+    // alta quando `alocacao_ganhos` é 'ok'/'reperguntado' (anti-loop determinístico), porque
+    // reinterrogar o que o gate já coletou era a origem das perguntas pós-preview.
     const total = totalEconomiaHoras(estado.saving);
     const unidade = unidadeHorasDe(estado.saving.tipo_saving);
     const racional = (data.content ?? "").trim();
@@ -1138,6 +1242,35 @@ export async function enviarMensagem(rawData: unknown) {
         total,
         unidade,
         racional || (estado.saving.alocacao_ganhos_racional as string) || "",
+      ),
+    });
+  } else if (faseCriterio && criterioAtual === "pendente") {
+    // (5) Turno de RESPOSTA ao gate do critério de projeto ([1.3]/[1.4]). ANTI-LOOP: aceita
+    // o que vier — inclusive "não sei onde conferir", que é resposta legítima (vira zona
+    // cinzenta no analisador, nunca reprovação automática). Marca 'ok' e injeta o nudge
+    // [SISTEMA] com o texto do usuário para o LLM escrever as seções faltantes.
+    const memorialAtual =
+      faseCriterio === "saving"
+        ? estado.saving.memorial_calculo
+        : estado.receita.memorial_calculo;
+    const normalizado = normalizarMarcadoresMemorial(memorialAtual);
+    const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
+    const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
+    const racional = (data.content ?? "").trim();
+    log("enviarMensagem", `Critério de projeto (${faseCriterio}): resposta recebida — registrando`);
+    if (faseCriterio === "saving") {
+      estado.saving = { ...estado.saving, criterio_secoes: "ok" };
+    } else {
+      estado.receita = { ...estado.receita, criterio_secoes: "ok" };
+    }
+    history.push({
+      role: "user",
+      // Se, por algum motivo, as duas seções já estiverem presentes, pedimos as duas mesmo
+      // assim seria ruído — nesse caso o nudge cobre o [1.4], que é o ponto mais frágil.
+      content: nudgeCriterioSecoes(
+        faltaProcesso,
+        faltaPonteiro || !faltaProcesso,
+        racional,
       ),
     });
   }
@@ -1177,6 +1310,17 @@ export async function enviarMensagem(rawData: unknown) {
         (resultado.saving.alocacao_ganhos_racional as string | null | undefined) ??
         estado.saving.alocacao_ganhos_racional ??
         null,
+      // Gate do critério de projeto ([1.3]/[1.4]): backend-only, nunca ecoado pelo LLM.
+      criterio_secoes: estado.saving.criterio_secoes ?? null,
+    };
+  }
+  // Mesmo re-merge no lado da RECEITA — sem isto o 'ok' do gate do critério se perderia a
+  // cada turno (o LLM não ecoa o campo) e a pergunta voltaria: o loop que a lição do split
+  // carga×escala mandou nunca repetir.
+  if (resultado.receita) {
+    resultado.receita = {
+      ...resultado.receita,
+      criterio_secoes: estado.receita.criterio_secoes ?? null,
     };
   }
 
@@ -1405,6 +1549,49 @@ export async function enviarMensagem(rawData: unknown) {
         content: perguntaAlocacaoGanhos(total, unidadeHorasDe(savingAtual.tipo_saving)),
         fase: "saving",
         saving: { ...savingAtual, alocacao_ganhos: "pendente" },
+      });
+      delete (resultado as { options?: unknown }).options;
+    }
+  }
+
+  // ── GATE CRITÉRIO DE PROJETO ([1.3]/[1.4]) — força a pergunta antes do preview ──
+  // Roda por ÚLTIMO, depois de todos os gates de saving, e só quando o resultado AINDA é
+  // preview/complete (um gate por turno). Vale para saving (inclusive custo evitado puro) e
+  // para receita. Se as duas seções já estão escritas e com substância, libera direto
+  // (marca 'ok'); senão bloqueia e pergunta UMA vez só (anti-loop) — na volta, o turno de
+  // resposta acima marca 'ok' aconteça o que acontecer.
+  if (
+    faseCriterio &&
+    criterioAtual !== "ok" &&
+    (resultado.type === "preview" || resultado.type === "complete")
+  ) {
+    const alvo = (
+      faseCriterio === "saving"
+        ? (resultado.saving ?? estado.saving)
+        : (resultado.receita ?? estado.receita)
+    ) as { memorial_calculo?: string | null };
+    const normalizado = normalizarMarcadoresMemorial(alvo.memorial_calculo);
+    const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
+    const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
+    if (!faltaProcesso && !faltaPonteiro) {
+      log("enviarMensagem", `Critério de projeto (${faseCriterio}): seções [1.3]/[1.4] presentes — liberado`);
+      if (faseCriterio === "saving" && resultado.saving) {
+        resultado.saving = { ...resultado.saving, criterio_secoes: "ok" };
+      } else if (faseCriterio === "receita" && resultado.receita) {
+        resultado.receita = { ...resultado.receita, criterio_secoes: "ok" };
+      }
+    } else {
+      log(
+        "enviarMensagem",
+        `⛔ Preview de ${faseCriterio} sem as seções do critério (processo: ${faltaProcesso ? "faltando" : "ok"}, ponteiro: ${faltaPonteiro ? "faltando" : "ok"}) — forçando pergunta`,
+      );
+      Object.assign(resultado, {
+        type: "question",
+        content: perguntaCriterioSecoes(faltaProcesso, faltaPonteiro),
+        fase: faseCriterio,
+        ...(faseCriterio === "saving"
+          ? { saving: { ...(resultado.saving ?? estado.saving), criterio_secoes: "pendente" } }
+          : { receita: { ...(resultado.receita ?? estado.receita), criterio_secoes: "pendente" } }),
       });
       delete (resultado as { options?: unknown }).options;
     }
@@ -1838,6 +2025,11 @@ const atualizarMetadadosSchema = z.object({
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
+  // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
+  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
+  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  contrafactual_afetados: z.string().max(1200).optional(),
+  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -1871,6 +2063,10 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
+  if (data.contrafactual_afetados !== undefined)
+    campos.contrafactual_afetados = data.contrafactual_afetados;
+  if (data.contrafactual_reclamacao !== undefined)
+    campos.contrafactual_reclamacao = data.contrafactual_reclamacao;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
@@ -1894,6 +2090,8 @@ export async function atualizarMetadados(rawData: unknown) {
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
+        contrafactual_afetados: data.contrafactual_afetados ?? null,
+        contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
@@ -2076,11 +2274,26 @@ export async function analisarProjetoFn(rawData: unknown) {
     conteudo.saving as Record<string, unknown> | undefined,
     conteudo.receita as Record<string, unknown> | undefined,
   );
-  const statusFinal = ehEspecial
-    ? "em_validacao" // especial nunca auto-aprova/reprova — validação humana
-    : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
-      ? "em_validacao"
-      : statusVeredito;
+  // Régua de CRITÉRIO DE PROJETO ("isto é projeto?") — independente da pontuação.
+  // `claro_nao` VENCE o veredito (reprova); `zona_cinzenta` manda para validação
+  // humana; `claro_sim` deixa o fluxo atual decidir. As invariantes (nunca reprova sem
+  // motivo, especial nunca reprova, materialidade alta → humana) já foram aplicadas por
+  // normalizarClassificacao dentro do analisador.
+  const classificacao = resultado.classificacao_avaliacao ?? null;
+  const { status: statusFinal, statusSheet } = decidirStatusSubmissao({
+    classificacao,
+    ehEspecial,
+    materialidade: materialidadeProjeto,
+    vereditoAprovado: resultado.resultado === "aprovado",
+    tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
+  });
+  const reprovadoPorCriterio = statusSheet === "Reprovado";
+  if (reprovadoPorCriterio) {
+    log(
+      "analisarProjeto",
+      `Classificação 'claro_nao' → status rejeitado/Reprovado (analisador havia retornado '${statusVeredito}')`,
+    );
+  }
   if (!ehEspecial && materialidadeProjeto > TETO_MATERIALIDADE_ANALISE) {
     log(
       `Materialidade R$ ${Math.round(materialidadeProjeto)}/mês > R$ ${TETO_MATERIALIDADE_ANALISE} → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`,
@@ -2091,6 +2304,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     complexidade: resultado.complexidade,
     observacoes,
     status: statusFinal,
+    // Espelho da classificação de elegibilidade (padrão complexidade/observacoes): serve
+    // ao resync, à reconciliação e à ficha do /dashboard. `motivo_reprovacao` volta a
+    // null quando o reenvio deixa de ser reprovado.
+    classificacao_avaliacao: resultado.classificacao_avaliacao ?? null,
+    classificacao_justificativa: resultado.classificacao_justificativa ?? null,
+    motivo_reprovacao: resultado.motivo_reprovacao ?? null,
     // Especial não é "validado" pelo analisador — quem valida é o humano; não carimba validated_at.
     ...(ehEspecial ? {} : { validated_at: new Date().toISOString() }),
   });
@@ -2107,13 +2326,12 @@ export async function analisarProjetoFn(rawData: unknown) {
     // pelo analisador também vão como "Pendente" na planilha — a aprovação
     // automática não é refletida no Sheets. O status interno (SQLite/dashboard)
     // continua correto. Reverter para 'Aprovado' quando a validação terminar.
-    const statusLabel = ehEspecial
-      ? "Pendente" // especial → sempre validação humana
-      : resultado.resultado === "aprovado"
-        ? "Pendente"
-        : materialidadeProjeto > TETO_MATERIALIDADE_ANALISE
-          ? "Pendente"
-          : "Reenvio Pendente";
+    // ⚠️ ÚNICA EXCEÇÃO à regra TEMPORÁRIA (decisão D1, 29/07/2026): classificação
+    // 'claro_nao' grava "Reprovado" — reprovar por não ser projeto é informação que
+    // precisa chegar ao autor. Todo o resto continua "Pendente".
+    // O rótulo vem da MESMA função pura que decidiu o status interno (não duplicar a
+    // precedência aqui — foi assim que os dois já divergiram no passado).
+    const statusLabel = statusSheet;
 
     // AGUARDADO (não fire-and-forget): assim o sync da Complexidade/Observações faz
     // parte da promise da análise. Evita o FAF aninhado que o runtime cancelava,
@@ -2126,10 +2344,65 @@ export async function analisarProjetoFn(rawData: unknown) {
       complexidade: resultado.complexidade,
       observacoes: observacoes ?? "",
       status: statusLabel,
+      // Colunas "Classificação" (sempre com texto) e "Motivo Reprovado". A
+      // "Motivo Reenvio" é MANUAL — o sistema nunca a escreve.
+      classificacao: resultado.classificacao_avaliacao ?? null,
+      classificacaoJustificativa: resultado.classificacao_justificativa ?? null,
+      motivoReprovacao: resultado.motivo_reprovacao ?? null,
     });
   }
 
   return resultado;
+}
+
+/**
+ * Decide o que a reconciliação deve fazer com UM projeto, a partir do que está na
+ * planilha e do que o SQLite tem para oferecer. Pura de propósito: é o invariante de
+ * CONVERGÊNCIA do cron e precisa ser testável sem banco nem Sheets.
+ *
+ * ⚠️ REGRESSÃO REAL (30/07/2026) que este desenho impede — não reintroduzir:
+ * quando a coluna "Classificação" entrou, o critério de "já está pronto" passou a ser
+ * `Complexidade preenchida E Classificação preenchida`. Só que um projeto ANTIGO tem
+ * Complexidade na planilha, Classificação vazia (coluna nova) e NADA de classificação
+ * no SQLite — logo o cron o reprocessava, escrevia só a Complexidade (que já estava
+ * lá), a Classificação continuava vazia e ele voltava no minuto seguinte. Para sempre.
+ * Medido na staging: 109 projetos × ~1 leitura de cabeçalho por minuto contra a cota de
+ * 60 leituras/min do Sheets → cota permanentemente estourada, appends de submissões
+ * novas falhando com 429 e projeto purgado do SQLite após a carência de 1h.
+ *
+ * A regra que corrige: só age quando existe algo REALMENTE gravável (coluna vazia na
+ * planilha E dado correspondente no SQLite) ou quando cabe uma re-análise (o SQLite não
+ * tem nem complexidade nem classificação). Nada a fazer → `'nada'`, e o projeto NÃO
+ * conta como pendente.
+ */
+export function decidirReconciliacaoPlanilha(args: {
+  /** Célula "Complexidade" da planilha (`undefined` = projeto não está na planilha). */
+  comp: string | undefined
+  /** Célula "Classificação" da planilha. */
+  classif: string | undefined
+  /** `projetos.complexidade` no SQLite. */
+  compSqlite: string
+  /** `projetos.classificacao_avaliacao` no SQLite. */
+  classifSqlite: string
+}): { acao: 'nada' | 'resync' | 'reanalisar'; colunas: Array<'complexidade' | 'classificacao'> } {
+  const { comp, classif, compSqlite, classifSqlite } = args
+  const nada = { acao: 'nada' as const, colunas: [] }
+  // Fora da planilha: a reconciliação não inventa linha (quem faz append é a IDA).
+  if (comp === undefined) return nada
+  const vazio = (v: string | undefined) => v === undefined || v === '' || v === '—'
+
+  const colunas: Array<'complexidade' | 'classificacao'> = []
+  if (vazio(comp) && compSqlite) colunas.push('complexidade')
+  if (vazio(classif) && classifSqlite) colunas.push('classificacao')
+  if (colunas.length) return { acao: 'resync', colunas }
+
+  // Sem nada para repor: só vale re-analisar se o SQLite está vazio nas DUAS pontas e
+  // ao menos uma das colunas da planilha está esperando dado.
+  const faltaNaPlanilha = vazio(comp) || vazio(classif)
+  if (faltaNaPlanilha && !compSqlite && !classifSqlite) {
+    return { acao: 'reanalisar', colunas: [] }
+  }
+  return nada
 }
 
 // ─── Reconciliação de Complexidade/Observações (rede de segurança) ───────────
@@ -2142,14 +2415,24 @@ export async function analisarProjetoFn(rawData: unknown) {
 //    notificar o Google Chat (update direto, evita spam);
 //  - se o SQLite também não tem → re-roda o analisador (que analisa + sincroniza).
 // Idempotente: rodar repetidamente é seguro. Legados sem `submitted_at` são pulados.
+//
+// ⚠️ A decisão de O QUE fazer com cada projeto é a função PURA
+// `decidirReconciliacaoPlanilha` — leia o comentário dela antes de mexer: é ali que
+// mora a garantia de que o cron CONVERGE (não repete o mesmo projeto para sempre).
 export async function reconciliarComplexidade(maxReanalises = 15) {
   // Mapa id→Complexidade da planilha (1 leitura). Só os SUBMETIDOS no SQLite são
   // candidatos (evita varrer ~270 legados sem submissão).
   const rows = await readAllRows();
   const compNaPlanilha = new Map<string, string>();
+  // "Classificação" tem a MESMA fragilidade da Complexidade (a análise em background
+  // pode ser cancelada antes do sync) — a mesma rede de segurança vale para ela.
+  const classifNaPlanilha = new Map<string, string>();
   for (const r of rows) {
     const id = (r["ID Projeto"] ?? "").toString().trim().toLowerCase();
-    if (id) compNaPlanilha.set(id, (r["Complexidade"] ?? "").toString().trim());
+    if (id) {
+      compNaPlanilha.set(id, (r["Complexidade"] ?? "").toString().trim());
+      classifNaPlanilha.set(id, (r["Classificação"] ?? "").toString().trim());
+    }
   }
 
   const submetidos = await getProjetosSubmetidos();
@@ -2158,19 +2441,41 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
   let faltando = 0;
 
   for (const p of submetidos) {
-    const comp = compNaPlanilha.get(String(p.id).trim().toLowerCase());
-    // Pula quem já tem complexidade não-vazia na planilha (ou nem está nela).
-    if (comp === undefined || (comp !== "" && comp !== "—")) continue;
+    const chave = String(p.id).trim().toLowerCase();
+    const compSqlite = (p.complexidade ?? "").toString().trim();
+    const classifSqlite = (p.classificacao_avaliacao ?? "").toString().trim();
+    // A decisão (e a garantia de convergência) mora na função pura — ver o comentário
+    // dela: reprocessar quem não tem nada a receber foi o loop que estourou a cota.
+    const { acao, colunas } = decidirReconciliacaoPlanilha({
+      comp: compNaPlanilha.get(chave),
+      classif: classifNaPlanilha.get(chave),
+      compSqlite,
+      classifSqlite,
+    });
+    if (acao === "nada") continue;
     faltando++;
 
-    const compSqlite = (p.complexidade ?? "").toString().trim();
     try {
-      if (compSqlite) {
-        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat).
-        await updateRowByProjectId(p.id, {
-          Complexidade: p.complexidade as string,
-          Observações: (p.observacoes as string | null)?.trim() ? (p.observacoes as string) : "—",
-        });
+      if (acao === "resync") {
+        // Só faltou o sync para o Sheets: repõe direto (SEM notificar o Chat). Escreve
+        // APENAS as colunas que estão vazias na planilha e têm dado no SQLite.
+        const celulas: Record<string, string> = {};
+        if (colunas.includes("complexidade")) {
+          celulas.Complexidade = compSqlite;
+          celulas.Observações = (p.observacoes as string | null)?.trim()
+            ? (p.observacoes as string)
+            : "—";
+        }
+        if (colunas.includes("classificacao")) {
+          celulas["Classificação"] = derivarClassificacaoSheet(
+            classifSqlite,
+            p.classificacao_justificativa as string | null,
+          );
+          celulas["Motivo Reprovado"] = (p.motivo_reprovacao as string | null)?.trim()
+            ? (p.motivo_reprovacao as string)
+            : "—";
+        }
+        await updateRowByProjectId(p.id, celulas);
         ressincronizados++;
       } else if (reanalisados < maxReanalises) {
         // Análise nunca concluiu: re-roda (analisa + sincroniza, aguardado).

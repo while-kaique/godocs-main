@@ -97,6 +97,12 @@ Entidade principal. Uma linha por projeto submetido.
 | alguem_fazia | TEXT | sim/não — tinha processo manual antes? |
 | complexidade | TEXT | automacao/inteligencia/autonomia |
 | observacoes | TEXT | Parecer da análise (staff-only) |
+| ponteiro_movido | TEXT | Critério de projeto (Etapa 2): lista `;` de `custo`/`receita`/`kpi`/`nenhum` |
+| ponteiro_evidencia | TEXT | Onde o ganho é verificável (rastreabilidade) |
+| contrafactual_reclamacao | TEXT | "Se desligar hoje, quem reclama e o que piora" |
+| classificacao_avaliacao | TEXT | Elegibilidade do analisador: `claro_sim`/`claro_nao`/`zona_cinzenta` |
+| classificacao_justificativa | TEXT | Porquê da classificação (SEMPRE preenchida) |
+| motivo_reprovacao | TEXT | Motivo legível ao autor — só em `claro_nao` |
 | submitted_at, validated_at | TEXT | |
 | validated_by | TEXT | Email do admin |
 | created_at, updated_at | TEXT | |
@@ -172,6 +178,7 @@ Config dinâmica (chave-valor).
 - **`leader_areas`**: user_id FK CASCADE, area_id FK CASCADE — N:N líder↔área
 - **`api_logs`**: id, projeto_id FK CASCADE, endpoint, method, duration_ms, status_code, error, request_size, response_size, request_body, response_body, created_at — métricas para o Investigador; limpeza >30 dias no cron
 - **`projeto_versions`**: id, projeto_id FK CASCADE, versao_num, acao (`submit_inicial` | `reenvio`), snapshot_projeto (JSON), snapshot_doc (JSON), **snapshot_chat** (JSON — conversa congelada da versão; NULL em versões antigas), submetido_por, created_at — UNIQUE(projeto_id, versao_num). Snapshot imutável a cada submissão/reenvio (sistema de versionamento). Alimenta a aba "Edições" e a visão da submissão original no Investigador (os `chat_messages` são apagados ao voltar etapas; o snapshot preserva o original).
+- **`admin_status_log`**: id, projeto_id, projeto_nome, status_anterior (NULL = célula vazia), status_novo, observacoes, admin_email, created_at — auditoria da triagem feita no **dashboard do admin**. A escrita que vale acontece no Google Sheets (fonte de verdade do status) e a planilha não guarda autoria de célula; sem esta tabela, "quem aprovou este projeto?" não tem resposta. Só registro: nada aqui alimenta a UI de status e o sync reverso não a lê. Ver `spec-docs/SPEC_DASHBOARD_ADMIN.md`.
 - **`form_events`**: id, projeto_id FK CASCADE, tipo (`submissao`|`saving`|`receita`|`tipos`|`metadados`|`back`|`submit`), fase (`doc`|`saving`|`receita`|`completo`), dados (JSON — pares label→valor), created_at — **APPEND-ONLY**: ao contrário de `chat_messages`, NUNCA é apagado pelas limpezas de chat. É a fonte do timeline determinístico do Investigador (os valores marcados no formulário — saving mensal, horas, receita… — chegam por payloads e não viram `chat_messages`, então sem isto não apareceriam). O flag `voltou` em `dados` marca reentradas (a pessoa voltou e reeditou a etapa).
 
 ## Status do projeto
@@ -192,6 +199,8 @@ Aplicadas em `schema.ts` com `try/catch` (colunas podem já existir):
 - ADD `complexidade` TEXT em `projetos`
 - RENAME `tinha_pessoa_antes` → `alguem_fazia` em `projetos`
 - ADD `observacoes` TEXT em `projetos`
+- ADD `ponteiro_movido` / `ponteiro_evidencia` / `contrafactual_reclamacao` TEXT em `projetos` (critério de projeto — Etapa 2)
+- ADD `classificacao_avaliacao` / `classificacao_justificativa` / `motivo_reprovacao` TEXT em `projetos` (classificação do analisador). ⚠️ O `CHECK` de `projetos.status` NÃO muda — o discriminador da reprovação é `classificacao_avaliacao`
 - ADD `especial` INTEGER DEFAULT 0 em `projetos`
 - ADD `contexto_especial` TEXT em `projetos`
 - ADD `arquivos_nomes` TEXT em `projetos` (JSON — nomes dos arquivos)

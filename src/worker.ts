@@ -36,6 +36,11 @@ import {
   updateConfiguracao,
   getUsuarios,
 } from '@/lib/admin.functions'
+import {
+  listarProjetosDashboard,
+  getProjetoDashboard,
+  definirStatusProjeto,
+} from '@/lib/dashboard-admin.functions'
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
 import { getSugestoesParticipantes } from '@/lib/participantes.functions'
 import { syncSheetsToSqlite } from '@/lib/google/sync-reverse'
@@ -373,6 +378,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await getProjetoDetalhes(id))
     }
 
+    // ── Dashboard do admin (triagem sobre a PLANILHA, não o SQLite) ──
+    // Ver src/lib/dashboard-admin.functions.ts: a listagem vem de readAllRows() porque
+    // o "Status" que vale é o da coluna do Sheets. `?refresh=1` fura o cache de 60s.
+    if (pathname === '/api/admin/dashboard/projetos' && method === 'GET') {
+      await requireAdmin(request)
+      const refresh = url.searchParams.get('refresh') === '1'
+      return json(await listarProjetosDashboard(refresh))
+    }
+    if (pathname.startsWith('/api/admin/dashboard/projetos/') && method === 'GET') {
+      await requireAdmin(request)
+      const id = decodeURIComponent(pathname.split('/').pop()!)
+      return json(await getProjetoDashboard(id))
+    }
+    if (pathname === '/api/admin/dashboard/status' && method === 'POST') {
+      const { email: adminEmail } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await definirStatusProjeto(body, adminEmail))
+    }
+
     if (pathname === '/api/admin/usuarios' && method === 'GET') {
       await requireAdmin(request)
       return json(await getUsuarios())
@@ -471,6 +495,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
       await requireAdmin(request)
       return json(await syncSheetsToSqlite())
+    }
+
+    // ── Reconciliação da análise sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/reanalisar-pendentes, sem o header de cron:
+    // repõe "Complexidade"/"Classificação" que a análise em background não chegou a
+    // gravar (ou re-roda o analisador de quem nunca foi analisado). Existe porque o
+    // cron de 1 min NÃO dispara na STAGING (conferido em 29/07/2026: habilitado às
+    // 17:02, seguiu `last=never`) — sem esta rota não há como validar o lado do
+    // analisador (Classificação/Reprovado/Motivo) fora de produção. Idempotente.
+    if (pathname === '/api/admin/reanalisar-pendentes' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await reconciliarComplexidade())
     }
 
     // ── Disparo de e-mails por segmento (admin) ──

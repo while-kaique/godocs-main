@@ -1,15 +1,37 @@
 # Plano — Critério de projeto: perguntas-chave + classificação da avaliação + reprovação com motivo
 
-**Status:** 🟡 **CODADO (T1–T8) e na STAGING; NÃO em prod, NÃO mergeado** — branch de integração
-`staging/criterios-coautor` (= critério + coautor único + o fix do loop, `cb8d677`), 769 testes verdes.
-**Validado na staging:** o lado do **agente** (gate T8 + as 2 seções novas do memorial + o comportamento de
-registrar a ausência de fonte em vez de inventar). **Falta validar:** o caminho
-**`claro_nao` → "Reprovado" + Motivo Reprovado** (o cenário `criterio-claro-nao` rodou, mas a linha não
-chegou à planilha por causa do loop de reconciliação — **corrigido em 30/07**, basta re-rodar).
-⚠️ **A régua do Rafa (T7) vai a prod SEM calibração** — decisão do Luis em 30/07 ("subir tudo, calibrar
-depois"); reprovar projeto é **visível ao autor**, então avisá-lo logo após o deploy.
+**Status:** ✅ **CONCLUÍDO (2026-07-30)** — T1–T8 + a calibragem da régua **em produção**: staging validada,
+prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). 769 testes verdes na branch de integração
+`staging/criterios-coautor` (= critério + coautor único + o fix do loop de reconciliação, `cb8d677`).
+**Validado na staging:** o lado do **agente** (gate T8 + as 2 seções novas do memorial + registrar a ausência
+de fonte em vez de inventar) e, após a calibragem, o caminho **`claro_nao` → "Reprovado" + Motivo Reprovado**
+(o caso-âncora da nuvem de palavras passou a ser REPROVADO — ver
+[calibragem-regua-criterio-e-resync-append](calibragem-regua-criterio-e-resync-append.md)).
+⚠️ **A régua do Rafa (T7) foi a prod SEM calibração com ele** — decisão do Luis em 30/07 ("subir tudo,
+calibrar depois"); reprovar projeto é **visível ao autor**, então a **pendência HUMANA** é avisá-lo e calibrar
+a régua com casos reais.
 ⚠️ **Escopo confirmado pelo Luis em 30/07:** ficam **2** perguntas no agente + **contrafactual** na Etapa 2
 (NÃO as 3 no formulário) — foi assim que a validação foi feita.
+
+### R1/R2 — refinamento pós-staging (29/07/2026, commit `b6485e4`)
+Depois de ver a Etapa 2 na staging, o Luis mudou **onde** duas coisas são coletadas (D5 da spec revisado):
+- **R1 — o ponteiro sai do formulário e vai para o AGENTE.** Os cards "moveu o ponteiro de quê?" e o campo
+  "onde isso pode ser verificado?" foram **removidos** da Etapa 2. No lugar: seção obrigatória
+  **`[1.4]` "Ponteiro movido e onde verificar"** no `MEMORIAL_ESQUELETO` (3 modos) + condução no
+  `orchestrator.ts` — pergunta **1×** qual ponteiro moveu (`type:"options"`: custo · receita · KPI da área ·
+  ainda não sei) e **1×** onde alguém abre e confere (relatório/painel/base **nomeados**), **argumenta o
+  racional junto com a pessoa** e, se ela não souber onde conferir, **registra exatamente isso e segue** —
+  nunca inventa fonte nem trava. Motivo: rastreabilidade não se resolve com checkbox. O analisador passou a
+  ler a rastreabilidade do memorial; seção ausente ou "não sei" → **zona cinzenta**, nunca reprovação
+  automática. ⚠️ `ponteiro_movido`/`ponteiro_evidencia` viraram colunas **LEGADO** (nada mais as escreve).
+- **R2 — "quem reclama" vira seleção, não texto livre.** Novo `AfetadosInput` com filtro **dinâmico**:
+  **pessoa** (autocomplete nome/e-mail, mesma lista da Etapa 1 — cache de módulo, sem refetch) ou
+  **time/área inteiro** (`GET /api/areas`), para não marcar pessoa por pessoa quando o impacto é do time
+  todo. Persiste em `contrafactual_afetados` (`"pessoa:a@x;b@y"` | `"time:Fiscal;CX"`) com
+  `serializarAfetados`/`desserializarAfetados` puras (round-trip testado; valor legado não derruba a tela).
+  Só **"E o que piora?"** segue texto livre (≥15 chars).
+- **Reuso:** o posicionamento do dropdown por portal foi extraído para o hook **`useDropdownAnchor`**, agora
+  compartilhado pelos autocompletes das Etapas 1 e 2 (eram ~40 linhas duplicadas). Spec: [`spec-docs/SPEC_CRITERIOS_PROJETO.md`](../../spec-docs/SPEC_CRITERIOS_PROJETO.md).
 **Blast-radius: ALTO** (formulário + orquestrador + analisador + sync + dashboard)
 
 ## Contexto
@@ -232,3 +254,49 @@ Dependentes: harness **E2E** (`scripts/e2e/`, valida A→AS — 3 colunas novas)
 `reenvio` lê `Status` + `Observações` **manuais** do Sheets) · sync reverso (as 3 fora de `SAFE_UPDATE_FIELDS`).
 Invariantes tocados: `MEMORIAL_ESQUELETO` como fonte única · mapeamento do Sheets **por nome** · memorial sem
 R$ visível ao usuário · `worker.js` commitado · staging antes de prod.
+
+## R3 — contexto do formulário chega ao agente (2026-07-29, commit `53e8ef8`)
+
+Achado ao conferir o que o agente de fato recebe: o ponto `[1.4]` era **cego ao contrafactual**.
+`contrafactual_afetados`/`contrafactual_reclamacao` eram gravados e lidos **só pelo analisador** — não
+existiam em `ProjetoContexto` nem no `SELECT` de `getProjetoContextoData`. Causa de fundo: o contexto do
+formulário chegava aos prompts por **whitelist manual de 14 campos**, e só a fase de doc injetava a descrição
+breve. Havia **dois canais** para o agente — o financeiro (`SavingColetado`, parâmetro próprio, completo) e o
+de contexto (a whitelist) — com os campos "antes do chat" divididos entre eles por acidente.
+
+- **`buildRespostasFormulario(ctx)`** — fonte única do bloco de formulário nos **4** prompts (doc · saving ·
+  receita · custo evitado). ⚠️ Campo novo no form entra AÍ + em `ProjetoContexto`/`getProjetoContexto`/
+  `getProjetoContextoData`; nunca solto num prompt.
+- **`buildDetalhesAprovados`** — fonte única do bloco herdado pelas 3 fases financeiras (era copiado nas
+  três) + `dependencias`/`configurar_antes`/`atencao`, de onde sai a fonte do `[1.4]`.
+- **`[1.4]`** deduz o ponteiro do contrafactual em vez de perguntar; propõe a fonte que a doc já nomeia.
+- **739 testes verdes** (`tests/contexto-formulario-agente.test.ts`, 13). `worker.js` rebuildado.
+
+**Decisão registrada (não reabrir sem motivo novo):** **"quem reclama" NÃO muda de tela.** Mover para a Etapa
+2.5 ou para depois da doc foi considerado e recusado — a **Etapa 2 é o único ponto por onde TODOS os projetos
+passam** (depois dela o fluxo abre em saving / receita / especial-que-pula-o-chat), então mover custaria
+implementar 2× e perder no ramo especial; e, com o funil corrigido, mover **não compra nada**.
+
+**Validação:** o roteiro dos 8 cenários + os 5 comportamentos observáveis do `[1.4]` + a regra de decisão do
+gate estão em [`docs/roteiro-validacao-criterios.md`](../roteiro-validacao-criterios.md).
+
+## T8 — Gate determinístico do `[1.3]`/`[1.4]` — ✅ **CODADO em 2026-07-30** (commit `9ce9b09`)
+
+> **Estado:** implementado exatamente como decidido abaixo (helpers puros + estado `criterio_secoes` em
+> saving E receita + pergunta 1× só), 752 testes verdes, `worker.js` rebuildado. **Falta validar:** deploy
+> na staging + E2E — travado na autenticação do MCP GoDeploy. Detalhe: `spec-docs/SPEC_CRITERIOS_PROJETO.md` §3.2c.
+
+### Decisão original (2026-07-29, com evidência)
+
+A validação em staging mostrou o prompt **não** segurando as duas seções: `receita-pura` fecha sem o
+`[1.3]` (2/2 rodadas) e sem o `[1.4]` (1/2); `custo-evitado-puro` grava só metade do `[1.4]` (2/2).
+Pela regra de decisão do roteiro ("ponto 1 falhando, mesmo 1× em 8 → fazer o gate") o Luis **confirmou
+o gate**, na versão barata:
+
+- Antes do preview, **extrair** as duas seções do memorial (helpers puros, no estilo de
+  `extrairAlocacaoGanhos`); **concretas → libera**.
+- Ausente/vaga → **bloqueia o preview e pergunta 1× só**, depois **segue** (anti-loop — a lição do
+  split carga×escala, que travou a edição). Clonar `alocacao_ganhos` em `enviarMensagem`, ~30 linhas.
+- **Começar pelo modo receita** (o caso reprodutível) e cobrir o `custo_evitado` (metade da seção).
+- Testes: os helpers de extração + o predicado do gate + o anti-loop, isolados.
+- ⚠️ Não transformar em gate os pontos 4/5 — eles **passaram**, e o roteiro avisa que gate ali pioraria.

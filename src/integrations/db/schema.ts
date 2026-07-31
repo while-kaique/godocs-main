@@ -226,6 +226,26 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_email ON ajuda_chamados(usuario_email);
   CREATE INDEX IF NOT EXISTS idx_ajuda_chamados_criado ON ajuda_chamados(created_at);
+
+  -- Auditoria da triagem feita no dashboard do admin: quem mudou o "Status" de um
+  -- projeto na planilha, de → para, com que motivo e quando. A escrita acontece no
+  -- Google Sheets (fonte de verdade do status) e a planilha não guarda autoria — sem
+  -- esta tabela, "quem aprovou este projeto?" não tem resposta. Só registro: nada aqui
+  -- alimenta a UI de status, e o sync reverso não lê esta tabela.
+  -- Ver spec-docs/SPEC_DASHBOARD_ADMIN.md.
+  CREATE TABLE IF NOT EXISTS admin_status_log (
+    id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id      TEXT NOT NULL,
+    projeto_nome    TEXT,
+    status_anterior TEXT,                              -- null quando a célula estava vazia
+    status_novo     TEXT NOT NULL,
+    observacoes     TEXT,                              -- motivo gravado na coluna "Observações"
+    admin_email     TEXT NOT NULL,
+    created_at      TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_status_log_projeto ON admin_status_log(projeto_id);
+  CREATE INDEX IF NOT EXISTS idx_admin_status_log_criado ON admin_status_log(created_at);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -334,6 +354,30 @@ const MIGRATIONS = [
   "ALTER TABLE email_lotes ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
   'ALTER TABLE email_lotes ADD COLUMN payload TEXT',
   "ALTER TABLE email_disparos ADD COLUMN audiencia TEXT NOT NULL DEFAULT 'legado'",
+  // ─── Critério de projeto (régua de recorrência · contrafactual · rastreabilidade) ──
+  // O CONTRAFACTUAL é pergunta determinística da Etapa 2 (padrão `usa_ai_proxy`) e NÃO
+  // barra a submissão — alimenta a classificação do analisador:
+  // `contrafactual_afetados`: quem sentiria falta, serializado como
+  // "pessoa:a@x.com;b@y.com" ou "time:Fiscal;CX" (escolhido na Team Guide — pessoas OU
+  // times inteiros); `contrafactual_reclamacao`: o que piora se desligar hoje.
+  // ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são LEGADO: a RASTREABILIDADE (que ponteiro
+  // moveu + onde verificar) saiu do formulário e passou a ser conduzida pelo AGENTE, na
+  // seção "Ponteiro movido e onde verificar" do memorial. As colunas ficam pelos projetos
+  // submetidos enquanto a pergunta existia no form; nada as escreve mais.
+  'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
+  'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN contrafactual_afetados TEXT',
+  // Classificação de ELEGIBILIDADE decidida pelo analisador ("isto é projeto?"),
+  // independente do veredito de pontuação: 'claro_sim'|'claro_nao'|'zona_cinzenta'.
+  // A justificativa é SEMPRE preenchida (fallback determinístico) → coluna
+  // "Classificação" do Sheets. `motivo_reprovacao` só existe em 'claro_nao' (nunca
+  // reprova sem motivo) → coluna "Motivo Reprovado". O discriminador da reprovação é
+  // ESTA coluna, não o CHECK de projetos.status (que segue rascunho|em_validacao|
+  // validado|rejeitado|aprovado — trocá-lo exigiria rebuild da tabela).
+  'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
+  'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
+  'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

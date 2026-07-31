@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-07-30 — Gate da Seção 2.4 recusava a resposta CERTA quando o ganho é "menos custo" + juiz do preview reinterrogava sem limite
+
+**PR:** [#217](https://github.com/while-kaique/godocs-main/pull/217) (mergeado) · **Status:** ✅ corrigida — validada na staging `edf400b4` com o cenário-âncora ponta a ponta (agente pergunta **1×**, a resposta de redução de headcount é **aceita de primeira**, sem reinterrogação no preview, seção gravada e coluna AK preenchida) e **prod `674a3710` deployado** (2026-07-30) · **Branch:** `fix/gate-alocacao-taxonomia-e-materialidade` · **Plano:** [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](../docs/plans/taxonomia-destino-ganho-e-anti-loop.md)
+
+**Sintoma (2 defeitos independentes, medidos no baseline de 24 conversas reais):**
+1. Saving alto cuja contrapartida foi **redução de headcount** (3 auxiliares). O usuário respondeu certo
+   ("reduzimos 3 auxiliares, vagas não repostas") e levou **5 reperguntas** — o agente insistia por uma
+   "entrega a mais" que não existe.
+2. **13 perguntas pós-preview**: o LLM-juiz do preview reinterrogava o destino do ganho **mesmo depois** de o
+   gate determinístico já ter coletado e registrado a resposta.
+
+**Causa-raiz:** era **100% de prompt**, em **3 textos que redigitavam a mesma régua** definindo "resposta
+completa" como o PAR _"atividades NOMEADAS **E** o que o time entrega **A MAIS**"_ — `blocoEconomiaAlta`
+(`buildSavingPrompt`), `blocoEconomiaAltaPv` (`buildSavingPreviewPrompt`) e os 3 textos do gate em
+`chat.functions.ts` (`perguntaAlocacaoGanhos` / `…Firme` / `nudgeAlocacaoGanhos`). Quando o ganho é **menos
+custo** (vaga não reposta, equipe menor, contrato cancelado), a entrega **não aumenta** — fica igual com menos
+gente — e a resposta certa lia como incompleta. O `blocoEconomiaAlta` citava "redução de equipe-vaga não
+reposta" de passagem, num parêntese de exemplos, mas o **gate** da frase seguia exigindo o par, e é o gate que
+decide. O 2º defeito: o juiz do preview **não tinha limite de recusas** e não sabia que o gate já havia
+coletado. ⚠️ **`respostaAlocacaoVaga` NÃO era o culpado** — verificado: "redução de 3 auxiliares" tem número,
+logo o predicado **aceita**. Ele não foi tocado (mexer afrouxaria a rede que pegou o boilerplate do Gostream).
+
+**Fix:**
+- **Fonte única `TAXONOMIA_DESTINO_GANHO`** (`orchestrator.ts`, ao lado de `LIMITE_ECONOMIA_ALTA`): declara os
+  **5 destinos aceitos** — *mais entrega · menos custo · menos erro/retrabalho · menos risco/fraude · menos
+  prazo* —, cada um com exemplo concreto, e a régua nova: **basta NOMEAR o destino e encaixá-lo em UM dos 5**.
+  "A mesma emissão de notas por um time menor, com as 3 vagas não repostas" é resposta **completa**, sem
+  entrega adicional e sem número. Os **3 pontos consomem a constante**; nenhum redigita a lista.
+- **Anti-loop determinístico no juiz:** `buildSavingPreviewPrompt` **deixa de injetar** o bloco de economia
+  alta quando `saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. Supressão determinística, **não**
+  persuasão ("recuse só 1 vez" é o tipo de garantia que falhou no Gostream) e **sem campo novo** no estado. O
+  juiz segue ativo onde o gate não se aplica (contrafactual `'nao'`, custo evitado puro `'externo'`) — ali é a
+  única rede.
+- **Nada afrouxou na ponta vaga:** "ganhou produtividade" / "sobra tempo" / "foi para outras atividades" sem
+  nome segue recusado 1x pelo gate, com o anti-loop de hoje intacto.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (constante + os 2 blocos + a supressão) ·
+`src/lib/chat.functions.ts` (os 3 textos, agora **exportados** para o teste da fonte única) ·
+`src/lib/testes/prompt-registry.ts` (regra 3 — a descrição afirmava a exigência antiga) ·
+`tests/taxonomia-destino-ganho.test.ts` (**novo**, 14 testes: constante, os 5 consumidores interpolando-a,
+supressão do bloco por estado, e guarda anti-afrouxamento do predicado) · `worker.js`.
+
+**Fronteiras respeitadas (não se mexeu):** `respostaAlocacaoVaga` · `aplicaGateAlocacaoGanhos` ·
+`LIMITE_ECONOMIA_ALTA` · gate da jornada/base 220h · split carga×escala · critério de projeto (`[1.3]`/`[1.4]`,
+PR #216) · colunas do Sheets. O cabeçalho `### O que mudou após a automação` **permanece exato** —
+`extrairAlocacaoGanhos` fatia por ele para a coluna "Alocação Ganhos" (AK).
+
+---
+
 ## 2026-07-30 — Cron de reconciliação entrava em LOOP e estourava a cota do Google Sheets
 
 **Sintoma.** Na staging, tudo que toca o Sheets começou a falhar com **429
@@ -955,3 +1004,54 @@ staging** (criar especial → flip p/ "Não" no Sheet → sync desmarca) antes d
 então a doc segue sem `saving.linhas`; ao reeditar, a Helen refaz o saving no chat (o flag/tipo já
 estão certos). A regra "Sheets é o banco principal; SQLite espelha em quase-tempo-real" guiou a
 escolha.
+
+---
+
+## `resyncGoogle`/edição não recuperava linha ausente da planilha — append perdido ficava irrecuperável (30/07/2026)
+
+**Sintoma.** Quando o **append da IDA** falha de vez (cota `429`/transiente), o projeto existe no SQLite mas
+**não existe na planilha**. Qualquer tentativa de conserto pelo caminho normal — reenvio, edição,
+`resyncGoogle` — usa `modo: 'edicao'` → `updateRowByProjectId`, que **não acha a linha, não faz nada e ainda
+devolve sucesso** (`ok: true`). Não havia caminho de recuperação: passada a **carência de 1h**,
+`reconciliarExclusoes` **purgava o projeto do SQLite** — perda silenciosa. Achado durante a validação em
+staging do fix da cota (`cb8d677`), que produziu exatamente esse estado num projeto real do run.
+
+**Causa.** `updateRowByProjectId` (`google/sheets.ts`) tratava "ID Projeto não encontrado" como um
+`console.warn` + `return` **void**: o chamador não tinha como distinguir "atualizei" de "não havia o que
+atualizar". E `syncSubmitToGoogle` (`google/sync.ts`) só apendava no `modo === 'novo'`.
+
+**Fix.**
+- `updateRowByProjectId` passa a devolver `Promise<boolean>`: **`false` SOMENTE no caminho "ID não
+  encontrado"** (linha ausente, recuperável). Todo o resto → `true` = "nada a recuperar", **inclusive o abort
+  por cabeçalho sem a coluna "ID Projeto"** — sem a coluna do ID não se pode afirmar que a linha falta, e
+  apendar arriscaria **duplicar**. Mudança **ADITIVA**: os 8 chamadores atuais ignoram o retorno e seguem
+  idênticos. ⚠️ **Zero leitura extra do Sheets** — a busca do ID já acontecia ali (requisito duro: a cota de
+  60 leituras/min é compartilhada com produção).
+- `syncSubmitToGoogle`, no `modo === 'edicao'`, quando o update reporta linha ausente, **cai para
+  `appendRow`** (decisor puro `deveRecuperarPorAppend`), logando como **RECUPERAÇÃO** e incluindo
+  **`Data Submissão`** (a linha está sendo criada agora; o ramo normal de edição omite essa coluna de
+  propósito, para preservar a data original).
+
+**Onde aterrissou:** `src/lib/google/sheets.ts` (`updateRowByProjectId`) ·
+`src/lib/google/sync.ts` (`deveRecuperarPorAppend` + ramo de edição) ·
+`tests/sheets-update-linha-ausente.test.ts` (retorno `true`/`false` + guarda de "nenhuma leitura adicional":
+no máximo 2 GETs no caminho de update) · `tests/sync-recuperacao-linha-ausente.test.ts` (apenda com
+`Data Submissão`; **não** apenda quando a linha existe — nunca duplica; `'novo'` segue só com append).
+Plano: [`docs/plans/calibragem-regua-criterio-e-resync-append.md`](../docs/plans/calibragem-regua-criterio-e-resync-append.md).
+
+**Risco aceito e registrado.** O fallback vale para todo `modo === 'edicao'`, então um reenvio pode
+**recriar** uma linha que um admin apagou **de propósito** — e apagar do Sheets é justamente como se remove
+um projeto. Janela estreita (a `reconciliarExclusoes` purga o projeto do SQLite em 1h) e o usuário de fato
+reenviou. A alternativa (checar existência antes) custaria uma leitura por sync, contra a cota.
+
+⚠️ **Variante do mesmo risco, apontada pela revisão de qualidade (severidade média, NÃO tratada):** `false`
+significa _"não casei o ID na coluna"_, não _"a linha nunca existiu"_. Se a linha **existe** mas o ID foi
+mexido à mão (apóstrofo/aspas à frente, ID trocado, linha movida de aba) — plausível numa planilha onde
+legados entram manualmente — a edição passa a **criar uma 2ª linha** para o mesmo projeto, onde antes era
+no-op; o mesmo vale para um append da 1ª submissão ainda **in-flight** num `waitUntil` concorrente.
+**Mitigações que já existem:** o append de recuperação grava o `ID Projeto`, então a edição seguinte encontra
+a linha (é **auto-limitante** — não vira uma linha por edição); o log sai como `RECUPERAÇÃO` com o id, e a
+falha é rotulada pela **etapa** real (`atualizar` · `recuperar (append)` · `inserir`), não pelo modo. Cercos
+desenhados e **não** implementados (custo × benefício, decisão de produto): condicionar o append a o SQLite
+confirmar que a linha nunca aterrissou (`atualizado_em` ausente) ou marcar a linha recuperada para a triagem
+do `/dashboard` detectar duplicata.

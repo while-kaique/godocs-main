@@ -1,0 +1,482 @@
+/**
+ * Detalhe de um projeto em overlay — a ficha de triagem.
+ *
+ * Mostra a linha INTEIRA da planilha (é isso que o validador precisa ver sem sair da
+ * tela) agrupada por assunto, e é onde o status é decidido. Os grupos abaixo listam as
+ * colunas por NOME: se uma coluna nova aparecer na planilha e não estiver em nenhum
+ * grupo, ela cai em "Outras colunas" — nunca desaparece.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { Loader2, ExternalLink, Save, History, FileText } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/status-badge';
+import { apiFetch } from '@/lib/api-client';
+import { fmtDataBR } from '@/lib/format-date';
+import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
+
+// Os status graváveis são replicados aqui (não importados de `.functions.ts`) para o
+// bundle do cliente não arrastar o módulo server-only. O servidor valida de novo.
+const STATUS_OPCOES = [
+  'Pendente',
+  'Em validação',
+  'Aprovado',
+  'Reenvio Pendente',
+  'Reprovado',
+  'Descontinuado',
+] as const;
+
+type Detalhe = {
+  id: string;
+  campos: Record<string, string>;
+  historico: {
+    status_anterior: string | null;
+    status_novo: string;
+    observacoes: string | null;
+    admin_email: string;
+    created_at: string | null;
+  }[];
+};
+
+type Grupo = { titulo: string; colunas: string[] };
+
+const GRUPOS: Grupo[] = [
+  {
+    titulo: 'Identificação',
+    colunas: [
+      'ID Projeto',
+      'Data Submissão',
+      'Data Criação',
+      'Atualizado Em',
+      'Área',
+      'Nome Completo',
+      'Email',
+      'Participantes',
+      'Participantes 2',
+      'Contribuidor',
+      'Tipos Projeto',
+      'Ferramenta',
+      'Escopo',
+      'Especial?',
+      'Contexto do Projeto Especial',
+      'Usa AI Proxy',
+      'URL',
+    ],
+  },
+  {
+    titulo: 'Saving e horas',
+    colunas: [
+      'Alguém Fazia?',
+      'Tipo de Saving',
+      'Saving Horas',
+      'Saving Horas Real',
+      'Saving Horas Escalado',
+      'Horas em Reais',
+      'Saving Reais',
+      'Diff Horas / Antes',
+      'Diff Saving / Antes',
+    ],
+  },
+  {
+    titulo: 'Custos e receita',
+    colunas: [
+      'Custo Evitado',
+      'Custo Mensal ou Pontual',
+      'Justificativa Custo Evitado',
+      'Custo Externo Mensal',
+      'Custo do Projeto',
+      'Custo do Projeto Mensal ou Pontual',
+      'Justificativa Custo do Projeto',
+      'Receita Mensal',
+      'Tipo de Receita',
+      'Ganho Total',
+    ],
+  },
+  {
+    titulo: 'Análise',
+    colunas: [
+      'Status',
+      'Complexidade',
+      // Régua de critério de projeto: a classificação vem SEMPRE com a justificativa;
+      // os motivos explicam a reprovação (analisador/triagem) e o pedido de reenvio.
+      'Classificação',
+      'Motivo Reprovado',
+      'Motivo Reenvio',
+      'Observações',
+      'Alocação Ganhos',
+      'Justificativa Saving Escalado e Real',
+      'Análise Antiagente',
+    ],
+  },
+];
+
+/** Textos longos: vão em bloco de largura cheia, dentro de um `<details>`. */
+const MEMORIAIS = ['Memorial de Saving', 'Receita Memorial', 'Memorial anterior'];
+
+/** A descrição abre a ficha (é a primeira coisa que a triagem lê). */
+const DESCRICAO = 'Descrição';
+
+/** Colunas já exibidas no cabeçalho — não repetir no corpo. */
+const NO_CABECALHO = ['Projeto'];
+
+const LIMITE_CURTO = 90; // acima disso o campo ocupa a linha inteira
+
+function ehUrl(v: string) {
+  return /^https?:\/\//i.test(v.trim());
+}
+
+function Campo({ nome, valor }: { nome: string; valor: string }) {
+  const longo = valor.length > LIMITE_CURTO;
+  return (
+    <div className={longo ? 'sm:col-span-2' : undefined}>
+      <dt className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+        {nome}
+      </dt>
+      <dd className="mt-0.5 text-[13px] leading-relaxed text-foreground">
+        {ehUrl(valor) ? (
+          <a
+            href={valor}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 break-all underline underline-offset-2"
+            style={{ color: 'var(--go-blue)' }}
+          >
+            Abrir link <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : longo ? (
+          <span className="whitespace-pre-wrap">{valor}</span>
+        ) : (
+          <span className="tabular-nums">{valor}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-5">
+      <h3
+        className="mb-2 border-b pb-1 text-[11px] font-bold uppercase tracking-[0.1em]"
+        style={{ color: 'var(--go-blue)', borderColor: 'rgba(0,89,169,0.15)' }}
+      >
+        {titulo}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+export function ProjetoDetalheDialog({
+  projeto,
+  onFechar,
+  onStatusSalvo,
+}: {
+  projeto: ProjetoDashboardResumo | null;
+  onFechar: () => void;
+  onStatusSalvo: (id: string, status: string, observacoes: string | undefined) => void;
+}) {
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [statusEscolhido, setStatusEscolhido] = useState<string>('');
+  const [observacoes, setObservacoes] = useState('');
+  // Motivos em coluna própria (nunca sequestram "Observações", que é o parecer usado
+  // pelo disparo de e-mails de reenvio).
+  const [motivoReenvio, setMotivoReenvio] = useState('');
+  const [motivoReprovado, setMotivoReprovado] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
+  // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
+  const obsOriginal = useRef('');
+  const motivoReenvioOriginal = useRef('');
+  const motivoReprovadoOriginal = useRef('');
+
+  const id = projeto?.id ?? null;
+
+  useEffect(() => {
+    if (!id) return;
+    let vivo = true;
+    setCarregando(true);
+    setErro(null);
+    setDetalhe(null);
+    apiFetch<Detalhe>(`/api/admin/dashboard/projetos/${encodeURIComponent(id)}`)
+      .then((d) => {
+        if (!vivo) return;
+        setDetalhe(d);
+        const obs = d.campos['Observações'] ?? '';
+        obsOriginal.current = obs;
+        setObservacoes(obs);
+        const mReenvio = d.campos['Motivo Reenvio'] ?? '';
+        const mReprovado = d.campos['Motivo Reprovado'] ?? '';
+        motivoReenvioOriginal.current = mReenvio;
+        motivoReprovadoOriginal.current = mReprovado;
+        setMotivoReenvio(mReenvio);
+        setMotivoReprovado(mReprovado);
+        setStatusEscolhido(d.campos['Status'] ?? '');
+      })
+      .catch((e: Error) => vivo && setErro(e.message))
+      .finally(() => vivo && setCarregando(false));
+    return () => {
+      vivo = false;
+    };
+  }, [id]);
+
+  async function salvarStatus() {
+    if (!projeto || !statusEscolhido) return;
+    setSalvando(true);
+    const obsMudou = observacoes !== obsOriginal.current;
+    const reenvioMudou = motivoReenvio !== motivoReenvioOriginal.current;
+    const reprovadoMudou = motivoReprovado !== motivoReprovadoOriginal.current;
+    try {
+      await apiFetch('/api/admin/dashboard/status', {
+        projeto_id: projeto.id,
+        status: statusEscolhido,
+        ...(obsMudou ? { observacoes } : {}),
+        ...(reenvioMudou ? { motivo_reenvio: motivoReenvio } : {}),
+        ...(reprovadoMudou ? { motivo_reprovado: motivoReprovado } : {}),
+      });
+      obsOriginal.current = observacoes;
+      motivoReenvioOriginal.current = motivoReenvio;
+      motivoReprovadoOriginal.current = motivoReprovado;
+      onStatusSalvo(projeto.id, statusEscolhido, obsMudou ? observacoes : undefined);
+      toast.success(`Status salvo na planilha: ${statusEscolhido}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível salvar o status.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const campos = detalhe?.campos ?? {};
+  const usados = new Set<string>([
+    ...GRUPOS.flatMap((g) => g.colunas),
+    ...MEMORIAIS,
+    DESCRICAO,
+    ...NO_CABECALHO,
+  ]);
+  const outras = Object.keys(campos).filter((k) => !usados.has(k));
+  const statusMudou = detalhe != null && statusEscolhido !== (campos['Status'] ?? '');
+  const obsMudou = detalhe != null && observacoes !== obsOriginal.current;
+  const motivosMudaram =
+    detalhe != null &&
+    (motivoReenvio !== motivoReenvioOriginal.current ||
+      motivoReprovado !== motivoReprovadoOriginal.current);
+  // Campo de motivo aparece conforme a decisão: reenvio pede o que corrigir; reprovação
+  // pede o porquê (e sobrepõe o motivo escrito pelo analisador).
+  const pedeMotivoReenvio = statusEscolhido === 'Reenvio Pendente';
+  const pedeMotivoReprovado = statusEscolhido === 'Reprovado';
+
+  return (
+    <Dialog open={projeto != null} onOpenChange={(aberto) => !aberto && onFechar()}>
+      <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2 pr-8">
+            <DialogTitle className="text-xl">
+              {projeto?.nome ?? 'Projeto sem nome'}
+            </DialogTitle>
+            <StatusBadge status={projeto?.statusChave ?? null} />
+            {projeto?.especial && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{
+                  background: 'rgba(215,219,0,0.18)',
+                  border: '1px solid rgba(215,219,0,0.5)',
+                  color: '#6b6f00',
+                }}
+              >
+                <FileText className="h-3 w-3" /> Especial
+              </span>
+            )}
+          </div>
+          <DialogDescription className="text-[13px]">
+            {projeto?.autor ?? 'Autor não informado'}
+            {projeto?.email ? ` · ${projeto.email}` : ''}
+            {projeto?.area ? ` · ${projeto.area}` : ''}
+            {projeto?.dataSubmissao ? ` · enviado em ${fmtDataBR(projeto.dataSubmissao)}` : ''}
+            <span className="ml-1 font-mono text-[11px] opacity-70">({projeto?.id})</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        {carregando && (
+          <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando a linha da planilha…
+          </div>
+        )}
+
+        {erro && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {erro}
+          </p>
+        )}
+
+        {detalhe && (
+          <>
+            {/* Decisão da triagem primeiro: é a ação que trouxe o validador até aqui. */}
+            <section
+              className="rounded-xl border p-4"
+              style={{ borderColor: 'rgba(0,89,169,0.18)', background: 'rgba(0,89,169,0.035)' }}
+            >
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--go-blue)' }}>
+                Decisão da triagem
+              </h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,240px)_1fr]">
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-muted-foreground">Status na planilha</span>
+                  <select
+                    value={statusEscolhido}
+                    onChange={(e) => setStatusEscolhido(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {!STATUS_OPCOES.includes(statusEscolhido as (typeof STATUS_OPCOES)[number]) && (
+                      <option value={statusEscolhido}>
+                        {statusEscolhido || 'Sem status'}
+                      </option>
+                    )}
+                    {STATUS_OPCOES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    Motivo / observações — vai para a coluna "Observações" e é o texto que o
+                    dono recebe no e-mail de reenvio
+                  </span>
+                  <textarea
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    rows={3}
+                    placeholder="Ex.: o memorial não quebra as horas por atividade — favor detalhar a composição."
+                    className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </label>
+              </div>
+
+              {/* Motivo em COLUNA PRÓPRIA, conforme a decisão. Não toca "Observações":
+                  aquele texto é o parecer que o disparo de e-mails usa. O autor VÊ estes
+                  motivos na tela do projeto dele — escreva para ele ler. */}
+              {(pedeMotivoReenvio || pedeMotivoReprovado) && (
+                <label className="mt-3 block">
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    {pedeMotivoReprovado
+                      ? 'Motivo da reprovação — vai para a coluna "Motivo Reprovado" e é o que o autor vê (sobrepõe o motivo do analisador)'
+                      : 'Motivo do reenvio — vai para a coluna "Motivo Reenvio" e é o que o autor vê'}
+                  </span>
+                  <textarea
+                    value={pedeMotivoReprovado ? motivoReprovado : motivoReenvio}
+                    onChange={(e) =>
+                      pedeMotivoReprovado
+                        ? setMotivoReprovado(e.target.value)
+                        : setMotivoReenvio(e.target.value)
+                    }
+                    rows={2}
+                    placeholder={
+                      pedeMotivoReprovado
+                        ? 'Ex.: entrega executada uma única vez, sem indicador verificável — não se enquadra como projeto recorrente.'
+                        : 'Ex.: projeto parado, em manutenção; reenviar depois de aplicar as correções.'
+                    }
+                    className="mt-1 w-full resize-y rounded-md border border-input bg-background p-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </label>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={salvarStatus}
+                  disabled={salvando || (!statusMudou && !obsMudou && !motivosMudaram)}
+                >
+                  {salvando ? <Loader2 className="animate-spin" /> : <Save />}
+                  Salvar na planilha
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {statusMudou || obsMudou || motivosMudaram
+                    ? 'Há mudanças não salvas.'
+                    : 'Nada mudou desde a última leitura.'}
+                </span>
+              </div>
+            </section>
+
+            {campos[DESCRICAO] && (
+              <Secao titulo="Descrição">
+                <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
+                  {campos[DESCRICAO]}
+                </p>
+              </Secao>
+            )}
+
+            {GRUPOS.map((g) => {
+              const presentes = g.colunas.filter((c) => campos[c]);
+              if (!presentes.length) return null;
+              return (
+                <Secao key={g.titulo} titulo={g.titulo}>
+                  <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    {presentes.map((c) => (
+                      <Campo key={c} nome={c} valor={campos[c]} />
+                    ))}
+                  </dl>
+                </Secao>
+              );
+            })}
+
+            {MEMORIAIS.some((m) => campos[m]) && (
+              <Secao titulo="Memoriais">
+                {MEMORIAIS.filter((m) => campos[m]).map((m) => (
+                  <details key={m} className="mb-2 rounded-lg border border-border bg-card">
+                    <summary className="cursor-pointer px-3 py-2 text-[13px] font-semibold">
+                      {m}
+                    </summary>
+                    <div className="whitespace-pre-wrap border-t border-border px-3 py-2 text-[12.5px] leading-relaxed">
+                      {campos[m]}
+                    </div>
+                  </details>
+                ))}
+              </Secao>
+            )}
+
+            {outras.length > 0 && (
+              <Secao titulo="Outras colunas">
+                <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                  {outras.map((c) => (
+                    <Campo key={c} nome={c} valor={campos[c]} />
+                  ))}
+                </dl>
+              </Secao>
+            )}
+
+            {detalhe.historico.length > 0 && (
+              <Secao titulo="Histórico de triagem">
+                <ul className="space-y-1.5">
+                  {detalhe.historico.map((h, i) => (
+                    <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
+                      <History className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-medium">
+                        {h.status_anterior ?? 'sem status'} → {h.status_novo}
+                      </span>
+                      <span className="text-muted-foreground">
+                        por {h.admin_email}
+                        {h.created_at ? ` em ${fmtDataBR(h.created_at)}` : ''}
+                      </span>
+                      {h.observacoes && (
+                        <span className="w-full text-muted-foreground">Motivo: {h.observacoes}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </Secao>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
