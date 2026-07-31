@@ -4,16 +4,28 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 7 — **planejamento, sem código**: o escopo fechado na parte 6 virou
+**Última sessão:** 2026-07-30, parte 8 — **`/ggsd:code` da fatia A1: T1–T6 codados e commitados**
+(`b390c62`, branch `fix/gate-alocacao-taxonomia-e-materialidade`, 797 testes verdes, `worker.js` rebuildado).
+Ver "Sessão de 2026-07-30 (parte 8)" abaixo. **Falta o T7** — staging antes de prod (regra 13).
+
+> **▶ PRÓXIMO PASSO:** **T7 do plano A1** — `npm run build && npm run build:worker` na worktree
+> `.claude/worktrees/fix-gates-a1a2` → **deploy no STAGING `edf400b4`** (⚠️ conferir qual branch está no ar
+> ANTES: o `updateApp` substitui a app inteira, e em 30/07 um deploy do `main` apagou perguntas da Etapa 2) →
+> validar no navegador o **cenário-âncora** (saving alto ≥44h cuja contrapartida é **redução de headcount**:
+> a resposta tem de ser **aceita de primeira**, sem repergunta e **sem reinterrogação no preview**, e a seção
+> "### O que mudou após a automação" tem de sair gravada) → **só então** prod `674a3710` → PR.
+
+---
+
+**Sessão anterior:** 2026-07-30, parte 7 — **planejamento, sem código**: o escopo fechado na parte 6 virou
 **plano aprovado** ([taxonomia-destino-ganho-e-anti-loop](plans/taxonomia-destino-ganho-e-anti-loop.md)),
 com **duas mudanças de escopo decididas pelo Luis nesta sessão** (ver "Sessão de 2026-07-30 (parte 7)"):
 a **jornada preguiçosa saiu** e o **anti-loop do juiz** ganhou desenho determinístico.
 
-> **▶ PRÓXIMO PASSO:** **`/ggsd:code` da fatia A1** — o plano está **aprovado** e o ponteiro `## Plano ativo`
-> aponta pra ele, então o `plan-gate` **libera** a edição de código (foi o que barrou as partes 6 e 7). A
-> worktree já existe e está **vazia**: `.claude/worktrees/fix-gates-a1a2`, branch
-> `fix/gate-alocacao-taxonomia-e-materialidade`, criada de `origin/main` (`39deaf9`). ⚠️ O nome da branch
-> ainda diz "materialidade" (era o escopo A2, hoje fora) — o conteúdo é **taxonomia + anti-loop**.
+> ~~**▶ PRÓXIMO PASSO:** `/ggsd:code` da fatia A1~~ → **FEITO na parte 8** (T1–T6). A worktree
+> `.claude/worktrees/fix-gates-a1a2` (branch `fix/gate-alocacao-taxonomia-e-materialidade`, de `origin/main`
+> `39deaf9`) tem o commit `b390c62`. ⚠️ O nome da branch ainda diz "materialidade" (era o escopo A2, hoje
+> fora) — o conteúdo é **taxonomia + anti-loop**.
 
 > **▶ Pendências da frente anterior (3 humanas + 1 técnica), ainda válidas:**
 > 1. **Avisar o Rafa** — a reprovação automática está em prod e o **motivo é visível ao autor** (D10). A
@@ -25,6 +37,44 @@ a **jornada preguiçosa saiu** e o **anti-loop do juiz** ganhou desenho determin
 > 3. **Causa-raiz do analisador morrendo no `waitUntil`** segue **aberta** — hoje o destrave é
 >    `POST /api/admin/reanalisar-pendentes` (40–70s). Precisa de plano próprio (`/ggsd:plan`).
 > 4. `CLAUDE.md` está em **~48k chars**, acima do teto de 40k — vale uma poda.
+
+## Sessão de 2026-07-30 (parte 8) — fatia A1 codada (T1–T6), staging pendente
+
+**Commit:** `b390c62` na `fix/gate-alocacao-taxonomia-e-materialidade` (worktree `fix-gates-a1a2`, sobre
+`origin/main` `39deaf9`). **797 testes verdes** (783 + 14 novos). `worker.js` rebuildado e commitado.
+
+**1. Fonte única.** `TAXONOMIA_DESTINO_GANHO` (`orchestrator.ts`, ao lado de `LIMITE_ECONOMIA_ALTA`) declara os
+**5 destinos aceitos** — *mais entrega · menos custo · menos erro/retrabalho · menos risco/fraude · menos
+prazo* —, cada um com exemplo concreto, e a régua nova: **basta NOMEAR o destino e encaixá-lo em UM dos 5**.
+Os **3 pontos** a interpolam (`blocoEconomiaAlta`, `blocoEconomiaAltaPv` e os 3 textos do gate em
+`chat.functions.ts`, que passaram a ser **exportados** para o teste da fonte única). Nenhum redigita a lista —
+e o teste garante isso derivando **em runtime** as linhas da constante e exigindo-as em cada consumidor.
+
+**2. Anti-loop determinístico.** `buildSavingPreviewPrompt` deixa de injetar o bloco de economia alta quando
+`saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. Sem campo novo, sem persuasão. O juiz **segue ativo**
+onde o gate não se aplica (`'nao'`/`'externo'`), que é onde ele é a única rede.
+
+**3. Fronteiras respeitadas (verificado por revisor de contexto fresco):** `respostaAlocacaoVaga`,
+`aplicaGateAlocacaoGanhos` e `LIMITE_ECONOMIA_ALTA` **inalterados** (zero hunks); jornada/220h, split
+carga×escala, critério `[1.3]`/`[1.4]`, `analyzer.ts` e colunas do Sheets intocados; o cabeçalho
+`### O que mudou após a automação` **permanece exato** (é por ele que a coluna AK é fatiada).
+
+**4. ⚠️ O que a execução descobriu e NÃO corrigiu (registrado no plano, item (a)):** o piso
+`respostaAlocacaoVaga` ainda marca como VAGA a resposta que **mistura** destino válido com filler — medido:
+*"não repusemos a vaga, o time menor dá conta com essa otimização"*, *"as divergências caíram, ficou mais
+eficiente"*, *"o fechamento ficou mais rápido, sobra tempo"* → vaga. As frases **limpas** dos 5 destinos
+passam. Custo: **1 repergunta firme** (a 2ª resposta é sempre aceita), não os 5 do caso do Rafa. Alinhar o
+piso é **fatia própria** — o predicado é fronteira dura deste plano e mexer nele exige decisão do Luis.
+
+**5. Ressalvas dos revisores (não bloqueantes, no commit e no plano):** conformidade **diverge-baixa** (link do
+plano na spec só resolve quando esta branch de docs mergear; a guarda saiu em arquivo novo em vez de estender
+`tests/gate-alocacao-ganhos.test.ts`) · qualidade **sugestoes** (além do item 4: a taxonomia inteira vai no
+texto exibido ao usuário e é reinjetada no histórico a cada turno, ~300 tokens — caberia derivar uma projeção
+curta para o chat da mesma fonte).
+
+**6. Não esquecer no T7:** conferir a branch no ar antes do `updateApp` (substitui a app inteira) · o
+`E2E_COOKIE`/`E2E_BASE_URL` (a worktree não tem `.env`, e o harness cai em **PROD** por default) · `tsc` tem
+**5 erros pré-existentes** (idênticos sem o diff — não são regressão).
 
 ## Sessão de 2026-07-30 (parte 7) — o escopo virou plano aprovado, com 2 mudanças de escopo
 
@@ -390,7 +440,7 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 
 ## Plano ativo
 **→ [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](plans/taxonomia-destino-ganho-e-anti-loop.md)** ·
-Status: ✅ **aprovado** (Luis, 2026-07-30)
+Status: 🔧 **T1–T6 executados** (2026-07-30, `b390c62`) — **falta T7: staging `edf400b4` → prod → PR**
 
 Implementa a fatia **A1** da frente
 [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) (T3): constante

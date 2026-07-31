@@ -1,6 +1,23 @@
 # Plano — Taxonomia de destino do ganho (aceitar "menos custo") + anti-loop no juiz do preview
 
-**Status:** ✅ aprovado (Luis, 2026-07-30)
+**Status:** 🔧 **executado parcialmente** (2026-07-30) — **T1–T6 codados e commitados** (`b390c62`, branch
+`fix/gate-alocacao-taxonomia-e-materialidade`, 797 testes verdes, `worker.js` rebuildado); **T7 (staging
+`edf400b4` + prod) PENDENTE**, e com ele o critério de aceitação 7. Critérios 1–6: ✅.
+
+> **Registrado na execução (2026-07-30) — o que a sessão de código descobriu e NÃO corrigiu:**
+> **(a)** o piso `respostaAlocacaoVaga` (fronteira dura deste plano) ainda classifica como VAGA a resposta que
+> **mistura** um destino válido com filler: medido, *"não repusemos a vaga que abriu, o time menor dá conta com
+> essa otimização"*, *"as divergências caíram muito, ficou mais eficiente"* e *"o fechamento ficou mais rápido,
+> sobra tempo"* → vaga. As frases **limpas** dos 5 destinos passam ("3 vagas não repostas", "de 20 para 2 por
+> mês", "cancelamos o contrato terceirizado", "trilha de aprovação", "saía no dia 10, agora no dia 3"). Custo
+> **1 repergunta firme** (não os 5 do caso-âncora), porque a 2ª resposta é sempre aceita. Alinhar o piso à
+> taxonomia é **fatia própria** — exige reabrir a fronteira com o Luis.
+> **(b)** suprimir o juiz remove o backstop **semântico** na trilha em que o `'ok'` veio do atalho heurístico
+> (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`): ali a rede restante é a **validação humana**. Era o
+> desenho escolhido; ficou explícito no comentário do código e na `SPEC_CORRECOES.md`.
+> **(c)** sugestões de baixa severidade não aplicadas: a taxonomia **inteira** vai no texto exibido ao usuário
+> (mistura copy de produto com instrução de prompt) e é **reinjetada no histórico** a cada turno (~300 tokens);
+> caberia derivar uma projeção curta para o chat da mesma fonte.
 
 **Objetivo:** parar de recusar respostas VÁLIDAS no gate da alocação de ganhos (Seção 2.4) — hoje o prompt
 só reconhece "o time entrega A MAIS", então "reduzimos 3 auxiliares" leva reperguntas — e cortar a segunda

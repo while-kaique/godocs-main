@@ -26,14 +26,21 @@ está**, mesmo disparando sem consequência em 15 de 24 conversas. Reavaliar dep
 pós-#216. O limiar de 176h **não é mais pendência** (a decisão foi tomada).
 ⚠️ **`respostaAlocacaoVaga` não se mexe** — o defeito é 100% de prompt; o predicado já aceita "redução de 3
 auxiliares".
-**Próximo:** `/ggsd:code` da fatia A1 (plano aprovado; o `plan-gate` libera).
+🔧 **A1 codada em 2026-07-30** (`b390c62`, `fix/gate-alocacao-taxonomia-e-materialidade`, 797 verdes):
+`TAXONOMIA_DESTINO_GANHO` como fonte única dos 5 destinos + anti-loop determinístico no juiz do preview.
+⚠️ Registrado na execução: o piso `respostaAlocacaoVaga` ainda marca como vaga a resposta que **mistura**
+destino válido com filler ("o time menor dá conta com essa otimização") — custo de **1 repergunta**, e
+alinhá-lo é **fatia própria** (fronteira deste plano).
+**Próximo:** **T7** — staging `edf400b4` com o cenário-âncora (redução de headcount aceita de primeira) → prod
+`674a3710` → PR.
 
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
 `E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
 
-**Próximo:** `/ggsd:code` da **Fase 6 / fatia A1** (plano aprovado). Em paralelo, humano: avisar o Rafa e
+**Próximo:** **T7 da Fase 6 / fatia A1** — staging `edf400b4` → prod → PR (código já commitado, `b390c62`).
+Em paralelo, humano: avisar o Rafa e
 calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
 causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
 Sheets) · poda do `CLAUDE.md` (~48k, teto 40k) · repovoar a aba `STAGING` com dado sintético.
