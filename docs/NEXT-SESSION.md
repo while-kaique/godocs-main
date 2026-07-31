@@ -4,248 +4,422 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-> **▶ PRÓXIMO PASSO:** **autenticar o MCP do GoDeploy** (`/mcp` → "claude.ai GoDeploy") e então
-> **deployar `9ce9b09` na STAGING `edf400b4`** → re-rodar o E2E dos 3 cenários + `inspect-perguntas.mjs`
-> (os pontos 1 e 2 do roteiro devem virar ✅) → chamar **`POST /api/admin/reanalisar-pendentes`** para
-> finalmente medir `Classificação`/`Reprovado`/`Motivo Reprovado` → limpar as linhas `[E2E-…]` da aba
-> STAGING → **prod `674a3710`** → PR. **Nada foi deployado nesta sessão.**
+**Última sessão:** 2026-07-30, parte 9 — **T7 da fatia A1 fechado: staging validada, prod deployado, repo
+sincronizado**. A1 está **completa** (T1–T7) e **em produção**; os 2 PRs pendentes do repo foram abertos
+(**#217** código, **#218** docs) e o `gh pr merge` foi **bloqueado pelo classificador de permissões**.
+Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 
-## Sessão de 2026-07-30 (código) — o gate do `[1.3]`/`[1.4]` foi CODADO; falta validar
+> **▶ PRÓXIMO PASSO:** **escolher a próxima fatia** (PRs #217 e #218 mergeados — staging, prod e `main`
+> sincronizados) — candidatas, nenhuma planejada: **(a) A2** — os gates ignoram materialidade
+> (`aplicaConfirmacaoBaseHoras`/`aplicaSplitCargaEscala` disparam com qualquer `horas_antes > 0`, então
+> 0,05h/mês leva o gate das 220h); **(b) auto-preenchimento da Seção 2.4** — achado novo do T7: com contexto
+> suficiente na doc o agente escreve o destino do ganho **sem perguntar** e **inventa** ("menos prazo / menos
+> retrabalho" que o usuário nunca disse), porque o atalho heurístico do gate
+> (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) libera quando a seção nomeia *algum* destino;
+> **(c) piso `respostaAlocacaoVaga`** — recusa resposta que MISTURA destino válido com filler (1 repergunta).
+> Qualquer uma delas começa com `/ggsd:plan`.
 
-Branch `feat/criterios-projeto-classificacao`, commit **`9ce9b09`**, **752 testes verdes** (13 novos),
-`build` + `build:worker` OK, `worker.js` recomitado. **Nada deployado** — staging e prod seguem em
-`53e8ef8`/`b6485e4`.
+## Sessão de 2026-07-30 (parte 9) — T7 da A1: staging → prod → repo
 
-**1. Gate determinístico das seções do critério (T8 do plano — o que a validação de 29/07 mandou fazer):**
-- `extrairProcessoAlterado` / `extrairPonteiroMovido` (`memorial-format.ts`). ⚠️ O `[1.4]` casa por
-  **PREFIXO** (`"ponteiro movido"`), não por título exato: senão a meia-seção
-  `**Ponteiro movido:** custo externo eliminado.` voltaria `null` e ficaria **indistinguível da ausência
-  total** — que é exatamente o que o gate precisa julgar.
-- Predicados puros `secaoProcessoVaga` / `secaoPonteiroVaga` (`orchestrator.ts`): ausente, curta
-  (`MIN_SECAO_CRITERIO` = 60) ou **sem nenhuma pista de onde conferir**. ⚠️ **Decisão fechada:** o gate
-  **NÃO** julga se a fonte foi bem NOMEADA ("no sistema" × "no Metabase") — a regex erraria e puniria quem
-  respondeu honestamente "não sei onde conferir", que é o **ponto 3** do roteiro e **passou** em staging.
-  Essa camada fica com o prompt e o analisador (zona cinzenta).
-- Estado **`criterio_secoes`** (`null`→`pendente`→`ok`) em **`SavingColetado` E `ReceitaColetada`**,
-  backend-only, re-mesclado a cada turno. ⚠️ Sem o re-merge do lado da **receita** o `'ok'` se perderia
-  (o LLM não ecoa o campo) e a pergunta voltaria — o **loop** que a lição do split carga×escala proibiu.
-- **ANTI-LOOP:** pergunta **1× só**; a resposta seguinte é sempre aceita e vira nudge `[SISTEMA]`. Roda
-  **por último** (jornada → teto → alocação → critério) e só sobre `preview`/`complete`.
-- Testes: `tests/gate-criterio-secoes.test.ts` (13) — inclui a meia-seção, o memorial legado com códigos
-  `[1.3]`/`[1.4]` e o caso que **não pode** bloquear (o "não sei onde conferir" honesto).
+**O que rodou:**
+1. **Testes + build na worktree `fix-gates-a1a2`:** 797 verdes; `npm run build` + `npm run build:worker`
+   reproduziram o `worker.js` já commitado (sem diff) — sinal de que o commit `b390c62` estava íntegro.
+2. **Staging `edf400b4` deployada** com o `dist/` inteiro via `scripts/deploy-godeploy.sh`. A conferência de
+   "qual branch está no ar" foi feita por comparação de branches: **todas** as branches locais menos as duas
+   pendentes já estavam contidas no `origin/main` (`39deaf9`), e a `fix/gate-…` estava 0 commits atrás dele —
+   logo o build é superset do que estava no ar, sem risco de apagar feature de outra branch.
+3. **Validação ponta a ponta na staging** (não só navegador): driver descartável no scratchpad reusando
+   `scripts/e2e/lib/{api,responder,env}.mjs`. O cenário-âncora **não** entrou em `scripts/e2e/scenarios.mjs`
+   porque o **gate de plano** recusa editar código sem plano ativo aprovado — a trava **não** foi contornada.
+   ⚠️ **Versionar o cenário no harness é passo próprio.**
+   - **Run 1** (doc com contexto rico): o agente **nunca perguntou** o destino — auto-preencheu a Seção 2.4 e
+     **inventou** "menos prazo / menos retrabalho". Ver o achado no próximo passo (b).
+   - **Run 2** (briefing negando explicitamente qualquer efeito de prazo/erro): o gate **perguntou 1×**, a
+     resposta de headcount foi **aceita de primeira**, **zero** reinterrogação no preview, e a seção saiu
+     gravada com a fala do usuário, enquadrada como *menos custo*. Planilha `STAGING`: 160h · R$ 2.230,40 ·
+     **AK preenchida** · split 160/0 · `Classificação` claro_sim.
+   - Limpeza: `POST /api/admin/e2e-cleanup` na staging (19 projetos `[E2E-…]` removidos).
+4. **Prod `674a3710` deployado** depois da staging (regra 13); os dois ambientes servem o mesmo entry
+   `index-CzawDJZX.js`, conferido via `GET /` com cookie.
+5. **Repo sincronizado:** `fix/gate-alocacao-taxonomia-e-materialidade` e
+   `docs/plano-loadings-dashboard-admin` empurradas; PRs **#217** e **#218** abertos e **mergeados** (o `gh pr merge` foi barrado pelo classificador na 1ª
+   tentativa e liberado pelo operador; a #218 exigiu resolver conflito de docs contra o `main` do #216).
 
-**2. Bloqueio do ANALISADOR — destravado só para VALIDAR:** rota **`POST /api/admin/reanalisar-pendentes`**
-(`requireAdmin`), mesmo trabalho do cron `reanalisar-pendentes` porém sob demanda (o cron de 1 min **não
-dispara na staging**). Repõe `Complexidade`/`Classificação` ou re-roda o analisador; idempotente
-(`reconciliarComplexidade`). ⚠️ **A causa-raiz segue ABERTA** — a análise ainda morre no `waitUntil`
-(timeout de 25s do proxy + fallback). As 2 saídas desenhadas e **NÃO** implementadas, decisão do Luis:
-(a) aterrissar a análise no próprio request do submit (o usuário passa a esperar ~40s);
-(b) o FRONT disparar `/api/chat/analisar` após o submit, no padrão do disparo de e-mails em lotes
-(precisa de guarda de idempotência, senão analisa 2× e paga 2× o LLM).
+**Armadilhas encontradas (para não repetir):**
+- ⚠️ **`E2E_COOKIE` expirado dá 302 em staging E prod** e o harness morre no 1º POST com "sessão não
+  autenticada". Cheque com `curl -H "Cookie: $E2E_COOKIE" <url>/api/auth/me` **antes** de rodar. Renovado
+  nesta sessão (`.env` da raiz **e** da worktree — `scripts/e2e/lib/env.mjs` lê o `.env` da raiz do worktree).
+- ⚠️ **Detector de "repergunta" ingênuo dá falso NEGATIVO:** (a) o `content` do **preview** contém o memorial
+  inteiro, então um regex de tema casa o texto do memorial e conta como "pergunta"; (b) o memorial gravado
+  **não** tem os `###` (o `normalizarMarcadoresMemorial` os remove), então procurar
+  `### O que mudou após a automação` não acha a seção que **está lá**. Case pelo título sem `#`.
+- ⚠️ O **gate de plano** (`plan-gate.sh`) barra edição de **código** — inclusive `scripts/e2e/*.mjs` — quando
+  o `## Plano ativo` do `NEXT-SESSION.md` não aponta plano `aprovado`. Docs passam.
 
-⚠️ **Travado no deploy:** o MCP `claude.ai GoDeploy` está **sem autenticação** nesta sessão — o Claude não
-consegue chamar `getUploadToken`/`updateApp`. O operador precisa rodar `/mcp` e autenticar.
+---
 
-⚠️ **`E2E_COOKIE` expira 30/07/2026 22:41 UTC** (ainda válido às 13:30 UTC de 30/07) — renove se a próxima
-rodada passar disso. **Limpeza pendente** (de 29/07): linhas `[E2E-stg-ctx-01]`/`[E2E-stg-ctx-02]` na aba
-STAGING — `npm run e2e:cleanup -- stg-ctx-01` e `… stg-ctx-02` (**planilha ANTES do SQLite**).
+**Sessão anterior:** 2026-07-30, parte 7 — **planejamento, sem código**: o escopo fechado na parte 6 virou
+**plano aprovado** ([taxonomia-destino-ganho-e-anti-loop](plans/taxonomia-destino-ganho-e-anti-loop.md)),
+com **duas mudanças de escopo decididas pelo Luis nesta sessão** (ver "Sessão de 2026-07-30 (parte 7)"):
+a **jornada preguiçosa saiu** e o **anti-loop do juiz** ganhou desenho determinístico.
 
-⚠️ Os **5 erros de `tsc`** seguem **pré-existentes** (`chat.functions.ts` + 3 em `submeter.tsx`) — nenhum
-erro novo foi introduzido.
+> ~~**▶ PRÓXIMO PASSO:** `/ggsd:code` da fatia A1~~ → **FEITO na parte 8** (T1–T6). A worktree
+> `.claude/worktrees/fix-gates-a1a2` (branch `fix/gate-alocacao-taxonomia-e-materialidade`, de `origin/main`
+> `39deaf9`) tem o commit `b390c62`. ⚠️ O nome da branch ainda diz "materialidade" (era o escopo A2, hoje
+> fora) — o conteúdo é **taxonomia + anti-loop**.
 
-## Sessão de 2026-07-29 (4ª rodada) — a validação em staging RODOU: o agente passa em 3 de 5, e o gate foi decidido
+> **▶ Pendências da frente anterior (3 humanas + 1 técnica), ainda válidas:**
+> 1. **Avisar o Rafa** — a reprovação automática está em prod e o **motivo é visível ao autor** (D10). A
+>    **calibração da régua com ele** segue pendente (agora pós-deploy).
+> 2. **Limpar as 15 linhas `[E2E-…]` da planilha da STAGING** — **não dá pelo script como está**: a planilha da
+>    staging é **arquivo próprio** cujo `GOOGLE_SHEETS_ID` é **secret do app** (o `.env` local tem o de prod).
+>    Com o ID em mão: `GOOGLE_SHEETS_ID=<id-staging> node --experimental-strip-types scripts/e2e/cleanup.mjs <runId>`
+>    (**planilha ANTES do SQLite**). IDs listados abaixo.
+> 3. **Causa-raiz do analisador morrendo no `waitUntil`** segue **aberta** — hoje o destrave é
+>    `POST /api/admin/reanalisar-pendentes` (40–70s). Precisa de plano próprio (`/ggsd:plan`).
+> 4. `CLAUDE.md` está em **~48k chars**, acima do teto de 40k — vale uma poda.
 
-Branch `feat/criterios-projeto-classificacao`. **739 testes verdes** (baseline conferido, nada de produto
-mudou). Único código tocado: **`scripts/e2e/inspect-perguntas.mjs`** (ferramenta de diagnóstico).
+## Sessão de 2026-07-30 (parte 8) — fatia A1 codada (T1–T6), staging pendente
 
-**7 conversas** contra a staging (runs `stg-ctx-01` + `stg-ctx-02`, o 2º com o cenário `especial`).
-Resultado completo, com evidência por ponto, em
-[`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) (seção "RESULTADO"). Em resumo:
-pontos **3, 4 e 5 ✅** (aceita "não sei" **sem inventar fonte** · zero repetição · **zero** pergunta de
-ponteiro — deduz do contrafactual, como projetado, com **1,8–2,7 perguntas/submissão** contra a baseline
-de 6,4); pontos **1 e 2 ❌** — o `receita-pura` fecha **sem o `[1.3]`** (as 2 rodadas) e **sem o `[1.4]`**
-(1 rodada), e o `custo-evitado-puro` grava só metade do `[1.4]` (`**Ponteiro movido:** custo externo
-eliminado.`, sem o "onde verificar") nas 2 rodadas. Pela regra de decisão do roteiro → **fazer o gate**.
+**Commit:** `b390c62` na `fix/gate-alocacao-taxonomia-e-materialidade` (worktree `fix-gates-a1a2`, sobre
+`origin/main` `39deaf9`). **797 testes verdes** (783 + 14 novos). `worker.js` rebuildado e commitado.
 
-⚠️ **O inspetor de perguntas estava MENTINDO** — lia `{messages:[…]}` com `content` em JSON, mas
-`/api/chat/historico/:id` devolve **array achatado** com `content` em **texto puro** (`options`/`fase`/
-`isPreview` são campos irmãos). Reportava **0 pergunta e 0 memorial em TODA conversa**: um falso negativo
-silencioso que levava à conclusão oposta ("o agente ignora as seções"). Corrigido e comentado no arquivo.
-**Lição:** instrumentação que só produz zeros é suspeita — confira contra o payload cru antes de concluir.
+**1. Fonte única.** `TAXONOMIA_DESTINO_GANHO` (`orchestrator.ts`, ao lado de `LIMITE_ECONOMIA_ALTA`) declara os
+**5 destinos aceitos** — *mais entrega · menos custo · menos erro/retrabalho · menos risco/fraude · menos
+prazo* —, cada um com exemplo concreto, e a régua nova: **basta NOMEAR o destino e encaixá-lo em UM dos 5**.
+Os **3 pontos** a interpolam (`blocoEconomiaAlta`, `blocoEconomiaAltaPv` e os 3 textos do gate em
+`chat.functions.ts`, que passaram a ser **exportados** para o teste da fonte única). Nenhum redigita a lista —
+e o teste garante isso derivando **em runtime** as linhas da constante e exigindo-as em cada consumidor.
 
-### ⛔ BLOQUEIO da próxima rodada — o ANALISADOR nunca foi validado (e não é bug do código novo)
-Nos 7 projetos a coluna `Classificação` saiu **`—`** e a `Complexidade` **vazia**. Causa, idêntica nos 7
-no log da staging: `[llm] Falha de TIMEOUT … 25000ms (proxy não respondeu)` → `fallback p/ OpenAI direto`
-→ **`waitUntil() tasks did not complete … have been cancelled`**. A análise morre antes de gravar; o
-código de classificação (T3/T4) **não chega a rodar**. A rede seria o cron `reanalisar-pendentes`, que na
-staging estava **`disabled`** — habilitei (`ejrje7my8g4c`, 17:02) e ele **continuou `last=never`**, com o
-`next` escorregando: **o cron de 1 minuto não dispara na staging**. ⚠️ **Deixei o cron LIGADO** — decidir
-se fica. Sem destravar isto, os critérios de aceitação **1 a 4** do plano (nuvem de palavras →
-`Reprovado` + motivo; `Classificação` nunca vazia) seguem **sem nenhuma evidência** e **não se pode ir a prod**.
-Caminhos: (a) fazer a análise aterrissar no próprio request (o fallback não cabe em 25s + `waitUntil`);
-(b) fazer o cron disparar na staging; (c) validar o analisador por teste/local em vez de staging.
+**2. Anti-loop determinístico.** `buildSavingPreviewPrompt` deixa de injetar o bloco de economia alta quando
+`saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. Sem campo novo, sem persuasão. O juiz **segue ativo**
+onde o gate não se aplica (`'nao'`/`'externo'`), que é onde ele é a única rede.
 
-### Limpeza pendente
-Linhas `[E2E-stg-ctx-01]` e `[E2E-stg-ctx-02]` na aba **STAGING** (7 projetos). O SQLite é limpo em bloco
-pelo endpoint (pega todo `[E2E-…`), mas as linhas da planilha precisam sair:
-`npm run e2e:cleanup -- stg-ctx-01` e `… stg-ctx-02` (**planilha ANTES do SQLite**, senão o sync reverso
-ressuscita). ⚠️ **`E2E_COOKIE` expira 30/07/2026 22:41 UTC** — renove antes da próxima rodada.
+**3. Fronteiras respeitadas (verificado por revisor de contexto fresco):** `respostaAlocacaoVaga`,
+`aplicaGateAlocacaoGanhos` e `LIMITE_ECONOMIA_ALTA` **inalterados** (zero hunks); jornada/220h, split
+carga×escala, critério `[1.3]`/`[1.4]`, `analyzer.ts` e colunas do Sheets intocados; o cabeçalho
+`### O que mudou após a automação` **permanece exato** (é por ele que a coluna AK é fatiada).
 
-## STAGING deployada em 2026-07-29 16:40 — commit `53e8ef8` (prod `674a3710` intacta)
+**4. ⚠️ O que a execução descobriu e NÃO corrigiu (registrado no plano, item (a)):** o piso
+`respostaAlocacaoVaga` ainda marca como VAGA a resposta que **mistura** destino válido com filler — medido:
+*"não repusemos a vaga, o time menor dá conta com essa otimização"*, *"as divergências caíram, ficou mais
+eficiente"*, *"o fechamento ficou mais rápido, sobra tempo"* → vaga. As frases **limpas** dos 5 destinos
+passam. Custo: **1 repergunta firme** (a 2ª resposta é sempre aceita), não os 5 do caso do Rafa. Alinhar o
+piso é **fatia própria** — o predicado é fronteira dura deste plano e mexer nele exige decisão do Luis.
 
-### E2E contra a staging — o que aprendi (reusável)
+**5. Ressalvas dos revisores (não bloqueantes, no commit e no plano):** conformidade **diverge-baixa** (link do
+plano na spec só resolve quando esta branch de docs mergear; a guarda saiu em arquivo novo em vez de estender
+`tests/gate-alocacao-ganhos.test.ts`) · qualidade **sugestoes** (além do item 4: a taxonomia inteira vai no
+texto exibido ao usuário e é reinjetada no histórico a cada turno, ~300 tokens — caberia derivar uma projeção
+curta para o chat da mesma fonte).
 
-- **O `E2E_COOKIE` do `.env` FUNCIONA na staging** — o cookie do edge vale para o domínio todo
-  (`/api/auth/me` → 200 nos dois hosts). Não precisa de cookie separado. (Expira 30/07/2026 22:41 UTC.)
-- Comando: `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING
-  E2E_ONLY=saving-puro,custo-evitado-puro,receita-pura npm run e2e:run -- <runId>` — **`E2E_ONLY`** filtra
-  cenários (não gasta os 24) e **`GOOGLE_SHEETS_TAB=STAGING`** faz o validador ler a aba certa.
-- ⚠️ **O E2E NÃO valida as mudanças do agente.** Ele confere as **colunas da planilha**; as perguntas vivem
-  nas `chat_messages`. Como o `[1.3]`/`[1.4]` são prompt-only, **passar no E2E não prova** que o agente
-  cumpriu as seções. Daí o **`scripts/e2e/inspect-perguntas.mjs`** (novo): lê o JSON do run, busca
-  `/api/chat/historico/:id` de cada projeto e reporta perguntas por fase · seções `[1.3]`/`[1.4]` presentes
-  no memorial · ponteiro/fonte perguntados >1× (anti-loop) · a seção `[1.4]` como foi gravada · média contra
-  a baseline de 6,4. Cobre 4 dos 5 comportamentos do roteiro.
-- ⚠️ **O ponto 3 do roteiro (o agente inventa fonte?) NÃO é automatizável assim** — o respondedor do E2E é um
-  LLM que tende a cooperar e dar uma fonte plausível. Precisa de humano no navegador respondendo "não sei".
-- **Logs:** MCP `getAppLogs` no `edf400b4` mostra request + `console.log` do worker (útil p/ erro/exceção),
-  **não** as perguntas do agente.
+**6. Não esquecer no T7:** conferir a branch no ar antes do `updateApp` (substitui a app inteira) · o
+`E2E_COOKIE`/`E2E_BASE_URL` (a worktree não tem `.env`, e o harness cai em **PROD** por default) · `tsc` tem
+**5 erros pré-existentes** (idênticos sem o diff — não são regressão).
 
-**Última sessão:** 2026-07-29 (3ª rodada) — o contexto do formulário passou a chegar aos 4 prompts
+## Sessão de 2026-07-30 (parte 7) — o escopo virou plano aprovado, com 2 mudanças de escopo
 
-## Sessão de 2026-07-29 (código, 3ª rodada) — o contexto do formulário chega ao agente
+**Nenhum código alterado** (sessão de planejamento; Gate D armado do começo ao fim). O plano está em
+[docs/plans/taxonomia-destino-ganho-e-anti-loop.md](plans/taxonomia-destino-ganho-e-anti-loop.md),
+**✅ aprovado (Luis, 2026-07-30)**.
 
-Branch `feat/criterios-projeto-classificacao`, commit **`53e8ef8`**, **739 testes verdes** (13 novos),
-`worker.js` rebuildado. **Nada deployado** — staging e prod seguem em `b6485e4`.
+**1. O defeito foi confirmado no código, e o culpado NÃO é quem se pensava.** A recusa de "menos custo" está
+em **3 textos de prompt** que definem resposta completa como _"atividades NOMEADAS **E** o que o time entrega
+**A MAIS**"_: `blocoEconomiaAlta` (`buildSavingPrompt`), `blocoEconomiaAltaPv` (`buildSavingPreviewPrompt`) e
+os 3 textos do gate em `chat.functions.ts` (`perguntaAlocacaoGanhos` / `…Firme` / `nudgeAlocacaoGanhos`).
+Quando o ganho é **menos custo**, a entrega **não aumenta** — e a resposta certa lê como incompleta. O
+`blocoEconomiaAlta` cita "redução de equipe-vaga não reposta" **de passagem**, num parêntese de exemplos, mas
+o **gate** da frase segue exigindo o par — e é o gate que decide. ⚠️ Confirmado que **`respostaAlocacaoVaga`
+(`orchestrator.ts:520`) NÃO reprova** "redução de 3 auxiliares" (tem número → aceita): o defeito é **100% de
+prompt**, e o predicado **não se mexe** (mexer afrouxaria a rede que pegou o boilerplate do Gostream).
 
-**O defeito que a sessão fechou.** O ponto `[1.4]` nasceu **cego ao contrafactual**:
-`contrafactual_afetados`/`contrafactual_reclamacao` eram gravados e lidos **só pelo analisador** — não
-existiam em `ProjetoContexto` nem no `SELECT` de `getProjetoContextoData`. O agente pedia o ponteiro sem
-saber o que a pessoa respondera duas telas antes. Causa de fundo, achada ao investigar: o contexto do
-formulário chegava aos prompts por **whitelist manual de 14 campos**, e só a fase de doc injetava a
-descrição breve — havia **dois canais** para o agente (o financeiro, `SavingColetado`, sempre completo; e o
-de contexto, a whitelist), com os campos "antes do chat" divididos entre eles por acidente.
+**2. Mudança de escopo — a jornada preguiçosa FICOU DE FORA (decisão do Luis).** O diagnóstico foi
+apresentado (o gate da jornada só define o `cap` do gate do teto, então com o maior cargo em 12h/mês a
+resposta é **inerte** — disparou em 15 de 24 conversas sem mudar nada) junto de um desenho **melhor que o
+limiar de 176h**: perguntar a jornada **sob demanda**, exatamente quando alguma linha passa de **220h** (o
+*menor* cap possível — logo, o único momento em que a resposta muda o resultado), sem número arbitrário e sem
+o risco que motivava a margem de 80%. **O Luis optou por deixar o gate como está.** O limiar de 176h,
+portanto, **não é mais pendência** — a decisão foi tomada. Reavaliar só **depois de re-medir** o baseline
+pós-#216.
 
-- **`buildRespostasFormulario(ctx)`** (`orchestrator.ts`, pura) — **FONTE ÚNICA** do bloco "RESPOSTAS QUE O
-  AUTOR JÁ DEU NO FORMULÁRIO", nos **4** prompts (doc · saving · receita · custo evitado): descrição,
-  contrafactual (quem + o que piora), escopo/serviço externo, AI Proxy + as regras "nunca pergunte de novo"
-  e "aponte contradição em vez de escolher em silêncio". Vazio → bloco omitido inteiro.
-  ⚠️ **Campo novo no formulário entra AÍ** + em `ProjetoContexto`/`getProjetoContexto`/
-  `getProjetoContextoData` — nunca solto num prompt (foi assim que o contrafactual ficou órfão).
-- **`buildDetalhesAprovados`** — fonte única do bloco que as 3 fases financeiras herdam da doc (era copiado
-  literalmente nas três) + `dependencias`/`configurar_antes`/`atencao`, que é onde os **sistemas nomeados**
-  (Metabase, Protheus, base X) aparecem — matéria-prima do "onde alguém confere" do `[1.4]`.
-- **`[1.4]` parte do que já existe:** deduz o ponteiro do contrafactual e **não pergunta** quando dá para
-  deduzir; **propõe** a fonte que a doc já nomeia em vez de perguntar em aberto. Efeito esperado: as duas
-  perguntas novas custam **+0 a +1** em vez de +0 a +3.
-- **Decisão registrada — a pergunta NÃO se move de tela.** O Luis considerou mover "quem reclama" para a
-  Etapa 2.5 e depois para depois da doc; ambas recusadas com motivo: a **Etapa 2 é o único ponto por onde
-  TODOS os projetos passam** (depois dela o fluxo abre em saving / receita / especial-que-pula-o-chat), então
-  mover custaria implementar 2× e perder no ramo especial — e, com o funil corrigido, mover **não compra
-  nada**, porque o campo nunca foi invisível por causa da tela. ⚠️ Não reabrir sem motivo novo.
-- **Testes:** `tests/contexto-formulario-agente.test.ts` (13) — as 4 fases recebem o contrafactual, rótulo
-  pessoa×time, valor legado sem prefixo não derruba a tela, seções vazias não viram `"null"`.
-- **Roteiro de validação:** `docs/roteiro-validacao-criterios.md` — define o que é "o agente acerta **sem
-  trava**" (5 comportamentos observáveis, com o ponto 1 sendo o mais grave porque falha em SILÊNCIO), os 8
-  cenários e a **regra de decisão** do gate.
+**3. Anti-loop do juiz do preview — desenho fechado (determinístico).** O juiz não tem limite de recusas e
+reinterroga mesmo depois do gate determinístico já ter coletado o destino (origem das 13 perguntas
+pós-preview do baseline). Fix escolhido: `buildSavingPreviewPrompt` **deixa de injetar** o
+`blocoEconomiaAltaPv` quando `saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. **Sem campo novo no
+estado e sem depender do LLM obedecer** a um "recuse só 1 vez" (persuasão é o tipo de garantia que já falhou
+no Gostream). O juiz **segue ativo** onde o gate não se aplica (contrafactual `'nao'`, custo evitado puro
+`'externo'`), que é onde ele é a única rede.
 
-⚠️ Os **5 erros de `tsc`** (`chat.functions.ts:1214/2955`, `submeter.tsx:446/566/589`) são **pré-existentes**
-— conferido com `git stash`. Não foram tocados.
-⚠️ **`CLAUDE.md` em 46,6k chars** (limite recomendado 40k; já estava em 44,6k) — enxugamento em PR próprio.
+**4. Fronteiras duras registradas no plano:** jornada/base 220h · split carga×escala · `respostaAlocacaoVaga`
+· `aplicaGateAlocacaoGanhos` · `LIMITE_ECONOMIA_ALTA` — **nada disso se mexe**. Fusão jornada+teto e
+re-medição do baseline seguem fora. **Confiança do blast-radius: média** — este repo **não tem**
+`docs/INDEX.md`, `docs/invariants.md` nem `scripts/ctx-route.sh`, então o mapeamento saiu de leitura direta
+do código; a sessão de código deve varrer os consumidores antes de editar.
 
-**Última sessão:** 2026-07-29 (código, 2ª rodada) — **refinamento pós-staging do critério de projeto**
-(pedido do Luis depois de ver a Etapa 2 na staging), branch `feat/criterios-projeto-classificacao`, commit
-`b6485e4`, **726 testes verdes**, staging `edf400b4` redeployado. Duas mudanças de **onde** a informação é
-coletada (D5 da spec revisado + D5b novo):
-- **O ponteiro movido saiu do formulário e virou trabalho do AGENTE.** Os cards "moveu o ponteiro de quê?" e
-  o campo "onde isso pode ser verificado?" foram removidos da Etapa 2; entrou a seção obrigatória **`[1.4]`
-  "Ponteiro movido e onde verificar"** no `MEMORIAL_ESQUELETO` (3 modos) + condução no `orchestrator.ts`: o
-  agente pergunta **1×** qual ponteiro moveu (`type:"options"`) e **1×** onde alguém abre e confere,
-  **constrói o racional junto com a pessoa**, e se ela não souber onde conferir **registra isso e segue**
-  (→ zona cinzenta, **nunca** reprovação automática); não pergunta se a doc aprovada já responde.
-  ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são colunas **LEGADO** — nada mais as escreve; **não
-  reintroduzir os cards de ponteiro na Etapa 2**.
-- **"Se desligar isso hoje, quem reclama?" virou seleção da Team Guide**, com filtro **dinâmico**: pessoa
-  (autocomplete nome/e-mail, mesma lista da Etapa 1 — cache de módulo, sem refetch) **ou** time/área inteiro
-  (`GET /api/areas`), para não marcar pessoa por pessoa quando o impacto é do time todo. Novo
-  `AfetadosInput` + coluna `contrafactual_afetados` (`"pessoa:a@x;b@y"` | `"time:Fiscal;CX"`) com
-  serialização pura testada. Só **"E o que piora?"** segue texto livre (premissa que assumi: o texto do
-  "o que piora" continua, porque é o sinal do contrafactual — se o Luis quiser cortar, é 1 linha).
-- **Reuso:** o posicionamento do dropdown por portal foi extraído para o hook **`useDropdownAnchor`**,
-  compartilhado agora pelos autocompletes das Etapas 1 e 2 (eram ~40 linhas duplicadas).
-⚠️ **Ainda não validado no navegador** — o fluxo do agente pedindo o ponteiro só aparece no chat.
-⚠️ **Prod (`674a3710`) e PR não foram tocados** nesta rodada, por decisão de fechamento de sessão.
-### Análise de fechamento (29/07, sem código) — onde cada informação deve ser colhida
-O Luis perguntou se o **"o que piora"** deveria ser determinístico na Etapa 2 ou ir para o agente. Conclusão:
-**manter determinístico**, porque a régua é assimétrica — no **ponteiro** o valor está na **argumentação**
-("no sistema" não é resposta; alguém tem de empurrar → agente), no **contrafactual** o valor está na
-**presença** (frase que o analisador e a triagem leem inteira → form garante que existe). Depender de prompt
-para o critério que reprova já falhou 2× neste repo (Seção 2.4 dos ≥44h; loop do split carga×escala). Além
-disso "quem reclama" + "o que piora" são o MESMO pensamento — separar quebra o par e gasta turno contra a
-métrica de 6,4 perguntas/submissão.
+**5. Não esquecer na sessão de código:** regra 3 (`prompt-registry.ts` **afirma hoje** a exigência antiga do
+"A MAIS" — sem atualizar, o registry passa a mentir), regra 1 (`worker.js` rebuildado e commitado), regra 12
+(`SPEC_CORRECOES.md`) e regra 13 (**staging `edf400b4` antes de prod**, com o cenário-âncora da redução de
+headcount tendo de passar **de primeira**). O cabeçalho `### O que mudou após a automação` **permanece
+exato** — `extrairAlocacaoGanhos` fatia por ele para a coluna "Alocação Ganhos" (AK).
 
-**Como a conferência dos pontos `[1.3]`/`[1.4]` acontece hoje: SÓ AUTOCONFERÊNCIA DO LLM (sem trava).**
-Verificado em código: as duas fases (`orchestrator.ts:940` saving · `:347` receita) só dizem *"você NÃO pode
-gerar o preview sem ter resposta para TODOS os pontos"*, e a receita ainda lista *"confirme internamente que
-TODOS os pontos 1.3, 1.4 e 6.1-6.5 estão preenchidos"*. O esqueleto declara as duas seções como obrigatórias
-(no modo `custo_evitado` ele é renderizado literalmente; saving/receita ainda inline). A única rede
-determinística é **depois do fato**: `normalizarMarcadoresMemorial` troca o `[1.4]` residual pelo título, e o
-**analisador** puxa para **zona cinzenta** quando a seção falta ou diz "não sei onde conferir". Ou seja:
-**se o agente pular o `[1.4]`, NADA bloqueia o preview** — ao contrário dos gates com dente (jornada, teto
-por pessoa, alocação ≥44h), que vivem em `chat.functions.ts` e descartam o preview do LLM.
-⚠️ Prompt sozinho já falhou 2× aqui (Gostream/Seção 2.4 · custo evitado puro, que exigiu backstop em
-`iniciarSaving`) — é a mesma classe de risco.
+## Sessão de 2026-07-30 (parte 6) — o que o agente pergunta hoje, e o que ainda falta podar
 
-**Duas pendências que saíram dessa análise (nenhuma codada):**
-1. **O agente não recebe o contrafactual.** Verificado: o `orchestrator.ts` só vê `descricao_breve` + a doc
-   (as ocorrências de "contrafactual" lá são do *saving contrafactual*, outro conceito). Fraqueza da escolha
-   acima: texto livre em form atrai linha preguiçosa e **ninguém cobra**. Arranjo proposto — **o form garante
-   que existe, o agente garante que presta**: injetar `contrafactual_afetados`/`contrafactual_reclamacao` no
-   contexto do memorial e aprofundar **1× SÓ se vago**, calando quando concreto (~1 campo no ctx + 3 linhas
-   de prompt).
-2. **RECORRÊNCIA — o 1º critério da régua — não é perguntada em lugar nenhum.** Nem form, nem agente: o
-   analisador **infere** do "Execução/trigger" da doc + do "já está em produção?" da Etapa 1. É justamente o
-   critério que reprova a **nuvem de palavras**, e é o único dos três por inferência — doc bem escrita fura.
-   **Recomendação:** pergunta determinística de **1 clique** na Etapa 2 ("com que frequência roda hoje:
-   agendado · por evento · sob demanda · rodou uma vez") — é **fato, não julgamento**, e fecha a régua.
-3. **Gate opcional do `[1.4]` (só com o ok do Luis).** Clonar o padrão que funcionou (`alocacao_ganhos`) na
-   versão barata: antes do preview, extrair a seção do ponteiro; nomeia fonte → **libera**; falta ou é vaga
-   ("no sistema"/"no ERP") → **bloqueia e pergunta 1× SÓ**, depois segue (anti-loop, lição do split que
-   travou a edição). ~1 extrator + 1 estado + ~30 linhas em `enviarMensagem`. **Faz sentido no MESMO passo da
-   recorrência** (mesmo trecho de `chat.functions.ts`). ⚠️ Decidir **depois** do staging: a validação mostra
-   com que frequência o agente acerta **sem** gate — se acertar sempre, o gate cai de prioridade.
-   ✅ **A pendência 1 (o agente não recebia o contrafactual) foi RESOLVIDA** no commit `53e8ef8`. A 3 segue
-   aberta, mas agora tem **critério de decisão escrito** (os 5 comportamentos + a regra) em
-   [`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) — não é mais julgamento no ato.
+**Nenhum código alterado** (o `plan-gate` recusou — ver Próximo passo). Sessão de leitura sobre
+`origin/main` `39deaf9`, não sobre o doc de 28/07 — a diferença importa, porque o `#216` mexeu nas perguntas.
 
-⚠️ **`CLAUDE.md` desta branch está em ~44,6k chars** (limite recomendado 40k) — vale um enxugamento em PR
-próprio; a seção do critério de projeto já foi escrita condensada.
+**1. Inventário do que a pessoa é perguntada HOJE** (levantado do código, não do baseline velho):
+- **Form** — Etapa 1: equipe + papel por participante (Coautor único). Etapa 2: nome · data · contexto de
+  negócio · AI Proxy · **"se desligar isso hoje, quem reclama?"** (pessoa/time da Team Guide) · **"e o que
+  piora?"** · arquivos. Etapa 2 financeira: "alguém já fazia?" → horas antes/depois · recorrência · custo
+  evitado · custo do projeto.
+- **Chat/doc** — só os campos que o extrator não tirou do código, + "usa IA como funcionalidade?" e, se sim,
+  "em que parte a IA entra?" (2 turnos, sempre).
+- **Chat/memorial** — as duas seções novas do critério: **`[1.3]` Processo alterado** e **`[1.4]` Ponteiro
+  movido e onde verificar**, nos 3 modos, com gate determinístico anti-loop (`perguntaCriterioSecoes`).
+- **Gates de sistema** — jornada/220h → teto por pessoa → split carga×escala → alocação de ganhos.
 
-_(Antes desta:)_ **2026-07-29 (código, 1ª rodada)** — **executado o plano do critério de projeto** (T1–T7), branch
-`feat/criterios-projeto-classificacao` (worktree `.claude/worktrees/criterios-projeto`, criada de
-`origin/main` `ad64895` + merge). Entregue: **(T1)** 2 perguntas determinísticas na Etapa 2 — *"moveu o
-ponteiro de quê?"* (cards multi: Custo · Receita · KPI · **Nenhum/ainda não sei**, que **passa**), *"onde
-isso pode ser verificado?"* (rastreabilidade, obrigatória só com ponteiro concreto) e *"se desligar hoje,
-quem reclama?"*; **(T2)** seção obrigatória **"Processo alterado"** no `MEMORIAL_ESQUELETO` (3 modos) +
-instrução anti-redundância nos prompts (não pergunta quando a doc já traz a magnitude, máx. 1 pergunta);
-**(T3)** o analisador classifica **claro sim / zona cinzenta / claro não** com justificativa SEMPRE, via as
-funções PURAS `normalizarClassificacao` (nunca reprova sem motivo · especial nunca reprova · >R$5k → zona
-cinzenta · fallback da justificativa) e `decidirStatusSubmissao` (status interno **e** rótulo do Sheets no
-mesmo lugar); **(T4)** 3 colunas por NOME (`Classificação` · `Motivo Reprovado` · **`Motivo Reenvio`, que o
-sistema NUNCA escreve**) + 6 colunas SQLite + o cron de reconciliação repondo `Classificação` vazia;
-**(T5)** modal de triagem do `/dashboard` grava os motivos em coluna própria, **sem tocar `Observações`**;
-**(T6)** o **autor vê o motivo** (aviso "Projeto reprovado" no card de Meus Projetos + bloco em
-`/projeto/$id`); **(T7)** régua de 1 página para o Rafa + `spec-docs/SPEC_CRITERIOS_PROJETO.md` (D1–D10).
-**723 testes verdes** (+65), `build` + `build:worker` OK (`worker.js` recomitado), `CLAUDE.md`/`docs/`
-atualizados (entrando enxugando: o bullet de carga×escala e o de alocação de ganhos foram condensados).
-De quebra, **reuso em vez de duplicação**: o card de checkbox foi extraído da Etapa 2.5 para
-`CardCheckboxGroup` e agora serve às duas telas.
-⚠️ **Os 3 cabeçalhos foram conferidos na planilha** em 29/07: `GoDocs` já tinha as colunas; a aba `STAGING`
-**não** tinha e o Luis as criou na hora (as duas abas agora com 51 colunas, grafia idêntica).
-⚠️ **Revisores de contexto fresco NÃO rodaram** — decisão do Luis nesta sessão (as instruções da sessão
-restringem subagentes); a revisão do diff (30 arquivos) acontece na validação em staging.
+**2. Prestação de contas da frente [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md):**
+**T1** ✅ (baseline) · **T2** ✅ (virou o plano do critério e foi executado inteiro, PR #216) ·
+**T3 e T4 ABERTOS**. Confirmado **no código do `main`**, não presumido: `orchestrator.ts` segue exigindo
+_"o QUE passaram a entregar A MAIS"_ e o juiz do preview segue mandando recusar **sem contador anti-loop**;
+`aplicaConfirmacaoBaseHoras` e `aplicaSplitCargaEscala` seguem disparando com qualquer `horas_antes > 0`.
 
-_(Antes desta:)_ **2026-07-29 (planejamento)** — nova frente, pedida pelo Luis: **apertar o critério de
+**3. Achado desta sessão — o gate da jornada não tem consequência própria** (`chat.functions.ts:1435-1490`):
+a única coisa que a resposta faz é definir o `cap` do gate do teto (`tetoPorJornada`: 220h dias úteis / até
+~300h com trabalho humano no fim de semana). Com o maior cargo em 12h/mês, a resposta é **inerte** — o teto
+nunca é atingido nos dois cenários. É por isso que ele disparou em 15 de 24 conversas sem mudar nada.
+
+**4. Escopo fechado da próxima fatia (decisões do Luis nesta sessão):**
+- **A1 — taxonomia de destino do ganho + anti-loop.** Constante única `TAXONOMIA_DESTINO_GANHO` consumida
+  pelos **3** lugares (bloco 2.4 do `buildSavingPrompt`, juiz do `buildSavingPreviewPrompt`, perguntas do
+  gate em `chat.functions.ts`): aceitar **mais entrega · menos custo · menos erro/retrabalho ·
+  menos risco/fraude · menos prazo** — _"a mesma entrega com um time menor"_ passa a ser resposta **válida e
+  completa**. O juiz do preview ganha limite de **1 recusa** (hoje não tem — daí as 13 perguntas
+  pós-preview). ⚠️ `respostaAlocacaoVaga` **já aceita** "redução de 3 auxiliares" (não bate no regex vago):
+  o defeito é 100% de **prompt**, não do predicado — não "consertar" o predicado por engano.
+- **Jornada preguiçosa** — só perguntar quando alguma linha tem `horas_antes` **≥ 176h/mês** (80% do teto;
+  a margem cobre o usuário corrigir as horas para cima no meio da conversa). **⏳ falta o Luis confirmar o
+  número.**
+- **Split carga×escala fica COMO ESTÁ** — decisão explícita do Luis nesta sessão. Não mexer.
+- **Fundir jornada + teto numa pergunta só ficou FORA** desta fatia (é o T3 estrutural; foi assim que nasceu
+  o loop do split). Reavaliar **depois de re-medir**.
+- ⚠️ **Re-medir antes de podar mais:** o baseline de **6,4 perguntas/submissão** é de **28/07, ANTES** do
+  #216 — que somou `[1.3]`/`[1.4]` **e** passou a injetar o contrafactual e a doc aprovada em todos os
+  prompts (`buildRespostasFormulario`). O saldo é desconhecido; rodar o mesmo script sobre as submissões
+  pós-#216 custa pouco.
+
+## ✅ Critério de projeto — EM PRODUÇÃO (PR #216 mergeado, `main` `39deaf9`)
+A calibração da régua (**só prompt**, `analyzer.ts`) foi provada ao vivo na staging: o cenário
+`criterio-claro-nao` (a **nuvem de palavras**, o caso do Rafa que motivou a frente) fechou em **Status
+"Reprovado"**, `Classificação` = _"Claro não — a recorrência falha… o contrafactual também falha… **a
+rastreabilidade do artefato existe, mas não compensa a falta do par**"_ e **`Motivo Reprovado`** legível, com
+caminho de volta pro autor. Os dois furos diagnosticados na parte 3 fecharam: o **entregável** deixou de valer
+como rastreabilidade e a **falha simultânea** (recorrência **e** contrafactual) virou exceção declarada ao
+"na dúvida → zona_cinzenta". `normalizarClassificacao` **intacta** (segue só rebaixando — D9).
+
+**Guarda de falso-positivo passou** (run `20260730-1300`, staging): `saving-puro` → **Claro sim** ·
+`custo-evitado-puro` → **Claro sim** · `complexidade-autonomia` → **Claro sim** · `receita-pura` →
+**Zona cinzenta**. **Nenhum** cenário legítimo virou `claro_nao`. 783 testes, `build` + `build:worker` OK,
+prod conferido (entry servido = build novo, favicon 200, `/api/auth/me` OK).
+
+## ⚠️ ARMADILHA que custou 3 projetos de teste EM PRODUÇÃO — ler antes de rodar E2E
+`scripts/e2e/lib/env.mjs` resolve o `.env` em `../../../.env` e, **quando não acha, cai em PROD**
+(`https://godocs.devgogroup.com`). **Worktree não tem `.env`** → dois runs foram pra produção e submeteram 3
+projetos `[E2E-20260730-1256]` na planilha real (removidos com `cleanup.mjs`, planilha antes do SQLite; prod
+voltou a **0** linhas E2E e 563 no total). **Sempre** exportar explicitamente:
+
+```bash
+export E2E_BASE_URL=https://godocs-staging.devgogroup.com
+export E2E_COOKIE=$(grep '^E2E_COOKIE=' /home/notebook/godocs-main/.env | sed 's/^E2E_COOKIE=//')
+```
+
+…e **conferir a linha `🚀 E2E run … contra <URL>`** antes de deixar rodar. Corolário: **nunca** pipar o run
+pra `tail` — a saída fica presa e o run **parece morto enquanto está submetendo**.
+
+## 🐞 Achado pré-existente (NÃO investigar como bug novo)
+`saving-multicargo` estoura os **40 turnos** em loop de repergunta da **Seção 2.4** quando o respondedor do
+E2E não tem o dado ("o briefing não detalha"). **Falha idêntica no código de prod**, sem a frente — não é
+regressão. O gate determinístico da 2.4 tem anti-loop; quem repergunta sem limite é a rede LLM-juiz do
+`buildSavingPreviewPrompt`.
+
+## 🧹 Linhas `[E2E-…]` a remover da planilha da STAGING (15)
+`d8ba3c3e8744ae84b969700ac757171b` · `ec2563e8f6ea9c5d25997765e32d97a8` · `dc17203497483353a6d232f46da60a79` ·
+`0db1fc6f734db2a17ae455b539fce365` · `1f2355c3dd0e30843b73125ff3238fa3` · `35155594eafce787b872b598b7d96945` ·
+`e67a44f3b4fb1dc1b1464c7408f80cfa` · `565aebd32a41f5a50064bef308de6817` · `a35cd24e885d088b43068347400e2dc7` ·
+`993b3741bad60bd43da5f1518ec2b6f3` · `ef85becf58e866e62e88a672f6c6a176` · `8eef40970185448a2509572ed734c812` ·
+`fccdeceedad244127c29df30a80d75b1` · `c8de6939bcfdf5ba35847bad4f8b2447` · `f688432cf4628579cff8b3686c52e9f8`
+
+⚠️ A aba `STAGING` recebeu **cópia de dados reais de prod** (decisão do Luis, 30/07) — contra a regra de
+"dados simulados". Vale considerar repovoar com dado sintético.
+
+## ⚠️ Risco médio ACEITO que viaja com a frente
+`false` = "não achei o ID" **≠** "a linha nunca existiu": ID mexido à mão na planilha (ou append in-flight)
+pode gerar **2ª linha** em vez de no-op no fallback de recuperação da IDA. Auto-limitante (o append grava o
+`ID Projeto`). Detalhe em `spec-docs/SPEC_CORRECOES.md`.
+
+## ✅ O fix da cota se sustentou sob submissão real (`stg-crit-05`)
+Re-rodado o cenário `criterio-claro-nao` no worktree `staging-criterios-coautor` → projeto
+`35155594eafce787b872b598b7d96945` (R$ 27,88, 2h, pontual). **A linha CHEGOU na planilha** — era exatamente
+o que falhava antes (`429` no append + purga após a carência de 1h). `POST /api/admin/reanalisar-pendentes`
+devolveu `{"submetidos":570,"faltando":1,"reanalisados":1}` em **38s / HTTP 200** (antes: ~109 projetos por
+rodada e HTTP 500). `Complexidade` = `automacao`, coluna **`Classificação` gravada** com justificativa, e as
+2 seções novas do memorial (`Processo alterado` · `Ponteiro movido e onde verificar`) presentes.
+
+## 🐞 A RÉGUA NÃO REPROVA O CASO QUE A MOTIVOU — plano aprovado, código pendente
+O veredito do cenário foi **zona cinzenta**, não `claro_nao`: Status "Pendente" e `Motivo Reprovado` vazio —
+**correto para zona cinzenta**, mas significa que o caminho da reprovação segue sem exercício real e, em
+prod, tende a **nunca disparar**. E o cenário é a **nuvem de palavras**, o caso do Rafa que motivou a frente
+inteira e que está escrito como few-shot de `claro_nao` no próprio prompt (`analyzer.ts:265`).
+
+A justificativa gravada entrega as 2 causas: _"a recorrência não está bem sustentada… o autor afirma que
+nada piora e que ninguém pediu de novo; **por outro lado, há um indicador de uso e um resultado verificável
+no material do evento**, então não é caso de claro_nao"_. Ou seja: **(1)** o analisador aceitou o
+**entregável** (o slide) como **rastreabilidade** — prova que a peça foi feita, não que um ponteiro mudou; e
+**(2)** o "use com PARCIMÔNIA / na dúvida SEMPRE zona_cinzenta" absorveu um caso em que **recorrência E
+contrafactual falharam juntos**, que a própria regra já mandava reprovar. Parte disso é artefato do
+respondedor do E2E (ele inventou uma evidência plausível), mas **não tudo** — a régua cedeu mesmo com o
+contrafactual negado. A `SPEC_CRITERIOS_PROJETO.md` já listava _"régua a calibrar com o Rafa antes de
+produção"_ como pendência: é esta.
+
+⚠️ **A parte determinística está OK** e não é o problema: `claro_nao → rejeitado + "Reprovado"` tem teste
+(AC1 em `tests/criterios-classificacao.test.ts`) e a escrita das colunas foi provada ao vivo. O que falta é
+o LLM **chegar** a `claro_nao`. **Decisão do Luis nesta sessão: calibrar ANTES de prod** (revê o "subir tudo,
+calibrar depois" de mais cedo, agora que se sabe que a reprovação pode nunca disparar) — e **levar o fix do
+`resyncGoogle` junto**. Plano aprovado: ver "Plano ativo".
+
+_(Contexto da sessão anterior:)_ **2026-07-30, parte 2** (validação em staging — **achou e corrigiu um bug crítico**). O deploy de prod estava aprovado pelo Luis ("subir tudo, calibrar a régua do Rafa depois",
+escopo do form mantido como validado), mas foi **parado por um achado** que ele não conhecia.
+
+## 🐞 LOOP DE RECONCILIAÇÃO QUE ESTOURAVA A COTA DO SHEETS — corrigido, commit `cb8d677`
+**Regressão da própria branch do critério** (⚠️ `origin/main` está LIMPO — `classifNaPlanilha` não existe
+lá; prod nunca teve o bug). Em `reconciliarComplexidade` (`chat.functions.ts`) a coluna nova
+`Classificação` fez o critério de "já está pronto" virar `Complexidade preenchida E Classificação
+preenchida` — **impossível de satisfazer** para projeto ANTIGO: tem Complexidade na planilha,
+`Classificação` vazia (coluna nova) e **nada** de classificação no SQLite, então o cron escrevia só a
+Complexidade (que já estava lá), a Classificação seguia vazia e ele voltava no minuto seguinte. **Para
+sempre.** Medido nos logs da staging: **109 projetos distintos, 693 tentativas em 7 rodadas (~99 leituras
+de cabeçalho por minuto)** contra a cota de **60 leituras/min** do Sheets.
+
+**Danos reais observados** (e que iriam a prod): **707 erros 429**; o **append da submissão do run 3
+morreu** (`[google/sync] Falha ao inserir na planilha: 429`) → o projeto **nunca chegou à planilha**; e,
+passada a **carência de 1h**, `reconciliarExclusoes` **apagaria o projeto do SQLite** — perda silenciosa.
+⚠️ A cota é do **mesmo projeto GCP da produção** (`398963590019`), então a staging estava **degradando o
+Sheets de prod**; o cron da staging foi pausado durante o diagnóstico e **religado** após o fix.
+
+**Fix:** a decisão virou a função **pura** `decidirReconciliacaoPlanilha` — só age quando há algo
+**realmente gravável** (coluna vazia na planilha **E** dado no SQLite) ou quando cabe re-análise (SQLite
+vazio nas duas pontas); nada a fazer → não conta como pendente e **não gera leitura**. **8 testes de
+convergência** (`tests/reconciliacao-convergencia.test.ts`), incluindo estabilidade da 2ª passada.
+**769 testes verdes**, `build` + `build:worker` OK, `worker.js` recomitado, **staging redeployada 15:03**.
+✅ **PROVA no ar:** `POST /api/admin/reanalisar-pendentes` → `{"submetidos":569,"faltando":0,
+"ressincronizados":0,"reanalisados":0}` em **15,8s** e **HTTP 200** (antes: ~109/rodada e HTTP 500).
+
+## 🐞 2º gap ACHADO e NÃO corrigido (decisão do Luis: fora deste fix)
+**`resyncGoogle` não recupera linha ausente:** ele usa `modo: "edicao"` → `updateRowByProjectId`; se a
+linha não existe na planilha, **não acha nada, não faz nada e ainda devolve `ok:true`**. Ou seja: quando o
+append da IDA falha (cota/transiente), **não existe caminho de recuperação** e o projeto é purgado após 1h.
+Fix sugerido: cair para **append** quando a linha não existe, em vez de no-op silencioso.
+
+## ✅ Validado nesta sessão (lado do AGENTE, item 1 do pedido)
+O `stg-crit-02` (que ficou em voo na sessão anterior) **fechou com sucesso** nos 2 cenários — e o
+`receita-pura` **não** estourou os 40 turnos, o risco que o handoff anterior apontava. Rodou **no worktree**,
+logo **com** as 2 correções do harness. A ficha do `/dashboard` confirma no memorial gravado as duas seções
+novas (`Processo alterado` + `Ponteiro movido e onde verificar`) e o **comportamento 3** intacto: _"Não foi
+informado no briefing um relatório, painel, sistema ou base específica para conferência desse número;
+portanto, a ausência de fonte nomeada fica registrada explicitamente, **sem inventar referência**"_.
+
+## ⚠️ Ainda NÃO validado: `claro_nao → "Reprovado"` (item 2 do pedido)
+O cenário novo `criterio-claro-nao` **rodou e submeteu** (`f97856f5…`, ganho R$27,88/mês, 40 turnos não
+estourados) — mas a linha **não chegou na planilha** por causa do bug acima, então o caminho da reprovação
+**não pôde ser conferido**. Com o fix no ar, **basta re-rodar o cenário**. O analisador em si **funciona**:
+os 2 projetos do `stg-crit-02` têm `complexidade` gravada no SQLite (`autonomia`/`automacao`) — o que
+falhava era só a escrita na planilha.
+
+## 🧭 Descobertas de método que economizam tempo na próxima sessão
+- ⚠️ **A staging tem `GOOGLE_SHEETS_ID` PRÓPRIO** (secret separado) — **não** é a "planilha de prod
+  compartilhada" que o `CLAUDE.md` descreve. Ler a planilha da staging com o `.env` local (ID de prod) dá
+  **0 linhas** e parece bug do produto. **Caminho certo:** `GET /api/admin/dashboard/projetos` (listagem) e
+  **`GET /api/admin/dashboard/projetos/:id`** (a **linha INTEIRA**, é onde `Classificação`/`Motivo
+  Reprovado` aparecem). O `read-criterio.mjs` do scratchpad **mede a planilha errada** — corrigir ou largar.
+- O cron `reanalisar-pendentes` **dispara sim na staging** (o handoff anterior dizia que não) — ele
+  devolvia **500 por cota**, não silêncio.
+- `/api/admin/investigador/projetos` **não** expõe `classificacao_avaliacao`; `/api/meus-projetos` expõe
+  `motivo_reprovado`/`motivo_reenvio` em **snake_case**.
+
+_(Antes desta:)_ **2026-07-30 (validação em staging — critério de projeto)** — pedido do Luis: **validar por
+E2E na staging que o agente pergunta o que o planejamento definiu, antes de levar TUDO a produção**.
+
+**✅ O GATE T8 FUNCIONOU — os 2 cenários que falhavam na rodada de 29/07 passaram** (run `stg-crit-01`,
+staging `edf400b4`, `inspect-perguntas.mjs`):
+
+| Cenário | 29/07 (só prompt) | 30/07 (com o gate T8) |
+|---|---|---|
+| `custo-evitado-puro` | ❌ `[1.4]` gravada **pela metade** (só `**Ponteiro movido:** custo externo`, sem o "onde verificar") nas 2 rodadas | ✅ `[1.3]` **e** `[1.4]` completas — ponteiro (custo externo do contrato) **+** onde conferir (histórico de cancelamento/faturamento + Portal) |
+| `receita-pura` | ❌ `[1.3]` **ausente**; `[1.4]` ausente numa das rodadas | ✅ `[1.3]` **e** `[1.4]` presentes |
+
+Mais: **0 repetição** de pergunta de ponteiro/fonte · **2,5 perguntas/submissão** (baseline de prod **6,4**)
+— as seções novas **não engordaram o funil**. E o comportamento 3 (o mais importante) se manteve: no
+`receita-pura` o agente **registrou a ausência da fonte em vez de inventar uma** — _"O briefing não informou
+relatório, painel, sistema ou base específica para conferência desse número"_ → vira **zona cinzenta**, nunca
+reprovação automática. ⚠️ **A decisão do PREFIXO se provou load-bearing**: o agente gravou o título como
+`### Ponteiro movido e conferência` (não o título exato) — com casamento por título exato o gate teria lido
+`null` e reperguntado à toa. **Não "corrigir" o prefixo.**
+
+**Também verificado nesta sessão:** (a) a staging roda **exatamente** `staging/criterios-coautor` — o entry
+`index-CLeuBaiL.js` do `/index.html` ao vivo bate com o `dist/` local (é assim que se confere qual branch
+está no ar, ver a armadilha do deploy que apagou a Etapa 2); (b) **761 testes verdes** na branch de
+integração, que já contém **todo** o `origin/main` (`ad64895`) — é superset limpo para prod; (c) as 3 colunas
+do critério (`Classificação` · `Motivo Reprovado` · `Motivo Reenvio`) **existem no cabeçalho das DUAS abas**,
+`STAGING` **e** `GoDocs` — o pré-requisito de prod está cumprido (mapeamento é por nome; nome errado é
+ignorado com aviso silencioso).
+
+**2 buracos do harness E2E corrigidos** (commitados na branch de integração) — os dois faziam o teste medir a
+coisa errada: **(1)** o `metaPadrao` **nunca enviava** `contrafactual_afetados`/`contrafactual_reclamacao`, as
+perguntas-chave da Etapa 2 — sem elas o agente roda **cego ao contrafactual**, exatamente o cenário que o
+roteiro manda não medir (é `buildRespostasFormulario` que as entrega aos 4 prompts); **(2)** **nenhum cenário
+cobria `claro_nao`** — o único caminho que grava **"Reprovado"** na planilha e o que mais precisa de
+validação, porque o autor vê. Criado o cenário **`criterio-claro-nao`** (nuvem de palavras: rodou 1×, sem
+recorrência, ninguém reclama, materialidade minúscula de propósito — acima de R$5k/mês o invariante de
+`normalizarClassificacao` rebaixa para zona cinzenta e o teste não provaria nada).
+
+⚠️ **O lado do ANALISADOR (item 2 do pedido) segue SEM validação** — pelo mesmo motivo de 29/07, não por bug
+do código novo: a análise morre no `waitUntil` (timeout de 25s do proxy → fallback OpenAI → *tasks
+cancelled*) e o cron de 1 min **não dispara na staging**. A rota de destrave existe
+(`POST /api/admin/reanalisar-pendentes`, `requireAdmin`, idempotente) e **foi chamada**, mas devolveu **500 por
+cota do Google Sheets** (`ReadRequestsPerMinutePerUser`, 60/min — estourada pelas minhas próprias leituras da
+planilha + o run). **É transitório: esperar ~1 min e repetir.** A causa-raiz do `waitUntil` continua aberta
+(decisão do Luis entre aterrissar a análise no request do submit ou disparar do front em lotes).
+
+⚠️ **Divergência de escopo registrada:** o pedido do Luis listou **3** perguntas para o **formulário**
+("que processo mudou e quanto" · "moveu ponteiro de custo/receita/KPI" · "se desligar hoje quem reclama").
+Pela decisão de **29/07** só o **contrafactual** ficou na Etapa 2 ("quem reclama" + "o que piora"); as outras
+duas são conduzidas pelo **agente** no chat e é isso que o gate T8 cobre — foi assim que validei. Se o Luis
+quiser as três **no form**, é mudança nova e precisa ser dita **antes** do deploy de prod.
+
+_(Antes desta:)_ **2026-07-30 (código, avulsa — fora do plano ativo)** — pedido direto do Luis:
+**Coautor único por projeto**. Cada projeto tem **1 autor** (o submissor/dono, que não escolhe papel) e
+**no máximo 1 Coautor** (`coexecutor`); Participante e Contribuidor seguem **sem limite**. Implementação
+**100% cliente** (nada de schema, sync ou colunas do Sheets — `derivarColunasPapeis` continua aceitando
+lista por causa dos legados): helpers puros `PAPEL_COAUTOR`/`coautoresSelecionados()`/`limitarCoautorUnico()`
+em `src/lib/submeter/constants.ts`; `validarEtapa1` bloqueia 2+ Coautores nos dois modos (submissão nova e
+edição); no seletor (`ParticipantesPapeisInput`) a opção **Coautor SAI da lista** dos demais quando alguém já
+a tem (`papeisDisponiveis` — a 1ª versão mostrava a opção *desabilitada* com "(já definido)" e o **Luis pediu
+para removê-la da view**); nota informativa abaixo do campo explica a ausência; o **seed da edição**
+(`applySeed`, `submeter.tsx`) aplica `limitarCoautorUnico` — legado importado do Sheets pode trazer vários
+e-mails na coluna "Participantes", então mantém o 1º e **limpa o papel dos demais** para o usuário
+reclassificar (em vez de travar a edição num estado que ele não criou). Branch **`feat/coautor-unico`**
+(`da91207` + `0ff9f6b`, sobre `main` `ad64895`), 8 testes novos em `tests/validacao-etapa1.test.ts`,
+**667 verdes**; `CLAUDE.md` + `spec-docs/SPEC_FEATURES_NOVAS.md` atualizados. **✅ VALIDADO pelo Luis no
+staging.** ⚠️ **Armadilha real desta sessão, que não pode repetir:** o **staging estava rodando a branch
+NÃO-mergeada `feat/criterios-projeto-classificacao`** (as perguntas-chave da Etapa 2), e o primeiro deploy —
+buildado de `origin/main` — **apagou aquelas perguntas da tela** (o `updateApp` substitui a app INTEIRA).
+Corrigido com a branch de integração **`staging/criterios-coautor`** (= `feat/criterios-projeto-classificacao`
++ merge do coautor; conflito só em duas linhas de `import`), **761 testes verdes**, `build` + `build:worker`
+OK, **staging redeployado** com as duas frentes. **Prod (`674a3710`) NÃO foi tocado em nenhum momento.**
+**Regra que vale daqui pra frente: antes de deployar no staging, descobrir QUAL branch está no ar e mergear a
+sua sobre ela.**
+
+_(Antes desta:)_ **Última sessão:** 2026-07-29 (planejamento) — nova frente, pedida pelo Luis: **apertar o critério de
 projeto** (o pedido do Rafa, caso da **nuvem de palavras**). Plano ✅ **aprovado** em
 [`docs/plans/criterios-projeto-classificacao.md`](plans/criterios-projeto-classificacao.md). Escopo: (a) **2
 perguntas determinísticas na Etapa 2** — "moveu sensivelmente o ponteiro de custo/receita/KPI?" + "onde isso
@@ -306,15 +480,42 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
+**Nenhum plano ativo.** O último — [taxonomia-destino-ganho-e-anti-loop](plans/taxonomia-destino-ganho-e-anti-loop.md)
+— está **✅ executado** (T1–T7, prod deployado, PR #217). O próximo passo é **mergear #217/#218** e depois
+**planejar** a fatia escolhida (A2 · auto-preenchimento da Seção 2.4 · piso `respostaAlocacaoVaga`) com
+`/ggsd:plan`. Referência do que a A1 entregou:
+
+Implementa a fatia **A1** da frente
+[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) (T3): constante
+única `TAXONOMIA_DESTINO_GANHO` (5 destinos — mais entrega · **menos custo** · menos erro/retrabalho · menos
+risco/fraude · menos prazo) consumida pelos **3** textos que hoje exigem o par _"nomeado **E** entregar A
+MAIS"_, + **anti-loop determinístico** no juiz do preview (o bloco sai do prompt quando
+`saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`).
+
+⚠️ **A jornada preguiçosa saiu do escopo** — decisão do Luis nesta sessão: o gate da jornada **fica como
+está**, mesmo com o diagnóstico de que a resposta é inerte em 15 de 24 conversas (ela só define o `cap` do
+gate do teto). Reavaliar **depois** de re-medir o baseline pós-#216. Os itens estruturais (registro de "já
+respondido", orçamento de perguntas, fusão dos 4 gates, T4) seguem para depois da re-medição.
+
+Os dois planos da frente do critério estão **concluídos e em produção**
+(`calibragem-regua-criterio-e-resync-append` + `criterios-projeto-classificacao`, PR #216 mergeado,
+`main` `39deaf9`). O que sobrou dela é **humano**: avisar o Rafa e **calibrar a régua com ele** usando casos
+reais — reprovar projeto é visível ao autor (D10).
+
+Frentes candidatas à próxima sessão, nenhuma planejada ainda (entram por `/ggsd:plan`):
+- **causa-raiz do analisador morrendo no `waitUntil`** — hoje mitigado pelo cron de 1 min em prod
+  (`reanalisar-pendentes`, conferido ativo e 200), que em troca **pressiona a cota do Sheets** (60 leituras/min
+  compartilhadas com a staging). Caminho quente de submissão: não mexer sem plano;
+- **poda do `CLAUDE.md`** (~48k chars, teto 40k);
+- **repovoar a aba `STAGING` com dado sintético** (ela recebeu cópia de dados reais de prod).
+
+**Plano anterior (a frente que este destrava)**
 **→ [docs/plans/criterios-projeto-classificacao.md](plans/criterios-projeto-classificacao.md)** ·
-Status: ✅ **executado (2026-07-29)** — código completo (T1–T7) **+ refinamento R1/R2 pós-staging** (ponteiro
-movido migrado para o agente · "quem reclama" por seleção pessoa/time da Team Guide) **+ R3: o contexto do
-formulário chega aos 4 prompts** (`buildRespostasFormulario`, commit `53e8ef8`), **739 testes verdes**.
-**O que falta não é código:** **deployar `53e8ef8` no staging `edf400b4`** (lá ainda está o `b6485e4`) e
-rodar os **8 cenários** de [`roteiro-validacao-criterios.md`](roteiro-validacao-criterios.md) → **prod
-`674a3710`** → PR, e **calibrar a régua com o Rafa** antes de produção (reprovar projeto é visível ao autor).
-**Barrar submissão segue FORA em definitivo** · **não reintroduzir os cards de ponteiro na Etapa 2** ·
-**"quem reclama" NÃO se move de tela** (a Etapa 2 é o único ponto por onde todos os projetos passam).
+Status: ✅ aprovado (Luis, 2026-07-29) e **CODADO** na branch `feat/criterios-projeto-classificacao`
+(T1–T8, até `9ce9b09`/`28cdb01`) — **no staging, ainda NÃO validado pelo Luis nem em prod**; era essa branch
+que estava no ar quando o deploy de 30/07 a sobrescreveu (ver "Última sessão").
+Critério de projeto: perguntas-chave na Etapa 2 + classificação em 3 níveis no analisador + reprovação com
+motivo nas colunas novas. **Barrar submissão segue FORA em definitivo** (a reprovação é pós-envio).
 
 **⚠️ Frente PARALELA, não sobrescrita — [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md)** ·
 Status: ✅ **aprovado (Luis, 2026-07-28)**, T1 executado, **ainda pendente de código**: **A1** (o gate da
@@ -366,34 +567,96 @@ _(Executados recentes: [aceitar-zip-submissao](plans/aceitar-zip-submissao.md) �
 ver pré-req das colunas abaixo.)_
 
 ## Próximo passo (setado)
-**Validar `feat/criterios-projeto-classificacao` no STAGING (`edf400b4`) e depois promover** — regra 13.
-Nesta ordem:
-1. **Calibrar a régua com o Rafa** — [`docs/criterios-projeto-recorrencia-evidencia.md`](criterios-projeto-recorrencia-evidencia.md).
-   É o gate humano que o plano de 28/07 exigia; reprovar projeto é visível ao autor. Pode rodar em paralelo
-   com o staging, mas **não** vai a prod sem o OK dele.
-2. ✅ **FEITO (29/07/2026, 13:55) — deploy no staging `edf400b4`** com o bundle `index-IxZZkvb_.js`
-   (conferido no `index.html` servido; `/favicon.svg` = 200 `image/svg+xml`). Prod NÃO foi tocado.
-   Falta só o Luis validar no navegador: Etapa 2 (as 2 perguntas + "Nenhum" avançando) → 3 submissões dos
-   critérios de aceitação na aba `STAGING` → seção "Processo alterado" no memorial → motivo no `/dashboard`
-   com `Observações` intacta → aviso do motivo em Meus Projetos e `/projeto/$id`.
-   _(Runbook original, se precisar redeployar:)_ **deploy no staging `edf400b4`** (fluxo do "Deploy rápido"; ⚠️ o `scripts/deploy-godeploy.sh` recebe o
-   **TOKEN**, não a URL, e o `uploadId` é **single-use** — novo `getUploadToken` entre staging e prod).
-3. **Validar os 3 cenários** dos critérios de aceitação, na aba `STAGING`: (a) submissão tipo "nuvem de
-   palavras" → `Classificação = "Claro não — …"`, `Status = Reprovado`, `Motivo Reprovado` preenchido;
-   (b) saving recorrente com indicador nomeado → `Claro sim` + `Status = Pendente` (nada mudou para ele);
-   (c) ganho real sem fonte verificável → `Zona cinzenta` + `Em validação`. Conferir que **nenhuma outra
-   coluna mudou** e que `Observações` fica intacta ao gravar motivo pelo `/dashboard`.
-4. **Prod `674a3710`** + `gh pr create` (conta **`LuisEduardo100`**, que tem WRITE; `rpaiagogroup` é READ).
+**→ Codar o plano aprovado com `/ggsd:code`: T1–T3 (calibrar a régua do `claro_nao`, só prompt) e
+T4–T5 (`resyncGoogle` recupera linha ausente por append), na branch `staging/criterios-coautor`.**
 
-**Pendências conhecidas (não bloqueiam o staging):**
-- **Harness E2E** (`scripts/e2e/`) valida A→AS e ainda **não** cobre as 3 colunas novas.
-- Projetos **legados** ficam com `Classificação = "—"` até serem reanalisados — **sem backfill** (decisão
-  implícita: o cron só repõe o que o SQLite tem).
-- Frente **paralela** [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md):
-  **A1** (o gate da alocação precisa aceitar "menos custo" — a taxonomia de impacto do T3 é reaproveitável)
-  e **A2** (materialidade nos gates) seguem pendentes de código.
-- ⚠️ `CLAUDE.md` em **~45,7k chars** (limite recomendado 40k; entrou +0,6k líquido nesta sessão, já com dois
-  bullets condensados). Continua valendo uma sessão de enxugamento.
+```bash
+cd .claude/worktrees/staging-criterios-coautor   # a branch que está NO AR na staging
+# T1-T3: src/lib/agents/analyzer.ts (régua) · T4: src/lib/google/sheets.ts · T5: src/lib/google/sync.ts
+npm run test && npm run build && npm run build:worker   # + comitar worker.js (regra 1)
+```
+**Depois, na ordem:** (1) **T6 — deploy no staging `edf400b4`** e re-rodar o cenário, esperando agora
+**Status "Reprovado" · Classificação "Claro não…" · Motivo Reprovado preenchido**:
+```bash
+E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING \
+  E2E_ONLY=criterio-claro-nao npm run e2e:run -- stg-crit-06
+curl -H "Cookie: $E2E_COOKIE" \
+  https://godocs-staging.devgogroup.com/api/admin/dashboard/projetos/<ID>   # a linha INTEIRA
+```
+⚠️ **NÃO use o `read-criterio.mjs`** do scratchpad — ele lê a planilha de **PROD** (a staging tem
+`GOOGLE_SHEETS_ID` próprio). Analisador não gravou (waitUntil)? `POST /api/admin/reanalisar-pendentes`
+(~38s, não estoura mais a cota). (2) **limpar os runs** — `npm run e2e:cleanup -- stg-crit-05` (e `01`/`02`/
+`03`, e o `04` que ficou parcial de um run abortado), **planilha ANTES do SQLite**, senão o sync reverso
+ressuscita. (3) **prod `674a3710`** (`getUploadToken` novo — `uploadId` é **single-use** — e o script recebe
+o **TOKEN**, não a URL). (4) **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`).
+⚠️ **Avisar o Rafa logo após o deploy:** reprovar projeto é **visível ao autor** (D10), e a régua vai ao ar
+recém-calibrada, sem rodada de calibração com ele.
+
+### _(Passos da sessão anterior — o que sobrou deles)_
+**Fechar a validação do critério e levar as DUAS frentes a produção** (o Luis respondeu a pergunta que estava
+aberta: quer **prod recebendo todas as mudanças**, depois de validar o critério por E2E na staging). O lado do
+**agente já está validado** (tabela no topo). Falta, nesta ordem:
+
+1. **Terminar o run `stg-crit-02`** (`receita-pura` + `custo-evitado-puro`) — ficou **em voo** no fim da
+   sessão, preso num vai-e-vem longo da fase **doc** do `receita-pura` (o respondedor do E2E responde "não
+   está no briefing" e o agente repergunta; pode bater no `MAX_TURNS`). Log em
+   `.../scratchpad/e2e-stg-crit-02.log`. ⚠️ **Não é bloqueio da validação** — o `stg-crit-01` já cobriu os
+   dois cenários com sucesso; se o `stg-crit-02` estourar turnos, isso é achado do **respondedor**, não do
+   produto.
+2. **Rodar o run 2 com os campos novos** (o harness já foi corrigido e commitado):
+   `E2E_BASE_URL=https://godocs-staging.devgogroup.com GOOGLE_SHEETS_TAB=STAGING
+   E2E_ONLY=criterio-claro-nao,receita-pura npm run e2e:run -- stg-crit-03` — este é o que valida o
+   **item 2 do pedido** (classificação em 3) e o caminho **`claro_nao` → "Reprovado" + Motivo Reprovado**.
+3. **Destravar o analisador:** esperar ~1 min (cota do Sheets) e repetir
+   `POST /api/admin/reanalisar-pendentes`; depois ler `Classificação`/`Motivo Reprovado`/`Status` na aba
+   `STAGING` (script pronto em `.../scratchpad/read-criterio.mjs`).
+4. **Limpar** os projetos de teste: `npm run e2e:cleanup -- stg-crit-01` (e `stg-crit-02`/`stg-crit-03`)
+   — **planilha ANTES do SQLite**, senão o sync reverso ressuscita.
+5. **Prod `674a3710`** com a branch de integração `staging/criterios-coautor` (já é superset do `main`):
+   `npm run test && npm run build && npm run build:worker` → `scripts/deploy-godeploy.sh <TOKEN>` → `updateApp`.
+   ⚠️ `getUploadToken` novo (o `uploadId` é single-use) e o script recebe o **TOKEN**, não a URL.
+6. **PR** via `/ggsd:ship` (conta `gh` em `LuisEduardo100`).
+
+⚠️ **Antes do passo 5, ver a divergência de escopo das 3 perguntas do formulário** registrada no bloco da
+última sessão — se o Luis quiser as três **no form** (e não duas no agente), isso muda o que vai a prod.
+⚠️ **Gate humano ainda de pé:** a régua do Rafa (T7) **deve ser calibrada com ele antes do deploy em
+produção** — reprovar projeto é visível ao autor.
+
+_(Resolvido — era o "PRIMEIRO" desta seção:)_ o staging hoje carrega **duas** frentes
+(Coautor único, já validado + critério de projeto, ainda **não** validado por ele). Decidir com ele:
+**(1)** subir a prod **só o Coautor único** (`feat/coautor-unico` rebaseada no `main`) e abrir o PR dela,
+deixando o critério de projeto só no staging; ou **(2)** esperar a validação do critério de projeto e subir as
+duas juntas. **Não subir prod antes dessa resposta.** Quando vier, o caminho do Coautor é: rebase no `main`
+→ `npm run test && build && build:worker` → **deploy prod `674a3710`** → `/ggsd:ship` (PR).
+⚠️ Ao deployar staging de novo, cheque antes qual branch está no ar (foi o erro desta sessão) e use uma branch
+de integração; worktrees vivos: `.claude/worktrees/coautor-unico` e `.claude/worktrees/staging-criterios-coautor`
+(este com `node_modules` por **symlink** para o outro).
+
+**DEPOIS — Executar o plano [criterios-projeto-classificacao](plans/criterios-projeto-classificacao.md)** com
+`/ggsd:code`, T1 → T7. Worktree novo a partir de **`origin/main` (`ad64895`)** — a branch atual
+`docs/plano-loadings-dashboard-admin` é **só de docs e está ATRÁS do main** (o `/dashboard` de triagem e o
+`dashboard-admin.functions.ts` **não existem** nela; só no `main`).
+
+**Antes de escrever a primeira linha, nesta ordem:**
+1. **Conferir a grafia exata** dos 3 cabeçalhos novos (`Classificação`, `Motivo Reprovado`, `Motivo Reenvio`)
+   nas abas **`GoDocs`** e **`STAGING`** — o Luis já criou as colunas, mas o mapeamento é **por nome** e um
+   acento diferente faz a coluna ser **ignorada com aviso**, silenciosamente. As duas abas já divergem em
+   posição de coluna.
+2. Ler o plano ativo inteiro + a seção **"Decisões fechadas que NÃO podem ser corrigidas por engano"**
+   (`spec-docs/`, regra 12).
+3. Invocar a skill **`frontend-design`** antes da UI da Etapa 2 e do modal de triagem (regra 11).
+
+**Ordem sugerida de execução:** T4 (colunas/sync — desbloqueia a verificação) → T1 (Etapa 2) → T3 (analisador
++ `normalizarClassificacao`) → T2 (memorial/agente) → T5 (`/dashboard`) → T6 (motivo visível ao autor — **é
+julgamento do Claude, confirmar com o Luis se mantém**) → T7 (régua de 1 página pro Rafa).
+
+**2 pontos de atenção que o Luis já conhece e não devem ser "corrigidos" por engano:**
+- **Não** encerrar a regra TEMPORÁRIA do `Pendente` (decisão D1: a única exceção é `claro_nao → Reprovado`).
+- **Não** mexer no `CHECK` de `projetos.status` (exigiria rebuild da tabela); o discriminador da reprovação é a
+  coluna nova `classificacao_avaliacao`.
+- ⚠️ A régua do Rafa tinha **gate humano** no plano de 28/07 ("nenhum código encosta na régua antes do OK
+  dele"). O Luis mandou codar; a régua sai no mesmo PR (T7) e **deve ser calibrada com o Rafa antes do deploy
+  em produção** — reprovar projeto é visível ao autor.
 
 ✅ **T6 dos loadings encerrado em 2026-07-28:** branch já estava 0 atrás do `origin/main`; 658 testes + `build`
 + `build:worker` verdes (`worker.js` inalterado); **staging `edf400b4`** validada no navegador pelo Luis;

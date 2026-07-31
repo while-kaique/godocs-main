@@ -6,17 +6,53 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Fase atual:** Fase 5 — **critério de projeto** (código ✅ completo em 2026-07-29, na branch
-`feat/criterios-projeto-classificacao`). As Fases 3 e 4 estão ✅ **mergeadas e em prod** (PRs #214 e #215).
-**Próximo:** **validar o gate do `[1.3]`/`[1.4]`** — ele foi ✅ **codado em 2026-07-30** (`9ce9b09`, 752
-testes verdes) mas **nada foi deployado**: o MCP do GoDeploy está sem autenticação. Sequência: `/mcp` →
-deploy na **staging `edf400b4`** → E2E dos 3 cenários + `inspect-perguntas.mjs` (pontos 1 e 2 do roteiro
-devem virar ✅) → **`POST /api/admin/reanalisar-pendentes`** (rota nova, `requireAdmin`) para medir enfim
-`Classificação`/`Reprovado`/`Motivo Reprovado` — o cron de 1 min **não dispara na staging**, e sem essa
-evidência os critérios de aceitação 1 a 4 seguem em aberto e **não se vai a prod**. ⚠️ A causa-raiz do
-`waitUntil` cancelado (timeout de 25s do proxy + fallback) continua **aberta** — decisão pendente entre
-aterrissar a análise no request do submit ou disparar `/api/chat/analisar` pelo front. Só então **prod `674a3710`** → PR — **calibrando a régua com o Rafa
-antes de produção** (reprovar projeto é visível ao autor).
+**Fase atual:** **nenhuma em aberto** — Fase 5 (**critério de projeto**) ✅ **CONCLUÍDA** em 2026-07-30:
+staging validada, prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). Fase 4 (loadings do
+`/dashboard`) ✅ (PR #215); Fase 3 (dashboard = triagem) ✅ (PR #214); `aceitar-zip-submissao` ✅ (PR #213).
+O **Coautor único por projeto** e o fix do **loop de reconciliação que estourava a cota do Sheets** (`cb8d677`)
+foram a produção **dentro do PR #216**.
+
+**Pendência HUMANA da Fase 5:** avisar o **Rafa** (a reprovação é visível ao autor — D10) e **calibrar a régua
+com ele** usando casos reais, agora pós-deploy.
+
+**Fase 6 — perguntas do agente, fatia A1 🟡 (plano ✅ APROVADO em 2026-07-30, código não começou):**
+**taxonomia de destino do ganho + anti-loop no juiz do preview**. A régua do critério entrou (Fase 5), mas a
+**poda** das perguntas antigas não: o gate da alocação ainda **recusa "menos custo"** (o caso real da redução
+de 3 auxiliares levou 5 reperguntas, por causa de 3 textos de prompt que exigem _"nomeado **E** entregar A
+MAIS"_) e o juiz do preview reinterroga sem limite. Plano em
+`docs/plans/taxonomia-destino-ganho-e-anti-loop.md`.
+⚠️ **A jornada preguiçosa saiu do escopo** — decisão do Luis em 2026-07-30: o gate da jornada **fica como
+está**, mesmo disparando sem consequência em 15 de 24 conversas. Reavaliar depois de re-medir o baseline
+pós-#216. O limiar de 176h **não é mais pendência** (a decisão foi tomada).
+⚠️ **`respostaAlocacaoVaga` não se mexe** — o defeito é 100% de prompt; o predicado já aceita "redução de 3
+auxiliares".
+✅ **A1 CONCLUÍDA em 2026-07-30** (`b390c62`, `fix/gate-alocacao-taxonomia-e-materialidade`, 797 verdes):
+`TAXONOMIA_DESTINO_GANHO` como fonte única dos 5 destinos + anti-loop determinístico no juiz do preview.
+**T7 fechado:** staging `edf400b4` validada ponta a ponta com o cenário-âncora (agente pergunta **1×**,
+"3 vagas não repostas / mesma entrega com time menor" **aceita de primeira**, sem reinterrogação no preview,
+seção gravada, coluna AK preenchida, 160h/R$2.230,40) → prod `674a3710` deployado → **PR #217 mergeado**.
+⚠️ Registrado na execução: o piso `respostaAlocacaoVaga` ainda marca como vaga a resposta que **mistura**
+destino válido com filler ("o time menor dá conta com essa otimização") — custo de **1 repergunta**, e
+alinhá-lo é **fatia própria** (fronteira deste plano).
+⚠️ **Achado novo do T7 (fatia própria):** com contexto suficiente na doc, o agente **auto-preenche** a
+Seção 2.4 **sem perguntar** e **inventa** o destino ("menos prazo/menos retrabalho" que ninguém disse) — o
+atalho heurístico do gate libera porque a seção nomeia *algum* destino. Rede restante: validação humana.
+**Próximo:** escolher a próxima fatia: **A2** (gates ignoram materialidade) ou o **auto-preenchimento
+da Seção 2.4** achado no T7.
+
+⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
+um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
+⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
+`E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
+
+**Próximo:** a próxima fatia da Fase 6 — **A2** (gates ignoram materialidade — 0,05h/mês leva o gate das
+220h) ou o **auto-preenchimento da Seção 2.4** achado no T7. Staging, prod e `main` estão sincronizados
+(PRs #217 e #218 mergeados).
+Em paralelo, humano: avisar o Rafa e
+calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
+causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
+Sheets) · poda do `CLAUDE.md` (~48k, teto 40k) · repovoar a aba `STAGING` com dado sintético.
+**Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
 
 ---
 
@@ -44,7 +80,7 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
-## Fase 3 — Dashboard do admin = triagem sobre a planilha ✅
+## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
@@ -68,52 +104,46 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
 
 **Próximo:** abrir o PR da `feat/dashboard-admin-sheets` (staging e prod já deployados).
 
-## Fase 4 — Loadings do `/dashboard` do admin ✅
+## Fase 4 — Loadings do `/dashboard` do admin 🟡
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,
 mas a causa é **serialização** — o `beforeLoad` bloqueia em "Verificando permissões" e só depois o `useEffect`
 lê a planilha; o cache do servidor é in-memory sem revalidação em background, e o de auth também.
 - ✅ Planejar (`docs/plans/loadings-dashboard-admin.md` — aprovado 2026-07-28; escopo escolhido pelo Luis:
   itens 1+2+3+4, **cache em SQLite FORA**).
-- ✅ Implementado T1–T5 (commit `3b93c65`) e **T6 fechado em 2026-07-28**: staging validada → prod
-  `674a3710` → **PR #215 mergeado** (`main` = `ad64895`). Nada pendente.
+- ⬜ Implementar T1 (SWR no servidor, cobre também a ficha) · T2 (auth em `sessionStorage`) · T3 (paralelizar
+  auth × planilha) · T4 (skeleton) · T5 (testes + `build:worker`) · T6 (spec + staging → prod).
 - **DoD:** cache vencido responde na hora com revalidação em background; reload/navegação entre telas admin
   não mostra "Verificando permissões"; as duas requisições saem em paralelo no 1º acesso; skeleton interativo
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
 
-## Fase 5 — Critério de projeto: elegibilidade, classificação e reprovação com motivo 🟡
-Pedido da gestão (Rafa, caso da **nuvem de palavras**): apertar o que conta como projeto pela régua
-**recorrência · contrafactual · rastreabilidade** — sem barrar o formulário.
-- ✅ Planejar (`docs/plans/criterios-projeto-classificacao.md` — aprovado 2026-07-29).
-- ✅ Implementar T1–T7 (2026-07-29): perguntas da Etapa 2 · seção "Processo alterado" no memorial ·
-  classificação em 3 níveis + `normalizarClassificacao`/`decidirStatusSubmissao` (puras) · 3 colunas do
-  Sheets + espelho SQLite + reconciliação · motivos na triagem do `/dashboard` · motivo visível ao autor ·
-  régua de 1 página + `spec-docs/SPEC_CRITERIOS_PROJETO.md`. **723 testes verdes.**
-- ✅ **Refinamento pós-staging (2026-07-29, pedido do Luis):** o **ponteiro movido + onde verificar SAÍRAM do
-  formulário** e passaram para o **agente** (seção obrigatória `[1.4]` "Ponteiro movido e onde verificar" nos 3
-  modos do `MEMORIAL_ESQUELETO` — pergunta 1× qual ponteiro, 1× onde se confere, constrói o racional COM a
-  pessoa, aceita "não sei onde conferir" → zona cinzenta, nunca reprovação automática); e **"quem reclama"
-  virou seleção da Team Guide** com filtro dinâmico **pessoa OU time/área inteiro** (`AfetadosInput`, coluna
-  `contrafactual_afetados`), só "o que piora" segue texto livre. **726 testes verdes**, staging redeployado.
-- ✅ **Contexto do formulário chega ao agente (2026-07-29, commit `53e8ef8`):** o `[1.4]` era **cego ao
-  contrafactual** — os campos da Etapa 2 nem eram lidos do banco para o agente. `buildRespostasFormulario`
-  virou a **fonte única** do bloco de formulário nos 4 prompts; `buildDetalhesAprovados` idem para a doc
-  herdada pelas fases financeiras (+ `dependencias`/`configurar_antes`/`atencao`, de onde sai a fonte do
-  `[1.4]`); o `[1.4]` passou a deduzir o ponteiro em vez de perguntar. **739 testes verdes.**
-  ⚠️ Decidido: **"quem reclama" NÃO muda de tela** — a Etapa 2 é o único ponto por onde todos os projetos
-  passam (depois dela o fluxo abre em saving/receita/especial).
-- ⬜ **Calibrar a régua com o Rafa** (gate humano — reprovar projeto é visível ao autor).
-- 🟡 Validar no **staging `edf400b4`** pelos **8 cenários** de `docs/roteiro-validacao-criterios.md` (que
-  também fixam a regra de decisão do gate do `[1.4]`) → **prod `674a3710`** → PR.
-- **DoD:** "nuvem de palavras" sai `Reprovado` com motivo; saving recorrente com indicador segue `Pendente`
-  sem mudança; ganho sem fonte vira `Zona cinzenta`/`Em validação`; a coluna `Classificação` nunca fica
-  vazia; ninguém é reprovado sem motivo; especial nunca reprova automático; `Observações` e `Motivo Reenvio`
-  intactas pelo sistema; contagem de perguntas por submissão não piora.
-- **Fronteira:** barrar submissão no formulário fica **FORA em definitivo**; a régua de complexidade e a
-  rota de projeto especial não foram tocadas; legados não recebem backfill de `Classificação`.
-
-**Próximo:** validar no staging o fluxo refinado (ponteiro no agente + seletor pessoa/time) e calibrar a
-régua com o Rafa.
+## Fase 5 — Critério de projeto: "isto é projeto?" ✅
+Pedido da gestão (Rafa) após submissões que não deveriam ter entrado — o caso-símbolo é a **nuvem de
+palavras** gerada uma vez para uma apresentação. Régua de 3 critérios (**recorrência · contrafactual ·
+rastreabilidade**; o impacto não precisa ser receita) julgando **elegibilidade**, separada da pontuação de
+qualidade. **Barrar submissão está FORA em definitivo** — a reprovação é pós-envio.
+- ✅ Planejar (`docs/plans/criterios-projeto-classificacao.md` — aprovado 2026-07-29) e **codar T1–T8**
+  (`feat/criterios-projeto-classificacao`, integrada em `staging/criterios-coautor`).
+- ✅ Validado na staging: o lado do **agente** (as 2 seções novas do memorial + o contrafactual da Etapa 2) e
+  a **escrita das colunas** (`Classificação` sempre preenchida).
+- ✅ **Régua calibrada e PROVADA ao vivo** (só prompt, `analyzer.ts`): o cenário `criterio-claro-nao` fecha em
+  Status **"Reprovado"** + `Classificação` _"Claro não — a recorrência falha… o contrafactual também falha… a
+  rastreabilidade do artefato existe, mas não compensa a falta do par"_ + `Motivo Reprovado` legível. O
+  **entregável** deixou de valer como rastreabilidade e a **falha simultânea** virou exceção declarada ao
+  "na dúvida → zona_cinzenta". `normalizarClassificacao` intacta (segue só rebaixando — D9).
+- ✅ **Guarda de falso-positivo passou:** `saving-puro`/`custo-evitado-puro`/`complexidade-autonomia` →
+  **Claro sim**; `receita-pura` → **zona cinzenta**; nenhum legítimo virou `claro_nao`.
+- ✅ **`resyncGoogle` recupera linha ausente** por append (sem leitura extra do Sheets).
+- ✅ T6 staging → **prod `674a3710`** → **PR #216 mergeado**. 783 testes verdes.
+- 🐞 Achado **pré-existente** (não é regressão): `saving-multicargo` estoura 40 turnos no loop de repergunta da
+  Seção 2.4 quando o respondedor não tem o dado — falha idêntica no código de prod.
+- ⬜ **Pendência humana:** avisar o Rafa + calibrar a régua com ele.
+- **DoD:** o cenário fecha com Status **"Reprovado"** + `Classificação` "Claro não…" + `Motivo Reprovado`
+  legível pelo autor; nenhum outro cenário muda de classificação; os guards de `normalizarClassificacao`
+  intactos (sem motivo → zona cinzenta · especial nunca reprova · > R$ 5k → zona cinzenta); nenhuma leitura
+  adicional do Sheets.
+- **Fronteira:** nada de **promoção determinística** para `claro_nao` — a normalização só **rebaixa** (D9);
+  a calibração é de **prompt**. A régua vai a prod recém-calibrada, sem rodada com o Rafa.
 
 ## Backlog
 - ⬜ Tela de gestão de admins (endpoints `/api/admin/admins` existem, ninguém consome; link "Configurações"

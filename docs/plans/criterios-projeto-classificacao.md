@@ -1,10 +1,17 @@
 # Plano — Critério de projeto: perguntas-chave + classificação da avaliação + reprovação com motivo
 
-**Status:** ✅ **executado (2026-07-29)** — T1–T7 codados **+ refinamento R1/R2 pós-staging no mesmo dia**
-(pedido do Luis, ver abaixo), **726 testes verdes**, `build` + `build:worker` OK, staging `edf400b4`
-redeployado. Falta o que **não é código**: validar no staging (os 3 cenários dos critérios de aceitação
-**+ o fluxo novo**) → **prod `674a3710`** → PR. ⚠️ **A régua (T7) deve ser calibrada com o Rafa antes de
-produção** — reprovar projeto é visível ao autor.
+**Status:** ✅ **CONCLUÍDO (2026-07-30)** — T1–T8 + a calibragem da régua **em produção**: staging validada,
+prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). 769 testes verdes na branch de integração
+`staging/criterios-coautor` (= critério + coautor único + o fix do loop de reconciliação, `cb8d677`).
+**Validado na staging:** o lado do **agente** (gate T8 + as 2 seções novas do memorial + registrar a ausência
+de fonte em vez de inventar) e, após a calibragem, o caminho **`claro_nao` → "Reprovado" + Motivo Reprovado**
+(o caso-âncora da nuvem de palavras passou a ser REPROVADO — ver
+[calibragem-regua-criterio-e-resync-append](calibragem-regua-criterio-e-resync-append.md)).
+⚠️ **A régua do Rafa (T7) foi a prod SEM calibração com ele** — decisão do Luis em 30/07 ("subir tudo,
+calibrar depois"); reprovar projeto é **visível ao autor**, então a **pendência HUMANA** é avisá-lo e calibrar
+a régua com casos reais.
+⚠️ **Escopo confirmado pelo Luis em 30/07:** ficam **2** perguntas no agente + **contrafactual** na Etapa 2
+(NÃO as 3 no formulário) — foi assim que a validação foi feita.
 
 ### R1/R2 — refinamento pós-staging (29/07/2026, commit `b6485e4`)
 Depois de ver a Etapa 2 na staging, o Luis mudou **onde** duas coisas são coletadas (D5 da spec revisado):
