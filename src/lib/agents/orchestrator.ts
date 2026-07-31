@@ -571,6 +571,24 @@ export function aplicaSplitCargaEscala(ctx: ProjetoContexto, saving: SavingColet
 // compartilharem o MESMO número (evita divergência).
 export const LIMITE_ECONOMIA_ALTA = 44;
 
+// TAXONOMIA DE DESTINO DO GANHO — FONTE ÚNICA da régua da Seção 2.4 ("o que mudou após a
+// automação"), consumida pelos 3 pontos que a cobram: o bloco de economia alta do
+// buildSavingPrompt, o LLM-juiz do buildSavingPreviewPrompt e os textos do gate
+// determinístico em chat.functions.ts (perguntaAlocacaoGanhos / …Firme / nudge…).
+// ⚠️ Antes, os 3 textos redigitavam a régua como o PAR "atividades NOMEADAS **E** o que o
+// time entrega A MAIS" — e quando a contrapartida do saving é MENOS CUSTO (vaga não
+// reposta, 3 auxiliares a menos, contrato cancelado) a entrega NÃO aumenta: fica igual com
+// menos gente. A resposta CERTA lia como incompleta e o gate reperguntava (5x num caso
+// real). Agora vale NOMEAR o destino e ENCAIXÁ-LO em um dos 5 — qualquer um basta.
+// A ponta vaga NÃO afrouxou: o que não nomeia nada segue recusado (respostaAlocacaoVaga).
+export const TAXONOMIA_DESTINO_GANHO = `DESTINOS QUE CONTAM — basta UM deles, não é preciso combinar dois. O destino está completo quando é NOMEADO e se encaixa em um destes 5:
+- **Mais entrega** — a mesma equipe passou a produzir mais volume ou algo novo (ex.: "o time dobrou as entrevistas por dia"; "cada analista cobre 2 lojas extras").
+- **Menos custo** — a mesma entrega com menos gente ou sem gasto externo (ex.: "3 auxiliares a menos"; "vaga não reposta após o desligamento"; "contrato terceirizado cancelado"). ✅ Vale POR SI SÓ — aqui a entrega fica IGUAL, e isso está correto.
+- **Menos erro/retrabalho** — a rotina passou a errar menos (ex.: "as divergências de conciliação caíram de 20 para 2 por mês").
+- **Menos risco/fraude** — passou a haver controle onde não havia (ex.: "toda liberação de crédito agora tem trilha de aprovação").
+- **Menos prazo** — o mesmo trabalho fica pronto mais rápido (ex.: "o fechamento saía no dia 10 e agora sai no dia 3").
+⚠️ O que NÃO conta é o que não nomeia nada: "ganhou produtividade", "sobra tempo", "ficou mais eficiente", "foi para outras atividades/outras demandas" sem dizer QUAIS. Número é bem-vindo quando houver, mas a falta dele não invalida um destino nomeado.`;
+
 // Escopo do GATE DETERMINÍSTICO da "Alocação de Ganhos" (Seção 2.4 — "O que mudou após a
 // automação"). Só quando ALGUÉM fazia a tarefa à mão (`alguem_fazia='sim'` → houve tempo
 // humano REAL liberado, sobre o qual a pergunta "pra onde foi?" faz sentido), o saving é
@@ -972,21 +990,23 @@ SEÇÃO 2.4 — O QUE MUDOU APÓS A AUTOMAÇÃO (OBRIGATÓRIO NESTE PROJETO)
 ECONOMIA ALTA DETECTADA: o saving total declarado é de ${totalHoras}h/mês.
 Isso é MUITA hora humana liberada — 44h/mês já equivale a uma jornada semanal CLT inteira por mês, e a maior linha individual sozinha equivale a ~${pctMesUtil}% de um mês útil (220h).${detalheLinhasAltas ? ` Cargo(s) com economia individual ≥44h/mês: ${detalheLinhasAltas}.` : ""}
 Um ganho desse porte SÓ É CRÍVEL se algo mudou DE VERDADE — a empresa não paga por horas ociosas. Sua missão aqui é descobrir e REGISTRAR no memorial O QUE MUDOU concretamente, para que quem lê a aprovação se convença de que o ganho é real.
-⛔ NÃO aceite respostas vagas/óbvias — elas NÃO preenchem o ponto: "ganhou produtividade", "sobra tempo", "ficou mais eficiente", "o time ficou mais focado" E TAMBÉM "o tempo foi realocado para outras atividades / outras demandas / outras prioridades". Dizer que o tempo "foi para outras atividades" é ÓBVIO e não diz NADA — toda hora liberada vai para alguma coisa. A pergunta de verdade é: QUAIS atividades, e o que isso passou a entregar A MAIS? Faça QUANTAS perguntas forem necessárias (sobre o total e sobre cada cargo com ≥44h) até ter o destino NOMEADO e, sempre que possível, QUANTIFICADO.
+${TAXONOMIA_DESTINO_GANHO}
 
-INVESTIGUE até NOMEAR e (quando der) QUANTIFICAR — registre a resposta:
-- QUAIS são, com NOME, as atividades concretas para onde o tempo foi? (ex.: "hunting e entrevistas", "atender mais clientes", "análise de crédito", "fechamento contábil"; ou ainda: o time passou a atender MUITO mais volume com a mesma equipe / realocação de função / redução de equipe-vaga não reposta / serviço terceirizado CANCELADO). Nunca aceite "outras atividades" sem o nome.
-- O QUE essas pessoas passaram a entregar A MAIS agora — de preferência com NÚMERO? Pergunte explicitamente algo como "o que vocês conseguem fazer hoje com esse tempo que antes não dava?" e busque a medida concreta (ex.: "2 a 3 entrevistas a mais por dia", "o dobro de tickets", "cada analista cobre 2 lojas a mais"). Se o usuário não tiver número, registre ao menos a nova entrega qualitativa concreta.
-- ${linhasIndividuaisAltas.length ? "Para CADA cargo com ≥44h/mês individuais, questione separadamente o que aquela pessoa faz agora e o que entrega a mais — não generalize uma resposta única para todos." : "Confirme que a soma das mudanças por pessoa explica o total declarado."}
+INVESTIGUE até ter o destino NOMEADO e encaixado num dos 5 destinos acima:
+- PARA ONDE foi o tempo, com NOME? (ex.: "hunting e entrevistas", "análise de crédito", "fechamento contábil"). Nunca aceite "outras atividades" sem o nome.
+- ⚠️ Se o destino for **menos custo** (equipe menor, vaga não reposta, contrato cancelado), a resposta está COMPLETA assim — a entrega fica IGUAL com menos gente, e isso É o ganho. NÃO insista por uma entrega adicional que não existe: confirme o que mudou no time (quantas pessoas/qual contrato) e siga.
+- Quando o destino for **mais entrega**, busque a medida concreta ("o dobro de tickets", "cada analista cobre 2 lojas extras"). Sem número, registre a nova entrega qualitativa concreta.
+- ${linhasIndividuaisAltas.length ? "Para CADA cargo com ≥44h/mês individuais, questione separadamente qual o destino daquele tempo — não generalize uma resposta única para todos." : "Confirme que a soma das mudanças por pessoa explica o total declarado."}
 - Se a pessoa segue no MESMO cargo e equipe e a resposta continua "nada mudou de verdade / só sobra tempo", então a economia declarada provavelmente está inflada — reabra a validação das horas.
 
-EXEMPLO (use como régua de qualidade):
-❌ INSUFICIENTE (vago — recusar): "o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de manter essa rotina manual." → não diz QUAIS atividades nem o ganho.
-✅ BOM (nomeado + quantificado — aceitar): "Antes, os 5 perfis lançavam o histórico do candidato e a marcação aprovado/reprovado à mão; agora isso é automático. O tempo ganho foi dedicado a hunting e entrevistas — com as horas que gastavam no preenchimento, o time hoje faz de 2 a 3 entrevistas a mais por dia."
+EXEMPLOS (use como régua de qualidade):
+❌ INSUFICIENTE (vago — recusar): "o tempo liberado foi realocado para outras atividades do time de R&S, sem necessidade de manter essa rotina manual." → não nomeia destino nenhum.
+✅ BOM — *mais entrega*: "Antes, os 5 perfis lançavam o histórico do candidato e a marcação aprovado/reprovado à mão; agora isso é automático. O tempo ganho foi para hunting e entrevistas — o time hoje faz o dobro de entrevistas por dia."
+✅ BOM — *menos custo*: "As 3 vagas de auxiliar de faturamento que saíram não foram repostas; a mesma emissão de notas é feita hoje pelo time menor, porque a conferência manual deixou de existir." → completo, mesmo sem entrega nova.
 
-REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela, no padrão do EXEMPLO BOM acima: (a) as atividades concretas NOMEADAS para onde o tempo foi e (b) o que o time passou a entregar A MAIS — com NÚMERO quando houver — concluindo que o ganho é válido por causa dessa mudança. Texto qualitativo, SEM R$.
+REGISTRO OBRIGATÓRIO NO MEMORIAL (ponto fixo [2.4]): a resposta a esta investigação NÃO pode ficar só na conversa — ela é a JUSTIFICATIVA de que essas ${totalHoras}h/mês são válidas e DEVE ser gravada na seção "### O que mudou após a automação" do memorial (que vai à planilha). Escreva nela, no padrão dos EXEMPLOS BONS acima: o destino CONCRETO do tempo liberado, em qual dos 5 destinos ele se encaixa, com NÚMERO quando houver, concluindo que o ganho é válido por causa dessa mudança. Texto qualitativo, SEM R$.
 
-GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com essa justificativa CONCRETA (atividades NOMEADAS + nova entrega). Não basta descrever a rotina antiga nem dizer que "foi para outras atividades" — precisa dizer QUAIS atividades e o que mudou na entrega. A seção vem logo após o total de horas.
+GATE: é PROIBIDO gerar o preview sem o ponto [2.4] preenchido com um destino CONCRETO encaixado na taxonomia. Não basta descrever a rotina antiga nem dizer que "foi para outras atividades". Mas um destino nomeado que se encaixe em QUALQUER um dos 5 já satisfaz o gate — não invente exigência extra. A seção vem logo após o total de horas.
 ═══════════════════════════════════════════════════════════════════`
     : "";
 
@@ -1229,16 +1249,29 @@ Não há economia de horas NEM custo evitado. Isso é INVÁLIDO para submissão.
   // Só saving MENSAL: o gate "o que mudou após a automação" (≥44h/MÊS) não vale para
   // pontual nem para trimestral/semestral (cuja base é o período, não o mês).
   const economiaAltaPv = saving.tipo_saving === "mensal" && totalHorasPv >= 44;
+  // ANTI-LOOP DETERMINÍSTICO: o gate de chat.functions.ts já coletou o destino do tempo
+  // (estado 'ok' — resposta aceita — ou 'reperguntado' — já recusada 1x, próxima aceita) e
+  // já injetou o nudge [SISTEMA] que manda escrever a seção. Reinterrogar aqui é DUPLICAR:
+  // o juiz não tem limite de recusas e foi a origem das perguntas pós-preview medidas no
+  // baseline. Então o bloco SAI do prompt. O juiz segue ativo exatamente onde o gate NÃO
+  // se aplica (contrafactual 'nao' / custo evitado puro 'externo', que nunca marcam o
+  // estado) — ali ele é a única rede. Supressão determinística, não persuasão: pedir ao
+  // LLM "recuse só uma vez" é o tipo de garantia que já falhou no caso Gostream.
+  const alocacaoJaColetada =
+    saving.alocacao_ganhos === "ok" || saving.alocacao_ganhos === "reperguntado";
   // Custo evitado PURO: há custo evitado e NÃO há horas → o memorial NÃO tem a seção
   // "Saving de Pessoas" (estrutura: Contexto, Contratos/Serviços Evitados, Resumo).
   const custoEvitadoPuroPv = semHoras && !semCustoEvitado;
-  const blocoEconomiaAltaPv = economiaAltaPv
-    ? `
+  const blocoEconomiaAltaPv =
+    economiaAltaPv && !alocacaoJaColetada
+      ? `
 
-ATENÇÃO — ECONOMIA ALTA (≥44h/mês): este projeto declara ${totalHorasPv}h/mês de saving. O memorial SÓ pode ser aprovado se a seção "### O que mudou após a automação" NOMEAR as atividades concretas para onde o tempo foi E disser o que o time passou a entregar A MAIS (com número quando houver) — ex.: "o tempo foi para hunting e entrevistas e o time faz de 2 a 3 entrevistas a mais por dia".
-- NÃO aprove se essa seção estiver ausente OU vaga/óbvia: "ganhou produtividade", "sobra tempo", "ficou mais eficiente" E TAMBÉM "o tempo foi realocado para outras atividades" sem dizer QUAIS. Dizer que "foi para outras atividades" não preenche o ponto — toda hora liberada vai para alguma coisa. Responda com type:"question" pedindo as atividades NOMEADAS e o ganho concreto. Mesmo que o usuário diga "aprovado".
-- Só emita type:"complete" depois que a seção nomear as atividades e a nova entrega.`
-    : "";
+ATENÇÃO — ECONOMIA ALTA (≥44h/mês): este projeto declara ${totalHorasPv}h/mês de saving. O memorial SÓ pode ser aprovado se a seção "### O que mudou após a automação" trouxer um destino CONCRETO do tempo liberado, encaixado na taxonomia abaixo.
+${TAXONOMIA_DESTINO_GANHO}
+- NÃO aprove se essa seção estiver ausente OU vaga/óbvia: "ganhou produtividade", "sobra tempo", "ficou mais eficiente" E TAMBÉM "o tempo foi realocado para outras atividades" sem dizer QUAIS. Dizer que "foi para outras atividades" não preenche o ponto — toda hora liberada vai para alguma coisa. Responda com type:"question" pedindo o destino concreto. Mesmo que o usuário diga "aprovado".
+- ⚠️ Se a seção já nomeia um destino que se encaixa em QUALQUER um dos 5 — inclusive **menos custo**, em que a entrega fica IGUAL com menos gente —, ela está COMPLETA: APROVE. Não exija entrega adicional nem número que o destino não pede, e NÃO repita uma pergunta que a conversa já respondeu.
+- Só emita type:"complete" depois que a seção nomear o destino.`
+      : "";
 
   return `Você é o assistente de análise financeira do GoGroup. O usuário está revisando o memorial de saving PADRONIZADO.
 

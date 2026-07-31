@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-07-30 — Gate da Seção 2.4 recusava a resposta CERTA quando o ganho é "menos custo" + juiz do preview reinterrogava sem limite
+
+**PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/gate-alocacao-taxonomia-e-materialidade` · **Plano:** [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](../docs/plans/taxonomia-destino-ganho-e-anti-loop.md)
+
+**Sintoma (2 defeitos independentes, medidos no baseline de 24 conversas reais):**
+1. Saving alto cuja contrapartida foi **redução de headcount** (3 auxiliares). O usuário respondeu certo
+   ("reduzimos 3 auxiliares, vagas não repostas") e levou **5 reperguntas** — o agente insistia por uma
+   "entrega a mais" que não existe.
+2. **13 perguntas pós-preview**: o LLM-juiz do preview reinterrogava o destino do ganho **mesmo depois** de o
+   gate determinístico já ter coletado e registrado a resposta.
+
+**Causa-raiz:** era **100% de prompt**, em **3 textos que redigitavam a mesma régua** definindo "resposta
+completa" como o PAR _"atividades NOMEADAS **E** o que o time entrega **A MAIS**"_ — `blocoEconomiaAlta`
+(`buildSavingPrompt`), `blocoEconomiaAltaPv` (`buildSavingPreviewPrompt`) e os 3 textos do gate em
+`chat.functions.ts` (`perguntaAlocacaoGanhos` / `…Firme` / `nudgeAlocacaoGanhos`). Quando o ganho é **menos
+custo** (vaga não reposta, equipe menor, contrato cancelado), a entrega **não aumenta** — fica igual com menos
+gente — e a resposta certa lia como incompleta. O `blocoEconomiaAlta` citava "redução de equipe-vaga não
+reposta" de passagem, num parêntese de exemplos, mas o **gate** da frase seguia exigindo o par, e é o gate que
+decide. O 2º defeito: o juiz do preview **não tinha limite de recusas** e não sabia que o gate já havia
+coletado. ⚠️ **`respostaAlocacaoVaga` NÃO era o culpado** — verificado: "redução de 3 auxiliares" tem número,
+logo o predicado **aceita**. Ele não foi tocado (mexer afrouxaria a rede que pegou o boilerplate do Gostream).
+
+**Fix:**
+- **Fonte única `TAXONOMIA_DESTINO_GANHO`** (`orchestrator.ts`, ao lado de `LIMITE_ECONOMIA_ALTA`): declara os
+  **5 destinos aceitos** — *mais entrega · menos custo · menos erro/retrabalho · menos risco/fraude · menos
+  prazo* —, cada um com exemplo concreto, e a régua nova: **basta NOMEAR o destino e encaixá-lo em UM dos 5**.
+  "A mesma emissão de notas por um time menor, com as 3 vagas não repostas" é resposta **completa**, sem
+  entrega adicional e sem número. Os **3 pontos consomem a constante**; nenhum redigita a lista.
+- **Anti-loop determinístico no juiz:** `buildSavingPreviewPrompt` **deixa de injetar** o bloco de economia
+  alta quando `saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. Supressão determinística, **não**
+  persuasão ("recuse só 1 vez" é o tipo de garantia que falhou no Gostream) e **sem campo novo** no estado. O
+  juiz segue ativo onde o gate não se aplica (contrafactual `'nao'`, custo evitado puro `'externo'`) — ali é a
+  única rede.
+- **Nada afrouxou na ponta vaga:** "ganhou produtividade" / "sobra tempo" / "foi para outras atividades" sem
+  nome segue recusado 1x pelo gate, com o anti-loop de hoje intacto.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (constante + os 2 blocos + a supressão) ·
+`src/lib/chat.functions.ts` (os 3 textos, agora **exportados** para o teste da fonte única) ·
+`src/lib/testes/prompt-registry.ts` (regra 3 — a descrição afirmava a exigência antiga) ·
+`tests/taxonomia-destino-ganho.test.ts` (**novo**, 14 testes: constante, os 5 consumidores interpolando-a,
+supressão do bloco por estado, e guarda anti-afrouxamento do predicado) · `worker.js`.
+
+**Fronteiras respeitadas (não se mexeu):** `respostaAlocacaoVaga` · `aplicaGateAlocacaoGanhos` ·
+`LIMITE_ECONOMIA_ALTA` · gate da jornada/base 220h · split carga×escala · critério de projeto (`[1.3]`/`[1.4]`,
+PR #216) · colunas do Sheets. O cabeçalho `### O que mudou após a automação` **permanece exato** —
+`extrairAlocacaoGanhos` fatia por ele para a coluna "Alocação Ganhos" (AK).
+
+---
+
 ## 2026-07-22 — Upload de `.zip` barrado como "extensão não suportada" na Etapa 2 (caso Rafael Lobo)
 
 **PR:** _(a abrir)_ · **Status:** 🔧 implementada (pendente validação no staging) · **Branch:** `fix/aceitar-zip-submissao` · **Plano:** [docs/plans/aceitar-zip-submissao.md](../docs/plans/aceitar-zip-submissao.md)

@@ -37,6 +37,7 @@ import {
   aplicaConfirmacaoBaseHoras,
   aplicaGateAlocacaoGanhos,
   respostaAlocacaoVaga,
+  TAXONOMIA_DESTINO_GANHO,
   secaoProcessoVaga,
   secaoPonteiroVaga,
   resolverSplitCargaEscala,
@@ -919,23 +920,33 @@ function nudgeTetoPessoa(cap: number): string {
 // prompt manda RECUSAR. Então o backend GARANTE a pergunta antes do preview (a menos que
 // o LLM já tenha escrito uma Seção 2.4 concreta) e injeta a resposta do usuário como base
 // da seção. Como no split, a INFORMAÇÃO é sempre coletada, independente do LLM.
-function perguntaAlocacaoGanhos(total: number, unidade: string): string {
-  return `Antes de eu fechar: **${total}${unidade}** é bastante tempo humano liberado — e um ganho desse tamanho só se sustenta se esse tempo virou outra coisa. **Pra onde foi esse tempo?** Me diga, com NOME, as atividades concretas que o time passou a fazer (ou fazer mais) com essas horas — e, se der, o quanto isso rende a mais (ex.: "foi para hunting e entrevistas — hoje fazemos 2 a 3 entrevistas a mais por dia"). ⚠️ "Foi realocado para outras atividades" não conta: preciso saber QUAIS.`;
+// ⚠️ Os 3 textos abaixo consomem TAXONOMIA_DESTINO_GANHO (orchestrator.ts) — a régua NÃO
+// se redigita aqui. Antes, cada um repetia o par "atividades NOMEADAS **E** o que o time
+// entrega A MAIS", que recusava a resposta certa quando o ganho é MENOS CUSTO (equipe
+// menor / vaga não reposta / contrato cancelado). Exportados para o teste da fonte única.
+export function perguntaAlocacaoGanhos(total: number, unidade: string): string {
+  return `Antes de eu fechar: **${total}${unidade}** é bastante tempo humano liberado — e um ganho desse tamanho só se sustenta se esse tempo virou outra coisa. **Pra onde foi esse tempo?** Me diga o destino CONCRETO, com nome. Qualquer um destes serve — inclusive equipe menor, que já é ganho por si só:
+
+${TAXONOMIA_DESTINO_GANHO}`;
 }
 // Reperguntada FIRME quando a 1ª resposta veio vaga (respostaAlocacaoVaga). Roda 1x só
 // (anti-loop): a próxima resposta é aceita como está, e a rede de segurança do preview
 // (LLM-juiz) + a validação humana seguem como backstops.
-function perguntaAlocacaoGanhosFirme(total: number, unidade: string): string {
-  return `Ainda preciso do destino CONCRETO dessas ${total}${unidade} — "outras atividades / mais produtividade / sobra tempo" não me diz nada, porque toda hora liberada vai para *alguma* coisa. Me dê o NOME das atividades para onde o tempo foi (ex.: "atender mais clientes", "análise de crédito", "hunting e entrevistas", "fechamento contábil") e, se possível, o que o time entrega A MAIS hoje por causa disso — de preferência com um número.`;
+export function perguntaAlocacaoGanhosFirme(total: number, unidade: string): string {
+  return `Ainda preciso do destino CONCRETO dessas ${total}${unidade} — "outras atividades / mais produtividade / sobra tempo" não me diz nada, porque toda hora liberada vai para *alguma* coisa. Me diga em qual destes destinos o ganho se encaixa e qual foi ele, com nome:
+
+${TAXONOMIA_DESTINO_GANHO}`;
 }
 // Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever a seção "### O que mudou
 // após a automação" a partir do que a PESSOA disse (não boilerplate). Espelha nudgeCargaEscala.
-function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): string {
+export function nudgeAlocacaoGanhos(total: number, unidade: string, racional: string): string {
   const base = racional?.trim()
     ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
     : "";
   return `[SISTEMA] O usuário informou PRA ONDE foi o tempo liberado dessas ${total}${unidade} economizadas.${base}
-Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva, no padrão "atividades NOMEADAS + o que o time entrega A MAIS (com número quando houver)": (a) as atividades concretas para onde o tempo foi (nunca "outras atividades") e (b) o que passou a ser entregue a mais agora, concluindo que o ganho é válido por causa dessa mudança. Se o usuário deu um número (ex.: "2-3 entrevistas a mais/dia"), inclua-o. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
+Registre isso no memorial na seção com o cabeçalho EXATO "### O que mudou após a automação" (logo após o total de horas da Seção 2), em texto qualitativo, SEM R$. Escreva o destino CONCRETO que o usuário deu (nunca "outras atividades"), deixando claro em qual dos destinos abaixo ele se encaixa, e conclua que o ganho é válido por causa dessa mudança. Se o usuário deu um número, inclua-o; se o destino é **menos custo** (equipe menor, vaga não reposta, contrato cancelado), registre assim mesmo — a entrega fica IGUAL e está correto. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.
+
+${TAXONOMIA_DESTINO_GANHO}`;
 }
 
 // ─── Gate determinístico 5: CRITÉRIO DE PROJETO (seções [1.3] e [1.4]) ───────
@@ -1211,8 +1222,11 @@ export async function enviarMensagem(rawData: unknown) {
     }
   } else if (gateAlocacao && estado.saving.alocacao_ganhos === "reperguntado") {
     // (4b) Segunda resposta após a reperguntada firme. ANTI-LOOP: aceita o que vier (mesmo
-    // ainda vago) — não repergunta uma 3ª vez. O nudge injeta o melhor racional disponível;
-    // a rede de segurança do preview (LLM-juiz) + a validação humana cobrem o resto.
+    // ainda vago) — não repergunta uma 3ª vez. O nudge injeta o melhor racional disponível.
+    // ⚠️ A partir daqui a rede restante é a VALIDAÇÃO HUMANA: o LLM-juiz do preview NÃO
+    // interroga mais este ponto — `buildSavingPreviewPrompt` suprime o bloco de economia
+    // alta quando `alocacao_ganhos` é 'ok'/'reperguntado' (anti-loop determinístico), porque
+    // reinterrogar o que o gate já coletou era a origem das perguntas pós-preview.
     const total = totalEconomiaHoras(estado.saving);
     const unidade = unidadeHorasDe(estado.saving.tipo_saving);
     const racional = (data.content ?? "").trim();
