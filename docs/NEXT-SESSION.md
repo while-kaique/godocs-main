@@ -4,16 +4,57 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 8 — **`/ggsd:code` da fatia A1: T1–T6 codados e commitados**
-(`b390c62`, branch `fix/gate-alocacao-taxonomia-e-materialidade`, 797 testes verdes, `worker.js` rebuildado).
-Ver "Sessão de 2026-07-30 (parte 8)" abaixo. **Falta o T7** — staging antes de prod (regra 13).
+**Última sessão:** 2026-07-30, parte 9 — **T7 da fatia A1 fechado: staging validada, prod deployado, repo
+sincronizado**. A1 está **completa** (T1–T7) e **em produção**; os 2 PRs pendentes do repo foram abertos
+(**#217** código, **#218** docs) e o `gh pr merge` foi **bloqueado pelo classificador de permissões**.
+Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 
-> **▶ PRÓXIMO PASSO:** **T7 do plano A1** — `npm run build && npm run build:worker` na worktree
-> `.claude/worktrees/fix-gates-a1a2` → **deploy no STAGING `edf400b4`** (⚠️ conferir qual branch está no ar
-> ANTES: o `updateApp` substitui a app inteira, e em 30/07 um deploy do `main` apagou perguntas da Etapa 2) →
-> validar no navegador o **cenário-âncora** (saving alto ≥44h cuja contrapartida é **redução de headcount**:
-> a resposta tem de ser **aceita de primeira**, sem repergunta e **sem reinterrogação no preview**, e a seção
-> "### O que mudou após a automação" tem de sair gravada) → **só então** prod `674a3710` → PR.
+> **▶ PRÓXIMO PASSO:** **mergear os PRs #217 e #218** (o código já está em prod; só o `main` está atrás) e
+> **escolher a próxima fatia** — candidatas, nenhuma planejada: **(a) A2** — os gates ignoram materialidade
+> (`aplicaConfirmacaoBaseHoras`/`aplicaSplitCargaEscala` disparam com qualquer `horas_antes > 0`, então
+> 0,05h/mês leva o gate das 220h); **(b) auto-preenchimento da Seção 2.4** — achado novo do T7: com contexto
+> suficiente na doc o agente escreve o destino do ganho **sem perguntar** e **inventa** ("menos prazo / menos
+> retrabalho" que o usuário nunca disse), porque o atalho heurístico do gate
+> (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) libera quando a seção nomeia *algum* destino;
+> **(c) piso `respostaAlocacaoVaga`** — recusa resposta que MISTURA destino válido com filler (1 repergunta).
+> Qualquer uma delas começa com `/ggsd:plan`.
+
+## Sessão de 2026-07-30 (parte 9) — T7 da A1: staging → prod → repo
+
+**O que rodou:**
+1. **Testes + build na worktree `fix-gates-a1a2`:** 797 verdes; `npm run build` + `npm run build:worker`
+   reproduziram o `worker.js` já commitado (sem diff) — sinal de que o commit `b390c62` estava íntegro.
+2. **Staging `edf400b4` deployada** com o `dist/` inteiro via `scripts/deploy-godeploy.sh`. A conferência de
+   "qual branch está no ar" foi feita por comparação de branches: **todas** as branches locais menos as duas
+   pendentes já estavam contidas no `origin/main` (`39deaf9`), e a `fix/gate-…` estava 0 commits atrás dele —
+   logo o build é superset do que estava no ar, sem risco de apagar feature de outra branch.
+3. **Validação ponta a ponta na staging** (não só navegador): driver descartável no scratchpad reusando
+   `scripts/e2e/lib/{api,responder,env}.mjs`. O cenário-âncora **não** entrou em `scripts/e2e/scenarios.mjs`
+   porque o **gate de plano** recusa editar código sem plano ativo aprovado — a trava **não** foi contornada.
+   ⚠️ **Versionar o cenário no harness é passo próprio.**
+   - **Run 1** (doc com contexto rico): o agente **nunca perguntou** o destino — auto-preencheu a Seção 2.4 e
+     **inventou** "menos prazo / menos retrabalho". Ver o achado no próximo passo (b).
+   - **Run 2** (briefing negando explicitamente qualquer efeito de prazo/erro): o gate **perguntou 1×**, a
+     resposta de headcount foi **aceita de primeira**, **zero** reinterrogação no preview, e a seção saiu
+     gravada com a fala do usuário, enquadrada como *menos custo*. Planilha `STAGING`: 160h · R$ 2.230,40 ·
+     **AK preenchida** · split 160/0 · `Classificação` claro_sim.
+   - Limpeza: `POST /api/admin/e2e-cleanup` na staging (19 projetos `[E2E-…]` removidos).
+4. **Prod `674a3710` deployado** depois da staging (regra 13); os dois ambientes servem o mesmo entry
+   `index-CzawDJZX.js`, conferido via `GET /` com cookie.
+5. **Repo sincronizado:** `fix/gate-alocacao-taxonomia-e-materialidade` e
+   `docs/plano-loadings-dashboard-admin` empurradas; PRs **#217** e **#218** abertos. **O merge foi bloqueado
+   pelo classificador de permissões** (`gh pr merge` e até `gh pr list --json` recusados) — pendente do operador.
+
+**Armadilhas encontradas (para não repetir):**
+- ⚠️ **`E2E_COOKIE` expirado dá 302 em staging E prod** e o harness morre no 1º POST com "sessão não
+  autenticada". Cheque com `curl -H "Cookie: $E2E_COOKIE" <url>/api/auth/me` **antes** de rodar. Renovado
+  nesta sessão (`.env` da raiz **e** da worktree — `scripts/e2e/lib/env.mjs` lê o `.env` da raiz do worktree).
+- ⚠️ **Detector de "repergunta" ingênuo dá falso NEGATIVO:** (a) o `content` do **preview** contém o memorial
+  inteiro, então um regex de tema casa o texto do memorial e conta como "pergunta"; (b) o memorial gravado
+  **não** tem os `###` (o `normalizarMarcadoresMemorial` os remove), então procurar
+  `### O que mudou após a automação` não acha a seção que **está lá**. Case pelo título sem `#`.
+- ⚠️ O **gate de plano** (`plan-gate.sh`) barra edição de **código** — inclusive `scripts/e2e/*.mjs` — quando
+  o `## Plano ativo` do `NEXT-SESSION.md` não aponta plano `aprovado`. Docs passam.
 
 ---
 
@@ -439,8 +480,10 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**→ [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](plans/taxonomia-destino-ganho-e-anti-loop.md)** ·
-Status: 🔧 **T1–T6 executados** (2026-07-30, `b390c62`) — **falta T7: staging `edf400b4` → prod → PR**
+**Nenhum plano ativo.** O último — [taxonomia-destino-ganho-e-anti-loop](plans/taxonomia-destino-ganho-e-anti-loop.md)
+— está **✅ executado** (T1–T7, prod deployado, PR #217). O próximo passo é **mergear #217/#218** e depois
+**planejar** a fatia escolhida (A2 · auto-preenchimento da Seção 2.4 · piso `respostaAlocacaoVaga`) com
+`/ggsd:plan`. Referência do que a A1 entregou:
 
 Implementa a fatia **A1** da frente
 [perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) (T3): constante

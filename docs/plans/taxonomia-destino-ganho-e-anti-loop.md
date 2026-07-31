@@ -1,8 +1,29 @@
 # Plano — Taxonomia de destino do ganho (aceitar "menos custo") + anti-loop no juiz do preview
 
-**Status:** 🔧 **executado parcialmente** (2026-07-30) — **T1–T6 codados e commitados** (`b390c62`, branch
-`fix/gate-alocacao-taxonomia-e-materialidade`, 797 testes verdes, `worker.js` rebuildado); **T7 (staging
-`edf400b4` + prod) PENDENTE**, e com ele o critério de aceitação 7. Critérios 1–6: ✅.
+**Status:** ✅ **executado** (2026-07-30) — **T1–T7 concluídos**. T1–T6 em `b390c62` (branch
+`fix/gate-alocacao-taxonomia-e-materialidade`, 797 testes verdes, `worker.js` rebuildado); **T7** fechado no
+mesmo dia: staging `edf400b4` deployada e validada, prod `674a3710` deployado, **PR #217** aberto (o
+`gh pr merge` foi bloqueado pelo classificador de permissões — merge pendente do operador). Critérios 1–7: ✅.
+
+> **T7 — como a validação foi feita e o que ela mostrou (2026-07-30):**
+> A validação do cenário-âncora rodou **ponta a ponta contra a staging** (não só no navegador), dirigindo o
+> chat com o LLM-responder do harness E2E a partir de um driver descartável no scratchpad — o cenário **não**
+> foi versionado em `scripts/e2e/scenarios.mjs` porque o gate de plano recusa editar código sem plano ativo
+> aprovado, e a trava não foi contornada. **Versionar o cenário no harness é um passo próprio.**
+> **Resultado (projeto `27e00f38…`, 160h/mês, contrapartida = redução de headcount):** o agente perguntou o
+> destino **1×**; a resposta _"não repusemos 3 vagas de assistente do Fiscal… a mesma entrega hoje pelo time
+> menor"_ foi **aceita de primeira** — sem repergunta firme e **sem reinterrogação no preview**; a seção
+> "O que mudou após a automação" saiu gravada **com a fala do usuário**, enquadrada como *menos custo*.
+> Planilha (aba `STAGING`): `Saving Horas` 160 · `Saving Reais` 2.230,40 · **`Alocação Ganhos` (AK)
+> preenchida** · split 160/0 · `Classificação` claro_sim · `Status` Pendente. Projetos de teste removidos via
+> `POST /api/admin/e2e-cleanup`. ⚠️ O `E2E_COOKIE` do `.env` estava expirado (302 em staging **e** prod) —
+> renovado pelo operador durante a sessão.
+> **⚠️ ACHADO NOVO — fatia própria, não bloqueou o deploy:** num 1º run em que a documentação dava contexto
+> suficiente, o agente **auto-preencheu** a Seção 2.4 **sem nunca perguntar**, atribuindo _"menos prazo /
+> menos retrabalho"_ que o usuário **nunca afirmou** — e o **atalho heurístico** do gate
+> (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) liberou porque a seção "nomeia" um destino. O atalho é
+> **pré-existente**, mas a taxonomia dá ao LLM um **menu** do qual ele se serve sozinho: é o item (b) abaixo
+> agravado de "sem backstop semântico" para "**invenção plausível**". Rede restante: validação humana.
 
 > **Registrado na execução (2026-07-30) — o que a sessão de código descobriu e NÃO corrigiu:**
 > **(a)** o piso `respostaAlocacaoVaga` (fronteira dura deste plano) ainda classifica como VAGA a resposta que
