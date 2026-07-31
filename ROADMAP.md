@@ -37,17 +37,19 @@ alinhá-lo é **fatia própria** (fronteira deste plano).
 ⚠️ **Achado novo do T7 (fatia própria):** com contexto suficiente na doc, o agente **auto-preenche** a
 Seção 2.4 **sem perguntar** e **inventa** o destino ("menos prazo/menos retrabalho" que ninguém disse) — o
 atalho heurístico do gate libera porque a seção nomeia *algum* destino. Rede restante: validação humana.
-**Próximo:** escolher a próxima fatia: **A2** (gates ignoram materialidade) ou o **auto-preenchimento
-da Seção 2.4** achado no T7.
+**Próximo:** **nada de código por ora** — o **A2 foi DESCARTADO** (decisão do Luis, 30/07: mesmo diagnóstico
+da jornada preguiçosa já recusada, ganho de 1–2 perguntas baratas e risco de enfraquecer o teto das 220h).
+Fatias vivas para quando voltar a codar: **auto-preenchimento da Seção 2.4** (agente inventa o destino) e o
+**piso `respostaAlocacaoVaga`**.
 
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
 `E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
 
-**Próximo:** a próxima fatia da Fase 6 — **A2** (gates ignoram materialidade — 0,05h/mês leva o gate das
-220h) ou o **auto-preenchimento da Seção 2.4** achado no T7. Staging, prod e `main` estão sincronizados
-(PRs #217 e #218 mergeados).
+**Próximo:** **nenhuma frente de código aberta** (decisão do Luis, 30/07) — staging, prod e `main`
+sincronizados (PRs #217/#218). **A2 descartado.** O que resta é humano: alinhar as 2 pendências com o Bruno
+e calibrar a régua com o Rafa.
 Em paralelo, humano: avisar o Rafa e
 calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
 causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
