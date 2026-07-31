@@ -4,15 +4,16 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-30, parte 6 — **diagnóstico, sem código**: inventário do que o agente pergunta
-hoje (pós-#216), prestação de contas da frente das perguntas e **escopo fechado da próxima fatia** (A1 +
-jornada preguiçosa). Ver a seção "Sessão de 2026-07-30 (parte 6)" abaixo.
+**Última sessão:** 2026-07-30, parte 7 — **planejamento, sem código**: o escopo fechado na parte 6 virou
+**plano aprovado** ([taxonomia-destino-ganho-e-anti-loop](plans/taxonomia-destino-ganho-e-anti-loop.md)),
+com **duas mudanças de escopo decididas pelo Luis nesta sessão** (ver "Sessão de 2026-07-30 (parte 7)"):
+a **jornada preguiçosa saiu** e o **anti-loop do juiz** ganhou desenho determinístico.
 
-> **▶ PRÓXIMO PASSO:** **`/ggsd:plan` da fatia A1 + jornada preguiçosa** (escopo fechado abaixo; falta só o
-> Luis confirmar o limiar de 176h). A worktree já existe e está **vazia**:
-> `.claude/worktrees/fix-gates-a1a2`, branch `fix/gate-alocacao-taxonomia-e-materialidade`, criada a partir
-> de `origin/main` (`39deaf9`). ⚠️ **O hook `plan-gate` recusa qualquer edição de código** enquanto
-> `## Plano ativo` não apontar um plano com `Status: aprovado` — foi o que barrou esta sessão.
+> **▶ PRÓXIMO PASSO:** **`/ggsd:code` da fatia A1** — o plano está **aprovado** e o ponteiro `## Plano ativo`
+> aponta pra ele, então o `plan-gate` **libera** a edição de código (foi o que barrou as partes 6 e 7). A
+> worktree já existe e está **vazia**: `.claude/worktrees/fix-gates-a1a2`, branch
+> `fix/gate-alocacao-taxonomia-e-materialidade`, criada de `origin/main` (`39deaf9`). ⚠️ O nome da branch
+> ainda diz "materialidade" (era o escopo A2, hoje fora) — o conteúdo é **taxonomia + anti-loop**.
 
 > **▶ Pendências da frente anterior (3 humanas + 1 técnica), ainda válidas:**
 > 1. **Avisar o Rafa** — a reprovação automática está em prod e o **motivo é visível ao autor** (D10). A
@@ -24,6 +25,51 @@ jornada preguiçosa). Ver a seção "Sessão de 2026-07-30 (parte 6)" abaixo.
 > 3. **Causa-raiz do analisador morrendo no `waitUntil`** segue **aberta** — hoje o destrave é
 >    `POST /api/admin/reanalisar-pendentes` (40–70s). Precisa de plano próprio (`/ggsd:plan`).
 > 4. `CLAUDE.md` está em **~48k chars**, acima do teto de 40k — vale uma poda.
+
+## Sessão de 2026-07-30 (parte 7) — o escopo virou plano aprovado, com 2 mudanças de escopo
+
+**Nenhum código alterado** (sessão de planejamento; Gate D armado do começo ao fim). O plano está em
+[docs/plans/taxonomia-destino-ganho-e-anti-loop.md](plans/taxonomia-destino-ganho-e-anti-loop.md),
+**✅ aprovado (Luis, 2026-07-30)**.
+
+**1. O defeito foi confirmado no código, e o culpado NÃO é quem se pensava.** A recusa de "menos custo" está
+em **3 textos de prompt** que definem resposta completa como _"atividades NOMEADAS **E** o que o time entrega
+**A MAIS**"_: `blocoEconomiaAlta` (`buildSavingPrompt`), `blocoEconomiaAltaPv` (`buildSavingPreviewPrompt`) e
+os 3 textos do gate em `chat.functions.ts` (`perguntaAlocacaoGanhos` / `…Firme` / `nudgeAlocacaoGanhos`).
+Quando o ganho é **menos custo**, a entrega **não aumenta** — e a resposta certa lê como incompleta. O
+`blocoEconomiaAlta` cita "redução de equipe-vaga não reposta" **de passagem**, num parêntese de exemplos, mas
+o **gate** da frase segue exigindo o par — e é o gate que decide. ⚠️ Confirmado que **`respostaAlocacaoVaga`
+(`orchestrator.ts:520`) NÃO reprova** "redução de 3 auxiliares" (tem número → aceita): o defeito é **100% de
+prompt**, e o predicado **não se mexe** (mexer afrouxaria a rede que pegou o boilerplate do Gostream).
+
+**2. Mudança de escopo — a jornada preguiçosa FICOU DE FORA (decisão do Luis).** O diagnóstico foi
+apresentado (o gate da jornada só define o `cap` do gate do teto, então com o maior cargo em 12h/mês a
+resposta é **inerte** — disparou em 15 de 24 conversas sem mudar nada) junto de um desenho **melhor que o
+limiar de 176h**: perguntar a jornada **sob demanda**, exatamente quando alguma linha passa de **220h** (o
+*menor* cap possível — logo, o único momento em que a resposta muda o resultado), sem número arbitrário e sem
+o risco que motivava a margem de 80%. **O Luis optou por deixar o gate como está.** O limiar de 176h,
+portanto, **não é mais pendência** — a decisão foi tomada. Reavaliar só **depois de re-medir** o baseline
+pós-#216.
+
+**3. Anti-loop do juiz do preview — desenho fechado (determinístico).** O juiz não tem limite de recusas e
+reinterroga mesmo depois do gate determinístico já ter coletado o destino (origem das 13 perguntas
+pós-preview do baseline). Fix escolhido: `buildSavingPreviewPrompt` **deixa de injetar** o
+`blocoEconomiaAltaPv` quando `saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`. **Sem campo novo no
+estado e sem depender do LLM obedecer** a um "recuse só 1 vez" (persuasão é o tipo de garantia que já falhou
+no Gostream). O juiz **segue ativo** onde o gate não se aplica (contrafactual `'nao'`, custo evitado puro
+`'externo'`), que é onde ele é a única rede.
+
+**4. Fronteiras duras registradas no plano:** jornada/base 220h · split carga×escala · `respostaAlocacaoVaga`
+· `aplicaGateAlocacaoGanhos` · `LIMITE_ECONOMIA_ALTA` — **nada disso se mexe**. Fusão jornada+teto e
+re-medição do baseline seguem fora. **Confiança do blast-radius: média** — este repo **não tem**
+`docs/INDEX.md`, `docs/invariants.md` nem `scripts/ctx-route.sh`, então o mapeamento saiu de leitura direta
+do código; a sessão de código deve varrer os consumidores antes de editar.
+
+**5. Não esquecer na sessão de código:** regra 3 (`prompt-registry.ts` **afirma hoje** a exigência antiga do
+"A MAIS" — sem atualizar, o registry passa a mentir), regra 1 (`worker.js` rebuildado e commitado), regra 12
+(`SPEC_CORRECOES.md`) e regra 13 (**staging `edf400b4` antes de prod**, com o cenário-âncora da redução de
+headcount tendo de passar **de primeira**). O cabeçalho `### O que mudou após a automação` **permanece
+exato** — `extrairAlocacaoGanhos` fatia por ele para a coluna "Alocação Ganhos" (AK).
 
 ## Sessão de 2026-07-30 (parte 6) — o que o agente pergunta hoje, e o que ainda falta podar
 
@@ -343,13 +389,20 @@ linhas** — os 4 valores reais são Aprovado · Pendente · Reenvio Pendente ·
 **aprovada** a frente dos loadings (ver Plano ativo). **Nenhum código alterado nesta sessão.**
 
 ## Plano ativo
-**Nenhum plano ativo** — e é justamente o que **trava a próxima sessão**: o hook `plan-gate` recusa editar
-código sem um plano com `Status: aprovado` apontado aqui. **Próximo é planejar a fatia A1 + jornada
-preguiçosa com `/ggsd:plan`** (escopo já fechado na "Sessão de 2026-07-30 (parte 6)"), dentro da frente
-[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) — cujo **T3** a
-prevê, mas **como spec sem código**: o plano novo precisa declarar que esta fatia **implementa** A1 + o
-limiar da jornada, deixando os itens estruturais (registro de "já respondido", orçamento de perguntas,
-fusão dos 4 gates, T4) para depois da re-medição.
+**→ [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](plans/taxonomia-destino-ganho-e-anti-loop.md)** ·
+Status: ✅ **aprovado** (Luis, 2026-07-30)
+
+Implementa a fatia **A1** da frente
+[perguntas-agente-recorrencia-evidencia](plans/perguntas-agente-recorrencia-evidencia.md) (T3): constante
+única `TAXONOMIA_DESTINO_GANHO` (5 destinos — mais entrega · **menos custo** · menos erro/retrabalho · menos
+risco/fraude · menos prazo) consumida pelos **3** textos que hoje exigem o par _"nomeado **E** entregar A
+MAIS"_, + **anti-loop determinístico** no juiz do preview (o bloco sai do prompt quando
+`saving.alocacao_ganhos` já é `'ok'`/`'reperguntado'`).
+
+⚠️ **A jornada preguiçosa saiu do escopo** — decisão do Luis nesta sessão: o gate da jornada **fica como
+está**, mesmo com o diagnóstico de que a resposta é inerte em 15 de 24 conversas (ela só define o `cap` do
+gate do teto). Reavaliar **depois** de re-medir o baseline pós-#216. Os itens estruturais (registro de "já
+respondido", orçamento de perguntas, fusão dos 4 gates, T4) seguem para depois da re-medição.
 
 Os dois planos da frente do critério estão **concluídos e em produção**
 (`calibragem-regua-criterio-e-resync-append` + `criterios-projeto-classificacao`, PR #216 mergeado,

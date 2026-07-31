@@ -15,6 +15,7 @@
 ## Planos
 | Plano | Status | Resumo (1 linha) |
 |---|---|---|
+| [taxonomia-destino-ganho-e-anti-loop](taxonomia-destino-ganho-e-anti-loop.md) | ◀ **ATIVO** — ✅ **aprovado** (Luis, 2026-07-30), aguardando `/ggsd:code` | Fatia **A1** da frente das perguntas: constante única `TAXONOMIA_DESTINO_GANHO` (5 destinos, incl. **menos custo**) consumida pelos 3 textos que hoje exigem _"nomeado **E** entregar A MAIS"_ — daí as 5 reperguntas na redução de 3 auxiliares — + **anti-loop** no juiz do preview (bloco sai quando `alocacao_ganhos` já é `'ok'`/`'reperguntado'`). ⚠️ **jornada preguiçosa FORA** (decisão do Luis); `respostaAlocacaoVaga` **não se mexe** (o defeito é de prompt) |
 | [remover-arquivo-e-doc-background](remover-arquivo-e-doc-background.md) | ✅ concluído — mergeado (PR #211) + prod (2026-07-23) | Etapa 2 do /submeter: remover de verdade arquivo já enviado (F1) + processar doc em background ao subir arquivos (F2) + ajuste "adiantar o background" |
 | [edicao-etapa1-participantes](edicao-etapa1-participantes.md) | executado (2026-07-17) | Etapa 1 (participantes + papéis) editável na edição — T1–T3 + R1/R2 feitos+staging, T4 limitação, T5 validação/prod pendente |
 | [ocultar-valor-meus-projetos](ocultar-valor-meus-projetos.md) | executado (2026-07-17) | Tirar o badge de valor R$ dos cards de "Meus Projetos" — esconder p/ todos + não serializar (INV-02); T1–T3 codados, falta T4 staging→prod |

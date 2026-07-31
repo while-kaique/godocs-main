@@ -15,19 +15,26 @@ foram a produção **dentro do PR #216**.
 **Pendência HUMANA da Fase 5:** avisar o **Rafa** (a reprovação é visível ao autor — D10) e **calibrar a régua
 com ele** usando casos reais, agora pós-deploy.
 
-**Fase 6 (candidata, escopo fechado em 2026-07-30, ainda SEM plano):** **perguntas do agente — fatia A1 +
-jornada preguiçosa**. A régua do critério entrou (Fase 5), mas a **poda** das perguntas antigas não: o gate
-da alocação ainda **recusa "menos custo"** (o caso real da redução de 3 auxiliares levou 5 reperguntas) e o
-gate da jornada dispara sem consequência em 15 de 24 conversas. Detalhe e decisões em
-`docs/NEXT-SESSION.md` ("Sessão de 2026-07-30 (parte 6)").
-**Próximo:** `/ggsd:plan` dessa fatia — sem plano aprovado, o `plan-gate` recusa qualquer edição de código.
+**Fase 6 — perguntas do agente, fatia A1 🟡 (plano ✅ APROVADO em 2026-07-30, código não começou):**
+**taxonomia de destino do ganho + anti-loop no juiz do preview**. A régua do critério entrou (Fase 5), mas a
+**poda** das perguntas antigas não: o gate da alocação ainda **recusa "menos custo"** (o caso real da redução
+de 3 auxiliares levou 5 reperguntas, por causa de 3 textos de prompt que exigem _"nomeado **E** entregar A
+MAIS"_) e o juiz do preview reinterroga sem limite. Plano em
+`docs/plans/taxonomia-destino-ganho-e-anti-loop.md`.
+⚠️ **A jornada preguiçosa saiu do escopo** — decisão do Luis em 2026-07-30: o gate da jornada **fica como
+está**, mesmo disparando sem consequência em 15 de 24 conversas. Reavaliar depois de re-medir o baseline
+pós-#216. O limiar de 176h **não é mais pendência** (a decisão foi tomada).
+⚠️ **`respostaAlocacaoVaga` não se mexe** — o defeito é 100% de prompt; o predicado já aceita "redução de 3
+auxiliares".
+**Próximo:** `/ggsd:code` da fatia A1 (plano aprovado; o `plan-gate` libera).
 
 ⚠️ **Ao deployar staging, conferir qual branch está no ar** — o `updateApp` substitui a app inteira (em 30/07
 um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na branch do critério).
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
 `E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
 
-**Próximo:** avisar o Rafa e calibrar a régua com ele (humano). Frentes candidatas, nenhuma planejada:
+**Próximo:** `/ggsd:code` da **Fase 6 / fatia A1** (plano aprovado). Em paralelo, humano: avisar o Rafa e
+calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
 causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
 Sheets) · poda do `CLAUDE.md` (~48k, teto 40k) · repovoar a aba `STAGING` com dado sintético.
 **Paralelo (Fase 1):** validar o round-trip em **staging** (regra 13, T5) — após o Luis criar as colunas "Participantes 2"/"Contribuidor" no Sheets
