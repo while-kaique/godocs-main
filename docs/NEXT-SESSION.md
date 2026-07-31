@@ -9,15 +9,28 @@ sincronizado**. A1 está **completa** (T1–T7) e **em produção**; os 2 PRs pe
 (**#217** código, **#218** docs) e o `gh pr merge` foi **bloqueado pelo classificador de permissões**.
 Ver "Sessão de 2026-07-30 (parte 9)" abaixo.
 
-> **▶ PRÓXIMO PASSO:** **escolher a próxima fatia** (PRs #217 e #218 mergeados — staging, prod e `main`
-> sincronizados) — candidatas, nenhuma planejada: **(a) A2** — os gates ignoram materialidade
-> (`aplicaConfirmacaoBaseHoras`/`aplicaSplitCargaEscala` disparam com qualquer `horas_antes > 0`, então
-> 0,05h/mês leva o gate das 220h); **(b) auto-preenchimento da Seção 2.4** — achado novo do T7: com contexto
-> suficiente na doc o agente escreve o destino do ganho **sem perguntar** e **inventa** ("menos prazo / menos
-> retrabalho" que o usuário nunca disse), porque o atalho heurístico do gate
-> (`extrairAlocacaoGanhos` + `!respostaAlocacaoVaga`) libera quando a seção nomeia *algum* destino;
-> **(c) piso `respostaAlocacaoVaga`** — recusa resposta que MISTURA destino válido com filler (1 repergunta).
-> Qualquer uma delas começa com `/ggsd:plan`.
+> **▶ PRÓXIMO PASSO — nenhuma frente de CÓDIGO aberta (decisão do Luis, 2026-07-30).** O GoDocs está com o
+> backlog de implementação **zerado por ora**: a fatia A1 fechou (PRs #217/#218 mergeados; staging, prod e
+> `main` sincronizados) e o **A2 foi DESCARTADO** — ver abaixo. O que resta é **humano**: (1) alinhar com o
+> **Bruno** as 2 pendências de decisão da seção seguinte (onde as perguntas-chave de critério vivem · a
+> "exceção projetos especiais" no limite de 1 coautor) e (2) calibrar a régua do critério com o **Rafa**,
+> agora que ela reprova em produção e o autor vê o motivo.
+> **Antes de abrir qualquer código novo:** existe **1 commit de docs à frente do `main`** nesta branch
+> (`docs/plano-loadings-dashboard-admin`) — abrir PR ou levá-lo junto do próximo.
+> **Se e quando voltar a codar**, as fatias ainda vivas, em ordem de valor: **(a) auto-preenchimento da
+> Seção 2.4** (o agente escreve o destino do ganho SEM perguntar e INVENTA — suja o memorial e a coluna
+> "Alocação Ganhos" com fala que não é do usuário; é qualidade de dado, o que a gestão lê) · **(b) piso
+> `respostaAlocacaoVaga`** (recusa resposta válida misturada com filler — custa 1 repergunta; fronteira que
+> exige confirmação do Luis). Qualquer uma começa com `/ggsd:plan`.
+
+### ❌ A2 (materialidade nos gates) — DESCARTADO em 2026-07-30 (decisão do Luis)
+Era: pendurar um piso de materialidade em `aplicaConfirmacaoBaseHoras`/`aplicaSplitCargaEscala`, que hoje
+disparam com qualquer `horas_antes > 0` (um projeto de 0,05h/mês leva o gate das 220h). **Fora** porque:
+**(1)** é o mesmo diagnóstico da "jornada preguiçosa", que o Luis **já havia recusado** em 30/07 — aprovar o
+A2 reabriria aquela decisão; **(2)** o ganho é de **1–2 perguntas baratas** (a jornada aparece como opção
+clicável, e o split **deixou de ser gate determinístico** em 03/07 — metade do alvo já estava desarmada);
+**(3)** pendurar materialidade no teto das 220h **enfraquece** um guard que existe para barrar número
+impossível — troca ruim (risco de dado errado por menos um clique). Reabrir exige plano próprio.
 
 ## ⏳ Pendentes de DECISÃO do Luis — cobrança do Bruno (chat, 2026-07-30)
 
