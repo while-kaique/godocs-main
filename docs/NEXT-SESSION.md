@@ -81,6 +81,26 @@ validação humana.
 > ⚠️ **PENDÊNCIA HUMANA NOVA (Luis):** criar a coluna **`Justificativa Aprovação do Líder`** no cabeçalho
 > das abas **`GoDocs` e `STAGING`** — sem ela o valor é ignorado com aviso (o resto do sync segue).
 >
+> 🆕 **Rodada 6 (17:18 e 17:24, commits `76ffe84` / `6e93636` / `bb96b06`) — 3 correções vistas pelo Luis
+> na tela + a régua do resumo.** (a) O **"i" do tooltip sumia**: era `var(--go-blue)` a 55% **sobre o header
+> azul**; ganhou `tone="claro"` (branco + disco translúcido, alvo de 20px) no `InfoTooltip` — prop aditiva,
+> as outras telas não mudam. (b) Os **7 cards de número** eram brancos sobre o card branco com borda de 10%;
+> foram para o azul-acinzentado das outras boxes (fundo 5%, borda 12%). (c) **"Resumo do projeto" passou a
+> vir do MEMORIAL** (`[1.2]`, nova pura `extrairResumoMemorial`), com o resumo da análise como fallback, e
+> renderiza por `SimpleMarkdown` (os `**` crus sumiram da tela).
+> ⚠️ **A primeira tentativa do (c) não funcionou e o motivo importa:** o memorial do "n8n audit" grava os
+> rótulos em **TEXTO PURO** (`Resumo: …`), sem `**` nem `###` — o `tituloDaLinha` não os enxerga, a extração
+> voltava `null` e a tela caía no fallback. O fix é o `extrairRotuloTextoPuro`, deliberadamente **FORA** do
+> `extrairSecaoMemorial`: aquele alimenta os **gates determinísticos** do critério de projeto e da
+> carga×escala, e afrouxar o casamento de título lá mudaria o que esses gates enxergam. **Não mover para lá.**
+> 867 testes verdes (+6). ⚠️ **Prettier reformata `aprovacoes.functions.ts` inteiro** (o arquivo usa aspas
+> simples, o config usa duplas) — não rodar nele, o diff vira ruído.
+>
+> 🛑 **DECISÃO DO LUIS (03/08, fim da rodada 6): NADA vai para prod nem para o repo por ora** — a ida a
+> produção será validada **com a diretoria** antes. Tudo está commitado na branch
+> `worktree-plano-aprovacao-lider-teamguide` (24 commits à frente do `origin/main`), **sem push e sem PR**.
+> A staging segue no ar com o build atual para a demonstração.
+>
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
