@@ -44,3 +44,8 @@ dist-ssr
 
 # Artefatos do harness E2E
 scripts/e2e/.runs/
+
+# Guia com credenciais em texto puro (chave privada da SA) — NUNCA commitar
+GOOGLE-CHAT-DM.md
+# Dump da OpenAPI do TeamGuide (1.4MB, artefato de referência local)
+openapi.json

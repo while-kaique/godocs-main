@@ -208,6 +208,17 @@ async function fonteLegado() {
 // Status do Sheets que contam como "reenvio pendente" (mesma normalização do StatusBadge).
 const STATUS_REENVIO = new Set(['reenvio pendente', 'rejeitado']);
 
+/**
+ * Célula de TEXTO da planilha → motivo do e-mail. ⚠️ Vazio **e "—"/"-" contam como
+ * ausência**: o padrão da planilha é "texto vazio → —" (`padronizarLinha` do sync grava
+ * "—" em "Observações" desde o append), então tratar só `''` fazia o e-mail sair com
+ * _"Motivo: —"_. Pura.
+ */
+export function motivoDaCelula(valor: string | null | undefined): string | null {
+  const s = (valor ?? '').trim();
+  return s === '' || s === '—' || s === '-' ? null : s;
+}
+
 // 'reenvio' — Sheets: linhas com Status normalizado em STATUS_REENVIO. Inclui o MOTIVO
 // (coluna "Observações") por projeto.
 async function fonteReenvio() {
@@ -220,7 +231,7 @@ async function fonteReenvio() {
       projeto: {
         id: (r['ID Projeto'] ?? '').trim(),
         nome: (r['Projeto'] ?? '').trim() || null,
-        motivo: (r['Observações'] ?? '').trim() || null,
+        motivo: motivoDaCelula(r['Observações']),
       },
     }));
   return agruparPorEmail(itens);

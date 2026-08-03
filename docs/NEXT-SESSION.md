@@ -4,7 +4,31 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-31 — **sessão de OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
+**Última sessão:** 2026-08-03 — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
+conjunta das 2 frentes fechadas na STAGING**. Investigação ao vivo da API TeamGuide (os endpoints de
+liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros), spec nova
+`spec-docs/SPEC_APROVACAO_LIDER.md` (D1–D10), plano **F0 aprovado** (não codado) e staging `edf400b4`
+deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
+validação humana.
+
+> **▶ PRÓXIMO PASSO — validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
+> No `/dashboard`: apagar um motivo/parecer deve gravar **"—"** (não branco) e projeto novo nasce com
+> "Motivo Reenvio" = "—". A staging grava na aba **`STAGING`** (planilha própria, não a de prod).
+> Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
+> Só **depois** disso a **F0** entra em código (plano já aprovado).
+
+> **O que validar (e o que NÃO existe ainda):** o único comportamento novo na staging é o **"—"** da coluna
+> "Motivo Reenvio" — append e append de recuperação nascem com "—" (`sync.ts:411/440`), o **update da edição
+> nunca toca** a coluna (é manual, `sync.ts:147`), apagar motivo/parecer no `/dashboard` grava "—", e o e-mail
+> de reenvio não sai mais com o literal "Motivo: —". ⚠️ **Sem backfill**: linhas legadas já em branco
+> **continuam em branco** (fronteira do plano, não esquecimento) — preencher o histórico é retroativo à parte.
+> Da frente da **pré-aprovação do líder** subiu **só documentação** (spec, `.gitignore`, docs vivos) —
+> **zero mudança de comportamento**: nada de `projeto_aprovacoes`, aba de aprovações ou `chat-dm.ts`, e as 10
+> pessoas seguem em "ÁREA NÃO IDENTIFICADA" com a paginação lendo 25.
+
+<details><summary>Sessões anteriores (histórico)</summary>
+
+**Sessão de 2026-07-31** — **OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
 (lógica da classificação de elegibilidade · projeto da Nyara que **desapareceu** de "Meus Projetos" ·
 **dupla contagem de R$ 161.913,78** no Sucesso.AI da Maria) e **1 correção aplicada em prod** (planilha +
 SQLite). Ver "Sessão de 2026-07-31" abaixo.
@@ -17,8 +41,43 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > — hoje o único bloco anti-dupla-contagem compara *horas × custo evitado*, e a fase de receita **não relê**
 > os itens do custo evitado; foi exatamente o buraco do Sucesso.AI.
 
+</details>
+
 ## Plano ativo
-**Nenhum** — nenhum plano em `aprovado` esperando execução (todos os de `docs/plans/INDEX.md` estão
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
+
+> **F0** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`): índice de liderança da
+> TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em 10 pessoas). **Nada
+> codado ainda.**
+> ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
+> `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
+
+### ⏭️ ANTES da F0 — entrega conjunta das 2 frentes fechadas (decisão do Luis, 2026-08-03)
+Duas frentes estão **prontas e não entregues**, e vão **juntas** (deploy de staging substitui a app INTEIRA —
+subir uma sozinha apaga a outra):
+1. **`fix/motivo-reenvio-traco`** (commit `a6e19f1`, worktree `.claude/worktrees/fix-motivo-reenvio-traco`) —
+   o T5 do plano [motivo-reenvio-traco-padrao](plans/motivo-reenvio-traco-padrao.md).
+2. **`worktree-plano-aprovacao-lider-teamguide`** (commit `81da73d`) — só docs: `spec-docs/SPEC_APROVACAO_LIDER.md`
+   + `.gitignore` (o `GOOGLE-CHAT-DM.md` tem **chave privada de SA em texto puro** e estava rastreável).
+
+**Sequência:** juntar as duas + `origin/main` → `npm run test` → `build` + `build:worker` → **staging
+`edf400b4`** → **validação humana do Luis** → **PR + merge**. Prod (`674a3710`) fica para depois da
+validação. ⚠️ Conferir qual branch está no ar na staging antes de subir.
+
+**Estado desta fatia:** branch `fix/motivo-reenvio-traco` no worktree
+`.claude/worktrees/fix-motivo-reenvio-traco`, commit **`a6e19f1`** — `sync.ts` (append e append de
+recuperação inicializam a coluna com "—"; **update da edição NUNCA a toca**), `ouTraco` no write-back do
+`/dashboard` (motivo/parecer apagado grava "—"), `motivoDaCelula` no `email-legados` (o e-mail de reenvio
+podia sair com _"Motivo: —"_ — defeito latente achado junto), `CLAUDE.md` (gotcha 4 reescrito),
+`SPEC_CORRECOES.md` e 3 arquivos de teste. **805 testes verdes**, `worker.js` rebuildado e commitado.
+**Sem backfill** das linhas legadas já em branco (fronteira registrada no plano).
+
+⚠️ **Estes docs (`NEXT-SESSION.md`, `plans/INDEX.md`, `plans/motivo-reenvio-traco-padrao.md`) estão
+NÃO-COMMITADOS de propósito:** o diretório principal está em `main` (RF-18 proíbe commitar lá) e a frente
+paralela está trabalhando nele — nenhuma operação de git foi feita aqui para não atropelá-la. Quem retomar:
+commite-os junto do T5 (ou na branch da frente que estiver ativa).
+
+_Antes desta fatia:_ **Nenhum** — nenhum plano em `aprovado` esperando execução (todos os de `docs/plans/INDEX.md` estão
 concluídos/executados, e o `perguntas-agente-recorrencia-evidencia` segue 🟡 parcial com T3/T4 abertos por
 decisão do Luis). O próximo passo desta sessão é **operacional** (varredura Drive × planilha), não precisa de
 plano. Voltar a codar → `/ggsd:plan` primeiro (candidato: gate anti-dupla-contagem `custo evitado × receita`).

@@ -37,7 +37,12 @@ alinhá-lo é **fatia própria** (fronteira deste plano).
 ⚠️ **Achado novo do T7 (fatia própria):** com contexto suficiente na doc, o agente **auto-preenche** a
 Seção 2.4 **sem perguntar** e **inventa** o destino ("menos prazo/menos retrabalho" que ninguém disse) — o
 atalho heurístico do gate libera porque a seção nomeia *algum* destino. Rede restante: validação humana.
-**Próximo:** **nada de código por ora** — o **A2 foi DESCARTADO** (decisão do Luis, 30/07: mesmo diagnóstico
+**Próximo (03/08):** 🟡 **T5 do fix "Motivo Reenvio → —"** — branch `fix/motivo-reenvio-traco` (`a6e19f1`,
+805 testes verdes, `worker.js` rebuildado) espera a **frente paralela** liberar para mergear `origin/main`,
+rebuildar e fazer **staging `edf400b4` → prod `674a3710` → PR**. Plano:
+[docs/plans/motivo-reenvio-traco-padrao.md](docs/plans/motivo-reenvio-traco-padrao.md).
+
+_Antes disso:_ **nada de código por ora** — o **A2 foi DESCARTADO** (decisão do Luis, 30/07: mesmo diagnóstico
 da jornada preguiçosa já recusada, ganho de 1–2 perguntas baratas e risco de enfraquecer o teto das 220h).
 Fatias vivas para quando voltar a codar: **auto-preenchimento da Seção 2.4** (agente inventa o destino) e o
 **piso `respostaAlocacaoVaga`**.
@@ -108,7 +113,9 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** abrir o PR da `feat/dashboard-admin-sheets` (staging e prod já deployados).
+**Próximo:** **validar a staging `edf400b4`** (frentes `fix/motivo-reenvio-traco` + docs da pré-aprovação
+do líder, deployadas em 2026-08-03) → **PR + merge** → prod `674a3710`. Em seguida, codar a **F0** da
+pré-aprovação do líder (plano ✅ aprovado: `docs/plans/teamguide-lideranca-e-areas.md`).
 
 ## Fase 4 — Loadings do `/dashboard` do admin 🟡
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,
