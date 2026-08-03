@@ -47,9 +47,13 @@ um deploy vindo do `main` apagou as perguntas da Etapa 2 que só existiam na bra
 ⚠️ **O harness E2E aponta pra PROD por default** quando não acha o `.env` (worktree não tem um): exportar
 `E2E_BASE_URL`/`E2E_COOKIE` e conferir a linha "🚀 E2E run … contra <URL>" antes de deixar rodar.
 
-**Próximo:** **nenhuma frente de código aberta** (decisão do Luis, 30/07) — staging, prod e `main`
-sincronizados (PRs #217/#218). **A2 descartado.** O que resta é humano: alinhar as 2 pendências com o Bruno
-e calibrar a régua com o Rafa.
+**Próximo (31/07):** **varrer Drive × planilha** para achar outros projetos purgados como o da **Nyara**
+("Consulta fiscal - IE e IM", submetido 29/07 15:00, doc no Drive mas linha nunca apendada → purgado do
+SQLite pela `reconciliarExclusoes`) **e decidir a recuperação dela**. Nenhuma frente de **código** aberta
+(decisão do Luis, 30/07; staging/prod/`main` sincronizados, PRs #217/#218; **A2 descartado**) — o candidato
+mais forte a virar plano é o **gate anti-dupla-contagem `custo evitado × receita`** (buraco que produziu a
+dupla contagem de R$ 161.913,78 no Sucesso.AI, corrigida à mão em 31/07). Humano: as 2 pendências com o
+Bruno e calibrar a régua com o Rafa.
 Em paralelo, humano: avisar o Rafa e
 calibrar a régua com ele. Frentes candidatas, nenhuma planejada:
 causa-raiz do analisador morrendo no `waitUntil` (hoje mitigado pelo cron de 1 min, que pressiona a cota do
