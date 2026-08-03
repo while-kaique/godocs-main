@@ -65,6 +65,11 @@ validação humana.
 > o autor** — ele descobre ao abrir o GoDocs. ⚠️ **Adição pequena em aberto: DM ao AUTOR quando o líder pede
 > ajuste** (o Luis perguntou; eu ofereci e ele não respondeu ainda).
 >
+> 🆕 **Rodada 4 (17:06, commit `a786f6c`)** — header ficou só com "← Início" + título e um **`i` (InfoTooltip)**
+> ao lado de "Pré-aprovações do meu time" explicando a página em 3 frases **sem travessões** (pedido explícito
+> do Luis); a linha de subtítulo saiu inteira, levando com ela o aviso de pré-visualização de admin; o rótulo
+> virou só **"Resumo do projeto"** (sem "(análise automática)").
+>
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
