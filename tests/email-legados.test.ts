@@ -213,6 +213,15 @@ describe("listarDestinatarios('reenvio')", () => {
     expect(mReadAll).toHaveBeenCalled();
     expect(mRows).not.toHaveBeenCalled(); // não toca no SQLite de legados
   });
+
+  it('"Observações" = "—" (padrão da planilha p/ vazio) conta como SEM motivo — o e-mail não sai com "Motivo: —"', async () => {
+    mReadAll.mockResolvedValue([
+      { Status: 'Reenvio Pendente', Email: 'ana@x.com', 'Nome Completo': 'Ana', 'ID Projeto': 'p1', Projeto: 'Proj 1', Observações: '—' },
+      { Status: 'rejeitado', Email: 'bia@x.com', 'Nome Completo': 'Bia', 'ID Projeto': 'p2', Projeto: 'Proj 2', Observações: '-' },
+    ]);
+    const { recipients } = await listarDestinatarios('reenvio');
+    expect(recipients.flatMap((r) => r.projetos.map((p) => p.motivo))).toEqual([null, null]);
+  });
 });
 
 describe("listarDestinatarios('todos')", () => {
