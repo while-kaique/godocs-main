@@ -2,6 +2,14 @@
 **Status:** ✅ **executado e commitado** (2026-08-03, `c9991be`) — e a sessão seguinte já entregou **F1 + F2**
 no mesmo commit. Falta só validar na staging → prod → PR (ver `spec-docs/SPEC_APROVACAO_LIDER.md` §7).
 
+> **Fecho da tarde de 03/08 (`1296e12` + `e4780cb`), fora do escopo original do plano F0:** entrou a **D12**
+> (rótulo próprio para os 3 casos sem fila — liderança grava **`Pré-aprovado (liderança)`**, via a função
+> pura `rotuloIsencaoSheet`) e a **DM foi LIGADA na staging** a pedido do Luis, para o teste real com o
+> líder dele (secrets `GOOGLE_CHAT_DM_ENABLED=true`/`CHAT_SA_*`/`GOOGLE_CHAT_DM_SUBJECT` no `edf400b4`;
+> prod segue no-op). Aprendizado de credencial: **só a SA `planilha-jg@` tem a DWD de Chat** — a `godocs@`
+> do Sheets devolve `401 unauthorized_client`, então a fallback `GOOGLE_SA_*` do `chat-dm.ts` não serve.
+> 848 testes verdes. O que resta do plano é **validação humana**, não código.
+
 > **Nota da sessão de 03/08 (F1+F2):** o Luis pediu a implementação direta, **sem rodar os revisores de
 > contexto fresco** — os 3 marcadores de gate ficaram ausentes e o commit saiu com a suíte verde (845 testes)
 > como única trava. Decisão dele, registrada aqui para não parecer gate furado.

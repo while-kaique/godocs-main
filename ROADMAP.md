@@ -113,12 +113,12 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **validar a fila do líder na staging `edf400b4`** (deployada em 2026-08-03 14:30 com F0+F1+F2)
-→ prod `674a3710` → PR. Pré-requisito do Luis: criar a coluna **`Aprovação do Líder`** no cabeçalho das
-abas `GoDocs` e `STAGING`.
+**Próximo:** **o Luis validar a fila em `/aprovacoes` na staging com o Lucas** (staging redeployada em
+2026-08-03 15:39 com a D12 e a **DM LIGADA** — a mensagem já chegou ao Lucas) → prod `674a3710` → PR.
+Pré-requisito do Luis: criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
-Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D11**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D12**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
 diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,
 índice de liderança (432 pessoas / 1 sem líder), tabela interna `projeto_aprovacoes`, rotas
@@ -126,10 +126,17 @@ diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaF
 coluna `Aprovação do Líder` no Sheets e a DM (`google/chat-dm.ts`) atrás do gate `GOOGLE_CHAT_DM_ENABLED`.
 **D11 (decisão do Luis, 03/08):** quem **já é liderança** (é `leader` de um time ativo na TeamGuide) fica
 **isento** — só o liderado de fato entra em fila, e quem aprova é o **líder direto**.
-- ⬜ Validar na staging → prod `674a3710` → PR. **Pendência humana:** a coluna no cabeçalho do Sheets (P2)
-  e, para ligar a DM em prod, os secrets `CHAT_SA_*` + `GOOGLE_CHAT_DM_ENABLED=true`.
-- **DoD:** liderado submete → fila abre e a coluna mostra "Pendente com X"; liderança submete → "—" e
-  nenhuma fila/DM; `/aprovacoes` aprova e pede ajuste (comentário obrigatório); autor vê o selo; a
+**D12 (decisão do Luis, 03/08):** os 3 casos sem fila ganharam **rótulo próprio** na coluna — liderança →
+**`Pré-aprovado (liderança)`**, sem líder → `Sem líder na TeamGuide`, TeamGuide fora → `Aprovação
+indisponível (integração)` (antes os 3 gravavam `—` e a auditoria não distinguia isenção de falha).
+- ✅ **Staging pronta para o teste real** (2026-08-03 15:39): redeploy com a D12 + **DM LIGADA** nela
+  (`GOOGLE_CHAT_DM_ENABLED=true`, `CHAT_SA_*`, `GOOGLE_CHAT_DM_SUBJECT`) — cadeia validada ao vivo e DM
+  recebida pelo Lucas. ⚠️ Staging **deixou de ser silenciosa**: submeter lá notifica pessoa real.
+- ⬜ Validar a fila em `/aprovacoes` (é o Lucas quem vê as linhas) → prod `674a3710` → PR.
+  **Pendência humana:** a coluna no cabeçalho do Sheets (P2) e, para ligar a DM **em prod**, os secrets
+  `CHAT_SA_*` + `GOOGLE_CHAT_DM_ENABLED=true` (prod hoje: DM no-op).
+- **DoD:** liderado submete → fila abre e a coluna mostra "Pendente com X"; liderança submete →
+  "Pré-aprovado (liderança)" e nenhuma fila/DM; `/aprovacoes` aprova e pede ajuste (comentário obrigatório); autor vê o selo; a
   submissão **nunca** falha por causa da pré-aprovação; validado em staging antes de prod.
 
 ## Fase 4 — Loadings do `/dashboard` do admin 🟡

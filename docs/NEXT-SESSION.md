@@ -4,15 +4,26 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-08-03 — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
+**Última sessão:** 2026-08-03 (tarde) — **fechou a decisão do rótulo de isenção (D12) e LIGOU a DM na
+staging.** O rótulo da liderança virou **`Pré-aprovado (liderança)`** e os outros 2 casos sem fila ganharam
+texto próprio (`rotuloIsencaoSheet`, função pura + 3 testes; 848 verdes, `worker.js` rebuildado). Staging
+`edf400b4` redeployada (15:39) com esse worker **e com a DM real ligada** (`GOOGLE_CHAT_DM_ENABLED=true` +
+`CHAT_SA_*` + `GOOGLE_CHAT_DM_SUBJECT`; a SA `planilha-jg@` é a única com DWD de Chat — a `godocs@` do
+Sheets dá `401 unauthorized_client`). Cadeia validada ao vivo e **a DM chegou ao Lucas**. Commits `1296e12`
+(código+spec) e `e4780cb` (docs). **Nada em prod nem no `main`.** Achado da sessão: a fila é a rota raiz
+**`/aprovacoes`**, não `/meus-projetos/aprovacoes` (o 404 do Luis era endereço errado).
+
+_Sessão anterior:_ 2026-08-03 (manhã) — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
 conjunta das 2 frentes fechadas na STAGING**. Investigação ao vivo da API TeamGuide (os endpoints de
 liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros), spec nova
 `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–D10), plano **F0 aprovado** (não codado) e staging `edf400b4`
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO (2026-08-03, sessão de código da pré-aprovação do líder) — validar na STAGING
-> (`edf400b4`) a fila do líder e então prod + PR.** O código de **F0 + F1 + F2 está pronto e commitado**
+> **▶ PRÓXIMO PASSO — o Lucas abrir `https://godocs-staging.devgogroup.com/aprovacoes` e decidir o
+> projeto que o Luis submeteu (aprovar e/ou pedir ajuste), e então prod `674a3710` + PR.** A tela é a rota
+> **raiz `/aprovacoes`** (a faixa/atalho aparece só p/ quem lidera — o Luis não a vê, e a fila dele vem
+> vazia por construção: as linhas pendentes são do líder). O código de **F0 + F1 + F2 está pronto e commitado**
 > (845 testes verdes, `worker.js` rebuildado): tabela `projeto_aprovacoes`, `aprovacoes.functions.ts`,
 > rotas `/api/aprovacoes/*`, tela **`/aprovacoes`** + faixa na home (só p/ quem lidera), selo no card do
 > autor, coluna **`Aprovação do Líder`** no Sheets e a DM (`google/chat-dm.ts`) atrás do gate
@@ -99,11 +110,12 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **executado** (código na branch `worktree-plano-aprovacao-lider-teamguide`, 2026-08-03)
 
-> **F0** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`): índice de liderança da
-> TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em 10 pessoas). **Nada
-> codado ainda.**
+> **F0 + F1 + F2** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`, D1–**D12**):
+> índice de liderança da TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em
+> 10 pessoas) + tabela/rotas/tela `/aprovacoes` + DM. **Codado e na staging.** O que resta do plano é
+> **validação humana** (o Lucas abrindo a fila), depois prod e PR — não há fatia de código pendente.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
 
