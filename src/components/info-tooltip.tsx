@@ -14,10 +14,17 @@ const BUBBLE_WIDTH = 224; // w-56
 export function InfoTooltip({
   text,
   label = "Mais informações",
+  tone = "padrao",
 }: {
   text: string;
   label?: string;
+  /**
+   * "claro" = o ícone vive sobre fundo ESCURO (ex.: o header azul de /aprovacoes).
+   * Sem ele o "i" fica azul sobre azul e desaparece.
+   */
+  tone?: "padrao" | "claro";
 }) {
+  const claro = tone === "claro";
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -67,8 +74,12 @@ export function InfoTooltip({
         onBlur={fechar}
         onClick={() => (open ? fechar() : abrir())}
         onKeyDown={(e) => e.key === "Escape" && fechar()}
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full transition-colors"
-        style={{ color: "var(--go-blue)", opacity: 0.55 }}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full transition-opacity hover:opacity-100"
+        style={
+          claro
+            ? { color: "var(--go-white)", opacity: 0.85, background: "rgba(255,255,255,0.2)" }
+            : { color: "var(--go-blue)", opacity: 0.55 }
+        }
       >
         <Info className="h-3.5 w-3.5" />
       </button>

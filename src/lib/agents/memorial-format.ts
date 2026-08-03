@@ -223,6 +223,21 @@ export function extrairPonteiroMovido(memorial: string | null | undefined): stri
   return extrairSecaoMemorial(memorial, PREFIXO_PONTEIRO_MOVIDO, { prefixo: true });
 }
 
+/**
+ * Extrai do memorial o "Resumo" (ponto [1.2], Seção 1 — Contexto): o parágrafo em que o
+ * agente conta, em prosa, o que o projeto faz e o que ele muda. É mais ABRANGENTE que o
+ * `resumo` da análise automática (que julga a submissão), e é ele que a tela de
+ * pré-aprovação mostra ao líder — a análise vira só o fallback.
+ *
+ * Casa o título exato "Resumo": o [1.2] vem antes da Seção 5 ("Resumo do saving") no
+ * texto, então a primeira ocorrência é sempre a certa.
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial).
+ */
+export function extrairResumoMemorial(memorial: string | null | undefined): string | null {
+  return extrairSecaoMemorial(memorial, TITULOS_MEMORIAL['1.2'].toLowerCase());
+}
+
 // Fatia uma seção do memorial pelo seu título legível (já em minúsculas). Captura o
 // conteúdo inline do rótulo (`**Título:** aqui`) + as linhas seguintes, parando no
 // próximo ponto/seção ou no separador `---` do bloco financeiro injetado. Base comum

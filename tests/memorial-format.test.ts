@@ -3,6 +3,7 @@ import {
   normalizarMarcadoresMemorial,
   extrairAlocacaoGanhos,
   extrairJustificativaCargaEscala,
+  extrairResumoMemorial,
   TITULOS_MEMORIAL,
 } from '@/lib/agents/memorial-format';
 
@@ -150,5 +151,36 @@ describe('extrairJustificativaCargaEscala', () => {
     expect(extrairJustificativaCargaEscala('### Total de horas\n10h/mês.\n### Tipo de saving\nmensal')).toBeNull();
     expect(extrairJustificativaCargaEscala(null)).toBeNull();
     expect(extrairJustificativaCargaEscala('')).toBeNull();
+  });
+});
+
+describe('extrairResumoMemorial', () => {
+  it('extrai o Resumo do contexto ([1.2]) escrito como rótulo inline', () => {
+    const memorial = normalizarMarcadoresMemorial(
+      [
+        '[1.1] Portal de reembolsos.',
+        '[1.2] O robô lê os comprovantes no e-mail, confere contra a política e lança no ERP.',
+        '[1.3] Antes a analista conferia um a um.',
+      ].join('\n'),
+    );
+    expect(extrairResumoMemorial(memorial)).toBe(
+      'O robô lê os comprovantes no e-mail, confere contra a política e lança no ERP.',
+    );
+  });
+
+  it('pega o Resumo do contexto, não o "Resumo do saving" que vem depois', () => {
+    const memorial = [
+      '### Resumo',
+      'O robô concilia as notas fiscais todo dia às 6h.',
+      '',
+      '### Resumo',
+      'Economia de 40h/mês.',
+    ].join('\n');
+    expect(extrairResumoMemorial(memorial)).toBe('O robô concilia as notas fiscais todo dia às 6h.');
+  });
+
+  it('devolve null quando o memorial não tem a seção (ou não existe)', () => {
+    expect(extrairResumoMemorial(null)).toBeNull();
+    expect(extrairResumoMemorial('### Total de horas\n90h/mês.')).toBeNull();
   });
 });

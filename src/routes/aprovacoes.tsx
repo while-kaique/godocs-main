@@ -64,7 +64,7 @@ type ItemAprovacao = {
   custo_externo_mensal: number | null;
   receita_mensal: number | null;
   memorial: string | null;
-  resumo_ia: string | null;
+  resumo: string | null;
 };
 
 type Fila = {
@@ -222,6 +222,7 @@ function AprovacoesPage() {
               </h1>
               <span style={{ color: "var(--go-white)" }}>
                 <InfoTooltip
+                  tone="claro"
                   label="O que é esta página"
                   text="Aqui ficam os projetos que pessoas do seu time submeteram e esperam a sua leitura. Você responde 3 perguntas rápidas e dá o parecer: pré-aprovar ou pedir ajuste. É uma pré-aprovação, não a decisão final: a equipe RPA valida cada projeto em paralelo, então nada fica parado esperando você."
                 />
@@ -455,10 +456,10 @@ function CardAprovacao({
           <CardNumero rotulo="Custo externo" valor={fmtReais(i.custo_externo_mensal)} negativo />
         </div>
 
-        {i.resumo_ia && (
+        {i.resumo && (
           <div
             className="mt-2 rounded-lg px-3.5 py-2.5"
-            style={{ background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.1)" }}
+            style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.12)" }}
           >
             <p
               className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
@@ -467,9 +468,11 @@ function CardAprovacao({
               <Sparkles className="h-3 w-3" />
               Resumo do projeto
             </p>
-            <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
-              {i.resumo_ia}
-            </p>
+            {/* Vem do memorial, então pode ter negrito/listas em markdown — renderiza
+                como o memorial expansível em vez de mostrar os asteriscos crus. */}
+            <div className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
+              <SimpleMarkdown text={i.resumo} isSaving />
+            </div>
           </div>
         )}
 
@@ -718,8 +721,10 @@ function CardNumero({
     <div
       className="rounded-lg px-2.5 py-2"
       style={{
-        background: "var(--go-white)",
-        border: "1px solid rgba(0,89,169,0.1)",
+        // Mesmo azul-acinzentado das outras boxes da tela (área, resumo): branco
+        // sobre branco só com a borda de 10% ficava difícil de ler.
+        background: "rgba(0,89,169,0.05)",
+        border: "1px solid rgba(0,89,169,0.12)",
         borderLeft: destaque ? "3px solid var(--go-lime)" : undefined,
       }}
     >

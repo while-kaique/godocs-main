@@ -20,7 +20,10 @@ import { z } from 'zod';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
 import { resumirChecklist, type ChaveChecklist } from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
-import { normalizarMarcadoresMemorial } from '@/lib/agents/memorial-format';
+import {
+  extrairResumoMemorial,
+  normalizarMarcadoresMemorial,
+} from '@/lib/agents/memorial-format';
 import { enviarDmChat } from '@/lib/google/chat-dm';
 import { ehProjetoTesteE2E } from '@/lib/google/chat';
 import { updateRowByProjectId } from '@/lib/google/sheets';
@@ -264,8 +267,8 @@ export type ItemAprovacao = {
   receita_mensal: number | null;
   /** Memorial financeiro pronto para leitura (títulos legíveis, sem marcadores [x.y]). */
   memorial: string | null;
-  /** Resumo do projeto escrito pelo analisador (IA) — contexto rápido para o líder. */
-  resumo_ia: string | null;
+  /** Resumo do projeto: a seção [1.2] do memorial (preferida) ou, na falta, o da análise. */
+  resumo: string | null;
 };
 
 /** Rótulo do papel do participante (mesmos 3 papéis da Etapa 1). */
@@ -356,7 +359,11 @@ export async function listarAprovacoesPendentes(
 ): Promise<{ lidera: boolean; itens: ItemAprovacao[] }> {
   const alvo = (email ?? '').trim().toLowerCase();
   const rows = await getAprovacoesPendentesDe(alvo);
-  const itens: ItemAprovacao[] = rows.map((r) => ({
+  const itens: ItemAprovacao[] = rows.map((r) => {
+    const memorial = r.memorial_calculo?.trim()
+      ? normalizarMarcadoresMemorial(r.memorial_calculo)
+      : null;
+    return {
     projeto_id: r.projeto_id,
     projeto_nome: r.projeto_nome,
     autor_nome: r.autor_nome,
@@ -374,12 +381,14 @@ export async function listarAprovacoesPendentes(
     tipo_saving: r.tipo_saving ?? null,
     ganho_total: r.ganho_total_mensal ?? null,
     custo_externo_mensal: r.custo_externo_mensal ?? null,
-    resumo_ia: r.resumo_ia?.trim() || null,
+    // O resumo do MEMORIAL ([1.2]) é mais abrangente que o da análise automática — o
+    // líder lê aquele; a análise entra só quando o memorial não tem a seção (projeto
+    // especial, legado antigo sem o ponto [1.2]).
+    resumo: extrairResumoMemorial(memorial) ?? (r.resumo_ia?.trim() || null),
     ...extrairNumeros(r),
-    memorial: r.memorial_calculo?.trim()
-      ? normalizarMarcadoresMemorial(r.memorial_calculo)
-      : null,
-  }));
+    memorial,
+    };
+  });
 
   let lidera = itens.length > 0;
   try {
