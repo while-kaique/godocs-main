@@ -42,6 +42,14 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
+> 🚨 **BLOQUEIO ATIVO (03/08 16:40) — a staging foi ATROPELADA por outra frente.** O meu deploy foi
+> **16:35:07**; o `getApp` do `edf400b4` mostra `updatedAt` **16:40:40** e a descrição de outra branch
+> ("Este update remove a pergunta 'E o que piora?' da Etapa 2"). O `updateApp` substitui a app INTEIRA, então
+> o que está no ar não tem a rota `/aprovacoes` → **404** (confirmado por curl: `/` = 200, `/aprovacoes` = 404).
+> **Não é bug da tela.** Decisão pendente do Luis: **(A)** redeployar o meu build (já compilado, 859 testes) e
+> a outra frente redeploya depois, ou **(B)** mergear `origin/main` + a branch dela na minha, rebuildar e
+> deployar o conjunto. ⚠️ **Antes de qualquer deploy de staging, rode `getApp` e confira `updatedAt`/descrição.**
+>
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
