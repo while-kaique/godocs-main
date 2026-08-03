@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive, Ban } from "lucide-react";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive, Ban, CheckCircle2, MessageSquareWarning, ShieldCheck } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -116,6 +116,13 @@ type Projeto = {
   // ou do pedido de reenvio (nunca de "Observações", que é parecer interno de staff).
   motivo_reprovado: string | null;
   motivo_reenvio: string | null;
+  // Pré-aprovação do líder (TeamGuide). null = não se aplica (o autor é liderança ou
+  // não tem líder). Informativa: a validação da equipe RPA corre em paralelo.
+  aprovacao: {
+    veredito: "pendente" | "aprovado" | "reprovado";
+    aprovadores: string[];
+    comentario: string | null;
+  } | null;
 };
 
 type Filtro = "todos" | "meus" | "participo" | "rascunhos";
@@ -750,6 +757,31 @@ function MeusProjetosPage() {
                                   Edição delegada
                                 </span>
                               )}
+                            </div>
+                          )}
+                          {/* Pré-aprovação do líder (TeamGuide) — informativa, não é
+                              portão: a triagem da RPA corre em paralelo. Ausente quando
+                              não se aplica (autor é liderança ou não tem líder). Estado
+                              por rótulo + ícone, nunca só por cor. */}
+                          {!ehRascunho && p.aprovacao && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]" style={{ color: "#a5a5b3" }}>
+                              {p.aprovacao.veredito === "aprovado" ? (
+                                <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "#15803d" }}>
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  Aprovado pelo líder
+                                </span>
+                              ) : p.aprovacao.veredito === "reprovado" ? (
+                                <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "#b45309" }}>
+                                  <MessageSquareWarning className="h-3.5 w-3.5" />
+                                  Ajuste pedido pelo líder
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "#8b8b9a" }}>
+                                  <ShieldCheck className="h-3.5 w-3.5" />
+                                  Aguardando o líder ({p.aprovacao.aprovadores.join(", ")})
+                                </span>
+                              )}
+                              {p.aprovacao.comentario && <span>— {p.aprovacao.comentario}</span>}
                             </div>
                           )}
                           {/* Pendência de REGULARIZAÇÃO (legado, com prazo) — âmbar */}

@@ -56,6 +56,7 @@ import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
+import { abrirPreAprovacao } from "@/lib/aprovacoes.functions";
 import { isAdmin } from "@/lib/auth.functions";
 import type {
   ChatFase,
@@ -2857,6 +2858,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
   });
 
+  // ── Pré-aprovação do líder (TeamGuide) ────────────────────────────────────
+  // Abre (ou reabre, no reenvio — D10) a fila do líder direto do autor e dispara a
+  // DM no Chat em background. NÃO bloqueia nada (D3): a função nunca lança e, quando
+  // o autor É liderança (D11) ou não tem líder (D6), devolve "—" e segue a vida.
+  const preAprovacao = await abrirPreAprovacao(projeto_id, { nomeProjeto: projeto.nome });
+
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {
     const membros = parseJson<string[]>(projeto.membros) ?? [];
@@ -2888,6 +2895,8 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
         // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
         memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
+        // Coluna "Aprovação do Líder": "Pendente com X" / "—" (isento).
+        aprovacaoLider: preAprovacao.rotuloSheet,
       }),
     );
   }

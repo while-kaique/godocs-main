@@ -113,9 +113,17 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **validar a staging `edf400b4`** (frentes `fix/motivo-reenvio-traco` + docs da pré-aprovação
-do líder, deployadas em 2026-08-03) → **PR + merge** → prod `674a3710`. Em seguida, codar a **F0** da
-pré-aprovação do líder (plano ✅ aprovado: `docs/plans/teamguide-lideranca-e-areas.md`).
+**Próximo:** **fechar os 3 revisores da F0 e commitar o WIP** (código pronto e verde no worktree
+`plano-aprovacao-lider-teamguide`, segurado pelos marcadores em `pendente` — ver `docs/NEXT-SESSION.md`).
+Depois: **validar a staging `edf400b4`** (frentes `fix/motivo-reenvio-traco` + docs da pré-aprovação
+do líder, deployadas em 2026-08-03) → **PR + merge** → prod `674a3710`.
+
+## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–D10). **F0 (base TeamGuide) 🟡 codada e verde, não
+commitada** em 2026-08-03: paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
+diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail
+exato e o índice de liderança (`getLideresDe`/`getLideradosDe`, 432 pessoas / 1 sem líder).
+**F1** (aprovação dentro do GoDocs) e **F2** (DM no Chat — credencial já validada) ⬜ planejadas.
 
 ## Fase 4 — Loadings do `/dashboard` do admin 🟡
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,

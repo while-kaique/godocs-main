@@ -1,5 +1,24 @@
 # Plano — Base TeamGuide: liderança + furo de áreas + paginação (F0 da pré-aprovação do líder)
-**Status:** ✅ aprovado (Luis, 2026-08-03)
+**Status:** 🟡 **executado — código pronto e verde, NÃO commitado** (2026-08-03)
+
+> **T1–T6 implementados**; 824 testes verdes (baseline 805); `worker.js` rebuildado.
+> **Não commitado** porque a sessão fechou **suja**: os 3 revisores de contexto fresco
+> (`verificador-conformidade`, `revisor-qualidade`, `revisor-reuso`) foram disparados mas a
+> janela acabou antes dos vereditos — `.claude/.review-status` e `.claude/.quality-status`
+> seguem em `pendente`, e os gates barram o commit. **Retomar = re-rodar os 3 revisores,
+> gravar os vereditos e commitar** (nada de código a escrever).
+>
+> **Achado que quase passou:** os testes autorados às cegas usavam ids **string**; a API real
+> devolve ids **numéricos** — todo `map.get(String(id))` errava em silêncio e tudo voltava
+> `null`. Só o **smoke contra a API real** pegou. Fix: `normalizarTimes()` na fronteira +
+> 2 guardas de regressão com ids numéricos.
+>
+> **Validado ao vivo (read-only, `TG_API_TOKEN` do `.env` da raiz):** `luis.albuquerque@` →
+> Lucas Gonçalves Queiroz (área RPA) · `rafael@` → **sem líder** (D6), área "N1" · 432 pessoas
+> no índice com **exatamente 1** sem líder (bate com a spec) · as pessoas do bug 3.2 resolvem
+> (BIZOPS · OPERAÇÕES · TIME JOAQUIM QUINDERE · N1 - LUIS LIVERI).
+
+_Status anterior:_ ✅ aprovado (Luis, 2026-08-03)
 
 **Objetivo:** deixar `src/lib/areas/teamguide.server.ts` capaz de responder **quem é o líder direto de um e-mail** (insumo da F1 de pré-aprovação) e, no caminho, fechar os 2 bugs achados na integração atual — a **paginação morta** e o **"ÁREA NÃO IDENTIFICADA" que atinge 10 pessoas**.
 

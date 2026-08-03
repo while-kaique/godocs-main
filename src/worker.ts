@@ -65,6 +65,7 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
+import { listarAprovacoesPendentes, decidirAprovacao } from '@/lib/aprovacoes.functions'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -245,6 +246,22 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!email) return errorJson('Não autorizado.', 401)
       const body = await readBody(request)
       return json(await criarChamadoAjuda(email, body))
+    }
+
+    // ── Pré-aprovação do líder (autenticado, NÃO admin) ──
+    // A fila é do LÍDER do autor (derivada da TeamGuide na submissão). O gate real é
+    // server-side: `decidirAprovacao` só grava se existir linha pendente para o e-mail
+    // do header (ver aprovacoes.functions.ts) — o frontend nunca autoriza nada.
+    if (pathname === '/api/aprovacoes/pendentes' && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      return json(await listarAprovacoesPendentes(email))
+    }
+    if (pathname === '/api/aprovacoes/decidir' && method === 'POST') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const body = await readBody(request)
+      return json(await decidirAprovacao(email, body))
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──

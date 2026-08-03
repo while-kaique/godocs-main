@@ -105,6 +105,13 @@ export const SHEET_COLUMNS = [
   // ("Claro sim — …" / "Claro não — …" / "Zona cinzenta — …"). Edição manual desta
   // coluna é sobrescrita na próxima submissão/resync.
   'Classificação',
+  // ─── Pré-aprovação do líder (TeamGuide) ─────────────────────────────────────
+  // "Pendente com <líder>" no append; "Aprovado por <líder> em dd/mm/aaaa" /
+  // "Reprovado por <líder> em dd/mm/aaaa — <motivo>" quando o líder decide no
+  // GoDocs; "—" quando não se aplica (autor é liderança, ou não tem líder).
+  // ⚠️ A coluna precisa existir no cabeçalho das abas GoDocs e STAGING (mapeamento
+  // por NOME — se faltar, é ignorada com aviso). NÃO bloqueia a triagem da RPA.
+  'Aprovação do Líder',
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

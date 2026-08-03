@@ -61,17 +61,30 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 describe('deriveAreaFromEmail', () => {
   beforeEach(() => {
     process.env.TG_API_TOKEN = 'fake-token';
-    // Mock que diferencia /teams (árvore) de /members (busca por NOME via ?text=).
+    // Dublê da API real: /teams (árvore), /employees/emails/{email} (resolve o
+    // e-mail exato) e /members paginado por pageNumber/pageSize (?page= é
+    // IGNORADO pela API, como no bug 3.1 da SPEC_APROVACAO_LIDER).
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const u = new URL(url);
       if (u.pathname === '/teams') {
         return { ok: true, json: async () => TEAMS } as Response;
       }
+      const alvoEmail = u.pathname.match(/^\/employees\/emails\/(.+)$/);
+      if (alvoEmail) {
+        const email = decodeURIComponent(alvoEmail[1]).toLowerCase();
+        const pessoa = MEMBERS.find((m) => m.contactEmail.toLowerCase() === email);
+        return {
+          ok: true,
+          json: async () =>
+            pessoa ? { exists: true, employeeId: pessoa.id } : { exists: false, employeeId: null },
+        } as Response;
+      }
       if (u.pathname.includes('/members')) {
         const text = norm(u.searchParams.get('text') ?? '');
-        const page = Number(u.searchParams.get('page') ?? '0');
-        // Só a página 0 traz resultados (mimetiza páginas parciais → fim).
-        const hits = page === 0 ? MEMBERS.filter((m) => norm(m.name).includes(text)) : [];
+        let hits = MEMBERS.filter((m) => norm(m.name).includes(text));
+        const tamanho = Math.min(Number(u.searchParams.get('pageSize') ?? '25') || 25, 100);
+        const pagina = Number(u.searchParams.get('pageNumber') ?? '0') || 0;
+        hits = hits.slice(pagina * tamanho, pagina * tamanho + tamanho);
         return { ok: true, json: async () => hits } as Response;
       }
       return { ok: true, json: async () => [] } as Response;
@@ -95,8 +108,10 @@ describe('deriveAreaFromEmail', () => {
     expect(await deriveAreaFromEmail('ninguem.aqui@gocase.com')).toBeNull();
   });
 
-  it('retorna null quando a pessoa não cai em nenhum nó-área', async () => {
-    expect(await deriveAreaFromEmail('chefe.geral@gocase.com')).toBeNull();
+  // D5: quem está alocado NO nó guarda-chuva (raiz/passthrough) resolve para o
+  // nome do próprio nó, em vez de cair no vazio ("ÁREA NÃO IDENTIFICADA").
+  it('usa o nome do próprio nó quando a pessoa está na raiz/passthrough', async () => {
+    expect(await deriveAreaFromEmail('chefe.geral@gocase.com')).toBe('Gocase');
   });
 
   it('lança erro sem TG_API_TOKEN', async () => {

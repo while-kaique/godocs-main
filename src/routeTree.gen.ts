@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubmeterRouteImport } from './routes/submeter'
 import { Route as MeusProjetosRouteImport } from './routes/meus-projetos'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AprovacoesRouteImport } from './routes/aprovacoes'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjetoIdRouteImport } from './routes/projeto.$id'
@@ -39,6 +40,11 @@ const MeusProjetosRoute = MeusProjetosRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AprovacoesRoute = AprovacoesRouteImport.update({
+  id: '/aprovacoes',
+  path: '/aprovacoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -114,6 +120,7 @@ const AuthenticatedTestesCenariosRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aprovacoes': typeof AprovacoesRoute
   '/auth': typeof AuthRoute
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aprovacoes': typeof AprovacoesRoute
   '/auth': typeof AuthRoute
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/aprovacoes': typeof AprovacoesRoute
   '/auth': typeof AuthRoute
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/aprovacoes'
     | '/auth'
     | '/meus-projetos'
     | '/submeter'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/aprovacoes'
     | '/auth'
     | '/meus-projetos'
     | '/submeter'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/aprovacoes'
     | '/auth'
     | '/meus-projetos'
     | '/submeter'
@@ -221,6 +233,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AprovacoesRoute: typeof AprovacoesRoute
   AuthRoute: typeof AuthRoute
   MeusProjetosRoute: typeof MeusProjetosRoute
   SubmeterRoute: typeof SubmeterRoute
@@ -249,6 +262,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aprovacoes': {
+      id: '/aprovacoes'
+      path: '/aprovacoes'
+      fullPath: '/aprovacoes'
+      preLoaderRoute: typeof AprovacoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -387,6 +407,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AprovacoesRoute: AprovacoesRoute,
   AuthRoute: AuthRoute,
   MeusProjetosRoute: MeusProjetosRoute,
   SubmeterRoute: SubmeterRoute,

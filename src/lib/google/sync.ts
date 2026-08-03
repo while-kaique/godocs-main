@@ -133,6 +133,9 @@ export type SubmitSyncParams = {
   // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
   // Em submissão nova fica null (não há versão anterior).
   memorialAnterior?: string | null;
+  // Pré-aprovação do líder → coluna "Aprovação do Líder". Texto já pronto
+  // ("Pendente com X" / "—"); null/vazio → "—". Não bloqueia nada (D3).
+  aprovacaoLider?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -385,6 +388,10 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.classificacao_justificativa as string | null | undefined,
       ),
       'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
+      // Pré-aprovação do líder: "Pendente com <líder>" na abertura da fila; "—" quando
+      // não se aplica (autor é liderança ou não tem líder). A DECISÃO é gravada depois,
+      // por updateRowByProjectId em aprovacoes.functions.ts.
+      'Aprovação do Líder': ouTraco(p.aprovacaoLider),
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

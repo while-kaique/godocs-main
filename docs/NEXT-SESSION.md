@@ -11,7 +11,10 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO — validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
+> **▶ PRÓXIMO PASSO (2026-08-03, fim da sessão de código) — fechar os 3 revisores da F0 e commitar o WIP**
+> (ver "🔴 WIP não commitado" na seção "Plano ativo"). Depois disso, retomar o passo anterior abaixo.
+
+> _Passo anterior, ainda pendente:_ **validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
 > No `/dashboard`: apagar um motivo/parecer deve gravar **"—"** (não branco) e projeto novo nasce com
 > "Motivo Reenvio" = "—". A staging grava na aba **`STAGING`** (planilha própria, não a de prod).
 > Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
@@ -44,7 +47,51 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: 🟡 **executado — código pronto, NÃO commitado** (2026-08-03)
+
+### 🔴 WIP não commitado (sessão fechou SUJA) — worktree `plano-aprovacao-lider-teamguide`
+A **F0 foi codada e está verde**, mas o commit está **segurado** pelos gates: os 3 revisores de contexto
+fresco foram disparados e a janela acabou antes dos vereditos → `.claude/.review-status` e
+`.claude/.quality-status` seguem em **`pendente`** (barrantes).
+
+**Os 3 revisores CHEGARAM a responder no fim da sessão, e os achados crítica/alta JÁ FORAM TRATADOS**
+(suíte seguiu 824 verdes, `worker.js` rebuildado) — falta só **re-rodar para confirmar** e gravar os
+vereditos:
+- **Conformidade → `diverge-alta` (procede, era bug real):** o fallback do T2 também agia sobre quem JÁ
+  resolvia — pessoa em 2+ times cujo 1º `teamsIds` fosse um nó guarda-chuva passaria a exibir
+  "BIZOPS"/"N1" em vez da área real, violando o critério 3. **Corrigido:** o fallback foi para um mapa
+  SEPARADO (`fallbackByTeamId`) e `deriveAreaFromEmail` faz **2 passadas** — área real primeiro.
+  ⚠️ **Ainda falta um teste** cobrindo membro multi-time (a lacuna que o revisor apontou).
+- **Qualidade → `bloqueio` (procede):** caches sem TTL — isolate quente serviria o retrato velho da org
+  e gravaria "ÁREA NÃO IDENTIFICADA" para quem entrou depois. **Corrigido:** `CACHE_TTL_MS` de 10 min
+  derrubando os 3 caches JUNTOS (`expirarCachesVencidos`). Também corrigido o achado baixo do
+  early-return de e-mail vazio antes do `await`. **Aberto (não tratado):** `tgGet` sem
+  `AbortSignal.timeout` (pré-existente, mas a exposição no caminho quente triplicou) e sem teto de raízes.
+- **Reuso → `possivel-duplicacao` (só-sugestão, nada bloqueia):** `carregarMembros` é um 2º roster ao
+  lado de `listarPessoasTeamGuide` (`/employees/refs`, 1 chamada) — a bifurcação é legítima (**`refs`
+  não traz `teamsIds`**) mas **não está registrada**; e a travessia da árvore está reimplementada 3×
+  (extrair `children`/`ancestors`) + `normalizarTimes(...).filter(deleted)` repetido em 3 sítios.
+
+**Retomar (não há código a escrever):** 1) re-rodar `ggsd:verificador-conformidade`,
+`ggsd:revisor-qualidade` e `ggsd:revisor-reuso` sobre o diff; 2) gravar os vereditos nos 2 marcadores;
+3) tratar achados crítica/alta; 4) commitar na branch `worktree-plano-aprovacao-lider-teamguide`.
+
+**Diff parado (5 arquivos):** `src/lib/areas/teamguide.server.ts` (único de produção) ·
+`tests/teamguide-lideranca.test.ts` (novo, 18 casos) · `tests/areas-teamguide.test.ts` ·
+`spec-docs/SPEC_APROVACAO_LIDER.md` (T5) · `worker.js`. **824 testes verdes** (baseline 805).
+
+**⚠️ Lição desta sessão — o smoke real pagou o próprio custo:** os testes autorados às cegas usavam
+ids **string**; a API TeamGuide devolve ids **numéricos**, então todo `map.get(String(id))` errava e a
+derivação devolvia `null`/`[]` **em silêncio** — a suíte ficava verde. Só o smoke contra a API real
+pegou. Fix: `normalizarTimes()` na fronteira + 2 guardas de regressão com ids numéricos.
+Para qualquer integração externa daqui pra frente: **fixture não substitui uma passada na API real**.
+
+**Validado ao vivo** (read-only, `TG_API_TOKEN` do `.env` da **raiz** — o worktree não tem `.env`):
+`luis.albuquerque@` → Lucas Gonçalves Queiroz / área RPA · `rafael@` → **sem líder** (D6) e área "N1" ·
+**432 pessoas, exatamente 1 sem líder** (bate com a spec) · as 10 pessoas do bug 3.2 agora resolvem.
+
+⚠️ **Isto NÃO substitui a validação humana da staging** descrita no topo (a frente do "—" da coluna
+"Motivo Reenvio"), que segue pendente. E **deploy continua FORA** da fronteira da F0.
 
 > **F0** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`): índice de liderança da
 > TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em 10 pessoas). **Nada

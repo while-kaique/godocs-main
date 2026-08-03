@@ -30,6 +30,9 @@ type TGMember = {
   teamsIds?: string[];
 };
 
+/** Uma pessoa na relação de liderança (o e-mail pode faltar no cadastro). */
+export type PessoaLideranca = { nome: string; email: string | null };
+
 const norm = (s?: string | null) =>
   (s ?? '').toLowerCase().normalize('NFD').replace(DIACRITICS, '').trim();
 
@@ -69,6 +72,19 @@ async function tgGet<T>(path: string, token: string): Promise<T> {
   }
 }
 
+// ⚠️ A API devolve os ids como NÚMERO (`id: 43685`), mas eles circulam aqui como
+// chave de Map e casam com `teamsIds` de membros — normalizamos na FRONTEIRA para
+// string, senão `map.get(String(id))` erra por tipo e tudo vira null (silencioso).
+function normalizarTimes(raw: TGTeam[]): TGTeam[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((t) => ({
+    ...t,
+    id: String(t.id),
+    teamParent: t.teamParent == null ? null : String(t.teamParent),
+    leader: t.leader ? { ...t.leader, id: String(t.leader.id) } : t.leader,
+  }));
+}
+
 function getToken(): string {
   const token = process.env.TG_API_TOKEN;
   if (!token) throw new Error('TG_API_TOKEN não configurado nas variáveis de ambiente.');
@@ -81,7 +97,7 @@ function getToken(): string {
 // `areaByTeamId`: mapa de QUALQUER time (o nó-área e todos os seus descendentes)
 //   para o nome do nó-área que o cobre — é o que resolve a área de uma pessoa.
 function buildAreaIndex(teamsRaw: TGTeam[]) {
-  const teams = teamsRaw.filter((t) => !t.deleted);
+  const teams = normalizarTimes(teamsRaw).filter((t) => !t.deleted);
   const byId = new Map(teams.map((t) => [t.id, t]));
   const children = (pid: string) => teams.filter((t) => t.teamParent === pid);
 
@@ -152,7 +168,57 @@ function buildAreaIndex(teamsRaw: TGTeam[]) {
     }
   }
 
-  return { teams, areaNodes, areaByTeamId };
+  // 2ª camada (D5): nó que a regra acima declara "não é área" — as raízes de
+  // domínio e os passthrough — mapeia para o NOME DE SI MESMO. Quem está alocado
+  // NO nó guarda-chuva (10 pessoas na base real) caía no vazio e virava
+  // "ÁREA NÃO IDENTIFICADA".
+  //
+  // ⚠️ Fica num mapa SEPARADO, não mesclado no `areaByTeamId`: quem está em 2+
+  // times (um guarda-chuva + uma área real) tem que continuar resolvendo a ÁREA
+  // REAL. Se as duas camadas dividissem o mapa, o "primeiro `teamsIds` que
+  // resolver" faria o guarda-chuva vencer — mudaria gente que HOJE já resolve.
+  const fallbackByTeamId = new Map<string, string>();
+  for (const t of teams) {
+    const nome = (t.name ?? '').trim();
+    if (nome && !areaByTeamId.has(t.id)) fallbackByTeamId.set(t.id, nome);
+  }
+
+  return { teams, areaNodes, areaByTeamId, fallbackByTeamId };
+}
+
+// ── Raízes de cobertura ──────────────────────────────────────────────────────
+//
+// Conjunto mínimo de times que, com `directOnly=false` (recursivo), cobre TODA a
+// árvore — é a partir deles que listamos os membros. Normalmente é só quem não
+// tem pai (`Gogroup`); a varredura genérica existe porque um ciclo na árvore
+// deixaria a lista de "sem pai" vazia e ninguém seria lido.
+function raizesDeCobertura(teams: TGTeam[]): TGTeam[] {
+  const byId = new Map(teams.map((t) => [t.id, t]));
+  const filhos = new Map<string, TGTeam[]>();
+  for (const t of teams) {
+    if (t.teamParent == null) continue;
+    filhos.set(t.teamParent, [...(filhos.get(t.teamParent) ?? []), t]);
+  }
+
+  const cobrir = (raiz: TGTeam, destino: Set<string>) => {
+    const pilha = [raiz];
+    while (pilha.length) {
+      const c = pilha.pop()!;
+      if (destino.has(c.id)) continue;
+      destino.add(c.id);
+      pilha.push(...(filhos.get(c.id) ?? []));
+    }
+  };
+
+  const cobertos = new Set<string>();
+  const raizes: TGTeam[] = [];
+  const semPai = teams.filter((t) => t.teamParent == null || !byId.has(t.teamParent));
+  for (const t of [...semPai, ...teams]) {
+    if (cobertos.has(t.id)) continue;
+    raizes.push(t);
+    cobrir(t, cobertos);
+  }
+  return raizes;
 }
 
 /** Deriva a lista canônica de nomes de área a partir da árvore da TeamGuide. */
@@ -205,60 +271,284 @@ export async function listarPessoasTeamGuide(): Promise<PessoaTeamGuide[]> {
 
 // ── Resolução de área por email ──────────────────────────────────────────────
 
-// A API TeamGuide NÃO tem busca por email: `?text=` casa por NOME (recursivo na
-// org). Estratégia: buscar pelos tokens do local-part do email (firstname,
-// lastname, "firstname lastname") a partir das raízes e filtrar por contactEmail
-// EXATO. Achado o membro, resolvemos teamsIds → nome do nó-área pela árvore.
-async function fetchMembersByText(rootId: string, text: string, token: string): Promise<TGMember[]> {
+// Teto real do `pageSize` da API (pedir 1000 devolve 100).
+const PAGE_SIZE = 100;
+// Trava de segurança do loop de páginas (com pageSize=100 cobre 2000 pessoas).
+const MAX_PAGINAS = 20;
+
+/**
+ * Lista os membros de um time (recursivo nos descendentes), paginando pelos
+ * nomes REAIS do parâmetro — `pageNumber`/`pageSize`.
+ *
+ * ⚠️ O `?page=N` que estava aqui é **ignorado** pela API (no OpenAPI `page` é o
+ * objeto `{pageNumber,pageSize}`): toda listagem relia a 1ª página e o `break`
+ * de página parcial nunca disparava. Por isso o loop para por **página sem id
+ * novo** ANTES de olhar o tamanho — se o parâmetro voltar a ser ignorado um dia,
+ * o pior caso é 1 requisição extra, não um giro até o limite com dado repetido.
+ */
+async function fetchTeamMembers(teamId: string, token: string): Promise<TGMember[]> {
   const out: TGMember[] = [];
   const seen = new Set<string>();
-  for (let page = 0; page < 20; page++) {
-    const path = `/teams/${rootId}/members?text=${encodeURIComponent(text)}&directOnly=false&page=${page}`;
+  for (let pageNumber = 0; pageNumber < MAX_PAGINAS; pageNumber++) {
+    const path = `/teams/${teamId}/members?directOnly=false&pageNumber=${pageNumber}&pageSize=${PAGE_SIZE}`;
     const batch = await tgGet<TGMember[]>(path, token);
     if (!Array.isArray(batch) || batch.length === 0) break;
+    let novos = 0;
     for (const m of batch) {
-      if (!seen.has(m.id)) { seen.add(m.id); out.push(m); }
+      const id = String(m.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(m);
+      novos++;
     }
-    if (batch.length < 25) break; // página parcial = última
+    if (novos === 0) break; // página repetida (parâmetro ignorado) ou fim
+    if (batch.length < PAGE_SIZE) break; // página parcial = última
   }
   return out;
 }
 
+// ── Base cacheada por isolate (árvore + membros) ─────────────────────────────
+//
+// A árvore e a lista de pessoas mudam devagar e a cota da API é compartilhada:
+// carregamos uma vez por isolate (mesma vida do cache de token) e derivamos
+// TODOS os índices em memória. Só o resultado de SUCESSO é cacheado.
+
+let cacheTimes: Promise<TGTeam[]> | null = null;
+let cacheMembros: Promise<TGMember[]> | null = null;
+
+// ⚠️ TTL curto e OBRIGATÓRIO. Sem ele, um isolate quente serve o retrato velho da
+// org para sempre: quem foi cadastrado (ou trocou de time) depois do aquecimento
+// não é achado e a submissão grava "ÁREA NÃO IDENTIFICADA" na planilha — o
+// próprio sintoma que esta fatia veio corrigir. Antes de haver cache, cada
+// submissão relia ao vivo.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+let cacheEm = 0;
+
+/** Derruba os 3 caches JUNTOS (área e liderança não podem divergir entre si). */
+function expirarCachesVencidos() {
+  if (cacheEm && Date.now() - cacheEm > CACHE_TTL_MS) {
+    cacheTimes = null;
+    cacheMembros = null;
+    cacheLideranca = null;
+    cacheEm = 0;
+  }
+}
+
+function carregarTimes(token: string): Promise<TGTeam[]> {
+  if (!cacheTimes) {
+    cacheEm = Date.now();
+    cacheTimes = tgGet<TGTeam[]>('/teams', token).catch((e) => {
+      cacheTimes = null;
+      throw e;
+    });
+  }
+  return cacheTimes;
+}
+
+function carregarMembros(teams: TGTeam[], token: string): Promise<TGMember[]> {
+  if (!cacheMembros) {
+    cacheMembros = (async () => {
+      const ativos = normalizarTimes(teams).filter((t) => !t.deleted);
+      const porId = new Map<string, TGMember>();
+      for (const raiz of raizesDeCobertura(ativos)) {
+        for (const m of await fetchTeamMembers(raiz.id, token)) {
+          const id = String(m.id);
+          if (!porId.has(id)) porId.set(id, m);
+        }
+      }
+      return [...porId.values()];
+    })().catch((e) => {
+      cacheMembros = null;
+      throw e;
+    });
+  }
+  return cacheMembros;
+}
+
+const emailDe = (m: TGMember) => (m.contactEmail ?? '').trim().toLowerCase();
+
+/** Resolve a pessoa pelo e-mail EXATO (`/employees/emails/{email}` + índice). */
+async function resolverMembroPorEmail(
+  alvo: string,
+  membros: TGMember[],
+  token: string,
+): Promise<TGMember | null> {
+  const porEmail = new Map(membros.filter((m) => emailDe(m)).map((m) => [emailDe(m), m]));
+  const porId = new Map(membros.map((m) => [String(m.id), m]));
+
+  try {
+    const r = await tgGet<{ exists?: boolean; employeeId?: string | number | null }>(
+      `/employees/emails/${encodeURIComponent(alvo)}`,
+      token,
+    );
+    if (r?.exists && r.employeeId != null) {
+      const achado = porId.get(String(r.employeeId));
+      if (achado) return achado;
+    }
+  } catch {
+    // E-mail desconhecido pode responder erro — o índice por contactEmail decide.
+  }
+  return porEmail.get(alvo) ?? null;
+}
+
 /**
  * Resolve o nome do nó-área canônico de uma pessoa pelo email cadastrado na
- * TeamGuide. Retorna `null` se a pessoa não for encontrada (ou não cair em
- * nenhuma área mapeada) — o chamador decide o aviso ("ÁREA NÃO IDENTIFICADA").
+ * TeamGuide. Retorna `null` se a pessoa não for encontrada — o chamador decide o
+ * aviso ("ÁREA NÃO IDENTIFICADA").
+ *
+ * ⚠️ Resolve pelo **e-mail exato**, não mais por busca de NOME a partir do
+ * local-part: aquilo errava em homônimo e em e-mail fora do padrão
+ * `nome.sobrenome@`, silenciosamente.
  */
 export async function deriveAreaFromEmail(email: string): Promise<string | null> {
   const alvo = (email ?? '').trim().toLowerCase();
   if (!alvo) return null;
   const token = getToken();
+  expirarCachesVencidos();
 
-  const teamsRaw = await tgGet<TGTeam[]>('/teams', token);
-  const { teams, areaByTeamId } = buildAreaIndex(teamsRaw);
+  const teamsRaw = await carregarTimes(token);
+  const { areaByTeamId, fallbackByTeamId } = buildAreaIndex(teamsRaw);
+  const membros = await carregarMembros(teamsRaw, token);
 
-  // Raízes de topo (sem pai) — a busca recursiva por text varre os descendentes.
-  const topRoots = teams.filter((t) => t.teamParent == null).map((t) => t.id);
-  if (topRoots.length === 0) return null;
+  const membro = await resolverMembroPorEmail(alvo, membros, token);
+  if (!membro) return null;
 
-  // Tokens de busca por NOME a partir do local-part (ex.: "luis.albuquerque").
-  const local = alvo.split('@')[0];
-  const partes = local.split(/[._-]+/).filter(Boolean);
-  const tentativas = [partes[0], partes[partes.length - 1], partes.join(' ')]
-    .filter((t, i, arr): t is string => !!t && arr.indexOf(t) === i);
+  const times = (membro.teamsIds ?? []).map(String);
+  // 1ª passada: área REAL. Só se NENHUM time dela resolver é que o guarda-chuva
+  // entra — assim ninguém que já tinha área passa a exibir "BIZOPS"/"N1".
+  for (const tid of times) {
+    const area = areaByTeamId.get(tid);
+    if (area) return area;
+  }
+  for (const tid of times) {
+    const guardaChuva = fallbackByTeamId.get(tid);
+    if (guardaChuva) return guardaChuva;
+  }
+  return null; // pessoa achada mas fora dos 3 domínios mapeados
+}
 
-  for (const text of tentativas) {
-    for (const rootId of topRoots) {
-      const membros = await fetchMembersByText(rootId, text, token);
-      const hit = membros.find((m) => (m.contactEmail ?? '').toLowerCase() === alvo);
-      if (hit) {
-        for (const tid of hit.teamsIds ?? []) {
-          const area = areaByTeamId.get(tid);
-          if (area) return area;
+// ── Liderança (D7): líder↔liderado derivados de /teams + membros ─────────────
+//
+// Os endpoints "óbvios" da TeamGuide (`/employees/{id}/leaders`, `/leaders/{id}/led`,
+// `/employees/{id}/teams`) devolvem **403** com o nosso token — não tentar de novo
+// (ver `spec-docs/SPEC_APROVACAO_LIDER.md` §2). A regra derivada:
+//
+//   líder de P = líder do time de P; se P **é** o líder daquele time, sobe pro
+//   time pai e repete. Pessoa em 2+ times devolve TODOS os líderes (D4).
+//
+// Quem chega ao topo sem líder fica com lista vazia (D6 — o CEO).
+
+type IndiceLideranca = {
+  /** e-mail (minúsculo) → líderes diretos */
+  lideresPorEmail: Map<string, PessoaLideranca[]>;
+  /** e-mail do líder (minúsculo) → liderados */
+  lideradosPorEmail: Map<string, { nome: string; email: string }[]>;
+  /**
+   * E-mails (minúsculos) de quem **É liderança**: aparece como `leader` de pelo
+   * menos um time ATIVO da árvore. Base da ISENÇÃO de pré-aprovação (decisão do
+   * Luis, 03/08/2026): uma liderança não precisa que o líder dela aprove o
+   * projeto — só o liderado "de fato" precisa. Deriva do `leader` do time (e não
+   * de "tem liderados no índice"), porque um time recém-criado pode ter líder e
+   * ainda nenhum membro — e o coordenador continua sendo liderança.
+   */
+  liderancasPorEmail: Set<string>;
+};
+
+function construirIndiceLideranca(teamsRaw: TGTeam[], membros: TGMember[]): IndiceLideranca {
+  const teams = normalizarTimes(teamsRaw).filter((t) => !t.deleted);
+  const byId = new Map(teams.map((t) => [t.id, t]));
+  const membroPorId = new Map(membros.map((m) => [String(m.id), m]));
+
+  const lideresDoMembro = (membro: TGMember): PessoaLideranca[] => {
+    const achados = new Map<string, PessoaLideranca>();
+    for (const tid of membro.teamsIds ?? []) {
+      let atual = byId.get(String(tid));
+      const visitados = new Set<string>(); // ciclo na árvore não trava
+      while (atual && !visitados.has(atual.id)) {
+        visitados.add(atual.id);
+        const lider = atual.leader;
+        // Sem líder, ou a própria pessoa lidera este time → sobe pro pai.
+        if (lider && String(lider.id) !== String(membro.id)) {
+          const cadastro = membroPorId.get(String(lider.id));
+          achados.set(String(lider.id), {
+            nome: (cadastro?.name ?? lider.name ?? '').trim(),
+            email: cadastro ? emailDe(cadastro) || null : null,
+          });
+          break;
         }
-        return null; // pessoa achada mas fora dos 3 domínios mapeados
+        atual = atual.teamParent != null ? byId.get(atual.teamParent) : undefined;
       }
     }
+    return [...achados.values()];
+  };
+
+  const lideresPorEmail = new Map<string, PessoaLideranca[]>();
+  const lideradosPorEmail = new Map<string, { nome: string; email: string }[]>();
+
+  for (const membro of membros) {
+    const email = emailDe(membro);
+    if (!email) continue;
+    const lideres = lideresDoMembro(membro);
+    lideresPorEmail.set(email, lideres);
+    for (const lider of lideres) {
+      if (!lider.email) continue;
+      const lista = lideradosPorEmail.get(lider.email) ?? [];
+      lista.push({ nome: (membro.name ?? '').trim(), email });
+      lideradosPorEmail.set(lider.email, lista);
+    }
   }
-  return null;
+
+  // Quem É liderança: e-mail do `leader` de qualquer time ativo (resolvido no
+  // cadastro de membros pelo id do líder). Líder sem e-mail cadastrado não entra —
+  // sem e-mail não há como casar com o autor da submissão.
+  const liderancasPorEmail = new Set<string>();
+  for (const t of teams) {
+    const liderId = t.leader?.id;
+    if (!liderId) continue;
+    const cadastro = membroPorId.get(String(liderId));
+    const email = cadastro ? emailDe(cadastro) : '';
+    if (email) liderancasPorEmail.add(email);
+  }
+
+  return { lideresPorEmail, lideradosPorEmail, liderancasPorEmail };
+}
+
+let cacheLideranca: IndiceLideranca | null = null;
+
+/** Índice de liderança da org inteira, cacheado por isolate (~6 chamadas). */
+export async function buildLiderancaIndex(): Promise<IndiceLideranca> {
+  const token = getToken();
+  expirarCachesVencidos();
+  const teamsRaw = await carregarTimes(token);
+  const membros = await carregarMembros(teamsRaw, token);
+  if (!cacheLideranca) cacheLideranca = construirIndiceLideranca(teamsRaw, membros);
+  return cacheLideranca;
+}
+
+/** Líderes diretos de um e-mail. Lista vazia quando não há (CEO, D6) ou é desconhecido. */
+export async function getLideresDe(email: string): Promise<PessoaLideranca[]> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return [];
+  const { lideresPorEmail } = await buildLiderancaIndex();
+  return lideresPorEmail.get(alvo) ?? [];
+}
+
+/** O outro lado da mesma relação: quem responde a este e-mail. */
+export async function getLideradosDe(email: string): Promise<{ nome: string; email: string }[]> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return [];
+  const { lideradosPorEmail } = await buildLiderancaIndex();
+  return lideradosPorEmail.get(alvo) ?? [];
+}
+
+/**
+ * A pessoa É liderança (lidera pelo menos um time)? Base da ISENÇÃO de
+ * pré-aprovação: liderança não precisa que o líder dela aprove o projeto dela.
+ * Ex.: o coordenador de RPA lidera o time (isento), o analista do time dele não.
+ */
+export async function ehLideranca(email: string): Promise<boolean> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return false;
+  const { liderancasPorEmail } = await buildLiderancaIndex();
+  return liderancasPorEmail.has(alvo);
 }

@@ -1012,6 +1012,107 @@ export async function insertAdminStatusLog(data: {
   );
 }
 
+// ── Pré-aprovação do líder (TeamGuide) ───────────────────────────────────────
+
+/** Número da versão mais recente do projeto (1 quando nunca versionou). */
+export async function getUltimaVersaoNum(projetoId: string): Promise<number> {
+  const row = await queryOne<{ n: number }>(
+    'SELECT COALESCE(MAX(versao_num), 1) AS n FROM projeto_versions WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return Number(row?.n ?? 1) || 1;
+}
+
+export type AprovacaoRow = {
+  id: string;
+  projeto_id: string;
+  versao: number;
+  autor_email: string | null;
+  aprovador_email: string;
+  aprovador_nome: string | null;
+  veredito: string; // 'pendente' | 'aprovado' | 'reprovado'
+  comentario: string | null;
+  decidido_por: string | null;
+  criado_em: string | null;
+  decidido_em: string | null;
+};
+
+/**
+ * Abre a fila de pré-aprovação de um projeto: apaga as linhas da rodada anterior e
+ * insere uma pendente por líder. O reset é intencional (D10) — reenviar um projeto
+ * invalida o veredito da versão anterior, que tinha outros números. A auditoria de
+ * "quem aprovou" fica na linha viva + no snapshot da versão.
+ */
+export async function abrirAprovacoesPendentes(
+  projetoId: string,
+  versao: number,
+  autorEmail: string | null,
+  aprovadores: { email: string; nome: string | null }[],
+): Promise<void> {
+  await exec('DELETE FROM projeto_aprovacoes WHERE projeto_id = ?', [projetoId]);
+  for (const a of aprovadores) {
+    const email = (a.email ?? '').trim().toLowerCase();
+    if (!email) continue;
+    await exec(
+      `INSERT INTO projeto_aprovacoes
+         (id, projeto_id, versao, autor_email, aprovador_email, aprovador_nome, veredito, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?, 'pendente', datetime('now'))`,
+      [generateId(), projetoId, versao, (autorEmail ?? '').trim().toLowerCase() || null, email, a.nome ?? null],
+    );
+  }
+}
+
+/** Fila do líder: pendências dele + dados do projeto para o card. */
+export function getAprovacoesPendentesDe(email: string) {
+  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null }>(
+    `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
+            p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE LOWER(a.aprovador_email) = LOWER(?)
+        AND a.veredito = 'pendente'
+        AND p.status != 'rascunho'
+      ORDER BY a.criado_em DESC`,
+    [email],
+  );
+}
+
+/** Todas as linhas de um projeto (a decisão de um líder resolve para os demais — D4). */
+export function getAprovacoesDoProjeto(projetoId: string) {
+  return queryAll<AprovacaoRow>(
+    'SELECT * FROM projeto_aprovacoes WHERE projeto_id = ? ORDER BY criado_em',
+    [projetoId],
+  );
+}
+
+/**
+ * Grava a decisão em TODAS as linhas do projeto (D4: o primeiro que decide resolve).
+ * `decidido_por` guarda quem realmente decidiu, mesmo nas linhas dos outros líderes.
+ */
+export function decidirAprovacoesDoProjeto(
+  projetoId: string,
+  veredito: 'aprovado' | 'reprovado',
+  comentario: string | null,
+  decididoPor: string,
+): Promise<void> {
+  return exec(
+    `UPDATE projeto_aprovacoes
+        SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now')
+      WHERE projeto_id = ? AND veredito = 'pendente'`,
+    [veredito, comentario, decididoPor.trim().toLowerCase(), projetoId],
+  );
+}
+
+/** Resumo (1 linha por projeto) para os cards de "Meus Projetos" do autor. */
+export function getAprovacoesDeProjetos(ids: string[]) {
+  if (!ids.length) return Promise.resolve([] as AprovacaoRow[]);
+  const marcas = ids.map(() => '?').join(',');
+  return queryAll<AprovacaoRow>(
+    `SELECT * FROM projeto_aprovacoes WHERE projeto_id IN (${marcas}) ORDER BY criado_em`,
+    ids,
+  );
+}
+
 // Histórico de status de um projeto (mais recente primeiro) — exibido no detalhe.
 export function getAdminStatusLogs(projetoId: string, limit = 20) {
   return queryAll<AdminStatusLogRow>(

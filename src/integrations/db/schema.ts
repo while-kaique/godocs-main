@@ -246,6 +246,34 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_projeto ON admin_status_log(projeto_id);
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_criado ON admin_status_log(created_at);
+
+  -- Pré-aprovação do LÍDER (integração TeamGuide). O liderado submete e o líder direto
+  -- (derivado de /teams + membros) recebe uma DM no Chat e aprova/reprova DENTRO do
+  -- GoDocs (a aprovação é estado do projeto, não do Chat). Uma linha por (projeto,
+  -- versão, aprovador): pessoa em 2+ times tem 2+ linhas e o PRIMEIRO que decidir
+  -- resolve para todos (D4). NÃO bloqueia a triagem da RPA (D3).
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo. O initSchema divide o
+  -- SQL por ponto-e-vírgula, então um deles dentro de comentário parte o CREATE ao meio.
+  -- ⚠️ Tabela INTERNA: fora de SAFE_UPDATE_FIELDS, o sync reverso nunca a toca.
+  -- Ver spec-docs/SPEC_APROVACAO_LIDER.md.
+  CREATE TABLE IF NOT EXISTS projeto_aprovacoes (
+    id               TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id       TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    versao           INTEGER NOT NULL DEFAULT 1,
+    autor_email      TEXT,
+    aprovador_email  TEXT NOT NULL,
+    aprovador_nome   TEXT,
+    veredito         TEXT NOT NULL DEFAULT 'pendente',  -- 'pendente'|'aprovado'|'reprovado'
+    comentario       TEXT,
+    decidido_por     TEXT,                              -- quem decidiu (pode ser outro líder — D4)
+    criado_em        TEXT DEFAULT (datetime('now')),
+    decidido_em      TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_aprovador
+    ON projeto_aprovacoes(aprovador_email);
+  CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_projeto
+    ON projeto_aprovacoes(projeto_id);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
