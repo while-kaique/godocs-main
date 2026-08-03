@@ -44,6 +44,29 @@ function dataBR(iso?: string | null): string {
 }
 
 /**
+ * Rótulo da coluna "Aprovação do Líder" nos 3 casos SEM FILA. Função PURA.
+ *
+ * Decisão do Luis (03/08/2026): os 3 casos deixam de compartilhar o mesmo "—" — na
+ * auditoria da planilha era impossível distinguir a isenção legítima de uma falha da
+ * integração. A liderança sai como "Pré-aprovado (liderança)": ninguém decidiu nada
+ * (o líder é o próprio autor), mas o efeito prático é que o projeto está liberado do
+ * lado do líder. ⚠️ Isto NÃO toca a coluna `Status` (segue "Pendente" pela regra
+ * temporária) e NÃO é parecer humano.
+ */
+export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
+  switch (motivo) {
+    case 'lideranca':
+      return 'Pré-aprovado (liderança)';
+    case 'sem_lider':
+      return 'Sem líder na TeamGuide';
+    case 'teamguide_indisponivel':
+      return 'Aprovação indisponível (integração)';
+    default:
+      return '—';
+  }
+}
+
+/**
  * Texto da coluna "Aprovação do Líder" do Sheets. Função PURA — é o único lugar que
  * redige esses rótulos (não redigitar em outro ponto).
  */
@@ -93,7 +116,7 @@ export async function abrirPreAprovacao(
     isento: true,
     motivo,
     aprovadores: [],
-    rotuloSheet: '—',
+    rotuloSheet: rotuloIsencaoSheet(motivo),
   });
 
   try {

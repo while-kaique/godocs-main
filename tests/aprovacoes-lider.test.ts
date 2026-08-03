@@ -26,6 +26,7 @@ import {
   listarAprovacoesPendentes,
   resumoAprovacaoPorProjeto,
   rotuloAprovacaoSheet,
+  rotuloIsencaoSheet,
 } from '@/lib/aprovacoes.functions';
 
 const mockLideranca = ehLideranca as unknown as ReturnType<typeof vi.fn>;
@@ -111,7 +112,11 @@ describe('pré-aprovação do líder', () => {
 
     const r = await abrirPreAprovacao(id);
 
-    expect(r).toMatchObject({ isento: true, motivo: 'lideranca', rotuloSheet: '—' });
+    expect(r).toMatchObject({
+      isento: true,
+      motivo: 'lideranca',
+      rotuloSheet: 'Pré-aprovado (liderança)',
+    });
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
     expect(mockDm).not.toHaveBeenCalled();
   });
@@ -122,7 +127,11 @@ describe('pré-aprovação do líder', () => {
 
     const r = await abrirPreAprovacao(id);
 
-    expect(r).toMatchObject({ isento: true, motivo: 'sem_lider', rotuloSheet: '—' });
+    expect(r).toMatchObject({
+      isento: true,
+      motivo: 'sem_lider',
+      rotuloSheet: 'Sem líder na TeamGuide',
+    });
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
   });
 
@@ -139,7 +148,11 @@ describe('pré-aprovação do líder', () => {
 
     const r = await abrirPreAprovacao(id);
 
-    expect(r).toMatchObject({ isento: true, motivo: 'teamguide_indisponivel', rotuloSheet: '—' });
+    expect(r).toMatchObject({
+      isento: true,
+      motivo: 'teamguide_indisponivel',
+      rotuloSheet: 'Aprovação indisponível (integração)',
+    });
   });
 
   it('projeto de teste E2E não dispara DM', async () => {
@@ -276,5 +289,25 @@ describe('rotuloAprovacaoSheet (puro)', () => {
       },
     ]);
     expect(txt).toMatch(/^Reprovado por Lucas em \d{2}\/\d{2}\/\d{4} — Rever as horas$/);
+  });
+});
+
+describe('rotuloIsencaoSheet (puro) — os 3 casos sem fila são distinguíveis', () => {
+  it('liderança sai como pré-aprovado (decisão do Luis, 03/08/2026)', () => {
+    expect(rotuloIsencaoSheet('lideranca')).toBe('Pré-aprovado (liderança)');
+  });
+
+  it('sem líder e falha de integração NÃO se confundem com a isenção de liderança', () => {
+    expect(rotuloIsencaoSheet('sem_lider')).toBe('Sem líder na TeamGuide');
+    expect(rotuloIsencaoSheet('teamguide_indisponivel')).toBe('Aprovação indisponível (integração)');
+    // os 3 textos são distintos entre si — é o ponto da mudança
+    const textos = (['lideranca', 'sem_lider', 'teamguide_indisponivel'] as const).map(
+      rotuloIsencaoSheet,
+    );
+    expect(new Set(textos).size).toBe(3);
+  });
+
+  it('motivo nulo (há fila) cai no "—" e nunca em texto de isenção', () => {
+    expect(rotuloIsencaoSheet(null)).toBe('—');
   });
 });

@@ -2895,7 +2895,8 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
         // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
         memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
-        // Coluna "Aprovação do Líder": "Pendente com X" / "—" (isento).
+        // Coluna "Aprovação do Líder": "Pendente com X" ou o rótulo da isenção
+        // ("Pré-aprovado (liderança)" / "Sem líder na TeamGuide" / …).
         aprovacaoLider: preAprovacao.rotuloSheet,
       }),
     );

@@ -28,16 +28,17 @@ validação humana.
 > alguém (o líder dela, ou a diretoria), a régua está concentrada em **um ponto**: a checagem de
 > `ehLideranca` no topo de `abrirPreAprovacao`.
 >
-> **⬜ DECISÃO PENDENTE DO LUIS (03/08) — rótulo da isenção na planilha.** Hoje os 3 casos sem fila
-> (autor é liderança · autor sem líder · TeamGuide fora) gravam o MESMO `—` na coluna `Aprovação do
-> Líder`, então na auditoria não se distingue "isento" de "a integração falhou". O `abrirPreAprovacao`
-> já devolve o `motivo` (`lideranca`/`sem_lider`/`teamguide_indisponivel`) — falta só mapear motivo →
-> texto em `rotuloAprovacaoSheet`. Luis vai escolher o rótulo (ex.: `Pré-aprovado (liderança)` ou
-> `Não se aplica — autor é liderança`); **sem a escolha dele, fica o `—`**. ⚠️ A coluna `Status` NÃO é
-> tocada pela feature em nenhum caso (segue "Pendente" pela regra temporária).
+> **✅ DECIDIDO (03/08) — rótulo da isenção na planilha → D12 na spec.** Os 3 casos sem fila deixaram de
+> compartilhar o `—`: liderança → **`Pré-aprovado (liderança)`** · autor sem líder → `Sem líder na
+> TeamGuide` · TeamGuide fora → `Aprovação indisponível (integração)`. Mora na função pura
+> **`rotuloIsencaoSheet(motivo)`** (`aprovacoes.functions.ts`), consumida pelo `semFila`; o `motivo` já
+> vinha pronto. **Comportamento inalterado** — liderança continua sem fila e sem DM, e o card do autor
+> **não** ganha selo (decisão do Luis: a feature é invisível para quem é isento). ⚠️ A coluna `Status`
+> NÃO é tocada pela feature em nenhum caso (segue "Pendente" pela regra temporária). 848 testes verdes,
+> `worker.js` rebuildado. **Este rótulo entra na validação da staging** (caso 2 abaixo).
 >
 > **O que validar na staging:** (1) submissão de um liderado → fila abre + coluna "Pendente com X";
-> (2) submissão de uma liderança → "—" e nenhuma fila; (3) `/aprovacoes` lista, aprova e pede ajuste
+> (2) submissão de uma liderança → coluna **"Pré-aprovado (liderança)"** e nenhuma fila/DM; (3) `/aprovacoes` lista, aprova e pede ajuste
 > (comentário obrigatório na reprovação); (4) o autor vê o selo no card. **Pré-requisito do Luis (P2):**
 > criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
 

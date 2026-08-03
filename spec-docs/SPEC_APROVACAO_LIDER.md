@@ -28,6 +28,7 @@ líder↔liderado vem da **TeamGuide**.
 | **D9** | A DM sai de uma **credencial de Chat própria** (`CHAT_SA_*` no `.env`, impersonando `GOOGLE_CHAT_DM_SUBJECT` = `rpa_ia@gocase.com`), com **fallback para `GOOGLE_SA_*`** — o mesmo padrão do `GMAIL_SA_*`. | ✅ **Validada ao vivo em 03/08/2026**: a troca de JWT por `access_token` com `sub=rpa_ia@gocase.com` e os 2 escopos de Chat retornou OK (sem enviar mensagem). Logo a **F2 não está mais bloqueada** — a DWD da SA `godocs@` virou **faxina** (apagar 2 linhas do `.env`), não pré-requisito. ⚠️ A credencial fica **só no `.env`/secrets**; nada de chave em doc (ver §5.5). |
 | **D10** | Aprovação é **por versão** do projeto: reenvio do liderado volta o veredito a pendente. | Aprovar a v1 não pode carimbar uma v2 com números diferentes. O `projeto_versions` já existe pra ancorar isso. |
 | **D11** | **Quem já É liderança está ISENTO** de pré-aprovação (decisão do Luis, 03/08/2026): o projeto dele não entra em fila nenhuma e não gera DM. Só o liderado "de fato" (quem não lidera time) precisa de aprovação — e quem aprova é o **líder direto**, nunca o líder do líder. | Não faz sentido uma liderança esperar o líder maior liberar o projeto dela. Ex.: o Lucas (coordenador de RPA) aprova o projeto do Luis (liderado dele), e o projeto do **Lucas** sai sem depender do Bruno; o Bruno, que também lidera, é isento pelo mesmo motivo. **Régua:** aparecer como `leader` de algum time ATIVO na TeamGuide (`ehLideranca`) — e não "tem liderados no índice", porque um time recém-criado pode ter líder e nenhum membro. |
+| **D12** | **Os 3 casos sem fila têm rótulo PRÓPRIO na coluna `Aprovação do Líder`** (decisão do Luis, 03/08/2026): liderança → **`Pré-aprovado (liderança)`** · autor sem líder → `Sem líder na TeamGuide` · TeamGuide fora → `Aprovação indisponível (integração)`. Nada disso toca a coluna `Status` nem o comportamento (segue sem fila e sem DM — D11/D6/D3). | Antes os 3 gravavam o mesmo `—` e a auditoria não distinguia a **isenção legítima** de uma **falha de integração** — mesmos sintoma e cara na planilha, causas opostas. O rótulo da liderança diz o **efeito** ("do lado do líder, liberado"), não um parecer: ninguém decidiu nada, porque o líder é o próprio autor — por isso `(liderança)` fica explícito no texto e a coluna `Status` continua "Pendente" pela regra temporária. Mora na função pura `rotuloIsencaoSheet(motivo)`; o `motivo` já vinha pronto do `abrirPreAprovacao`. **O card do autor NÃO ganha selo** (a feature segue invisível para quem é isento). |
 
 ---
 
@@ -168,7 +169,10 @@ paginação parando em página repetida.
     É a prova de que quem decide lidera o autor. Reprovar **exige comentário** (é o
     texto que o autor lê). D4: grava em TODAS as linhas pendentes do projeto.
   - `resumoAprovacaoPorProjeto(ids)` — 1 query (IN) para os cards do autor.
-  - `rotuloAprovacaoSheet(linhas)` — função **pura**, único lugar que redige os rótulos.
+  - `rotuloAprovacaoSheet(linhas)` — função **pura**, único lugar que redige os rótulos
+    de fila (pendente/aprovado/reprovado).
+  - `rotuloIsencaoSheet(motivo)` — função **pura**, único lugar que redige os rótulos dos
+    3 casos SEM fila (D12). ⚠️ Não redigitar esses textos no `semFila` nem no chamador.
 - **Rotas** (`src/worker.ts`, autenticadas, **não** admin):
   `GET /api/aprovacoes/pendentes` · `POST /api/aprovacoes/decidir`.
 - **Frontend**: rota própria **`/aprovacoes`** ("Aprovações do meu time") em vez da 5ª
