@@ -239,6 +239,8 @@ export type ItemAprovacao = {
   receita_mensal: number | null;
   /** Memorial financeiro pronto para leitura (títulos legíveis, sem marcadores [x.y]). */
   memorial: string | null;
+  /** Resumo do projeto escrito pelo analisador (IA) — contexto rápido para o líder. */
+  resumo_ia: string | null;
 };
 
 /** Rótulo do papel do participante (mesmos 3 papéis da Etapa 1). */
@@ -347,6 +349,7 @@ export async function listarAprovacoesPendentes(
     tipo_saving: r.tipo_saving ?? null,
     ganho_total: r.ganho_total_mensal ?? null,
     custo_externo_mensal: r.custo_externo_mensal ?? null,
+    resumo_ia: r.resumo_ia?.trim() || null,
     ...extrairNumeros(r),
     memorial: r.memorial_calculo?.trim()
       ? normalizarMarcadoresMemorial(r.memorial_calculo)

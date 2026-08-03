@@ -1071,7 +1071,7 @@ export async function abrirAprovacoesPendentes(
  * `getAllReenvios`, que varre TODOS os reenvios e não pode carregar blobs.
  */
 export function getAprovacoesPendentesDe(email: string) {
-  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null; custo_externo_mensal: number | null; ganho_total_mensal: number | null; custo_evitado_itens: string | null; doc_conteudo: string | null }>(
+  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null; custo_externo_mensal: number | null; ganho_total_mensal: number | null; custo_evitado_itens: string | null; doc_conteudo: string | null; resumo_ia: string | null }>(
     `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
             p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial,
             p.descricao_breve AS descricao_breve, p.saving_horas AS saving_horas,
@@ -1081,7 +1081,9 @@ export function getAprovacoesPendentesDe(email: string) {
             p.custo_externo_mensal AS custo_externo_mensal,
             p.ganho_total_mensal AS ganho_total_mensal,
             p.custo_evitado_itens AS custo_evitado_itens,
-            d.conteudo AS doc_conteudo
+            d.conteudo AS doc_conteudo,
+            (SELECT an.resumo FROM analises an WHERE an.projeto_id = p.id
+              ORDER BY an.created_at DESC LIMIT 1) AS resumo_ia
        FROM projeto_aprovacoes a
        JOIN projetos p ON p.id = a.projeto_id
        LEFT JOIN documentacao d ON d.projeto_id = p.id

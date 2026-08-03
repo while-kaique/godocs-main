@@ -36,7 +36,7 @@ import {
   FileText,
   Loader2,
   MessageSquareWarning,
-  ShieldCheck,
+  Sparkles,
   User,
   Users,
 } from "lucide-react";
@@ -63,6 +63,7 @@ type ItemAprovacao = {
   custo_externo_mensal: number | null;
   receita_mensal: number | null;
   memorial: string | null;
+  resumo_ia: string | null;
 };
 
 type Fila = {
@@ -191,56 +192,47 @@ function AprovacoesPage() {
         }}
       >
         {/* Header azul + onda creme (mesma assinatura das telas internas) */}
-        <div className="relative" style={{ background: "var(--go-blue)", minHeight: 180 }}>
+        <div className="relative" style={{ background: "var(--go-blue)", minHeight: 108 }}>
           <div className="absolute bottom-0 left-0 right-0">
             <svg
               viewBox="0 0 1440 60"
               preserveAspectRatio="none"
               className="block w-full"
-              style={{ height: 40 }}
+              style={{ height: 26 }}
             >
               <path d="M0,60 L0,20 Q720,0 1440,20 L1440,60 Z" fill="var(--go-cream)" />
             </svg>
           </div>
-          <div className="relative z-10 mx-auto max-w-4xl px-8 py-10">
+          <div className="relative z-10 mx-auto max-w-4xl px-8 pb-7 pt-5">
             <Link
               to="/"
-              className="mb-4 inline-flex items-center gap-1.5 text-[12px] font-semibold opacity-80 transition-opacity hover:opacity-100"
+              className="mb-2 inline-flex items-center gap-1.5 text-[12px] font-semibold opacity-80 transition-opacity hover:opacity-100"
               style={{ color: "var(--go-white)" }}
             >
               ← Início
             </Link>
             <h1
               className="font-extrabold tracking-tight"
-              style={{ fontSize: "clamp(1.6rem,4vw,2.2rem)", color: "var(--go-white)" }}
+              style={{ fontSize: "clamp(1.35rem,3vw,1.7rem)", color: "var(--go-white)" }}
             >
               Pré-aprovações do meu time
             </h1>
-            <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
-              Projetos que pessoas do seu time submeteram e esperam a sua leitura de gestor.
+            <p className="mt-1 text-[12px]" style={{ color: "rgba(255,255,255,0.75)" }}>
+              Projetos do seu time esperando a sua leitura de gestor. Não é a aprovação final — a
+              triagem da equipe RPA corre em paralelo.
+              {preview && (
+                <>
+                  {" "}
+                  <span className="font-semibold" style={{ color: "var(--go-lime)" }}>
+                    Pré-visualização de admin: fila de {preview} (o que você decidir fica no seu nome).
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        <main className="mx-auto max-w-4xl px-8 py-8">
-          {preview && (
-            <div
-              className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
-              style={{
-                background: "rgba(180,83,9,0.07)",
-                border: "1px solid rgba(180,83,9,0.2)",
-                color: "#b45309",
-              }}
-            >
-              <Eye className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>
-                <strong>Pré-visualização de admin.</strong> Você está vendo a fila de{" "}
-                <strong>{preview}</strong>. Se decidir algo aqui, o registro fica no seu nome, não
-                no dele.
-              </p>
-            </div>
-          )}
-
+        <main className="mx-auto max-w-4xl px-8 pb-8 pt-4">
           {isLoading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin" style={{ color: "var(--go-blue)" }} />
@@ -262,23 +254,6 @@ function AprovacoesPage() {
 
           {!isLoading && !erro && (
             <>
-              {/* O que é a pré-aprovação: não decide o projeto e não trava a RPA (D3). */}
-              <div
-                className="mb-6 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
-                style={{
-                  background: "rgba(0,89,169,0.05)",
-                  border: "1px solid rgba(0,89,169,0.12)",
-                  color: "var(--go-blue)",
-                }}
-              >
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>
-                  Isto é uma <strong>pré-aprovação</strong>, não a aprovação final: a validação da
-                  equipe RPA corre em paralelo e nada fica parado esperando você. O que você
-                  responde abaixo é a leitura de quem conhece a área — é isso que a triagem usa.
-                </p>
-              </div>
-
               {itens.length === 0 && (
                 <div
                   className="rounded-xl p-10 text-center"
@@ -463,47 +438,56 @@ function CardAprovacao({
           )}
         </div>
 
-        {/* Os números do ganho, do jeito que a planilha os registra. O ganho total vem
-            destacado (barra lime) porque é o número que resume o projeto; os demais só
-            aparecem quando existem, para o card não encher de "—". */}
+        {/* Ganho total em destaque + resumo da IA + um card por número. O líder precisa
+            ver TODOS os campos (custo evitado, custo externo, receita) mesmo quando zerados
+            — "não declarado" também é informação para decidir. */}
         <div
           className="mt-3 rounded-lg px-3.5 py-3"
           style={{ background: "rgba(0,89,169,0.04)", borderLeft: "3px solid var(--go-lime)" }}
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "#8b8b9a" }}>
+            Ganho total
+          </p>
+          <p className="font-extrabold" style={{ color: "var(--go-blue)", fontSize: 22 }}>
+            {fmtReais(i.ganho_total) ??
+              fmtReais(i.saving_reais) ??
+              (i.especial ? "Projeto especial (sem ganho declarado)" : "Não declarado")}
+          </p>
+
+          {i.resumo_ia && (
+            <div
+              className="mt-2 rounded-md px-3 py-2"
+              style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.1)" }}
+            >
               <p
-                className="text-[10px] font-bold uppercase tracking-wide"
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
                 style={{ color: "#8b8b9a" }}
               >
-                Ganho total
+                <Sparkles className="h-3 w-3" />
+                Resumo do projeto (análise automática)
               </p>
-              <p className="font-extrabold" style={{ color: "var(--go-blue)", fontSize: 19 }}>
-                {fmtReais(i.ganho_total) ??
-                  fmtReais(i.saving_reais) ??
-                  (i.especial ? "Projeto especial (sem ganho declarado)" : "Não declarado")}
+              <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
+                {i.resumo_ia}
               </p>
             </div>
-            <span
-              className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-              style={{ background: "rgba(0,89,169,0.09)", color: "var(--go-blue)" }}
-            >
-              {TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? "Recorrência não declarada"}
-            </span>
-          </div>
+          )}
 
-          <dl className="mt-2.5 grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
-            <Numero rotulo="Horas economizadas" valor={horas} />
-            <Numero rotulo="Saving em R$" valor={reais} />
-            <Numero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
-            <Numero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
+          <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <CardNumero rotulo="Horas economizadas" valor={horas} />
+            <CardNumero
+              rotulo="Recorrência"
+              valor={TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? null}
+            />
+            <CardNumero rotulo="Saving em R$" valor={reais} />
+            <CardNumero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
+            <CardNumero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
             {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
-            <Numero
-              rotulo="Custo externo (subtrai)"
+            <CardNumero
+              rotulo="Custo externo"
               valor={fmtReais(i.custo_externo_mensal)}
               negativo
             />
-          </dl>
+          </div>
         </div>
 
         {/* Memorial: fica fechado por padrão para o card não virar parede de texto */}
@@ -728,8 +712,11 @@ function CardAprovacao({
   );
 }
 
-/** Uma linha "rótulo → valor" dos números do ganho. Ausente = não renderiza. */
-function Numero({
+/**
+ * Um card por número do ganho. Sem valor mostra "Não declarado" em vez de desaparecer:
+ * o líder precisa saber que o campo não foi preenchido (era o pedido do Luis).
+ */
+function CardNumero({
   rotulo,
   valor,
   negativo,
@@ -738,13 +725,23 @@ function Numero({
   valor: string | null;
   negativo?: boolean;
 }) {
-  if (!valor) return null;
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[12px]">
-      <dt style={{ color: "#8b8b9a" }}>{rotulo}</dt>
-      <dd className="font-bold" style={{ color: negativo ? "#b45309" : "var(--go-text-heading)" }}>
-        {negativo ? `− ${valor}` : valor}
-      </dd>
+    <div
+      className="rounded-md px-2.5 py-2"
+      style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.1)" }}
+    >
+      <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: "#8b8b9a" }}>
+        {rotulo}
+      </p>
+      <p
+        className="mt-0.5 font-bold"
+        style={{
+          fontSize: 13.5,
+          color: valor ? (negativo ? "#b45309" : "var(--go-text-heading)") : "#a5a5b3",
+        }}
+      >
+        {valor ? (negativo ? `− ${valor}` : valor) : "Não declarado"}
+      </p>
     </div>
   );
 }
