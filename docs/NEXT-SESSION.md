@@ -17,6 +17,15 @@ validação humana.
 > Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
 > Só **depois** disso a **F0** entra em código (plano já aprovado).
 
+> **O que validar (e o que NÃO existe ainda):** o único comportamento novo na staging é o **"—"** da coluna
+> "Motivo Reenvio" — append e append de recuperação nascem com "—" (`sync.ts:411/440`), o **update da edição
+> nunca toca** a coluna (é manual, `sync.ts:147`), apagar motivo/parecer no `/dashboard` grava "—", e o e-mail
+> de reenvio não sai mais com o literal "Motivo: —". ⚠️ **Sem backfill**: linhas legadas já em branco
+> **continuam em branco** (fronteira do plano, não esquecimento) — preencher o histórico é retroativo à parte.
+> Da frente da **pré-aprovação do líder** subiu **só documentação** (spec, `.gitignore`, docs vivos) —
+> **zero mudança de comportamento**: nada de `projeto_aprovacoes`, aba de aprovações ou `chat-dm.ts`, e as 10
+> pessoas seguem em "ÁREA NÃO IDENTIFICADA" com a paginação lendo 25.
+
 <details><summary>Sessões anteriores (histórico)</summary>
 
 **Sessão de 2026-07-31** — **OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
