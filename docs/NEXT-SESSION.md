@@ -37,6 +37,14 @@ validação humana.
 > NÃO é tocada pela feature em nenhum caso (segue "Pendente" pela regra temporária). 848 testes verdes,
 > `worker.js` rebuildado. **Este rótulo entra na validação da staging** (caso 2 abaixo).
 >
+> **✅ STAGING PRONTA PARA O TESTE REAL (03/08, 15:39)** — `edf400b4` redeployada com o worker atual
+> (inclui a D12) e a **DM LIGADA**: secrets `GOOGLE_CHAT_DM_ENABLED=true`, `CHAT_SA_CLIENT_EMAIL`,
+> `CHAT_SA_KEY_BASE64`, `GOOGLE_CHAT_DM_SUBJECT=rpa_ia@gocase.com`. Cadeia validada ao vivo (troca de
+> JWT + `spaces:setup` + post; DM de teste recebida pelo Luis). Aprovador esperado do Luis:
+> **Lucas Goncalves Queiroz / lucas.queiroz@gocase.com** (`leader` do time RPA `43718`; o Luis é membro
+> direto e não lidera time → não cai na isenção). ⚠️ **Submeter na staging manda Chat REAL para o
+> Lucas.** Prod continua sem os secrets (DM no-op) e sem a feature.
+>
 > **O que validar na staging:** (1) submissão de um liderado → fila abre + coluna "Pendente com X";
 > (2) submissão de uma liderança → coluna **"Pré-aprovado (liderança)"** e nenhuma fila/DM; (3) `/aprovacoes` lista, aprova e pede ajuste
 > (comentário obrigatório na reprovação); (4) o autor vê o selo no card. **Pré-requisito do Luis (P2):**

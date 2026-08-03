@@ -95,6 +95,15 @@ ADMIN_EMAILS, etc.) + **5 overrides** (`GODOCS_ENV=staging`, `GOOGLE_SHEETS_ID`,
 `GOOGLE_DRIVE_FOLDER_ID`, `APP_BASE_URL`). **Não** setados de propósito: `GOOGLE_CHAT_WEBHOOK_URL`,
 `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` (Chat mudo) e `GOOGLE_DRIVE_FOLDER_ID_AJUDA` (cai na pasta de staging).
 
+> ⚠️ **EXCEÇÃO ao "Chat mudo" (03/08/2026) — a DM do líder está LIGADA na staging.** Foram setados
+> `GOOGLE_CHAT_DM_ENABLED=true`, `CHAT_SA_CLIENT_EMAIL`, `CHAT_SA_KEY_BASE64` e
+> `GOOGLE_CHAT_DM_SUBJECT=rpa_ia@gocase.com` (SA `planilha-jg@`, a única com a DWD de Chat — a
+> `godocs@` do Sheets devolve `401 unauthorized_client`). Os webhooks de *space* seguem mudos; o que
+> mudou é só a **DM privada** da pré-aprovação. **Submeter na staging notifica uma pessoa REAL** no
+> Google Chat (o líder do autor, derivado da TeamGuide) — não é mais ambiente 100% silencioso. Para
+> silenciar de novo: `GOOGLE_CHAT_DM_ENABLED=false` (troca de secret, sem redeploy). Prod (`674a3710`)
+> continua **sem** esses 4 secrets → DM no-op.
+
 ## Testar com o harness E2E
 
 ```bash
