@@ -51,6 +51,20 @@ validação humana.
 > O 404 que o Luis viu no navegador era real e vinha do atropelo, não da tela. ⚠️ Antes de deployar staging,
 > rode `getApp(edf400b4)` e compare `updatedAt`/descrição.
 >
+> 🆕 **Rodada 3 (17:01, staging `edf400b4`, commit `58aab6c`, 861 testes)** — ajustes do Luis vendo a tela:
+> as **2 boxes de explicação saíram** (o essencial virou 1 linha no header; o aviso de pré-visualização de
+> admin virou destaque lime na mesma linha), **header baixo** (108px, onda 26px) para o card caber sem rolar,
+> **resumo da ANÁLISE AUTOMÁTICA** (`analises.resumo`, subquery pela mais recente) abaixo do ganho total e
+> **um card por número** (horas · recorrência · saving R$ · custo evitado · receita · custo externo com "−"),
+> com **"Não declarado"** quando o campo está vazio (antes a linha desaparecia).
+>
+> ❓ **Perguntas do Luis respondidas (podem virar pedido):** pré-aprovar/pedir ajuste gravam o veredito em
+> todas as linhas do projeto + a coluna `Aprovação do Líder` (com o checklist no texto), tiram o item da fila
+> e mostram o selo no card do autor; **`Status` não é tocado** e a triagem da RPA segue. Um **"não" no
+> checklist NÃO bloqueia** a pré-aprovação (viaja no texto para a triagem). **O pedido de ajuste NÃO notifica
+> o autor** — ele descobre ao abrir o GoDocs. ⚠️ **Adição pequena em aberto: DM ao AUTOR quando o líder pede
+> ajuste** (o Luis perguntou; eu ofereci e ele não respondeu ainda).
+>
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
