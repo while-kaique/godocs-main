@@ -138,6 +138,15 @@ custo evitado puro — e `receita`/`receita_preview`):
   perderia e a pergunta voltaria: o **loop** que a lição do split carga×escala mandou nunca repetir.
 - **ANTI-LOOP:** pergunta **UMA vez só**. O turno de resposta marca `'ok'` aconteça o que acontecer e injeta
   nudge `[SISTEMA]` com o texto do usuário para o LLM escrever a(s) seção(ões) faltante(s).
+  ⚠️ **O gate TEM de ler o estado VIVO no momento em que avalia** (`deveBloquearPorCriterio`), nunca o
+  snapshot `criterioAtual` tirado no topo do turno. Ler o snapshot **anula este anti-loop**: no mesmo turno,
+  o ramo de resposta marca `'ok'` e o gate relê `'pendente'`, re-armando a pergunta — foi o **loop de 38
+  perguntas** reproduzido em prod (03/08/2026), que travava a submissão em 500 e atingia justamente quem
+  respondia "não há indicador". `criterioAtual` continua existindo com **um único uso legítimo**: decidir
+  se o turno corrente é a resposta à pergunta do gate. Guard: `tests/gate-criterio-secoes.test.ts` simula os
+  turnos na ordem real e prova que a leitura viva converge em 1 pergunta e a do snapshot, não.
+  ⚠️ Depois dessa única pergunta **não existe segunda trava**: quem segura a qualidade é o nudge `[SISTEMA]`
+  e a triagem humana. Reintroduzir uma re-verificação bloqueante recria o loop.
 - Roda **por último**, depois de todos os gates de saving (jornada → teto → alocação) e só quando o
   resultado ainda é `preview`/`complete` — um gate por turno.
 - **Apresentação da pergunta (revisada 2026-08-03).** ⚠️ **Nunca numerar os pedidos com letras.** A versão

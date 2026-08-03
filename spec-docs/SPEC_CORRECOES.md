@@ -6,9 +6,65 @@
 
 ---
 
+## 2026-08-03 — Gate do critério reperguntava 38× e travava a submissão (anti-loop anulado por snapshot)
+
+**Status:** ✅ codada e testada (826 testes verdes, já com o #224) · **Branch:** `fix/loop-gate-criterio` · **PR:** [#225](https://github.com/while-kaique/godocs-main/pull/225)
+
+**Sintoma:** reproduzido **em produção** em 03/08/2026 (projeto `471dd0c9…`, fase de saving). O gate do
+critério repetiu a MESMA pergunta (`perguntaCriterioSecoes`) **38 vezes seguidas** e a submissão nunca
+fechou: `submeter-validacao` devolvia **500 "sem ganho mensurável"**, porque a fase financeira jamais
+completava. Atingia exatamente quem responde honestamente que **não há ponteiro nem fonte** — a população
+que a regra "aceita 'não sei onde conferir' → zona cinzenta, nunca reprovação automática" existe para
+proteger. O agente chegava a dizer _"me diga isso mesmo, que eu registro a ausência"_ e reperguntava.
+
+**Causa-raiz — o anti-loop se anulava sozinho.** Em `chat.functions.ts`, dentro de UM MESMO turno:
+
+1. `criterioAtual` é lido no topo de `enviarMensagem` (~1153) — um **snapshot**;
+2. o ramo de resposta (~1267) marca `criterio_secoes: 'ok'` no **estado**;
+3. o gate (~1580) relia **`criterioAtual`** — ainda `'pendente'` — e **re-armava `'pendente'`**.
+
+O comentário acima do gate já dizia _"pergunta UMA vez só (anti-loop) — na volta, o turno de resposta
+marca 'ok' aconteça o que acontecer"_. A intenção estava certa; a **segunda leitura do mesmo campo** a
+anulava. Não era regra de negócio errada: era **acoplamento entre duas leituras**, invisível em teste de
+unidade porque não vivia dentro de nenhuma das duas.
+
+**Por que só travava quem não tem indicador:** a única saída do ciclo era o LLM escrever uma `[1.4]` que
+passasse em `secaoPonteiroVaga`, que exige **≥60 chars E** casar `PISTA_ONDE_VERIFICAR`. A regex é generosa
+(aceita `"não soube"`, `"sem fonte"`), mas a resposta honesta gera texto curto — `**Ponteiro movido:** não
+há indicador.` **passa na regex e reprova no comprimento**. Quem tinha um Metabase para citar escrevia três
+linhas, passava nos dois e nunca via o problema. _(Contorno usado em prod: responder de forma longa e
+cooperativa.)_
+
+**Fix:** o gate passou a ler o **estado vivo**, não o snapshot:
+
+```ts
+const criterioResolvido =
+  faseCriterio === "saving"
+    ? ((resultado.saving ?? estado.saving).criterio_secoes ?? null)
+    : ((resultado.receita ?? estado.receita).criterio_secoes ?? null);
+if (faseCriterio && deveBloquearPorCriterio(criterioResolvido, resultado.type)) { … }
+```
+
+O re-merge de `criterio_secoes` (~1337/1346) já roda **antes** do gate, então `resultado.saving` carrega o
+`'ok'` do turno. A regra virou o **decisor puro `deveBloquearPorCriterio`** (`'ok'` nunca volta a bloquear;
+só age sobre `preview`/`complete`) — testável sem subir o `enviarMensagem` inteiro. `criterioAtual` **fica**,
+com um único uso legítimo e comentado: decidir se ESTE turno é a resposta à pergunta do gate.
+
+**O que segura a qualidade depois da única pergunta:** o nudge `[SISTEMA]` (manda o LLM escrever a seção a
+partir do que a pessoa respondeu) e a triagem humana. **Nunca uma segunda trava** — era ela que travava o
+usuário. É o que a `SPEC_CRITERIOS_PROJETO` já mandava.
+
+**Onde aterrissou:** `src/lib/chat.functions.ts` (`deveBloquearPorCriterio` + leitura viva no gate +
+comentário-guarda no `criterioAtual`) · `tests/gate-criterio-secoes.test.ts` (+5 testes, incluindo a
+**simulação turno a turno na ordem real** — `viva` converge em 1 pergunta, `snapshot` repergunta nos 40
+turnos, travando o bug para sempre).
+
+**Pendência proposta (NÃO incluída):** afrouxar o piso de 60 chars de `secaoPonteiroVaga` quando o texto
+**registra ausência explícita** — hoje uma resposta honesta e curta é indistinguível de rótulo vazio. Com
+este fix ela deixou de travar alguém (o gate avalia uma vez só), então é qualidade, não bloqueio.
 ## 2026-08-03 — Gate do critério pedia "**(b)** …" ao usuário: alínea órfã de um roteiro que ele nunca viu
 
-**Status:** codada e testada (819 testes verdes) · **Branch:** `fix/gate-criterio-ux` · **PR:** _(a abrir)_
+**Status:** ✅ mergeada · **Branch:** `fix/gate-criterio-ux` · **PR:** [#224](https://github.com/while-kaique/godocs-main/pull/224)
 
 **Sintoma:** no meio da conversa do memorial de saving, o agente perguntava literalmente
 _"**(b)** qual ponteiro isso moveu e onde dá pra conferir…"_ — começando numa alínea "(b)" sem que
