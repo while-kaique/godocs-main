@@ -42,13 +42,14 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> 🚨 **BLOQUEIO ATIVO (03/08 16:40) — a staging foi ATROPELADA por outra frente.** O meu deploy foi
-> **16:35:07**; o `getApp` do `edf400b4` mostra `updatedAt` **16:40:40** e a descrição de outra branch
-> ("Este update remove a pergunta 'E o que piora?' da Etapa 2"). O `updateApp` substitui a app INTEIRA, então
-> o que está no ar não tem a rota `/aprovacoes` → **404** (confirmado por curl: `/` = 200, `/aprovacoes` = 404).
-> **Não é bug da tela.** Decisão pendente do Luis: **(A)** redeployar o meu build (já compilado, 859 testes) e
-> a outra frente redeploya depois, ou **(B)** mergear `origin/main` + a branch dela na minha, rebuildar e
-> deployar o conjunto. ⚠️ **Antes de qualquer deploy de staging, rode `getApp` e confira `updatedAt`/descrição.**
+> ✅ **DESBLOQUEADO (16:53:37) — staging no ar com o build INTEGRADO.** `origin/main` mergeado na branch
+> (já continha `fix/remove-pergunta-o-que-piora`, a frente que havia atropelado a staging às 16:40 — ninguém
+> perdeu nada); conflito só no `worker.js` (gerado), resolvido por rebuild. **861 testes verdes**, commits
+> `bc3b77a` (+ merge). ⚠️ **LIÇÃO DE DIAGNÓSTICO:** `curl` sem `Accept: text/html` devolve **404 em TODAS** as
+> rotas SPA (`/meus-projetos` inclusive) — o fallback do Godeploy só vale para requisições de NAVEGAÇÃO. Meu
+> teste inicial era inválido; com `-H "Accept: text/html" -H "Sec-Fetch-Mode: navigate"` a rota responde 200.
+> O 404 que o Luis viu no navegador era real e vinha do atropelo, não da tela. ⚠️ Antes de deployar staging,
+> rode `getApp(edf400b4)` e compare `updatedAt`/descrição.
 >
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
