@@ -118,7 +118,7 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
 Pré-requisito do Luis: criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
-Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D12**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D13**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
 diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,
 índice de liderança (432 pessoas / 1 sem líder), tabela interna `projeto_aprovacoes`, rotas
@@ -132,7 +132,15 @@ indisponível (integração)` (antes os 3 gravavam `—` e a auditoria não dist
 - ✅ **Staging pronta para o teste real** (2026-08-03 15:39): redeploy com a D12 + **DM LIGADA** nela
   (`GOOGLE_CHAT_DM_ENABLED=true`, `CHAT_SA_*`, `GOOGLE_CHAT_DM_SUBJECT`) — cadeia validada ao vivo e DM
   recebida pelo Lucas. ⚠️ Staging **deixou de ser silenciosa**: submeter lá notifica pessoa real.
-- ⬜ Validar a fila em `/aprovacoes` (é o Lucas quem vê as linhas) → prod `674a3710` → PR.
+**D13 (ressalvas do Lucas, 03/08 noite, `1d3aeb2`):** nomenclatura **pré-aprovação** em toda a UI e na
+planilha (`Pré-aprovado`/`Ajuste pedido`), **card auto-suficiente** (dono · participantes com papel · saving
+em R$ + horas · descrição · memorial expansível) e **checklist de 3 perguntas sim/não** (move KPI · sentiria
+falta · saving coerente) obrigatório no servidor nos 2 vereditos — textos em `src/lib/aprovacoes-checklist.ts`
+(módulo puro, fonte única). **`/aprovacoes?como=<e-mail>`** = pré-visualização só de admin (o `decidido_por`
+grava o admin). ⚠️ O líder vê **R$** de saving — exceção consciente ao "cliente não vê R$", a confirmar.
+- ✅ **Staging redeployada com a D13** (2026-08-03 16:26, 856 testes verdes) — fila real: projeto "n8n audit"
+  do Luis esperando o Lucas.
+- ⬜ Luis olhar a tela nova (`?como=lucas.queiroz@gocase.com`) → prod `674a3710` → PR.
   **Pendência humana:** a coluna no cabeçalho do Sheets (P2) e, para ligar a DM **em prod**, os secrets
   `CHAT_SA_*` + `GOOGLE_CHAT_DM_ENABLED=true` (prod hoje: DM no-op).
 - **DoD:** liderado submete → fila abre e a coluna mostra "Pendente com X"; liderança submete →

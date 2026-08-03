@@ -4,14 +4,28 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-08-03 (tarde) — **fechou a decisão do rótulo de isenção (D12) e LIGOU a DM na
-staging.** O rótulo da liderança virou **`Pré-aprovado (liderança)`** e os outros 2 casos sem fila ganharam
-texto próprio (`rotuloIsencaoSheet`, função pura + 3 testes; 848 verdes, `worker.js` rebuildado). Staging
-`edf400b4` redeployada (15:39) com esse worker **e com a DM real ligada** (`GOOGLE_CHAT_DM_ENABLED=true` +
-`CHAT_SA_*` + `GOOGLE_CHAT_DM_SUBJECT`; a SA `planilha-jg@` é a única com DWD de Chat — a `godocs@` do
-Sheets dá `401 unauthorized_client`). Cadeia validada ao vivo e **a DM chegou ao Lucas**. Commits `1296e12`
-(código+spec) e `e4780cb` (docs). **Nada em prod nem no `main`.** Achado da sessão: a fila é a rota raiz
-**`/aprovacoes`**, não `/meus-projetos/aprovacoes` (o 404 do Luis era endereço errado).
+**Última sessão:** 2026-08-03 (noite) — **atendeu as ressalvas do Lucas na tela de pré-aprovação (D13).**
+O Lucas abriu `/aprovacoes` na staging e apontou 4 coisas: "a visualização não tá legal", "não é uma
+aprovação e sim uma **pré**-aprovação", "o gestor tem que responder algumas perguntas com sim e não" e "o
+card já tem que vir com as principais informações — dono, participantes, valor total de saving, memorial".
+Tudo implementado no commit **`1d3aeb2`** (856 testes verdes, +6 novos; `worker.js` rebuildado; **staging
+`edf400b4` redeployada às 16:26**):
+
+1. **Nomenclatura pré-aprovação** em toda a UI, na home, no card do autor e na planilha
+   (`Pré-aprovado` / `Ajuste pedido` / `Pré-aprovação pendente com…` — nunca mais `Aprovado`/`Reprovado`).
+2. **Card auto-suficiente:** dono (+ área), participantes **com papel**, **saving em destaque (R$ + horas,
+   unidade por cadência)**, descrição e **memorial expansível** dentro do card. Ler a doc completa virou opção.
+3. **Checklist do gestor — 3 perguntas sim/não** (*move KPI da área? · a área sentiria falta se fosse
+   desligado? · o saving é coerente com o impacto?*), **obrigatórias no servidor** (`decidirSchema`) nos DOIS
+   vereditos e anexadas ao rótulo do Sheets. Um "não" **não** reprova sozinho (a tela diz isso). Textos em
+   **`src/lib/aprovacoes-checklist.ts`** — módulo PURO, FONTE ÚNICA (tela + Sheets), não redigitar.
+4. **`/aprovacoes?como=<e-mail>` — pré-visualização só de ADMIN** da fila de outra pessoa: foi assim que o
+   Luis viu a tela "como o Lucas". Decidindo nesse modo, o **`decidido_por` grava o admin**, nunca o líder.
+
+⚠️ **Exceção consciente que precisa de confirmação:** o líder vê o **saving em R$** — sem o número não há
+como responder a 3ª pergunta. Isso contraria "cliente não vê R$ de saving"; reverter para só-horas é 1 linha.
+⚠️ **`CLAUDE.md` está em 52 kB** (limite prático 40 kB) — pré-existente, merece PR de enxugamento próprio.
+⚠️ **A DM da staging é REAL** — submeter lá para testar notifica o Lucas de verdade.
 
 _Sessão anterior:_ 2026-08-03 (manhã) — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
 conjunta das 2 frentes fechadas na STAGING**. Investigação ao vivo da API TeamGuide (os endpoints de
@@ -20,14 +34,15 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO — o Lucas abrir `https://godocs-staging.devgogroup.com/aprovacoes` e decidir o
-> projeto que o Luis submeteu (aprovar e/ou pedir ajuste), e então prod `674a3710` + PR.** A tela é a rota
-> **raiz `/aprovacoes`** (a faixa/atalho aparece só p/ quem lidera — o Luis não a vê, e a fila dele vem
-> vazia por construção: as linhas pendentes são do líder). O código de **F0 + F1 + F2 está pronto e commitado**
-> (845 testes verdes, `worker.js` rebuildado): tabela `projeto_aprovacoes`, `aprovacoes.functions.ts`,
-> rotas `/api/aprovacoes/*`, tela **`/aprovacoes`** + faixa na home (só p/ quem lidera), selo no card do
-> autor, coluna **`Aprovação do Líder`** no Sheets e a DM (`google/chat-dm.ts`) atrás do gate
-> `GOOGLE_CHAT_DM_ENABLED` (fica **false** na staging).
+> **▶ PRÓXIMO PASSO — o Luis olhar a tela nova em
+> `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
+> admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
+> dele, deployar **prod `674a3710`** e abrir o PR.** Se ele quiser o saving só em horas, é 1 linha antes de
+> subir. O código de **F0 + F1 + F2 + D11/D12/D13 está pronto e commitado** na branch
+> `worktree-plano-aprovacao-lider-teamguide`: tabela `projeto_aprovacoes` (+3 colunas do checklist),
+> `aprovacoes.functions.ts`, `aprovacoes-checklist.ts`, rotas `/api/aprovacoes/*`, tela **`/aprovacoes`** +
+> faixa na home (só p/ quem lidera), selo no card do autor, coluna **`Aprovação do Líder`** no Sheets e a DM
+> (`google/chat-dm.ts`) — **ligada na staging**, no-op em prod (sem os secrets).
 >
 > **D11 escrita na spec** (decisão do Luis): quem **já é liderança** (aparece como `leader` de um time ativo
 > na TeamGuide → `ehLideranca`) fica **ISENTO** — não entra em fila e não recebe DM. Só o liderado de fato
