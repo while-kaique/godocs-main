@@ -954,6 +954,28 @@ ${TAXONOMIA_DESTINO_GANHO}`;
 // é SILENCIOSA — o analisador lê a ausência como rastreabilidade não comprovada e o autor cai
 // em triagem manual injusta. Então o backend confere as seções antes do preview e, se faltar,
 // pergunta UMA vez (anti-loop: a resposta seguinte é sempre aceita e vira nudge [SISTEMA]).
+// Decisor PURO do gate: com este estado e este tipo de resultado, o preview deve ser
+// bloqueado para perguntar as seções do critério?
+//
+// ⚠️ `resolvido` TEM de ser o estado lido NO MOMENTO do gate. Passar o snapshot do início
+// do turno (`criterioAtual`) reintroduz o loop de 38 perguntas de 03/08/2026: o turno de
+// resposta marca 'ok', o gate relê o valor velho ('pendente') e repergunta para sempre.
+// A função existe justamente para tornar essa regra testável sem subir todo o
+// `enviarMensagem` — o bug era invisível em teste de unidade porque vivia no ACOPLAMENTO
+// entre duas leituras do mesmo campo, não dentro de nenhuma delas.
+//
+// 'ok' NUNCA volta a bloquear: é o "pergunta UMA vez só" da SPEC_CRITERIOS_PROJETO. O que
+// segura a qualidade depois disso é o nudge [SISTEMA] (manda o LLM escrever a seção a
+// partir do que a pessoa respondeu) e, no fim da fila, a triagem humana — nunca uma
+// segunda trava, que é o que travava o usuário.
+export function deveBloquearPorCriterio(
+  resolvido: "pendente" | "ok" | null | undefined,
+  tipoResultado: string,
+): boolean {
+  if (resolvido === "ok") return false;
+  return tipoResultado === "preview" || tipoResultado === "complete";
+}
+
 function perguntaCriterioSecoes(faltaProcesso: boolean, faltaPonteiro: boolean): string {
   const pedidos: string[] = [];
   if (faltaProcesso) {
@@ -1128,6 +1150,10 @@ export async function enviarMensagem(rawData: unknown) {
       : estado.fase === "receita" || estado.fase === "receita_preview"
         ? "receita"
         : null;
+  // ⚠️ SNAPSHOT DE PROPÓSITO, e com UM único uso legítimo: decidir, logo abaixo, se ESTE
+  // turno é a resposta do usuário à pergunta do gate ('pendente' quando o turno começou).
+  // NÃO reutilizar no gate lá embaixo — lá o estado já mudou dentro deste mesmo turno, e
+  // ler o valor velho é literalmente o loop de 38 perguntas (ver deveBloquearPorCriterio).
   const criterioAtual =
     faseCriterio === "saving"
       ? (estado.saving.criterio_secoes ?? null)
@@ -1557,10 +1583,22 @@ export async function enviarMensagem(rawData: unknown) {
   // para receita. Se as duas seções já estão escritas e com substância, libera direto
   // (marca 'ok'); senão bloqueia e pergunta UMA vez só (anti-loop) — na volta, o turno de
   // resposta acima marca 'ok' aconteça o que acontecer.
+  //
+  // ⚠️ ESTADO LIDO AGORA, NUNCA o `criterioAtual` do topo do turno. `criterioAtual` é um
+  // snapshot tirado ANTES do turno de resposta rodar; usá-lo aqui foi o LOOP DE 38
+  // PERGUNTAS reproduzido em prod (03/08/2026, projeto 471dd0c9…): no mesmo turno, o ramo
+  // de resposta marcava 'ok' no estado e o gate logo abaixo relia o snapshot — ainda
+  // 'pendente' — e RE-ARMAVA 'pendente', anulando o próprio anti-loop descrito acima.
+  // Quem respondia honestamente "não há indicador" nunca saía: a submissão morria em 500
+  // ("sem ganho mensurável"), porque a fase financeira jamais completava. Escapava só quem
+  // tinha um painel para citar — texto longo o bastante para passar em `secaoPonteiroVaga`.
+  const criterioResolvido =
+    faseCriterio === "saving"
+      ? ((resultado.saving ?? estado.saving).criterio_secoes ?? null)
+      : ((resultado.receita ?? estado.receita).criterio_secoes ?? null);
   if (
     faseCriterio &&
-    criterioAtual !== "ok" &&
-    (resultado.type === "preview" || resultado.type === "complete")
+    deveBloquearPorCriterio(criterioResolvido, resultado.type)
   ) {
     const alvo = (
       faseCriterio === "saving"
