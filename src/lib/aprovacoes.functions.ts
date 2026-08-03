@@ -206,8 +206,7 @@ export function mensagemDmAprovacao(nomeProjeto: string, autor: string): string 
   return (
     `*${autor}* submeteu o projeto *${nomeProjeto}* no GoDocs e a sua pré-aprovação está pendente. ` +
     `São 3 perguntas rápidas de sim/não e o parecer — o card já vem com dono, participantes, ` +
-    `saving e memorial. A triagem da equipe RPA segue em paralelo, então nada fica travado ` +
-    `esperando por você.\n` +
+    `os números do ganho e o memorial.\n` +
     `${base}/aprovacoes`
   );
 }
@@ -230,10 +229,14 @@ export type ItemAprovacao = {
   descricao_breve: string | null;
   /** Participantes com o papel de cada um (o autor NÃO entra — ele é o dono). */
   participantes: ParticipanteAprovacao[];
-  /** Números do ganho, para a 3ª pergunta do checklist. */
+  /** Números do ganho, para a 3ª pergunta do checklist. Ver `extrairNumeros`. */
   saving_horas: number | null;
   saving_reais: number | null;
   tipo_saving: string | null;
+  ganho_total: number | null;
+  custo_evitado_reais: number | null;
+  custo_externo_mensal: number | null;
+  receita_mensal: number | null;
   /** Memorial financeiro pronto para leitura (títulos legíveis, sem marcadores [x.y]). */
   memorial: string | null;
 };
@@ -276,6 +279,36 @@ export function montarParticipantes(
   return out;
 }
 
+/**
+ * Números do card, nas MESMAS fontes que o sync do Sheets usa (para o líder não ver um
+ * número diferente do que a planilha mostra). Pura, exportada para teste.
+ *
+ * • custo evitado e receita vivem no JSON da `documentacao` (`saving`/`receita`) — não há
+ *   coluna própria em `projetos`; o custo evitado cai para a SOMA dos itens do formulário
+ *   quando o JSON da doc não tem o valor.
+ * • custo externo é o custo INCORRIDO (subtrai do ganho), ≠ custo evitado (que soma).
+ */
+export function extrairNumeros(row: {
+  custo_evitado_itens: string | null;
+  doc_conteudo: string | null;
+}): { custo_evitado_reais: number | null; receita_mensal: number | null } {
+  const doc = parseJson<{
+    saving?: { custo_evitado_reais?: unknown };
+    receita?: { valor_ganho_mensal?: unknown };
+  }>(row.doc_conteudo, {});
+  const doDoc = Number(doc.saving?.custo_evitado_reais) || 0;
+  const itens = parseJson<{ valor?: unknown }[]>(row.custo_evitado_itens, []);
+  const somaItens = Array.isArray(itens)
+    ? itens.reduce((s, i) => s + (Number(i?.valor) || 0), 0)
+    : 0;
+  const evitado = doDoc > 0 ? doDoc : somaItens;
+  const receita = Number(doc.receita?.valor_ganho_mensal) || 0;
+  return {
+    custo_evitado_reais: evitado > 0 ? evitado : null,
+    receita_mensal: receita > 0 ? receita : null,
+  };
+}
+
 function parseJson<T>(texto: string | null | undefined, padrao: T): T {
   if (!texto) return padrao;
   try {
@@ -312,6 +345,9 @@ export async function listarAprovacoesPendentes(
     saving_horas: r.saving_horas ?? null,
     saving_reais: r.saving_reais ?? null,
     tipo_saving: r.tipo_saving ?? null,
+    ganho_total: r.ganho_total_mensal ?? null,
+    custo_externo_mensal: r.custo_externo_mensal ?? null,
+    ...extrairNumeros(r),
     memorial: r.memorial_calculo?.trim()
       ? normalizarMarcadoresMemorial(r.memorial_calculo)
       : null,

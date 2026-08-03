@@ -28,6 +28,7 @@ import {
   rotuloAprovacaoSheet,
   rotuloIsencaoSheet,
   montarParticipantes,
+  extrairNumeros,
 } from '@/lib/aprovacoes.functions';
 import { checklistCompleto, resumirChecklist } from '@/lib/aprovacoes-checklist';
 
@@ -456,5 +457,35 @@ describe('montarParticipantes (puro)', () => {
   it('projeto sem participantes/papéis não quebra', () => {
     expect(montarParticipantes(null, null, null)).toEqual([]);
     expect(montarParticipantes('{ nao é json', 'nem isso', 'a@x')).toEqual([]);
+  });
+});
+
+describe('extrairNumeros (puro) — números do card nas fontes do sync', () => {
+  it('custo evitado vem do JSON da doc e a receita do bloco de receita', () => {
+    expect(
+      extrairNumeros({
+        custo_evitado_itens: JSON.stringify([{ valor: 100 }, { valor: 50 }]),
+        doc_conteudo: JSON.stringify({
+          saving: { custo_evitado_reais: 900 },
+          receita: { valor_ganho_mensal: 1200 },
+        }),
+      }),
+    ).toEqual({ custo_evitado_reais: 900, receita_mensal: 1200 });
+  });
+
+  it('sem valor na doc, o custo evitado cai na SOMA dos itens do formulário', () => {
+    expect(
+      extrairNumeros({
+        custo_evitado_itens: JSON.stringify([{ valor: 100 }, { valor: 50 }]),
+        doc_conteudo: null,
+      }),
+    ).toEqual({ custo_evitado_reais: 150, receita_mensal: null });
+  });
+
+  it('zero e JSON quebrado viram null (o card não mostra a linha)', () => {
+    expect(extrairNumeros({ custo_evitado_itens: 'x{', doc_conteudo: 'y{' })).toEqual({
+      custo_evitado_reais: null,
+      receita_mensal: null,
+    });
   });
 });

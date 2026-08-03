@@ -1073,15 +1073,20 @@ export async function abrirAprovacoesPendentes(
  * `getAllReenvios`, que varre TODOS os reenvios e não pode carregar blobs.
  */
 export function getAprovacoesPendentesDe(email: string) {
-  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null }>(
+  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null; custo_externo_mensal: number | null; ganho_total_mensal: number | null; custo_evitado_itens: string | null; doc_conteudo: string | null }>(
     `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
             p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial,
             p.descricao_breve AS descricao_breve, p.saving_horas AS saving_horas,
             p.saving_reais AS saving_reais, p.tipo_saving AS tipo_saving,
             p.memorial_calculo AS memorial_calculo, p.membros AS membros,
-            p.membros_papeis AS membros_papeis, p.contexto_especial AS contexto_especial
+            p.membros_papeis AS membros_papeis, p.contexto_especial AS contexto_especial,
+            p.custo_externo_mensal AS custo_externo_mensal,
+            p.ganho_total_mensal AS ganho_total_mensal,
+            p.custo_evitado_itens AS custo_evitado_itens,
+            d.conteudo AS doc_conteudo
        FROM projeto_aprovacoes a
        JOIN projetos p ON p.id = a.projeto_id
+       LEFT JOIN documentacao d ON d.projeto_id = p.id
       WHERE LOWER(a.aprovador_email) = LOWER(?)
         AND a.veredito = 'pendente'
         AND p.status != 'rascunho'

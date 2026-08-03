@@ -31,6 +31,7 @@ import {
   Check,
   ChevronDown,
   Clock,
+  ExternalLink,
   Eye,
   FileText,
   Loader2,
@@ -57,6 +58,10 @@ type ItemAprovacao = {
   saving_horas: number | null;
   saving_reais: number | null;
   tipo_saving: string | null;
+  ganho_total: number | null;
+  custo_evitado_reais: number | null;
+  custo_externo_mensal: number | null;
+  receita_mensal: number | null;
   memorial: string | null;
 };
 
@@ -73,6 +78,14 @@ const TIPO_LABEL: Record<string, string> = {
   saving: "Saving",
   receita_incremental: "Receita incremental",
   especial: "Especial",
+};
+
+// Recorrência do ganho, com o mesmo vocabulário do formulário (Etapa 2).
+const TIPO_SAVING_LABEL: Record<string, string> = {
+  mensal: "Recorrente (mensal)",
+  pontual: "Pontual (uma vez)",
+  trimestral: "A cada trimestre",
+  semestral: "A cada semestre",
 };
 
 // Mesma régua de unidade do saving usada no chat: trimestral/semestral mostram o
@@ -415,8 +428,11 @@ function CardAprovacao({
           </p>
         )}
 
-        {/* Dono · participantes · saving — o líder decide sem abrir outra tela */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {/* Dono e participantes. Sem participantes, a coluna nem aparece — o projeto é
+            só do dono e uma coluna vazia só rouba espaço. */}
+        <div
+          className={`mt-4 grid gap-3 ${i.participantes.length > 0 ? "sm:grid-cols-2" : ""}`}
+        >
           <Bloco icone={<User className="h-3.5 w-3.5" />} titulo="Dono">
             <span className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
               {i.autor_nome || i.autor_email || "—"}
@@ -428,10 +444,8 @@ function CardAprovacao({
             )}
           </Bloco>
 
-          <Bloco icone={<Users className="h-3.5 w-3.5" />} titulo="Participantes">
-            {i.participantes.length === 0 ? (
-              <span style={{ color: "#a5a5b3" }}>Só o dono</span>
-            ) : (
+          {i.participantes.length > 0 && (
+            <Bloco icone={<Users className="h-3.5 w-3.5" />} titulo="Participantes">
               <ul className="space-y-0.5">
                 {i.participantes.map((p) => (
                   <li key={p.email}>
@@ -445,40 +459,51 @@ function CardAprovacao({
                   </li>
                 ))}
               </ul>
-            )}
-          </Bloco>
+            </Bloco>
+          )}
+        </div>
 
-          {/* Saving em destaque (barra lime): é o número da 3ª pergunta */}
-          <div
-            className="rounded-lg px-3 py-2.5"
-            style={{
-              background: "rgba(0,89,169,0.04)",
-              borderLeft: "3px solid var(--go-lime)",
-            }}
-          >
-            <p
-              className="text-[10px] font-bold uppercase tracking-wide"
-              style={{ color: "#8b8b9a" }}
-            >
-              Saving declarado
-            </p>
-            {horas || reais ? (
-              <>
-                <p className="mt-0.5 font-extrabold" style={{ color: "var(--go-blue)", fontSize: 17 }}>
-                  {reais ?? horas}
-                </p>
-                {reais && horas && (
-                  <p className="text-[11px]" style={{ color: "#6b6b7a" }}>
-                    {horas}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-0.5 text-[13px]" style={{ color: "#a5a5b3" }}>
-                {i.especial ? "Projeto especial (sem saving)" : "Não declarado"}
+        {/* Os números do ganho, do jeito que a planilha os registra. O ganho total vem
+            destacado (barra lime) porque é o número que resume o projeto; os demais só
+            aparecem quando existem, para o card não encher de "—". */}
+        <div
+          className="mt-3 rounded-lg px-3.5 py-3"
+          style={{ background: "rgba(0,89,169,0.04)", borderLeft: "3px solid var(--go-lime)" }}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div>
+              <p
+                className="text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: "#8b8b9a" }}
+              >
+                Ganho total
               </p>
-            )}
+              <p className="font-extrabold" style={{ color: "var(--go-blue)", fontSize: 19 }}>
+                {fmtReais(i.ganho_total) ??
+                  fmtReais(i.saving_reais) ??
+                  (i.especial ? "Projeto especial (sem ganho declarado)" : "Não declarado")}
+              </p>
+            </div>
+            <span
+              className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              style={{ background: "rgba(0,89,169,0.09)", color: "var(--go-blue)" }}
+            >
+              {TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? "Recorrência não declarada"}
+            </span>
           </div>
+
+          <dl className="mt-2.5 grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
+            <Numero rotulo="Horas economizadas" valor={horas} />
+            <Numero rotulo="Saving em R$" valor={reais} />
+            <Numero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
+            <Numero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
+            {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
+            <Numero
+              rotulo="Custo externo (subtrai)"
+              valor={fmtReais(i.custo_externo_mensal)}
+              negativo
+            />
+          </dl>
         </div>
 
         {/* Memorial: fica fechado por padrão para o card não virar parede de texto */}
@@ -499,15 +524,18 @@ function CardAprovacao({
               />
             </button>
           )}
-          <Link
-            to="/projeto/$id"
-            params={{ id: i.projeto_id }}
+          {/* Nova aba de propósito: o líder não perde o checklist já marcado no card. */}
+          <a
+            href={`/projeto/${i.projeto_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
             style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
           >
             <Eye className="h-3.5 w-3.5" />
             Ler a documentação completa
-          </Link>
+            <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
 
         {memorialAberto && i.memorial && (
@@ -696,6 +724,27 @@ function CardAprovacao({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Uma linha "rótulo → valor" dos números do ganho. Ausente = não renderiza. */
+function Numero({
+  rotulo,
+  valor,
+  negativo,
+}: {
+  rotulo: string;
+  valor: string | null;
+  negativo?: boolean;
+}) {
+  if (!valor) return null;
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-[12px]">
+      <dt style={{ color: "#8b8b9a" }}>{rotulo}</dt>
+      <dd className="font-bold" style={{ color: negativo ? "#b45309" : "var(--go-text-heading)" }}>
+        {negativo ? `− ${valor}` : valor}
+      </dd>
     </div>
   );
 }

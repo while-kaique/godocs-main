@@ -22,6 +22,14 @@ Tudo implementado no commit **`1d3aeb2`** (856 testes verdes, +6 novos; `worker.
 4. **`/aprovacoes?como=<e-mail>` — pré-visualização só de ADMIN** da fila de outra pessoa: foi assim que o
    Luis viu a tela "como o Lucas". Decidindo nesse modo, o **`decidido_por` grava o admin**, nunca o líder.
 
+**Rodada 2 da mesma sessão (16:35, staging redeployada, 859 testes)** — 4 ajustes pedidos pelo Luis depois
+de ver a tela: (a) o card mostra **todos os números do ganho** (ganho total em destaque + recorrência ao lado;
+horas economizadas, saving em R$, custo evitado, receita mensal e custo externo com "−", cada linha só quando
+existe) nas MESMAS fontes do sync do Sheets — custo evitado e receita saem do JSON da `documentacao`
+(`extrairNumeros`, pura, 3 testes), pois não há coluna em `projetos`; (b) **"Ler a documentação completa" abre
+em nova aba** (`<a target="_blank">`, não `<Link>`) p/ não perder o checklist marcado; (c) **sem participantes
+a coluna nem aparece**; (d) saiu da DM a frase "a triagem da equipe RPA segue em paralelo…".
+
 ⚠️ **Exceção consciente que precisa de confirmação:** o líder vê o **saving em R$** — sem o número não há
 como responder a 3ª pergunta. Isso contraria "cliente não vê R$ de saving"; reverter para só-horas é 1 linha.
 ⚠️ **`CLAUDE.md` está em 52 kB** (limite prático 40 kB) — pré-existente, merece PR de enxugamento próprio.
@@ -34,7 +42,7 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO — o Luis olhar a tela nova em
+> **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
 > dele, deployar **prod `674a3710`** e abrir o PR.** Se ele quiser o saving só em horas, é 1 linha antes de
