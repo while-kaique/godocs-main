@@ -4,7 +4,22 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-07-31 — **sessão de OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
+**Última sessão:** 2026-08-03 — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
+conjunta das 2 frentes fechadas na STAGING**. Investigação ao vivo da API TeamGuide (os endpoints de
+liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros), spec nova
+`spec-docs/SPEC_APROVACAO_LIDER.md` (D1–D10), plano **F0 aprovado** (não codado) e staging `edf400b4`
+deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
+validação humana.
+
+> **▶ PRÓXIMO PASSO — validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
+> No `/dashboard`: apagar um motivo/parecer deve gravar **"—"** (não branco) e projeto novo nasce com
+> "Motivo Reenvio" = "—". A staging grava na aba **`STAGING`** (planilha própria, não a de prod).
+> Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
+> Só **depois** disso a **F0** entra em código (plano já aprovado).
+
+<details><summary>Sessões anteriores (histórico)</summary>
+
+**Sessão de 2026-07-31** — **OPERAÇÃO em produção, sem mudança de código**: 3 diagnósticos
 (lógica da classificação de elegibilidade · projeto da Nyara que **desapareceu** de "Meus Projetos" ·
 **dupla contagem de R$ 161.913,78** no Sucesso.AI da Maria) e **1 correção aplicada em prod** (planilha +
 SQLite). Ver "Sessão de 2026-07-31" abaixo.
@@ -16,6 +31,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > **Candidato a frente de CÓDIGO** (exige `/ggsd:plan`): **gate anti-dupla-contagem `custo evitado × receita`**
 > — hoje o único bloco anti-dupla-contagem compara *horas × custo evitado*, e a fase de receita **não relê**
 > os itens do custo evitado; foi exatamente o buraco do Sucesso.AI.
+
+</details>
 
 ## Plano ativo
 **→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
