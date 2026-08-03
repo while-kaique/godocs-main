@@ -203,15 +203,15 @@ export function validarEtapa2(
   // O PONTEIRO movido (custo/receita/KPI + onde verificar) NÃO é mais pergunta de
   // formulário: quem conduz é o AGENTE, que constrói o racional junto com a pessoa e
   // escreve a seção "Ponteiro movido e onde verificar" do memorial. Aqui fica só o
-  // contrafactual — QUEM sente falta (pessoas ou times, da Team Guide) e O QUE piora.
+  // contrafactual — QUEM sente falta (pessoas ou times, da Team Guide). O "o que piora"
+  // saiu do formulário (03/08/2026): nunca teve coluna própria no Sheets e o agente já
+  // cobre o efeito de desligar na conversa. Não reintroduzir aqui.
   if (!form.contrafactualAfetados || form.contrafactualAfetados.length === 0) {
     errs.contrafactualAfetados =
       form.contrafactualAfetadosTipo === "time"
         ? "Selecione ao menos um time/área que sentiria falta"
         : "Selecione ao menos uma pessoa que sentiria falta";
   }
-  if ((form.contrafactualReclamacao ?? "").trim().length < 15)
-    errs.contrafactualReclamacao = "Descreva em uma frase o que piora se a automação parar";
 
   if (arquivosCount === 0 && nomesExistentesCount === 0) {
     errs.documentacao = "Selecione pelo menos um arquivo do projeto";
@@ -261,16 +261,15 @@ export interface FormData {
   // '' = não respondido; 'sim'/'nao' = resposta determinística na etapa 2. O agente
   // de documentação faz auto-detecção do uso na doc enviada e cruza com esta resposta.
   usaAiProxy: "sim" | "nao" | "";
-  // ─── Contrafactual ("se desligar isso hoje, quem reclama e o que piora?") ───
+  // ─── Contrafactual ("se desligar isso hoje, quem reclama?") ───
   // QUEM sente falta é escolhido na Team Guide (mesma fonte do autocomplete da Etapa 1),
   // dinamicamente por PESSOA ou por TIME/ÁREA — quando o impacto é de um time inteiro,
   // não se marca pessoa por pessoa. `tipo` decide qual seletor aparece; a lista guarda
   // e-mails (pessoa) ou nomes de área (time). A RASTREABILIDADE (ponteiro movido + onde
-  // verificar) NÃO vem mais do formulário — é conduzida pelo agente no memorial.
+  // verificar) NÃO vem mais do formulário — é conduzida pelo agente no memorial, e o
+  // "o que piora" (`contrafactualReclamacao`) foi REMOVIDO em 03/08/2026.
   contrafactualAfetadosTipo: AfetadoTipo;
   contrafactualAfetados: string[];
-  // O que piora se a automação parar hoje (uma frase) — CONTRAFACTUAL.
-  contrafactualReclamacao: string;
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;

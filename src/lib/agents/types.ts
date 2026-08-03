@@ -357,11 +357,12 @@ export type ProjetoContexto = {
   // ÚNICO canal de contexto do formulário para os prompts (o financeiro viaja à parte,
   // em SavingColetado/ReceitaColetada). Campo que não estiver nomeado neste tipo é
   // INVISÍVEL para o agente. Renderizados juntos por buildRespostasFormulario().
-  // Contrafactual (Etapa 2): "pessoa:a@x;b@y" | "time:Fiscal;CX" + o que piora.
+  // Contrafactual (Etapa 2): "pessoa:a@x;b@y" | "time:Fiscal;CX" — quem sentiria falta.
   // Insumo direto do ponto [1.4] do memorial (ponteiro movido) — o agente parte daqui
-  // em vez de perguntar do zero.
+  // em vez de perguntar do zero. ⚠️ O "o que piora" (`contrafactual_reclamacao`) foi
+  // REMOVIDO do formulário em 03/08/2026 e NÃO deve voltar a nenhum prompt: o agente
+  // cobre o efeito de desligar na conversa, e a pergunta nunca teve coluna no Sheets.
   contrafactual_afetados?: string | null;
-  contrafactual_reclamacao?: string | null;
   // Governança: o projeto usa o AI Proxy interno? ('sim' | 'nao')
   usa_ai_proxy?: string | null;
   // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas

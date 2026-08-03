@@ -102,7 +102,10 @@ COMO AGIR NA EDIÇÃO:
 // custo evitado). Antes cada prompt escolhia à mão o que mostrar: só a fase de doc
 // injetava a descrição breve, e o contrafactual da Etapa 2 não chegava a prompt NENHUM
 // — o agente perguntava o ponteiro do [1.4] sem saber que a pessoa já havia respondido,
-// duas telas antes, quem sentiria falta e o que piora.
+// duas telas antes, quem sentiria falta.
+//
+// ⚠️ O "o que piora se desligar" saiu do formulário em 03/08/2026: não existe mais campo
+// para renderizar aqui. O agente cobre o efeito de desligar na conversa.
 //
 // ⚠️ Campo NOVO no formulário → renderize AQUI (e nomeie em ProjetoContexto +
 // getProjetoContexto). Não volte a injetar campo solto direto no prompt: foi assim que o
@@ -118,8 +121,6 @@ export function buildRespostasFormulario(ctx: ProjetoContexto): string {
     const rotulo = tipo === "time" ? "Times/áreas que sentiriam falta" : "Pessoas que sentiriam falta";
     linhas.push(`- ${rotulo}: ${lista.join(", ")}`);
   }
-  const piora = ctx.contrafactual_reclamacao?.trim();
-  if (piora) linhas.push(`- O que piora se a automação for desligada hoje: "${piora}"`);
 
   if (ctx.escopo === "externo") {
     const servico = ctx.servico_externo?.trim();
@@ -426,7 +427,7 @@ SEÇÃO 1 — CONTEXTO
 
 [1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
   COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) PRIMEIRO olhe as RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (quem sentiria falta + o que piora se desligar): muitas vezes elas JÁ dizem qual ponteiro é ("volta a conferir 400 notas à mão" → custo/horas; "pedido sai errado" → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite a resposta dela como base e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  a) PRIMEIRO olhe o que o autor JÁ DEU: as RESPOSTAS DO FORMULÁRIO (quem sentiria falta se a automação parasse) e os DETALHES TÉCNICOS APROVADOS. Muitas vezes eles JÁ dizem qual ponteiro é (um time Fiscal que volta a conferir nota por nota → custo/horas; pedido que sai errado → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite no que se baseou e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
   b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
   c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
   ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
@@ -1065,7 +1066,7 @@ SEÇÃO 1 — CONTEXTO
 
 [1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
   COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) PRIMEIRO olhe as RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (quem sentiria falta + o que piora se desligar): muitas vezes elas JÁ dizem qual ponteiro é ("volta a conferir 400 notas à mão" → custo/horas; "pedido sai errado" → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite a resposta dela como base e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  a) PRIMEIRO olhe o que o autor JÁ DEU: as RESPOSTAS DO FORMULÁRIO (quem sentiria falta se a automação parasse) e os DETALHES TÉCNICOS APROVADOS. Muitas vezes eles JÁ dizem qual ponteiro é (um time Fiscal que volta a conferir nota por nota → custo/horas; pedido que sai errado → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite no que se baseou e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
   b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
   c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
   ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
