@@ -654,11 +654,13 @@ export function Step2({
         />
       </FormGroup>
 
-      {/* ─── Contrafactual — "se desligar isso hoje, quem reclama e o que piora?"
-          Nenhuma resposta aqui BARRA a submissão: ela alimenta a classificação do
+      {/* ─── Contrafactual — "se desligar isso hoje, quem reclama?"
+          A resposta aqui NÃO BARRA a submissão: ela alimenta a classificação do
           analisador depois do envio. O PONTEIRO movido (custo/receita/KPI + onde
           verificar) NÃO é mais pergunta de formulário — o agente conduz a pergunta e
-          constrói o racional junto com a pessoa na fase do memorial. */}
+          constrói o racional junto com a pessoa na fase do memorial. O mesmo vale para
+          o "o que piora" (removido do form em 03/08/2026): o agente cobre o efeito de
+          desligar na conversa, e a pergunta nunca teve coluna própria no Sheets. */}
       <FormGroup>
         <FormLabel
           required
@@ -683,37 +685,6 @@ export function Step2({
           areas={areas}
           loadingAreas={areasLoading}
         />
-      </FormGroup>
-
-      <FormGroup>
-        <FormLabel
-          required
-          hint="O que voltaria a dar trabalho, a atrasar ou a dar errado se a automação parasse."
-        >
-          E o que piora?
-        </FormLabel>
-        <textarea
-          className={cn(
-            "go-input w-full resize-none rounded-lg p-3 text-sm leading-relaxed",
-            errors.contrafactualReclamacao && "!border-[#dc2626]"
-          )}
-          style={{
-            minHeight: 72,
-            border: "1.5px solid rgba(0,89,169,0.18)",
-            background: "var(--go-white)",
-            color: "var(--go-text-heading)",
-            outline: "none",
-            transition: "border-color 0.15s",
-          }}
-          placeholder="Ex: o fechamento volta a ser feito à mão em 2 planilhas e atrasa a entrega para a contabilidade."
-          value={form.contrafactualReclamacao}
-          onChange={(e) => {
-            updateField("contrafactualReclamacao", e.currentTarget.value);
-            clearError("contrafactualReclamacao");
-          }}
-          maxLength={600}
-        />
-        <FieldError message={errors.contrafactualReclamacao} />
       </FormGroup>
 
       {/* Upload de arquivos */}

@@ -29,7 +29,6 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     usaAiProxy: '',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: [],
-    contrafactualReclamacao: '',
     especial: false,
     contextoEspecial: '',
     ...over,

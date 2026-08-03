@@ -150,10 +150,13 @@ ganho_total = saving_mensal + receita_equiv
   status/complexidade**. Coluna **"Usa AI Proxy" (AL)** ('Sim'/'Não'/'—', valor declarado).
 
 - **Critério de projeto (elegibilidade)** → [spec-docs/SPEC_CRITERIOS_PROJETO.md](../spec-docs/SPEC_CRITERIOS_PROJETO.md) ·
-  [régua para a gestão](criterios-projeto-recorrencia-evidencia.md): a Etapa 2 pergunta *"moveu o ponteiro de
-  quê?"* (`ponteiro_movido`, cards multi — **"Nenhum / ainda não sei" é resposta VÁLIDA e passa**), *"onde
-  isso pode ser verificado?"* (`ponteiro_evidencia`, obrigatória só com ponteiro concreto) e *"se desligar
-  hoje, quem reclama?"* (`contrafactual_reclamacao`). Nenhuma delas **barra** a submissão. Depois do envio o
+  [régua para a gestão](criterios-projeto-recorrencia-evidencia.md): a Etapa 2 pergunta só *"se desligar
+  hoje, quem reclama?"* (`contrafactual_afetados` — pessoas ou um time/área inteiro, escolhidos na Team
+  Guide), que **não barra** a submissão. ⚠️ *"Moveu o ponteiro de quê?"*/*"onde isso pode ser verificado?"*
+  (`ponteiro_movido`/`ponteiro_evidencia`) e *"e o que piora?"* (`contrafactual_reclamacao`) **saíram do
+  formulário** — as duas primeiras viraram seções do memorial conduzidas pelo agente; o "o que piora" foi
+  **removido em 03/08/2026** (nunca teve coluna própria no Sheets) e o analisador extrai o efeito de
+  desligar da documentação/memorial. Depois do envio o
   **analisador** classifica em `claro_sim`/`zona_cinzenta`/`claro_nao` (sempre com justificativa) e
   `claro_nao` grava **"Reprovado"** na coluna Status — única exceção à regra TEMPORÁRIA do "Pendente" —
   com `Motivo Reprovado` visível ao autor. Invariantes em `normalizarClassificacao` e precedência de status
