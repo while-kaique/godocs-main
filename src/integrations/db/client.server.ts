@@ -1035,6 +1035,10 @@ export type AprovacaoRow = {
   decidido_por: string | null;
   criado_em: string | null;
   decidido_em: string | null;
+  // Checklist do gestor (3 perguntas de sim/não). null = parecer anterior ao checklist.
+  resp_move_kpi: string | null;
+  resp_sente_falta: string | null;
+  resp_saving_coerente: string | null;
 };
 
 /**
@@ -1062,11 +1066,20 @@ export async function abrirAprovacoesPendentes(
   }
 }
 
-/** Fila do líder: pendências dele + dados do projeto para o card. */
+/**
+ * Fila do líder: pendências dele + tudo que o card precisa mostrar SEM abrir o projeto
+ * (dono, participantes, saving e memorial — pedido do Lucas em 03/08/2026). A fila tem
+ * poucas linhas por pessoa, então trazer o memorial aqui é barato — diferente de
+ * `getAllReenvios`, que varre TODOS os reenvios e não pode carregar blobs.
+ */
 export function getAprovacoesPendentesDe(email: string) {
-  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null }>(
+  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null }>(
     `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
-            p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial
+            p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial,
+            p.descricao_breve AS descricao_breve, p.saving_horas AS saving_horas,
+            p.saving_reais AS saving_reais, p.tipo_saving AS tipo_saving,
+            p.memorial_calculo AS memorial_calculo, p.membros AS membros,
+            p.membros_papeis AS membros_papeis, p.contexto_especial AS contexto_especial
        FROM projeto_aprovacoes a
        JOIN projetos p ON p.id = a.projeto_id
       WHERE LOWER(a.aprovador_email) = LOWER(?)
@@ -1094,12 +1107,22 @@ export function decidirAprovacoesDoProjeto(
   veredito: 'aprovado' | 'reprovado',
   comentario: string | null,
   decididoPor: string,
+  respostas?: { move_kpi: string; sente_falta: string; saving_coerente: string } | null,
 ): Promise<void> {
   return exec(
     `UPDATE projeto_aprovacoes
-        SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now')
+        SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now'),
+            resp_move_kpi = ?, resp_sente_falta = ?, resp_saving_coerente = ?
       WHERE projeto_id = ? AND veredito = 'pendente'`,
-    [veredito, comentario, decididoPor.trim().toLowerCase(), projetoId],
+    [
+      veredito,
+      comentario,
+      decididoPor.trim().toLowerCase(),
+      respostas?.move_kpi ?? null,
+      respostas?.sente_falta ?? null,
+      respostas?.saving_coerente ?? null,
+      projetoId,
+    ],
   );
 }
 

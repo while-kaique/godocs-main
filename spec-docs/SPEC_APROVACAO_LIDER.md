@@ -30,6 +30,7 @@ líder↔liderado vem da **TeamGuide**.
 | **D11** | **Quem já É liderança está ISENTO** de pré-aprovação (decisão do Luis, 03/08/2026): o projeto dele não entra em fila nenhuma e não gera DM. Só o liderado "de fato" (quem não lidera time) precisa de aprovação — e quem aprova é o **líder direto**, nunca o líder do líder. | Não faz sentido uma liderança esperar o líder maior liberar o projeto dela. Ex.: o Lucas (coordenador de RPA) aprova o projeto do Luis (liderado dele), e o projeto do **Lucas** sai sem depender do Bruno; o Bruno, que também lidera, é isento pelo mesmo motivo. **Régua:** aparecer como `leader` de algum time ATIVO na TeamGuide (`ehLideranca`) — e não "tem liderados no índice", porque um time recém-criado pode ter líder e nenhum membro. |
 | **D12** | **Os 3 casos sem fila têm rótulo PRÓPRIO na coluna `Aprovação do Líder`** (decisão do Luis, 03/08/2026): liderança → **`Pré-aprovado (liderança)`** · autor sem líder → `Sem líder na TeamGuide` · TeamGuide fora → `Aprovação indisponível (integração)`. Nada disso toca a coluna `Status` nem o comportamento (segue sem fila e sem DM — D11/D6/D3). | Antes os 3 gravavam o mesmo `—` e a auditoria não distinguia a **isenção legítima** de uma **falha de integração** — mesmos sintoma e cara na planilha, causas opostas. O rótulo da liderança diz o **efeito** ("do lado do líder, liberado"), não um parecer: ninguém decidiu nada, porque o líder é o próprio autor — por isso `(liderança)` fica explícito no texto e a coluna `Status` continua "Pendente" pela regra temporária. Mora na função pura `rotuloIsencaoSheet(motivo)`; o `motivo` já vinha pronto do `abrirPreAprovacao`. **O card do autor NÃO ganha selo** (a feature segue invisível para quem é isento). |
 
+| **D13** | **A tela é auto-suficiente e o parecer tem CHECKLIST** (ressalvas do Lucas, 03/08/2026): (a) a nomenclatura é **pré-aprovação** em toda a interface e na planilha (`Pré-aprovado`/`Ajuste pedido`, nunca `Aprovado`/`Reprovado`); (b) o card traz **dono, participantes com papel, saving (R$ + horas), descrição e o memorial expansível** — sem precisar abrir outra tela; (c) antes de decidir o líder responde **3 perguntas de sim/não** — *move KPI da área? · a área sentiria falta se fosse desligado? · o saving é coerente com o impacto?* —, **obrigatórias no servidor** e anexadas ao rótulo da planilha. Um "não" **não** reprova nada sozinho. | O Lucas abriu a tela e disse: "aparece mas a visualização não tá legal", "não é uma aprovação e sim uma **pré**-aprovação", "o gestor tem que responder algumas perguntas com sim e não" e "o card já tem que vir com as principais informações — dono, participantes, valor total de saving, memorial… pra ser o mais fácil, rápido e intuitivo possível pro líder". Sem as 3 perguntas o parecer é um carimbo e não informa a triagem; com o card cego o líder abandonava a fila para caçar dados. **As perguntas moram em `src/lib/aprovacoes-checklist.ts` (FONTE ÚNICA, módulo puro)** — consumido pela tela e pelo rótulo do Sheets. Elas são obrigatórias **nos dois** vereditos (aprovar e pedir ajuste), cobradas pelo `decidirSchema` (o frontend só desabilita o botão). ⚠️ O saving aparece **com R$** para o líder: é exceção consciente ao "cliente não vê R$ de saving" (o gestor precisa do número para responder a 3ª pergunta) e valeu a pena confirmar. **Pré-visualização de admin:** `/aprovacoes?como=<e-mail>` abre a fila de outra pessoa (só admin, ignorado para os demais) para validar a tela sem ser o líder — se o admin decidir nesse modo, o `decidido_por` gravado é **o do admin**, nunca o do líder. |
 ---
 
 ## 2. O que a API TeamGuide realmente entrega (verificado ao vivo, 03/08/2026)
@@ -173,15 +174,24 @@ paginação parando em página repetida.
     de fila (pendente/aprovado/reprovado).
   - `rotuloIsencaoSheet(motivo)` — função **pura**, único lugar que redige os rótulos dos
     3 casos SEM fila (D12). ⚠️ Não redigitar esses textos no `semFila` nem no chamador.
+  - `montarParticipantes(membros, papeis, autor)` — função **pura**: lista do card com
+    nome legível + papel, sem o autor e sem repetição (D13).
+- **`src/lib/aprovacoes-checklist.ts`** — módulo **PURO** (sem import de servidor) com as
+  **3 perguntas** do checklist do gestor (D13), `checklistCompleto` e `resumirChecklist`.
+  FONTE ÚNICA: a tela e o rótulo do Sheets leem daqui. ⚠️ Ao mudar o texto de uma
+  pergunta, altere a constante — não redigite na tela.
 - **Rotas** (`src/worker.ts`, autenticadas, **não** admin):
   `GET /api/aprovacoes/pendentes` · `POST /api/aprovacoes/decidir`.
-- **Frontend**: rota própria **`/aprovacoes`** ("Aprovações do meu time") em vez da 5ª
+- **Frontend**: rota própria **`/aprovacoes`** ("Pré-aprovações do meu time") em vez da 5ª
   aba de "Meus Projetos" — a fila é um fluxo de decisão (ler doc → aprovar/pedir ajuste
   com comentário), e a lista de "Meus Projetos" é derivada de um único fetch com
   contagem por filtro (encaixar outra fonte ali era cirurgia num arquivo de 43 KB por
   zero ganho de UX). Entrada: faixa na home, visível **só a quem lidera**. O card abre
   `/projeto/$id` read-only (memorial **sem R$** — a regra vale também pro líder).
-  Estado por **rótulo + ícone**, nunca só cor.
+  Estado por **rótulo + ícone**, nunca só cor. O card é **auto-suficiente** (D13): dono,
+  participantes com papel, saving em destaque, descrição e memorial expansível — abrir a
+  documentação completa virou opção, não pré-requisito. O bloco "Seu parecer" só libera
+  os botões com as **3 respostas** marcadas.
 - **Sheets:** coluna **`Aprovação do Líder`** (mapeada por nome) — `"Pendente com X"` no
   append, `"Aprovado por X em dd/mm/aaaa"` / `"Reprovado por X em dd/mm/aaaa — motivo"`
   quando o líder decide, `"—"` quando não se aplica. ⚠️ **A coluna precisa existir no

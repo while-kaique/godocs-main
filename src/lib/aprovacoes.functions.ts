@@ -18,6 +18,9 @@
 
 import { z } from 'zod';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
+import { resumirChecklist, type ChaveChecklist } from '@/lib/aprovacoes-checklist';
+import { derivarNomeDeEmail } from '@/lib/auth.functions';
+import { normalizarMarcadoresMemorial } from '@/lib/agents/memorial-format';
 import { enviarDmChat } from '@/lib/google/chat-dm';
 import { ehProjetoTesteE2E } from '@/lib/google/chat';
 import { updateRowByProjectId } from '@/lib/google/sheets';
@@ -71,13 +74,24 @@ export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string 
  * redige esses rótulos (não redigitar em outro ponto).
  */
 export function rotuloAprovacaoSheet(
-  linhas: Pick<AprovacaoRow, 'veredito' | 'aprovador_nome' | 'aprovador_email' | 'comentario' | 'decidido_por' | 'decidido_em'>[],
+  linhas: Pick<
+    AprovacaoRow,
+    | 'veredito'
+    | 'aprovador_nome'
+    | 'aprovador_email'
+    | 'comentario'
+    | 'decidido_por'
+    | 'decidido_em'
+    | 'resp_move_kpi'
+    | 'resp_sente_falta'
+    | 'resp_saving_coerente'
+  >[],
 ): string {
   if (!linhas.length) return '—';
   const decidida = linhas.find((l) => l.veredito === 'aprovado' || l.veredito === 'reprovado');
   if (!decidida) {
     const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
-    return `Pendente com ${nomes}`;
+    return `Pré-aprovação pendente com ${nomes}`;
   }
   // Quem decidiu pode ser outro líder da mesma fila (D4) — o `decidido_por` manda.
   const quem =
@@ -85,9 +99,20 @@ export function rotuloAprovacaoSheet(
     decidida.decidido_por ||
     decidida.aprovador_nome ||
     decidida.aprovador_email;
-  const rotulo = decidida.veredito === 'aprovado' ? 'Aprovado' : 'Reprovado';
+  // "Pré-aprovado"/"Ajuste pedido" (não "Aprovado"/"Reprovado"): o parecer do líder é
+  // PRÉ-aprovação e nunca substitui a triagem da RPA — a planilha tem que dizer isso.
+  const rotulo = decidida.veredito === 'aprovado' ? 'Pré-aprovado' : 'Ajuste pedido';
   const comentario = (decidida.comentario ?? '').trim();
-  return `${rotulo} por ${quem} em ${dataBR(decidida.decidido_em)}${comentario ? ` — ${comentario}` : ''}`;
+  const checklist = resumirChecklist({
+    move_kpi: decidida.resp_move_kpi,
+    sente_falta: decidida.resp_sente_falta,
+    saving_coerente: decidida.resp_saving_coerente,
+  });
+  return (
+    `${rotulo} por ${quem} em ${dataBR(decidida.decidido_em)}` +
+    (checklist ? ` — ${checklist}` : '') +
+    (comentario ? ` — ${comentario}` : '')
+  );
 }
 
 // ─── Abertura da fila (chamada na submissão) ─────────────────────────────────
@@ -150,6 +175,9 @@ export async function abrirPreAprovacao(
         comentario: null,
         decidido_por: null,
         decidido_em: null,
+        resp_move_kpi: null,
+        resp_sente_falta: null,
+        resp_saving_coerente: null,
       })),
     );
 
@@ -177,13 +205,16 @@ export function mensagemDmAprovacao(nomeProjeto: string, autor: string): string 
   const base = (process.env.APP_BASE_URL ?? 'https://godocs.devgogroup.com').replace(/\/$/, '');
   return (
     `*${autor}* submeteu o projeto *${nomeProjeto}* no GoDocs e a sua pré-aprovação está pendente. ` +
-    `Você consegue ler a documentação e aprovar (ou pedir ajuste) direto no app — ` +
-    `a triagem da equipe RPA segue em paralelo, então nada fica travado esperando por você.\n` +
+    `São 3 perguntas rápidas de sim/não e o parecer — o card já vem com dono, participantes, ` +
+    `saving e memorial. A triagem da equipe RPA segue em paralelo, então nada fica travado ` +
+    `esperando por você.\n` +
     `${base}/aprovacoes`
   );
 }
 
 // ─── Fila do líder ───────────────────────────────────────────────────────────
+
+export type ParticipanteAprovacao = { nome: string; email: string; papel: string };
 
 export type ItemAprovacao = {
   projeto_id: string;
@@ -195,7 +226,64 @@ export type ItemAprovacao = {
   tipos_projeto: string[];
   especial: boolean;
   criado_em: string | null;
+  /** O que o projeto faz, em uma linha (vem do formulário). */
+  descricao_breve: string | null;
+  /** Participantes com o papel de cada um (o autor NÃO entra — ele é o dono). */
+  participantes: ParticipanteAprovacao[];
+  /** Números do ganho, para a 3ª pergunta do checklist. */
+  saving_horas: number | null;
+  saving_reais: number | null;
+  tipo_saving: string | null;
+  /** Memorial financeiro pronto para leitura (títulos legíveis, sem marcadores [x.y]). */
+  memorial: string | null;
 };
+
+/** Rótulo do papel do participante (mesmos 3 papéis da Etapa 1). */
+const PAPEL_LABEL: Record<string, string> = {
+  coexecutor: 'Coautor',
+  planejador: 'Participante',
+  contribuidor: 'Contribuidor',
+  // Papéis LEGADO de uma feature anterior — a Etapa 1 já não os oferece.
+  idealizador: 'Contribuidor',
+  referencia_tecnica: 'Contribuidor',
+};
+
+/**
+ * Monta a lista de participantes do card (nome legível + papel), a partir da lista plana
+ * `membros` e do mapa `membros_papeis`. Pura, exportada para teste. Sem papel gravado
+ * (projeto legado) o participante entra como "Coautor", igual ao sync do Sheets.
+ */
+export function montarParticipantes(
+  membrosJson: string | null,
+  papeisJson: string | null,
+  autorEmail: string | null,
+): ParticipanteAprovacao[] {
+  const lista = parseJson<string[]>(membrosJson, []);
+  const papeis = parseJson<Record<string, string>>(papeisJson, {});
+  const autor = (autorEmail ?? '').trim().toLowerCase();
+  const vistos = new Set<string>();
+  const out: ParticipanteAprovacao[] = [];
+  for (const bruto of lista) {
+    const email = String(bruto ?? '').trim().toLowerCase();
+    if (!email || email === autor || vistos.has(email)) continue;
+    vistos.add(email);
+    out.push({
+      nome: derivarNomeDeEmail(email),
+      email,
+      papel: PAPEL_LABEL[papeis[email] ?? ''] ?? 'Coautor',
+    });
+  }
+  return out;
+}
+
+function parseJson<T>(texto: string | null | undefined, padrao: T): T {
+  if (!texto) return padrao;
+  try {
+    return (JSON.parse(texto) as T) ?? padrao;
+  } catch {
+    return padrao;
+  }
+}
 
 /**
  * Fila de pré-aprovação de quem está logado. `lidera` diz se a pessoa lidera alguém
@@ -215,15 +303,18 @@ export async function listarAprovacoesPendentes(
     autor_email: r.autor_email,
     area: r.area,
     submitted_at: r.submitted_at,
-    tipos_projeto: (() => {
-      try {
-        return (JSON.parse(r.tipos_projeto ?? '[]') as string[]) ?? [];
-      } catch {
-        return [];
-      }
-    })(),
+    tipos_projeto: parseJson<string[]>(r.tipos_projeto, []),
     especial: r.especial === 1,
     criado_em: r.criado_em,
+    // Projeto especial não tem memorial financeiro — o contexto ocupa esse lugar.
+    descricao_breve: r.descricao_breve?.trim() || r.contexto_especial?.trim() || null,
+    participantes: montarParticipantes(r.membros, r.membros_papeis, r.autor_email),
+    saving_horas: r.saving_horas ?? null,
+    saving_reais: r.saving_reais ?? null,
+    tipo_saving: r.tipo_saving ?? null,
+    memorial: r.memorial_calculo?.trim()
+      ? normalizarMarcadoresMemorial(r.memorial_calculo)
+      : null,
   }));
 
   let lidera = itens.length > 0;
@@ -237,10 +328,20 @@ export async function listarAprovacoesPendentes(
 
 // ─── Decisão ─────────────────────────────────────────────────────────────────
 
+const simNao = z.enum(['sim', 'nao']);
+
 const decidirSchema = z.object({
   projeto_id: z.string().min(1),
   veredito: z.enum(['aprovado', 'reprovado']),
   comentario: z.string().trim().max(2000).optional().nullable(),
+  // Checklist do gestor — OBRIGATÓRIO nos dois vereditos (pedido do Lucas, 03/08/2026).
+  // É o que transforma o parecer em informação para a triagem, então o servidor cobra:
+  // o frontend só bloqueia o botão, quem garante é aqui.
+  respostas: z.object({
+    move_kpi: simNao,
+    sente_falta: simNao,
+    saving_coerente: simNao,
+  }),
 });
 
 /**
@@ -254,20 +355,28 @@ const decidirSchema = z.object({
 export async function decidirAprovacao(
   email: string,
   body: unknown,
+  opts?: { atorReal?: string | null },
 ): Promise<{ ok: true; veredito: Veredito }> {
   const alvo = (email ?? '').trim().toLowerCase();
   const parsed = decidirSchema.safeParse(body);
   if (!parsed.success) {
-    throw Object.assign(new Error(parsed.error.issues[0]?.message ?? 'Dados inválidos.'), {
-      status: 400,
-    });
+    const issue = parsed.error.issues[0];
+    const doChecklist = issue?.path?.[0] === 'respostas';
+    throw Object.assign(
+      new Error(
+        doChecklist
+          ? 'Responda as 3 perguntas do checklist antes de registrar o parecer.'
+          : (issue?.message ?? 'Dados inválidos.'),
+      ),
+      { status: 400 },
+    );
   }
-  const { projeto_id, veredito } = parsed.data;
+  const { projeto_id, veredito, respostas } = parsed.data;
   const comentario = (parsed.data.comentario ?? '').trim() || null;
 
   if (veredito === 'reprovado' && !comentario) {
     throw Object.assign(
-      new Error('Para reprovar, escreva o que precisa ser ajustado — o autor recebe esse texto.'),
+      new Error('Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto.'),
       { status: 400 },
     );
   }
@@ -283,7 +392,11 @@ export async function decidirAprovacao(
     );
   }
 
-  await decidirAprovacoesDoProjeto(projeto_id, veredito, comentario, alvo);
+  // `decidido_por` guarda quem CLICOU. Na pré-visualização de admin (validação da tela)
+  // o clique é do admin, não do líder — a auditoria registra o admin, nunca finge que o
+  // líder decidiu.
+  const quemDecidiu = (opts?.atorReal ?? '').trim().toLowerCase() || alvo;
+  await decidirAprovacoesDoProjeto(projeto_id, veredito, comentario, quemDecidiu, respostas);
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);

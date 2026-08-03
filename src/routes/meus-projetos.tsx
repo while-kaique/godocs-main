@@ -768,7 +768,7 @@ function MeusProjetosPage() {
                               {p.aprovacao.veredito === "aprovado" ? (
                                 <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "#15803d" }}>
                                   <CheckCircle2 className="h-3.5 w-3.5" />
-                                  Aprovado pelo líder
+                                  Pré-aprovado pelo líder
                                 </span>
                               ) : p.aprovacao.veredito === "reprovado" ? (
                                 <span className="inline-flex items-center gap-1 font-semibold" style={{ color: "#b45309" }}>

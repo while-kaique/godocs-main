@@ -309,7 +309,7 @@ function Home() {
                 </span>
                 <div>
                   <p className="text-[14px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-                    Aprovações do meu time
+                    Pré-aprovações do meu time
                   </p>
                   <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
                     {fila.count > 0

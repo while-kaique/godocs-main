@@ -406,6 +406,15 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
   'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
+  // Checklist do gestor na pré-aprovação (3 perguntas de sim/não pedidas pelo Lucas em
+  // 03/08/2026). São OBRIGATÓRIAS para registrar o parecer e ficam junto da decisão:
+  // move_kpi = o projeto move um KPI da área  ·  sente_falta = a área sentiria falta se
+  // o projeto fosse desligado  ·  saving_coerente = o saving declarado é coerente com o
+  // impacto que a área percebe. Valores 'sim'|'nao' (null = parecer antigo, antes do
+  // checklist). Um "nao" NÃO reprova sozinho — é sinal para a triagem da RPA ler.
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

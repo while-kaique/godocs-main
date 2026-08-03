@@ -1,13 +1,17 @@
-// Fila de pré-aprovação do líder (F1 da SPEC_APROVACAO_LIDER).
+// Fila de PRÉ-APROVAÇÃO do líder (F1 da SPEC_APROVACAO_LIDER).
 //
-// A pessoa que lidera um time vê aqui os projetos do time esperando o parecer dela,
-// lê a documentação em /projeto/$id (read-only, memorial SEM R$) e aprova ou pede
-// ajuste — com o comentário obrigatório na reprovação, porque é o texto que o autor lê.
+// A pessoa que lidera um time vê aqui os projetos do time esperando a leitura dela e
+// dá o parecer sem sair da tela: o card já traz dono, participantes, saving e memorial
+// (pedido do Lucas, 03/08/2026 — "o mais fácil, rápido e intuitivo possível pro líder").
 //
-// Identidade GoGroup, mesma linguagem visual de /meus-projetos (header azul + onda
-// creme + cards brancos, Poppins). Estado NUNCA só por cor: rótulo + ícone sempre.
-// A triagem da equipe RPA segue em paralelo (D3) — a copy diz isso, para o líder não
-// achar que o projeto está travado esperando por ele.
+// Antes de decidir, o líder responde 3 perguntas de sim/não (CHECKLIST_APROVACAO) — é
+// o que só quem conhece a área sabe responder, e é o que a triagem da equipe RPA lê.
+//
+// Nomenclatura: é PRÉ-aprovação, nunca "aprovação". O parecer do líder não decide o
+// projeto e não trava a triagem da RPA (D3) — a copy repete isso onde o líder decide.
+//
+// Identidade GoGroup (header azul + onda creme + cards brancos, Poppins). Estado NUNCA
+// só por cor: rótulo + ícone sempre.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -15,15 +19,28 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
+import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
+import {
+  CHECKLIST_APROVACAO,
+  checklistCompleto,
+  type ChaveChecklist,
+  type RespostaChecklist,
+} from "@/lib/aprovacoes-checklist";
 import {
   BadgeCheck,
-  CheckCircle2,
+  Check,
+  ChevronDown,
+  Clock,
   Eye,
+  FileText,
   Loader2,
   MessageSquareWarning,
   ShieldCheck,
+  User,
   Users,
 } from "lucide-react";
+
+type Participante = { nome: string; email: string; papel: string };
 
 type ItemAprovacao = {
   projeto_id: string;
@@ -35,15 +52,48 @@ type ItemAprovacao = {
   tipos_projeto: string[];
   especial: boolean;
   criado_em: string | null;
+  descricao_breve: string | null;
+  participantes: Participante[];
+  saving_horas: number | null;
+  saving_reais: number | null;
+  tipo_saving: string | null;
+  memorial: string | null;
 };
 
-type Fila = { lidera: boolean; itens: ItemAprovacao[] };
+type Fila = {
+  lidera: boolean;
+  itens: ItemAprovacao[];
+  /** E-mail da fila que estou vendo, quando um admin abre com `?como=` (validação). */
+  visualizando_como?: string | null;
+};
+
+type Respostas = Partial<Record<ChaveChecklist, RespostaChecklist>>;
 
 const TIPO_LABEL: Record<string, string> = {
   saving: "Saving",
   receita_incremental: "Receita incremental",
   especial: "Especial",
 };
+
+// Mesma régua de unidade do saving usada no chat: trimestral/semestral mostram o
+// acumulado do período, pontual é total único.
+function unidadeHoras(tipo: string | null): string {
+  if (tipo === "trimestral") return "h/trimestre";
+  if (tipo === "semestral") return "h/semestre";
+  if (tipo === "pontual") return "h (total único)";
+  return "h/mês";
+}
+
+function fmtHoras(h: number | null, tipo: string | null): string | null {
+  if (!h || h <= 0) return null;
+  const n = h.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  return `${n} ${unidadeHoras(tipo)}`;
+}
+
+function fmtReais(v: number | null): string | null {
+  if (!v || v <= 0) return null;
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+}
 
 function fmtDate(iso: string | null): string {
   return iso ? fmtDataBR(iso) : "—";
@@ -55,21 +105,33 @@ export const Route = createFileRoute("/aprovacoes")({
 
 function AprovacoesPage() {
   const queryClient = useQueryClient();
+  // `?como=` só funciona para admin (o servidor ignora para os demais) — é o caminho de
+  // validação da tela: abrir a fila do líder sem ser ele.
+  const como = new URLSearchParams(window.location.search).get("como")?.trim() ?? "";
   const { data, isLoading, error } = useQuery({
-    queryKey: ["aprovacoes-pendentes"],
-    queryFn: () => apiFetch<Fila>("/api/aprovacoes/pendentes"),
+    queryKey: ["aprovacoes-pendentes", como],
+    queryFn: () =>
+      apiFetch<Fila>(`/api/aprovacoes/pendentes${como ? `?como=${encodeURIComponent(como)}` : ""}`),
     staleTime: 30_000,
   });
-  // Projeto cuja caixa de comentário está aberta (só na reprovação).
-  const [reprovando, setReprovando] = useState<string | null>(null);
+
+  // Estado por projeto: respostas do checklist, caixa de ajuste aberta e envio em curso.
+  const [respostas, setRespostas] = useState<Record<string, Respostas>>({});
+  const [memorialAberto, setMemorialAberto] = useState<Record<string, boolean>>({});
+  const [pedindoAjuste, setPedindoAjuste] = useState<string | null>(null);
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState<string | null>(null);
 
   const itens = data?.itens ?? [];
+  const preview = data?.visualizando_como ?? null;
   const erro = error ? (error instanceof Error ? error.message : "Erro ao carregar a fila.") : null;
 
+  function marcar(projetoId: string, chave: ChaveChecklist, valor: RespostaChecklist) {
+    setRespostas((prev) => ({ ...prev, [projetoId]: { ...prev[projetoId], [chave]: valor } }));
+  }
+
   function removerDaFila(projetoId: string) {
-    queryClient.setQueryData<Fila>(["aprovacoes-pendentes"], (old) =>
+    queryClient.setQueryData<Fila>(["aprovacoes-pendentes", como], (old) =>
       old ? { ...old, itens: old.itens.filter((i) => i.projeto_id !== projetoId) } : old,
     );
   }
@@ -79,19 +141,25 @@ function AprovacoesPage() {
     try {
       await apiFetch(
         "/api/aprovacoes/decidir",
-        { projeto_id: projetoId, veredito, comentario: texto ?? null },
+        {
+          projeto_id: projetoId,
+          veredito,
+          comentario: texto ?? null,
+          respostas: respostas[projetoId] ?? {},
+          ...(como ? { como } : {}),
+        },
         "POST",
       );
       removerDaFila(projetoId);
-      setReprovando(null);
+      setPedindoAjuste(null);
       setComentario("");
       toast.success(
         veredito === "aprovado"
-          ? "Projeto aprovado. O autor e a equipe RPA já veem seu parecer."
+          ? "Projeto pré-aprovado. O autor e a equipe RPA já veem o seu parecer."
           : "Ajuste solicitado. O autor recebe o seu comentário.",
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível registrar sua decisão.");
+      toast.error(e instanceof Error ? e.message : "Não foi possível registrar o seu parecer.");
     } finally {
       setEnviando(null);
     }
@@ -133,15 +201,33 @@ function AprovacoesPage() {
               className="font-extrabold tracking-tight"
               style={{ fontSize: "clamp(1.6rem,4vw,2.2rem)", color: "var(--go-white)" }}
             >
-              Aprovações do meu time
+              Pré-aprovações do meu time
             </h1>
             <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
-              Projetos que pessoas do seu time submeteram e esperam o seu parecer.
+              Projetos que pessoas do seu time submeteram e esperam a sua leitura de gestor.
             </p>
           </div>
         </div>
 
         <main className="mx-auto max-w-4xl px-8 py-8">
+          {preview && (
+            <div
+              className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
+              style={{
+                background: "rgba(180,83,9,0.07)",
+                border: "1px solid rgba(180,83,9,0.2)",
+                color: "#b45309",
+              }}
+            >
+              <Eye className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>Pré-visualização de admin.</strong> Você está vendo a fila de{" "}
+                <strong>{preview}</strong>. Se decidir algo aqui, o registro fica no seu nome, não
+                no dele.
+              </p>
+            </div>
+          )}
+
           {isLoading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin" style={{ color: "var(--go-blue)" }} />
@@ -163,7 +249,7 @@ function AprovacoesPage() {
 
           {!isLoading && !erro && (
             <>
-              {/* Como funciona: a pré-aprovação não trava a triagem da RPA (D3). */}
+              {/* O que é a pré-aprovação: não decide o projeto e não trava a RPA (D3). */}
               <div
                 className="mb-6 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
                 style={{
@@ -174,10 +260,9 @@ function AprovacoesPage() {
               >
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
-                  Seu parecer é a leitura de quem conhece o time — a validação da equipe RPA
-                  corre em paralelo, então nada fica parado esperando você. Abra a documentação
-                  antes de decidir; ao pedir ajuste, escreva o que precisa mudar (o autor lê
-                  esse texto).
+                  Isto é uma <strong>pré-aprovação</strong>, não a aprovação final: a validação da
+                  equipe RPA corre em paralelo e nada fica parado esperando você. O que você
+                  responde abaixo é a leitura de quem conhece a área — é isso que a triagem usa.
                 </p>
               </div>
 
@@ -209,177 +294,432 @@ function AprovacoesPage() {
               )}
 
               {itens.length > 0 && (
-                <div className="space-y-3">
-                  {itens.map((i) => {
-                    const ocupado = enviando === i.projeto_id;
-                    const pedindoAjuste = reprovando === i.projeto_id;
-                    return (
-                      <div
-                        key={i.projeto_id}
-                        className="overflow-hidden rounded-xl p-5"
-                        style={{
-                          background: "var(--go-white)",
-                          border: "1px solid rgba(0,89,169,0.08)",
-                          boxShadow: "var(--go-shadow-sm)",
-                        }}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className="truncate font-semibold"
-                                style={{ color: "var(--go-text-heading)", fontSize: 15 }}
-                              >
-                                {i.projeto_nome ?? "(sem nome)"}
-                              </span>
-                              {i.especial && (
-                                <span
-                                  className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                                  style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
-                                >
-                                  Especial
-                                </span>
-                              )}
-                              {i.tipos_projeto
-                                .filter((t) => t !== "especial")
-                                .map((t) => (
-                                  <span
-                                    key={t}
-                                    className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                    style={{
-                                      background: "rgba(0,89,169,0.08)",
-                                      color: "var(--go-blue)",
-                                    }}
-                                  >
-                                    {TIPO_LABEL[t] ?? t}
-                                  </span>
-                                ))}
-                            </div>
-                            <div
-                              className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
-                              style={{ color: "#8b8b9a" }}
-                            >
-                              <span className="inline-flex items-center gap-1">
-                                <Users className="h-3.5 w-3.5" />
-                                {i.autor_nome || i.autor_email || "—"}
-                              </span>
-                              {i.area && <span>{i.area}</span>}
-                              <span>Enviado em {fmtDate(i.submitted_at)}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                            <Link
-                              to="/projeto/$id"
-                              params={{ id: i.projeto_id }}
-                              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                              style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Ler documentação
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReprovando(pedindoAjuste ? null : i.projeto_id);
-                                setComentario("");
-                              }}
-                              disabled={ocupado}
-                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
-                              style={{ background: "rgba(180,83,9,0.1)", color: "#b45309" }}
-                            >
-                              <MessageSquareWarning className="h-3.5 w-3.5" />
-                              Pedir ajuste
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => decidir(i.projeto_id, "aprovado")}
-                              disabled={ocupado}
-                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
-                              style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                            >
-                              {ocupado ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              )}
-                              Aprovar
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Caixa de ajuste: abre no próprio card, comentário obrigatório. */}
-                        {pedindoAjuste && (
-                          <div
-                            className="mt-4 rounded-lg p-4"
-                            style={{
-                              background: "rgba(180,83,9,0.05)",
-                              border: "1px solid rgba(180,83,9,0.15)",
-                            }}
-                          >
-                            <label
-                              htmlFor={`ajuste-${i.projeto_id}`}
-                              className="mb-1.5 block text-[12px] font-semibold"
-                              style={{ color: "#b45309" }}
-                            >
-                              O que precisa ser ajustado?
-                            </label>
-                            <textarea
-                              id={`ajuste-${i.projeto_id}`}
-                              value={comentario}
-                              onChange={(e) => setComentario(e.target.value)}
-                              rows={3}
-                              maxLength={2000}
-                              placeholder="Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
-                              className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                              style={{
-                                background: "var(--go-white)",
-                                border: "1.5px solid rgba(180,83,9,0.25)",
-                                color: "var(--go-text-heading)",
-                              }}
-                            />
-                            <div className="mt-2.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setReprovando(null);
-                                  setComentario("");
-                                }}
-                                className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
-                                style={{
-                                  background: "transparent",
-                                  color: "#6b6b7a",
-                                  border: "1.5px solid rgba(0,0,0,0.12)",
-                                }}
-                              >
-                                Cancelar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => decidir(i.projeto_id, "reprovado", comentario.trim())}
-                                disabled={ocupado || comentario.trim().length === 0}
-                                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
-                                style={{ background: "#b45309", border: "1.5px solid #b45309" }}
-                              >
-                                {ocupado ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <MessageSquareWarning className="h-3.5 w-3.5" />
-                                )}
-                                Enviar pedido de ajuste
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="space-y-4">
+                  {itens.map((i) => (
+                    <CardAprovacao
+                      key={i.projeto_id}
+                      item={i}
+                      respostas={respostas[i.projeto_id] ?? {}}
+                      onResponder={(chave, valor) => marcar(i.projeto_id, chave, valor)}
+                      memorialAberto={!!memorialAberto[i.projeto_id]}
+                      onToggleMemorial={() =>
+                        setMemorialAberto((p) => ({ ...p, [i.projeto_id]: !p[i.projeto_id] }))
+                      }
+                      ocupado={enviando === i.projeto_id}
+                      pedindoAjuste={pedindoAjuste === i.projeto_id}
+                      onAbrirAjuste={() => {
+                        setPedindoAjuste(pedindoAjuste === i.projeto_id ? null : i.projeto_id);
+                        setComentario("");
+                      }}
+                      comentario={comentario}
+                      onComentario={setComentario}
+                      onAprovar={() => decidir(i.projeto_id, "aprovado")}
+                      onPedirAjuste={() =>
+                        decidir(i.projeto_id, "reprovado", comentario.trim())
+                      }
+                    />
+                  ))}
                 </div>
               )}
             </>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+// ─── Card de um projeto ──────────────────────────────────────────────────────
+
+function CardAprovacao({
+  item: i,
+  respostas,
+  onResponder,
+  memorialAberto,
+  onToggleMemorial,
+  ocupado,
+  pedindoAjuste,
+  onAbrirAjuste,
+  comentario,
+  onComentario,
+  onAprovar,
+  onPedirAjuste,
+}: {
+  item: ItemAprovacao;
+  respostas: Respostas;
+  onResponder: (chave: ChaveChecklist, valor: RespostaChecklist) => void;
+  memorialAberto: boolean;
+  onToggleMemorial: () => void;
+  ocupado: boolean;
+  pedindoAjuste: boolean;
+  onAbrirAjuste: () => void;
+  comentario: string;
+  onComentario: (v: string) => void;
+  onAprovar: () => void;
+  onPedirAjuste: () => void;
+}) {
+  const completo = checklistCompleto(respostas);
+  const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
+  const horas = fmtHoras(i.saving_horas, i.tipo_saving);
+  const reais = fmtReais(i.saving_reais);
+
+  return (
+    <div
+      className="overflow-hidden rounded-xl"
+      style={{
+        background: "var(--go-white)",
+        border: "1px solid rgba(0,89,169,0.08)",
+        boxShadow: "var(--go-shadow-sm)",
+      }}
+    >
+      {/* ── Zona 1: o que é o projeto ───────────────────────────────────────── */}
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="font-bold"
+            style={{ color: "var(--go-text-heading)", fontSize: 16, lineHeight: 1.3 }}
+          >
+            {i.projeto_nome ?? "(sem nome)"}
+          </span>
+          {i.especial && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
+            >
+              Especial
+            </span>
+          )}
+          {i.tipos_projeto
+            .filter((t) => t !== "especial")
+            .map((t) => (
+              <span
+                key={t}
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+              >
+                {TIPO_LABEL[t] ?? t}
+              </span>
+            ))}
+          <span
+            className="ml-auto inline-flex items-center gap-1 text-[11px]"
+            style={{ color: "#a5a5b3" }}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Enviado em {fmtDate(i.submitted_at)}
+          </span>
+        </div>
+
+        {i.descricao_breve && (
+          <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "#6b6b7a" }}>
+            {i.descricao_breve}
+          </p>
+        )}
+
+        {/* Dono · participantes · saving — o líder decide sem abrir outra tela */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Bloco icone={<User className="h-3.5 w-3.5" />} titulo="Dono">
+            <span className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
+              {i.autor_nome || i.autor_email || "—"}
+            </span>
+            {i.area && (
+              <span className="block text-[11px]" style={{ color: "#a5a5b3" }}>
+                {i.area}
+              </span>
+            )}
+          </Bloco>
+
+          <Bloco icone={<Users className="h-3.5 w-3.5" />} titulo="Participantes">
+            {i.participantes.length === 0 ? (
+              <span style={{ color: "#a5a5b3" }}>Só o dono</span>
+            ) : (
+              <ul className="space-y-0.5">
+                {i.participantes.map((p) => (
+                  <li key={p.email}>
+                    <span className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
+                      {p.nome}
+                    </span>
+                    <span className="text-[11px]" style={{ color: "#a5a5b3" }}>
+                      {" "}
+                      · {p.papel}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Bloco>
+
+          {/* Saving em destaque (barra lime): é o número da 3ª pergunta */}
+          <div
+            className="rounded-lg px-3 py-2.5"
+            style={{
+              background: "rgba(0,89,169,0.04)",
+              borderLeft: "3px solid var(--go-lime)",
+            }}
+          >
+            <p
+              className="text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: "#8b8b9a" }}
+            >
+              Saving declarado
+            </p>
+            {horas || reais ? (
+              <>
+                <p className="mt-0.5 font-extrabold" style={{ color: "var(--go-blue)", fontSize: 17 }}>
+                  {reais ?? horas}
+                </p>
+                {reais && horas && (
+                  <p className="text-[11px]" style={{ color: "#6b6b7a" }}>
+                    {horas}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-0.5 text-[13px]" style={{ color: "#a5a5b3" }}>
+                {i.especial ? "Projeto especial (sem saving)" : "Não declarado"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Memorial: fica fechado por padrão para o card não virar parede de texto */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {i.memorial && (
+            <button
+              type="button"
+              onClick={onToggleMemorial}
+              aria-expanded={memorialAberto}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+              style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {memorialAberto ? "Fechar memorial" : "Ver memorial do cálculo"}
+              <ChevronDown
+                className="h-3.5 w-3.5 transition-transform motion-reduce:transition-none"
+                style={{ transform: memorialAberto ? "rotate(180deg)" : "none" }}
+              />
+            </button>
+          )}
+          <Link
+            to="/projeto/$id"
+            params={{ id: i.projeto_id }}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+            style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ler a documentação completa
+          </Link>
+        </div>
+
+        {memorialAberto && i.memorial && (
+          <div
+            className="mt-3 max-h-96 overflow-y-auto rounded-lg px-4 py-3 text-[13px]"
+            style={{ background: "var(--go-cream)", border: "1px solid rgba(0,89,169,0.1)" }}
+          >
+            <SimpleMarkdown text={i.memorial} isSaving />
+          </div>
+        )}
+      </div>
+
+      {/* ── Zona 2: o parecer do líder ──────────────────────────────────────── */}
+      <div
+        className="px-5 py-4"
+        style={{ background: "rgba(0,89,169,0.03)", borderTop: "1px solid rgba(0,89,169,0.08)" }}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+            Seu parecer
+          </p>
+          <p className="text-[11px]" style={{ color: completo ? "#15803d" : "#8b8b9a" }}>
+            {completo
+              ? "3 de 3 respondidas"
+              : `Faltam ${faltam} de 3 perguntas`}
+          </p>
+        </div>
+
+        <div className="mt-2.5 space-y-2">
+          {CHECKLIST_APROVACAO.map((p) => {
+            const marcada = respostas[p.chave];
+            return (
+              <div
+                key={p.chave}
+                className="flex flex-col gap-2 rounded-lg px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                style={{
+                  background: "var(--go-white)",
+                  border: marcada
+                    ? "1.5px solid rgba(0,89,169,0.25)"
+                    : "1.5px solid rgba(0,0,0,0.07)",
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="flex items-start gap-1.5 text-[13px] font-semibold"
+                    style={{ color: "var(--go-text-heading)" }}
+                  >
+                    {/* Estado por ícone + borda, nunca só por cor */}
+                    {marcada && (
+                      <Check
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                        style={{ color: "var(--go-blue)" }}
+                      />
+                    )}
+                    {p.pergunta}
+                  </p>
+                  <p className="mt-0.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                    {p.ajuda}
+                  </p>
+                </div>
+                <div
+                  className="flex shrink-0 gap-1 self-start rounded-full p-1 sm:self-auto"
+                  style={{ background: "rgba(0,0,0,0.04)" }}
+                  role="group"
+                  aria-label={p.pergunta}
+                >
+                  {(["sim", "nao"] as RespostaChecklist[]).map((v) => {
+                    const ativo = marcada === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => onResponder(p.chave, v)}
+                        aria-pressed={ativo}
+                        className="cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold transition-all"
+                        style={{
+                          background: ativo ? "var(--go-blue)" : "transparent",
+                          color: ativo ? "var(--go-white)" : "#6b6b7a",
+                        }}
+                      >
+                        {v === "sim" ? "Sim" : "Não"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Um "Não" é sinal, não veto — o líder precisa saber disso antes de travar. */}
+        {completo && Object.values(respostas).some((v) => v === "nao") && (
+          <p className="mt-2.5 text-[11px] leading-snug" style={{ color: "#b45309" }}>
+            Respondeu "Não" em algo? Pode pré-aprovar do mesmo jeito — a resposta vai junto para a
+            triagem da RPA. Se o projeto precisa mudar antes, peça o ajuste.
+          </p>
+        )}
+
+        <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onAbrirAjuste}
+            disabled={ocupado || !completo}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: "rgba(180,83,9,0.1)", color: "#b45309" }}
+          >
+            <MessageSquareWarning className="h-3.5 w-3.5" />
+            Pedir ajuste
+          </button>
+          <button
+            type="button"
+            onClick={onAprovar}
+            disabled={ocupado || !completo}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+          >
+            {ocupado ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <BadgeCheck className="h-3.5 w-3.5" />
+            )}
+            Pré-aprovar
+          </button>
+        </div>
+        {!completo && (
+          <p className="mt-2 text-right text-[11px]" style={{ color: "#8b8b9a" }}>
+            Responda as 3 perguntas para liberar o parecer.
+          </p>
+        )}
+
+        {/* Caixa de ajuste: comentário obrigatório, é o texto que o autor lê. */}
+        {pedindoAjuste && (
+          <div
+            className="mt-3 rounded-lg p-4"
+            style={{ background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.15)" }}
+          >
+            <label
+              htmlFor={`ajuste-${i.projeto_id}`}
+              className="mb-1.5 block text-[12px] font-semibold"
+              style={{ color: "#b45309" }}
+            >
+              O que precisa ser ajustado?
+            </label>
+            <textarea
+              id={`ajuste-${i.projeto_id}`}
+              value={comentario}
+              onChange={(e) => onComentario(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
+              className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+              style={{
+                background: "var(--go-white)",
+                border: "1.5px solid rgba(180,83,9,0.25)",
+                color: "var(--go-text-heading)",
+              }}
+            />
+            <div className="mt-2.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={onAbrirAjuste}
+                className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
+                style={{
+                  background: "transparent",
+                  color: "#6b6b7a",
+                  border: "1.5px solid rgba(0,0,0,0.12)",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={onPedirAjuste}
+                disabled={ocupado || comentario.trim().length === 0}
+                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
+                style={{ background: "#b45309", border: "1.5px solid #b45309" }}
+              >
+                {ocupado ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <MessageSquareWarning className="h-3.5 w-3.5" />
+                )}
+                Enviar pedido de ajuste
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Bloco de informação do card (rótulo pequeno + conteúdo). */
+function Bloco({
+  icone,
+  titulo,
+  children,
+}: {
+  icone: React.ReactNode;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(0,89,169,0.04)" }}>
+      <p
+        className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
+        style={{ color: "#8b8b9a" }}
+      >
+        {icone}
+        {titulo}
+      </p>
+      <div className="mt-0.5 text-[13px]">{children}</div>
     </div>
   );
 }

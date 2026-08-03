@@ -27,7 +27,9 @@ import {
   resumoAprovacaoPorProjeto,
   rotuloAprovacaoSheet,
   rotuloIsencaoSheet,
+  montarParticipantes,
 } from '@/lib/aprovacoes.functions';
+import { checklistCompleto, resumirChecklist } from '@/lib/aprovacoes-checklist';
 
 const mockLideranca = ehLideranca as unknown as ReturnType<typeof vi.fn>;
 const mockLideres = getLideresDe as unknown as ReturnType<typeof vi.fn>;
@@ -53,6 +55,9 @@ function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
     },
   };
 }
+
+// Checklist do gestor: obrigatório em toda decisão (pedido do Lucas, 03/08/2026).
+const RESP_OK = { move_kpi: 'sim', sente_falta: 'sim', saving_coerente: 'sim' } as const;
 
 const LUCAS = { nome: 'Lucas Gonçalves Queiroz', email: 'lucas.queiroz@gocase.com' };
 const ALINE = { nome: 'Aline Montenegro', email: 'aline.montenegro@gocase.com' };
@@ -98,7 +103,7 @@ describe('pré-aprovação do líder', () => {
 
     expect(r.isento).toBe(false);
     expect(r.aprovadores.map((a) => a.email)).toEqual([LUCAS.email]);
-    expect(r.rotuloSheet).toBe('Pendente com Lucas Gonçalves Queiroz');
+    expect(r.rotuloSheet).toBe('Pré-aprovação pendente com Lucas Gonçalves Queiroz');
     const linhas = await getAprovacoesDoProjeto(id);
     expect(linhas).toHaveLength(1);
     expect(linhas[0].veredito).toBe('pendente');
@@ -174,7 +179,7 @@ describe('pré-aprovação do líder', () => {
     expect(await naFila(LUCAS.email)).toHaveLength(1);
     expect(await naFila(ALINE.email)).toHaveLength(1);
 
-    await decidirAprovacao(ALINE.email, { projeto_id: id, veredito: 'aprovado' });
+    await decidirAprovacao(ALINE.email, { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK });
 
     // …e a decisão de um limpa a fila do outro.
     expect(await naFila(LUCAS.email)).toEqual([]);
@@ -189,12 +194,12 @@ describe('pré-aprovação do líder', () => {
     await abrirPreAprovacao(id);
 
     await expect(
-      decidirAprovacao('estranho@gocase.com', { projeto_id: id, veredito: 'aprovado' }),
+      decidirAprovacao('estranho@gocase.com', { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK }),
     ).rejects.toMatchObject({ status: 403 });
     // E não decide duas vezes: depois de decidido, a linha não está mais pendente.
-    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado' });
+    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK });
     await expect(
-      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'reprovado', comentario: 'x' }),
+      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'reprovado', comentario: 'x', respostas: RESP_OK }),
     ).rejects.toMatchObject({ status: 403 });
   });
 
@@ -203,13 +208,14 @@ describe('pré-aprovação do líder', () => {
     await abrirPreAprovacao(id);
 
     await expect(
-      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'reprovado', comentario: '   ' }),
+      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'reprovado', comentario: '   ', respostas: RESP_OK }),
     ).rejects.toMatchObject({ status: 400 });
 
     await decidirAprovacao(LUCAS.email, {
       projeto_id: id,
       veredito: 'reprovado',
       comentario: 'Confira a frequência das horas do fiscal.',
+      respostas: RESP_OK,
     });
     const resumo = await resumoAprovacaoPorProjeto([id]);
     expect(resumo[id]).toMatchObject({
@@ -222,20 +228,20 @@ describe('pré-aprovação do líder', () => {
     const id = await criarProjeto();
     await abrirPreAprovacao(id);
 
-    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado' });
+    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK });
 
     expect(mockSheet).toHaveBeenCalledTimes(1);
     const [projetoId, cells] = mockSheet.mock.calls[0];
     expect(projetoId).toBe(id);
     expect(String((cells as Record<string, string>)['Aprovação do Líder'])).toMatch(
-      /^Aprovado por Lucas Gonçalves Queiroz em \d{2}\/\d{2}\/\d{4}$/,
+      /^Pré-aprovado por Lucas Gonçalves Queiroz em \d{2}\/\d{2}\/\d{4} — Move KPI: sim · Sentiria falta: sim · Saving coerente: sim$/,
     );
   });
 
   it('reenvio REABRE a fila — o veredito da versão anterior não carimba a nova (D10)', async () => {
     const id = await criarProjeto();
     await abrirPreAprovacao(id);
-    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado' });
+    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK });
     expect((await resumoAprovacaoPorProjeto([id]))[id].veredito).toBe('aprovado');
 
     await abrirPreAprovacao(id); // reenvio
@@ -256,6 +262,107 @@ describe('pré-aprovação do líder', () => {
     expect(r.lidera).toBe(true);
   });
 
+
+  it('CHECKLIST: sem as 3 respostas o parecer não é gravado (400) e a fila continua', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+
+    await expect(
+      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado' }),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      decidirAprovacao(LUCAS.email, {
+        projeto_id: id,
+        veredito: 'aprovado',
+        respostas: { move_kpi: 'sim', sente_falta: 'sim' },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    // valor fora de sim/nao também não passa
+    await expect(
+      decidirAprovacao(LUCAS.email, {
+        projeto_id: id,
+        veredito: 'aprovado',
+        respostas: { move_kpi: 'talvez', sente_falta: 'sim', saving_coerente: 'sim' },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const fila = (await listarAprovacoesPendentes(LUCAS.email)).itens.filter(
+      (i) => i.projeto_id === id,
+    );
+    expect(fila).toHaveLength(1);
+  });
+
+  it('CHECKLIST: as respostas ficam gravadas na decisão e vão para a planilha', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+
+    await decidirAprovacao(LUCAS.email, {
+      projeto_id: id,
+      veredito: 'aprovado',
+      respostas: { move_kpi: 'sim', sente_falta: 'nao', saving_coerente: 'sim' },
+    });
+
+    const linhas = await getAprovacoesDoProjeto(id);
+    expect(linhas[0]).toMatchObject({
+      resp_move_kpi: 'sim',
+      resp_sente_falta: 'nao',
+      resp_saving_coerente: 'sim',
+    });
+    const [, cells] = mockSheet.mock.calls[0];
+    expect(String((cells as Record<string, string>)['Aprovação do Líder'])).toContain(
+      'Sentiria falta: não',
+    );
+  });
+
+  it('PRÉ-VISUALIZAÇÃO DE ADMIN: quem clicou é quem fica no `decidido_por`', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+
+    await decidirAprovacao(
+      LUCAS.email,
+      { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK },
+      { atorReal: 'luis.albuquerque@gocase.com' },
+    );
+
+    const linhas = await getAprovacoesDoProjeto(id);
+    expect(linhas.every((l) => l.decidido_por === 'luis.albuquerque@gocase.com')).toBe(true);
+  });
+
+  it('o card traz dono, participantes, saving e memorial sem abrir o projeto', async () => {
+    const id = `p-card-${Date.now()}`;
+    await insertProjetoRaw({
+      id,
+      nome: 'Conciliação fiscal',
+      responsavel_nome: 'Luis Albuquerque',
+      responsavel_email: 'luis.albuquerque@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      submitted_at: new Date().toISOString(),
+      tipos_projeto: JSON.stringify(['saving']),
+      area: 'RPA',
+      descricao_breve: 'Concilia notas do fiscal todos os dias.',
+      membros: JSON.stringify(['maria@gocase.com', 'luis.albuquerque@gocase.com']),
+      membros_papeis: JSON.stringify({ 'maria@gocase.com': 'planejador' }),
+      saving_horas: 44,
+      saving_reais: 3200,
+      tipo_saving: 'mensal',
+      memorial_calculo: '### Resumo\nTotal de 44h/mês.',
+    });
+    await abrirPreAprovacao(id);
+
+    const item = (await listarAprovacoesPendentes(LUCAS.email)).itens.find(
+      (i) => i.projeto_id === id,
+    )!;
+    expect(item.autor_nome).toBe('Luis Albuquerque');
+    expect(item.participantes).toEqual([
+      { nome: 'Maria', email: 'maria@gocase.com', papel: 'Participante' },
+    ]);
+    expect(item.saving_horas).toBe(44);
+    expect(item.saving_reais).toBe(3200);
+    expect(item.memorial).toContain('Total de 44h/mês');
+    expect(item.descricao_breve).toBe('Concilia notas do fiscal todos os dias.');
+  });
+
   it('quem não lidera ninguém não vê a fila', async () => {
     const r = await listarAprovacoesPendentes('luis.albuquerque@gocase.com');
 
@@ -271,10 +378,10 @@ describe('rotuloAprovacaoSheet (puro)', () => {
   it('pendente lista todos os líderes da fila', () => {
     expect(
       rotuloAprovacaoSheet([
-        { veredito: 'pendente', aprovador_nome: 'Lucas', aprovador_email: 'l@x', comentario: null, decidido_por: null, decidido_em: null },
-        { veredito: 'pendente', aprovador_nome: 'Aline', aprovador_email: 'a@x', comentario: null, decidido_por: null, decidido_em: null },
+        { veredito: 'pendente', aprovador_nome: 'Lucas', aprovador_email: 'l@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
+        { veredito: 'pendente', aprovador_nome: 'Aline', aprovador_email: 'a@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
       ]),
-    ).toBe('Pendente com Lucas, Aline');
+    ).toBe('Pré-aprovação pendente com Lucas, Aline');
   });
 
   it('reprovado leva o motivo para a planilha', () => {
@@ -286,9 +393,14 @@ describe('rotuloAprovacaoSheet (puro)', () => {
         comentario: 'Rever as horas',
         decidido_por: 'l@x',
         decidido_em: '2026-08-03T12:00:00.000Z',
+        resp_move_kpi: 'sim',
+        resp_sente_falta: 'sim',
+        resp_saving_coerente: 'nao',
       },
     ]);
-    expect(txt).toMatch(/^Reprovado por Lucas em \d{2}\/\d{2}\/\d{4} — Rever as horas$/);
+    expect(txt).toMatch(
+      /^Ajuste pedido por Lucas em \d{2}\/\d{2}\/\d{4} — Move KPI: sim · Sentiria falta: sim · Saving coerente: não — Rever as horas$/,
+    );
   });
 });
 
@@ -309,5 +421,40 @@ describe('rotuloIsencaoSheet (puro) — os 3 casos sem fila são distinguíveis'
 
   it('motivo nulo (há fila) cai no "—" e nunca em texto de isenção', () => {
     expect(rotuloIsencaoSheet(null)).toBe('—');
+  });
+});
+
+describe('checklist do gestor (puro)', () => {
+  it('só libera com as 3 respondidas', () => {
+    expect(checklistCompleto({})).toBe(false);
+    expect(checklistCompleto({ move_kpi: 'sim', sente_falta: 'nao' })).toBe(false);
+    expect(checklistCompleto({ move_kpi: 'sim', sente_falta: 'nao', saving_coerente: 'sim' })).toBe(
+      true,
+    );
+  });
+
+  it('parecer antigo (sem checklist) não suja o rótulo da planilha', () => {
+    expect(resumirChecklist({})).toBe('');
+  });
+});
+
+describe('montarParticipantes (puro)', () => {
+  it('tira o autor da lista, deduplica e traduz o papel', () => {
+    expect(
+      montarParticipantes(
+        JSON.stringify(['ANA@gocase.com', 'ana@gocase.com', 'dono@gocase.com', 'bruno.lima@gocase.com']),
+        JSON.stringify({ 'ana@gocase.com': 'coexecutor', 'bruno.lima@gocase.com': 'idealizador' }),
+        'Dono@gocase.com',
+      ),
+    ).toEqual([
+      { nome: 'Ana', email: 'ana@gocase.com', papel: 'Coautor' },
+      // papel LEGADO cai em Contribuidor, igual ao sync do Sheets
+      { nome: 'Bruno Lima', email: 'bruno.lima@gocase.com', papel: 'Contribuidor' },
+    ]);
+  });
+
+  it('projeto sem participantes/papéis não quebra', () => {
+    expect(montarParticipantes(null, null, null)).toEqual([]);
+    expect(montarParticipantes('{ nao é json', 'nem isso', 'a@x')).toEqual([]);
   });
 });

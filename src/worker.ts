@@ -252,16 +252,28 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // A fila é do LÍDER do autor (derivada da TeamGuide na submissão). O gate real é
     // server-side: `decidirAprovacao` só grava se existir linha pendente para o e-mail
     // do header (ver aprovacoes.functions.ts) — o frontend nunca autoriza nada.
+    //
+    // `?como=<e-mail>` abre a fila de OUTRA pessoa e existe para a validação da tela
+    // (o admin precisa ver o que o líder vê). Só ADMIN pode usar; qualquer outro e-mail
+    // no parâmetro é ignorado e a pessoa vê a própria fila. Ao decidir nesse modo, o
+    // `decidido_por` gravado é o do ADMIN — a auditoria não finge que o líder clicou.
     if (pathname === '/api/aprovacoes/pendentes' && method === 'GET') {
       const email = getEmailFromRequest(request)
       if (!email) return errorJson('Não autorizado.', 401)
-      return json(await listarAprovacoesPendentes(email))
+      const como = (url.searchParams.get('como') ?? '').trim().toLowerCase()
+      const preview = como && como !== email.toLowerCase() && (await isAdmin(email)) ? como : null
+      const fila = await listarAprovacoesPendentes(preview ?? email)
+      return json({ ...fila, visualizando_como: preview })
     }
     if (pathname === '/api/aprovacoes/decidir' && method === 'POST') {
       const email = getEmailFromRequest(request)
       if (!email) return errorJson('Não autorizado.', 401)
-      const body = await readBody(request)
-      return json(await decidirAprovacao(email, body))
+      const body = await readBody<Record<string, unknown>>(request)
+      const como = String(body?.como ?? '').trim().toLowerCase()
+      const preview = como && como !== email.toLowerCase() && (await isAdmin(email)) ? como : null
+      return json(
+        await decidirAprovacao(preview ?? email, body, preview ? { atorReal: email } : undefined),
+      )
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──
