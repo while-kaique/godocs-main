@@ -313,6 +313,33 @@ describe('definirStatusProjeto', () => {
     expect(Object.keys(escritas)).not.toContain('Observações');
   });
 
+  // ── Padrão da planilha: coluna de TEXTO nunca fica em branco (vazio → "—") ──
+  it('motivo APAGADO grava "—" (não deixa a célula em branco)', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Pendente', motivo_reenvio: '   ', motivo_reprovado: '' },
+      'admin@gocase.com',
+    );
+    const escritas = mockUpdateRow.mock.calls[0]![1] as Record<string, string>;
+    expect(escritas['Motivo Reenvio']).toBe('—');
+    expect(escritas['Motivo Reprovado']).toBe('—');
+  });
+
+  it('parecer APAGADO grava "—" em "Observações"', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Pendente', observacoes: '' },
+      'admin@gocase.com',
+    );
+    expect((mockUpdateRow.mock.calls[0]![1] as Record<string, string>)['Observações']).toBe('—');
+  });
+
+  it('a auditoria não registra o "—" como se fosse motivo', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Pendente', motivo_reenvio: '  ' },
+      'admin@gocase.com',
+    );
+    expect(mockInsertLog).toHaveBeenCalledWith(expect.objectContaining({ observacoes: null }));
+  });
+
   it('a auditoria registra o motivo quando não há parecer em "Observações"', async () => {
     await definirStatusProjeto(
       { projeto_id: 'legado-148', status: 'Reprovado', motivo_reprovado: 'sem recorrência' },

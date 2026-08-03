@@ -377,8 +377,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       'Análise Antiagente': ouTraco((p.projeto as { analise_antiagente?: string | null }).analise_antiagente),
       // Critério de projeto: classificação de elegibilidade + motivo da reprovação.
       // No append a análise ainda não rodou → "—"; o analisador sobrescreve as duas
-      // via syncUpdateToGoogle. ⚠️ "Motivo Reenvio" NÃO entra aqui: é MANUAL (triagem
-      // humana no /dashboard), como as colunas de Diff — o sistema nunca a escreve.
+      // via syncUpdateToGoogle. ⚠️ "Motivo Reenvio" NÃO entra aqui — o CONTEÚDO dela é
+      // da triagem humana (/dashboard); só o APPEND a inicializa com "—" (logo abaixo),
+      // nunca o update.
       'Classificação': derivarClassificacaoSheet(
         p.projeto.classificacao_avaliacao as string | null | undefined,
         p.projeto.classificacao_justificativa as string | null | undefined,
@@ -398,8 +399,16 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // "Data Submissão" é a data em que a pessoa SUBMETEU — só na submissão nova
     // (append). Na EDIÇÃO, NÃO escrevemos essa coluna (preserva a data original);
     // só "Atualizado Em" reflete a edição.
+    //
+    // "Motivo Reenvio" segue a mesma regra de MOMENTO, por outro motivo: o CONTEÚDO é
+    // da triagem humana (/dashboard), mas a célula não pode NASCER em branco — o padrão
+    // da planilha é "texto vazio → —" (padronizarLinha). Então o APPEND a inicializa
+    // com "—" e o UPDATE da edição NUNCA a toca (sobrescrever apagaria o motivo que o
+    // admin escreveu). ⚠️ Não confundir com as colunas de Diff, que o sistema nunca
+    // escreve em NENHUM momento.
     if (p.modo !== 'edicao') {
       row['Data Submissão'] = dataSubmissao;
+      row['Motivo Reenvio'] = '—';
     }
 
     // Padroniza antes de gravar: numérico vazio → 0; texto vazio → "—".
@@ -424,8 +433,12 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
             `[google/sync] RECUPERAÇÃO: linha do projeto "${p.projetoId}" não existe na planilha — criando por append.`,
           );
           // A linha está sendo CRIADA agora, então "Data Submissão" entra (o ramo
-          // normal de edição a omite de propósito, para preservar a data original).
-          await appendRow(padronizarLinha({ ...row, 'Data Submissão': dataSubmissao }));
+          // normal de edição a omite de propósito, para preservar a data original) —
+          // e "Motivo Reenvio" nasce com "—" pelo mesmo motivo (a célula da linha
+          // antiga já se foi junto com ela; não há motivo de triagem para preservar).
+          await appendRow(
+            padronizarLinha({ ...row, 'Data Submissão': dataSubmissao, 'Motivo Reenvio': '—' }),
+          );
         }
       } else {
         await appendRow(rowPadronizada);

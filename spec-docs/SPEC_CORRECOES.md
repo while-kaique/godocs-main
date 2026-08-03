@@ -6,6 +6,51 @@
 
 ---
 
+## 2026-08-03 — Coluna "Motivo Reenvio" nascia em BRANCO, fora do padrão "texto vazio → —"
+
+**Status:** codada e testada (805 testes verdes) · **Branch:** `fix/motivo-reenvio-traco` · **Plano:** [docs/plans/motivo-reenvio-traco-padrao.md](../docs/plans/motivo-reenvio-traco-padrao.md) · **PR:** _(a abrir)_
+
+**Sintoma:** toda linha nova da planilha vinha com a célula **"Motivo Reenvio" vazia**, enquanto as outras
+colunas de texto sem dado traziam **"—"** (`Observações`, `Motivo Reprovado`, `Análise Antiagente`,
+`Memorial anterior`). Célula em branco na planilha é ambígua: não se distingue "ninguém pediu reenvio" de
+"a escrita falhou". Havia o mesmo furo no `/dashboard`: o admin que **apagava** o motivo deixava a célula
+em branco.
+
+**Causa-raiz:** duas, ambas de **omissão do padrão**, não de lógica.
+1. `padronizarLinha` (`src/lib/google/sync.ts`) converte toda coluna de TEXTO vazia em `"—"` — mas
+   **"Motivo Reenvio" nunca entrava no payload** do append. Foi excluída de propósito, pelo motivo certo (o
+   conteúdo é da triagem humana no `/dashboard`, e um update sobrescrevendo apagaria o texto do admin) —
+   só que a exclusão foi aplicada ao **append** também, onde não há nada para preservar. O comentário no
+   código ("como as colunas de Diff — o sistema nunca a escreve") equiparava a coluna às de Diff, que são
+   manuais em **qualquer** momento; esta não é.
+2. `definirStatusProjeto` (`src/lib/dashboard-admin.functions.ts`) gravava `motivo.trim()` **direto**, sem
+   passar pelo padrão — motivo apagado virava `''`.
+
+**Fix (3 pontos + doc):**
+- **`sync.ts` — `syncSubmitToGoogle`:** `row['Motivo Reenvio'] = '—'` **só quando `p.modo !== 'edicao'`**
+  (junto de `Data Submissão`), e também no **append de RECUPERAÇÃO** (linha ausente → a linha nasce agora,
+  não há motivo de triagem a preservar). O **update in-place da edição continua sem tocar a coluna** — é o
+  invariante que segura o texto do admin.
+- **`dashboard-admin.functions.ts`:** helper puro **`ouTraco`** (inverso do `texto()`) aplicado a
+  `Motivo Reenvio`, `Motivo Reprovado` e `Observações` na escrita e no patch de cache. A **auditoria**
+  (`admin_status_log`) segue registrando `null` quando não há motivo — o "—" não vira texto de log.
+- **`email-legados.functions.ts`:** `motivoDaCelula()` trata `"—"`/`"-"` como ausência ao ler
+  **"Observações"** — o append já gravava "—" ali, então o e-mail de reenvio podia sair com _"Motivo: —"_.
+  (Defeito latente encontrado junto, mesmo padrão.)
+- **`CLAUDE.md`:** o gotcha 4 do "Critério de projeto" deixou de dizer "o sistema NUNCA escreve" e passou a
+  declarar a distinção real: **conteúdo** é manual; o **append inicializa com "—"**; o **update nunca toca**.
+
+**Onde aterrissou:** `src/lib/google/sync.ts` · `src/lib/dashboard-admin.functions.ts` ·
+`src/lib/email-legados.functions.ts` · `tests/sync-motivo-reenvio-traco.test.ts` (novo — append inicializa,
+edição não toca, recuperação inicializa, Diff intocadas) · `tests/dashboard-admin.test.ts` +
+`tests/email-legados.test.ts` (casos novos) · `CLAUDE.md`.
+
+**Fora do escopo (decisão):** **não** houve backfill das linhas legadas já em branco na planilha — daqui
+pra frente as novas nascem com "—"; as antigas só mudam quando editadas (ou num backfill próprio, se o
+Luis pedir).
+
+---
+
 ## 2026-07-30 — Gate da Seção 2.4 recusava a resposta CERTA quando o ganho é "menos custo" + juiz do preview reinterrogava sem limite
 
 **PR:** [#217](https://github.com/while-kaique/godocs-main/pull/217) (mergeado) · **Status:** ✅ corrigida — validada na staging `edf400b4` com o cenário-âncora ponta a ponta (agente pergunta **1×**, a resposta de redução de headcount é **aceita de primeira**, sem reinterrogação no preview, seção gravada e coluna AK preenchida) e **prod `674a3710` deployado** (2026-07-30) · **Branch:** `fix/gate-alocacao-taxonomia-e-materialidade` · **Plano:** [docs/plans/taxonomia-destino-ganho-e-anti-loop.md](../docs/plans/taxonomia-destino-ganho-e-anti-loop.md)

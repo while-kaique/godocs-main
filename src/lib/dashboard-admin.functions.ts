@@ -65,6 +65,16 @@ export function texto(valor: string | undefined): string | null {
 }
 
 /**
+ * Inverso do `texto` para ESCRITA: o que a triagem grava numa coluna de TEXTO nunca vai
+ * como célula em branco — vazio (ou já "—"/"-") vira **"—"**, o mesmo padrão do
+ * `padronizarLinha` do sync (`src/lib/google/sync.ts`). Sem isso, o admin que APAGA o
+ * motivo deixava a célula suja/vazia, fora do padrão da planilha. Pura.
+ */
+export function ouTraco(valor: string | null | undefined): string {
+  return texto(valor ?? undefined) ?? '—';
+}
+
+/**
  * Número pt-BR tolerante: "R$ 1.234,56", "418,2" e "10.5". Regra: se há vírgula, ela é
  * o decimal e o ponto é milhar; só ponto → decimal. (Mesma regra do sync reverso.)
  */
@@ -448,18 +458,18 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
 
   const statusAnterior = texto(linha['Status']);
   const updates: Partial<Record<(typeof COLUNAS_ESCRITAS)[number], string>> = { Status: status };
-  if (observacoes !== undefined) updates['Observações'] = observacoes.trim();
-  if (motivo_reenvio !== undefined) updates['Motivo Reenvio'] = motivo_reenvio.trim();
-  if (motivo_reprovado !== undefined) updates['Motivo Reprovado'] = motivo_reprovado.trim();
+  if (observacoes !== undefined) updates['Observações'] = ouTraco(observacoes);
+  if (motivo_reenvio !== undefined) updates['Motivo Reenvio'] = ouTraco(motivo_reenvio);
+  if (motivo_reprovado !== undefined) updates['Motivo Reprovado'] = ouTraco(motivo_reprovado);
 
   await updateRowByProjectId(projeto_id, updates);
 
   // Corrige a linha no cache em vez de reler a planilha inteira: a tela reflete a
   // mudança na hora e a próxima leitura real acontece no TTL normal.
   const valores: Record<string, string> = { Status: status };
-  if (observacoes !== undefined) valores['Observações'] = observacoes.trim();
-  if (motivo_reenvio !== undefined) valores['Motivo Reenvio'] = motivo_reenvio.trim();
-  if (motivo_reprovado !== undefined) valores['Motivo Reprovado'] = motivo_reprovado.trim();
+  if (observacoes !== undefined) valores['Observações'] = ouTraco(observacoes);
+  if (motivo_reenvio !== undefined) valores['Motivo Reenvio'] = ouTraco(motivo_reenvio);
+  if (motivo_reprovado !== undefined) valores['Motivo Reprovado'] = ouTraco(motivo_reprovado);
   const mutavel = linha as Record<string, string>;
   Object.assign(mutavel, valores);
   // Sobrevive a uma releitura que começou antes desta escrita (ver `patchesEscritos`).
