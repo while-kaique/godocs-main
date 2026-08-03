@@ -28,6 +28,14 @@ validação humana.
 > alguém (o líder dela, ou a diretoria), a régua está concentrada em **um ponto**: a checagem de
 > `ehLideranca` no topo de `abrirPreAprovacao`.
 >
+> **⬜ DECISÃO PENDENTE DO LUIS (03/08) — rótulo da isenção na planilha.** Hoje os 3 casos sem fila
+> (autor é liderança · autor sem líder · TeamGuide fora) gravam o MESMO `—` na coluna `Aprovação do
+> Líder`, então na auditoria não se distingue "isento" de "a integração falhou". O `abrirPreAprovacao`
+> já devolve o `motivo` (`lideranca`/`sem_lider`/`teamguide_indisponivel`) — falta só mapear motivo →
+> texto em `rotuloAprovacaoSheet`. Luis vai escolher o rótulo (ex.: `Pré-aprovado (liderança)` ou
+> `Não se aplica — autor é liderança`); **sem a escolha dele, fica o `—`**. ⚠️ A coluna `Status` NÃO é
+> tocada pela feature em nenhum caso (segue "Pendente" pela regra temporária).
+>
 > **O que validar na staging:** (1) submissão de um liderado → fila abre + coluna "Pendente com X";
 > (2) submissão de uma liderança → "—" e nenhuma fila; (3) `/aprovacoes` lista, aprova e pede ajuste
 > (comentário obrigatório na reprovação); (4) o autor vê o selo no card. **Pré-requisito do Luis (P2):**
