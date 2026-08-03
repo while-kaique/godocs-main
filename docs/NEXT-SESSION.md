@@ -70,6 +70,17 @@ validação humana.
 > do Luis); a linha de subtítulo saiu inteira, levando com ela o aviso de pré-visualização de admin; o rótulo
 > virou só **"Resumo do projeto"** (sem "(análise automática)").
 >
+> 🆕 **Rodada 5 (17:11, commit `dc53193`) — DUAS COLUNAS no Sheets (combinado com o Luis):**
+> **`Aprovação do Líder`** passa a guardar **SÓ o estado** (`Pré-aprovado` · `Pré-pendente` ·
+> `Pré-reprovado`), e o detalhe (quem, quando, as 3 respostas do checklist, comentário) vai na coluna
+> **NOVA `Justificativa Aprovação do Líder`**. Funções puras novas: `justificativaAprovacaoSheet` e
+> `justificativaIsencaoSheet` (a D12 sobrevive: liderança = `Pré-aprovado` + motivo na justificativa;
+> sem líder / TeamGuide fora = `—` no estado + motivo próprio). Tela: **7 cards no mesmo nível** (ganho
+> total com barra lime, horas, recorrência, saving, custo evitado, receita, custo externo) e o **resumo
+> do projeto abaixo deles, em largura cheia**.
+> ⚠️ **PENDÊNCIA HUMANA NOVA (Luis):** criar a coluna **`Justificativa Aprovação do Líder`** no cabeçalho
+> das abas **`GoDocs` e `STAGING`** — sem ela o valor é ignorado com aviso (o resto do sync segue).
+>
 > **▶ PRÓXIMO PASSO — o Luis olhar a tela na staging (redeploy 16:35) em
 > `https://godocs-staging.devgogroup.com/aprovacoes?como=lucas.queiroz@gocase.com` (pré-visualização de
 > admin da fila do Lucas — a fila real tem o projeto "n8n audit" do Luis, 40 h/mês · R$ 431,20) e, com o ok
