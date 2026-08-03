@@ -40,6 +40,7 @@ import {
   TAXONOMIA_DESTINO_GANHO,
   secaoProcessoVaga,
   secaoPonteiroVaga,
+  PISTA_ONDE_VERIFICAR,
   resolverSplitCargaEscala,
   totalEconomiaHoras,
   unidadeHorasDe,
@@ -957,21 +958,69 @@ ${TAXONOMIA_DESTINO_GANHO}`;
 // é SILENCIOSA — o analisador lê a ausência como rastreabilidade não comprovada e o autor cai
 // em triagem manual injusta. Então o backend confere as seções antes do preview e, se faltar,
 // pergunta UMA vez (anti-loop: a resposta seguinte é sempre aceita e vira nudge [SISTEMA]).
-function perguntaCriterioSecoes(faltaProcesso: boolean, faltaPonteiro: boolean): string {
-  const pedidos: string[] = [];
-  if (faltaProcesso) {
-    pedidos.push(
-      "**(a) que processo mudou e o quanto** — qual rotina era feita antes, como ela é hoje e o tamanho disso (volume, frequência, tempo);",
+// Frase de escape, repetida nos 3 formatos: "não sei onde conferir" É resposta legítima
+// (vira zona cinzenta no analisador, nunca reprovação automática — decisão fechada da
+// SPEC_CRITERIOS_PROJETO). Sem ela a pergunta lê como exigência e a pessoa inventa fonte.
+const ESCAPE_SEM_FONTE =
+  "Se não houver um lugar onde esse número é medido, me diga isso mesmo — eu registro a " +
+  "ausência em vez de inventar uma fonte.";
+
+// Opções (botões) de "qual ponteiro este projeto moveu". Espelham a régua do prompt
+// ([1.4], BLOCO_SECOES_CRITERIO) em rótulos curtos o bastante para caber numa pílula.
+// ⚠️ Só entram quando o ÚNICO buraco é o ponteiro: classificar é escolha de uma lista,
+// mas "que processo mudou" precisa de prosa — botão ali fecharia o gate sem a resposta.
+export const OPCOES_PONTEIRO = [
+  "Custo (horas, headcount, contrato)",
+  "Receita (vendas, ticket, pedidos)",
+  "KPI da área (erro, retrabalho, prazo, risco)",
+  "Ainda não sei dizer",
+];
+
+// Pergunta do gate. ⚠️ NUNCA numere os pedidos com letras: a versão anterior emitia
+// "**(a) …**" / "**(b) …**" e, no caso mais comum (só o ponteiro falta), a mensagem
+// começava num "(b)" órfão — o usuário via uma alínea de um roteiro que nunca lhe foi
+// mostrado (bug reportado ago/2026). Bullets se explicam sozinhos em qualquer combinação.
+export function perguntaCriterioSecoes(faltaProcesso: boolean, faltaPonteiro: boolean): string {
+  // Só o ponteiro: pergunta curta + botões (ver OPCOES_PONTEIRO). O "onde conferir" vai
+  // no mesmo turno como convite — quem souber já responde tudo digitando; quem clicar no
+  // botão dá só o ponteiro, e o nudge manda o agente cobrar a fonte (uma vez).
+  if (faltaPonteiro && !faltaProcesso) {
+    return (
+      "Antes de eu fechar o memorial, falta o ponto que sustenta o projeto na régua: " +
+      "**qual ponteiro este projeto moveu?**\n\n" +
+      "Escolha abaixo o que mais se aproxima. Se já souber, me diga junto **onde esse " +
+      "número pode ser conferido** — o nome do relatório, painel, sistema ou base (por " +
+      'exemplo, o painel "Conciliação diária" no Metabase, ou a base pedidos_cancelados).\n\n' +
+      ESCAPE_SEM_FONTE
     );
   }
-  if (faltaPonteiro) {
-    pedidos.push(
-      "**(b) qual ponteiro isso moveu e onde dá pra conferir** — custo, receita ou um KPI da área (erro, retrabalho, prazo/SLA, fraude/risco) — e em qual relatório, painel, sistema ou base (com NOME) alguém abriria pra ver esse número.",
+  // Só o processo: uma coisa só, sem lista.
+  if (faltaProcesso && !faltaPonteiro) {
+    return (
+      "Antes de eu fechar o memorial, falta descrever **o processo que mudou e o tamanho " +
+      "dele**: qual rotina era feita antes, como ela é hoje, e o volume, a frequência e o " +
+      "tempo envolvidos."
     );
   }
-  return `Antes de eu fechar o memorial, falta o essencial da régua de projeto:\n\n${pedidos.join(
-    "\n",
-  )}\n\nSe você não souber onde esse número pode ser conferido, tudo bem — me diga isso mesmo, que eu registro a ausência em vez de inventar uma fonte.`;
+  // Os dois: bullets, sem letras — cada um se lê sozinho.
+  return (
+    "Antes de eu fechar o memorial, faltam os dois pontos que sustentam o projeto na régua:\n\n" +
+    "- **O processo que mudou e o tamanho dele** — qual rotina era feita antes, como ela é " +
+    "hoje, e o volume, a frequência e o tempo envolvidos.\n" +
+    "- **O ponteiro que isso moveu e onde conferir** — custo, receita ou um KPI da área " +
+    "(erro, retrabalho, prazo, risco) — e em qual relatório, painel, sistema ou base, " +
+    "**com nome**, alguém abriria pra ver esse número.\n\n" +
+    ESCAPE_SEM_FONTE
+  );
+}
+
+// A resposta ao gate trouxe a FONTE ("onde alguém confere") ou só classificou o ponteiro?
+// Clique num botão = só o ponteiro: o rótulo não diz onde conferir — e "KPI da área…"
+// casaria a PISTA_ONDE_VERIFICAR por acidente (a regex aceita "kpi"), o que faria o nudge
+// dar a fonte por resolvida. Texto digitado passa pela MESMA régua do gate.
+export function respostaTrouxeFonte(content: string, selecionouOpcao: boolean): boolean {
+  if (selecionouOpcao) return false;
+  return PISTA_ONDE_VERIFICAR.test(content ?? "");
 }
 // Nudge [SISTEMA] com a resposta do usuário: manda o LLM escrever as seções faltantes a
 // partir do que a PESSOA disse (e do que a doc já traz), com os cabeçalhos EXATOS.
@@ -979,6 +1028,12 @@ function nudgeCriterioSecoes(
   faltaProcesso: boolean,
   faltaPonteiro: boolean,
   racional: string,
+  // true quando o usuário CLASSIFICOU o ponteiro (clique no botão) mas não disse onde o
+  // número se confere. O gate não repergunta — ele fez sua pergunta e não vira loop —,
+  // então o agente completa: propõe a fonte que a doc aprovada já nomeia e, se não houver,
+  // pergunta UMA vez. Sem isso, o clique no botão fecharia o gate com meia seção [1.4] —
+  // exatamente a falha do custo-evitado-puro que originou este gate.
+  precisaFonte = false,
 ): string {
   const secoes = [
     faltaProcesso
@@ -991,7 +1046,11 @@ function nudgeCriterioSecoes(
   const base = racional.trim()
     ? `\nO usuário respondeu assim (use ISTO como base, sintetizando — não copie cru): «${racional.trim()}»`
     : "";
-  return `[SISTEMA] O usuário respondeu sobre o critério de projeto (processo alterado / ponteiro movido).${base}
+  const fonte = precisaFonte
+    ? `
+⚠️ O usuário CLASSIFICOU o ponteiro, mas NÃO disse onde esse número pode ser conferido. Antes de escrever a seção, resolva a fonte assim, nesta ordem: (1) se os DETALHES TÉCNICOS APROVADOS já nomeiam o relatório/painel/sistema/base onde o número vive, PROPONHA essa fonte para o usuário confirmar; (2) senão, pergunte UMA única vez onde alguém abriria para conferir esse número, pedindo o NOME ("no sistema" é vago); (3) se ele não souber, registre EXATAMENTE isso na seção e siga — nunca invente uma fonte nem trave a conversa.`
+    : "";
+  return `[SISTEMA] O usuário respondeu sobre o critério de projeto (processo alterado / ponteiro movido).${base}${fonte}
 Escreva agora, no memorial, a(s) seção(ões) com o cabeçalho EXATO: ${secoes.join(" e ")}. Use também o que a documentação técnica já aprovada traz. Depois siga para o preview. NÃO pergunte sobre isso de novo — a informação já foi coletada.`;
 }
 
@@ -1263,6 +1322,13 @@ export async function enviarMensagem(rawData: unknown) {
     } else {
       estado.receita = { ...estado.receita, criterio_secoes: "ok" };
     }
+    // O gate perguntou o ponteiro com BOTÕES? Então a resposta pode ter vindo só como
+    // classificação ("Custo (horas, headcount, contrato)"), sem dizer onde o número se
+    // confere — e a seção [1.4] sairia pela metade, que é justamente a falha que originou
+    // este gate. Nesse caso o nudge manda o agente completar a fonte (uma vez).
+    const precisaFonte =
+      (faltaPonteiro || !faltaProcesso) &&
+      !respostaTrouxeFonte(racional, (data.selected_option ?? null) !== null);
     history.push({
       role: "user",
       // Se, por algum motivo, as duas seções já estiverem presentes, pedimos as duas mesmo
@@ -1271,6 +1337,7 @@ export async function enviarMensagem(rawData: unknown) {
         faltaProcesso,
         faltaPonteiro || !faltaProcesso,
         racional,
+        precisaFonte,
       ),
     });
   }
@@ -1585,15 +1652,37 @@ export async function enviarMensagem(rawData: unknown) {
         "enviarMensagem",
         `⛔ Preview de ${faseCriterio} sem as seções do critério (processo: ${faltaProcesso ? "faltando" : "ok"}, ponteiro: ${faltaPonteiro ? "faltando" : "ok"}) — forçando pergunta`,
       );
-      Object.assign(resultado, {
-        type: "question",
-        content: perguntaCriterioSecoes(faltaProcesso, faltaPonteiro),
-        fase: faseCriterio,
-        ...(faseCriterio === "saving"
+      // Botões só quando o ÚNICO buraco é o ponteiro (classificar = escolher de uma lista).
+      // Com o processo faltando, a resposta precisa ser prosa — um clique fecharia o gate
+      // sem a seção [1.3]. O frontend mantém o campo de texto ao lado dos botões
+      // ("Selecione uma opção ou escreva sua resposta"), então quem quiser detalhar, detalha.
+      // ⚠️ `formatResponse` só serializa `options` quando o type é "options" (e lê a
+      // pergunta de `question`, não de `content`) — os dois ramos precisam ser coerentes,
+      // senão os botões somem no caminho para a tela.
+      const comBotoes = faltaPonteiro && !faltaProcesso;
+      const pergunta = perguntaCriterioSecoes(faltaProcesso, faltaPonteiro);
+      const estadoGate =
+        faseCriterio === "saving"
           ? { saving: { ...(resultado.saving ?? estado.saving), criterio_secoes: "pendente" } }
-          : { receita: { ...(resultado.receita ?? estado.receita), criterio_secoes: "pendente" } }),
-      });
-      delete (resultado as { options?: unknown }).options;
+          : { receita: { ...(resultado.receita ?? estado.receita), criterio_secoes: "pendente" } };
+      if (comBotoes) {
+        Object.assign(resultado, {
+          type: "options",
+          question: pergunta,
+          options: OPCOES_PONTEIRO,
+          fase: faseCriterio,
+          ...estadoGate,
+        });
+        delete (resultado as { content?: unknown }).content;
+      } else {
+        Object.assign(resultado, {
+          type: "question",
+          content: pergunta,
+          fase: faseCriterio,
+          ...estadoGate,
+        });
+        delete (resultado as { options?: unknown }).options;
+      }
     }
   }
 
