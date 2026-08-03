@@ -1,11 +1,44 @@
 import { describe, it, expect } from "vitest";
-import { secaoProcessoVaga, secaoPonteiroVaga, MIN_SECAO_CRITERIO } from "@/lib/agents/orchestrator";
+import {
+  secaoProcessoVaga,
+  secaoPonteiroVaga,
+  MIN_SECAO_CRITERIO,
+  BLOCO_SECOES_CRITERIO,
+  buildSavingPrompt,
+  buildReceitaPrompt,
+} from "@/lib/agents/orchestrator";
 import {
   extrairProcessoAlterado,
   extrairPonteiroMovido,
   normalizarMarcadoresMemorial,
 } from "@/lib/agents/memorial-format";
-import { savingVazio, receitaVazia } from "@/lib/agents/types";
+import {
+  perguntaCriterioSecoes,
+  respostaTrouxeFonte,
+  OPCOES_PONTEIRO,
+} from "@/lib/chat.functions";
+import { savingVazio, receitaVazia, documentacaoVazia } from "@/lib/agents/types";
+import type { ProjetoContexto, DocumentacaoColetada } from "@/lib/agents/types";
+
+const CTX_TESTE: ProjetoContexto = {
+  responsavel_nome: "Ana",
+  responsavel_email: "ana@gocase.com",
+  area: "Fiscal",
+  ferramenta: "n8n",
+  membros: [],
+  nome_projeto: "Conciliação diária",
+  data_criacao: null,
+  doc_texto: null,
+};
+
+const DOC_TESTE: DocumentacaoColetada = {
+  ...documentacaoVazia(),
+  nome_projeto: "Conciliação diária",
+  o_que_faz: "Concilia notas fiscais",
+  execucao: "Todo dia às 7h",
+  fluxo: "1. baixa notas 2. compara 3. grava",
+  dependencias: "Metabase, Protheus",
+};
 
 // Gate DETERMINÍSTICO do CRITÉRIO DE PROJETO — seções [1.3] "Processo alterado" e [1.4]
 // "Ponteiro movido e onde verificar". Origem: validação em staging 29/07/2026 (runs
@@ -109,5 +142,101 @@ describe("estado do gate no tipo", () => {
   it("nasce null em saving e receita (backend-only, não ecoado pelo LLM)", () => {
     expect(savingVazio().criterio_secoes).toBeNull();
     expect(receitaVazia().criterio_secoes).toBeNull();
+  });
+});
+
+// ─── Apresentação da pergunta do gate (ago/2026) ─────────────────────────────
+// Bug reportado: no meio da conversa o usuário via "b) onde alguém abre e confere?" —
+// uma alínea de um roteiro que ele nunca viu. Duas origens, as duas fechadas aqui:
+// (1) o texto do gate numerava os pedidos com "**(a)**"/"**(b)**" e, quando só o ponteiro
+//     faltava (o caso mais comum), a mensagem COMEÇAVA num "(b)" órfão;
+// (2) o prompt do agente usa a)/b)/c) como roteiro e nada proibia copiá-los para o chat.
+const ALINEA_ORFA = /\(?[a-c]\)\s/;
+
+describe("perguntaCriterioSecoes — sem marcadores de roteiro", () => {
+  it.each([
+    ["só o ponteiro falta", false, true],
+    ["só o processo falta", true, false],
+    ["os dois faltam", true, true],
+  ])("não emite alínea órfã quando %s", (_caso, faltaProcesso, faltaPonteiro) => {
+    const texto = perguntaCriterioSecoes(faltaProcesso, faltaPonteiro);
+    expect(texto).not.toMatch(ALINEA_ORFA);
+    expect(texto).not.toContain("[1.3]");
+    expect(texto).not.toContain("[1.4]");
+  });
+
+  it("com os dois buracos, usa bullets — cada item se lê sozinho", () => {
+    const texto = perguntaCriterioSecoes(true, true);
+    const bullets = texto.split("\n").filter((l) => l.startsWith("- "));
+    expect(bullets).toHaveLength(2);
+  });
+
+  it("só o ponteiro: pergunta curta que casa com os botões", () => {
+    const texto = perguntaCriterioSecoes(false, true);
+    expect(texto).toContain("qual ponteiro este projeto moveu");
+    expect(texto).not.toContain("processo que mudou");
+  });
+
+  it("só o processo: não fala de ponteiro nem de escolher opção", () => {
+    const texto = perguntaCriterioSecoes(true, false);
+    expect(texto).toContain("processo que mudou");
+    expect(texto).not.toMatch(/escolha abaixo/i);
+  });
+
+  it.each([
+    ["ponteiro", false, true],
+    ["ambos", true, true],
+  ])("mantém o escape 'não sei onde conferir' quando falta %s", (_c, fp, fpt) => {
+    // Decisão fechada (SPEC_CRITERIOS_PROJETO): a ausência de fonte é resposta legítima
+    // (zona cinzenta, nunca reprovação automática). Sem a frase, a pessoa inventa fonte.
+    expect(perguntaCriterioSecoes(fp, fpt)).toMatch(/em vez de inventar uma fonte/);
+  });
+});
+
+describe("OPCOES_PONTEIRO — botões do gate", () => {
+  it("oferece os 3 ponteiros da régua + a saída honesta", () => {
+    expect(OPCOES_PONTEIRO).toHaveLength(4);
+    expect(OPCOES_PONTEIRO[0]).toMatch(/^Custo/);
+    expect(OPCOES_PONTEIRO[1]).toMatch(/^Receita/);
+    expect(OPCOES_PONTEIRO[2]).toMatch(/^KPI da área/);
+    expect(OPCOES_PONTEIRO[3]).toBe("Ainda não sei dizer");
+  });
+});
+
+describe("respostaTrouxeFonte — o clique não vale por fonte", () => {
+  it("clique em botão NUNCA conta como fonte, nem o rótulo com 'KPI'", () => {
+    // ⚠️ Guard preciso: PISTA_ONDE_VERIFICAR aceita "kpi", então o rótulo
+    // "KPI da área (erro, retrabalho, prazo, risco)" casaria a regex por acidente e o
+    // nudge daria a fonte por resolvida — a seção [1.4] sairia pela metade, que é
+    // exatamente a falha do custo-evitado-puro que originou este gate.
+    for (const opcao of OPCOES_PONTEIRO) {
+      expect(respostaTrouxeFonte(opcao, true)).toBe(false);
+    }
+  });
+
+  it("texto digitado com fonte nomeada conta", () => {
+    expect(
+      respostaTrouxeFonte('Caiu o retrabalho; confere no painel "Conciliação" do Metabase', false),
+    ).toBe(true);
+  });
+
+  it("texto digitado sem nenhuma pista de onde conferir não conta", () => {
+    expect(respostaTrouxeFonte("Melhorou bastante a rotina do time.", false)).toBe(false);
+  });
+});
+
+describe("BLOCO_SECOES_CRITERIO — fonte única do [1.3]/[1.4] no prompt", () => {
+  it("proíbe explicitamente ecoar os marcadores do roteiro", () => {
+    // Sem esta linha o LLM copia "b) …" para o chat — a origem (2) do bug.
+    expect(BLOCO_SECOES_CRITERIO).toContain("ROTEIRO INTERNO");
+    expect(BLOCO_SECOES_CRITERIO).toMatch(/NUNCA os escreva na mensagem ao usuário/);
+  });
+
+  it("é o MESMO bloco nos prompts de saving e de receita (não redigitar)", () => {
+    // Antes eram duas cópias idênticas caractere a caractere, prontas para divergir.
+    const saving = buildSavingPrompt(CTX_TESTE, DOC_TESTE, savingVazio(), "resumo");
+    const receita = buildReceitaPrompt(CTX_TESTE, DOC_TESTE, receitaVazia(), "resumo");
+    expect(saving).toContain(BLOCO_SECOES_CRITERIO);
+    expect(receita).toContain(BLOCO_SECOES_CRITERIO);
   });
 });
