@@ -197,7 +197,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > **F0 + F1 + F2** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`, D1–**D12**):
 > índice de liderança da TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em
 > 10 pessoas) + tabela/rotas/tela `/aprovacoes` + DM. **Codado e na staging.** O que resta do plano é
-> **validação humana** (o Lucas abrindo a fila), depois prod e PR — não há fatia de código pendente.
+> **validação humana**, depois prod e PR — não há fatia de código pendente. 🛑 **Desde 03/08 à noite a ida
+> a prod está TRAVADA até a validação com a DIRETORIA** (decisão do Luis): branch commitada, sem push/PR.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
 

@@ -113,9 +113,10 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **o Luis validar a fila em `/aprovacoes` na staging com o Lucas** (staging redeployada em
-2026-08-03 15:39 com a D12 e a **DM LIGADA** — a mensagem já chegou ao Lucas) → prod `674a3710` → PR.
-Pré-requisito do Luis: criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
+**Próximo:** **validar com a DIRETORIA se a pré-aprovação vai para produção** (decisão do Luis, 03/08 noite —
+nada sobe, nem para prod nem para o repo, antes disso). A staging `edf400b4` está no ar com a rodada 6
+(17:24) para a demonstração. Pré-requisito do Luis quando destravar: criar **`Aprovação do Líder`** e
+**`Justificativa Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
 Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D13**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
@@ -140,7 +141,15 @@ falta · saving coerente) obrigatório no servidor nos 2 vereditos — textos em
 grava o admin). ⚠️ O líder vê **R$** de saving — exceção consciente ao "cliente não vê R$", a confirmar.
 - ✅ **Staging redeployada com a D13** (2026-08-03 16:26, 856 testes verdes) — fila real: projeto "n8n audit"
   do Luis esperando o Lucas.
-- ⬜ Luis olhar a tela nova (`?como=lucas.queiroz@gocase.com`) → prod `674a3710` → PR.
+**D14 + rodada 6 (03/08 noite, `dc53193`/`76ffe84`/`6e93636`):** a coluna **`Aprovação do Líder`** passou a
+guardar **só o estado** (`Pré-aprovado`/`Pré-pendente`/`Pré-reprovado`, filtrável) e o detalhe — quem decidiu,
+quando, as 3 respostas do checklist e o comentário — foi para a coluna nova **`Justificativa Aprovação do
+Líder`**. Tela: 7 cards de número no mesmo nível, header só título + tooltip, **"Resumo do projeto" vindo do
+memorial (`[1.2]`)** em vez da análise automática.
+- 🛑 **TRAVADO para prod (decisão do Luis, 03/08 noite):** a ida a produção **será validada com a
+  DIRETORIA** antes. A branch está commitada (25 commits), **sem push e sem PR**; a staging segue no ar
+  para a demonstração.
+- ⬜ Validar com a diretoria → prod `674a3710` → PR.
   **Pendência humana:** a coluna no cabeçalho do Sheets (P2) e, para ligar a DM **em prod**, os secrets
   `CHAT_SA_*` + `GOOGLE_CHAT_DM_ENABLED=true` (prod hoje: DM no-op).
 - **DoD:** liderado submete → fila abre e a coluna mostra "Pendente com X"; liderança submete →
