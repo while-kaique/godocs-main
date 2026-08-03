@@ -22,6 +22,12 @@ validação humana.
 > na TeamGuide → `ehLideranca`) fica **ISENTO** — não entra em fila e não recebe DM. Só o liderado de fato
 > precisa, e quem aprova é o **líder direto**, nunca o líder do líder.
 >
+> **Esclarecido com o Luis (03/08, fim da sessão):** para uma **liderança** (ex.: Lucas Queiroz), "isento"
+> significa **ninguém vê fila nenhuma** — sem DM, coluna `—`, e o projeto vai **direto para a triagem da
+> RPA**, como era antes da feature. Se um dia quiserem que o projeto de uma liderança também apareça para
+> alguém (o líder dela, ou a diretoria), a régua está concentrada em **um ponto**: a checagem de
+> `ehLideranca` no topo de `abrirPreAprovacao`.
+>
 > **O que validar na staging:** (1) submissão de um liderado → fila abre + coluna "Pendente com X";
 > (2) submissão de uma liderança → "—" e nenhuma fila; (3) `/aprovacoes` lista, aprova e pede ajuste
 > (comentário obrigatório na reprovação); (4) o autor vê o selo no card. **Pré-requisito do Luis (P2):**
