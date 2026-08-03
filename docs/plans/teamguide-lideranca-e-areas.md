@@ -1,5 +1,11 @@
 # Plano — Base TeamGuide: liderança + furo de áreas + paginação (F0 da pré-aprovação do líder)
-**Status:** 🟡 **executado — código pronto e verde, NÃO commitado** (2026-08-03)
+**Status:** ✅ **executado e commitado** (2026-08-03, `c9991be`) — e a sessão seguinte já entregou **F1 + F2**
+no mesmo commit. Falta só validar na staging → prod → PR (ver `spec-docs/SPEC_APROVACAO_LIDER.md` §7).
+
+> **Nota da sessão de 03/08 (F1+F2):** o Luis pediu a implementação direta, **sem rodar os revisores de
+> contexto fresco** — os 3 marcadores de gate ficaram ausentes e o commit saiu com a suíte verde (845 testes)
+> como única trava. Decisão dele, registrada aqui para não parecer gate furado.
+> Nesta rodada entrou também a **D11** (liderança é isenta de pré-aprovação), que não existia no plano F0.
 
 > **T1–T6 implementados**; 824 testes verdes (baseline 805); `worker.js` rebuildado.
 > **Não commitado** porque a sessão fechou **suja**: os 3 revisores de contexto fresco
