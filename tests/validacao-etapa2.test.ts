@@ -34,7 +34,6 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     usaAiProxy: 'sim',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: ['maria@gocase.com'],
-    contrafactualReclamacao: 'O fechamento volta a ser feito à mão e atrasa.',
     especial: false,
     contextoEspecial: '',
     ...over,
@@ -138,7 +137,7 @@ describe('camposMinimosDocProntos — gatilho do background (F2, gatilho enxuto)
 // Invariante central: obrigatório RESPONDER ≠ barrar a submissão (a reprovação é
 // pós-envio, decidida pelo analisador). O PONTEIRO movido saiu do formulário — quem
 // pergunta e constrói o racional é o AGENTE, na seção do memorial.
-describe('validarEtapa2 — contrafactual (quem reclama / o que piora)', () => {
+describe('validarEtapa2 — contrafactual (quem reclama)', () => {
   it('exige ao menos uma pessoa quando o filtro é por pessoa', () => {
     const errs = validarEtapa2(baseForm({ contrafactualAfetados: [] }), opts());
     expect(errs.contrafactualAfetados).toMatch(/pessoa/i);
@@ -160,13 +159,12 @@ describe('validarEtapa2 — contrafactual (quem reclama / o que piora)', () => {
     expect(errs).toEqual({});
   });
 
-  it('exige descrever o que piora (frase curta demais bloqueia)', () => {
-    expect(validarEtapa2(baseForm({ contrafactualReclamacao: '' }), opts()).contrafactualReclamacao)
-      .toBeTruthy();
-    expect(
-      validarEtapa2(baseForm({ contrafactualReclamacao: 'nada' }), opts())
-        .contrafactualReclamacao,
-    ).toBeTruthy();
+  // A pergunta "E o que piora?" foi REMOVIDA do formulário em 03/08/2026 — nunca teve
+  // coluna própria no Sheets e o analisador extrai o efeito de desligar da doc/memorial.
+  it('NÃO exige mais o "o que piora" (pergunta removida do formulário)', () => {
+    const errs = validarEtapa2(baseForm(), opts());
+    expect(errs).toEqual({});
+    expect(Object.keys(errs)).not.toContain('contrafactualReclamacao');
   });
 
   it('NÃO exige mais nada sobre ponteiro/evidência (saiu do formulário)', () => {
@@ -178,7 +176,7 @@ describe('validarEtapa2 — contrafactual (quem reclama / o que piora)', () => {
   it('a pergunta nova NÃO entra no gatilho do processamento em background', () => {
     expect(
       camposMinimosDocProntos(
-        baseForm({ contrafactualAfetados: [], contrafactualReclamacao: '' }),
+        baseForm({ contrafactualAfetados: [] }),
       ),
     ).toBe(true);
   });

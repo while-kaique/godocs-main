@@ -2,9 +2,12 @@
 //
 // O defeito que estes testes travam: o que o autor preenche ANTES do chat chegava aos
 // prompts de forma acidental. Só a fase de doc injetava a descrição breve, e o
-// contrafactual da Etapa 2 (quem sentiria falta + o que piora) não chegava a prompt
-// NENHUM — o agente perguntava o ponteiro do [1.4] sem saber que a pessoa já havia
-// respondido, duas telas antes. A causa era a whitelist manual do ProjetoContexto.
+// contrafactual da Etapa 2 (quem sentiria falta) não chegava a prompt NENHUM — o agente
+// perguntava o ponteiro do [1.4] sem saber que a pessoa já havia respondido, duas telas
+// antes. A causa era a whitelist manual do ProjetoContexto.
+//
+// ⚠️ A pergunta "E o que piora?" (`contrafactual_reclamacao`) saiu do formulário em
+// 03/08/2026 — há um teste abaixo garantindo que ela não volte ao bloco.
 import { describe, it, expect } from 'vitest';
 import {
   buildRespostasFormulario,
@@ -44,11 +47,9 @@ describe('buildRespostasFormulario — bloco único do formulário', () => {
     const bloco = buildRespostasFormulario({
       ...ctxBase,
       contrafactual_afetados: serializarAfetados('pessoa', ['ana@gocase.com', 'bruno@gocase.com']),
-      contrafactual_reclamacao: 'Volta a conferir 400 notas à mão por dia',
     });
     expect(bloco).toContain('Pessoas que sentiriam falta');
     expect(bloco).toContain('ana@gocase.com, bruno@gocase.com');
-    expect(bloco).toContain('Volta a conferir 400 notas à mão por dia');
   });
 
   it('renderiza o contrafactual por TIME com o rótulo certo', () => {
@@ -71,13 +72,30 @@ describe('buildRespostasFormulario — bloco único do formulário', () => {
   });
 
   it('sobrevive a valor legado sem prefixo (não derruba o prompt)', () => {
+    // Sem prefixo a lista vem vazia: o bloco simplesmente não ganha a linha de
+    // afetados. O que NÃO pode acontecer é lançar/derrubar o prompt.
     const bloco = buildRespostasFormulario({
       ...ctxBase,
       contrafactual_afetados: 'ana@gocase.com',
-      contrafactual_reclamacao: 'Piora o fechamento',
+      descricao_breve: 'Automatiza a conciliação',
     });
-    // Sem prefixo a lista vem vazia — o que piora ainda tem de aparecer.
-    expect(bloco).toContain('Piora o fechamento');
+    expect(bloco).toContain('Automatiza a conciliação');
+    expect(bloco).not.toContain('sentiriam falta');
+  });
+
+  // O "o que piora" saiu do formulário em 03/08/2026 (nunca teve coluna no Sheets; o
+  // analisador extrai o efeito de desligar da doc/memorial). Guarda de regressão: o
+  // bloco NÃO pode voltar a citar a pergunta nem carregar o campo legado.
+  it('NÃO renderiza mais "o que piora" (pergunta removida do formulário)', () => {
+    const bloco = buildRespostasFormulario({
+      ...ctxBase,
+      contrafactual_afetados: serializarAfetados('time', ['Fiscal']),
+      // @ts-expect-error campo LEGADO: não existe mais em ProjetoContexto
+      contrafactual_reclamacao: 'Volta a conferir 400 notas à mão por dia',
+    });
+    expect(bloco).toContain('Fiscal');
+    expect(bloco).not.toContain('Volta a conferir 400 notas à mão por dia');
+    expect(bloco).not.toMatch(/o que piora/i);
   });
 });
 
@@ -86,7 +104,6 @@ describe('o bloco chega a TODAS as fases (era o defeito)', () => {
     ...ctxBase,
     descricao_breve: 'Automatiza a conciliação fiscal',
     contrafactual_afetados: serializarAfetados('time', ['Fiscal']),
-    contrafactual_reclamacao: 'Volta a conferir 400 notas à mão',
   };
 
   it.each([
@@ -95,14 +112,14 @@ describe('o bloco chega a TODAS as fases (era o defeito)', () => {
     ['receita', () => buildReceitaPrompt(ctx, docCompleta, receitaVazia(), 'resumo')],
   ])('a fase %s recebe o contrafactual do formulário', (_fase, build) => {
     const prompt = build();
-    expect(prompt).toContain('Volta a conferir 400 notas à mão');
+    expect(prompt).toContain('Automatiza a conciliação fiscal');
     expect(prompt).toContain('Fiscal');
   });
 
   it('a fase de custo evitado puro também recebe', () => {
     // alguem_fazia === 'externo' delega para buildSavingCustoEvitadoPrompt.
     const prompt = buildSavingPrompt({ ...ctx, alguem_fazia: 'externo' }, docCompleta, savingVazio(), 'r');
-    expect(prompt).toContain('Volta a conferir 400 notas à mão');
+    expect(prompt).toContain('Automatiza a conciliação fiscal');
   });
 });
 
@@ -125,8 +142,16 @@ describe('buildDetalhesAprovados — a doc que a fase financeira herda', () => {
 describe('[1.4] parte do que já foi respondido', () => {
   it('manda deduzir o ponteiro do contrafactual antes de perguntar', () => {
     const prompt = buildSavingPrompt(ctxBase, docCompleta, savingVazio(), 'resumo');
-    expect(prompt).toMatch(/PRIMEIRO olhe as RESPOSTAS QUE O AUTOR JÁ DEU/);
+    expect(prompt).toMatch(/PRIMEIRO olhe o que o autor JÁ DEU/);
+    expect(prompt).toMatch(/RESPOSTAS DO FORMULÁRIO \(quem sentiria falta/);
     expect(prompt).toMatch(/vá direto ao item \(b\)/);
+  });
+
+  // O [1.4] deduzia o ponteiro citando "o que piora se desligar" — campo removido do
+  // formulário em 03/08/2026. O prompt não pode mandar o agente procurar por ele.
+  it('NÃO manda mais procurar "o que piora" no formulário', () => {
+    const prompt = buildSavingPrompt(ctxBase, docCompleta, savingVazio(), 'resumo');
+    expect(prompt).not.toMatch(/o que piora se desligar/i);
   });
 
   it('manda propor a fonte que a doc já nomeia', () => {

@@ -36,8 +36,9 @@ O sistema não colhia rastreabilidade nem contrafactual de forma estruturada, e 
 - **D5b — "Quem reclama" é seleção, não texto livre (29/07/2026).** Quem sentiria falta é escolhido na
   **Team Guide** (mesma fonte do autocomplete de participantes da Etapa 1), com filtro **dinâmico**:
   por **pessoa** (autocomplete nome/e-mail) **ou** por **time/área** inteiro (`GET /api/areas`) — quando o
-  impacto é do time todo, não se marca pessoa por pessoa. Trocar o tipo limpa a lista. Só o "o que piora"
-  segue texto livre.
+  impacto é do time todo, não se marca pessoa por pessoa. Trocar o tipo limpa a lista. *(Na época, só o
+  "o que piora" seguia texto livre — **essa pergunta foi removida em 03/08/2026**, ver 3.1; hoje a Etapa 2
+  não tem nenhum texto livre de contrafactual.)*
 - **D6 — 3 colunas novas na planilha**, criadas à mão pelo Luis nas abas `GoDocs` **e** `STAGING`:
   `Motivo Reenvio` (**só humano** — o sistema NUNCA escreve, como as colunas de Diff) ·
   `Motivo Reprovado` (sistema + triagem) · `Classificação` (sistema, sempre com texto).
@@ -60,7 +61,22 @@ O sistema não colhia rastreabilidade nem contrafactual de forma estruturada, e 
 | Pergunta | Campo | Coluna SQLite |
 |---|---|---|
 | "Se desligar isso hoje, quem reclama?" (toggle **Pessoas específicas** / **Um time/área inteiro** → chips) | `form.contrafactualAfetadosTipo` + `form.contrafactualAfetados` | `contrafactual_afetados` (`"pessoa:a@x;b@y"` \| `"time:Fiscal;CX"`) |
-| "E o que piora?" (texto livre, ≥15 caracteres) | `form.contrafactualReclamacao` | `contrafactual_reclamacao` |
+
+> ⚠️ **"E o que piora?" foi REMOVIDA do formulário (03/08/2026) — decisão fechada, não reintroduzir.**
+> Era um texto livre (≥15 caracteres) em `form.contrafactualReclamacao` → `contrafactual_reclamacao`.
+> **Por quê:** a resposta **nunca teve coluna própria no Sheets** (era despejada em outra), e o efeito de
+> desligar já sai da documentação e do memorial — o campo cobrava uma frase obrigatória sem destino.
+> **Onde aterrissou:** removida do `step2.tsx`, de `validarEtapa2`/`FormData` (`submeter/constants.ts`), do
+> payload de `submeter.tsx`, dos schemas zod e da persistência (`chat.functions.ts`), do `INSERT`/`SELECT` de
+> `client.server.ts`, do seed da edição (`meus-projetos.functions.ts`), de `ProjetoContexto`
+> (`agents/types.ts`), de `buildRespostasFormulario` (`orchestrator.ts`), do prompt **e** do payload do
+> analisador (`analyzer.ts`), do mock/descrição do `prompt-registry.ts` e do `metaPadrao` do harness E2E.
+> **Coluna SQLite `contrafactual_reclamacao` fica como LEGADO** (nada escreve nem lê; o `ALTER` permanece
+> só para bancos novos baterem com prod — mesmo tratamento de `ponteiro_movido`/`ponteiro_evidencia`).
+> **No analisador:** o critério CONTRAFACTUAL passou a se sustentar em `contrafactual_afetados` + o que a
+> **doc/memorial** dizem do efeito de desligar; o "par que reprova" (recorrência + contrafactual falhando
+> juntos) segue valendo. Guardas de regressão: `tests/contexto-formulario-agente.test.ts` (bloco não pode
+> voltar a citar "o que piora") e `tests/validacao-etapa2.test.ts` (não pode voltar a barrar).
 
 - UI: `AfetadosInput` (`submeter/form-components.tsx`) em `step2.tsx` · validação pura em `validarEtapa2`
   (`submeter/constants.ts`) · serialização pura `serializarAfetados`/`desserializarAfetados` (round-trip
@@ -144,14 +160,15 @@ custo evitado puro — e `receita`/`receita_preview`):
 
 ### 3.2b Contexto do formulário → prompts (`buildRespostasFormulario`)
 
-O `[1.4]` nasceu **cego ao contrafactual**: `contrafactual_afetados`/`contrafactual_reclamacao` eram
-gravados e lidos **só pelo analisador** — não existiam em `ProjetoContexto`, então o agente perguntava
+O `[1.4]` nasceu **cego ao contrafactual**: `contrafactual_afetados` (e o então existente
+`contrafactual_reclamacao`) eram gravados e lidos **só pelo analisador** — não existiam em
+`ProjetoContexto`, então o agente perguntava
 o ponteiro sem saber o que a pessoa respondera duas telas antes. Causa de fundo: o contexto do
 formulário chegava aos prompts por **whitelist manual**, e só a fase de doc injetava a descrição breve.
 
 - **`buildRespostasFormulario(ctx)`** (`orchestrator.ts`, pura) = **FONTE ÚNICA** do bloco "RESPOSTAS
   QUE O AUTOR JÁ DEU NO FORMULÁRIO", injetado nos **4** prompts (doc · saving · receita · custo
-  evitado). Renderiza descrição breve, contrafactual (quem + o que piora), escopo/serviço externo e AI
+  evitado). Renderiza descrição breve, contrafactual (quem sentiria falta), escopo/serviço externo e AI
   Proxy, com as regras "nunca pergunte de novo" e "aponte contradição em vez de escolher em silêncio".
   Vazio → bloco omitido inteiro. ⚠️ **Campo novo no formulário → renderize AQUI** e nomeie em
   `ProjetoContexto` + `getProjetoContexto` + `getProjetoContextoData`; não voltar a injetar campo solto

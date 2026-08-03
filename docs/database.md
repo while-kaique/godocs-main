@@ -99,7 +99,7 @@ Entidade principal. Uma linha por projeto submetido.
 | observacoes | TEXT | Parecer da análise (staff-only) |
 | ponteiro_movido | TEXT | Critério de projeto (Etapa 2): lista `;` de `custo`/`receita`/`kpi`/`nenhum` |
 | ponteiro_evidencia | TEXT | Onde o ganho é verificável (rastreabilidade) |
-| contrafactual_reclamacao | TEXT | "Se desligar hoje, quem reclama e o que piora" |
+| contrafactual_reclamacao | TEXT | ⚠️ **LEGADO** — "o que piora se desligar hoje"; pergunta removida do form em 03/08/2026, nada escreve nem lê |
 | classificacao_avaliacao | TEXT | Elegibilidade do analisador: `claro_sim`/`claro_nao`/`zona_cinzenta` |
 | classificacao_justificativa | TEXT | Porquê da classificação (SEMPRE preenchida) |
 | motivo_reprovacao | TEXT | Motivo legível ao autor — só em `claro_nao` |

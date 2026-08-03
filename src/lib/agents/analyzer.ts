@@ -254,7 +254,7 @@ Os metadados trazem "usa_ai_proxy_declarado" (resposta do formulário: 'sim'/'na
 Além do veredito de qualidade acima, você deve julgar a **ELEGIBILIDADE** da submissão: isto é um **projeto de automação** ou é uma **peça única sem evidência**? Este julgamento é INDEPENDENTE da pontuação e usa 3 critérios:
 
 1. **RECORRÊNCIA** — a solução **roda de novo** sem alguém pedir (agendada, por evento, em uso contínuo) ou é reusada de forma sistemática? Uma entrega feita UMA vez, sob encomenda, que ninguém executa novamente, NÃO tem recorrência. ⚠️ Projeto **PONTUAL legítimo** existe (uma migração/limpeza de base que rodou uma vez e resolveu um problema real e mensurável) — o que reprova é a peça única **sem efeito duradouro nem evidência**.
-2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O autor respondeu no formulário QUEM sentiria falta (\`contrafactual_afetados\` — pessoas específicas ou um time/área inteiro, escolhidos na Team Guide) e O QUE piora (\`contrafactual_reclamacao\`). "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto; um time inteiro nomeado é sinal forte a favor.
+2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O autor respondeu no formulário QUEM sentiria falta (\`contrafactual_afetados\` — pessoas específicas ou um time/área inteiro, escolhidos na Team Guide). ⚠️ O formulário **NÃO pergunta mais O QUE piora**: esse efeito você extrai da **documentação e do memorial** (o processo que voltaria a ser manual, o que atrasaria, o que voltaria a dar erro) — não cobre nem cite um campo de formulário para isso. "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto; um time inteiro nomeado é sinal forte a favor. Lista de afetados vazia **e** nada na documentação indicando quem depende da automação → contrafactual NÃO sustentado.
 3. **RASTREABILIDADE** — existe um **indicador nomeado** que mudou, verificável em um **relatório, sistema ou base** que se possa abrir e conferir? Isso NÃO vem do formulário: quem coleta é o AGENTE, na seção **"Ponteiro movido e onde verificar"** do memorial (qual ponteiro — custo/receita/KPI — e onde conferir), junto da seção **"Processo alterado"** (o que mudou e quanto). Seção ausente (submissão antiga) ou registrando que o autor não sabe onde conferir → rastreabilidade NÃO comprovada, o que puxa para **zona_cinzenta** — não para reprovação automática. Os campos \`ponteiro_movido\`/\`ponteiro_evidencia\` só existem em submissões da época em que a pergunta ficava no formulário; quando vierem preenchidos, valem como resposta do autor.
    ⚠️ **O próprio entregável NÃO conta como indicador.** "Dá pra conferir no slide", "o arquivo gerado está lá", "o material do evento mostra o resultado" provam apenas que a **peça foi produzida** — provam a existência do artefato, não que um ponteiro se moveu. Indicador é uma **métrica** (horas de trabalho · custo · taxa de erro/retrabalho · prazo/SLA · receita) que se abra **hoje** num relatório, sistema ou base nomeados e que se possa comparar **antes × depois**. Quando a **única evidência** oferecida é o entregável produzido (o slide, o arquivo, o material), a rastreabilidade **não está comprovada** — trate-a como ausente.
 
@@ -271,7 +271,7 @@ EXEMPLOS-ÂNCORA (calibração):
 REGRAS DA CLASSIFICAÇÃO:
 - **"claro_sim"** — os 3 critérios se sustentam (ou 2 se sustentam e o terceiro é claramente inferível da documentação).
 - **"claro_nao"** — falha **evidente** em recorrência **E** em rastreabilidade/contrafactual: é peça única sem efeito duradouro nem indicador. Use com PARCIMÔNIA — só quando a submissão não se sustenta como projeto.
-- **"claro_nao" — o par que reprova, declarado:** quando a **recorrência** falha (a entrega rodou uma vez, sob encomenda, é peça única e ninguém a executa de novo) **E** o **contrafactual** é negado (o autor indica que nada piora, ninguém reclama ou ninguém pediu de novo), a classificação é **claro_nao** — **sem buscar salvação** numa evidência de que o entregável existiu (o slide, o arquivo, o material). Os dois critérios que sustentam "isto é um projeto" falharam juntos; a rastreabilidade do artefato não os repõe.
+- **"claro_nao" — o par que reprova, declarado:** quando a **recorrência** falha (a entrega rodou uma vez, sob encomenda, é peça única e ninguém a executa de novo) **E** o **contrafactual** é negado (o autor indica — na conversa ou na documentação — que nada piora, ninguém reclama ou ninguém pediu de novo), a classificação é **claro_nao** — **sem buscar salvação** numa evidência de que o entregável existiu (o slide, o arquivo, o material). Os dois critérios que sustentam "isto é um projeto" falharam juntos; a rastreabilidade do artefato não os repõe.
 - **"zona_cinzenta"** — qualquer dúvida razoável, incluindo: falta só a rastreabilidade; o autor respondeu "nenhum / ainda não sei" no ponteiro mas descreve um ganho plausível; a evidência é vaga. **Na dúvida entre claro_nao e zona_cinzenta, escolha SEMPRE zona_cinzenta** (a triagem humana decide) — com UMA **exceção** declarada: isso **não se aplica** quando recorrência e contrafactual falham **juntos** (o par acima), caso em que a classificação correta é **claro_nao**.
 - **A justificativa é OBRIGATÓRIA em TODOS os casos**, inclusive "claro_sim": 2 a 4 frases dizendo **qual critério passou e qual falhou, e por quê**, citando o que o autor respondeu. Nunca escreva algo genérico como "atende aos critérios".
 - Em **"claro_nao"**, escreva também \`motivo_reprovacao\`: um texto **legível pelo AUTOR** (ele vai ver), respeitoso e concreto, dizendo o que faltou e o que ele pode fazer (ex.: "Esta entrega foi executada uma única vez e não há um indicador verificável de mudança. Se a rotina passar a rodar de forma recorrente — ou se você puder apontar o relatório onde o ganho aparece — submeta novamente."). SEM motivo, a reprovação é rebaixada automaticamente para zona cinzenta.
@@ -347,14 +347,15 @@ export function buildUserMessage(
       usa_ai_proxy_declarado: projeto.usa_ai_proxy ?? null,
       ai_proxy_detectado_na_doc: detectarAiProxy(docTexto),
       // ─── Critério de projeto (régua de elegibilidade) ───────────────────
-      // Contrafactual: respostas determinísticas da Etapa 2 (quem sentiria falta —
-      // pessoas ou times da Team Guide — e o que piora). Não barram a submissão, mas
-      // são sinal FORTE. null = submissão anterior à feature → infira da documentação,
-      // não penalize. A RASTREABILIDADE vem do memorial (seção "Ponteiro movido e onde
-      // verificar", escrita pelo agente), não daqui; ponteiro_movido/ponteiro_evidencia
-      // são LEGADO (só existem em submissões da época da pergunta no formulário).
+      // Contrafactual: resposta determinística da Etapa 2 (quem sentiria falta — pessoas
+      // ou times da Team Guide). Não barra a submissão, mas é sinal FORTE. null =
+      // submissão anterior à feature → infira da documentação, não penalize. ⚠️ O "o que
+      // piora" saiu do formulário (03/08/2026) e NÃO volta aqui: o efeito de desligar o
+      // analisador extrai da doc/memorial. A RASTREABILIDADE vem do memorial (seção
+      // "Ponteiro movido e onde verificar", escrita pelo agente), não daqui;
+      // ponteiro_movido/ponteiro_evidencia são LEGADO (só existem em submissões da época
+      // da pergunta no formulário).
       contrafactual_afetados: projeto.contrafactual_afetados ?? null,
-      contrafactual_reclamacao: projeto.contrafactual_reclamacao ?? null,
       ponteiro_movido: projeto.ponteiro_movido ?? null,
       ponteiro_evidencia: projeto.ponteiro_evidencia ?? null,
     },

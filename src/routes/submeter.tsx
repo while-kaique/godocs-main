@@ -87,7 +87,6 @@ type AgentMeta = {
   // ("pessoa:a@x;b@y") para a comparação de metaChanged ser estável — é o mesmo formato
   // gravado no SQLite.
   contrafactualAfetados: string;
-  contrafactualReclamacao: string;
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
   contextoEspecial: string;
 };
@@ -465,7 +464,6 @@ export function SubmeterPageContent({
           usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           contrafactualAfetadosTipo: afetadosSeed.tipo,
           contrafactualAfetados: afetadosSeed.lista,
-          contrafactualReclamacao: (data.contrafactual_reclamacao as string) ?? "",
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
         };
@@ -634,7 +632,6 @@ export function SubmeterPageContent({
             newForm.contrafactualAfetadosTipo,
             newForm.contrafactualAfetados,
           ),
-          contrafactualReclamacao: newForm.contrafactualReclamacao.trim(),
           contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
@@ -660,7 +657,6 @@ export function SubmeterPageContent({
       participantesPapeis: d.form.participantesPapeis ?? {},
       contrafactualAfetadosTipo: d.form.contrafactualAfetadosTipo ?? "pessoa",
       contrafactualAfetados: d.form.contrafactualAfetados ?? [],
-      contrafactualReclamacao: d.form.contrafactualReclamacao ?? "",
     });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
@@ -859,7 +855,6 @@ export function SubmeterPageContent({
     usaAiProxy: "",
     contrafactualAfetadosTipo: "pessoa",
     contrafactualAfetados: [],
-    contrafactualReclamacao: "",
     especial: false,
     contextoEspecial: "",
   });
@@ -1010,9 +1005,8 @@ export function SubmeterPageContent({
       form.contrafactualAfetadosTipo,
       form.contrafactualAfetados ?? [],
     ),
-    contrafactualReclamacao: form.contrafactualReclamacao.trim(),
     contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contrafactualAfetadosTipo, form.contrafactualAfetados, form.contrafactualReclamacao, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contrafactualAfetadosTipo, form.contrafactualAfetados, form.contextoEspecial, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -1060,7 +1054,6 @@ export function SubmeterPageContent({
             contrafactual_afetados:
               serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
               undefined,
-            contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
             docs,
           },
         );
@@ -1309,7 +1302,6 @@ export function SubmeterPageContent({
           contrafactual_afetados:
             serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
             undefined,
-          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
           docs,
@@ -1391,7 +1383,6 @@ export function SubmeterPageContent({
           contrafactual_afetados:
             serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
             undefined,
-          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
           // submeter-validacao quebrava com "Documentação ainda não foi gerada").
@@ -1429,7 +1420,6 @@ export function SubmeterPageContent({
           contrafactual_afetados:
             serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
             undefined,
-          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           contexto_especial: form.contextoEspecial.trim(),
           // A doc especial é montada da descrição + contexto (sem IA); não precisa reenviar
           // arquivos. reset_doc garante a substituição da doc gerada pelo background.
@@ -1462,7 +1452,6 @@ export function SubmeterPageContent({
           contrafactual_afetados:
             serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
             undefined,
-          contrafactual_reclamacao: form.contrafactualReclamacao.trim() || undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
           docs,
@@ -1535,7 +1524,6 @@ export function SubmeterPageContent({
           descricao_breve: meta.descricaoBreve,
           usa_ai_proxy: meta.usaAiProxy || undefined,
           contrafactual_afetados: meta.contrafactualAfetados || undefined,
-          contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
           contexto_especial: meta.contextoEspecial,
           // Propaga a natureza do projeto: false sinaliza conversão especial→normal.
           especial: form.especial,
@@ -1625,7 +1613,6 @@ export function SubmeterPageContent({
               descricao_breve: meta.descricaoBreve,
               usa_ai_proxy: meta.usaAiProxy || undefined,
               contrafactual_afetados: meta.contrafactualAfetados || undefined,
-              contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
               contexto_especial: meta.contextoEspecial,
               especial: form.especial,
               reset_doc: true,
@@ -1699,7 +1686,6 @@ export function SubmeterPageContent({
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
             contrafactual_afetados: meta.contrafactualAfetados || undefined,
-            contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
             // Conversão especial→normal: este ramo só roda com form.especial=false,
             // mas mandamos o valor real para o backend zerar a flag no banco.
             especial: form.especial,
@@ -1799,7 +1785,6 @@ export function SubmeterPageContent({
             descricao_breve: meta.descricaoBreve,
             usa_ai_proxy: meta.usaAiProxy || undefined,
             contrafactual_afetados: meta.contrafactualAfetados || undefined,
-            contrafactual_reclamacao: meta.contrafactualReclamacao || undefined,
             especial: form.especial,
             reset_doc: true,
           }
