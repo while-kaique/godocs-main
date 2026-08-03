@@ -359,11 +359,15 @@ const MIGRATIONS = [
   // barra a submissão — alimenta a classificação do analisador:
   // `contrafactual_afetados`: quem sentiria falta, serializado como
   // "pessoa:a@x.com;b@y.com" ou "time:Fiscal;CX" (escolhido na Team Guide — pessoas OU
-  // times inteiros); `contrafactual_reclamacao`: o que piora se desligar hoje.
-  // ⚠️ `ponteiro_movido`/`ponteiro_evidencia` são LEGADO: a RASTREABILIDADE (que ponteiro
-  // moveu + onde verificar) saiu do formulário e passou a ser conduzida pelo AGENTE, na
-  // seção "Ponteiro movido e onde verificar" do memorial. As colunas ficam pelos projetos
-  // submetidos enquanto a pergunta existia no form; nada as escreve mais.
+  // times inteiros).
+  // ⚠️ `ponteiro_movido`/`ponteiro_evidencia`/`contrafactual_reclamacao` são LEGADO: a
+  // RASTREABILIDADE (que ponteiro moveu + onde verificar) e o "o que piora se desligar
+  // hoje" saíram do formulário — a primeira passou a ser conduzida pelo AGENTE na seção
+  // "Ponteiro movido e onde verificar" do memorial; o "o que piora" foi REMOVIDO em
+  // 03/08/2026 (nunca teve coluna no Sheets; o analisador extrai o efeito da doc). As
+  // colunas ficam pelos projetos submetidos enquanto as perguntas existiam no form; nada
+  // as escreve nem as lê mais. O ALTER permanece só para o schema de bancos novos bater
+  // com o de produção — não reintroduza as perguntas.
   'ALTER TABLE projetos ADD COLUMN ponteiro_movido TEXT',
   'ALTER TABLE projetos ADD COLUMN ponteiro_evidencia TEXT',
   'ALTER TABLE projetos ADD COLUMN contrafactual_reclamacao TEXT',

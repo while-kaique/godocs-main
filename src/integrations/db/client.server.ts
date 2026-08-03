@@ -233,14 +233,14 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'contrafactual_reclamacao' | 'submitted_at'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'submitted_at'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo, p.servico_externo,
            p.descricao_breve, p.data_criacao_projeto, p.area,
            p.especial, p.contexto_especial,
            p.saving_horas, p.saving_reais, p.tipo_saving, p.memorial_calculo,
            p.custo_externo_mensal, p.alguem_fazia,
-           p.usa_ai_proxy, p.contrafactual_afetados, p.contrafactual_reclamacao,
+           p.usa_ai_proxy, p.contrafactual_afetados,
            p.submitted_at,
            a.nome as area_nome
     FROM projetos p
@@ -281,7 +281,6 @@ export type InsertProjeto = {
   usa_ai_proxy?: string | null;
   // Contrafactual (Etapa 2) — ver ProjetoRow/schema.ts.
   contrafactual_afetados?: string | null;
-  contrafactual_reclamacao?: string | null;
   status?: string;
 };
 
@@ -292,8 +291,8 @@ export async function insertProjeto(data: InsertProjeto) {
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
-      contrafactual_afetados, contrafactual_reclamacao, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contrafactual_afetados, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     id,
     data.responsavel_nome,
@@ -315,7 +314,6 @@ export async function insertProjeto(data: InsertProjeto) {
     data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
     data.usa_ai_proxy ?? null,
     data.contrafactual_afetados ?? null,
-    data.contrafactual_reclamacao ?? null,
     data.status ?? 'rascunho',
     now,
     now,
@@ -1245,7 +1243,10 @@ export type ProjetoRow = {
   // Contrafactual — resposta determinística da Etapa 2 (não barra submissão).
   // "pessoa:a@x.com;b@y.com" | "time:Fiscal;CX" — quem sentiria falta (Team Guide).
   contrafactual_afetados: string | null;
-  contrafactual_reclamacao: string | null; // o que piora se desligar hoje
+  // ⚠️ LEGADO: o "o que piora se desligar hoje" saiu do formulário em 03/08/2026 — nunca
+  // teve coluna própria no Sheets e o agente cobre o efeito na conversa. A coluna fica
+  // pelos projetos submetidos enquanto a pergunta existia; nada a escreve nem a lê mais.
+  contrafactual_reclamacao: string | null;
   // ⚠️ LEGADO: a rastreabilidade (ponteiro movido + onde verificar) saiu do formulário e
   // hoje é conduzida pelo AGENTE no memorial. Nada escreve mais estas duas colunas.
   ponteiro_movido: string | null;

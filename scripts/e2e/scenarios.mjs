@@ -50,20 +50,21 @@ ${corpo.atencao}
 export function buildScenarios(runId) {
   const tag = (t) => `[E2E-${runId}] ${t}`;
 
-  // ⚠️ `contrafactual_afetados` + `contrafactual_reclamacao` são as perguntas-chave do
-  // critério de projeto coletadas na Etapa 2 (quem reclama se desligar hoje / o que piora).
-  // Elas precisam VIAJAR no payload: é `buildRespostasFormulario` (orchestrator.ts) que as
-  // entrega aos 4 prompts, e é delas que o agente deduz o ponteiro do [1.4] em vez de
-  // perguntar. Rodar o harness sem elas mede um agente cego ao contrafactual — o cenário
-  // errado. Formato do afetados: "time:A;B" ou "pessoa:a@x;b@y" (ver desserializarAfetados).
+  // ⚠️ `contrafactual_afetados` é a pergunta-chave do critério de projeto coletada na
+  // Etapa 2 (quem reclama se desligar hoje). Ela precisa VIAJAR no payload: é
+  // `buildRespostasFormulario` (orchestrator.ts) que a entrega aos 4 prompts, e é dela que
+  // o agente parte para o ponteiro do [1.4] em vez de perguntar do zero. Rodar o harness
+  // sem ela mede um agente cego ao contrafactual — o cenário errado. Formato:
+  // "time:A;B" ou "pessoa:a@x;b@y" (ver desserializarAfetados).
+  // ⚠️ O "o que piora" (`contrafactual_reclamacao`) foi REMOVIDO do formulário em
+  // 03/08/2026 — não reintroduzir no payload: o backend não aceita mais o campo e o
+  // analisador extrai o efeito de desligar da doc/memorial.
   const metaPadrao = {
     ferramenta: 'n8n',
     escopo: 'interno',
     membros: [],
     data_criacao: '2026-06-10',
     contrafactual_afetados: 'time:Fiscal;Financeiro',
-    contrafactual_reclamacao:
-      'O time Fiscal volta a conferir nota por nota à mão e o fechamento atrasa dois dias.',
   };
 
   const cenarios = [];
@@ -447,17 +448,19 @@ RECEITA: gera R$5000/mês de receita incremental recorrente (50 reativações co
         ...metaPadrao,
         ferramenta: 'Python',
         descricao_breve: 'Script que gerou uma nuvem de palavras para o slide de encerramento do evento interno.',
-        // Contrafactual VAZIO de propósito: ninguém reclama, nada piora. É o sinal central
-        // do "claro não" — sobrescreve o padrão preenchido do metaPadrao.
+        // Contrafactual VAZIO de propósito: ninguém sentiria falta. É o sinal central do
+        // "claro não" — sobrescreve o padrão preenchido do metaPadrao. ⚠️ O "o que piora"
+        // saiu do formulário (03/08/2026): o "nada piora / ninguém pediu de novo" agora
+        // viaja pela DOC e pelo briefing, que é de onde o analisador extrai o efeito.
         contrafactual_afetados: '',
-        contrafactual_reclamacao: 'Nada piora. Foi usado uma vez, no slide final, e ninguém pediu de novo.',
       },
       doc: DOC_BASE('Nuvem de Palavras', {
         oque: 'Gera uma imagem de nuvem de palavras a partir das respostas de um formulário.',
         fluxo: 'Script Python lê o CSV exportado do formulário e salva um PNG.',
         deps: 'Python, wordcloud, matplotlib.',
         config: 'Rodar o script apontando para o CSV.',
-        atencao: 'Rodou uma única vez, para o evento de 2026.',
+        atencao:
+          'Rodou uma única vez, para o evento de 2026. Nada piora se não rodar mais: foi usado no slide final e ninguém pediu de novo.',
       }),
       briefing: `Projeto: nuvem de palavras para o slide de encerramento do evento interno.
 Rodou UMA ÚNICA VEZ, para aquele evento. NÃO é recorrente e não há previsão de rodar de novo.

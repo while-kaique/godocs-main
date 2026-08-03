@@ -134,9 +134,11 @@ Régua de **dois eixos** sobre o TRABALHO (não pela ferramenta nem por impacto)
 
 Julgamento **independente** da pontuação, pela régua **recorrência · contrafactual · rastreabilidade** — ver
 [spec-docs/SPEC_CRITERIOS_PROJETO.md](../spec-docs/SPEC_CRITERIOS_PROJETO.md) e a
-[régua para a gestão](criterios-projeto-recorrencia-evidencia.md). Entradas: as 3 respostas determinísticas
-da Etapa 2 (`ponteiro_movido` · `ponteiro_evidencia` · `contrafactual_reclamacao`) + a seção "Processo
-alterado" do memorial. Saída: `classificacao_avaliacao` ∈ `claro_sim` | `zona_cinzenta` | `claro_nao`,
+[régua para a gestão](criterios-projeto-recorrencia-evidencia.md). Entrada determinística da Etapa 2:
+`contrafactual_afetados` (quem sentiria falta) + as seções "Processo alterado" e "Ponteiro movido e onde
+verificar" do memorial. ⚠️ `ponteiro_movido`/`ponteiro_evidencia`/`contrafactual_reclamacao` são **LEGADO**:
+saíram do formulário (o "o que piora" em 03/08/2026) e o analisador extrai o efeito de desligar da
+doc/memorial — não voltar a cobrá-los no prompt. Saída: `classificacao_avaliacao` ∈ `claro_sim` | `zona_cinzenta` | `claro_nao`,
 `classificacao_justificativa` (**sempre**) e `motivo_reprovacao` (só na reprovação, escrito para o AUTOR ler).
 
 `normalizarClassificacao` (pura) rebaixa para `zona_cinzenta` quando a reprovação vem **sem motivo**, quando

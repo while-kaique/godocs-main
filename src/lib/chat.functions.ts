@@ -235,7 +235,6 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     // sem ele o agente pergunta o ponteiro do zero, ignorando o que a pessoa já
     // respondeu na Etapa 2. Campo novo no formulário → nomeie AQUI também.
     contrafactual_afetados: data.contrafactual_afetados ?? null,
-    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
@@ -477,10 +476,10 @@ const iniciarSubmissaoSchema = z.object({
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
   // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
-  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
-  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  // (o "o que piora" saiu do form em 03/08/2026). Não barra a submissão — alimenta a
+  // classificação de elegibilidade do analisador. O PONTEIRO movido também saiu do form
+  // (o agente conduz no memorial). NÃO reintroduzir o "o que piora" aqui.
   contrafactual_afetados: z.string().max(1200).optional(),
-  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: altíssimo impacto que não se encaixa em saving/receita.
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
@@ -632,7 +631,6 @@ export async function iniciarSubmissao(rawData: unknown) {
       descricao_breve: data.descricao_breve ?? null,
       usa_ai_proxy: data.usa_ai_proxy ?? null,
       contrafactual_afetados: data.contrafactual_afetados ?? null,
-      contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
       especial: data.especial ?? false,
       contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
       status: "rascunho",
@@ -663,7 +661,6 @@ export async function iniciarSubmissao(rawData: unknown) {
     descricao_breve: data.descricao_breve ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
     contrafactual_afetados: data.contrafactual_afetados ?? null,
-    contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
     especial: data.especial ?? false,
     contexto_especial: data.especial ? (data.contexto_especial ?? null) : null,
     arquivos: data.docs.map((d) => d.filename),
@@ -2026,10 +2023,10 @@ const atualizarMetadadosSchema = z.object({
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
   usa_ai_proxy: z.enum(["sim", "nao"]).optional(),
   // Contrafactual (Etapa 2): quem sentiria falta ("pessoa:a@x;b@y" | "time:Fiscal;CX")
-  // e o que piora. Não barram a submissão — alimentam a classificação de elegibilidade
-  // do analisador. O PONTEIRO movido saiu do form (o agente conduz no memorial).
+  // (o "o que piora" saiu do form em 03/08/2026). Não barra a submissão — alimenta a
+  // classificação de elegibilidade do analisador. O PONTEIRO movido também saiu do form
+  // (o agente conduz no memorial). NÃO reintroduzir o "o que piora" aqui.
   contrafactual_afetados: z.string().max(1200).optional(),
-  contrafactual_reclamacao: z.string().max(600).optional(),
   // Projeto especial: contexto especial (entrada determinística da fase de doc).
   contexto_especial: z.string().max(2000).optional(),
   // Edição de projeto especial: monta a doc sem IA (buildDocEspecial) e pula o
@@ -2065,8 +2062,6 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
   if (data.contrafactual_afetados !== undefined)
     campos.contrafactual_afetados = data.contrafactual_afetados;
-  if (data.contrafactual_reclamacao !== undefined)
-    campos.contrafactual_reclamacao = data.contrafactual_reclamacao;
   if (data.contexto_especial !== undefined) campos.contexto_especial = data.contexto_especial;
   if (Object.keys(campos).length > 0) {
     await updateProjeto(data.projeto_id, campos);
@@ -2091,7 +2086,6 @@ export async function atualizarMetadados(rawData: unknown) {
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,
         contrafactual_afetados: data.contrafactual_afetados ?? null,
-        contrafactual_reclamacao: data.contrafactual_reclamacao ?? null,
         contexto_especial: data.contexto_especial ?? null,
       },
       arquivos: temDocs ? data.docs!.map((d) => d.filename) : null,
