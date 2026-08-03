@@ -11,14 +11,43 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO (2026-08-03, fim da sessão de código) — fechar os 3 revisores da F0 e commitar o WIP**
-> (ver "🔴 WIP não commitado" na seção "Plano ativo"). Depois disso, retomar o passo anterior abaixo.
+> **▶ PRÓXIMO PASSO (2026-08-03, sessão de código da pré-aprovação do líder) — validar na STAGING
+> (`edf400b4`) a fila do líder e então prod + PR.** O código de **F0 + F1 + F2 está pronto e commitado**
+> (845 testes verdes, `worker.js` rebuildado): tabela `projeto_aprovacoes`, `aprovacoes.functions.ts`,
+> rotas `/api/aprovacoes/*`, tela **`/aprovacoes`** + faixa na home (só p/ quem lidera), selo no card do
+> autor, coluna **`Aprovação do Líder`** no Sheets e a DM (`google/chat-dm.ts`) atrás do gate
+> `GOOGLE_CHAT_DM_ENABLED` (fica **false** na staging).
+>
+> **D11 escrita na spec** (decisão do Luis): quem **já é liderança** (aparece como `leader` de um time ativo
+> na TeamGuide → `ehLideranca`) fica **ISENTO** — não entra em fila e não recebe DM. Só o liderado de fato
+> precisa, e quem aprova é o **líder direto**, nunca o líder do líder.
+>
+> **O que validar na staging:** (1) submissão de um liderado → fila abre + coluna "Pendente com X";
+> (2) submissão de uma liderança → "—" e nenhuma fila; (3) `/aprovacoes` lista, aprova e pede ajuste
+> (comentário obrigatório na reprovação); (4) o autor vê o selo no card. **Pré-requisito do Luis (P2):**
+> criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`.
 
-> _Passo anterior, ainda pendente:_ **validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
+> _Passo anterior:_ **validar o "—" RODANDO EM PRODUÇÃO** (`https://godocs.devgogroup.com/`, deploy
+> 2026-08-03 13:00). Decisão do Luis: a aprovação do "—" acontece em prod, não na staging. Depois dela:
+> **codar a F0** (plano aprovado) e **escrever a D11** em `spec-docs/SPEC_APROVACAO_LIDER.md` — a fila do
+> líder vira **entrada própria no menu com selo de contagem** (visível só a quem lidera alguém), **não** a
+> 5ª aba de "Meus Projetos" que a spec ainda descreve.
+>
+> ✅ **ENTREGUE em 2026-08-03:** staging `edf400b4` (12:38) → **PR #221 mergeado** (`main` `c65e5a1`) → **prod
+> `674a3710`** (13:00), servindo `index-CzawDJZX.js` — mesmo artefato nos dois ambientes, sem rebuild no meio.
+> Nada pendente de envio.
+>
+> ⚠️ **Aprendizado desta sessão (custou um commit indevido na `main` local, revertido sem push):** no
+> diretório RAIZ, **nunca `git add -A`** — ele arrasta `.claude/worktrees/` como 8 repos git embutidos. O
+> `.gitignore` passa a cobri-los; ainda assim, use caminhos explícitos no `git add`.
+
+<details><summary>Instruções da validação em staging (superadas pela decisão de validar em prod)</summary>
 > No `/dashboard`: apagar um motivo/parecer deve gravar **"—"** (não branco) e projeto novo nasce com
 > "Motivo Reenvio" = "—". A staging grava na aba **`STAGING`** (planilha própria, não a de prod).
 > Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
 > Só **depois** disso a **F0** entra em código (plano já aprovado).
+
+</details>
 
 > **O que validar (e o que NÃO existe ainda):** o único comportamento novo na staging é o **"—"** da coluna
 > "Motivo Reenvio" — append e append de recuperação nascem com "—" (`sync.ts:411/440`), o **update da edição
@@ -47,51 +76,7 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: 🟡 **executado — código pronto, NÃO commitado** (2026-08-03)
-
-### 🔴 WIP não commitado (sessão fechou SUJA) — worktree `plano-aprovacao-lider-teamguide`
-A **F0 foi codada e está verde**, mas o commit está **segurado** pelos gates: os 3 revisores de contexto
-fresco foram disparados e a janela acabou antes dos vereditos → `.claude/.review-status` e
-`.claude/.quality-status` seguem em **`pendente`** (barrantes).
-
-**Os 3 revisores CHEGARAM a responder no fim da sessão, e os achados crítica/alta JÁ FORAM TRATADOS**
-(suíte seguiu 824 verdes, `worker.js` rebuildado) — falta só **re-rodar para confirmar** e gravar os
-vereditos:
-- **Conformidade → `diverge-alta` (procede, era bug real):** o fallback do T2 também agia sobre quem JÁ
-  resolvia — pessoa em 2+ times cujo 1º `teamsIds` fosse um nó guarda-chuva passaria a exibir
-  "BIZOPS"/"N1" em vez da área real, violando o critério 3. **Corrigido:** o fallback foi para um mapa
-  SEPARADO (`fallbackByTeamId`) e `deriveAreaFromEmail` faz **2 passadas** — área real primeiro.
-  ⚠️ **Ainda falta um teste** cobrindo membro multi-time (a lacuna que o revisor apontou).
-- **Qualidade → `bloqueio` (procede):** caches sem TTL — isolate quente serviria o retrato velho da org
-  e gravaria "ÁREA NÃO IDENTIFICADA" para quem entrou depois. **Corrigido:** `CACHE_TTL_MS` de 10 min
-  derrubando os 3 caches JUNTOS (`expirarCachesVencidos`). Também corrigido o achado baixo do
-  early-return de e-mail vazio antes do `await`. **Aberto (não tratado):** `tgGet` sem
-  `AbortSignal.timeout` (pré-existente, mas a exposição no caminho quente triplicou) e sem teto de raízes.
-- **Reuso → `possivel-duplicacao` (só-sugestão, nada bloqueia):** `carregarMembros` é um 2º roster ao
-  lado de `listarPessoasTeamGuide` (`/employees/refs`, 1 chamada) — a bifurcação é legítima (**`refs`
-  não traz `teamsIds`**) mas **não está registrada**; e a travessia da árvore está reimplementada 3×
-  (extrair `children`/`ancestors`) + `normalizarTimes(...).filter(deleted)` repetido em 3 sítios.
-
-**Retomar (não há código a escrever):** 1) re-rodar `ggsd:verificador-conformidade`,
-`ggsd:revisor-qualidade` e `ggsd:revisor-reuso` sobre o diff; 2) gravar os vereditos nos 2 marcadores;
-3) tratar achados crítica/alta; 4) commitar na branch `worktree-plano-aprovacao-lider-teamguide`.
-
-**Diff parado (5 arquivos):** `src/lib/areas/teamguide.server.ts` (único de produção) ·
-`tests/teamguide-lideranca.test.ts` (novo, 18 casos) · `tests/areas-teamguide.test.ts` ·
-`spec-docs/SPEC_APROVACAO_LIDER.md` (T5) · `worker.js`. **824 testes verdes** (baseline 805).
-
-**⚠️ Lição desta sessão — o smoke real pagou o próprio custo:** os testes autorados às cegas usavam
-ids **string**; a API TeamGuide devolve ids **numéricos**, então todo `map.get(String(id))` errava e a
-derivação devolvia `null`/`[]` **em silêncio** — a suíte ficava verde. Só o smoke contra a API real
-pegou. Fix: `normalizarTimes()` na fronteira + 2 guardas de regressão com ids numéricos.
-Para qualquer integração externa daqui pra frente: **fixture não substitui uma passada na API real**.
-
-**Validado ao vivo** (read-only, `TG_API_TOKEN` do `.env` da **raiz** — o worktree não tem `.env`):
-`luis.albuquerque@` → Lucas Gonçalves Queiroz / área RPA · `rafael@` → **sem líder** (D6) e área "N1" ·
-**432 pessoas, exatamente 1 sem líder** (bate com a spec) · as 10 pessoas do bug 3.2 agora resolvem.
-
-⚠️ **Isto NÃO substitui a validação humana da staging** descrita no topo (a frente do "—" da coluna
-"Motivo Reenvio"), que segue pendente. E **deploy continua FORA** da fronteira da F0.
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
 
 > **F0** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`): índice de liderança da
 > TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em 10 pessoas). **Nada

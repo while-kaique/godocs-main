@@ -49,3 +49,5 @@ scripts/e2e/.runs/
 GOOGLE-CHAT-DM.md
 # Dump da OpenAPI do TeamGuide (1.4MB, artefato de referência local)
 openapi.json
+# Worktrees do Claude Code — repos git embutidos, NUNCA versionar
+.claude/worktrees/
