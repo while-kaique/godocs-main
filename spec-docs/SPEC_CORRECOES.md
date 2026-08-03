@@ -8,7 +8,7 @@
 
 ## 2026-08-03 — Gate do critério reperguntava 38× e travava a submissão (anti-loop anulado por snapshot)
 
-**Status:** codada e testada (812 testes verdes) · **Branch:** `fix/loop-gate-criterio` · **PR:** _(a abrir)_
+**Status:** ✅ codada e testada (826 testes verdes, já com o #224) · **Branch:** `fix/loop-gate-criterio` · **PR:** [#225](https://github.com/while-kaique/godocs-main/pull/225)
 
 **Sintoma:** reproduzido **em produção** em 03/08/2026 (projeto `471dd0c9…`, fase de saving). O gate do
 critério repetiu a MESMA pergunta (`perguntaCriterioSecoes`) **38 vezes seguidas** e a submissão nunca
@@ -62,6 +62,62 @@ turnos, travando o bug para sempre).
 **Pendência proposta (NÃO incluída):** afrouxar o piso de 60 chars de `secaoPonteiroVaga` quando o texto
 **registra ausência explícita** — hoje uma resposta honesta e curta é indistinguível de rótulo vazio. Com
 este fix ela deixou de travar alguém (o gate avalia uma vez só), então é qualidade, não bloqueio.
+## 2026-08-03 — Gate do critério pedia "**(b)** …" ao usuário: alínea órfã de um roteiro que ele nunca viu
+
+**Status:** ✅ mergeada · **Branch:** `fix/gate-criterio-ux` · **PR:** [#224](https://github.com/while-kaique/godocs-main/pull/224)
+
+**Sintoma:** no meio da conversa do memorial de saving, o agente perguntava literalmente
+_"**(b)** qual ponteiro isso moveu e onde dá pra conferir…"_ — começando numa alínea "(b)" sem que
+nenhum "(a)" tivesse aparecido antes. O usuário não tem como saber o que é "(b)": as letras são de um
+roteiro **interno**, nunca mostrado. Efeito colateral: a pergunta mais importante da régua de critério
+chegava com cara de formulário truncado, e (diferente das irmãs jornada/teto/alocação) **sem botão nenhum**.
+
+**Causa-raiz:** duas origens independentes, as duas de APRESENTAÇÃO — a lógica do gate estava certa.
+1. **Texto do gate** (`perguntaCriterioSecoes`, `chat.functions.ts`): montava a mensagem como uma lista
+   numerada por letras fixas — `"**(a)** que processo mudou…"` para a `[1.3]` e `"**(b)** qual ponteiro…"`
+   para a `[1.4]` —, mas os dois itens são **condicionais e independentes**. No caso mais comum (a `[1.3]`
+   escrita e só a `[1.4]` faltando — exatamente o `custo-evitado-puro` que originou o gate na staging), só
+   o segundo item entrava e a mensagem **abria no "(b)"**. As letras só faziam sentido quando os dois
+   buracos coexistiam.
+2. **Prompt do agente** (bloco `[1.4]`, `orchestrator.ts`): o roteiro "COMO CONDUZIR" usa `a)`/`b)`/`c)` e
+   **nada proibia copiá-los** para o chat — o LLM ecoava o roteiro cru. Os códigos `[x.y]` do memorial já
+   tinham essa trava (+ a rede determinística `normalizarMarcadoresMemorial`); as letras do roteiro, não.
+   Agravante: o bloco `[1.3]`/`[1.4]` era **digitado duas vezes** (saving e receita), idêntico caractere a
+   caractere — corrigir num lado deixaria o outro para trás.
+
+**Fix (3 pontos):**
+- **Copy sem marcadores** (`perguntaCriterioSecoes`): 3 formatos, um por combinação de buracos, cada item
+  legível sozinho. Só-ponteiro e só-processo viram **frase única**; os dois juntos viram **bullets** (`- `,
+  que o `SimpleMarkdown` do chat já renderiza). A frase de escape "…em vez de inventar uma fonte" continua
+  em todo formato que cobra o ponteiro — a ausência de fonte é resposta legítima (decisão fechada da
+  `SPEC_CRITERIOS_PROJETO`).
+- **Botões** (`OPCOES_PONTEIRO`, 4 opções: Custo · Receita · KPI da área · "Ainda não sei dizer"), **só
+  quando o ÚNICO buraco é o ponteiro** — classificar é escolher de uma lista, mas "que processo mudou"
+  precisa de prosa, e um clique ali fecharia o gate sem a seção `[1.3]`. ⚠️ Detalhe que quase passou:
+  `formatResponse` **só serializa `options` quando `type === 'options'`** (e lê a pergunta de `question`,
+  não de `content`) — com `type: 'question'` os botões sumiriam a caminho da tela.
+- **`BLOCO_SECOES_CRITERIO`** (`orchestrator.ts`): as duas cópias do bloco `[1.3]`/`[1.4]` viraram **uma
+  constante única**, interpolada em `buildSavingPrompt` e `buildReceitaPrompt` — mesma disciplina da
+  `TAXONOMIA_DESTINO_GANHO`. A primeira linha é a trava **anti-vazamento** ("os marcadores são roteiro
+  interno; NUNCA os escreva na mensagem ao usuário").
+
+**Detalhe que preserva a rastreabilidade:** o clique num botão dá só a **classificação**, sem dizer onde o
+número se confere — e a `[1.4]` sairia pela metade, que é a falha original do gate. Então o turno de
+resposta calcula `precisaFonte` (`respostaTrouxeFonte`: **clique nunca conta como fonte**; texto digitado
+passa pela mesma `PISTA_ONDE_VERIFICAR` do gate) e o nudge `[SISTEMA]` manda o agente completar a fonte na
+ordem certa: propor o sistema/base que a doc aprovada já nomeia → senão perguntar **1×** → senão registrar
+a ausência. ⚠️ O guard preciso importa: o rótulo _"KPI da área (erro, retrabalho, prazo, risco)"_ **casaria
+a regex por acidente** (ela aceita "kpi") e daria a fonte por resolvida.
+
+**Invariante preservado:** o gate determinístico continua perguntando **UMA vez só** — os botões não
+adicionam turno, e o follow-up da fonte fica com o agente (que já tem anti-redundância e anti-loop no
+roteiro). A contagem de perguntas por submissão não muda.
+
+**Onde aterrissou:** `src/lib/chat.functions.ts` (`perguntaCriterioSecoes`, `OPCOES_PONTEIRO`,
+`respostaTrouxeFonte`, `nudgeCriterioSecoes`, ramo de botões do gate) · `src/lib/agents/orchestrator.ts`
+(`BLOCO_SECOES_CRITERIO`, `PISTA_ONDE_VERIFICAR` exportada) · `src/lib/testes/prompt-registry.ts`
+(descrições de saving e receita) · `tests/gate-criterio-secoes.test.ts` (+14 testes: nenhum formato emite
+alínea órfã, bullets quando faltam os dois, o clique não vale por fonte, bloco único nos 2 prompts).
 
 ---
 
