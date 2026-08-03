@@ -11,11 +11,27 @@ liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros
 deployada com `fix/motivo-reenvio-traco` + os docs desta frente. **PR ainda não aberto** — espera a
 validação humana.
 
-> **▶ PRÓXIMO PASSO — validar a staging (`https://godocs-staging.devgogroup.com/`) e então abrir PR + merge.**
+> **▶ PRÓXIMO PASSO — validar o "—" RODANDO EM PRODUÇÃO** (`https://godocs.devgogroup.com/`, deploy
+> 2026-08-03 13:00). Decisão do Luis: a aprovação do "—" acontece em prod, não na staging. Depois dela:
+> **codar a F0** (plano aprovado) e **escrever a D11** em `spec-docs/SPEC_APROVACAO_LIDER.md` — a fila do
+> líder vira **entrada própria no menu com selo de contagem** (visível só a quem lidera alguém), **não** a
+> 5ª aba de "Meus Projetos" que a spec ainda descreve.
+>
+> ✅ **ENTREGUE em 2026-08-03:** staging `edf400b4` (12:38) → **PR #221 mergeado** (`main` `c65e5a1`) → **prod
+> `674a3710`** (13:00), servindo `index-CzawDJZX.js` — mesmo artefato nos dois ambientes, sem rebuild no meio.
+> Nada pendente de envio.
+>
+> ⚠️ **Aprendizado desta sessão (custou um commit indevido na `main` local, revertido sem push):** no
+> diretório RAIZ, **nunca `git add -A`** — ele arrasta `.claude/worktrees/` como 8 repos git embutidos. O
+> `.gitignore` passa a cobri-los; ainda assim, use caminhos explícitos no `git add`.
+
+<details><summary>Instruções da validação em staging (superadas pela decisão de validar em prod)</summary>
 > No `/dashboard`: apagar um motivo/parecer deve gravar **"—"** (não branco) e projeto novo nasce com
 > "Motivo Reenvio" = "—". A staging grava na aba **`STAGING`** (planilha própria, não a de prod).
 > Depois do merge: prod `674a3710`. `gh` precisa da conta **`LuisEduardo100`** (a `rpaiagogroup` é read-only).
 > Só **depois** disso a **F0** entra em código (plano já aprovado).
+
+</details>
 
 > **O que validar (e o que NÃO existe ainda):** o único comportamento novo na staging é o **"—"** da coluna
 > "Motivo Reenvio" — append e append de recuperação nascem com "—" (`sync.ts:411/440`), o **update da edição
