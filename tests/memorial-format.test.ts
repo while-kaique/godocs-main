@@ -184,3 +184,38 @@ describe('extrairResumoMemorial', () => {
     expect(extrairResumoMemorial('### Total de horas\n90h/mês.')).toBeNull();
   });
 });
+
+describe('extrairResumoMemorial — rótulo em texto puro (formato real da staging)', () => {
+  // Memorial do projeto "n8n audit" como o agente gravou: rótulos SEM ** e SEM ###.
+  const memorialTextoPuro = [
+    'Memorial de Cálculo',
+    'Contexto',
+    'Resumo: O projeto audita fluxos de 4 instâncias do n8n, consolida os dados em Google Sheets e gera documentação em Markdown para os fluxos ativos. Também produz um relatório diário com criticidade, cobertura de documentação e candidatos a limpeza.',
+    'Processo alterado: Antes, a conferência e documentação dos fluxos precisariam ser feitas manualmente por um estagiário.',
+    'Ponteiro movido e onde verificar: horas de trabalho operacional.',
+    'Saving de Pessoas',
+  ].join('\n');
+
+  it('extrai o resumo quando o rótulo é texto puro, parando no próximo rótulo', () => {
+    expect(extrairResumoMemorial(memorialTextoPuro)).toBe(
+      'O projeto audita fluxos de 4 instâncias do n8n, consolida os dados em Google Sheets e gera documentação em Markdown para os fluxos ativos. Também produz um relatório diário com criticidade, cobertura de documentação e candidatos a limpeza.',
+    );
+  });
+
+  it('o memorial em negrito continua saindo pelo caminho normal (sem o fallback)', () => {
+    const misto = ['**Resumo:** O certo.', '### Processo alterado', 'Era manual.'].join('\n');
+    expect(extrairResumoMemorial(misto)).toBe('O certo.');
+  });
+
+  it('não confunde uma frase do resumo que tenha ":" com o próximo rótulo', () => {
+    const memorial = [
+      'Resumo: O robô concilia notas.',
+      'Ele roda de madrugada, sem supervisão: às 6h o relatório já está pronto.',
+      '',
+      'Processo alterado: era manual.',
+    ].join('\n');
+    expect(extrairResumoMemorial(memorial)).toBe(
+      'O robô concilia notas.\nEle roda de madrugada, sem supervisão: às 6h o relatório já está pronto.',
+    );
+  });
+});
