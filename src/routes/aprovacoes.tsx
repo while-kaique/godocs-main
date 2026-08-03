@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
+import { InfoTooltip } from "@/components/info-tooltip";
 import {
   CHECKLIST_APROVACAO,
   checklistCompleto,
@@ -137,7 +138,6 @@ function AprovacoesPage() {
   const [enviando, setEnviando] = useState<string | null>(null);
 
   const itens = data?.itens ?? [];
-  const preview = data?.visualizando_como ?? null;
   const erro = error ? (error instanceof Error ? error.message : "Erro ao carregar a fila.") : null;
 
   function marcar(projetoId: string, chave: ChaveChecklist, valor: RespostaChecklist) {
@@ -211,24 +211,22 @@ function AprovacoesPage() {
             >
               ← Início
             </Link>
-            <h1
-              className="font-extrabold tracking-tight"
-              style={{ fontSize: "clamp(1.35rem,3vw,1.7rem)", color: "var(--go-white)" }}
-            >
-              Pré-aprovações do meu time
-            </h1>
-            <p className="mt-1 text-[12px]" style={{ color: "rgba(255,255,255,0.75)" }}>
-              Projetos do seu time esperando a sua leitura de gestor. Não é a aprovação final — a
-              triagem da equipe RPA corre em paralelo.
-              {preview && (
-                <>
-                  {" "}
-                  <span className="font-semibold" style={{ color: "var(--go-lime)" }}>
-                    Pré-visualização de admin: fila de {preview} (o que você decidir fica no seu nome).
-                  </span>
-                </>
-              )}
-            </p>
+            {/* O título já explica a página; o "i" carrega o resto (o que é
+                pré-aprovação, que a RPA valida em paralelo) sem ocupar a tela. */}
+            <div className="flex items-center gap-2">
+              <h1
+                className="font-extrabold tracking-tight"
+                style={{ fontSize: "clamp(1.35rem,3vw,1.7rem)", color: "var(--go-white)" }}
+              >
+                Pré-aprovações do meu time
+              </h1>
+              <span style={{ color: "var(--go-white)" }}>
+                <InfoTooltip
+                  label="O que é esta página"
+                  text="Aqui ficam os projetos que pessoas do seu time submeteram e esperam a sua leitura. Você responde 3 perguntas rápidas e dá o parecer: pré-aprovar ou pedir ajuste. É uma pré-aprovação, não a decisão final: a equipe RPA valida cada projeto em paralelo, então nada fica parado esperando você."
+                />
+              </span>
+            </div>
           </div>
         </div>
 
@@ -464,7 +462,7 @@ function CardAprovacao({
                 style={{ color: "#8b8b9a" }}
               >
                 <Sparkles className="h-3 w-3" />
-                Resumo do projeto (análise automática)
+                Resumo do projeto
               </p>
               <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
                 {i.resumo_ia}
