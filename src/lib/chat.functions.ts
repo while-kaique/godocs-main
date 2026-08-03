@@ -2892,6 +2892,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // Coluna "Aprovação do Líder": "Pendente com X" ou o rótulo da isenção
         // ("Pré-aprovado (liderança)" / "Sem líder na TeamGuide" / …).
         aprovacaoLider: preAprovacao.rotuloSheet,
+        justificativaAprovacaoLider: preAprovacao.justificativaSheet,
       }),
     );
   }

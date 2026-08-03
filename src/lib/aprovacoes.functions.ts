@@ -57,9 +57,20 @@ function dataBR(iso?: string | null): string {
  * temporária) e NÃO é parecer humano.
  */
 export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
+  // Liderança é o único caso sem fila que tem ESTADO: do lado do líder está liberado.
+  // Os outros 2 não têm parecer nenhum — o porquê vai na justificativa.
+  return motivo === 'lideranca' ? 'Pré-aprovado' : '—';
+}
+
+/**
+ * Texto da coluna "Justificativa Aprovação do Líder" nos 3 casos SEM FILA. Função PURA.
+ * É aqui que a auditoria distingue a isenção legítima de uma falha de integração (D12) —
+ * antes isso morava no rótulo de estado e poluía o filtro da planilha.
+ */
+export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
   switch (motivo) {
     case 'lideranca':
-      return 'Pré-aprovado (liderança)';
+      return 'Autor é liderança na TeamGuide, isento de pré-aprovação (ninguém decidiu)';
     case 'sem_lider':
       return 'Sem líder na TeamGuide';
     case 'teamguide_indisponivel':
@@ -73,7 +84,21 @@ export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string 
  * Texto da coluna "Aprovação do Líder" do Sheets. Função PURA — é o único lugar que
  * redige esses rótulos (não redigitar em outro ponto).
  */
-export function rotuloAprovacaoSheet(
+export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, 'veredito'>[]): string {
+  if (!linhas.length) return '—';
+  const decidida = linhas.find((l) => l.veredito === 'aprovado' || l.veredito === 'reprovado');
+  if (!decidida) return 'Pré-pendente';
+  return decidida.veredito === 'aprovado' ? 'Pré-aprovado' : 'Pré-reprovado';
+}
+
+/**
+ * Texto da coluna "Justificativa Aprovação do Líder": quem decidiu, quando, as 3
+ * respostas do checklist e o comentário. Função PURA — único lugar que redige isso.
+ *
+ * Decisão do Luis (03/08/2026): a coluna de estado guarda SÓ o estado (para filtrar na
+ * planilha) e todo o detalhe vive aqui.
+ */
+export function justificativaAprovacaoSheet(
   linhas: Pick<
     AprovacaoRow,
     | 'veredito'
@@ -91,7 +116,7 @@ export function rotuloAprovacaoSheet(
   const decidida = linhas.find((l) => l.veredito === 'aprovado' || l.veredito === 'reprovado');
   if (!decidida) {
     const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
-    return `Pré-aprovação pendente com ${nomes}`;
+    return `Aguardando ${nomes}`;
   }
   // Quem decidiu pode ser outro líder da mesma fila (D4) — o `decidido_por` manda.
   const quem =
@@ -99,19 +124,16 @@ export function rotuloAprovacaoSheet(
     decidida.decidido_por ||
     decidida.aprovador_nome ||
     decidida.aprovador_email;
-  // "Pré-aprovado"/"Ajuste pedido" (não "Aprovado"/"Reprovado"): o parecer do líder é
-  // PRÉ-aprovação e nunca substitui a triagem da RPA — a planilha tem que dizer isso.
-  const rotulo = decidida.veredito === 'aprovado' ? 'Pré-aprovado' : 'Ajuste pedido';
-  const comentario = (decidida.comentario ?? '').trim();
   const checklist = resumirChecklist({
     move_kpi: decidida.resp_move_kpi,
     sente_falta: decidida.resp_sente_falta,
     saving_coerente: decidida.resp_saving_coerente,
   });
+  const comentario = (decidida.comentario ?? '').trim();
   return (
-    `${rotulo} por ${quem} em ${dataBR(decidida.decidido_em)}` +
-    (checklist ? ` — ${checklist}` : '') +
-    (comentario ? ` — ${comentario}` : '')
+    `${quem} em ${dataBR(decidida.decidido_em)}` +
+    (checklist ? ` · ${checklist}` : '') +
+    (comentario ? ` · ${comentario}` : '')
   );
 }
 
@@ -122,8 +144,10 @@ export type ResultadoAbertura = {
   isento: boolean;
   motivo: 'lideranca' | 'sem_lider' | 'teamguide_indisponivel' | null;
   aprovadores: { email: string; nome: string | null }[];
-  /** Texto pronto para a coluna "Aprovação do Líder". */
+  /** Estado pronto para a coluna "Aprovação do Líder". */
   rotuloSheet: string;
+  /** Detalhe pronto para a coluna "Justificativa Aprovação do Líder". */
+  justificativaSheet: string;
 };
 
 /**
@@ -142,6 +166,7 @@ export async function abrirPreAprovacao(
     motivo,
     aprovadores: [],
     rotuloSheet: rotuloIsencaoSheet(motivo),
+    justificativaSheet: justificativaIsencaoSheet(motivo),
   });
 
   try {
@@ -167,19 +192,19 @@ export async function abrirPreAprovacao(
     const versao = opts?.versao ?? (await getUltimaVersaoNum(projetoId));
     await abrirAprovacoesPendentes(projetoId, versao, autor, aprovadores);
 
-    const rotuloSheet = rotuloAprovacaoSheet(
-      aprovadores.map((a) => ({
-        veredito: 'pendente',
-        aprovador_nome: a.nome,
-        aprovador_email: a.email,
-        comentario: null,
-        decidido_por: null,
-        decidido_em: null,
-        resp_move_kpi: null,
-        resp_sente_falta: null,
-        resp_saving_coerente: null,
-      })),
-    );
+    const pendentes = aprovadores.map((a) => ({
+      veredito: 'pendente' as const,
+      aprovador_nome: a.nome,
+      aprovador_email: a.email,
+      comentario: null,
+      decidido_por: null,
+      decidido_em: null,
+      resp_move_kpi: null,
+      resp_sente_falta: null,
+      resp_saving_coerente: null,
+    }));
+    const rotuloSheet = rotuloAprovacaoSheet(pendentes);
+    const justificativaSheet = justificativaAprovacaoSheet(pendentes);
 
     // DM em background, best-effort (mudo p/ projetos de teste E2E, como o Chat atual).
     const nome = opts?.nomeProjeto ?? projeto.nome ?? 'Projeto sem nome';
@@ -193,7 +218,7 @@ export async function abrirPreAprovacao(
       );
     }
 
-    return { isento: false, motivo: null, aprovadores, rotuloSheet };
+    return { isento: false, motivo: null, aprovadores, rotuloSheet, justificativaSheet };
   } catch (e) {
     console.error('[aprovacoes] falha ao abrir a pré-aprovação (não-fatal):', e);
     return semFila('teamguide_indisponivel');
@@ -439,9 +464,11 @@ export async function decidirAprovacao(
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
-  const rotulo = rotuloAprovacaoSheet(atualizadas);
   runBackground(
-    updateRowByProjectId(projeto_id, { 'Aprovação do Líder': rotulo })
+    updateRowByProjectId(projeto_id, {
+      'Aprovação do Líder': rotuloAprovacaoSheet(atualizadas),
+      'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(atualizadas),
+    })
       .then(() => undefined)
       .catch((e) => console.error('[aprovacoes] falha ao gravar no Sheets (não-fatal):', e)),
   );

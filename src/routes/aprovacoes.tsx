@@ -436,57 +436,42 @@ function CardAprovacao({
           )}
         </div>
 
-        {/* Ganho total em destaque + resumo da IA + um card por número. O líder precisa
-            ver TODOS os campos (custo evitado, custo externo, receita) mesmo quando zerados
-            — "não declarado" também é informação para decidir. */}
-        <div
-          className="mt-3 rounded-lg px-3.5 py-3"
-          style={{ background: "rgba(0,89,169,0.04)", borderLeft: "3px solid var(--go-lime)" }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "#8b8b9a" }}>
-            Ganho total
-          </p>
-          <p className="font-extrabold" style={{ color: "var(--go-blue)", fontSize: 22 }}>
-            {fmtReais(i.ganho_total) ??
-              fmtReais(i.saving_reais) ??
-              (i.especial ? "Projeto especial (sem ganho declarado)" : "Não declarado")}
-          </p>
-
-          {i.resumo_ia && (
-            <div
-              className="mt-2 rounded-md px-3 py-2"
-              style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.1)" }}
-            >
-              <p
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
-                style={{ color: "#8b8b9a" }}
-              >
-                <Sparkles className="h-3 w-3" />
-                Resumo do projeto
-              </p>
-              <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
-                {i.resumo_ia}
-              </p>
-            </div>
-          )}
-
-          <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <CardNumero rotulo="Horas economizadas" valor={horas} />
-            <CardNumero
-              rotulo="Recorrência"
-              valor={TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? null}
-            />
-            <CardNumero rotulo="Saving em R$" valor={reais} />
-            <CardNumero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
-            <CardNumero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
-            {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
-            <CardNumero
-              rotulo="Custo externo"
-              valor={fmtReais(i.custo_externo_mensal)}
-              negativo
-            />
-          </div>
+        {/* Um card por número, todos no mesmo nível (o ganho total é o primeiro, com a
+            barra lime). O resumo do projeto vem DEPOIS, ocupando o card inteiro, porque é
+            texto corrido e não cabe numa coluna estreita. */}
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <CardNumero
+            rotulo="Ganho total"
+            valor={fmtReais(i.ganho_total) ?? fmtReais(i.saving_reais)}
+            destaque
+            vazio={i.especial ? "Projeto especial" : undefined}
+          />
+          <CardNumero rotulo="Horas economizadas" valor={horas} />
+          <CardNumero rotulo="Recorrência" valor={TIPO_SAVING_LABEL[i.tipo_saving ?? ""] ?? null} />
+          <CardNumero rotulo="Saving em R$" valor={reais} />
+          <CardNumero rotulo="Custo evitado" valor={fmtReais(i.custo_evitado_reais)} />
+          <CardNumero rotulo="Receita mensal" valor={fmtReais(i.receita_mensal)} />
+          {/* Custo externo é o que a solução CONSOME para rodar — subtrai do ganho. */}
+          <CardNumero rotulo="Custo externo" valor={fmtReais(i.custo_externo_mensal)} negativo />
         </div>
+
+        {i.resumo_ia && (
+          <div
+            className="mt-2 rounded-lg px-3.5 py-2.5"
+            style={{ background: "rgba(0,89,169,0.04)", border: "1px solid rgba(0,89,169,0.1)" }}
+          >
+            <p
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: "#8b8b9a" }}
+            >
+              <Sparkles className="h-3 w-3" />
+              Resumo do projeto
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "#4b4b5a" }}>
+              {i.resumo_ia}
+            </p>
+          </div>
+        )}
 
         {/* Memorial: fica fechado por padrão para o card não virar parede de texto */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -718,27 +703,43 @@ function CardNumero({
   rotulo,
   valor,
   negativo,
+  destaque,
+  vazio,
 }: {
   rotulo: string;
   valor: string | null;
   negativo?: boolean;
+  /** O número que resume o projeto: fonte maior + barra lime da identidade. */
+  destaque?: boolean;
+  /** Texto quando não há valor (default "Não declarado"). */
+  vazio?: string;
 }) {
   return (
     <div
-      className="rounded-md px-2.5 py-2"
-      style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.1)" }}
+      className="rounded-lg px-2.5 py-2"
+      style={{
+        background: "var(--go-white)",
+        border: "1px solid rgba(0,89,169,0.1)",
+        borderLeft: destaque ? "3px solid var(--go-lime)" : undefined,
+      }}
     >
       <p className="text-[9.5px] font-bold uppercase tracking-wide" style={{ color: "#8b8b9a" }}>
         {rotulo}
       </p>
       <p
-        className="mt-0.5 font-bold"
+        className={destaque ? "mt-0.5 font-extrabold" : "mt-0.5 font-bold"}
         style={{
-          fontSize: 13.5,
-          color: valor ? (negativo ? "#b45309" : "var(--go-text-heading)") : "#a5a5b3",
+          fontSize: destaque ? 17 : 13.5,
+          color: valor
+            ? negativo
+              ? "#b45309"
+              : destaque
+                ? "var(--go-blue)"
+                : "var(--go-text-heading)"
+            : "#a5a5b3",
         }}
       >
-        {valor ? (negativo ? `− ${valor}` : valor) : "Não declarado"}
+        {valor ? (negativo ? `− ${valor}` : valor) : (vazio ?? "Não declarado")}
       </p>
     </div>
   );

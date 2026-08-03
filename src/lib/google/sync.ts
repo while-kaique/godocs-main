@@ -133,9 +133,14 @@ export type SubmitSyncParams = {
   // Edição: memorial da ÚLTIMA versão ANTES desta edição → coluna "Memorial anterior".
   // Em submissão nova fica null (não há versão anterior).
   memorialAnterior?: string | null;
-  // Pré-aprovação do líder → coluna "Aprovação do Líder". Texto já pronto
-  // ("Pendente com X" / "—"); null/vazio → "—". Não bloqueia nada (D3).
+  // Pré-aprovação do líder → coluna "Aprovação do Líder". Só o ESTADO
+  // ("Pré-aprovado" / "Pré-pendente" / "Pré-reprovado"); null/vazio → "—".
+  // Não bloqueia nada (D3).
   aprovacaoLider?: string | null;
+  // Detalhe do parecer (quem, quando, checklist, comentário) → coluna
+  // "Justificativa Aprovação do Líder". Separada para a planilha poder filtrar
+  // pelo estado sem depender de texto livre.
+  justificativaAprovacaoLider?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -392,6 +397,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       // não se aplica (autor é liderança ou não tem líder). A DECISÃO é gravada depois,
       // por updateRowByProjectId em aprovacoes.functions.ts.
       'Aprovação do Líder': ouTraco(p.aprovacaoLider),
+      'Justificativa Aprovação do Líder': ouTraco(p.justificativaAprovacaoLider),
     };
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

@@ -112,6 +112,10 @@ export const SHEET_COLUMNS = [
   // ⚠️ A coluna precisa existir no cabeçalho das abas GoDocs e STAGING (mapeamento
   // por NOME — se faltar, é ignorada com aviso). NÃO bloqueia a triagem da RPA.
   'Aprovação do Líder',
+  // Detalhe do parecer: quem decidiu, quando, as 3 respostas do checklist e o
+  // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
+  // Pré-reprovado) — decisão do Luis, 03/08/2026.
+  'Justificativa Aprovação do Líder',
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

@@ -27,6 +27,8 @@ import {
   resumoAprovacaoPorProjeto,
   rotuloAprovacaoSheet,
   rotuloIsencaoSheet,
+  justificativaAprovacaoSheet,
+  justificativaIsencaoSheet,
   montarParticipantes,
   extrairNumeros,
 } from '@/lib/aprovacoes.functions';
@@ -104,7 +106,8 @@ describe('pré-aprovação do líder', () => {
 
     expect(r.isento).toBe(false);
     expect(r.aprovadores.map((a) => a.email)).toEqual([LUCAS.email]);
-    expect(r.rotuloSheet).toBe('Pré-aprovação pendente com Lucas Gonçalves Queiroz');
+    expect(r.rotuloSheet).toBe('Pré-pendente');
+    expect(r.justificativaSheet).toBe('Aguardando Lucas Gonçalves Queiroz');
     const linhas = await getAprovacoesDoProjeto(id);
     expect(linhas).toHaveLength(1);
     expect(linhas[0].veredito).toBe('pendente');
@@ -121,7 +124,7 @@ describe('pré-aprovação do líder', () => {
     expect(r).toMatchObject({
       isento: true,
       motivo: 'lideranca',
-      rotuloSheet: 'Pré-aprovado (liderança)',
+      rotuloSheet: 'Pré-aprovado',
     });
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
     expect(mockDm).not.toHaveBeenCalled();
@@ -136,7 +139,7 @@ describe('pré-aprovação do líder', () => {
     expect(r).toMatchObject({
       isento: true,
       motivo: 'sem_lider',
-      rotuloSheet: 'Sem líder na TeamGuide',
+      rotuloSheet: '—',
     });
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
   });
@@ -157,7 +160,7 @@ describe('pré-aprovação do líder', () => {
     expect(r).toMatchObject({
       isento: true,
       motivo: 'teamguide_indisponivel',
-      rotuloSheet: 'Aprovação indisponível (integração)',
+      rotuloSheet: '—',
     });
   });
 
@@ -234,8 +237,10 @@ describe('pré-aprovação do líder', () => {
     expect(mockSheet).toHaveBeenCalledTimes(1);
     const [projetoId, cells] = mockSheet.mock.calls[0];
     expect(projetoId).toBe(id);
-    expect(String((cells as Record<string, string>)['Aprovação do Líder'])).toMatch(
-      /^Pré-aprovado por Lucas Gonçalves Queiroz em \d{2}\/\d{2}\/\d{4} — Move KPI: sim · Sentiria falta: sim · Saving coerente: sim$/,
+    const c = cells as Record<string, string>;
+    expect(c['Aprovação do Líder']).toBe('Pré-aprovado');
+    expect(String(c['Justificativa Aprovação do Líder'])).toMatch(
+      /^Lucas Gonçalves Queiroz em \d{2}\/\d{2}\/\d{4} · Move KPI: sim · Sentiria falta: sim · Saving coerente: sim$/,
     );
   });
 
@@ -310,7 +315,7 @@ describe('pré-aprovação do líder', () => {
       resp_saving_coerente: 'sim',
     });
     const [, cells] = mockSheet.mock.calls[0];
-    expect(String((cells as Record<string, string>)['Aprovação do Líder'])).toContain(
+    expect(String((cells as Record<string, string>)['Justificativa Aprovação do Líder'])).toContain(
       'Sentiria falta: não',
     );
   });
@@ -371,22 +376,24 @@ describe('pré-aprovação do líder', () => {
   });
 });
 
-describe('rotuloAprovacaoSheet (puro)', () => {
-  it('sem fila → "—" (isento ou sem líder)', () => {
+describe('Sheets: estado e justificativa são colunas SEPARADAS (decisão 03/08/2026)', () => {
+  const pendentes = [
+    { veredito: 'pendente', aprovador_nome: 'Lucas', aprovador_email: 'l@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
+    { veredito: 'pendente', aprovador_nome: 'Aline', aprovador_email: 'a@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
+  ];
+
+  it('sem fila → "—" nas duas colunas', () => {
     expect(rotuloAprovacaoSheet([])).toBe('—');
+    expect(justificativaAprovacaoSheet([])).toBe('—');
   });
 
-  it('pendente lista todos os líderes da fila', () => {
-    expect(
-      rotuloAprovacaoSheet([
-        { veredito: 'pendente', aprovador_nome: 'Lucas', aprovador_email: 'l@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
-        { veredito: 'pendente', aprovador_nome: 'Aline', aprovador_email: 'a@x', comentario: null, decidido_por: null, decidido_em: null, resp_move_kpi: null, resp_sente_falta: null, resp_saving_coerente: null },
-      ]),
-    ).toBe('Pré-aprovação pendente com Lucas, Aline');
+  it('pendente → estado "Pré-pendente"; os líderes vão para a justificativa', () => {
+    expect(rotuloAprovacaoSheet(pendentes)).toBe('Pré-pendente');
+    expect(justificativaAprovacaoSheet(pendentes)).toBe('Aguardando Lucas, Aline');
   });
 
-  it('reprovado leva o motivo para a planilha', () => {
-    const txt = rotuloAprovacaoSheet([
+  it('decidido → o estado é UMA palavra; checklist e comentário só na justificativa', () => {
+    const linhas = [
       {
         veredito: 'reprovado',
         aprovador_nome: 'Lucas',
@@ -398,30 +405,38 @@ describe('rotuloAprovacaoSheet (puro)', () => {
         resp_sente_falta: 'sim',
         resp_saving_coerente: 'nao',
       },
-    ]);
-    expect(txt).toMatch(
-      /^Ajuste pedido por Lucas em \d{2}\/\d{2}\/\d{4} — Move KPI: sim · Sentiria falta: sim · Saving coerente: não — Rever as horas$/,
+    ];
+    expect(rotuloAprovacaoSheet(linhas)).toBe('Pré-reprovado');
+    expect(rotuloAprovacaoSheet(linhas)).not.toContain('Rever as horas');
+    expect(justificativaAprovacaoSheet(linhas)).toMatch(
+      /^Lucas em \d{2}\/\d{2}\/\d{4} · Move KPI: sim · Sentiria falta: sim · Saving coerente: não · Rever as horas$/,
     );
+    expect(rotuloAprovacaoSheet([{ veredito: 'aprovado' }])).toBe('Pré-aprovado');
   });
 });
 
-describe('rotuloIsencaoSheet (puro) — os 3 casos sem fila são distinguíveis', () => {
-  it('liderança sai como pré-aprovado (decisão do Luis, 03/08/2026)', () => {
-    expect(rotuloIsencaoSheet('lideranca')).toBe('Pré-aprovado (liderança)');
+describe('isenção (puro) — estado enxuto + motivo na justificativa (D12)', () => {
+  it('liderança sai como "Pré-aprovado" e o motivo vai para a justificativa', () => {
+    expect(rotuloIsencaoSheet('lideranca')).toBe('Pré-aprovado');
+    expect(justificativaIsencaoSheet('lideranca')).toContain('liderança');
   });
 
-  it('sem líder e falha de integração NÃO se confundem com a isenção de liderança', () => {
-    expect(rotuloIsencaoSheet('sem_lider')).toBe('Sem líder na TeamGuide');
-    expect(rotuloIsencaoSheet('teamguide_indisponivel')).toBe('Aprovação indisponível (integração)');
-    // os 3 textos são distintos entre si — é o ponto da mudança
+  it('sem líder e falha de integração não têm estado, só justificativa distinta', () => {
+    expect(rotuloIsencaoSheet('sem_lider')).toBe('—');
+    expect(rotuloIsencaoSheet('teamguide_indisponivel')).toBe('—');
+    expect(justificativaIsencaoSheet('sem_lider')).toBe('Sem líder na TeamGuide');
+    expect(justificativaIsencaoSheet('teamguide_indisponivel')).toBe(
+      'Aprovação indisponível (integração)',
+    );
     const textos = (['lideranca', 'sem_lider', 'teamguide_indisponivel'] as const).map(
-      rotuloIsencaoSheet,
+      justificativaIsencaoSheet,
     );
     expect(new Set(textos).size).toBe(3);
   });
 
-  it('motivo nulo (há fila) cai no "—" e nunca em texto de isenção', () => {
+  it('motivo nulo (há fila) cai no "—" nas duas', () => {
     expect(rotuloIsencaoSheet(null)).toBe('—');
+    expect(justificativaIsencaoSheet(null)).toBe('—');
   });
 });
 
