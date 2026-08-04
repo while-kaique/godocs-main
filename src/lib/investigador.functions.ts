@@ -4,7 +4,9 @@
  */
 
 import {
-  getProjetosWithArea,
+  getProjetosParaInvestigador,
+  getProjetoWithAreaById,
+  getChatMetricsPorProjeto,
   getChatMessages,
   getDocumentacao,
   getApiLogsByProjeto,
@@ -15,7 +17,7 @@ import {
   getVersionsByProjeto,
   getFormEventsByProjeto,
   parseJson,
-  type ProjetoRow,
+  type ChatMetricsRow,
   type ChatMessageRow,
   type ApiLogRow,
 } from '@/integrations/db/client.server'
@@ -179,6 +181,16 @@ function enrichChatMessages(
   })
 }
 
+/** Mesma decisão do `inferFaseAtual`, a partir das métricas agregadas no SQL:
+ * a fase da última mensagem do assistente que declara uma; sem nenhuma mas com
+ * conversa iniciada → 'doc'; sem mensagem alguma → 'aguardando_inicio'.
+ * Função PURA — coberta por teste junto com o `inferFaseAtual` que ela espelha. */
+export function faseAtualDeMetricas(m: ChatMetricsRow | undefined): FaseAtual {
+  if (!m || m.total === 0) return 'aguardando_inicio'
+  if (m.fase) return m.fase as FaseAtual
+  return 'doc'
+}
+
 function getUltimaAtividade(messages: ChatMessageRow[], updatedAt: string | null): string | null {
   if (messages.length > 0) {
     const last = messages[messages.length - 1].created_at
@@ -207,9 +219,15 @@ function toEpoch(ts: string | null | undefined): number {
  * Inclui fase atual, métricas de chat, métricas de API.
  */
 export async function getProjetosInvestigador() {
-  const projetos = await getProjetosWithArea()
+  const projetos = await getProjetosParaInvestigador()
   const recentLogs = await getApiLogsRecent(5000)
   const reenvioCounts = await getReenvioCounts()
+  // ⚠️ UMA query agregada para o chat de todos os projetos. NÃO reintroduzir um
+  // `getChatMessages(p.id)` dentro do laço: era um round-trip por projeto (com o
+  // texto completo das mensagens) e fazia este endpoint estourar — 500/503, lista
+  // vazia e os contadores "0 submetidos / 0 abandonados" mentindo na tela.
+  const chatMetrics = new Map<string, ChatMetricsRow>()
+  for (const m of await getChatMetricsPorProjeto()) chatMetrics.set(m.projeto_id, m)
 
   // Agrupa logs por projeto_id para evitar N+1
   const logsByProjeto = new Map<string, ApiLogRow[]>()
@@ -223,12 +241,10 @@ export async function getProjetosInvestigador() {
   const result: ProjetoInvestigador[] = []
 
   for (const p of projetos) {
-    const messages = await getChatMessages(p.id)
+    const metrics = chatMetrics.get(p.id)
     const logs = logsByProjeto.get(p.id) ?? []
 
-    const faseAtual = inferFaseAtual(messages)
-    const totalMsgsUser = messages.filter((m) => m.role === 'user').length
-    const totalMsgsIA = messages.filter((m) => m.role === 'assistant').length
+    const faseAtual = faseAtualDeMetricas(metrics)
 
     const errosApi = logs.filter((l) => l.status_code >= 400)
     const duracoes = logs.filter((l) => l.duration_ms != null).map((l) => l.duration_ms!)
@@ -246,12 +262,12 @@ export async function getProjetosInvestigador() {
       status: p.status,
       tipos_projeto: parseJson<string[]>(p.tipos_projeto),
       descricao_breve: p.descricao_breve,
-      complexidade: (p as ProjetoRow & { complexidade?: string }).complexidade ?? null,
+      complexidade: p.complexidade ?? null,
       fase_atual: faseAtual,
-      total_mensagens: messages.length,
-      total_mensagens_usuario: totalMsgsUser,
-      total_mensagens_ia: totalMsgsIA,
-      ultima_atividade: getUltimaAtividade(messages, p.updated_at),
+      total_mensagens: metrics?.total ?? 0,
+      total_mensagens_usuario: metrics?.total_user ?? 0,
+      total_mensagens_ia: metrics?.total_ia ?? 0,
+      ultima_atividade: metrics?.ultima_atividade ?? p.updated_at,
       tem_erro: errosApi.length > 0,
       total_erros_api: errosApi.length,
       media_duracao_api_ms: mediaDuracao,
@@ -272,8 +288,9 @@ export async function getProjetosInvestigador() {
  * Detalhes completos de um projeto para o painel de investigação.
  */
 export async function getProjetoInvestigadorDetalhes(id: string) {
-  const projetos = await getProjetosWithArea()
-  const p = projetos.find((proj) => proj.id === id)
+  // Busca DIRETA por id — antes carregava todos os projetos (com todos os blobs)
+  // para depois fazer `.find()` em memória.
+  const p = await getProjetoWithAreaById(id)
   if (!p) throw Object.assign(new Error('Projeto não encontrado.'), { status: 404 })
 
   const messages = await getChatMessages(id)
@@ -326,7 +343,7 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
     status: p.status,
     tipos_projeto: parseJson<string[]>(p.tipos_projeto),
     descricao_breve: p.descricao_breve,
-    complexidade: (p as ProjetoRow & { complexidade?: string }).complexidade ?? null,
+    complexidade: p.complexidade ?? null,
     fase_atual: faseAtual,
     total_mensagens: messages.length,
     total_mensagens_usuario: totalMsgsUser,
@@ -366,7 +383,7 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
           pontuacao_maxima: analise.pontuacao_maxima,
           justificativa: analise.justificativa,
           resumo: analise.resumo,
-          complexidade: (p as ProjetoRow & { complexidade?: string }).complexidade ?? null,
+          complexidade: p.complexidade ?? null,
           complexidade_justificativa: analise.complexidade_justificativa ?? null,
           criterios_hardcoded: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_hardcoded) ?? [],
           criterios_dinamicos: parseJson<Array<{ criterio: string; pontos: number; justificativa: string }>>(analise.criterios_dinamicos) ?? [],
