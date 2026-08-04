@@ -4,6 +4,50 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## 🚨 04/08 (fim da tarde) — a fila do líder foi APAGADA por cópia de prod na aba STAGING, e recuperada
+>
+> **Sintoma:** o Luis copiou prod → aba `STAGING` (para eu rodar o dry-run líder↔liderado), depois restaurou
+> a versão de testes — e a tela do líder continuou vazia. **Não era bug da tela.** A fila mora em
+> `projeto_aprovacoes`, tabela INTERNA (o Sheets é só espelho do veredito), e `projeto_id` é
+> `REFERENCES projetos(id) **ON DELETE CASCADE**`: os IDs de teste sumiram da aba → `reconciliarExclusoes`
+> removeu os projetos (passada a carência de 1h) → **a fila foi em cascata**. Restaurar a aba recria o
+> PROJETO (como legado, via sync reverso), **nunca a fila** — quem abre fila é o `abrirPreAprovacao`, chamado
+> só no fim do `submeterParaValidacao`. Diagnóstico confirmado ANTES de mexer:
+> `GET /api/aprovacoes/pendentes?como=lucas.queiroz@gocase.com` → `{"lidera":true,"itens":[]}`.
+>
+> **Recuperação (commit `eff631e`, staging `edf400b4` deployada às 13:45):** nova rota
+> **`POST /api/admin/aprovacoes/reabrir`** (`requireAdmin`) + `reabrirPreAprovacoes` em
+> `aprovacoes.functions.ts`. Aceita `projetoIds` **OU** `autorEmail` (**fail-closed** — não existe "reabre
+> tudo"), é **`dry` por DEFAULT** (escrever exige `dry:false`) e **NUNCA sobrescreve parecer já dado**:
+> projeto que já tem linha (pendente OU decidida) é ignorado salvo `forcar:true` — porque
+> `abrirAprovacoesPendentes` **deleta** as linhas do projeto antes de inserir, e um reabrir cego apagaria o
+> veredito do líder. Espelha `Aprovação do Líder`/`Justificativa…` no Sheets como o submit faz.
+> **Aplicado:** 4 projetos do Luis voltaram à fila do Lucas (`itens: 4`, conferido pela API). ⚠️ **Saíram 4
+> DMs reais** para o Lucas (DM ligada na staging e nenhum projeto tem a tag `[E2E-`, que é o que muta).
+> ⚠️ Rota ainda **não** está em prod nem em PR.
+>
+> 🔒 **Regra nova (aprendizado):** cópia de prod por cima da aba STAGING **sempre** mata a fila, mesmo
+> restaurando depois. Se precisar de dados de prod lá, **apendar** preservando as linhas de teste — e, se
+> acontecer de novo, recuperar pela rota acima em vez de refazer submissões.
+>
+> ## 📋 Dry-run líder↔liderado (04/08, LEITURA PURA — o Luis AINDA NÃO LEU)
+>
+> Rodado sobre a aba STAGING (580 linhas, já com a cópia de prod) + TeamGuide ao vivo (430 pessoas, 107
+> lideranças), aplicando a régua real (`construirIndiceLideranca` + `ehLideranca`). Script:
+> `scratchpad/dryrun-lider.mjs` (SA do `.env` + `/teams` + membros paginados; **some com o scratchpad**).
+> **76 pendentes** (`Pendente` 63 + `Reenvio Pendente` 13) = **43 com líder** (26 líderes) + **23 isentos por
+> liderança (30% da fila!)** + **10 fora da TeamGuide**. Filas grandes: Natalia Pavão 6 · Murilo Guimarães 4 ·
+> Igor Morais 3 · Vinicius Elias 3. Único caso de **2 líderes** (D4): os 2 do Samuel Campos (Samir Labib +
+> Stefany Costa). Coluna `Aprovação do Líder` **vazia em 580/580**. Nenhum líder recebendo projeto de área
+> estranha — as atribuições fazem sentido.
+> ⛔ **BLOQUEIO ACHADO (precisa de ação humana):** o cabeçalho tem **`Justificativa Aprovação do Lider`**
+> — *sem acento* — e o código escreve `'Justificativa Aprovação do Líder'`. Mapeamento é por nome exato →
+> chave não casa → **a justificativa é descartada com aviso** (o rótulo de estado casa certo). Corrigir o
+> acento na **STAGING e conferir na aba `GoDocs` de prod** antes de subir a feature.
+> ⚠️ **10 sem DM:** 6 reenvios do **Glauco Bezerra** (`glaucolb@gobeaute.com.br`, e-mail fora do padrão) +
+> Michael Dias ×2 e Gesiel Silva (já `ÁREA NÃO IDENTIFICADA`) + Jhenyfer Silva. Corrigir o cadastro na
+> TeamGuide resolve os 10 de uma vez.
+>
 > 🔁 **A staging foi atropelada 3× no MESMO dia (04/08: ~09:40, 14:10 e o redeploy meu no meio).** A causa é
 > estrutural, não descuido: `updateApp` **substitui a app inteira** e a branch da pré-aprovação **não está no
 > `main`** — então QUALQUER deploy de outra frente apaga a tela `/aprovacoes`, e quem descobre é o Lucas, no
