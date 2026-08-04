@@ -4,6 +4,30 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## ✅ 04/08 (noite, rodada final) — 3 DESFECHOS no parecer + pergunta/exemplo por "não" (staging 18:25)
+>
+> Ajustes do Lucas sobre o D16 (commit **`28a033a`**, 936 testes, staging `edf400b4`):
+> **(1)** 1ª pergunta virou "move algum KPI **da área**" (tirado o "sua" — direcionava ao líder);
+> **(2)** a caixa de justificativa passou a ter **pergunta E exemplo POR CHAVE** (`JUSTIFICATIVA_POR_CHAVE`
+> no módulo único) — `move_kpi`: "O que este projeto entrega, se não move um indicador da área?" ·
+> `sente_falta`: "Se desligar o projeto não impactaria a área, justifique a aprovação."; era o exemplo do
+> SAVING aparecendo em cima de um "não" de KPI que ele reprovou. 2 "nãos" → **um campo** com bullet por
+> pergunta. Exemplos são **placeholder**;
+> **(3)** **saving incoerente é PRÉ-REQUISITO, não justificativa** — `bloqueiaPreAprovacao` (fonte única):
+> o botão verde SOME e aparece o `AVISO_SAVING_INCOERENTE` ("redirecione ao time para ajustes ou reprove");
+> o servidor recusa `aprovado` com 400 **mesmo com texto**;
+> **(4)** **3 botões**: Pré-aprovar verde `#15803d` · Pedir ajuste âmbar `#b45309` · Reprovar vermelho
+> `#b91c1c` (ícone próprio em cada — estado nunca só por cor). Veredito **`ajuste`** passou a ser SEPARADO de
+> `reprovado` (antes os dois gravavam `reprovado`): rótulos do Sheets `Pré-aprovado` · **`Ajuste pedido`** ·
+> `Pré-reprovado`; reprovar também exige motivo. ⚠️ **Sem migração** — a coluna `veredito` NÃO tem `CHECK`
+> (conferido); os tipos foram alargados em `client.server.ts` + `aprovacoes.functions.ts`.
+> ⚠️ Pareceres ANTIGOS gravados como `reprovado` significavam "ajuste" e agora aparecem como reprovação
+> (poucos, só staging — nada a corrigir).
+> ⚠️ **A DM em cartão (`0572a78`) subiu NESTE deploy** — inevitável (`updateApp` troca a app inteira): quem
+> submeter na staging manda o cartão novo para o líder.
+> **Próximo passo:** o Lucas validar essa rodada na staging (fluxo dos 3 botões + textos do "não"); depois
+> prod + PR (regra 10: incorporar `origin/main` `7980aa4` e rebuildar `worker.js`/`dist`).
+>
 > ## ⏳ 04/08 (fim) — 2 DECISÕES ESPERANDO O LUCAS (nada codar antes)
 >
 > **1) A pergunta do "Não" foi REPROVADA pelo Lucas.** Motivo: o título é genérico e **o exemplo do campo é

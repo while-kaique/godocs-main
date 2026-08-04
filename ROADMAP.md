@@ -120,6 +120,11 @@ campo `comentario` → coluna `Justificativa Aprovação do Líder`. Régua na f
 Staging redeployada 04/08 17:21 (934 testes). ⚠️ O aviso antecipado sobre o "não" foi **removido** a pedido
 dele (poluía a tela) — quem informa é a caixa, no clique.
 
+**04/08 (noite):** o Lucas reprovou a 1ª versão da pergunta do "não" e pediu 3 mudanças, já no ar na staging
+(`28a033a`): pergunta+exemplo POR CHAVE do "não", saving incoerente como PRÉ-REQUISITO (sem botão verde) e
+**3 botões** (Pré-aprovar verde · Pedir ajuste âmbar · Reprovar vermelho), com `ajuste` separado de
+`reprovado` no veredito e no Sheets. Falta ele validar essa rodada.
+
 **Próximo:** **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
 paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
