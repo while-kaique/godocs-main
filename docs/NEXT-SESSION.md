@@ -4,6 +4,47 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## ✅ 04/08 (noite) — "Não" no checklist passou a exigir explicação (D16) + dry-run sobre a aba GoDocs de PROD
+>
+> **Pedido do Luis:** "hoje se a pessoa botar um não a gente não pede justificativa; quando clicar em
+> pré-aprovar e tiver algum não, deve vir uma box pra explicar, e a explicação vai pro campo de
+> justificativa". Implementado como **D16** (`spec-docs/SPEC_APROVACAO_LIDER.md`) — commits **`da32167`** +
+> **`2c40eef`**, staging `edf400b4` deployada às 17:21, **934 testes verdes**, prod NÃO tocada.
+>
+> **Como ficou:** clicar em **Pré-aprovar** com qualquer resposta "não" **não grava** — abre a caixa
+> *"Por que você pré-aprova mesmo com 'Não' em «X»?"* (campo focado, botão "Pré-aprovar com esta
+> explicação"). O texto entra no **MESMO campo `comentario`** → coluna **`Justificativa Aprovação do Líder`**,
+> concatenado ao resumo do checklist. Nenhuma coluna nova. Régua na FONTE ÚNICA
+> **`exigeJustificativa`/`temNaoNoChecklist`** (`src/lib/aprovacoes-checklist.ts`), consumida pela tela **e
+> cobrada no servidor** (`decidirAprovacao` → **400**) — o frontend nunca é a garantia. Checklist todo "Sim"
+> segue pré-aprovando em 1 clique; "Pedir ajuste" segue exigindo texto sempre; o "não" **continua sem ser
+> veto** (D13 intacto), só não passa calado. A caixa é a MESMA do ajuste (`caixa: 'ajuste' | 'justificar'`),
+> com cor/copy/destino próprios. ⚠️ **2ª rodada do Luis:** o parágrafo âmbar que avisava do "não" ANTES do
+> clique foi **removido** ("só tá poluindo a tela") — quem informa é a caixa, no clique. 1 teste antigo
+> precisou de comentário (aprovava com "não" sem texto).
+>
+> ## 📋 Dry-run líder↔liderado sobre a aba **GoDocs de PRODUÇÃO** (04/08 noite — o Luis JÁ LEU o resultado)
+>
+> Leitura pura (`readAllRows` + `construirIndiceLideranca`/`ehLideranca` ao vivo), zero escrita, zero DM.
+> Script committado em **`scripts/dryrun-lider/`** (fora do `npm run test`;
+> `npx vitest run --config scripts/dryrun-lider/vitest.config.ts`; carrega o `.env` do repo PRINCIPAL porque
+> o worktree não tem `.env` — sem `GOOGLE_SHEETS_ID/TAB` o default É prod). ⏳ **DECISÃO PENDENTE:** virar
+> rota admin de dry-run, ficar como script, ou apagar (perguntei, sem resposta).
+>
+> **Números (582 linhas → 568 pendentes):** **319 projetos entrariam em fila** · **321 DMs** (2 projetos com
+> autor em 2 times → 2 líderes, D4) · **55 líderes** · **214 isentos por liderança** (D11, 57 autores) ·
+> **35 sem líder** (D6) · 0 sem e-mail. Carga: **10 líderes com 10+ projetos**, 24 com 4–9, 15 com 2–3, 6
+> com 1. Topo: Murilo Guimarães **19** (13 do mesmo liderado, Kevyn) · Leyde Rodrigues 14 · Giovanna Sabrina
+> 13 · Rackel Viana 13 · Kelly Sousa 12 · Eduarda Lourencini 12 · Gilvania Pinheiro 12 · Igor Morais 11 ·
+> Will Fernandes 11 · Natália Pavão 10. O Lucas ficaria com 9.
+> ⚠️ **Isso é o BACKLOG inteiro, não o fluxo do dia** — `abrirPreAprovacao` só roda **na submissão**, então
+> ligar em prod **não** dispara nada retroativo; os legados só entram quando alguém reenviar. Uma fila de 319
+> só existe se alguém abrir fila para o histórico (a rota `reabrir` faz isso, e é `dry` por default).
+> ⚠️ **Os 35 "sem líder" NÃO são o CEO:** **0** deles é pessoa ATIVA na TeamGuide — são e-mails fora da base
+> ativa (ex-funcionário / e-mail diferente do cadastro). Concentração: Glauco Bezerra 6 · Paulo Seabra 5 ·
+> Michael Dias 4 · Eduarda Alves 4 · Ana Estolano 3. Causa é **cadastro**, não hierarquia — corrigir na
+> TeamGuide resolve em bloco (mesmo achado do dry-run da manhã, agora quantificado em prod).
+>
 > ## 🚨 04/08 (fim da tarde) — a fila do líder foi APAGADA por cópia de prod na aba STAGING, e recuperada
 >
 > **Sintoma:** o Luis copiou prod → aba `STAGING` (para eu rodar o dry-run líder↔liderado), depois restaurou
@@ -348,6 +389,9 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > a prod está TRAVADA até a validação com a DIRETORIA** (decisão do Luis): branch commitada, sem push/PR.
 > **04/08:** o `origin/main` (PRs #224–#227) foi mergeado na branch e a staging redeployada; a fila do Lucas
 > tem **3 itens pendentes** (2 mockados criados de propósito) esperando ele abrir com a **própria conta**.
+> **04/08 noite:** entrou o **D16** ("não" no checklist exige explicação, commits `da32167`+`2c40eef`,
+> staging 17:21) — segue sem push/PR. ⚠️ A branch está **atrás do `origin/main` `7980aa4` (PR #231)**: antes
+> do PR, incorporar o main e **rebuildar `worker.js` + `dist`** (regra 10).
 > **04/08 (tarde):** a fila virou **slider de 1 projeto por vez** (D15 — ver "Última sessão"), redeployada;
 > continua sendo a MESMA validação humana pendente, agora com a tela nova.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag

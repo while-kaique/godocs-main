@@ -113,6 +113,13 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
+**D16 (pedido do Luis, 04/08 noite, `da32167`+`2c40eef`):** pré-aprovar com **qualquer "não"** no checklist
+**exige explicação** — o clique em "Pré-aprovar" abre uma caixa em vez de gravar, e o texto entra no mesmo
+campo `comentario` → coluna `Justificativa Aprovação do Líder`. Régua na fonte única
+(`exigeJustificativa`/`temNaoNoChecklist`) e **cobrada no servidor** (400). O "não" segue **sem ser veto**.
+Staging redeployada 04/08 17:21 (934 testes). ⚠️ O aviso antecipado sobre o "não" foi **removido** a pedido
+dele (poluía a tela) — quem informa é a caixa, no clique.
+
 **Próximo:** **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
 paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
@@ -125,7 +132,7 @@ criar **`Aprovação do Líder`** e **`Justificativa Aprovação do Líder`** no
 `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
-Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D15**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D16**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
 diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,
 índice de liderança (432 pessoas / 1 sem líder), tabela interna `projeto_aprovacoes`, rotas
