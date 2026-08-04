@@ -669,9 +669,9 @@ function CardAprovacao({
 }) {
   const completo = checklistCompleto(respostas);
   const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
-  // Com "não" marcado, pré-aprovar passa pela caixa de explicação (o texto vai para a
-  // coluna "Justificativa Aprovação do Líder", junto do checklist).
-  const temNao = temNaoNoChecklist(respostas);
+  // Perguntas respondidas com "não" — nomeadas no título da caixa de explicação, que é
+  // onde o líder fica sabendo que precisa escrever (o texto vai para a coluna
+  // "Justificativa Aprovação do Líder", junto do checklist).
   const naos = CHECKLIST_APROVACAO.filter((p) => respostas[p.chave] === "nao");
   const horas = fmtHoras(i.saving_horas, i.tipo_saving);
   const reais = fmtReais(i.saving_reais);
@@ -961,23 +961,8 @@ function CardAprovacao({
           })}
         </div>
 
-        {/* Um "Não" é sinal, não veto — mas agora pede explicação (04/08/2026). */}
-        {!decidido && temNao && (
-          <p
-            className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-snug"
-            style={{ color: "#b45309" }}
-          >
-            <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              Você respondeu "Não" em{" "}
-              {naos.map((p) => `"${p.rotulo}"`).join(naos.length === 2 ? " e " : ", ")}. Pode
-              pré-aprovar do mesmo jeito — ao clicar em "Pré-aprovar" vamos pedir uma explicação
-              curta, que segue junto para a triagem da RPA. Se o projeto precisa mudar antes, peça o
-              ajuste.
-            </span>
-          </p>
-        )}
-
+        {/* Sem aviso antecipado sobre o "Não" (04/08/2026): quem clica em "Pré-aprovar"
+            já cai na caixa de explicação, e o texto solto aqui só poluía a tela. */}
         {!decidido && (
           <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
