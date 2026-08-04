@@ -89,7 +89,20 @@ export function normalizarTexto(s: string): string {
  * Um falso positivo custa UMA pergunta com dois botões (a pessoa responde "já acontece e
  * foi medido" e nunca mais é perguntada), então a lista pode ser generosa — mas não vaga.
  */
-export const PISTAS_PROJECAO: readonly { marca: string; re: RegExp }[] = [
+/**
+ * Pistas cujo GATILHO E UMA PALAVRA AFIRMATIVA ("projecao", "expectativa", "premissa",
+ * "potencial") precisam checar o que vem ANTES: "nao e projecao, ja aconteceu" afirma
+ * exatamente o contrario e nao pode armar o gate. Marcadas com `negavel: true`.
+ *
+ * ATENCAO - encontrado no pre-flight sobre os cenarios E2E reais: o briefing do
+ * `custo-evitado-puro` diz "ja foi cancelado na pratica (nao e projecao, ja aconteceu)" e
+ * armava o gate. As pistas que JA SAO negacoes ('nao-e-medido', 'sem-historico',
+ * 'ainda-nao') NAO levam o flag - nelas a negacao e o proprio sinal.
+ */
+const NEGACAO_ANTES =
+  /(?:\bnao (?:e|era|se trata de)|\bnao ha|\bnem |\bsem |\bdeixou de ser )[^.;]{0,24}$/
+
+export const PISTAS_PROJECAO: readonly { marca: string; re: RegExp; negavel?: boolean }[] = [
   // A confissão literal do caso de origem: "não é um número medido", "não é histórico medido".
   {
     marca: 'nao-e-medido',
@@ -114,11 +127,12 @@ export const PISTAS_PROJECAO: readonly { marca: string; re: RegExp }[] = [
   {
     marca: 'premissa',
     re: /\b(?:premissa|hipotese|suposicao)(?:s)? (?:conservadora|conservadoras|de piso|otimista|inicial|iniciais|de trabalho|teorica)\b/,
+    negavel: true,
   },
   // "projeção", "projetado", "projetada".
-  { marca: 'projecao', re: /\b(?:projecao|projecoes|projetad[oa]s?)\b/ },
+  { marca: 'projecao', re: /\b(?:projecao|projecoes|projetad[oa]s?)\b/, negavel: true },
   // "a expectativa é", "expectativa de ganho".
-  { marca: 'expectativa', re: /\bexpectativa\b/ },
+  { marca: 'expectativa', re: /\bexpectativa\b/, negavel: true },
   // "quando estiver rodando", "quando entrar em produção".
   { marca: 'quando-estiver', re: /\bquando (?:estiver|entrar|comecar|passar|for|migrarmos|tivermos)\b/ },
   // Futuro colado a VERBO DE GANHO (nunca futuro genérico — ver nota acima).
@@ -132,7 +146,7 @@ export const PISTAS_PROJECAO: readonly { marca: string; re: RegExp }[] = [
     re: /\b(?:a validar|recalibrar|calibrar (?:depois|dep|no futuro)|validar (?:com|nos|apos) (?:os )?primeiros)\b/,
   },
   // "potencial de receita", "ganho potencial".
-  { marca: 'potencial', re: /\b(?:potencial de (?:receita|ganho|economia)|ganho potencial|receita potencial)\b/ },
+  { marca: 'potencial', re: /\b(?:potencial de (?:receita|ganho|economia)|ganho potencial|receita potencial)\b/, negavel: true },
   // "vamos cancelar/encerrar/migrar" — o sinal clássico do custo evitado projetado.
   { marca: 'vamos-fazer', re: /\bvamos (?:cancelar|encerrar|migrar|lancar|implementar|desligar|substituir)\b/ },
   // "em testes", "em homologação", "em piloto", "prova de conceito".
@@ -170,6 +184,8 @@ export function detectarGanhoProjetado(
     for (const pista of PISTAS_PROJECAO) {
       const m = pista.re.exec(t)
       if (!m) continue
+      // Palavra afirmativa dentro de uma negacao ("nao e projecao, ja aconteceu") NAO conta.
+      if (pista.negavel && NEGACAO_ANTES.test(t.slice(Math.max(0, m.index - 40), m.index))) continue
       if (!marcas.includes(pista.marca)) marcas.push(pista.marca)
       if (!trecho) trecho = recortarTrecho(t, m.index, m[0].length)
     }
@@ -306,6 +322,22 @@ export function mensagemGanhoProjetado(modo: 'saving' | 'receita'): string {
   )
 }
 
+/**
+ * Repetição da mensagem de bloqueio, quando a pessoa segue conversando depois de já ter
+ * confirmado que o ganho é projetado. Curta de propósito: repetir o texto longo a cada
+ * turno LÊ como loop, e o que a pessoa precisa saber é só que a decisão está tomada e
+ * qual é a única coisa que a reabre.
+ */
+export function mensagemGanhoProjetadoRepetida(modo: 'saving' | 'receita'): string {
+  const oQue = modo === 'receita' ? 'a receita' : 'o saving'
+  return (
+    `Sigo sem poder fechar ${oQue} com um número que ainda não foi medido — isso não muda ` +
+    `conversando. Para retomar: reabra o formulário desta etapa quando tiver a medição, ou ` +
+    `marque o projeto como **especial** na Etapa 2. Se o ganho JÁ foi apurado, me diga há ` +
+    `quanto tempo a solução roda e onde o número é medido, e eu sigo daqui.`
+  )
+}
+
 // ── Decisores puros ─────────────────────────────────────────────────────────
 
 /** O gate se aplica a esta fase? Vale nas duas famílias financeiras. */
@@ -316,8 +348,38 @@ export function aplicaGateGanhoProjetado(fase: string): 'saving' | 'receita' | n
 }
 
 /**
- * O gate deve BLOQUEAR este resultado do LLM?
- * Só mexe em preview/complete — pergunta intermediária do agente passa direto.
+ * PRÉ-EMPÇÃO — o gate assume o turno ANTES de chamar o LLM?
+ *
+ * ⚠️ Esta função existe por causa de uma falha real encontrada na STAGING (04/08/2026, ver
+ * SPEC_CORRECOES): a primeira versão do gate só agia sobre `preview`/`complete`, espelhando
+ * o gate de sobreposição. Só que ali o LLM QUER previewar; aqui, com o portão reforçado no
+ * prompt, ele passa a RECUSAR — e nunca chega a preview. Resultado observado: o agente
+ * negociava com o usuário ~15 turnos seguidos ("escolha: encerrar a submissão ou
+ * reclassificar como especial"), oferecendo caminhos que o chat não executa, o histórico
+ * crescia de 38 para 56 mensagens e a submissão morria em 500. O gate — que existe
+ * justamente para dar um estado TERMINAL a isso — ficava inerte.
+ *
+ * Então: havendo pista de projeção e estado ainda não avaliado, o backend faz a pergunta
+ * ANTES de gastar a chamada de LLM. Uma pergunta, dois botões, estado terminal.
+ *
+ * Só dispara com `estado == null` — 'pendente'/'reperguntado' são tratados pelo ramo de
+ * resposta e os terminais nunca reabrem. Sem pista, não arma (o gate não é uma pergunta de
+ * rotina; quem não escreveu linguagem de projeção nunca a vê).
+ */
+export function devePreemptarPorProjecao(
+  estado: EstadoGanhoReal | null | undefined,
+  temPista: boolean,
+): boolean {
+  if (estado != null) return false
+  return temPista
+}
+
+/**
+ * O gate deve BLOQUEAR este resultado do LLM? (backstop pós-orquestrador)
+ *
+ * Pega o caso que a pré-empção não alcança: a pista aparece SÓ no memorial que o LLM
+ * acabou de escrever, no mesmo turno em que ele gera o preview — que é literalmente o
+ * caso de origem (a ressalva "não é histórico medido" nasceu dentro do preview).
  *
  * 'projetado' bloqueia SEMPRE (é a função do gate); 'real'/'nao_respondido' liberam para
  * sempre; `null`/'pendente'/'reperguntado' bloqueiam até haver resposta.

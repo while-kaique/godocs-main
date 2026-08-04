@@ -8,7 +8,69 @@
 
 ## 2026-08-04 — Ganho PROJETADO virou receita apurada: o agente perguntou 2×, ouviu "não é um número medido" e gerou o preview igual
 
-**Status:** ✅ codada e testada (925 verdes) · **Branch:** `fix/gate-ganho-projetado` · **PR:** _(a abrir)_ · **Pendente:** validar na staging (regra 13) antes de prod
+**Status:** ✅ codada, testada (925 verdes) e **validada na staging** — a staging REPROVOU a 1ª versão do fix e a correção está no adendo abaixo · **Branch:** `fix/gate-ganho-projetado`
+
+**⚠️ ADENDO — a STAGING reprovou a primeira versão do fix (04/08/2026).** Vale mais que o fix
+em si, porque é a lição transferível: **um gate que só hooka `preview`/`complete` fica inerte
+exatamente quando o prompt passa a funcionar.**
+
+O que a staging mostrou (cenário oficial `receita-pura`, dirigido pelo LLM responder, projeto
+`0d719dec…`): com o portão reforçado, o agente **parou de previewar** e começou a **negociar**:
+
+```
+🤖 IA: "Não consigo finalizar como receita incremental realizada, porque você confirmou
+        que os 80 pedidos/mês e a margem de R$100 são estimativas do briefing…"
+   Opções: Encerrar a submissão sem registrar receita | Reclassificar como especial
+```
+
+— repetido **~15 turnos**, histórico crescendo de 38 para 56 mensagens, oferecendo caminhos que
+o chat **não executa** (quem encerra ou reclassifica é a pessoa, no formulário), e a submissão
+morrendo em `500 "Não é possível submeter receita incremental"`. Nos logs do worker, **nenhuma**
+linha `Ganho real × projetado`: o gate nunca rodou.
+
+**Causa do erro de desenho:** copiei o hook do `sobreposicao-receita`, onde o LLM **quer**
+previewar (o gate intercepta o preview). Aqui é o oposto — o prompt ensina o LLM a **recusar**,
+então `resultado.type` nunca é `preview`/`complete` e a condição do gate nunca fecha. O prompt
+virou a única autoridade, e prompt sem estado terminal = loop, exatamente o que o gate existia
+para evitar. Nenhum teste de unidade podia pegar isso: o defeito vivia no **acoplamento entre o
+prompt e o hook**, não dentro de nenhum dos dois.
+
+**Correção (3 partes):**
+
+1. **`devePreemptarPorProjecao(estado, temPista)`** — o gate assume o turno **ANTES** da chamada
+   de LLM, quando há pista e o estado é `null`. Uma pergunta, dois botões, estado terminal — e
+   economiza a chamada. O hook antigo (`deveBloquearPorProjecao`, pós-orquestrador) **fica**, como
+   backstop para a pista que nasce dentro do memorial do próprio turno (o caso de origem).
+   Novo ramo para o estado `'projetado'`: qualquer mensagem recebe
+   `mensagemGanhoProjetadoRepetida` (curta — repetir o texto longo lê como loop) **sem chamar o
+   LLM**; a única coisa que reabre é a pessoa AFIRMAR a medição (`interpretarGanhoReal → 'real'`).
+2. **O prompt proíbe o LLM de conduzir a decisão** — mesmo padrão da jornada-base ("o sistema faz
+   essa pergunta, você não"): sem oferecer caminhos, sem repetir a recusa, apenas reagir aos avisos
+   `[SISTEMA]`.
+3. **Guarda de NEGAÇÃO nas pistas afirmativas** (`negavel: true` + `NEGACAO_ANTES`). Um pré-flight
+   do detector sobre os **29 cenários E2E reais** apontou 1 falso positivo: o briefing do
+   `custo-evitado-puro` diz _"já foi cancelado na prática (**não é projeção**, já aconteceu)"_ — a
+   palavra-gatilho dentro de uma negação que afirma o contrário. Depois da guarda: **0 de 29** armam
+   o gate à toa. As pistas que JÁ SÃO negação (`nao-e-medido`, `sem-historico`, `ainda-nao`) não
+   levam o flag — nelas a negação é o próprio sinal.
+
+**Também corrigido: os briefings de receita da suíte E2E.** Eles diziam só "gera R$8000/mês de
+receita incremental", sem afirmar medição — então o responder respondia com honestidade
+("estimativa do briefing") e o portão passava a recusar, quebrando `receita-pura`. Como todo
+cenário representa um projeto **em produção** (a premissa da Etapa 1), os 6 racionais e 3 briefings
+de receita passaram a declarar desde quando roda e **onde o número é apurado**. É leitura correta do
+cenário, não afrouxamento do gate.
+
+**Validação na staging (2ª rodada, `edf400b4`, 04/08/2026):**
+
+| Cenário | Resultado |
+|---|---|
+| A — reprodução do caso real (falas do autor, 1% "não medido") | gate perguntou **1×** (2 botões, ancorado na Etapa 1) → clique em "ainda é expectativa" → **BLOQUEOU** com as duas saídas → **nenhum** preview/complete → submissão barrada |
+| B — regressão, receita medida de verdade | gate **não apareceu** → preview → complete → submetido com `valor_ganho_mensal = 8000`, memorial em passado/presente ("passou a recuperar… Antes… depois") |
+
+Harness novo: `scripts/e2e/validar-ganho-projetado.mjs` (respostas SCRIPTADAS com as falas reais
+do caso, em vez do LLM responder — o ponto é exercitar o caminho exato que falhou). Aborta se
+`E2E_BASE_URL` não for a staging. 23 projetos de teste limpos via `/api/admin/e2e-cleanup`.
 
 **Sintoma.** O projeto **"Automação cadastro de novos cliente"** (`a2172a9ff26a6a26cdd073b91efdb86d`,
 Eduardo Santana / B2B GOBEAUTE, submetido 28/07/2026) entrou na planilha com **R$ 10.000/mês de receita

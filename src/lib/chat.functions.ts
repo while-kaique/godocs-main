@@ -64,6 +64,8 @@ import {
   deveBloquearPorProjecao,
   interpretarGanhoReal,
   mensagemGanhoProjetado,
+  mensagemGanhoProjetadoRepetida,
+  devePreemptarPorProjecao,
   nudgeGanhoRealConfirmado,
   perguntaGanhoReal,
   perguntaGanhoRealFirme,
@@ -1285,7 +1287,29 @@ export async function enviarMensagem(rawData: unknown) {
         ? (estado.receita.ganho_real ?? null)
         : null;
   let reask: OrchestratorResult | null = null;
-  if (faseGanhoReal && (ganhoRealAtual === "pendente" || ganhoRealAtual === "reperguntado")) {
+  if (faseGanhoReal && ganhoRealAtual === "projetado") {
+    // (0a) Estado TERMINAL de bloqueio. A única coisa que reabre é a pessoa AFIRMAR que o
+    // ganho foi medido — aí o gate cede e a conversa segue. Qualquer outra mensagem recebe a
+    // resposta curta de bloqueio, SEM chamar o LLM: era ele quem ficava negociando "escolha
+    // um caminho" por 15 turnos (falha encontrada na staging, 04/08/2026).
+    const racional = (data.content ?? "").trim();
+    if (interpretarGanhoReal(racional, data.selected_option ?? null) === "real") {
+      log("enviarMensagem", `Ganho real × projetado (${faseGanhoReal}): usuário afirmou medição — reabrindo`);
+      if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: "real" };
+      else estado.receita = { ...estado.receita, ganho_real: "real" };
+      history.push({ role: "user", content: nudgeGanhoRealConfirmado(racional) });
+    } else {
+      log("enviarMensagem", `⛔ Ganho projetado confirmado (${faseGanhoReal}) — mantendo o bloqueio (sem LLM)`);
+      reask = {
+        type: "question",
+        content: mensagemGanhoProjetadoRepetida(faseGanhoReal),
+        fase: faseGanhoReal,
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
+    }
+  } else if (faseGanhoReal && (ganhoRealAtual === "pendente" || ganhoRealAtual === "reperguntado")) {
     // (0) Turno de RESPOSTA ao gate GANHO REAL × PROJETADO. Vem PRIMEIRO na cadeia porque é
     // a premissa mais externa: não faz sentido validar horas ou base de cálculo de um ganho
     // que ainda não aconteceu. ANTI-LOOP por construção: 'pendente' → ambíguo → 'reperguntado'
@@ -1511,6 +1535,34 @@ export async function enviarMensagem(rawData: unknown) {
             : NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
     });
   }
+  // ── PRÉ-EMPÇÃO DO GATE GANHO REAL × PROJETADO (antes de gastar a chamada de LLM) ──
+  // Roda DEPOIS da cadeia de respostas (não rouba o turno de resposta de outro gate) e só
+  // quando nenhum outro gate já assumiu (`reask == null`).
+  //
+  // ⚠️ POR QUE existe: a 1ª versão do gate só agia sobre preview/complete, espelhando o gate
+  // de sobreposição — mas ali o LLM QUER previewar. Aqui, com o portão reforçado no prompt,
+  // ele passa a RECUSAR e nunca chega a preview: na staging (04/08/2026) o agente negociou
+  // "escolha: encerrar a submissão ou reclassificar como especial" por ~15 turnos seguidos,
+  // o histórico foi de 38 a 56 mensagens e a submissão morreu em 500 — com o gate INERTE.
+  // Pré-emptando, o backend faz UMA pergunta de dois botões e chega a estado terminal.
+  if (faseGanhoReal && reask === null && devePreemptarPorProjecao(ganhoRealAtual, detProjecao !== null)) {
+    log(
+      "enviarMensagem",
+      `⛔ Pré-empção do gate ganho real × projetado (${faseGanhoReal}, pistas: ${detProjecao!.marcas.join(",")}) — perguntando antes do LLM`,
+    );
+    if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: "pendente" };
+    else estado.receita = { ...estado.receita, ganho_real: "pendente" };
+    reask = {
+      type: "options",
+      question: perguntaGanhoReal(detProjecao!, faseGanhoReal),
+      options: OPCOES_GANHO_REAL,
+      fase: faseGanhoReal,
+      coletado: estado.coletado,
+      saving: estado.saving,
+      receita: estado.receita,
+    };
+  }
+
   // NOTA: o split CARGA REAL × ESCALA NÃO tem mais gate determinístico aqui. O agente
   // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
   // gravação (resolverSplitCargaEscala em submeterParaValidacao) — ver SPEC_CORRECOES.

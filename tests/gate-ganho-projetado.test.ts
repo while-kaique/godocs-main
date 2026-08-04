@@ -11,6 +11,8 @@ import {
   detectarGanhoProjetado,
   interpretarGanhoReal,
   deveBloquearPorProjecao,
+  devePreemptarPorProjecao,
+  mensagemGanhoProjetadoRepetida,
   aplicaGateGanhoProjetado,
   ganhoRealResolvido,
   normalizarTexto,
@@ -327,5 +329,68 @@ describe('prompt — o portão passa a existir na RECEITA (era o bug)', () => {
     expect(ce).not.toContain('saving contrafactual');
     expect(receita).toContain('receita nova JÁ ESTÁ ENTRANDO');
     expect(ce).toContain('JÁ foi cancelado ou reduzido NA PRÁTICA');
+  });
+});
+
+describe('devePreemptarPorProjecao — a correção que a STAGING exigiu', () => {
+  // A 1ª versão do gate só agia sobre preview/complete (espelhando o gate de sobreposição).
+  // Na staging o LLM, com o portão reforçado, passou a RECUSAR e nunca chegou a preview:
+  // negociou "escolha: encerrar ou reclassificar" por ~15 turnos, histórico de 38 → 56
+  // mensagens, submissão morta em 500 — com o gate INERTE. A pré-empção resolve isso.
+  it('arma quando há pista e o estado nunca foi avaliado', () => {
+    expect(devePreemptarPorProjecao(null, true)).toBe(true);
+    expect(devePreemptarPorProjecao(undefined, true)).toBe(true);
+  });
+
+  it('NÃO arma sem pista — o gate não é pergunta de rotina', () => {
+    expect(devePreemptarPorProjecao(null, false)).toBe(false);
+  });
+
+  it('NÃO arma quando o gate já está em curso (o ramo de resposta cuida disso)', () => {
+    expect(devePreemptarPorProjecao('pendente', true)).toBe(false);
+    expect(devePreemptarPorProjecao('reperguntado', true)).toBe(false);
+  });
+
+  it('NÃO arma em nenhum estado terminal — nem com pista nova', () => {
+    for (const t of ESTADOS_TERMINAIS_GANHO_REAL) {
+      expect(devePreemptarPorProjecao(t, true), t).toBe(false);
+    }
+  });
+
+  it('a repetição do bloqueio é CURTA e diz o que reabre (repetir o texto longo lê como loop)', () => {
+    for (const modo of ['saving', 'receita'] as const) {
+      const curta = mensagemGanhoProjetadoRepetida(modo);
+      expect(curta.length).toBeLessThan(mensagemGanhoProjetado(modo).length);
+      expect(curta).toMatch(/especial/i);
+      expect(curta).toMatch(/medi[çc]ão/i);
+    }
+  });
+});
+
+describe('guarda de NEGAÇÃO nas pistas afirmativas', () => {
+  // Achado no pré-flight sobre os cenários E2E reais: o briefing do `custo-evitado-puro`
+  // diz "já foi cancelado na prática (não é projeção, já aconteceu)" — a palavra-gatilho
+  // aparece dentro de uma negação que afirma exatamente o contrário.
+  const negados = [
+    'o contrato ja foi cancelado na pratica (nao e projecao, ja aconteceu)',
+    'nao e uma expectativa: o numero saiu do relatorio de pedidos',
+    'nao e premissa conservadora, e o valor apurado no fechamento',
+    'sem projecao nenhuma — os 42 pedidos estao no painel',
+  ];
+  for (const texto of negados) {
+    it(`não arma com: "${texto.slice(0, 50)}…"`, () => {
+      expect(detectarGanhoProjetado([texto]), texto).toBeNull();
+    });
+  }
+
+  it('mas a MESMA palavra sem negação segue armando', () => {
+    expect(detectarGanhoProjetado(['é uma projeção do que deve acontecer'])?.marcas).toContain('projecao');
+    expect(detectarGanhoProjetado(['a expectativa é fechar 40 pedidos'])?.marcas).toContain('expectativa');
+  });
+
+  it('as pistas que JÁ SÃO negação não são afetadas pela guarda', () => {
+    // "não é um número medido" é a confissão do caso de origem — tem de continuar armando.
+    expect(detectarGanhoProjetado(['nao e um numero medido'])?.marcas).toContain('nao-e-medido');
+    expect(detectarGanhoProjetado(['ainda nao temos historico'])?.marcas).toContain('sem-historico');
   });
 });
