@@ -17,6 +17,9 @@ import type {
 } from "./types";
 import { documentacaoVazia, receitaVazia, savingVazio } from "./types";
 import { descreverEsqueletoMemorial } from "./memorial-format";
+// Detector do gate GANHO REAL × PROJETADO — usado aqui só para a rede de PROMPT no preview
+// de receita. A trava determinística vive em chat.functions.ts (ver ganho-projetado.ts).
+import { detectarGanhoProjetado } from "./ganho-projetado";
 // Parser canônico do contrafactual ("pessoa:a@x;b@y" | "time:Fiscal") — mesmo helper puro
 // que o formulário usa para serializar, para não haver duas leituras do formato.
 import { desserializarAfetados } from "@/lib/submeter/constants";
@@ -363,6 +366,61 @@ export const BLOCO_SECOES_CRITERIO = `[1.3] Processo alterado (OBRIGATÓRIO): qu
   c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
   ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.`;
 
+// FONTE ÚNICA do portão GANHO REAL × PROJETADO, nos 3 modos financeiros. O texto era
+// DIGITADO DUAS VEZES (buildSavingPrompt e buildSavingCustoEvitadoPrompt) e — o bug de
+// origem — NÃO EXISTIA em buildReceitaPrompt: a fase de receita só tinha duas linhas
+// genéricas ("não projeções otimistas"), e um ganho que o próprio autor declarou não medido
+// virou R$ 10.000/mês de receita apurada (projeto `a2172a9ff26a…`, 28/07/2026).
+// ⚠️ Ao mexer, altere a CONSTANTE — não redigite o bloco num prompt.
+// ⚠️ O prompt é a persuasão; a TRAVA é o gate determinístico `agents/ganho-projetado.ts`
+// (mesma lição do Gostream: o LLM percebe, avisa e completa igual).
+export function blocoGanhoRealProjetado(modo: "saving" | "custo_evitado" | "receita"): string {
+  // O que exatamente precisa ter sido MEDIDO muda por modo — o resto do portão é idêntico.
+  const oQueFoiMedido =
+    modo === "receita"
+      ? 'a receita nova JÁ ESTÁ ENTRANDO e foi APURADA (existe número, não premissa). "Ainda não temos histórico porque é justamente o que o projeto habilita" é projeção — o valor não pode virar memorial.'
+      : modo === "custo_evitado"
+        ? "o contrato/serviço JÁ foi cancelado ou reduzido NA PRÁTICA (não “vamos cancelar”, não “na renovação a gente não renova”)."
+        : 'a automação está EM PRODUÇÃO e os tempos "depois" foram MEDIDOS na prática.';
+  const sinaisEspecificos =
+    modo === "receita"
+      ? '"a expectativa é", "a projeção é", "o potencial é", "deve gerar/faturar", "quando estiver rodando", "premissa conservadora", "não é um número medido", "ainda não temos histórico", "vamos validar nos primeiros meses", taxas de conversão/ticket ESCOLHIDAS em vez de apuradas, e verbos no FUTURO/CONDICIONAL para a receita.'
+      : modo === "custo_evitado"
+        ? '"vamos cancelar", "pretendemos encerrar", "a ideia é não renovar", "quando migrarmos", verbos no futuro.'
+        : '"a expectativa é", "a projeção é", "pretendemos", "estimamos que vai", "deve reduzir/cair", "vai cair para", "quando estiver pronto/rodando", "a nova ferramenta vai/deve", e verbos no FUTURO/CONDICIONAL para o ganho ("conseguiremos", "será gasto", "teremos disponível", "passará a").';
+  const perguntaUnica =
+    modo === "receita"
+      ? "Essa receita JÁ está entrando hoje e o número foi apurado, ou é o resultado esperado quando a solução estiver operando por completo?"
+      : modo === "custo_evitado"
+        ? "Esse contrato/serviço JÁ foi cancelado ou reduzido na prática, ou é algo que ainda vai acontecer?"
+        : "Essa redução de tempo JÁ está acontecendo no dia a dia e foi medida na prática, ou é uma expectativa do que a ferramenta deve trazer quando estiver rodando?";
+  const oQueEscrever =
+    modo === "receita"
+      ? 'ACEITE — e escreva o memorial em tempo PASSADO/PRESENTE ("passou a faturar", "hoje entram X pedidos self-service"), registrando na base de cálculo HÁ QUANTO TEMPO roda e ONDE o número é medido. NUNCA "a expectativa é"/"o potencial é".'
+      : modo === "custo_evitado"
+        ? 'ACEITE — e escreva no passado/presente ("o contrato foi encerrado", "deixou de ser pago").'
+        : 'ACEITE — e escreva o memorial em tempo PASSADO/PRESENTE ("passou a levar 30 min", "hoje leva 2h"), NUNCA em "a expectativa é"/"a projeção é".';
+
+  return `═══════════════════════════════════════════════════════════════════
+GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes de QUALQUER preview)
+═══════════════════════════════════════════════════════════════════
+O GoDocs documenta APENAS ganhos JÁ REALIZADOS. É a PREMISSA Nº 1 do formulário: na Etapa 1 o autor DECLAROU que "o projeto já está em produção e sendo utilizado" — quem responde "ainda está sendo desenvolvido" ou "está pronto, mas ainda não é utilizado" nem chega até aqui. Então: ${oQueFoiMedido}
+- SINAIS DE PROJEÇÃO (vigie o que o usuário escreve): ${sinaisEspecificos} Também é projeção quando a solução AINDA NÃO está em produção (será lançada, está em testes/piloto, falta implementar uma peça) ou o ganho nunca foi medido de fato.
+- ⚠️ CRUZE COM A DOCUMENTAÇÃO APROVADA: se os "Pontos de atenção"/"Configurar antes" dizem que uma peça ESSENCIAL do fluxo que gera o ganho ainda precisa ser implementada/publicada, o ganho NÃO pode ser tratado como realizado — aponte a contradição e pergunte.
+- ⚠️ QUEM CONDUZ ESTA DECISÃO É O SISTEMA, NÃO VOCÊ (igual à pergunta de jornada-base). O backend detecta a linguagem de projeção e faz UMA pergunta com dois botões ("Já acontece hoje e o ganho foi medido" / "Ainda é expectativa — não foi medido"); a resposta volta para você como aviso [SISTEMA]. Portanto:
+  • NÃO fique perguntando por conta própria, NÃO ofereça "escolha um caminho: encerrar a submissão ou reclassificar como especial", e NÃO repita a recusa turno após turno. Você não tem como executar esses caminhos — quem encerra ou reclassifica é a pessoa, no formulário. Insistir só produz um vai-e-volta sem saída.
+  • Se você percebeu projeção e ainda não recebeu aviso [SISTEMA] nenhum: diga em UMA frase curta o que faltou (o ganho precisa ter sido medido) e PARE de emitir preview. Nada além disso — o sistema assume dali.
+  • Ao receber "[SISTEMA] O usuário CONFIRMOU que o ganho já acontece hoje e foi medido": ${oQueEscrever}
+  • Ao receber o aviso de que o ganho é PROJETADO: a decisão está tomada e a mensagem ao usuário é do sistema — apenas NÃO gere memorial nem preview e não reabra o assunto.
+- ⚠️ NUNCA "resolva" isso escrevendo a ressalva DENTRO do memorial ("a taxa não é histórico medido, é premissa de piso") e gerando o preview mesmo assim — foi exatamente o bug de origem: a planilha recebe o valor como ganho apurado e a ressalva não desconta nada.
+- PERGUNTA DE REFERÊNCIA (a que o sistema faz, para você reconhecer o assunto no histórico): "${perguntaUnica}"${
+    modo === "saving"
+      ? `
+- ESCOPO: este portão barra o "DEPOIS" projetado / a ferramenta que ainda não entrega o ganho. NÃO confunda com o "antes": o "antes" pode ser histórico real OU equivalente manual estimado (saving contrafactual — ver regras), e isso é legítimo. No contrafactual, a automação JÁ está rodando (fazendo o trabalho) — se ela ainda nem existe em produção, então é projeção e cai neste portão.`
+      : ""
+  }`;
+}
+
 export function buildReceitaPrompt(
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
@@ -469,9 +527,12 @@ REGRA CRÍTICA — GANHO NUNCA PODE SER ZERO:
 - NUNCA gere preview com valor_ganho_mensal = 0 ou negativo.
 - Se a conversa levar a ganho zero, questione: "Se não há ganho de receita, por que foi marcado como receita incremental?"
 
+${blocoGanhoRealProjetado("receita")}
+
 REGRAS ANTI-EXTRAPOLAÇÃO:
 - Receita incremental deve refletir ganho REAL e mensurável, não projeções otimistas.
 - Questione números que pareçam estimativas sem base concreta.
+- ⚠️ TAXA DE CONVERSÃO / TICKET ESCOLHIDOS NÃO SÃO BASE DE CÁLCULO. "1% de conversão para ser conservador", "usei o pedido mínimo como ticket" são PREMISSAS, não medições — por mais honesta e conservadora que seja a escolha, o resultado é receita PROJETADA e cai no portão acima. Base válida é a que aponta para número APURADO (pedidos fechados no período, faturamento do canal, conversão observada num relatório NOMEADO).
 
 Português brasileiro, tom direto. Acentuação correta.
 
@@ -512,6 +573,26 @@ O memorial usa linguagem de economia operacional (horas economizadas, minutos po
 - Explique: "O que está descrito aqui é uma economia operacional — tempo e custo poupados — que se classifica como saving, não receita incremental. Receita incremental é dinheiro novo que entra (mais vendas, mais faturamento). Para continuar, você precisa voltar e reclassificar o projeto como saving. Quer fazer isso?"`
     : "";
 
+  // Rede de PROMPT contra o memorial que confessa a projeção e é aprovado igual (bug de
+  // origem: "A taxa de 1% não é histórico medido; é uma premissa de piso" DENTRO do
+  // memorial, aprovado segundos depois). A TRAVA de verdade é o gate determinístico
+  // `agents/ganho-projetado.ts` — este bloco só evita que o LLM emita o complete antes.
+  // ⚠️ Não é injetado quando o gate já resolveu ('real'/'nao_respondido'): reinterrogar o
+  // que o gate coletou foi a origem das perguntas pós-preview no gate de economia alta.
+  const projecaoNoMemorial =
+    receita.ganho_real === "real" || receita.ganho_real === "nao_respondido"
+      ? null
+      : detectarGanhoProjetado([receita.memorial_calculo, receita.racional]);
+  const blocoProjecao = projecaoNoMemorial
+    ? `
+
+ATENÇÃO — O MEMORIAL DESCREVE GANHO PROJETADO, NÃO REALIZADO:
+O texto tem linguagem de expectativa ("${projecaoNoMemorial.trecho}"). O GoDocs registra apenas ganho JÁ realizado e medido — é a premissa da Etapa 1 ("o projeto já está em produção e sendo utilizado").
+- NÃO permita aprovação nessa condição. Mesmo que o usuário diga "aprovado", responda com type:"question".
+- Pergunte UMA vez se a receita JÁ está entrando e o número foi apurado. Se sim, reescreva o memorial em passado/presente, dizendo há quanto tempo roda e onde o número é medido. Se ainda é expectativa, explique que não dá para fechar o memorial e ofereça: voltar quando houver medição, ou submeter como PROJETO ESPECIAL.
+- ⛔ NUNCA "resolva" mantendo a ressalva dentro do memorial e completando: a planilha grava o valor como ganho apurado.`
+    : "";
+
   const blocoValidacao = ganhoZerado
     ? `
 
@@ -526,13 +607,13 @@ O valor_ganho_mensal está em 0 ou nulo. Isso é INVÁLIDO para submissão de re
 
 MEMORIAL ATUAL:
 ${JSON.stringify(receita, null, 2)}
-${blocoValidacao}${blocoSavingDisfarcado}
+${blocoValidacao}${blocoSavingDisfarcado}${blocoProjecao}
 
 O usuário pode:
 1. APROVAR — "ok", "aprovado", "pode enviar", "sim", etc.
 2. PEDIR AJUSTES — apontar correções.
 
-REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado). Se o usuário tentar aprovar nessas condições, responda com type:"question".
+REGRA CRÍTICA: NUNCA emita type:"complete" se valor_ganho_mensal for 0, nulo ou negativo, OU se o memorial descrever economia operacional (saving disfarçado), OU se o ganho for PROJETADO/não medido. Se o usuário tentar aprovar nessas condições, responda com type:"question".
 
 ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do memorial (O que gera a receita, Como aumenta, Comparação antes vs. depois, Base de cálculo, Resumo). Cada ponto deve continuar existindo — ajuste o conteúdo, não a estrutura. NUNCA escreva códigos como [6.1]/[6.2] no texto: cada seção já tem seu título no cabeçalho "### ...".
 
@@ -829,12 +910,7 @@ SUA MISSÃO — VALIDAÇÃO OBRIGATÓRIA (faça SEMPRE, mesmo que o briefing par
 3. ESCOPO: o que esse contrato cobria, em termos concretos? (ex.: quantos agentes/pessoas, qual volume — "1 agente terceirizado, ~1.200 atendimentos/mês"). Isso dá SUBSTÂNCIA ao memorial para o validador humano cruzar com o valor.
 Registre as respostas dos 3 pontos na seção "Contratos/Serviços Evitados" do memorial. NÃO peça o valor em R$ (já veio do formulário).
 
-═══════════════════════════════════════════════════════════════════
-GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes do preview)
-═══════════════════════════════════════════════════════════════════
-O GoDocs documenta APENAS ganhos JÁ REALIZADOS. O contrato/serviço precisa JÁ ter sido cancelado/reduzido na prática.
-- SINAIS DE PROJEÇÃO: "vamos cancelar", "pretendemos encerrar", "a ideia é não renovar", "quando migrarmos", verbos no futuro. Também é projeção se a automação ainda não está em produção.
-- AO DETECTAR, pergunte UMA vez: "Esse contrato/serviço JÁ foi cancelado ou reduzido na prática, ou é algo que ainda vai acontecer?" Se JÁ aconteceu → siga e escreva no passado/presente ("o contrato foi encerrado", "deixou de ser pago"). Se ainda NÃO → NÃO gere preview; oriente a voltar quando o cancelamento estiver efetivado (ou submeter como projeto especial).
+${blocoGanhoRealProjetado("custo_evitado")}
 
 ⚠️ REGRA DE OURO — SEM R$ NO CONTEÚDO VISÍVEL: o memorial_calculo e o preview são exibidos ao usuário e NÃO podem conter NENHUM valor em R$ (nem o valor do custo evitado). Descreva o contrato/serviço de forma QUALITATIVA (o que era, periodicidade ${isPontual ? "pontual" : "mensal"}). O valor em R$ vive SÓ no campo \`custo_evitado_reais\` (preenchido pelo formulário — PRESERVE, não altere).
 
@@ -1176,15 +1252,7 @@ ${
 - Pergunte sobre a rotina mensal: quais tarefas, com que frequência dentro do mês, quanto tempo cada execução.`
 }
 
-═══════════════════════════════════════════════════════════════════
-GANHO REAL × PROJETADO — PORTÃO OBRIGATÓRIO (antes de QUALQUER preview)
-═══════════════════════════════════════════════════════════════════
-O GoDocs documenta APENAS ganhos JÁ REALIZADOS: a automação está EM PRODUÇÃO e os tempos "depois" foram MEDIDOS na prática. Ganho PROJETADO (expectativa do que a ferramenta "deve" trazer quando estiver pronta/rodando) NÃO é aceito aqui — é a primeira premissa do formulário.
-- SINAIS DE PROJEÇÃO (vigie o que o usuário escreve, sobretudo no "depois"): "a expectativa é", "a projeção é", "pretendemos", "estimamos que vai", "deve reduzir/cair", "vai cair para", "quando estiver pronto/rodando", "a nova ferramenta vai/deve", e verbos no FUTURO/CONDICIONAL para o ganho ("conseguiremos", "será gasto", "teremos disponível", "passará a"). Também é projeção quando a automação AINDA NÃO está em produção (será lançada, está em testes) ou o "depois" nunca foi medido de fato.
-- AO DETECTAR projeção, PARE e pergunte UMA vez, direto: "Essa redução de tempo JÁ está acontecendo no dia a dia e foi medida na prática, ou é uma expectativa do que a ferramenta deve trazer quando estiver rodando?"
-  • Se o usuário CONFIRMAR que já está em produção e os tempos "depois" foram MEDIDOS (peça a base: há quanto tempo roda e como mediram), ACEITE — e escreva o memorial em tempo PASSADO/PRESENTE ("passou a levar 30 min", "hoje leva 2h"), NUNCA em "a expectativa é"/"a projeção é".
-  • Se for apenas expectativa/estimativa (a ferramenta ainda não roda ou o ganho não foi medido), NÃO gere o preview de saving. Explique que o GoDocs registra ganhos JÁ realizados e oriente a (a) voltar quando a ferramenta estiver rodando e o ganho medido, ou (b) submeter como PROJETO ESPECIAL se for caso de alto impacto e difícil mensuração. NÃO monte memorial com números projetados.
-- ESCOPO: este portão barra o "DEPOIS" projetado / a ferramenta que ainda não entrega o ganho. NÃO confunda com o "antes": o "antes" pode ser histórico real OU equivalente manual estimado (saving contrafactual — ver regras), e isso é legítimo. No contrafactual, a automação JÁ está rodando (fazendo o trabalho) — se ela ainda nem existe em produção, então é projeção e cai neste portão.
+${blocoGanhoRealProjetado("saving")}
 ${baseHorasBlock}
 VALIDAÇÃO DE HORAS — OBRIGATÓRIO (aplica-se SOMENTE às linhas com horas antes > 0):
 - ATENÇÃO: as regras abaixo valem APENAS para linhas que TÊM rotina manual prévia (horas_antes > 0). Para linhas com 0h antes, NÃO se aplicam — não cobre detalhamento de rotina nem "faça a conta" de algo que ninguém fazia.

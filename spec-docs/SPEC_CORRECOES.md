@@ -6,6 +6,175 @@
 
 ---
 
+## 2026-08-04 — Ganho PROJETADO virou receita apurada: o agente perguntou 2×, ouviu "não é um número medido" e gerou o preview igual
+
+**Status:** ✅ codada, testada (925 verdes) e **validada na staging** — a staging REPROVOU a 1ª versão do fix e a correção está no adendo abaixo · **Branch:** `fix/gate-ganho-projetado`
+
+**⚠️ ADENDO — a STAGING reprovou a primeira versão do fix (04/08/2026).** Vale mais que o fix
+em si, porque é a lição transferível: **um gate que só hooka `preview`/`complete` fica inerte
+exatamente quando o prompt passa a funcionar.**
+
+O que a staging mostrou (cenário oficial `receita-pura`, dirigido pelo LLM responder, projeto
+`0d719dec…`): com o portão reforçado, o agente **parou de previewar** e começou a **negociar**:
+
+```
+🤖 IA: "Não consigo finalizar como receita incremental realizada, porque você confirmou
+        que os 80 pedidos/mês e a margem de R$100 são estimativas do briefing…"
+   Opções: Encerrar a submissão sem registrar receita | Reclassificar como especial
+```
+
+— repetido **~15 turnos**, histórico crescendo de 38 para 56 mensagens, oferecendo caminhos que
+o chat **não executa** (quem encerra ou reclassifica é a pessoa, no formulário), e a submissão
+morrendo em `500 "Não é possível submeter receita incremental"`. Nos logs do worker, **nenhuma**
+linha `Ganho real × projetado`: o gate nunca rodou.
+
+**Causa do erro de desenho:** copiei o hook do `sobreposicao-receita`, onde o LLM **quer**
+previewar (o gate intercepta o preview). Aqui é o oposto — o prompt ensina o LLM a **recusar**,
+então `resultado.type` nunca é `preview`/`complete` e a condição do gate nunca fecha. O prompt
+virou a única autoridade, e prompt sem estado terminal = loop, exatamente o que o gate existia
+para evitar. Nenhum teste de unidade podia pegar isso: o defeito vivia no **acoplamento entre o
+prompt e o hook**, não dentro de nenhum dos dois.
+
+**Correção (3 partes):**
+
+1. **`devePreemptarPorProjecao(estado, temPista)`** — o gate assume o turno **ANTES** da chamada
+   de LLM, quando há pista e o estado é `null`. Uma pergunta, dois botões, estado terminal — e
+   economiza a chamada. O hook antigo (`deveBloquearPorProjecao`, pós-orquestrador) **fica**, como
+   backstop para a pista que nasce dentro do memorial do próprio turno (o caso de origem).
+   Novo ramo para o estado `'projetado'`: qualquer mensagem recebe
+   `mensagemGanhoProjetadoRepetida` (curta — repetir o texto longo lê como loop) **sem chamar o
+   LLM**; a única coisa que reabre é a pessoa AFIRMAR a medição (`interpretarGanhoReal → 'real'`).
+2. **O prompt proíbe o LLM de conduzir a decisão** — mesmo padrão da jornada-base ("o sistema faz
+   essa pergunta, você não"): sem oferecer caminhos, sem repetir a recusa, apenas reagir aos avisos
+   `[SISTEMA]`.
+3. **Guarda de NEGAÇÃO nas pistas afirmativas** (`negavel: true` + `NEGACAO_ANTES`). Um pré-flight
+   do detector sobre os **29 cenários E2E reais** apontou 1 falso positivo: o briefing do
+   `custo-evitado-puro` diz _"já foi cancelado na prática (**não é projeção**, já aconteceu)"_ — a
+   palavra-gatilho dentro de uma negação que afirma o contrário. Depois da guarda: **0 de 29** armam
+   o gate à toa. As pistas que JÁ SÃO negação (`nao-e-medido`, `sem-historico`, `ainda-nao`) não
+   levam o flag — nelas a negação é o próprio sinal.
+
+**Também corrigido: os briefings de receita da suíte E2E.** Eles diziam só "gera R$8000/mês de
+receita incremental", sem afirmar medição — então o responder respondia com honestidade
+("estimativa do briefing") e o portão passava a recusar, quebrando `receita-pura`. Como todo
+cenário representa um projeto **em produção** (a premissa da Etapa 1), os 6 racionais e 3 briefings
+de receita passaram a declarar desde quando roda e **onde o número é apurado**. É leitura correta do
+cenário, não afrouxamento do gate.
+
+**Validação na staging (2ª rodada, `edf400b4`, 04/08/2026):**
+
+| Cenário | Resultado |
+|---|---|
+| A — reprodução do caso real (falas do autor, 1% "não medido") | gate perguntou **1×** (2 botões, ancorado na Etapa 1) → clique em "ainda é expectativa" → **BLOQUEOU** com as duas saídas → **nenhum** preview/complete → submissão barrada |
+| B — regressão, receita medida de verdade | gate **não apareceu** → preview → complete → submetido com `valor_ganho_mensal = 8000`, memorial em passado/presente ("passou a recuperar… Antes… depois") |
+
+Harness novo: `scripts/e2e/validar-ganho-projetado.mjs` (respostas SCRIPTADAS com as falas reais
+do caso, em vez do LLM responder — o ponto é exercitar o caminho exato que falhou). Aborta se
+`E2E_BASE_URL` não for a staging. 23 projetos de teste limpos via `/api/admin/e2e-cleanup`.
+
+**Sintoma.** O projeto **"Automação cadastro de novos cliente"** (`a2172a9ff26a6a26cdd073b91efdb86d`,
+Eduardo Santana / B2B GOBEAUTE, submetido 28/07/2026) entrou na planilha com **R$ 10.000/mês de receita
+incremental** — um número que o próprio autor declarou, por escrito e no chat, **não ter sido medido**.
+A conversa (15 mensagens, recuperada pelo Investigador) é inequívoca:
+
+- **msg 8** — o agente desconfia: _"existe checkout/pedido direto na LP ou esse valor vem de leads que
+  passam a converter mais depois?"_
+- **msg 10** — insiste: _"que dado real ou evidência sustenta o 1% de conversão usado na conta?"_
+- **msg 11** — o autor responde com total honestidade: _"é uma premissa conservadora, **não um número
+  medido** — **ainda não temos histórico** de checkout self-service porque ele é justamente o que o
+  projeto habilita… a ideia é validar com os primeiros meses e recalibrar."_
+- **msg 12 (14 segundos depois)** — o agente gera o **preview** e **copia a confissão para dentro do
+  memorial**: _"A taxa de 1% não é histórico medido; é uma premissa de piso, 20 vezes abaixo da conversão
+  humana atual."_
+- **msg 13/14** — "Aprovado" → `complete`. `valor_ganho_mensal = 10000`, `tipo_saving = mensal`.
+
+Agravante: a **documentação aprovada no mesmo projeto** dizia que o endpoint `POST /api/b2b-leads` — a
+peça que recebe o lead e viabiliza o pedido — **ainda precisava ser implementada**, e que 3 das LPs
+estavam pendentes. O mecanismo que gera a receita não existia em produção. O analisador chegou a
+registrar o risco (_"pode superestimar o ganho se não houver fechamento realmente automatizado"_) e
+**aprovou 11/13**.
+
+**Causa-raiz — duas falhas somadas.**
+
+1. **`buildReceitaPrompt` era o ÚNICO dos três prompts financeiros SEM o portão "real × projetado".**
+   `buildSavingPrompt` e `buildSavingCustoEvitadoPrompt` tinham o bloco completo (detectar sinais →
+   parar → perguntar 1× → não previewar se for expectativa). A receita tinha **duas linhas genéricas**
+   sob "REGRAS ANTI-EXTRAPOLAÇÃO" (_"deve refletir ganho REAL… não projeções otimistas"_) — o bastante
+   para o LLM **questionar** (ele questionou, duas vezes), nada para **barrar**.
+2. **Prompt sozinho não segura** — a mesma lição do Gostream (gate ≥44h), do custo evitado puro e do
+   Sucesso.AI (sobreposição): o agente percebe, avisa, e completa igual. Aqui houve um agravante novo:
+   ele "resolveu" o conflito **escrevendo a ressalva dentro do memorial**, o que dá aparência de rigor e
+   não desconta nada — a planilha recebe o valor como ganho apurado e a gestão soma.
+
+E, atravessando as duas: a **premissa nº 1 do formulário** (a pergunta da Etapa 1 _"este projeto já está
+em produção?"_, que o `validarEtapa1` usa para **bloquear** o avanço quando a resposta não é "sim") era
+**invisível ao agente**. `prodStatus` vive só no frontend — não está no payload, no SQLite, no
+`ProjetoContexto` nem em prompt nenhum. O agente nunca pôde dizer "você declarou que já está rodando".
+
+**Fix — prompt em fonte única + gate determinístico.**
+
+- **`blocoGanhoRealProjetado(modo)`** (`agents/orchestrator.ts`) — FONTE ÚNICA do portão nos 3 modos
+  (`saving` · `custo_evitado` · `receita`). Os dois blocos que existiam eram digitados à mão e agora saem
+  da constante; a receita **passa a ter portão**. O texto ancora explicitamente na premissa da Etapa 1,
+  manda **cruzar com a doc aprovada** (peça essencial pendente ⇒ ganho não realizado) e **proíbe** a saída
+  que o caso tomou (ressalva no memorial + preview). Reforço específico de receita: taxa de conversão /
+  ticket **escolhidos** são premissas, não base de cálculo.
+- **`agents/ganho-projetado.ts`** — gate determinístico, espelhando o módulo do `sobreposicao-receita`
+  (PR #230): `detectarGanhoProjetado` varre **memorial do turno + falas do usuário na fase + racional do
+  formulário** contra a lista DECLARADA `PISTAS_PROJECAO` (16 pistas, cada uma com rótulo para log/teste).
+  Havendo pista, o backend troca o preview/complete por **uma pergunta de 2 botões**.
+  Estado `saving.ganho_real` / `receita.ganho_real` (backend-only, re-mesclado a cada turno):
+  `null → 'pendente' → 'reperguntado' → terminal`.
+  - `'real'` → libera **para sempre** + nudge `[SISTEMA]` exigindo memorial em passado/presente, **há
+    quanto tempo roda** e **onde o número é medido**.
+  - `'projetado'` → **BLOQUEIA o preview** com a mensagem que oferece as **duas saídas reais**: voltar
+    quando houver medição, ou marcar **especial** na Etapa 2 (validação 100% humana, sem memorial).
+  - 2 respostas ambíguas → `'nao_respondido'`: libera, mas o memorial carrega _"Não foi confirmado se o
+    ganho já está medido na prática — conferir na triagem."_
+- Rede adicional de prompt em `buildReceitaPreviewPrompt` (não permite `complete` no "aprovado" quando o
+  memorial ainda tem linguagem de projeção), **suprimida** quando o gate já resolveu — reinterrogar o que
+  o gate coletou foi a origem das perguntas pós-preview no gate de economia alta.
+
+**Anti-loop (o repo já queimou 2×: as 38 perguntas do `[1.4]` e o forçamento do carga×escala).** Quatro
+travas por construção: **(a)** no máximo 2 perguntas; **(b)** estados terminais **absorventes** (nenhum
+ramo volta a `null`/`'pendente'` — é onde o gate do teto guarda risco); **(c)** saída por **CLIQUE**, não
+por juízo do LLM sobre texto livre; **(d)** o bloqueio lê o **estado VIVO**, nunca o snapshot do topo do
+turno. Ausência de pista marca `'real'` para não reavaliar a cada turno.
+
+⚠️ **`'projetado'` bloqueia o preview para sempre — e isso é a função do gate, não um bug.** Não é beco
+sem saída: reenviar o formulário determinístico da fase financeira chama `iniciarSaving`/`iniciarReceita`,
+que apaga as mensagens da fase e **zera** o estado; e marcar o projeto como especial na Etapa 2 desvia do
+memorial. As duas saídas estão escritas na mensagem de bloqueio (com teste que garante isso).
+
+**Decisões de precisão do detector (para não punir quem fez certo).** Um falso positivo custa **uma**
+pergunta de dois botões, então a lista pode ser generosa — mas ficaram **de fora** de propósito:
+`"estimativa"`/`"estimo"` soltos (é a palavra do **saving contrafactual** legítimo, o caso mais comum do
+produto) e futuro genérico (`"o backend deve validar"`, `"vai rodar todo dia"`) — o futuro só conta colado
+a **verbo de ganho** (`vai gerar`, `deve reduzir`). Há teste de regressão para os 8 negativos.
+
+⚠️ **O `\b` do JS é ASCII-only** — a mesma armadilha do gate `[1.4]`: um radical seguido de fronteira de
+palavra (`nao foi medid` + fronteira) **nunca** casa `"medido"`, porque a fronteira exige um
+não-caractere depois do `d`. Nenhuma pista leva fronteira no fim.
+
+**Onde aterrissou.**
+
+| Arquivo | O quê |
+|---|---|
+| `src/lib/agents/ganho-projetado.ts` | **novo** — módulo do gate: pistas, detector, pergunta/interpretação, nudges, decisores puros |
+| `src/lib/agents/orchestrator.ts` | `blocoGanhoRealProjetado(modo)` (fonte única); portão injetado em `buildReceitaPrompt`; os 2 blocos inline substituídos; `blocoProjecao` no preview de receita |
+| `src/lib/agents/types.ts` | `ganho_real` em `SavingColetado` e `ReceitaColetada` (+ `savingVazio`/`receitaVazia`) |
+| `src/lib/chat.functions.ts` | ramo de resposta (1º da cadeia) + gate de bloqueio (antes da jornada) + re-merge nos dois lados |
+| `src/lib/testes/prompt-registry.ts` | descrições de `saving` e `receita` atualizadas (regra 3) |
+| `tests/gate-ganho-projetado.test.ts` | **novo** — 54 casos, incluindo as falas e o memorial REAIS do projeto de origem |
+| `tests/agents-types.test.ts` | guard de nº de chaves de `savingVazio` (22 → 23) |
+
+**Lição que não pode regredir.** Quando o agente **avisa e passa**, o aviso não é uma trava — vira
+justificativa. E quando o autor é **honesto** sobre a incerteza, o sistema precisa honrar a honestidade
+**barrando o número**, não registrando a ressalva junto do valor: quem lê a planilha soma a coluna, não o
+memorial.
+
+---
+
 ## 2026-08-03 — `[1.4]` honesta e curta era lida como rótulo vazio (piso de 60 chars × registro de ausência)
 
 **Status:** ✅ codada, testada (831 verdes) e validada na staging · **Branch:** `fix/piso-ausencia-fonte` · **PR:** [#226](https://github.com/while-kaique/godocs-main/pull/226)

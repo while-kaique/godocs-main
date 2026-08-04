@@ -58,6 +58,23 @@ import {
   NUDGE_SOBREPOSICAO_AJUSTAR,
   NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
 } from "@/lib/agents/sobreposicao-receita";
+import {
+  aplicaGateGanhoProjetado,
+  detectarGanhoProjetado,
+  deveBloquearPorProjecao,
+  interpretarGanhoReal,
+  mensagemGanhoProjetado,
+  mensagemGanhoProjetadoRepetida,
+  devePreemptarPorProjecao,
+  nudgeGanhoRealConfirmado,
+  perguntaGanhoReal,
+  perguntaGanhoRealFirme,
+  textosParaDeteccaoReceita,
+  textosParaDeteccaoSaving,
+  OPCOES_GANHO_REAL,
+  NUDGE_GANHO_REAL_SEM_RESPOSTA,
+  type EstadoGanhoReal,
+} from "@/lib/agents/ganho-projetado";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
@@ -1247,8 +1264,92 @@ export async function enviarMensagem(rawData: unknown) {
   // ⚠️ MESMA semântica do `criterioAtual`: SNAPSHOT com um único uso legítimo — saber se
   // ESTE turno é a resposta à pergunta do gate. NÃO reutilizar no bloqueio lá embaixo.
   const sobreposicaoAtual = estado.receita.sobreposicao_custo_evitado ?? null;
+  // Gate GANHO REAL × PROJETADO. Vale nas duas famílias financeiras (o caso de origem é de
+  // receita, mas o portão de saving também era só prompt). A detecção é TEXTUAL sobre o
+  // memorial + as falas do usuário NESTA fase — não depende do LLM perceber, que foi
+  // exatamente o que falhou: ele perguntou duas vezes, ouviu "não é um número medido" e
+  // gerou o preview com a ressalva escrita dentro do memorial.
+  const faseGanhoReal = aplicaGateGanhoProjetado(estado.fase);
+  const falasUsuarioFase = [
+    ...history.filter((m) => m.role === "user").map((m) => m.content),
+  ];
+  const detProjecao =
+    faseGanhoReal === "saving"
+      ? detectarGanhoProjetado(textosParaDeteccaoSaving(estado.saving, falasUsuarioFase))
+      : faseGanhoReal === "receita"
+        ? detectarGanhoProjetado(textosParaDeteccaoReceita(estado.receita, falasUsuarioFase))
+        : null;
+  // ⚠️ SNAPSHOT — mesmo contrato dos dois acima: só para saber se ESTE turno é a resposta.
+  const ganhoRealAtual =
+    faseGanhoReal === "saving"
+      ? (estado.saving.ganho_real ?? null)
+      : faseGanhoReal === "receita"
+        ? (estado.receita.ganho_real ?? null)
+        : null;
   let reask: OrchestratorResult | null = null;
-  if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
+  if (faseGanhoReal && ganhoRealAtual === "projetado") {
+    // (0a) Estado TERMINAL de bloqueio. A única coisa que reabre é a pessoa AFIRMAR que o
+    // ganho foi medido — aí o gate cede e a conversa segue. Qualquer outra mensagem recebe a
+    // resposta curta de bloqueio, SEM chamar o LLM: era ele quem ficava negociando "escolha
+    // um caminho" por 15 turnos (falha encontrada na staging, 04/08/2026).
+    const racional = (data.content ?? "").trim();
+    if (interpretarGanhoReal(racional, data.selected_option ?? null) === "real") {
+      log("enviarMensagem", `Ganho real × projetado (${faseGanhoReal}): usuário afirmou medição — reabrindo`);
+      if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: "real" };
+      else estado.receita = { ...estado.receita, ganho_real: "real" };
+      history.push({ role: "user", content: nudgeGanhoRealConfirmado(racional) });
+    } else {
+      log("enviarMensagem", `⛔ Ganho projetado confirmado (${faseGanhoReal}) — mantendo o bloqueio (sem LLM)`);
+      reask = {
+        type: "question",
+        content: mensagemGanhoProjetadoRepetida(faseGanhoReal),
+        fase: faseGanhoReal,
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
+    }
+  } else if (faseGanhoReal && (ganhoRealAtual === "pendente" || ganhoRealAtual === "reperguntado")) {
+    // (0) Turno de RESPOSTA ao gate GANHO REAL × PROJETADO. Vem PRIMEIRO na cadeia porque é
+    // a premissa mais externa: não faz sentido validar horas ou base de cálculo de um ganho
+    // que ainda não aconteceu. ANTI-LOOP por construção: 'pendente' → ambíguo → 'reperguntado'
+    // → qualquer resposta cai em estado TERMINAL. Nunca uma terceira pergunta.
+    const racional = (data.content ?? "").trim();
+    const resp = interpretarGanhoReal(racional, data.selected_option ?? null);
+    const primeiraVez = ganhoRealAtual === "pendente";
+    // Ambíguo na 1ª → repergunta FIRME 1x. Ambíguo na 2ª → 'nao_respondido' (libera com marca).
+    const novo: EstadoGanhoReal = resp ?? (primeiraVez ? "reperguntado" : "nao_respondido");
+    if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: novo };
+    else estado.receita = { ...estado.receita, ganho_real: novo };
+    log("enviarMensagem", `Ganho real × projetado (${faseGanhoReal}): resposta → "${novo}"`);
+    if (novo === "reperguntado") {
+      reask = {
+        type: "options",
+        question: perguntaGanhoRealFirme(faseGanhoReal),
+        options: OPCOES_GANHO_REAL,
+        fase: faseGanhoReal,
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
+    } else if (novo === "projetado") {
+      // Confirmou que é expectativa: BLOQUEIA aqui mesmo, sem gastar uma chamada de LLM.
+      // A mensagem oferece as DUAS saídas reais (voltar quando medido / projeto especial) —
+      // ver a nota do módulo sobre por que isto não é um beco sem saída.
+      reask = {
+        type: "question",
+        content: mensagemGanhoProjetado(faseGanhoReal),
+        fase: faseGanhoReal,
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
+    } else if (novo === "real") {
+      history.push({ role: "user", content: nudgeGanhoRealConfirmado(racional) });
+    } else {
+      history.push({ role: "user", content: NUDGE_GANHO_REAL_SEM_RESPOSTA });
+    }
+  } else if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
     const resp = interpretarJornada(data.content, data.selected_option ?? null);
     if (resp === null) {
@@ -1434,6 +1535,34 @@ export async function enviarMensagem(rawData: unknown) {
             : NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
     });
   }
+  // ── PRÉ-EMPÇÃO DO GATE GANHO REAL × PROJETADO (antes de gastar a chamada de LLM) ──
+  // Roda DEPOIS da cadeia de respostas (não rouba o turno de resposta de outro gate) e só
+  // quando nenhum outro gate já assumiu (`reask == null`).
+  //
+  // ⚠️ POR QUE existe: a 1ª versão do gate só agia sobre preview/complete, espelhando o gate
+  // de sobreposição — mas ali o LLM QUER previewar. Aqui, com o portão reforçado no prompt,
+  // ele passa a RECUSAR e nunca chega a preview: na staging (04/08/2026) o agente negociou
+  // "escolha: encerrar a submissão ou reclassificar como especial" por ~15 turnos seguidos,
+  // o histórico foi de 38 a 56 mensagens e a submissão morreu em 500 — com o gate INERTE.
+  // Pré-emptando, o backend faz UMA pergunta de dois botões e chega a estado terminal.
+  if (faseGanhoReal && reask === null && devePreemptarPorProjecao(ganhoRealAtual, detProjecao !== null)) {
+    log(
+      "enviarMensagem",
+      `⛔ Pré-empção do gate ganho real × projetado (${faseGanhoReal}, pistas: ${detProjecao!.marcas.join(",")}) — perguntando antes do LLM`,
+    );
+    if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: "pendente" };
+    else estado.receita = { ...estado.receita, ganho_real: "pendente" };
+    reask = {
+      type: "options",
+      question: perguntaGanhoReal(detProjecao!, faseGanhoReal),
+      options: OPCOES_GANHO_REAL,
+      fase: faseGanhoReal,
+      coletado: estado.coletado,
+      saving: estado.saving,
+      receita: estado.receita,
+    };
+  }
+
   // NOTA: o split CARGA REAL × ESCALA NÃO tem mais gate determinístico aqui. O agente
   // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
   // gravação (resolverSplitCargaEscala em submeterParaValidacao) — ver SPEC_CORRECOES.
@@ -1472,6 +1601,9 @@ export async function enviarMensagem(rawData: unknown) {
         null,
       // Gate do critério de projeto ([1.3]/[1.4]): backend-only, nunca ecoado pelo LLM.
       criterio_secoes: estado.saving.criterio_secoes ?? null,
+      // Gate ganho real × projetado: backend-only. Perder isto no round-trip re-armaria o
+      // gate a cada turno — o loop clássico.
+      ganho_real: estado.saving.ganho_real ?? null,
     };
   }
   // Mesmo re-merge no lado da RECEITA — sem isto o 'ok' do gate do critério se perderia a
@@ -1484,6 +1616,8 @@ export async function enviarMensagem(rawData: unknown) {
       // Gate da sobreposição receita × custo evitado: backend-only, nunca ecoado pelo LLM.
       // Perder isto no round-trip re-armaria o gate a cada turno — o loop clássico.
       sobreposicao_custo_evitado: estado.receita.sobreposicao_custo_evitado ?? null,
+      // Gate ganho real × projetado: backend-only, nunca ecoado pelo LLM (mesmo motivo).
+      ganho_real: estado.receita.ganho_real ?? null,
     };
   }
 
@@ -1606,6 +1740,76 @@ export async function enviarMensagem(rawData: unknown) {
       },
     });
     delete (resultado as { options?: unknown }).options;
+  }
+
+  // ── GATE GANHO REAL × PROJETADO — força a pergunta antes de QUALQUER preview ──
+  // Roda PRIMEIRO entre os gates de bloqueio: é a premissa mais externa (a Etapa 1 declarou
+  // que o projeto já está em produção). Não faz sentido validar jornada, teto ou base de
+  // cálculo de um ganho que ainda não aconteceu — e um gate por turno é a convenção daqui.
+  //
+  // ⚠️ ESTADO LIDO AGORA, NUNCA o `ganhoRealAtual` do topo do turno: o ramo de resposta
+  // acima já mudou o estado DENTRO deste mesmo turno, e reler o snapshot é literalmente o
+  // loop de 38 perguntas do gate [1.4] (03/08/2026).
+  //
+  // ⚠️ A detecção também roda sobre o memorial QUE O LLM ACABOU DE ESCREVER (não só sobre o
+  // estado de entrada): o caso de origem confessou a projeção DENTRO do memorial no MESMO
+  // turno em que gerou o preview — sem reler o resultado, o gate passaria ao largo.
+  const ganhoRealResolvidoAgora = (
+    faseGanhoReal === "saving"
+      ? (resultado.saving ?? estado.saving)
+      : (resultado.receita ?? estado.receita)
+  )?.ganho_real;
+  if (faseGanhoReal && deveBloquearPorProjecao(ganhoRealResolvidoAgora, resultado.type)) {
+    const alvo =
+      faseGanhoReal === "saving"
+        ? (resultado.saving ?? estado.saving)
+        : (resultado.receita ?? estado.receita);
+    const det =
+      faseGanhoReal === "saving"
+        ? detectarGanhoProjetado(
+            textosParaDeteccaoSaving(alvo as SavingColetado, falasUsuarioFase),
+          )
+        : detectarGanhoProjetado(
+            textosParaDeteccaoReceita(alvo as ReceitaColetada, falasUsuarioFase),
+          );
+    if (ganhoRealResolvidoAgora === "projetado") {
+      // Já confirmado como expectativa: o preview segue bloqueado (a função do gate).
+      log("enviarMensagem", `⛔ Preview de ${faseGanhoReal} com ganho PROJETADO confirmado — bloqueando`);
+      Object.assign(resultado, {
+        type: "question",
+        content: mensagemGanhoProjetado(faseGanhoReal),
+        fase: faseGanhoReal,
+      });
+      delete (resultado as { options?: unknown }).options;
+    } else if (det ?? detProjecao) {
+      // Há pista de projeção e o gate ainda não foi respondido → pergunta (1ª vez).
+      const detalhe = (det ?? detProjecao)!;
+      log(
+        "enviarMensagem",
+        `⛔ Preview de ${faseGanhoReal} com linguagem de ganho projetado (${detalhe.marcas.join(",")}) — forçando pergunta`,
+      );
+      const estadoGate =
+        faseGanhoReal === "saving"
+          ? { saving: { ...(alvo as SavingColetado), ganho_real: "pendente" as const } }
+          : { receita: { ...(alvo as ReceitaColetada), ganho_real: "pendente" as const } };
+      Object.assign(resultado, {
+        type: "options",
+        question: perguntaGanhoReal(detalhe, faseGanhoReal),
+        options: OPCOES_GANHO_REAL,
+        fase: faseGanhoReal,
+        ...estadoGate,
+      });
+      delete (resultado as { content?: unknown }).content;
+    } else {
+      // Nenhuma pista: o gate NÃO se aplica a este projeto. Marca 'real' para não reavaliar a
+      // cada turno (e para o `deveBloquearPorProjecao` liberar de imediato). ⚠️ Não confundir
+      // com o 'real' CONFIRMADO pelo usuário — aqui é ausência de sinal, não afirmação dele.
+      if (faseGanhoReal === "saving" && resultado.saving) {
+        resultado.saving = { ...resultado.saving, ganho_real: "real" };
+      } else if (faseGanhoReal === "receita" && resultado.receita) {
+        resultado.receita = { ...resultado.receita, ganho_real: "real" };
+      }
+    }
   }
 
   // ── GATE JORNADA-BASE — força a pergunta antes do 1º preview ────────────────

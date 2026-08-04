@@ -313,7 +313,7 @@ Sem custo evitado e sem custo externo.`,
 
   // 6) Receita pura mensal.
   {
-    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 8000, racional: '80 vendas adicionais/mês a R$100 de margem.' };
+    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 8000, racional: '80 vendas recuperadas/mês × R$100 de margem, medidas no relatório "Pedidos por origem" do Metabase; roda em produção desde março de 2026.' };
     cenarios.push({
       key: 'receita-pura',
       nome: tag('Recuperação de carrinhos abandonados'),
@@ -327,7 +327,7 @@ Sem custo evitado e sem custo externo.`,
         atencao: 'Limite de 1 cupom por cliente/semana.',
       }),
       briefing: `Projeto: recuperação de carrinhos abandonados no n8n. Determinístico.
-Gera RECEITA INCREMENTAL: cerca de 80 vendas recuperadas por mês, com margem média de R$100 cada → R$8000/mês de receita incremental recorrente (mensal).
+Gera RECEITA INCREMENTAL: 80 vendas recuperadas por mês, com margem média de R$100 cada → R$8000/mês de receita incremental recorrente (mensal). Roda em produção desde março de 2026 e o número é APURADO todo mês no relatório "Pedidos por origem" do Metabase (não é estimativa: são pedidos fechados contados lá).
 Não há economia de horas (ninguém fazia isso antes manualmente de forma relevante).`,
       receita,
       expected: {
@@ -339,7 +339,7 @@ Não há economia de horas (ninguém fazia isso antes manualmente de forma relev
 
   // 7) Receita pontual (valor cheio na col X).
   {
-    const receita = { tipo_saving: 'pontual', valor_ganho_mensal: 24000, racional: 'Campanha única que gerou R$24000 de receita adicional.' };
+    const receita = { tipo_saving: 'pontual', valor_ganho_mensal: 24000, racional: 'Campanha única já executada: R$24000 de receita adicional apurada no fechamento do mês, no relatório "Pedidos por origem" do Metabase.' };
     cenarios.push({
       key: 'receita-pontual',
       nome: tag('Campanha sazonal automatizada'),
@@ -353,7 +353,7 @@ Não há economia de horas (ninguém fazia isso antes manualmente de forma relev
         atencao: 'Janela de envio limitada ao período da campanha.',
       }),
       briefing: `Projeto: campanha sazonal automatizada no n8n. Determinístico.
-Gera RECEITA INCREMENTAL PONTUAL: uma campanha única que trouxe R$24000 de receita adicional (evento pontual, não recorrente).
+Gera RECEITA INCREMENTAL PONTUAL: uma campanha única, JÁ EXECUTADA, que trouxe R$24000 de receita adicional (evento pontual, não recorrente). O valor foi APURADO no fechamento, no relatório "Pedidos por origem" do Metabase — não é estimativa.
 Sem economia de horas relevante.`,
       receita,
       expected: {
@@ -370,7 +370,7 @@ Sem economia de horas relevante.`,
       alguem_fazia: 'sim',
       linhas: [{ cargo: 'Analista Sênior', horas_antes: 24, horas_depois: 4 }],
     };
-    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 5000, racional: '50 upsells/mês a R$100.' };
+    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 5000, racional: '50 upsells/mês × R$100 já apurados no relatório "Pedidos por origem" do Metabase; em produção desde março de 2026.' };
     const c = calcSaving(saving);
     cenarios.push({
       key: 'saving-mais-receita',
@@ -386,7 +386,7 @@ Sem economia de horas relevante.`,
       }),
       briefing: `Projeto: reativação de clientes inativos no n8n. Determinístico.
 SAVING: 1 Analista Sênior gastava 24h/mês montando listas e disparos manuais; agora 4h/mês. Alguém já fazia = sim. Sem custo evitado/externo.
-RECEITA: gera R$5000/mês de receita incremental recorrente (50 reativações com margem R$100).`,
+RECEITA: gera R$5000/mês de receita incremental recorrente (50 reativações com margem R$100). Roda em produção desde março de 2026 e o número é APURADO todo mês no relatório "Pedidos por origem" do Metabase (não é estimativa: são pedidos fechados contados lá).`,
       saving,
       receita,
       expected: {
@@ -665,7 +665,7 @@ Custo externo NOVO: serviço de validação R$150/mês (subtrai).`,
         { nome: 'Consultoria mensal', valor: 300, recorrencia: 'mensal', justificativa: 'Consultoria mensal dispensada após a automação.' },
       ],
     };
-    const receita = { tipo_saving: 'pontual', valor_ganho_mensal: 18000, racional: 'Recuperação pontual de R$18000 numa ação única.' };
+    const receita = { tipo_saving: 'pontual', valor_ganho_mensal: 18000, racional: 'Ação única já executada: R$18000 recuperados, apurados no relatório "Pedidos por origem" do Metabase.' };
     const c = calcSaving(saving);
     cenarios.push({
       key: 'saving-receita-pontual',
@@ -768,7 +768,7 @@ Quando o agente perguntar se usa IA, a resposta é SIM (a IA decide e age sozinh
 
   // D3) inteligencia × receita — IA GERA conteúdo para aumentar conversão.
   {
-    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 6000, racional: '60 conversões adicionais/mês a R$100 de margem.' };
+    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 6000, racional: '60 conversões/mês × R$100 de margem já apuradas no relatório "Pedidos por origem" do Metabase; em produção desde março de 2026.' };
     cenarios.push({
       key: 'complexidade-inteligencia-receita',
       nome: tag('Geração de descrições de produto por IA'),
@@ -799,7 +799,7 @@ Sem economia de horas relevante. Quando perguntado se usa IA, a resposta é SIM 
       alguem_fazia: 'sim',
       linhas: [{ cargo: 'Analista Sênior', horas_antes: 20, horas_depois: 4 }],
     };
-    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 4000, racional: '40 agendamentos/mês a R$100 de margem.' };
+    const receita = { tipo_saving: 'mensal', valor_ganho_mensal: 4000, racional: '40 agendamentos/mês × R$100 de margem já apurados no relatório "Pedidos por origem" do Metabase; em produção desde março de 2026.' };
     const c = calcSaving(saving);
     cenarios.push({
       key: 'complexidade-autonomia-savrec',
