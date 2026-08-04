@@ -4,6 +4,21 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## 🐛 04/08 (18:34) — caixa do parecer dessincronizada (bug do Lucas) + placeholders removidos
+>
+> Commit **`fed1f0e`**, staging `edf400b4` às 18:34, 936 testes. **Esperando a validação dele.**
+>
+> **Bug:** ele marcou os 3 como "não", abriu a caixa, mudou tudo para "sim" — e a pergunta continuou a do
+> "não". Causa: a caixa era aberta com a pergunta do momento do CLIQUE e seguia aberta enquanto as respostas
+> mudavam. **Fix em `marcar()`:** mudar QUALQUER resposta fecha a caixa (`setCaixa(null)`) e limpa o texto.
+> ⚠️ Escolha deliberada — reabrir custa 1 clique, mas o risco pior era **gravar justificativa de uma pergunta
+> que virou "sim"** (o texto ia para a coluna do Sheets junto do checklist já corrigido). Não trocar por
+> "adaptar o título ao vivo" sem resolver o texto já digitado.
+>
+> **Placeholders REMOVIDOS** (pedido dele): o campo entra vazio nos 3 modos; `JustificativaChecklist` perdeu
+> o campo `exemplo`. A pergunta no topo já diz o que responder e o exemplo arriscava ser enviado como
+> resposta. ⚠️ **NÃO reintroduzir** (está anotado no módulo).
+>
 > ## 📊 04/08 (noite) — dry-run FINAL da fila, aba GoDocs de PROD, por líder → liderado
 >
 > ⚠️ O Luis achou que o dry-run tinha rodado na planilha da STAGING. **Rodou em PROD**: o worktree não tem
