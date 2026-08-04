@@ -781,3 +781,65 @@ TEMPORÁRIA do "Pendente"), com motivo que **o autor vê**. Invariantes na funç
 `normalizarClassificacao`: nunca reprova sem motivo · especial nunca reprova automático · materialidade
 > R$ 5k/mês vira decisão humana · justificativa nunca vazia. **Barrar submissão continua FORA** — a
 reprovação é pós-envio e a triagem humana sobrepõe tudo.
+
+---
+
+## Gate de sobreposição RECEITA × CUSTO EVITADO (04/08/2026)
+
+**Problema.** O anti-dupla-contagem existente só compara *horas × custo evitado*. O mesmo
+dinheiro declarado como **custo evitado** (saving) e, depois, como **receita incremental**
+passava batido. Caso Sucesso.AI (Maria Ponciano): "Ressarcimento das transportadoras"
+(R$ 55.864,38) e "Receita retida em reenvio" (R$ 106.049,40) estavam nos itens de custo
+evitado e foram declarados de novo como receita — R$ 161.913,78, exatamente a soma.
+
+**Por que avisar não bastava.** O agente PERCEBEU e avisou: _"os R$ 55.864,38 são
+ressarcimento/cobrança de transportadora — isso é saving operacional, não receita
+incremental… confirme se devo excluir"_. A autora **repetiu o valor sem justificar** e ele
+aceitou. Duas falhas: (a) ele nunca disse que o valor **já estava contabilizado** — porque
+a fase de receita não lê os itens do custo evitado; (b) um aviso que se atravessa
+repetindo o número não é trava.
+
+**O que foi feito.**
+1. **Detecção determinística** (`detectarSobreposicaoReceita`), não depende do LLM
+   perceber (⚠️ "o prompt sozinho NÃO segurava"): compara os itens do custo evitado com o
+   dinheiro da receita por **valor** (item == total · item citado no racional · soma dos
+   itens == total) ou por **nome** (nome do item dentro do racional, **≥8 chars** — nomes
+   curtos como "Frete" armariam o gate em qualquer projeto).
+2. **Confirmação explícita, não aviso**: bloqueia preview/complete e pergunta com
+   `type:'options'` — "são valores diferentes" × "é o mesmo dinheiro". A pergunta NOMEIA a
+   inconsistência (o que é custo evitado, o que é receita, e que seriam contados 2×).
+3. **`custo_evitado_itens` em `ProjetoContexto`** (+ `getProjetoContextoData`) — insumo
+   EXCLUSIVO do gate. ⚠️ **Não entra em prompt**: o R$ do custo evitado é escondido do LLM
+   por decisão de produto.
+
+**⚠️ ANTI-LOOP — 4 travas por construção.** Este repo já queimou duas vezes (loop de 38
+perguntas do gate `[1.4]`; forçamento do split carga×escala, removido em 03/07/2026 por
+travar a edição). Por isso:
+- **(1) No máximo 2 perguntas**, sempre — independe de a resposta ser boa.
+- **(2) Máquina estritamente MONOTÔNICA**: `null → 'pendente' → 'reperguntado' → terminal`
+  (`'confirmado'`/`'ajustar'`/`'nao_respondido'`). Nenhum ramo anda para trás.
+  ⚠️ A 1ª versão do ramo de bloqueio via `'reperguntado'` e voltava a `'pendente'` — **loop
+  real**, alcançável quando outro gate consome o turno de resposta na cadeia de `else if`.
+  Pego pelo **teste de simulação de 20 turnos**, não por revisão. O teste ficou.
+- **(3) Saída por CLIQUE**, não por juízo do LLM sobre texto livre — foi exatamente o
+  juízo-sobre-texto que produziu os dois loops anteriores.
+- **(4) Lê o estado VIVO**, nunca o snapshot do topo do turno (lição do bug das 38).
+
+**Desfechos.** `'confirmado'` → nudge manda registrar no memorial, em uma frase, o que
+distingue os dois. `'ajustar'` → nudge manda voltar ao saving e remover o item duplicado;
+**não** muta o saving sozinho. `'nao_respondido'` → libera e grava no memorial
+"Sobreposição … apontada e não confirmada pelo autor — conferir na triagem".
+
+**Não confunde o bot:** zero instrução nova no prompt no caminho normal — o gate é código
+determinístico e o nudge `[SISTEMA]` entra **uma vez**, só quando dispara. Roda depois do
+gate do critério e só com `!reask` (um gate por turno).
+
+**Onde aterrissou:** `src/lib/agents/sobreposicao-receita.ts` (módulo puro) ·
+`src/lib/agents/types.ts` (`ReceitaColetada.sobreposicao_custo_evitado`,
+`ProjetoContexto.custo_evitado_itens`) · `src/integrations/db/client.server.ts` (SELECT) ·
+`src/lib/chat.functions.ts` (ramos de resposta 6/6b, ramo de bloqueio, re-merge) ·
+`tests/sobreposicao-receita.test.ts` (23 testes; detecção do caso real, falsos positivos,
+interpretação, e as simulações anti-loop).
+
+**Escopo v1.** Só a fase de receita e só com itens de custo evitado presentes. A ordem
+inversa (receita declarada primeiro, custo evitado depois) fica de fora.
