@@ -447,23 +447,45 @@ function Investigador() {
   const [detalhes, setDetalhes] = useState<ProjetoDetalhes | null>(null)
   const [detalhesLoading, setDetalhesLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  // Endpoints que falharam na última rodada — sem isto, uma lista vazia por ERRO
+  // é indistinguível de uma lista vazia de verdade (o caso que fez a tela exibir
+  // "0 submetidos" com 289 edições, impossível: todo reenvio pressupõe submissão).
+  const [falhas, setFalhas] = useState<string[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const emVooRef = useRef(false)
 
   const fetchData = useCallback(async () => {
-    // allSettled (não all): cada endpoint é independente — se um falhar (ex.: /edicoes
-    // estourando algum limite), os outros continuam populando a tela. Com Promise.all,
-    // a rejeição de QUALQUER um caía no catch e zerava TODAS as listas (Investigador
-    // aparecia vazio mesmo com /projetos respondendo 200).
-    const [pRes, sRes, eRes] = await Promise.allSettled([
-      apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
-      apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
-      apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
-    ])
-    if (pRes.status === 'fulfilled') setProjetos(pRes.value ?? [])
-    if (sRes.status === 'fulfilled') setStats(sRes.value ?? null)
-    if (eRes.status === 'fulfilled') setEdicoes(eRes.value ?? [])
-    setLastRefresh(new Date())
-    setLoading(false)
+    // Guard de requisição em voo: o polling é de 8s, mas uma rodada lenta demora
+    // mais que isso. Sem o guard, as chamadas se EMPILHAVAM sobre um endpoint já
+    // sobrecarregado — a fila de `canceled` que aparecia nos logs do Godeploy.
+    if (emVooRef.current) return
+    emVooRef.current = true
+    try {
+      // allSettled (não all): cada endpoint é independente — se um falhar (ex.: /edicoes
+      // estourando algum limite), os outros continuam populando a tela. Com Promise.all,
+      // a rejeição de QUALQUER um caía no catch e zerava TODAS as listas (Investigador
+      // aparecia vazio mesmo com /projetos respondendo 200).
+      const [pRes, sRes, eRes] = await Promise.allSettled([
+        apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
+        apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
+        apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
+      ])
+      if (pRes.status === 'fulfilled') setProjetos(pRes.value ?? [])
+      if (sRes.status === 'fulfilled') setStats(sRes.value ?? null)
+      if (eRes.status === 'fulfilled') setEdicoes(eRes.value ?? [])
+      // Mantém o dado velho na tela (não zera), mas AVISA que está desatualizado.
+      setFalhas(
+        [
+          pRes.status === 'rejected' ? 'projetos' : null,
+          sRes.status === 'rejected' ? 'estatísticas' : null,
+          eRes.status === 'rejected' ? 'edições' : null,
+        ].filter((x): x is string => x !== null),
+      )
+      setLastRefresh(new Date())
+      setLoading(false)
+    } finally {
+      emVooRef.current = false
+    }
   }, [])
 
   useEffect(() => {
@@ -683,6 +705,21 @@ function Investigador() {
       </div>
       {/* Chips de filtros avançados ativos */}
       {!ehEdicoes && <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />}
+
+      {/* Falha de carregamento — os contadores abaixo NÃO podem ser lidos como
+          verdade quando a fonte deles não respondeu. Rótulo + ícone além da cor. */}
+      {falhas.length > 0 && (
+        <div
+          role="status"
+          className="mt-3 flex items-start gap-2 rounded-[var(--go-radius-sm)] border border-red-500/25 bg-red-50 px-3 py-2 text-xs text-red-800"
+        >
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            <strong>Falha ao carregar {falhas.join(' e ')}.</strong> Os números exibidos estão
+            incompletos ou desatualizados — não interprete como zero. Tente “Atualizar”.
+          </span>
+        </div>
+      )}
 
       {/* Lista */}
       <div className="mt-4">
