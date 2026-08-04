@@ -4,7 +4,44 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-08-03 (noite) — **atendeu as ressalvas do Lucas na tela de pré-aprovação (D13).**
+**Última sessão:** 2026-08-04 (manhã) — **staging atropelada de novo, restaurada, e fila do líder populada
+com 2 projetos mockados.** Zero mudança de comportamento no produto: a sessão foi diagnóstico + integração +
+seed de dados.
+
+1. **O sintoma:** nem o Luis nem o Lucas abriam `/aprovacoes` na staging. **Causa:** um deploy de outra
+   frente (Kaique) sobrescreveu o `edf400b4` com um build **sem a rota** — `updateApp` troca a app inteira.
+   ⚠️ **O sintoma engana:** `/aprovacoes` responde **200** (é o fallback SPA servindo o `index.html`) e o
+   TanStack, sem a rota no bundle, devolve o usuário pra `/`. Nada de 404 na cara.
+2. **Diagnóstico sem navegador (vale guardar):** `getAppFile(edf400b4, asset, /index.html)` → pega o
+   `index-<hash>.js` → `grep aprovacoes` nele. Zero ocorrências = build errado no ar. Comparar com o
+   `dist/` local fecha o caso em 2 comandos.
+3. **Integração:** mergeado `origin/main` (11 commits do Kaique, PRs **#224–#227** — gate do critério +
+   seção `[1.4]`) na branch. **Só o `worker.js` conflitou** (artefato de build) → resolvido com
+   `npm run build:worker`. **891 testes verdes** (861 meus + 30 dele).
+4. **Staging redeployada** (`edf400b4` apenas; prod `674a3710` **não** foi tocada) e a rota confirmada no ar.
+5. ⚠️ **Armadilha de smoke test que custou um redeploy inteiro:** `curl` **sem `Accept: text/html`** dá
+   **404** em toda rota profunda — o fallback SPA só atende requisição de navegação. Isso **não** é
+   regressão nem `assetConfig` faltando. Sempre mandar o header ao testar rota de SPA por curl.
+6. **Fila do Lucas populada com 2 mockados** (pedido do Luis: ver a tela com mais de um pendente), criados
+   pelo **fluxo real** do formulário — chat com o agente, memorial gerado, gates de jornada/critério
+   passando —, não por INSERT no banco. Script em scratchpad (não versionado), reusando
+   `scripts/e2e/lib/{api,responder}.mjs`.
+   - ⚠️ **Nome SEM o prefixo `[E2E-`** de propósito: `ehProjetoTesteE2E` silencia a DM, e o Luis quis a
+     **DM real** pro Lucas. Efeito colateral: **o `e2e-cleanup` não pega esses 2** — a limpeza é manual, e
+     **planilha ANTES do SQLite** (senão o sync reverso ressuscita).
+   - ⚠️ **O harness aponta pra PROD por default** (`E2E_BASE_URL` ausente → `godocs.devgogroup.com`) e a
+     **worktree não tem `.env`** — foi assim que 3 projetos de teste caíram em prod em 30/07. O script novo
+     **aborta** se o BASE_URL não for o da staging.
+   - Fila atual (3 itens, todos do Luis): **Alerta de ruptura de estoque** (15h, R$ 1.519,35, custo evitado
+     R$ 1.200 — o card com mais números) · **Baixa automática de NF-e** (34h, R$ 857, 2 cargos no memorial) ·
+     **n8n audit** (40h, R$ 431,20 — o que já existia).
+7. **Aberto para o Luis confirmar:** se as 2 DMs chegaram ao Lucas e **se o link delas abre a staging**
+   (`mensagemDmAprovacao` usa `APP_BASE_URL`, que está setado no `edf400b4`, mas o valor do secret não é
+   legível — se apontar pra prod, o Lucas cai numa app sem a tela).
+8. ⚠️ **Se o Lucas decidir via `?como=`, o `decidido_por` grava o ADMIN**, não ele — para a validação valer
+   como o gestor, ele entra com a própria conta em `/aprovacoes`.
+
+**Última sessão anterior:** 2026-08-03 (noite) — **atendeu as ressalvas do Lucas na tela de pré-aprovação (D13).**
 O Lucas abriu `/aprovacoes` na staging e apontou 4 coisas: "a visualização não tá legal", "não é uma
 aprovação e sim uma **pré**-aprovação", "o gestor tem que responder algumas perguntas com sim e não" e "o
 card já tem que vir com as principais informações — dono, participantes, valor total de saving, memorial".
@@ -199,6 +236,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > 10 pessoas) + tabela/rotas/tela `/aprovacoes` + DM. **Codado e na staging.** O que resta do plano é
 > **validação humana**, depois prod e PR — não há fatia de código pendente. 🛑 **Desde 03/08 à noite a ida
 > a prod está TRAVADA até a validação com a DIRETORIA** (decisão do Luis): branch commitada, sem push/PR.
+> **04/08:** o `origin/main` (PRs #224–#227) foi mergeado na branch e a staging redeployada; a fila do Lucas
+> tem **3 itens pendentes** (2 mockados criados de propósito) esperando ele abrir com a **própria conta**.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
 
