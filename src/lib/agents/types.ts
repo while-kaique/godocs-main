@@ -160,6 +160,12 @@ export type SavingColetado = {
   // (ou já respondidas pelo usuário). ANTI-LOOP: pergunta UMA vez só — a resposta seguinte
   // vira nudge [SISTEMA] e o fluxo segue. Ver SPEC_CRITERIOS_PROJETO.
   criterio_secoes?: "pendente" | "ok" | null;
+  // Estado do GATE DETERMINÍSTICO de GANHO REAL × PROJETADO. Backend-only (não ecoado pelo
+  // LLM; re-mesclado a cada turno). null = sem pista de projeção / ainda não avaliado ·
+  // 'pendente' → 'reperguntado' → TERMINAL ('real' | 'projetado' | 'nao_respondido').
+  // ⚠️ 'projetado' segue BLOQUEANDO o preview — é a função do gate. Ver
+  // `agents/ganho-projetado.ts` (inclui as duas saídas oferecidas à pessoa).
+  ganho_real?: "pendente" | "reperguntado" | "real" | "projetado" | "nao_respondido" | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -185,6 +191,7 @@ export const savingVazio = (): SavingColetado => ({
   alocacao_ganhos: null,
   alocacao_ganhos_racional: null,
   criterio_secoes: null,
+  ganho_real: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
@@ -212,6 +219,10 @@ export type ReceitaColetada = {
     | "ajustar"
     | "nao_respondido"
     | null;
+  // Gate determinístico de GANHO REAL × PROJETADO — mesma semântica do campo homônimo em
+  // SavingColetado. O caso de origem é de RECEITA (`buildReceitaPrompt` não tinha portão
+  // nenhum). Backend-only, re-mesclado a cada turno. Ver `agents/ganho-projetado.ts`.
+  ganho_real?: "pendente" | "reperguntado" | "real" | "projetado" | "nao_respondido" | null;
 };
 
 export const receitaVazia = (): ReceitaColetada => ({
@@ -221,6 +232,7 @@ export const receitaVazia = (): ReceitaColetada => ({
   racional: null,
   criterio_secoes: null,
   sobreposicao_custo_evitado: null,
+  ganho_real: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────
