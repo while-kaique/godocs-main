@@ -23,32 +23,28 @@ export type PerguntaChecklist = {
 };
 
 /**
- * Pergunta e exemplo da caixa de justificativa, ESPECÍFICOS de cada "não" (Lucas
- * reprovou a 1ª versão em 04/08/2026: título genérico e exemplo SEMPRE do saving, mesmo
- * quando o "não" era em "move KPI" — "o exemplo tem que condizer com o não que a pessoa
- * marcou"). O exemplo é `placeholder`, nunca texto preenchido: ninguém envia o exemplo
- * por acidente.
+ * Pergunta da caixa de justificativa, ESPECÍFICA de cada "não" (Lucas reprovou a 1ª
+ * versão em 04/08/2026: o título era genérico e o exemplo era SEMPRE o do saving, mesmo
+ * quando o "não" era em "move KPI").
+ *
+ * ⚠️ **SEM exemplo/placeholder** (Lucas, 04/08/2026 — 2ª rodada): o campo entra vazio. A
+ * pergunta já diz o que responder; o texto de exemplo virava ruído e arriscava alguém
+ * mandar o exemplo como resposta. NÃO reintroduzir.
  */
-export type JustificativaChecklist = { pergunta: string; exemplo: string };
+export type JustificativaChecklist = { pergunta: string };
 
 export const JUSTIFICATIVA_POR_CHAVE: Record<ChaveChecklist, JustificativaChecklist> = {
   move_kpi: {
     pergunta: 'O que este projeto entrega, se não move um indicador da área?',
-    exemplo:
-      'Ex.: não aparece em nenhum indicador que a área acompanha, mas elimina a conferência manual de 2 planilhas antes de cada fechamento — o efeito é o fechamento sair no prazo, não um número de painel.',
   },
   sente_falta: {
     pergunta: 'Se desligar o projeto não impactaria a área, justifique a aprovação.',
-    exemplo:
-      'Ex.: hoje quase não roda porque o volume caiu, mas na alta de novembro ele evita duas pessoas dedicadas à mesma conferência — desligar agora só empurra o custo para a próxima temporada.',
   },
   // ⚠️ Esta NÃO tem caixa de justificativa: "saving incoerente" bloqueia a
-  // pré-aprovação (ver `bloqueiaPreAprovacao`). Fica declarada para a tela poder
-  // explicar o bloqueio a partir da MESMA fonte, sem redigitar texto.
+  // pré-aprovação (ver `bloqueiaPreAprovacao`). Fica declarada só para a lista ficar
+  // completa; o texto do bloqueio é o AVISO_SAVING_INCOERENTE.
   saving_coerente: {
     pergunta: 'O saving não confere — o projeto precisa voltar para o autor corrigir.',
-    exemplo:
-      'Se o projeto está com erro nos cálculos ou ganhos, pedimos que redirecione ao time para ajustes ou reprove.',
   },
 };
 

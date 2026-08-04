@@ -225,6 +225,13 @@ function AprovacoesPage() {
 
   function marcar(projetoId: string, chave: ChaveChecklist, valor: RespostaChecklist) {
     setRespostas((prev) => ({ ...prev, [projetoId]: { ...prev[projetoId], [chave]: valor } }));
+    // ⚠️ BUG que o Lucas pegou (04/08/2026): ele marcou tudo "não", abriu a caixa, mudou
+    // tudo para "sim" — e a caixa continuou com a pergunta do "não". Mudar QUALQUER
+    // resposta fecha a caixa e limpa o texto: a pergunta e o texto escrito sempre
+    // correspondem às respostas do momento do clique. Reabrir custa 1 clique; caixa
+    // dessincronizada gravaria justificativa de uma pergunta que virou "sim".
+    setCaixa(null);
+    setComentario("");
   }
 
   async function decidir(projetoId: string, veredito: Veredito, texto?: string) {
@@ -1157,11 +1164,6 @@ function CaixaParecer({
     : modo === "ajuste"
       ? "O que precisa ser ajustado?"
       : "Por que este projeto está sendo reprovado?";
-  const exemplo = justificando
-    ? (primeira ? JUSTIFICATIVA_POR_CHAVE[primeira].exemplo : "")
-    : modo === "ajuste"
-      ? "Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
-      : "Ex.: o processo descrito não é automação, é uma planilha preenchida à mão pela própria equipe.";
   const rotuloBotao = justificando
     ? "Pré-aprovar com esta explicação"
     : modo === "ajuste"
@@ -1200,7 +1202,6 @@ function CaixaParecer({
         rows={3}
         maxLength={2000}
         autoFocus
-        placeholder={exemplo}
         className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
         style={{
           background: "var(--go-white)",
