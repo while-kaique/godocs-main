@@ -66,7 +66,7 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
-import { listarAprovacoesPendentes, decidirAprovacao } from '@/lib/aprovacoes.functions'
+import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -529,6 +529,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const body = await readBody<{ projetoId?: string; dry?: boolean }>(request)
       if (!body?.projetoId) return errorJson('projetoId é obrigatório', 400)
       return json(await reconciliarFinanceiroDoSheet(body.projetoId, { dry: body.dry }))
+    }
+
+    // ── Reabrir a fila do líder (admin, recuperação) ──
+    // A fila é interna (`projeto_aprovacoes`) e cai em CASCATA junto do projeto —
+    // sobrescrever a aba do Sheets faz a `reconciliarExclusoes` apagar o projeto e,
+    // com ele, a fila; restaurar a aba recria o projeto, nunca a fila. Isto repõe.
+    // ⚠️ `dry` é o DEFAULT: escrever exige `{"dry":false}` explícito no body.
+    if (pathname === '/api/admin/aprovacoes/reabrir' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await reabrirPreAprovacoes(await readBody<unknown>(request)))
     }
 
     // ── Sync reverso manual (admin) ──

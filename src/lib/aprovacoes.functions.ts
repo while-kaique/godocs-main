@@ -36,6 +36,7 @@ import {
   getAprovacoesDeProjetos,
   getUltimaVersaoNum,
   getProjetoById,
+  getProjetosByOwnerEmail,
   type AprovacaoRow,
 } from '@/integrations/db/client.server';
 
@@ -237,6 +238,129 @@ export function mensagemDmAprovacao(nomeProjeto: string, autor: string): string 
     `os números do ganho e o memorial.\n` +
     `${base}/aprovacoes`
   );
+}
+
+// ─── RECUPERAÇÃO: reabrir a fila de projetos já submetidos (admin) ───────────
+//
+// A fila mora em `projeto_aprovacoes`, tabela INTERNA: o Sheets é só espelho do
+// veredito e o sync reverso nunca a escreve. Como `projeto_aprovacoes.projeto_id`
+// é `REFERENCES projetos(id) ON DELETE CASCADE`, qualquer coisa que apague o
+// projeto apaga a fila junto — e o caminho MAIS FÁCIL de fazer isso sem querer é
+// a `reconciliarExclusoes`: sumiu da planilha (ex.: alguém sobrescreveu a aba
+// STAGING com uma cópia de prod), passou a carência de 1h, o projeto é removido
+// em cascata. Restaurar a aba recria o PROJETO (como legado), mas NUNCA a fila:
+// quem abre fila é o `abrirPreAprovacao`, chamado só no fim do
+// `submeterParaValidacao`. Sem isto, a única forma de recuperar era reenviar cada
+// projeto pelo formulário. (Aconteceu de verdade em 04/08/2026, na staging.)
+//
+// ⚠️ FAIL-CLOSED de propósito: exige `projetoIds` OU `autorEmail` — não existe
+// "reabre tudo". E NUNCA sobrescreve parecer já dado: projeto que já tem linha
+// (pendente ou decidida) é ignorado, salvo `forcar: true` — porque
+// `abrirAprovacoesPendentes` DELETA as linhas do projeto antes de inserir, e um
+// "reabrir" cego apagaria o veredito que o líder já deu.
+const reabrirSchema = z
+  .object({
+    projetoIds: z.array(z.string().min(1)).optional(),
+    autorEmail: z.string().min(1).optional(),
+    limite: z.number().int().positive().max(50).optional(),
+    forcar: z.boolean().optional(),
+    dry: z.boolean().optional(),
+  })
+  .refine((v) => (v.projetoIds?.length ?? 0) > 0 || !!v.autorEmail, {
+    message: 'Informe projetoIds ou autorEmail — não existe reabrir tudo.',
+  });
+
+export type ResultadoReabertura = {
+  ok: true;
+  dry: boolean;
+  reabertos: { projeto_id: string; nome: string | null; aprovadores: string[] }[];
+  isentos: { projeto_id: string; nome: string | null; motivo: string }[];
+  ignorados: { projeto_id: string; nome: string | null; motivo: string }[];
+};
+
+export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReabertura> {
+  const { projetoIds, autorEmail, limite, forcar, dry } = reabrirSchema.parse(body);
+  const seco = dry !== false; // ⚠️ dry é o DEFAULT: escrever exige `dry:false` explícito.
+
+  const out: ResultadoReabertura = { ok: true, dry: seco, reabertos: [], isentos: [], ignorados: [] };
+
+  // Alvos: lista explícita OU os projetos submetidos de um autor (mais recentes primeiro).
+  let ids = projetoIds ?? [];
+  if (!ids.length && autorEmail) {
+    const alvo = autorEmail.trim().toLowerCase();
+    const doAutor = (await getProjetosByOwnerEmail(alvo)).filter(
+      (p) =>
+        (p.responsavel_email ?? '').trim().toLowerCase() === alvo &&
+        (p.status ?? '') !== 'rascunho' &&
+        Number(p.descontinuado ?? 0) !== 1,
+    );
+    ids = doAutor.slice(0, limite ?? 10).map((p) => p.id);
+  }
+
+  for (const id of ids) {
+    const projeto = await getProjetoById(id);
+    if (!projeto) {
+      out.ignorados.push({ projeto_id: id, nome: null, motivo: 'projeto não existe no SQLite' });
+      continue;
+    }
+    const nome = projeto.nome ?? null;
+    if ((projeto.status ?? '') === 'rascunho') {
+      out.ignorados.push({ projeto_id: id, nome, motivo: 'rascunho (nunca entra em fila)' });
+      continue;
+    }
+    if (!forcar) {
+      const jaTem = await getAprovacoesDoProjeto(id);
+      if (jaTem.length) {
+        out.ignorados.push({
+          projeto_id: id,
+          nome,
+          motivo: `já tem fila (${jaTem.map((a) => a.veredito).join(', ')}) — use forcar:true para recriar`,
+        });
+        continue;
+      }
+    }
+
+    if (seco) {
+      // Sem escrever: só diz quem SERIA o aprovador (mesma régua do abrirPreAprovacao).
+      const autor = (projeto.responsavel_email ?? '').trim().toLowerCase();
+      if (!autor) {
+        out.isentos.push({ projeto_id: id, nome, motivo: 'sem_lider' });
+      } else if (await ehLideranca(autor)) {
+        out.isentos.push({ projeto_id: id, nome, motivo: 'lideranca' });
+      } else {
+        const lideres = (await getLideresDe(autor)).filter((l) => !!l.email);
+        if (!lideres.length) out.isentos.push({ projeto_id: id, nome, motivo: 'sem_lider' });
+        else
+          out.reabertos.push({
+            projeto_id: id,
+            nome,
+            aprovadores: lideres.map((l) => l.email!.toLowerCase()),
+          });
+      }
+      continue;
+    }
+
+    const r = await abrirPreAprovacao(id, { nomeProjeto: nome });
+    if (r.isento) {
+      out.isentos.push({ projeto_id: id, nome, motivo: r.motivo ?? 'isento' });
+    } else {
+      out.reabertos.push({ projeto_id: id, nome, aprovadores: r.aprovadores.map((a) => a.email) });
+    }
+    // Espelha o estado no Sheets, como o submit faz (best-effort — a fonte é o SQLite).
+    runBackground(
+      updateRowByProjectId(id, {
+        'Aprovação do Líder': r.rotuloSheet,
+        'Justificativa Aprovação do Líder': r.justificativaSheet,
+      })
+        .then(() => undefined)
+        .catch((e) => console.error('[aprovacoes/reabrir] falha ao gravar no Sheets:', e)),
+    );
+  }
+
+  console.log(
+    `[aprovacoes/reabrir] dry=${seco} reabertos=${out.reabertos.length} isentos=${out.isentos.length} ignorados=${out.ignorados.length}`,
+  );
+  return out;
 }
 
 // ─── Fila do líder ───────────────────────────────────────────────────────────
