@@ -343,6 +343,26 @@ Se precisa de clarificação:
 {"type":"question","content":"sua pergunta sobre o ajuste","coletado":{...campos atuais}}`;
 }
 
+// FONTE ÚNICA das seções [1.3] "Processo alterado" e [1.4] "Ponteiro movido e onde
+// verificar" — a rastreabilidade da régua de critério (SPEC_CRITERIOS_PROJETO). O bloco
+// era DIGITADO DUAS VEZES (buildReceitaPrompt e buildSavingPrompt), idêntico caractere a
+// caractere; consolidado aqui para não divergir na próxima edição — mesma disciplina da
+// TAXONOMIA_DESTINO_GANHO.
+// ⚠️ A primeira linha é ANTI-VAZAMENTO e não pode sair: sem ela o LLM copiava os marcadores
+// do roteiro para o chat, e o usuário via "b) onde alguém abre e confere?" sem nunca ter
+// visto um "a)" (bug reportado ago/2026). Espelha a regra dos códigos [x.y] no memorial,
+// que já tinham a rede determinística `normalizarMarcadoresMemorial`.
+export const BLOCO_SECOES_CRITERIO = `[1.3] Processo alterado (OBRIGATÓRIO): qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$.
+  ⚠️ ANTI-REDUNDÂNCIA — o que já é sabido NUNCA vira pergunta: se os DETALHES TÉCNICOS APROVADOS (a documentação que o usuário já validou) descrevem o processo E a magnitude, ESCREVA a seção a partir deles, sem perguntar nada. Só pergunte quando faltar a MAGNITUDE (volume/frequência/tempo) — e nesse caso faça no MÁXIMO 1 pergunta, junto de outra que você já ia fazer quando possível. NUNCA repita a pergunta.
+
+[1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
+  ⚠️ OS MARCADORES SÃO ROTEIRO INTERNO: os códigos [1.3]/[1.4] e as letras a)/b)/c) abaixo organizam VOCÊ, não a conversa. NUNCA os escreva na mensagem ao usuário — ele não faz ideia do que é "(b)". Pergunte em português corrido, uma pergunta por vez.
+  COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
+  a) PRIMEIRO olhe o que o autor JÁ DEU: as RESPOSTAS DO FORMULÁRIO (quem sentiria falta se a automação parasse) e os DETALHES TÉCNICOS APROVADOS. Muitas vezes eles JÁ dizem qual ponteiro é (um time Fiscal que volta a conferir nota por nota → custo/horas; pedido que sai errado → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite no que se baseou e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
+  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
+  c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
+  ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.`;
+
 export function buildReceitaPrompt(
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
@@ -422,15 +442,7 @@ resposta for rasa, preencha com o que tem — mas NUNCA pule um ponto.
 ═══════════════════════════════════════════════════════════════════
 
 SEÇÃO 1 — CONTEXTO
-[1.3] Processo alterado (OBRIGATÓRIO): qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$.
-  ⚠️ ANTI-REDUNDÂNCIA — o que já é sabido NUNCA vira pergunta: se os DETALHES TÉCNICOS APROVADOS (a documentação que o usuário já validou) descrevem o processo E a magnitude, ESCREVA a seção a partir deles, sem perguntar nada. Só pergunte quando faltar a MAGNITUDE (volume/frequência/tempo) — e nesse caso faça no MÁXIMO 1 pergunta, junto de outra que você já ia fazer quando possível. NUNCA repita a pergunta.
-
-[1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
-  COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) PRIMEIRO olhe o que o autor JÁ DEU: as RESPOSTAS DO FORMULÁRIO (quem sentiria falta se a automação parasse) e os DETALHES TÉCNICOS APROVADOS. Muitas vezes eles JÁ dizem qual ponteiro é (um time Fiscal que volta a conferir nota por nota → custo/horas; pedido que sai errado → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite no que se baseou e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
-  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
-  c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
-  ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
+${BLOCO_SECOES_CRITERIO}
 
 SEÇÃO 6 — RECEITA INCREMENTAL
 [6.1] O que gera a receita nova: qual produto, serviço, canal ou funcionalidade. → COLETE DO USUÁRIO
@@ -660,8 +672,32 @@ export const MIN_SECAO_CRITERIO = 60;
 // ausência ("não sabe / não foi informado onde conferir") — porque aceitar "não sei onde
 // conferir" e anotar isso é comportamento CORRETO (ponto 3 do roteiro, que já passou em
 // staging): vira zona cinzenta no analisador, nunca reprovação automática.
-const PISTA_ONDE_VERIFICAR =
+// Exportada porque o gate determinístico (chat.functions.ts) usa a MESMA régua para
+// decidir se a resposta do usuário já trouxe a fonte ou se o nudge precisa cobrá-la.
+export const PISTA_ONDE_VERIFICAR =
   /onde|conferi|verific|acompanh|rastrea|relat[óo]ri|painel|dashboard|planilha|sistema|base\b|banco de dados|metabase|erp|protheus|sheets?|extrato|fatura|contrato|nota fiscal|log\b|ticket|chamado|indicador|kpi|m[ée]trica|n[ãa]o soube|n[ãa]o sabe|n[ãa]o foi informad|sem fonte|n[ãa]o h[áa] (uma )?fonte/i;
+
+// REGISTRO EXPLÍCITO de que não há onde conferir — subconjunto declarado da
+// PISTA_ONDE_VERIFICAR, separado porque merece uma régua de COMPRIMENTO diferente.
+//
+// ⚠️ Motivo (03/08/2026): registrar ausência é legitimamente CURTO ("não há indicador"),
+// nomear e descrever uma fonte não é. Com um piso único de 60 chars, a seção honesta
+// ficava indistinguível do rótulo vazio que originou o gate — e o gate a cobrava de novo,
+// numa pergunta cuja única resposta verdadeira já estava escrita ali. Pior: o nudge
+// [SISTEMA] mandava o LLM reescrever a seção, empurrando-o a INVENTAR uma fonte, que é
+// exatamente o que a régua quer evitar. Não é bloqueio (desde o #225 o gate pergunta uma
+// vez só) — é a diferença entre uma pergunta útil e uma pergunta que ensina a mentir.
+//
+// Deliberadamente ESTREITA: exige a negação ("não sei/soube/há/existe…", "sem …") ligada,
+// na mesma oração, ao objeto que faltou (fonte · indicador · onde · relatório · painel…).
+// "custo externo eliminado." — a meia-seção real que motivou o gate — não casa, e segue
+// reprovando pelo piso de 60.
+//
+// ⚠️ Sem `\b` depois do verbo: em JS `\b` é ASCII-only, então "há" (termina em vogal
+// acentuada) seguido de espaço NÃO é fronteira de palavra e a alternativa nunca casaria —
+// justamente a forma mais comum ("não há indicador"). Use `\s+` para separar.
+export const REGISTRO_AUSENCIA_FONTE =
+  /\bn[ãa]o\s+(?:soube|sabe|sei|se\s+sabe|foi\s+informad\w*|h[áa]|existe\w*|possui|temos|tem)(?:\s+|$)[^.;!?]{0,60}?\b(?:onde|fonte|indicador(?:es)?|ponteiro|kpi|m[ée]trica|relat[óo]rio|painel|dashboard|base|planilha|sistema|registro|n[úu]mero)\b|\bsem\s+(?:fonte|indicador|registro)\b|\bfonte\s+n[ãa]o\s+informad/i;
 
 // A seção [1.3] "Processo alterado" está ausente ou sem substância?
 export function secaoProcessoVaga(texto: string | null | undefined): boolean {
@@ -675,8 +711,14 @@ export function secaoProcessoVaga(texto: string | null | undefined): boolean {
 // NENHUMA pista do onde-verificar. NÃO julga se a fonte foi bem NOMEADA ("no sistema" ×
 // "no Metabase") — distinguir isso por regex geraria falso positivo em quem respondeu
 // honestamente "não sei onde conferir"; essa camada fica com o prompt e o analisador.
+//
+// ⚠️ O registro EXPLÍCITO da ausência dispensa o piso de comprimento (ver
+// REGISTRO_AUSENCIA_FONTE): a seção está escrita, só que a resposta verdadeira é curta.
+// O piso continua valendo para todo o resto — inclusive para a meia-seção sem
+// onde-verificar que originou o gate.
 export function secaoPonteiroVaga(texto: string | null | undefined): boolean {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  if (REGISTRO_AUSENCIA_FONTE.test(t)) return false;
   if (t.length < MIN_SECAO_CRITERIO) return true;
   return !PISTA_ONDE_VERIFICAR.test(t);
 }
@@ -1061,15 +1103,7 @@ resposta for rasa, preencha com o que tem — mas NUNCA pule um ponto.
 SEÇÃO 1 — CONTEXTO
 [1.1] Nome do projeto: já tem (${coletado.nome_projeto}).
 [1.2] Resumo: 1-2 frases sobre o que o projeto faz. Já tem do contexto — use o que foi aprovado.
-[1.3] Processo alterado (OBRIGATÓRIO): qual rotina/processo mudou, como era ANTES, como é AGORA e a MAGNITUDE (volume, frequência, tempo). Sem R$.
-  ⚠️ ANTI-REDUNDÂNCIA — o que já é sabido NUNCA vira pergunta: se os DETALHES TÉCNICOS APROVADOS (a documentação que o usuário já validou) descrevem o processo E a magnitude, ESCREVA a seção a partir deles, sem perguntar nada. Só pergunte quando faltar a MAGNITUDE (volume/frequência/tempo) — e nesse caso faça no MÁXIMO 1 pergunta, junto de outra que você já ia fazer quando possível. NUNCA repita a pergunta.
-
-[1.4] Ponteiro movido e onde verificar (OBRIGATÓRIO — RASTREABILIDADE): QUAL ponteiro este projeto moveu de fato e ONDE isso pode ser conferido. Sem R$.
-  COMO CONDUZIR (você constrói o racional JUNTO com a pessoa — não é carimbo):
-  a) PRIMEIRO olhe o que o autor JÁ DEU: as RESPOSTAS DO FORMULÁRIO (quem sentiria falta se a automação parasse) e os DETALHES TÉCNICOS APROVADOS. Muitas vezes eles JÁ dizem qual ponteiro é (um time Fiscal que volta a conferir nota por nota → custo/horas; pedido que sai errado → KPI de erro). Quando já disserem, NÃO faça esta pergunta — afirme o ponteiro que você deduziu, cite no que se baseou e vá direto ao item (b). Só quando NÃO houver como deduzir, pergunte 1× com \`type:"options"\`: "Qual ponteiro este projeto moveu de fato?" — opções: "Custo (horas, hora extra, headcount, contrato/licença)", "Receita (mais vendas, menos perda de pedido, ticket)", "KPI da área (erro, retrabalho, prazo/SLA, fraude/risco)", "Ainda não sei dizer". O impacto NÃO precisa ser dinheiro — KPI vale igual.
-  b) Em seguida pergunte ONDE alguém pode abrir e CONFERIR esse número: um relatório, painel, sistema ou base NOMEADOS (ex.: painel "Conciliação diária" no Metabase, relatório de horas do Protheus, base pedidos_cancelados). "No sistema" é vago — peça o nome. ⚠️ Antes de perguntar, procure nos DETALHES TÉCNICOS APROVADOS (Dependências, Configurar antes, Pontos de atenção): se a doc já nomeia o sistema/base onde o número vive, PROPONHA essa fonte para a pessoa confirmar em vez de perguntar em aberto.
-  c) ARGUMENTE junto: se a pessoa disser que "reduziu erro" mas o número não existe em lugar nenhum, diga isso com franqueza e pergunte o que dá para usar como referência (um controle do time, um export, uma contagem manual). Se ela responder "não sei onde conferir", ACEITE, registre a seção dizendo EXATAMENTE isso (é sinal legítimo para a validação humana) e SIGA — nunca invente uma fonte nem trave a conversa.
-  ⚠️ ANTI-REDUNDÂNCIA + ANTI-LOOP: se a doc aprovada ou o que a pessoa já contou nesta conversa já traz o ponteiro E a fonte, escreva a seção sem perguntar. Cada uma das perguntas (a) e (b) acontece no MÁXIMO 1× — junte-as com outra pergunta quando possível. NUNCA repita.
+${BLOCO_SECOES_CRITERIO}
 
 SEÇÃO 2 — SAVING DE PESSOAS (economia de horas)
 Para CADA pessoa/cargo listada acima, colete:

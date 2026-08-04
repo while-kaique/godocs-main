@@ -110,6 +110,13 @@ souber onde conferir, **registra exatamente isso** e SEGUE — nunca inventa fon
 para a triagem: puxa para `zona_cinzenta`, **não** para reprovação automática). Anti-redundância e
 anti-loop iguais aos da seção `1.3`: se a doc aprovada já traz ponteiro + fonte, escreve sem perguntar.
 
+⚠️ **`BLOCO_SECOES_CRITERIO` (`orchestrator.ts`) é a FONTE ÚNICA das duas seções nos prompts** — era
+digitado duas vezes (`buildSavingPrompt` e `buildReceitaPrompt`), idêntico caractere a caractere. **Não
+redigitar**: altere a constante. A primeira linha do bloco é a trava **anti-vazamento** — os códigos
+`[1.3]`/`[1.4]` e as letras `a)`/`b)`/`c)` do roteiro organizam o AGENTE, e é **proibido escrevê-los na
+mensagem ao usuário** (bug ago/2026: a pessoa via _"b) onde alguém abre e confere?"_ no chat sem nunca ter
+visto um "a)"). Mesma regra que já valia para os códigos `[x.y]` no memorial.
+
 ### 3.2c Gate determinístico do `[1.3]`/`[1.4]` (D11 — implementado 2026-07-30)
 
 O prompt sozinho **não segurou** (evidência da staging, D11). O backend agora confere as duas seções
@@ -131,8 +138,34 @@ custo evitado puro — e `receita`/`receita_preview`):
   perderia e a pergunta voltaria: o **loop** que a lição do split carga×escala mandou nunca repetir.
 - **ANTI-LOOP:** pergunta **UMA vez só**. O turno de resposta marca `'ok'` aconteça o que acontecer e injeta
   nudge `[SISTEMA]` com o texto do usuário para o LLM escrever a(s) seção(ões) faltante(s).
+  ⚠️ **O gate TEM de ler o estado VIVO no momento em que avalia** (`deveBloquearPorCriterio`), nunca o
+  snapshot `criterioAtual` tirado no topo do turno. Ler o snapshot **anula este anti-loop**: no mesmo turno,
+  o ramo de resposta marca `'ok'` e o gate relê `'pendente'`, re-armando a pergunta — foi o **loop de 38
+  perguntas** reproduzido em prod (03/08/2026), que travava a submissão em 500 e atingia justamente quem
+  respondia "não há indicador". `criterioAtual` continua existindo com **um único uso legítimo**: decidir
+  se o turno corrente é a resposta à pergunta do gate. Guard: `tests/gate-criterio-secoes.test.ts` simula os
+  turnos na ordem real e prova que a leitura viva converge em 1 pergunta e a do snapshot, não.
+  ⚠️ Depois dessa única pergunta **não existe segunda trava**: quem segura a qualidade é o nudge `[SISTEMA]`
+  e a triagem humana. Reintroduzir uma re-verificação bloqueante recria o loop.
 - Roda **por último**, depois de todos os gates de saving (jornada → teto → alocação) e só quando o
   resultado ainda é `preview`/`complete` — um gate por turno.
+- **Apresentação da pergunta (revisada 2026-08-03).** ⚠️ **Nunca numerar os pedidos com letras.** A versão
+  original montava `"**(a)** que processo mudou…"` / `"**(b)** qual ponteiro…"`, mas os dois itens são
+  **condicionais**: no caso mais comum (só a `[1.4]` falta) a mensagem **abria num "(b)" órfão** — uma
+  alínea de um roteiro que o usuário nunca viu. Hoje são 3 formatos, um por combinação de buracos: frase
+  única quando falta um, **bullets** (`- `) quando faltam os dois. A frase de escape "…em vez de inventar
+  uma fonte" acompanha todo formato que cobra o ponteiro.
+- **Botões (`OPCOES_PONTEIRO`)** — Custo · Receita · KPI da área · "Ainda não sei dizer" — **só quando o
+  ÚNICO buraco é o ponteiro**: classificar é escolher de uma lista, mas "que processo mudou" precisa de
+  prosa, e um clique ali fecharia o gate sem a `[1.3]`. ⚠️ O ramo com botões precisa emitir
+  `type: 'options'` + `question` (não `type: 'question'` + `content`): `formatResponse` só serializa
+  `options` no primeiro caso, e os botões sumiriam a caminho da tela.
+- **O clique NÃO vale por fonte.** Um botão dá só a classificação; sem isso a `[1.4]` sairia pela metade —
+  a falha que originou este gate. `respostaTrouxeFonte` (clique → sempre `false`; texto digitado → mesma
+  `PISTA_ONDE_VERIFICAR`) alimenta o `precisaFonte` do nudge, que manda o agente propor a fonte nomeada na
+  doc aprovada → senão perguntar **1×** → senão registrar a ausência. ⚠️ O clique tem de ser tratado à
+  parte porque o rótulo _"KPI da área…"_ casaria a regex por acidente (ela aceita "kpi").
+  O gate segue perguntando **uma vez só** — os botões não adicionam turno.
 
 ### 3.2b Contexto do formulário → prompts (`buildRespostasFormulario`)
 

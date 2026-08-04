@@ -1,11 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { secaoProcessoVaga, secaoPonteiroVaga, MIN_SECAO_CRITERIO } from "@/lib/agents/orchestrator";
+import {
+  secaoProcessoVaga,
+  secaoPonteiroVaga,
+  MIN_SECAO_CRITERIO,
+  REGISTRO_AUSENCIA_FONTE,
+  BLOCO_SECOES_CRITERIO,
+  buildSavingPrompt,
+  buildReceitaPrompt,
+} from "@/lib/agents/orchestrator";
 import {
   extrairProcessoAlterado,
   extrairPonteiroMovido,
   normalizarMarcadoresMemorial,
 } from "@/lib/agents/memorial-format";
-import { savingVazio, receitaVazia } from "@/lib/agents/types";
+import {
+  perguntaCriterioSecoes,
+  respostaTrouxeFonte,
+  deveBloquearPorCriterio,
+  OPCOES_PONTEIRO,
+} from "@/lib/chat.functions";
+import { savingVazio, receitaVazia, documentacaoVazia } from "@/lib/agents/types";
+import type { ProjetoContexto, DocumentacaoColetada } from "@/lib/agents/types";
+
+const CTX_TESTE: ProjetoContexto = {
+  responsavel_nome: "Ana",
+  responsavel_email: "ana@gocase.com",
+  area: "Fiscal",
+  ferramenta: "n8n",
+  membros: [],
+  nome_projeto: "Conciliação diária",
+  data_criacao: null,
+  doc_texto: null,
+};
+
+const DOC_TESTE: DocumentacaoColetada = {
+  ...documentacaoVazia(),
+  nome_projeto: "Conciliação diária",
+  o_que_faz: "Concilia notas fiscais",
+  execucao: "Todo dia às 7h",
+  fluxo: "1. baixa notas 2. compara 3. grava",
+  dependencias: "Metabase, Protheus",
+};
 
 // Gate DETERMINÍSTICO do CRITÉRIO DE PROJETO — seções [1.3] "Processo alterado" e [1.4]
 // "Ponteiro movido e onde verificar". Origem: validação em staging 29/07/2026 (runs
@@ -105,9 +140,232 @@ describe("secaoPonteiroVaga — [1.4]", () => {
   });
 });
 
+// ─── Piso de comprimento × registro de ausência (03/08/2026) ─────────────────
+// A seção honesta e CURTA ("não há indicador") era indistinguível do rótulo vazio: as duas
+// caíam no mesmo piso de 60 chars. O gate então cobrava de novo uma pergunta cuja única
+// resposta verdadeira já estava escrita ali, e o nudge [SISTEMA] mandava o LLM reescrever
+// a seção — empurrando-o a INVENTAR uma fonte, o oposto do que a régua quer.
+describe("secaoPonteiroVaga — ausência registrada dispensa o piso de comprimento", () => {
+  it("o caso do bug: 'não há indicador' é seção ESCRITA, não rótulo vazio", () => {
+    const curtoEHonesto = "**Ponteiro movido:** não há indicador.";
+    expect(curtoEHonesto.length).toBeLessThan(MIN_SECAO_CRITERIO);
+    expect(secaoPonteiroVaga(curtoEHonesto)).toBe(false);
+  });
+
+  it("aceita as variantes de registro de ausência, todas abaixo do piso", () => {
+    for (const t of [
+      "Não sei onde conferir esse número.",
+      "O autor não soube apontar a fonte.",
+      "Ponteiro: 6h. Não existe relatório com isso.",
+      "Não foi informado onde conferir.",
+      "Ganho de prazo, sem indicador acompanhado.",
+      "Reduziu retrabalho; fonte não informada.",
+    ]) {
+      expect(t.length).toBeLessThan(MIN_SECAO_CRITERIO);
+      expect(REGISTRO_AUSENCIA_FONTE.test(t)).toBe(true);
+      expect(secaoPonteiroVaga(t)).toBe(false);
+    }
+  });
+
+  it("NÃO afrouxa para a meia-seção que originou o gate (regressão)", () => {
+    // Observada em staging no `custo-evitado-puro`: metade da [1.4], sem onde-verificar e
+    // sem registrar ausência nenhuma. Continua reprovando pelo piso de 60.
+    for (const t of [
+      "custo externo eliminado.",
+      "**Ponteiro movido:** custo externo eliminado.",
+      "**Ponteiro movido:** melhorou bastante a rotina.",
+      "Reduziu o tempo do time.",
+    ]) {
+      expect(REGISTRO_AUSENCIA_FONTE.test(t)).toBe(false);
+      expect(secaoPonteiroVaga(t)).toBe(true);
+    }
+  });
+
+  it("a negação precisa estar ligada ao objeto que faltou, na mesma oração", () => {
+    // Regex ESTREITA de propósito: uma negação solta sobre outro assunto não vira
+    // "ausência registrada" e não pode furar o piso.
+    const negacaoDeOutraCoisa = "O time não gostava da rotina antiga.";
+    expect(REGISTRO_AUSENCIA_FONTE.test(negacaoDeOutraCoisa)).toBe(false);
+    expect(secaoPonteiroVaga(negacaoDeOutraCoisa)).toBe(true);
+  });
+
+  it("seção completa com fonte NOMEADA continua passando (não houve regressão)", () => {
+    expect(secaoPonteiroVaga(extrairPonteiroMovido(memorialCompleto))).toBe(false);
+  });
+});
+
 describe("estado do gate no tipo", () => {
   it("nasce null em saving e receita (backend-only, não ecoado pelo LLM)", () => {
     expect(savingVazio().criterio_secoes).toBeNull();
     expect(receitaVazia().criterio_secoes).toBeNull();
+  });
+});
+
+// ─── Loop de 38 perguntas (prod, 03/08/2026) ─────────────────────────────────
+// O gate lia `criterioAtual`, um SNAPSHOT tirado no topo do turno. No mesmo turno, o ramo
+// de resposta marcava `criterio_secoes:'ok'` no estado e o gate, logo abaixo, relia o
+// snapshot ainda 'pendente' → re-armava 'pendente' e reperguntava. O anti-loop documentado
+// ("pergunta UMA vez só") se anulava sozinho. Quem respondia "não há indicador" repetia a
+// mesma pergunta 38× e a submissão morria em 500 ("sem ganho mensurável"), porque a fase
+// financeira nunca completava. Escapava só quem tinha painel para citar — texto longo o
+// bastante para `secaoPonteiroVaga` liberar.
+describe("deveBloquearPorCriterio — o anti-loop que se anulava", () => {
+  it("bloqueia na PRIMEIRA vez (estado ainda não resolvido)", () => {
+    expect(deveBloquearPorCriterio(null, "preview")).toBe(true);
+    expect(deveBloquearPorCriterio(undefined, "complete")).toBe(true);
+  });
+
+  it("NUNCA bloqueia depois de resolvido — o coração do fix", () => {
+    expect(deveBloquearPorCriterio("ok", "preview")).toBe(false);
+    expect(deveBloquearPorCriterio("ok", "complete")).toBe(false);
+  });
+
+  it("só age sobre preview/complete (um gate por turno)", () => {
+    for (const tipo of ["question", "options", "message"]) {
+      expect(deveBloquearPorCriterio(null, tipo)).toBe(false);
+      expect(deveBloquearPorCriterio("pendente", tipo)).toBe(false);
+    }
+  });
+
+  it("REPRODUZ a sequência do loop: estado vivo converge, snapshot não", () => {
+    // Turno 1 — nada resolvido, o LLM manda preview sem as seções → o gate pergunta.
+    let estado: "pendente" | "ok" | null = null;
+    expect(deveBloquearPorCriterio(estado, "preview")).toBe(true);
+    estado = "pendente";
+
+    // Turno 2 — o usuário responde. O ramo de resposta marca 'ok' ANTES do gate rodar.
+    const snapshotDoTopoDoTurno = estado; // 'pendente' — o que o código lia (bug)
+    estado = "ok"; // estado vivo, o que o gate passou a ler (fix)
+
+    // Com o estado VIVO o gate libera e a submissão fecha.
+    expect(deveBloquearPorCriterio(estado, "preview")).toBe(false);
+    // Com o SNAPSHOT ele reperguntaria — e o turno 3 recomeçaria idêntico, 38×.
+    expect(deveBloquearPorCriterio(snapshotDoTopoDoTurno, "preview")).toBe(true);
+  });
+
+  it("converge em NO MÁXIMO 1 pergunta mesmo se o memorial nunca melhorar", () => {
+    // O pior caso real: o LLM só escreve seções curtas e sem onde-verificar, que
+    // `secaoPonteiroVaga` reprova para sempre. Antes isso era o loop infinito; agora o
+    // estado resolvido encerra o gate independentemente do texto.
+    // ⚠️ A fixture NÃO pode registrar ausência ("não há indicador") — isso hoje é seção
+    // VÁLIDA (REGISTRO_AUSENCIA_FONTE) e o teste deixaria de exercitar o pior caso.
+    const memorialQueNuncaPassa = "**Ponteiro movido:** melhorou bastante a rotina.";
+    expect(secaoPonteiroVaga(memorialQueNuncaPassa)).toBe(true); // segue reprovando…
+
+    // Simula a ORDEM REAL de `enviarMensagem`: dentro do MESMO turno, o ramo de resposta
+    // roda primeiro (marca 'ok'), o LLM roda, e só então o gate avalia.
+    function simular(leituraDoGate: "viva" | "snapshot") {
+      let estado: "pendente" | "ok" | null = null;
+      let perguntas = 0;
+      for (let turno = 0; turno < 40; turno++) {
+        const snapshotDoTopo = estado; // capturado ANTES de qualquer mutação do turno
+        if (estado === "pendente") estado = "ok"; // turno de resposta: aceita o que vier
+        const lido = leituraDoGate === "viva" ? estado : snapshotDoTopo;
+        if (deveBloquearPorCriterio(lido, "preview")) {
+          perguntas++;
+          estado = "pendente"; // o gate re-arma para o próximo turno
+        }
+      }
+      return perguntas;
+    }
+
+    expect(simular("viva")).toBe(1); // fix: pergunta uma vez e libera
+    expect(simular("snapshot")).toBe(40); // bug: repergunta em todo turno, sem fim
+  });
+});
+
+// ─── Apresentação da pergunta do gate (ago/2026) ─────────────────────────────
+// Bug reportado: no meio da conversa o usuário via "b) onde alguém abre e confere?" —
+// uma alínea de um roteiro que ele nunca viu. Duas origens, as duas fechadas aqui:
+// (1) o texto do gate numerava os pedidos com "**(a)**"/"**(b)**" e, quando só o ponteiro
+//     faltava (o caso mais comum), a mensagem COMEÇAVA num "(b)" órfão;
+// (2) o prompt do agente usa a)/b)/c) como roteiro e nada proibia copiá-los para o chat.
+const ALINEA_ORFA = /\(?[a-c]\)\s/;
+
+describe("perguntaCriterioSecoes — sem marcadores de roteiro", () => {
+  it.each([
+    ["só o ponteiro falta", false, true],
+    ["só o processo falta", true, false],
+    ["os dois faltam", true, true],
+  ])("não emite alínea órfã quando %s", (_caso, faltaProcesso, faltaPonteiro) => {
+    const texto = perguntaCriterioSecoes(faltaProcesso, faltaPonteiro);
+    expect(texto).not.toMatch(ALINEA_ORFA);
+    expect(texto).not.toContain("[1.3]");
+    expect(texto).not.toContain("[1.4]");
+  });
+
+  it("com os dois buracos, usa bullets — cada item se lê sozinho", () => {
+    const texto = perguntaCriterioSecoes(true, true);
+    const bullets = texto.split("\n").filter((l) => l.startsWith("- "));
+    expect(bullets).toHaveLength(2);
+  });
+
+  it("só o ponteiro: pergunta curta que casa com os botões", () => {
+    const texto = perguntaCriterioSecoes(false, true);
+    expect(texto).toContain("qual ponteiro este projeto moveu");
+    expect(texto).not.toContain("processo que mudou");
+  });
+
+  it("só o processo: não fala de ponteiro nem de escolher opção", () => {
+    const texto = perguntaCriterioSecoes(true, false);
+    expect(texto).toContain("processo que mudou");
+    expect(texto).not.toMatch(/escolha abaixo/i);
+  });
+
+  it.each([
+    ["ponteiro", false, true],
+    ["ambos", true, true],
+  ])("mantém o escape 'não sei onde conferir' quando falta %s", (_c, fp, fpt) => {
+    // Decisão fechada (SPEC_CRITERIOS_PROJETO): a ausência de fonte é resposta legítima
+    // (zona cinzenta, nunca reprovação automática). Sem a frase, a pessoa inventa fonte.
+    expect(perguntaCriterioSecoes(fp, fpt)).toMatch(/em vez de inventar uma fonte/);
+  });
+});
+
+describe("OPCOES_PONTEIRO — botões do gate", () => {
+  it("oferece os 3 ponteiros da régua + a saída honesta", () => {
+    expect(OPCOES_PONTEIRO).toHaveLength(4);
+    expect(OPCOES_PONTEIRO[0]).toMatch(/^Custo/);
+    expect(OPCOES_PONTEIRO[1]).toMatch(/^Receita/);
+    expect(OPCOES_PONTEIRO[2]).toMatch(/^KPI da área/);
+    expect(OPCOES_PONTEIRO[3]).toBe("Ainda não sei dizer");
+  });
+});
+
+describe("respostaTrouxeFonte — o clique não vale por fonte", () => {
+  it("clique em botão NUNCA conta como fonte, nem o rótulo com 'KPI'", () => {
+    // ⚠️ Guard preciso: PISTA_ONDE_VERIFICAR aceita "kpi", então o rótulo
+    // "KPI da área (erro, retrabalho, prazo, risco)" casaria a regex por acidente e o
+    // nudge daria a fonte por resolvida — a seção [1.4] sairia pela metade, que é
+    // exatamente a falha do custo-evitado-puro que originou este gate.
+    for (const opcao of OPCOES_PONTEIRO) {
+      expect(respostaTrouxeFonte(opcao, true)).toBe(false);
+    }
+  });
+
+  it("texto digitado com fonte nomeada conta", () => {
+    expect(
+      respostaTrouxeFonte('Caiu o retrabalho; confere no painel "Conciliação" do Metabase', false),
+    ).toBe(true);
+  });
+
+  it("texto digitado sem nenhuma pista de onde conferir não conta", () => {
+    expect(respostaTrouxeFonte("Melhorou bastante a rotina do time.", false)).toBe(false);
+  });
+});
+
+describe("BLOCO_SECOES_CRITERIO — fonte única do [1.3]/[1.4] no prompt", () => {
+  it("proíbe explicitamente ecoar os marcadores do roteiro", () => {
+    // Sem esta linha o LLM copia "b) …" para o chat — a origem (2) do bug.
+    expect(BLOCO_SECOES_CRITERIO).toContain("ROTEIRO INTERNO");
+    expect(BLOCO_SECOES_CRITERIO).toMatch(/NUNCA os escreva na mensagem ao usuário/);
+  });
+
+  it("é o MESMO bloco nos prompts de saving e de receita (não redigitar)", () => {
+    // Antes eram duas cópias idênticas caractere a caractere, prontas para divergir.
+    const saving = buildSavingPrompt(CTX_TESTE, DOC_TESTE, savingVazio(), "resumo");
+    const receita = buildReceitaPrompt(CTX_TESTE, DOC_TESTE, receitaVazia(), "resumo");
+    expect(saving).toContain(BLOCO_SECOES_CRITERIO);
+    expect(receita).toContain(BLOCO_SECOES_CRITERIO);
   });
 });
