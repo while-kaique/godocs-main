@@ -4,6 +4,21 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> 🔁 **A staging foi atropelada 3× no MESMO dia (04/08: ~09:40, 14:10 e o redeploy meu no meio).** A causa é
+> estrutural, não descuido: `updateApp` **substitui a app inteira** e a branch da pré-aprovação **não está no
+> `main`** — então QUALQUER deploy de outra frente apaga a tela `/aprovacoes`, e quem descobre é o Lucas, no
+> 404. O 2º atropelamento (14:10, "main mergeado — investigador N+1 + reconciliação + gate de sobreposição")
+> deu **404 de verdade**, não o redirect silencioso pra home do 1º — o `assetConfig` do build alheio difere.
+> **Restaurado às 14:32** mergeando os 3 commits novos do `main` (`aacaa20`/`0dddda5`/`f417d5b`; só o
+> `worker.js` conflita → `npm run build:worker`), **931 testes**, rota e fila (3 itens) conferidas no ar.
+> ⏳ **DECISÃO PENDENTE DO LUIS** — 3 opções oferecidas: (1) combinar com o Kaique que ele mergeie a branch
+> antes de deployar staging; (2) **app de staging separado só p/ esta validação** (recomendado se o Lucas for
+> olhar hoje — é o único que garante que ele não bata em 404 no meio da avaliação; custo: dobrar os secrets);
+> (3) aceitar e redeployar quando cair (~10 min cada). **Dados nunca correm risco** — o SQLite persiste entre
+> deploys; só o código é trocado.
+> ⚠️ Ele perguntou se eu "subi os testes E2E pra staging": **não** — os E2E são scripts locais; o que foi
+> criado lá são 2 **projetos** (dados) via a API real. Nenhum código de teste foi deployado.
+
 **Última sessão:** 2026-08-04 (manhã) — **staging atropelada de novo, restaurada, e fila do líder populada
 com 2 projetos mockados.** Zero mudança de comportamento no produto: a sessão foi diagnóstico + integração +
 seed de dados.

@@ -113,7 +113,9 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
+**Próximo:** **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
+`docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
+paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
 populada com 2 projetos mockados justamente para ele ver a tela com mais de um pendente). Depois disso:
 **limpar os 2 mockados** e **validar com a DIRETORIA se a pré-aprovação vai para produção** (decisão do
 Luis, 03/08 noite — nada sobe, nem para prod nem para o repo, antes disso). A staging `edf400b4` está no ar
