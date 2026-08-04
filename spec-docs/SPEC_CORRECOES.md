@@ -8,7 +8,16 @@
 
 ## 2026-08-03 — `[1.4]` honesta e curta era lida como rótulo vazio (piso de 60 chars × registro de ausência)
 
-**Status:** ✅ codada e testada (831 testes verdes) · **Branch:** `fix/piso-ausencia-fonte` · **PR:** #226
+**Status:** ✅ codada, testada (831 verdes) e validada na staging · **Branch:** `fix/piso-ausencia-fonte` · **PR:** [#226](https://github.com/while-kaique/godocs-main/pull/226)
+
+⚠️ **O que a staging cobriu — e o que NÃO cobriu.** O run em `edf400b4` (04/08/2026, cenário "peça
+única" com resposta curta e honesta no gate) confirmou o **#225** num chat real — o gate perguntou
+**1×** (era 38), a submissão fechou em 6 turnos e a cadeia de reprovação chegou íntegra à aba
+`STAGING` (`Status="Reprovado"`, `Motivo Reenvio` intacto em `"—"`). Mas **não exercitou este PR**:
+mesmo com o usuário respondendo em 40 chars, o agente escreveu a `[1.4]` em prosa (~200 chars,
+_"…Não há indicador formal para conferência…"_), que já passava na régua antiga. Ou seja, a seção
+curta é **rara na prática** — o LLM tende a expandir. Este fix fecha o buraco quando ela aparece
+(e tira o incentivo a inventar fonte); a garantia é a bateria de unidade, não o E2E.
 
 **Sintoma:** uma seção `[1.4]` que **registra a ausência de fonte** — `**Ponteiro movido:** não há
 indicador.` — era classificada como vaga por `secaoPonteiroVaga`. O gate então cobrava a seção de novo,
