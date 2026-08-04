@@ -128,7 +128,13 @@ async function getChatAccessToken(): Promise<string> {
  *  - destino == remetente (a API do Chat não abre DM consigo mesmo);
  *  - credencial ausente ou erro da API.
  */
-export async function enviarDmChat(email: string, texto: string): Promise<boolean> {
+export async function enviarDmChat(
+  email: string,
+  // String = mensagem de texto puro. Objeto = corpo cru da API do Chat (`text` +
+  // `cardsV2`), para quem quer cartão — quem monta o corpo é o chamador, este módulo
+  // só cuida de credencial + espaço de DM.
+  corpo: string | Record<string, unknown>,
+): Promise<boolean> {
   const destino = (email ?? '').trim().toLowerCase();
   if (!destino) return false;
 
@@ -168,7 +174,7 @@ export async function enviarDmChat(email: string, texto: string): Promise<boolea
     const msg = await fetch(`${CHAT_API}/${space.name}/messages`, {
       method: 'POST',
       headers: auth,
-      body: JSON.stringify({ text: texto }),
+      body: JSON.stringify(typeof corpo === 'string' ? { text: corpo } : corpo),
     });
     if (!msg.ok) {
       console.error(`[chat-dm] envio da mensagem falhou (${msg.status}): ${await msg.text()}`);

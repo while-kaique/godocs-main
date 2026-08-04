@@ -1160,6 +1160,19 @@ export async function abrirAprovacoesPendentes(
 }
 
 /**
+ * Quantos projetos estão pendentes para este aprovador. Só a CONTAGEM (a DM usa para
+ * dizer "3 projetos esperando você"); a fila em si é a `getAprovacoesPendentesDe`.
+ */
+export async function contarAprovacoesPendentesDe(email: string): Promise<number> {
+  const rows = await queryAll<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM projeto_aprovacoes
+      WHERE LOWER(aprovador_email) = LOWER(?) AND veredito = 'pendente'`,
+    [email],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
  * Fila do líder: pendências dele + tudo que o card precisa mostrar SEM abrir o projeto
  * (dono, participantes, saving e memorial — pedido do Lucas em 03/08/2026). A fila tem
  * poucas linhas por pessoa, então trazer o memorial aqui é barato — diferente de

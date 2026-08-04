@@ -4,6 +4,36 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## 🔧 04/08 (fim da noite) — DM refeita como CARTÃO + ⚠️ CORREÇÃO do dry-run (não era só pendente)
+>
+> **1) DM virou cartão (`cardsV2`) — pedido do Luis, commit a seguir, NÃO deployada ainda.**
+> Antes: 1 parágrafo corrido + link cru na última linha, sem título, sem botão, nada do projeto além do
+> nome. Agora: cabeçalho **"Pré-aprovação pendente"** + subtítulo com o nome do projeto, 3 linhas
+> `decoratedText` (**Quem submeteu** · **Área** · **Sua fila — N projetos esperando você**) e **botão
+> "Abrir a fila"** (azul GoGroup). Onde mexi: `corpoDmAprovacao()` (nova, pura) e `mensagemDmAprovacao()`
+> (encurtada — virou o **fallback** do `text`, que é o que aparece na notificação do celular e na prévia da
+> conversa, POR ISSO mantém a URL: o botão não existe fora do cartão) em `aprovacoes.functions.ts`;
+> `enviarDmChat(email, corpo)` passou a aceitar **string OU corpo cru** (`{text, cardsV2}`) — quem monta o
+> cartão é o chamador, o módulo `chat-dm.ts` só cuida de credencial + espaço de DM.
+> Regras que NÃO podem regredir: **(a) nada de R$ na DM** (Chat se lê por cima do ombro; saving em R$ é
+> staff-only, mesma régua do `ocultarReaisSaving`); **(b) linhas condicionais** — área/fila só entram quando
+> existem (cartão com "—" parece erro de sistema; "Sua fila" só a partir de 2); **(c)** a contagem
+> (**`contarAprovacoesPendentesDe`**, novo `COUNT` em `client.server.ts`) é resolvida **ANTES** do
+> `runBackground` — um `await` antes do `enviarDmChat` dentro do fire-and-forget deixa a promise pendurada e
+> **matou 1 teste** ("avisa por DM" via `toHaveBeenCalledTimes`) até eu inverter a ordem. 934 testes verdes,
+> `worker.js` rebuildado. ⛔ **NÃO deployei na staging de propósito:** a DM está LIGADA lá e sairia mensagem
+> real para o Lucas no meio da validação dele — perguntei se pode subir agora e ficou **sem resposta**.
+>
+> **2) ⚠️ O dry-run das 15h estava ERRADO — o Luis pegou.** O filtro aceitava qualquer `Status` não-vazio
+> menos descontinuado/reprovado, e **490 das 568 linhas eram "Aprovado"**. Números CERTOS, só `Pendente`
+> (64) + `Reenvio Pendente` (14) = **78 linhas**: **45 projetos em fila** · **47 DMs** (2 com 2 líderes, D4) ·
+> **27 líderes** · **23 isentos por liderança** (~30%) · **10 sem líder**. Carga máxima **Natália Pavão 6**,
+> Murilo 4, Vinícius Elias 4, Igor Morais 3, o resto 2 ou 1 — **ninguém com 10+** (o "10 líderes com 10+" do
+> resumo anterior era artefato do filtro largo). Bate com o dry-run da manhã sobre a STAGING (76 → 43).
+> Os 10 sem líder seguem sendo **cadastro** (Glauco Bezerra concentra 6), não hierarquia. O script
+> (`scripts/dryrun-lider/`) já imprime a **quebra por Status dentro/fora do filtro** — foi o que expôs o erro;
+> manter esse print em qualquer dry-run futuro.
+>
 > ## ✅ 04/08 (noite) — "Não" no checklist passou a exigir explicação (D16) + dry-run sobre a aba GoDocs de PROD
 >
 > **Pedido do Luis:** "hoje se a pessoa botar um não a gente não pede justificativa; quando clicar em

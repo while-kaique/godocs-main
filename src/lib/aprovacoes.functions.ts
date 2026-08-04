@@ -33,6 +33,7 @@ import {
   decidirAprovacoesDoProjeto,
   getAprovacoesDoProjeto,
   getAprovacoesPendentesDe,
+  contarAprovacoesPendentesDe,
   getAprovacoesDeProjetos,
   getUltimaVersaoNum,
   getProjetoById,
@@ -213,10 +214,26 @@ export async function abrirPreAprovacao(
     // DM em background, best-effort (mudo p/ projetos de teste E2E, como o Chat atual).
     const nome = opts?.nomeProjeto ?? projeto.nome ?? 'Projeto sem nome';
     if (!ehProjetoTesteE2E(nome)) {
+      // Tamanho da fila de cada líder (já inclui este projeto — as linhas foram
+      // abertas acima). Resolvido ANTES do `runBackground` para o disparo da DM ser
+      // síncrono: um `await` antes do `enviarDmChat` deixaria a promise pendurada num
+      // caminho fire-and-forget. Contagem é 1 COUNT local; falha → linha omitida.
+      const filaPorLider = new Map<string, number | null>();
+      for (const a of aprovadores) {
+        filaPorLider.set(a.email, await contarAprovacoesPendentesDe(a.email).catch(() => null));
+      }
       runBackground(
         Promise.all(
           aprovadores.map((a) =>
-            enviarDmChat(a.email, mensagemDmAprovacao(nome, projeto.responsavel_nome ?? autor)),
+            enviarDmChat(
+              a.email,
+              corpoDmAprovacao({
+                nomeProjeto: nome,
+                autor: projeto.responsavel_nome ?? autor,
+                area: projeto.area ?? null,
+                naFila: filaPorLider.get(a.email) ?? null,
+              }),
+            ),
           ),
         ).then(() => undefined),
       );
@@ -229,15 +246,114 @@ export async function abrirPreAprovacao(
   }
 }
 
-/** Texto da DM (1 parágrafo + link da fila). Pura. */
+/** URL da fila, sem barra dupla. */
+function urlDaFila(): string {
+  return `${(process.env.APP_BASE_URL ?? 'https://godocs.devgogroup.com').replace(/\/$/, '')}/aprovacoes`;
+}
+
+/**
+ * Texto puro da DM — é o FALLBACK do cartão (notificação do celular, cliente que não
+ * renderiza `cardsV2`) e o que aparece na prévia da conversa. Pura.
+ *
+ * Enxuto de propósito: quem decide é a tela (D1/D2 — a DM é o carteiro). A mensagem
+ * responde "de quem é, o que é, onde clico" e para aí; explicar a mecânica das 3
+ * perguntas aqui só roubava a linha de quem lê no celular.
+ */
 export function mensagemDmAprovacao(nomeProjeto: string, autor: string): string {
-  const base = (process.env.APP_BASE_URL ?? 'https://godocs.devgogroup.com').replace(/\/$/, '');
-  return (
-    `*${autor}* submeteu o projeto *${nomeProjeto}* no GoDocs e a sua pré-aprovação está pendente. ` +
-    `São 3 perguntas rápidas de sim/não e o parecer — o card já vem com dono, participantes, ` +
-    `os números do ganho e o memorial.\n` +
-    `${base}/aprovacoes`
-  );
+  return `Pré-aprovação pendente · ${nomeProjeto} — de ${autor}\n${urlDaFila()}`;
+}
+
+/**
+ * Corpo da DM como CARTÃO do Chat (`cardsV2`), com o texto acima como fallback.
+ *
+ * Refatorado a pedido do Luis (04/08/2026): antes era um parágrafo corrido com o link
+ * cru na última linha — sem título, sem botão e sem dizer NADA do projeto além do nome.
+ * O cartão dá hierarquia (título → o que é → ação) e cabe numa olhada no celular.
+ *
+ * Regras que valem a pena manter:
+ *  - **Nada de R$ aqui.** O ganho vive na tela, atrás do login. A DM pode ser lida por
+ *    cima do ombro de alguém e o número de saving é staff-only (mesma régua do
+ *    `ocultarReaisSaving`); o cartão diz o que é e chama para a tela.
+ *  - **Linhas condicionais:** área/fila só entram quando existem — linha "—" em cartão
+ *    de Chat parece erro de sistema.
+ *  - **Botão + link no fallback:** o botão só existe no cartão; sem a URL no `text`,
+ *    quem lê a notificação do celular fica sem caminho.
+ */
+export function corpoDmAprovacao(opts: {
+  nomeProjeto: string;
+  autor: string;
+  area?: string | null;
+  /** Quantos projetos ficam esperando esta pessoa (inclui este). */
+  naFila?: number | null;
+}): Record<string, unknown> {
+  const url = urlDaFila();
+  const linhas: Record<string, unknown>[] = [
+    {
+      decoratedText: {
+        topLabel: 'Quem submeteu',
+        text: opts.autor,
+        startIcon: { knownIcon: 'PERSON' },
+      },
+    },
+  ];
+  if (opts.area?.trim()) {
+    linhas.push({
+      decoratedText: {
+        topLabel: 'Área',
+        text: opts.area.trim(),
+        startIcon: { knownIcon: 'MEMBERSHIP' },
+      },
+    });
+  }
+  if (opts.naFila && opts.naFila > 1) {
+    linhas.push({
+      decoratedText: {
+        topLabel: 'Sua fila',
+        text: `${opts.naFila} projetos esperando você`,
+        startIcon: { knownIcon: 'CLOCK' },
+      },
+    });
+  }
+
+  return {
+    text: mensagemDmAprovacao(opts.nomeProjeto, opts.autor),
+    cardsV2: [
+      {
+        cardId: 'pre-aprovacao',
+        card: {
+          header: {
+            title: 'Pré-aprovação pendente',
+            subtitle: opts.nomeProjeto,
+            imageUrl: 'https://godocs.devgogroup.com/favicon.svg',
+            imageType: 'CIRCLE',
+          },
+          sections: [
+            { widgets: linhas },
+            {
+              widgets: [
+                {
+                  textParagraph: {
+                    text: 'São 3 perguntas de sim/não e o seu parecer. A equipe RPA valida em paralelo — nada fica parado esperando você.',
+                  },
+                },
+                {
+                  buttonList: {
+                    buttons: [
+                      {
+                        text: 'Abrir a fila',
+                        onClick: { openLink: { url } },
+                        color: { red: 0, green: 0.349, blue: 0.663, alpha: 1 },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  };
 }
 
 // ─── RECUPERAÇÃO: reabrir a fila de projetos já submetidos (admin) ───────────

@@ -57,13 +57,27 @@ async function main() {
   const pendentes = rows.filter((r) => {
     const st = norm(r['Status']);
     if (!st) return false;
-    if (st.includes('descontinuado') || st.includes('reprovado')) return false;
+    // PENDENTE DE VERDADE: só quem ainda espera parecer da triagem. "Aprovado" e
+    // "Descontinuado" ficam fora (a 1ª versão deste dry-run os incluía e inflava a
+    // conta — 490 das 568 linhas eram "Aprovado").
+    if (st !== 'pendente' && st !== 'reenvio pendente') return false;
     const apr = norm(r['Aprovação do Líder']);
     // Já decidido pelo líder não entraria de novo (só o reenvio reabre — D10).
     if (apr.startsWith('pre-aprovado') || apr.startsWith('pre-reprovado')) return false;
     return true;
   });
   console.log(`Pendentes considerados: ${pendentes.length}`);
+  // Transparência do filtro: QUAIS valores de Status entraram (e quais ficaram fora).
+  const contar = (lista: typeof rows) => {
+    const m = new Map<string, number>();
+    for (const r of lista) m.set(txt(r['Status']) || '(vazio)', (m.get(txt(r['Status']) || '(vazio)') ?? 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1]);
+  };
+  console.log('-- Status DENTRO do filtro:');
+  for (const [k, n] of contar(pendentes)) console.log(`   ${k}: ${n}`);
+  console.log('-- Status FORA do filtro:');
+  const dentro = new Set(pendentes);
+  for (const [k, n] of contar(rows.filter((r) => !dentro.has(r)))) console.log(`   ${k}: ${n}`);
 
   const casos: Caso[] = [];
   const emailsVistos = new Map<string, { lideres: Caso['lideres']; lideranca: boolean }>();
