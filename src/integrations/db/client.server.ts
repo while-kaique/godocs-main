@@ -324,7 +324,7 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'submitted_at'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'custo_evitado_itens' | 'submitted_at'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo, p.servico_externo,
            p.descricao_breve, p.data_criacao_projeto, p.area,
@@ -332,6 +332,10 @@ export function getProjetoContextoData(id: string) {
            p.saving_horas, p.saving_reais, p.tipo_saving, p.memorial_calculo,
            p.custo_externo_mensal, p.alguem_fazia,
            p.usa_ai_proxy, p.contrafactual_afetados,
+           -- Itens do custo evitado: insumo do gate de SOBREPOSIÇÃO receita × custo
+           -- evitado (agents/sobreposicao-receita.ts). Sem eles a fase de receita é
+           -- cega para o dinheiro já contado no saving — o buraco do Sucesso.AI.
+           p.custo_evitado_itens,
            p.submitted_at,
            a.nome as area_nome
     FROM projetos p

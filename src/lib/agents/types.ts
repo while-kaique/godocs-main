@@ -201,6 +201,17 @@ export type ReceitaColetada = {
   // homônimo em SavingColetado (o `receita-pura` foi justamente o caso reprodutível da
   // validação em staging). Backend-only, re-mesclado a cada turno.
   criterio_secoes?: "pendente" | "ok" | null;
+  // Gate determinístico da SOBREPOSIÇÃO receita × custo evitado (o mesmo dinheiro
+  // declarado dos dois lados — caso Sucesso.AI). Backend-only, re-mesclado a cada turno.
+  // 'confirmado' | 'ajustar' | 'nao_respondido' são TERMINAIS: o gate nunca mais pergunta.
+  // ⚠️ Máximo de 2 perguntas por projeto. Ver `agents/sobreposicao-receita.ts`.
+  sobreposicao_custo_evitado?:
+    | "pendente"
+    | "reperguntado"
+    | "confirmado"
+    | "ajustar"
+    | "nao_respondido"
+    | null;
 };
 
 export const receitaVazia = (): ReceitaColetada => ({
@@ -209,6 +220,7 @@ export const receitaVazia = (): ReceitaColetada => ({
   memorial_calculo: null,
   racional: null,
   criterio_secoes: null,
+  sobreposicao_custo_evitado: null,
 });
 
 // ─── Resultados do orquestrador ─────────────────────────────────────────────
@@ -363,6 +375,10 @@ export type ProjetoContexto = {
   // REMOVIDO do formulário em 03/08/2026 e NÃO deve voltar a nenhum prompt: o agente
   // cobre o efeito de desligar na conversa, e a pergunta nunca teve coluna no Sheets.
   contrafactual_afetados?: string | null;
+  // JSON dos itens de custo evitado do formulário. Insumo EXCLUSIVO do gate de
+  // sobreposição receita × custo evitado (`agents/sobreposicao-receita.ts`) — NÃO vai
+  // para prompt: o R$ do custo evitado é escondido do LLM por decisão de produto.
+  custo_evitado_itens?: string | null;
   // Governança: o projeto usa o AI Proxy interno? ('sim' | 'nao')
   usa_ai_proxy?: string | null;
   // Saving: alguém já fazia a tarefa manualmente antes? 'sim' → horas_antes são horas
