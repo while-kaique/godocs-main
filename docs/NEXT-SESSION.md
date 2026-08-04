@@ -4,6 +4,9 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> **04/08 18:41 (`4bb5e55`, staging):** tirado o "abaixo" da ajuda da 3ª pergunta ("Compare as horas e o
+> valor com a rotina real do time") — o card foi reorganizado e o "abaixo" já não apontava para nada.
+>
 > ## 🐛 04/08 (18:34) — caixa do parecer dessincronizada (bug do Lucas) + placeholders removidos
 >
 > Commit **`fed1f0e`**, staging `edf400b4` às 18:34, 936 testes. **Esperando a validação dele.**
