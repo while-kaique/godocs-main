@@ -4,6 +4,24 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## ⏳ 04/08 (fim) — 2 DECISÕES ESPERANDO O LUCAS (nada codar antes)
+>
+> **1) A pergunta do "Não" foi REPROVADA pelo Lucas.** Motivo: o título é genérico e **o exemplo do campo é
+> sempre o do saving**, mesmo quando o "Não" foi em "move KPI" — "o exemplo tem que condizer com o não que a
+> pessoa marcou, e ser dinâmico, porque cada não representa algo diferente". Mandei 3 opções para ele aprovar
+> (recomendei a 1): **(1) pergunta E exemplo próprios por chave** — `move_kpi`: "O que este projeto entrega,
+> se não move um indicador seu?" · `sente_falta`: "Se desligassem hoje e ninguém reclamasse, por que ainda
+> vale manter?" · `saving_coerente`: "O que está fora no saving: o número, as horas ou a frequência?";
+> **(2)** pergunta única + só o exemplo dinâmico (mais simples, mas convida "não sei"); **(3)** dois campos
+> (o que está fora / o que a RPA deve fazer — parecer melhor, digitação dobrada, contra o "rápido pro líder"
+> do D13). Com 2+ "nãos": **um único campo** com um bullet por "não" (não duas caixas). Exemplos ficam como
+> **placeholder** (nunca preenchidos, para ninguém enviar o exemplo por acidente). Ao implementar, os textos
+> entram no MESMO módulo único `src/lib/aprovacoes-checklist.ts` (tela + Sheets leem de lá) e o D16 da spec
+> precisa ser atualizado.
+>
+> **2) A DM em cartão está commitada (`0572a78`) e NÃO deployada** — subir na staging manda mensagem real
+> para o Lucas no meio da validação dele. Esperando o "pode subir".
+>
 > ## 🔧 04/08 (fim da noite) — DM refeita como CARTÃO + ⚠️ CORREÇÃO do dry-run (não era só pendente)
 >
 > **1) DM virou cartão (`cardsV2`) — pedido do Luis, commit a seguir, NÃO deployada ainda.**
