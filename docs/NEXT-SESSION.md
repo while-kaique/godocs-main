@@ -19,6 +19,15 @@
 > ⚠️ Ele perguntou se eu "subi os testes E2E pra staging": **não** — os E2E são scripts locais; o que foi
 > criado lá são 2 **projetos** (dados) via a API real. Nenhum código de teste foi deployado.
 
+> ⏳ **AGUARDANDO SEU OLHAR (04/08 15:39):** a home passou a aceitar **`?como=<e-mail>`** (pré-visualização de
+> ADMIN, o servidor ignora o param para os demais) — antes a faixa decidia só pelo e-mail de quem está logado
+> e o Luis, que não lidera time, **nunca** conseguia ver a "view do chefe". Link dado a ele:
+> `https://godocs-staging.devgogroup.com/?como=lucas.queiroz@gocase.com`; o `?como=` **viaja no clique** da
+> faixa (prop `search` do `Link`), senão abriria a fila vazia do admin. Commit `HEAD` (código +
+> staging deployada), **931 testes**; falta o veredito visual dele e, se aprovar, **1 linha na spec** (é
+> extensão do D13, que já registrava o `?como=` da tela). ⚠️ **No modo preview os botões gravam de verdade** —
+> decidir ali põe o e-mail do ADMIN em `decidido_por`, não o do líder.
+
 **Última sessão:** 2026-08-04 (tarde) — **a fila do líder virou um SLIDER de 1 projeto por vez** (pedido do
 Luis). Mudança de UI pequena e fechada, **só na tela `/aprovacoes`**; nada de servidor mudou (sem
 `build:worker`). Commits `0eeaf89` (código) + `6110630` (spec/CLAUDE.md), **931 testes verdes**, staging

@@ -71,11 +71,18 @@ function Home() {
   // (quem não lidera ninguém nunca vê). Busca silenciosa, como o selo de pendentes.
   const [fila, setFila] = useState<{ lidera: boolean; count: number } | null>(null);
 
+  // `?como=<e-mail>` = pré-visualização de ADMIN da home de outra pessoa (o servidor
+  // ignora o param para quem não é admin). Sem isso não havia como conferir a faixa do
+  // líder sem ser ele — o mesmo caminho de validação que a tela `/aprovacoes` já tinha.
+  const comoPreview = new URLSearchParams(window.location.search).get("como")?.trim() ?? "";
+
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const r = await apiFetch<{ lidera: boolean; itens: unknown[] }>("/api/aprovacoes/pendentes");
+        const r = await apiFetch<{ lidera: boolean; itens: unknown[] }>(
+          `/api/aprovacoes/pendentes${comoPreview ? `?como=${encodeURIComponent(comoPreview)}` : ""}`,
+        );
         if (alive) setFila({ lidera: r.lidera, count: r.itens?.length ?? 0 });
       } catch {
         // Silencioso: sem a fila, a faixa não aparece.
@@ -84,7 +91,7 @@ function Home() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [comoPreview]);
 
   useEffect(() => {
     if (acesso_negado) {
@@ -289,6 +296,9 @@ function Home() {
           {fila?.lidera && (
             <Link
               to="/aprovacoes"
+              // No modo pré-visualização o param viaja com o clique: senão a faixa abriria
+              // a fila do admin (vazia) em vez da fila que ele está conferindo.
+              search={comoPreview ? { como: comoPreview } : undefined}
               className="mb-6 flex flex-col gap-3 rounded-xl px-5 py-4 transition-all hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between"
               style={{
                 background: "var(--go-white)",
