@@ -82,7 +82,7 @@ export const CHECKLIST_APROVACAO: PerguntaChecklist[] = [
   {
     chave: 'saving_coerente',
     pergunta: 'O saving declarado é coerente com o impacto que você vê na área?',
-    ajuda: 'Compare as horas e o valor abaixo com a rotina real do time.',
+    ajuda: 'Compare as horas e o valor com a rotina real do time.',
     rotulo: 'Saving coerente',
   },
 ];
