@@ -1281,3 +1281,50 @@ falha é rotulada pela **etapa** real (`atualizar` · `recuperar (append)` · `i
 desenhados e **não** implementados (custo × benefício, decisão de produto): condicionar o append a o SQLite
 confirmar que a linha nunca aterrissou (`atualizado_em` ausente) ou marcar a linha recuperada para a triagem
 do `/dashboard` detectar duplicata.
+
+---
+
+## Correção de triagem na planilha não chegava ao banco — reenvio revertia o conserto (04/08/2026)
+
+**Sintoma.** No Sucesso.AI (Maria Ponciano), dois componentes de **receita** — "Ressarcimento das
+transportadoras" (R$ 55.864,38) e "Receita retida em reenvio" (R$ 106.049,40) — foram declarados como itens
+de **custo evitado** no saving e, no reenvio de 29/07, declarados **de novo** como receita incremental. O
+mesmo dinheiro dos dois lados. A planilha foi corrigida à mão em 31/07 (Custo Evitado e Saving Reais
+174.238,10 → 12.324,32; Ganho Total 190.429,48 → 28.515,70), **mas o SQLite não**: seguia com
+`custo_evitado_reais = 174.238,10` e os 4 itens no JSON.
+
+**Causa.** O sync reverso (`syncSheetsToSqlite`) só atualiza `SAFE_UPDATE_FIELDS` — as colunas financeiras
+ficam de fora, e `custo_evitado_itens` **não tem coluna no Sheets**, então nunca poderia voltar por ali. Como
+o formulário de edição seeda do SQLite (`getMeuProjeto`), **o próximo reenvio da autora reescreveria a
+planilha com os 4 itens** e desfaria a correção sozinho. Correção manual sem contrapartida no banco é
+temporária por construção.
+
+**Fix.** `reconciliarFinanceiroDoSheet` (`src/lib/reconciliar-financeiro.ts`) + rota
+`POST /api/admin/reconciliar-financeiro` (`requireAdmin`, body `{projetoId, dry?}`): puxa para o SQLite o
+estado já validado na planilha — reconstrói os itens do texto de "Justificativa Custo Evitado"/"Custo do
+Projeto" (formato gerado pelo próprio app: `• nome — R$ valor (recorrência). justificativa`), recomputa o
+saving com `recomputarSavingFinanceiro` (horas seguem sendo a fonte de verdade) e regrava
+`custo_evitado_itens`/`justificativa`, `saving_reais`, `ganho_total_mensal`, `memorial_calculo` e
+`documentacao.conteudo.saving`.
+
+**Invariantes que não podem regredir:**
+- ⚠️ **Não escreve NADA no Sheets** — nem uma célula, em especial `Atualizado Em` (carimbo de sistema que
+  regulariza legado). É mão única, planilha → banco.
+- ⚠️ **FAIL-CLOSED em duas frentes:** linha da justificativa fora do formato → aborta (não vira item por
+  adivinhação); soma dos itens ≠ célula de total → aborta pedindo que a planilha seja corrigida antes. Um
+  palpite aqui grava número errado no banco que a gestão lê.
+- ⚠️ **Receita entra com ÷10** (`ganhoTotalMensal`, mesma fórmula de `submeterParaValidacao`) — o Ganho Total
+  **não é a soma simples**. Regra de negócio documentada em `docs/business-rules.md`, com teste explícito
+  para ninguém "corrigir" por engano.
+- `dry: true` devolve o diff sem gravar. **Usar sempre antes da escrita real.**
+
+**Onde aterrissou:** `src/lib/reconciliar-financeiro.ts` · `src/worker.ts` (rota) ·
+`tests/reconciliar-financeiro.test.ts` (parse do formato real da planilha, nome com hífen × travessão
+separador, fail-closed, pontual pelo valor cheio, ÷10 da receita).
+
+**Ponto cego de ORIGEM, ainda aberto (prevenção).** O bloco anti-dupla-contagem existente só compara
+*horas × custo evitado*; **não há checagem custo evitado × receita**, e a fase de receita não relê os itens do
+custo evitado. O agente chegou a estranhar a natureza do valor ("ressarcimento é saving operacional, não
+receita incremental — confirme se devo excluir"), a autora reafirmou e ele aceitou (comportamento previsto:
+argumenta 1×, aceita a discordância) — mas **nunca disse que o valor já estava contabilizado no saving**,
+porque não olhou. Enquanto esse gate não existir, o padrão pode se repetir.
