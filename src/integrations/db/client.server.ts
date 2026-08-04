@@ -173,6 +173,97 @@ export function getProjetoById(id: string) {
   return queryOne<ProjetoRow>('SELECT * FROM projetos WHERE id = ?', [id]);
 }
 
+/** Colunas que a LISTAGEM do Investigador realmente usa.
+ *
+ * ⚠️ Deliberadamente enxuto — NÃO voltar para `p.*`. O `SELECT p.*` arrastava
+ * `memorial_calculo`, `observacoes`, `contexto_especial` e demais blobs de TODOS
+ * os projetos só para renderizar uma lista que mostra nome, autor e métricas. */
+const PROJETO_INVESTIGADOR_COLS = [
+  'p.id', 'p.nome', 'p.responsavel_nome', 'p.responsavel_email',
+  'p.area', 'p.ferramenta', 'p.escopo', 'p.status', 'p.tipos_projeto',
+  'p.descricao_breve', 'p.complexidade', 'p.chat_completo',
+  'p.created_at', 'p.updated_at', 'p.submitted_at',
+].join(', ');
+
+export type ProjetoInvestigadorRow = Pick<
+  ProjetoRow,
+  | 'id' | 'nome' | 'responsavel_nome' | 'responsavel_email' | 'area' | 'ferramenta'
+  | 'escopo' | 'status' | 'tipos_projeto' | 'descricao_breve' | 'chat_completo'
+  | 'created_at' | 'updated_at' | 'submitted_at'
+> & { area_nome: string | null; complexidade: string | null };
+
+/** Projetos para a LISTAGEM do Investigador — só as colunas exibidas. */
+export function getProjetosParaInvestigador() {
+  return queryAll<ProjetoInvestigadorRow>(`
+    SELECT ${PROJETO_INVESTIGADOR_COLS}, a.nome AS area_nome
+    FROM projetos p
+    LEFT JOIN areas a ON p.area_id = a.id
+    ORDER BY p.created_at DESC
+  `);
+}
+
+/** UM projeto com a área resolvida — evita carregar a tabela inteira só para achar
+ *  um id, como fazia o `.find()` sobre `getProjetosWithArea()`. Aqui o `p.*` é
+ *  barato (uma linha) e o detalhe precisa de campos fora da lista enxuta
+ *  (`membros`, `servico_externo`, `data_criacao_projeto`). */
+export function getProjetoWithAreaById(id: string) {
+  return queryOne<ProjetoRow & { area_nome: string | null; complexidade: string | null }>(`
+    SELECT p.*, a.nome AS area_nome
+    FROM projetos p
+    LEFT JOIN areas a ON p.area_id = a.id
+    WHERE p.id = ?
+  `, [id]);
+}
+
+export type ChatMetricsRow = {
+  projeto_id: string;
+  total: number;
+  total_user: number;
+  total_ia: number;
+  ultima_atividade: string | null;
+  fase: string | null;
+};
+
+/** Métricas de chat de TODOS os projetos numa única query agregada.
+ *
+ * ⚠️ Substitui o N+1 que derrubava `/api/admin/investigador/projetos`: era um
+ * `getChatMessages(id)` por projeto — centenas de round-trips sequenciais
+ * trazendo o `content` INTEIRO de cada mensagem, só para calcular 4 escalares.
+ * O request estourava e a plataforma o marcava `canceled` (500/503 no browser),
+ * enquanto o front exibia lista vazia em silêncio. Mesma lição do
+ * `getAllReenvios`: agregue no SQL, trafegue só escalar.
+ *
+ * `fase` = a fase da última mensagem do assistente que declara uma (equivale a
+ * varrer as mensagens de trás para frente). `json_valid` é obrigatório: o
+ * `content` nem sempre é JSON e `json_extract` sobre texto solto lança erro —
+ * daí o CASE (garante a ordem de avaliação, que o AND não garante). */
+export function getChatMetricsPorProjeto() {
+  return queryAll<ChatMetricsRow>(`
+    SELECT m.projeto_id, m.total, m.total_user, m.total_ia, m.ultima_atividade, f.fase
+    FROM (
+      SELECT projeto_id,
+             COUNT(*) AS total,
+             SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS total_user,
+             SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS total_ia,
+             MAX(created_at) AS ultima_atividade
+      FROM chat_messages
+      GROUP BY projeto_id
+    ) m
+    LEFT JOIN (
+      SELECT projeto_id, fase FROM (
+        SELECT projeto_id,
+               CASE WHEN json_valid(content) THEN json_extract(content, '$.fase') END AS fase,
+               ROW_NUMBER() OVER (
+                 PARTITION BY projeto_id ORDER BY created_at DESC, rowid DESC
+               ) AS rn
+        FROM chat_messages
+        WHERE role = 'assistant'
+          AND CASE WHEN json_valid(content) THEN json_extract(content, '$.fase') END IS NOT NULL
+      ) ranked WHERE rn = 1
+    ) f ON f.projeto_id = m.projeto_id
+  `);
+}
+
 /** Projetos efetivamente submetidos (têm submitted_at). Usado pela reconciliação
  *  da coluna "Complexidade" no Sheets — evita varrer legados sem submissão. */
 export function getProjetosSubmetidos() {
@@ -233,7 +324,7 @@ export async function getProjetoWithRelations(id: string) {
 }
 
 export function getProjetoContextoData(id: string) {
-  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'submitted_at'> & { area_nome: string | null }>(`
+  return queryOne<Pick<ProjetoRow, 'responsavel_nome' | 'responsavel_email' | 'ferramenta' | 'membros' | 'nome' | 'tipo_projeto' | 'tipos_projeto' | 'escopo' | 'servico_externo' | 'descricao_breve' | 'data_criacao_projeto' | 'area' | 'especial' | 'contexto_especial' | 'saving_horas' | 'saving_reais' | 'tipo_saving' | 'memorial_calculo' | 'custo_externo_mensal' | 'alguem_fazia' | 'usa_ai_proxy' | 'contrafactual_afetados' | 'custo_evitado_itens' | 'submitted_at'> & { area_nome: string | null }>(`
     SELECT p.responsavel_nome, p.responsavel_email, p.ferramenta, p.membros,
            p.nome, p.tipo_projeto, p.tipos_projeto, p.escopo, p.servico_externo,
            p.descricao_breve, p.data_criacao_projeto, p.area,
@@ -241,6 +332,10 @@ export function getProjetoContextoData(id: string) {
            p.saving_horas, p.saving_reais, p.tipo_saving, p.memorial_calculo,
            p.custo_externo_mensal, p.alguem_fazia,
            p.usa_ai_proxy, p.contrafactual_afetados,
+           -- Itens do custo evitado: insumo do gate de SOBREPOSIÇÃO receita × custo
+           -- evitado (agents/sobreposicao-receita.ts). Sem eles a fase de receita é
+           -- cega para o dinheiro já contado no saving — o buraco do Sucesso.AI.
+           p.custo_evitado_itens,
            p.submitted_at,
            a.nome as area_nome
     FROM projetos p

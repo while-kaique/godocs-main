@@ -53,6 +53,7 @@ import {
 import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados, descontinuarProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
+import { reconciliarFinanceiroDoSheet } from '@/lib/reconciliar-financeiro'
 import {
   getPreviewDisparo,
   salvarTemplate,
@@ -516,6 +517,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request)
       const body = await readBody<{ dry?: boolean }>(request)
       return json(await retroativoCustosPontuais(body))
+    }
+
+    // ── Reconciliação financeira PLANILHA → SQLITE (admin) ──
+    // Puxa para o banco os números já corrigidos pela triagem na planilha (colunas
+    // financeiras + itens de custo evitado/projeto), que o sync reverso não cobre.
+    // Sem isso o formulário de edição seeda do SQLite antigo e o próximo reenvio
+    // REVERTE a correção. Não escreve nada no Sheets. `dry: true` só devolve o diff.
+    if (pathname === '/api/admin/reconciliar-financeiro' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ projetoId?: string; dry?: boolean }>(request)
+      if (!body?.projetoId) return errorJson('projetoId é obrigatório', 400)
+      return json(await reconciliarFinanceiroDoSheet(body.projetoId, { dry: body.dry }))
     }
 
     // ── Sync reverso manual (admin) ──

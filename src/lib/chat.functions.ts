@@ -46,6 +46,18 @@ import {
   unidadeHorasDe,
   receitaMemorialEhSaving,
 } from "@/lib/agents/orchestrator";
+import {
+  aplicaGateSobreposicao,
+  detectarSobreposicaoReceita,
+  deveBloquearPorSobreposicao,
+  interpretarSobreposicao,
+  perguntaSobreposicao,
+  perguntaSobreposicaoFirme,
+  OPCOES_SOBREPOSICAO,
+  NUDGE_SOBREPOSICAO_CONFIRMADO,
+  NUDGE_SOBREPOSICAO_AJUSTAR,
+  NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
+} from "@/lib/agents/sobreposicao-receita";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
@@ -237,6 +249,8 @@ async function getProjetoContexto(projeto_id: string): Promise<ProjetoContexto> 
     // sem ele o agente pergunta o ponteiro do zero, ignorando o que a pessoa já
     // respondeu na Etapa 2. Campo novo no formulário → nomeie AQUI também.
     contrafactual_afetados: data.contrafactual_afetados ?? null,
+    // Insumo do gate de sobreposição receita × custo evitado. NÃO entra em prompt.
+    custo_evitado_itens: data.custo_evitado_itens ?? null,
     usa_ai_proxy: data.usa_ai_proxy ?? null,
     // 'sim'/'nao' — no 'nao' as horas_antes são o equivalente manual estimado, não
     // uma rotina real (o orquestrador valida de forma diferente — sem pedir o passo
@@ -1220,6 +1234,20 @@ export async function enviarMensagem(rawData: unknown) {
       : faseCriterio === "receita"
         ? (estado.receita.criterio_secoes ?? null)
         : null;
+  // Gate da SOBREPOSIÇÃO receita × custo evitado. A detecção é DETERMINÍSTICA (compara o
+  // dinheiro da receita com os itens de custo evitado do formulário) — não depende do LLM
+  // perceber, que foi exatamente o que falhou no Sucesso.AI: ele percebeu, avisou e passou.
+  const gateSobreposicao = aplicaGateSobreposicao(estado.receita, estado.fase);
+  const detSobreposicao = gateSobreposicao
+    ? detectarSobreposicaoReceita(
+        ctx.custo_evitado_itens,
+        estado.receita.valor_ganho_mensal,
+        estado.receita.racional,
+      )
+    : null;
+  // ⚠️ MESMA semântica do `criterioAtual`: SNAPSHOT com um único uso legítimo — saber se
+  // ESTE turno é a resposta à pergunta do gate. NÃO reutilizar no bloqueio lá embaixo.
+  const sobreposicaoAtual = estado.receita.sobreposicao_custo_evitado ?? null;
   let reask: OrchestratorResult | null = null;
   if (gateBaseHoras && estado.saving.jornada_base === "pendente") {
     // (1) Turno de resposta à JORNADA (dias úteis × fim de semana).
@@ -1364,6 +1392,48 @@ export async function enviarMensagem(rawData: unknown) {
         precisaFonte,
       ),
     });
+  } else if (gateSobreposicao && sobreposicaoAtual === "pendente") {
+    // (6) 1ª RESPOSTA ao gate de SOBREPOSIÇÃO receita × custo evitado.
+    // Clique decide; texto livre cai no fallback por regex. Ambíguo → repergunta UMA vez.
+    const resp = interpretarSobreposicao(data.content, data.selected_option ?? null);
+    if (resp === null && detSobreposicao) {
+      log("enviarMensagem", "Sobreposição receita×custo evitado: resposta ambígua — 2ª e ÚLTIMA pergunta");
+      estado.receita = { ...estado.receita, sobreposicao_custo_evitado: "reperguntado" };
+      reask = {
+        type: "options",
+        question: perguntaSobreposicaoFirme(detSobreposicao),
+        options: OPCOES_SOBREPOSICAO,
+        fase: "receita",
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: { ...estado.receita, sobreposicao_custo_evitado: "reperguntado" },
+      };
+    } else {
+      const decisao = resp ?? "nao_respondido";
+      log("enviarMensagem", `Sobreposição receita×custo evitado: decisão "${decisao}" — encerrando o gate`);
+      estado.receita = { ...estado.receita, sobreposicao_custo_evitado: decisao };
+      history.push({
+        role: "user",
+        content:
+          decisao === "confirmado" ? NUDGE_SOBREPOSICAO_CONFIRMADO : NUDGE_SOBREPOSICAO_AJUSTAR,
+      });
+    }
+  } else if (gateSobreposicao && sobreposicaoAtual === "reperguntado") {
+    // (6b) 2ª resposta. ⚠️ ANTI-LOOP DURO: aceita o que vier. Ambíguo de novo →
+    // 'nao_respondido' (libera + marca para a triagem). NUNCA uma terceira pergunta.
+    const resp = interpretarSobreposicao(data.content, data.selected_option ?? null);
+    const decisao = resp ?? "nao_respondido";
+    log("enviarMensagem", `Sobreposição receita×custo evitado: 2ª resposta "${decisao}" — encerrado (anti-loop)`);
+    estado.receita = { ...estado.receita, sobreposicao_custo_evitado: decisao };
+    history.push({
+      role: "user",
+      content:
+        decisao === "confirmado"
+          ? NUDGE_SOBREPOSICAO_CONFIRMADO
+          : decisao === "ajustar"
+            ? NUDGE_SOBREPOSICAO_AJUSTAR
+            : NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
+    });
   }
   // NOTA: o split CARGA REAL × ESCALA NÃO tem mais gate determinístico aqui. O agente
   // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
@@ -1412,6 +1482,9 @@ export async function enviarMensagem(rawData: unknown) {
     resultado.receita = {
       ...resultado.receita,
       criterio_secoes: estado.receita.criterio_secoes ?? null,
+      // Gate da sobreposição receita × custo evitado: backend-only, nunca ecoado pelo LLM.
+      // Perder isto no round-trip re-armaria o gate a cada turno — o loop clássico.
+      sobreposicao_custo_evitado: estado.receita.sobreposicao_custo_evitado ?? null,
     };
   }
 
@@ -1719,6 +1792,63 @@ export async function enviarMensagem(rawData: unknown) {
         });
         delete (resultado as { options?: unknown }).options;
       }
+    }
+  }
+
+  // ── GATE: SOBREPOSIÇÃO receita × custo evitado ─────────────────────────────
+  // Roda DEPOIS do gate do critério, e só se aquele não tiver assumido o turno — um gate
+  // por turno, senão o usuário leva duas perguntas de uma vez (a ordenação é a mesma do
+  // saving: jornada → teto → alocação → critério).
+  //
+  // ⚠️ ESTADO LIDO AGORA, nunca o `sobreposicaoAtual` do topo do turno — mesma armadilha
+  // que produziu o loop de 38 perguntas no gate do critério.
+  //
+  // ⚠️ ANTI-LOOP: o gate só pergunta quando o estado ainda NÃO é terminal. Como o ramo de
+  // resposta lá em cima sempre termina em estado terminal ('confirmado'/'ajustar'/
+  // 'nao_respondido') — inclusive quando a resposta é ininteligível —, o teto de DUAS
+  // perguntas é estrutural, não depende de o texto do usuário ser bom o bastante.
+  const sobreposicaoResolvidaAgora = (resultado.receita ?? estado.receita)
+    .sobreposicao_custo_evitado;
+  if (
+    gateSobreposicao &&
+    detSobreposicao &&
+    !reask &&
+    deveBloquearPorSobreposicao(sobreposicaoResolvidaAgora, resultado.type)
+  ) {
+    // ⚠️ MONOTÔNICO, sem exceção: null → 'pendente' → 'reperguntado' → 'nao_respondido'.
+    // Nenhum ramo anda para trás. Chegar aqui já em 'reperguntado' significa que a resposta
+    // do usuário foi consumida por OUTRO gate no mesmo turno (a cadeia de `else if` lá em
+    // cima) — nesse caso NÃO se pergunta uma 3ª vez: encerra em 'nao_respondido', libera o
+    // preview e deixa a marca para a triagem. Re-armar 'pendente' aqui era um loop de
+    // verdade (o teste de simulação pegou), da mesma família do bug das 38 perguntas.
+    if (sobreposicaoResolvidaAgora === "reperguntado") {
+      log(
+        "enviarMensagem",
+        "Sobreposição receita×custo evitado: 2 perguntas já feitas e sem resposta — liberando com marca de triagem",
+      );
+      resultado.receita = {
+        ...(resultado.receita ?? estado.receita),
+        sobreposicao_custo_evitado: "nao_respondido",
+      };
+    } else {
+      const jaPerguntou = sobreposicaoResolvidaAgora === "pendente";
+      log(
+        "enviarMensagem",
+        `⛔ Preview de receita com sobreposição de custo evitado (via ${detSobreposicao.via}, R$ ${detSobreposicao.total}) — ${jaPerguntou ? "repergunta firme (2ª e última)" : "perguntando"}`,
+      );
+      Object.assign(resultado, {
+        type: "options",
+        question: jaPerguntou
+          ? perguntaSobreposicaoFirme(detSobreposicao)
+          : perguntaSobreposicao(detSobreposicao),
+        options: OPCOES_SOBREPOSICAO,
+        fase: "receita",
+        receita: {
+          ...(resultado.receita ?? estado.receita),
+          sobreposicao_custo_evitado: jaPerguntou ? "reperguntado" : "pendente",
+        },
+      });
+      delete (resultado as { content?: unknown }).content;
     }
   }
 

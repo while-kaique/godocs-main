@@ -1281,3 +1281,106 @@ falha é rotulada pela **etapa** real (`atualizar` · `recuperar (append)` · `i
 desenhados e **não** implementados (custo × benefício, decisão de produto): condicionar o append a o SQLite
 confirmar que a linha nunca aterrissou (`atualizado_em` ausente) ou marcar a linha recuperada para a triagem
 do `/dashboard` detectar duplicata.
+
+---
+
+## Investigador levava minutos e mentia nos contadores ("0 submetidos" com 289 edições) — N+1 de chat derrubava `/projetos` (04/08/2026)
+
+**Sintoma.** O painel `/investigador` demorava **minutos** para listar — quando listava. Ao carregar,
+mostrava **0 Submetidos · 289 Edições · 0 Abandonados**, o que é impossível: todo reenvio pressupõe uma
+submissão. Console do navegador: `500` seguido de vários `503` em
+`/api/admin/investigador/projetos`.
+
+**Causa.** Duas, somadas.
+
+1. **N+1 no servidor.** `getProjetosInvestigador` (`investigador.functions.ts`) fazia
+   `await getChatMessages(p.id)` **dentro do laço de projetos** — um round-trip por projeto, sequencial,
+   com `SELECT *` trazendo o **`content` inteiro** de cada mensagem, só para calcular 4 escalares (fase
+   atual, 3 contagens e a última atividade). Com centenas de projetos o request nunca terminava: nos logs
+   do Godeploy toda chamada saía `canceled` (uma como `Network connection lost.`), enquanto `/stats` e
+   `/edicoes` respondiam `ok` em 100% das vezes. Agravantes: `chat_messages` **não tinha índice em
+   `projeto_id`** (cada uma das N consultas varria a tabela inteira) e `getProjetosWithArea()` fazia
+   `SELECT p.*`, arrastando `memorial_calculo` e demais blobs de TODOS os projetos para uma listagem que
+   não os exibe. O `getProjetoInvestigadorDetalhes` ainda carregava a tabela inteira para um `.find()`.
+2. **Falha silenciosa no front.** As 3 abas não têm a mesma fonte: `Submetidos`/`Abandonados` filtram a
+   lista `projetos` (`isSubmetido` = `!!submitted_at`), e `Edições` vem de `/edicoes`, endpoint separado.
+   Com `/projetos` morto, `projetos` ficava `[]` e o `Promise.allSettled` — que existe justamente para uma
+   falha não zerar as outras listas — **engolia o erro**: `setLoading(false)` rodava igual e a tela
+   apresentava "0" como se fosse resposta legítima. Daí a combinação impossível.
+
+**Fix.**
+- **Uma query agregada** para o chat de todos os projetos (`getChatMetricsPorProjeto`,
+  `client.server.ts`): contagens via `SUM(CASE …)`, `MAX(created_at)` para a última atividade e a fase
+  pela última mensagem do assistente que declara uma (`ROW_NUMBER() OVER (PARTITION BY projeto_id …)` +
+  `json_extract`). ⚠️ O `json_valid` vai dentro de um **`CASE`**, não num `AND`: o `content` nem sempre é
+  JSON e `json_extract` sobre texto solto lança erro — o `CASE` garante a ordem de avaliação que o `AND`
+  não garante.
+- **Listagem enxuta** (`getProjetosParaInvestigador`): só as ~15 colunas exibidas, sem blobs. Detalhe usa
+  `getProjetoWithAreaById` (busca direta por id; ali o `p.*` é barato, uma linha).
+- **Índice** `idx_chat_messages_projeto_id` — toda leitura de chat filtra por `projeto_id`.
+- **Front:** guard de requisição em voo (`emVooRef`) para o polling de 8s parar de **empilhar** chamadas
+  sobre um endpoint já sobrecarregado, e banner de falha (`falhas`) — o dado velho continua na tela, mas
+  rotulado como incompleto, para que "0" nunca mais seja lido como verdade.
+
+**Onde aterrissou:** `src/integrations/db/client.server.ts` (`getProjetosParaInvestigador`,
+`getProjetoWithAreaById`, `getChatMetricsPorProjeto`, `PROJETO_INVESTIGADOR_COLS`) ·
+`src/integrations/db/schema.ts` (índice) · `src/lib/investigador.functions.ts` (`faseAtualDeMetricas`,
+laço sem I/O) · `src/routes/_authenticated/investigador.tsx` (guard + banner) ·
+`tests/investigador-n1.test.ts` (guarda de regressão: `getChatMessages` **não** pode ser chamado pela
+listagem; mapeamento das métricas; `faseAtualDeMetricas` espelhando o `inferFaseAtual`).
+
+**Validação (staging, 575 projetos).** Todas as chamadas a `/api/admin/investigador/projetos` saíram
+`outcome: ok` — zero `canceled` —, a lista renderizou de imediato e os rascunhos abandonados exibiram
+`0/1 msgs`, "Parou em: Documentação" e "inativo há 11h14min", confirmando que contagem, fase
+(`json_extract`) e `ultima_atividade` vêm corretas do datasource do Godeploy. O SQL foi exercitado antes
+em `better-sqlite3` com `content` não-JSON, mensagem `complete` sem fase e empate de `created_at`.
+
+⚠️ **Mesma lição do `getAllReenvios`** (bug de jul/2026 que zerava o Investigador): nesta tela, **agregue no
+SQL e trafegue só escalar**. Não reintroduzir `getChatMessages` por projeto na listagem.
+
+---
+
+## Correção de triagem na planilha não chegava ao banco — reenvio revertia o conserto (04/08/2026)
+
+**Sintoma.** No Sucesso.AI (Maria Ponciano), dois componentes de **receita** — "Ressarcimento das
+transportadoras" (R$ 55.864,38) e "Receita retida em reenvio" (R$ 106.049,40) — foram declarados como itens
+de **custo evitado** no saving e, no reenvio de 29/07, declarados **de novo** como receita incremental. O
+mesmo dinheiro dos dois lados. A planilha foi corrigida à mão em 31/07 (Custo Evitado e Saving Reais
+174.238,10 → 12.324,32; Ganho Total 190.429,48 → 28.515,70), **mas o SQLite não**: seguia com
+`custo_evitado_reais = 174.238,10` e os 4 itens no JSON.
+
+**Causa.** O sync reverso (`syncSheetsToSqlite`) só atualiza `SAFE_UPDATE_FIELDS` — as colunas financeiras
+ficam de fora, e `custo_evitado_itens` **não tem coluna no Sheets**, então nunca poderia voltar por ali. Como
+o formulário de edição seeda do SQLite (`getMeuProjeto`), **o próximo reenvio da autora reescreveria a
+planilha com os 4 itens** e desfaria a correção sozinho. Correção manual sem contrapartida no banco é
+temporária por construção.
+
+**Fix.** `reconciliarFinanceiroDoSheet` (`src/lib/reconciliar-financeiro.ts`) + rota
+`POST /api/admin/reconciliar-financeiro` (`requireAdmin`, body `{projetoId, dry?}`): puxa para o SQLite o
+estado já validado na planilha — reconstrói os itens do texto de "Justificativa Custo Evitado"/"Custo do
+Projeto" (formato gerado pelo próprio app: `• nome — R$ valor (recorrência). justificativa`), recomputa o
+saving com `recomputarSavingFinanceiro` (horas seguem sendo a fonte de verdade) e regrava
+`custo_evitado_itens`/`justificativa`, `saving_reais`, `ganho_total_mensal`, `memorial_calculo` e
+`documentacao.conteudo.saving`.
+
+**Invariantes que não podem regredir:**
+- ⚠️ **Não escreve NADA no Sheets** — nem uma célula, em especial `Atualizado Em` (carimbo de sistema que
+  regulariza legado). É mão única, planilha → banco.
+- ⚠️ **FAIL-CLOSED em duas frentes:** linha da justificativa fora do formato → aborta (não vira item por
+  adivinhação); soma dos itens ≠ célula de total → aborta pedindo que a planilha seja corrigida antes. Um
+  palpite aqui grava número errado no banco que a gestão lê.
+- ⚠️ **Receita entra com ÷10** (`ganhoTotalMensal`, mesma fórmula de `submeterParaValidacao`) — o Ganho Total
+  **não é a soma simples**. Regra de negócio documentada em `docs/business-rules.md`, com teste explícito
+  para ninguém "corrigir" por engano.
+- `dry: true` devolve o diff sem gravar. **Usar sempre antes da escrita real.**
+
+**Onde aterrissou:** `src/lib/reconciliar-financeiro.ts` · `src/worker.ts` (rota) ·
+`tests/reconciliar-financeiro.test.ts` (parse do formato real da planilha, nome com hífen × travessão
+separador, fail-closed, pontual pelo valor cheio, ÷10 da receita).
+
+**Ponto cego de ORIGEM, ainda aberto (prevenção).** O bloco anti-dupla-contagem existente só compara
+*horas × custo evitado*; **não há checagem custo evitado × receita**, e a fase de receita não relê os itens do
+custo evitado. O agente chegou a estranhar a natureza do valor ("ressarcimento é saving operacional, não
+receita incremental — confirme se devo excluir"), a autora reafirmou e ele aceitou (comportamento previsto:
+argumenta 1×, aceita a discordância) — mas **nunca disse que o valor já estava contabilizado no saving**,
+porque não olhou. Enquanto esse gate não existir, o padrão pode se repetir.
