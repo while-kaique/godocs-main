@@ -19,7 +19,49 @@
 > ⚠️ Ele perguntou se eu "subi os testes E2E pra staging": **não** — os E2E são scripts locais; o que foi
 > criado lá são 2 **projetos** (dados) via a API real. Nenhum código de teste foi deployado.
 
-**Última sessão:** 2026-08-04 (manhã) — **staging atropelada de novo, restaurada, e fila do líder populada
+**Última sessão:** 2026-08-04 (tarde) — **a fila do líder virou um SLIDER de 1 projeto por vez** (pedido do
+Luis). Mudança de UI pequena e fechada, **só na tela `/aprovacoes`**; nada de servidor mudou (sem
+`build:worker`). Commits `0eeaf89` (código) + `6110630` (spec/CLAUDE.md), **931 testes verdes**, staging
+`edf400b4` redeployada às 11:46 e o bundle conferido no ar (`getAppFile` → `BarraFila`/`decididos` presentes).
+
+1. **O problema:** com 12 projetos empilhados o líder rolava a tela procurando onde parou e não sabia quanto
+   faltava — o oposto do "mais fácil, rápido e intuitivo possível" que motivou o D13.
+2. **O que existe agora:** barra no topo com **`3 de 12`** + **um traço por projeto** (colorido pelo parecer
+   já dado, clicável para saltar), **um** card na tela e, ao decidir, **salto automático para o próximo sem
+   parecer** + scroll ao topo.
+3. ⚠️ **A decisão que mais importa não regredir — o total NÃO encolhe ao decidir.** O `useEffect` que
+   sincroniza com o servidor é **append-only** (só acrescenta projeto novo) e o item decidido **fica** no
+   slider em modo leitura (faixa "Você pré-aprovou…" + checklist desabilitado). Se a lista encolhesse,
+   `3 de 12` viraria `3 de 11` no meio do caminho e o líder perderia a referência de progresso — além de não
+   poder voltar para rever o próprio parecer. O cache do React Query **perde** o item (a fila do servidor não
+   o traz mais); quem preserva é o estado local (`fila` + `decididos` + `indice`).
+4. **Navegação em 3 vias:** botões no topo, botões no pé do card ("Projeto anterior" / "Decidir depois") e
+   as setas `←`/`→` do teclado — **ignoradas dentro de `INPUT`/`TEXTAREA`**, senão brigariam com o cursor da
+   caixa de ajuste. Fila **> 20** projetos → os traços viram barra de progresso (40 traços de 3px não se
+   clicam nem se leem).
+5. **A11y/identidade:** animação reusa `go-step-in`/`go-step-in-back` das etapas do formulário (mesmo gesto
+   de "avançar" do produto) e o estado **nunca fica só na cor do traço** — a contagem "2 pré-aprovados ·
+   1 ajuste pedido" está escrita e cada traço tem `aria-label`/`title` com nome do projeto + situação.
+6. ⚠️ **Numeração das decisões da spec estava com um buraco:** o **D14** (duas colunas no Sheets, estado ×
+   justificativa) vivia só no código (`dc53193`) e na memória, **nunca na spec** — foi escrito agora, e o
+   slider ficou como **D15**. Conferir a tabela da spec antes de inventar o próximo número.
+7. **Pergunta do Luis respondida (sem código):** a entrada da tela **não** depende da DM — é a faixa na
+   **home** (`src/routes/index.tsx:289`), visível só para quem `lidera` na TeamGuide, e ela aparece **mesmo
+   com a fila vazia**. Não existe item de menu: de outra tela, o líder tem que voltar em "← Início".
+   **Oferta em aberto:** atalho fixo no cabeçalho com o número de pendentes (mudança pequena).
+8. **Onde aterrissou:** `src/routes/aprovacoes.tsx` (novo componente `BarraFila`; `CardAprovacao` ganhou
+   `decidido`/`proximoPendente`/`podeVoltar`/`podeAvancar` e uma Zona 3 de navegação) ·
+   `spec-docs/SPEC_APROVACAO_LIDER.md` (D14 + D15 + nota no F1) · `CLAUDE.md` (seção da pré-aprovação).
+9. ⚠️ **O `CLAUDE.md` está em 62 kB** — muito acima do teto de 40 k em que o Claude Code avisa (ver
+   memória `claude-md-limite-40k`). Não mexi além do parágrafo da feature; **vale uma faxina em sessão
+   própria**, movendo detalhe para `docs/`/`spec-docs/`.
+10. **O que NÃO mudou:** nenhum arquivo de servidor, nenhuma rota de API, nenhum teste novo (a mudança é de
+    apresentação — o `decidirAprovacao` e o checklist obrigatório seguem intactos). Prod continua **sem** a
+    feature e a branch segue **sem push e sem PR** (trava da diretoria).
+
+---
+
+## Sessão de 2026-08-04 (manhã) — staging atropelada de novo, restaurada, e fila do líder populada
 com 2 projetos mockados.** Zero mudança de comportamento no produto: a sessão foi diagnóstico + integração +
 seed de dados.
 
@@ -253,6 +295,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > a prod está TRAVADA até a validação com a DIRETORIA** (decisão do Luis): branch commitada, sem push/PR.
 > **04/08:** o `origin/main` (PRs #224–#227) foi mergeado na branch e a staging redeployada; a fila do Lucas
 > tem **3 itens pendentes** (2 mockados criados de propósito) esperando ele abrir com a **própria conta**.
+> **04/08 (tarde):** a fila virou **slider de 1 projeto por vez** (D15 — ver "Última sessão"), redeployada;
+> continua sendo a MESMA validação humana pendente, agora com a tela nova.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
 

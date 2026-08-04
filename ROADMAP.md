@@ -116,15 +116,16 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
 **Próximo:** **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
 paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
-populada com 2 projetos mockados justamente para ele ver a tela com mais de um pendente). Depois disso:
+populada com 2 projetos mockados justamente para ele ver a tela com mais de um pendente, e desde 04/08 à
+tarde ela é um **slider de 1 projeto por vez**, D15). Depois disso:
 **limpar os 2 mockados** e **validar com a DIRETORIA se a pré-aprovação vai para produção** (decisão do
 Luis, 03/08 noite — nada sobe, nem para prod nem para o repo, antes disso). A staging `edf400b4` está no ar
-com a rodada 6 + o `main` do Kaique mergeado (04/08, 891 testes). Pré-requisito do Luis quando destravar:
+com a rodada 6 + o `main` do Kaique mergeado + o slider da fila (04/08, 931 testes). Pré-requisito do Luis quando destravar:
 criar **`Aprovação do Líder`** e **`Justificativa Aprovação do Líder`** no cabeçalho das abas `GoDocs` e
 `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
-Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D13**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D15**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
 diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,
 índice de liderança (432 pessoas / 1 sem líder), tabela interna `projeto_aprovacoes`, rotas
