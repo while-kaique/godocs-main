@@ -677,6 +677,28 @@ export const MIN_SECAO_CRITERIO = 60;
 export const PISTA_ONDE_VERIFICAR =
   /onde|conferi|verific|acompanh|rastrea|relat[óo]ri|painel|dashboard|planilha|sistema|base\b|banco de dados|metabase|erp|protheus|sheets?|extrato|fatura|contrato|nota fiscal|log\b|ticket|chamado|indicador|kpi|m[ée]trica|n[ãa]o soube|n[ãa]o sabe|n[ãa]o foi informad|sem fonte|n[ãa]o h[áa] (uma )?fonte/i;
 
+// REGISTRO EXPLÍCITO de que não há onde conferir — subconjunto declarado da
+// PISTA_ONDE_VERIFICAR, separado porque merece uma régua de COMPRIMENTO diferente.
+//
+// ⚠️ Motivo (03/08/2026): registrar ausência é legitimamente CURTO ("não há indicador"),
+// nomear e descrever uma fonte não é. Com um piso único de 60 chars, a seção honesta
+// ficava indistinguível do rótulo vazio que originou o gate — e o gate a cobrava de novo,
+// numa pergunta cuja única resposta verdadeira já estava escrita ali. Pior: o nudge
+// [SISTEMA] mandava o LLM reescrever a seção, empurrando-o a INVENTAR uma fonte, que é
+// exatamente o que a régua quer evitar. Não é bloqueio (desde o #225 o gate pergunta uma
+// vez só) — é a diferença entre uma pergunta útil e uma pergunta que ensina a mentir.
+//
+// Deliberadamente ESTREITA: exige a negação ("não sei/soube/há/existe…", "sem …") ligada,
+// na mesma oração, ao objeto que faltou (fonte · indicador · onde · relatório · painel…).
+// "custo externo eliminado." — a meia-seção real que motivou o gate — não casa, e segue
+// reprovando pelo piso de 60.
+//
+// ⚠️ Sem `\b` depois do verbo: em JS `\b` é ASCII-only, então "há" (termina em vogal
+// acentuada) seguido de espaço NÃO é fronteira de palavra e a alternativa nunca casaria —
+// justamente a forma mais comum ("não há indicador"). Use `\s+` para separar.
+export const REGISTRO_AUSENCIA_FONTE =
+  /\bn[ãa]o\s+(?:soube|sabe|sei|se\s+sabe|foi\s+informad\w*|h[áa]|existe\w*|possui|temos|tem)(?:\s+|$)[^.;!?]{0,60}?\b(?:onde|fonte|indicador(?:es)?|ponteiro|kpi|m[ée]trica|relat[óo]rio|painel|dashboard|base|planilha|sistema|registro|n[úu]mero)\b|\bsem\s+(?:fonte|indicador|registro)\b|\bfonte\s+n[ãa]o\s+informad/i;
+
 // A seção [1.3] "Processo alterado" está ausente ou sem substância?
 export function secaoProcessoVaga(texto: string | null | undefined): boolean {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
@@ -689,8 +711,14 @@ export function secaoProcessoVaga(texto: string | null | undefined): boolean {
 // NENHUMA pista do onde-verificar. NÃO julga se a fonte foi bem NOMEADA ("no sistema" ×
 // "no Metabase") — distinguir isso por regex geraria falso positivo em quem respondeu
 // honestamente "não sei onde conferir"; essa camada fica com o prompt e o analisador.
+//
+// ⚠️ O registro EXPLÍCITO da ausência dispensa o piso de comprimento (ver
+// REGISTRO_AUSENCIA_FONTE): a seção está escrita, só que a resposta verdadeira é curta.
+// O piso continua valendo para todo o resto — inclusive para a meia-seção sem
+// onde-verificar que originou o gate.
 export function secaoPonteiroVaga(texto: string | null | undefined): boolean {
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  if (REGISTRO_AUSENCIA_FONTE.test(t)) return false;
   if (t.length < MIN_SECAO_CRITERIO) return true;
   return !PISTA_ONDE_VERIFICAR.test(t);
 }

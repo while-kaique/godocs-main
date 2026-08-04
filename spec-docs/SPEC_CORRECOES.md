@@ -6,6 +6,62 @@
 
 ---
 
+## 2026-08-03 — `[1.4]` honesta e curta era lida como rótulo vazio (piso de 60 chars × registro de ausência)
+
+**Status:** ✅ codada e testada (831 testes verdes) · **Branch:** `fix/piso-ausencia-fonte` · **PR:** #226
+
+**Sintoma:** uma seção `[1.4]` que **registra a ausência de fonte** — `**Ponteiro movido:** não há
+indicador.` — era classificada como vaga por `secaoPonteiroVaga`. O gate então cobrava a seção de novo,
+numa pergunta cuja **única resposta verdadeira já estava escrita ali**. Pior que a pergunta redundante: o
+nudge `[SISTEMA]` manda o LLM **reescrever** a seção a partir da resposta do usuário — ou seja, empurra o
+agente a **inventar uma fonte**, exatamente o que a régua de rastreabilidade quer evitar. Era a pendência
+declarada na entrada do #225 (logo abaixo).
+
+**Causa-raiz — um piso de comprimento para dois casos de tamanho natural diferente.** `secaoPonteiroVaga`
+exigia **≥ `MIN_SECAO_CRITERIO` (60) chars E** casar `PISTA_ONDE_VERIFICAR`. Só que a `PISTA` mistura:
+
+- **nomear** uma fonte ("no relatório de conciliação do Metabase") → texto longo, 60 chars é fácil;
+- **registrar a ausência** ("não há indicador") → texto curto **por natureza**.
+
+Com o piso único, a seção honesta ficava indistinguível do **rótulo vazio** que originou o gate
+(`"**Ponteiro movido:** custo externo eliminado."`, a meia-seção do `custo-evitado-puro` em staging).
+A decisão fechada da `SPEC_CRITERIOS_PROJETO` — _"aceita 'não sei onde conferir' → zona cinzenta, nunca
+reprovação automática"_ — valia no analisador, mas o gate a contradizia antes de chegar lá.
+
+**Fix:** extrair de `PISTA_ONDE_VERIFICAR` um subconjunto declarado, `REGISTRO_AUSENCIA_FONTE`, e
+dispensar o piso quando ele casa — **o próprio registro da ausência é a substância**, não o comprimento.
+Sem número mágico novo:
+
+```ts
+export function secaoPonteiroVaga(texto: string | null | undefined): boolean {
+  const t = (texto ?? "").replace(/\s+/g, " ").trim();
+  if (REGISTRO_AUSENCIA_FONTE.test(t)) return false; // ausência registrada = seção escrita
+  if (t.length < MIN_SECAO_CRITERIO) return true;
+  return !PISTA_ONDE_VERIFICAR.test(t);
+}
+```
+
+A regex é **estreita de propósito**: exige a negação (`não sei/soube/há/existe…`, `sem …`) ligada, **na
+mesma oração**, ao objeto que faltou (fonte · indicador · onde · relatório · painel…). Negação sobre
+outro assunto ("o time não gostava da rotina antiga") **não** fura o piso.
+
+⚠️ **Pegadinha que custou uma rodada de teste:** `\b` em JS é **ASCII-only**. `\bn[ãa]o\s+(?:…|h[áa])\b`
+**nunca** casaria `"não há indicador"`, porque entre o `á` e o espaço não existe fronteira de palavra —
+os dois são não-word. Justamente a forma mais comum. Separador correto: `(?:\s+|$)`.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (`REGISTRO_AUSENCIA_FONTE` + short-circuit em
+`secaoPonteiroVaga`) · `tests/gate-criterio-secoes.test.ts` (+5 testes: o caso do bug, 6 variantes de
+registro de ausência abaixo do piso, **regressão da meia-seção** que segue reprovando, negação de outro
+assunto, e a fonte nomeada intacta). A fixture do teste "converge em NO MÁXIMO 1 pergunta" trocou de
+`"não há indicador"` para `"melhorou bastante a rotina"` — a antiga virou seção **válida** e deixaria o
+teste de exercitar o pior caso.
+
+**Escopo:** só a régua de qualidade da seção. **Não** mexe no anti-loop do #225 (o gate segue perguntando
+uma vez só), nem no analisador — uma `[1.4]` que registra ausência continua indo para **zona cinzenta**,
+que é o desfecho correto.
+
+---
+
 ## 2026-08-03 — Gate do critério reperguntava 38× e travava a submissão (anti-loop anulado por snapshot)
 
 **Status:** ✅ codada e testada (826 testes verdes, já com o #224) · **Branch:** `fix/loop-gate-criterio` · **PR:** [#225](https://github.com/while-kaique/godocs-main/pull/225)
@@ -59,9 +115,10 @@ comentário-guarda no `criterioAtual`) · `tests/gate-criterio-secoes.test.ts` (
 **simulação turno a turno na ordem real** — `viva` converge em 1 pergunta, `snapshot` repergunta nos 40
 turnos, travando o bug para sempre).
 
-**Pendência proposta (NÃO incluída):** afrouxar o piso de 60 chars de `secaoPonteiroVaga` quando o texto
-**registra ausência explícita** — hoje uma resposta honesta e curta é indistinguível de rótulo vazio. Com
-este fix ela deixou de travar alguém (o gate avalia uma vez só), então é qualidade, não bloqueio.
+**Pendência proposta (NÃO incluída aqui):** afrouxar o piso de 60 chars de `secaoPonteiroVaga` quando o
+texto **registra ausência explícita** — hoje uma resposta honesta e curta é indistinguível de rótulo
+vazio. Com este fix ela deixou de travar alguém (o gate avalia uma vez só), então é qualidade, não
+bloqueio. → **Resolvida** na entrada acima (`fix/piso-ausencia-fonte`, PR #226).
 ## 2026-08-03 — Gate do critério pedia "**(b)** …" ao usuário: alínea órfã de um roteiro que ele nunca viu
 
 **Status:** ✅ mergeada · **Branch:** `fix/gate-criterio-ux` · **PR:** [#224](https://github.com/while-kaique/godocs-main/pull/224)

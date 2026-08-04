@@ -3,6 +3,7 @@ import {
   secaoProcessoVaga,
   secaoPonteiroVaga,
   MIN_SECAO_CRITERIO,
+  REGISTRO_AUSENCIA_FONTE,
   BLOCO_SECOES_CRITERIO,
   buildSavingPrompt,
   buildReceitaPrompt,
@@ -139,6 +140,60 @@ describe("secaoPonteiroVaga — [1.4]", () => {
   });
 });
 
+// ─── Piso de comprimento × registro de ausência (03/08/2026) ─────────────────
+// A seção honesta e CURTA ("não há indicador") era indistinguível do rótulo vazio: as duas
+// caíam no mesmo piso de 60 chars. O gate então cobrava de novo uma pergunta cuja única
+// resposta verdadeira já estava escrita ali, e o nudge [SISTEMA] mandava o LLM reescrever
+// a seção — empurrando-o a INVENTAR uma fonte, o oposto do que a régua quer.
+describe("secaoPonteiroVaga — ausência registrada dispensa o piso de comprimento", () => {
+  it("o caso do bug: 'não há indicador' é seção ESCRITA, não rótulo vazio", () => {
+    const curtoEHonesto = "**Ponteiro movido:** não há indicador.";
+    expect(curtoEHonesto.length).toBeLessThan(MIN_SECAO_CRITERIO);
+    expect(secaoPonteiroVaga(curtoEHonesto)).toBe(false);
+  });
+
+  it("aceita as variantes de registro de ausência, todas abaixo do piso", () => {
+    for (const t of [
+      "Não sei onde conferir esse número.",
+      "O autor não soube apontar a fonte.",
+      "Ponteiro: 6h. Não existe relatório com isso.",
+      "Não foi informado onde conferir.",
+      "Ganho de prazo, sem indicador acompanhado.",
+      "Reduziu retrabalho; fonte não informada.",
+    ]) {
+      expect(t.length).toBeLessThan(MIN_SECAO_CRITERIO);
+      expect(REGISTRO_AUSENCIA_FONTE.test(t)).toBe(true);
+      expect(secaoPonteiroVaga(t)).toBe(false);
+    }
+  });
+
+  it("NÃO afrouxa para a meia-seção que originou o gate (regressão)", () => {
+    // Observada em staging no `custo-evitado-puro`: metade da [1.4], sem onde-verificar e
+    // sem registrar ausência nenhuma. Continua reprovando pelo piso de 60.
+    for (const t of [
+      "custo externo eliminado.",
+      "**Ponteiro movido:** custo externo eliminado.",
+      "**Ponteiro movido:** melhorou bastante a rotina.",
+      "Reduziu o tempo do time.",
+    ]) {
+      expect(REGISTRO_AUSENCIA_FONTE.test(t)).toBe(false);
+      expect(secaoPonteiroVaga(t)).toBe(true);
+    }
+  });
+
+  it("a negação precisa estar ligada ao objeto que faltou, na mesma oração", () => {
+    // Regex ESTREITA de propósito: uma negação solta sobre outro assunto não vira
+    // "ausência registrada" e não pode furar o piso.
+    const negacaoDeOutraCoisa = "O time não gostava da rotina antiga.";
+    expect(REGISTRO_AUSENCIA_FONTE.test(negacaoDeOutraCoisa)).toBe(false);
+    expect(secaoPonteiroVaga(negacaoDeOutraCoisa)).toBe(true);
+  });
+
+  it("seção completa com fonte NOMEADA continua passando (não houve regressão)", () => {
+    expect(secaoPonteiroVaga(extrairPonteiroMovido(memorialCompleto))).toBe(false);
+  });
+});
+
 describe("estado do gate no tipo", () => {
   it("nasce null em saving e receita (backend-only, não ecoado pelo LLM)", () => {
     expect(savingVazio().criterio_secoes).toBeNull();
@@ -189,10 +244,12 @@ describe("deveBloquearPorCriterio — o anti-loop que se anulava", () => {
   });
 
   it("converge em NO MÁXIMO 1 pergunta mesmo se o memorial nunca melhorar", () => {
-    // O pior caso real: o autor não tem indicador nenhum e o LLM só escreve seções curtas,
-    // que `secaoPonteiroVaga` reprova para sempre. Antes isso era o loop infinito; agora o
+    // O pior caso real: o LLM só escreve seções curtas e sem onde-verificar, que
+    // `secaoPonteiroVaga` reprova para sempre. Antes isso era o loop infinito; agora o
     // estado resolvido encerra o gate independentemente do texto.
-    const memorialQueNuncaPassa = "**Ponteiro movido:** não há indicador.";
+    // ⚠️ A fixture NÃO pode registrar ausência ("não há indicador") — isso hoje é seção
+    // VÁLIDA (REGISTRO_AUSENCIA_FONTE) e o teste deixaria de exercitar o pior caso.
+    const memorialQueNuncaPassa = "**Ponteiro movido:** melhorou bastante a rotina.";
     expect(secaoPonteiroVaga(memorialQueNuncaPassa)).toBe(true); // segue reprovando…
 
     // Simula a ORDEM REAL de `enviarMensagem`: dentro do MESMO turno, o ramo de resposta
