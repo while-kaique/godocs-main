@@ -32,7 +32,12 @@ import {
   montarParticipantes,
   extrairNumeros,
 } from '@/lib/aprovacoes.functions';
-import { checklistCompleto, resumirChecklist } from '@/lib/aprovacoes-checklist';
+import {
+  checklistCompleto,
+  exigeJustificativa,
+  resumirChecklist,
+  temNaoNoChecklist,
+} from '@/lib/aprovacoes-checklist';
 
 const mockLideranca = ehLideranca as unknown as ReturnType<typeof vi.fn>;
 const mockLideres = getLideresDe as unknown as ReturnType<typeof vi.fn>;
@@ -228,6 +233,40 @@ describe('pré-aprovação do líder', () => {
     });
   });
 
+  it('pré-aprovar com "não" no checklist exige explicação (04/08/2026)', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+
+    // Sem texto: barra (a contradição "não é coerente, mas pré-aprovo" precisa de motivo).
+    await expect(
+      decidirAprovacao(LUCAS.email, {
+        projeto_id: id,
+        veredito: 'aprovado',
+        respostas: { ...RESP_OK, saving_coerente: 'nao' },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // Com texto: grava, e a explicação vai para a coluna de justificativa junto do checklist.
+    await decidirAprovacao(LUCAS.email, {
+      projeto_id: id,
+      veredito: 'aprovado',
+      comentario: 'Horas altas para o volume de hoje, mas eram 3 pessoas em picos.',
+      respostas: { ...RESP_OK, saving_coerente: 'nao' },
+    });
+    const resumo = await resumoAprovacaoPorProjeto([id]);
+    expect(resumo[id]).toMatchObject({ veredito: 'aprovado' });
+    const cells = mockSheet.mock.calls.at(-1)![1] as Record<string, string>;
+    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('Saving coerente: não');
+    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('3 pessoas em picos');
+  });
+
+  it('pré-aprovar com checklist todo "sim" NÃO exige explicação', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+    await decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado', respostas: RESP_OK });
+    expect((await resumoAprovacaoPorProjeto([id]))[id].veredito).toBe('aprovado');
+  });
+
   it('a decisão reflete na planilha (best-effort)', async () => {
     const id = await criarProjeto();
     await abrirPreAprovacao(id);
@@ -305,6 +344,8 @@ describe('pré-aprovação do líder', () => {
     await decidirAprovacao(LUCAS.email, {
       projeto_id: id,
       veredito: 'aprovado',
+      // Com um "não" no checklist, a explicação é obrigatória (04/08/2026).
+      comentario: 'O processo é sazonal, a área só sente falta no fechamento.',
       respostas: { move_kpi: 'sim', sente_falta: 'nao', saving_coerente: 'sim' },
     });
 
@@ -451,6 +492,19 @@ describe('checklist do gestor (puro)', () => {
 
   it('parecer antigo (sem checklist) não suja o rótulo da planilha', () => {
     expect(resumirChecklist({})).toBe('');
+  });
+
+  it('exigeJustificativa: sempre no ajuste, e na pré-aprovação só com "não"', () => {
+    const todosSim = { move_kpi: 'sim', sente_falta: 'sim', saving_coerente: 'sim' } as const;
+    const comNao = { ...todosSim, sente_falta: 'nao' } as const;
+
+    expect(temNaoNoChecklist(todosSim)).toBe(false);
+    expect(temNaoNoChecklist(comNao)).toBe(true);
+
+    expect(exigeJustificativa('aprovado', todosSim)).toBe(false);
+    expect(exigeJustificativa('aprovado', comNao)).toBe(true);
+    // Pedir ajuste sempre pede texto — inclusive com o checklist todo "sim".
+    expect(exigeJustificativa('reprovado', todosSim)).toBe(true);
   });
 });
 

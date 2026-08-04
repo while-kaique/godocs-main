@@ -31,6 +31,7 @@ import { InfoTooltip } from "@/components/info-tooltip";
 import {
   CHECKLIST_APROVACAO,
   checklistCompleto,
+  temNaoNoChecklist,
   type ChaveChecklist,
   type RespostaChecklist,
 } from "@/lib/aprovacoes-checklist";
@@ -89,6 +90,9 @@ type Respostas = Partial<Record<ChaveChecklist, RespostaChecklist>>;
 /** Parecer que o líder já deu nesta sessão (o card fica no slider, marcado). */
 type Veredito = "aprovado" | "reprovado";
 
+/** Caixa de texto aberta no card: pedido de ajuste ou explicação de um "não". */
+type CaixaTexto = "ajuste" | "justificar" | null;
+
 const TIPO_LABEL: Record<string, string> = {
   saving: "Saving",
   receita_incremental: "Receita incremental",
@@ -143,10 +147,13 @@ function AprovacoesPage() {
     staleTime: 30_000,
   });
 
-  // Estado por projeto: respostas do checklist, caixa de ajuste aberta e envio em curso.
+  // Estado por projeto: respostas do checklist, caixa de texto aberta e envio em curso.
+  // A caixa tem 2 propósitos (mesmo campo de texto, destinos de leitura diferentes):
+  // "ajuste" = o que o autor precisa mudar; "justificar" = por que pré-aprova apesar do
+  // "não" no checklist.
   const [respostas, setRespostas] = useState<Record<string, Respostas>>({});
   const [memorialAberto, setMemorialAberto] = useState<Record<string, boolean>>({});
-  const [pedindoAjuste, setPedindoAjuste] = useState(false);
+  const [caixa, setCaixa] = useState<CaixaTexto>(null);
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState<string | null>(null);
 
@@ -178,7 +185,7 @@ function AprovacoesPage() {
       if (destino < 0 || destino >= fila.length || destino === indice) return;
       setVoltando(destino < indice);
       setIndice(destino);
-      setPedindoAjuste(false);
+      setCaixa(null);
       setComentario("");
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -232,7 +239,7 @@ function AprovacoesPage() {
       queryClient.setQueryData<Fila>(["aprovacoes-pendentes", como], (old) =>
         old ? { ...old, itens: old.itens.filter((i) => i.projeto_id !== projetoId) } : old,
       );
-      setPedindoAjuste(false);
+      setCaixa(null);
       setComentario("");
       const proximo = proximoPendente(indice);
       if (proximo !== null) irPara(proximo);
@@ -404,14 +411,27 @@ function AprovacoesPage() {
                         }))
                       }
                       ocupado={enviando === atual.projeto_id}
-                      pedindoAjuste={pedindoAjuste}
+                      caixa={caixa}
                       onAbrirAjuste={() => {
-                        setPedindoAjuste(!pedindoAjuste);
+                        setCaixa(caixa === "ajuste" ? null : "ajuste");
+                        setComentario("");
+                      }}
+                      onFecharCaixa={() => {
+                        setCaixa(null);
                         setComentario("");
                       }}
                       comentario={comentario}
                       onComentario={setComentario}
-                      onAprovar={() => decidir(atual.projeto_id, "aprovado")}
+                      // Com um "não" no checklist, "Pré-aprovar" NÃO grava direto: abre a
+                      // caixa para o líder explicar. Quem garante é o servidor.
+                      onAprovar={() => {
+                        const resp = respostas[atual.projeto_id] ?? {};
+                        if (temNaoNoChecklist(resp) && !comentario.trim()) {
+                          setCaixa("justificar");
+                          return;
+                        }
+                        decidir(atual.projeto_id, "aprovado", comentario.trim() || undefined);
+                      }}
                       onPedirAjuste={() =>
                         decidir(atual.projeto_id, "reprovado", comentario.trim())
                       }
@@ -611,8 +631,9 @@ function CardAprovacao({
   memorialAberto,
   onToggleMemorial,
   ocupado,
-  pedindoAjuste,
+  caixa,
   onAbrirAjuste,
+  onFecharCaixa,
   comentario,
   onComentario,
   onAprovar,
@@ -631,8 +652,10 @@ function CardAprovacao({
   memorialAberto: boolean;
   onToggleMemorial: () => void;
   ocupado: boolean;
-  pedindoAjuste: boolean;
+  /** Caixa de texto aberta: pedido de ajuste ou explicação do "não" no checklist. */
+  caixa: CaixaTexto;
   onAbrirAjuste: () => void;
+  onFecharCaixa: () => void;
   comentario: string;
   onComentario: (v: string) => void;
   onAprovar: () => void;
@@ -646,6 +669,10 @@ function CardAprovacao({
 }) {
   const completo = checklistCompleto(respostas);
   const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
+  // Com "não" marcado, pré-aprovar passa pela caixa de explicação (o texto vai para a
+  // coluna "Justificativa Aprovação do Líder", junto do checklist).
+  const temNao = temNaoNoChecklist(respostas);
+  const naos = CHECKLIST_APROVACAO.filter((p) => respostas[p.chave] === "nao");
   const horas = fmtHoras(i.saving_horas, i.tipo_saving);
   const reais = fmtReais(i.saving_reais);
 
@@ -934,11 +961,20 @@ function CardAprovacao({
           })}
         </div>
 
-        {/* Um "Não" é sinal, não veto — o líder precisa saber disso antes de travar. */}
-        {!decidido && completo && Object.values(respostas).some((v) => v === "nao") && (
-          <p className="mt-2.5 text-[11px] leading-snug" style={{ color: "#b45309" }}>
-            Respondeu "Não" em algo? Pode pré-aprovar do mesmo jeito — a resposta vai junto para a
-            triagem da RPA. Se o projeto precisa mudar antes, peça o ajuste.
+        {/* Um "Não" é sinal, não veto — mas agora pede explicação (04/08/2026). */}
+        {!decidido && temNao && (
+          <p
+            className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-snug"
+            style={{ color: "#b45309" }}
+          >
+            <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Você respondeu "Não" em{" "}
+              {naos.map((p) => `"${p.rotulo}"`).join(naos.length === 2 ? " e " : ", ")}. Pode
+              pré-aprovar do mesmo jeito — ao clicar em "Pré-aprovar" vamos pedir uma explicação
+              curta, que segue junto para a triagem da RPA. Se o projeto precisa mudar antes, peça o
+              ajuste.
+            </span>
           </p>
         )}
 
@@ -976,37 +1012,61 @@ function CardAprovacao({
           </p>
         )}
 
-        {/* Caixa de ajuste: comentário obrigatório, é o texto que o autor lê. */}
-        {!decidido && pedindoAjuste && (
+        {/* Caixa de texto: obrigatória nos dois caminhos. No "ajuste" é o texto que o
+            AUTOR lê; no "justificar" é a explicação do "não" que a TRIAGEM lê (vai para a
+            coluna "Justificativa Aprovação do Líder"). */}
+        {!decidido && caixa && (
           <div
             className="mt-3 rounded-lg p-4"
-            style={{ background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.15)" }}
+            style={
+              caixa === "ajuste"
+                ? { background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.15)" }
+                : { background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.18)" }
+            }
           >
             <label
-              htmlFor={`ajuste-${i.projeto_id}`}
+              htmlFor={`comentario-${i.projeto_id}`}
               className="mb-1.5 block text-[12px] font-semibold"
-              style={{ color: "#b45309" }}
+              style={{ color: caixa === "ajuste" ? "#b45309" : "var(--go-blue)" }}
             >
-              O que precisa ser ajustado?
+              {caixa === "ajuste"
+                ? "O que precisa ser ajustado?"
+                : `Por que você pré-aprova mesmo com "Não" em ${naos
+                    .map((p) => `"${p.rotulo}"`)
+                    .join(naos.length === 2 ? " e " : ", ")}?`}
             </label>
+            {caixa === "justificar" && (
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#6b6b7a" }}>
+                Duas ou três linhas bastam. A equipe RPA lê isso na triagem, junto com as suas
+                respostas do checklist.
+              </p>
+            )}
             <textarea
-              id={`ajuste-${i.projeto_id}`}
+              id={`comentario-${i.projeto_id}`}
               value={comentario}
               onChange={(e) => onComentario(e.target.value)}
               rows={3}
               maxLength={2000}
-              placeholder="Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
+              autoFocus
+              placeholder={
+                caixa === "ajuste"
+                  ? "Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
+                  : "Ex.: o saving parece alto para o volume de hoje, mas o processo era feito por 3 pessoas em picos — vale a triagem conferir a frequência."
+              }
               className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
               style={{
                 background: "var(--go-white)",
-                border: "1.5px solid rgba(180,83,9,0.25)",
+                border:
+                  caixa === "ajuste"
+                    ? "1.5px solid rgba(180,83,9,0.25)"
+                    : "1.5px solid rgba(0,89,169,0.25)",
                 color: "var(--go-text-heading)",
               }}
             />
             <div className="mt-2.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={onAbrirAjuste}
+                onClick={onFecharCaixa}
                 className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
                 style={{
                   background: "transparent",
@@ -1018,17 +1078,23 @@ function CardAprovacao({
               </button>
               <button
                 type="button"
-                onClick={onPedirAjuste}
+                onClick={caixa === "ajuste" ? onPedirAjuste : onAprovar}
                 disabled={ocupado || comentario.trim().length === 0}
                 className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
-                style={{ background: "#b45309", border: "1.5px solid #b45309" }}
+                style={
+                  caixa === "ajuste"
+                    ? { background: "#b45309", border: "1.5px solid #b45309" }
+                    : { background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }
+                }
               >
                 {ocupado ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
+                ) : caixa === "ajuste" ? (
                   <MessageSquareWarning className="h-3.5 w-3.5" />
+                ) : (
+                  <BadgeCheck className="h-3.5 w-3.5" />
                 )}
-                Enviar pedido de ajuste
+                {caixa === "ajuste" ? "Enviar pedido de ajuste" : "Pré-aprovar com esta explicação"}
               </button>
             </div>
           </div>

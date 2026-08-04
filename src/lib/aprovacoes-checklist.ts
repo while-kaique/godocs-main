@@ -51,6 +51,34 @@ export function checklistCompleto(
 }
 
 /**
+ * Alguma das 3 perguntas foi respondida com "não"?
+ *
+ * Pedido do Luis (04/08/2026): pré-aprovar com um "não" no checklist passava batido — o
+ * líder marcava "o saving não é coerente" e carimbava sem dizer uma palavra, e a triagem
+ * recebia a contradição sem explicação. Agora o "não" exige a explicação (que vai para a
+ * coluna "Justificativa Aprovação do Líder").
+ */
+export function temNaoNoChecklist(
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): boolean {
+  return CHECKLIST_APROVACAO.some((p) => respostas[p.chave] === 'nao');
+}
+
+/**
+ * O parecer exige texto escrito? FONTE ÚNICA da regra — a tela usa para abrir a caixa e o
+ * servidor usa para cobrar (o frontend nunca é a garantia).
+ *
+ * - pedir ajuste: sempre (o autor precisa saber o que mudar);
+ * - pré-aprovar: só quando há "não" no checklist.
+ */
+export function exigeJustificativa(
+  veredito: 'aprovado' | 'reprovado',
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): boolean {
+  return veredito === 'reprovado' || temNaoNoChecklist(respostas);
+}
+
+/**
  * Resumo legível do checklist ("Move KPI: sim · Sentiria falta: sim · Saving coerente: não").
  * Devolve "" quando o parecer é antigo (sem checklist), para o rótulo não ganhar sujeira.
  */

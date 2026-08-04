@@ -18,7 +18,7 @@
 
 import { z } from 'zod';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
-import { resumirChecklist, type ChaveChecklist } from '@/lib/aprovacoes-checklist';
+import { resumirChecklist, temNaoNoChecklist, type ChaveChecklist } from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import {
   extrairResumoMemorial,
@@ -574,6 +574,18 @@ export async function decidirAprovacao(
   if (veredito === 'reprovado' && !comentario) {
     throw Object.assign(
       new Error('Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto.'),
+      { status: 400 },
+    );
+  }
+
+  // Pré-aprovar COM um "não" no checklist exige a explicação (04/08/2026): a contradição
+  // "não move KPI / o saving não é coerente, mas pré-aprovo" é justamente o que a triagem
+  // precisa entender. Mesma régua da tela (`exigeJustificativa`), cobrada aqui.
+  if (veredito === 'aprovado' && temNaoNoChecklist(respostas) && !comentario) {
+    throw Object.assign(
+      new Error(
+        'Você respondeu "não" em alguma pergunta. Explique por que ainda assim pré-aprova — a explicação vai junto para a triagem da RPA.',
+      ),
       { status: 400 },
     );
   }
