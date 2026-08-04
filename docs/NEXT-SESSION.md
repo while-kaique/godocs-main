@@ -4,6 +4,23 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## 📊 04/08 (noite) — dry-run FINAL da fila, aba GoDocs de PROD, por líder → liderado
+>
+> ⚠️ O Luis achou que o dry-run tinha rodado na planilha da STAGING. **Rodou em PROD**: o worktree não tem
+> `.env`, então `getSheetConfig()` cai no default (planilha + aba `GoDocs` de prod) — a prova é a quebra por
+> Status (582 linhas, 490 "Aprovado"), que só existe lá. O script agora imprime a visão que ele pediu
+> ("Líder (N) — N DM(s), K liderado(s): Autor (n), …" + os projetos de cada autor).
+>
+> **Se disparasse hoje (só `Pendente` + `Reenvio Pendente` = 78 linhas): 45 projetos · 47 DMs · 27 líderes.**
+> Natália Pavão **6** (Clistony 4 · Jenifer 1 · Kauany 1) · Murilo Guimarães **4** (Kevyn 3 · Mariane 1) ·
+> Vinícius Elias **4** (Nathalia Pinheiro 3 · Joaovitor 1) · Igor Morais **3** (Gean Carlos 3) · 7 líderes
+> com 2 · **15 líderes com 1** · Lucas Queiroz **1** (Luis Eduardo). **47 ≠ 45** porque os 2 projetos do
+> **Samuel Campos** caem em 2 líderes (Samir Labib + Stefany Costa, D4 — o 1º que decidir resolve).
+> Fora: 23 isentos por liderança (D11) + 10 de e-mail fora da base ativa da TeamGuide (6 do Glauco).
+> **Conclusão:** teto de 6 por líder, ninguém sobrecarregado — um disparo real é absorvível, MAS só acontece
+> se alguém abrir fila para o histórico (a rota `reabrir`, `dry` por default); no fluxo normal a fila abre
+> **na submissão**.
+>
 > ## ✅ 04/08 (noite, rodada final) — 3 DESFECHOS no parecer + pergunta/exemplo por "não" (staging 18:25)
 >
 > Ajustes do Lucas sobre o D16 (commit **`28a033a`**, 936 testes, staging `edf400b4`):

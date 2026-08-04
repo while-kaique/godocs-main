@@ -139,12 +139,25 @@ async function main() {
   console.log('\n═══ POR LÍDER (fila em /aprovacoes) ═══');
   const ranking = [...porLider.entries()].sort((a, b) => b[1].projetos.length - a[1].projetos.length);
   for (const [email, info] of ranking) {
-    console.log(
-      `\n${info.nome ?? email} <${email}> — ${info.projetos.length} projeto(s) na fila, ` +
-        `${info.projetos.length} DM(s), ${info.liderados.size} liderado(s)`,
-    );
+    // Visão pedida pelo Luis (04/08): "Lucas Queiroz (6): Luis Eduardo (2), X (2)…" —
+    // o líder, o total que ele abre na fila e a quebra POR LIDERADO.
+    const porAutor = new Map<string, { nome: string; projetos: Caso[] }>();
     for (const p of info.projetos) {
-      console.log(`   · [${p.id}] ${p.projeto} — ${p.autor} <${p.email}>`);
+      const cur = porAutor.get(p.email) ?? { nome: p.autor, projetos: [] };
+      cur.projetos.push(p);
+      porAutor.set(p.email, cur);
+    }
+    const quebra = [...porAutor.values()]
+      .sort((a, b) => b.projetos.length - a.projetos.length)
+      .map((a) => `${a.nome} (${a.projetos.length})`)
+      .join(', ');
+    console.log(
+      `\n${info.nome ?? email} (${info.projetos.length}) — ${info.projetos.length} DM(s), ` +
+        `${porAutor.size} liderado(s): ${quebra}`,
+    );
+    for (const [, a] of [...porAutor].sort((x, y) => y[1].projetos.length - x[1].projetos.length)) {
+      console.log(`   ${a.nome}:`);
+      for (const p of a.projetos) console.log(`      · [${p.id}] ${p.projeto}`);
     }
   }
 
