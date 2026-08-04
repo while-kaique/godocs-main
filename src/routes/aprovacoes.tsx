@@ -10,11 +10,18 @@
 // Nomenclatura: é PRÉ-aprovação, nunca "aprovação". O parecer do líder não decide o
 // projeto e não trava a triagem da RPA (D3) — a copy repete isso onde o líder decide.
 //
+// UM PROJETO POR VEZ (slider, 04/08/2026): com 12 projetos na fila, a lista empilhada
+// obrigava o líder a rolar procurando onde parou. Agora a fila avança como as etapas do
+// formulário — decide, cai no próximo pendente — e a barra de posição no topo diz onde
+// ele está ("Projeto 3 de 12") e o que já resolveu. O total NÃO encolhe ao decidir: a
+// fila é a de quando ele abriu a tela, então "3 de 12" continua sendo 3 de 12 e ele pode
+// voltar para rever o próprio parecer.
+//
 // Identidade GoGroup (header azul + onda creme + cards brancos, Poppins). Estado NUNCA
 // só por cor: rótulo + ícone sempre.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
@@ -28,9 +35,12 @@ import {
   type RespostaChecklist,
 } from "@/lib/aprovacoes-checklist";
 import {
+  ArrowRight,
   BadgeCheck,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   ExternalLink,
   Eye,
@@ -75,6 +85,9 @@ type Fila = {
 };
 
 type Respostas = Partial<Record<ChaveChecklist, RespostaChecklist>>;
+
+/** Parecer que o líder já deu nesta sessão (o card fica no slider, marcado). */
+type Veredito = "aprovado" | "reprovado";
 
 const TIPO_LABEL: Record<string, string> = {
   saving: "Saving",
@@ -133,24 +146,74 @@ function AprovacoesPage() {
   // Estado por projeto: respostas do checklist, caixa de ajuste aberta e envio em curso.
   const [respostas, setRespostas] = useState<Record<string, Respostas>>({});
   const [memorialAberto, setMemorialAberto] = useState<Record<string, boolean>>({});
-  const [pedindoAjuste, setPedindoAjuste] = useState<string | null>(null);
+  const [pedindoAjuste, setPedindoAjuste] = useState(false);
   const [comentario, setComentario] = useState("");
   const [enviando, setEnviando] = useState<string | null>(null);
 
-  const itens = data?.itens ?? [];
+  // A fila do slider é ESTÁVEL: cresce quando chega projeto novo do servidor, nunca
+  // encolhe quando o líder decide (senão "3 de 12" viraria "3 de 11" no meio do caminho
+  // e ele perderia a referência de quanto falta). O parecer já dado fica em `decididos`.
+  const [fila, setFila] = useState<ItemAprovacao[]>([]);
+  const [decididos, setDecididos] = useState<Record<string, Veredito>>({});
+  const [indice, setIndice] = useState(0);
+  // Direção do último movimento — só para a animação entrar do lado certo.
+  const [voltando, setVoltando] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setFila((prev) => {
+      const jaNaFila = new Set(prev.map((i) => i.projeto_id));
+      const novos = data.itens.filter((i) => !jaNaFila.has(i.projeto_id));
+      return novos.length > 0 ? [...prev, ...novos] : prev;
+    });
+  }, [data]);
+
+  const total = fila.length;
+  const atual = fila[indice] ?? null;
+  const pendentes = fila.filter((i) => !decididos[i.projeto_id]).length;
   const erro = error ? (error instanceof Error ? error.message : "Erro ao carregar a fila.") : null;
+
+  const irPara = useCallback(
+    (destino: number) => {
+      if (destino < 0 || destino >= fila.length || destino === indice) return;
+      setVoltando(destino < indice);
+      setIndice(destino);
+      setPedindoAjuste(false);
+      setComentario("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [fila.length, indice],
+  );
+
+  /** Próximo projeto ainda sem parecer, começando depois de `de` e dando a volta. */
+  function proximoPendente(de: number): number | null {
+    for (let passo = 1; passo <= fila.length; passo++) {
+      const i = (de + passo) % fila.length;
+      if (!decididos[fila[i].projeto_id]) return i;
+    }
+    return null;
+  }
+
+  // Setas do teclado navegam a fila (fora de campos de texto, para não brigar com o
+  // cursor da caixa de ajuste).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const alvo = e.target as HTMLElement | null;
+      const tag = alvo?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || alvo?.isContentEditable) return;
+      if (e.key === "ArrowRight") irPara(indice + 1);
+      if (e.key === "ArrowLeft") irPara(indice - 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [indice, irPara]);
 
   function marcar(projetoId: string, chave: ChaveChecklist, valor: RespostaChecklist) {
     setRespostas((prev) => ({ ...prev, [projetoId]: { ...prev[projetoId], [chave]: valor } }));
   }
 
-  function removerDaFila(projetoId: string) {
-    queryClient.setQueryData<Fila>(["aprovacoes-pendentes", como], (old) =>
-      old ? { ...old, itens: old.itens.filter((i) => i.projeto_id !== projetoId) } : old,
-    );
-  }
-
-  async function decidir(projetoId: string, veredito: "aprovado" | "reprovado", texto?: string) {
+  async function decidir(projetoId: string, veredito: Veredito, texto?: string) {
     setEnviando(projetoId);
     try {
       await apiFetch(
@@ -164,9 +227,15 @@ function AprovacoesPage() {
         },
         "POST",
       );
-      removerDaFila(projetoId);
-      setPedindoAjuste(null);
+      setDecididos((prev) => ({ ...prev, [projetoId]: veredito }));
+      // O cache perde o item (a fila do servidor não o traz mais); o slider mantém.
+      queryClient.setQueryData<Fila>(["aprovacoes-pendentes", como], (old) =>
+        old ? { ...old, itens: old.itens.filter((i) => i.projeto_id !== projetoId) } : old,
+      );
+      setPedindoAjuste(false);
       setComentario("");
+      const proximo = proximoPendente(indice);
+      if (proximo !== null) irPara(proximo);
       toast.success(
         veredito === "aprovado"
           ? "Projeto pré-aprovado. O autor e a equipe RPA já veem o seu parecer."
@@ -253,7 +322,7 @@ function AprovacoesPage() {
 
           {!isLoading && !erro && (
             <>
-              {itens.length === 0 && (
+              {total === 0 && (
                 <div
                   className="rounded-xl p-10 text-center"
                   style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.08)" }}
@@ -280,33 +349,85 @@ function AprovacoesPage() {
                 </div>
               )}
 
-              {itens.length > 0 && (
-                <div className="space-y-4">
-                  {itens.map((i) => (
+              {atual && (
+                <>
+                  {/* Tudo respondido: a fila fica navegável para rever, mas o líder
+                      precisa saber que acabou sem contar os selos um por um. */}
+                  {pendentes === 0 && (
+                    <div
+                      className="mb-3 flex flex-wrap items-center gap-2 rounded-xl px-4 py-3"
+                      style={{
+                        background: "rgba(21,128,61,0.06)",
+                        border: "1px solid rgba(21,128,61,0.2)",
+                      }}
+                    >
+                      <BadgeCheck className="h-4 w-4 shrink-0" style={{ color: "#15803d" }} />
+                      <p className="text-[13px] font-semibold" style={{ color: "#15803d" }}>
+                        Você deu parecer nos {total} {total === 1 ? "projeto" : "projetos"} da fila.
+                      </p>
+                      <Link
+                        to="/meus-projetos"
+                        className="ml-auto text-[12px] font-bold underline"
+                        style={{ color: "#15803d" }}
+                      >
+                        Ver meus projetos
+                      </Link>
+                    </div>
+                  )}
+
+                  <BarraFila
+                    fila={fila}
+                    indice={indice}
+                    decididos={decididos}
+                    pendentes={pendentes}
+                    onIr={irPara}
+                  />
+
+                  {/* A troca de projeto entra pelo lado, como as etapas do formulário —
+                      é o mesmo gesto de "avançar" do resto do produto. */}
+                  <div
+                    key={atual.projeto_id}
+                    style={{
+                      animation: `${voltando ? "go-step-in-back" : "go-step-in"} 0.28s ease-out`,
+                    }}
+                  >
                     <CardAprovacao
-                      key={i.projeto_id}
-                      item={i}
-                      respostas={respostas[i.projeto_id] ?? {}}
-                      onResponder={(chave, valor) => marcar(i.projeto_id, chave, valor)}
-                      memorialAberto={!!memorialAberto[i.projeto_id]}
+                      item={atual}
+                      decidido={decididos[atual.projeto_id] ?? null}
+                      respostas={respostas[atual.projeto_id] ?? {}}
+                      onResponder={(chave, valor) => marcar(atual.projeto_id, chave, valor)}
+                      memorialAberto={!!memorialAberto[atual.projeto_id]}
                       onToggleMemorial={() =>
-                        setMemorialAberto((p) => ({ ...p, [i.projeto_id]: !p[i.projeto_id] }))
+                        setMemorialAberto((p) => ({
+                          ...p,
+                          [atual.projeto_id]: !p[atual.projeto_id],
+                        }))
                       }
-                      ocupado={enviando === i.projeto_id}
-                      pedindoAjuste={pedindoAjuste === i.projeto_id}
+                      ocupado={enviando === atual.projeto_id}
+                      pedindoAjuste={pedindoAjuste}
                       onAbrirAjuste={() => {
-                        setPedindoAjuste(pedindoAjuste === i.projeto_id ? null : i.projeto_id);
+                        setPedindoAjuste(!pedindoAjuste);
                         setComentario("");
                       }}
                       comentario={comentario}
                       onComentario={setComentario}
-                      onAprovar={() => decidir(i.projeto_id, "aprovado")}
+                      onAprovar={() => decidir(atual.projeto_id, "aprovado")}
                       onPedirAjuste={() =>
-                        decidir(i.projeto_id, "reprovado", comentario.trim())
+                        decidir(atual.projeto_id, "reprovado", comentario.trim())
                       }
+                      proximoPendente={
+                        pendentes > 0 ? () => {
+                          const p = proximoPendente(indice);
+                          if (p !== null) irPara(p);
+                        } : null
+                      }
+                      podeVoltar={indice > 0}
+                      podeAvancar={indice < total - 1}
+                      onVoltar={() => irPara(indice - 1)}
+                      onAvancar={() => irPara(indice + 1)}
                     />
-                  ))}
-                </div>
+                  </div>
+                </>
               )}
             </>
           )}
@@ -316,10 +437,175 @@ function AprovacoesPage() {
   );
 }
 
+// ─── Barra de posição na fila ────────────────────────────────────────────────
+
+/**
+ * Onde o líder está e o que já resolveu. Cada traço é um projeto, na ordem da fila, e
+ * carrega o parecer já dado — dá pra ver o turno inteiro num relance e clicar para voltar
+ * a um projeto específico. Com fila longa (> 20) os traços viram uma barra de progresso,
+ * porque 40 traços de 3px não se clicam nem se leem.
+ */
+function BarraFila({
+  fila,
+  indice,
+  decididos,
+  pendentes,
+  onIr,
+}: {
+  fila: ItemAprovacao[];
+  indice: number;
+  decididos: Record<string, Veredito>;
+  pendentes: number;
+  onIr: (destino: number) => void;
+}) {
+  const total = fila.length;
+  const aprovados = fila.filter((i) => decididos[i.projeto_id] === "aprovado").length;
+  const ajustes = fila.filter((i) => decididos[i.projeto_id] === "reprovado").length;
+  const mostrarTracos = total <= 20;
+  const resolvidos = total - pendentes;
+
+  const corDoTraco = (item: ItemAprovacao, ehAtual: boolean) => {
+    const v = decididos[item.projeto_id];
+    if (v === "aprovado") return "var(--go-lime)";
+    if (v === "reprovado") return "#b45309";
+    return ehAtual ? "var(--go-blue)" : "rgba(0,89,169,0.18)";
+  };
+
+  return (
+    <div
+      className="mb-3 rounded-xl px-4 py-3.5"
+      style={{
+        background: "var(--go-white)",
+        border: "1px solid rgba(0,89,169,0.08)",
+        boxShadow: "var(--go-shadow-sm)",
+      }}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p
+            className="text-[9.5px] font-bold uppercase tracking-[0.14em]"
+            style={{ color: "#8b8b9a" }}
+          >
+            Fila do seu time
+          </p>
+          <p className="mt-0.5 flex items-baseline gap-1.5">
+            <span
+              className="font-extrabold leading-none"
+              style={{ fontSize: 22, color: "var(--go-blue)" }}
+            >
+              {indice + 1}
+            </span>
+            <span className="text-[13px] font-semibold" style={{ color: "#6b6b7a" }}>
+              de {total} {total === 1 ? "projeto" : "projetos"}
+            </span>
+            <span className="text-[12px]" style={{ color: "#a5a5b3" }}>
+              · {pendentes === 0 ? "nenhum esperando você" : `${pendentes} esperando você`}
+            </span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onIr(indice - 1)}
+            disabled={indice === 0}
+            aria-label="Projeto anterior"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-2 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Anterior
+          </button>
+          <button
+            type="button"
+            onClick={() => onIr(indice + 1)}
+            disabled={indice >= total - 1}
+            aria-label="Próximo projeto"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-full px-3.5 py-2 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+          >
+            Próximo
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {mostrarTracos ? (
+        <div className="mt-3 flex gap-1" role="tablist" aria-label="Projetos da fila">
+          {fila.map((item, idx) => {
+            const ehAtual = idx === indice;
+            const v = decididos[item.projeto_id];
+            const situacao =
+              v === "aprovado" ? "pré-aprovado" : v === "reprovado" ? "ajuste pedido" : "sem parecer";
+            return (
+              <button
+                key={item.projeto_id}
+                type="button"
+                role="tab"
+                aria-selected={ehAtual}
+                aria-label={`Projeto ${idx + 1} de ${total}: ${item.projeto_nome ?? "sem nome"} — ${situacao}`}
+                title={`${idx + 1}. ${item.projeto_nome ?? "sem nome"} — ${situacao}`}
+                onClick={() => onIr(idx)}
+                className="group flex-1 cursor-pointer py-1.5"
+              >
+                <span
+                  className="block rounded-full transition-all motion-reduce:transition-none"
+                  style={{
+                    height: ehAtual ? 8 : 5,
+                    background: corDoTraco(item, ehAtual),
+                    boxShadow: ehAtual ? "0 0 0 2px rgba(0,89,169,0.18)" : undefined,
+                  }}
+                />
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          className="mt-3.5 h-1.5 overflow-hidden rounded-full"
+          style={{ background: "rgba(0,89,169,0.12)" }}
+          role="progressbar"
+          aria-valuenow={resolvidos}
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-label={`${resolvidos} de ${total} projetos com parecer`}
+        >
+          <span
+            className="block h-full rounded-full transition-all motion-reduce:transition-none"
+            style={{
+              width: `${total > 0 ? (resolvidos / total) * 100 : 0}%`,
+              background: "var(--go-blue)",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Contagem escrita: o traço colorido é atalho visual, não a informação. */}
+      {(aprovados > 0 || ajustes > 0) && (
+        <p className="mt-2 flex flex-wrap gap-x-3 text-[11px]" style={{ color: "#8b8b9a" }}>
+          {aprovados > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <BadgeCheck className="h-3 w-3" style={{ color: "#15803d" }} />
+              {aprovados} {aprovados === 1 ? "pré-aprovado" : "pré-aprovados"}
+            </span>
+          )}
+          {ajustes > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <MessageSquareWarning className="h-3 w-3" style={{ color: "#b45309" }} />
+              {ajustes} {ajustes === 1 ? "ajuste pedido" : "ajustes pedidos"}
+            </span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Card de um projeto ──────────────────────────────────────────────────────
 
 function CardAprovacao({
   item: i,
+  decidido,
   respostas,
   onResponder,
   memorialAberto,
@@ -331,8 +617,15 @@ function CardAprovacao({
   onComentario,
   onAprovar,
   onPedirAjuste,
+  proximoPendente,
+  podeVoltar,
+  podeAvancar,
+  onVoltar,
+  onAvancar,
 }: {
   item: ItemAprovacao;
+  /** Parecer já dado nesta sessão — o card fica na fila, em modo leitura. */
+  decidido: Veredito | null;
   respostas: Respostas;
   onResponder: (chave: ChaveChecklist, valor: RespostaChecklist) => void;
   memorialAberto: boolean;
@@ -344,6 +637,12 @@ function CardAprovacao({
   onComentario: (v: string) => void;
   onAprovar: () => void;
   onPedirAjuste: () => void;
+  /** Salta para o próximo projeto sem parecer (null quando não há mais nenhum). */
+  proximoPendente: (() => void) | null;
+  podeVoltar: boolean;
+  podeAvancar: boolean;
+  onVoltar: () => void;
+  onAvancar: () => void;
 }) {
   const completo = checklistCompleto(respostas);
   const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
@@ -527,12 +826,50 @@ function CardAprovacao({
           <p className="text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
             Seu parecer
           </p>
-          <p className="text-[11px]" style={{ color: completo ? "#15803d" : "#8b8b9a" }}>
-            {completo
-              ? "3 de 3 respondidas"
-              : `Faltam ${faltam} de 3 perguntas`}
-          </p>
+          {!decidido && (
+            <p className="text-[11px]" style={{ color: completo ? "#15803d" : "#8b8b9a" }}>
+              {completo ? "3 de 3 respondidas" : `Faltam ${faltam} de 3 perguntas`}
+            </p>
+          )}
         </div>
+
+        {/* Já decidido: o card continua na fila para o líder rever o que registrou, sem
+            poder mudar (a decisão foi gravada e o autor já foi avisado). */}
+        {decidido && (
+          <div
+            className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg px-3.5 py-3"
+            style={
+              decidido === "aprovado"
+                ? { background: "rgba(21,128,61,0.07)", border: "1.5px solid rgba(21,128,61,0.22)" }
+                : { background: "rgba(180,83,9,0.07)", border: "1.5px solid rgba(180,83,9,0.22)" }
+            }
+          >
+            {decidido === "aprovado" ? (
+              <BadgeCheck className="h-4 w-4 shrink-0" style={{ color: "#15803d" }} />
+            ) : (
+              <MessageSquareWarning className="h-4 w-4 shrink-0" style={{ color: "#b45309" }} />
+            )}
+            <p
+              className="text-[12.5px] font-semibold"
+              style={{ color: decidido === "aprovado" ? "#15803d" : "#b45309" }}
+            >
+              {decidido === "aprovado"
+                ? "Você pré-aprovou este projeto. O autor e a equipe RPA já veem o parecer."
+                : "Você pediu ajuste. O autor recebeu o seu comentário."}
+            </p>
+            {proximoPendente && (
+              <button
+                type="button"
+                onClick={proximoPendente}
+                className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold transition-all"
+                style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+              >
+                Ir para o próximo sem parecer
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="mt-2.5 space-y-2">
           {CHECKLIST_APROVACAO.map((p) => {
@@ -579,8 +916,9 @@ function CardAprovacao({
                         key={v}
                         type="button"
                         onClick={() => onResponder(p.chave, v)}
+                        disabled={!!decidido}
                         aria-pressed={ativo}
-                        className="cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold transition-all"
+                        className="cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           background: ativo ? "var(--go-blue)" : "transparent",
                           color: ativo ? "var(--go-white)" : "#6b6b7a",
@@ -597,47 +935,49 @@ function CardAprovacao({
         </div>
 
         {/* Um "Não" é sinal, não veto — o líder precisa saber disso antes de travar. */}
-        {completo && Object.values(respostas).some((v) => v === "nao") && (
+        {!decidido && completo && Object.values(respostas).some((v) => v === "nao") && (
           <p className="mt-2.5 text-[11px] leading-snug" style={{ color: "#b45309" }}>
             Respondeu "Não" em algo? Pode pré-aprovar do mesmo jeito — a resposta vai junto para a
             triagem da RPA. Se o projeto precisa mudar antes, peça o ajuste.
           </p>
         )}
 
-        <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onAbrirAjuste}
-            disabled={ocupado || !completo}
-            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: "rgba(180,83,9,0.1)", color: "#b45309" }}
-          >
-            <MessageSquareWarning className="h-3.5 w-3.5" />
-            Pedir ajuste
-          </button>
-          <button
-            type="button"
-            onClick={onAprovar}
-            disabled={ocupado || !completo}
-            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-          >
-            {ocupado ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <BadgeCheck className="h-3.5 w-3.5" />
-            )}
-            Pré-aprovar
-          </button>
-        </div>
-        {!completo && (
+        {!decidido && (
+          <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onAbrirAjuste}
+              disabled={ocupado || !completo}
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: "rgba(180,83,9,0.1)", color: "#b45309" }}
+            >
+              <MessageSquareWarning className="h-3.5 w-3.5" />
+              Pedir ajuste
+            </button>
+            <button
+              type="button"
+              onClick={onAprovar}
+              disabled={ocupado || !completo}
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+            >
+              {ocupado ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <BadgeCheck className="h-3.5 w-3.5" />
+              )}
+              Pré-aprovar
+            </button>
+          </div>
+        )}
+        {!decidido && !completo && (
           <p className="mt-2 text-right text-[11px]" style={{ color: "#8b8b9a" }}>
             Responda as 3 perguntas para liberar o parecer.
           </p>
         )}
 
         {/* Caixa de ajuste: comentário obrigatório, é o texto que o autor lê. */}
-        {pedindoAjuste && (
+        {!decidido && pedindoAjuste && (
           <div
             className="mt-3 rounded-lg p-4"
             style={{ background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.15)" }}
@@ -694,6 +1034,37 @@ function CardAprovacao({
           </div>
         )}
       </div>
+
+      {/* ── Zona 3: sair deste projeto sem decidir ──────────────────────────── */}
+      {/* Card longo: quem chega ao fim e quer pular não deveria ter de rolar de volta
+          até a barra do topo. */}
+      {(podeVoltar || podeAvancar) && (
+        <div
+          className="flex items-center justify-between gap-2 px-5 py-3"
+          style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+        >
+          <button
+            type="button"
+            onClick={onVoltar}
+            disabled={!podeVoltar}
+            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+            style={{ color: "var(--go-blue)" }}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Projeto anterior
+          </button>
+          <button
+            type="button"
+            onClick={onAvancar}
+            disabled={!podeAvancar}
+            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+            style={{ color: "var(--go-blue)" }}
+          >
+            {decidido ? "Próximo projeto" : "Decidir depois"}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
