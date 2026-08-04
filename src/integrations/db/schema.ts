@@ -59,6 +59,12 @@ const SCHEMA_SQL = `
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  -- Toda leitura de chat filtra por projeto_id. Sem este índice cada consulta
+  -- varre a tabela inteira — o que tornava o Investigador (uma consulta por
+  -- projeto) inviável quando o volume de mensagens cresceu.
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_projeto_id
+    ON chat_messages(projeto_id);
+
   CREATE TABLE IF NOT EXISTS documentacao (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     projeto_id TEXT NOT NULL UNIQUE REFERENCES projetos(id) ON DELETE CASCADE,
