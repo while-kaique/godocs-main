@@ -29,9 +29,12 @@ import { fmtDataBR } from "@/lib/format-date";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { InfoTooltip } from "@/components/info-tooltip";
 import {
+  AVISO_SAVING_INCOERENTE,
   CHECKLIST_APROVACAO,
+  JUSTIFICATIVA_POR_CHAVE,
+  bloqueiaPreAprovacao,
+  chavesQueExigemJustificativa,
   checklistCompleto,
-  temNaoNoChecklist,
   type ChaveChecklist,
   type RespostaChecklist,
 } from "@/lib/aprovacoes-checklist";
@@ -47,6 +50,7 @@ import {
   Eye,
   FileText,
   Loader2,
+  CircleX,
   MessageSquareWarning,
   Sparkles,
   User,
@@ -87,11 +91,14 @@ type Fila = {
 
 type Respostas = Partial<Record<ChaveChecklist, RespostaChecklist>>;
 
-/** Parecer que o líder já deu nesta sessão (o card fica no slider, marcado). */
-type Veredito = "aprovado" | "reprovado";
+/**
+ * Parecer que o líder já deu nesta sessão (o card fica no slider, marcado). 3 desfechos
+ * desde 04/08/2026 (decisão do Lucas): ajuste devolve para corrigir, reprovado é recusa.
+ */
+type Veredito = "aprovado" | "ajuste" | "reprovado";
 
-/** Caixa de texto aberta no card: pedido de ajuste ou explicação de um "não". */
-type CaixaTexto = "ajuste" | "justificar" | null;
+/** Caixa de texto aberta no card. Cada modo tem título, cor e destino próprios. */
+type CaixaTexto = "ajuste" | "reprovar" | "justificar" | null;
 
 const TIPO_LABEL: Record<string, string> = {
   saving: "Saving",
@@ -246,7 +253,9 @@ function AprovacoesPage() {
       toast.success(
         veredito === "aprovado"
           ? "Projeto pré-aprovado. O autor e a equipe RPA já veem o seu parecer."
-          : "Ajuste solicitado. O autor recebe o seu comentário.",
+          : veredito === "ajuste"
+            ? "Ajuste solicitado. O autor recebe o seu comentário."
+            : "Projeto reprovado. O autor recebe o seu motivo.",
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível registrar o seu parecer.");
@@ -412,8 +421,8 @@ function AprovacoesPage() {
                       }
                       ocupado={enviando === atual.projeto_id}
                       caixa={caixa}
-                      onAbrirAjuste={() => {
-                        setCaixa(caixa === "ajuste" ? null : "ajuste");
+                      onAbrirCaixa={(modo) => {
+                        setCaixa(caixa === modo ? null : modo);
                         setComentario("");
                       }}
                       onFecharCaixa={() => {
@@ -426,15 +435,14 @@ function AprovacoesPage() {
                       // caixa para o líder explicar. Quem garante é o servidor.
                       onAprovar={() => {
                         const resp = respostas[atual.projeto_id] ?? {};
-                        if (temNaoNoChecklist(resp) && !comentario.trim()) {
+                        if (chavesQueExigemJustificativa(resp).length > 0 && !comentario.trim()) {
                           setCaixa("justificar");
                           return;
                         }
                         decidir(atual.projeto_id, "aprovado", comentario.trim() || undefined);
                       }}
-                      onPedirAjuste={() =>
-                        decidir(atual.projeto_id, "reprovado", comentario.trim())
-                      }
+                      onPedirAjuste={() => decidir(atual.projeto_id, "ajuste", comentario.trim())}
+                      onReprovar={() => decidir(atual.projeto_id, "reprovado", comentario.trim())}
                       proximoPendente={
                         pendentes > 0 ? () => {
                           const p = proximoPendente(indice);
@@ -480,14 +488,16 @@ function BarraFila({
 }) {
   const total = fila.length;
   const aprovados = fila.filter((i) => decididos[i.projeto_id] === "aprovado").length;
-  const ajustes = fila.filter((i) => decididos[i.projeto_id] === "reprovado").length;
+  const ajustes = fila.filter((i) => decididos[i.projeto_id] === "ajuste").length;
+  const reprovados = fila.filter((i) => decididos[i.projeto_id] === "reprovado").length;
   const mostrarTracos = total <= 20;
   const resolvidos = total - pendentes;
 
   const corDoTraco = (item: ItemAprovacao, ehAtual: boolean) => {
     const v = decididos[item.projeto_id];
     if (v === "aprovado") return "var(--go-lime)";
-    if (v === "reprovado") return "#b45309";
+    if (v === "ajuste") return "#b45309";
+    if (v === "reprovado") return "#b91c1c";
     return ehAtual ? "var(--go-blue)" : "rgba(0,89,169,0.18)";
   };
 
@@ -556,7 +566,13 @@ function BarraFila({
             const ehAtual = idx === indice;
             const v = decididos[item.projeto_id];
             const situacao =
-              v === "aprovado" ? "pré-aprovado" : v === "reprovado" ? "ajuste pedido" : "sem parecer";
+              v === "aprovado"
+                ? "pré-aprovado"
+                : v === "ajuste"
+                  ? "ajuste pedido"
+                  : v === "reprovado"
+                    ? "reprovado"
+                    : "sem parecer";
             return (
               <button
                 key={item.projeto_id}
@@ -601,7 +617,7 @@ function BarraFila({
       )}
 
       {/* Contagem escrita: o traço colorido é atalho visual, não a informação. */}
-      {(aprovados > 0 || ajustes > 0) && (
+      {(aprovados > 0 || ajustes > 0 || reprovados > 0) && (
         <p className="mt-2 flex flex-wrap gap-x-3 text-[11px]" style={{ color: "#8b8b9a" }}>
           {aprovados > 0 && (
             <span className="inline-flex items-center gap-1">
@@ -613,6 +629,12 @@ function BarraFila({
             <span className="inline-flex items-center gap-1">
               <MessageSquareWarning className="h-3 w-3" style={{ color: "#b45309" }} />
               {ajustes} {ajustes === 1 ? "ajuste pedido" : "ajustes pedidos"}
+            </span>
+          )}
+          {reprovados > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <CircleX className="h-3 w-3" style={{ color: "#b91c1c" }} />
+              {reprovados} {reprovados === 1 ? "reprovado" : "reprovados"}
             </span>
           )}
         </p>
@@ -632,12 +654,13 @@ function CardAprovacao({
   onToggleMemorial,
   ocupado,
   caixa,
-  onAbrirAjuste,
+  onAbrirCaixa,
   onFecharCaixa,
   comentario,
   onComentario,
   onAprovar,
   onPedirAjuste,
+  onReprovar,
   proximoPendente,
   podeVoltar,
   podeAvancar,
@@ -654,12 +677,13 @@ function CardAprovacao({
   ocupado: boolean;
   /** Caixa de texto aberta: pedido de ajuste ou explicação do "não" no checklist. */
   caixa: CaixaTexto;
-  onAbrirAjuste: () => void;
+  onAbrirCaixa: (modo: Exclude<CaixaTexto, null>) => void;
   onFecharCaixa: () => void;
   comentario: string;
   onComentario: (v: string) => void;
   onAprovar: () => void;
   onPedirAjuste: () => void;
+  onReprovar: () => void;
   /** Salta para o próximo projeto sem parecer (null quando não há mais nenhum). */
   proximoPendente: (() => void) | null;
   podeVoltar: boolean;
@@ -673,6 +697,9 @@ function CardAprovacao({
   // onde o líder fica sabendo que precisa escrever (o texto vai para a coluna
   // "Justificativa Aprovação do Líder", junto do checklist).
   const naos = CHECKLIST_APROVACAO.filter((p) => respostas[p.chave] === "nao");
+  // Saving incoerente é PRÉ-REQUISITO, não algo a justificar: some o "Pré-aprovar".
+  const bloqueado = bloqueiaPreAprovacao(respostas);
+  const chavesJustificar = chavesQueExigemJustificativa(respostas);
   const horas = fmtHoras(i.saving_horas, i.tipo_saving);
   const reais = fmtReais(i.saving_reais);
 
@@ -868,21 +895,30 @@ function CardAprovacao({
             style={
               decidido === "aprovado"
                 ? { background: "rgba(21,128,61,0.07)", border: "1.5px solid rgba(21,128,61,0.22)" }
-                : { background: "rgba(180,83,9,0.07)", border: "1.5px solid rgba(180,83,9,0.22)" }
+                : decidido === "ajuste"
+                  ? { background: "rgba(180,83,9,0.07)", border: "1.5px solid rgba(180,83,9,0.22)" }
+                  : { background: "rgba(220,38,38,0.07)", border: "1.5px solid rgba(220,38,38,0.22)" }
             }
           >
             {decidido === "aprovado" ? (
               <BadgeCheck className="h-4 w-4 shrink-0" style={{ color: "#15803d" }} />
-            ) : (
+            ) : decidido === "ajuste" ? (
               <MessageSquareWarning className="h-4 w-4 shrink-0" style={{ color: "#b45309" }} />
+            ) : (
+              <CircleX className="h-4 w-4 shrink-0" style={{ color: "#b91c1c" }} />
             )}
             <p
               className="text-[12.5px] font-semibold"
-              style={{ color: decidido === "aprovado" ? "#15803d" : "#b45309" }}
+              style={{
+                color:
+                  decidido === "aprovado" ? "#15803d" : decidido === "ajuste" ? "#b45309" : "#b91c1c",
+              }}
             >
               {decidido === "aprovado"
                 ? "Você pré-aprovou este projeto. O autor e a equipe RPA já veem o parecer."
-                : "Você pediu ajuste. O autor recebeu o seu comentário."}
+                : decidido === "ajuste"
+                  ? "Você pediu ajuste. O autor recebeu o seu comentário."
+                  : "Você reprovou este projeto. O autor recebeu o seu motivo."}
             </p>
             {proximoPendente && (
               <button
@@ -963,32 +999,60 @@ function CardAprovacao({
 
         {/* Sem aviso antecipado sobre o "Não" (04/08/2026): quem clica em "Pré-aprovar"
             já cai na caixa de explicação, e o texto solto aqui só poluía a tela. */}
+        {/* Saving incoerente = erro de submissão, não algo a justificar: o
+            "Pré-aprovar" sai de cena e sobram ajuste/reprovação. */}
+        {!decidido && bloqueado && (
+          <p
+            className="mt-2.5 flex items-start gap-1.5 rounded-lg px-3 py-2.5 text-[11.5px] leading-snug"
+            style={{
+              background: "rgba(220,38,38,0.06)",
+              border: "1px solid rgba(220,38,38,0.18)",
+              color: "#b91c1c",
+            }}
+          >
+            <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{AVISO_SAVING_INCOERENTE}</span>
+          </p>
+        )}
+
         {!decidido && (
           <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={onAbrirAjuste}
+              onClick={() => onAbrirCaixa("reprovar")}
               disabled={ocupado || !completo}
               className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "rgba(180,83,9,0.1)", color: "#b45309" }}
+              style={{ background: "rgba(220,38,38,0.1)", color: "#b91c1c" }}
+            >
+              <CircleX className="h-3.5 w-3.5" />
+              Reprovar
+            </button>
+            <button
+              type="button"
+              onClick={() => onAbrirCaixa("ajuste")}
+              disabled={ocupado || !completo}
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: "rgba(180,83,9,0.12)", color: "#b45309" }}
             >
               <MessageSquareWarning className="h-3.5 w-3.5" />
               Pedir ajuste
             </button>
-            <button
-              type="button"
-              onClick={onAprovar}
-              disabled={ocupado || !completo}
-              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-            >
-              {ocupado ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <BadgeCheck className="h-3.5 w-3.5" />
-              )}
-              Pré-aprovar
-            </button>
+            {!bloqueado && (
+              <button
+                type="button"
+                onClick={onAprovar}
+                disabled={ocupado || !completo}
+                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: "#15803d" }}
+              >
+                {ocupado ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                )}
+                Pré-aprovar
+              </button>
+            )}
           </div>
         )}
         {!decidido && !completo && (
@@ -997,92 +1061,25 @@ function CardAprovacao({
           </p>
         )}
 
-        {/* Caixa de texto: obrigatória nos dois caminhos. No "ajuste" é o texto que o
-            AUTOR lê; no "justificar" é a explicação do "não" que a TRIAGEM lê (vai para a
-            coluna "Justificativa Aprovação do Líder"). */}
+        {/* Caixa de texto: obrigatória nos 3 caminhos, com título/exemplo próprios.
+            - "ajuste"/"reprovar": o texto é lido pelo AUTOR;
+            - "justificar": o texto é lido pela TRIAGEM, e a pergunta + o exemplo vêm da
+              CHAVE que ficou "não" (`JUSTIFICATIVA_POR_CHAVE`) — exemplo genérico do
+              saving em cima de um "não" de KPI foi o que o Lucas reprovou. Com 2 "nãos",
+              um bullet por pergunta e um campo só (duas caixas empilhadas cansam). */}
         {!decidido && caixa && (
-          <div
-            className="mt-3 rounded-lg p-4"
-            style={
-              caixa === "ajuste"
-                ? { background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.15)" }
-                : { background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.18)" }
+          <CaixaParecer
+            projetoId={i.projeto_id}
+            modo={caixa}
+            chavesJustificar={chavesJustificar}
+            comentario={comentario}
+            onComentario={onComentario}
+            ocupado={ocupado}
+            onCancelar={onFecharCaixa}
+            onConfirmar={
+              caixa === "ajuste" ? onPedirAjuste : caixa === "reprovar" ? onReprovar : onAprovar
             }
-          >
-            <label
-              htmlFor={`comentario-${i.projeto_id}`}
-              className="mb-1.5 block text-[12px] font-semibold"
-              style={{ color: caixa === "ajuste" ? "#b45309" : "var(--go-blue)" }}
-            >
-              {caixa === "ajuste"
-                ? "O que precisa ser ajustado?"
-                : `Por que você pré-aprova mesmo com "Não" em ${naos
-                    .map((p) => `"${p.rotulo}"`)
-                    .join(naos.length === 2 ? " e " : ", ")}?`}
-            </label>
-            {caixa === "justificar" && (
-              <p className="mb-2 text-[11px] leading-snug" style={{ color: "#6b6b7a" }}>
-                Duas ou três linhas bastam. A equipe RPA lê isso na triagem, junto com as suas
-                respostas do checklist.
-              </p>
-            )}
-            <textarea
-              id={`comentario-${i.projeto_id}`}
-              value={comentario}
-              onChange={(e) => onComentario(e.target.value)}
-              rows={3}
-              maxLength={2000}
-              autoFocus
-              placeholder={
-                caixa === "ajuste"
-                  ? "Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
-                  : "Ex.: o saving parece alto para o volume de hoje, mas o processo era feito por 3 pessoas em picos — vale a triagem conferir a frequência."
-              }
-              className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-              style={{
-                background: "var(--go-white)",
-                border:
-                  caixa === "ajuste"
-                    ? "1.5px solid rgba(180,83,9,0.25)"
-                    : "1.5px solid rgba(0,89,169,0.25)",
-                color: "var(--go-text-heading)",
-              }}
-            />
-            <div className="mt-2.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={onFecharCaixa}
-                className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
-                style={{
-                  background: "transparent",
-                  color: "#6b6b7a",
-                  border: "1.5px solid rgba(0,0,0,0.12)",
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={caixa === "ajuste" ? onPedirAjuste : onAprovar}
-                disabled={ocupado || comentario.trim().length === 0}
-                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
-                style={
-                  caixa === "ajuste"
-                    ? { background: "#b45309", border: "1.5px solid #b45309" }
-                    : { background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }
-                }
-              >
-                {ocupado ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : caixa === "ajuste" ? (
-                  <MessageSquareWarning className="h-3.5 w-3.5" />
-                ) : (
-                  <BadgeCheck className="h-3.5 w-3.5" />
-                )}
-                {caixa === "ajuste" ? "Enviar pedido de ajuste" : "Pré-aprovar com esta explicação"}
-              </button>
-            </div>
-          </div>
+          />
         )}
       </div>
 
@@ -1116,6 +1113,129 @@ function CardAprovacao({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Caixa de texto do parecer. Um componente para os 3 modos: o que muda é o título, a
+ * cor, o exemplo (placeholder) e o rótulo do botão — a mecânica é a mesma.
+ */
+function CaixaParecer({
+  projetoId,
+  modo,
+  chavesJustificar,
+  comentario,
+  onComentario,
+  ocupado,
+  onCancelar,
+  onConfirmar,
+}: {
+  projetoId: string;
+  modo: Exclude<CaixaTexto, null>;
+  /** Perguntas que ficaram "não" e pedem explicação (só no modo "justificar"). */
+  chavesJustificar: ChaveChecklist[];
+  comentario: string;
+  onComentario: (v: string) => void;
+  ocupado: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  const justificando = modo === "justificar";
+  const cor = modo === "reprovar" ? "#b91c1c" : modo === "ajuste" ? "#b45309" : "var(--go-blue)";
+  const fundo =
+    modo === "reprovar"
+      ? "rgba(220,38,38,0.05)"
+      : modo === "ajuste"
+        ? "rgba(180,83,9,0.05)"
+        : "rgba(0,89,169,0.05)";
+  const primeira = chavesJustificar[0];
+  const titulo = justificando
+    ? chavesJustificar.length > 1
+      ? "Dois pontos ficaram como \"Não\". Explique cada um:"
+      : (primeira ? JUSTIFICATIVA_POR_CHAVE[primeira].pergunta : "Explique o seu parecer")
+    : modo === "ajuste"
+      ? "O que precisa ser ajustado?"
+      : "Por que este projeto está sendo reprovado?";
+  const exemplo = justificando
+    ? (primeira ? JUSTIFICATIVA_POR_CHAVE[primeira].exemplo : "")
+    : modo === "ajuste"
+      ? "Ex.: as horas do time fiscal estão altas para o volume atual — confira a frequência antes de reenviar."
+      : "Ex.: o processo descrito não é automação, é uma planilha preenchida à mão pela própria equipe.";
+  const rotuloBotao = justificando
+    ? "Pré-aprovar com esta explicação"
+    : modo === "ajuste"
+      ? "Enviar pedido de ajuste"
+      : "Confirmar reprovação";
+
+  return (
+    <div className="mt-3 rounded-lg p-4" style={{ background: fundo, border: `1px solid ${cor}33` }}>
+      <label
+        htmlFor={`comentario-${projetoId}`}
+        className="mb-1.5 block text-[12px] font-semibold"
+        style={{ color: cor }}
+      >
+        {titulo}
+      </label>
+      {/* 2+ "nãos": a pergunta de cada um vira bullet, para o líder não esquecer nenhum. */}
+      {justificando && chavesJustificar.length > 1 && (
+        <ul className="mb-2 space-y-1">
+          {chavesJustificar.map((c) => (
+            <li key={c} className="text-[11.5px] leading-snug" style={{ color: "#4b4b5a" }}>
+              • <strong>{CHECKLIST_APROVACAO.find((p) => p.chave === c)?.rotulo}</strong> —{" "}
+              {JUSTIFICATIVA_POR_CHAVE[c].pergunta}
+            </li>
+          ))}
+        </ul>
+      )}
+      {justificando && chavesJustificar.length === 1 && (
+        <p className="mb-2 text-[11px] leading-snug" style={{ color: "#6b6b7a" }}>
+          Duas ou três linhas bastam. A equipe RPA lê isso na triagem, junto com as suas respostas.
+        </p>
+      )}
+      <textarea
+        id={`comentario-${projetoId}`}
+        value={comentario}
+        onChange={(e) => onComentario(e.target.value)}
+        rows={3}
+        maxLength={2000}
+        autoFocus
+        placeholder={exemplo}
+        className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+        style={{
+          background: "var(--go-white)",
+          border: `1.5px solid ${cor}40`,
+          color: "var(--go-text-heading)",
+        }}
+      />
+      <div className="mt-2.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
+          style={{ background: "transparent", color: "#6b6b7a", border: "1.5px solid rgba(0,0,0,0.12)" }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={onConfirmar}
+          disabled={ocupado || comentario.trim().length === 0}
+          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
+          style={{ background: justificando ? "#15803d" : cor, border: `1.5px solid ${justificando ? "#15803d" : cor}` }}
+        >
+          {ocupado ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : justificando ? (
+            <BadgeCheck className="h-3.5 w-3.5" />
+          ) : modo === "ajuste" ? (
+            <MessageSquareWarning className="h-3.5 w-3.5" />
+          ) : (
+            <CircleX className="h-3.5 w-3.5" />
+          )}
+          {rotuloBotao}
+        </button>
+      </div>
     </div>
   );
 }

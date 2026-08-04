@@ -18,7 +18,13 @@
 
 import { z } from 'zod';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
-import { resumirChecklist, temNaoNoChecklist, type ChaveChecklist } from '@/lib/aprovacoes-checklist';
+import {
+  AVISO_SAVING_INCOERENTE,
+  bloqueiaPreAprovacao,
+  chavesQueExigemJustificativa,
+  resumirChecklist,
+  type ChaveChecklist,
+} from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import {
   extrairResumoMemorial,
@@ -41,7 +47,11 @@ import {
   type AprovacaoRow,
 } from '@/integrations/db/client.server';
 
-export type Veredito = 'pendente' | 'aprovado' | 'reprovado';
+// 3 desfechos (decisão do Lucas, 04/08/2026): 'ajuste' devolve ao autor para corrigir,
+// 'reprovado' é recusa. Antes os dois eram 'reprovado' — linhas ANTIGAS com 'reprovado'
+// nasceram como "ajuste pedido" e seguem lidas como recusa (nada a migrar: são poucas e
+// só na staging).
+export type Veredito = 'pendente' | 'aprovado' | 'ajuste' | 'reprovado';
 
 // ─── Rótulos (Sheets + UI) ───────────────────────────────────────────────────
 
@@ -91,9 +101,10 @@ export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): 
  */
 export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, 'veredito'>[]): string {
   if (!linhas.length) return '—';
-  const decidida = linhas.find((l) => l.veredito === 'aprovado' || l.veredito === 'reprovado');
+  const decidida = linhas.find((l) => l.veredito !== 'pendente');
   if (!decidida) return 'Pré-pendente';
-  return decidida.veredito === 'aprovado' ? 'Pré-aprovado' : 'Pré-reprovado';
+  if (decidida.veredito === 'aprovado') return 'Pré-aprovado';
+  return decidida.veredito === 'ajuste' ? 'Ajuste pedido' : 'Pré-reprovado';
 }
 
 /**
@@ -118,7 +129,7 @@ export function justificativaAprovacaoSheet(
   >[],
 ): string {
   if (!linhas.length) return '—';
-  const decidida = linhas.find((l) => l.veredito === 'aprovado' || l.veredito === 'reprovado');
+  const decidida = linhas.find((l) => l.veredito !== 'pendente');
   if (!decidida) {
     const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
     return `Aguardando ${nomes}`;
@@ -645,7 +656,7 @@ const simNao = z.enum(['sim', 'nao']);
 
 const decidirSchema = z.object({
   projeto_id: z.string().min(1),
-  veredito: z.enum(['aprovado', 'reprovado']),
+  veredito: z.enum(['aprovado', 'ajuste', 'reprovado']),
   comentario: z.string().trim().max(2000).optional().nullable(),
   // Checklist do gestor — OBRIGATÓRIO nos dois vereditos (pedido do Lucas, 03/08/2026).
   // É o que transforma o parecer em informação para a triagem, então o servidor cobra:
@@ -687,17 +698,27 @@ export async function decidirAprovacao(
   const { projeto_id, veredito, respostas } = parsed.data;
   const comentario = (parsed.data.comentario ?? '').trim() || null;
 
-  if (veredito === 'reprovado' && !comentario) {
+  if (veredito !== 'aprovado' && !comentario) {
     throw Object.assign(
-      new Error('Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto.'),
+      new Error(
+        veredito === 'ajuste'
+          ? 'Para pedir ajuste, escreva o que precisa mudar — o autor recebe esse texto.'
+          : 'Para reprovar, escreva o motivo — o autor recebe esse texto.',
+      ),
       { status: 400 },
     );
+  }
+
+  // Saving incoerente NÃO se justifica, se corrige (Lucas, 04/08/2026): número errado
+  // volta para o autor. A tela já esconde o "Pré-aprovar"; aqui é a garantia.
+  if (veredito === 'aprovado' && bloqueiaPreAprovacao(respostas)) {
+    throw Object.assign(new Error(AVISO_SAVING_INCOERENTE), { status: 400 });
   }
 
   // Pré-aprovar COM um "não" no checklist exige a explicação (04/08/2026): a contradição
   // "não move KPI / o saving não é coerente, mas pré-aprovo" é justamente o que a triagem
   // precisa entender. Mesma régua da tela (`exigeJustificativa`), cobrada aqui.
-  if (veredito === 'aprovado' && temNaoNoChecklist(respostas) && !comentario) {
+  if (veredito === 'aprovado' && chavesQueExigemJustificativa(respostas).length > 0 && !comentario) {
     throw Object.assign(
       new Error(
         'Você respondeu "não" em alguma pergunta. Explique por que ainda assim pré-aprova — a explicação vai junto para a triagem da RPA.',

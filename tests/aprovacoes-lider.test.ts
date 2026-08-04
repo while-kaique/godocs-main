@@ -33,6 +33,7 @@ import {
   extrairNumeros,
 } from '@/lib/aprovacoes.functions';
 import {
+  bloqueiaPreAprovacao,
   checklistCompleto,
   exigeJustificativa,
   resumirChecklist,
@@ -233,6 +234,52 @@ describe('pré-aprovação do líder', () => {
     });
   });
 
+  it('SAVING INCOERENTE bloqueia a pré-aprovação — só ajuste/reprovação (04/08/2026)', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+    const respostas = { ...RESP_OK, saving_coerente: 'nao' as const };
+
+    // Número errado não se justifica, se corrige: nem com texto o "aprovado" passa.
+    await expect(
+      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'aprovado', respostas }),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      decidirAprovacao(LUCAS.email, {
+        projeto_id: id,
+        veredito: 'aprovado',
+        comentario: 'confio no autor',
+        respostas,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // Ajuste passa (com texto) e a planilha recebe o rótulo próprio.
+    await decidirAprovacao(LUCAS.email, {
+      projeto_id: id,
+      veredito: 'ajuste',
+      comentario: 'As horas supõem diário; é 2× por semana. Corrija a frequência.',
+      respostas,
+    });
+    const cells = mockSheet.mock.calls.at(-1)![1] as Record<string, string>;
+    expect(cells['Aprovação do Líder']).toBe('Ajuste pedido');
+  });
+
+  it('REPROVAR é desfecho próprio (rótulo e exigência de motivo)', async () => {
+    const id = await criarProjeto();
+    await abrirPreAprovacao(id);
+    await expect(
+      decidirAprovacao(LUCAS.email, { projeto_id: id, veredito: 'reprovado', respostas: RESP_OK }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    await decidirAprovacao(LUCAS.email, {
+      projeto_id: id,
+      veredito: 'reprovado',
+      comentario: 'Não é automação: a planilha é preenchida à mão pela própria equipe.',
+      respostas: RESP_OK,
+    });
+    const cells = mockSheet.mock.calls.at(-1)![1] as Record<string, string>;
+    expect(cells['Aprovação do Líder']).toBe('Pré-reprovado');
+  });
+
   it('pré-aprovar com "não" no checklist exige explicação (04/08/2026)', async () => {
     const id = await criarProjeto();
     await abrirPreAprovacao(id);
@@ -242,7 +289,7 @@ describe('pré-aprovação do líder', () => {
       decidirAprovacao(LUCAS.email, {
         projeto_id: id,
         veredito: 'aprovado',
-        respostas: { ...RESP_OK, saving_coerente: 'nao' },
+        respostas: { ...RESP_OK, sente_falta: 'nao' },
       }),
     ).rejects.toMatchObject({ status: 400 });
 
@@ -250,14 +297,14 @@ describe('pré-aprovação do líder', () => {
     await decidirAprovacao(LUCAS.email, {
       projeto_id: id,
       veredito: 'aprovado',
-      comentario: 'Horas altas para o volume de hoje, mas eram 3 pessoas em picos.',
-      respostas: { ...RESP_OK, saving_coerente: 'nao' },
+      comentario: 'Roda pouco hoje, mas na alta de novembro evita 2 pessoas dedicadas.',
+      respostas: { ...RESP_OK, sente_falta: 'nao' },
     });
     const resumo = await resumoAprovacaoPorProjeto([id]);
     expect(resumo[id]).toMatchObject({ veredito: 'aprovado' });
     const cells = mockSheet.mock.calls.at(-1)![1] as Record<string, string>;
-    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('Saving coerente: não');
-    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('3 pessoas em picos');
+    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('Sentiria falta: não');
+    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('alta de novembro');
   });
 
   it('pré-aprovar com checklist todo "sim" NÃO exige explicação', async () => {
@@ -505,6 +552,12 @@ describe('checklist do gestor (puro)', () => {
     expect(exigeJustificativa('aprovado', comNao)).toBe(true);
     // Pedir ajuste sempre pede texto — inclusive com o checklist todo "sim".
     expect(exigeJustificativa('reprovado', todosSim)).toBe(true);
+    expect(exigeJustificativa('ajuste', todosSim)).toBe(true);
+    // Saving incoerente NÃO pede justificativa: bloqueia a pré-aprovação.
+    const savingRuim = { ...todosSim, saving_coerente: 'nao' } as const;
+    expect(bloqueiaPreAprovacao(savingRuim)).toBe(true);
+    expect(bloqueiaPreAprovacao(comNao)).toBe(false);
+    expect(exigeJustificativa('aprovado', savingRuim)).toBe(false);
   });
 });
 

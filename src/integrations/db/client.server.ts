@@ -1123,7 +1123,7 @@ export type AprovacaoRow = {
   autor_email: string | null;
   aprovador_email: string;
   aprovador_nome: string | null;
-  veredito: string; // 'pendente' | 'aprovado' | 'reprovado'
+  veredito: string; // 'pendente' | 'aprovado' | 'ajuste' | 'reprovado'
   comentario: string | null;
   decidido_por: string | null;
   criado_em: string | null;
@@ -1217,7 +1217,8 @@ export function getAprovacoesDoProjeto(projetoId: string) {
  */
 export function decidirAprovacoesDoProjeto(
   projetoId: string,
-  veredito: 'aprovado' | 'reprovado',
+  // 3 desfechos desde 04/08/2026: 'ajuste' devolve ao autor, 'reprovado' é recusa.
+  veredito: 'aprovado' | 'ajuste' | 'reprovado',
   comentario: string | null,
   decididoPor: string,
   respostas?: { move_kpi: string; sente_falta: string; saving_coerente: string } | null,

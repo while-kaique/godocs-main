@@ -22,10 +22,58 @@ export type PerguntaChecklist = {
   rotulo: string;
 };
 
+/**
+ * Pergunta e exemplo da caixa de justificativa, ESPECÍFICOS de cada "não" (Lucas
+ * reprovou a 1ª versão em 04/08/2026: título genérico e exemplo SEMPRE do saving, mesmo
+ * quando o "não" era em "move KPI" — "o exemplo tem que condizer com o não que a pessoa
+ * marcou"). O exemplo é `placeholder`, nunca texto preenchido: ninguém envia o exemplo
+ * por acidente.
+ */
+export type JustificativaChecklist = { pergunta: string; exemplo: string };
+
+export const JUSTIFICATIVA_POR_CHAVE: Record<ChaveChecklist, JustificativaChecklist> = {
+  move_kpi: {
+    pergunta: 'O que este projeto entrega, se não move um indicador da área?',
+    exemplo:
+      'Ex.: não aparece em nenhum indicador que a área acompanha, mas elimina a conferência manual de 2 planilhas antes de cada fechamento — o efeito é o fechamento sair no prazo, não um número de painel.',
+  },
+  sente_falta: {
+    pergunta: 'Se desligar o projeto não impactaria a área, justifique a aprovação.',
+    exemplo:
+      'Ex.: hoje quase não roda porque o volume caiu, mas na alta de novembro ele evita duas pessoas dedicadas à mesma conferência — desligar agora só empurra o custo para a próxima temporada.',
+  },
+  // ⚠️ Esta NÃO tem caixa de justificativa: "saving incoerente" bloqueia a
+  // pré-aprovação (ver `bloqueiaPreAprovacao`). Fica declarada para a tela poder
+  // explicar o bloqueio a partir da MESMA fonte, sem redigitar texto.
+  saving_coerente: {
+    pergunta: 'O saving não confere — o projeto precisa voltar para o autor corrigir.',
+    exemplo:
+      'Se o projeto está com erro nos cálculos ou ganhos, pedimos que redirecione ao time para ajustes ou reprove.',
+  },
+};
+
+/**
+ * "Não" que IMPEDE a pré-aprovação (decisão do Lucas, 04/08/2026): número errado não se
+ * justifica, se corrige. Com `saving_coerente = 'nao'` a tela esconde o "Pré-aprovar" e
+ * deixa só "Pedir ajuste" / "Reprovar" — e o servidor recusa a aprovação.
+ *
+ * As outras duas seguem aprovando COM explicação (D16): ali o "não" é contexto que só o
+ * gestor tem, não erro de submissão.
+ */
+export function bloqueiaPreAprovacao(
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): boolean {
+  return respostas.saving_coerente === 'nao';
+}
+
+/** Texto do bloqueio — FONTE ÚNICA (tela e, se preciso, erro do servidor). */
+export const AVISO_SAVING_INCOERENTE =
+  'Se o projeto está com erro nos cálculos ou ganhos, pedimos que redirecione ao time para ajustes ou reprove.';
+
 export const CHECKLIST_APROVACAO: PerguntaChecklist[] = [
   {
     chave: 'move_kpi',
-    pergunta: 'O projeto move algum KPI da sua área?',
+    pergunta: 'O projeto move algum KPI da área?',
     ajuda: 'Vale qualquer indicador que vocês acompanham: horas, custo, erro, prazo, risco.',
     rotulo: 'Move KPI',
   },
@@ -72,10 +120,22 @@ export function temNaoNoChecklist(
  * - pré-aprovar: só quando há "não" no checklist.
  */
 export function exigeJustificativa(
-  veredito: 'aprovado' | 'reprovado',
+  veredito: 'aprovado' | 'ajuste' | 'reprovado',
   respostas: Partial<Record<ChaveChecklist, string | null>>,
 ): boolean {
-  return veredito === 'reprovado' || temNaoNoChecklist(respostas);
+  // Ajuste e reprovação sempre pedem texto (o autor lê). Pré-aprovar pede quando há
+  // "não" que ADMITE justificativa — o `saving_coerente` não admite: ele bloqueia.
+  if (veredito !== 'aprovado') return true;
+  return chavesQueExigemJustificativa(respostas).length > 0;
+}
+
+/** Chaves com "não" que pedem explicação para pré-aprovar (exclui o bloqueante). */
+export function chavesQueExigemJustificativa(
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): ChaveChecklist[] {
+  return CHECKLIST_APROVACAO.filter(
+    (p) => p.chave !== 'saving_coerente' && respostas[p.chave] === 'nao',
+  ).map((p) => p.chave);
 }
 
 /**
