@@ -737,30 +737,36 @@ function MeusProjetosPage() {
                           boxShadow: "var(--go-shadow-sm)",
                         }}
                       >
-                        {/* Cabeçalho: identificação à esquerda, ações à direita. Os avisos
-                            ficam FORA desta linha (abaixo, na largura inteira do card) —
-                            dentro da coluna esquerda a fileira de botões a esmagava para
-                            ~250px e o motivo virava uma tira de ~30 caracteres por linha. */}
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        {/* Nome em LINHA PRÓPRIA, na largura inteira do card. Dividindo a
+                            linha com a fileira de botões, a coluna do nome sobrava com
+                            ~230px e o truncate cortava em ~28 caracteres — numa barreira
+                            invisível, já que o espaço à direita do nome está livre (os
+                            botões ficam na linha de baixo). */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className="truncate font-semibold"
+                            style={{ color: "var(--go-text-heading)", fontSize: 15 }}
+                          >
+                            {p.nome ?? "(sem nome)"}
+                          </span>
+                          {p.especial && (
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                              style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
+                            >
+                              Especial
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Metadados à esquerda, ações à direita. Os avisos ficam FORA desta
+                            linha (abaixo, na largura inteira do card) — dentro da coluna
+                            esquerda a fileira de botões os esmagava para ~250px e o motivo
+                            virava uma tira de ~30 caracteres por linha. */}
+                        <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className="truncate font-semibold"
-                                style={{ color: "var(--go-text-heading)", fontSize: 15 }}
-                              >
-                                {p.nome ?? "(sem nome)"}
-                              </span>
-                              {p.especial && (
-                                <span
-                                  className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                                  style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
-                                >
-                                  Especial
-                                </span>
-                              )}
-                            </div>
                             <div
-                              className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
+                              className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
                               style={{ color: "#8b8b9a" }}
                             >
                               {p.area_nome && <span>{p.area_nome}</span>}
