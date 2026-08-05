@@ -45,9 +45,19 @@ livre em bloco citado com o rótulo da D18, e selo **"Respondeu 'não' no checkl
 (sem push). Registro: **D19** em `SPEC_APROVACAO_LIDER.md` + CLAUDE.md (seções da pré-aprovação e do
 dashboard). **Deployado na staging** às 14:46 — cron pós-deploy `200 ok`, sem exceptions.
 
+**3. Coluna "Pré-status" na TABELA do `/dashboard`** (pedido do Luis logo depois, commit `b456626`, **1028
+testes**): ao lado de "Status", para saber se foi pré-aprovado **sem abrir ficha por ficha**. Chip
+**COMPARTILHADO** com a ficha (`ChipEstadoParecer`, variante compacta) — rótulo/cor/ícone dos 5 estados num
+lugar só, senão um dia a tabela mostraria "Aprovado" onde a ficha mostra "Pré-aprovado". Projeto sem fila fica
+**"—" quieto** (chip "Sem parecer" em centenas de linhas mataria a leitura). ⚠️ **Só o rótulo curto entra na
+listagem** — a justificativa multi-linha segue no detalhe (listagem enxuta, gotcha 4 do dashboard). ⚠️ O campo
+`aprovacaoLider` usa **`valorDaColuna` (tolerante)**: com `row['Aprovação do Líder']` a coluna nasceria vazia
+em TODO projeto, porque o cabeçalho real é `…do Lider`. Skeleton alinhado à coluna nova (mesma quebra `md`).
+**Deployado na staging** às 15:09 (cron pós-deploy `200 ok`).
+
 ### ➡️ PRÓXIMO PASSO
-**Abrir `/dashboard` na staging, buscar um projeto que já tem parecer e conferir a seção "Pré-aprovação do
-líder" na ficha** (de preferência um caso com "não" no checklist, para ver o selo e o destaque da linha).
+**Abrir `/dashboard` na staging e conferir as DUAS coisas: a coluna "Pré-status" na tabela e a seção
+"Pré-aprovação do líder" na ficha de um projeto com parecer** (de preferência um caso com "não" no checklist, para ver o selo e o destaque da linha).
 Passando, a feature segue **travada para prod** até a validação com a diretoria — e o que resta em código
 é a **F3 do Gomoon** (agregada + cron + POST), que depende do endpoint/token deles (P4).
 ⚠️ Ainda **não pushei nada** (nem PR): quando a fatia fechar, é `/ggsd:ship`.

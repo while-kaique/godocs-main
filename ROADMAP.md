@@ -135,7 +135,9 @@ Efeito colateral bom: a staging voltou a ser **100% muda**.
 
 **05/08 (D18/D19) — validado na staging e o parecer virou tela** ✅ A coluna AF **recebe o parecer completo** (confirmado pelo Luis na staging). Em seguida, **D19** (commit `e61bace`, **1025 testes**): o parecer do líder passou a aparecer **dividido na ficha de triagem do `/dashboard`** — chip de estado, quem decidiu + quando, **1 linha por pergunta do checklist com o sim/não**, texto livre citado com o rótulo da D18 e selo **"Respondeu 'não' no checklist"**. Fonte é a **LINHA DA PLANILHA** (zero leitura nova, invariante do dashboard intacta); `chaveColuna` mudou para o módulo PURO `src/lib/coluna-chave.ts` porque a tela roda no CLIENTE e precisa casar `…do Lider`. **Deployado na staging** (14:46, cron pós-deploy `200 ok`) — falta **conferir no navegador**.
 
-**Próximo:** **abrir a ficha de um projeto com parecer em `/dashboard` na staging e conferir a seção "Pré-aprovação do líder"** — depois, **mandar o `docs/integracao-gomoon-chat.md` ao time do Gomoon** e obter URL + token + a
+Somada a ela, a coluna **"Pré-status"** na TABELA (commit `b456626`, **1028 testes**), com o chip compartilhado — a triagem vê o parecer sem abrir ficha por ficha.
+
+**Próximo:** **conferir na staging a coluna "Pré-status" da tabela + a seção "Pré-aprovação do líder" na ficha (de preferência num projeto com "não" no checklist)** — depois, **mandar o `docs/integracao-gomoon-chat.md` ao time do Gomoon** e obter URL + token + a
 confirmação do admin do Workspace sobre a **DM proativa do bot** (P4) — sem isso a F3 não tem onde postar. Em
 paralelo, segue de pé: **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
