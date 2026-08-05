@@ -10,7 +10,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     root: path.resolve(__dirname, '../..'),
-    include: ['scripts/dryrun-lider/dryrun-lider.ts'],
+    include: ['scripts/dryrun-lider/relatorio-sheet.ts'],
     testTimeout: 900_000,
     disableConsoleIntercept: true,
   },
