@@ -17,7 +17,14 @@ type Time = {
   leader: { id: string; name: string } | null;
   deleted?: boolean;
 };
-type Membro = { id: string; name: string; contactEmail: string; teamsIds: string[] };
+type Membro = {
+  id: string;
+  name: string;
+  contactEmail: string;
+  teamsIds: string[];
+  /** `position` da API — é o que decide a isenção desde a D20. */
+  cargo?: string | null;
+};
 
 const norm = (s: string) =>
   s
@@ -103,7 +110,13 @@ function dublarFetch(times: Time[], membros: Membro[], opcoes: { paginaFixa?: bo
 
     if (u.pathname === '/employees/refs') {
       return json(
-        membros.map((m) => ({ id: m.id, name: m.name, contactEmail: m.contactEmail, role: null })),
+        membros.map((m) => ({
+          id: m.id,
+          name: m.name,
+          contactEmail: m.contactEmail,
+          position: m.cargo ?? null,
+          role: null,
+        })),
       );
     }
     return json([]);
@@ -374,11 +387,11 @@ const TIMES_LIDERANCA: Time[] = [
 ];
 
 const MEMBROS_LIDERANCA: Membro[] = [
-  { id: '1', name: 'Rafael Lobo', contactEmail: 'rafael@gocase.com', teamsIds: ['43685'] },
+  { id: '1', name: 'Rafael Lobo', contactEmail: 'rafael@gocase.com', teamsIds: ['43685'], cargo: 'CEO' },
   { id: '8', name: 'Luis Liveri', contactEmail: 'luis.liveri@gocase.com', teamsIds: ['43689'] },
-  { id: '3', name: 'Bruno Bezerra Bluhm', contactEmail: 'bruno.bezerra@gocase.com', teamsIds: ['46642'] },
-  { id: '20', name: 'Lucas Gonçalves Queiroz', contactEmail: 'lucas.queiroz@gocase.com', teamsIds: ['50001'] },
-  { id: '30', name: 'Luis Albuquerque', contactEmail: 'luis.albuquerque@gocase.com', teamsIds: ['50001'] },
+  { id: '3', name: 'Bruno Bezerra Bluhm', contactEmail: 'bruno.bezerra@gocase.com', teamsIds: ['46642'], cargo: 'Diretor Executivo' },
+  { id: '20', name: 'Lucas Gonçalves Queiroz', contactEmail: 'lucas.queiroz@gocase.com', teamsIds: ['50001'], cargo: 'Coordenador de RPA JR' },
+  { id: '30', name: 'Luis Albuquerque', contactEmail: 'luis.albuquerque@gocase.com', teamsIds: ['50001'], cargo: 'Analista de RPA' },
   { id: '21', name: 'Simony Morais', contactEmail: 'simony.morais@gocase.com', teamsIds: ['50004'] },
   { id: '22', name: 'Adyla Martins', contactEmail: 'adyla.martins@gocase.com', teamsIds: ['50003'] },
   { id: '23', name: 'Joaquim Quindere', contactEmail: 'joaquim.quindere@gocase.com', teamsIds: ['48320', '50008'] },
@@ -521,14 +534,16 @@ describe('getLideresDe / getLideradosDe (T4)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// D11 — Isenção de liderança (quem já lidera não precisa de pré-aprovação)
+// D20 — Isenção de pré-aprovação pelo CARGO (coordenador para cima)
 // ---------------------------------------------------------------------------
 //
-// A régua é "aparece como `leader` de algum time ATIVO", e não "tem liderados no
-// índice": um time recém-criado pode ter líder e nenhum membro, e o coordenador
-// continua sendo liderança (logo, isento).
+// A régua é o **cargo** (`position` da TeamGuide), não a posição na árvore. A D11
+// original perguntava "aparece como `leader` de algum time ATIVO", e a TeamGuide
+// pendura um nó por pessoa: uma ANALISTA figurava como líder do time dela mesma e
+// saía isenta sem ninguém aprovar (caso Fablícia Lima, 05/08/2026). Aqui provamos os
+// dois lados — o cargo manda, e a árvore não isenta mais ninguém sozinha.
 
-describe('ehLideranca — isenção de pré-aprovação (D11)', () => {
+describe('ehLideranca — isenção de pré-aprovação (D20)', () => {
   beforeEach(() => {
     process.env.TG_API_TOKEN = 'fake-token';
   });
@@ -537,61 +552,69 @@ describe('ehLideranca — isenção de pré-aprovação (D11)', () => {
     delete process.env.TG_API_TOKEN;
   });
 
-  it('quem lidera um time é liderança (caso Lucas, coordenador de RPA)', async () => {
+  it('cargo de coordenador para cima é isento (Lucas, Bruno, CEO)', async () => {
     dublarFetch(TIMES_LIDERANCA, MEMBROS_LIDERANCA);
     const { ehLideranca } = await carregarModulo();
 
-    expect(await ehLideranca('lucas.queiroz@gocase.com')).toBe(true);
-    // Bruno lidera o BIZOPS (é líder do Lucas) — também isento.
-    expect(await ehLideranca('bruno.bezerra@gocase.com')).toBe(true);
-    // E o CEO, que lidera o N1.
-    expect(await ehLideranca('rafael@gocase.com')).toBe(true);
+    expect(await ehLideranca('lucas.queiroz@gocase.com')).toBe(true); // Coordenador de RPA JR
+    expect(await ehLideranca('bruno.bezerra@gocase.com')).toBe(true); // Diretor Executivo
+    expect(await ehLideranca('rafael@gocase.com')).toBe(true); // CEO
   });
 
-  it('quem não lidera ninguém NÃO é liderança (caso Luis, liderado do Lucas)', async () => {
+  it('cargo de analista NÃO isenta, e quem aprova é o líder DIRETO', async () => {
     dublarFetch(TIMES_LIDERANCA, MEMBROS_LIDERANCA);
     const { ehLideranca, getLideresDe } = await carregarModulo();
 
     expect(await ehLideranca('luis.albuquerque@gocase.com')).toBe(false);
-    // …e quem aprova é o líder DIRETO (Lucas), nunca o líder do líder (Bruno).
+    // …e é o líder DIRETO (Lucas), nunca o líder do líder (Bruno).
     expect(porNome(await getLideresDe('luis.albuquerque@gocase.com'))).toEqual([
       'Lucas Gonçalves Queiroz',
     ]);
   });
 
-  it('é liderança mesmo com o time vazio (a régua é o `leader` do time)', async () => {
-    const timesComTimeVazio: Time[] = [
+  it('LIDERAR UM TIME NÃO ISENTA MAIS — é o cargo que decide (caso Fablícia)', async () => {
+    // Reproduz o desenho real: a analista tem um nó próprio na árvore, pendurado no
+    // time da supervisora, e é `leader` dele. Pela régua antiga saía isenta; agora
+    // entra na fila da supervisora — que também não é isenta (D20).
+    const times: Time[] = [
       ...TIMES_LIDERANCA,
-      { id: '50099', name: 'TIME NOVO', teamParent: '46642', leader: { id: '40', name: 'Nina Nova' } },
+      { id: '50097', name: 'TRANSPORTES E SLA B2C', teamParent: '46642', leader: { id: '41', name: 'Kelly Sousa' } },
+      { id: '50096', name: '[TRANSPORTES] TIME FABRICIA LIMA', teamParent: '50097', leader: { id: '42', name: 'Fablicia Lima' } },
     ];
     const membros: Membro[] = [
       ...MEMBROS_LIDERANCA,
-      // A Nina está alocada no BIZOPS e lidera um time que ainda não tem gente.
-      { id: '40', name: 'Nina Nova', contactEmail: 'nina.nova@gocase.com', teamsIds: ['46642'] },
+      { id: '41', name: 'Kelly Sousa', contactEmail: 'kelly.sousa@gocase.com', teamsIds: ['50097'], cargo: 'Supervisora de Transportes' },
+      { id: '42', name: 'Fablicia Lima', contactEmail: 'fablicia.lima@gocase.com', teamsIds: ['50096'], cargo: 'Analista de Logistica PL' },
     ];
-    dublarFetch(timesComTimeVazio, membros);
-    const { ehLideranca, getLideradosDe } = await carregarModulo();
+    dublarFetch(times, membros);
+    const { ehLideranca, getLideresDe } = await carregarModulo();
 
-    expect(await getLideradosDe('nina.nova@gocase.com')).toEqual([]);
-    expect(await ehLideranca('nina.nova@gocase.com')).toBe(true);
+    expect(await ehLideranca('fablicia.lima@gocase.com')).toBe(false);
+    expect(porNome(await getLideresDe('fablicia.lima@gocase.com'))).toEqual(['Kelly Sousa']);
+    expect(await ehLideranca('kelly.sousa@gocase.com')).toBe(false);
   });
 
-  it('e-mail vazio ou desconhecido não é liderança (nunca lança)', async () => {
-    dublarFetch(TIMES_LIDERANCA, MEMBROS_LIDERANCA);
+  it('e-mail vazio, desconhecido ou sem cargo cadastrado NÃO isenta (nunca lança)', async () => {
+    const membros: Membro[] = [
+      ...MEMBROS_LIDERANCA,
+      // Está na base, lidera um time, mas o cargo não foi cadastrado → entra em fila.
+      { id: '43', name: 'Sem Cargo', contactEmail: 'sem.cargo@gocase.com', teamsIds: ['50001'] },
+    ];
+    dublarFetch(TIMES_LIDERANCA, membros);
     const { ehLideranca } = await carregarModulo();
 
     expect(await ehLideranca('')).toBe(false);
     expect(await ehLideranca('ninguem.aqui@gocase.com')).toBe(false);
+    expect(await ehLideranca('sem.cargo@gocase.com')).toBe(false);
   });
 
-  it('time deletado não faz de ninguém liderança', async () => {
-    const comDeletado: Time[] = [
-      ...TIMES_LIDERANCA,
-      { id: '50098', name: 'TIME MORTO', teamParent: '46642', leader: { id: '30', name: 'Luis Albuquerque' }, deleted: true },
-    ];
-    dublarFetch(comDeletado, MEMBROS_LIDERANCA);
-    const { ehLideranca } = await carregarModulo();
+  it('getCargoDe devolve o cargo cru da TeamGuide', async () => {
+    dublarFetch(TIMES_LIDERANCA, MEMBROS_LIDERANCA);
+    const { getCargoDe } = await carregarModulo();
 
-    expect(await ehLideranca('luis.albuquerque@gocase.com')).toBe(false);
+    expect(await getCargoDe('lucas.queiroz@gocase.com')).toBe('Coordenador de RPA JR');
+    expect(await getCargoDe('LUCAS.QUEIROZ@GOCASE.COM')).toBe('Coordenador de RPA JR');
+    expect(await getCargoDe('ninguem.aqui@gocase.com')).toBeNull();
+    expect(await getCargoDe('')).toBeNull();
   });
 });

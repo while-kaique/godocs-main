@@ -87,7 +87,10 @@ export function rotuloIsencaoSheet(motivo: ResultadoAbertura['motivo']): string 
 export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): string {
   switch (motivo) {
     case 'lideranca':
-      return 'Autor é liderança na TeamGuide, isento de pré-aprovação (ninguém decidiu)';
+      // D20 (05/08/2026): a isenção é pelo CARGO (coordenador para cima), não por
+      // aparecer como líder de um time — o texto diz qual dos dois, senão a triagem
+      // lê "liderança" achando que a pessoa tem equipe.
+      return 'Autor tem cargo de liderança na TeamGuide (coordenador ou acima), isento de pré-aprovação (ninguém decidiu)';
     case 'sem_lider':
       return 'Sem líder na TeamGuide';
     case 'teamguide_indisponivel':

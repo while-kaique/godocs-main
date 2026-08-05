@@ -9,6 +9,8 @@
 // canônica de áreas mesmo as sem gente alocada. A mesma árvore também resolve a
 // área de UMA pessoa pelo email (deriveAreaFromEmail).
 
+import { ehCargoDeLideranca } from '@/lib/cargo-lideranca';
+
 const BASE = 'https://api.teamguide.app';
 
 // Range de marcas diacríticas combinantes (para remover acentos após NFD).
@@ -257,7 +259,8 @@ export type PessoaTeamGuide = { nome: string; email: string; cargo: string | nul
  */
 export async function listarPessoasTeamGuide(): Promise<PessoaTeamGuide[]> {
   const token = getToken();
-  const refs = await tgGet<TGEmployeeRef[]>('/employees/refs?unpaged=true&page=0', token);
+  expirarCachesVencidos();
+  const refs = await carregarRefs(token);
 
   const porEmail = new Map<string, PessoaTeamGuide>();
   for (const r of refs) {
@@ -315,6 +318,7 @@ async function fetchTeamMembers(teamId: string, token: string): Promise<TGMember
 
 let cacheTimes: Promise<TGTeam[]> | null = null;
 let cacheMembros: Promise<TGMember[]> | null = null;
+let cacheRefs: Promise<TGEmployeeRef[]> | null = null;
 
 // ⚠️ TTL curto e OBRIGATÓRIO. Sem ele, um isolate quente serve o retrato velho da
 // org para sempre: quem foi cadastrado (ou trocou de time) depois do aquecimento
@@ -329,9 +333,26 @@ function expirarCachesVencidos() {
   if (cacheEm && Date.now() - cacheEm > CACHE_TTL_MS) {
     cacheTimes = null;
     cacheMembros = null;
+    cacheRefs = null;
     cacheLideranca = null;
     cacheEm = 0;
   }
+}
+
+/**
+ * Base de funcionários com CARGO (`/employees/refs`, ~440 pessoas numa chamada),
+ * cacheada junto com a árvore. É a fonte do cargo que decide a isenção (D20) — e
+ * como isso roda no caminho quente da submissão, não pode ser uma leitura por vez.
+ */
+function carregarRefs(token: string): Promise<TGEmployeeRef[]> {
+  if (!cacheRefs) {
+    if (!cacheEm) cacheEm = Date.now();
+    cacheRefs = tgGet<TGEmployeeRef[]>('/employees/refs?unpaged=true&page=0', token).catch((e) => {
+      cacheRefs = null;
+      throw e;
+    });
+  }
+  return cacheRefs;
 }
 
 function carregarTimes(token: string): Promise<TGTeam[]> {
@@ -541,14 +562,29 @@ export async function getLideradosDe(email: string): Promise<{ nome: string; ema
   return lideradosPorEmail.get(alvo) ?? [];
 }
 
+/** Cargo cadastrado na TeamGuide (`position`), ou `null` se a pessoa não está lá. */
+export async function getCargoDe(email: string): Promise<string | null> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return null;
+  const token = getToken();
+  expirarCachesVencidos();
+  const refs = await carregarRefs(token);
+  const achado = refs.find((r) => (r.contactEmail ?? '').trim().toLowerCase() === alvo);
+  return (achado?.position ?? '').trim() || null;
+}
+
 /**
- * A pessoa É liderança (lidera pelo menos um time)? Base da ISENÇÃO de
- * pré-aprovação: liderança não precisa que o líder dela aprove o projeto dela.
- * Ex.: o coordenador de RPA lidera o time (isento), o analista do time dele não.
+ * A pessoa é ISENTA de pré-aprovação? A régua é o **CARGO** — coordenador para cima
+ * (D20, `ehCargoDeLideranca`, fonte única em `@/lib/cargo-lideranca`).
+ *
+ * ⚠️ NÃO é mais "aparece como `leader` de um time ativo" (D11 original): a TeamGuide
+ * pendura um nó por pessoa na árvore, então analista com nó próprio saía isenta sem
+ * ninguém aprovar (caso Fablícia Lima, "Analista de Logistica PL", 05/08/2026).
+ * ⚠️ Também NÃO é "tem liderado": quem lidera time grande com cargo de IC (ex.
+ * "Team Líder Cx", 12 liderados) segue em fila de propósito — decide o cargo.
+ * ⚠️ Nunca lança por e-mail vazio/desconhecido: sem cargo, o seguro é passar pelo
+ * líder (`false`).
  */
 export async function ehLideranca(email: string): Promise<boolean> {
-  const alvo = (email ?? '').trim().toLowerCase();
-  if (!alvo) return false;
-  const { liderancasPorEmail } = await buildLiderancaIndex();
-  return liderancasPorEmail.has(alvo);
+  return ehCargoDeLideranca(await getCargoDe(email));
 }

@@ -6,12 +6,16 @@
 // ⚠️ `RELATORIO_WRITE=1` para escrever; sem a flag é DRY-RUN (só imprime o resumo).
 //
 // Rodar:
-//   npx vitest run --config scripts/dryrun-lider/vitest.config.ts
-//   RELATORIO_WRITE=1 npx vitest run --config scripts/dryrun-lider/vitest.config.ts
+//   npx vitest run --config scripts/dryrun-lider/relatorio.config.ts
+//   RELATORIO_WRITE=1 npx vitest run --config scripts/dryrun-lider/relatorio.config.ts
 //
 // Fontes: aba `GoDocs` (readAllRows) + índice de liderança da TeamGuide
-// (`buildLiderancaIndex` — a MESMA régua que a feature usa em produção, para o relatório
-// não contar uma coisa e o sistema fazer outra).
+// (`buildLiderancaIndex`) + a régua de isenção por CARGO (`ehCargoDeLideranca`, D20) —
+// as MESMAS que a feature usa em produção, para o relatório não contar uma coisa e o
+// sistema fazer outra.
+//
+// Duas tabelas (Luis, 05/08/2026): quem RECEBE a mensagem e quem NÃO recebe, com o
+// motivo — a isenção por cargo tem de ser auditável ao lado da fila.
 
 import fs from 'node:fs';
 import { it } from 'vitest';
@@ -26,6 +30,7 @@ const { getAccessToken } = await import('@/lib/google/auth');
 const { buildLiderancaIndex, listarPessoasTeamGuide } = await import(
   '@/lib/areas/teamguide.server'
 );
+const { ehCargoDeLideranca } = await import('@/lib/cargo-lideranca');
 
 const ABA = 'Relação Líder-Liderado';
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
@@ -35,10 +40,10 @@ const ESCREVER = process.env.RELATORIO_WRITE === '1';
 const txt = (v: unknown) => String(v ?? '').trim();
 const low = (v: unknown) => txt(v).toLowerCase();
 
-type Projeto = { id: string; nome: string; autorNome: string; autorEmail: string; status: string };
+type Projeto = { id: string; nome: string; autorNome: string; autorEmail: string };
 
 async function main() {
-  // ── 1. Projetos PENDENTES da aba GoDocs (é o que geraria DM hoje) ──────────
+  // ── 1. Projetos PENDENTES da aba GoDocs (é o que geraria mensagem hoje) ────
   const rows = await readAllRows();
   const pendentes: Projeto[] = rows
     // Só "Pendente" (Luis, 05/08): "Reenvio Pendente" fica FORA da relação.
@@ -48,80 +53,104 @@ async function main() {
       nome: txt(r['Projeto']) || '(sem nome)',
       autorNome: txt(r['Nome Completo']) || '—',
       autorEmail: low(r['Email']),
-      status: txt(r['Status']),
     }));
 
-  // ── 2. Hierarquia da TeamGuide (mesma régua da feature) ────────────────────
-  const { lideresPorEmail, liderancasPorEmail } = await buildLiderancaIndex();
+  // ── 2. Hierarquia + cargos da TeamGuide (mesma régua da feature) ──────────
+  const { lideresPorEmail } = await buildLiderancaIndex();
   const pessoas = await listarPessoasTeamGuide();
   const nomePorEmail = new Map(pessoas.map((p) => [p.email.toLowerCase(), p.nome]));
+  const cargoPorEmail = new Map(pessoas.map((p) => [p.email.toLowerCase(), p.cargo ?? '']));
+  const naTeamGuide = new Set(pessoas.map((p) => p.email.toLowerCase()));
 
-  const nome = (email: string, fallback = '') =>
-    nomePorEmail.get(email) || fallback || email || '—';
+  const nome = (email: string, fallback = '') => nomePorEmail.get(email) || fallback || email || '—';
+  const cargo = (email: string) => cargoPorEmail.get(email) || '—';
 
-  // ── 3. Bloco "fila hoje": líder → liderado → projeto ──────────────────────
-  type LinhaFila = { lider: string; liderEmail: string; autor: string; autorEmail: string; proj: Projeto };
+  // ── 3. Separa em "recebe" × "não recebe" pela régua de produção ───────────
+  type LinhaFila = { liderEmail: string; liderNome: string; proj: Projeto };
   const fila: LinhaFila[] = [];
-  const semLider: Projeto[] = [];
-  const isentos: Projeto[] = [];
+  const foraDaFila: { proj: Projeto; motivo: string }[] = [];
 
   for (const p of pendentes) {
     if (!p.autorEmail) {
-      semLider.push(p);
+      foraDaFila.push({ proj: p, motivo: 'Sem e-mail do autor na planilha' });
       continue;
     }
-    if (liderancasPorEmail.has(p.autorEmail)) {
-      isentos.push(p);
+    // D20 — isenção pelo CARGO (coordenador para cima).
+    if (ehCargoDeLideranca(cargoPorEmail.get(p.autorEmail))) {
+      foraDaFila.push({ proj: p, motivo: 'Isento: cargo de liderança (coordenador ou acima)' });
+      continue;
+    }
+    if (!naTeamGuide.has(p.autorEmail)) {
+      foraDaFila.push({ proj: p, motivo: 'Autor não está cadastrado na TeamGuide' });
       continue;
     }
     const lideres = (lideresPorEmail.get(p.autorEmail) ?? []).filter((l) => !!l.email);
     if (!lideres.length) {
-      semLider.push(p);
+      foraDaFila.push({ proj: p, motivo: 'Sem líder na TeamGuide' });
       continue;
     }
+    // Pessoa em 2+ times gera 2+ linhas (D4): o primeiro que decide resolve.
     for (const l of lideres) {
       const e = String(l.email).toLowerCase();
-      fila.push({
-        lider: nome(e, l.nome ?? ''),
-        liderEmail: e,
-        autor: p.autorNome,
-        autorEmail: p.autorEmail,
-        proj: p,
-      });
+      fila.push({ liderEmail: e, liderNome: nome(e, l.nome ?? ''), proj: p });
     }
   }
-
-  // Agrupa por líder e, dentro dele, por liderado (a visão que o Luis pediu).
-  const porLider = new Map<string, LinhaFila[]>();
-  for (const f of fila) porLider.set(f.liderEmail, [...(porLider.get(f.liderEmail) ?? []), f]);
-  const ranking = [...porLider.entries()].sort((a, b) => b[1].length - a[1].length);
 
   // ── 4. Monta as linhas da aba ─────────────────────────────────────────────
   const linhas: (string | number)[][] = [];
   const push = (...cells: (string | number)[]) => linhas.push(cells);
 
-  // UMA tabela só (Luis, 05/08): a relação líder ↔ liderado dos projetos pendentes.
-  // Sem resumo, sem seções — o chefe abre e lê a relação direto.
-  push('Líder', 'E-mail do líder', 'Liderado', 'E-mail do liderado', 'Projetos pendentes');
+  // Tabela 1 — quem RECEBE, agrupado por líder e, dentro dele, por liderado.
+  const porLider = new Map<string, LinhaFila[]>();
+  for (const f of fila) porLider.set(f.liderEmail, [...(porLider.get(f.liderEmail) ?? []), f]);
+  const ranking = [...porLider.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  push('QUEM RECEBE A MENSAGEM (fila de pré-aprovação)');
+  push('Líder', 'E-mail do líder', 'Cargo do líder', 'Liderado', 'E-mail do liderado', 'Cargo do liderado', 'Projetos pendentes');
   for (const [email, itens] of ranking) {
     const porAutor = new Map<string, LinhaFila[]>();
-    for (const i of itens) porAutor.set(i.autorEmail, [...(porAutor.get(i.autorEmail) ?? []), i]);
+    for (const i of itens) {
+      porAutor.set(i.proj.autorEmail, [...(porAutor.get(i.proj.autorEmail) ?? []), i]);
+    }
     for (const [autorEmail, doAutor] of [...porAutor].sort((a, b) => b[1].length - a[1].length)) {
       push(
-        doAutor[0].lider,
+        doAutor[0].liderNome,
         email,
-        doAutor[0].autor,
+        cargo(email),
+        nome(autorEmail, doAutor[0].proj.autorNome),
         autorEmail,
+        cargo(autorEmail),
         doAutor.length,
       );
     }
   }
 
-  console.log(`Linhas do relatório: ${linhas.length}`);
+  // Tabela 2 — quem NÃO recebe, e por quê (a auditoria da isenção).
+  push('');
+  push('QUEM NÃO ENTRA NA FILA (ninguém é avisado)');
+  push('Autor', 'E-mail', 'Cargo', 'Motivo', 'Projeto', 'ID do projeto');
+  for (const f of foraDaFila.sort(
+    (a, b) => a.motivo.localeCompare(b.motivo, 'pt-BR') || a.proj.autorNome.localeCompare(b.proj.autorNome, 'pt-BR'),
+  )) {
+    push(
+      nome(f.proj.autorEmail, f.proj.autorNome),
+      f.proj.autorEmail || '—',
+      cargo(f.proj.autorEmail),
+      f.motivo,
+      f.proj.nome,
+      f.proj.id,
+    );
+  }
+
   console.log(
-    `Pendentes ${pendentes.length} · fila ${new Set(fila.map((f) => f.proj.id)).size} · DMs ${fila.length} · ` +
-      `líderes ${porLider.size} · isentos ${isentos.length} · sem líder ${semLider.length}`,
+    `Pendentes ${pendentes.length} · na fila ${new Set(fila.map((f) => f.proj.id)).size} projetos ` +
+      `(${fila.length} linhas, ${porLider.size} líderes avisados) · fora da fila ${foraDaFila.length}`,
   );
+  const porMotivo = new Map<string, number>();
+  for (const f of foraDaFila) porMotivo.set(f.motivo, (porMotivo.get(f.motivo) ?? 0) + 1);
+  for (const [m, n] of [...porMotivo].sort((a, b) => b[1] - a[1])) console.log(`   ${n}× ${m}`);
+  console.log(`Linhas do relatório: ${linhas.length}`);
+
   if (!ESCREVER) {
     console.log('DRY-RUN (sem RELATORIO_WRITE=1): nada foi escrito no Sheets.');
     return;
