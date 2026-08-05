@@ -4,7 +4,39 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🚚 05/08 (última sessão) — D17: o aviso ao líder SAI do GoDocs e vai para o bot do GOMOON
+## ✅ 05/08 (última sessão) — D18: o parecer do líder chega INTEIRO na planilha
+
+**Pedido do Luis:** _"corrigir a mudança de pré-aprovação na planilha, mudando o status e a justificativa
+conforme com o que vem; a justificativa tem que salvar tudo que vier do usuário, as respostas (sim, não e as
+justificativas) de forma devida."_ Eram **duas** causas independentes:
+
+1. **A justificativa era descartada.** O cabeçalho de prod E staging é `Justificativa Aprovação do **Lider**`
+   (sem acento) e o código escreve `…do **Líder**`; com o match por nome EXATO a chave não casava e o valor
+   ia para o lixo com aviso — o ESTADO aparecia em AE e o resto do parecer, em lugar nenhum.
+   **Fix sem tocar no cabeçalho:** `chaveColuna` + `resolverColunaLetra` (exato → normalizado) no
+   `updateRowByProjectId` **e** no `appendRow`/`orderValuesByHeaders`; chave AMBÍGUA só casa por nome exato.
+2. **O conteúdo era pobre:** resumo de 1 linha em rótulos internos + texto livre sem rótulo. Agora a coluna
+   guarda TUDO: assinatura (estado + nome + e-mail + data) · **1 linha por PERGUNTA do checklist com o
+   sim/não** · texto livre **rotulado** (`O que precisa ser ajustado` · `Motivo da reprovação` ·
+   `Justificativa do "não" em <perguntas>` · `Comentário do líder`).
+
+**Onde:** `src/lib/google/sheets.ts`, `src/lib/aprovacoes-checklist.ts` (`detalharChecklist`/`rotuloChecklist`,
+fonte única), `src/lib/aprovacoes.functions.ts` (`justificativaAprovacaoSheet`/`rotuloComentarioSheet`),
+`scripts/dryrun-lider/hdr.ts`, +9 testes (**945 verdes**), `worker.js` rebuildado.
+Commit **`3aac5f5`** na branch `worktree-plano-aprovacao-lider-teamguide` (sem push). Registro:
+`SPEC_CORRECOES.md` (2026-08-05) + **D18** em `SPEC_APROVACAO_LIDER.md` + CLAUDE.md.
+⚠️ **A coluna `Status` do Sheets segue intocada** (D3 — a pré-aprovação não bloqueia a triagem da RPA).
+⚠️ **Nada foi deployado.** Verificação ao vivo do cabeçalho:
+`npx vitest run --config scripts/dryrun-lider/vitest.config.ts`.
+
+### ➡️ PRÓXIMO PASSO
+**Deployar esta branch na STAGING (`edf400b4`, regra 13) e conferir na aba `STAGING` que a coluna AF recebe o
+parecer completo** — antes, checar se a staging não está com outro build no ar
+([[staging-pode-ter-branch-nao-mergeada]]: `updateApp` substitui a app inteira; mergear `origin/main` na
+branch e `npm run build:worker` se preciso). Depois disso, a feature continua **travada para prod** até a
+validação com a diretoria, e a F3 do Gomoon (agregada + cron + POST) segue não codada.
+
+## 🚚 05/08 — D17: o aviso ao líder SAI do GoDocs e vai para o bot do GOMOON
 
 **Decisão do Luis nesta sessão (D17):** o GoDocs **não fala mais com a API do Google Chat**. Quem entrega a
 DM é o **bot do Gomoon**; nós mandamos **1 POST/dia às 6h BRT** com um **snapshot da RELAÇÃO**
