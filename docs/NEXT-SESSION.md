@@ -18,7 +18,14 @@
 > (líder · e-mail · nº projetos · nº liderados · `Liderado (n)` · projeto · ID · status, agrupado como ele
 > pediu) · **3. Fora da fila** com o motivo por linha (isento por liderança × e-mail fora da base ativa).
 >
-> **Números de 05/08:** 78 pendentes → **44 em fila · 46 DMs · 27 líderes · 24 isentos · 10 sem líder**.
+> **REVISÃO 05/08 (`424b075`, aba regravada):** o Luis pediu **uma tabela só** — sem resumo, sem bloco de
+> "fora da fila" e **sem `Reenvio Pendente`** (só `Pendente`). Colunas: `Líder · E-mail do líder · Liderado ·
+> E-mail do liderado · Projetos pendentes` (1 linha por PAR, ordenada por quem tem mais). Números com o
+> filtro novo: **64 pendentes → 40 projetos · 42 DMs · 26 líderes · 32 pares** (isentos 21, sem líder 3 —
+> agora **não aparecem na aba**; se a gestão sentir falta, virar 2ª aba). Os NOMES dos projetos também não
+> estão na tabela (só a contagem) — acrescentar coluna/linha-por-projeto se pedirem.
+>
+> **Números da 1ª versão (04/08→05/08):** 78 pendentes → **44 em fila · 46 DMs · 27 líderes · 24 isentos · 10 sem líder**.
 > ⚠️ Mudou de leve vs. o dry-run de 04/08 (45 fila / 23 isentos): a hierarquia é lida AO VIVO na TeamGuide e
 > **um autor passou a liderar time** → virou isento. O total (68) não mudou. Não "corrigir" essa variação:
 > ela é esperada e o relatório sempre reflete a TeamGuide do momento.
