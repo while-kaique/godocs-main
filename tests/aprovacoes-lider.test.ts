@@ -13,11 +13,9 @@ vi.mock('@/lib/areas/teamguide.server', () => ({
   getLideresDe: vi.fn(),
   getLideradosDe: vi.fn(),
 }));
-vi.mock('@/lib/google/chat-dm', () => ({ enviarDmChat: vi.fn(async () => true) }));
 vi.mock('@/lib/google/sheets', () => ({ updateRowByProjectId: vi.fn(async () => true) }));
 
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
-import { enviarDmChat } from '@/lib/google/chat-dm';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { setDb, insertProjetoRaw, getAprovacoesDoProjeto } from '@/integrations/db/client.server';
 import {
@@ -43,7 +41,6 @@ import {
 const mockLideranca = ehLideranca as unknown as ReturnType<typeof vi.fn>;
 const mockLideres = getLideresDe as unknown as ReturnType<typeof vi.fn>;
 const mockLiderados = getLideradosDe as unknown as ReturnType<typeof vi.fn>;
-const mockDm = enviarDmChat as unknown as ReturnType<typeof vi.fn>;
 const mockSheet = updateRowByProjectId as unknown as ReturnType<typeof vi.fn>;
 
 function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
@@ -101,11 +98,10 @@ describe('pré-aprovação do líder', () => {
     mockLideranca.mockResolvedValue(false);
     mockLideres.mockResolvedValue([LUCAS]);
     mockLiderados.mockResolvedValue([]);
-    mockDm.mockResolvedValue(true);
     mockSheet.mockResolvedValue(true);
   });
 
-  it('abre a fila com o líder DIRETO e avisa por DM', async () => {
+  it('abre a fila com o líder DIRETO', async () => {
     const id = await criarProjeto();
 
     const r = await abrirPreAprovacao(id);
@@ -117,11 +113,9 @@ describe('pré-aprovação do líder', () => {
     const linhas = await getAprovacoesDoProjeto(id);
     expect(linhas).toHaveLength(1);
     expect(linhas[0].veredito).toBe('pendente');
-    expect(mockDm).toHaveBeenCalledTimes(1);
-    expect(mockDm.mock.calls[0][0]).toBe(LUCAS.email);
   });
 
-  it('AUTOR QUE É LIDERANÇA fica isento — nenhuma fila, nenhuma DM (D11)', async () => {
+  it('AUTOR QUE É LIDERANÇA fica isento — nenhuma fila (D11)', async () => {
     mockLideranca.mockResolvedValue(true);
     const id = await criarProjeto();
 
@@ -133,7 +127,6 @@ describe('pré-aprovação do líder', () => {
       rotuloSheet: 'Pré-aprovado',
     });
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
-    expect(mockDm).not.toHaveBeenCalled();
   });
 
   it('autor sem líder (topo da cadeia) não entra em fila nenhuma (D6)', async () => {
@@ -170,12 +163,17 @@ describe('pré-aprovação do líder', () => {
     });
   });
 
-  it('projeto de teste E2E não dispara DM', async () => {
+  // D17 (05/08/2026): notificar é do Gomoon, e a submissão NÃO dispara nada. Logo o
+  // projeto de teste `[E2E-…]` entra na fila como qualquer outro — excluí-lo é
+  // responsabilidade de quem monta o payload diário (docs/integracao-gomoon-chat.md).
+  // Este teste existe para ninguém reintroduzir o filtro AQUI.
+  it('projeto de teste E2E abre fila normalmente (o mute mora no payload do Gomoon)', async () => {
     const id = await criarProjeto('[E2E-abc] Projeto');
 
-    await abrirPreAprovacao(id);
+    const r = await abrirPreAprovacao(id);
 
-    expect(mockDm).not.toHaveBeenCalled();
+    expect(r.isento).toBe(false);
+    expect(await getAprovacoesDoProjeto(id)).toHaveLength(1);
   });
 
   it('multi-time: 2 líderes na fila e o PRIMEIRO que decide resolve (D4)', async () => {
