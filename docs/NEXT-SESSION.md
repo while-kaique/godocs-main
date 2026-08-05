@@ -4,7 +4,57 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 05/08 (última sessão) — D18: o parecer do líder chega INTEIRO na planilha
+## ✅ 05/08 (última sessão) — staging validada + D19: o parecer do líder virou TELA na triagem
+
+**Duas coisas nesta sessão.**
+
+**1. A D18 foi validada na staging.** Antes do deploy, incorporei `origin/main` (estava 4 commits à
+frente: gate do ponteiro `[1.4]` + gate de ganho projetado) — conflito em `SPEC_CORRECOES.md`
+resolvido **unindo os dois lados** (regra 7) e `worker.js` regerado. Deploy no `edf400b4`, e **o Luis
+confirmou ao vivo: a coluna do parecer recebe o conteúdo certo.**
+
+**2. D19 — o parecer do líder aparece DIVIDIDO na ficha de triagem do `/dashboard`.** Pedido do Luis:
+_"ver as respostas do usuário líder no projeto da pessoa… fácil e bem dividido, para que não tenhamos
+que entrar na planilha e ver de forma feia a pré-aprovação."_
+**O que estava errado:** as 2 colunas do líder **já chegavam** na ficha, mas fora de qualquer grupo —
+caíam no balde **"Outras colunas"**: o estado como campo qualquer e a justificativa multi-linha da D18
+como texto corrido num grid de 2 colunas. O conteúdo estava lá, ilegível.
+**O que tem agora:** seção **"Pré-aprovação do líder"** logo abaixo da caixa de decisão — chip de estado
+(`Pré-aprovado`/`Ajuste pedido`/`Pré-reprovado`/`Pré-pendente`/`Sem parecer`), quem decidiu + quando,
+**1 linha por pergunta com o sim/não** (espinha azul ligando as 3; o "não" com chip âmbar + faixa), texto
+livre em bloco citado com o rótulo da D18, e selo **"Respondeu 'não' no checklist"** — a contradição
+*pré-aprovado com "não"* é o que a triagem precisa ver primeiro. Fila aberta (`Aguardando …`) e as
+**isenções da D12** também aparecem distinguíveis.
+
+**Decisões que não devem regredir:**
+- **A fonte é a LINHA DA PLANILHA, não `projeto_aprovacoes`** — o detalhe já a traz inteira: zero leitura
+  nova, invariante do dashboard ("lê `readAllRows`, nunca o SQLite") intacta, e funciona para linha de
+  outro ambiente / legado / fila reaberta à mão.
+- **`chaveColuna` mudou de casa** para o módulo PURO **`src/lib/coluna-chave.ts`** (`google/sheets.ts`
+  importa e reexporta): a tela roda no **CLIENTE** e precisa casar o cabeçalho `…do Lider` sem acento —
+  quase repeti o bug da D18 do outro lado. A exclusão de "Outras colunas" usa a **mesma chave tolerante**;
+  com `Set` de nome exato a célula crua reaparecia logo abaixo do painel.
+- **O parser não redigita nenhuma pergunta** (fonte única `CHECKLIST_APROVACAO`) e **nada é engolido**:
+  linha não reconhecida aparece como veio. **Teste de IDA-E-VOLTA** (`tests/dashboard-parecer-lider.test.ts`)
+  gera com `justificativaAprovacaoSheet` e lê com o parser — mudar a escrita quebra o teste em vez de
+  degradar a tela em silêncio.
+
+**Onde:** `src/lib/coluna-chave.ts` (novo), `src/lib/aprovacoes-parecer.ts` (novo),
+`src/components/dashboard/parecer-lider.tsx` (novo), `src/components/dashboard/projeto-detalhe-dialog.tsx`,
+`src/lib/google/sheets.ts`, +13 testes (**1025 verdes**), `worker.js` rebuildado. Commit **`e61bace`**
+(sem push). Registro: **D19** em `SPEC_APROVACAO_LIDER.md` + CLAUDE.md (seções da pré-aprovação e do
+dashboard). **Deployado na staging** às 14:46 — cron pós-deploy `200 ok`, sem exceptions.
+
+### ➡️ PRÓXIMO PASSO
+**Abrir `/dashboard` na staging, buscar um projeto que já tem parecer e conferir a seção "Pré-aprovação do
+líder" na ficha** (de preferência um caso com "não" no checklist, para ver o selo e o destaque da linha).
+Passando, a feature segue **travada para prod** até a validação com a diretoria — e o que resta em código
+é a **F3 do Gomoon** (agregada + cron + POST), que depende do endpoint/token deles (P4).
+⚠️ Ainda **não pushei nada** (nem PR): quando a fatia fechar, é `/ggsd:ship`.
+⚠️ Fora de escopo por decisão: a **listagem** do `/dashboard` continua sem coluna/filtro de pré-aprovação
+(só se vê abrindo a ficha) — o Luis foi avisado e é um acréscimo pequeno se ele quiser.
+
+## 📌 05/08 — D18: o parecer do líder chega INTEIRO na planilha
 
 **Pedido do Luis:** _"corrigir a mudança de pré-aprovação na planilha, mudando o status e a justificativa
 conforme com o que vem; a justificativa tem que salvar tudo que vier do usuário, as respostas (sim, não e as
