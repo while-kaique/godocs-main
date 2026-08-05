@@ -67,7 +67,7 @@ import {
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
-import { notificarLideresPendentes } from '@/lib/gomoon-lideres.functions'
+import { notificarLideresPendentes, anunciarPreAprovacao } from '@/lib/gomoon-lideres.functions'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -565,6 +565,20 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request)
       const body = await readBody<{ dry?: boolean }>(request).catch(() => ({}) as { dry?: boolean })
       return json(await notificarLideresPendentes({ dry: body?.dry === true }))
+    }
+
+    // ── Anúncio de abertura da feature → Gomoon (admin, UMA VEZ) ──
+    // Evento único: o texto que explica a pré-aprovação para a empresa inteira, no dia
+    // em que a feature entra em produção. NÃO tem cron — e a chave de idempotência do
+    // anúncio é SEM data, então o Gomoon entrega uma vez por pessoa para sempre (um
+    // POST repetido volta como `ja_entregue`, nunca como segunda DM).
+    // ⚠️ `dry` é o DEFAULT aqui (ao contrário do aviso diário): enviar exige
+    // `{"dry":false}` explícito no body, porque um POST sem body falaria com a
+    // empresa inteira.
+    if (pathname === '/api/admin/anunciar-pre-aprovacao' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ dry?: boolean }>(request).catch(() => ({}) as { dry?: boolean })
+      return json(await anunciarPreAprovacao({ dry: body?.dry !== false }))
     }
 
     // ── Sync reverso manual (admin) ──

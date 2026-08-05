@@ -317,6 +317,50 @@ Detalhe completo (contrato dos 2 lados, decisões, invariantes) em
 
 ---
 
+## 9. D21 — quem REDIGE as mensagens é o GoDocs (06/08/2026)
+
+**Decisão do Luis (06/08/2026):** o texto das DMs vai **pronto** no payload; o Gomoon
+entrega. Contrato **v2** em [docs/integracao-gomoon-chat.md](../docs/integracao-gomoon-chat.md)
+§13–§14 (foi o que o Luis passou ao João Victor para ele implementar do lado dele).
+
+**Por que a inversão** (o §7 do contrato dizia "o template é do Gomoon"): o `total` é a
+**soma** dos liderados, a lista quer bullets na ordem certa, o plural muda a frase e a data
+sai em fuso de Brasília. Isso do outro lado significaria um mini-engine de template lá e a
+cópia morando em dois repos. Com o texto pronto, mexer numa vírgula é deploy **nosso**.
+
+| Peça | Onde |
+|---|---|
+| **Redação (PURA, fonte única)** | **`src/lib/gomoon-mensagens.ts`** |
+| Aviso diário ao líder | `renderMensagemLider()` → `lideres[].mensagem.texto` do payload |
+| Anúncio de abertura (1×, empresa) | `TEXTO_ANUNCIO_PRE_APROVACAO` + `ANUNCIO_CHAVE` |
+| Envio do anúncio | `anunciarPreAprovacao()` + `POST /api/admin/anunciar-pre-aprovacao` |
+| Testes | `tests/gomoon-mensagens.test.ts` (+ os 2 do payload) |
+
+**Decisões fechadas que NÃO podem ser "corrigidas" por engano:**
+
+- **O anúncio NÃO viaja no payload diário.** Endpoint próprio (`/api/godocs/anuncio`), chave
+  `godocs:anuncio:pre-aprovacao-lider:v1` **SEM data** → o Gomoon entrega **1× por pessoa,
+  para sempre**. Pendurado no snapshot diário, o anúncio viraria DM de anúncio **todo dia**.
+  Mexer na redação **não** reenvia nada; só um `v2` explícito reabre o disparo.
+- **`dry` é o DEFAULT do anúncio** (`anunciarPreAprovacao` e a rota): enviar exige
+  `{"dry":false}`. É a única rota do repo em que um POST distraído fala com a empresa inteira.
+- **A audiência é resolvida pelo Gomoon** (`destinatarios: "todos"`) — quem já resolve
+  e-mail→usuário do Chat é ele. Não montamos lista de funcionários.
+- **A mensagem é renderizada DEPOIS de ordenar os liderados** — renderizar antes daria uma DM
+  com os bullets em ordem diferente da lista do payload.
+- **Nenhum valor em R$ nos textos** (o teste do payload varre o JSON, e o texto agora está
+  dentro dele). No anúncio a varredura é por **valor** (`R$`, "N mil/reais"), não pela palavra:
+  o texto explica que o líder confere "o ganho declarado".
+- **O texto do anúncio é conferido contra o app por teste**: isenção = **D20** (coordenação
+  para cima, sem citar supervisor) · entrada da fila = **faixa "Pré-aprovações do meu time" da
+  home** (não existe menu "GoDocs → Pré-aprovações") · o ajuste **"fica visível em Meus
+  Projetos"**, e **não** "você recebe" — o autor não é avisado por DM nem e-mail (pendência
+  aberta desde 03/08; se um dia for avisado, cabe no mesmo payload diário).
+- **O Gomoon mantém o template dele como fallback** (se `mensagem` faltar) — é o que deixa os
+  dois lados deployarem em qualquer ordem.
+
+---
+
 ## 7. Próximos passos (código pronto — 03/08/2026)
 
 1. **Staging** (`edf400b4`, regra 13): validar a submissão de um liderado (fila abre +

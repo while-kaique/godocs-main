@@ -4,7 +4,12 @@ Documento de contrato para o time do **Gomoon**. Descreve o que o GoDocs envia, 
 envia, e o que o Gomoon precisa provisionar para entregar a mensagem por DM no Google
 Chat do Workspace da empresa.
 
-**Versão:** 1 · **Data:** 05/08/2026 · **Responsável GoDocs:** Luis Albuquerque
+**Versão:** 2 · **Data:** 06/08/2026 · **Responsável GoDocs:** Luis Albuquerque
+
+> **v2 (06/08/2026)** — duas mudanças, ambas nas seções **§13** e **§14**: o **texto da DM
+> passa a vir pronto de nós** no campo `mensagem.texto` (o template do Gomoon fica como
+> fallback) e o **anúncio de abertura da feature** ganha **endpoint próprio**, com chave de
+> idempotência **sem data**. O resto do contrato (§1–§12) não muda.
 
 ---
 
@@ -31,7 +36,8 @@ TeamGuide, do banco do GoDocs, nem decidir quem é elegível.
 
 ## 2. O disparo
 
-- **1 requisição por dia**, às **06:00 (horário de Brasília)**, disparada por cron no GoDocs.
+- **1 requisição por dia**, às **09:00 (horário de Brasília)**, disparada por cron no GoDocs
+  (era 06:00 na v1 do contrato — mudou porque o Gomoon entrega a DM na hora do POST; ver §12).
 - O corpo é um **snapshot completo do dia**: todos os líderes que têm pendência naquele
   momento, cada um com seus liderados.
 - Dia sem nenhuma pendência: a requisição **acontece igual**, com `"lideres": []`. Silêncio
@@ -63,7 +69,8 @@ Content-Type: application/json
       "liderados": [
         { "nome": "Ana Souza",  "email": "ana@gocase.com",   "projetos_pendentes": 2 },
         { "nome": "Bruno Lima", "email": "bruno@gocase.com", "projetos_pendentes": 3 }
-      ]
+      ],
+      "mensagem": { "texto": "*Você tem projeto para pré-aprovar no GoDocs* 📋\n\nOi, Lucas! …" }
     }
   ]
 }
@@ -79,6 +86,7 @@ Content-Type: application/json
 | `lideres[].idempotency_key` | string | `godocs:<email>:<YYYY-MM-DD>`. Ver §4 |
 | `lideres[].liderados[]` | array | Só quem tem projeto pendente. Nunca vazio |
 | `liderados[].projetos_pendentes` | number ≥ 1 | Quantos projetos daquela pessoa esperam parecer |
+| `lideres[].mensagem.texto` | string | **A DM já redigida** (markup do Chat). Ver **§13** |
 
 O total de projetos do líder é a **soma** dos `projetos_pendentes` dos liderados dele — não
 mandamos o total pré-calculado. Se a mensagem precisar dos **nomes** dos projetos, avisem:
@@ -154,6 +162,10 @@ nunca aparecem no payload.
 ---
 
 ## 7. A mensagem (template do Gomoon)
+
+⚠️ **Superado em parte pela §13 (06/08/2026): o texto passa a vir PRONTO de nós, em
+`mensagem.texto`, e o template do Gomoon fica como fallback.** As 3 regras abaixo continuam
+valendo — agora é a nossa redação que as cumpre.
 
 O template é do Gomoon. Três regras que pedimos que sejam respeitadas:
 
@@ -324,17 +336,20 @@ Chat — como consumir a API.md` (fora do repo). O que ele fixa:
 |---|---|
 | Agregada da relação | `getPendenciasPorLider()` (`src/integrations/db/client.server.ts`) |
 | Montagem do payload (PURA) | `montarPayloadLideresPendentes()` (`src/lib/gomoon-lideres.functions.ts`) |
-| Envio | `notificarLideresPendentes()` — mesmo arquivo |
+| **Redação das 2 mensagens (PURA)** | **`src/lib/gomoon-mensagens.ts`** — ver §13/§14 |
+| Envio | `notificarLideresPendentes()` — mesmo arquivo do payload |
 | Cron | `POST /api/cron/notificar-lideres` (header `x-godeploy-cron`) |
 | Manual (admin) | `POST /api/admin/notificar-lideres` — `{"dry":true}` monta e **não envia** |
-| Testes | `tests/gomoon-lideres.test.ts` · `tests/gomoon-pendencias-sql.test.ts` |
+| **Anúncio (uma vez)** | `anunciarPreAprovacao()` + `POST /api/admin/anunciar-pre-aprovacao` (**dry por default**) |
+| Testes | `tests/gomoon-lideres.test.ts` · `tests/gomoon-mensagens.test.ts` · `tests/gomoon-pendencias-sql.test.ts` |
 
 **Horário: 09:00 BRT** (decisão do Luis, 05/08/2026 — o João sugeriu 09h–10h porque a DM
 sai na hora do POST e às 6h o líder recebia notificação de madrugada). O cron do Godeploy
 é **UTC**: `0 12 * * 1-5`.
 
 **Secrets** (Godeploy): `GOMOON_TOKEN` (obrigatório — sem ele o run não envia e diz por
-quê) e `GOMOON_LIDERES_URL` (opcional; o default já é a URL de produção do §11). Setados
+quê), `GOMOON_LIDERES_URL` e `GOMOON_ANUNCIO_URL` (opcionais; os defaults já são as URLs de
+produção do §11/§14). Setados
 na **staging** (`edf400b4`) e no `.env` local em 05/08/2026; **faltam na produção**
 (`674a3710`) — entram junto com o deploy de prod da feature.
 
@@ -375,3 +390,90 @@ separado** (opção 1) e a proteção passa a ser do lado dele, imune ao nosso p
 
 ⚠️ **Ainda pendente do João Victor:** o **token de produção** (§1 do documento dele — foi
 enviado por canal separado; entra como secret nos dois apps).
+
+---
+
+## 13. Quem redige é o GoDocs — `mensagem.texto` (v2 do contrato, 06/08/2026)
+
+**Decisão (Luis, 06/08/2026):** o texto da DM viaja **pronto** no payload, num campo novo
+`mensagem.texto` por líder. O template do Gomoon vira **fallback**.
+
+Por quê: o `total` é a **soma** dos liderados, a lista precisa de bullets na ordem certa, o
+plural muda a frase (*1 projeto de Ana* × *5 projetos da sua equipe*) e a data sai em fuso
+de **Brasília**. Pedir isso a um template do outro lado significaria um mini-engine lá e a
+cópia morando em dois repos — com o texto pronto, mexer numa vírgula é deploy **nosso**.
+
+**O que o Gomoon faz:**
+
+1. **Aceita e PERSISTE** `lideres[].mensagem.texto` junto com o item da fila — não
+   re-renderiza na hora de entregar.
+2. **Na entrega:** se `mensagem.texto` existe, é ele que vai; se falta, cai no template
+   interno. É isso que deixa os dois lados deployarem em **qualquer ordem**.
+3. **Validação:** campo **opcional**, string, teto de ~4.000 chars (limite do Chat). Nada de
+   `400` novo — a validação do §11 derruba o **lote inteiro**, e um texto comprido não pode
+   matar o dia.
+4. **Idempotência:** a regra do §4 já resolve — chave existente e **não entregue** →
+   substitui o item, **inclusive o texto** (o novo é mais recente).
+5. **Auditoria:** o `GET` passa a devolver o texto efetivamente enviado (é o que responde
+   "recebeu, mas veio errado").
+6. **Cartão:** se ele montar cartão, `mensagem.texto` é o corpo — não repetir o mesmo texto
+   dentro e fora.
+
+**Duas regras sobre o texto (valem nos dois endpoints):**
+
+- Chega **pronto, em markup do Google Chat** (`*negrito*`, `_itálico_`, `•`, `\n`, emoji
+  inline). Não escapar, não reformatar. `[texto](url)` **não** renderiza — a URL vai crua.
+- **Não prefixar nem sufixar nada** (título, saudação, assinatura, rodapé): o texto já tem
+  título e fechamento, e o acréscimo sai duplicado.
+
+Nosso lado: **`src/lib/gomoon-mensagens.ts`** (módulo PURO, fonte única das duas redações) →
+`renderMensagemLider()` é chamada dentro de `montarPayloadLideresPendentes`, **depois** de
+ordenar os liderados (renderizar antes daria uma DM em ordem diferente da lista).
+
+---
+
+## 14. Anúncio de abertura — endpoint próprio (§13 v2, 06/08/2026)
+
+A mensagem que **explica a feature para a empresa**, uma vez. ⚠️ **Não pode** viajar no
+`/lideres-pendentes`: aquele é um snapshot que o cron repete todo dia — um anúncio pendurado
+nele vira DM de anúncio diária.
+
+```http
+POST https://gomoon.gogroupbr.com/api/godocs/anuncio
+Authorization: Bearer <GOMOON_TOKEN>
+```
+
+```json
+{
+  "origem": "godocs",
+  "ambiente": "producao",
+  "gerado_em": "2026-08-06T12:00:00Z",
+  "anuncio": {
+    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v1",
+    "destinatarios": "todos",
+    "mensagem": { "texto": "*Novidade no GoDocs…* 🚀\n\n…" }
+  }
+}
+```
+
+- **`idempotency_key` SEM data** → entregar **uma vez por pessoa, para sempre**. POST
+  repetido é no-op (`ja_entregue`), nunca segunda DM. É a diferença de regra em relação ao
+  diário. Um `v2` explícito é o único jeito de reabrir o disparo.
+- ⚠️ **`ambiente: "staging"` tem de ser honrado aqui também**, com o mesmo roteamento para o
+  destinatário de teste. Sem isso, um teste nosso vira DM para a **empresa inteira** — risco
+  muito maior que o do endpoint diário.
+- **`destinatarios: "todos"`** = **o Gomoon expande** pelo diretório do Workspace (decisão do
+  Luis, 06/08/2026: quem já resolve e-mail→usuário do Chat é ele). A forma de lista
+  (`[{email, nome}]`) fica no contrato para um envio dirigido, mas não é a que usamos.
+- Resposta e auditoria iguais às do diário (`202` + `resultados[]` por pessoa).
+
+Nosso lado: `anunciarPreAprovacao()` (mesmo arquivo do diário) + **`POST
+/api/admin/anunciar-pre-aprovacao`**. **NÃO tem cron** — é evento único, disparado à mão no
+dia do rollout. ⚠️ **`dry` é o DEFAULT**: enviar exige `{"dry":false}` explícito, porque um
+POST sem body falaria com a empresa toda.
+
+O texto do anúncio é conferido contra o código por teste (`tests/gomoon-mensagens.test.ts`):
+a isenção descrita é a **D20** (coordenação para cima, sem citar supervisor), a entrada da
+fila é a **faixa "Pré-aprovações do meu time" da home** (não existe menu "GoDocs →
+Pré-aprovações") e a frase do ajuste diz *"fica visível em Meus Projetos"* — **não** "você
+recebe", porque o autor não é avisado por DM nem e-mail (pendência aberta).

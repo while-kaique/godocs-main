@@ -18,10 +18,13 @@ vi.mock('@/integrations/db/client.server', () => ({
 import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import {
   montarPayloadLideresPendentes,
+  montarPayloadAnuncio,
   dataChaveBRT,
   notificarLideresPendentes,
+  anunciarPreAprovacao,
   type LinhaPendencia,
 } from '@/lib/gomoon-lideres.functions';
+import { ANUNCIO_CHAVE } from '@/lib/gomoon-mensagens';
 
 const mPendencias = getPendenciasPorLider as unknown as ReturnType<typeof vi.fn>;
 
@@ -91,9 +94,38 @@ describe('montarPayloadLideresPendentes — formato do contrato (§3)', () => {
     for (const proibido of ['saving', 'reais', 'R$', 'ganho', 'receita', 'custo', 'memorial']) {
       expect(bruto.toLowerCase()).not.toContain(proibido.toLowerCase());
     }
-    // Só as 4 chaves do líder + as 3 do liderado existem.
-    expect(Object.keys(p.lideres[0]).sort()).toEqual(['email', 'idempotency_key', 'liderados', 'nome', 'url']);
+    // Só as 6 chaves do líder + as 3 do liderado existem. `mensagem` (o texto pronto)
+    // entra no mesmo JSON, então a varredura acima cobre a DM também.
+    expect(Object.keys(p.lideres[0]).sort()).toEqual([
+      'email',
+      'idempotency_key',
+      'liderados',
+      'mensagem',
+      'nome',
+      'url',
+    ]);
     expect(Object.keys(p.lideres[0].liderados[0]).sort()).toEqual(['email', 'nome', 'projetos_pendentes']);
+    expect(Object.keys(p.lideres[0].mensagem)).toEqual(['texto']);
+  });
+
+  it('⚠️ a mensagem do líder vai PRONTA no payload e casa com a lista de liderados (§13)', () => {
+    const p = montarPayloadLideresPendentes(
+      [
+        linha({ liderado_email: 'ana@gocase.com', liderado_nome: 'Ana Souza', projetos_pendentes: 2 }),
+        linha({ liderado_email: 'bruno@gocase.com', liderado_nome: 'Bruno Lima', projetos_pendentes: 3 }),
+      ],
+      OPTS,
+    );
+    const texto = p.lideres[0].mensagem.texto;
+
+    // Saudação pelo PRIMEIRO nome, total somado por nós e a MESMA ordem dos bullets.
+    expect(texto).toContain('Oi, Lucas!');
+    expect(texto).toContain('*5 projetos* da sua equipe');
+    expect(texto.indexOf('• Bruno Lima — 3 projetos')).toBeLessThan(
+      texto.indexOf('• Ana Souza — 2 projetos'),
+    );
+    // O link é o do próprio item — nunca um hardcode que ignore a staging.
+    expect(texto).toContain(p.lideres[0].url);
   });
 
   it('normaliza e-mail (caixa) e deriva o nome do liderado quando o banco não tem', () => {
@@ -290,5 +322,130 @@ describe('notificarLideresPendentes — envio', () => {
     expect(r.ok).toBe(false);
     expect(r.erro).toContain('db fora');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Anúncio de abertura (uma vez, para a empresa) ────────────────────────────
+// O que estes testes seguram: o anúncio é um EVENTO ÚNICO com chave SEM data (§13),
+// dry por DEFAULT (um POST distraído falaria com a empresa toda) e sem R$ no texto.
+
+describe('anunciarPreAprovacao — o disparo único', () => {
+  const fetchMock = vi.fn();
+  const envAntigo = { ...process.env };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.GOMOON_TOKEN = 'tok-secreto';
+    delete process.env.GOMOON_ANUNCIO_URL;
+    delete process.env.GODOCS_ENV;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...envAntigo };
+  });
+
+  const resposta202 = (resultados: unknown[]) => ({
+    ok: true,
+    status: 202,
+    text: async () => JSON.stringify({ ok: true, resultados }),
+  });
+
+  it('⚠️ SEM opts é DRY — enviar exige { dry: false } explícito', async () => {
+    const r = await anunciarPreAprovacao();
+    expect(r.dry).toBe(true);
+    expect(r.ok).toBe(true);
+    expect(r.payload?.anuncio.mensagem.texto).toContain('Novidade no GoDocs');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a chave de idempotência é SEM DATA (entrega 1× por pessoa, para sempre — §13)', () => {
+    const p = montarPayloadAnuncio({ ambiente: 'producao', geradoEm: '2026-08-06T12:00:00.000Z' });
+    expect(p.anuncio.idempotency_key).toBe(ANUNCIO_CHAVE);
+    expect(p.anuncio.idempotency_key).toBe('godocs:anuncio:pre-aprovacao-lider:v1');
+    // Se um YYYY-MM-DD vazar para cá, o anúncio vira aviso diário e a empresa recebe
+    // o mesmo texto todo dia.
+    expect(p.anuncio.idempotency_key).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('a audiência é resolvida pelo Gomoon (destinatarios: "todos" — decisão 06/08/2026)', () => {
+    const p = montarPayloadAnuncio({ ambiente: 'producao', geradoEm: '2026-08-06T12:00:00.000Z' });
+    expect(p.anuncio.destinatarios).toBe('todos');
+    expect(p.origem).toBe('godocs');
+  });
+
+  it('⚠️ NENHUM valor em R$ no texto do anúncio (§7.1)', () => {
+    // A lista de palavras do aviso diário não serve aqui: o anúncio EXPLICA que o líder
+    // confere "o ganho declarado". O que não pode é VALOR.
+    const texto = montarPayloadAnuncio({ ambiente: 'producao', geradoEm: '2026-08-06T12:00:00.000Z' })
+      .anuncio.mensagem.texto;
+    expect(texto).not.toContain('R$');
+    expect(texto).not.toMatch(/\d[\d.,]*\s*(reais|mil)/i);
+  });
+
+  it('envia com bearer no endpoint do ANÚNCIO (não no do aviso diário)', async () => {
+    fetchMock.mockResolvedValue(resposta202([{ email: 'a@gocase.com', ok: true }]));
+    const r = await anunciarPreAprovacao({ dry: false });
+
+    expect(r.ok).toBe(true);
+    expect(r.status).toBe(202);
+    expect(r.itens).toBe(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://gomoon.gogroupbr.com/api/godocs/anuncio');
+    expect(init.headers.Authorization).toBe('Bearer tok-secreto');
+    expect(JSON.parse(init.body).anuncio.idempotency_key).toBe(ANUNCIO_CHAVE);
+  });
+
+  it('⚠️ na STAGING o campo `ambiente` sai "staging" (única proteção — e aqui o risco é a empresa toda)', async () => {
+    process.env.GODOCS_ENV = 'staging';
+    fetchMock.mockResolvedValue(resposta202([{ ok: true }]));
+    const r = await anunciarPreAprovacao({ dry: false });
+    expect(r.ambiente).toBe('staging');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).ambiente).toBe('staging');
+  });
+
+  it('repetir o disparo NÃO é falha — conta `ja_entregues` (§13)', async () => {
+    fetchMock.mockResolvedValue(
+      resposta202([
+        { email: 'a@gocase.com', ok: true, codigo: 'ja_entregue' },
+        { email: 'b@gocase.com', ok: true },
+      ]),
+    );
+    const r = await anunciarPreAprovacao({ dry: false });
+    expect(r.ok).toBe(true);
+    expect(r.ja_entregues).toBe(1);
+    expect(r.falhas).toEqual([]);
+  });
+
+  it('falhas são reportadas e a lista é cortada em 20 (broadcast não cabe na resposta)', async () => {
+    const muitas = Array.from({ length: 25 }, (_, i) => ({
+      email: `f${i}@gocase.com`,
+      ok: false,
+      codigo: 'usuario_desconhecido',
+    }));
+    fetchMock.mockResolvedValue(resposta202(muitas));
+    const r = await anunciarPreAprovacao({ dry: false });
+    expect(r.falhas_total).toBe(25);
+    expect(r.falhas).toHaveLength(20);
+    expect(r.falhas[0]).toEqual({ email: 'f0@gocase.com', codigo: 'usuario_desconhecido' });
+  });
+
+  it('sem GOMOON_TOKEN não envia e diz por quê (não lança)', async () => {
+    delete process.env.GOMOON_TOKEN;
+    const r = await anunciarPreAprovacao({ dry: false });
+    expect(r.ok).toBe(false);
+    expect(r.erro).toMatch(/GOMOON_TOKEN/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('HTTP ruim e falha de rede voltam como ok:false (nunca lança)', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'token invalido' });
+    expect((await anunciarPreAprovacao({ dry: false })).ok).toBe(false);
+
+    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    const r = await anunciarPreAprovacao({ dry: false });
+    expect(r.ok).toBe(false);
+    expect(r.erro).toContain('ECONNREFUSED');
   });
 });

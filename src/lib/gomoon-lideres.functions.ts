@@ -6,6 +6,13 @@
 //
 // Contrato dos dois lados: docs/integracao-gomoon-chat.md.
 //
+// Duas mensagens saem daqui (D21, 06/08/2026) — a REDAÇÃO das duas mora em
+// `gomoon-mensagens.ts` (módulo puro, fonte única):
+//  1. o aviso DIÁRIO ao líder com pendência (cron, `notificarLideresPendentes`);
+//  2. o ANÚNCIO de abertura da feature — uma vez, para a empresa
+//     (`anunciarPreAprovacao`, disparo manual de admin, endpoint próprio do Gomoon).
+// Nós mandamos o texto PRONTO em `mensagem.texto`; o template do Gomoon é fallback.
+//
 // Invariantes que NÃO podem regredir:
 //  • **Nenhum valor em R$ no payload** (§7.1). É o que torna impossível vazar saving
 //    numa DM que se lê por cima do ombro. Só nome, e-mail e CONTAGEM.
@@ -22,8 +29,14 @@
 import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import { getGodocsEnv } from '@/lib/env';
+import {
+  ANUNCIO_CHAVE,
+  TEXTO_ANUNCIO_PRE_APROVACAO,
+  renderMensagemLider,
+} from '@/lib/gomoon-mensagens';
 
 const URL_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes';
+const URL_ANUNCIO_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/anuncio';
 const APP_PADRAO = 'https://godocs.devgogroup.com';
 /** O Gomoon responde entre 0,6s e 1,7s em produção; o contrato pede ≤10s (§3). */
 const TIMEOUT_MS = 15_000;
@@ -37,6 +50,12 @@ export type LideradoPayload = {
   projetos_pendentes: number;
 };
 
+/** O texto pronto que o Gomoon entrega. Ver `gomoon-mensagens.ts` e §13 do contrato. */
+export type MensagemPayload = {
+  /** Markup do Google Chat, já renderizado. O Gomoon NÃO prefixa nem sufixa nada. */
+  texto: string;
+};
+
 export type LiderPayload = {
   email: string;
   nome: string | null;
@@ -45,6 +64,12 @@ export type LiderPayload = {
   idempotency_key: string;
   /** Nunca vazio (§3). */
   liderados: LideradoPayload[];
+  /**
+   * Mensagem já redigida por nós (§13). O Gomoon usa este texto; se o campo faltar,
+   * ele cai no template interno dele — é o que deixa os dois lados deployarem em
+   * qualquer ordem.
+   */
+  mensagem: MensagemPayload;
 };
 
 export type PayloadLideresPendentes = {
@@ -109,7 +134,9 @@ export function montarPayloadLideresPendentes(
 ): PayloadLideresPendentes {
   const dia = dataChaveBRT(opts.geradoEm);
   const url = `${origemDe(opts.appUrl, APP_PADRAO)}/aprovacoes`;
-  const porLider = new Map<string, LiderPayload>();
+  // A `mensagem` entra só no fim: o texto lista os liderados na ordem final e soma o
+  // total, então renderizar antes de agrupar/ordenar daria uma DM diferente da lista.
+  const porLider = new Map<string, Omit<LiderPayload, 'mensagem'>>();
 
   for (const l of linhas) {
     const email = (l.lider_email ?? '').trim().toLowerCase();
@@ -138,13 +165,14 @@ export function montarPayloadLideresPendentes(
     });
   }
 
-  const lideres = [...porLider.values()]
-    .map((lider) => ({
-      ...lider,
-      liderados: [...lider.liderados].sort(
+  const lideres: LiderPayload[] = [...porLider.values()]
+    .map((lider) => {
+      const liderados = [...lider.liderados].sort(
         (a, b) => b.projetos_pendentes - a.projetos_pendentes || a.nome.localeCompare(b.nome, 'pt-BR'),
-      ),
-    }))
+      );
+      const comOrdem = { ...lider, liderados };
+      return { ...comOrdem, mensagem: { texto: renderMensagemLider(comOrdem, opts.geradoEm) } };
+    })
     .sort((a, b) => a.email.localeCompare(b.email));
 
   return { origem: 'godocs', ambiente: opts.ambiente, gerado_em: opts.geradoEm, lideres };
@@ -180,6 +208,77 @@ export type ResultadoNotificacao = {
   /** Só no dry-run: o payload que SERIA enviado (a validação da staging olha isto). */
   payload?: PayloadLideresPendentes;
 };
+
+/** Resposta crua do POST. `erro` presente = não deu certo (HTTP ruim, rede ou timeout). */
+type RespostaGomoon = { status?: number; texto: string; erro?: string };
+
+/**
+ * O POST ao Gomoon — compartilhado pelo aviso diário e pelo anúncio.
+ *
+ * NUNCA lança: devolve o erro no campo `erro`. Quem chama é cron ou rota admin, e
+ * uma exceção viraria 500 opaco no log da plataforma.
+ */
+async function postGomoon(url: string, token: string, payload: unknown): Promise<RespostaGomoon> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const texto = await resp.text().catch(() => '');
+    if (!resp.ok) {
+      // 400 = lote inteiro rejeitado (JSON/origem/ambiente/gerado_em) · 401 = token.
+      console.error(`[gomoon] POST recusado (${resp.status}): ${texto.slice(0, 500)}`);
+      return { status: resp.status, texto, erro: texto.slice(0, 500) || `HTTP ${resp.status}` };
+    }
+    return { status: resp.status, texto };
+  } catch (e) {
+    const abortou = e instanceof Error && e.name === 'AbortError';
+    const msg = abortou ? `timeout de ${TIMEOUT_MS}ms` : e instanceof Error ? e.message : String(e);
+    console.error('[gomoon] falha no POST:', msg);
+    return { texto: '', erro: msg };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Lê o `resultados[]` da resposta (§3) — tolerante a corpo vazio ou não-JSON.
+ *
+ * `ja_entregue` vem com `ok:true`: é o comportamento CORRETO quando o disparo repete
+ * (§4), não uma falha. Contamos à parte para o log não parecer um problema.
+ *
+ * ⚠️ O e-mail de reserva é resolvido pelo índice no array COMPLETO, antes do filtro —
+ * filtrar primeiro e indexar depois atribuiria a falha ao líder errado no log.
+ */
+function resumirItens(
+  texto: string,
+  emailNoIndice: (i: number) => string | undefined,
+): { itens: number; jaEntregues: number; falhas: { email: string; codigo: string }[] } {
+  let itens: ResultadoItemGomoon[] = [];
+  try {
+    itens = (JSON.parse(texto)?.resultados as ResultadoItemGomoon[]) ?? [];
+  } catch {
+    itens = [];
+  }
+  const falhas = itens
+    .map((i, idx) => ({
+      ok: i?.ok !== false,
+      email: i?.email ?? emailNoIndice(idx) ?? '(desconhecido)',
+      codigo: i?.codigo ?? 'erro_interno',
+    }))
+    .filter((i) => !i.ok)
+    .map(({ email, codigo }) => ({ email, codigo }));
+
+  return {
+    itens: itens.length,
+    jaEntregues: itens.filter((i) => i?.codigo === 'ja_entregue').length,
+    falhas,
+  };
+}
 
 /**
  * Monta e envia o snapshot diário ao Gomoon.
@@ -243,57 +342,137 @@ export async function notificarLideresPendentes(
     return { ...base, ...contagem, erro: 'GOMOON_TOKEN não configurado.' };
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    const texto = await resp.text().catch(() => '');
-    if (!resp.ok) {
-      // 400 = lote inteiro rejeitado (JSON/origem/ambiente/gerado_em) · 401 = token.
-      console.error(`[gomoon] POST recusado (${resp.status}): ${texto.slice(0, 500)}`);
-      return { ...base, ...contagem, status: resp.status, erro: texto.slice(0, 500) || `HTTP ${resp.status}` };
-    }
-
-    // 202 com resultado por item, na mesma ordem do array enviado (§3).
-    let itens: ResultadoItemGomoon[] = [];
-    try {
-      itens = (JSON.parse(texto)?.resultados as ResultadoItemGomoon[]) ?? [];
-    } catch {
-      itens = [];
-    }
-    // `ja_entregue` vem com ok:true — é o comportamento CORRETO quando o cron repete
-    // (§4), não uma falha. Contamos à parte para o log não parecer um problema.
-    const jaEntregues = itens.filter((i) => i?.codigo === 'ja_entregue').length;
-    const falhas = itens
-      .filter((i) => i?.ok === false)
-      .map((i, idx) => ({
-        email: i?.email ?? payload.lideres[idx]?.email ?? '(desconhecido)',
-        codigo: i?.codigo ?? 'erro_interno',
-      }));
-
-    if (falhas.length) {
-      console.error(
-        `[gomoon] ${falhas.length} líder(es) não entraram na fila:`,
-        falhas.map((f) => `${f.email}=${f.codigo}`).join(', '),
-      );
-    }
-    console.log(
-      `[gomoon] snapshot enviado (${ambiente}): ${contagem.lideres} líder(es), ` +
-        `${contagem.liderados} liderado(s), ${contagem.projetos} projeto(s) — HTTP ${resp.status}` +
-        (jaEntregues ? ` · ${jaEntregues} já entregue(s) hoje` : ''),
-    );
-    return { ...base, ...contagem, ok: true, status: resp.status, falhas, ja_entregues: jaEntregues };
-  } catch (e) {
-    const abortou = e instanceof Error && e.name === 'AbortError';
-    const msg = abortou ? `timeout de ${TIMEOUT_MS}ms` : e instanceof Error ? e.message : String(e);
-    console.error('[gomoon] falha ao enviar o snapshot:', msg);
-    return { ...base, ...contagem, erro: msg };
-  } finally {
-    clearTimeout(timer);
+  const resp = await postGomoon(url, token, payload);
+  if (resp.erro) {
+    return { ...base, ...contagem, status: resp.status, erro: resp.erro };
   }
+
+  // 202 com resultado por item, na mesma ordem do array enviado (§3).
+  const { jaEntregues, falhas } = resumirItens(resp.texto, (i) => payload.lideres[i]?.email);
+  if (falhas.length) {
+    console.error(
+      `[gomoon] ${falhas.length} líder(es) não entraram na fila:`,
+      falhas.map((f) => `${f.email}=${f.codigo}`).join(', '),
+    );
+  }
+  console.log(
+    `[gomoon] snapshot enviado (${ambiente}): ${contagem.lideres} líder(es), ` +
+      `${contagem.liderados} liderado(s), ${contagem.projetos} projeto(s) — HTTP ${resp.status}` +
+      (jaEntregues ? ` · ${jaEntregues} já entregue(s) hoje` : ''),
+  );
+  return { ...base, ...contagem, ok: true, status: resp.status, falhas, ja_entregues: jaEntregues };
+}
+
+// ─── Anúncio de abertura (uma vez, para a empresa) ────────────────────────────
+
+export type PayloadAnuncio = {
+  origem: 'godocs';
+  ambiente: 'producao' | 'staging';
+  gerado_em: string;
+  anuncio: {
+    /** SEM data (§13): entrega uma vez por pessoa, PARA SEMPRE. */
+    idempotency_key: string;
+    /**
+     * `'todos'` = o Gomoon expande pelo diretório do Workspace (decisão de
+     * 06/08/2026 — quem já resolve e-mail→usuário do Chat é ele). A forma de lista
+     * existe no contrato para um envio dirigido, mas não é a que usamos.
+     */
+    destinatarios: 'todos' | { email: string; nome?: string }[];
+    mensagem: MensagemPayload;
+  };
+};
+
+export type ResultadoAnuncio = {
+  ok: boolean;
+  dry: boolean;
+  ambiente: 'producao' | 'staging';
+  gerado_em: string;
+  chave: string;
+  status?: number;
+  /** Quantos itens o Gomoon reportou (0 quando ele processa a lista de forma assíncrona). */
+  itens: number;
+  /** Pessoas que já tinham recebido este anúncio — repetir o disparo NÃO reenvia (§13). */
+  ja_entregues: number;
+  /** Cortado em 20: num broadcast a lista inteira não caberia no corpo da resposta. */
+  falhas: { email: string; codigo: string }[];
+  falhas_total: number;
+  erro?: string;
+  payload?: PayloadAnuncio;
+};
+
+/** Monta o payload do anúncio. Função PURA (exportada para teste). */
+export function montarPayloadAnuncio(opts: {
+  ambiente: 'producao' | 'staging';
+  geradoEm: string;
+}): PayloadAnuncio {
+  return {
+    origem: 'godocs',
+    ambiente: opts.ambiente,
+    gerado_em: opts.geradoEm,
+    anuncio: {
+      idempotency_key: ANUNCIO_CHAVE,
+      destinatarios: 'todos',
+      mensagem: { texto: TEXTO_ANUNCIO_PRE_APROVACAO },
+    },
+  };
+}
+
+/**
+ * Dispara o anúncio de abertura da feature — **uma vez**, para a empresa.
+ *
+ * NÃO tem cron: é um evento único, disparado à mão pelo admin no dia em que a
+ * feature entra em produção (`POST /api/admin/anunciar-pre-aprovacao`). Repetir o
+ * POST é seguro — a chave sem data faz o Gomoon ignorar quem já recebeu (§13) —,
+ * mas não é para virar rotina.
+ *
+ * ⚠️ `ambiente` deriva do `GODOCS_ENV`, como no aviso diário, e aqui o risco é MAIOR:
+ * sem o campo, um teste da staging viraria DM para a empresa inteira.
+ *
+ * NUNCA lança. ⚠️ **`dry` é o DEFAULT** — ao contrário do aviso diário, enviar exige
+ * `{ dry: false }` EXPLÍCITO: uma chamada distraída aqui fala com a empresa inteira.
+ */
+export async function anunciarPreAprovacao(opts?: { dry?: boolean }): Promise<ResultadoAnuncio> {
+  const dry = opts?.dry !== false;
+  const ambiente = getGodocsEnv() === 'staging' ? 'staging' : 'producao';
+  const geradoEm = new Date().toISOString();
+  const payload = montarPayloadAnuncio({ ambiente, geradoEm });
+
+  const base: ResultadoAnuncio = {
+    ok: false,
+    dry,
+    ambiente,
+    gerado_em: geradoEm,
+    chave: ANUNCIO_CHAVE,
+    itens: 0,
+    ja_entregues: 0,
+    falhas: [],
+    falhas_total: 0,
+  };
+
+  if (dry) return { ...base, ok: true, payload };
+
+  const url = process.env.GOMOON_ANUNCIO_URL || URL_ANUNCIO_PADRAO;
+  const token = (process.env.GOMOON_TOKEN || '').trim();
+  if (!token) {
+    console.warn('[gomoon] GOMOON_TOKEN não configurado — anúncio NÃO enviado.');
+    return { ...base, erro: 'GOMOON_TOKEN não configurado.' };
+  }
+
+  const resp = await postGomoon(url, token, payload);
+  if (resp.erro) return { ...base, status: resp.status, erro: resp.erro };
+
+  const { itens, jaEntregues, falhas } = resumirItens(resp.texto, () => undefined);
+  console.log(
+    `[gomoon] anúncio "${ANUNCIO_CHAVE}" enviado (${ambiente}) — HTTP ${resp.status}, ` +
+      `${itens} item(ns), ${jaEntregues} já entregue(s), ${falhas.length} falha(s)`,
+  );
+  return {
+    ...base,
+    ok: true,
+    status: resp.status,
+    itens,
+    ja_entregues: jaEntregues,
+    falhas: falhas.slice(0, 20),
+    falhas_total: falhas.length,
+  };
 }
