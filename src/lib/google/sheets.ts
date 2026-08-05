@@ -2,6 +2,7 @@
 
 import { getAccessToken } from './auth';
 import { assertNaoEhDefaultDeProd } from '../env';
+import { chaveColuna } from '../coluna-chave';
 
 const DEFAULT_SPREADSHEET_ID = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const DEFAULT_SHEET_NAME = 'GoDocs';
@@ -144,27 +145,11 @@ export type HeaderMap = {
   letterByKey: Record<string, string>;
 };
 
-/**
- * Chave de comparação de um nome de coluna: minúsculas, SEM ACENTO, espaços
- * colapsados. Só para CASAR nomes — o nome escrito no código continua acentuado
- * (regra 4).
- *
- * ⚠️ Por que existe: o cabeçalho real é digitado à mão pela equipe e uma letra de
- * diferença fazia a coluna ser ignorada COM AVISO, em silêncio para quem usa o
- * app. Foi exatamente o que aconteceu com a pré-aprovação do líder: o cabeçalho
- * de prod e da staging tem "Justificativa Aprovação do **Lider**" (sem acento no
- * "i") e o código escreve "…do **Líder**" → o estado do parecer aparecia na
- * planilha e o checklist + a justificativa do gestor eram DESCARTADOS
- * (confirmado ao vivo em 04 e 05/08/2026).
- */
-export function chaveColuna(nome: string): string {
-  return String(nome ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // tira os acentos (marcas combinantes do NFD)
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
+// A regra de casamento de nome de coluna vive em `@/lib/coluna-chave` (módulo PURO):
+// o CLIENTE também precisa dela para achar a coluna do parecer do líder na ficha de
+// triagem, e este arquivo é server-only (importa `./auth`). Reexportada aqui porque os
+// chamadores e os testes de sempre a esperam neste módulo.
+export { chaveColuna };
 
 /**
  * Índice normalizado nome→X a partir de uma lista de nomes. Chave AMBÍGUA (dois
