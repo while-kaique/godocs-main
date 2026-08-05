@@ -44,8 +44,20 @@ produtos` **seguem isentos** (lideram 5 e 3 pessoas).
 
 **⚠️ Nada foi deployado** — staging e prod seguem com a régua antiga (D11). O código está só na branch.
 
+**Ainda nesta sessão — os 2 modelos de mensagem do bot + a API do Gomoon.** O Luis pediu os corpos para
+passar ao João Victor, e mandou o documento da API que ele **já construiu**. Ambos foram gravados em
+**`docs/integracao-gomoon-chat.md` §10 e §11**: (a) a mensagem de **abertura da feature** para a empresa e a
+de **projeto pendente** para o líder (sem R$, com a data do snapshot, variações de 1 projeto / 1 liderado);
+(b) os dados da API — `POST https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes`, `Bearer <token>`,
+400 na requisição inteira / 401 no token, **GET no mesmo endpoint devolve os últimos 50 itens** (auditoria
+do "não recebi", aceita `?email=`), e ele oferece **token separado de staging** que força modo de teste no
+servidor. ⚠️ **O nosso lado (F3) continua não existindo**: agregada em `projeto_aprovacoes` + cron das 6h
+(`0 9 * * 1-5`, o cron do Godeploy é UTC) + o POST. E falta **pedir o token** ao João Victor.
+
 **Próximo passo:** o Luis conferir a aba "Relação Líder-Liderado" na planilha de prod (quem recebe × quem
-não recebe); se estiver ok → **deploy na staging (`edf400b4`, regra 13)** → validar → prod → PR.
+não recebe) e mandar os 2 modelos da §10 ao João Victor; se a aba estiver ok → **deploy da D20 na staging
+(`edf400b4`, regra 13)** → validar → prod → PR. Depois disso, **F3** (agregada + cron + POST na API do
+Gomoon), que já tem endpoint e contrato prontos.
 
 ---
 

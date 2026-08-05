@@ -211,3 +211,92 @@ de bot não passa sem um token de bypass dedicado. É um projeto próprio, não 
 - [ ] Confirmação do admin do Workspace sobre a DM proativa do bot (§8.4)
 - [ ] Lista final dos códigos de erro devolvidos por item
 - [ ] Como consultar o log de entrega
+
+---
+
+## 10. Os 2 modelos de mensagem (redigidos pelo GoDocs, 05/08/2026)
+
+Pedido do Luis para passar ao João Victor. O template continua sendo **do Gomoon** (§7) —
+estes são os corpos sugeridos, já obedecendo as 3 regras acima (sem R$, com a data do
+snapshot, texto simples além do cartão).
+
+### 10.1 Abertura da feature (anúncio, uma vez, para a empresa)
+
+```
+*Novidade no GoDocs: os projetos agora passam por uma pré-aprovação do líder* 🚀
+
+A partir de agora, todo projeto submetido no GoDocs passa por uma *pré-aprovação
+do líder direto* antes de chegar à validação do time de RPA & IA.
+
+*Como funciona*
+• Você submete seu projeto no GoDocs normalmente — o formulário não mudou.
+• Seu líder direto é avisado por aqui e abre a fila dele em *GoDocs → Pré-aprovações*.
+• Ele confere o que você registrou e responde três perguntas rápidas: o projeto move
+  um indicador da área? a área sentiria falta se ele parasse de rodar? o ganho
+  declarado faz sentido?
+• Ele então *pré-aprova* ou *pede um ajuste*. Se pedir ajuste, você recebe exatamente
+  o que precisa corrigir e reenvia o projeto.
+
+*O que muda para você*
+• A pré-aprovação *não substitui* a validação do time de RPA & IA — ela acontece
+  antes, e traz o olhar de quem conhece a rotina da área de perto.
+• Quem tem cargo de coordenação para cima não passa por essa etapa: o projeto segue
+  direto para a validação.
+
+*Por que estamos fazendo isso*
+Para que cada projeto chegue à validação com o aval de quem vive o processo no dia a
+dia — menos retrabalho para todo mundo e um impacto declarado mais fiel à realidade
+da área.
+
+Dúvidas? É só chamar o time de RPA & IA ou usar o botão de ajuda dentro do GoDocs.
+```
+
+⚠️ O texto reflete a **D20**: a isenção é por CARGO (coordenação para cima) — se a régua
+mudar, esta mensagem muda junto.
+
+### 10.2 Projeto pendente de pré-aprovação (recorrente, bot → líder)
+
+Campos entre `{{ }}` são os do payload da §3.
+
+```
+*Você tem projeto para pré-aprovar no GoDocs* 📋
+
+Oi, {{lideres[].nome}}! {{total}} projetos da sua equipe estão aguardando a sua
+pré-aprovação:
+
+• {{liderados[].nome}} — {{liderados[].projetos_pendentes}} projeto(s)
+• {{liderados[].nome}} — {{liderados[].projetos_pendentes}} projeto(s)
+
+São três perguntas rápidas por projeto, e você pode *pré-aprovar* ou *pedir ajuste*
+na própria tela.
+
+👉 {{lideres[].url}}
+
+_Situação em {{gerado_em → DD/MM}} às 06h. Se você já decidiu depois disso, pode
+ignorar esta mensagem._
+```
+
+Variações: **1 projeto só** → *"Você tem *1 projeto* da {{nome}} aguardando a sua
+pré-aprovação"*, sem bullets; **1 liderado com vários** → mesma coisa, sem bullets.
+⚠️ `{{total}}` é a **soma** dos `projetos_pendentes` — o payload não manda o total pronto.
+
+---
+
+## 11. A API do Gomoon JÁ EXISTE (recebido do João Victor em 05/08/2026)
+
+Documento original: `C:\Users\Notebook\Downloads\Integração GoDocs → Gomoon → Google
+Chat — como consumir a API.md` (fora do repo). O que ele fixa:
+
+| Item | Valor |
+|---|---|
+| Endpoint | `POST https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes` — **um só para os 2 ambientes** |
+| Auth | `Authorization: Bearer <token>` |
+| Erros | **400** na requisição inteira (JSON inválido, origem ≠ `godocs`, ambiente inválido, `gerado_em` não parseável, `lideres` não-array) · **401** token ausente/errado |
+| Auditoria | o MESMO endpoint responde a **GET** com o mesmo token: últimos 50 itens, aceita `?email=` — é a resposta ao "o líder diz que não recebeu" (§8.6) |
+| Staging | ele oferece **token separado** que força modo de teste no servidor, independente do payload (torna impossível a staging cutucar líder real) — **basta pedir** |
+| Fora de escopo | decidir dentro do Chat (§9): o botão só abre a tela |
+
+⚠️ **Falta o nosso lado (F3):** a agregada em `projeto_aprovacoes` (`GROUP BY
+aprovador_email`) + o cron das 6h (UTC no Godeploy → `0 9 * * 1-5`) + o POST. Nada disso
+existe ainda. Pedir ao João Victor: **o token de produção** e, se formos usar staging, o
+**token separado** acima.
