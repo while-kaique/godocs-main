@@ -1,15 +1,16 @@
 # Pré-aprovação do líder (integração TeamGuide) — 03/08/2026
 
-> Status: **🟢 F0 + F1 + F2 implementadas** (03/08/2026) — a DM (F2) nasce atrás do
-> gate `GOOGLE_CHAT_DM_ENABLED` (ligar = trocar a env, sem redeploy de código).
-> Pendente: validação na staging → prod (regra 13) e a coluna do Sheets (P2). Autor do plano:
-> sessão Claude de 03/08/2026, a partir de investigação **ao vivo** contra
-> `https://api.teamguide.app` com o `TG_API_TOKEN` do `.env`.
+> Status: **🟢 F0 + F1 implementadas** (03/08/2026). ⚠️ **A F2 (envio da DM) foi
+> REMOVIDA do GoDocs em 05/08/2026 — ver D17**: notificar o líder passou a ser do
+> **Gomoon**, e o que fica aqui é abrir a fila. Pendente: o cron/POST para o Gomoon
+> (não codado), validação na staging → prod (regra 13) e as colunas do Sheets (P2).
+> Autor do plano: sessão Claude de 03/08/2026, a partir de investigação **ao vivo**
+> contra `https://api.teamguide.app` com o `TG_API_TOKEN` do `.env`.
 
-O liderado submete um projeto no GoDocs; o **líder direto** recebe uma **DM privada
-no Google Chat** (remetente `rpa_ia@gocase.com`) avisando, e **aprova dentro do
-próprio GoDocs** — a DM é só o carteiro, nunca o lugar da decisão. A relação
-líder↔liderado vem da **TeamGuide**.
+O liderado submete um projeto no GoDocs; o **líder direto** é avisado por **DM no
+Google Chat** (entregue pelo bot do **Gomoon**, D17) e **aprova dentro do próprio
+GoDocs** — a DM é só o carteiro, nunca o lugar da decisão. A relação líder↔liderado
+vem da **TeamGuide**.
 
 ---
 
@@ -24,8 +25,8 @@ líder↔liderado vem da **TeamGuide**.
 | **D5** | Área das pessoas nos nós de diretoria/passthrough = **nome do próprio nó** (`N1`, `BIZOPS`, `OPERAÇÕES`, `TIME JOAQUIM QUINDERE`…). | Fiel ao TeamGuide, zero nome inventado. Rejeitado: rótulo sintético "DIRETORIA" (não existe na fonte) e herdar a área de um filho (enganoso — Bruno Bezerra não é de "DADOS"). |
 | **D6** | **Autor sem líder** (só `rafael@gocase.com`, CEO) → projeto **não** entra em fila de aprovação nenhuma; vai direto pra triagem, sem erro e sem DM. | O topo da cadeia não tem quem aprove. Silenciar é o comportamento correto, não uma exceção a tratar. |
 | **D7** | A relação líder↔liderado é derivada de **`/teams` + membros**, **não** dos endpoints de liderança da TeamGuide. | Os endpoints "óbvios" (`/employees/{id}/leaders`, `/leaders/{id}/led`, `/employees/{id}/teams`) devolvem **403** com o nosso token (ver §2). A derivação pela árvore funciona hoje e cobre 431/432 pessoas. |
-| **D8** | Falha de DM **nunca** derruba a submissão (best-effort em `runBackground`). ⚠️ **A DM deixou de ser muda na staging em 03/08/2026** (decisão do Luis, para validar o fluxo real com o líder dele): o `edf400b4` ganhou `GOOGLE_CHAT_DM_ENABLED=true` + `CHAT_SA_*` + `GOOGLE_CHAT_DM_SUBJECT`. Consequência: **submeter na staging manda Chat de verdade para uma pessoa de verdade** — o link da mensagem usa o `APP_BASE_URL` da staging. Prod segue **sem** os secrets (DM no-op) até a decisão de ligar lá. | Mesmo padrão do widget de ajuda e do `sendChatNotification`. Submissão é o caminho crítico; notificação não é. |
-| **D9** | A DM sai de uma **credencial de Chat própria** (`CHAT_SA_*` no `.env`, impersonando `GOOGLE_CHAT_DM_SUBJECT` = `rpa_ia@gocase.com`), com **fallback para `GOOGLE_SA_*`** — o mesmo padrão do `GMAIL_SA_*`. | ✅ **Validada ao vivo em 03/08/2026**: a troca de JWT por `access_token` com `sub=rpa_ia@gocase.com` e os 2 escopos de Chat retornou OK (sem enviar mensagem). Logo a **F2 não está mais bloqueada** — a DWD da SA `godocs@` virou **faxina** (apagar 2 linhas do `.env`), não pré-requisito. ⚠️ A credencial fica **só no `.env`/secrets**; nada de chave em doc (ver §5.5). |
+| **D8** | ⚠️ **SUPERADA pela D17 (05/08/2026)** — não há mais envio de DM neste código; a submissão só abre a fila (o princípio "notificação nunca derruba a submissão" continua valendo, agora por construção). Texto original: Falha de DM **nunca** derruba a submissão (best-effort em `runBackground`). ⚠️ **A DM deixou de ser muda na staging em 03/08/2026** (decisão do Luis, para validar o fluxo real com o líder dele): o `edf400b4` ganhou `GOOGLE_CHAT_DM_ENABLED=true` + `CHAT_SA_*` + `GOOGLE_CHAT_DM_SUBJECT`. Consequência: **submeter na staging manda Chat de verdade para uma pessoa de verdade** — o link da mensagem usa o `APP_BASE_URL` da staging. Prod segue **sem** os secrets (DM no-op) até a decisão de ligar lá. | Mesmo padrão do widget de ajuda e do `sendChatNotification`. Submissão é o caminho crítico; notificação não é. |
+| **D9** | ⚠️ **SUPERADA pela D17 (05/08/2026)** — a credencial de Chat saiu do GoDocs junto do `chat-dm.ts`; quem autentica no Chat agora é o Gomoon. As linhas `CHAT_SA_*`/`GOOGLE_CHAT_DM_*` do `.env` e dos secrets do `edf400b4` viraram **faxina**. Texto original: A DM sai de uma **credencial de Chat própria** (`CHAT_SA_*` no `.env`, impersonando `GOOGLE_CHAT_DM_SUBJECT` = `rpa_ia@gocase.com`), com **fallback para `GOOGLE_SA_*`** — o mesmo padrão do `GMAIL_SA_*`. | ✅ **Validada ao vivo em 03/08/2026**: a troca de JWT por `access_token` com `sub=rpa_ia@gocase.com` e os 2 escopos de Chat retornou OK (sem enviar mensagem). Logo a **F2 não está mais bloqueada** — a DWD da SA `godocs@` virou **faxina** (apagar 2 linhas do `.env`), não pré-requisito. ⚠️ A credencial fica **só no `.env`/secrets**; nada de chave em doc (ver §5.5). |
 | **D10** | Aprovação é **por versão** do projeto: reenvio do liderado volta o veredito a pendente. | Aprovar a v1 não pode carimbar uma v2 com números diferentes. O `projeto_versions` já existe pra ancorar isso. |
 | **D11** | **Quem já É liderança está ISENTO** de pré-aprovação (decisão do Luis, 03/08/2026): o projeto dele não entra em fila nenhuma e não gera DM. Só o liderado "de fato" (quem não lidera time) precisa de aprovação — e quem aprova é o **líder direto**, nunca o líder do líder. | Não faz sentido uma liderança esperar o líder maior liberar o projeto dela. Ex.: o Lucas (coordenador de RPA) aprova o projeto do Luis (liderado dele), e o projeto do **Lucas** sai sem depender do Bruno; o Bruno, que também lidera, é isento pelo mesmo motivo. **Régua:** aparecer como `leader` de algum time ATIVO na TeamGuide (`ehLideranca`) — e não "tem liderados no índice", porque um time recém-criado pode ter líder e nenhum membro. |
 | **D12** | **Os 3 casos sem fila têm rótulo PRÓPRIO na coluna `Aprovação do Líder`** (decisão do Luis, 03/08/2026): liderança → **`Pré-aprovado (liderança)`** · autor sem líder → `Sem líder na TeamGuide` · TeamGuide fora → `Aprovação indisponível (integração)`. Nada disso toca a coluna `Status` nem o comportamento (segue sem fila e sem DM — D11/D6/D3). | Antes os 3 gravavam o mesmo `—` e a auditoria não distinguia a **isenção legítima** de uma **falha de integração** — mesmos sintoma e cara na planilha, causas opostas. O rótulo da liderança diz o **efeito** ("do lado do líder, liberado"), não um parecer: ninguém decidiu nada, porque o líder é o próprio autor — por isso `(liderança)` fica explícito no texto e a coluna `Status` continua "Pendente" pela regra temporária. Mora na função pura `rotuloIsencaoSheet(motivo)`; o `motivo` já vinha pronto do `abrirPreAprovacao`. **O card do autor NÃO ganha selo** (a feature segue invisível para quem é isento). |
@@ -34,6 +35,7 @@ líder↔liderado vem da **TeamGuide**.
 | **D14** | **DUAS colunas no Sheets: estado × justificativa** (decisão do Luis, 03/08/2026, commit `dc53193` — decisão que já estava no código e faltava aqui). **`Aprovação do Líder`** guarda **só o estado**, filtrável e sem texto livre — `Pré-aprovado` · `Pré-pendente` · `Pré-reprovado` · `—` —, e todo o detalhe (quem decidiu, quando, as 3 respostas do checklist, comentário do ajuste) vai na coluna **`Justificativa Aprovação do Líder`**. Puras e únicas: `rotuloAprovacaoSheet`/`justificativaAprovacaoSheet` (com fila) e `rotuloIsencaoSheet`/`justificativaIsencaoSheet` (sem fila). | Uma coluna com estado **e** prosa não filtra nem soma: a triagem não conseguia contar quantos projetos estão pré-aprovados sem ler cada célula. A D12 sobrevive intacta: liderança → estado `Pré-aprovado` + o motivo na justificativa; sem líder / TeamGuide fora → `—` no estado + justificativa própria (a distinção isenção × falha de integração continua legível). ⚠️ **A coluna `Justificativa Aprovação do Líder` precisa existir no cabeçalho** das abas `GoDocs` e `STAGING`, além da `Aprovação do Líder` — sem ela o valor é ignorado com aviso e o resto do sync segue. |
 | **D15** | **A fila é um SLIDER de um projeto por vez** (pedido do Luis, 04/08/2026): barra de posição no topo (`3 de 12` + um traço por projeto), **um** card na tela e, ao decidir, salto automático para o próximo **sem parecer**. ⚠️ **O total NÃO encolhe quando o líder decide** — a fila exibida é a de quando ele abriu a tela: o item decidido **fica** no slider em modo leitura (faixa "Você pré-aprovou…" + checklist desabilitado), e o `useEffect` que sincroniza com o servidor é **append-only** (só acrescenta projeto novo, nunca remove). | Com 12 projetos empilhados o líder rolava a tela procurando onde parou e não sabia quanto faltava — o oposto do "mais fácil, rápido e intuitivo possível" do D13. **Por que o total é estável:** se a lista encolhesse a cada parecer, "3 de 12" viraria "3 de 11" no meio do caminho (a referência de progresso mudaria de significado a cada clique) e o líder não poderia voltar para rever o que registrou. O cache do React Query **perde** o item decidido (a fila do servidor não o traz mais) — quem preserva é o estado local do slider. Navegação: botões no topo e no pé do card + setas `←`/`→` do teclado (ignoradas dentro de campos de texto, senão brigariam com o cursor da caixa de ajuste). Fila **> 20** projetos → os traços viram barra de progresso (40 traços de 3px não se clicam nem se leem). Animação reusa `go-step-in`/`go-step-in-back` das etapas do formulário (mesmo gesto de "avançar" do resto do produto) e o **estado nunca fica só na cor do traço**: a contagem "2 pré-aprovados · 1 ajuste pedido" está escrita e cada traço tem `aria-label`/`title` com nome do projeto + situação. |
 | **D16** | **"Não" no checklist + pré-aprovar → a explicação é OBRIGATÓRIA** (pedido do Luis, 04/08/2026). Clicar em **Pré-aprovar** com qualquer uma das 3 perguntas em "Não" **não grava direto**: abre uma caixa ("Por que você pré-aprova mesmo com 'Não' em …?") e o texto entra no **mesmo campo `comentario`**, indo para a coluna **`Justificativa Aprovação do Líder`** junto do resumo do checklist (D14). Régua na FONTE ÚNICA `exigeJustificativa(veredito, respostas)` / `temNaoNoChecklist` (`src/lib/aprovacoes-checklist.ts`), consumida pela tela **e cobrada no servidor** (`decidirAprovacao` → 400) — o frontend nunca é a garantia. Pedir ajuste continua exigindo texto sempre; checklist todo "Sim" continua pré-aprovando em 1 clique. | Um "Não" segue **não sendo veto** (D13), mas passava batido: o líder marcava "o saving não é coerente" e carimbava sem uma palavra, e a triagem recebia a contradição sem explicação — o oposto do motivo de existir o checklist (transformar o parecer em informação). Reusa o campo `comentario` em vez de criar coluna nova: os dois textos são "o que o líder escreveu ao decidir", e a justificativa já concatena checklist + comentário. |
+| **D17** | **A ENTREGA da DM sai do GoDocs e vira responsabilidade do GOMOON** (decisão do Luis, 05/08/2026). O GoDocs **não fala mais com a API do Google Chat**: `src/lib/google/chat-dm.ts`, o disparo dentro do `abrirPreAprovacao` e os construtores de mensagem/cartão (`mensagemDmAprovacao`, `corpoDmAprovacao`) foram **removidos**, junto dos secrets `GOOGLE_CHAT_DM_ENABLED` / `CHAT_SA_*` / `GOOGLE_CHAT_DM_SUBJECT`. No lugar entra **1 POST/dia às 6h (BRT)** com um **snapshot da RELAÇÃO** líder↔liderados-com-pendência (por líder: e-mail, nome, `url` da fila e os liderados com a contagem de projetos); o Gomoon enfileira, monta a mensagem, decide a hora e entrega pelo bot dele. Contrato completo em **`docs/integracao-gomoon-chat.md`**. ⚠️ **A submissão não notifica mais nada** — ela só ABRE a fila; e o mute dos projetos `[E2E-…]` passa a ser de quem monta o payload (por isso o teste agora afirma que projeto E2E **entra** na fila). **Ainda NÃO codado:** a agregada (`GROUP BY aprovador_email`), o cron e o POST. | O que quebrava era sempre a **entrega**, e ela dependia de coisas que não são nossas: a DWD de Chat existe só na SA `planilha-jg@` (a `godocs@` dá `401 unauthorized_client`), o `spaces:setup` + JWT na mão eram 190 linhas de infra alheia ao produto, e retentativa exigiria estado de entrega no nosso SQLite — estado que não é nosso. Quem sabe se o cartão renderizou, se o bot está instalado e se vale retentar é quem fala com o Chat. **Ganho de segurança:** mandando só a relação, é **impossível** um valor de saving vazar numa DM (o payload não carrega R$). **Preço aceito:** o número envelhece entre o snapshot das 6h e a entrega deles (o 1º líder que decide resolve para todos — D4), então a mensagem precisa dizer "situação em DD/MM às 06h"; e a copy do cartão passa a ser mantida por eles. |
 ---
 
 ## 2. O que a API TeamGuide realmente entrega (verificado ao vivo, 03/08/2026)
@@ -205,21 +207,31 @@ paginação parando em página repetida.
   cabeçalho** das abas `GoDocs` e `STAGING` (pré-requisito P2 do Luis) — sem ela o valor
   é ignorado com aviso e o resto do sync segue normal.
 
-### F2 — DM privada no Google Chat — ✅ **implementada 03/08/2026** (atrás do gate)
+### F2 — envio da DM — ❌ **REMOVIDA do GoDocs em 05/08/2026 (D17)**
 
-> Como aterrissou: `src/lib/google/chat-dm.ts` (novo) — `enviarDmChat(email, texto)` faz
-> `spaces:setup` (idempotente, `DIRECT_MESSAGE`) + `POST /messages`, com token próprio
-> (SA `CHAT_SA_*` → fallback `GOOGLE_SA_*`, impersonando `GOOGLE_CHAT_DM_SUBJECT`).
-> **Nunca lança** — devolve `false` e loga. Disparo em `runBackground` dentro de
-> `abrirPreAprovacao`. Envs documentadas no `.env.example`.
+Foi implementada em 03/08/2026 (`src/lib/google/chat-dm.ts` + `corpoDmAprovacao`, DM real
+validada na staging e recebida pelo Lucas) e **desmontada em 05/08/2026**: entregar a DM
+é do **Gomoon**. O que saiu do repo: `src/lib/google/chat-dm.ts`, o disparo dentro do
+`abrirPreAprovacao`, `mensagemDmAprovacao`/`corpoDmAprovacao`/`urlDaFila` e as assertivas
+de DM em `tests/aprovacoes-lider.test.ts`.
 
-- Gate `GOOGLE_CHAT_DM_ENABLED` (`!= "true"` → no-op silencioso): é assim que a staging
-  fica muda e que o rollout em prod é uma troca de env, sem redeploy de código (D8).
-- Guard: destino `==` subject → no-op (a API não abre DM consigo mesmo), não falha.
-- Mudo para projetos de teste E2E (`ehProjetoTesteE2E`), igual ao Chat atual.
-- ⚠️ O `chat-dm.ts` NÃO reusa o `createSignedJwt` do `auth.ts` (que é privado ao
-  módulo) — repete só o mint do JWT, com os escopos de Chat. Se um dia o `auth.ts`
-  exportar o helper, é uma boa faxina.
+⚠️ **Não reimplementar aqui.** O caminho novo é o **F3**.
+
+### F3 — POST diário da relação para o Gomoon — ⏳ **não codado** (contrato fechado)
+
+Contrato em **[docs/integracao-gomoon-chat.md](../docs/integracao-gomoon-chat.md)** (documento
+escrito para o time do Gomoon; é a fonte). Resumo do que falta construir do nosso lado:
+
+- **Agregada** em `projeto_aprovacoes`: `WHERE veredito='pendente'` + `GROUP BY
+  aprovador_email`, devolvendo por líder os liderados (`autor_email`) e a contagem de
+  projetos. O `contarAprovacoesPendentesDe` (já existente, hoje sem chamador) é o
+  embrião — a agregada nova o substitui em uma consulta.
+- **Cron** diário 6h BRT → **`0 9 * * 1-5` (o cron do Godeploy é UTC)**.
+- **POST** com o snapshot completo (`lideres: []` em dia sem pendência), `Authorization:
+  Bearer` de um secret novo, e chave de idempotência `godocs:<email>:<YYYY-MM-DD>`.
+- **Excluir os projetos `[E2E-…]`** ao montar o payload — o mute deixou de existir no
+  `abrirPreAprovacao` (é lá que estava, via `ehProjetoTesteE2E`).
+- **Sem R$ no payload**, por decisão: o dado sensível não sai do app.
 
 
 ---
@@ -258,11 +270,12 @@ paginação parando em página repetida.
 |---|---|---|
 | ~~P1~~ | ~~**DWD da SA `godocs@admin-n8n-study`**~~ — **RESOLVIDA por outro caminho (03/08/2026)**: a credencial `CHAT_SA_*` do `.env` já tem os escopos `chat.spaces` + `chat.messages.create` com `sub=rpa_ia@gocase.com`, validada ao vivo (D9). Pedir a DWD da SA `godocs@` virou opcional — se um dia sair, é só apagar as 2 linhas `CHAT_SA_*` e cair no fallback `GOOGLE_SA_*`. | — (era: Admin do Workspace) |
 | P2 | Criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`. | Luis |
-| P3 | Confirmar que `rpa_ia@gocase.com` existe e tem **Google Chat ativo** (é o remetente impersonado). | Luis / TI |
+| ~~P3~~ | ~~Confirmar que `rpa_ia@gocase.com` tem **Google Chat ativo**~~ — **caducou com a D17**: não impersonamos mais caixa nenhuma. | — |
+| P4 | **Gomoon (D17):** URL do endpoint (prod + staging), token, confirmação do admin do Workspace de que o bot faz **DM proativa** (exige o Chat app instalado para a org), códigos de erro e como consultar o log de entrega. Checklist em `docs/integracao-gomoon-chat.md` §10. | Luis + time Gomoon |
+| P5 | **Faxina de secrets:** apagar `GOOGLE_CHAT_DM_ENABLED`, `CHAT_SA_CLIENT_EMAIL`, `CHAT_SA_KEY_BASE64` e `GOOGLE_CHAT_DM_SUBJECT` do `edf400b4` e do `.env` local (inertes desde a D17). | Luis |
 
-**F0 e F1 não dependem de nada disso** e podem ir a staging → prod antes.
-F2 nasce atrás do gate `GOOGLE_CHAT_DM_ENABLED=false` — mas por **cautela de
-rollout** (D8), não por bloqueio de credencial: ligar é trocar a env.
+**F0 e F1 não dependem de nada disso** e podem ir a staging → prod antes. **F3** (o POST
+diário) depende só da P4.
 
 ---
 
@@ -270,8 +283,9 @@ rollout** (D8), não por bloqueio de credencial: ligar é trocar a env.
 
 1. **Staging** (`edf400b4`, regra 13): validar a submissão de um liderado (fila abre +
    coluna "Pendente com X"), a de uma liderança (isento, coluna "—"), a fila em
-   `/aprovacoes`, o aprovar e o pedir-ajuste. `GOOGLE_CHAT_DM_ENABLED` fica **false**.
+   `/aprovacoes`, o aprovar e o pedir-ajuste. **Nenhuma notificação sai** (D17).
 2. **Coluna do Sheets** (P2) antes de validar a planilha — sem ela o valor é ignorado
    com aviso (o resto do sync não quebra).
-3. **Prod** (`674a3710`) e, num segundo momento, ligar `GOOGLE_CHAT_DM_ENABLED=true`
-   nos secrets (rollout da DM separado do rollout da tela).
+3. **Prod** (`674a3710`) — travado até a validação com a diretoria (decisão do Luis,
+   03/08/2026). O rollout do aviso ao líder é **independente** da tela: só acontece
+   quando a F3 existir e o Gomoon tiver o endpoint de pé (P4).

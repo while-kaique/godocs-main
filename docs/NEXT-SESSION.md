@@ -4,6 +4,40 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+## 🚚 05/08 (última sessão) — D17: o aviso ao líder SAI do GoDocs e vai para o bot do GOMOON
+
+**Decisão do Luis nesta sessão (D17):** o GoDocs **não fala mais com a API do Google Chat**. Quem entrega a
+DM é o **bot do Gomoon**; nós mandamos **1 POST/dia às 6h BRT** com um **snapshot da RELAÇÃO**
+líder↔liderados-com-pendência e **só isso** (por líder: e-mail, nome, `url` da fila, liderados + contagem de
+projetos). O Gomoon enfileira, monta a mensagem, decide a hora e entrega.
+
+**Escrito:** **`docs/integracao-gomoon-chat.md`** (novo) — contrato fechado **para mandar ao time deles**: payload,
+resposta por item, idempotência, ambientes, regras de copy e o que eles precisam provisionar.
+
+**Removido do código (feito, 936 testes verdes, `worker.js` rebuildado):** `src/lib/google/chat-dm.ts`
+(deletado) · o disparo dentro do `abrirPreAprovacao` · `corpoDmAprovacao`/`mensagemDmAprovacao`/`urlDaFila` ·
+os asserts de DM nos testes · as 4 envs de DM do `.env.example`. Docs atualizados: **D17 + F3 na
+`SPEC_APROVACAO_LIDER.md`** (D8/D9 marcadas como superadas, F2 = "REMOVIDA, não reimplementar"), gotcha (9) do
+`CLAUDE.md`, `docs/staging.md` (**a staging voltou a ser 100% muda**).
+
+> ♻️ **REUSO ÓBVIO para a F3 — não recomeçar do zero:** o relatório desta MESMA data
+> (`scripts/dryrun-lider/relatorio-sheet.ts`, bloco 📗 abaixo) já monta a relação líder → liderados →
+> projetos pendentes. A F3 é a mesma agregação virando **1 consulta SQL** (`projeto_aprovacoes`,
+> `veredito='pendente'`, `GROUP BY aprovador_email`) + cron + POST.
+
+**O que falta (F3, não codado)** — agregada + cron (**`0 9 * * 1-5`: o cron do Godeploy é UTC**) + POST com
+`Authorization: Bearer`; **sem R$ no payload**; idempotência `godocs:<email>:<YYYY-MM-DD>` (POST repetido
+SUBSTITUI, nunca acumula); dia sem pendência manda `lideres: []`; **excluir `[E2E-…]` ao montar o payload**
+(o mute saiu do `abrirPreAprovacao` — há teste afirmando que projeto E2E agora ENTRA na fila); staging com
+endpoint/token próprio.
+
+**Bloqueio externo (P4):** a F3 só liga quando o Gomoon devolver URL + token + a confirmação do admin do
+Workspace de que o bot faz **DM proativa** (exige o Chat app instalado para a org inteira). **P5:** apagar
+os 4 secrets de DM do `edf400b4` (inertes desde agora).
+
+⚠️ **Tudo isto está na worktree `worktree-plano-aprovacao-lider-teamguide`, COMMITADO nesta sessão e SEM
+push** (a branch segue travada para prod até a validação com a diretoria).
+
 > ## 📗 05/08 — RELATÓRIO na aba "Relação Líder-Liderado" (planilha de PROD) para a gestão avaliar
 >
 > Pedido do Luis: "meu chefe precisa ver de forma organizada e avaliar se está tudo certo". Gerador em

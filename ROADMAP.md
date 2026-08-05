@@ -125,7 +125,15 @@ dele (poluía a tela) — quem informa é a caixa, no clique.
 **3 botões** (Pré-aprovar verde · Pedir ajuste âmbar · Reprovar vermelho), com `ajuste` separado de
 `reprovado` no veredito e no Sheets. Falta ele validar essa rodada.
 
-**Próximo:** **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
+**05/08 (D17):** o **envio da DM saiu do GoDocs** — quem entrega é o **bot do Gomoon**, a partir de 1 POST/dia
+(6h BRT) com a relação líder↔liderados pendentes. Contrato fechado em **`docs/integracao-gomoon-chat.md`**
+(pronto para mandar ao time deles); `chat-dm.ts` + o disparo na submissão + o cartão **removidos** (936 testes
+verdes). A **F3** (agregada + cron + POST) **não está codada** e depende do endpoint/token deles (P4 da spec).
+Efeito colateral bom: a staging voltou a ser **100% muda**.
+
+**Próximo:** **mandar o `docs/integracao-gomoon-chat.md` ao time do Gomoon** e obter URL + token + a
+confirmação do admin do Workspace sobre a **DM proativa do bot** (P4) — sem isso a F3 não tem onde postar. Em
+paralelo, segue de pé: **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
 paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
 populada com 2 projetos mockados justamente para ele ver a tela com mais de um pendente, e desde 04/08 à
