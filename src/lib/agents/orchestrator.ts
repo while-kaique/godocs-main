@@ -755,8 +755,18 @@ export const MIN_SECAO_CRITERIO = 60;
 // staging): vira zona cinzenta no analisador, nunca reprovação automática.
 // Exportada porque o gate determinístico (chat.functions.ts) usa a MESMA régua para
 // decidir se a resposta do usuário já trouxe a fonte ou se o nudge precisa cobrá-la.
+//
+// ⚠️ SEM verbo solto ("onde"/"conferi"/"verific"/"acompanh"/"rastrea") sem um SUBSTANTIVO de
+// fonte ao lado: verbo sozinho casa qualquer frase que fale de verificação, mesmo apontando
+// só para o próprio arquivo de entrada/saída da automação (ex.: "isso pode ser conferido no
+// CSV exportado e no PNG gerado pela automação" — o entregável, não um ponteiro real). Isso
+// deixava a seção passar como preenchida sem o usuário ter dito onde o número se confere; o
+// LLM respondia por ele mesmo e o gate nunca perguntava. NÃO é o mesmo caso do "no sistema" ×
+// "no Metabase" (SPEC_CRITERIOS_PROJETO): "sistema" nomeia ALGO, ainda que vago; um verbo sem
+// substância não nomeia nada. "não sei onde conferir" continua intacto — vai por
+// REGISTRO_AUSENCIA_FONTE, que roda ANTES desta lista.
 export const PISTA_ONDE_VERIFICAR =
-  /onde|conferi|verific|acompanh|rastrea|relat[óo]ri|painel|dashboard|planilha|sistema|base\b|banco de dados|metabase|erp|protheus|sheets?|extrato|fatura|contrato|nota fiscal|log\b|ticket|chamado|indicador|kpi|m[ée]trica|n[ãa]o soube|n[ãa]o sabe|n[ãa]o foi informad|sem fonte|n[ãa]o h[áa] (uma )?fonte/i;
+  /relat[óo]ri|painel|dashboard|planilha|sistema|base\b|banco de dados|metabase|erp|protheus|sheets?|extrato|fatura|contrato|nota fiscal|log\b|ticket|chamado|indicador|kpi|m[ée]trica|n[ãa]o soube|n[ãa]o sabe|n[ãa]o foi informad|sem fonte|n[ãa]o h[áa] (uma )?fonte/i;
 
 // REGISTRO EXPLÍCITO de que não há onde conferir — subconjunto declarado da
 // PISTA_ONDE_VERIFICAR, separado porque merece uma régua de COMPRIMENTO diferente.

@@ -192,6 +192,32 @@ describe("secaoPonteiroVaga — ausência registrada dispensa o piso de comprime
   it("seção completa com fonte NOMEADA continua passando (não houve regressão)", () => {
     expect(secaoPonteiroVaga(extrairPonteiroMovido(memorialCompleto))).toBe(false);
   });
+
+  it("caso real (05/08/2026): o LLM aponta pro próprio arquivo da automação, sem ponteiro — segue vago", () => {
+    // Observado em conversa real simulando a "nuvem de palavras" (o caso-âncora que
+    // originou toda a régua de critério): o LLM escreveu a seção [1.4] por conta própria,
+    // sem NUNCA perguntar, e o texto passava antes da correção — só porque "conferido"
+    // casava o verbo solto "conferi". O que ele apontou é o CSV de entrada e o PNG de
+    // saída da PRÓPRIA automação (o entregável), não um ponteiro de custo/receita/KPI.
+    const autorrespondido =
+      "Ponteiro movido: tempo operacional da área, reduzindo o esforço manual para " +
+      "preparar o material de encerramento do evento. Isso pode ser conferido no próprio " +
+      "CSV exportado do formulário e no arquivo PNG gerado pela automação.";
+    expect(REGISTRO_AUSENCIA_FONTE.test(autorrespondido)).toBe(false);
+    expect(secaoPonteiroVaga(autorrespondido)).toBe(true);
+  });
+
+  it("verbo solto sem substantivo de fonte não basta (regressão do bug do 'conferido')", () => {
+    for (const t of [
+      "Isso é acompanhado de perto pelo time toda semana, sem falta nenhuma vez.",
+      "O resultado pode ser conferido facilmente por qualquer pessoa da equipe interessada.",
+      "É possível rastrear o histórico completo dessa mudança ao longo do tempo todo.",
+    ]) {
+      expect(t.length).toBeGreaterThanOrEqual(MIN_SECAO_CRITERIO);
+      expect(REGISTRO_AUSENCIA_FONTE.test(t)).toBe(false);
+      expect(secaoPonteiroVaga(t)).toBe(true);
+    }
+  });
 });
 
 describe("estado do gate no tipo", () => {
