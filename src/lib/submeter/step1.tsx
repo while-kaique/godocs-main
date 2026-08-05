@@ -346,6 +346,7 @@ export function Step1({
                   <FormInput
                     type="text"
                     placeholder="Ex: Zapier, Make, HubSpot, Salesforce..."
+                    maxLength={200} /* = `servico_externo` no schema */
                     value={form.servicoExterno}
                     onChange={(e) => updateField("servicoExterno", e.currentTarget.value)}
                     error={errors.servicoExterno}
@@ -369,6 +370,10 @@ export function Step1({
                       </label>
                       <FormInput
                         placeholder="Nome da ferramenta..."
+                        /* 192 = 200 do schema (`ferramenta`) − os 8 chars do prefixo
+                           "Outros: " que o submeter concatena. Sem esta trava o backend
+                           devolvia erro de validação depois de tudo preenchido. */
+                        maxLength={192}
                         value={form.ferramentaOutra}
                         onChange={(e) => updateField("ferramentaOutra", e.currentTarget.value)}
                         error={errors.ferramentaOutra}
