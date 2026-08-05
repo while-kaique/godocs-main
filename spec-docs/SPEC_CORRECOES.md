@@ -1588,3 +1588,60 @@ custo evitado. O agente chegou a estranhar a natureza do valor ("ressarcimento �
 receita incremental — confirme se devo excluir"), a autora reafirmou e ele aceitou (comportamento previsto:
 argumenta 1×, aceita a discordância) — mas **nunca disse que o valor já estava contabilizado no saving**,
 porque não olhou. Enquanto esse gate não existir, o padrão pode se repetir.
+
+---
+
+## Motivo da reprovação ilegível no card de "Meus Projetos" (05/08/2026)
+
+**Sintoma.** O autor de um projeto reprovado via o motivo escrito pelo analisador/triagem como um bloco de
+texto cinza minúsculo e apertado, e o card ficava desproporcionalmente alto. Relato do usuário: *"a
+justificativa fica um texto cinza de forma gigante e apertada, horrível de ler"*.
+
+**Causa.** Três problemas somados no mesmo bloco (`AvisoPendencia`, então local a `meus-projetos.tsx`):
+
+1. **Tipografia e medida.** 11px com `leading-snug` (~1,375) e `#334155` a 90% de opacidade sobre fundo
+   tingido. O bloco ocupava a largura disponível sem teto de medida → 120+ caracteres por linha em desktop.
+2. **Zero hierarquia.** O texto institucional ("a análise concluiu que…") e o motivo REAL saíam no MESMO
+   tamanho, num único `<span>` corrido, com "Motivo:" como rótulo *run-in*. O que o autor precisa ler estava
+   enterrado no que ele não precisa.
+3. **Sem teto de altura.** A coluna "Motivo Reprovado" aceita **4000 caracteres** (`dashboard-admin.functions.ts`)
+   e a triagem escreve texto livre com quebras de linha. Um único projeto reprovado deixava o card ~8x mais
+   alto que os vizinhos e a lista deixava de ser escaneável.
+
+E um quarto, que só apareceu no ambiente real (o mock em largura livre não reproduziu): o bloco vivia
+**dentro da coluna esquerda** do cabeçalho do card, que a fileira de 4 botões da direita esmaga para ~250px.
+Qualquer teto de medida era irrelevante — o texto virava uma tira de ~30 caracteres por linha. O mesmo
+esmagamento cortava o **nome do projeto** em ~28 caracteres, numa "barreira invisível": o espaço à direita do
+nome está livre (os botões ficam na linha de baixo), mas o flex não reflui em volta do texto.
+
+**Fix.** `AvisoPendencia` extraído para `src/components/aviso-pendencia.tsx` como fonte única dos 3 tons
+(legado · reenvio · reprovado), consumido pela lista e por `/projeto/$id` — que redigiam blocos separados,
+com tamanhos divergentes (11px × 12,5px). O bloco foi reposicionado como **parecer**, não alerta:
+
+- **Estado padrão = tira de UMA LINHA** (ícone + veredito + "Ver motivo"/"Ver o que ajustar"); o parecer abre
+  no clique. A tira INTEIRA é o `<button aria-expanded>` — alvo de clique generoso e um único stop de teclado.
+- Aberto: o motivo ganha **superfície própria** (placa clara sobre o painel tingido), **13px/1.6 em slate-800**
+  e medida travada em **72ch**; o texto institucional vai para baixo, em 11,5px.
+- **Ordem invertida:** veredito → motivo → texto institucional.
+- Os avisos saíram da linha do cabeçalho (agora abaixo, na largura inteira do card) e o **nome do projeto
+  ganhou linha própria**.
+- Rótulo da placa nomeia QUEM escreveu ("Parecer da análise") em vez de repetir "reprovado", que o selo de
+  status e o título da tira já dizem.
+
+**Decisões que não podem regredir:**
+- ⚠️ **Não abrir por padrão.** Foi a primeira tentativa (painel aberto com clamp de 4 linhas +
+  `ResizeObserver` medindo o transbordo) e o usuário **reprovou**: *"o card fica gigante com essa aba cinza"*.
+  O clamp resolvia o texto de 4000 caracteres, mas não o volume no estado de repouso. Com tudo colapsado, a
+  lógica de medição deixou de existir — não a reintroduza.
+- ⚠️ **O nome do projeto NÃO volta para a linha dos botões** (o truncate voltaria a cortar em ~28 chars). O
+  `truncate` fica como rede para nome absurdo, agora em ~90 caracteres.
+- ⚠️ **Estado nunca só por cor** (regra 11): ícone + rótulo escrito em todos os tons.
+
+**Onde aterrissou:** `src/components/aviso-pendencia.tsx` (novo) · `src/routes/meus-projetos.tsx` ·
+`src/routes/projeto.$id.tsx` · `CLAUDE.md` (bullet "Três estados de pendência").
+
+**Ponto cego de validação.** A tela `/projeto/$id` **não foi exercitada no staging**: ela não lê o Sheets (por
+decisão, ver comentário em `meus-projetos.functions.ts`) e usa o espelho SQLite `motivo_reprovacao` escrito
+pelo analisador; os projetos semeados para o teste visual existiam só na planilha, então o bloco não
+renderizava lá. O componente é o mesmo da lista, mas a tela de detalhe só foi verificada por leitura de
+código. Mobile também só por raciocínio de CSS (o `resize_window` do Chrome não pegou).
