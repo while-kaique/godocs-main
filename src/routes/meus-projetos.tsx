@@ -8,7 +8,20 @@ import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, RotateCcw, Users, X, Archive } from "lucide-react";
+import {
+  FileText,
+  PencilLine,
+  Eye,
+  Trash2,
+  Loader2,
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Users,
+  X,
+  Archive,
+} from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -173,7 +186,10 @@ function DistribuirEdicaoModal({
               <Users style={{ width: 18, height: 18 }} />
             </span>
             <div className="min-w-0">
-              <h2 className="font-extrabold leading-tight" style={{ color: "var(--go-text-heading)", fontSize: 16 }}>
+              <h2
+                className="font-extrabold leading-tight"
+                style={{ color: "var(--go-text-heading)", fontSize: 16 }}
+              >
                 Quem pode editar
               </h2>
               <p className="mt-0.5 truncate text-[12px]" style={{ color: "#8b8b9a" }}>
@@ -195,8 +211,9 @@ function DistribuirEdicaoModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <p className="text-[12.5px] leading-snug" style={{ color: "#6b6b7a" }}>
-            Escolha quais participantes podem <span className="font-semibold">editar e reenviar</span> este
-            projeto como se fossem você. Como autor, você sempre pode editar.
+            Escolha quais participantes podem{" "}
+            <span className="font-semibold">editar e reenviar</span> este projeto como se fossem
+            você. Como autor, você sempre pode editar.
           </p>
 
           {participantes.length === 0 ? (
@@ -224,7 +241,10 @@ function DistribuirEdicaoModal({
                         border: `1px solid ${checked ? "rgba(0,89,169,0.25)" : "rgba(0,0,0,0.1)"}`,
                       }}
                     >
-                      <span className="min-w-0 truncate text-[13px] font-medium" style={{ color: "var(--go-text-heading)" }}>
+                      <span
+                        className="min-w-0 truncate text-[13px] font-medium"
+                        style={{ color: "var(--go-text-heading)" }}
+                      >
                         {m}
                       </span>
                       {/* Switch visual */}
@@ -247,12 +267,19 @@ function DistribuirEdicaoModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 border-t px-6 py-4" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+        <div
+          className="flex justify-end gap-2 border-t px-6 py-4"
+          style={{ borderColor: "rgba(0,0,0,0.06)" }}
+        >
           <button
             type="button"
             onClick={onClose}
             className="rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-            style={{ background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.12)" }}
+            style={{
+              background: "transparent",
+              color: "#8b8b9a",
+              border: "1px solid rgba(0,0,0,0.12)",
+            }}
           >
             Cancelar
           </button>
@@ -331,9 +358,14 @@ function ConfirmDescontinuarModal({
         {/* Faixa de alerta */}
         <div
           className="flex items-center gap-2.5 px-5 py-3.5"
-          style={{ background: "rgba(245,158,11,0.12)", borderBottom: "1.5px solid rgba(245,158,11,0.25)" }}
+          style={{
+            background: "rgba(245,158,11,0.12)",
+            borderBottom: "1.5px solid rgba(245,158,11,0.25)",
+          }}
         >
-          <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden>⚠️</span>
+          <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden>
+            ⚠️
+          </span>
           <span
             id="descontinuar-modal-title"
             className="text-[14px] font-extrabold"
@@ -346,13 +378,15 @@ function ConfirmDescontinuarModal({
         {/* Corpo */}
         <div className="px-5 py-4">
           <p className="text-[13px] leading-relaxed" style={{ color: "var(--go-text-heading)" }}>
-            Tem certeza que deseja marcar{" "}
-            <strong>{nome ? `"${nome}"` : "este projeto"}</strong> como{" "}
-            <strong style={{ color: "#b45309" }}>descontinuado</strong>?
+            Tem certeza que deseja marcar <strong>{nome ? `"${nome}"` : "este projeto"}</strong>{" "}
+            como <strong style={{ color: "#b45309" }}>descontinuado</strong>?
           </p>
-          <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--go-text-muted, #6b6b7a)" }}>
-            Os pontos no <strong>GoMoon</strong> deixarão de contar para este projeto e ele
-            não será mais considerado um projeto ativo. Você pode reativá-lo depois.
+          <p
+            className="mt-2.5 text-[13px] leading-relaxed"
+            style={{ color: "var(--go-text-muted, #6b6b7a)" }}
+          >
+            Os pontos no <strong>GoMoon</strong> deixarão de contar para este projeto e ele não será
+            mais considerado um projeto ativo. Você pode reativá-lo depois.
           </p>
         </div>
 
@@ -390,13 +424,19 @@ function MeusProjetosPage() {
   // React Query cacheia a lista (que lê o Sheets, ~9s). staleTime de 60s: voltar da
   // tela de visualização para cá dentro desse intervalo serve do cache — sem spinner
   // nem nova leitura da planilha. O QueryClient é estável entre navegações SPA.
-  const { data: projetos = [], isLoading: loading, error } = useQuery({
+  const {
+    data: projetos = [],
+    isLoading: loading,
+    error,
+  } = useQuery({
     queryKey: ["meus-projetos"],
     queryFn: () => apiFetch<Projeto[]>("/api/meus-projetos"),
     staleTime: 60_000,
   });
   const erro = error
-    ? (error instanceof Error ? error.message : "Erro ao carregar projetos.")
+    ? error instanceof Error
+      ? error.message
+      : "Erro ao carregar projetos."
     : null;
   // Abre em "Todos" (tudo que você submeteu ou participa). "Meus", "Participo" e
   // "Rascunhos" recortam essa lista por papel/estado.
@@ -509,12 +549,20 @@ function MeusProjetosPage() {
     >
       <div
         className="min-h-[calc(100vh-20px)] overflow-hidden"
-        style={{ background: "var(--go-bg-page)", borderRadius: "0 0 var(--go-radius-xl) var(--go-radius-xl)" }}
+        style={{
+          background: "var(--go-bg-page)",
+          borderRadius: "0 0 var(--go-radius-xl) var(--go-radius-xl)",
+        }}
       >
         {/* Header azul */}
         <div className="relative" style={{ background: "var(--go-blue)", minHeight: 180 }}>
           <div className="absolute bottom-0 left-0 right-0">
-            <svg viewBox="0 0 1440 60" preserveAspectRatio="none" className="block w-full" style={{ height: 40 }}>
+            <svg
+              viewBox="0 0 1440 60"
+              preserveAspectRatio="none"
+              className="block w-full"
+              style={{ height: 40 }}
+            >
               <path d="M0,60 L0,20 Q720,0 1440,20 L1440,60 Z" fill="var(--go-cream)" />
             </svg>
           </div>
@@ -549,7 +597,11 @@ function MeusProjetosPage() {
           {!loading && erro && (
             <div
               className="rounded-xl p-6 text-center text-sm"
-              style={{ background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)", color: "#dc2626" }}
+              style={{
+                background: "rgba(220,38,38,0.05)",
+                border: "1px solid rgba(220,38,38,0.15)",
+                color: "#dc2626",
+              }}
             >
               {erro}
             </div>
@@ -560,7 +612,10 @@ function MeusProjetosPage() {
               className="rounded-xl p-10 text-center"
               style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.08)" }}
             >
-              <FileText className="mx-auto mb-3 h-10 w-10 opacity-30" style={{ color: "var(--go-blue)" }} />
+              <FileText
+                className="mx-auto mb-3 h-10 w-10 opacity-30"
+                style={{ color: "var(--go-blue)" }}
+              />
               <p className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
                 Nenhum projeto encontrado
               </p>
@@ -593,13 +648,21 @@ function MeusProjetosPage() {
                       style={
                         ativo
                           ? { background: "var(--go-blue)", color: "var(--go-white)" }
-                          : { background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.1)" }
+                          : {
+                              background: "transparent",
+                              color: "#8b8b9a",
+                              border: "1px solid rgba(0,0,0,0.1)",
+                            }
                       }
                     >
                       {f.label}
                       <span
                         className="rounded-full px-1.5 text-[11px] font-bold"
-                        style={ativo ? { background: "rgba(255,255,255,0.2)" } : { background: "rgba(0,0,0,0.05)" }}
+                        style={
+                          ativo
+                            ? { background: "rgba(255,255,255,0.2)" }
+                            : { background: "rgba(0,0,0,0.05)" }
+                        }
                       >
                         {n}
                       </span>
@@ -611,26 +674,34 @@ function MeusProjetosPage() {
               {/* Aviso "só o autor edita" — em "Participo" e em "Todos", apenas quando há
                   participação SEM edição delegada (se o autor já delegou a edição a você,
                   o card mostra "Editar" e o aviso não se aplica àquele projeto). */}
-              {(filtro === "participo" || filtro === "todos") && grupos.participo.some((p) => !p.podeEditar) && (
-                <div
-                  className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
-                  style={{ background: "rgba(0,89,169,0.05)", border: "1px solid rgba(0,89,169,0.12)", color: "var(--go-blue)" }}
-                >
-                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    {filtro === "participo"
-                      ? "Você participa destes projetos. Em alguns, só o autor edita — você apenas visualiza, a menos que o autor delegue a edição a você. Para transferir a autoria, acione a equipe RPA."
-                      : "Alguns projetos abaixo são de outra pessoa (você participa). Sem a edição delegada pelo autor, você só visualiza. Para transferir a autoria, acione a equipe RPA."}
-                  </p>
-                </div>
-              )}
+              {(filtro === "participo" || filtro === "todos") &&
+                grupos.participo.some((p) => !p.podeEditar) && (
+                  <div
+                    className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-[12px] leading-snug"
+                    style={{
+                      background: "rgba(0,89,169,0.05)",
+                      border: "1px solid rgba(0,89,169,0.12)",
+                      color: "var(--go-blue)",
+                    }}
+                  >
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      {filtro === "participo"
+                        ? "Você participa destes projetos. Em alguns, só o autor edita — você apenas visualiza, a menos que o autor delegue a edição a você. Para transferir a autoria, acione a equipe RPA."
+                        : "Alguns projetos abaixo são de outra pessoa (você participa). Sem a edição delegada pelo autor, você só visualiza. Para transferir a autoria, acione a equipe RPA."}
+                    </p>
+                  </div>
+                )}
 
               {visiveis.length === 0 && (
                 <div
                   className="rounded-xl p-10 text-center"
                   style={{ background: "var(--go-white)", border: "1px solid rgba(0,89,169,0.08)" }}
                 >
-                  <FileText className="mx-auto mb-3 h-10 w-10 opacity-30" style={{ color: "var(--go-blue)" }} />
+                  <FileText
+                    className="mx-auto mb-3 h-10 w-10 opacity-30"
+                    style={{ color: "var(--go-blue)" }}
+                  />
                   <p className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
                     {filtro === "rascunhos"
                       ? "Nenhum rascunho em andamento"
@@ -659,193 +730,249 @@ function MeusProjetosPage() {
                     return (
                       <div
                         key={p.id}
-                        className="group flex flex-col gap-3 overflow-hidden rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
+                        className="group overflow-hidden rounded-xl p-5"
                         style={{
                           background: "var(--go-white)",
                           border: "1px solid rgba(0,89,169,0.08)",
                           boxShadow: "var(--go-shadow-sm)",
                         }}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate font-semibold" style={{ color: "var(--go-text-heading)", fontSize: 15 }}>
-                              {p.nome ?? "(sem nome)"}
-                            </span>
-                            {p.especial && (
+                        {/* Cabeçalho: identificação à esquerda, ações à direita. Os avisos
+                            ficam FORA desta linha (abaixo, na largura inteira do card) —
+                            dentro da coluna esquerda a fileira de botões a esmagava para
+                            ~250px e o motivo virava uma tira de ~30 caracteres por linha. */}
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                                style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
+                                className="truncate font-semibold"
+                                style={{ color: "var(--go-text-heading)", fontSize: 15 }}
                               >
-                                Especial
+                                {p.nome ?? "(sem nome)"}
                               </span>
-                            )}
-                          </div>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]" style={{ color: "#8b8b9a" }}>
-                            {p.area_nome && <span>{p.area_nome}</span>}
-                            {/* Valor R$ do projeto NÃO é exibido aqui (INV-02 + decisão
-                                /ggsd:plan 2026-07-17): dono/usuário não vê o financeiro em
-                                "Meus Projetos". O campo vem `null` do server (mapItem). */}
-                            <span>{p.submitted_at ? `Enviado em ${fmtDate(p.submitted_at)}` : `Criado em ${fmtDate(p.created_at)}`}</span>
-                          </div>
-                          {/* Autoria + tooltip de transferência (não em rascunho — é seu) */}
-                          {!ehRascunho && (
-                            <div className="mt-1.5 flex items-center gap-1 text-[11px]" style={{ color: "#a5a5b3" }}>
-                              <span>
-                                Autoria:{" "}
-                                <span style={{ color: "#8b8b9a", fontWeight: 600 }}>
-                                  {ehOwner ? "você" : p.responsavel_nome || p.responsavel_email || "—"}
-                                </span>
-                              </span>
-                              {/* Disclaimer de transferência só p/ participante SEM edição
-                                  (no projeto próprio ou com edição delegada, é redundante). */}
-                              {!ehOwner && !podeEditar && (
-                                <InfoTooltip text={TRANSFERIR_AUTORIA} label="Sobre a autoria do projeto" />
-                              )}
-                              {/* Participante com edição delegada pelo dono. */}
-                              {!ehOwner && podeEditar && (
+                              {p.especial && (
                                 <span
-                                  className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                  className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                                  style={{ background: "var(--go-lime)", color: "var(--go-blue)" }}
                                 >
-                                  Edição delegada
+                                  Especial
                                 </span>
                               )}
                             </div>
-                          )}
-                          {/* Pendência de REGULARIZAÇÃO (legado, com prazo) — âmbar */}
-                          {p.pendente && (
-                            <AvisoPendencia
-                              tone="legado"
-                              titulo="Regularização de legado"
-                              texto={
-                                podeEditar
-                                  ? `Atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
-                                  : `Pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
-                              }
-                            />
-                          )}
-                          {/* REPROVADO pela régua de critério de projeto — cinza-ardósia.
-                              Copy NÃO se mistura com o reenvio: aqui a análise concluiu
-                              que a entrega não se sustenta como projeto. */}
-                          {ehReprovado(p.status) && (
-                            <AvisoPendencia
-                              tone="reprovado"
-                              titulo="Projeto reprovado"
-                              texto="A análise avaliou esta entrega pelos critérios de recorrência e evidência. Se discordar, fale com a equipe RPA."
-                              motivo={p.motivo_reprovado}
-                            />
-                          )}
-                          {/* Pendência de REENVIO (reprovado na análise) — vermelho */}
-                          {ehReenvioSolicitado(p.status) && (
-                            <AvisoPendencia
-                              tone="reenvio"
-                              titulo="Reenvio solicitado"
-                              texto={
-                                podeEditar
-                                  ? "Corrija o ponto apontado e reenvie para nova validação."
-                                  : "Só o autor pode reenviar — acione o autor ou a equipe RPA."
-                              }
-                              motivo={p.motivo_reenvio}
-                            />
-                          )}
-                        </div>
+                            <div
+                              className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]"
+                              style={{ color: "#8b8b9a" }}
+                            >
+                              {p.area_nome && <span>{p.area_nome}</span>}
+                              {/* Valor R$ do projeto NÃO é exibido aqui (INV-02 + decisão
+                                /ggsd:plan 2026-07-17): dono/usuário não vê o financeiro em
+                                "Meus Projetos". O campo vem `null` do server (mapItem). */}
+                              <span>
+                                {p.submitted_at
+                                  ? `Enviado em ${fmtDate(p.submitted_at)}`
+                                  : `Criado em ${fmtDate(p.created_at)}`}
+                              </span>
+                            </div>
+                            {/* Autoria + tooltip de transferência (não em rascunho — é seu) */}
+                            {!ehRascunho && (
+                              <div
+                                className="mt-1.5 flex items-center gap-1 text-[11px]"
+                                style={{ color: "#a5a5b3" }}
+                              >
+                                <span>
+                                  Autoria:{" "}
+                                  <span style={{ color: "#8b8b9a", fontWeight: 600 }}>
+                                    {ehOwner
+                                      ? "você"
+                                      : p.responsavel_nome || p.responsavel_email || "—"}
+                                  </span>
+                                </span>
+                                {/* Disclaimer de transferência só p/ participante SEM edição
+                                  (no projeto próprio ou com edição delegada, é redundante). */}
+                                {!ehOwner && !podeEditar && (
+                                  <InfoTooltip
+                                    text={TRANSFERIR_AUTORIA}
+                                    label="Sobre a autoria do projeto"
+                                  />
+                                )}
+                                {/* Participante com edição delegada pelo dono. */}
+                                {!ehOwner && podeEditar && (
+                                  <span
+                                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                    style={{
+                                      background: "rgba(0,89,169,0.08)",
+                                      color: "var(--go-blue)",
+                                    }}
+                                  >
+                                    Edição delegada
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
 
-                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                          <StatusBadge status={p.status} />
-                          {ehRascunho ? (
-                            <>
-                              <Link
-                                to="/submeter"
-                                search={{ retomar: p.id }}
-                                className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                                style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                              >
-                                <PencilLine className="h-3.5 w-3.5" />
-                                Continuar
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => pedirExclusaoRascunho(p.id, p.nome)}
-                                disabled={excluindo === p.id}
-                                title="Excluir rascunho"
-                                aria-label="Excluir rascunho"
-                                className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
-                                style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
-                              >
-                                {excluindo === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {/* Distribuir o poder de edição — quem pode editar (dono ou editor
-                                  já delegado) gerencia quais participantes editam o projeto. */}
-                              {podeEditar && (
-                                <button
-                                  type="button"
-                                  onClick={() => setDelegando(p)}
-                                  title="Distribuir o poder de edição"
-                                  aria-label="Quem pode editar"
-                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
-                                >
-                                  <Users className="h-3.5 w-3.5" />
-                                  Quem pode editar
-                                </button>
-                              )}
-                              {/* Descontinuar / Reativar — quem pode editar arquiva o projeto
-                                  (para de contar como pendência) ou o traz de volta. */}
-                              {podeEditar &&
-                                (p.descontinuado ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => enviarDescontinuar(p.id, false)}
-                                    disabled={descontinuando === p.id}
-                                    title="Reativar projeto"
-                                    aria-label="Reativar projeto"
-                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
-                                    style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
-                                  >
-                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                                    Reativar
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmarDescontinuar(p)}
-                                    disabled={descontinuando === p.id}
-                                    title="Descontinuar projeto"
-                                    aria-label="Descontinuar projeto"
-                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
-                                    style={{ background: "rgba(100,116,139,0.1)", color: "#475569" }}
-                                  >
-                                    {descontinuando === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
-                                    Descontinuar
-                                  </button>
-                                ))}
-                              {podeEditar ? (
+                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                            <StatusBadge status={p.status} />
+                            {ehRascunho ? (
+                              <>
                                 <Link
-                                  to="/editar/$id"
-                                  params={{ id: p.id }}
+                                  to="/submeter"
+                                  search={{ retomar: p.id }}
                                   className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
                                   style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
                                 >
                                   <PencilLine className="h-3.5 w-3.5" />
-                                  Editar
+                                  Continuar
                                 </Link>
-                              ) : (
-                                <Link
-                                  to="/projeto/$id"
-                                  params={{ id: p.id }}
-                                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                                  style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+                                <button
+                                  type="button"
+                                  onClick={() => pedirExclusaoRascunho(p.id, p.nome)}
+                                  disabled={excluindo === p.id}
+                                  title="Excluir rascunho"
+                                  aria-label="Excluir rascunho"
+                                  className="inline-flex items-center justify-center rounded-full p-2 transition-all disabled:opacity-50"
+                                  style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
                                 >
-                                  <Eye className="h-3.5 w-3.5" />
-                                  Visualizar
-                                </Link>
-                              )}
-                            </>
-                          )}
+                                  {excluindo === p.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* Distribuir o poder de edição — quem pode editar (dono ou editor
+                                  já delegado) gerencia quais participantes editam o projeto. */}
+                                {podeEditar && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDelegando(p)}
+                                    title="Distribuir o poder de edição"
+                                    aria-label="Quem pode editar"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                                    style={{
+                                      background: "rgba(0,89,169,0.08)",
+                                      color: "var(--go-blue)",
+                                    }}
+                                  >
+                                    <Users className="h-3.5 w-3.5" />
+                                    Quem pode editar
+                                  </button>
+                                )}
+                                {/* Descontinuar / Reativar — quem pode editar arquiva o projeto
+                                  (para de contar como pendência) ou o traz de volta. */}
+                                {podeEditar &&
+                                  (p.descontinuado ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => enviarDescontinuar(p.id, false)}
+                                      disabled={descontinuando === p.id}
+                                      title="Reativar projeto"
+                                      aria-label="Reativar projeto"
+                                      className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
+                                      style={{
+                                        background: "rgba(0,89,169,0.08)",
+                                        color: "var(--go-blue)",
+                                      }}
+                                    >
+                                      {descontinuando === p.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <RotateCcw className="h-3.5 w-3.5" />
+                                      )}
+                                      Reativar
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmarDescontinuar(p)}
+                                      disabled={descontinuando === p.id}
+                                      title="Descontinuar projeto"
+                                      aria-label="Descontinuar projeto"
+                                      className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-50"
+                                      style={{
+                                        background: "rgba(100,116,139,0.1)",
+                                        color: "#475569",
+                                      }}
+                                    >
+                                      {descontinuando === p.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Archive className="h-3.5 w-3.5" />
+                                      )}
+                                      Descontinuar
+                                    </button>
+                                  ))}
+                                {podeEditar ? (
+                                  <Link
+                                    to="/editar/$id"
+                                    params={{ id: p.id }}
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                                    style={{
+                                      background: "var(--go-blue)",
+                                      color: "var(--go-white)",
+                                    }}
+                                  >
+                                    <PencilLine className="h-3.5 w-3.5" />
+                                    Editar
+                                  </Link>
+                                ) : (
+                                  <Link
+                                    to="/projeto/$id"
+                                    params={{ id: p.id }}
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                                    style={{
+                                      background: "rgba(0,89,169,0.08)",
+                                      color: "var(--go-blue)",
+                                    }}
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    Visualizar
+                                  </Link>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Avisos na largura inteira do card (ver comentário do cabeçalho). */}
+                        {/* Pendência de REGULARIZAÇÃO (legado, com prazo) — âmbar */}
+                        {p.pendente && (
+                          <AvisoPendencia
+                            tone="legado"
+                            titulo="Regularização de legado"
+                            texto={
+                              podeEditar
+                                ? `Atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
+                                : `Pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
+                            }
+                          />
+                        )}
+                        {/* REPROVADO pela régua de critério de projeto — cinza-ardósia.
+                            Copy NÃO se mistura com o reenvio: aqui a análise concluiu
+                            que a entrega não se sustenta como projeto. */}
+                        {ehReprovado(p.status) && (
+                          <AvisoPendencia
+                            tone="reprovado"
+                            titulo="Projeto reprovado"
+                            texto="A análise avaliou esta entrega pelos critérios de recorrência e evidência. Se discordar, fale com a equipe RPA."
+                            motivo={p.motivo_reprovado}
+                          />
+                        )}
+                        {/* Pendência de REENVIO (reprovado na análise) — vermelho */}
+                        {ehReenvioSolicitado(p.status) && (
+                          <AvisoPendencia
+                            tone="reenvio"
+                            titulo="Reenvio solicitado"
+                            texto={
+                              podeEditar
+                                ? "Corrija o ponto apontado e reenvie para nova validação."
+                                : "Só o autor pode reenviar — acione o autor ou a equipe RPA."
+                            }
+                            motivo={p.motivo_reenvio}
+                          />
+                        )}
                       </div>
                     );
                   })}
@@ -854,14 +981,21 @@ function MeusProjetosPage() {
 
               {/* Paginação — só quando o filtro tem mais de uma página */}
               {totalPaginas > 1 && (
-                <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="Paginação">
+                <nav
+                  className="mt-6 flex items-center justify-center gap-1.5"
+                  aria-label="Paginação"
+                >
                   <button
                     type="button"
                     onClick={() => setPagina((p) => Math.max(1, p - 1))}
                     disabled={paginaSegura <= 1}
                     aria-label="Página anterior"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:opacity-40"
-                    style={{ background: "transparent", color: "var(--go-blue)", border: "1px solid rgba(0,89,169,0.15)" }}
+                    style={{
+                      background: "transparent",
+                      color: "var(--go-blue)",
+                      border: "1px solid rgba(0,89,169,0.15)",
+                    }}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -878,7 +1012,11 @@ function MeusProjetosPage() {
                         style={
                           ativo
                             ? { background: "var(--go-blue)", color: "var(--go-white)" }
-                            : { background: "transparent", color: "#8b8b9a", border: "1px solid rgba(0,0,0,0.1)" }
+                            : {
+                                background: "transparent",
+                                color: "#8b8b9a",
+                                border: "1px solid rgba(0,0,0,0.1)",
+                              }
                         }
                       >
                         {n}
@@ -891,7 +1029,11 @@ function MeusProjetosPage() {
                     disabled={paginaSegura >= totalPaginas}
                     aria-label="Próxima página"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:opacity-40"
-                    style={{ background: "transparent", color: "var(--go-blue)", border: "1px solid rgba(0,89,169,0.15)" }}
+                    style={{
+                      background: "transparent",
+                      color: "var(--go-blue)",
+                      border: "1px solid rgba(0,89,169,0.15)",
+                    }}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>

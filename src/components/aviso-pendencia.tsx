@@ -179,10 +179,7 @@ export function AvisoPendencia({
       }}
     >
       {/* Estado nunca só por cor: ícone + rótulo escrito. */}
-      <p
-        className="flex items-center gap-1.5 text-[13px] font-bold"
-        style={{ color: tema.titulo }}
-      >
+      <p className="flex items-center gap-1.5 text-[13px] font-bold" style={{ color: tema.titulo }}>
         <span className="shrink-0" aria-hidden>
           {tema.icone}
         </span>
