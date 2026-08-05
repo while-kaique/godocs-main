@@ -4,6 +4,25 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+> ## 📗 05/08 — RELATÓRIO na aba "Relação Líder-Liderado" (planilha de PROD) para a gestão avaliar
+>
+> Pedido do Luis: "meu chefe precisa ver de forma organizada e avaliar se está tudo certo". Gerador em
+> **`scripts/dryrun-lider/relatorio-sheet.ts`** (commit `d5261e0`), aba **criada** na planilha do GoDocs.
+> Rodar: `RELATORIO_WRITE=1 npx vitest run --config scripts/dryrun-lider/vitest.config.ts` — **sem a flag é
+> DRY-RUN** (só imprime). ⚠️ **NUNCA escreve na aba `GoDocs`**; e ao rodar de novo **limpa os VALORES** da aba
+> do relatório e regrava (não deleta a aba, para não perder comentários que a gestão deixe lá).
+>
+> **Escopo (o Luis confirmou 2×): SÓ projetos pendentes** (`Pendente` + `Reenvio Pendente`) e **aba de PROD**
+> — tirei a seção "hierarquia completa da TeamGuide" que eu tinha posto (abriria 430 pessoas para auditoria,
+> fora do escopo). 3 blocos: **1. Resumo** (com coluna explicando cada número) · **2. Fila por líder**
+> (líder · e-mail · nº projetos · nº liderados · `Liderado (n)` · projeto · ID · status, agrupado como ele
+> pediu) · **3. Fora da fila** com o motivo por linha (isento por liderança × e-mail fora da base ativa).
+>
+> **Números de 05/08:** 78 pendentes → **44 em fila · 46 DMs · 27 líderes · 24 isentos · 10 sem líder**.
+> ⚠️ Mudou de leve vs. o dry-run de 04/08 (45 fila / 23 isentos): a hierarquia é lida AO VIVO na TeamGuide e
+> **um autor passou a liderar time** → virou isento. O total (68) não mudou. Não "corrigir" essa variação:
+> ela é esperada e o relatório sempre reflete a TeamGuide do momento.
+>
 > **04/08 18:41 (`4bb5e55`, staging):** tirado o "abaixo" da ajuda da 3ª pergunta ("Compare as horas e o
 > valor com a rotina real do time") — o card foi reorganizado e o "abaixo" já não apontava para nada.
 >
