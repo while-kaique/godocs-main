@@ -31,6 +31,7 @@ import {
   extrairNumeros,
 } from '@/lib/aprovacoes.functions';
 import {
+  CHECKLIST_APROVACAO,
   bloqueiaPreAprovacao,
   checklistCompleto,
   exigeJustificativa,
@@ -301,8 +302,12 @@ describe('pré-aprovação do líder', () => {
     const resumo = await resumoAprovacaoPorProjeto([id]);
     expect(resumo[id]).toMatchObject({ veredito: 'aprovado' });
     const cells = mockSheet.mock.calls.at(-1)![1] as Record<string, string>;
-    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('Sentiria falta: não');
-    expect(String(cells['Justificativa Aprovação do Líder'])).toContain('alta de novembro');
+    const just = String(cells['Justificativa Aprovação do Líder']);
+    // A pergunta como o líder a leu + o "não" que ele marcou (não um código resumido).
+    expect(just).toContain('Se este projeto fosse desligado hoje, a área sentiria falta? — não');
+    // E a explicação rotulada pela pergunta que ficou "não" (05/08/2026).
+    expect(just).toContain('Justificativa do "não" em Sentiria falta: Roda pouco hoje');
+    expect(just).toContain('alta de novembro');
   });
 
   it('pré-aprovar com checklist todo "sim" NÃO exige explicação', async () => {
@@ -323,9 +328,16 @@ describe('pré-aprovação do líder', () => {
     expect(projetoId).toBe(id);
     const c = cells as Record<string, string>;
     expect(c['Aprovação do Líder']).toBe('Pré-aprovado');
-    expect(String(c['Justificativa Aprovação do Líder'])).toMatch(
-      /^Lucas Gonçalves Queiroz em \d{2}\/\d{2}\/\d{4} · Move KPI: sim · Sentiria falta: sim · Saving coerente: sim$/,
+    // Uma linha de assinatura + UMA LINHA POR PERGUNTA do checklist (05/08/2026). Sem
+    // texto livre (checklist todo "sim"), são exatamente 4 linhas.
+    const linhasJust = String(c['Justificativa Aprovação do Líder']).split('\n');
+    expect(linhasJust[0]).toMatch(
+      /^Pré-aprovado por Lucas Gonçalves Queiroz \(lucas\.queiroz@gocase\.com\) em \d{2}\/\d{2}\/\d{4}$/,
     );
+    expect(linhasJust).toHaveLength(4);
+    for (const p of CHECKLIST_APROVACAO) {
+      expect(linhasJust).toContain(`${p.pergunta} — sim`);
+    }
   });
 
   it('reenvio REABRE a fila — o veredito da versão anterior não carimba a nova (D10)', async () => {
@@ -401,9 +413,11 @@ describe('pré-aprovação do líder', () => {
       resp_saving_coerente: 'sim',
     });
     const [, cells] = mockSheet.mock.calls[0];
-    expect(String((cells as Record<string, string>)['Justificativa Aprovação do Líder'])).toContain(
-      'Sentiria falta: não',
-    );
+    const just = String((cells as Record<string, string>)['Justificativa Aprovação do Líder']);
+    expect(just).toContain('O projeto move algum KPI da área? — sim');
+    expect(just).toContain('Se este projeto fosse desligado hoje, a área sentiria falta? — não');
+    expect(just).toContain('O saving declarado é coerente com o impacto que você vê na área? — sim');
+    expect(just).toContain('O processo é sazonal');
   });
 
   it('PRÉ-VISUALIZAÇÃO DE ADMIN: quem clicou é quem fica no `decidido_por`', async () => {
@@ -494,10 +508,85 @@ describe('Sheets: estado e justificativa são colunas SEPARADAS (decisão 03/08/
     ];
     expect(rotuloAprovacaoSheet(linhas)).toBe('Pré-reprovado');
     expect(rotuloAprovacaoSheet(linhas)).not.toContain('Rever as horas');
-    expect(justificativaAprovacaoSheet(linhas)).toMatch(
-      /^Lucas em \d{2}\/\d{2}\/\d{4} · Move KPI: sim · Sentiria falta: sim · Saving coerente: não · Rever as horas$/,
-    );
+    const just = justificativaAprovacaoSheet(linhas);
+    expect(just.split('\n')[0]).toMatch(/^Pré-reprovado por Lucas \(l@x\) em \d{2}\/\d{2}\/\d{4}$/);
+    expect(just).toContain('O saving declarado é coerente com o impacto que você vê na área? — não');
+    // Reprovação: o texto livre é o MOTIVO, e a planilha diz isso.
+    expect(just).toContain('Motivo da reprovação: Rever as horas');
     expect(rotuloAprovacaoSheet([{ veredito: 'aprovado' }])).toBe('Pré-aprovado');
+  });
+});
+
+describe('Justificativa do Sheets guarda TUDO o que o líder respondeu (05/08/2026)', () => {
+  const base = {
+    aprovador_nome: 'Lucas',
+    aprovador_email: 'l@x',
+    decidido_por: 'l@x',
+    decidido_em: '2026-08-05T12:00:00.000Z',
+  };
+
+  it('pedido de ajuste: o texto livre é rotulado como o que precisa mudar', () => {
+    const just = justificativaAprovacaoSheet([
+      {
+        ...base,
+        veredito: 'ajuste',
+        comentario: 'Refazer as horas do time fiscal',
+        resp_move_kpi: 'sim',
+        resp_sente_falta: 'sim',
+        resp_saving_coerente: 'nao',
+      },
+    ]);
+    expect(just.split('\n')[0]).toContain('Ajuste pedido por Lucas');
+    expect(just).toContain('O que precisa ser ajustado: Refazer as horas do time fiscal');
+  });
+
+  it('DOIS "nãos": a explicação diz A QUAIS perguntas ela responde', () => {
+    const just = justificativaAprovacaoSheet([
+      {
+        ...base,
+        veredito: 'aprovado',
+        comentario: 'Projeto sazonal: só aparece no fechamento, mas ali é crítico.',
+        resp_move_kpi: 'nao',
+        resp_sente_falta: 'nao',
+        resp_saving_coerente: 'sim',
+      },
+    ]);
+    expect(just).toContain('Justificativa do "não" em Move KPI e Sentiria falta:');
+    expect(just).toContain('O projeto move algum KPI da área? — não');
+    expect(just).toContain('Se este projeto fosse desligado hoje, a área sentiria falta? — não');
+    expect(just).toContain('Projeto sazonal');
+  });
+
+  it('parecer ANTIGO (sem checklist) não inventa respostas — só assinatura + texto', () => {
+    const just = justificativaAprovacaoSheet([
+      {
+        ...base,
+        veredito: 'aprovado',
+        comentario: 'ok',
+        resp_move_kpi: null,
+        resp_sente_falta: null,
+        resp_saving_coerente: null,
+      },
+    ]);
+    expect(just.split('\n')).toHaveLength(2);
+    expect(just).not.toContain('—');
+    expect(just).toContain('Comentário do líder: ok');
+  });
+
+  it('decidido por quem não está na fila (preview de admin) — nome derivado + e-mail', () => {
+    const just = justificativaAprovacaoSheet([
+      {
+        ...base,
+        aprovador_nome: null,
+        veredito: 'aprovado',
+        comentario: null,
+        decidido_por: 'luis.albuquerque@gocase.com',
+        resp_move_kpi: 'sim',
+        resp_sente_falta: 'sim',
+        resp_saving_coerente: 'sim',
+      },
+    ]);
+    expect(just.split('\n')[0]).toContain('Luis Albuquerque (luis.albuquerque@gocase.com)');
   });
 });
 

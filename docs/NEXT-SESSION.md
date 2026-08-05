@@ -38,7 +38,7 @@ os 4 secrets de DM do `edf400b4` (inertes desde agora).
 ⚠️ **Tudo isto está na worktree `worktree-plano-aprovacao-lider-teamguide`, COMMITADO nesta sessão e SEM
 push** (a branch segue travada para prod até a validação com a diretoria).
 
-> ## ⛔ 05/08 — CONFIRMADO EM PROD: a coluna AF do cabeçalho está SEM ACENTO → justificativa descartada
+> ## ✅ 05/08 — a coluna AF do cabeçalho está SEM ACENTO (prod E staging) → justificativa era descartada · RESOLVIDO
 >
 > O Luis perguntou se a tela de aprovações grava as colunas certas. **Conferido ao vivo** no cabeçalho da aba
 > `GoDocs` de PRODUÇÃO (53 colunas, script `scripts/dryrun-lider/hdr.ts`):
@@ -48,11 +48,14 @@ push** (a branch segue travada para prod até a validação com a diretoria).
 > ESTADO apareceria em AE, mas **quem decidiu, quando, o checklist e a justificativa não apareceriam em lugar
 > nenhum**. É o MESMO bug já visto na staging em 04/08 — continua igual em prod.
 >
-> **Duas saídas oferecidas ao Luis (esperando escolha):** (a) **renomear AF1 para `Justificativa Aprovação do
-> Líder`** (recomendado; renomear não desloca nada, o mapeamento é por nome) — não fiz sozinho porque o
-> cabeçalho de prod alimenta ida, volta e o dashboard de triagem; (b) mudar a constante do código para
-> `Lider` sem acento (contra a regra 4, e obrigaria a STAGING a repetir o erro).
-> ⛔ **Enquanto não resolver, NÃO subir a feature para prod** — gravaria estado sem justificativa.
+> ✅ **RESOLVIDO NO CÓDIGO em 05/08 (3ª saída, melhor que as 2 oferecidas — nenhum cabeçalho foi tocado):**
+> o casamento de nome de coluna passou a ser **exato primeiro, normalizado depois** (`chaveColuna` +
+> `resolverColunaLetra` em `google/sheets.ts`), no `updateRowByProjectId` **e** no `appendRow`. Acento, caixa e
+> espaço a mais deixam de descartar valor; chave AMBÍGUA (2 cabeçalhos que normalizam igual) só casa por nome
+> exato, para nunca gravar na coluna errada. Conferido contra o cabeçalho REAL de prod: exato **não** casa,
+> tolerante resolve **AF**. **Não é mais preciso renomear a AF1** — e o ⛔ bloqueio de ida a prod por este
+> motivo **caiu**. Junto foi o pedido do Luis de a coluna guardar TUDO (D18): perguntas por extenso + resposta
+> + texto livre rotulado. Registro: `SPEC_CORRECOES.md` (2026-08-05) e **D18** em `SPEC_APROVACAO_LIDER.md`.
 >
 > ## 📗 05/08 — RELATÓRIO na aba "Relação Líder-Liderado" (planilha de PROD) para a gestão avaliar
 >

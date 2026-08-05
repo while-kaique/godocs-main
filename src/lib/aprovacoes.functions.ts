@@ -26,7 +26,8 @@ import {
   AVISO_SAVING_INCOERENTE,
   bloqueiaPreAprovacao,
   chavesQueExigemJustificativa,
-  resumirChecklist,
+  detalharChecklist,
+  rotuloChecklist,
   type ChaveChecklist,
 } from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
@@ -109,11 +110,41 @@ export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, 'veredito'>[]): 
 }
 
 /**
- * Texto da coluna "Justificativa Aprovação do Líder": quem decidiu, quando, as 3
- * respostas do checklist e o comentário. Função PURA — único lugar que redige isso.
+ * Rótulo do texto livre do líder, conforme o que ele escreveu É. Função pura.
  *
- * Decisão do Luis (03/08/2026): a coluna de estado guarda SÓ o estado (para filtrar na
- * planilha) e todo o detalhe vive aqui.
+ * O campo é UM só (`comentario`), mas serve a 3 propósitos diferentes — sem dizer qual,
+ * a triagem recebia um texto solto sem saber se era pedido de ajuste, motivo de recusa
+ * ou a explicação de um "não" no checklist (e, com 2 "nãos", nem a qual pergunta ele
+ * responde).
+ */
+export function rotuloComentarioSheet(
+  veredito: string,
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): string {
+  if (veredito === 'ajuste') return 'O que precisa ser ajustado';
+  if (veredito === 'reprovado') return 'Motivo da reprovação';
+  const chaves = chavesQueExigemJustificativa(respostas);
+  if (chaves.length) {
+    const nomes = chaves.map(rotuloChecklist).filter(Boolean).join(' e ');
+    return `Justificativa do "não" em ${nomes}`;
+  }
+  return 'Comentário do líder';
+}
+
+/**
+ * Texto da coluna "Justificativa Aprovação do Líder": o parecer INTEIRO, em linhas —
+ * quem decidiu (nome + e-mail), quando, cada PERGUNTA do checklist com o que o líder
+ * respondeu e o texto que ele escreveu, rotulado pelo que ele é. Função PURA — único
+ * lugar que redige isso.
+ *
+ * Decisões:
+ *  • 03/08/2026 (Luis) — a coluna de estado guarda SÓ o estado (para filtrar na
+ *    planilha) e todo o detalhe vive aqui.
+ *  • 05/08/2026 (Luis) — "a justificativa tem que salvar TUDO que vier do usuário, as
+ *    respostas (sim, não) e as justificativas, de forma devida". Saiu o resumo de uma
+ *    linha em códigos ("Move KPI: sim · …") e entraram as perguntas escritas por
+ *    extenso, uma por linha, mais o texto livre rotulado. ⚠️ Os textos das perguntas
+ *    vêm da FONTE ÚNICA `aprovacoes-checklist.ts` — não redigitar aqui.
  */
 export function justificativaAprovacaoSheet(
   linhas: Pick<
@@ -135,23 +166,34 @@ export function justificativaAprovacaoSheet(
     const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
     return `Aguardando ${nomes}`;
   }
-  // Quem decidiu pode ser outro líder da mesma fila (D4) — o `decidido_por` manda.
-  const quem =
-    linhas.find((l) => (l.decidido_por ?? '') === (l.aprovador_email ?? ''))?.aprovador_nome ||
-    decidida.decidido_por ||
+  // Quem decidiu pode ser outro líder da mesma fila (D4) — o `decidido_por` manda. Na
+  // pré-visualização de admin (`?como=`) o e-mail não é de nenhum líder da fila: cai no
+  // nome derivado do e-mail, e o e-mail fica registrado do lado (é a auditoria).
+  const email = (decidida.decidido_por || decidida.aprovador_email || '').trim();
+  const nome =
+    linhas.find((l) => (l.aprovador_email ?? '').toLowerCase() === email.toLowerCase())
+      ?.aprovador_nome ||
     decidida.aprovador_nome ||
-    decidida.aprovador_email;
-  const checklist = resumirChecklist({
+    (email ? derivarNomeDeEmail(email) : '');
+  const assinatura = [nome, email && nome !== email ? `(${email})` : '']
+    .filter(Boolean)
+    .join(' ');
+
+  const respostas = {
     move_kpi: decidida.resp_move_kpi,
     sente_falta: decidida.resp_sente_falta,
     saving_coerente: decidida.resp_saving_coerente,
-  });
+  };
   const comentario = (decidida.comentario ?? '').trim();
-  return (
-    `${quem} em ${dataBR(decidida.decidido_em)}` +
-    (checklist ? ` · ${checklist}` : '') +
-    (comentario ? ` · ${comentario}` : '')
-  );
+
+  const partes = [
+    // O estado sai do MESMO lugar que a coluna de estado (não redigitar rótulos).
+    `${rotuloAprovacaoSheet([decidida])}${assinatura ? ` por ${assinatura}` : ''} em ${dataBR(decidida.decidido_em)}`,
+    // Uma linha por pergunta respondida (parecer antigo, sem checklist → nenhuma).
+    ...detalharChecklist(respostas),
+    ...(comentario ? [`${rotuloComentarioSheet(decidida.veredito, respostas)}: ${comentario}`] : []),
+  ];
+  return partes.join('\n');
 }
 
 // ─── Abertura da fila (chamada na submissão) ─────────────────────────────────

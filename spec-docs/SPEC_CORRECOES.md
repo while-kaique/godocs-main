@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-08-05 — Parecer do líder chegava MUTILADO na planilha (coluna sem acento + justificativa resumida)
+
+**Status:** ✅ codada e testada (945 verdes) · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** pendente
+
+**Sintoma.** O líder pré-aprovava/pedia ajuste em `/aprovacoes`, a coluna **`Aprovação do Líder` (AE)**
+mudava de estado normalmente — e a coluna **`Justificativa Aprovação do Líder` (AF)** ficava **vazia**: quem
+decidiu, quando, as 3 respostas do checklist e o texto que o líder escreveu não apareciam em lugar nenhum.
+E, no que chegava (staging antiga), o detalhe era um resumo em rótulos internos (`Move KPI: sim · Sentiria
+falta: não`) com o texto livre concatenado **sem dizer o que era** — com dois "nãos" no checklist (D16) era
+impossível saber a qual pergunta a explicação respondia.
+
+**Causa-raiz.** Duas, independentes:
+1. **Nome da coluna com uma letra de diferença.** O cabeçalho real de **prod E staging** é
+   `Justificativa Aprovação do **Lider**` (sem acento no "i") e o código escreve `…do **Líder**` (regra 4).
+   O mapeamento do sync é por **NOME EXATO** (`fetchHeaderMap`): chave que não casa é **ignorada com aviso** e
+   o resto da escrita segue — falha 100% silenciosa para quem usa o app. Conferido ao vivo em 04 e 05/08/2026.
+2. **Formato pobre por decisão antiga.** `justificativaAprovacaoSheet` produzia uma linha só, com
+   `resumirChecklist` (rótulos curtos) e o `comentario` colado no fim sem rótulo.
+
+**Fix.**
+- `google/sheets.ts`: `chaveColuna` (minúsculas, sem acento via NFD, espaços colapsados) +
+  `resolverColunaLetra` (exato **primeiro**, normalizado como rede) usados no `updateRowByProjectId`; o
+  `appendRow`/`orderValuesByHeaders` casam pelo mesmo critério, e `chavesForaDoCabecalho` mantém o aviso só
+  para o que realmente não existe. **Fail-safe:** chave AMBÍGUA (2 cabeçalhos que normalizam igual) é
+  descartada do índice tolerante — só casa por nome exato, para nunca gravar na coluna errada.
+- `aprovacoes-checklist.ts`: `detalharChecklist` (a PERGUNTA como o líder a leu + a resposta) e
+  `rotuloChecklist` — os textos seguem na FONTE ÚNICA.
+- `aprovacoes.functions.ts`: `justificativaAprovacaoSheet` virou multi-linha (assinatura com nome **e**
+  e-mail + uma linha por pergunta + texto livre) e `rotuloComentarioSheet` nomeia o texto conforme o
+  veredito/checklist (`O que precisa ser ajustado` · `Motivo da reprovação` · `Justificativa do "não" em …` ·
+  `Comentário do líder`).
+
+**Onde aterrissou.** `src/lib/google/sheets.ts`, `src/lib/aprovacoes-checklist.ts`,
+`src/lib/aprovacoes.functions.ts`, `scripts/dryrun-lider/hdr.ts` (o diagnóstico agora prova exato **e**
+resolvido), testes em `tests/sheets-mapping.test.ts` (+5) e `tests/aprovacoes-lider.test.ts` (+4, e os 4
+antigos passaram a afirmar o formato novo). Decisão: **D18** de `SPEC_APROVACAO_LIDER.md`.
+
+**Verificação.** 945 testes verdes + leitura ao vivo do cabeçalho de **produção** (53 colunas):
+`Aprovação do Líder` → AE (exato) e `Justificativa Aprovação do Líder` → **AF só pelo match tolerante**
+(`npx vitest run --config scripts/dryrun-lider/vitest.config.ts`). ⚠️ Com isto, o **⛔ bloqueio de ida a
+prod** por causa do acento **deixa de existir** — não é preciso renomear o cabeçalho.
+
+---
+
 ## 2026-08-03 — `[1.4]` honesta e curta era lida como rótulo vazio (piso de 60 chars × registro de ausência)
 
 **Status:** ✅ codada, testada (831 verdes) e validada na staging · **Branch:** `fix/piso-ausencia-fonte` · **PR:** [#226](https://github.com/while-kaique/godocs-main/pull/226)

@@ -134,6 +134,29 @@ export function chavesQueExigemJustificativa(
   ).map((p) => p.chave);
 }
 
+/** Rótulo curto de uma pergunta ("Move KPI"). "" quando a chave não existe. */
+export function rotuloChecklist(chave: ChaveChecklist): string {
+  return CHECKLIST_APROVACAO.find((p) => p.chave === chave)?.rotulo ?? '';
+}
+
+/**
+ * O checklist inteiro em linhas legíveis — a PERGUNTA como o líder a leu, seguida do
+ * que ele respondeu:
+ *
+ *     O projeto move algum KPI da área? — não
+ *
+ * Vai para a coluna "Justificativa Aprovação do Líder" (pedido do Luis, 05/08/2026: a
+ * planilha precisa guardar TUDO o que o líder respondeu, não um resumo em código). Só
+ * entram perguntas respondidas — parecer antigo, sem checklist, devolve lista vazia.
+ */
+export function detalharChecklist(
+  respostas: Partial<Record<ChaveChecklist, string | null>>,
+): string[] {
+  return CHECKLIST_APROVACAO.filter(
+    (p) => respostas[p.chave] === 'sim' || respostas[p.chave] === 'nao',
+  ).map((p) => `${p.pergunta} — ${respostas[p.chave] === 'nao' ? 'não' : 'sim'}`);
+}
+
 /**
  * Resumo legível do checklist ("Move KPI: sim · Sentiria falta: sim · Saving coerente: não").
  * Devolve "" quando o parecer é antigo (sem checklist), para o rótulo não ganhar sujeira.
