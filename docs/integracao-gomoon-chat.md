@@ -248,11 +248,22 @@ Para que cada projeto chegue à validação com o aval de quem vive o processo n
 dia — menos retrabalho para todo mundo e um impacto declarado mais fiel à realidade
 da área.
 
+*De onde vem a relação de líder e liderado*
+A dupla líder ↔ liderado é lida direto do organograma da TeamGuide — o GoDocs não tem
+uma lista própria. Se o seu líder aparecer errado, ou se você achar que não deveria
+estar na lista de alguém, a correção precisa acontecer lá: fale com
+<QUEM MANTÉM O ORGANOGRAMA> e, uma vez ajustado, as próximas submissões já saem com a
+hierarquia certa.
+
 Dúvidas? É só chamar o time de RPA & IA ou usar o botão de ajuda dentro do GoDocs.
 ```
 
 ⚠️ O texto reflete a **D20**: a isenção é por CARGO (coordenação para cima) — se a régua
 mudar, esta mensagem muda junto.
+⚠️ **`<QUEM MANTÉM O ORGANOGRAMA>` é um espaço a preencher** — não sabemos quem faz a
+correção na TeamGuide (Gente e Gestão? o próprio líder?). O Luis define antes de enviar.
+⚠️ A promessa é **"as próximas submissões"**, não correção retroativa: fila já aberta
+mantém o líder antigo, porque as linhas de `projeto_aprovacoes` nascem na submissão.
 
 ### 10.2 Projeto pendente de pré-aprovação (recorrente, bot → líder)
 
