@@ -6,6 +6,41 @@
 
 ---
 
+## 2026-08-05 — Gate do [1.4] "Ponteiro movido" nunca perguntava: o LLM respondia por conta própria, apontando pro próprio arquivo da automação
+
+**Status:** ✅ codada e testada (938 verdes) · **Branch:** `fix/gate-ponteiro-verbo-generico` · ⏳ staging pendente
+
+**Sintoma:** simulando de novo o caso-âncora "nuvem de palavras" (o mesmo que originou toda a
+régua de critério — ver `SPEC_CRITERIOS_PROJETO.md`), a IA nunca perguntou **"qual ponteiro este
+projeto moveu, e onde conferir?"** — a pergunta do gate `[1.4]`. O memorial saiu com:
+
+> Ponteiro movido: tempo operacional da área... Isso pode ser conferido no próprio CSV
+> exportado do formulário e no arquivo PNG gerado pela automação.
+
+— citando o CSV de entrada e o PNG de saída **da própria automação** (o entregável) como
+"onde conferir", não um ponteiro real de custo/receita/KPI.
+
+**Causa-raiz:** `secaoPonteiroVaga` (`orchestrator.ts`) só força a pergunta quando a seção
+`[1.4]` que o **próprio LLM** escreveu no preview é "vaga" — curta ou sem nenhuma palavra da
+lista `PISTA_ONDE_VERIFICAR`. Essa lista incluía verbos soltos (`onde`, `conferi`, `verific`,
+`acompanh`, `rastrea`) que casam **qualquer** frase que fale de verificação, mesmo sem nomear
+fonte alguma. A palavra "conferi**do**" bastou para o regex marcar a seção como preenchida —
+o LLM respondeu por conta própria, e o gate nunca chegou a perguntar.
+
+**Fix (1 arquivo, regex only — não muda prompt nem estado):** removidos da
+`PISTA_ONDE_VERIFICAR` os verbos sem substantivo companheiro; sobrou só a lista de
+substantivos de fonte (relatório, painel, sistema, planilha, base, Metabase, ERP…) + os
+padrões de registro de ausência (`REGISTRO_AUSENCIA_FONTE`, checado antes e intocado). ⚠️ **Não
+é o mesmo caso do "no sistema" × "no Metabase"** (decisão fechada da `SPEC_CRITERIOS_PROJETO.md`
+— nomear vago ainda é nomear, "sistema" continua passando): aqui o problema é a ausência de
+**qualquer** substantivo, não a qualidade do nome.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (`PISTA_ONDE_VERIFICAR`) ·
+`tests/gate-criterio-secoes.test.ts` (2 casos novos, incl. reprodução literal do texto acima).
+**Sem mudança de prompt, de estado ou de fluxo do agente** — só a régua textual do gate.
+
+---
+
 ## 2026-08-04 — Ganho PROJETADO virou receita apurada: o agente perguntou 2×, ouviu "não é um número medido" e gerou o preview igual
 
 **Status:** ✅ codada, testada (925 verdes) e **validada na staging** — a staging REPROVOU a 1ª versão do fix e a correção está no adendo abaixo · **Branch:** `fix/gate-ganho-projetado`
