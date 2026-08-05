@@ -4,7 +4,63 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 05/08 (última sessão) — D20: a isenção de pré-aprovação passa a ser pelo CARGO
+## ✅ 05/08 (última sessão) — F3/D17: o aviso diário ao líder (GoDocs → Gomoon) implementado e validado na staging
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — executado;
+a feature inteira segue **travada para prod** até a validação com a diretoria.
+
+**O que motivou:** o Luis trouxe o documento de resposta do **João Victor** (`~/Downloads/Integração GoDocs →
+Gomoon → Google Chat — como consumir a API.md`): a API deles **já está em produção** e implementou o nosso
+contrato v1 **sem mudar o formato de entrada**. Faltava só o nosso lado (F3).
+
+**O que ficou pronto** (commits `f6110a2` + `ec2cfe4`, **1078 testes**, staging `edf400b4` redeployada 15:51):
+
+| Peça | Onde |
+|---|---|
+| Agregada líder×liderado | `getPendenciasPorLider()` — `src/integrations/db/client.server.ts` |
+| Payload (PURO) + envio | `src/lib/gomoon-lideres.functions.ts` |
+| Cron (09h BRT = `0 12 * * 1-5` UTC) | `POST /api/cron/notificar-lideres` |
+| Manual/admin (`{"dry":true}` não envia) | `POST /api/admin/notificar-lideres` |
+| Testes | `tests/gomoon-lideres.test.ts` · `tests/gomoon-pendencias-sql.test.ts` |
+
+**Decisões da sessão:**
+- **09h BRT, não 6h** — o Gomoon entrega a DM **na hora que recebe o POST**; às 6h o líder acordava com
+  notificação no celular. Sugestão dele, aceita pelo Luis.
+- **Staging fica na opção 2** do contrato: o campo `ambiente` (derivado do `GODOCS_ENV`) é a **única**
+  proteção. O token separado que fecharia isso estruturalmente está disponível **a pedido** do João.
+- A relação sai da **própria fila** (`projeto_aprovacoes`), não de uma 2ª consulta à TeamGuide — senão o
+  payload poderia divergir do que a tela `/aprovacoes` mostra.
+
+**Validado ao vivo na staging:** dry-run → payload certo · envio real → **202**, `falhas: []` · log do Gomoon
+(`GET` no mesmo endpoint) → `status: entregue` + `messageName` · **`destinatarioEfetivo` = João**, ou seja o
+líder REAL nomeado no payload (Lucas Queiroz) **não** recebeu · POST repetido → `ja_entregues: 1`, **sem 2ª DM**.
+
+⚠️ **Bug pego na validação:** `APP_BASE_URL` **não é uma origem limpa** — na staging vale
+`…/meus-projetos` (o disparo de e-mails usa o link inteiro) e a concatenação gerava
+`/meus-projetos/aprovacoes`, rota inexistente: o líder cairia num **404 vindo da DM**. `origemDe()` descarta o
+caminho; 2 testes de regressão.
+
+**Também nesta sessão:** `origin/main` incorporado (regra 10) — o conflito em `src/routes/meus-projetos.tsx`
+foi resolvido **pegando o card redesenhado do `main`** (que extraiu `AvisoPendencia` para
+`src/components/aviso-pendencia.tsx`) e **reaplicando por cima** o selo do parecer do líder + o campo
+`aprovacao` do tipo. `worker.js` e `dist` rebuildados **depois** do merge.
+
+**O que falta, e é decisão/ação do Luis:**
+1. **Do lado do Gomoon** (não é código nosso): pedir ao João **(a)** trocar o destinatário de teste do modo
+   staging para o e-mail do Luis — no modo staging os e-mails do payload são ignorados, então **não temos
+   como** fazer a DM chegar nele — e **(b)** disparar o **anúncio da feature**, que é broadcast do Gomoon e
+   **não passa pela nossa API**.
+2. **Secret `GOMOON_TOKEN` na PROD** (`674a3710`) — só foi setado na staging (`edf400b4`) e no `.env` local.
+3. **Criar o cron** `0 12 * * 1-5` → `/api/cron/notificar-lideres`. Ambos só quando a feature for a prod.
+
+**Dois pontos registrados e NÃO mexidos** (fora do escopo pedido): o `CLAUDE.md` está em **71k** (a régua
+pede <40k) e a tela de "Meus Projetos" trata o veredito **`'ajuste'`** como *"Aguardando o líder"* — o union
+do frontend só tem 3 valores e o `tsc` já acusava isso **antes** desta sessão (7 erros pré-existentes em 3
+arquivos, nenhum introduzido aqui).
+
+---
+
+## ✅ 05/08 — D20: a isenção de pré-aprovação passa a ser pelo CARGO
 
 **O que motivou:** o Luis olhou a aba **"Relação Líder-Liderado"** da planilha de prod e perguntou por que a
 **Fablícia** não aparecia com a líder dela (Kelly), mesmo tendo projeto pendente.

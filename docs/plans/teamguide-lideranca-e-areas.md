@@ -2,6 +2,15 @@
 **Status:** ✅ **executado e commitado** (2026-08-03, `c9991be`) — e a sessão seguinte já entregou **F1 + F2**
 no mesmo commit. Falta só validar na staging → prod → PR (ver `spec-docs/SPEC_APROVACAO_LIDER.md` §7).
 
+> **F3 entregue em 05/08/2026 (`f6110a2` + `ec2cfe4`, 1078 testes) — o aviso diário ao líder.** A DM saiu do
+> nosso lado (D17): o GoDocs manda **1 POST/dia às 09h BRT** (`0 12 * * 1-5` UTC) com a RELAÇÃO
+> líder↔liderados-pendentes e o **bot do Gomoon** entrega. Agregada `getPendenciasPorLider` +
+> `src/lib/gomoon-lideres.functions.ts` + cron `/api/cron/notificar-lideres` + manual
+> `/api/admin/notificar-lideres` (`{"dry":true}` não envia). **Validado na staging:** 202 → `entregue`, o
+> líder real do payload **não** recebeu (proteção do `ambiente:"staging"`), POST repetido → `ja_entregue`.
+> Contrato dos 2 lados + decisões em `docs/integracao-gomoon-chat.md` §11–12. Falta `GOMOON_TOKEN` + cron
+> **na prod**.
+
 > **Fecho da tarde de 03/08 (`1296e12` + `e4780cb`), fora do escopo original do plano F0:** entrou a **D12**
 > (rótulo próprio para os 3 casos sem fila — liderança grava **`Pré-aprovado (liderança)`**, via a função
 > pura `rotuloIsencaoSheet`) e a **DM foi LIGADA na staging** a pedido do Luis, para o teste real com o
