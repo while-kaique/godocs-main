@@ -38,6 +38,22 @@ os 4 secrets de DM do `edf400b4` (inertes desde agora).
 ⚠️ **Tudo isto está na worktree `worktree-plano-aprovacao-lider-teamguide`, COMMITADO nesta sessão e SEM
 push** (a branch segue travada para prod até a validação com a diretoria).
 
+> ## ⛔ 05/08 — CONFIRMADO EM PROD: a coluna AF do cabeçalho está SEM ACENTO → justificativa descartada
+>
+> O Luis perguntou se a tela de aprovações grava as colunas certas. **Conferido ao vivo** no cabeçalho da aba
+> `GoDocs` de PRODUÇÃO (53 colunas, script `scripts/dryrun-lider/hdr.ts`):
+> **AE = `Aprovação do Líder` ✅ casa** · **AF = `Justificativa Aprovação do Lider` ❌ SEM o acento no "i"**,
+> e o código escreve `'Justificativa Aprovação do Líder'`. Mapeamento é por NOME EXATO (`fetchHeaderMap`) →
+> a chave não encontra par e o valor é **ignorado com aviso** (o resto da escrita segue). Efeito hoje: o
+> ESTADO apareceria em AE, mas **quem decidiu, quando, o checklist e a justificativa não apareceriam em lugar
+> nenhum**. É o MESMO bug já visto na staging em 04/08 — continua igual em prod.
+>
+> **Duas saídas oferecidas ao Luis (esperando escolha):** (a) **renomear AF1 para `Justificativa Aprovação do
+> Líder`** (recomendado; renomear não desloca nada, o mapeamento é por nome) — não fiz sozinho porque o
+> cabeçalho de prod alimenta ida, volta e o dashboard de triagem; (b) mudar a constante do código para
+> `Lider` sem acento (contra a regra 4, e obrigaria a STAGING a repetir o erro).
+> ⛔ **Enquanto não resolver, NÃO subir a feature para prod** — gravaria estado sem justificativa.
+>
 > ## 📗 05/08 — RELATÓRIO na aba "Relação Líder-Liderado" (planilha de PROD) para a gestão avaliar
 >
 > Pedido do Luis: "meu chefe precisa ver de forma organizada e avaliar se está tudo certo". Gerador em
