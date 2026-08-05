@@ -62,8 +62,9 @@ describe("savingVazio", () => {
       "alocacao_ganhos",
       "alocacao_ganhos_racional",
       "criterio_secoes",
+      "ganho_real",
     ];
-    expect(Object.keys(saving)).toHaveLength(22);
+    expect(Object.keys(saving)).toHaveLength(23);
     expect(saving.linhas).toEqual([]);
     for (const campo of nulos) {
       expect(saving[campo]).toBeNull();
