@@ -7,7 +7,8 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, CalendarClock, RotateCcw, Users, X, Archive, Ban } from "lucide-react";
+import { AvisoPendencia } from "@/components/aviso-pendencia";
+import { FileText, PencilLine, Eye, Trash2, Loader2, Info, ChevronLeft, ChevronRight, RotateCcw, Users, X, Archive } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
@@ -32,47 +33,6 @@ function ehReenvioSolicitado(status: string | null): boolean {
 // usada para restaurar o aviso âmbar ao REATIVAR um projeto, sem precisar refetch.
 function ehLegadoPendente(p: { id: string; atualizado_em: string | null }): boolean {
   return p.id.toLowerCase().includes("legado") && !p.atualizado_em;
-}
-
-// Aviso de pendência com barra de acento à esquerda. Dois tons distintos:
-// "legado" (âmbar, regularização com prazo) e "reenvio" (vermelho, ação corretiva).
-function AvisoPendencia({
-  tone,
-  icon,
-  titulo,
-  texto,
-  motivo,
-}: {
-  tone: "legado" | "reenvio" | "reprovado";
-  icon: React.ReactNode;
-  titulo: string;
-  texto: string;
-  // Motivo escrito pelo analisador ou pela triagem — o autor precisa ver o PORQUÊ, não
-  // só o selo. Ausente (legado/análise antiga) → o aviso aparece sem o bloco.
-  motivo?: string | null;
-}) {
-  const c =
-    tone === "legado"
-      ? { bg: "rgba(245,158,11,0.08)", bar: "#f59e0b", fg: "#b45309" }
-      : tone === "reprovado"
-        ? { bg: "rgba(71,85,105,0.07)", bar: "#475569", fg: "#334155" }
-        : { bg: "rgba(220,38,38,0.06)", bar: "#dc2626", fg: "#b91c1c" };
-  return (
-    <div
-      className="mt-2 flex items-start gap-2 rounded-md py-1.5 pl-2.5 pr-3 text-[11px] leading-snug"
-      style={{ background: c.bg, borderLeft: `3px solid ${c.bar}`, color: c.fg }}
-    >
-      <span className="mt-px shrink-0" aria-hidden>{icon}</span>
-      <span>
-        <span className="font-bold">{titulo}</span> — {texto}
-        {motivo && (
-          <span className="mt-1 block whitespace-pre-wrap opacity-90">
-            <span className="font-semibold">Motivo:</span> {motivo}
-          </span>
-        )}
-      </span>
-    </div>
-  );
 }
 
 const TRANSFERIR_AUTORIA =
@@ -756,12 +716,11 @@ function MeusProjetosPage() {
                           {p.pendente && (
                             <AvisoPendencia
                               tone="legado"
-                              icon={<CalendarClock className="h-3.5 w-3.5" />}
                               titulo="Regularização de legado"
                               texto={
                                 podeEditar
-                                  ? `atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
-                                  : `pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
+                                  ? `Atualize este projeto até ${PRAZO_LEGADO} para regularizar o cadastro — basta editar e salvar.`
+                                  : `Pendente de regularização até ${PRAZO_LEGADO}. Só o autor pode atualizar — acione o autor ou a equipe RPA.`
                               }
                             />
                           )}
@@ -771,9 +730,8 @@ function MeusProjetosPage() {
                           {ehReprovado(p.status) && (
                             <AvisoPendencia
                               tone="reprovado"
-                              icon={<Ban className="h-3.5 w-3.5" />}
                               titulo="Projeto reprovado"
-                              texto="a análise concluiu que esta entrega não se enquadra como projeto pelos critérios de recorrência e evidência. Se discordar, fale com a equipe RPA."
+                              texto="A análise avaliou esta entrega pelos critérios de recorrência e evidência. Se discordar, fale com a equipe RPA."
                               motivo={p.motivo_reprovado}
                             />
                           )}
@@ -781,12 +739,11 @@ function MeusProjetosPage() {
                           {ehReenvioSolicitado(p.status) && (
                             <AvisoPendencia
                               tone="reenvio"
-                              icon={<RotateCcw className="h-3.5 w-3.5" />}
                               titulo="Reenvio solicitado"
                               texto={
                                 podeEditar
-                                  ? "a análise apontou um ponto a ajustar. Corrija e reenvie para nova validação."
-                                  : "a análise apontou um ponto a ajustar. Só o autor pode reenviar — acione o autor ou a equipe RPA."
+                                  ? "Corrija o ponto apontado e reenvie para nova validação."
+                                  : "Só o autor pode reenviar — acione o autor ou a equipe RPA."
                               }
                               motivo={p.motivo_reenvio}
                             />

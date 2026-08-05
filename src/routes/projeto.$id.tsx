@@ -4,9 +4,10 @@ import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { AvisoPendencia } from "@/components/aviso-pendencia";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
-import { Loader2, FileText, PencilLine, Eye, Ban, RotateCcw } from "lucide-react";
+import { Loader2, FileText, PencilLine, Eye } from "lucide-react";
 
 const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
@@ -196,30 +197,11 @@ function ProjetoReadOnlyPage() {
               {/* Reprovação / pedido de reenvio COM O MOTIVO — reprovar sem explicar
                   deixa o autor sem saída. Estado nunca só por cor: ícone + rótulo. */}
               {(p.motivo_reprovado || p.motivo_reenvio) && (
-                <div
-                  className="rounded-xl p-4 text-[12.5px] leading-relaxed"
-                  style={
-                    p.motivo_reprovado
-                      ? { background: "rgba(71,85,105,0.07)", borderLeft: "3px solid #475569", color: "#334155" }
-                      : { background: "rgba(220,38,38,0.06)", borderLeft: "3px solid #dc2626", color: "#b91c1c" }
-                  }
-                >
-                  <p className="flex items-center gap-1.5 font-bold">
-                    {p.motivo_reprovado ? (
-                      <>
-                        <Ban className="h-3.5 w-3.5" aria-hidden /> Projeto reprovado
-                      </>
-                    ) : (
-                      <>
-                        <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reenvio solicitado
-                      </>
-                    )}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">
-                    <span className="font-semibold">Motivo:</span>{" "}
-                    {p.motivo_reprovado ?? p.motivo_reenvio}
-                  </p>
-                </div>
+                <AvisoPendencia
+                  tone={p.motivo_reprovado ? "reprovado" : "reenvio"}
+                  titulo={p.motivo_reprovado ? "Projeto reprovado" : "Reenvio solicitado"}
+                  motivo={p.motivo_reprovado ?? p.motivo_reenvio}
+                />
               )}
 
               {/* Metadados */}
