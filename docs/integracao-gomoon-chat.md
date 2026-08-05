@@ -333,9 +333,26 @@ Chat — como consumir a API.md` (fora do repo). O que ele fixa:
 sai na hora do POST e às 6h o líder recebia notificação de madrugada). O cron do Godeploy
 é **UTC**: `0 12 * * 1-5`.
 
-**Secrets** (Godeploy, nos DOIS apps): `GOMOON_TOKEN` (obrigatório — sem ele o run não
-envia e diz por quê) e `GOMOON_LIDERES_URL` (opcional; o default já é a URL de produção
-do §11). O `APP_BASE_URL` já existente monta o `url` de cada líder.
+**Secrets** (Godeploy): `GOMOON_TOKEN` (obrigatório — sem ele o run não envia e diz por
+quê) e `GOMOON_LIDERES_URL` (opcional; o default já é a URL de produção do §11). Setados
+na **staging** (`edf400b4`) e no `.env` local em 05/08/2026; **faltam na produção**
+(`674a3710`) — entram junto com o deploy de prod da feature.
+
+⚠️ **`APP_BASE_URL` NÃO é uma origem limpa** — na staging ela vale
+`https://godocs-staging.devgogroup.com/**meus-projetos**` (o disparo de e-mails usa o
+link inteiro). Concatenar `/aprovacoes` nela gerava `…/meus-projetos/aprovacoes`, rota que
+não existe: o líder cairia num 404 vindo da DM. O `origemDe()` descarta o caminho. Pego na
+validação da staging, com teste de regressão.
+
+### Validado na staging — 05/08/2026
+
+| Passo | Resultado |
+|---|---|
+| `POST /api/admin/notificar-lideres {"dry":true}` | Payload montado, nada enviado |
+| Envio real (`{"dry":false}`) | **HTTP 202**, `falhas: []` |
+| Log de entrega (`GET` no endpoint do Gomoon) | `status: entregue`, `messageName` presente |
+| ⚠️ Proteção do §6 | `destinatarioEfetivo: joaovictor.esteves@gocase.com` — o líder REAL nomeado no payload (Lucas Queiroz) **não** recebeu |
+| Repetir o POST (cron rodando 2×) | `ja_entregues: 1`, `falhas: []` — **nenhuma 2ª DM** |
 
 **Staging:** ficamos na **opção 2** do §6 — o campo `ambiente` deriva do `GODOCS_ENV`
 (fonte única do ambiente no GoDocs) e o Gomoon roteia tudo para o destinatário de teste

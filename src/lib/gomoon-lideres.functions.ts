@@ -80,6 +80,23 @@ export function dataChaveBRT(iso: string): string {
 }
 
 /**
+ * ORIGEM (protocolo + host) de uma URL, descartando qualquer caminho. Função pura.
+ *
+ * ⚠️ `APP_BASE_URL` **não é uma origem limpa**: na staging ela vale
+ * `https://godocs-staging.devgogroup.com/meus-projetos` (o disparo de e-mails usa esse
+ * link inteiro). Concatenar `/aprovacoes` nela gerava
+ * `…/meus-projetos/aprovacoes` — rota que não existe, e o líder cairia num 404 vindo
+ * da DM. A tela mora na RAIZ (`src/routes/aprovacoes.tsx`).
+ */
+export function origemDe(url: string, padrao: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return padrao.replace(/\/+$/, '');
+  }
+}
+
+/**
  * Agrupa as linhas da agregada no payload do §3. Função PURA (exportada para teste).
  *
  * Os liderados saem ordenados por quantidade decrescente (é a ordem em que o Gomoon
@@ -91,7 +108,7 @@ export function montarPayloadLideresPendentes(
   opts: { ambiente: 'producao' | 'staging'; geradoEm: string; appUrl: string },
 ): PayloadLideresPendentes {
   const dia = dataChaveBRT(opts.geradoEm);
-  const url = `${opts.appUrl.replace(/\/+$/, '')}/aprovacoes`;
+  const url = `${origemDe(opts.appUrl, APP_PADRAO)}/aprovacoes`;
   const porLider = new Map<string, LiderPayload>();
 
   for (const l of linhas) {

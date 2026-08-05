@@ -130,6 +130,22 @@ describe('montarPayloadLideresPendentes — formato do contrato (§3)', () => {
     expect(p.origem).toBe('godocs');
   });
 
+  it('⚠️ APP_BASE_URL com CAMINHO não vaza para o link do líder', () => {
+    // A staging tem `APP_BASE_URL=https://godocs-staging.devgogroup.com/meus-projetos`
+    // (o disparo de e-mails usa o link inteiro). Concatenar dava `/meus-projetos/
+    // aprovacoes` — rota inexistente: o líder cairia num 404 vindo da DM.
+    const p = montarPayloadLideresPendentes([linha({})], {
+      ...OPTS,
+      appUrl: 'https://godocs-staging.devgogroup.com/meus-projetos',
+    });
+    expect(p.lideres[0].url).toBe('https://godocs-staging.devgogroup.com/aprovacoes');
+  });
+
+  it('appUrl inválida cai no default de produção, nunca num link quebrado', () => {
+    const p = montarPayloadLideresPendentes([linha({})], { ...OPTS, appUrl: 'nao-e-url' });
+    expect(p.lideres[0].url).toBe('https://godocs.devgogroup.com/aprovacoes');
+  });
+
   it('a url é a mesma para todos e não carrega token (§5)', () => {
     const p = montarPayloadLideresPendentes([linha({}), linha({ lider_email: 'b@gocase.com' })], OPTS);
     expect(new Set(p.lideres.map((l) => l.url)).size).toBe(1);
