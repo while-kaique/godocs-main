@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   interpretarParecerLider,
+  chaveDoEstado,
   COLUNA_ESTADO_LIDER,
   COLUNA_JUSTIFICATIVA_LIDER,
 } from '@/lib/aprovacoes-parecer';
@@ -194,5 +195,43 @@ describe('valorDaColuna — casamento tolerante (fonte única com a escrita)', (
     expect(sheets.chaveColuna('Justificativa Aprovação do Líder')).toBe(
       chaveColuna('justificativa aprovacao do lider'),
     );
+  });
+});
+
+describe('coluna "Pré-status" da tabela (mapResumo)', () => {
+  it('lê o estado do líder mesmo com o cabeçalho SEM acento de prod/staging', async () => {
+    const { mapResumo } = await import('@/lib/dashboard-admin.functions');
+
+    const comAcento = mapResumo({
+      'ID Projeto': 'abc123',
+      Projeto: 'Teste',
+      'Aprovação do Líder': 'Pré-aprovado',
+    } as never);
+    expect(comAcento?.aprovacaoLider).toBe('Pré-aprovado');
+
+    // Era o bug de origem: `row['Aprovação do Líder']` daria undefined e a coluna
+    // nasceria vazia em TODO projeto.
+    const semAcento = mapResumo({
+      'ID Projeto': 'abc124',
+      Projeto: 'Teste',
+      'Aprovacao do Lider': 'Ajuste pedido',
+    } as never);
+    expect(semAcento?.aprovacaoLider).toBe('Ajuste pedido');
+  });
+
+  it('projeto sem fila fica null (a tabela mostra "—", não um chip)', async () => {
+    const { mapResumo } = await import('@/lib/dashboard-admin.functions');
+    expect(mapResumo({ 'ID Projeto': 'x', 'Aprovação do Líder': '—' } as never)?.aprovacaoLider).toBeNull();
+    expect(mapResumo({ 'ID Projeto': 'x' } as never)?.aprovacaoLider).toBeNull();
+  });
+
+  it('o chip da tabela usa a MESMA régua de estado do painel da ficha', () => {
+    expect(chaveDoEstado('Pré-aprovado')).toBe('aprovado');
+    expect(chaveDoEstado('Pre-aprovado')).toBe('aprovado'); // digitado sem acento na planilha
+    expect(chaveDoEstado('Ajuste pedido')).toBe('ajuste');
+    expect(chaveDoEstado('Pré-pendente')).toBe('pendente');
+    expect(chaveDoEstado('Pré-reprovado')).toBe('reprovado');
+    expect(chaveDoEstado('Em conversa com o gestor')).toBe('sem_parecer');
+    expect(chaveDoEstado(null)).toBe('sem_parecer');
   });
 });

@@ -70,7 +70,11 @@ function limpo(v: string | undefined | null): string | null {
   return s === '' || s === '—' || s === '-' ? null : s;
 }
 
-function chaveDoEstado(estado: string | null): EstadoParecer {
+/**
+ * Estado do parecer a partir do rótulo cru da coluna. EXPORTADA porque a TABELA do
+ * dashboard mostra a mesma coluna ("Pré-status") e não pode ter uma segunda régua.
+ */
+export function chaveDoEstado(estado: string | null): EstadoParecer {
   const k = (estado ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

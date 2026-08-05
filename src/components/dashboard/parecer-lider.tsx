@@ -15,7 +15,7 @@
  *  • Nada é descartado: linha que o parser não reconhece aparece como veio.
  */
 import { CheckCircle2, XCircle, Clock, MinusCircle, PencilLine, Quote } from 'lucide-react';
-import type { EstadoParecer, ParecerLider } from '@/lib/aprovacoes-parecer';
+import { chaveDoEstado, type EstadoParecer, type ParecerLider } from '@/lib/aprovacoes-parecer';
 
 /** Aparência de cada estado. `icone` + `rotulo` garantem leitura sem depender da cor. */
 const APARENCIA: Record<
@@ -59,18 +59,34 @@ const APARENCIA: Record<
   },
 };
 
-function ChipEstado({ parecer }: { parecer: ParecerLider }) {
-  const a = APARENCIA[parecer.estadoChave];
+/**
+ * Chip do estado do parecer — usado na ficha E na coluna "Pré-status" da tabela, para os
+ * dois lugares não terem réguas diferentes de rótulo, cor e ícone.
+ *
+ * `estado` é o valor CRU da coluna: estado desconhecido (alguém digitou à mão na planilha)
+ * é exibido como está, não traduzido para "Pré-aprovado".
+ */
+export function ChipEstadoParecer({
+  estado,
+  compacto = false,
+}: {
+  estado: string | null;
+  compacto?: boolean;
+}) {
+  const chave = chaveDoEstado(estado);
+  const a = APARENCIA[chave];
   const { Icone } = a;
-  // O rótulo cru da planilha manda quando existe: se alguém escrever um estado que não
-  // conhecemos, a triagem tem de ver o que está escrito lá, não a nossa tradução.
-  const rotulo = parecer.estadoChave === 'sem_parecer' ? (parecer.estado ?? a.rotulo) : a.rotulo;
+  const rotulo = chave === 'sem_parecer' ? (estado ?? a.rotulo) : a.rotulo;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+      className={
+        compacto
+          ? 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold'
+          : 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold'
+      }
       style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
     >
-      <Icone className="h-3.5 w-3.5" aria-hidden />
+      <Icone className={compacto ? 'h-3 w-3 shrink-0' : 'h-3.5 w-3.5'} aria-hidden />
       {rotulo}
     </span>
   );
@@ -104,7 +120,7 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ChipEstado parecer={parecer} />
+        <ChipEstadoParecer estado={parecer.estado} />
         {parecer.assinatura && (
           <p className="text-[12.5px] text-muted-foreground">
             por <span className="font-medium text-foreground">{parecer.assinatura}</span>
