@@ -264,6 +264,15 @@ mudar, esta mensagem muda junto.
 correção na TeamGuide (Gente e Gestão? o próprio líder?). O Luis define antes de enviar.
 ⚠️ A promessa é **"as próximas submissões"**, não correção retroativa: fila já aberta
 mantém o líder antigo, porque as linhas de `projeto_aprovacoes` nascem na submissão.
+⚠️ **A frase do "pede um ajuste" promete demais — verificado no código em 05/08/2026
+(`src/routes/meus-projetos.tsx:767-784`).** O autor **vê** o selo *"Ajuste pedido pelo
+líder"* + o texto do líder no **card de "Meus Projetos"** — mas **ninguém o avisa** (não
+há DM nem e-mail; pendência aberta desde 03/08) e a tela de detalhe `/projeto/$id`
+**não** mostra o parecer. Trocar "você recebe exatamente o que precisa corrigir" por:
+_"Se pedir ajuste, o que precisa ser corrigido fica visível no seu projeto em *GoDocs →
+Meus Projetos*, e é só ajustar e reenviar."_ **Pendente do Luis** (proposto, não aplicado).
+Se quisermos avisar o autor de verdade, cabe no mesmo payload diário do Gomoon (uma lista
+de autores com ajuste pedido) — não existe hoje.
 
 ### 10.2 Projeto pendente de pré-aprovação (recorrente, bot → líder)
 
