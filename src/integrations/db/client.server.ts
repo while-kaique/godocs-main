@@ -1203,6 +1203,50 @@ export function getAprovacoesPendentesDe(email: string) {
   );
 }
 
+/**
+ * Snapshot da RELAÇÃO líder↔liderados-pendentes, para o POST diário ao Gomoon (D17).
+ * Uma linha por par (líder, liderado) com quantos projetos daquele liderado esperam
+ * o parecer daquele líder.
+ *
+ * ⚠️ A relação sai da PRÓPRIA FILA, não da TeamGuide: `projeto_aprovacoes` já foi
+ * escrita a partir dela na submissão. Reconsultar a TeamGuide aqui só criaria uma
+ * segunda régua (e um jeito de o payload divergir do que a tela `/aprovacoes` mostra).
+ *
+ * ⚠️ NENHUM valor em R$ sai daqui — é o que torna impossível vazar saving numa DM
+ * (§7 do contrato). Só nome, e-mail e contagem.
+ *
+ * Filtros: rascunho nunca entra em fila; projeto DESCONTINUADO não precisa mais de
+ * parecer; e os projetos de teste do harness (`[E2E-…]`) ficam de fora — o mute de
+ * Chat saiu do `abrirPreAprovacao`, então excluí-los é responsabilidade de quem monta
+ * o payload. (`LIKE` no SQLite não trata `[` como especial — o prefixo casa literal.)
+ */
+export function getPendenciasPorLider() {
+  return queryAll<{
+    lider_email: string;
+    lider_nome: string | null;
+    liderado_email: string | null;
+    liderado_nome: string | null;
+    projetos_pendentes: number;
+  }>(
+    `SELECT LOWER(TRIM(a.aprovador_email))                                  AS lider_email,
+            MAX(a.aprovador_nome)                                           AS lider_nome,
+            LOWER(TRIM(COALESCE(NULLIF(TRIM(a.autor_email), ''),
+                                p.responsavel_email, '')))                  AS liderado_email,
+            MAX(COALESCE(p.responsavel_nome, ''))                           AS liderado_nome,
+            COUNT(*)                                                        AS projetos_pendentes
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE a.veredito = 'pendente'
+        AND COALESCE(TRIM(a.aprovador_email), '') != ''
+        AND p.status != 'rascunho'
+        AND COALESCE(p.descontinuado, 0) != 1
+        AND COALESCE(p.nome, '') NOT LIKE '[E2E-%'
+      GROUP BY lider_email, liderado_email
+      ORDER BY lider_email, projetos_pendentes DESC, liderado_email`,
+    [],
+  );
+}
+
 /** Todas as linhas de um projeto (a decisão de um líder resolve para os demais — D4). */
 export function getAprovacoesDoProjeto(projetoId: string) {
   return queryAll<AprovacaoRow>(

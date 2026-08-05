@@ -274,11 +274,46 @@ escrito para o time do Gomoon; é a fonte). Resumo do que falta construir do nos
 | ~~P1~~ | ~~**DWD da SA `godocs@admin-n8n-study`**~~ — **RESOLVIDA por outro caminho (03/08/2026)**: a credencial `CHAT_SA_*` do `.env` já tem os escopos `chat.spaces` + `chat.messages.create` com `sub=rpa_ia@gocase.com`, validada ao vivo (D9). Pedir a DWD da SA `godocs@` virou opcional — se um dia sair, é só apagar as 2 linhas `CHAT_SA_*` e cair no fallback `GOOGLE_SA_*`. | — (era: Admin do Workspace) |
 | P2 | Criar a coluna **`Aprovação do Líder`** no cabeçalho das abas `GoDocs` e `STAGING`. | Luis |
 | ~~P3~~ | ~~Confirmar que `rpa_ia@gocase.com` tem **Google Chat ativo**~~ — **caducou com a D17**: não impersonamos mais caixa nenhuma. | — |
-| P4 | **Gomoon (D17):** URL do endpoint (prod + staging), token, confirmação do admin do Workspace de que o bot faz **DM proativa** (exige o Chat app instalado para a org), códigos de erro e como consultar o log de entrega. Checklist em `docs/integracao-gomoon-chat.md` §10. | Luis + time Gomoon |
+| ~~P4~~ | ~~**Gomoon (D17):** URL, token, DM proativa, códigos de erro, log de entrega~~ — **RESPONDIDA em 05/08/2026** pelo João Victor: a API está **em produção** (`POST https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes`); o **Bot Gomoon é admin-installed** no Workspace via Marketplace privado (DM 1:1 já materializada com 1.082 contas — não precisou de DWD); erros e log de entrega em `docs/integracao-gomoon-chat.md` §11–12. **Resta só o token** (enviado por canal separado, entra como secret). | Luis + time Gomoon |
 | P5 | **Faxina de secrets:** apagar `GOOGLE_CHAT_DM_ENABLED`, `CHAT_SA_CLIENT_EMAIL`, `CHAT_SA_KEY_BASE64` e `GOOGLE_CHAT_DM_SUBJECT` do `edf400b4` e do `.env` local (inertes desde a D17). | Luis |
+| P6 | **Secret `GOMOON_TOKEN`** nos apps `edf400b4` (staging) e `674a3710` (prod) + **cron `0 12 * * 1-5`** (09h BRT) apontando para `POST /api/cron/notificar-lideres`. | Luis |
 
 **F0 e F1 não dependem de nada disso** e podem ir a staging → prod antes. **F3** (o POST
-diário) depende só da P4.
+diário) está **implementada** (05/08/2026 — ver §8 abaixo) e depende só da P6.
+
+---
+
+## 8. F3 — o POST diário ao Gomoon (implementado 05/08/2026)
+
+Detalhe completo (contrato dos 2 lados, decisões, invariantes) em
+[docs/integracao-gomoon-chat.md](../docs/integracao-gomoon-chat.md) §11–12. Resumo:
+
+| Peça | Onde |
+|---|---|
+| Agregada líder×liderado | `getPendenciasPorLider()` — `src/integrations/db/client.server.ts` |
+| Payload (PURO) + envio | `src/lib/gomoon-lideres.functions.ts` |
+| Cron (09h BRT = `0 12 * * 1-5` UTC) | `POST /api/cron/notificar-lideres` |
+| Manual/admin (`{"dry":true}` não envia) | `POST /api/admin/notificar-lideres` |
+| Testes | `tests/gomoon-lideres.test.ts` · `tests/gomoon-pendencias-sql.test.ts` |
+
+**Decisões fechadas que NÃO podem ser "corrigidas" por engano:**
+
+- **A relação sai da FILA (`projeto_aprovacoes`), não da TeamGuide.** A fila já foi escrita
+  a partir dela na submissão; reconsultar aqui criaria uma segunda régua e um jeito de o
+  payload divergir do que a tela `/aprovacoes` mostra.
+- **Nenhum valor em R$ no payload** — só nome, e-mail e contagem. É o que torna impossível
+  vazar saving numa DM que se lê por cima do ombro. Há teste varrendo o JSON.
+- **Dia sem pendência dispara igual, com `lideres: []`.** Silêncio é indistinguível de cron
+  morto. Não "otimizar" pulando o POST.
+- **A data da `idempotency_key` é o dia de Brasília**, não o UTC (disparo noturno viraria
+  "amanhã" e renderia uma 2ª DM no mesmo dia).
+- **`notificarLideresPendentes` nunca lança** — o chamador é cron; o corpo da resposta É o
+  relatório.
+- **09h BRT, não 6h** (o Gomoon entrega a DM na hora que recebe o POST; às 6h o líder
+  recebia notificação de madrugada).
+- **Staging protegida só pelo campo `ambiente`** (opção 2 do contrato, derivado do
+  `GODOCS_ENV`). ⚠️ `GODOCS_ENV` errado na staging = DM para líder real. O token separado
+  que fecharia isso estruturalmente está disponível a pedido do João Victor.
 
 ---
 

@@ -292,7 +292,7 @@ na própria tela.
 
 👉 {{lideres[].url}}
 
-_Situação em {{gerado_em → DD/MM}} às 06h. Se você já decidiu depois disso, pode
+_Situação em {{gerado_em → DD/MM}} às 09h. Se você já decidiu depois disso, pode
 ignorar esta mensagem._
 ```
 
@@ -316,7 +316,45 @@ Chat — como consumir a API.md` (fora do repo). O que ele fixa:
 | Staging | ele oferece **token separado** que força modo de teste no servidor, independente do payload (torna impossível a staging cutucar líder real) — **basta pedir** |
 | Fora de escopo | decidir dentro do Chat (§9): o botão só abre a tela |
 
-⚠️ **Falta o nosso lado (F3):** a agregada em `projeto_aprovacoes` (`GROUP BY
-aprovador_email`) + o cron das 6h (UTC no Godeploy → `0 9 * * 1-5`) + o POST. Nada disso
-existe ainda. Pedir ao João Victor: **o token de produção** e, se formos usar staging, o
-**token separado** acima.
+---
+
+## 12. O nosso lado — IMPLEMENTADO (05/08/2026)
+
+| Peça | Onde |
+|---|---|
+| Agregada da relação | `getPendenciasPorLider()` (`src/integrations/db/client.server.ts`) |
+| Montagem do payload (PURA) | `montarPayloadLideresPendentes()` (`src/lib/gomoon-lideres.functions.ts`) |
+| Envio | `notificarLideresPendentes()` — mesmo arquivo |
+| Cron | `POST /api/cron/notificar-lideres` (header `x-godeploy-cron`) |
+| Manual (admin) | `POST /api/admin/notificar-lideres` — `{"dry":true}` monta e **não envia** |
+| Testes | `tests/gomoon-lideres.test.ts` · `tests/gomoon-pendencias-sql.test.ts` |
+
+**Horário: 09:00 BRT** (decisão do Luis, 05/08/2026 — o João sugeriu 09h–10h porque a DM
+sai na hora do POST e às 6h o líder recebia notificação de madrugada). O cron do Godeploy
+é **UTC**: `0 12 * * 1-5`.
+
+**Secrets** (Godeploy, nos DOIS apps): `GOMOON_TOKEN` (obrigatório — sem ele o run não
+envia e diz por quê) e `GOMOON_LIDERES_URL` (opcional; o default já é a URL de produção
+do §11). O `APP_BASE_URL` já existente monta o `url` de cada líder.
+
+**Staging:** ficamos na **opção 2** do §6 — o campo `ambiente` deriva do `GODOCS_ENV`
+(fonte única do ambiente no GoDocs) e o Gomoon roteia tudo para o destinatário de teste
+dele. ⚠️ Isso significa que **o campo é a única proteção**: um `GODOCS_ENV` errado na
+staging manda DM para líder real. Se um dia isso incomodar, o João emite o **token
+separado** (opção 1) e a proteção passa a ser do lado dele, imune ao nosso payload.
+
+**Decisões nossas que o contrato não fixava:**
+- A relação sai da **própria fila** (`projeto_aprovacoes`), não de uma segunda consulta à
+  TeamGuide — senão o payload poderia divergir do que a tela `/aprovacoes` mostra.
+- Ficam de fora: **rascunho**, projeto **descontinuado**, linha **já decidida** e os
+  projetos de teste **`[E2E-…]`** (o mute de Chat saiu do `abrirPreAprovacao` na D17, então
+  excluí-los virou responsabilidade de quem monta o payload).
+- A data da `idempotency_key` é o dia-calendário de **Brasília**, não o UTC: com o cron às
+  09h BRT dá no mesmo, mas um disparo manual à noite cairia no "dia seguinte" em UTC e
+  renderia uma segunda DM no mesmo dia.
+- `notificarLideresPendentes` **nunca lança** — o chamador é um cron, e uma exceção viraria
+  500 opaco no log. Toda falha volta como `ok:false` + `erro`, e o corpo da resposta é o
+  relatório (quantos líderes/liderados/projetos, status HTTP, falhas por item).
+
+⚠️ **Ainda pendente do João Victor:** o **token de produção** (§1 do documento dele — foi
+enviado por canal separado; entra como secret nos dois apps).
