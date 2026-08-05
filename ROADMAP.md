@@ -137,7 +137,9 @@ Efeito colateral bom: a staging voltou a ser **100% muda**.
 
 Somada a ela, a coluna **"Pré-status"** na TABELA (commit `b456626`, **1028 testes**), com o chip compartilhado — a triagem vê o parecer sem abrir ficha por ficha.
 
-**Próximo:** **conferir na staging a coluna "Pré-status" da tabela + a seção "Pré-aprovação do líder" na ficha (de preferência num projeto com "não" no checklist)** — depois, **mandar o `docs/integracao-gomoon-chat.md` ao time do Gomoon** e obter URL + token + a
+**05/08 (D20) — a isenção de pré-aprovação passa a ser pelo CARGO** ✅ A régua D11 ("é `leader` de um time ativo") isentava **analista com nó próprio na árvore** da TeamGuide — a Fablícia Lima saía `Pré-aprovado (liderança)` sem ninguém olhar (21 das 64 pendentes). Agora isenta **coordenador para cima** (supervisor NÃO), na fonte única `src/lib/cargo-lideranca.ts` (commit `0040fef`, **1049 testes**). Aba "Relação Líder-Liderado" de prod regravada com 2 tabelas (**quem recebe × quem não entra na fila**): 52 projetos em fila, 29 líderes, 10 isentos por cargo. ⚠️ **Não deployado** — staging/prod seguem na régua antiga.
+
+**Próximo:** **o Luis conferir a aba "Relação Líder-Liderado" (prod) e, se ok, deployar a D20 na staging `edf400b4`** — junto com **conferir a coluna "Pré-status" da tabela + a seção "Pré-aprovação do líder" na ficha (de preferência num projeto com "não" no checklist)** — depois, **mandar o `docs/integracao-gomoon-chat.md` ao time do Gomoon** e obter URL + token + a
 confirmação do admin do Workspace sobre a **DM proativa do bot** (P4) — sem isso a F3 não tem onde postar. Em
 paralelo, segue de pé: **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em

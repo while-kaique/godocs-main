@@ -4,7 +4,52 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 05/08 (última sessão) — staging validada + D19: o parecer do líder virou TELA na triagem
+## ✅ 05/08 (última sessão) — D20: a isenção de pré-aprovação passa a ser pelo CARGO
+
+**O que motivou:** o Luis olhou a aba **"Relação Líder-Liderado"** da planilha de prod e perguntou por que a
+**Fablícia** não aparecia com a líder dela (Kelly), mesmo tendo projeto pendente.
+
+**O diagnóstico** (scripts novos em `scripts/dryrun-lider/`, leitura pura contra prod + TeamGuide):
+a relação estava CERTA (`líder = kelly.sousa@`), mas a Fablícia era isenta pela **D11** — a TeamGuide
+pendura **um nó por pessoa** na árvore (`[TRANSPORTES] TIME FABRICIA LIMA`, filho do time da Kelly) e ela
+figurava como `leader` dele. Sendo `leader` de um time ativo, saía `Pré-aprovado (liderança)` **sem ninguém
+olhar**. Isso atingia **21 das 64** linhas pendentes.
+
+**Dois candidatos testados e um descartado:**
+- `liderados > 0` acertava 7 dos 8 casos, mas **descartado**: 22 pessoas com cargo de IC lideram gente de
+  fato (`Team Líder Cx` tem 12 liderados) e a régua as tiraria da isenção.
+- **cargo** — a decisão do Luis: *"todos respondem o líder que tiverem, mas cargos altos como coordenador,
+  head, diretor, diretoria, gerente, ceo (esses cargos pra cima) não passam"*. **Supervisor NÃO isenta.**
+
+**D20 implementada** (commit `0040fef`, **1049 testes**, `worker.js` rebuildado):
+- **`src/lib/cargo-lideranca.ts`** (PURO, fonte única) — `ehCargoDeLideranca` + `CARGOS_LIDERANCA`
+  (casa por **PALAVRA**: o `soci` solto fazia "Assistente de **Soci**al Media" virar sócio) +
+  `EXCECOES_CARGO_LIDERANCA` (gerência de **OFÍCIO**: Diretor de Arte, Gerente/Diretor de Projetos,
+  Gerente/Diretor de Produto — coordenação de projetos/produtos **não** é exceção, lidera gente).
+- `ehLideranca` agora só pergunta o cargo (`getCargoDe`); `/employees/refs` entrou nos caches por isolate
+  (a régua roda no caminho quente da submissão). Cargo vazio / fora da TeamGuide → **entra em fila**.
+- Justificativa do Sheets diz **"cargo de liderança (coordenador ou acima)"** (senão a triagem lê
+  "liderança" achando que a pessoa tem equipe).
+- Cadeia validada por teste: Fablícia (Analista) → **Kelly (Supervisora, aprova)** → **João Conde (Gerente,
+  isento)**; e Arnaldo (`Diretor de Arte PL II`) → **Aline (Coordenadora, isenta)**.
+
+**Aba "Relação Líder-Liderado" (prod) REGRAVADA** com a régua nova e **2 tabelas** (pedido do Luis: *"todos
+que iriam receber e quem n iria"*): **QUEM RECEBE** (líder · cargo · liderado · cargo · nº pendentes) e
+**QUEM NÃO ENTRA NA FILA** com o motivo em coluna própria. Números: **65 pendentes → 52 projetos em fila,
+29 líderes avisados, 10 isentos por cargo, 3 fora da TeamGuide** (antes: 21 isentos / 40 na fila).
+
+**Rulings do Luis registrados:** JR no cargo alto (`Coordenador de RPA JR`) **é isento**; `Gerente/Diretor
+de Projetos` e `de Produto` são **exceção** (entram em fila); `Coordenador de Projetos` e `Coordenadora de
+produtos` **seguem isentos** (lideram 5 e 3 pessoas).
+
+**⚠️ Nada foi deployado** — staging e prod seguem com a régua antiga (D11). O código está só na branch.
+
+**Próximo passo:** o Luis conferir a aba "Relação Líder-Liderado" na planilha de prod (quem recebe × quem
+não recebe); se estiver ok → **deploy na staging (`edf400b4`, regra 13)** → validar → prod → PR.
+
+---
+
+## ✅ 05/08 — staging validada + D19: o parecer do líder virou TELA na triagem
 
 **Duas coisas nesta sessão.**
 
