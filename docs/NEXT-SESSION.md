@@ -4,7 +4,65 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 05/08 (última sessão) — F3/D17: o aviso diário ao líder (GoDocs → Gomoon) implementado e validado na staging
+## ✅ 06/08 (última sessão) — D21: quem REDIGE as 2 DMs é o GoDocs (texto pronto no payload + anúncio com endpoint próprio)
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
+**executado**; esta sessão foi um pedido direto do Luis por cima dele (nenhum plano novo). A feature inteira
+continua **travada para prod** até a validação com a diretoria.
+
+**O que motivou:** o Luis escreveu à mão os **2 corpos de mensagem** (anúncio da feature para a empresa +
+aviso de pendência ao líder, com `{{lideres[].nome}}`, `{{total}}`, bullets de `{{liderados[]}}`) e perguntou
+o que o **João Victor** precisaria mudar na API do Gomoon para receber "mais um parâmetro: as mensagens".
+
+**A resposta (e a decisão):** pedir ao Gomoon que interpole aquilo significaria, do lado dele, um
+**mini-engine de template** (bloco de repetição, plural, soma do `total`, data em fuso de Brasília) e a
+**cópia da mensagem morando em 2 repos**. Inverteu-se o §7 do contrato: **nós renderizamos**, o texto viaja
+**pronto** em `lideres[].mensagem.texto`, e o template dele fica como **fallback** (é o que deixa os dois
+lados deployarem em qualquer ordem). Mexer numa vírgula passa a ser deploy nosso.
+
+**Contrato v2** — `docs/integracao-gomoon-chat.md` **§13** (mensagem pronta) e **§14** (anúncio). Foi isso
+que o Luis mandou ao João Victor; o adendo cobre o que faltava na 1ª versão da conversa: o **contrato do
+endpoint do anúncio** (senão ele inventaria um) e o alerta de que **`ambiente:"staging"` tem de ser honrado
+lá também** — sem isso um teste nosso viraria DM para a empresa inteira.
+
+**O que ficou pronto** (commit `35fa358`, **1107 testes**, `worker.js` rebuildado):
+
+| Peça | Onde |
+|---|---|
+| **Redação das 2 mensagens (PURA, fonte única)** | **`src/lib/gomoon-mensagens.ts`** |
+| Aviso diário ao líder | `renderMensagemLider()` → `lideres[].mensagem.texto` |
+| Anúncio (1× para a empresa) | `TEXTO_ANUNCIO_PRE_APROVACAO` + `ANUNCIO_CHAVE` (sem data) |
+| Envio do anúncio | `anunciarPreAprovacao()` + `POST /api/admin/anunciar-pre-aprovacao` |
+| Testes | `tests/gomoon-mensagens.test.ts` + 2 novos no `tests/gomoon-lideres.test.ts` |
+
+**Decisões da sessão (todas na spec, §9 = D21):**
+- **O anúncio NÃO viaja no payload diário** — endpoint próprio e chave **sem data**
+  (`godocs:anuncio:pre-aprovacao-lider:v1` → 1× por pessoa **para sempre**). Pendurado no snapshot que o cron
+  repete, viraria DM de anúncio **todo dia**. Mexer no texto não reenvia nada; só um `v2` explícito.
+- **`dry` é o DEFAULT do anúncio** (função e rota): enviar exige `{"dry":false}`. É a única rota do repo em
+  que um POST sem body falaria com a empresa inteira.
+- **A audiência é do Gomoon** (`destinatarios: "todos"`) — quem já resolve e-mail→usuário do Chat é ele; não
+  montamos lista de funcionários (decisão do Luis: *"eles resolvem lá"*).
+- **Renderizar DEPOIS de ordenar os liderados** — antes daria uma DM com bullets em ordem diferente da lista.
+
+**Duas promessas do texto do Luis, corrigidas contra o código (com teste prendendo):**
+1. *"abre a fila em GoDocs → Pré-aprovações"* → **não existe esse menu**; a entrada é a **faixa
+   "Pré-aprovações do meu time" da home** (`src/routes/index.tsx:296`).
+2. *"você recebe exatamente o que precisa corrigir"* → o autor **não é avisado** (não há DM nem e-mail para
+   ele); virou **"fica visível no seu projeto em Meus Projetos"**, que é o que o app faz.
+
+**O que falta:**
+1. **João Victor implementar o lado dele** — o campo `mensagem.texto` no diário e o **endpoint
+   `/api/godocs/anuncio`**, que **hoje não existe** (disparar a nossa rota agora devolve erro, não DM).
+2. **Staging** (regra 13): validar as 2 mensagens — `{"dry":true}` para conferir o texto, depois
+   `{"dry":false}`. A proteção continua sendo o campo `ambiente`.
+3. Segue de pé: **`GOMOON_TOKEN` na prod** + **cron `0 12 * * 1-5`**, e a **validação com a diretoria**.
+
+⚠️ **Nada deployado nesta sessão** e nada enviado a ninguém — tudo na branch.
+
+---
+
+## ✅ 05/08 — F3/D17: o aviso diário ao líder (GoDocs → Gomoon) implementado e validado na staging
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — executado;
 a feature inteira segue **travada para prod** até a validação com a diretoria.
