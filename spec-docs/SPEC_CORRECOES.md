@@ -150,6 +150,52 @@ antigos passaram a afirmar o formato novo). Decisão: **D18** de `SPEC_APROVACAO
 prod** por causa do acento **deixa de existir** — não é preciso renomear o cabeçalho.
 ---
 
+
+---
+
+## 2026-08-05 — Erro "too big" em inglês travou a submissão 10× (caso Josiely): campo sem `maxLength` + ZodError cru no toast
+
+**Status:** ✅ codada e testada (943 verdes) · **Branch:** `fix/erro-validacao-amigavel` · ⏳ staging pendente
+(a staging está ocupada pela frente da pré-aprovação do líder — `updateApp` substitui a app inteira)
+
+**Sintoma:** a Josiely tentou submeter "Análise Inteligente de Prazos" e recebeu um erro vermelho
+com **`[{"code":"too_big","maximum":200,…}]`** — JSON cru, em inglês, sem dizer QUAL campo corrigir.
+Tentou **10×** (17:32/17:34/17:38 de 05/08) e só passou às 17:40, depois de encurtar a lista de
+ferramentas por tentativa e erro. Nos logs de prod as 10 requisições aparecem **sem NENHUMA linha de
+log** (a pista que resolveu o caso).
+
+**Causa-raiz:** duas falhas somadas.
+1. O input "✏️ Especifique a ferramenta" (`step1.tsx`) **não tinha `maxLength`**, mas o schema tem
+   `ferramenta: z.string().max(200)` — e o valor enviado é `"Outros: " + texto`, então **193 chars
+   digitados** já estouram. Mesmo furo em `nome_projeto` e `servico_externo` (200 cada).
+2. O `ZodError` subia pelo `errorJson(err.message, 500)` e o `apiFetch` joga `data.error` **literal**
+   no toast. Como o `parse` é a primeira instrução de `iniciarSubmissao` (antes do 1º `log`), a
+   requisição morria sem deixar rastro no log — só no `api_logs`, que não tem endpoint de listagem.
+
+**Fix:** módulo PURO `src/lib/erro-validacao.ts` (`traduzirErroValidacao`) traduz ZodError →
+**400 + frase em PT-BR nomeando o campo e o limite** ("Ferramenta utilizada: texto muito longo — o
+limite é 200 caracteres."), no máximo 3 frases + contador. Ligado nos **dois** catches do `worker.ts`
+(dispatcher `/api/chat/*` e catch geral) — cobre todas as rotas de uma vez. Devolve `null` para erro
+que **não** é de validação, então falha real segue 500 (não engolimos bug de servidor como erro do
+usuário), e o `api_logs` continua gravando o erro **técnico** para o Investigador. Mais as travas de
+`maxLength` na tela: `ferramentaOutra` **192** (200 − os 8 do prefixo `"Outros: "`), `nome_projeto`
+200, `servicoExterno` 200.
+
+**Onde aterrissou:** `src/lib/erro-validacao.ts` (novo) · `src/worker.ts` (2 catches) ·
+`src/lib/submeter/step1.tsx` · `src/lib/submeter/step2.tsx` · `tests/erro-validacao.test.ts` (5 casos,
+incl. o caso real de 201 chars e o guard de "não engolir erro que não é validação") · `worker.js`.
+
+**Descartado (não re-investigar):** limite de payload do edge/Godeploy — sondei a staging com bodies
+de **1/4/8/10/12/20 MB** e todos chegaram ao worker. O PDF dela tinha 265 KB.
+
+**Achado colateral (frente SEPARADA):** o proxy de LLM estourou o timeout de **25 s em praticamente
+TODA chamada** na janela inteira do log, caindo no fallback OpenAI direto — nada se perde, mas são
++25 s por turno do chat, para todos. Não investigado.
+
+**Plano:** `docs/plans/fix-ferramenta-too-big-submissao.md`
+
+---
+
 ## 2026-08-05 — Gate do [1.4] "Ponteiro movido" nunca perguntava: o LLM respondia por conta própria, apontando pro próprio arquivo da automação
 
 **Status:** ✅ codada e testada (938 verdes) · **Branch:** `fix/gate-ponteiro-verbo-generico` · ⏳ staging pendente

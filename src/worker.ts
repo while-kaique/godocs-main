@@ -68,6 +68,7 @@ import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
 import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
+import { traduzirErroValidacao } from '@/lib/erro-validacao'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -347,7 +348,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return new Response(resJson, { status: 200, headers: { 'Content-Type': 'application/json' } })
       } catch (e) {
         const err = e as Error & { status?: number }
-        statusCode = err.status ?? 500
+        // Erro de VALIDAÇÃO (ZodError) → 400 com frase em PT-BR nomeando o campo e o
+        // limite. Antes subia o JSON cru do Zod (`{"code":"too_big",…}`) como 500 e o
+        // toast mostrava isso em inglês — a pessoa não tinha o que corrigir (bug real,
+        // caso Josiely 05/08/2026). No `api_logs` gravamos o erro TÉCNICO (`err.message`),
+        // para o Investigador não perder o path exato do campo.
+        const amigavel = traduzirErroValidacao(e)
+        statusCode = amigavel?.status ?? err.status ?? 500
         errorMsg = err.message
         await insertApiLog({
           projeto_id: projetoId,
@@ -361,7 +368,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           request_body: reqJson,
           response_body: null,
         }).catch(() => {})
-        return errorJson(err.message, statusCode)
+        return errorJson(amigavel?.mensagem ?? err.message, statusCode)
       }
     }
 
@@ -696,9 +703,11 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     return errorJson('Rota não encontrada', 404)
   } catch (e) {
     const err = e as Error & { status?: number }
-    const status = err.status ?? 500
+    // Mesma tradução do dispatcher de /api/chat/*: validação → 400 legível em PT-BR.
+    const amigavel = traduzirErroValidacao(e)
+    const status = amigavel?.status ?? err.status ?? 500
     console.error(`[worker] ${method} ${pathname}:`, err.message)
-    return errorJson(err.message, status)
+    return errorJson(amigavel?.mensagem ?? err.message, status)
   }
 }
 
