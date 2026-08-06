@@ -4,6 +4,46 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+## 🔴 06/08 (EM CURSO — PAROU NO MEIO) — D27: especial fora da fila + DISPARO RETROATIVO
+
+**PRÓXIMO PASSO EXATO:** ⚠️ **retomar o disparo retroativo do passo 1 abaixo.** A staging já tem a D27; a
+**PROD NÃO** — o deploy foi interrompido pelo Luis na hora de pegar o token de upload.
+
+**D27 (decisão do Luis, 06/08/2026) — projeto ESPECIAL não é pendência do líder.** Commit `5e40491`,
+**1102 testes**, staging `edf400b4` deployada 16:32 BRT. Motivo: especial **não tem memorial financeiro**,
+então a 3ª pergunta do checklist do gestor (*"o saving faz sentido?"*) não teria o que julgar — e o destino
+dele sempre foi a validação humana da RPA.
+- `abrirPreAprovacao` **não abre fila** para especial, com `motivo: 'especial'` + justificativa própria (D12:
+  a auditoria precisa distinguir isenção legítima de falha de integração).
+- ⚠️ O guard roda **ANTES da TeamGuide** — é flag do projeto, não depende de rede.
+- Rede de segurança no SQL das **3** consultas que definem "pendente": payload da DM (`getPendenciasPorLider`),
+  tela do líder (`getAprovacoesPendentesDe`) e o **CONTADOR** da faixa da home
+  (`contarAprovacoesPendentesDe`, que ganhou o `JOIN` — sem ele diria "3 pendentes" e abriria uma fila de 2).
+- O script `scripts/dryrun-lider/relatorio-sheet.ts` aplica a mesma régua (lê a coluna `Especial?`).
+
+**Relação de prod REGRAVADA em 06/08 13:31** (aba "Relação Líder-Liderado", 75 linhas, `RELATORIO_WRITE=1`):
+**73 pendentes → 35 projetos na fila (39 linhas, 27 líderes)** · **38 fora**: **29× projeto especial** ·
+8× isento por cargo · 1× autor fora da TeamGuide. (Antes da D27 eram 64 na fila — os especiais eram quase
+metade.) ⚠️ **Michael e Gesiel não precisaram de exceção manual**: caem sozinhos em "Autor não está
+cadastrado na TeamGuide". Só que a categoria mostra **1**, não 2 — provável que o projeto do outro seja
+especial (o filtro do especial roda ANTES, por ser característica do projeto). **Conferir qual está onde.**
+
+### ⏭️ O disparo RETROATIVO — os 4 passos, NESTA ordem
+1. **Deploy da D27 em PROD (`674a3710`)** — ⚠️ **TEM de vir antes do backfill**, senão os 29 especiais entram
+   na fila. (A staging já está.)
+2. **Popular a fila em prod** com os 35 projetos: hoje ela está **VAZIA** (`abrirPreAprovacao` só roda em
+   submissão nova; não há importação retroativa). Usar `POST /api/admin/aprovacoes/reabrir` — ⚠️ **fail-closed**:
+   exige `projetoIds` OU `autorEmail`, não existe "reabre tudo", e `dry` é o DEFAULT.
+3. **Dry-run do disparo** (`POST /api/admin/notificar-lideres {"dry":true}`) para o Luis conferir a lista
+   nominal dos 27 líderes ANTES de qualquer DM.
+4. **Disparo real** (`{"dry":false}`) — ⚠️ **27 líderes REAIS recebem DM**. O Luis autorizou o disparo, mas
+   pediu para confirmar antes deste passo.
+
+⚠️ **Outra sessão mexeu neste doc em paralelo** (a seção "Aprovações Pendentes por Líder" abaixo apareceu
+durante esta) — conferir se as duas abas de relatório na planilha de prod não se atropelam.
+
+---
+
 ## ✅ 06/08 (sessão MAIS RECENTE) — aba "Aprovações Pendentes por Líder" na planilha de PROD
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
