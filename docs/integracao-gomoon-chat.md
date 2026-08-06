@@ -508,3 +508,81 @@ a isenção descrita é a **D20** (coordenação para cima, sem citar supervisor
 fila é a **faixa "Pré-aprovações do meu time" da home** (não existe menu "GoDocs →
 Pré-aprovações") e a frase do ajuste diz *"fica visível em Meus Projetos"* — **não** "você
 recebe", porque o autor não é avisado por DM nem e-mail (pendência aberta).
+
+---
+
+## 15. v3 do doc deles + D24/D25 — o anúncio SAI do GoDocs e a DM encolhe (06/08/2026)
+
+⚠️ **Esta seção SUPERSEDE o §14 acima** (endpoint de anúncio do nosso lado) e ajusta o §13.
+
+### 15.1 O anúncio global deixou de ser nosso (D24)
+
+Decisão do Luis, 06/08/2026: **o Gomoon guarda o texto e faz o disparo** da mensagem única de
+abertura. Do nosso lado foram **REMOVIDOS** — não reimplementar:
+
+`TEXTO_ANUNCIO_PRE_APROVACAO` · `ANUNCIO_VERSAO`/`ANUNCIO_CHAVE` · `montarPayloadAnuncio` ·
+`anunciarPreAprovacao` · a rota `POST /api/admin/anunciar-pre-aprovacao` · os testes do anúncio.
+
+**Texto acordado** (registro do combinado — a versão em vigor é a que o Gomoon guarda), com os
+ajustes pedidos pelo chefe do Luis: **sem** a lista das 3 perguntas entre parênteses · **com**
+`reprova` como 3º veredito (existe no app: os botões são **Reprovar · Pedir ajuste ·
+Pré-aprovar**) · "coordenação+ vai direto para a validação do time de RPA" · "uma vez ajustado"
+(sem o "lá") · "saem corretas" (não "certas"):
+
+```
+<b>Novidade no GoDocs: os projetos agora passam por uma pré-aprovação do líder</b> 🚀
+
+Todo projeto submetido no GoDocs passa a ter uma <b>pré-aprovação do líder direto</b> antes de chegar à validação do time de RPA & IA.
+
+<b>Como funciona</b>
+• Você submete o projeto normalmente.
+• Seu líder é avisado por aqui e abre a fila em <b>GoDocs → Pré-aprovações</b>.
+• Ele responde três perguntas rápidas e então <b>pré-aprova</b>, <b>pede um ajuste</b> ou <b>reprova</b>.
+• Pediu ajuste? O que corrigir fica visível no seu projeto em <b>Meus Projetos</b>, é só editar e reenviar.
+
+<b>O que muda para você</b>
+• A pré-aprovação <b>não substitui</b> a validação do time de RPA & IA: ela vem antes e traz o olhar de quem conhece a rotina da área.
+• Projetos de cargos de coordenação+ vão direto para validação do time de RPA.
+• A relação líder ↔ liderado vem do organograma da TeamGuide. Se o seu líder aparecer errado, fale com a gente: uma vez ajustado, as próximas submissões já saem corretas.
+
+Dúvidas? Chame o time de RPA & IA ou use o botão de ajuda dentro do GoDocs.
+```
+
+⚠️ Duas divergências **conhecidas e mantidas** (o Luis foi avisado): o menu `GoDocs →
+Pré-aprovações` **não existe** (a entrada é a faixa "Pré-aprovações do meu time" na home), e a
+frase da isenção diz "time de RPA" enquanto o resto do texto diz "time de RPA & IA".
+
+### 15.2 A DM ao líder encolheu (D25) — pedido do LUCAS, que a recebe
+
+Saíram **três** coisas, todas por pedido de quem lê a mensagem:
+
+| O que saiu | Por quê (palavras dele) |
+|---|---|
+| "São três perguntas rápidas por projeto, e você pode pré-aprovar ou pedir ajuste na própria tela." | *"Não precisa falar das 3 perguntas aí tb… é você ir lá pré-aprovar e pronto, acabou."* |
+| "<i>Situação em DD/MM às HHh. Se você já decidiu depois disso, pode ignorar…</i>" | *"Se ele já decidiu, a mensagem não chegaria pra ele."* Era a ressalva do §7.2 — mas o snapshot já exclui quem decidiu. Levou junto `dataHoraBRT` e o parâmetro `geradoEm` de `renderMensagemLider`. |
+| A linha `👉 <url>` | O cartão já monta o botão **"Abrir a fila"** do campo `url`: o endereço aparecia **2×** (visto no print do disparo). ⚠️ **O campo `url` continua obrigatório** — é o destino do botão; se a entrega deixar de ser cartão, a linha do link tem de VOLTAR ou a DM fica sem caminho. |
+
+Sobrou **título + quem está esperando (+ bullets, no caso de vários) **. Os três cortes estão
+fixados em `tests/gomoon-mensagens.test.ts`: voltar atrás tem de ser DECISÃO, não regressão.
+
+### 15.3 O que mudou do lado deles (v3 do doc do João Victor)
+
+- ⚠️ **Bug de idempotência ENTRE AMBIENTES — corrigido lá.** Staging e produção dividiam a chave
+  `godocs:<email>:<data>`: **um teste nosso de staging queimava a DM real do líder naquele dia**
+  (aconteceu com o `lucas.queiroz@` em 05/08, 15h52). Agora a chave é **namespaceada por
+  ambiente** no Gomoon; a chave que mandamos continua igual e volta como veio.
+- **Bypass de idempotência na staging** (pedido nosso, já ativo em 06/08): re-disparar no mesmo
+  dia com `ambiente: "staging"` **reentrega** — é assim que se revalida texto sem esperar o dia
+  seguinte. Em produção a trava vale integral.
+- **O Luis entrou na lista de destinatários de teste** da staging (antes só o João recebia).
+- **Um cartão só.** Texto e cartão renderizavam juntos e duplicavam tudo na tela; agora o corpo é
+  só o nosso texto, e o resumo de uma linha foi para o **`fallbackText`** (alimenta a notificação
+  do celular, não renderiza no corpo).
+- **Tags aceitas no cartão:** `<b>` `<i>` `<u>` `<s>` `<br>` (e `\n`). ⚠️ **`<a href>` NÃO** —
+  qualquer outra tag, ou tag com atributo, sai **escapada** (aparece como texto). A URL vai crua.
+- Códigos novos no `resultados[]`: `payload_invalido`, `em_andamento`,
+  `staging_sem_destinatario`; avisos `texto_invalido_ignorado` / `texto_muito_longo_ignorado`
+  (texto ruim **não** derruba o item — cai no template interno deles). Teto de **4.096** chars.
+- **Horário:** eles pediram 09h–10h BRT; já estamos em `0 12 * * 1-5` (09h BRT). Fechado.
+- **Aberto:** o **token separado para a staging** (opção 1 do §6) segue oferecido e não emitido —
+  hoje a única proteção é o campo `ambiente` sair certo daqui.

@@ -1,31 +1,28 @@
-// Os TEXTOS das DMs da pré-aprovação (D21) — `src/lib/gomoon-mensagens.ts`.
+// O TEXTO da DM ao líder (D21) — `src/lib/gomoon-mensagens.ts`.
 //
 // O que estes testes seguram:
-//  • quem redige é o GODOCS: o texto vai PRONTO no payload, então o plural, o total e
-//    a data são responsabilidade nossa e têm de estar certos (do outro lado não há
-//    engine de template para consertar);
-//  • a data/hora sai em fuso de BRASÍLIA e do `gerado_em` — não é fixa em "09h";
+//  • quem redige é o GODOCS: o texto vai PRONTO no payload, então o plural e o total
+//    são responsabilidade nossa e têm de estar certos (do outro lado não há engine de
+//    template para consertar);
+//  • o CORTE pedido pelo Lucas (06/08/2026) — sem a frase das 3 perguntas e sem a
+//    ressalva "Situação em …, pode ignorar" — não pode voltar por acidente;
 //  • NENHUM valor em R$ (§7.1 do contrato);
 //  • o markup é o de CARD (`<b>`/`<i>`), NÃO o `*asterisco*` de mensagem de texto — o
 //    Gomoon entrega dentro de um `cardsV2`/`TextParagraph`, onde asterisco não é
 //    interpretado e chega literal na tela (foi o bug do 1º disparo, 06/08/2026).
+//
+// ⚠️ O ANÚNCIO global NÃO mora mais aqui (D24, 06/08/2026): quem guarda o texto e
+// dispara é o Gomoon. Se alguém reintroduzir `TEXTO_ANUNCIO_PRE_APROVACAO` neste
+// módulo, é regressão — o combinado está em `docs/integracao-gomoon-chat.md`.
 import { describe, it, expect } from 'vitest';
 
-import {
-  renderMensagemLider,
-  dataHoraBRT,
-  primeiroNome,
-  TEXTO_ANUNCIO_PRE_APROVACAO,
-  ANUNCIO_CHAVE,
-} from '@/lib/gomoon-mensagens';
+import { renderMensagemLider, primeiroNome } from '@/lib/gomoon-mensagens';
 
 const URL = 'https://godocs.devgogroup.com/aprovacoes';
-const GERADO = '2026-08-06T12:00:00.000Z'; // 09h de Brasília
-const lider = (liderados: { nome: string; projetos_pendentes: number }[], nome: string | null = 'Lucas Queiroz') => ({
-  nome,
-  url: URL,
-  liderados,
-});
+const lider = (
+  liderados: { nome: string; projetos_pendentes: number }[],
+  nome: string | null = 'Lucas Queiroz',
+) => ({ nome, url: URL, liderados });
 
 describe('renderMensagemLider — as três formas', () => {
   it('vários liderados: total somado + bullets na ordem recebida', () => {
@@ -34,7 +31,6 @@ describe('renderMensagemLider — as três formas', () => {
         { nome: 'Bruno Lima', projetos_pendentes: 3 },
         { nome: 'Ana Souza', projetos_pendentes: 2 },
       ]),
-      GERADO,
     );
     expect(t).toContain(
       'Oi, Lucas! <b>5 projetos</b> da sua equipe estão aguardando a sua pré-aprovação:',
@@ -44,7 +40,7 @@ describe('renderMensagemLider — as três formas', () => {
   });
 
   it('um liderado: nomeia a pessoa e NÃO abre lista de 1 item', () => {
-    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 3 }]), GERADO);
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 3 }]));
     expect(t).toContain(
       'Oi, Lucas! <b>3 projetos</b> de <b>Ana Souza</b> estão aguardando a sua pré-aprovação.',
     );
@@ -52,7 +48,7 @@ describe('renderMensagemLider — as três formas', () => {
   });
 
   it('um projeto só: concordância no singular', () => {
-    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }]), GERADO);
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }]));
     expect(t).toContain('<b>1 projeto</b> de <b>Ana Souza</b> está aguardando');
     expect(t).not.toContain('1 projetos');
     expect(t).not.toContain('estão aguardando');
@@ -64,42 +60,56 @@ describe('renderMensagemLider — as três formas', () => {
         { nome: 'Bruno Lima', projetos_pendentes: 2 },
         { nome: 'Ana Souza', projetos_pendentes: 1 },
       ]),
-      GERADO,
     );
-    expect(t).toContain('• Ana Souza — 1 projeto\n');
+    // `endsWith` (e não `toContain`) para distinguir "1 projeto" de "1 projetos":
+    // sem a linha do link, o último bullet é a última linha da mensagem.
+    expect(t.endsWith('• Ana Souza — 1 projeto')).toBe(true);
     expect(t).toContain('• Bruno Lima — 2 projetos');
   });
 
   it('líder sem nome no banco: saudação sem nome, nunca "Oi, null!"', () => {
-    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }], null), GERADO);
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }], null));
     expect(t).toContain('Oi! <b>1 projeto</b>');
     expect(t).not.toMatch(/null|undefined/);
   });
 
-  it('carrega a data do snapshot em Brasília (§7.2) e a ressalva de que o número envelhece', () => {
-    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }]), GERADO);
-    expect(t).toContain('<i>Situação em 06/08 às 09h.');
-    expect(t).toContain('pode ignorar esta mensagem.</i>');
+  it('⚠️ NÃO fala das 3 perguntas — corte pedido pelo Lucas (06/08/2026)', () => {
+    // "Não precisa falar das 3 perguntas aí": o que a tela pede, ele descobre na tela.
+    // A mesma frase saiu do texto de abertura, a pedido do chefe do Luis.
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 2 }]));
+    expect(t.toLowerCase()).not.toContain('perguntas');
+    expect(t).not.toContain('pedir ajuste');
   });
 
-  it('traz o título e a linha do link — formato do modelo do Luis (06/08/2026)', () => {
-    // ⚠️ Sabendo do custo: o cartão do Gomoon já mostra cabeçalho próprio ("📋
-    // Pré-aprovação pendente") e o botão "Abrir a fila" (do campo `url`), então título
-    // e link aparecem 2× na DM. Ele foi avisado disso e manteve o formato dele. Este
-    // teste existe para a remoção voltar a ser DECISÃO, não regressão silenciosa.
-    const t = renderMensagemLider(
-      {
-        nome: 'Lucas',
-        url: 'https://godocs-staging.devgogroup.com/aprovacoes',
-        liderados: [{ nome: 'Ana', projetos_pendentes: 1 }],
-      },
-      GERADO,
-    );
+  it('⚠️ NÃO traz a ressalva "Situação em …, pode ignorar" — corte do Lucas', () => {
+    // "Se ele já decidiu, a mensagem não chegaria pra ele." A linha vinha do §7.2 do
+    // contrato (o número envelhece entre disparo e leitura), mas o snapshot já exclui
+    // quem decidiu. Voltar com ela tem de ser DECISÃO, não regressão.
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 2 }]));
+    expect(t).not.toContain('Situação em');
+    expect(t).not.toContain('pode ignorar');
+    expect(t).not.toContain('<i>');
+  });
+
+  it('a mensagem é curta: título e quem está esperando — nada mais', () => {
+    // "É você ir lá pré-aprovar e pronto, acabou" (Lucas). Se alguém acrescentar
+    // parágrafo, este teste cai — de propósito.
+    const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 2 }]));
+    expect(t.split('\n').filter((l) => l.trim()).length).toBe(2);
+  });
+
+  it('⚠️ NÃO repete o link no corpo — quem leva à fila é o BOTÃO do cartão', () => {
+    // O cartão do Gomoon monta "Abrir a fila" a partir do campo `url`; a linha
+    // `👉 <url>` fazia o mesmo endereço aparecer 2× na DM (o Luis viu no print e
+    // mandou tirar, 06/08/2026). ⚠️ Se a entrega deixar de ser cartão — sem botão —,
+    // a linha tem de VOLTAR, senão a DM fica sem caminho nenhum.
+    const t = renderMensagemLider(lider([{ nome: 'Ana', projetos_pendentes: 1 }], 'Lucas'));
     expect(t.startsWith('<b>Você tem projeto para pré-aprovar no GoDocs</b> 📋')).toBe(true);
-    expect(t).toContain('👉 https://godocs-staging.devgogroup.com/aprovacoes');
+    expect(t).not.toContain(URL);
+    expect(t).not.toContain('👉');
   });
 
-  it('⚠️ markup de CARD (<b>/<i>), nunca o *asterisco* de mensagem de texto', () => {
+  it('⚠️ markup de CARD (<b>), nunca o *asterisco* de mensagem de texto', () => {
     // Dentro de um `TextParagraph` o asterisco NÃO é interpretado: chega literal na
     // tela. Se algum dia a entrega virar mensagem de texto simples, este teste é o
     // lugar de inverter a regra — de propósito, não por acidente.
@@ -108,13 +118,14 @@ describe('renderMensagemLider — as três formas', () => {
         { nome: 'Bruno Lima', projetos_pendentes: 3 },
         { nome: 'Ana Souza', projetos_pendentes: 2 },
       ]),
-      GERADO,
     );
     expect(t).not.toContain('*');
     expect(t).not.toMatch(/_[^_]+_/);
     expect(t).toMatch(/<b>.+<\/b>/);
     // `<br>` não: o card do Gomoon preserva o `\n` (conferido no disparo de 06/08).
     expect(t).not.toContain('<br');
+    // `<a href>` sai ESCAPADO no cartão deles (v3 do doc) — a URL vai crua.
+    expect(t).not.toContain('<a ');
     expect(t).toContain('\n');
   });
 
@@ -124,29 +135,10 @@ describe('renderMensagemLider — as três formas', () => {
         { nome: 'Bruno Lima', projetos_pendentes: 3 },
         { nome: 'Ana Souza', projetos_pendentes: 2 },
       ]),
-      GERADO,
     );
     for (const proibido of ['R$', 'saving', 'reais', 'ganho', 'receita', 'custo', 'memorial']) {
       expect(t.toLowerCase()).not.toContain(proibido.toLowerCase());
     }
-  });
-});
-
-describe('dataHoraBRT — fuso de Brasília, hora do disparo', () => {
-  it('o cron das 09h BRT (12h UTC)', () => {
-    expect(dataHoraBRT('2026-08-06T12:00:00.000Z')).toBe('06/08 às 09h');
-  });
-
-  it('22h de Brasília ainda é o MESMO dia (em UTC já seria o seguinte)', () => {
-    expect(dataHoraBRT('2026-08-07T01:00:00.000Z')).toBe('06/08 às 22h');
-  });
-
-  it('meia-noite é 00h, nunca 24h', () => {
-    expect(dataHoraBRT('2026-08-06T03:00:00.000Z')).toBe('06/08 às 00h');
-  });
-
-  it('data inválida não estoura nem imprime "Invalid Date"', () => {
-    expect(dataHoraBRT('nao-e-data')).toMatch(/^\d{2}\/\d{2} às \d{2}h$/);
   });
 });
 
@@ -156,58 +148,5 @@ describe('primeiroNome', () => {
     expect(primeiroNome('  Ana  Paula ')).toBe('Ana');
     expect(primeiroNome(null)).toBe('');
     expect(primeiroNome('   ')).toBe('');
-  });
-});
-
-describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no app', () => {
-  it('não promete aviso ao autor: diz que o ajuste FICA VISÍVEL em Meus Projetos', () => {
-    // O app mostra o parecer no card de "Meus Projetos", mas NÃO avisa o autor (não há
-    // DM nem e-mail para ele). "você recebe o que precisa corrigir" seria promessa falsa.
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain(
-      'fica visível no seu projeto em <b>Meus Projetos</b>',
-    );
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toMatch(/você recebe/i);
-  });
-
-  it('é o texto que o Luis colou — a versão CURTA, não o §10.1 longo', () => {
-    // Eu errei nos dois sentidos em 06/08: condensei o §10.1 e depois "restaurei" o
-    // longo. O que ele quer é este. Se estas frases sumirem, alguém reescreveu de novo.
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('• Você submete o projeto normalmente.');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('A relação líder ↔ liderado vem do organograma');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('Por que estamos fazendo isso');
-  });
-
-  it('a isenção descrita é a D20 (coordenação para cima), sem citar supervisor', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('cargo de coordenação para cima');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO.toLowerCase()).not.toContain('supervisor');
-  });
-
-  it('⚠️ cita "GoDocs → Pré-aprovações", que NÃO existe no app — decisão dele', () => {
-    // A entrada real é a FAIXA "Pré-aprovações do meu time" na home; esse item de menu
-    // não existe. Ele foi avisado (06/08/2026) e manteve a redação. O teste fixa a
-    // divergência CONHECIDA para ela não ser confundida com engano de quem ler depois.
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('<b>GoDocs → Pré-aprovações</b>');
-  });
-
-  it('⚠️ markup de CARD também no anúncio — sem asterisco literal na tela', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('*');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toMatch(/<b>.+<\/b>/);
-  });
-
-  it('⚠️ SEM travessão também no anúncio (pedido do Luis, 06/08/2026)', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('—');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('–');
-  });
-
-  it('não deixou placeholder de redação para trás', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toMatch(/<[A-ZÀ-Ú ]+>|\{\{|TODO/);
-  });
-
-  it('a versão da chave acompanha o texto — mexer na redação não reenvia nada', () => {
-    // ⚠️ Pin DE PROPÓSITO: subir a versão faz o Gomoon reentregar o anúncio para a
-    // empresa inteira, então tem de ser uma edição consciente — e não carona num
-    // commit que só mexeu na redação. `v1` e `v2` foram queimados ainda em teste (ver
-    // o histórico em ANUNCIO_VERSAO); `v4` é a versão que vai para produção.
-    expect(ANUNCIO_CHAVE).toBe('godocs:anuncio:pre-aprovacao-lider:v4');
   });
 });

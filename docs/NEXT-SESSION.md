@@ -4,6 +4,51 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+## ✅ 06/08 (sessão MAIS RECENTE) — D24/D25: o anúncio saiu do GoDocs e a DM ao líder encolheu
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
+**executado**; execução direta por cima dele (nenhum plano novo). A feature inteira continua **travada para
+prod** até a validação com a diretoria.
+
+**O que motivou:** o Luis pediu para disparar o aviso do líder e ver como chega. Do disparo saíram 3 pedidos
+— dele, do chefe dele e do **Lucas Queiroz** (o líder que recebe a DM).
+
+**O que entrou (staging `edf400b4`, deployada 2× nesta sessão, 1091 testes verdes):**
+1. **D24 — o ANÚNCIO GLOBAL saiu do GoDocs.** Quem guarda o texto e dispara é o **Gomoon**. Removidos
+   `TEXTO_ANUNCIO_PRE_APROVACAO`, `ANUNCIO_VERSAO`/`ANUNCIO_CHAVE`, `montarPayloadAnuncio`,
+   `anunciarPreAprovacao`, a rota `POST /api/admin/anunciar-pre-aprovacao` e os testes do anúncio.
+   **Não reimplementar.** O texto acordado (com os ajustes do chefe: sem a lista das 3 perguntas · com
+   **"reprova"** como 3º veredito · "coordenação+ vai direto para a validação do time de RPA" · "uma vez
+   ajustado" · "saem corretas") está registrado no **§15.1** de `docs/integracao-gomoon-chat.md`.
+2. **D25 — a DM ao líder encolheu**, por pedido do Lucas: saíram a frase das "três perguntas rápidas", a
+   ressalva "Situação em … pode ignorar" (levou junto `dataHoraBRT` e o parâmetro `geradoEm`) e, depois,
+   a linha `👉 <url>` — o cartão já monta o botão "Abrir a fila" do campo `url`. ⚠️ **O campo `url`
+   continua obrigatório**: é o destino do botão e agora o ÚNICO caminho até a fila.
+3. Os 3 cortes viraram **teste** (`tests/gomoon-mensagens.test.ts`) — voltar atrás tem de ser decisão.
+
+**Validado na staging (2 disparos reais, `202`, 0 falhas):** caso de **1 pessoa/1 projeto** (Lucas ← Luis) e
+caso de **2 pessoas/3 projetos** (Will Fernandes ← Mária Dávila 2 + Leticia Fernandes 1), este último montado
+reabrindo 3 filas reais via `POST /api/admin/aprovacoes/reabrir` — **as filas seguem abertas na staging**.
+
+**Do lado do Gomoon (v3 do doc do João Victor, §15.3):** corrigido o bug em que **staging queimava a chave de
+PRODUÇÃO** do mesmo líder no dia (aconteceu com o Lucas em 05/08); **bypass de idempotência na staging já
+ativo** (redisparar no mesmo dia reentrega — confirmado: `ja_entregues: 0` no 2º disparo); o **Luis entrou na
+lista de destinatários de teste**; cartão único + `fallbackText`; `<a href>` **não** funciona (sai escapado).
+
+**Pendências desta frente:**
+- ⚠️ **Prod continua sem `GOMOON_TOKEN` e sem o cron** `0 12 * * 1-5` → `/api/cron/notificar-lideres`.
+  Enquanto isso, nenhum líder real recebe nada.
+- **Token separado de staging** (opção 1 do §6) — oferecido pelo João Victor, não emitido. Hoje a única
+  proteção contra DM para líder real é o campo `ambiente` derivado do `GODOCS_ENV`.
+- **Título fixo no singular** ("Você tem projeto para pré-aprovar") mesmo com 3 projetos — o Luis viu e não
+  pediu mudança; é 1 linha se quiser concordância.
+- Limpar as 3 filas que semeei na staging, se atrapalharem outro teste.
+
+**Próximo passo:** validar com o Luis as 2 DMs sem a linha do link e, com o OK dele, abrir o PR desta branch
+com `/ggsd:ship` (a feature segue travada para prod pela diretoria — o ship é do código, não do rollout).
+
+---
+
 ## ✅ 06/08 (última sessão) — D21 DEPLOYADA e DISPARADA na staging + D22: o markup era o de superfície errada
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue

@@ -6,12 +6,14 @@
 //
 // Contrato dos dois lados: docs/integracao-gomoon-chat.md.
 //
-// Duas mensagens saem daqui (D21, 06/08/2026) — a REDAÇÃO das duas mora em
-// `gomoon-mensagens.ts` (módulo puro, fonte única):
-//  1. o aviso DIÁRIO ao líder com pendência (cron, `notificarLideresPendentes`);
-//  2. o ANÚNCIO de abertura da feature — uma vez, para a empresa
-//     (`anunciarPreAprovacao`, disparo manual de admin, endpoint próprio do Gomoon).
-// Nós mandamos o texto PRONTO em `mensagem.texto`; o template do Gomoon é fallback.
+// UMA mensagem sai daqui: o aviso DIÁRIO ao líder com pendência. A redação mora em
+// `gomoon-mensagens.ts` (módulo puro, fonte única) e nós mandamos o texto PRONTO em
+// `mensagem.texto`; o template do Gomoon é fallback.
+//
+// ⚠️ **O ANÚNCIO de abertura da feature SAIU do GoDocs (D24, 06/08/2026).** Quem guarda
+// o texto e dispara a mensagem única para a empresa é o GOMOON. `anunciarPreAprovacao`,
+// `montarPayloadAnuncio` e a rota `/api/admin/anunciar-pre-aprovacao` foram REMOVIDOS —
+// **não reimplementar**. O texto acordado está em `docs/integracao-gomoon-chat.md`.
 //
 // Invariantes que NÃO podem regredir:
 //  • **Nenhum valor em R$ no payload** (§7.1). É o que torna impossível vazar saving
@@ -29,14 +31,9 @@
 import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import { getGodocsEnv } from '@/lib/env';
-import {
-  ANUNCIO_CHAVE,
-  TEXTO_ANUNCIO_PRE_APROVACAO,
-  renderMensagemLider,
-} from '@/lib/gomoon-mensagens';
+import { renderMensagemLider } from '@/lib/gomoon-mensagens';
 
 const URL_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes';
-const URL_ANUNCIO_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/anuncio';
 const APP_PADRAO = 'https://godocs.devgogroup.com';
 /** O Gomoon responde entre 0,6s e 1,7s em produção; o contrato pede ≤10s (§3). */
 const TIMEOUT_MS = 15_000;
@@ -171,7 +168,7 @@ export function montarPayloadLideresPendentes(
         (a, b) => b.projetos_pendentes - a.projetos_pendentes || a.nome.localeCompare(b.nome, 'pt-BR'),
       );
       const comOrdem = { ...lider, liderados };
-      return { ...comOrdem, mensagem: { texto: renderMensagemLider(comOrdem, opts.geradoEm) } };
+      return { ...comOrdem, mensagem: { texto: renderMensagemLider(comOrdem) } };
     })
     .sort((a, b) => a.email.localeCompare(b.email));
 
@@ -361,118 +358,4 @@ export async function notificarLideresPendentes(
       (jaEntregues ? ` · ${jaEntregues} já entregue(s) hoje` : ''),
   );
   return { ...base, ...contagem, ok: true, status: resp.status, falhas, ja_entregues: jaEntregues };
-}
-
-// ─── Anúncio de abertura (uma vez, para a empresa) ────────────────────────────
-
-export type PayloadAnuncio = {
-  origem: 'godocs';
-  ambiente: 'producao' | 'staging';
-  gerado_em: string;
-  anuncio: {
-    /** SEM data (§13): entrega uma vez por pessoa, PARA SEMPRE. */
-    idempotency_key: string;
-    /**
-     * `'todos'` = o Gomoon expande pelo diretório do Workspace (decisão de
-     * 06/08/2026 — quem já resolve e-mail→usuário do Chat é ele). A forma de lista
-     * existe no contrato para um envio dirigido, mas não é a que usamos.
-     */
-    destinatarios: 'todos' | { email: string; nome?: string }[];
-    mensagem: MensagemPayload;
-  };
-};
-
-export type ResultadoAnuncio = {
-  ok: boolean;
-  dry: boolean;
-  ambiente: 'producao' | 'staging';
-  gerado_em: string;
-  chave: string;
-  status?: number;
-  /** Quantos itens o Gomoon reportou (0 quando ele processa a lista de forma assíncrona). */
-  itens: number;
-  /** Pessoas que já tinham recebido este anúncio — repetir o disparo NÃO reenvia (§13). */
-  ja_entregues: number;
-  /** Cortado em 20: num broadcast a lista inteira não caberia no corpo da resposta. */
-  falhas: { email: string; codigo: string }[];
-  falhas_total: number;
-  erro?: string;
-  payload?: PayloadAnuncio;
-};
-
-/** Monta o payload do anúncio. Função PURA (exportada para teste). */
-export function montarPayloadAnuncio(opts: {
-  ambiente: 'producao' | 'staging';
-  geradoEm: string;
-}): PayloadAnuncio {
-  return {
-    origem: 'godocs',
-    ambiente: opts.ambiente,
-    gerado_em: opts.geradoEm,
-    anuncio: {
-      idempotency_key: ANUNCIO_CHAVE,
-      destinatarios: 'todos',
-      mensagem: { texto: TEXTO_ANUNCIO_PRE_APROVACAO },
-    },
-  };
-}
-
-/**
- * Dispara o anúncio de abertura da feature — **uma vez**, para a empresa.
- *
- * NÃO tem cron: é um evento único, disparado à mão pelo admin no dia em que a
- * feature entra em produção (`POST /api/admin/anunciar-pre-aprovacao`). Repetir o
- * POST é seguro — a chave sem data faz o Gomoon ignorar quem já recebeu (§13) —,
- * mas não é para virar rotina.
- *
- * ⚠️ `ambiente` deriva do `GODOCS_ENV`, como no aviso diário, e aqui o risco é MAIOR:
- * sem o campo, um teste da staging viraria DM para a empresa inteira.
- *
- * NUNCA lança. ⚠️ **`dry` é o DEFAULT** — ao contrário do aviso diário, enviar exige
- * `{ dry: false }` EXPLÍCITO: uma chamada distraída aqui fala com a empresa inteira.
- */
-export async function anunciarPreAprovacao(opts?: { dry?: boolean }): Promise<ResultadoAnuncio> {
-  const dry = opts?.dry !== false;
-  const ambiente = getGodocsEnv() === 'staging' ? 'staging' : 'producao';
-  const geradoEm = new Date().toISOString();
-  const payload = montarPayloadAnuncio({ ambiente, geradoEm });
-
-  const base: ResultadoAnuncio = {
-    ok: false,
-    dry,
-    ambiente,
-    gerado_em: geradoEm,
-    chave: ANUNCIO_CHAVE,
-    itens: 0,
-    ja_entregues: 0,
-    falhas: [],
-    falhas_total: 0,
-  };
-
-  if (dry) return { ...base, ok: true, payload };
-
-  const url = process.env.GOMOON_ANUNCIO_URL || URL_ANUNCIO_PADRAO;
-  const token = (process.env.GOMOON_TOKEN || '').trim();
-  if (!token) {
-    console.warn('[gomoon] GOMOON_TOKEN não configurado — anúncio NÃO enviado.');
-    return { ...base, erro: 'GOMOON_TOKEN não configurado.' };
-  }
-
-  const resp = await postGomoon(url, token, payload);
-  if (resp.erro) return { ...base, status: resp.status, erro: resp.erro };
-
-  const { itens, jaEntregues, falhas } = resumirItens(resp.texto, () => undefined);
-  console.log(
-    `[gomoon] anúncio "${ANUNCIO_CHAVE}" enviado (${ambiente}) — HTTP ${resp.status}, ` +
-      `${itens} item(ns), ${jaEntregues} já entregue(s), ${falhas.length} falha(s)`,
-  );
-  return {
-    ...base,
-    ok: true,
-    status: resp.status,
-    itens,
-    ja_entregues: jaEntregues,
-    falhas: falhas.slice(0, 20),
-    falhas_total: falhas.length,
-  };
 }
