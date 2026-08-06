@@ -412,3 +412,44 @@ dentro de um **cartão** (`cardsV2` → `TextParagraph`):
 3. **Prod** (`674a3710`) — travado até a validação com a diretoria (decisão do Luis,
    03/08/2026). O rollout do aviso ao líder é **independente** da tela: só acontece
    quando a F3 existir e o Gomoon tiver o endpoint de pé (P4).
+
+---
+
+## 11. D26 — o aviso ao líder passa a ser IMEDIATO (06/08/2026)
+
+**Decisão do Luis:** o líder é avisado **na submissão**, não no dia seguinte às 09h.
+
+**Premissa que estava errada na D17:** tratamos a integração como "API diária". Não é — a
+§9 do doc do Gomoon diz *"entregamos a DM na hora em que recebemos o POST"*. A cadência
+sempre foi escolha nossa (o cron + a data dentro da chave de idempotência). Por isso a
+mudança **não exige nada do Gomoon**: mesmo endpoint, mesmo payload, mesmo token.
+
+### O que foi codado
+
+- **`notificarLideresDoProjeto(projetoId, aprovadores, {nomeProjeto, dry})`**
+  (`src/lib/gomoon-lideres.functions.ts`) — monta o payload só dos líderes daquele projeto,
+  com o **backlog** de cada um, e envia.
+- **`chaveDeProjeto(email, projetoId)`** → `godocs:<email>:<projetoId>`. A montagem do payload
+  ganhou o parâmetro `chaveDe` para os dois disparos compartilharem a mesma função pura.
+- **Call site**: `submeterParaValidacao` (`chat.functions.ts`), via `runBackground`, logo após
+  `abrirPreAprovacao` e só quando `!isento && aprovadores.length`.
+- **`enviarPayload`** extraído: token, POST, leitura do `resultados[]` e log são compartilhados
+  pelo imediato e pelo diário — não podem divergir.
+
+### Decisões fechadas que NÃO podem ser "corrigidas" por engano
+
+1. **A chave é por PROJETO, não por dia.** Com a chave diária, a 2ª submissão do dia para o
+   mesmo líder volta `ja_entregue` e a DM some **em silêncio**. Trocar de volta reintroduz o bug.
+2. **Manda o backlog do líder, não só o projeto que disparou.** É deliberado: devolve o efeito
+   de lembrete que o digest dava, e usa a mesma agregada da tela `/aprovacoes`.
+3. **Guard `[E2E-…]` explícito no caminho imediato.** A agregada filtrar o projeto **não basta** —
+   sem o guard, a submissão de teste dispara a DM do backlog do líder.
+4. **Não manda `lideres: []`.** Lista vazia é invariante do CRON, não deste caminho.
+5. **O cron diário NÃO foi apagado** — está implementado, testado e apenas não agendado. As
+   chaves são independentes, então os dois convivem se um dia quisermos os dois.
+
+### Aberto
+
+- O heartbeat sumiu junto com o cron: silêncio agora é indistinguível de integração quebrada.
+- Perguntas ao João Victor (§16 de `docs/integracao-gomoon-chat.md`): descarte de item em retry
+  quando chega POST novo, volume, e quem dispara o anúncio de abertura.

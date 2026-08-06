@@ -31,6 +31,7 @@
 import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import { getGodocsEnv } from '@/lib/env';
+import { ehProjetoTesteE2E } from '@/lib/google/chat';
 import { renderMensagemLider } from '@/lib/gomoon-mensagens';
 
 const URL_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes';
@@ -119,17 +120,46 @@ export function origemDe(url: string, padrao: string): string {
 }
 
 /**
+ * Chave de idempotência do aviso DIÁRIO: um dia, uma entrega por líder (§4).
+ * O POST é um snapshot que SUBSTITUI o estado do dia — cron repetido não reentrega.
+ */
+export function chaveDiaria(email: string, geradoEm: string): string {
+  return `godocs:${email}:${dataChaveBRT(geradoEm)}`;
+}
+
+/**
+ * Chave de idempotência do aviso IMEDIATO (D26): uma entrega por PROJETO, para sempre.
+ *
+ * ⚠️ NÃO dá para reaproveitar a chave diária aqui. Com disparo por submissão, dois
+ * projetos que caem no mesmo dia para o mesmo líder colidiriam na chave: o Gomoon
+ * devolveria `ja_entregue` no segundo (§8 — "chave já entregue → ignoramos") e a DM do
+ * segundo projeto sumiria em silêncio. A chave é string OPACA do lado deles ("continua
+ * sendo a mesma e é devolvida como veio", §3), então o formato é escolha nossa.
+ */
+export function chaveDeProjeto(email: string, projetoId: string): string {
+  return `godocs:${email}:${projetoId}`;
+}
+
+/**
  * Agrupa as linhas da agregada no payload do §3. Função PURA (exportada para teste).
  *
  * Os liderados saem ordenados por quantidade decrescente (é a ordem em que o Gomoon
  * lista na mensagem) e, no empate, por nome — para o payload ser estável entre runs.
  * O TOTAL do líder NÃO vai pré-calculado: o Gomoon soma (confirmado por eles no §2).
+ *
+ * `chaveDe` troca a granularidade da idempotência sem duplicar a montagem: o aviso
+ * diário usa a chave por DIA, o imediato usa a chave por PROJETO. Default = diária.
  */
 export function montarPayloadLideresPendentes(
   linhas: LinhaPendencia[],
-  opts: { ambiente: 'producao' | 'staging'; geradoEm: string; appUrl: string },
+  opts: {
+    ambiente: 'producao' | 'staging';
+    geradoEm: string;
+    appUrl: string;
+    chaveDe?: (email: string) => string;
+  },
 ): PayloadLideresPendentes {
-  const dia = dataChaveBRT(opts.geradoEm);
+  const chaveDe = opts.chaveDe ?? ((email: string) => chaveDiaria(email, opts.geradoEm));
   const url = `${origemDe(opts.appUrl, APP_PADRAO)}/aprovacoes`;
   // A `mensagem` entra só no fim: o texto lista os liderados na ordem final e soma o
   // total, então renderizar antes de agrupar/ordenar daria uma DM diferente da lista.
@@ -148,7 +178,7 @@ export function montarPayloadLideresPendentes(
         email,
         nome: (l.lider_nome ?? '').trim() || null,
         url,
-        idempotency_key: `godocs:${email}:${dia}`,
+        idempotency_key: chaveDe(email),
         liderados: [],
       };
       porLider.set(email, atual);
@@ -277,48 +307,9 @@ function resumirItens(
   };
 }
 
-/**
- * Monta e envia o snapshot diário ao Gomoon.
- *
- * NUNCA lança — o chamador é um cron: uma exceção viraria 500 opaco no log da
- * plataforma. Toda falha volta como `ok:false` + `erro`, e o corpo da resposta do
- * cron é o próprio relatório.
- *
- * `dry: true` monta o payload e NÃO envia nada (é como se valida sem cutucar ninguém).
- */
-export async function notificarLideresPendentes(
-  opts?: { dry?: boolean },
-): Promise<ResultadoNotificacao> {
-  const dry = opts?.dry === true;
-  const ambiente = getGodocsEnv() === 'staging' ? 'staging' : 'producao';
-  const geradoEm = new Date().toISOString();
-
-  const base: ResultadoNotificacao = {
-    ok: false,
-    dry,
-    ambiente,
-    gerado_em: geradoEm,
-    lideres: 0,
-    liderados: 0,
-    projetos: 0,
-    falhas: [],
-    ja_entregues: 0,
-  };
-
-  let payload: PayloadLideresPendentes;
-  try {
-    const linhas = await getPendenciasPorLider();
-    payload = montarPayloadLideresPendentes(linhas, {
-      ambiente,
-      geradoEm,
-      appUrl: process.env.APP_BASE_URL ?? APP_PADRAO,
-    });
-  } catch (e) {
-    console.error('[gomoon] falha ao montar o snapshot de pendências:', e);
-    return { ...base, erro: e instanceof Error ? e.message : String(e) };
-  }
-
-  const contagem = {
+/** Contagens do relatório, derivadas do payload. */
+function contarPayload(payload: PayloadLideresPendentes) {
+  return {
     lideres: payload.lideres.length,
     liderados: payload.lideres.reduce((s, l) => s + l.liderados.length, 0),
     projetos: payload.lideres.reduce(
@@ -326,16 +317,28 @@ export async function notificarLideresPendentes(
       0,
     ),
   };
+}
 
-  if (dry) {
-    return { ...base, ...contagem, ok: true, payload };
-  }
+/**
+ * Envia um payload já montado e resume a resposta. Compartilhado pelos DOIS disparos
+ * (imediato por submissão e snapshot diário) — a checagem de token, o tratamento de
+ * erro e a leitura do `resultados[]` são idênticos e não podem divergir.
+ *
+ * NUNCA lança: toda falha volta em `erro`.
+ */
+async function enviarPayload(
+  payload: PayloadLideresPendentes,
+  base: ResultadoNotificacao,
+  rotulo: string,
+): Promise<ResultadoNotificacao> {
+  const contagem = contarPayload(payload);
+  if (base.dry) return { ...base, ...contagem, ok: true, payload };
 
   const url = process.env.GOMOON_LIDERES_URL || URL_PADRAO;
   const token = (process.env.GOMOON_TOKEN || '').trim();
   if (!token) {
     // Defensivo como o resto das integrações: sem secret, não manda e diz por quê.
-    console.warn('[gomoon] GOMOON_TOKEN não configurado — snapshot NÃO enviado.');
+    console.warn(`[gomoon] GOMOON_TOKEN não configurado — ${rotulo} NÃO enviado.`);
     return { ...base, ...contagem, erro: 'GOMOON_TOKEN não configurado.' };
   }
 
@@ -353,9 +356,125 @@ export async function notificarLideresPendentes(
     );
   }
   console.log(
-    `[gomoon] snapshot enviado (${ambiente}): ${contagem.lideres} líder(es), ` +
+    `[gomoon] ${rotulo} enviado (${base.ambiente}): ${contagem.lideres} líder(es), ` +
       `${contagem.liderados} liderado(s), ${contagem.projetos} projeto(s) — HTTP ${resp.status}` +
-      (jaEntregues ? ` · ${jaEntregues} já entregue(s) hoje` : ''),
+      (jaEntregues ? ` · ${jaEntregues} já entregue(s)` : ''),
   );
   return { ...base, ...contagem, ok: true, status: resp.status, falhas, ja_entregues: jaEntregues };
+}
+
+/** Esqueleto do relatório, antes de saber o que foi montado. */
+function baseResultado(dry: boolean): ResultadoNotificacao {
+  return {
+    ok: false,
+    dry,
+    ambiente: getGodocsEnv() === 'staging' ? 'staging' : 'producao',
+    gerado_em: new Date().toISOString(),
+    lideres: 0,
+    liderados: 0,
+    projetos: 0,
+    falhas: [],
+    ja_entregues: 0,
+  };
+}
+
+/**
+ * AVISO IMEDIATO (D26, 06/08/2026) — o disparo do caminho quente da submissão.
+ *
+ * Decisão do Luis (06/08/2026): o líder é avisado **na hora**, não na manhã seguinte.
+ * A API do Gomoon nunca foi "diária" — ela entrega na hora em que recebe o POST (§9);
+ * a cadência sempre foi escolha NOSSA. O aviso diário (`notificarLideresPendentes`)
+ * continua existindo e testado, apenas não está agendado.
+ *
+ * ⚠️ Manda o BACKLOG INTEIRO do líder, não só o projeto que disparou. O gatilho é o
+ * projeto novo; o conteúdo é "o que está te esperando agora". É o que devolve o efeito
+ * de lembrete que o digest diário dava: quem ignorou a DM de ontem vê os dois projetos
+ * na DM de hoje. Por isso a relação sai da MESMA agregada do diário — uma régua só, e
+ * a DM nunca diverge do que a tela `/aprovacoes` mostra.
+ *
+ * ⚠️ NÃO manda `lideres: []`. A lista vazia é invariante do CRON (§2: prova de que o
+ * run aconteceu num dia sem pendência); aqui ela só gastaria uma chamada — se a fila
+ * do líder está vazia, não há o que avisar.
+ *
+ * NUNCA lança (D3): o chamador é o fim de `submeterParaValidacao`. Uma exceção aqui
+ * derrubaria a submissão de alguém por causa de um aviso.
+ */
+export async function notificarLideresDoProjeto(
+  projetoId: string,
+  aprovadores: { email: string; nome: string | null }[],
+  opts?: { dry?: boolean; nomeProjeto?: string | null },
+): Promise<ResultadoNotificacao> {
+  const base = baseResultado(opts?.dry === true);
+
+  // Projeto de teste do harness não avisa ninguém. O filtro existe na agregada, mas
+  // aqui ele precisa ser explícito: sem isto, uma submissão `[E2E-…]` (que a agregada
+  // descarta) ainda dispararia a DM do BACKLOG do líder — um ping real por teste.
+  if (ehProjetoTesteE2E(opts?.nomeProjeto)) {
+    console.log(`[gomoon] ${projetoId} é projeto de teste E2E — aviso ao líder suprimido.`);
+    return { ...base, ok: true };
+  }
+
+  const alvos = new Set(
+    aprovadores.map((a) => (a.email ?? '').trim().toLowerCase()).filter(Boolean),
+  );
+  if (!alvos.size) return { ...base, ok: true };
+
+  let payload: PayloadLideresPendentes;
+  try {
+    const linhas = (await getPendenciasPorLider()).filter((l) =>
+      alvos.has((l.lider_email ?? '').trim().toLowerCase()),
+    );
+    payload = montarPayloadLideresPendentes(linhas, {
+      ambiente: base.ambiente,
+      geradoEm: base.gerado_em,
+      appUrl: process.env.APP_BASE_URL ?? APP_PADRAO,
+      chaveDe: (email) => chaveDeProjeto(email, projetoId),
+    });
+  } catch (e) {
+    console.error('[gomoon] falha ao montar o aviso imediato ao líder:', e);
+    return { ...base, erro: e instanceof Error ? e.message : String(e) };
+  }
+
+  if (!payload.lideres.length) {
+    // A fila do líder ficou vazia entre abrir e avisar (projeto descontinuado, decidido
+    // por outro líder, ou o próprio projeto filtrado). Nada a enviar — não é erro.
+    return { ...base, ok: true };
+  }
+
+  return enviarPayload(payload, base, `aviso imediato (${projetoId})`);
+}
+
+/**
+ * SNAPSHOT DIÁRIO — o aviso em lote, disparado por cron.
+ *
+ * ⚠️ Continua implementado e testado, mas **não está agendado** desde a D26: quem avisa
+ * o líder é o disparo imediato acima. Ligar de volta é criar o cron
+ * `0 12 * * 1-5 → POST /api/cron/notificar-lideres` — as chaves de idempotência são
+ * independentes (dia × projeto), então os dois convivem sem se anular.
+ *
+ * NUNCA lança — o chamador é um cron: uma exceção viraria 500 opaco no log da
+ * plataforma. Toda falha volta como `ok:false` + `erro`, e o corpo da resposta do
+ * cron é o próprio relatório.
+ *
+ * `dry: true` monta o payload e NÃO envia nada (é como se valida sem cutucar ninguém).
+ */
+export async function notificarLideresPendentes(
+  opts?: { dry?: boolean },
+): Promise<ResultadoNotificacao> {
+  const base = baseResultado(opts?.dry === true);
+
+  let payload: PayloadLideresPendentes;
+  try {
+    const linhas = await getPendenciasPorLider();
+    payload = montarPayloadLideresPendentes(linhas, {
+      ambiente: base.ambiente,
+      geradoEm: base.gerado_em,
+      appUrl: process.env.APP_BASE_URL ?? APP_PADRAO,
+    });
+  } catch (e) {
+    console.error('[gomoon] falha ao montar o snapshot de pendências:', e);
+    return { ...base, erro: e instanceof Error ? e.message : String(e) };
+  }
+
+  return enviarPayload(payload, base, 'snapshot');
 }

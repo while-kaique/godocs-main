@@ -71,8 +71,8 @@ const plural = (n: number, palavra: string) => `${n} ${palavra}${n > 1 ? 's' : '
  * Sobrou o que ele resumiu como *"é você ir lá pré-aprovar e pronto, acabou"*:
  * título, quem está esperando e o link.
  *
- * ⚠️ O link continua repetido (linha `👉` + botão "Abrir a fila" do cartão) — decisão
- * do Luis, ver o cabeçalho do arquivo. Tirar é apagar uma linha.
+ * ⚠️ NÃO há linha de link: quem leva o líder à fila é o botão "Abrir a fila" que o
+ * cartão monta do campo `url` — ver o comentário no fim da função.
  *
  * Três formas, porque a frase única ficava errada nos extremos:
  *  • vários liderados → "N projetos da sua equipe" + bullets;

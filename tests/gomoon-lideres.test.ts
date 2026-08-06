@@ -20,6 +20,7 @@ import {
   montarPayloadLideresPendentes,
   dataChaveBRT,
   notificarLideresPendentes,
+  notificarLideresDoProjeto,
   type LinhaPendencia,
 } from '@/lib/gomoon-lideres.functions';
 
@@ -322,6 +323,135 @@ describe('notificarLideresPendentes — envio', () => {
     const r = await notificarLideresPendentes();
     expect(r.ok).toBe(false);
     expect(r.erro).toContain('db fora');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── D26: aviso IMEDIATO por submissão ───────────────────────────────────────
+//
+// A cadência virou "avisa na hora" (06/08/2026). O que estes testes seguram:
+//  • chave por PROJETO, não por dia — senão a 2ª submissão do dia para o mesmo líder
+//    volta `ja_entregue` e a DM some em silêncio (§8);
+//  • o disparo manda o BACKLOG do líder, não só o projeto que chegou;
+//  • projeto `[E2E-…]` não avisa ninguém — a agregada filtra o projeto, mas sem o
+//    guard explícito o teste ainda dispararia a DM do backlog do líder;
+//  • nunca lança e nunca manda `lideres: []` (a lista vazia é invariante do CRON);
+//  • ⚠️ em produção o `ambiente` sai "producao" e o texto não menciona staging.
+describe('notificarLideresDoProjeto — aviso imediato (D26)', () => {
+  const fetchMock = vi.fn();
+  const envAntigo = { ...process.env };
+  const LIDER = [{ email: 'lucas.queiroz@gocase.com', nome: 'Lucas Queiroz' }];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+    process.env.GOMOON_TOKEN = 'tok-secreto';
+    process.env.GOMOON_LIDERES_URL = 'https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes';
+    delete process.env.GODOCS_ENV;
+    mPendencias.mockResolvedValue([linha({})]);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 202,
+      text: async () => JSON.stringify({ ok: true, resultados: [{ ok: true }] }),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...envAntigo };
+  });
+
+  const corpo = () => JSON.parse(fetchMock.mock.calls[0][1].body) as {
+    ambiente: string;
+    lideres: { idempotency_key: string; email: string; url: string; mensagem: { texto: string } }[];
+  };
+
+  it('a chave é por PROJETO, não por dia (§8 — 2 submissões no mesmo dia não colidem)', async () => {
+    await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    expect(corpo().lideres[0].idempotency_key).toBe('godocs:lucas.queiroz@gocase.com:proj-abc');
+
+    fetchMock.mockClear();
+    await notificarLideresDoProjeto('proj-xyz', LIDER, { nomeProjeto: 'Robô Contábil' });
+    expect(corpo().lideres[0].idempotency_key).toBe('godocs:lucas.queiroz@gocase.com:proj-xyz');
+  });
+
+  it('⚠️ em produção o ambiente é "producao" e NADA na mensagem diz staging', async () => {
+    await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    const b = corpo();
+    expect(b.ambiente).toBe('producao');
+    expect(b.lideres[0].mensagem.texto.toLowerCase()).not.toContain('staging');
+    expect(b.lideres[0].mensagem.texto.toLowerCase()).not.toContain('teste');
+    expect(b.lideres[0].url).toBe('https://godocs.devgogroup.com/aprovacoes');
+  });
+
+  it('manda o BACKLOG do líder, não só o projeto que disparou', async () => {
+    mPendencias.mockResolvedValue([
+      linha({ liderado_email: 'ana@gocase.com', liderado_nome: 'Ana Souza', projetos_pendentes: 2 }),
+      linha({ liderado_email: 'bruno@gocase.com', liderado_nome: 'Bruno Lima', projetos_pendentes: 1 }),
+    ]);
+    const r = await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    expect(r.projetos).toBe(3);
+    expect(corpo().lideres[0].mensagem.texto).toContain('3 projetos');
+  });
+
+  it('avisa SÓ os líderes do projeto — a fila dos outros não vaza no POST', async () => {
+    mPendencias.mockResolvedValue([
+      linha({}),
+      linha({ lider_email: 'kelly@gocase.com', lider_nome: 'Kelly Santos' }),
+    ]);
+    await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    const emails = corpo().lideres.map((l) => l.email);
+    expect(emails).toEqual(['lucas.queiroz@gocase.com']);
+  });
+
+  it('projeto [E2E-…] NÃO avisa ninguém (nem o backlog do líder)', async () => {
+    const r = await notificarLideresDoProjeto('proj-abc', LIDER, {
+      nomeProjeto: '[E2E-abc123] Robô de teste',
+    });
+    expect(r.ok).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sem aprovador (autor isento ou sem líder) é no-op', async () => {
+    const r = await notificarLideresDoProjeto('proj-abc', [], { nomeProjeto: 'Robô Fiscal' });
+    expect(r.ok).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fila vazia NÃO vira POST com lideres: [] (isso é invariante do cron, não daqui)', async () => {
+    mPendencias.mockResolvedValue([]);
+    const r = await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    expect(r.ok).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('NENHUM valor em R$ no payload (§7.1)', async () => {
+    mPendencias.mockResolvedValue([linha({ projetos_pendentes: 2 })]);
+    await notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' });
+    const cru = fetchMock.mock.calls[0][1].body as string;
+    expect(cru).not.toMatch(/R\$|saving_reais|ganho_total|economia/i);
+  });
+
+  it('⚠️ D3: falha do banco/rede NÃO lança — a submissão não pode cair por causa da DM', async () => {
+    mPendencias.mockRejectedValue(new Error('db fora'));
+    await expect(
+      notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' }),
+    ).resolves.toMatchObject({ ok: false });
+
+    mPendencias.mockResolvedValue([linha({})]);
+    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    await expect(
+      notificarLideresDoProjeto('proj-abc', LIDER, { nomeProjeto: 'Robô Fiscal' }),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it('dry-run monta e não envia', async () => {
+    const r = await notificarLideresDoProjeto('proj-abc', LIDER, {
+      nomeProjeto: 'Robô Fiscal',
+      dry: true,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.payload?.lideres[0].idempotency_key).toBe('godocs:lucas.queiroz@gocase.com:proj-abc');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

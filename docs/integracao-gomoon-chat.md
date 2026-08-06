@@ -586,3 +586,72 @@ fixados em `tests/gomoon-mensagens.test.ts`: voltar atrás tem de ser DECISÃO, 
 - **Horário:** eles pediram 09h–10h BRT; já estamos em `0 12 * * 1-5` (09h BRT). Fechado.
 - **Aberto:** o **token separado para a staging** (opção 1 do §6) segue oferecido e não emitido —
   hoje a única proteção é o campo `ambiente` sair certo daqui.
+
+---
+
+## 16. D26 — o aviso passa a ser IMEDIATO, na submissão (06/08/2026)
+
+**Decisão do Luis (06/08/2026):** o líder é avisado **na hora em que o liderado submete**,
+não na manhã seguinte.
+
+**A API deles nunca foi "diária".** A §9 do doc do João Victor é explícita: *"Entregamos a
+DM na hora em que recebemos o POST."* O endpoint, o payload e o token são os mesmos; o que
+era diário era **o nosso cron**. Nada precisa mudar do lado do Gomoon.
+
+### O que muda do nosso lado
+
+| Peça | Antes (D17) | Agora (D26) |
+|---|---|---|
+| Gatilho | cron `0 12 * * 1-5` (09h BRT) | `runBackground` no fim de `submeterParaValidacao`, logo após `abrirPreAprovacao` |
+| Função | `notificarLideresPendentes()` | `notificarLideresDoProjeto(projetoId, aprovadores, {nomeProjeto})` |
+| Chave | `godocs:<email>:<YYYY-MM-DD>` | **`godocs:<email>:<projetoId>`** (`chaveDeProjeto`) |
+| Escopo | todos os líderes com pendência | só os líderes **daquele** projeto |
+| Conteúdo | backlog de cada líder | **backlog do líder** (não só o projeto que disparou) |
+
+### Por que a chave TEM de ser por projeto
+
+Com a chave diária e disparo por submissão, dois projetos do mesmo líder no mesmo dia
+colidem: o Gomoon devolve `ja_entregue` no segundo (§8 — *"chave já entregue → ignoramos"*)
+e a DM do segundo projeto **some em silêncio**. A chave é string opaca do lado deles
+(§3: *"continua sendo a mesma e é devolvida como veio"*), então o formato é escolha nossa e
+a mudança **não exige nada do Gomoon**.
+
+### Por que manda o BACKLOG, não só o projeto que chegou
+
+O gatilho é o projeto novo; o conteúdo é *"o que está te esperando agora"*. É o que devolve
+o efeito de lembrete que o digest diário dava — quem ignorou a DM de ontem vê os dois
+projetos na DM de hoje. E a relação sai da **mesma agregada** (`getPendenciasPorLider`), então
+a DM nunca diverge do que a tela `/aprovacoes` mostra.
+
+### Invariantes próprias do caminho imediato
+
+- **`[E2E-…]` tem guard EXPLÍCITO.** A agregada já filtra o projeto de teste, mas sem o guard
+  a submissão de um `[E2E-…]` ainda dispararia a DM do **backlog** do líder — um ping real por
+  execução do harness.
+- **Nunca manda `lideres: []`.** A lista vazia é invariante do **cron** (§2: prova de que o run
+  aconteceu num dia sem pendência). Aqui ela só gastaria uma chamada.
+- **Nunca lança** (D3). O chamador é o fim de `submeterParaValidacao`: uma exceção derrubaria a
+  submissão de alguém por causa de um aviso.
+- **`ambiente` continua derivando do `GODOCS_ENV`** — em produção (sem a env) sai `"producao"`,
+  e o texto que redigimos não menciona teste nem staging em lugar nenhum. Teste explícito.
+
+### O snapshot diário continua existindo
+
+`notificarLideresPendentes`, a rota de cron e a rota admin seguem implementadas e testadas —
+apenas **não há cron agendado**. Ligar de volta é criar `0 12 * * 1-5 → POST
+/api/cron/notificar-lideres`: as chaves (dia × projeto) são independentes, então os dois
+disparos convivem sem se anular.
+
+⚠️ **Efeito colateral de não ter o cron:** perdemos o *heartbeat*. O `lideres: []` de um dia
+sem pendência era a prova de que a integração estava viva; com o imediato sozinho, silêncio é
+indistinguível de integração quebrada.
+
+### A perguntar ao João Victor (não bloqueia o deploy)
+
+- **§8, 3º bullet:** *"Pendência de dia anterior que nunca saiu → descartada quando chega lote
+  novo."* Foi escrito para 1 lote/dia. Com N POSTs pequenos, um item em retry (`rate_limit`)
+  seria descartado pelo POST da submissão seguinte?
+- **Volume:** o padrão de chamada muda de 1 POST/dia para N POSTs espalhados no expediente.
+- **Anúncio de abertura:** a §4 diz que `/api/godocs/anuncio` **exige** `mensagem.texto` no corpo
+  (*"não existe template interno de anúncio"*). Como a D24 tirou o anúncio do GoDocs, hoje
+  **ninguém chama esse endpoint** — confirmar que ele dispara à mão com o texto combinado.
