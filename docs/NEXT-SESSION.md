@@ -99,6 +99,93 @@ não for mesclado** — foi exatamente assim que aconteceu.
 
 ## 🚨 06/08 — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu
 
+<details><summary>Histórico da sessão paralela do mesmo dia (coluna do líder nunca vazia + re-sync)</summary>
+
+## 🔧 06/08 (SESSÃO MAIS RECENTE) — coluna do líder nunca nasce vazia + o re-sync deixou de APAGAR o parecer
+
+**PRÓXIMO PASSO EXATO:** **mesclar `fix/pre-pendente-sempre-e-traco` na
+`worktree-plano-aprovacao-lider-teamguide` (PR #235)** e, **quando a outra frente liberar**,
+deployar prod (`674a3710`). ⚠️ O Luis avisou no meio da sessão que **estava mexendo no GoDocs
+em paralelo** — por isso **prod NÃO foi tocada** e o merge não foi feito por conta própria (a
+branch da feature pode estar em uso). Enquanto o fix não estiver na branch da feature, **o
+próximo deploy dela repete o buraco** (é o 4º atropelo da mesma natureza).
+
+**Plano ativo:** nenhum — esta sessão foi um fix direto a partir de um sintoma reportado, sem
+`docs/plans/<slug>.md`. Próximo trabalho novo deve começar por `/ggsd:plan`.
+
+### O sintoma NÃO era o que parecia (e isso é o achado que vale guardar)
+Reportado: "os novos submetidos estão sendo submetidos com essa linha sem nenhum status" +
+"a justificativa indo sem o hífen". **Não era mapeamento de coluna.** Prova dura:
+- Cabeçalho real de prod: **53 colunas**, `AE "Aprovação do Líder"` + `AF "Justificativa
+  Aprovação do Lider"` **existem**, **zero chave ambígua** (script novo `cabecalho-full.ts`).
+- `getApp(674a3710)` → **version 227** com a `userDescription` dos fixes do analisador, e
+  `GET /api/aprovacoes/pendentes` → **404**: a prod estava rodando o **`main`, SEM a feature**.
+  Sem o código, o sync nunca recebia as 2 chaves → `orderValuesByHeaders` escrevia `''` →
+  **célula em branco**. Restaurado na **version 228** (`17:08 UTC` = 14:08 BRT), por outra
+  frente, ~5 min antes desta sessão olhar.
+- ⚠️ **O `—` na AF das linhas de 03–05/08 NÃO foi o sistema** (a feature não estava no ar
+  nessas datas): foi **preenchimento manual** da planilha. A última linha da janela (E2E de
+  14:07 BRT, 1 min antes do restore) tem as **duas** células vazias — a assinatura exata do
+  build sem feature. Não gaste tempo procurando bug de escrita nessas linhas.
+- ⚠️ **Diagnostique por `getApp` + `GET /api/aprovacoes/pendentes`, NUNCA pela tela**
+  `/aprovacoes` (o SPA fallback a abre mesmo sem a feature — casca).
+
+### O bug de código REAL, achado no caminho: o re-sync apagava o parecer do líder
+`resyncGoogle` chamava `syncSubmitToGoogle` **sem** `aprovacaoLider`/`justificativaAprovacaoLider`,
+e a linha fazia `ouTraco(p.aprovacaoLider)` sem condição → `undefined` virava **`—`** e o
+`updateRowByProjectId` gravava isso **por cima do parecer que o líder já tinha dado** (estado +
+assinatura + checklist + comentário). Ou seja: a ferramenta de **RECUPERAÇÃO** (linha morta por
+cota 429) **destruía a pré-aprovação** do projeto que ia salvar.
+
+**Fix:** nessas 2 colunas **`undefined` ≠ `null`** — `null` = "não se aplica" → grava `—` (a
+célula **nunca** nasce vazia, **inclusive no append de RECUPERAÇÃO**: foi o teste que pegou esse
+ramo, porque ele monta a linha a partir do `row` do modo `edicao`, que já não trazia as chaves);
+**`undefined` = "não sei, não encoste"** → coluna **OMITIDA do update**. `resyncGoogle` passa o
+estado REAL derivado de `getAprovacoesDoProjeto` pelas funções puras que já existiam
+(`rotuloAprovacaoSheet`/`justificativaAprovacaoSheet`) e **não reabre fila** (isso é
+`reabrirPreAprovacoes`).
+
+### Decisões do Luis nesta sessão (fechadas — não "consertar" por engano)
+- **`Pré-pendente` só quando a fila REALMENTE abre.** As **D12/D20/D27 ficam de pé** (coordenador+
+  → `Pré-aprovado`; especial · sem líder · TeamGuide fora → `—`). Rótulo incondicional "igual ao
+  Status Pendente" diria "esperando o líder" em projeto que **nunca** entra na fila de ninguém e
+  quebraria a aba de espera por líder. O que a planilha ganha é **nunca ficar vazia**.
+- **Sem retroativo:** *"só com os novos submetidos essa condição"* — **nenhum backfill**. Os
+  projetos da janela sem-feature (incl. "Hub de Importação"/Gustavo Castro, 13:41 BRT) **não**
+  são regularizados, e a lista de backfill dos handoffs anteriores **não** deve ser rodada
+  sem nova decisão dele.
+
+### Estado da entrega
+- **2 commits** em `fix/pre-pendente-sempre-e-traco` (`dcfd26c` fix + `928b44d` scripts).
+  `worker.js` rebuildado e commitado (regra 1). `CLAUDE.md` + `SPEC_CORRECOES.md` atualizados
+  (regras 7/12). **1118 testes verdes** (+6).
+- **Novo teste:** `tests/sync-aprovacao-lider-colunas.test.ts` — 6 casos, incl. **"re-sync não
+  toca as colunas"** e **"recuperação nasce preenchida"**.
+- ⚠️ Os 7 erros de `npx tsc --noEmit` são **pré-existentes** (idênticos na branch base, em
+  arquivos não tocados) — não são desta sessão.
+- **VALIDADO NA STAGING** (`edf400b4`, deploy 17:31 UTC) com **1 cenário E2E real**
+  (`E2E_ONLY=saving-puro`): a linha nasceu com **`Pré-pendente`** + **`Aguardando Lucas
+  Goncalves Queiroz`**, e as linhas antigas da mesma aba mostram as 2 células vazias. Limpeza
+  feita (`GOOGLE_SHEETS_TAB=STAGING`, planilha antes do SQLite).
+
+### Scripts de leitura pura novos (fora do `npm run test`)
+- **`scripts/dryrun-lider/cabecalho-full.ts`** — cabeçalho inteiro + **chaves ambíguas** + colunas
+  que o código conhece e o cabeçalho não tem. É o que mata a hipótese "mapeamento de coluna".
+- **`scripts/dryrun-lider/ultimas-linhas.ts`** — últimas N linhas nas colunas que importam;
+  **`ABA=STAGING`** inspeciona a staging (default `GoDocs` = **PRODUÇÃO**).
+- **`scripts/dryrun-lider/cargo-de.ts`** — `ALVO=<email>`: cargo + isenção D20 + líderes + estado
+  esperado. Serve para escolher um autor **não-isento** antes de exercitar a fila ponta a ponta.
+- ⚠️ **O worktree não tem `.env`** — harness E2E e estes scripts não o acham. Rodar com
+  `set -a; . /home/notebook/godocs-main/.env; set +a` e **sempre** passar `E2E_BASE_URL` e
+  `GOOGLE_SHEETS_TAB` explícitos: **o default dos dois é PRODUÇÃO**.
+
+---
+
+## 🚨 06/08 (sessão anterior) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu
+
+</details>
+
+
 **PRÓXIMO PASSO EXATO:** ⚠️ **aplicar o deploy em PROD (`674a3710`) para RESTAURAR a pré-aprovação** —
 o build está pronto e validado (merge do `origin/main` + D27, **1112 testes**, staging `edf400b4`
 deployada 16:45 UTC e respondendo). Só falta `getUploadToken` → `scripts/deploy-godeploy.sh` →
