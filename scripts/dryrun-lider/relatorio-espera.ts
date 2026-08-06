@@ -16,11 +16,14 @@
 // as MESMAS da feature em produção, para o relatório não contar uma coisa e o sistema
 // fazer outra.
 //
-// ⚠️ UMA TABELA SÓ, 5 colunas: Líder · E-mail · Projetos pendentes · **Dias pendentes**
-// (a lista, do mais antigo para o mais novo: `128, 40, 3`) · Mais antigo (dias). A 1ª
-// versão tinha 3 tabelas e 11 colunas e o Luis cortou: *"está com muita informação"*.
-// O que saiu, se algum dia voltar a fazer falta: cargo, espera média, detalhe projeto a
-// projeto (nome/ID/data/estado) e a tabela dos pendentes que não esperam líder nenhum.
+// ⚠️ UMA TABELA SÓ, 6 colunas: Líder · E-mail · Projetos pendentes · **Dias pendentes**
+// (a lista, do mais antigo para o mais novo: `128, 40, 3`) · **Quem está esperando (dias)**
+// (o autor de cada pendência, na MESMA ordem: `Ana — 128 · Bruno — 40`) · Mais antigo
+// (dias). A 1ª versão tinha 3 tabelas e 11 colunas e o Luis cortou: *"está com muita
+// informação"*; a coluna das pessoas ele pediu de volta em seguida, para pesquisar o
+// projeto de cada um e conferir se o relatório acertou.
+// O que segue fora, se algum dia voltar a fazer falta: cargo, espera média, detalhe
+// projeto a projeto (nome/ID/data/estado) e a tabela dos pendentes que não esperam líder.
 //
 // ⚠️ O RELÓGIO é a coluna `Data Submissão` (o cabeçalho da aba repete isso, porque muda a
 // leitura do número): para projeto submetido pelo app é exatamente quando a fila do líder
@@ -137,11 +140,22 @@ async function main() {
   const porLider = new Map<string, LinhaFila[]>();
   for (const f of fila) porLider.set(f.liderEmail, [...(porLider.get(f.liderEmail) ?? []), f]);
 
-  const diasOrdenados = (itens: LinhaFila[]) =>
-    itens.map((i) => i.proj.dias ?? 0).sort((a, b) => b - a);
+  // Ordena UMA vez por espera e deriva as duas colunas da MESMA lista — se cada coluna
+  // ordenasse por conta própria, "42, 34" e "Ana — 34, Bruno — 42" sairiam trocados e a
+  // conferência apontaria a pessoa errada.
+  const porEspera = (itens: LinhaFila[]) =>
+    [...itens].sort((a, b) => (b.proj.dias ?? 0) - (a.proj.dias ?? 0));
+  const diasOrdenados = (itens: LinhaFila[]) => porEspera(itens).map((i) => i.proj.dias ?? 0);
   const esperaMax = (itens: LinhaFila[]) => diasOrdenados(itens)[0] ?? 0;
   const acimaDoLimite = (itens: LinhaFila[]) =>
     itens.filter((i) => (i.proj.dias ?? 0) > LIMITE_DIAS).length;
+  // Quem está esperando, na MESMA ordem dos dias. O nome vem da TeamGuide com fallback
+  // para o "Nome Completo" da planilha — é por ele que o Luis pesquisa o projeto para
+  // conferir se o relatório acertou.
+  const pessoasEsperando = (itens: LinhaFila[]) =>
+    porEspera(itens)
+      .map((i) => `${nome(i.proj.autorEmail, i.proj.autorNome)} — ${i.proj.dias ?? '—'}`)
+      .join(' · ');
 
   const ranking = [...porLider.entries()].sort(
     (a, b) =>
@@ -153,16 +167,25 @@ async function main() {
   const carimbo = AGORA.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   push(
     `Gerado em ${carimbo} (BRT) · "Dias pendentes" = dias desde a submissão de cada projeto que espera esse líder, ` +
-      'do mais antigo para o mais novo · só Status = "Pendente".',
+      'do mais antigo para o mais novo · "Quem está esperando" traz o autor de cada um, na MESMA ordem · ' +
+      'só Status = "Pendente".',
   );
   push('');
-  push('Líder', 'E-mail do líder', 'Projetos pendentes', 'Dias pendentes', 'Mais antigo (dias)');
+  push(
+    'Líder',
+    'E-mail do líder',
+    'Projetos pendentes',
+    'Dias pendentes',
+    'Quem está esperando (dias)',
+    'Mais antigo (dias)',
+  );
   for (const [email, itens] of ranking) {
     push(
       itens[0].liderNome,
       email,
       itens.length,
       diasOrdenados(itens).join(', '),
+      pessoasEsperando(itens),
       esperaMax(itens),
     );
   }
@@ -185,6 +208,11 @@ async function main() {
       `   ${esperaMax(itens)}d máx · ${acimaDoLimite(itens)}/${itens.length} atrasados · ` +
         `${itens[0].liderNome} <${email}>`,
     );
+  }
+  // Amostra do pareamento dias × pessoas: é o que se confere de olho antes de escrever.
+  console.log('Amostra (dias | quem está esperando):');
+  for (const [, itens] of ranking.slice(0, 10)) {
+    console.log(`   ${itens[0].liderNome}: ${diasOrdenados(itens).join(', ')} | ${pessoasEsperando(itens)}`);
   }
   console.log(`Linhas do relatório: ${linhas.length}`);
 
