@@ -1,5 +1,47 @@
 # Plano — Base TeamGuide: liderança + furo de áreas + paginação (F0 da pré-aprovação do líder)
-**Status:** ✅ aprovado (Luis, 2026-08-03)
+**Status:** ✅ **executado e commitado** (2026-08-03, `c9991be`) — e a sessão seguinte já entregou **F1 + F2**
+no mesmo commit. Falta só validar na staging → prod → PR (ver `spec-docs/SPEC_APROVACAO_LIDER.md` §7).
+
+> **F3 entregue em 05/08/2026 (`f6110a2` + `ec2cfe4`, 1078 testes) — o aviso diário ao líder.** A DM saiu do
+> nosso lado (D17): o GoDocs manda **1 POST/dia às 09h BRT** (`0 12 * * 1-5` UTC) com a RELAÇÃO
+> líder↔liderados-pendentes e o **bot do Gomoon** entrega. Agregada `getPendenciasPorLider` +
+> `src/lib/gomoon-lideres.functions.ts` + cron `/api/cron/notificar-lideres` + manual
+> `/api/admin/notificar-lideres` (`{"dry":true}` não envia). **Validado na staging:** 202 → `entregue`, o
+> líder real do payload **não** recebeu (proteção do `ambiente:"staging"`), POST repetido → `ja_entregue`.
+> Contrato dos 2 lados + decisões em `docs/integracao-gomoon-chat.md` §11–12. Falta `GOMOON_TOKEN` + cron
+> **na prod**.
+
+> **Fecho da tarde de 03/08 (`1296e12` + `e4780cb`), fora do escopo original do plano F0:** entrou a **D12**
+> (rótulo próprio para os 3 casos sem fila — liderança grava **`Pré-aprovado (liderança)`**, via a função
+> pura `rotuloIsencaoSheet`) e a **DM foi LIGADA na staging** a pedido do Luis, para o teste real com o
+> líder dele (secrets `GOOGLE_CHAT_DM_ENABLED=true`/`CHAT_SA_*`/`GOOGLE_CHAT_DM_SUBJECT` no `edf400b4`;
+> prod segue no-op). Aprendizado de credencial: **só a SA `planilha-jg@` tem a DWD de Chat** — a `godocs@`
+> do Sheets devolve `401 unauthorized_client`, então a fallback `GOOGLE_SA_*` do `chat-dm.ts` não serve.
+> 848 testes verdes. O que resta do plano é **validação humana**, não código.
+
+> **Nota da sessão de 03/08 (F1+F2):** o Luis pediu a implementação direta, **sem rodar os revisores de
+> contexto fresco** — os 3 marcadores de gate ficaram ausentes e o commit saiu com a suíte verde (845 testes)
+> como única trava. Decisão dele, registrada aqui para não parecer gate furado.
+> Nesta rodada entrou também a **D11** (liderança é isenta de pré-aprovação), que não existia no plano F0.
+
+> **T1–T6 implementados**; 824 testes verdes (baseline 805); `worker.js` rebuildado.
+> **Não commitado** porque a sessão fechou **suja**: os 3 revisores de contexto fresco
+> (`verificador-conformidade`, `revisor-qualidade`, `revisor-reuso`) foram disparados mas a
+> janela acabou antes dos vereditos — `.claude/.review-status` e `.claude/.quality-status`
+> seguem em `pendente`, e os gates barram o commit. **Retomar = re-rodar os 3 revisores,
+> gravar os vereditos e commitar** (nada de código a escrever).
+>
+> **Achado que quase passou:** os testes autorados às cegas usavam ids **string**; a API real
+> devolve ids **numéricos** — todo `map.get(String(id))` errava em silêncio e tudo voltava
+> `null`. Só o **smoke contra a API real** pegou. Fix: `normalizarTimes()` na fronteira +
+> 2 guardas de regressão com ids numéricos.
+>
+> **Validado ao vivo (read-only, `TG_API_TOKEN` do `.env` da raiz):** `luis.albuquerque@` →
+> Lucas Gonçalves Queiroz (área RPA) · `rafael@` → **sem líder** (D6), área "N1" · 432 pessoas
+> no índice com **exatamente 1** sem líder (bate com a spec) · as pessoas do bug 3.2 resolvem
+> (BIZOPS · OPERAÇÕES · TIME JOAQUIM QUINDERE · N1 - LUIS LIVERI).
+
+_Status anterior:_ ✅ aprovado (Luis, 2026-08-03)
 
 **Objetivo:** deixar `src/lib/areas/teamguide.server.ts` capaz de responder **quem é o líder direto de um e-mail** (insumo da F1 de pré-aprovação) e, no caminho, fechar os 2 bugs achados na integração atual — a **paginação morta** e o **"ÁREA NÃO IDENTIFICADA" que atinge 10 pessoas**.
 

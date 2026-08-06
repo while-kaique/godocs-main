@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
+import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
 import { STATUS_TRIAGEM, pilulaDe, corDaRegua } from '@/components/dashboard/status-triagem';
@@ -350,6 +351,9 @@ function Dashboard() {
                 </Th>
                 <Th className="hidden lg:table-cell">Área</Th>
                 <Th>Status</Th>
+                {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
+                    ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
+                <Th className="hidden md:table-cell">Pré-status</Th>
                 <Th className="hidden xl:table-cell">Complexidade</Th>
                 <Th
                   className="text-right"
@@ -375,7 +379,7 @@ function Dashboard() {
                 <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="p-10 text-center text-sm text-muted-foreground">
                     {projetos.length === 0
                       ? 'A planilha não devolveu nenhum projeto.'
                       : 'Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila.'}
@@ -436,6 +440,15 @@ function Dashboard() {
                     </td>
                     <td className="px-3 py-2.5">
                       <StatusBadge status={p.statusChave} />
+                    </td>
+                    <td className="hidden px-3 py-2.5 md:table-cell">
+                      {p.aprovacaoLider ? (
+                        <ChipEstadoParecer estado={p.aprovacaoLider} compacto />
+                      ) : (
+                        // Projeto sem fila nenhuma (legado, isento): "—" quieto em vez de
+                        // um chip "Sem parecer" repetido em centenas de linhas.
+                        <span className="text-[12.5px] text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="hidden px-3 py-2.5 text-[12.5px] xl:table-cell">
                       {p.complexidade ?? '—'}

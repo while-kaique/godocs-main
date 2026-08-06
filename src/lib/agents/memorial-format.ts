@@ -223,6 +223,64 @@ export function extrairPonteiroMovido(memorial: string | null | undefined): stri
   return extrairSecaoMemorial(memorial, PREFIXO_PONTEIRO_MOVIDO, { prefixo: true });
 }
 
+/**
+ * Extrai do memorial o "Resumo" (ponto [1.2], Seção 1 — Contexto): o parágrafo em que o
+ * agente conta, em prosa, o que o projeto faz e o que ele muda. É mais ABRANGENTE que o
+ * `resumo` da análise automática (que julga a submissão), e é ele que a tela de
+ * pré-aprovação mostra ao líder — a análise vira só o fallback.
+ *
+ * Casa o título exato "Resumo": o [1.2] vem antes da Seção 5 ("Resumo do saving") no
+ * texto, então a primeira ocorrência é sempre a certa.
+ *
+ * Use sobre o memorial JÁ normalizado (normalizarMarcadoresMemorial).
+ */
+export function extrairResumoMemorial(memorial: string | null | undefined): string | null {
+  return (
+    extrairSecaoMemorial(memorial, TITULOS_MEMORIAL['1.2'].toLowerCase()) ??
+    extrairRotuloTextoPuro(memorial, TITULOS_MEMORIAL['1.2'])
+  );
+}
+
+/**
+ * Fallback do resumo para memoriais em que o agente escreveu o rótulo em TEXTO PURO
+ * ("Resumo: o projeto audita…"), sem `**negrito**` nem `###` — formato real encontrado
+ * na staging (03/08/2026), invisível para o `tituloDaLinha`.
+ *
+ * Fica FORA do `extrairSecaoMemorial` de propósito: aquele alimenta os gates
+ * determinísticos do critério de projeto e da carga×escala, e afrouxar o casamento de
+ * título lá mudaria o que aqueles gates enxergam. Aqui o pior caso é um resumo a mais.
+ *
+ * Para no próximo rótulo do mesmo formato ("Processo alterado:"), num cabeçalho, no
+ * separador `---` ou na linha em branco.
+ */
+function extrairRotuloTextoPuro(memorial: string | null | undefined, titulo: string): string | null {
+  if (!memorial) return null;
+  const linhas = memorial.split(/\r?\n/);
+  const abre = new RegExp(`^\\s*${titulo}\\s*:\\s*(.*)$`, 'i');
+  // Outro rótulo curto começando a linha ("Processo alterado:") — sem vírgula/ponto no
+  // meio, para não confundir com uma frase do próprio resumo que contenha ":".
+  const OUTRO_ROTULO = /^\s*[A-ZÁ-Ú][^:,.]{2,60}:\s/;
+
+  const inicio = linhas.findIndex((l) => abre.test(l));
+  if (inicio < 0) return null;
+
+  const partes: string[] = [];
+  const primeira = linhas[inicio].match(abre)?.[1]?.trim();
+  if (primeira) partes.push(primeira);
+
+  for (let j = inicio + 1; j < linhas.length; j++) {
+    const l = linhas[j];
+    if (!l.trim()) break;
+    if (tituloDaLinha(l) !== null) break;
+    if (OUTRO_ROTULO.test(l)) break;
+    if (/^\s*-{3,}\s*$/.test(l)) break;
+    partes.push(l);
+  }
+
+  const texto = partes.join('\n').trim();
+  return texto || null;
+}
+
 // Fatia uma seção do memorial pelo seu título legível (já em minúsculas). Captura o
 // conteúdo inline do rótulo (`**Título:** aqui`) + as linhas seguintes, parando no
 // próximo ponto/seção ou no separador `---` do bloco financeiro injetado. Base comum

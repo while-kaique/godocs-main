@@ -24,6 +24,8 @@ import { readAllRows, updateRowByProjectId, type SheetRow } from '@/lib/google/s
 import { parseDataFlexivel } from '@/lib/format-date';
 import { runBackground } from '@/lib/background';
 import { insertAdminStatusLog, getAdminStatusLogs } from '@/integrations/db/client.server';
+import { valorDaColuna } from '@/lib/coluna-chave';
+import { COLUNA_ESTADO_LIDER } from '@/lib/aprovacoes-parecer';
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +138,13 @@ export type ProjetoDashboardResumo = {
   especial: boolean;
   atualizadoEm: string | null;
   observacoes: string | null;
+  /**
+   * Estado da pré-aprovação do líder — coluna "Pré-status" da tabela (pedido do Luis,
+   * 05/08/2026: dar para saber se o líder já decidiu sem abrir a ficha). É o rótulo CRU
+   * da planilha; quem traduz para chip é `ChipEstadoParecer`. Cabe na listagem enxuta
+   * porque é um rótulo curto — a JUSTIFICATIVA (multi-linha) segue só no detalhe.
+   */
+  aprovacaoLider: string | null;
   busca: string;
 };
 
@@ -326,6 +335,10 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     especial: ehSim(row['Especial?']),
     atualizadoEm: texto(row['Atualizado Em']),
     observacoes: texto(row['Observações']),
+    // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"
+    // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna
+    // nasceria vazia para todo projeto. Ver `coluna-chave.ts`.
+    aprovacaoLider: texto(valorDaColuna(row as Record<string, string>, COLUNA_ESTADO_LIDER)),
     // O que a busca alcança: nome do projeto, autor, e-mail, id, área e ferramenta.
     busca: chaveBusca(nome, autor, email, id, area, ferramenta),
   };

@@ -8,7 +8,13 @@ import type { GoDeployDB } from '@/integrations/db/db-adapter';
 vi.mock('@/lib/google/sheets', () => ({ readAllRows: vi.fn() }));
 
 import { readAllRows } from '@/lib/google/sheets';
-import { setDb, getProjetoById, insertProjetoRaw } from '@/integrations/db/client.server';
+import {
+  setDb,
+  getProjetoById,
+  insertProjetoRaw,
+  abrirAprovacoesPendentes,
+  getAprovacoesDoProjeto,
+} from '@/integrations/db/client.server';
 import { syncSheetsToSqlite, syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 
 const mockedRead = readAllRows as unknown as ReturnType<typeof vi.fn>;
@@ -621,5 +627,53 @@ describe('reconhecimento de "Descontinuado" (Sheets → SQLite)', () => {
     ]);
     await syncSheetsToSqlite();
     expect((await getProjetoById('desc-keep'))?.descontinuado).toBe(1);
+  });
+});
+
+// Critério de aceitação 6 do plano da pré-aprovação do líder: a decisão do líder é
+// AUTORIZAÇÃO, e a planilha é só espelho dela. Digitar o veredito na célula à mão não
+// pode virar pré-aprovação no app — por isso `Aprovação do Líder` /
+// `Justificativa Aprovação do Líder` ficam FORA de `SAFE_UPDATE_FIELDS` e a tabela
+// `projeto_aprovacoes` é interna (o sync reverso não a conhece).
+describe('pré-aprovação do líder NÃO volta da planilha (autorização, não dado)', () => {
+  it('digitar "Pré-aprovado" na célula deixa a fila pendente e o projeto intocado', async () => {
+    await insertProjetoRaw({
+      id: 'aprov-manual',
+      nome: 'Projeto com fila aberta',
+      responsavel_nome: 'Liderado',
+      responsavel_email: 'liderado@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      updated_at: new Date().toISOString(),
+    });
+    await abrirAprovacoesPendentes('aprov-manual', 1, 'liderado@gocase.com', [
+      { email: 'lider@gocase.com', nome: 'Líder' },
+    ]);
+
+    mockedRead.mockResolvedValue([
+      {
+        'ID Projeto': 'APROV-MANUAL',
+        'Nome Completo': 'Liderado',
+        Email: 'liderado@gocase.com',
+        Projeto: 'Projeto com fila aberta',
+        Ferramenta: 'n8n',
+        Status: 'Pendente',
+        // Alguém "aprovando" na mão, direto na planilha.
+        'Aprovação do Líder': 'Pré-aprovado',
+        'Justificativa Aprovação do Líder': 'Aprovado por mim mesmo',
+      },
+    ]);
+
+    await syncSheetsToSqlite();
+
+    const linhas = await getAprovacoesDoProjeto('aprov-manual');
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].veredito).toBe('pendente');
+    expect(linhas[0].decidido_por).toBeNull();
+    expect(linhas[0].decidido_em).toBeNull();
+    // E nenhuma coluna do projeto virou depósito do texto do veredito.
+    const p = await getProjetoById('aprov-manual');
+    expect(JSON.stringify(p)).not.toContain('Aprovado por mim mesmo');
+    expect(JSON.stringify(p)).not.toContain('Pré-aprovado');
   });
 });

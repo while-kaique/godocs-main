@@ -2,6 +2,7 @@
 
 import { getAccessToken } from './auth';
 import { assertNaoEhDefaultDeProd } from '../env';
+import { chaveColuna } from '../coluna-chave';
 
 const DEFAULT_SPREADSHEET_ID = '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const DEFAULT_SHEET_NAME = 'GoDocs';
@@ -105,6 +106,17 @@ export const SHEET_COLUMNS = [
   // ("Claro sim — …" / "Claro não — …" / "Zona cinzenta — …"). Edição manual desta
   // coluna é sobrescrita na próxima submissão/resync.
   'Classificação',
+  // ─── Pré-aprovação do líder (TeamGuide) ─────────────────────────────────────
+  // "Pendente com <líder>" no append; "Aprovado por <líder> em dd/mm/aaaa" /
+  // "Reprovado por <líder> em dd/mm/aaaa — <motivo>" quando o líder decide no
+  // GoDocs; "—" quando não se aplica (autor é liderança, ou não tem líder).
+  // ⚠️ A coluna precisa existir no cabeçalho das abas GoDocs e STAGING (mapeamento
+  // por NOME — se faltar, é ignorada com aviso). NÃO bloqueia a triagem da RPA.
+  'Aprovação do Líder',
+  // Detalhe do parecer: quem decidiu, quando, as 3 respostas do checklist e o
+  // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
+  // Pré-reprovado) — decisão do Luis, 03/08/2026.
+  'Justificativa Aprovação do Líder',
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
@@ -126,7 +138,49 @@ export function colLetter(index: number): string {
 // Lê a linha 1 da aba e devolve os nomes na ORDEM real + o mapa nome→letra. É a
 // peça que torna o sync robusto a reordenação/inserção manual de colunas: nada
 // aqui depende de posição fixa.
-export type HeaderMap = { headers: string[]; letterByName: Record<string, string> };
+export type HeaderMap = {
+  headers: string[];
+  letterByName: Record<string, string>;
+  /** Índice TOLERANTE (nome normalizado → letra). Ver `chaveColuna`. */
+  letterByKey: Record<string, string>;
+};
+
+// A regra de casamento de nome de coluna vive em `@/lib/coluna-chave` (módulo PURO):
+// o CLIENTE também precisa dela para achar a coluna do parecer do líder na ficha de
+// triagem, e este arquivo é server-only (importa `./auth`). Reexportada aqui porque os
+// chamadores e os testes de sempre a esperam neste módulo.
+export { chaveColuna };
+
+/**
+ * Índice normalizado nome→X a partir de uma lista de nomes. Chave AMBÍGUA (dois
+ * nomes distintos que normalizam igual) é DESCARTADA — fail-safe: melhor não
+ * casar do que gravar na coluna errada.
+ */
+function indexarPorChave<T>(nomes: string[], valor: (nome: string, i: number) => T): Record<string, T> {
+  const vezes = new Map<string, number>();
+  for (const n of nomes) {
+    if (!n) continue;
+    const k = chaveColuna(n);
+    vezes.set(k, (vezes.get(k) ?? 0) + 1);
+  }
+  const out: Record<string, T> = {};
+  nomes.forEach((n, i) => {
+    if (!n) return;
+    const k = chaveColuna(n);
+    // >1 = ambíguo (ou nome repetido): quem resolve é o match EXATO, não este índice.
+    if (vezes.get(k) !== 1 || k in out) return;
+    out[k] = valor(n, i);
+  });
+  return out;
+}
+
+/**
+ * Resolve a letra da coluna: match EXATO primeiro (comportamento de sempre),
+ * tolerante (acento/caixa/espaço) como rede. `undefined` = coluna não existe.
+ */
+export function resolverColunaLetra(map: HeaderMap, nome: string): string | undefined {
+  return map.letterByName[nome] ?? map.letterByKey[chaveColuna(nome)];
+}
 
 export async function fetchHeaderMap(token: string, spreadsheetId: string, sheetName: string): Promise<HeaderMap> {
   const range = `'${sheetName}'!1:1`;
@@ -142,19 +196,50 @@ export async function fetchHeaderMap(token: string, spreadsheetId: string, sheet
   headers.forEach((h, i) => {
     if (h && !(h in letterByName)) letterByName[h] = colLetter(i);
   });
-  return { headers, letterByName };
+  const letterByKey = indexarPorChave(headers, (_n, i) => colLetter(i));
+  return { headers, letterByName, letterByKey };
 }
 
 // Ordena os valores (mapa nome→valor) conforme a ORDEM real do cabeçalho. Colunas
 // sem valor entram vazias (preserva alinhamento). Função pura — testável.
+//
+// O casamento header↔valor é o mesmo do update: EXATO primeiro, tolerante a
+// acento/caixa depois (`chaveColuna`) — senão o append repetiria o bug da coluna
+// "Justificativa Aprovação do Lider".
 export function orderValuesByHeaders(
   headers: string[],
   values: Partial<Record<string, string | number>>,
 ): (string | number)[] {
+  const nomePorChave = indexarPorChave(Object.keys(values), (n) => n);
+  // Cabeçalho ambíguo (2 colunas que normalizam igual) NÃO recebe valor pelo índice
+  // tolerante — as duas casariam com a mesma chave e o valor seria escrito 2×.
+  const chavePorHeader = indexarPorChave(headers, (n) => n);
   return headers.map((h) => {
-    const v = values[h];
+    const chave = chaveColuna(h);
+    const ambiguo = chavePorHeader[chave] == null;
+    const nome = h in values ? h : ambiguo ? undefined : nomePorChave[chave];
+    const v = nome == null ? undefined : values[nome];
     return v == null ? '' : v;
   });
+}
+
+/**
+ * Nomes de coluna que o chamador mandou e o cabeçalho real NÃO tem (nem por match
+ * tolerante) — os únicos que serão ignorados de fato. Puro, para o aviso do append.
+ */
+export function chavesForaDoCabecalho(
+  headers: string[],
+  values: Partial<Record<string, string | number>>,
+): string[] {
+  const letterByKey = indexarPorChave(headers, (_n, i) => colLetter(i));
+  const map: HeaderMap = {
+    headers,
+    letterByName: Object.fromEntries(headers.map((h, i) => [h, colLetter(i)])),
+    letterByKey,
+  };
+  return Object.keys(values).filter(
+    (k) => values[k] != null && resolverColunaLetra(map, k) == null,
+  );
 }
 
 // ─── Append: adiciona nova linha ao final da planilha ────────────────────────
@@ -171,11 +256,8 @@ export async function appendRow(values: Partial<Record<SheetColumn, string | num
     throw new Error('Sheets append abortado: cabeçalho da planilha está vazio.');
   }
 
-  const headerSet = new Set(headers);
-  for (const key of Object.keys(values)) {
-    if (values[key as SheetColumn] != null && !headerSet.has(key)) {
-      console.warn(`[google/sheets] Coluna "${key}" não existe no cabeçalho da planilha — valor ignorado no append.`);
-    }
+  for (const key of chavesForaDoCabecalho(headers, values)) {
+    console.warn(`[google/sheets] Coluna "${key}" não existe no cabeçalho da planilha — valor ignorado no append.`);
   }
 
   const rowValues = orderValuesByHeaders(headers, values);
@@ -261,9 +343,10 @@ export async function updateRowByProjectId(
   const token = await getAccessToken();
   const { spreadsheetId, sheetName } = getSheetConfig();
 
-  // 0. Resolver as letras das colunas pelo cabeçalho real.
-  const { letterByName } = await fetchHeaderMap(token, spreadsheetId, sheetName);
-  const idCol = letterByName['ID Projeto'];
+  // 0. Resolver as letras das colunas pelo cabeçalho real (exato, com rede
+  //    tolerante a acento/caixa — ver `resolverColunaLetra`).
+  const mapa = await fetchHeaderMap(token, spreadsheetId, sheetName);
+  const idCol = resolverColunaLetra(mapa, 'ID Projeto');
   if (!idCol) {
     console.warn('[google/sheets] Coluna "ID Projeto" não encontrada no cabeçalho — update abortado.');
     return true; // sem a coluna do ID não se afirma que a linha falta → nada a recuperar
@@ -306,7 +389,7 @@ export async function updateRowByProjectId(
   const data: { range: string; values: (string | number)[][] }[] = [];
   for (const [columnName, value] of Object.entries(updates)) {
     if (value == null) continue;
-    const col = letterByName[columnName];
+    const col = resolverColunaLetra(mapa, columnName);
     if (!col) {
       console.warn(`[google/sheets] Coluna "${columnName}" não existe no cabeçalho da planilha, pulando`);
       continue;

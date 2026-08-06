@@ -3,6 +3,7 @@ import {
   normalizarMarcadoresMemorial,
   extrairAlocacaoGanhos,
   extrairJustificativaCargaEscala,
+  extrairResumoMemorial,
   TITULOS_MEMORIAL,
 } from '@/lib/agents/memorial-format';
 
@@ -150,5 +151,71 @@ describe('extrairJustificativaCargaEscala', () => {
     expect(extrairJustificativaCargaEscala('### Total de horas\n10h/mês.\n### Tipo de saving\nmensal')).toBeNull();
     expect(extrairJustificativaCargaEscala(null)).toBeNull();
     expect(extrairJustificativaCargaEscala('')).toBeNull();
+  });
+});
+
+describe('extrairResumoMemorial', () => {
+  it('extrai o Resumo do contexto ([1.2]) escrito como rótulo inline', () => {
+    const memorial = normalizarMarcadoresMemorial(
+      [
+        '[1.1] Portal de reembolsos.',
+        '[1.2] O robô lê os comprovantes no e-mail, confere contra a política e lança no ERP.',
+        '[1.3] Antes a analista conferia um a um.',
+      ].join('\n'),
+    );
+    expect(extrairResumoMemorial(memorial)).toBe(
+      'O robô lê os comprovantes no e-mail, confere contra a política e lança no ERP.',
+    );
+  });
+
+  it('pega o Resumo do contexto, não o "Resumo do saving" que vem depois', () => {
+    const memorial = [
+      '### Resumo',
+      'O robô concilia as notas fiscais todo dia às 6h.',
+      '',
+      '### Resumo',
+      'Economia de 40h/mês.',
+    ].join('\n');
+    expect(extrairResumoMemorial(memorial)).toBe('O robô concilia as notas fiscais todo dia às 6h.');
+  });
+
+  it('devolve null quando o memorial não tem a seção (ou não existe)', () => {
+    expect(extrairResumoMemorial(null)).toBeNull();
+    expect(extrairResumoMemorial('### Total de horas\n90h/mês.')).toBeNull();
+  });
+});
+
+describe('extrairResumoMemorial — rótulo em texto puro (formato real da staging)', () => {
+  // Memorial do projeto "n8n audit" como o agente gravou: rótulos SEM ** e SEM ###.
+  const memorialTextoPuro = [
+    'Memorial de Cálculo',
+    'Contexto',
+    'Resumo: O projeto audita fluxos de 4 instâncias do n8n, consolida os dados em Google Sheets e gera documentação em Markdown para os fluxos ativos. Também produz um relatório diário com criticidade, cobertura de documentação e candidatos a limpeza.',
+    'Processo alterado: Antes, a conferência e documentação dos fluxos precisariam ser feitas manualmente por um estagiário.',
+    'Ponteiro movido e onde verificar: horas de trabalho operacional.',
+    'Saving de Pessoas',
+  ].join('\n');
+
+  it('extrai o resumo quando o rótulo é texto puro, parando no próximo rótulo', () => {
+    expect(extrairResumoMemorial(memorialTextoPuro)).toBe(
+      'O projeto audita fluxos de 4 instâncias do n8n, consolida os dados em Google Sheets e gera documentação em Markdown para os fluxos ativos. Também produz um relatório diário com criticidade, cobertura de documentação e candidatos a limpeza.',
+    );
+  });
+
+  it('o memorial em negrito continua saindo pelo caminho normal (sem o fallback)', () => {
+    const misto = ['**Resumo:** O certo.', '### Processo alterado', 'Era manual.'].join('\n');
+    expect(extrairResumoMemorial(misto)).toBe('O certo.');
+  });
+
+  it('não confunde uma frase do resumo que tenha ":" com o próximo rótulo', () => {
+    const memorial = [
+      'Resumo: O robô concilia notas.',
+      'Ele roda de madrugada, sem supervisão: às 6h o relatório já está pronto.',
+      '',
+      'Processo alterado: era manual.',
+    ].join('\n');
+    expect(extrairResumoMemorial(memorial)).toBe(
+      'O robô concilia notas.\nEle roda de madrugada, sem supervisão: às 6h o relatório já está pronto.',
+    );
   });
 });

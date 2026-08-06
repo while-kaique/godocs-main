@@ -6,6 +6,97 @@
 
 ---
 
+## 2026-08-06 — Líder levava "Acesso negado." ao abrir a documentação do projeto que precisa aprovar
+
+**Status:** ✅ codada e testada · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** #235
+
+**Sintoma.** O Estevão Vidal, líder, escreveu no Chat: *"não to conseguindo abrir a página de 'Ler a
+documentação completa' no godocs pra aprovar um projeto"* — o print mostra `/projeto/323278fc…` com a
+tela read-only montada (cabeçalho "Projeto", selo "SOMENTE LEITURA") e, no corpo, **"Acesso negado."**.
+Acontecia com **todo** líder: 28 deles tinham acabado de ser convidados a `/aprovacoes` pela DM do Gomoon.
+
+**Causa-raiz.** O gate de leitura do detalhe (`getMeuProjeto`, `meus-projetos.functions.ts`) era
+`temAcesso = ehOwner || ehParticipante` → **403** para o líder, que não é nenhum dos dois. O card da fila
+(`src/routes/aprovacoes.tsx`) oferecia o link mesmo assim. Era a **T3 do plano F1** e o **critério de
+aceitação nº 2** ("abre `/projeto/$id` **sem 403**"), que a `SPEC_APROVACAO_LIDER.md` afirmava cumprido —
+a tarefa nunca foi implementada e o texto da spec envelheceu como se tivesse sido. O `/ggsd:ship` do PR
+#235 pegou exatamente isto (revisor de conformidade em contexto fresco: `diverge-alta`, confiança 0,74) e
+**barrou o merge**; o relato do Estevão chegou no mesmo dia, do lado do usuário.
+
+**Fix (D28).** Uma **3ª porta** de leitura, escopada: quem tem **linha em `projeto_aprovacoes`** para
+aquele projeto abre o detalhe. Puro `resolverAcessoAprovador(linhas, email)` + I/O `acessoDeAprovador`
+(`aprovacoes.functions.ts`); `getMeuProjeto` só consulta essa porta quando owner/participante/admin falham
+(zero I/O extra para eles) e devolve `papel: 'aprovador'`. **`podeEditar` não muda** — quando o acesso vem
+só da fila, `temAcesso` e `ehAdmin` são falsos por construção, então a expressão de edição já dá `false`
+sem cláusula nova (gotcha 8: líder não vira editor; isso é `editores_delegados`). Na tela: selo
+**"Aguarda seu parecer" / "Parecer registrado"** (rótulo + ícone, nunca só cor) e o link de voltar aponta
+para **`/aprovacoes`** em vez de "Meus Projetos".
+
+**Decisões dentro do fix** (as duas mereciam pergunta e foram resolvidas pelo lado seguro):
+- **Linha JÁ DECIDIDA também dá leitura.** O slider mantém o item decidido em modo leitura (D15) e o link
+  continua ali — expirar o acesso no clique do parecer devolveria o mesmo 403 logo depois de aprovar.
+- **Nunca consulta a TeamGuide.** A liderança ao vivo é a régua de quem **entra** na fila, não de quem já
+  foi convocado a decidir; além de custar latência na abertura do detalhe, uma reorganização de time
+  apagaria o acesso a um projeto que a pessoa tem em mãos. A linha da fila já é a prova — é a MESMA régua
+  do gate de `decidirAprovacao`.
+
+**Onde aterrissou.** `src/lib/aprovacoes.functions.ts` (predicado puro + wrapper) ·
+`src/lib/meus-projetos.functions.ts` (3ª porta, `Papel` ganha `'aprovador'`) ·
+`src/routes/projeto.$id.tsx` (selo + origem do link) · `tests/aprovacoes-lider.test.ts`
+(6 casos do predicado puro + 5 de `getMeuProjeto`: líder pendente lê e não edita, líder que já decidiu
+segue lendo, estranho e projeto-sem-fila seguem em 403, autor intocado) ·
+`spec-docs/SPEC_APROVACAO_LIDER.md` (D28 + a linha que afirmava o critério cumprido).
+
+⚠️ **Achado colateral do teste** (vale para quem escrever teste de ownership aqui): `isAdmin` lê
+`ADMIN_EMAILS` do **ambiente**, e a máquina de quem roda os testes pode ter a variável exportada — o
+primeiro fixture usava um líder que era admin, o override de admin abria o projeto e o teste do 403
+**passava por engano**. O bloco novo fixa `isAdmin` em `false` via `vi.mock`.
+
+---
+
+## 2026-08-05 — Parecer do líder chegava MUTILADO na planilha (coluna sem acento + justificativa resumida)
+
+**Status:** ✅ codada e testada (945 verdes) · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** pendente
+
+**Sintoma.** O líder pré-aprovava/pedia ajuste em `/aprovacoes`, a coluna **`Aprovação do Líder` (AE)**
+mudava de estado normalmente — e a coluna **`Justificativa Aprovação do Líder` (AF)** ficava **vazia**: quem
+decidiu, quando, as 3 respostas do checklist e o texto que o líder escreveu não apareciam em lugar nenhum.
+E, no que chegava (staging antiga), o detalhe era um resumo em rótulos internos (`Move KPI: sim · Sentiria
+falta: não`) com o texto livre concatenado **sem dizer o que era** — com dois "nãos" no checklist (D16) era
+impossível saber a qual pergunta a explicação respondia.
+
+**Causa-raiz.** Duas, independentes:
+1. **Nome da coluna com uma letra de diferença.** O cabeçalho real de **prod E staging** é
+   `Justificativa Aprovação do **Lider**` (sem acento no "i") e o código escreve `…do **Líder**` (regra 4).
+   O mapeamento do sync é por **NOME EXATO** (`fetchHeaderMap`): chave que não casa é **ignorada com aviso** e
+   o resto da escrita segue — falha 100% silenciosa para quem usa o app. Conferido ao vivo em 04 e 05/08/2026.
+2. **Formato pobre por decisão antiga.** `justificativaAprovacaoSheet` produzia uma linha só, com
+   `resumirChecklist` (rótulos curtos) e o `comentario` colado no fim sem rótulo.
+
+**Fix.**
+- `google/sheets.ts`: `chaveColuna` (minúsculas, sem acento via NFD, espaços colapsados) +
+  `resolverColunaLetra` (exato **primeiro**, normalizado como rede) usados no `updateRowByProjectId`; o
+  `appendRow`/`orderValuesByHeaders` casam pelo mesmo critério, e `chavesForaDoCabecalho` mantém o aviso só
+  para o que realmente não existe. **Fail-safe:** chave AMBÍGUA (2 cabeçalhos que normalizam igual) é
+  descartada do índice tolerante — só casa por nome exato, para nunca gravar na coluna errada.
+- `aprovacoes-checklist.ts`: `detalharChecklist` (a PERGUNTA como o líder a leu + a resposta) e
+  `rotuloChecklist` — os textos seguem na FONTE ÚNICA.
+- `aprovacoes.functions.ts`: `justificativaAprovacaoSheet` virou multi-linha (assinatura com nome **e**
+  e-mail + uma linha por pergunta + texto livre) e `rotuloComentarioSheet` nomeia o texto conforme o
+  veredito/checklist (`O que precisa ser ajustado` · `Motivo da reprovação` · `Justificativa do "não" em …` ·
+  `Comentário do líder`).
+
+**Onde aterrissou.** `src/lib/google/sheets.ts`, `src/lib/aprovacoes-checklist.ts`,
+`src/lib/aprovacoes.functions.ts`, `scripts/dryrun-lider/hdr.ts` (o diagnóstico agora prova exato **e**
+resolvido), testes em `tests/sheets-mapping.test.ts` (+5) e `tests/aprovacoes-lider.test.ts` (+4, e os 4
+antigos passaram a afirmar o formato novo). Decisão: **D18** de `SPEC_APROVACAO_LIDER.md`.
+
+**Verificação.** 945 testes verdes + leitura ao vivo do cabeçalho de **produção** (53 colunas):
+`Aprovação do Líder` → AE (exato) e `Justificativa Aprovação do Líder` → **AF só pelo match tolerante**
+(`npx vitest run --config scripts/dryrun-lider/vitest.config.ts`). ⚠️ Com isto, o **⛔ bloqueio de ida a
+prod** por causa do acento **deixa de existir** — não é preciso renomear o cabeçalho.
+---
+
 ## 2026-08-05 — Gate do [1.4] "Ponteiro movido" nunca perguntava: o LLM respondia por conta própria, apontando pro próprio arquivo da automação
 
 **Status:** ✅ codada e testada (938 verdes) · **Branch:** `fix/gate-ponteiro-verbo-generico` · ⏳ staging pendente

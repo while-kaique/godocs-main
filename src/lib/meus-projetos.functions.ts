@@ -15,6 +15,11 @@ import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { isAdmin } from '@/lib/auth.functions';
+import {
+  resumoAprovacaoPorProjeto,
+  acessoDeAprovador,
+  type ResumoAprovacao,
+} from '@/lib/aprovacoes.functions';
 
 export type MeuProjetoItem = {
   id: string;
@@ -60,6 +65,14 @@ export type MeuProjetoItem = {
   // espelho SQLite — uma sobreposição manual só aparece lá após o próximo resync.
   motivo_reprovado: string | null;
   motivo_reenvio: string | null;
+  // Pré-aprovação do líder (TeamGuide). `null` quando não se aplica: o autor É
+  // liderança (isento) ou não tem líder. NÃO é portão de nada — a triagem da RPA
+  // roda em paralelo. Ver spec-docs/SPEC_APROVACAO_LIDER.md.
+  aprovacao: {
+    veredito: 'pendente' | 'aprovado' | 'reprovado';
+    aprovadores: string[];
+    comentario: string | null;
+  } | null;
 };
 
 // Prazo para regularizar legados (editar/reenviar até deixar de ter "Atualizado Em" vazio).
@@ -161,7 +174,11 @@ export function ehEditorDelegado(projeto: ProjetoRow, email: string): boolean {
   return delegados.some((d) => d.trim().toLowerCase() === alvo);
 }
 
-export type Papel = 'owner' | 'participante';
+// 'aprovador' = líder convocado à pré-aprovação deste projeto (linha em
+// `projeto_aprovacoes`). Lê o detalhe, NUNCA edita — o poder de edição é do owner e dos
+// `editores_delegados`. Só o DETALHE (`getMeuProjeto`) usa este papel: a listagem de
+// "Meus Projetos" segue owner/participante (a fila do líder mora em `/aprovacoes`).
+export type Papel = 'owner' | 'participante' | 'aprovador';
 
 // "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
 export function temAtualizadoEm(v: string | null | undefined): boolean {
@@ -197,6 +214,7 @@ export function mapItem(
   podeEditar: boolean,
   statusSheet?: string | null,
   motivos?: { reprovado?: string | null; reenvio?: string | null },
+  aprovacao?: MeuProjetoItem['aprovacao'],
 ): MeuProjetoItem {
   // Célula vazia / "—" / "-" → null (o card simplesmente não mostra o bloco).
   const motivo = (v: string | null | undefined): string | null => {
@@ -255,6 +273,7 @@ export function mapItem(
     // triagem) e caímos no espelho SQLite escrito pelo analisador.
     motivo_reprovado: motivo(motivos?.reprovado) ?? motivo(p.motivo_reprovacao),
     motivo_reenvio: motivo(motivos?.reenvio),
+    aprovacao: aprovacao ?? null,
   };
 }
 
@@ -287,22 +306,34 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // "Atualizado Em": resolverAtualizadoEm — planilha quando preenchida, senão o espelho
   // SQLite (ver nota na função). Garante que um legado recém-editado deixe de aparecer
   // como pendente sem esperar o sync IDA para o Sheets.
-  return rows
-    .filter((p) => temAcesso(p, email))
-    .map((p) =>
-      mapItem(
-        p,
-        resolverAtualizadoEm(atualizadoMap.get(p.id.toLowerCase()), p.atualizado_em),
-        ehOwner(p, email) ? 'owner' : 'participante',
-        // Na lista (só owner/participante), pode editar = owner OU editor delegado.
-        ehOwner(p, email) || ehEditorDelegado(p, email),
-        statusMap.get(p.id.toLowerCase()) ?? null,
-        {
-          reprovado: motivoReprovadoMap.get(p.id.toLowerCase()) ?? null,
-          reenvio: motivoReenvioMap.get(p.id.toLowerCase()) ?? null,
-        },
-      ),
+  const visiveis = rows.filter((p) => temAcesso(p, email));
+  // Pré-aprovação do líder: 1 query só (IN) para todos os projetos da tela — nunca
+  // por item, e nunca chama a TeamGuide aqui. Falha não pode derrubar a listagem.
+  let aprovacoes: Record<string, ResumoAprovacao> = {};
+  try {
+    aprovacoes = await resumoAprovacaoPorProjeto(visiveis.map((p) => p.id));
+  } catch (e) {
+    console.error('[meus-projetos] falha ao ler as pré-aprovações (seguindo sem):', e);
+  }
+
+  return visiveis.map((p) => {
+    const ap = aprovacoes[p.id];
+    return mapItem(
+      p,
+      resolverAtualizadoEm(atualizadoMap.get(p.id.toLowerCase()), p.atualizado_em),
+      ehOwner(p, email) ? 'owner' : 'participante',
+      // Na lista (só owner/participante), pode editar = owner OU editor delegado.
+      ehOwner(p, email) || ehEditorDelegado(p, email),
+      statusMap.get(p.id.toLowerCase()) ?? null,
+      {
+        reprovado: motivoReprovadoMap.get(p.id.toLowerCase()) ?? null,
+        reenvio: motivoReenvioMap.get(p.id.toLowerCase()) ?? null,
+      },
+      ap
+        ? { veredito: ap.veredito, aprovadores: ap.aprovadores, comentario: ap.comentario }
+        : null,
     );
+  });
 }
 
 /**
@@ -457,7 +488,14 @@ export async function getMeuProjeto(
   // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
   // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
   const ehAdmin = await isAdmin(email);
-  if (!temAcesso(data, email) && !ehAdmin) {
+  // 3ª porta de leitura: o LÍDER convocado à pré-aprovação (linha em
+  // `projeto_aprovacoes`). Sem ela, o card da fila oferece "Ler a documentação completa"
+  // e o líder — que não é owner nem participante — leva 403 na cara (bug real em prod,
+  // 06/08/2026, com 28 líderes já convidados para `/aprovacoes`). Só é consultada quando
+  // as outras 2 portas falham: para owner/participante/admin é zero I/O extra.
+  const acessoAprovador =
+    temAcesso(data, email) || ehAdmin ? { aprovador: false, pendente: false } : await acessoDeAprovador(id, email);
+  if (!temAcesso(data, email) && !ehAdmin && !acessoAprovador.aprovador) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   // EDIÇÃO: o owner (quem submeteu), um editor delegado (participante a quem o dono
@@ -465,9 +503,17 @@ export async function getMeuProjeto(
   // participante (não-delegado) VENCE o override de admin: um admin que também é
   // participante do projeto NÃO edita (vê como qualquer participante). O override de
   // admin vale só para projetos em que ele não tem papel (não é owner nem participante).
+  // ⚠️ O aprovador NÃO entra nesta conta: quando o acesso vem só da fila, `temAcesso` e
+  // `ehAdmin` são falsos por construção (a porta 3 só é consultada quando as duas
+  // primeiras falham), então `podeEditar` fica false sem cláusula nova. Líder que também
+  // é admin/owner/delegado mantém exatamente o poder que já tinha (gotcha 8 da spec).
   const podeEditar =
     ehOwner(data, email) || ehEditorDelegado(data, email) || (ehAdmin && !ehParticipante(data, email));
-  const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
+  const papel: Papel = ehOwner(data, email)
+    ? 'owner'
+    : acessoAprovador.aprovador
+      ? 'aprovador'
+      : 'participante';
 
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;
@@ -484,8 +530,27 @@ export async function getMeuProjeto(
     };
   }
 
+  // Pré-aprovação do líder (só SQLite — sem TeamGuide, sem Sheets). null = não se aplica.
+  let aprovacao: MeuProjetoItem['aprovacao'] = null;
+  try {
+    const ap = (await resumoAprovacaoPorProjeto([id]))[id];
+    if (ap) {
+      aprovacao = { veredito: ap.veredito, aprovadores: ap.aprovadores, comentario: ap.comentario };
+    }
+  } catch (e) {
+    console.error('[meus-projetos] falha ao ler a pré-aprovação do detalhe:', e);
+  }
+
   // Detalhe não consulta o Sheets; usa o "Atualizado Em" espelhado no SQLite.
-  const base = mapItem({ ...data, area_nome: data.area_nome ?? null }, data.atualizado_em ?? null, papel, podeEditar);
+  const base = mapItem(
+    { ...data, area_nome: data.area_nome ?? null },
+    data.atualizado_em ?? null,
+    papel,
+    podeEditar,
+    undefined,
+    undefined,
+    aprovacao,
+  );
   return {
     ...base,
     podeEditar,

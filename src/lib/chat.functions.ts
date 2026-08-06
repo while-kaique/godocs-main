@@ -86,6 +86,8 @@ import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
+import { abrirPreAprovacao } from "@/lib/aprovacoes.functions";
+import { notificarLideresDoProjeto } from "@/lib/gomoon-lideres.functions";
 import { isAdmin } from "@/lib/auth.functions";
 import type {
   ChatFase,
@@ -3312,6 +3314,25 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     ganho_total_mensal: ganhoTotalMensal > 0 ? Math.round(ganhoTotalMensal * 100) / 100 : null,
   });
 
+  // ── Pré-aprovação do líder (TeamGuide) ────────────────────────────────────
+  // Abre (ou reabre, no reenvio — D10) a fila do líder direto do autor. NÃO bloqueia
+  // nada (D3): a função nunca lança e, quando o autor É liderança (D20) ou não tem
+  // líder (D6), devolve "—" e segue a vida.
+  const preAprovacao = await abrirPreAprovacao(projeto_id, { nomeProjeto: projeto.nome });
+
+  // Aviso IMEDIATO ao líder (D26, 06/08/2026): o POST ao Gomoon sai agora, não na
+  // manhã seguinte. Fire-and-forget via `runBackground` — o Godeploy cancelaria a
+  // promise assim que a Response voltasse, e a submissão NÃO pode esperar uma DM.
+  // `notificarLideresDoProjeto` nunca lança; o `catch` é cinto de segurança do
+  // agendamento em si. Isento (sem líder / liderança) → `aprovadores` vazio → no-op.
+  if (!preAprovacao.isento && preAprovacao.aprovadores.length) {
+    runBackground(
+      notificarLideresDoProjeto(projeto_id, preAprovacao.aprovadores, {
+        nomeProjeto: projeto.nome,
+      }).catch((e) => err("submeterParaValidacao", "Aviso ao líder falhou (não bloqueante):", e)),
+    );
+  }
+
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {
     const membros = parseJson<string[]>(projeto.membros) ?? [];
@@ -3343,6 +3364,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // Edição: o memorial que estava gravado ANTES deste update (projeto foi lido
         // antes do updateProjeto) → vai para a coluna "Memorial anterior" no Sheets.
         memorialAnterior: ehReenvio ? (projeto.memorial_calculo ?? null) : null,
+        // Coluna "Aprovação do Líder" guarda só o ESTADO ("Pré-pendente", ou
+        // "Pré-aprovado" quando o autor é liderança, ou "—"); quem é o líder e o
+        // porquê da isenção vão na "Justificativa Aprovação do Líder" (D14).
+        aprovacaoLider: preAprovacao.rotuloSheet,
+        justificativaAprovacaoLider: preAprovacao.justificativaSheet,
       }),
     );
   }

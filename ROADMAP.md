@@ -113,9 +113,99 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **validar a staging `edf400b4`** (frentes `fix/motivo-reenvio-traco` + docs da pré-aprovação
-do líder, deployadas em 2026-08-03) → **PR + merge** → prod `674a3710`. Em seguida, codar a **F0** da
-pré-aprovação do líder (plano ✅ aprovado: `docs/plans/teamguide-lideranca-e-areas.md`).
+**D16 (pedido do Luis, 04/08 noite, `da32167`+`2c40eef`):** pré-aprovar com **qualquer "não"** no checklist
+**exige explicação** — o clique em "Pré-aprovar" abre uma caixa em vez de gravar, e o texto entra no mesmo
+campo `comentario` → coluna `Justificativa Aprovação do Líder`. Régua na fonte única
+(`exigeJustificativa`/`temNaoNoChecklist`) e **cobrada no servidor** (400). O "não" segue **sem ser veto**.
+Staging redeployada 04/08 17:21 (934 testes). ⚠️ O aviso antecipado sobre o "não" foi **removido** a pedido
+dele (poluía a tela) — quem informa é a caixa, no clique.
+
+**04/08 (noite):** o Lucas reprovou a 1ª versão da pergunta do "não" e pediu 3 mudanças, já no ar na staging
+(`28a033a`): pergunta+exemplo POR CHAVE do "não", saving incoerente como PRÉ-REQUISITO (sem botão verde) e
+**3 botões** (Pré-aprovar verde · Pedir ajuste âmbar · Reprovar vermelho), com `ajuste` separado de
+`reprovado` no veredito e no Sheets. Falta ele validar essa rodada.
+
+**05/08 (D17):** o **envio da DM saiu do GoDocs** — quem entrega é o **bot do Gomoon**, a partir de 1 POST/dia
+(6h BRT) com a relação líder↔liderados pendentes. Contrato fechado em **`docs/integracao-gomoon-chat.md`**
+(pronto para mandar ao time deles); `chat-dm.ts` + o disparo na submissão + o cartão **removidos** (936 testes
+verdes). A **F3** (agregada + cron + POST) **não está codada** e depende do endpoint/token deles (P4 da spec).
+Efeito colateral bom: a staging voltou a ser **100% muda**.
+
+**05/08 (D18) — parecer do líder chegava mutilado na planilha: CORRIGIDO** ✅ (commit `3aac5f5`, **945 testes**). O cabeçalho de prod/staging tem `Justificativa Aprovação do **Lider**` (sem acento) e o match por nome EXATO descartava a justificativa inteira; agora o casamento é **exato → normalizado** (`chaveColuna`/`resolverColunaLetra`) no update **e** no append, e a coluna guarda **tudo** o que o líder respondeu (perguntas por extenso + sim/não + texto livre rotulado). **Cai o bloqueio de ida a prod pelo acento** — sem renomear nada. Falta **validar na STAGING** (`edf400b4`, regra 13).
+
+**05/08 (D18/D19) — validado na staging e o parecer virou tela** ✅ A coluna AF **recebe o parecer completo** (confirmado pelo Luis na staging). Em seguida, **D19** (commit `e61bace`, **1025 testes**): o parecer do líder passou a aparecer **dividido na ficha de triagem do `/dashboard`** — chip de estado, quem decidiu + quando, **1 linha por pergunta do checklist com o sim/não**, texto livre citado com o rótulo da D18 e selo **"Respondeu 'não' no checklist"**. Fonte é a **LINHA DA PLANILHA** (zero leitura nova, invariante do dashboard intacta); `chaveColuna` mudou para o módulo PURO `src/lib/coluna-chave.ts` porque a tela roda no CLIENTE e precisa casar `…do Lider`. **Deployado na staging** (14:46, cron pós-deploy `200 ok`) — falta **conferir no navegador**.
+
+Somada a ela, a coluna **"Pré-status"** na TABELA (commit `b456626`, **1028 testes**), com o chip compartilhado — a triagem vê o parecer sem abrir ficha por ficha.
+
+**05/08 (D20) — a isenção de pré-aprovação passa a ser pelo CARGO** ✅ A régua D11 ("é `leader` de um time ativo") isentava **analista com nó próprio na árvore** da TeamGuide — a Fablícia Lima saía `Pré-aprovado (liderança)` sem ninguém olhar (21 das 64 pendentes). Agora isenta **coordenador para cima** (supervisor NÃO), na fonte única `src/lib/cargo-lideranca.ts` (commit `0040fef`, **1049 testes**). Aba "Relação Líder-Liderado" de prod regravada com 2 tabelas (**quem recebe × quem não entra na fila**): 52 projetos em fila, 29 líderes, 10 isentos por cargo. ⚠️ **Não deployado** — staging/prod seguem na régua antiga.
+
+**05/08 (D17/F3) — o aviso diário ao líder saiu do papel e foi VALIDADO na staging** ✅ (commits `f6110a2` + `ec2cfe4`, **1078 testes**, staging `edf400b4` redeployada 15:51). A API do Gomoon **já estava em produção** (resposta do João Victor ao contrato v1) e implementou o nosso formato de entrada sem mudar nada; o **Bot Gomoon é admin-installed** no Workspace, então o risco que podia travar o projeto (DM proativa) **não existe**. Nosso lado: agregada `getPendenciasPorLider` (`GROUP BY` líder×liderado direto na **fila**, não numa 2ª consulta à TeamGuide) → builder PURO `montarPayloadLideresPendentes` + `notificarLideresPendentes` (`src/lib/gomoon-lideres.functions.ts`) → cron `POST /api/cron/notificar-lideres` + manual `POST /api/admin/notificar-lideres` (`{"dry":true}` monta e não envia — o cron não dispara na staging). **Horário passou de 6h para 09h BRT** (`0 12 * * 1-5` UTC): o Gomoon entrega na hora que recebe o POST, e às 6h o líder acordava com notificação. Validação ao vivo: **202** → log `entregue` com `destinatarioEfetivo` = João (o líder real do payload **não** recebeu — a proteção do `ambiente:"staging"` funcionou) → POST repetido devolve `ja_entregue`, **sem 2ª DM**. ⚠️ Bug pego na validação: `APP_BASE_URL` **não é origem limpa** (na staging vale `…/meus-projetos`) e o link saía `…/meus-projetos/aprovacoes` — 404 vindo da DM; `origemDe()` corrige, com teste. Secret `GOMOON_TOKEN` na staging + `.env`; **falta na prod**, junto com o cron.
+
+**06/08 (D21) — quem REDIGE as 2 DMs é o GoDocs** ✅ (commit `35fa358`, **1107 testes**). O Luis escreveu os 2 corpos de mensagem (anúncio da feature + aviso ao líder) e perguntou o que o Gomoon teria de mudar para recebê-los. Decisão: **nós renderizamos** — o texto viaja **pronto** em `lideres[].mensagem.texto` e o template deles fica como **fallback** (contrato **v2**, `docs/integracao-gomoon-chat.md` §13–§14). Motivo: o `total` é a SOMA dos liderados, os bullets têm ordem, o plural muda a frase e a data é BRT — do lado deles isso seria um mini-engine de template e a cópia em 2 repos. O **anúncio** ganhou **endpoint próprio** (`/api/godocs/anuncio`) com chave **SEM data** (1× por pessoa para sempre; no payload diário viraria DM de anúncio todo dia) + `anunciarPreAprovacao` + `POST /api/admin/anunciar-pre-aprovacao` com **`dry` por default** (única rota do repo em que um POST sem body falaria com a empresa inteira). Fonte única PURA `src/lib/gomoon-mensagens.ts`. Duas promessas do texto corrigidas contra o código, com teste: não existe menu "GoDocs → Pré-aprovações" (a entrada é a **faixa da home**) e o autor **não é avisado** de ajuste pedido (virou "fica visível em Meus Projetos"). ⚠️ **Nada deployado** — e o **endpoint do anúncio ainda não existe do lado do Gomoon**.
+
+**06/08 (D22) — a D21 foi deployada e DISPARADA na staging, e o markup estava na superfície errada** ✅ (commits `33e6049` + `31cccb3`, **1109 testes**, staging `edf400b4` redeployada 12:10). O João Victor avisou que o lado dele estava pronto; disparamos os 2 (**202, `falhas: []`** nos dois). A DM chegou com o markup **cru na tela** (`*Você tem projeto…*`) — e **não era falta de formatação nossa nem bug dele**: o contrato v2 não fixava a **superfície de entrega**. O Google Chat tem 2 sintaxes que não se conversam (mensagem de texto → `*negrito*`; **cartão `TextParagraph` → `<b>`**) e o Gomoon entrega em **cartão**. Correção: as 2 mensagens passaram a HTML de cartão, e o aviso ao líder **perdeu a linha de título e a do link** — o print mostrou que o **cabeçalho do cartão** e o **botão "Abrir a fila"** já diziam a mesma coisa (o `url` **continua** no payload: é dele que o botão sai). Regra escrita no §13 do contrato + **D22** na spec: **a sintaxe segue a superfície**; se a entrega deixar de ser cartão, `gomoon-mensagens.ts` volta ao asterisco no MESMO deploy. ⚠️ O anúncio precisou de **`ANUNCIO_VERSAO` `v1`→`v2`**: a chave sem data tornou o `v1` **no-op eterno** depois de entregue ao destinatário de teste — **`v2` é a versão que vai para prod, e ninguém da empresa recebeu o `v1`**; o valor está **pinado no teste de propósito** (bump fala com a empresa inteira, não é número de build). O aviso diário re-disparado no mesmo dia devolve `ja_entregues: 1` (correto, §4) — para revalidar hoje, o João precisa limpar a chave do dia. ⚠️ **Só staging** — prod segue sem token, sem cron e sem a feature.
+
+**06/08 (D26) — o aviso ao líder virou IMEDIATO e a feature FOI PARA PRODUÇÃO** ✅ (commits `ae1835b` + `6af2636`, **1111 testes**, staging `edf400b4` e prod `674a3710` deployadas ~12:20 BRT). O Luis mandou subir — e o **anúncio global já tinha saído em produção pelo João Victor** (~12:00 BRT, `ambiente:"producao"`, entregue ao Lucas), então a empresa já sabe da feature. A premissa da D17 estava **errada**: a **§9 do doc v3** diz *"entregamos a DM na hora em que recebemos o POST"* — a integração **nunca foi diária**, a cadência era o **nosso** cron. Agora `notificarLideresDoProjeto` dispara no fim de `submeterParaValidacao` via `runBackground`, com **chave por PROJETO** (`godocs:<email>:<projetoId>`) — a chave diária faria a **2ª submissão do dia** do mesmo líder voltar `ja_entregue` e a DM sumir em silêncio (§8). Manda o **backlog** do líder (não só o projeto que chegou), tem **guard `[E2E-…]` explícito**, nunca manda `lideres: []` e **nunca lança** (D3). **Nada mudou do lado do Gomoon.** Validado na staging (dry-run + envio real **202, 0 falhas**, log `entregue`) e em prod (dry-run **`ambiente:"producao"`**, fila vazia — sem backfill, as DMs começam na 1ª submissão real). O prefixo `[STAGING]` **é escrito pelo Gomoon** e prod não tem `GODOCS_ENV` — teste prende as 2 pontas. `GOMOON_TOKEN` **nos 2 apps**; o snapshot diário segue codado mas **sem cron**. ⚠️ Falta exercitar o **wiring do submit** numa submissão de verdade.
+
+**06/08 — PR [#235](https://github.com/while-kaique/godocs-main/pull/235) aberto** ✅ `origin/main` estava parado (branch 0 atrás, nada a mesclar); push dos 3 commits + PR pela conta `LuisEduardo100`. ⚠️ **"Às 14h começa o disparo" não existe**: com a D26 o aviso sai **na submissão**, sem cron nem janela — já no ar desde ~12:20. Pendente a escolha do Luis: só acompanhar, **ou** ligar TAMBÉM um resumo diário às 14h (`0 17 * * 1-5` UTC, código pronto, chaves independentes) — lembrando que o Lucas pediu **menos** ruído (D25).
+
+**06/08 — aba "Aprovações Pendentes por Líder" na planilha de PROD** ✅ (commits `43e425f` + `84ff92a`, **1101 testes**). Pedido do Luis: *"quem está há mais de 5 dias esperando aprovação"*. `scripts/dryrun-lider/relatorio-espera.ts` (+ `espera.config.ts`), irmão do `relatorio-sheet.ts`: aba dedicada, limpa-e-regrava, `ESPERA_WRITE=1` para escrever, **mesma régua de fila da produção** (D20, isenção por cargo), corte por `ESPERA_LIMITE_DIAS` (default 5). **1ª versão cortada por ele no mesmo dia** (*"muita informação"*): de 3 tabelas/11 colunas/121 linhas para **1 tabela de 5 colunas**/34 linhas — Líder · E-mail · Projetos pendentes · **Dias pendentes** (a lista por projeto) · Mais antigo (dias). Retrato: **73 pendentes → 56 na fila de 31 líderes · 41 projetos acima de 5 dias com 26 líderes · máxima 128 dias**. ⚠️ O relógio é `Data Submissão` (em legado a fila nunca abriu — é a idade da pendência) e o **estado ficou de fora** porque `Aprovação do Líder` está vazia nos 73 (prod entrou **sem backfill**).
+
+**06/08 — a aba ganhou a coluna "Quem está esperando (dias)"** ✅ (commit `13da550`, 1101 testes). Pedido do Luis: a coluna é a **conferência** do relatório (*"pra pesquisar o projeto da pessoa e ver se você acertou"*), então as duas listas saem da **MESMA** ordenação — ordenando em separado, dias e pessoas sairiam trocados e ele conferiria a pessoa errada. Escrita confirmada por **leitura de volta** (HTTP 200, 6 colunas). ⚠️ Na conferência, autor repetido na linha = 2 projetos dele, e o mesmo autor sob 2 líderes = pessoa em 2 times (**D4**, o 1º que decide resolve). Pendente a oferta de incluir o **nome do projeto** junto da pessoa.
+
+**06/08 (D27) — projeto ESPECIAL não é pendência do líder** 🟡 (commit `5e40491`, **1102 testes**, staging `edf400b4` deployada 16:32 — **PROD AINDA NÃO**). Decisão do Luis: especial **não tem memorial financeiro**, então a 3ª pergunta do checklist do gestor não teria o que julgar, e o destino dele sempre foi a validação humana da RPA. `abrirPreAprovacao` não abre fila (motivo/justificativa próprios — D12), com o guard **antes da TeamGuide** (é flag do projeto, não depende de rede) e rede de segurança no SQL das 3 consultas que definem "pendente" — payload da DM, tela do líder e o **contador** da faixa da home (que ganhou o `JOIN`, senão diria "3 pendentes" e abriria fila de 2). Relação regravada: **73 pendentes → 35 na fila / 27 líderes**, com **29 especiais** fora (antes eram 64).
+
+**06/08 — 🚨 PROD FICOU SEM A FEATURE** (não é regressão nossa): às **13:24 BRT** um deploy de outra frente subiu o `main` (que **não tem** `aprovacoes.functions.ts`) em cima da D26 e **apagou a pré-aprovação de produção** — `getApp(674a3710)` marca `version 227`/`16:24:11 UTC` com a descrição dos fixes do analisador, e `GET /api/aprovacoes/pendentes` responde **404**. ⚠️ `/aprovacoes` ainda ABRE (fallback SPA + bundle antigo em cache) — a tela não prova nada, **o teste é a rota de API**. Custo já materializado: o **Gustavo Castro** submeteu 17 min depois (13:41) e a líder **Vitória Azevedo** não foi avisada (o Gomoon só tem o `anuncio` dela; zero aviso) — o projeto **não** é especial e o autor **não** é isento, a fila simplesmente não existia. O merge do `origin/main` (regra 10) preservou os fixes da outra frente no build pronto. **Só o merge do PR #235 fecha esse buraco em definitivo.**
+
+**Próximo:** 🔴 **DECISÃO DO LUIS — mesclar o PR #235 assim mesmo, ou corrigir o 403 antes?** O `/ggsd:ship` rodou e **NÃO mesclou**: o revisor de conformidade devolveu **`diverge-alta` (confiança 0,74)**. O achado: o card da fila oferece "Ler a documentação completa" → `/projeto/$id`, mas `temAcesso` segue `ehOwner || ehParticipante` (`meus-projetos.functions.ts:154`) e o líder leva **403** — é a T3/critério 2 do plano F1, que a spec ainda afirma cumprido. NÃO trava a decisão (o card é auto-suficiente), mas 28 líderes acabaram de ser convidados p/ `/aprovacoes`. Recomendação: mesclar assim mesmo (a proteção contra o atropelo vale mais hoje) e tratar o 403 como fatia curta. _O disparo retroativo FOI FEITO em 06/08_ (prod restaurada · backfill 36 projetos / 28 líderes · aba regravada batendo com o payload · disparo 202, 0 falhas) e o aviso IMEDIATO na submissão está no ar, validado por dry-run com `projetoId`. _Depois:_ **provar o wiring do `submeterParaValidacao` numa submissão real** (único pedaço da D26 nunca exercitado) · levar a **D27** para a spec/`CLAUDE.md` (regra 12) · corrigir a contradição do cron da F3 na spec. ⚠️ 2 divergências planilha × SQLite achadas no retroativo: id de legado em CAIXA diferente (some da lista sem erro) e o `reabrir` não filtra `[E2E-…]` (corrigido, `2c577ec`).
+paralelo, segue de pé: **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
+`docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
+paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
+populada com 2 projetos mockados justamente para ele ver a tela com mais de um pendente, e desde 04/08 à
+tarde ela é um **slider de 1 projeto por vez**, D15). Depois disso:
+**limpar os 2 mockados** e **validar com a DIRETORIA se a pré-aprovação vai para produção** (decisão do
+Luis, 03/08 noite — nada sobe, nem para prod nem para o repo, antes disso). A staging `edf400b4` está no ar
+com a rodada 6 + o `main` do Kaique mergeado + o slider da fila (04/08, 931 testes). Pré-requisito do Luis quando destravar:
+criar **`Aprovação do Líder`** e **`Justificativa Aprovação do Líder`** no cabeçalho das abas `GoDocs` e
+`STAGING`.
+
+## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
+Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D16**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
+(2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
+diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,
+índice de liderança (432 pessoas / 1 sem líder), tabela interna `projeto_aprovacoes`, rotas
+`/api/aprovacoes/*`, tela **`/aprovacoes`** (faixa na home só p/ quem lidera) + selo no card do autor,
+coluna `Aprovação do Líder` no Sheets e a DM (`google/chat-dm.ts`) atrás do gate `GOOGLE_CHAT_DM_ENABLED`.
+**D11 (decisão do Luis, 03/08):** quem **já é liderança** (é `leader` de um time ativo na TeamGuide) fica
+**isento** — só o liderado de fato entra em fila, e quem aprova é o **líder direto**.
+**D12 (decisão do Luis, 03/08):** os 3 casos sem fila ganharam **rótulo próprio** na coluna — liderança →
+**`Pré-aprovado (liderança)`**, sem líder → `Sem líder na TeamGuide`, TeamGuide fora → `Aprovação
+indisponível (integração)` (antes os 3 gravavam `—` e a auditoria não distinguia isenção de falha).
+- ✅ **Staging pronta para o teste real** (2026-08-03 15:39): redeploy com a D12 + **DM LIGADA** nela
+  (`GOOGLE_CHAT_DM_ENABLED=true`, `CHAT_SA_*`, `GOOGLE_CHAT_DM_SUBJECT`) — cadeia validada ao vivo e DM
+  recebida pelo Lucas. ⚠️ Staging **deixou de ser silenciosa**: submeter lá notifica pessoa real.
+**D13 (ressalvas do Lucas, 03/08 noite, `1d3aeb2`):** nomenclatura **pré-aprovação** em toda a UI e na
+planilha (`Pré-aprovado`/`Ajuste pedido`), **card auto-suficiente** (dono · participantes com papel · saving
+em R$ + horas · descrição · memorial expansível) e **checklist de 3 perguntas sim/não** (move KPI · sentiria
+falta · saving coerente) obrigatório no servidor nos 2 vereditos — textos em `src/lib/aprovacoes-checklist.ts`
+(módulo puro, fonte única). **`/aprovacoes?como=<e-mail>`** = pré-visualização só de admin (o `decidido_por`
+grava o admin). ⚠️ O líder vê **R$** de saving — exceção consciente ao "cliente não vê R$", a confirmar.
+- ✅ **Staging redeployada com a D13** (2026-08-03 16:26, 856 testes verdes) — fila real: projeto "n8n audit"
+  do Luis esperando o Lucas.
+**D14 + rodada 6 (03/08 noite, `dc53193`/`76ffe84`/`6e93636`):** a coluna **`Aprovação do Líder`** passou a
+guardar **só o estado** (`Pré-aprovado`/`Pré-pendente`/`Pré-reprovado`, filtrável) e o detalhe — quem decidiu,
+quando, as 3 respostas do checklist e o comentário — foi para a coluna nova **`Justificativa Aprovação do
+Líder`**. Tela: 7 cards de número no mesmo nível, header só título + tooltip, **"Resumo do projeto" vindo do
+memorial (`[1.2]`)** em vez da análise automática.
+- 🛑 **TRAVADO para prod (decisão do Luis, 03/08 noite):** a ida a produção **será validada com a
+  DIRETORIA** antes. A branch está commitada (25 commits), **sem push e sem PR**; a staging segue no ar
+  para a demonstração.
+- ⬜ Validar com a diretoria → prod `674a3710` → PR.
+  **Pendência humana:** a coluna no cabeçalho do Sheets (P2) e, para ligar a DM **em prod**, os secrets
+  `CHAT_SA_*` + `GOOGLE_CHAT_DM_ENABLED=true` (prod hoje: DM no-op).
+- **DoD:** liderado submete → fila abre e a coluna mostra "Pendente com X"; liderança submete →
+  "Pré-aprovado (liderança)" e nenhuma fila/DM; `/aprovacoes` aprova e pede ajuste (comentário obrigatório); autor vê o selo; a
+  submissão **nunca** falha por causa da pré-aprovação; validado em staging antes de prod.
 
 ## Fase 4 — Loadings do `/dashboard` do admin 🟡
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,

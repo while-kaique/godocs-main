@@ -252,6 +252,34 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_projeto ON admin_status_log(projeto_id);
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_criado ON admin_status_log(created_at);
+
+  -- Pré-aprovação do LÍDER (integração TeamGuide). O liderado submete e o líder direto
+  -- (derivado de /teams + membros) recebe uma DM no Chat e aprova/reprova DENTRO do
+  -- GoDocs (a aprovação é estado do projeto, não do Chat). Uma linha por (projeto,
+  -- versão, aprovador): pessoa em 2+ times tem 2+ linhas e o PRIMEIRO que decidir
+  -- resolve para todos (D4). NÃO bloqueia a triagem da RPA (D3).
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo. O initSchema divide o
+  -- SQL por ponto-e-vírgula, então um deles dentro de comentário parte o CREATE ao meio.
+  -- ⚠️ Tabela INTERNA: fora de SAFE_UPDATE_FIELDS, o sync reverso nunca a toca.
+  -- Ver spec-docs/SPEC_APROVACAO_LIDER.md.
+  CREATE TABLE IF NOT EXISTS projeto_aprovacoes (
+    id               TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    projeto_id       TEXT NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+    versao           INTEGER NOT NULL DEFAULT 1,
+    autor_email      TEXT,
+    aprovador_email  TEXT NOT NULL,
+    aprovador_nome   TEXT,
+    veredito         TEXT NOT NULL DEFAULT 'pendente',  -- 'pendente'|'aprovado'|'reprovado'
+    comentario       TEXT,
+    decidido_por     TEXT,                              -- quem decidiu (pode ser outro líder — D4)
+    criado_em        TEXT DEFAULT (datetime('now')),
+    decidido_em      TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_aprovador
+    ON projeto_aprovacoes(aprovador_email);
+  CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_projeto
+    ON projeto_aprovacoes(projeto_id);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -388,6 +416,15 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN classificacao_avaliacao TEXT',
   'ALTER TABLE projetos ADD COLUMN classificacao_justificativa TEXT',
   'ALTER TABLE projetos ADD COLUMN motivo_reprovacao TEXT',
+  // Checklist do gestor na pré-aprovação (3 perguntas de sim/não pedidas pelo Lucas em
+  // 03/08/2026). São OBRIGATÓRIAS para registrar o parecer e ficam junto da decisão:
+  // move_kpi = o projeto move um KPI da área  ·  sente_falta = a área sentiria falta se
+  // o projeto fosse desligado  ·  saving_coerente = o saving declarado é coerente com o
+  // impacto que a área percebe. Valores 'sim'|'nao' (null = parecer antigo, antes do
+  // checklist). Um "nao" NÃO reprova sozinho — é sinal para a triagem da RPA ler.
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

@@ -95,6 +95,16 @@ ADMIN_EMAILS, etc.) + **5 overrides** (`GODOCS_ENV=staging`, `GOOGLE_SHEETS_ID`,
 `GOOGLE_DRIVE_FOLDER_ID`, `APP_BASE_URL`). **Não** setados de propósito: `GOOGLE_CHAT_WEBHOOK_URL`,
 `GOOGLE_CHAT_WEBHOOK_URL_AJUDA` (Chat mudo) e `GOOGLE_DRIVE_FOLDER_ID_AJUDA` (cai na pasta de staging).
 
+> ✅ **A staging voltou a ser 100% muda (05/08/2026).** Entre 03 e 05/08 a DM da pré-aprovação
+> ficou LIGADA aqui (secrets `GOOGLE_CHAT_DM_ENABLED=true` + `CHAT_SA_*` + `GOOGLE_CHAT_DM_SUBJECT`)
+> para validar o fluxo real com um líder de verdade. Com a **D17** o envio saiu do GoDocs — quem
+> entrega a DM agora é o **bot do Gomoon**, a partir de um POST diário com a relação de pendências
+> (`docs/integracao-gomoon-chat.md`). Consequência: **submeter na staging não notifica ninguém**.
+> ⚠️ Os 4 secrets continuam setados no `edf400b4` e estão **inertes** (nenhum código os lê) —
+> apagá-los é faxina pendente (P5 da spec). ⚠️ Quando a F3 for codada, o cron da staging **não**
+> pode apontar para a fila de produção do Gomoon: token/endpoint próprio ou `ambiente: "staging"`
+> roteado para um destinatário de teste, senão teste nosso vira DM para líder real.
+
 ## Testar com o harness E2E
 
 ```bash

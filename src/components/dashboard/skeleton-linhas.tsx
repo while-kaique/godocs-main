@@ -26,7 +26,7 @@ function Barra({ largura, className = '' }: { largura: string; className?: strin
   );
 }
 
-export function SkeletonLinhas({ linhas = 8, colunas = 8 }: { linhas?: number; colunas?: number }) {
+export function SkeletonLinhas({ linhas = 8, colunas = 9 }: { linhas?: number; colunas?: number }) {
   return (
     <>
       {Array.from({ length: linhas }, (_, i) => (
@@ -53,6 +53,11 @@ export function SkeletonLinhas({ linhas = 8, colunas = 8 }: { linhas?: number; c
           <td className="px-3 py-3.5">
             <span className="block h-5 w-24 rounded-full bg-muted-foreground/15" />
           </td>
+          {/* Pré-status: mesma quebra (`md`) da coluna real, senão a silhueta do
+              carregamento não bate com a tabela que chega depois. */}
+          <td className="hidden px-3 py-3.5 md:table-cell">
+            <span className="block h-5 w-20 rounded-full bg-muted-foreground/15" />
+          </td>
           <td className="hidden px-3 py-3.5 xl:table-cell">
             <Barra largura="50%" />
           </td>
@@ -62,7 +67,7 @@ export function SkeletonLinhas({ linhas = 8, colunas = 8 }: { linhas?: number; c
           <td className="hidden px-3 py-3.5 sm:table-cell">
             <Barra largura="70%" />
           </td>
-          {colunas > 7 && <td className="pr-3" />}
+          {colunas > 8 && <td className="pr-3" />}
         </tr>
       ))}
     </>

@@ -1105,6 +1105,205 @@ export async function insertAdminStatusLog(data: {
   );
 }
 
+// ── Pré-aprovação do líder (TeamGuide) ───────────────────────────────────────
+
+/** Número da versão mais recente do projeto (1 quando nunca versionou). */
+export async function getUltimaVersaoNum(projetoId: string): Promise<number> {
+  const row = await queryOne<{ n: number }>(
+    'SELECT COALESCE(MAX(versao_num), 1) AS n FROM projeto_versions WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return Number(row?.n ?? 1) || 1;
+}
+
+export type AprovacaoRow = {
+  id: string;
+  projeto_id: string;
+  versao: number;
+  autor_email: string | null;
+  aprovador_email: string;
+  aprovador_nome: string | null;
+  veredito: string; // 'pendente' | 'aprovado' | 'ajuste' | 'reprovado'
+  comentario: string | null;
+  decidido_por: string | null;
+  criado_em: string | null;
+  decidido_em: string | null;
+  // Checklist do gestor (3 perguntas de sim/não). null = parecer anterior ao checklist.
+  resp_move_kpi: string | null;
+  resp_sente_falta: string | null;
+  resp_saving_coerente: string | null;
+};
+
+/**
+ * Abre a fila de pré-aprovação de um projeto: apaga as linhas da rodada anterior e
+ * insere uma pendente por líder. O reset é intencional (D10) — reenviar um projeto
+ * invalida o veredito da versão anterior, que tinha outros números. A auditoria de
+ * "quem aprovou" fica na linha viva + no snapshot da versão.
+ */
+export async function abrirAprovacoesPendentes(
+  projetoId: string,
+  versao: number,
+  autorEmail: string | null,
+  aprovadores: { email: string; nome: string | null }[],
+): Promise<void> {
+  await exec('DELETE FROM projeto_aprovacoes WHERE projeto_id = ?', [projetoId]);
+  for (const a of aprovadores) {
+    const email = (a.email ?? '').trim().toLowerCase();
+    if (!email) continue;
+    await exec(
+      `INSERT INTO projeto_aprovacoes
+         (id, projeto_id, versao, autor_email, aprovador_email, aprovador_nome, veredito, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?, 'pendente', datetime('now'))`,
+      [generateId(), projetoId, versao, (autorEmail ?? '').trim().toLowerCase() || null, email, a.nome ?? null],
+    );
+  }
+}
+
+/**
+ * Quantos projetos estão pendentes para este aprovador. Só a CONTAGEM (a DM usa para
+ * dizer "3 projetos esperando você"); a fila em si é a `getAprovacoesPendentesDe`.
+ */
+export async function contarAprovacoesPendentesDe(email: string): Promise<number> {
+  const rows = await queryAll<{ n: number }>(
+    // ⚠️ O JOIN existe para os MESMOS filtros da `getAprovacoesPendentesDe`: o número
+    // da faixa da home tem de bater com o tamanho da fila que a tela abre. Sem ele, o
+    // líder via "3 pendentes" e encontrava 2 (D27 — especial não é pendência).
+    `SELECT COUNT(*) AS n
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE LOWER(a.aprovador_email) = LOWER(?)
+        AND a.veredito = 'pendente'
+        AND p.status != 'rascunho'
+        AND COALESCE(p.especial, 0) != 1`,
+    [email],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Fila do líder: pendências dele + tudo que o card precisa mostrar SEM abrir o projeto
+ * (dono, participantes, saving e memorial — pedido do Lucas em 03/08/2026). A fila tem
+ * poucas linhas por pessoa, então trazer o memorial aqui é barato — diferente de
+ * `getAllReenvios`, que varre TODOS os reenvios e não pode carregar blobs.
+ */
+export function getAprovacoesPendentesDe(email: string) {
+  return queryAll<AprovacaoRow & { projeto_nome: string | null; autor_nome: string | null; area: string | null; submitted_at: string | null; tipos_projeto: string | null; especial: number | null; descricao_breve: string | null; saving_horas: number | null; saving_reais: number | null; tipo_saving: string | null; memorial_calculo: string | null; membros: string | null; membros_papeis: string | null; contexto_especial: string | null; custo_externo_mensal: number | null; ganho_total_mensal: number | null; custo_evitado_itens: string | null; doc_conteudo: string | null; resumo_ia: string | null }>(
+    `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
+            p.submitted_at AS submitted_at, p.tipos_projeto AS tipos_projeto, p.especial AS especial,
+            p.descricao_breve AS descricao_breve, p.saving_horas AS saving_horas,
+            p.saving_reais AS saving_reais, p.tipo_saving AS tipo_saving,
+            p.memorial_calculo AS memorial_calculo, p.membros AS membros,
+            p.membros_papeis AS membros_papeis, p.contexto_especial AS contexto_especial,
+            p.custo_externo_mensal AS custo_externo_mensal,
+            p.ganho_total_mensal AS ganho_total_mensal,
+            p.custo_evitado_itens AS custo_evitado_itens,
+            d.conteudo AS doc_conteudo,
+            (SELECT an.resumo FROM analises an WHERE an.projeto_id = p.id
+              ORDER BY an.created_at DESC LIMIT 1) AS resumo_ia
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+       LEFT JOIN documentacao d ON d.projeto_id = p.id
+      WHERE LOWER(a.aprovador_email) = LOWER(?)
+        AND a.veredito = 'pendente'
+        AND p.status != 'rascunho'
+        AND COALESCE(p.especial, 0) != 1
+      ORDER BY a.criado_em DESC`,
+    [email],
+  );
+}
+
+/**
+ * Snapshot da RELAÇÃO líder↔liderados-pendentes, para o POST diário ao Gomoon (D17).
+ * Uma linha por par (líder, liderado) com quantos projetos daquele liderado esperam
+ * o parecer daquele líder.
+ *
+ * ⚠️ A relação sai da PRÓPRIA FILA, não da TeamGuide: `projeto_aprovacoes` já foi
+ * escrita a partir dela na submissão. Reconsultar a TeamGuide aqui só criaria uma
+ * segunda régua (e um jeito de o payload divergir do que a tela `/aprovacoes` mostra).
+ *
+ * ⚠️ NENHUM valor em R$ sai daqui — é o que torna impossível vazar saving numa DM
+ * (§7 do contrato). Só nome, e-mail e contagem.
+ *
+ * Filtros: rascunho nunca entra em fila; projeto DESCONTINUADO não precisa mais de
+ * parecer; e os projetos de teste do harness (`[E2E-…]`) ficam de fora — o mute de
+ * Chat saiu do `abrirPreAprovacao`, então excluí-los é responsabilidade de quem monta
+ * o payload. (`LIKE` no SQLite não trata `[` como especial — o prefixo casa literal.)
+ */
+export function getPendenciasPorLider() {
+  return queryAll<{
+    lider_email: string;
+    lider_nome: string | null;
+    liderado_email: string | null;
+    liderado_nome: string | null;
+    projetos_pendentes: number;
+  }>(
+    `SELECT LOWER(TRIM(a.aprovador_email))                                  AS lider_email,
+            MAX(a.aprovador_nome)                                           AS lider_nome,
+            LOWER(TRIM(COALESCE(NULLIF(TRIM(a.autor_email), ''),
+                                p.responsavel_email, '')))                  AS liderado_email,
+            MAX(COALESCE(p.responsavel_nome, ''))                           AS liderado_nome,
+            COUNT(*)                                                        AS projetos_pendentes
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE a.veredito = 'pendente'
+        AND COALESCE(TRIM(a.aprovador_email), '') != ''
+        AND p.status != 'rascunho'
+        AND COALESCE(p.descontinuado, 0) != 1
+        AND COALESCE(p.especial, 0) != 1
+        AND COALESCE(p.nome, '') NOT LIKE '[E2E-%'
+      GROUP BY lider_email, liderado_email
+      ORDER BY lider_email, projetos_pendentes DESC, liderado_email`,
+    [],
+  );
+}
+
+/** Todas as linhas de um projeto (a decisão de um líder resolve para os demais — D4). */
+export function getAprovacoesDoProjeto(projetoId: string) {
+  return queryAll<AprovacaoRow>(
+    'SELECT * FROM projeto_aprovacoes WHERE projeto_id = ? ORDER BY criado_em',
+    [projetoId],
+  );
+}
+
+/**
+ * Grava a decisão em TODAS as linhas do projeto (D4: o primeiro que decide resolve).
+ * `decidido_por` guarda quem realmente decidiu, mesmo nas linhas dos outros líderes.
+ */
+export function decidirAprovacoesDoProjeto(
+  projetoId: string,
+  // 3 desfechos desde 04/08/2026: 'ajuste' devolve ao autor, 'reprovado' é recusa.
+  veredito: 'aprovado' | 'ajuste' | 'reprovado',
+  comentario: string | null,
+  decididoPor: string,
+  respostas?: { move_kpi: string; sente_falta: string; saving_coerente: string } | null,
+): Promise<void> {
+  return exec(
+    `UPDATE projeto_aprovacoes
+        SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now'),
+            resp_move_kpi = ?, resp_sente_falta = ?, resp_saving_coerente = ?
+      WHERE projeto_id = ? AND veredito = 'pendente'`,
+    [
+      veredito,
+      comentario,
+      decididoPor.trim().toLowerCase(),
+      respostas?.move_kpi ?? null,
+      respostas?.sente_falta ?? null,
+      respostas?.saving_coerente ?? null,
+      projetoId,
+    ],
+  );
+}
+
+/** Resumo (1 linha por projeto) para os cards de "Meus Projetos" do autor. */
+export function getAprovacoesDeProjetos(ids: string[]) {
+  if (!ids.length) return Promise.resolve([] as AprovacaoRow[]);
+  const marcas = ids.map(() => '?').join(',');
+  return queryAll<AprovacaoRow>(
+    `SELECT * FROM projeto_aprovacoes WHERE projeto_id IN (${marcas}) ORDER BY criado_em`,
+    ids,
+  );
+}
+
 // Histórico de status de um projeto (mais recente primeiro) — exibido no detalhe.
 export function getAdminStatusLogs(projetoId: string, limit = 20) {
   return queryAll<AdminStatusLogRow>(

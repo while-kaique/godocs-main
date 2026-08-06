@@ -18,8 +18,15 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
+import { ParecerLiderPainel } from '@/components/dashboard/parecer-lider';
 import { apiFetch } from '@/lib/api-client';
 import { fmtDataBR } from '@/lib/format-date';
+import {
+  COLUNA_ESTADO_LIDER,
+  COLUNA_JUSTIFICATIVA_LIDER,
+  interpretarParecerLider,
+} from '@/lib/aprovacoes-parecer';
+import { chaveColuna } from '@/lib/coluna-chave';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
 // Os status graváveis são replicados aqui (não importados de `.functions.ts`) para o
@@ -262,7 +269,17 @@ export function ProjetoDetalheDialog({
     DESCRICAO,
     ...NO_CABECALHO,
   ]);
-  const outras = Object.keys(campos).filter((k) => !usados.has(k));
+  // As duas colunas do líder viram a seção "Pré-aprovação do líder" e por isso saem de
+  // "Outras colunas". ⚠️ A exclusão é por chave TOLERANTE: o cabeçalho real de prod e da
+  // staging é "Justificativa Aprovação do Lider" (sem acento) e um `Set` de nomes exatos
+  // deixaria a célula multi-linha aparecer DE NOVO ali embaixo, crua.
+  const chavesDoLider = new Set(
+    [COLUNA_ESTADO_LIDER, COLUNA_JUSTIFICATIVA_LIDER].map(chaveColuna),
+  );
+  const parecerLider = interpretarParecerLider(campos);
+  const outras = Object.keys(campos).filter(
+    (k) => !usados.has(k) && !chavesDoLider.has(chaveColuna(k)),
+  );
   const statusMudou = detalhe != null && statusEscolhido !== (campos['Status'] ?? '');
   const obsMudou = detalhe != null && observacoes !== obsOriginal.current;
   const motivosMudaram =
@@ -405,6 +422,14 @@ export function ProjetoDetalheDialog({
                 </span>
               </div>
             </section>
+
+            {/* Logo depois da decisão: é o insumo que a triagem usa para decidir, e
+                antes vivia só na planilha (célula multi-linha, ilegível ali). */}
+            {!parecerLider.vazio && (
+              <Secao titulo="Pré-aprovação do líder">
+                <ParecerLiderPainel parecer={parecerLider} />
+              </Secao>
+            )}
 
             {campos[DESCRICAO] && (
               <Secao titulo="Descrição">

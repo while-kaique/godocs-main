@@ -7,10 +7,16 @@ import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
-import { Loader2, FileText, PencilLine, Eye } from "lucide-react";
+import { Loader2, FileText, PencilLine, Eye, Stamp, CheckCheck } from "lucide-react";
 
 const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
+
+// O líder abre esta tela pela fila de pré-aprovação, não por "Meus Projetos" — a doc é
+// insumo do parecer dele. Ele lê e não edita (o poder de edição é do autor e de quem ele
+// delega), então o cabeçalho diz de onde ele veio e o que ainda se espera dele.
+const APROVADOR_ORIGEM = { to: "/aprovacoes", label: "← Pré-aprovações" } as const;
+const MEUS_PROJETOS_ORIGEM = { to: "/meus-projetos", label: "← Meus Projetos" } as const;
 
 export const Route = createFileRoute("/projeto/$id")({
   head: () => ({
@@ -34,8 +40,11 @@ type Detalhes = {
   submitted_at: string | null;
   created_at: string | null;
   arquivos_nomes: string[];
-  papel: "owner" | "participante";
+  // "aprovador" = líder convocado à pré-aprovação deste projeto (lê, não edita).
+  papel: "owner" | "participante" | "aprovador";
   podeEditar: boolean;
+  // Resumo da fila do líder — usado só para dizer se o parecer DELE ainda falta.
+  aprovacao: { veredito: string; aprovadores: string[]; comentario: string | null } | null;
   responsavel_nome: string;
   responsavel_email: string;
   ferramenta: string;
@@ -84,6 +93,14 @@ function ProjetoReadOnlyPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Quem chega como aprovador volta para a fila; todo mundo mais, para "Meus Projetos".
+  // Enquanto carrega, o padrão é "Meus Projetos" (não há papel ainda para decidir).
+  const ehAprovador = p?.papel === "aprovador";
+  const origem = ehAprovador ? APROVADOR_ORIGEM : MEUS_PROJETOS_ORIGEM;
+  // O parecer dele ainda falta? A fila é resolvida pelo PRIMEIRO líder que decide (D4),
+  // então "pendente" aqui significa que ninguém decidiu — inclusive ele.
+  const parecerPendente = ehAprovador && (p?.aprovacao?.veredito ?? "pendente") === "pendente";
+
   // Cada memorial guarda o tipo (saving/receita) para o acento certo no render.
   // normalizarMarcadoresMemorial troca os códigos [x.x] por títulos legíveis —
   // cobre também memoriais legados gravados antes da mudança nos prompts.
@@ -112,11 +129,11 @@ function ProjetoReadOnlyPage() {
           </div>
           <div className="relative z-10 mx-auto max-w-3xl px-8 py-9">
             <Link
-              to="/meus-projetos"
+              to={origem.to}
               className="mb-4 inline-flex items-center gap-1.5 text-[12px] font-semibold opacity-80 transition-opacity hover:opacity-100"
               style={{ color: "var(--go-white)" }}
             >
-              ← Meus Projetos
+              {origem.label}
             </Link>
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4" style={{ color: "rgba(255,255,255,0.7)" }} />
@@ -174,6 +191,29 @@ function ProjetoReadOnlyPage() {
                         style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
                       >
                         Você participa
+                      </span>
+                    )}
+                    {/* Aprovador: estado por RÓTULO + ÍCONE (nunca só cor). */}
+                    {ehAprovador && (
+                      <span
+                        className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide align-middle"
+                        style={
+                          parecerPendente
+                            ? { background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }
+                            : { background: "rgba(71,85,105,0.10)", color: "#475569" }
+                        }
+                      >
+                        {parecerPendente ? (
+                          <>
+                            <Stamp className="h-3 w-3" aria-hidden="true" />
+                            Aguarda seu parecer
+                          </>
+                        ) : (
+                          <>
+                            <CheckCheck className="h-3 w-3" aria-hidden="true" />
+                            Parecer registrado
+                          </>
+                        )}
                       </span>
                     )}
                   </p>

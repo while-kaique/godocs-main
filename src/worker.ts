@@ -50,7 +50,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade, getProjetoById, getAprovacoesDoProjeto } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados, descontinuarProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { reconciliarFinanceiroDoSheet } from '@/lib/reconciliar-financeiro'
@@ -66,6 +66,8 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
+import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
+import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -183,6 +185,19 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await reconciliarComplexidade())
     }
 
+    // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
+    // 1×/dia às 09h BRT (`0 12 * * 1-5` — o cron do Godeploy é UTC). O Gomoon
+    // enfileira, monta a mensagem e entrega a DM pelo bot dele; o GoDocs não fala
+    // com a API do Google Chat. Ver docs/integracao-gomoon-chat.md.
+    // ⚠️ Dia sem pendência dispara IGUAL, com `lideres: []` — silêncio seria
+    // indistinguível de cron morto. A função nunca lança: o corpo é o relatório.
+    if (pathname === '/api/cron/notificar-lideres' && method === 'POST') {
+      if (!request.headers.get('x-godeploy-cron')) {
+        return errorJson('Rota exclusiva de cron.', 403)
+      }
+      return json(await notificarLideresPendentes())
+    }
+
     // ── Meus Projetos (filtrado pelo email do header — anti-IDOR) ──
     if (pathname === '/api/meus-projetos' && method === 'GET') {
       const email = getEmailFromRequest(request)
@@ -246,6 +261,34 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       if (!email) return errorJson('Não autorizado.', 401)
       const body = await readBody(request)
       return json(await criarChamadoAjuda(email, body))
+    }
+
+    // ── Pré-aprovação do líder (autenticado, NÃO admin) ──
+    // A fila é do LÍDER do autor (derivada da TeamGuide na submissão). O gate real é
+    // server-side: `decidirAprovacao` só grava se existir linha pendente para o e-mail
+    // do header (ver aprovacoes.functions.ts) — o frontend nunca autoriza nada.
+    //
+    // `?como=<e-mail>` abre a fila de OUTRA pessoa e existe para a validação da tela
+    // (o admin precisa ver o que o líder vê). Só ADMIN pode usar; qualquer outro e-mail
+    // no parâmetro é ignorado e a pessoa vê a própria fila. Ao decidir nesse modo, o
+    // `decidido_por` gravado é o do ADMIN — a auditoria não finge que o líder clicou.
+    if (pathname === '/api/aprovacoes/pendentes' && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const como = (url.searchParams.get('como') ?? '').trim().toLowerCase()
+      const preview = como && como !== email.toLowerCase() && (await isAdmin(email)) ? como : null
+      const fila = await listarAprovacoesPendentes(preview ?? email)
+      return json({ ...fila, visualizando_como: preview })
+    }
+    if (pathname === '/api/aprovacoes/decidir' && method === 'POST') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      const body = await readBody<Record<string, unknown>>(request)
+      const como = String(body?.como ?? '').trim().toLowerCase()
+      const preview = como && como !== email.toLowerCase() && (await isAdmin(email)) ? como : null
+      return json(
+        await decidirAprovacao(preview ?? email, body, preview ? { atorReal: email } : undefined),
+      )
     }
 
     // ── Chat (público — qualquer usuário pode submeter) ──
@@ -500,6 +543,49 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const body = await readBody<{ projetoId?: string; dry?: boolean }>(request)
       if (!body?.projetoId) return errorJson('projetoId é obrigatório', 400)
       return json(await reconciliarFinanceiroDoSheet(body.projetoId, { dry: body.dry }))
+    }
+
+    // ── Reabrir a fila do líder (admin, recuperação) ──
+    // A fila é interna (`projeto_aprovacoes`) e cai em CASCATA junto do projeto —
+    // sobrescrever a aba do Sheets faz a `reconciliarExclusoes` apagar o projeto e,
+    // com ele, a fila; restaurar a aba recria o projeto, nunca a fila. Isto repõe.
+    // ⚠️ `dry` é o DEFAULT: escrever exige `{"dry":false}` explícito no body.
+    if (pathname === '/api/admin/aprovacoes/reabrir' && method === 'POST') {
+      await requireAdmin(request)
+      return json(await reabrirPreAprovacoes(await readBody<unknown>(request)))
+    }
+
+    // ── Snapshot de pendências → Gomoon, sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/notificar-lideres, sem o header de cron.
+    // Existe porque o cron NÃO dispara na STAGING (mesmo motivo do
+    // /api/admin/reanalisar-pendentes abaixo) — sem esta rota não há como validar a
+    // integração fora de produção. ⚠️ `{"dry":true}` monta o payload e NÃO envia
+    // nada: é assim que se confere o conteúdo sem cutucar ninguém.
+    // ⚠️ Com `projetoId`, ensaia o AVISO IMEDIATO (D26) daquele projeto em vez do
+    // snapshot: é o único jeito de conferir o payload do caminho quente (chave por
+    // projeto, escopo do líder, texto) sem passar um formulário inteiro. Os
+    // aprovadores saem da fila REAL do projeto — a rota não abre fila nem inventa
+    // líder, então um projeto isento/sem fila devolve 0 e não envia nada.
+    if (pathname === '/api/admin/notificar-lideres' && method === 'POST') {
+      await requireAdmin(request)
+      const body = await readBody<{ dry?: boolean; projetoId?: string }>(request).catch(
+        () => ({}) as { dry?: boolean; projetoId?: string },
+      )
+      const dry = body?.dry === true
+      const projetoId = (body?.projetoId ?? '').trim()
+      if (!projetoId) return json(await notificarLideresPendentes({ dry }))
+
+      const projeto = await getProjetoById(projetoId)
+      if (!projeto) return errorJson('Projeto não encontrado.', 404)
+      const aprovadores = (await getAprovacoesDoProjeto(projetoId))
+        .filter((a) => a.veredito === 'pendente')
+        .map((a) => ({ email: a.aprovador_email, nome: a.aprovador_nome }))
+      return json(
+        await notificarLideresDoProjeto(projetoId, aprovadores, {
+          dry,
+          nomeProjeto: projeto.nome,
+        }),
+      )
     }
 
     // ── Sync reverso manual (admin) ──

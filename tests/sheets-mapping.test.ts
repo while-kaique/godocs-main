@@ -11,6 +11,8 @@ import {
   updateRowByProjectId,
   readAllRows,
   colLetter,
+  chaveColuna,
+  chavesForaDoCabecalho,
 } from '@/lib/google/sheets';
 import { custoEvitadoRecorrenciaLabel } from '@/lib/google/sync';
 
@@ -130,6 +132,86 @@ describe('updateRowByProjectId (por nome)', () => {
     const obsCol = colLetter(LIVE_HEADERS.indexOf('Observações'));
     expect(ranges).toContain(`'GoDocs'!${statusCol}3`);
     expect(ranges).toContain(`'GoDocs'!${obsCol}3`);
+  });
+});
+
+// Cabeçalho REAL de prod/staging (conferido em 04 e 05/08/2026): a coluna da
+// justificativa do líder está SEM ACENTO no "Lider", e o código escreve "Líder".
+// Antes do match tolerante, a chave não casava e o valor era descartado com aviso —
+// o parecer do gestor não aparecia em lugar nenhum.
+const HEADERS_SEM_ACENTO = [
+  'ID Projeto',
+  'Status',
+  'Aprovação do Líder',
+  'Justificativa Aprovação do Lider',
+];
+
+describe('casamento de coluna tolerante a acento/caixa (05/08/2026)', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('chaveColuna normaliza acento, caixa e espaço — sem confundir nomes distintos', () => {
+    expect(chaveColuna('Justificativa Aprovação do Líder')).toBe(
+      chaveColuna('  justificativa aprovacao do  LIDER '),
+    );
+    expect(chaveColuna('Participantes')).not.toBe(chaveColuna('Participantes 2'));
+  });
+
+  it('update grava na coluna sem acento quando o código manda o nome acentuado', async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url);
+      if ((init?.method ?? 'GET') === 'POST') return okResp({});
+      if (u.includes('1%3A1')) return okResp({ values: [HEADERS_SEM_ACENTO] });
+      return okResp({ values: [['ID Projeto'], ['p1']] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await updateRowByProjectId('p1', {
+      'Aprovação do Líder': 'Pré-aprovado',
+      'Justificativa Aprovação do Líder': 'Pré-aprovado por Lucas em 05/08/2026',
+    });
+
+    const batch = fetchMock.mock.calls.find((c) => String(c[0]).includes('batchUpdate'))!;
+    const body = JSON.parse((batch[1] as RequestInit).body as string);
+    const porRange = Object.fromEntries(
+      (body.data as { range: string; values: string[][] }[]).map((d) => [d.range, d.values[0][0]]),
+    );
+    const colJust = colLetter(HEADERS_SEM_ACENTO.indexOf('Justificativa Aprovação do Lider'));
+    const colEstado = colLetter(HEADERS_SEM_ACENTO.indexOf('Aprovação do Líder'));
+    expect(porRange[`'GoDocs'!${colEstado}2`]).toBe('Pré-aprovado');
+    expect(porRange[`'GoDocs'!${colJust}2`]).toBe('Pré-aprovado por Lucas em 05/08/2026');
+  });
+
+  it('append também alinha o valor à coluna sem acento', async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'POST') return okResp({});
+      if (String(url).includes('1%3A1')) return okResp({ values: [HEADERS_SEM_ACENTO] });
+      return okResp({ values: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await appendRow({ 'ID Projeto': 'p1', 'Justificativa Aprovação do Líder': 'Aguardando Lucas' });
+
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).includes(':append'))!;
+    const row = JSON.parse((call[1] as RequestInit).body as string).values[0] as string[];
+    expect(row[HEADERS_SEM_ACENTO.indexOf('Justificativa Aprovação do Lider')]).toBe(
+      'Aguardando Lucas',
+    );
+  });
+
+  it('coluna que NÃO existe segue ignorada (o aviso não some) e nada casa por acidente', () => {
+    expect(chavesForaDoCabecalho(HEADERS_SEM_ACENTO, { 'Motivo Reenvio': 'x' })).toEqual([
+      'Motivo Reenvio',
+    ]);
+    expect(chavesForaDoCabecalho(HEADERS_SEM_ACENTO, { 'Justificativa Aprovação do Líder': 'x' })).toEqual([]);
+  });
+
+  it('AMBÍGUO não casa: dois cabeçalhos que normalizam igual só aceitam match exato', () => {
+    const headers = ['Área', 'AREA', 'Status'];
+    // "Área"/"AREA" normalizam para a mesma chave → o índice tolerante descarta as duas.
+    const row = orderValuesByHeaders(headers, { 'área': 'x', Status: 'ok' });
+    expect(row).toEqual(['', '', 'ok']);
+    // Já o nome EXATO continua funcionando.
+    expect(orderValuesByHeaders(headers, { 'AREA': 'y' })[1]).toBe('y');
   });
 });
 

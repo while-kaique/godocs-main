@@ -67,6 +67,32 @@ function Home() {
     };
   }, []);
 
+  // Pré-aprovação do líder: a faixa só existe para quem lidera um time na TeamGuide
+  // (quem não lidera ninguém nunca vê). Busca silenciosa, como o selo de pendentes.
+  const [fila, setFila] = useState<{ lidera: boolean; count: number } | null>(null);
+
+  // `?como=<e-mail>` = pré-visualização de ADMIN da home de outra pessoa (o servidor
+  // ignora o param para quem não é admin). Sem isso não havia como conferir a faixa do
+  // líder sem ser ele — o mesmo caminho de validação que a tela `/aprovacoes` já tinha.
+  const comoPreview = new URLSearchParams(window.location.search).get("como")?.trim() ?? "";
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await apiFetch<{ lidera: boolean; itens: unknown[] }>(
+          `/api/aprovacoes/pendentes${comoPreview ? `?como=${encodeURIComponent(comoPreview)}` : ""}`,
+        );
+        if (alive) setFila({ lidera: r.lidera, count: r.itens?.length ?? 0 });
+      } catch {
+        // Silencioso: sem a fila, a faixa não aparece.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [comoPreview]);
+
   useEffect(() => {
     if (acesso_negado) {
       toast.warning(
@@ -265,6 +291,56 @@ function Home() {
         </div>
 
         <main className="mx-auto max-w-6xl px-8 pt-8">
+          {/* Fila de pré-aprovação — só para quem lidera um time (TeamGuide). O número
+              é a informação; o rótulo e o ícone carregam o estado (nunca só a cor). */}
+          {fila?.lidera && (
+            <Link
+              to="/aprovacoes"
+              // No modo pré-visualização o param viaja com o clique: senão a faixa abriria
+              // a fila do admin (vazia) em vez da fila que ele está conferindo.
+              search={comoPreview ? { como: comoPreview } : undefined}
+              className="mb-6 flex flex-col gap-3 rounded-xl px-5 py-4 transition-all hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between"
+              style={{
+                background: "var(--go-white)",
+                border: "1px solid rgba(0,89,169,0.12)",
+                boxShadow: "var(--go-shadow-sm)",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center"
+                  style={{
+                    background: "rgba(0,89,169,0.07)",
+                    borderRadius: "var(--go-radius-md)",
+                    color: "var(--go-blue)",
+                  }}
+                >
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-[14px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+                    Pré-aprovações do meu time
+                  </p>
+                  <p className="mt-0.5 text-[12px]" style={{ color: "#8b8b9a" }}>
+                    {fila.count > 0
+                      ? `${fila.count} projeto${fila.count > 1 ? "s" : ""} do seu time espera${fila.count > 1 ? "m" : ""} o seu parecer.`
+                      : "Nenhum projeto do seu time esperando parecer agora."}
+                  </p>
+                </div>
+              </div>
+              <span
+                className="inline-flex items-center gap-2 self-start rounded-full px-4 py-2 text-[12px] font-semibold sm:self-auto"
+                style={{
+                  background: fila.count > 0 ? "var(--go-blue)" : "rgba(0,89,169,0.08)",
+                  color: fila.count > 0 ? "var(--go-white)" : "var(--go-blue)",
+                }}
+              >
+                Abrir fila
+                <ArrowRight className="h-3.5 w-3.5" />
+              </span>
+            </Link>
+          )}
+
           {/* Action Cards */}
           <section className="grid grid-cols-1 gap-6 pb-12 md:grid-cols-2">
             <ActionCard
