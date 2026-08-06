@@ -4,7 +4,63 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 06/08 (sessão MAIS RECENTE) — D24/D25: o anúncio saiu do GoDocs e a DM ao líder encolheu
+## ✅ 06/08 (sessão MAIS RECENTE) — D26: o aviso ao líder virou IMEDIATO e a feature FOI PARA PRODUÇÃO
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
+**executado**; execução direta por cima. ⚠️ **A trava "só depois da diretoria" caiu**: o Luis mandou subir, e
+o **anúncio global já tinha sido disparado em produção pelo João Victor** (~12:00 BRT, `ambiente:"producao"`,
+entregue) — a empresa já sabe da feature.
+
+**O que motivou:** o Luis perguntou o que faltava para prod e disse que o desenho certo é *"submissão nova já
+dispara pra API"*. Eu tinha respondido que a integração era diária — **estava errado**: a **§9 do doc v3 do
+João Victor** diz *"entregamos a DM na hora em que recebemos o POST"*. A cadência **sempre foi escolha nossa**
+(o cron + a data dentro da chave de idempotência), e mudá-la **não exigiu nada do Gomoon**.
+
+**O que foi feito** (commits `ae1835b` + `6af2636`, **1111 testes**, staging `edf400b4` e prod `674a3710`
+deployadas ~12:20 BRT):
+- `notificarLideresDoProjeto(projetoId, aprovadores, {nomeProjeto})` sai do fim de `submeterParaValidacao`
+  via `runBackground`, logo após `abrirPreAprovacao`.
+- **Chave por PROJETO** (`godocs:<email>:<projetoId>`, `chaveDeProjeto`) — com a chave diária, a **2ª
+  submissão do dia** para o mesmo líder voltaria `ja_entregue` (§8) e a DM sumiria **em silêncio**. A chave é
+  string OPACA do lado deles (§3), então o formato é nosso.
+- Manda o **BACKLOG do líder**, não só o projeto que disparou — devolve o efeito de lembrete do digest e sai
+  da MESMA agregada da tela `/aprovacoes`.
+- **Guard `[E2E-…]` EXPLÍCITO** no caminho imediato: a agregada filtra o projeto de teste, mas sem o guard a
+  submissão E2E ainda dispararia a DM do **backlog** do líder.
+- **Nunca manda `lideres: []`** (invariante do CRON) e **nunca lança** (D3).
+- Rota admin aceita `{"projetoId":"…"}` para ensaiar o caminho quente sem passar um formulário inteiro.
+- Doc drift corrigido: o commit `4fce723` tirou a linha `👉` do texto, mas `CLAUDE.md` e o jsdoc seguiam
+  dizendo que ela ficou.
+
+**Validação.** Staging: dry-run (chave por projeto certa, **só o líder daquele projeto**, texto sem menção a
+staging) → envio real **202, 0 falhas** → log do Gomoon `status: entregue`, `messageName` presente. Prod:
+dry-run devolveu **`ambiente:"producao"`** e **`lideres: []`** — a fila nasce vazia (não há backfill), então as
+DMs começam na **próxima submissão real**.
+
+**O medo do Luis, respondido com prova:** o prefixo `[STAGING — destinatário real: …]` **é escrito pelo
+GOMOON**, não por nós — o anúncio que saiu hoje em `ambiente:"producao"` chegou **sem prefixo**, direto no
+`lucas.queiroz@`. Prod **não tem** `GODOCS_ENV`, logo `ambiente:"producao"`. Teste explícito prende as 2 pontas.
+
+**Estado dos secrets/cron:** `GOMOON_TOKEN` **setado nos 2 apps** (prod desde 12:09 BRT) — o mesmo token serve
+os 2 ambientes e as 2 rotas (§1 do doc v3); **não existe "token de produção pendente"** (isso ficou
+desatualizado no nosso doc). **Nenhum cron `notificar-lideres` existe** — o snapshot diário segue implementado
+e testado, só **não agendado**.
+
+**Pendências desta sessão:**
+1. ⚠️ **O wiring do `submeterParaValidacao` NÃO foi exercitado ponta a ponta** — validei
+   `notificarLideresDoProjeto` pela rota admin, mas as 6 linhas dentro do submit só rodam numa submissão real.
+   Falha ali é **silenciosa mas benigna**: a DM não sai, a submissão **não** cai. Provar com 1 submissão na
+   staging, ou acompanhar a 1ª submissão real de prod pelo `GET` no endpoint do Gomoon (`?email=`).
+2. **Perdemos o heartbeat**: sem o cron diário, silêncio virou ambíguo ("ninguém submeteu" × "quebrou").
+3. **3 perguntas ao João Victor** (nenhuma bloqueia, detalhe no §16 de `docs/integracao-gomoon-chat.md`):
+   descarte de item em retry quando chega POST novo (§8, 3º bullet, escrito para 1 lote/dia); volume (N POSTs
+   espalhados); e confirmar que **ele** dispara o anúncio à mão — a §4 exige `mensagem.texto` no corpo e
+   **nada no GoDocs chama esse endpoint**.
+4. **Nada foi para o `main`** — os 2 commits estão só na branch, sem push nem PR.
+
+---
+
+## ✅ 06/08 — D24/D25: o anúncio saiu do GoDocs e a DM ao líder encolheu
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
 **executado**; execução direta por cima dele (nenhum plano novo). A feature inteira continua **travada para
