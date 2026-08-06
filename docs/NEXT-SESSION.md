@@ -23,8 +23,22 @@ preciso saber quem está há mais de 5 dias esperando aprovação"*.
   quero uma coluna com os dias pendentes: 50, 30, 20, 2, 3, 5"*): de 3 tabelas / 11 colunas / 121 linhas para
   **1 tabela de 5 colunas** e 34 linhas — Líder · E-mail · Projetos pendentes · **Dias pendentes** (a LISTA
   por projeto, mais antigo primeiro) · Mais antigo (dias), essa numérica para ordenar na planilha.
-- O que saiu está **listado no cabeçalho do script** (cargo, contagem acima do corte, média, detalhe projeto a
-  projeto, tabela dos que não esperam líder) — voltar tem de ser decisão, não arqueologia.
+- **Depois ele pediu a coluna das PESSOAS de volta** (commit `13da550`): *"quero também uma relação de quem é a
+  pessoa que esse líder tá pendente, pq quero a info pra pesquisar o projeto da pessoa e ver se você acertou"* →
+  **"Quem está esperando (dias)"** = `Samuel da Silva Campos — 128 · Samuel da Silva Campos — 8`. Como a coluna
+  É a conferência, as duas listas saem da **MESMA** ordenação (`porEspera`): ordenando cada uma por conta
+  própria, `42, 34` e `Ana — 34 · Bruno — 42` sairiam trocados e a conferência apontaria a pessoa errada. O
+  dry-run passou a imprimir uma amostra `dias | pessoas` para checar o pareamento antes de escrever.
+- **Duas coisas que parecem bug na conferência e NÃO são:** o mesmo autor 2× na linha (são 2 projetos dele) e o
+  mesmo autor sob 2 líderes (pessoa em 2 times → 2 linhas, o **primeiro que decide resolve** — D4).
+- **Escrita confirmada por LEITURA de volta** da aba (`values.get`, HTTP 200, 6 colunas) — não ficou só no
+  "a API não reclamou".
+- ⚠️ **Correção registrada para não virar folclore:** a tabelinha de exemplo que eu mostrei no chat (`128, 128`,
+  `128, 6`) foi montada de cabeça, **não lida da planilha** — os valores reais são `128, 8` nas duas primeiras
+  linhas. Os agregados (56 na fila · 31 líderes · 41 acima de 5 dias · máxima 128) vieram do run e valem.
+- O que segue fora está **listado no cabeçalho do script** (cargo, contagem acima do corte, média, detalhe
+  projeto a projeto, tabela dos que não esperam líder) — voltar tem de ser decisão, não arqueologia. Ofereci
+  colocar o **nome do projeto** junto da pessoa (pouparia a busca dele na conferência); ele não respondeu.
 
 **Retrato do 1º run (06/08, 12h50 BRT):** 73 pendentes → **56 na fila de 31 líderes** · **41 projetos acima de
 5 dias, com 26 líderes** · espera máxima **128 dias** (Samir Labib e Stefany Costa) · maior volume Natalia
