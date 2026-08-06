@@ -50,7 +50,7 @@ import {
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade, getProjetoById, getAprovacoesDoProjeto } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados, descontinuarProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { reconciliarFinanceiroDoSheet } from '@/lib/reconciliar-financeiro'
@@ -67,7 +67,7 @@ import {
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
-import { notificarLideresPendentes } from '@/lib/gomoon-lideres.functions'
+import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
 import { getGodocsEnv } from '@/lib/env'
 import type { GoDeployDB } from '@/integrations/db/db-adapter'
 
@@ -561,10 +561,31 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // /api/admin/reanalisar-pendentes abaixo) — sem esta rota não há como validar a
     // integração fora de produção. ⚠️ `{"dry":true}` monta o payload e NÃO envia
     // nada: é assim que se confere o conteúdo sem cutucar ninguém.
+    // ⚠️ Com `projetoId`, ensaia o AVISO IMEDIATO (D26) daquele projeto em vez do
+    // snapshot: é o único jeito de conferir o payload do caminho quente (chave por
+    // projeto, escopo do líder, texto) sem passar um formulário inteiro. Os
+    // aprovadores saem da fila REAL do projeto — a rota não abre fila nem inventa
+    // líder, então um projeto isento/sem fila devolve 0 e não envia nada.
     if (pathname === '/api/admin/notificar-lideres' && method === 'POST') {
       await requireAdmin(request)
-      const body = await readBody<{ dry?: boolean }>(request).catch(() => ({}) as { dry?: boolean })
-      return json(await notificarLideresPendentes({ dry: body?.dry === true }))
+      const body = await readBody<{ dry?: boolean; projetoId?: string }>(request).catch(
+        () => ({}) as { dry?: boolean; projetoId?: string },
+      )
+      const dry = body?.dry === true
+      const projetoId = (body?.projetoId ?? '').trim()
+      if (!projetoId) return json(await notificarLideresPendentes({ dry }))
+
+      const projeto = await getProjetoById(projetoId)
+      if (!projeto) return errorJson('Projeto não encontrado.', 404)
+      const aprovadores = (await getAprovacoesDoProjeto(projetoId))
+        .filter((a) => a.veredito === 'pendente')
+        .map((a) => ({ email: a.aprovador_email, nome: a.aprovador_nome }))
+      return json(
+        await notificarLideresDoProjeto(projetoId, aprovadores, {
+          dry,
+          nomeProjeto: projeto.nome,
+        }),
+      )
     }
 
     // ── Sync reverso manual (admin) ──
