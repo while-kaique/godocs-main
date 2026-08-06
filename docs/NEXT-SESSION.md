@@ -37,6 +37,20 @@ Depois do deploy de prod, os 3 checks passaram lá também.
 (autora Joyce Lima)**, o mesmo do print. Ter linha em `projeto_aprovacoes` é a **única** condição da porta nova
 (D28), então `/projeto/323278fc…` agora responde 200 para ele.
 
+**🆕 PEDIDO NOVO DO LUCAS (06/08, fim do dia, por Chat — ainda NÃO planejado, NÃO codado):** *"No card de
+aprovação também tem que ter a info do que a pessoa marcou naquele 'se alguém fazia'."* Ou seja: o card da fila
+`/aprovacoes` precisa mostrar a resposta de **"Alguém já fazia esse processo antes?"** (`alguem_fazia`), porque é
+ela que diz se as horas são **reais** (alguém fazia), **contrafactuais** (ninguém fazia, estimado como se fizesse)
+ou se o ganho é **custo externo evitado** (contrato encerrado, 0h) — três casos com o MESMO R$ e credibilidade
+diferente, e é justamente o que ele precisa para responder a 3ª pergunta do checklist ("o saving é coerente?").
+⚠️ **Hoje o campo NÃO viaja no payload:** `ItemAprovacao` (`src/lib/aprovacoes.functions.ts`) traz
+`saving_horas`/`saving_reais`/`tipo_saving`/`ganho_total`/custo externo/custo evitado/receita, e `alguem_fazia`
+não está lá — então é agregada da fila → tipo → render no card, com **rótulo legível** (nunca o valor interno
+`sim`/`nao`/`externo`). **2 perguntas para ele ANTES de codar, porque mudam o escopo:** (1) só esse campo ou o
+pacote da Etapa 2 junto (a composição das horas antes/depois por cargo é o irmão natural para julgar coerência)?
+(2) que rótulo ele quer no **custo evitado puro** — um "Não" seco esconde o caso mais delicado. Começar por
+`/ggsd:plan` (é mudança de payload + UI → regra 11, skill `frontend-design` antes de codar).
+
 **⛔ PRÓXIMO PASSO — a única coisa que falta é olho humano de LÍDER (2 coisas, 1 clique cada):** pedir ao
 **Estevão** (ou ao Lucas) para abrir o link do card outra vez e confirmar que a doc aparece — e, na mesma
 passada, **provar o wiring do aviso na submissão** (o único pedaço da D26 nunca exercitado ponta a ponta):
