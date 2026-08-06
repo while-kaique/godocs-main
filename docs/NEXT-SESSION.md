@@ -4,7 +4,46 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 06/08 (sessão MAIS RECENTE) — D26: o aviso ao líder virou IMEDIATO e a feature FOI PARA PRODUÇÃO
+## ✅ 06/08 (sessão MAIS RECENTE) — aba "Aprovações Pendentes por Líder" na planilha de PROD
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
+**executado**. Esta sessão não mexeu em código de aplicação: é **ferramenta de gestão** (script de relatório),
+irmã da aba "Relação Líder-Liderado".
+
+**O que motivou:** o Luis pediu *"uma aba no sheets de prod, assim como a de líder-liderado, com uma relação
+de líderes com projetos pendentes pra aprovação — nome, e-mail, quantidade de projetos e o estado — porque
+preciso saber quem está há mais de 5 dias esperando aprovação"*.
+
+**O que foi feito** (commits `43e425f` + `84ff92a`, **1101 testes verdes**, aba criada e regravada em prod):
+- **`scripts/dryrun-lider/relatorio-espera.ts`** + `espera.config.ts` — mesma mecânica do
+  `relatorio-sheet.ts` (aba dedicada, limpa-e-regrava, `ESPERA_WRITE=1` para escrever, dry-run por default),
+  mesma régua de fila da produção (**D20**, isenção por CARGO) para o relatório não contar uma coisa e o
+  sistema fazer outra. Corte configurável por `ESPERA_LIMITE_DIAS` (default 5) — é decisão de gestão.
+- **A 1ª versão foi CORTADA pelo próprio Luis no mesmo dia** (*"está com muita informação, resume essa aba, eu
+  quero uma coluna com os dias pendentes: 50, 30, 20, 2, 3, 5"*): de 3 tabelas / 11 colunas / 121 linhas para
+  **1 tabela de 5 colunas** e 34 linhas — Líder · E-mail · Projetos pendentes · **Dias pendentes** (a LISTA
+  por projeto, mais antigo primeiro) · Mais antigo (dias), essa numérica para ordenar na planilha.
+- O que saiu está **listado no cabeçalho do script** (cargo, contagem acima do corte, média, detalhe projeto a
+  projeto, tabela dos que não esperam líder) — voltar tem de ser decisão, não arqueologia.
+
+**Retrato do 1º run (06/08, 12h50 BRT):** 73 pendentes → **56 na fila de 31 líderes** · **41 projetos acima de
+5 dias, com 26 líderes** · espera máxima **128 dias** (Samir Labib e Stefany Costa) · maior volume Natalia
+Pavão, 6 pendentes.
+
+**⚠️ Duas ressalvas que mudam a leitura dos números** (a 1ª está escrita no cabeçalho da aba):
+1. O **relógio é a coluna `Data Submissão`**. Para projeto submetido pelo app é exatamente quando a fila do
+   líder abriu; para **LEGADO** (a maioria dos pendentes) a fila nunca abriu — ali o número é a **idade da
+   pendência**, não o tempo em que o líder viu o projeto.
+2. A coluna **`Aprovação do Líder` está VAZIA nos 73 pendentes** — produção entrou em 06/08 **sem backfill**.
+   Foi por isso que **o estado saiu da aba**: hoje seria uma coluna com o mesmo valor em todas as linhas.
+   Quando as novas submissões preencherem (`Pré-pendente`/`Pré-aprovado`/`Ajuste pedido`/`Pré-reprovado`),
+   vale trazer de volta.
+
+**Pendências desta frente que seguem abertas:** exercitar o **wiring do aviso imediato numa submissão real em
+prod** (falha ali é silenciosa-mas-benigna) · decidir se liga também o **cron do resumo diário** (código
+pronto, não agendado) · **PR #235** aberto, aguardando merge.
+
+## ✅ 06/08 — D26: o aviso ao líder virou IMEDIATO e a feature FOI PARA PRODUÇÃO
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
 **executado**; execução direta por cima. ⚠️ **A trava "só depois da diretoria" caiu**: o Luis mandou subir, e
