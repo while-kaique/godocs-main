@@ -13,7 +13,20 @@ vi.mock('@/lib/areas/teamguide.server', () => ({
   getLideresDe: vi.fn(),
   getLideradosDe: vi.fn(),
 }));
-vi.mock('@/lib/google/sheets', () => ({ updateRowByProjectId: vi.fn(async () => true) }));
+// `readAllRows` existe no mock porque `meus-projetos.functions` → `google/sync-reverse`
+// o importa; o detalhe do projeto não lê a planilha, então nunca é chamado.
+vi.mock('@/lib/google/sheets', () => ({
+  updateRowByProjectId: vi.fn(async () => true),
+  readAllRows: vi.fn(async () => []),
+}));
+// ⚠️ `isAdmin` é FIXADO em false: ele lê `ADMIN_EMAILS` do ambiente, e a máquina de quem
+// roda os testes pode ter a variável exportada (aconteceu — o líder do fixture era admin,
+// o override de admin abria o projeto e o teste do 403 passava por engano). O acesso do
+// líder aqui tem de vir da FILA, não de ser admin.
+vi.mock('@/lib/auth.functions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth.functions')>()),
+  isAdmin: vi.fn(async () => false),
+}));
 
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
 import { updateRowByProjectId } from '@/lib/google/sheets';
@@ -29,7 +42,10 @@ import {
   justificativaIsencaoSheet,
   montarParticipantes,
   extrairNumeros,
+  resolverAcessoAprovador,
+  acessoDeAprovador,
 } from '@/lib/aprovacoes.functions';
+import { getMeuProjeto } from '@/lib/meus-projetos.functions';
 import {
   CHECKLIST_APROVACAO,
   bloqueiaPreAprovacao,
@@ -729,5 +745,129 @@ describe('extrairNumeros (puro) — números do card nas fontes do sync', () => 
       custo_evitado_reais: null,
       receita_mensal: null,
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Acesso de LEITURA do líder à tela read-only do projeto (T3 do plano F1).
+//
+// Bug real em produção (06/08/2026): o card da fila oferece "Ler a documentação
+// completa" → `/projeto/$id`, mas o gate era `ehOwner || ehParticipante` e o líder
+// levava "Acesso negado." (403) — reportado pelo Estevão Vidal com 28 líderes já
+// convidados para `/aprovacoes`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolverAcessoAprovador (puro) — a linha da fila é a prova', () => {
+  const pendente = { aprovador_email: LUCAS.email, veredito: 'pendente' };
+  const decidida = { aprovador_email: LUCAS.email, veredito: 'aprovado' };
+
+  it('linha PENDENTE dá leitura e sinaliza que o parecer falta', () => {
+    expect(resolverAcessoAprovador([pendente], LUCAS.email)).toEqual({
+      aprovador: true,
+      pendente: true,
+    });
+  });
+
+  it('linha JÁ DECIDIDA continua dando leitura (o card segue oferecendo a doc — D15)', () => {
+    expect(resolverAcessoAprovador([decidida], LUCAS.email)).toEqual({
+      aprovador: true,
+      pendente: false,
+    });
+  });
+
+  it('quem não está na fila do projeto não ganha nada', () => {
+    expect(resolverAcessoAprovador([pendente], ALINE.email)).toEqual({
+      aprovador: false,
+      pendente: false,
+    });
+    expect(resolverAcessoAprovador([], LUCAS.email)).toEqual({ aprovador: false, pendente: false });
+  });
+
+  it('e-mail vazio nunca abre porta (caminho de header ausente)', () => {
+    expect(resolverAcessoAprovador([{ aprovador_email: '', veredito: 'pendente' }], '')).toEqual({
+      aprovador: false,
+      pendente: false,
+    });
+  });
+
+  it('casa e-mail sem se importar com caixa e espaços', () => {
+    expect(
+      resolverAcessoAprovador([{ aprovador_email: ' LUCAS.Queiroz@Gocase.com ', veredito: 'pendente' }], LUCAS.email)
+        .aprovador,
+    ).toBe(true);
+  });
+
+  it('com 2 líderes (D4), a decisão de um deixa o outro sem pendência mas com leitura', () => {
+    const linhas = [
+      { aprovador_email: LUCAS.email, veredito: 'aprovado' },
+      { aprovador_email: ALINE.email, veredito: 'aprovado' },
+    ];
+    expect(resolverAcessoAprovador(linhas, ALINE.email)).toEqual({ aprovador: true, pendente: false });
+  });
+});
+
+// ⚠️ Reusa o banco do primeiro `describe` de propósito: `setDb` só roda o `initSchema`
+// na PRIMEIRA chamada (guard `_schemaReady`), então um `beforeAll` próprio com outro
+// `:memory:` entregaria um banco vazio ("no such table: projetos"). Os ids são únicos
+// (`seq`), então compartilhar não colide.
+describe('getMeuProjeto — o líder LÊ o projeto e NÃO edita', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLideranca.mockResolvedValue(false);
+    mockLideres.mockResolvedValue([LUCAS]);
+    mockLiderados.mockResolvedValue([]);
+    mockSheet.mockResolvedValue(true);
+  });
+
+  it('líder com pendência abre o detalhe: papel "aprovador", podeEditar FALSE', async () => {
+    const id = await criarProjeto('Projeto do liderado');
+    await abrirPreAprovacao(id);
+
+    expect(await acessoDeAprovador(id, LUCAS.email)).toEqual({ aprovador: true, pendente: true });
+
+    const p = await getMeuProjeto(id, LUCAS.email);
+    expect(p.papel).toBe('aprovador');
+    expect(p.podeEditar).toBe(false);
+    expect(p.aprovacao?.veredito).toBe('pendente');
+  });
+
+  it('líder que JÁ decidiu continua abrindo o detalhe (não perde o que aprovou)', async () => {
+    const id = await criarProjeto('Projeto já decidido');
+    await abrirPreAprovacao(id);
+    await decidirAprovacao(LUCAS.email, {
+      projeto_id: id,
+      veredito: 'aprovado',
+      respostas: RESP_OK,
+    });
+
+    const p = await getMeuProjeto(id, LUCAS.email);
+    expect(p.papel).toBe('aprovador');
+    expect(p.podeEditar).toBe(false);
+    expect(p.aprovacao?.veredito).toBe('aprovado');
+  });
+
+  it('quem NÃO está na fila segue levando 403 (o fix não é uma porta aberta)', async () => {
+    const id = await criarProjeto('Projeto de outro time');
+    await abrirPreAprovacao(id); // fila do LUCAS
+
+    await expect(getMeuProjeto(id, ALINE.email)).rejects.toThrow('Acesso negado.');
+    await expect(getMeuProjeto(id, 'estranho@gocase.com')).rejects.toThrow('Acesso negado.');
+  });
+
+  it('projeto SEM fila nenhuma não vira leitura para ninguém de fora', async () => {
+    mockLideres.mockResolvedValue([]); // autor sem líder → sem fila (D6)
+    const id = await criarProjeto('Projeto sem fila');
+    await abrirPreAprovacao(id);
+
+    await expect(getMeuProjeto(id, LUCAS.email)).rejects.toThrow('Acesso negado.');
+  });
+
+  it('o AUTOR não é afetado: segue owner e editando', async () => {
+    const id = await criarProjeto('Projeto do autor');
+    await abrirPreAprovacao(id);
+
+    const p = await getMeuProjeto(id, 'luis.albuquerque@gocase.com');
+    expect(p.papel).toBe('owner');
+    expect(p.podeEditar).toBe(true);
   });
 });

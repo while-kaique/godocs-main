@@ -682,6 +682,59 @@ export async function decidirAprovacao(
   return { ok: true, veredito };
 }
 
+// ─── Acesso de LEITURA do aprovador (tela read-only do projeto) ──────────────
+
+export type AcessoAprovador = {
+  /** Tem (ou teve) linha na fila deste projeto → pode LER o detalhe. */
+  aprovador: boolean;
+  /** Ainda há linha `pendente` para este e-mail (o parecer dele falta). */
+  pendente: boolean;
+};
+
+const SEM_ACESSO: AcessoAprovador = { aprovador: false, pendente: false };
+
+/**
+ * Decide o acesso de leitura a partir das linhas da fila. Função PURA.
+ *
+ * A linha da fila É a prova de autorização — mesma régua do gate de `decidirAprovacao`,
+ * que só grava se existir linha para (projeto, e-mail). Aqui a régua é de propósito mais
+ * larga que a da decisão: **linha DECIDIDA também dá leitura**. O card da fila continua
+ * oferecendo "Ler a documentação completa" depois do parecer registrado (o slider mantém
+ * o item em modo leitura — D15), e quem acabou de aprovar não pode levar 403 no próprio
+ * projeto que aprovou.
+ *
+ * ⚠️ NÃO consulta a TeamGuide: além da latência (isto roda ao abrir o detalhe), a
+ * liderança ao vivo é a régua de quem ENTRA na fila, não de quem já foi convocado a
+ * decidir. Trocar isso por `getLideresDe` faria uma reorganização de time apagar o
+ * acesso a um projeto que a pessoa já tinha em mãos.
+ */
+export function resolverAcessoAprovador(
+  linhas: Pick<AprovacaoRow, 'aprovador_email' | 'veredito'>[],
+  email: string,
+): AcessoAprovador {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return SEM_ACESSO;
+  const minhas = linhas.filter((l) => (l.aprovador_email ?? '').trim().toLowerCase() === alvo);
+  if (!minhas.length) return SEM_ACESSO;
+  return { aprovador: true, pendente: minhas.some((l) => l.veredito === 'pendente') };
+}
+
+/** Versão I/O do predicado acima (1 leitura no SQLite, sem rede). */
+export async function acessoDeAprovador(
+  projetoId: string,
+  email: string,
+): Promise<AcessoAprovador> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return SEM_ACESSO;
+  try {
+    return resolverAcessoAprovador(await getAprovacoesDoProjeto(projetoId), alvo);
+  } catch (e) {
+    // Falha de leitura não pode virar acesso concedido — nem 500 na tela do autor.
+    console.error('[aprovacoes] falha ao checar o acesso do aprovador:', e);
+    return SEM_ACESSO;
+  }
+}
+
 // ─── Visão do autor (cards de "Meus Projetos" / tela read-only) ──────────────
 
 export type ResumoAprovacao = {

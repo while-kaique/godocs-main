@@ -6,7 +6,25 @@
 
 ## ✅ 06/08 (SESSÃO MAIS RECENTE) — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
 
-**PRÓXIMO PASSO EXATO — decisão do Luis, feita a pergunta e SEM resposta ainda:** o `/ggsd:ship` rodou e
+**✅ DECIDIDO E FEITO (06/08, decisão do Luis: _"vamos corrigir esses detalhes e fazer o merge"_):** o 403
+do líder foi **CORRIGIDO** antes do merge — o Estevão Vidal reportou o bug do lado do usuário no mesmo dia
+(*"não to conseguindo abrir a página de 'Ler a documentação completa'"*, print com **"Acesso negado."**), que
+é exatamente o achado que barrou o `/ggsd:ship`. Fix na **D28**: 3ª porta de leitura em `getMeuProjeto` para
+quem tem linha em `projeto_aprovacoes` (só leitura — `podeEditar` intocado), papel `'aprovador'`, selo
+"Aguarda seu parecer"/"Parecer registrado" e link de volta pra `/aprovacoes`. **1124 testes verdes**
+(+13: 6 do predicado puro, 5 de `getMeuProjeto`, 1 do critério 6 do plano, 1 do D27). Junto foram fechados
+os achados de doc do review: **D27** (especial não abre fila) e **D28** entraram na spec e no `CLAUDE.md`
+(regra 12), a **contradição do cron da F3** (`0 9` × `0 12`) foi resolvida na spec, e a sugestão de tirar o
+`abrirPreAprovacao` do caminho quente foi **recusada com motivo registrado** (mover ela move o **append da
+planilha** junto — o ponto frágil que já purgou projeto; ver §11.6 da spec).
+
+**⛔ PRÓXIMO PASSO — o fix precisa ir ao AR:** o código está no PR #235/`main`, mas **prod ainda tem o 403**.
+Regra 13: **staging `edf400b4` primeiro** (⚠️ conferir o que está no ar lá antes — `updateApp` substitui a app
+inteira), abrir `/projeto/$id` como líder com pendência, e só então **prod `674a3710`**.
+
+<details><summary>Histórico: o que o ship barrou (resolvido acima)</summary>
+
+o `/ggsd:ship` rodou e
 **NÃO mesclou** o PR #235: o revisor de conformidade em contexto fresco devolveu **`diverge-alta`
 (confiança 0,74)**. Escolher entre **(a)** mesclar assim mesmo — recomendado: a proteção contra o atropelo
 vale mais hoje que o link quebrado — ou **(b)** corrigir o 403 antes (fatia curta e independente) e mesclar
@@ -32,6 +50,8 @@ usa `0 12` = 09h BRT) e o critério 6 não tem teste.
 teste) · **zero R$** no payload do Gomoon (teste varre o JSON) · `projeto_aprovacoes` inalcançável pelo sync
 reverso · `Status` do Sheets nunca tocada · `Atualizado Em` só lida pelo dashboard. Nenhum escopo vazado em
 código de produção fora da feature. **Sem CI no repo** — quem decide o merge é só esse review.
+
+</details>
 
 **O que a sessão executou, os 4 passos, em produção** (o Luis pediu: *"fazer o disparo de retroativo e
 que toda submissão que cair faça a comunicação para a api do gomoon"*):

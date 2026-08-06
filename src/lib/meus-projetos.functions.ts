@@ -15,7 +15,11 @@ import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { isAdmin } from '@/lib/auth.functions';
-import { resumoAprovacaoPorProjeto, type ResumoAprovacao } from '@/lib/aprovacoes.functions';
+import {
+  resumoAprovacaoPorProjeto,
+  acessoDeAprovador,
+  type ResumoAprovacao,
+} from '@/lib/aprovacoes.functions';
 
 export type MeuProjetoItem = {
   id: string;
@@ -170,7 +174,11 @@ export function ehEditorDelegado(projeto: ProjetoRow, email: string): boolean {
   return delegados.some((d) => d.trim().toLowerCase() === alvo);
 }
 
-export type Papel = 'owner' | 'participante';
+// 'aprovador' = líder convocado à pré-aprovação deste projeto (linha em
+// `projeto_aprovacoes`). Lê o detalhe, NUNCA edita — o poder de edição é do owner e dos
+// `editores_delegados`. Só o DETALHE (`getMeuProjeto`) usa este papel: a listagem de
+// "Meus Projetos" segue owner/participante (a fila do líder mora em `/aprovacoes`).
+export type Papel = 'owner' | 'participante' | 'aprovador';
 
 // "Atualizado Em" preenchido? Trata vazio/"—"/"-" como ausente (= legado pendente).
 export function temAtualizadoEm(v: string | null | undefined): boolean {
@@ -480,7 +488,14 @@ export async function getMeuProjeto(
   // LEITURA: owner OU participante (membro) podem abrir. Admins (emails do RPA
   // cadastrados na tabela `admins`) podem abrir QUALQUER projeto.
   const ehAdmin = await isAdmin(email);
-  if (!temAcesso(data, email) && !ehAdmin) {
+  // 3ª porta de leitura: o LÍDER convocado à pré-aprovação (linha em
+  // `projeto_aprovacoes`). Sem ela, o card da fila oferece "Ler a documentação completa"
+  // e o líder — que não é owner nem participante — leva 403 na cara (bug real em prod,
+  // 06/08/2026, com 28 líderes já convidados para `/aprovacoes`). Só é consultada quando
+  // as outras 2 portas falham: para owner/participante/admin é zero I/O extra.
+  const acessoAprovador =
+    temAcesso(data, email) || ehAdmin ? { aprovador: false, pendente: false } : await acessoDeAprovador(id, email);
+  if (!temAcesso(data, email) && !ehAdmin && !acessoAprovador.aprovador) {
     throw Object.assign(new Error('Acesso negado.'), { status: 403 });
   }
   // EDIÇÃO: o owner (quem submeteu), um editor delegado (participante a quem o dono
@@ -488,9 +503,17 @@ export async function getMeuProjeto(
   // participante (não-delegado) VENCE o override de admin: um admin que também é
   // participante do projeto NÃO edita (vê como qualquer participante). O override de
   // admin vale só para projetos em que ele não tem papel (não é owner nem participante).
+  // ⚠️ O aprovador NÃO entra nesta conta: quando o acesso vem só da fila, `temAcesso` e
+  // `ehAdmin` são falsos por construção (a porta 3 só é consultada quando as duas
+  // primeiras falham), então `podeEditar` fica false sem cláusula nova. Líder que também
+  // é admin/owner/delegado mantém exatamente o poder que já tinha (gotcha 8 da spec).
   const podeEditar =
     ehOwner(data, email) || ehEditorDelegado(data, email) || (ehAdmin && !ehParticipante(data, email));
-  const papel: Papel = ehOwner(data, email) ? 'owner' : 'participante';
+  const papel: Papel = ehOwner(data, email)
+    ? 'owner'
+    : acessoAprovador.aprovador
+      ? 'aprovador'
+      : 'participante';
 
   const docRow = data.documentacao?.[0];
   const docConteudo = docRow ? parseJson(docRow.conteudo) : null;

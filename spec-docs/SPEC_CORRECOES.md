@@ -6,6 +6,54 @@
 
 ---
 
+## 2026-08-06 — Líder levava "Acesso negado." ao abrir a documentação do projeto que precisa aprovar
+
+**Status:** ✅ codada e testada · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** #235
+
+**Sintoma.** O Estevão Vidal, líder, escreveu no Chat: *"não to conseguindo abrir a página de 'Ler a
+documentação completa' no godocs pra aprovar um projeto"* — o print mostra `/projeto/323278fc…` com a
+tela read-only montada (cabeçalho "Projeto", selo "SOMENTE LEITURA") e, no corpo, **"Acesso negado."**.
+Acontecia com **todo** líder: 28 deles tinham acabado de ser convidados a `/aprovacoes` pela DM do Gomoon.
+
+**Causa-raiz.** O gate de leitura do detalhe (`getMeuProjeto`, `meus-projetos.functions.ts`) era
+`temAcesso = ehOwner || ehParticipante` → **403** para o líder, que não é nenhum dos dois. O card da fila
+(`src/routes/aprovacoes.tsx`) oferecia o link mesmo assim. Era a **T3 do plano F1** e o **critério de
+aceitação nº 2** ("abre `/projeto/$id` **sem 403**"), que a `SPEC_APROVACAO_LIDER.md` afirmava cumprido —
+a tarefa nunca foi implementada e o texto da spec envelheceu como se tivesse sido. O `/ggsd:ship` do PR
+#235 pegou exatamente isto (revisor de conformidade em contexto fresco: `diverge-alta`, confiança 0,74) e
+**barrou o merge**; o relato do Estevão chegou no mesmo dia, do lado do usuário.
+
+**Fix (D28).** Uma **3ª porta** de leitura, escopada: quem tem **linha em `projeto_aprovacoes`** para
+aquele projeto abre o detalhe. Puro `resolverAcessoAprovador(linhas, email)` + I/O `acessoDeAprovador`
+(`aprovacoes.functions.ts`); `getMeuProjeto` só consulta essa porta quando owner/participante/admin falham
+(zero I/O extra para eles) e devolve `papel: 'aprovador'`. **`podeEditar` não muda** — quando o acesso vem
+só da fila, `temAcesso` e `ehAdmin` são falsos por construção, então a expressão de edição já dá `false`
+sem cláusula nova (gotcha 8: líder não vira editor; isso é `editores_delegados`). Na tela: selo
+**"Aguarda seu parecer" / "Parecer registrado"** (rótulo + ícone, nunca só cor) e o link de voltar aponta
+para **`/aprovacoes`** em vez de "Meus Projetos".
+
+**Decisões dentro do fix** (as duas mereciam pergunta e foram resolvidas pelo lado seguro):
+- **Linha JÁ DECIDIDA também dá leitura.** O slider mantém o item decidido em modo leitura (D15) e o link
+  continua ali — expirar o acesso no clique do parecer devolveria o mesmo 403 logo depois de aprovar.
+- **Nunca consulta a TeamGuide.** A liderança ao vivo é a régua de quem **entra** na fila, não de quem já
+  foi convocado a decidir; além de custar latência na abertura do detalhe, uma reorganização de time
+  apagaria o acesso a um projeto que a pessoa tem em mãos. A linha da fila já é a prova — é a MESMA régua
+  do gate de `decidirAprovacao`.
+
+**Onde aterrissou.** `src/lib/aprovacoes.functions.ts` (predicado puro + wrapper) ·
+`src/lib/meus-projetos.functions.ts` (3ª porta, `Papel` ganha `'aprovador'`) ·
+`src/routes/projeto.$id.tsx` (selo + origem do link) · `tests/aprovacoes-lider.test.ts`
+(6 casos do predicado puro + 5 de `getMeuProjeto`: líder pendente lê e não edita, líder que já decidiu
+segue lendo, estranho e projeto-sem-fila seguem em 403, autor intocado) ·
+`spec-docs/SPEC_APROVACAO_LIDER.md` (D28 + a linha que afirmava o critério cumprido).
+
+⚠️ **Achado colateral do teste** (vale para quem escrever teste de ownership aqui): `isAdmin` lê
+`ADMIN_EMAILS` do **ambiente**, e a máquina de quem roda os testes pode ter a variável exportada — o
+primeiro fixture usava um líder que era admin, o override de admin abria o projeto e o teste do 403
+**passava por engano**. O bloco novo fixa `isAdmin` em `false` via `vi.mock`.
+
+---
+
 ## 2026-08-05 — Parecer do líder chegava MUTILADO na planilha (coluna sem acento + justificativa resumida)
 
 **Status:** ✅ codada e testada (945 verdes) · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** pendente
