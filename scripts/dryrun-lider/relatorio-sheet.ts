@@ -40,7 +40,7 @@ const ESCREVER = process.env.RELATORIO_WRITE === '1';
 const txt = (v: unknown) => String(v ?? '').trim();
 const low = (v: unknown) => txt(v).toLowerCase();
 
-type Projeto = { id: string; nome: string; autorNome: string; autorEmail: string };
+type Projeto = { id: string; nome: string; autorNome: string; autorEmail: string; especial: boolean };
 
 async function main() {
   // ── 1. Projetos PENDENTES da aba GoDocs (é o que geraria mensagem hoje) ────
@@ -53,6 +53,9 @@ async function main() {
       nome: txt(r['Projeto']) || '(sem nome)',
       autorNome: txt(r['Nome Completo']) || '—',
       autorEmail: low(r['Email']),
+      // D27 (06/08/2026): especial não é pendência do líder. A planilha grava
+      // "Sim"/"Não" — qualquer coisa que comece com "s" conta como sim.
+      especial: low(r['Especial?']).startsWith('s'),
     }));
 
   // ── 2. Hierarquia + cargos da TeamGuide (mesma régua da feature) ──────────
@@ -71,6 +74,13 @@ async function main() {
   const foraDaFila: { proj: Projeto; motivo: string }[] = [];
 
   for (const p of pendentes) {
+    // D27 — projeto ESPECIAL fica fora, antes de qualquer pergunta sobre a pessoa:
+    // não tem memorial financeiro para o líder julgar (a 3ª pergunta do checklist
+    // não teria o que avaliar) e o destino dele é a validação humana da RPA.
+    if (p.especial) {
+      foraDaFila.push({ proj: p, motivo: 'Projeto especial — sem pré-aprovação do líder' });
+      continue;
+    }
     if (!p.autorEmail) {
       foraDaFila.push({ proj: p, motivo: 'Sem e-mail do autor na planilha' });
       continue;

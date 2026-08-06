@@ -144,6 +144,39 @@ describe('pré-aprovação do líder', () => {
     expect(await getAprovacoesDoProjeto(id)).toEqual([]);
   });
 
+  // D27 (06/08/2026, decisão do Luis): projeto ESPECIAL não é pendência do líder —
+  // não tem memorial financeiro, então a 3ª pergunta do checklist ("o saving faz
+  // sentido?") não teria o que julgar, e o destino dele sempre foi a validação humana
+  // da RPA. ⚠️ O guard roda ANTES da TeamGuide: é um flag do projeto, não depende de
+  // integração externa — por isso este teste deixa a liderança/os líderes mockados
+  // como um autor NORMAL e ainda assim espera fila zero.
+  it('projeto ESPECIAL não abre fila, nem consulta a TeamGuide (D27)', async () => {
+    mockLideranca.mockResolvedValue(false);
+    mockLideres.mockResolvedValue([ALINE]);
+    const id = `p-especial-${++seq}`;
+    await insertProjetoRaw({
+      id,
+      nome: 'Projeto especial de teste',
+      responsavel_nome: 'Luis Albuquerque',
+      responsavel_email: 'luis.albuquerque@gocase.com',
+      ferramenta: 'n8n',
+      status: 'em_validacao',
+      submitted_at: new Date().toISOString(),
+      tipos_projeto: JSON.stringify(['especial']),
+      especial: 1,
+      area: 'RPA',
+    });
+
+    const r = await abrirPreAprovacao(id);
+
+    expect(r).toMatchObject({ isento: true, motivo: 'especial', rotuloSheet: '—' });
+    expect(r.aprovadores).toEqual([]);
+    expect(await getAprovacoesDoProjeto(id)).toEqual([]);
+    // A auditoria precisa distinguir isenção legítima de falha de integração (D12).
+    expect(r.justificativaSheet).toMatch(/especial/i);
+    expect(mockLideranca).not.toHaveBeenCalled();
+  });
+
   it('líder sem e-mail cadastrado não vira aprovador', async () => {
     mockLideres.mockResolvedValue([{ nome: 'Líder Sem Email', email: null }]);
     const id = await criarProjeto();

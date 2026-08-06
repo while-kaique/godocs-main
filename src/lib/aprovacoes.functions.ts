@@ -95,6 +95,11 @@ export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): 
       return 'Sem líder na TeamGuide';
     case 'teamguide_indisponivel':
       return 'Aprovação indisponível (integração)';
+    // D27 (06/08/2026): projeto ESPECIAL não é pendência do líder. Ele não tem
+    // memorial financeiro, então a 3ª pergunta do checklist ("o saving faz sentido?")
+    // não teria o que julgar — e o destino dele sempre foi a validação humana da RPA.
+    case 'especial':
+      return 'Projeto especial — sem pré-aprovação do líder (vai direto à validação da RPA)';
     default:
       return '—';
   }
@@ -204,7 +209,7 @@ export function justificativaAprovacaoSheet(
 export type ResultadoAbertura = {
   /** Nenhuma fila aberta porque o autor É liderança (D11) ou não tem líder (D6). */
   isento: boolean;
-  motivo: 'lideranca' | 'sem_lider' | 'teamguide_indisponivel' | null;
+  motivo: 'lideranca' | 'sem_lider' | 'teamguide_indisponivel' | 'especial' | null;
   aprovadores: { email: string; nome: string | null }[];
   /** Estado pronto para a coluna "Aprovação do Líder". */
   rotuloSheet: string;
@@ -236,6 +241,13 @@ export async function abrirPreAprovacao(
     if (!projeto) return semFila('sem_lider');
     const autor = (projeto.responsavel_email ?? '').trim().toLowerCase();
     if (!autor) return semFila('sem_lider');
+
+    // D27 — projeto ESPECIAL não abre fila (decisão do Luis, 06/08/2026). Vem ANTES
+    // da TeamGuide: é um flag do próprio projeto, não depende de integração externa.
+    if (Number(projeto.especial) === 1) {
+      console.log(`[aprovacoes] ${projetoId} é ESPECIAL → sem fila de pré-aprovação (D27).`);
+      return semFila('especial');
+    }
 
     // D11 — liderança é isenta: não faz sentido o líder do líder aprovar.
     if (await ehLideranca(autor)) {

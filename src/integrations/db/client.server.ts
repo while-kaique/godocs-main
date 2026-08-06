@@ -1165,8 +1165,16 @@ export async function abrirAprovacoesPendentes(
  */
 export async function contarAprovacoesPendentesDe(email: string): Promise<number> {
   const rows = await queryAll<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM projeto_aprovacoes
-      WHERE LOWER(aprovador_email) = LOWER(?) AND veredito = 'pendente'`,
+    // ⚠️ O JOIN existe para os MESMOS filtros da `getAprovacoesPendentesDe`: o número
+    // da faixa da home tem de bater com o tamanho da fila que a tela abre. Sem ele, o
+    // líder via "3 pendentes" e encontrava 2 (D27 — especial não é pendência).
+    `SELECT COUNT(*) AS n
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE LOWER(a.aprovador_email) = LOWER(?)
+        AND a.veredito = 'pendente'
+        AND p.status != 'rascunho'
+        AND COALESCE(p.especial, 0) != 1`,
     [email],
   );
   return Number(rows[0]?.n ?? 0);
@@ -1198,6 +1206,7 @@ export function getAprovacoesPendentesDe(email: string) {
       WHERE LOWER(a.aprovador_email) = LOWER(?)
         AND a.veredito = 'pendente'
         AND p.status != 'rascunho'
+        AND COALESCE(p.especial, 0) != 1
       ORDER BY a.criado_em DESC`,
     [email],
   );
@@ -1240,6 +1249,7 @@ export function getPendenciasPorLider() {
         AND COALESCE(TRIM(a.aprovador_email), '') != ''
         AND p.status != 'rascunho'
         AND COALESCE(p.descontinuado, 0) != 1
+        AND COALESCE(p.especial, 0) != 1
         AND COALESCE(p.nome, '') NOT LIKE '[E2E-%'
       GROUP BY lider_email, liderado_email
       ORDER BY lider_email, projetos_pendentes DESC, liderado_email`,
