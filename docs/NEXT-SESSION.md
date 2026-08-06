@@ -6,10 +6,32 @@
 
 ## ✅ 06/08 (SESSÃO MAIS RECENTE) — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
 
-**PRÓXIMO PASSO EXATO:** **mesclar o PR #235** (`/ggsd:ship`) — é a única coisa que impede prod de ser
-atropelada de novo. O Luis foi perguntado ao fim da sessão e ainda **não respondeu**; sem o merge, o
-próximo deploy de qualquer outra frente derruba a feature outra vez — agora com **36 filas abertas e 28
-líderes já avisados**, ou seja, o custo do atropelo subiu.
+**PRÓXIMO PASSO EXATO — decisão do Luis, feita a pergunta e SEM resposta ainda:** o `/ggsd:ship` rodou e
+**NÃO mesclou** o PR #235: o revisor de conformidade em contexto fresco devolveu **`diverge-alta`
+(confiança 0,74)**. Escolher entre **(a)** mesclar assim mesmo — recomendado: a proteção contra o atropelo
+vale mais hoje que o link quebrado — ou **(b)** corrigir o 403 antes (fatia curta e independente) e mesclar
+tudo junto. Enquanto não mesclar, o próximo deploy de outra frente derruba a feature de novo, agora com
+**36 filas abertas e 28 líderes já avisados**.
+
+**O achado que barrou o merge — `src/routes/aprovacoes.tsx:859`:** o card da fila oferece *"Ler a
+documentação completa"* → `/projeto/$id`, mas o gate segue `ehOwner || ehParticipante`
+(`meus-projetos.functions.ts:154,483`) — o líder não é nenhum dos dois e leva **403**. É a **T3 do plano F1**
+e o **critério de aceitação nº 2**, que a spec ainda afirma cumprido (`SPEC_APROVACAO_LIDER.md:198`). ⚠️
+**Não trava a decisão** (o card é auto-suficiente por decisão — D13/D15), mas 28 líderes acabaram de ser
+convidados para `/aprovacoes` e quem clicar nesse link bate no erro. Fix: estender `temAcesso` a quem tem
+aprovação PENDENTE, **sem** conceder edição (+ o teste do predicado, que não existe).
+
+**4 achados de baixa severidade** (não bloqueiam, ficam de lição de casa): `abrirPreAprovacao` é **aguardado**
+no caminho quente do submit em vez de `runBackground` (`chat.functions.ts:3319` — não derruba, mas soma a
+latência da TeamGuide) · o casamento tolerante de coluna mexeu no **sync inteiro**, além do blast-radius
+aprovado (`google/sheets.ts`, testado e com guarda de ambiguidade) · a **D27 não está na spec nem no
+`CLAUDE.md`**, só neste doc (**regra 12**) · a spec se contradiz sobre o cron da F3 (`0 9` × `0 12`, o código
+usa `0 12` = 09h BRT) e o critério 6 não tem teste.
+
+✅ **Os 5 invariantes críticos passaram, com evidência:** `abrirPreAprovacao` nunca lança (try/catch +
+teste) · **zero R$** no payload do Gomoon (teste varre o JSON) · `projeto_aprovacoes` inalcançável pelo sync
+reverso · `Status` do Sheets nunca tocada · `Atualizado Em` só lida pelo dashboard. Nenhum escopo vazado em
+código de produção fora da feature. **Sem CI no repo** — quem decide o merge é só esse review.
 
 **O que a sessão executou, os 4 passos, em produção** (o Luis pediu: *"fazer o disparo de retroativo e
 que toda submissão que cair faça a comunicação para a api do gomoon"*):
