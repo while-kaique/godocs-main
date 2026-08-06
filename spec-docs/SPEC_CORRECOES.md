@@ -1645,3 +1645,58 @@ decisão, ver comentário em `meus-projetos.functions.ts`) e usa o espelho SQLit
 pelo analisador; os projetos semeados para o teste visual existiam só na planilha, então o bloco não
 renderizava lá. O componente é o mesmo da lista, mas a tela de detalhe só foi verificada por leitura de
 código. Mobile também só por raciocínio de CSS (o `resize_window` do Chrome não pegou).
+
+## Zona cinzenta indevida: campo LEGADO vazio derrubava a rastreabilidade de TODA submissão nova (05/08/2026)
+
+**Sintoma.** "Bot de Faturamento V2" (Mario Monteiro, submetido 05/08/2026 13:14) saiu **Zona cinzenta**
+mesmo tendo **aprovado com 11/13** na régua de qualidade e mesmo tendo eliminado um contrato de equipe
+terceirizada de **R$ 3.600/mês**. A justificativa gravada na coluna `Classificação` dizia, textualmente, que
+o memorial *"não aponta um indicador nomeado e verificável **com ponteiro movido preenchido**"*.
+
+**Causa 1 — o campo LEGADO vazio era lido como "o autor não respondeu".** `buildUserMessage` mandava
+`ponteiro_movido: null` e `ponteiro_evidencia: null` em **toda** submissão. Esses campos são **LEGADO** desde
+03/08/2026 (os cards saíram da Etapa 2 e nada mais os escreve), então chegam `null` sempre — não por omissão
+do autor, mas porque a pergunta não existe mais. O prompt até avisa que são legado e que a rastreabilidade
+vem da seção do memorial, mas o payload contradizia o prompt: presente-e-nulo lê como ausência de resposta,
+não como campo aposentado. Isso enviesava **todas** as submissões novas para zona cinzenta, não só esta.
+
+**Causa 2 — o analisador recebia o total do custo evitado, mas não o nome do contrato.** O payload trazia
+`custo_evitado_reais: 3600` e nada mais: `custo_evitado_itens` (que nomeia *"Equipe Terceirizada — R$ 3.600,00
+(mensal)"*) nunca era enviado, ao contrário do `custo_projeto_itens`, que já ia. E a régua não declarava que
+contrato encerrado **é** indicador — então o modelo procurou painel/KPI, não achou, e rebaixou. Um contrato
+que parou de ser pago é o eixo **custo** da própria taxonomia do analisador, e é mais auditável que dashboard.
+
+**Fix (3 edições, 2 delas determinísticas — mexem no INPUT, não na persuasão):**
+
+1. `ponteiro_movido`/`ponteiro_evidencia` só entram no payload quando **realmente preenchidos** (spread
+   condicional). Submissão legada com o campo escrito segue valendo como resposta do autor; submissão nova
+   simplesmente não menciona o campo. **Zero mudança de prompt** — a frase que já existia lá ("só existem em
+   submissões da época da pergunta no formulário") passou a ser literalmente verdadeira.
+2. `custo_evitado_itens` passou a ser enviado dentro de `memorial_saving`, espelhando exatamente o
+   `custo_projeto_itens` vizinho (mesmo `parseJson`, mesma forma) — nenhum conceito novo para o modelo.
+3. **Uma frase** no critério 3 da régua, encostada no aviso do "próprio entregável NÃO conta" (que é onde o
+   modelo estava lendo quando errou): contrato/serviço externo **ENCERRADO** é indicador nomeado, conferível
+   e já é um antes × depois; não se rebaixa por faltar painel ou KPI.
+
+**Por que NÃO virou gate determinístico.** `normalizarClassificacao` é declaradamente *só rebaixa, nunca
+promove*. Promover `zona_cinzenta → claro_sim` por existir custo evitado quebraria a invariante e passaria
+batido um custo evitado inventado. E o custo de um falso `zona_cinzenta` é **uma triagem humana** — não é
+usuário travado, diferente do loop do `[1.4]` ou do ganho projetado virando receita apurada. As duas correções
+determinísticas já tiram um sinal falso e colocam um verdadeiro; só a terceira é prompt, e é regra, não
+persuasão.
+
+**Onde aterrissou:** `src/lib/agents/analyzer.ts` (`buildUserMessage` × 2 + `buildSystemPrompt` × 1) ·
+`src/lib/testes/prompt-registry.ts` (descrição, regra 3) · `tests/analyzer-rastreabilidade-custo.test.ts`
+(novo, 8 casos: campo omitido quando nulo/vazio, enviado quando preenchido, itens nomeados no payload,
+e a régua nova sem afrouxar a trava do entregável) · `CLAUDE.md`.
+
+**Achado adjacente, NÃO corrigido aqui (inversão Real/Escalado).** O mesmo projeto gravou
+`Saving Horas Real = 0` e `Escalado = 10`, com a justificativa automática *"Ninguém fazia esta tarefa
+manualmente… a carga humana real é 0h"* — mas a conversa e o memorial dizem que o Supervisor gastava 10h/mês
+(conferência 3h + ajustes/filtros 4h + pós-processamento 2h + consolidação 1h) e hoje gasta 0. Causa: o ramo
+**2c** da árvore ("há trabalho manual ADICIONAL que o contrato não cobria?" → **Sim**) mapeia para
+`alguem_fazia='nao'` (`submeter.tsx`), e aí `derivarSplitHorasSheet` aplica a regra do contrafactual
+(`Real=0, Escalado=TOTAL`). Só que essas horas eram **reais**. O ramo é distinguível sem migração
+(`'nao'` **+ com** custo evitado **+ com** linhas = 2c; `'nao'` **sem** custo evitado = contrafactual puro),
+mas o `'nao' → Real=0/Escalado=TOTAL` é **decisão fechada de 29/06/2026** — confirmar a intenção de produto
+antes de mexer.

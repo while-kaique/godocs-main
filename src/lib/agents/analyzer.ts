@@ -13,8 +13,16 @@ import type {
   CriterioResult,
   Complexidade,
   ClassificacaoAvaliacao,
+  SavingColetado,
 } from './types';
 import { detectarAiProxy } from './extractor';
+// Mesmas derivações que `submeterParaValidacao` aplica antes de gravar no Sheets — o
+// snapshot da documentação fica defasado no financeiro (ver comentário em buildUserMessage).
+import {
+  recomputarSavingFinanceiro,
+  custoEvitadoMensalFromItens,
+  custoProjetoMensalFromItens,
+} from './saving-calc';
 
 const log = (...args: unknown[]) => console.log('[analyzer]', ...args);
 const err = (...args: unknown[]) => console.error('[analyzer]', ...args);
@@ -257,6 +265,7 @@ Além do veredito de qualidade acima, você deve julgar a **ELEGIBILIDADE** da s
 2. **CONTRAFACTUAL** — se **desligar hoje**, algo **piora de forma perceptível** e alguém **reclama**? O autor respondeu no formulário QUEM sentiria falta (\`contrafactual_afetados\` — pessoas específicas ou um time/área inteiro, escolhidos na Team Guide). ⚠️ O formulário **NÃO pergunta mais O QUE piora**: esse efeito você extrai da **documentação e do memorial** (o processo que voltaria a ser manual, o que atrasaria, o que voltaria a dar erro) — não cobre nem cite um campo de formulário para isso. "Ninguém reclamaria" / "nada mudaria" é sinal FORTE de que não é projeto; um time inteiro nomeado é sinal forte a favor. Lista de afetados vazia **e** nada na documentação indicando quem depende da automação → contrafactual NÃO sustentado.
 3. **RASTREABILIDADE** — existe um **indicador nomeado** que mudou, verificável em um **relatório, sistema ou base** que se possa abrir e conferir? Isso NÃO vem do formulário: quem coleta é o AGENTE, na seção **"Ponteiro movido e onde verificar"** do memorial (qual ponteiro — custo/receita/KPI — e onde conferir), junto da seção **"Processo alterado"** (o que mudou e quanto). Seção ausente (submissão antiga) ou registrando que o autor não sabe onde conferir → rastreabilidade NÃO comprovada, o que puxa para **zona_cinzenta** — não para reprovação automática. Os campos \`ponteiro_movido\`/\`ponteiro_evidencia\` só existem em submissões da época em que a pergunta ficava no formulário; quando vierem preenchidos, valem como resposta do autor.
    ⚠️ **O próprio entregável NÃO conta como indicador.** "Dá pra conferir no slide", "o arquivo gerado está lá", "o material do evento mostra o resultado" provam apenas que a **peça foi produzida** — provam a existência do artefato, não que um ponteiro se moveu. Indicador é uma **métrica** (horas de trabalho · custo · taxa de erro/retrabalho · prazo/SLA · receita) que se abra **hoje** num relatório, sistema ou base nomeados e que se possa comparar **antes × depois**. Quando a **única evidência** oferecida é o entregável produzido (o slide, o arquivo, o material), a rastreabilidade **não está comprovada** — trate-a como ausente.
+   ⚠️ **Contrato/serviço externo ENCERRADO é indicador nomeado.** Quando \`memorial_saving.custo_evitado_reais\` > 0 e \`custo_evitado_itens\` nomeia o serviço que deixou de ser pago (ex.: "Equipe terceirizada — R$ 3.600/mês"), a rastreabilidade está comprovada pelo eixo **custo**: o contrato/nota que parou é conferível e já é um antes × depois. Não rebaixe por faltar painel ou KPI — nesse caso o custo É o ponteiro.
 
 **O impacto NÃO precisa ser receita.** Vale qualquer ganho recorrente e verificável desta taxonomia: **horas** de trabalho humano · **custo** (headcount, hora extra, contrato/licença) · **erro** (taxa de falha, retrabalho) · **fraude/risco** evitado · **prazo/SLA** (tempo de ciclo) · **receita**. Um projeto que só reduz erro, sem tocar em R$, é projeto legítimo.
 
@@ -356,8 +365,14 @@ export function buildUserMessage(
       // ponteiro_movido/ponteiro_evidencia são LEGADO (só existem em submissões da época
       // da pergunta no formulário).
       contrafactual_afetados: projeto.contrafactual_afetados ?? null,
-      ponteiro_movido: projeto.ponteiro_movido ?? null,
-      ponteiro_evidencia: projeto.ponteiro_evidencia ?? null,
+      // ⚠️ Os LEGADO só entram quando REALMENTE preenchidos. Mandá-los sempre (como
+      // `null`) fazia o analisador ler "ponteiro movido não preenchido" e rebaixar a
+      // rastreabilidade de TODA submissão nova — nada escreve essas colunas desde
+      // 03/08/2026, então o campo vazio era um sinal FALSO, não uma ausência de dado.
+      // (caso real: "Bot de Faturamento V2", 05/08/2026 — zona cinzenta citando
+      // literalmente "sem ponteiro movido preenchido", com o memorial preenchido.)
+      ...(projeto.ponteiro_movido ? { ponteiro_movido: projeto.ponteiro_movido } : {}),
+      ...(projeto.ponteiro_evidencia ? { ponteiro_evidencia: projeto.ponteiro_evidencia } : {}),
     },
     documentacao_tecnica: {
       o_que_faz: conteudo.o_que_faz ?? '(não preenchido)',
@@ -378,20 +393,41 @@ export function buildUserMessage(
   }
 
   if (saving) {
+    // ⚠️ `documentacao.conteudo.saving` é um SNAPSHOT do chat e fica DEFASADO no
+    // financeiro: `submeterParaValidacao` re-deriva custo evitado e custo do projeto dos
+    // ITENS PERSISTIDOS (fonte da verdade) e recomputa o líquido para o Sheets, mas NÃO
+    // regrava a documentação. Sem repetir a mesma derivação aqui, o analisador recebia o
+    // custo evitado ZERADO e o líquido só das horas. _(caso "Bot de Faturamento V2",
+    // 05/08/2026: o analisador viu custo evitado 0 e R$ 427,50, enquanto a planilha tinha
+    // um contrato de R$ 3.600/mês encerrado e R$ 4.027,50 de líquido — e então classificou
+    // como zona cinzenta por "faltar indicador verificável".)_ Mesmas 3 linhas do submit.
+    const savingFonte = recomputarSavingFinanceiro(
+      {
+        ...(saving as unknown as SavingColetado),
+        custo_evitado_reais: custoEvitadoMensalFromItens(projeto.custo_evitado_itens) || null,
+        custo_projeto_reais: custoProjetoMensalFromItens(projeto.custo_projeto_itens) || null,
+      },
+      Number(projeto.custo_externo_mensal) || 0,
+    );
+
     dados.memorial_saving = {
-      linhas: saving.linhas ?? [],
-      economia_horas_mes: saving.economia_horas_mes ?? 0,
+      linhas: savingFonte.linhas ?? [],
+      economia_horas_mes: savingFonte.economia_horas_mes ?? 0,
       // economia_reais_mes é o LÍQUIDO = R$ das horas (soma das linhas) + custo_evitado_reais
-      // − custo_externo_mensal. Enviamos as parcelas para o analisador reconciliar e NÃO
-      // confundir a diferença (horas × líquido) com uma inconsistência do memorial.
-      economia_reais_mes: saving.economia_reais_mes ?? 0,
-      custo_evitado_reais: saving.custo_evitado_reais ?? 0,
+      // − custo_externo_mensal − custo_projeto_reais. Enviamos as parcelas para o analisador
+      // reconciliar e NÃO confundir a diferença (horas × líquido) com uma inconsistência.
+      economia_reais_mes: savingFonte.economia_reais_mes ?? 0,
+      custo_evitado_reais: savingFonte.custo_evitado_reais ?? 0,
       custo_evitado_tipo: saving.custo_evitado_tipo ?? null,
-      custo_externo_mensal: saving.custo_externo_mensal ?? 0,
+      // Itens NOMEADOS do custo evitado (mesma forma do custo_projeto_itens abaixo).
+      // O total sozinho é um número solto; é o nome do contrato/serviço encerrado que
+      // sustenta a RASTREABILIDADE pelo eixo custo (ver régua de critério, item 3).
+      custo_evitado_itens: parseJson(projeto.custo_evitado_itens as string | null) ?? [],
+      custo_externo_mensal: savingFonte.custo_externo_mensal ?? 0,
       // Custos do projeto DECLARADOS no formulário (serviços externos pagos que a
       // solução consome). Total mensalizado que ABATE + a lista de itens, para o
       // analisador cruzar com os serviços pagos que aparecem na doc enviada.
-      custo_projeto_reais: saving.custo_projeto_reais ?? 0,
+      custo_projeto_reais: savingFonte.custo_projeto_reais ?? 0,
       custo_projeto_itens: parseJson(projeto.custo_projeto_itens as string | null) ?? [],
       tipo_saving: saving.tipo_saving ?? null,
       memorial_calculo: saving.memorial_calculo ?? '(sem memorial)',
