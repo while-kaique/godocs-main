@@ -46,6 +46,18 @@ os 2 ambientes e as 2 rotas (§1 do doc v3); **não existe "token de produção 
 desatualizado no nosso doc). **Nenhum cron `notificar-lideres` existe** — o snapshot diário segue implementado
 e testado, só **não agendado**.
 
+**Repo sincronizado + PR aberto (06/08, fim da sessão):** `git fetch` mostrou `origin/main` **parado** — a
+branch já estava em cima dele (0 atrás), então **nada a mesclar e nenhum rebuild**. Push dos 3 commits
+(`ae1835b`, `6af2636`, `779bbf8`) e **PR [#235](https://github.com/while-kaique/godocs-main/pull/235)** aberto
+pela conta `LuisEduardo100` (a `rpaiagogroup` é READ). ⚠️ A branch já tinha um PR **MERGED** antigo (#221) —
+por isso o #235 é novo, não uma reabertura.
+
+⏰ **"Às 14h começa o disparo normal" — NÃO existe horário.** Com a D26 o aviso sai **na submissão**; não há
+cron nem janela agendada, e a feature **já estava no ar desde ~12:20**. Respondido ao Luis com as 2 leituras
+possíveis, **pendente a escolha dele**: (a) só acompanhar (nada a fazer) ou (b) querer **também** um resumo
+diário às 14h — aí é criar o cron `0 17 * * 1-5` (UTC), com o código do snapshot já pronto e as chaves
+(dia × projeto) independentes. ⚠️ Lembrar que o **Lucas pediu MENOS ruído** (D25) antes de ligar o diário.
+
 **Pendências desta sessão:**
 1. ⚠️ **O wiring do `submeterParaValidacao` NÃO foi exercitado ponta a ponta** — validei
    `notificarLideresDoProjeto` pela rota admin, mas as 6 linhas dentro do submit só rodam numa submissão real.
