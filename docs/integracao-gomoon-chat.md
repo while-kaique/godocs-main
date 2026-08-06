@@ -446,6 +446,11 @@ cópia morando em dois repos — com o texto pronto, mexer numa vírgula é depl
   abertura e fechamento, e o acréscimo sai duplicado. _(O prefixo
   `[STAGING — destinatário real: …]` é exceção combinada e só vale com `ambiente:"staging"`
   — em produção não pode aparecer.)_
+- **Sem travessão (`—`) no texto entregue** (pedido do Luis, 06/08/2026). Régua **nossa**,
+  de redação: vale nas duas mensagens e inclusive nos bullets (`• Ana: 2 projetos`, não
+  `• Ana — 2 projetos`). Nada muda do lado do Gomoon; fica registrado aqui porque o
+  template de fallback dele usa travessão e, se um dia ele entrar em cena, a DM sairá
+  fora do padrão. Teste que segura: `tests/gomoon-mensagens.test.ts`.
 
 Nosso lado: **`src/lib/gomoon-mensagens.ts`** (módulo PURO, fonte única das duas redações) →
 `renderMensagemLider()` é chamada dentro de `montarPayloadLideresPendentes`, **depois** de
@@ -470,7 +475,7 @@ Authorization: Bearer <GOMOON_TOKEN>
   "ambiente": "producao",
   "gerado_em": "2026-08-06T12:00:00Z",
   "anuncio": {
-    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v2",
+    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v3",
     "destinatarios": "todos",
     "mensagem": { "texto": "<b>Novidade no GoDocs…</b> 🚀\n\n…" }
   }
@@ -480,9 +485,11 @@ Authorization: Bearer <GOMOON_TOKEN>
 - **`idempotency_key` SEM data** → entregar **uma vez por pessoa, para sempre**. POST
   repetido é no-op (`ja_entregue`), nunca segunda DM. É a diferença de regra em relação ao
   diário. Subir a **versão** no fim da chave é o único jeito de reabrir o disparo.
-  ⚠️ **A versão em vigor é a `v2`** (06/08/2026): o `v1` foi entregue ao destinatário de
-  teste no 1º disparo de staging e, sem data na chave, virou no-op eterno — o texto
-  corrigido para markup de cartão precisou de versão nova para poder ser revalidado.
+  ⚠️ **A versão em vigor é a `v3`** (06/08/2026). As duas anteriores morreram queimadas
+  **em teste**, sempre pelo mesmo motivo (chave sem data = no-op eterno depois do 1º
+  disparo de staging): o `v1` chegou com asterisco literal na tela, o `v2` corrigiu o
+  markup, e o `v3` traz a redação de volta ao texto original do §10.1 e tira os
+  travessões. Nenhuma pessoa da empresa recebeu `v1` nem `v2`.
   Ninguém da empresa recebeu o `v1`.
 - ⚠️ **`ambiente: "staging"` tem de ser honrado aqui também**, com o mesmo roteamento para o
   destinatário de teste. Sem isso, um teste nosso vira DM para a **empresa inteira** — risco

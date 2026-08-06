@@ -32,6 +32,13 @@
 // ANÚNCIO mantém o título, porque lá o cabeçalho do card é genérico ("GoDocs").
 // ⚠️ NENHUM VALOR EM R$ nos textos (§7.1 do contrato) — DM se lê por cima do ombro.
 // Nome, e-mail e CONTAGEM de projetos são tudo o que pode aparecer.
+//
+// ⚠️ SEM TRAVESSÃO (`—`) NO TEXTO ENTREGUE (pedido do Luis, 06/08/2026). Vale para as
+// duas mensagens, inclusive nos bullets ("• Ana: 2 projetos", não "• Ana — 2 projetos").
+// A redação usa dois-pontos, ponto final ou vírgula no lugar. Os comentários deste
+// arquivo podem usar travessão à vontade — a régua é sobre o que chega no Chat, e há
+// teste varrendo os dois textos. _(Mesma preferência já registrada na tela `/aprovacoes`:
+// o cabeçalho dela também foi redigido sem travessões.)_
 
 /**
  * Versão do anúncio de abertura. A chave de idempotência do Gomoon entrega esse
@@ -48,11 +55,16 @@
  *    chave sem data faz dele um no-op para sempre (`ja_entregue`). Ninguém da empresa
  *    chegou a receber — o `v1` morreu virgem em produção.
  *  • `v2` — 06/08/2026, MESMO texto do `v1` corrigido para markup de cartão
- *    (`<b>`/`<i>` em vez de `*asterisco*`, que chegava literal na tela). Bump pedido
- *    pelo Luis para o João Victor conseguir revalidar a formatação sem depender de
- *    ele limpar a chave do lado dele. É esta a versão que vai para produção.
+ *    (`<b>`/`<i>` em vez de `*asterisco*`, que chegava literal na tela). Também
+ *    queimado em teste: entregue ao destinatário de teste do Gomoon no disparo das
+ *    12h10 e, pela chave sem data, no-op eterno dali em diante.
+ *  • `v3` — 06/08/2026, redação de volta ao texto ORIGINAL do Luis (as seções "Por
+ *    que estamos fazendo isso" e "De onde vem a relação de líder e liderado" tinham
+ *    sido condensadas por mim) e **sem travessão**. Bump necessário para o Luis, que
+ *    entrou na lista de destinatários de teste do Gomoon, conseguir ver o anúncio: com
+ *    `v2` ele voltaria `ja_entregue`. É esta a versão que vai para produção.
  */
-export const ANUNCIO_VERSAO = 'v2';
+export const ANUNCIO_VERSAO = 'v3';
 
 /** `godocs:anuncio:<assunto>:<versão>` — SEM data, ao contrário do aviso diário (§13). */
 export const ANUNCIO_CHAVE = `godocs:anuncio:pre-aprovacao-lider:${ANUNCIO_VERSAO}`;
@@ -60,43 +72,57 @@ export const ANUNCIO_CHAVE = `godocs:anuncio:pre-aprovacao-lider:${ANUNCIO_VERSA
 /**
  * Anúncio de abertura da feature — uma vez, para a empresa.
  *
- * ⚠️ Cada afirmação daqui foi conferida contra o código (06/08/2026); as duas que
- * costumam envelhecer:
- *  • *"cargo de coordenação para cima"* é a **D20** (`ehCargoDeLideranca`,
- *    `src/lib/cargo-lideranca.ts`) — supervisor NÃO isenta. Se a régua mudar, este
- *    texto muda junto.
- *  • *"o que corrigir fica visível em Meus Projetos"* é o que o app realmente faz
- *    (`src/routes/meus-projetos.tsx`): o autor VÊ o selo e o texto do líder no card,
- *    mas **ninguém o avisa** (não há DM nem e-mail para o autor). Por isso a frase
- *    diz "fica visível", não "você recebe" — não prometer aviso que não existe.
- *  • A entrada da fila é a FAIXA da página inicial ("Pré-aprovações do meu time"),
- *    não um item de menu: não existe menu "GoDocs → Pré-aprovações".
+ * ⚠️ **Este é o texto do Luis** (§10.1 do contrato), com a estrutura dele preservada:
+ * as seções "Por que estamos fazendo isso" e "De onde vem a relação de líder e
+ * liderado" chegaram a ser condensadas por mim e voltaram em 06/08/2026 a pedido dele.
+ * Editar aqui é reescrever a comunicação da empresa — não encurtar por conta própria.
+ *
+ * Só duas frases dele mudaram, e as duas porque o app não faz o que prometiam
+ * (conferido no código em 06/08/2026):
+ *  • *"você recebe exatamente o que precisa corrigir"* → *"fica visível no seu projeto
+ *    em Meus Projetos"*: o autor VÊ o selo e o texto do líder no card
+ *    (`src/routes/meus-projetos.tsx`), mas **ninguém o avisa** — não há DM nem e-mail
+ *    para ele. Não prometer aviso que não existe.
+ *  • *"a fila dele em GoDocs → Pré-aprovações"* → a FAIXA da página inicial
+ *    ("Pré-aprovações do meu time"): esse item de menu não existe.
+ * E *"cargo de coordenação para cima"* é a **D20** (`ehCargoDeLideranca`,
+ * `src/lib/cargo-lideranca.ts`) — supervisor NÃO isenta. Se a régua mudar, o texto muda.
  */
 export const TEXTO_ANUNCIO_PRE_APROVACAO = [
   '<b>Novidade no GoDocs: os projetos agora passam por uma pré-aprovação do líder</b> 🚀',
   '',
-  'Todo projeto submetido no GoDocs passa a ter uma <b>pré-aprovação do líder direto</b> ' +
-    'antes de chegar à validação do time de RPA & IA.',
+  'A partir de agora, todo projeto submetido no GoDocs passa por uma <b>pré-aprovação ' +
+    'do líder direto</b> antes de chegar à validação do time de RPA & IA.',
   '',
   '<b>Como funciona</b>',
-  '• Você submete o projeto normalmente — o formulário não mudou.',
-  '• Seu líder é avisado por aqui e abre a fila dele pela faixa <b>Pré-aprovações do meu time</b>, ' +
-    'na página inicial do GoDocs.',
-  '• Ele responde três perguntas rápidas (o projeto move um indicador da área? a área ' +
-    'sentiria falta se ele parasse de rodar? o ganho declarado faz sentido?) e então ' +
-    '<b>pré-aprova</b> ou <b>pede um ajuste</b>.',
-  '• Pediu ajuste? O que precisa ser corrigido fica visível no seu projeto em ' +
-    '<b>Meus Projetos</b> — é só editar e reenviar.',
+  '• Você submete seu projeto no GoDocs normalmente. O formulário não mudou.',
+  '• Seu líder direto é avisado por aqui e abre a fila dele pela faixa ' +
+    '<b>Pré-aprovações do meu time</b>, na página inicial do GoDocs.',
+  '• Ele confere o que você registrou e responde três perguntas rápidas: o projeto move ' +
+    'um indicador da área? a área sentiria falta se ele parasse de rodar? o ganho ' +
+    'declarado faz sentido?',
+  '• Ele então <b>pré-aprova</b> ou <b>pede um ajuste</b>. Se pedir ajuste, o que precisa ' +
+    'ser corrigido fica visível no seu projeto em <b>Meus Projetos</b>, e é só ajustar e ' +
+    'reenviar.',
   '',
   '<b>O que muda para você</b>',
-  '• A pré-aprovação <b>não substitui</b> a validação do time de RPA & IA: ela vem antes e ' +
-    'traz o olhar de quem conhece a rotina da área.',
-  '• Quem tem cargo de coordenação para cima não passa por essa etapa — o projeto segue ' +
+  '• A pré-aprovação <b>não substitui</b> a validação do time de RPA & IA: ela acontece ' +
+    'antes, e traz o olhar de quem conhece a rotina da área de perto.',
+  '• Quem tem cargo de coordenação para cima não passa por essa etapa: o projeto segue ' +
     'direto para a validação.',
-  '• A relação líder ↔ liderado vem do organograma da TeamGuide. Se o seu líder aparecer ' +
-    'errado, fale com a gente: uma vez ajustado lá, as próximas submissões já saem certas.',
   '',
-  'Dúvidas? Chame o time de RPA & IA ou use o botão de ajuda dentro do GoDocs.',
+  '<b>Por que estamos fazendo isso</b>',
+  'Para que cada projeto chegue à validação com o aval de quem vive o processo no dia a ' +
+    'dia: menos retrabalho para todo mundo e um impacto declarado mais fiel à realidade ' +
+    'da área.',
+  '',
+  '<b>De onde vem a relação de líder e liderado</b>',
+  'A dupla líder e liderado é lida direto do organograma da TeamGuide. O GoDocs não tem ' +
+    'uma lista própria. Se o seu líder aparecer errado, ou se você achar que não deveria ' +
+    'estar na lista de alguém, a correção precisa acontecer lá: fale com o time de ' +
+    'RPA & IA e, uma vez ajustado, as próximas submissões já saem com a hierarquia certa.',
+  '',
+  'Dúvidas? É só chamar o time de RPA & IA ou usar o botão de ajuda dentro do GoDocs.',
 ].join('\n');
 
 /**
@@ -167,7 +193,8 @@ export function renderMensagemLider(
     linhas.push(
       `${saudacao}<b>${plural(total, 'projeto')}</b> da sua equipe estão aguardando a sua pré-aprovação:`,
       '',
-      ...lider.liderados.map((d) => `• ${d.nome} — ${plural(d.projetos_pendentes, 'projeto')}`),
+      // Dois-pontos, não travessão: ver a régua "sem travessão" no topo do arquivo.
+      ...lider.liderados.map((d) => `• ${d.nome}: ${plural(d.projetos_pendentes, 'projeto')}`),
     );
   }
 
