@@ -136,10 +136,16 @@ export type SubmitSyncParams = {
   // Pré-aprovação do líder → coluna "Aprovação do Líder". Só o ESTADO
   // ("Pré-aprovado" / "Pré-pendente" / "Pré-reprovado"); null/vazio → "—".
   // Não bloqueia nada (D3).
+  //
+  // ⚠️ `undefined` ≠ `null` AQUI (e só nestas 2 colunas): `null` é "não se aplica"
+  // e grava "—"; **`undefined` é "não sei, não encoste"** e OMITE a coluna do
+  // update — quem não conhece o estado da fila (o `resyncGoogle`) não pode
+  // apagar o parecer que o líder já deu. No APPEND a omissão não existe: a linha
+  // nasce agora e a célula tem de nascer com "—" (padrão "texto vazio → —").
   aprovacaoLider?: string | null;
   // Detalhe do parecer (quem, quando, checklist, comentário) → coluna
   // "Justificativa Aprovação do Líder". Separada para a planilha poder filtrar
-  // pelo estado sem depender de texto livre.
+  // pelo estado sem depender de texto livre. Mesma regra de `undefined` acima.
   justificativaAprovacaoLider?: string | null;
 };
 
@@ -393,12 +399,23 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         p.projeto.classificacao_justificativa as string | null | undefined,
       ),
       'Motivo Reprovado': ouTraco(p.projeto.motivo_reprovacao as string | null | undefined),
-      // Pré-aprovação do líder: "Pendente com <líder>" na abertura da fila; "—" quando
-      // não se aplica (autor é liderança ou não tem líder). A DECISÃO é gravada depois,
-      // por updateRowByProjectId em aprovacoes.functions.ts.
-      'Aprovação do Líder': ouTraco(p.aprovacaoLider),
-      'Justificativa Aprovação do Líder': ouTraco(p.justificativaAprovacaoLider),
     };
+
+    // Pré-aprovação do líder: "Pré-pendente" na abertura da fila; "Pré-aprovado" /
+    // "—" nos casos sem fila (rotuloIsencaoSheet). A DECISÃO do líder é gravada
+    // depois, por updateRowByProjectId em aprovacoes.functions.ts.
+    //
+    // ⚠️ Só entram na linha quando o chamador SABE o estado da fila. O `resyncGoogle`
+    // (e qualquer re-sync futuro) roda sem passar por `abrirPreAprovacao`: mandando
+    // `undefined`, o `ouTraco` gravava "—" e **apagava o parecer que o líder já tinha
+    // dado** — a coluna é espelho do SQLite, não pode ser zerada por um re-sync.
+    // No APPEND a linha nasce agora: aí a célula tem de nascer com "—" (nunca vazia).
+    if (p.aprovacaoLider !== undefined || p.modo !== 'edicao') {
+      row['Aprovação do Líder'] = ouTraco(p.aprovacaoLider);
+    }
+    if (p.justificativaAprovacaoLider !== undefined || p.modo !== 'edicao') {
+      row['Justificativa Aprovação do Líder'] = ouTraco(p.justificativaAprovacaoLider);
+    }
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
     // submissão nova (ou edição sem anterior) grava "—" (regra: texto vazio → traço),
@@ -449,8 +466,16 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
           // normal de edição a omite de propósito, para preservar a data original) —
           // e "Motivo Reenvio" nasce com "—" pelo mesmo motivo (a célula da linha
           // antiga já se foi junto com ela; não há motivo de triagem para preservar).
+          // As 2 colunas do líder seguem a mesma régua: omitir preserva a célula, mas
+          // aqui NÃO HÁ célula a preservar — a linha nasce agora e não pode nascer vazia.
           await appendRow(
-            padronizarLinha({ ...row, 'Data Submissão': dataSubmissao, 'Motivo Reenvio': '—' }),
+            padronizarLinha({
+              ...row,
+              'Data Submissão': dataSubmissao,
+              'Motivo Reenvio': '—',
+              'Aprovação do Líder': ouTraco(p.aprovacaoLider),
+              'Justificativa Aprovação do Líder': ouTraco(p.justificativaAprovacaoLider),
+            }),
           );
         }
       } else {

@@ -572,6 +572,7 @@ export function Step2({
         <FormInput
           type="text"
           placeholder="Ex: Automação de Relatórios de Vendas"
+          maxLength={200} /* = `nome_projeto` no schema */
           value={form.nomeProjeto}
           onChange={(e) => updateField("nomeProjeto", e.currentTarget.value)}
           error={errors.nomeProjeto}
