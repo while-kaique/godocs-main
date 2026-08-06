@@ -113,9 +113,12 @@ paginação, ficha com todas as colunas e **mudança de status gravando no Sheet
   (+"Observações") sem duplicar linha, **sem tocar "Atualizado Em"**, e audita quem mudou; validado em
   staging antes de prod.
 
-**Próximo:** **validar a staging `edf400b4`** (frentes `fix/motivo-reenvio-traco` + docs da pré-aprovação
-do líder, deployadas em 2026-08-03) → **PR + merge** → prod `674a3710`. Em seguida, codar a **F0** da
-pré-aprovação do líder (plano ✅ aprovado: `docs/plans/teamguide-lideranca-e-areas.md`).
+**Próximo:** **validar a formatação das 2 DMs do Gomoon no Chat** (staging `edf400b4`, redeployada em
+2026-08-06 com o texto literal do Luis, anúncio `v4`). **Bloqueado no João Victor:** incluir o Luis nos
+destinatários de teste do **anúncio** e limpar a chave do dia
+`godocs:lucas.queiroz@gocase.com:2026-08-06` — só então o aviso ao líder reentrega. Depois: **PR + merge**
+das frentes já validadas → prod `674a3710`. A pré-aprovação do líder (F0+F1, planos ✅ executados) segue
+**travada para prod até a validação com a diretoria**.
 
 ## Fase 4 — Loadings do `/dashboard` do admin 🟡
 Tirar a espera percebida da tela de triagem. Medido: leitura do Sheets **1.450–2.360 ms** / payload **2,65 MB**,

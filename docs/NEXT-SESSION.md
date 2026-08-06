@@ -4,7 +4,115 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-**Última sessão:** 2026-08-03 — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
+## 🔎 Sessão de 2026-08-06 (Gomoon: as 2 DMs passam a ser o texto literal do Luis)
+
+Worktree `plano-aprovacao-lider-teamguide` · branch `worktree-plano-aprovacao-lider-teamguide` ·
+commits **`ad1bad3`** (errado, corrigido) + **`773fe74`** · **1111 testes verdes** · `worker.js`
+rebuildado · **staging `edf400b4` redeployada 12:46**.
+
+**O que a sessão fez.** O Luis mandou tirar os travessões das DMs e colou as duas mensagens
+exatamente como quer que saiam. Eu errei o alvo duas vezes antes de acertar: (1) tinha condensado
+o texto do §10.1 do contrato; (2) ao ouvir "tire os travessões", "restaurei" a versão LONGA — a
+que ele quer é a CURTA. Agora `src/lib/gomoon-mensagens.ts` carrega o texto dele palavra por
+palavra, com `<b>` só onde o original marcava negrito.
+
+- **Anúncio:** versão curta, sem travessão. `ANUNCIO_VERSAO` **v4** (v1/v2/v3 queimados em teste —
+  a chave sem data é no-op eterno depois do 1º disparo).
+- **Aviso ao líder:** de volta ao modelo do §10.2 — título, bullets **com travessão** (aquele é
+  dele) e a linha `👉 <url>`.
+- ⚠️ **Duas divergências CONHECIDAS, decisão dele, cada uma com teste que a fixa:** o anúncio cita
+  `GoDocs → Pré-aprovações` (menu que **não existe**; a entrada é a faixa da home) e o aviso duplica
+  título/link com o cabeçalho e o botão do cartão do Gomoon.
+
+**Estado dos disparos na staging.** Anúncio `v4` **entregue** (202) — mas **só para o
+`joaovictor.esteves@gocase.com`**: no anúncio a staging colapsa para **um** destinatário de teste
+(§6 do doc do João Victor), e o Luis entrou na lista de teste só da **pendência diária**. O **aviso
+ao líder com o texto novo nunca foi entregue**: a chave `godocs:lucas.queiroz@gocase.com:2026-08-06`
+queimou nos disparos das 08h50/12h10.
+
+**⛔ PRÓXIMO PASSO — depende do João Victor (Gomoon), pedido já redigido para o Luis mandar:**
+(1) incluir o Luis nos destinatários de teste do **anúncio**; (2) limpar a chave do dia
+`godocs:lucas.queiroz@gocase.com:2026-08-06` no bucket de staging. Com qualquer uma das duas
+liberada, re-disparar (`POST /api/admin/notificar-lideres {"dry":false}` e/ou
+`/api/admin/anunciar-pre-aprovacao {"dry":false}`) e conferir a formatação no Chat. Sem isso, o
+aviso só sai amanhã, no primeiro POST manual (a staging não tem cron). **Prod segue travada até a
+validação com a diretoria** (sem `GOMOON_TOKEN` nem cron no `674a3710`).
+
+**Vale perguntar ao João:** se ele conseguir **suprimir o cabeçalho do cartão quando vem
+`mensagem.texto`**, a duplicação de título/link some sem mexer no texto do Luis.
+
+---
+
+## 🔎 Sessão de 2026-08-05 (caso Josiely — diagnóstico + fix codado)
+
+**Erro "too big" na submissão: diagnosticado, reproduzido e CORRIGIDO** (T1+T2). Plano em
+[`docs/plans/fix-ferramenta-too-big-submissao.md`](plans/fix-ferramenta-too-big-submissao.md).
+Branch **`fix/erro-validacao-amigavel`** · commit **`b9fe98e`** · worktree `.claude/worktrees/fix-too-big` ·
+base `origin/main` `bac862b` · **943 testes verdes** · `worker.js` rebuildado · `SPEC_CORRECOES.md` atualizada.
+
+**⛔ PRÓXIMO PASSO (decisão do Luis, depois deploy):** a **staging está bloqueada** — a app `edf400b4` está
+com a frente da **pré-aprovação do líder**, que não está na `main`, e o `updateApp` **substitui a app
+inteira** (deployar daqui APAGARIA a feature do líder no meio da validação de outra sessão). Escolher:
+**(a)** mergear esta branch por cima da do líder e validar as duas juntas na staging · **(b)** esperar a
+staging liberar · **(c)** abrir o PR (`/ggsd:ship`) e deployar na próxima janela.
+
+**O que o fix entrega:** o toast passa de `[{"code":"too_big","maximum":200,…}]` para _"Não foi possível
+enviar — revise o campo: **Ferramenta utilizada**: texto muito longo — o limite é 200 caracteres."_ E o campo
+agora **para de aceitar** texto no limite (`maxLength`), então o erro vira rede de segurança, não o caminho
+normal. Detalhe do que aterrissou: no plano.
+
+- **Causa:** o input "✏️ Especifique a ferramenta" (`src/lib/submeter/step1.tsx:371`) **não tem `maxLength`**,
+  mas o schema tem `ferramenta: z.string().max(200)`. Como o valor enviado é `"Outros: " + texto`, 193 chars
+  digitados já estouram → **`ZodError` `too_big` cru, HTTP 500, em inglês, direto no toast**.
+- **Prova:** as 10 `POST /api/chat/iniciar-submissao` dela (17:32/17:34/17:38 de 05/08) têm **ZERO linha de
+  log** — morreram no `iniciarSubmissaoSchema.parse` (`chat.functions.ts:611`), único throw antes do 1º log.
+  Ela foi cortando a lista de ferramentas até passar (a que funcionou tem 126 chars). Reproduzido na staging.
+- **DESCARTADO (não re-investigar):** limite de payload do edge — sondei 1/4/8/10/12/**20 MB** na staging e
+  todos chegaram ao worker.
+- **Achado colateral (frente SEPARADA, não investigada):** o proxy de LLM está estourando o timeout de
+  **25 s em praticamente TODA chamada** e caindo no fallback OpenAI direto → +25 s por turno do chat, para
+  todo mundo.
+- **Ação humana:** avisar a Josiely que o projeto `1d37cb8155199ce91a3687dc7832c532` **entrou**, mas ficou
+  como **`rascunho`** (não submetido).
+
+> ⚠️ O **plano ativo NÃO mudou**: segue a **F0** (`teamguide-lideranca-e-areas`). Este plano novo é uma
+> frente paralela de bug, curta e independente.
+
+---
+
+**Última sessão (2ª de 2026-08-03):** **planejamento da F1 da pré-aprovação do líder** — o desenho de UX
+foi fechado com o Luis (fila em **rota própria `/aprovacoes`**, decisão dentro da tela read-only
+`/projeto/$id`, espelho na coluna `Aprovação do Líder`) e virou plano **aprovado**:
+`docs/plans/pre-aprovacao-lider-fila-e-decisao.md`. **Zero código** — sessão de planejamento.
+
+> ⚠️ **O plano ATIVO continua sendo a F0.** A F1 depende do `getLideresDe()` dela; ordem decidida pelo Luis:
+> F0 primeiro, em sessão à parte.
+
+**3 achados de código desta sessão** (leitura, não edição) que sustentam o plano da F1:
+> 1. **`temAcesso = ehOwner || ehParticipante`** (`meus-projetos.functions.ts:146`) → o líder, que não é
+>    nenhum dos dois, levaria **403** ao abrir `/projeto/$id`. Destravar isso escopado a quem tem aprovação
+>    pendente (sem conceder edição) é o **miolo da F1** (T3).
+> 2. **A tela read-only renderiza `p.documentacao.saving.memorial_calculo`** — o memorial do LLM, **sem R$** —,
+>    não o `p.memorial_calculo` enriquecido. Então "líder vê R$" (decisão do Luis) é **render novo**, não troca
+>    de fonte (T7).
+> 3. **`index.tsx:211` NÃO é botão condicional a admin** — é link **estático** para `/auth` (o gate mora
+>    dentro do `/auth`, que devolve `/?acesso_negado`). Não existe nav condicional por usuário: o selo
+>    "Aprovações" **reusa o padrão do selo de pendências de legado** (`index.tsx:44-68`, fetch silencioso).
+
+**Capturado-e-adiado (não corrigido — merece plano próprio):** `getMeuProjeto` **já devolve `saving_reais` e
+`memorial_calculo` com R$** para o autor e para participantes; a regra "cliente não vê financeiro de saving"
+é garantida **só no frontend**, e o R$ viaja no payload de quem não deveria vê-lo (devtools). **Pré-existente**,
+não introduzido pela F1. Fix seria strip server-side do financeiro para quem não é staff nem aprovador.
+
+⚠️ **WIP — docs desta sessão NÃO-COMMITADOS de propósito:** `docs/plans/pre-aprovacao-lider-fila-e-decisao.md`
+(novo), `docs/plans/INDEX.md`, `docs/NEXT-SESSION.md` e `ROADMAP.md` estão modificados na **raiz**, que está em
+**`main`** — o RF-18 proíbe commitar lá, e trocar a branch da raiz atropelaria a frente paralela que trabalha
+nesse diretório. **Quem retomar: commite-os junto da branch ativa** (mesma situação da sessão anterior).
+⚠️ **Nunca `git add -A` na raiz** (`.claude/worktrees/` entra como repos embutidos — já causou commit indevido).
+
+<details><summary>Sessão anterior do mesmo dia (histórico)</summary>
+
+**Sessão de 2026-08-03 (1ª)** — **planejamento da pré-aprovação do líder (integração TeamGuide) + entrega
 conjunta das 2 frentes fechadas na STAGING**. Investigação ao vivo da API TeamGuide (os endpoints de
 liderança dão **403**; a relação líder↔liderado sai de `/teams` + membros), spec nova
 `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–D10), plano **F0 aprovado** (não codado) e staging `edf400b4`
@@ -59,8 +167,15 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 
 </details>
 
+</details>
+
 ## Plano ativo
 **→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **aprovado** (Luis, 2026-08-03)
+
+> **Na fila, atrás da F0:** [pre-aprovacao-lider-fila-e-decisao](plans/pre-aprovacao-lider-fila-e-decisao.md)
+> · Status: ✅ **aprovado** (Luis, 2026-08-03) — a **F1** (fila `/aprovacoes` + decisão na tela do projeto +
+> coluna `Aprovação do Líder`). **Ordem decidida pelo Luis:** F0 primeiro, em sessão à parte; a F1 depende do
+> `getLideresDe()` dela. O ponteiro só se move para a F1 quando a F0 estiver executada.
 
 > **F0** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`): índice de liderança da
 > TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em 10 pessoas). **Nada
