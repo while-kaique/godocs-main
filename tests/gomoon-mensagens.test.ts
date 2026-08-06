@@ -190,6 +190,10 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
   });
 
   it('a versão da chave acompanha o texto — mexer na redação não reenvia nada', () => {
-    expect(ANUNCIO_CHAVE.endsWith(':v1')).toBe(true);
+    // ⚠️ Pin DE PROPÓSITO: subir a versão faz o Gomoon reentregar o anúncio para a
+    // empresa inteira, então tem de ser uma edição consciente — e não carona num
+    // commit que só mexeu na redação. `v1` foi queimado ainda em teste (ver o
+    // histórico em ANUNCIO_VERSAO); `v2` é a versão que vai para produção.
+    expect(ANUNCIO_CHAVE).toBe('godocs:anuncio:pre-aprovacao-lider:v2');
   });
 });

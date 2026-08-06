@@ -470,16 +470,20 @@ Authorization: Bearer <GOMOON_TOKEN>
   "ambiente": "producao",
   "gerado_em": "2026-08-06T12:00:00Z",
   "anuncio": {
-    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v1",
+    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v2",
     "destinatarios": "todos",
-    "mensagem": { "texto": "*Novidade no GoDocs…* 🚀\n\n…" }
+    "mensagem": { "texto": "<b>Novidade no GoDocs…</b> 🚀\n\n…" }
   }
 }
 ```
 
 - **`idempotency_key` SEM data** → entregar **uma vez por pessoa, para sempre**. POST
   repetido é no-op (`ja_entregue`), nunca segunda DM. É a diferença de regra em relação ao
-  diário. Um `v2` explícito é o único jeito de reabrir o disparo.
+  diário. Subir a **versão** no fim da chave é o único jeito de reabrir o disparo.
+  ⚠️ **A versão em vigor é a `v2`** (06/08/2026): o `v1` foi entregue ao destinatário de
+  teste no 1º disparo de staging e, sem data na chave, virou no-op eterno — o texto
+  corrigido para markup de cartão precisou de versão nova para poder ser revalidado.
+  Ninguém da empresa recebeu o `v1`.
 - ⚠️ **`ambiente: "staging"` tem de ser honrado aqui também**, com o mesmo roteamento para o
   destinatário de teste. Sem isso, um teste nosso vira DM para a **empresa inteira** — risco
   muito maior que o do endpoint diário.

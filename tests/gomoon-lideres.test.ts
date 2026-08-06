@@ -366,7 +366,7 @@ describe('anunciarPreAprovacao — o disparo único', () => {
   it('a chave de idempotência é SEM DATA (entrega 1× por pessoa, para sempre — §13)', () => {
     const p = montarPayloadAnuncio({ ambiente: 'producao', geradoEm: '2026-08-06T12:00:00.000Z' });
     expect(p.anuncio.idempotency_key).toBe(ANUNCIO_CHAVE);
-    expect(p.anuncio.idempotency_key).toBe('godocs:anuncio:pre-aprovacao-lider:v1');
+    expect(p.anuncio.idempotency_key).toBe('godocs:anuncio:pre-aprovacao-lider:v2');
     // Se um YYYY-MM-DD vazar para cá, o anúncio vira aviso diário e a empresa recebe
     // o mesmo texto todo dia.
     expect(p.anuncio.idempotency_key).not.toMatch(/\d{4}-\d{2}-\d{2}/);

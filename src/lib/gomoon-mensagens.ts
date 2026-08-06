@@ -36,9 +36,23 @@
 /**
  * Versão do anúncio de abertura. A chave de idempotência do Gomoon entrega esse
  * texto **uma vez por pessoa, para sempre** — então mexer na redação NÃO reenvia
- * nada. Só um `v2` explícito reabre o disparo (e aí todo mundo recebe de novo).
+ * nada. Só uma versão nova reabre o disparo (e aí todo mundo recebe de novo).
+ *
+ * ⚠️ **Isto NÃO é um número de build — cada bump fala com gente de novo.** Só sobe
+ * quando a intenção for reanunciar. O teste de `ANUNCIO_CHAVE` prende o valor de
+ * propósito: mudar aqui obriga a mudar o teste, e é essa a fricção.
+ *
+ * Histórico:
+ *  • `v1` — 06/08/2026, texto de abertura da feature. **Queimado ainda em teste**: o
+ *    1º disparo de staging entregou o `v1` ao destinatário de teste do Gomoon, e a
+ *    chave sem data faz dele um no-op para sempre (`ja_entregue`). Ninguém da empresa
+ *    chegou a receber — o `v1` morreu virgem em produção.
+ *  • `v2` — 06/08/2026, MESMO texto do `v1` corrigido para markup de cartão
+ *    (`<b>`/`<i>` em vez de `*asterisco*`, que chegava literal na tela). Bump pedido
+ *    pelo Luis para o João Victor conseguir revalidar a formatação sem depender de
+ *    ele limpar a chave do lado dele. É esta a versão que vai para produção.
  */
-export const ANUNCIO_VERSAO = 'v1';
+export const ANUNCIO_VERSAO = 'v2';
 
 /** `godocs:anuncio:<assunto>:<versão>` — SEM data, ao contrário do aviso diário (§13). */
 export const ANUNCIO_CHAVE = `godocs:anuncio:pre-aprovacao-lider:${ANUNCIO_VERSAO}`;
