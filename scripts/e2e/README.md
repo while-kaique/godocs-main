@@ -2,7 +2,7 @@
 
 Exercita o fluxo de submissão/edição de ponta a ponta contra a aplicação (default:
 **produção**) cobrindo um cartesiano amplo das dimensões do formulário e valida cada
-coluna gerada na planilha (A→AS). São **24 cenários** organizados em grupos:
+coluna gerada na planilha (A→AS). São **29 cenários** organizados em grupos:
 
 - **A — saving financeiro** (complexidade=automacao): custo evitado {não·mensal·pontual·**misto**}
   × custo externo {não·sim} = 8 células + multi-cargo.
@@ -20,6 +20,30 @@ coluna gerada na planilha (A→AS). São **24 cenários** organizados em grupos:
   (`baseOnly`): a edição faz UPDATE in-place na mesma linha, então a base não é validada
   standalone (a linha reflete o estado pós-edição). O memorial pré-edição (M0) é capturado em
   tempo de run via `GET /api/meus-projetos/:id` e comparado contra a coluna `Memorial anterior`.
+- **G — régua de critério** (coluna **`Classificação`**, AZ): 5 cenários que miram a
+  ELEGIBILIDADE, não o financeiro. Dois passam pelo **eixo custo** (contrato/SaaS encerrado,
+  com "onde verificar" fraco de propósito) e três são **controles** que precisam continuar
+  reprovando. Cada um declara `classificacaoEsperada`. ⚠️ A coluna AZ é preenchida pelo
+  analisador em BACKGROUND (+ cron de 1 min), então leia-a alguns minutos após o run —
+  `validate.mjs` não a cobre. Baseline validado em **prod, 06/08/2026** (`gpt-5.4-mini`), **5/5**:
+
+  | key | forma | esperado |
+  |---|---|---|
+  | `crit-custo-evitado-fonte-fraca` | horas + contrato de terceirizada encerrado, sem painel/KPI | `claro_sim` |
+  | `crit-custo-evitado-puro-fonte-fraca` | custo evitado puro (0h), SaaS cancelado, sem painel | `claro_sim` |
+  | `crit-peca-unica-com-custo` | ⚠️ **controle adversarial** — peça única + contrafactual negado, **mas com** custo evitado | `claro_nao` |
+  | `crit-recorrente-sem-fonte` | recorrente, sem custo evitado e sem fonte nomeável | `zona_cinzenta` |
+  | `crit-fonte-forte` | recorrente com painel nomeado | `claro_sim` |
+
+  ⚠️ **`crit-peca-unica-com-custo` é o que NÃO pode regredir.** Ele existe porque a régua
+  passou a aceitar *contrato externo encerrado* como indicador nomeado (fix de 06/08/2026):
+  se essa regra virar salvo-conduto, um projeto que rodou UMA vez e cujo contrafactual foi
+  negado passaria a ser aprovado só por ter um R$ evitado junto. A régua diz que recorrência
+  e contrafactual falhando **JUNTOS** dão `claro_nao` "sem buscar salvação" numa evidência —
+  este cenário é a trava disso. Valida também o efeito completo: `Status="Reprovado"` (única
+  exceção à regra TEMPORÁRIA do "Pendente") + `Motivo Reprovado` legível ao autor.
+  ⚠️ Os briefings mandam o respondedor **não inventar fonte** quando não há; sem isso o
+  cenário mede outra coisa.
 
 ## Pré-requisitos (uma vez)
 

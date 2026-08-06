@@ -1157,6 +1157,202 @@ Não há ferramenta antiga que deixou de ser paga (sem custo evitado).`,
     });
   }
 
+  // ─── G — RÉGUA DE CRITÉRIO (coluna "Classificação") ────────────────────────
+  // Matriz montada para o fix de 06/08/2026 (campo LEGADO de ponteiro indo como null +
+  // custo evitado invisível no payload). O alvo NÃO é coluna financeira: é a coluna AZ.
+  // Dois cenários que DEVEM passar pelo eixo custo e três CONTROLES que precisam
+  // continuar reprovando — senão a frase nova ("contrato encerrado é indicador") teria
+  // afrouxado a régua. `classificacaoEsperada` é lida pelo leitor de resultados.
+
+  // G1 — réplica do "Bot de Faturamento V2": horas + contrato de terceirizada encerrado,
+  // e um "onde verificar" FRACO de propósito (só o ERP e os registros da própria
+  // automação, sem painel/KPI nomeado). Era exatamente o caso que saiu zona cinzenta.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'nao',
+      linhas: [{ cargo: 'Supervisor', horas_antes: 10, horas_depois: 0 }],
+      tem_custo_evitado: 'sim',
+      custo_evitado_itens: [
+        { nome: 'Equipe terceirizada de faturamento', valor: 3600, recorrencia: 'mensal', justificativa: 'Time terceirizado que emitia as notas manualmente; contrato encerrado após a automação.' },
+      ],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'crit-custo-evitado-fonte-fraca',
+      nome: tag('Emissor de notas em lote (contrato encerrado, fonte fraca)'),
+      tipos_projeto: ['saving'],
+      classificacaoEsperada: 'claro_sim',
+      meta: { ...metaPadrao, ferramenta: 'Python', contrafactual_afetados: 'time:Fiscal', descricao_breve: 'Bot que emite notas fiscais em lote no ERP para os pedidos aprovados aguardando faturamento.' },
+      doc: DOC_BASE('Emissor de Notas em Lote', {
+        oque: 'Faz login no ERP e emite notas fiscais em lote para os pedidos aprovados que aguardam faturamento, ordenando por valor.',
+        fluxo: 'Script Python com Playwright loga no ERP, filtra os pedidos aguardando faturamento e dispara a emissão em massa, salvando evidências de cada execução.',
+        deps: 'Python, Playwright, credenciais do ERP.',
+        config: 'Credenciais no .env e o limite mínimo de valor por lote.',
+        atencao: 'Sensível a mudanças de layout do ERP; a execução grava screenshots e logs por conta.',
+      }),
+      briefing: `Projeto: bot que emite notas fiscais em lote no ERP. Roda diariamente, em produção há meses.
+NINGUÉM INTERNO fazia a emissão: havia uma EQUIPE TERCEIRIZADA que emitia as notas manualmente, e o contrato dela (R$ 3.600/mês) JÁ FOI ENCERRADO por causa da automação — não é projeção, já aconteceu.
+Além disso, existe SIM um trabalho manual adicional que o contrato não cobria: 1 Supervisor gastava 10h/mês supervisionando esses faturamentos (conferência 3h, ajustes e filtros manuais 4h, pós-processamento 2h, consolidação 1h). Hoje são 0h.
+Se o agente perguntar QUAL ponteiro se moveu: custo e horas operacionais da área.
+Se perguntar ONDE se confere: no próprio ERP, na tela de listagem de pedidos, e nos registros de execução do bot. NÃO existe painel, dashboard ou KPI formal nomeado para isso — não invente um.
+Aprove o memorial quando refletir isso.`,
+      saving,
+      expected: {
+        hard: { 'Custo Evitado': c.custoEvitadoMensal, 'Saving Reais': c.savingReais, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Tipo de Saving': 'mensal', 'Alguém Fazia?': 'nao' },
+      },
+    });
+  }
+
+  // G2 — eixo custo ISOLADO: custo evitado puro (0h) com fonte fraca. Se a régua só
+  // aceitasse painel/KPI, este cairia em zona cinzenta.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'externo',
+      linhas: [],
+      tem_custo_evitado: 'sim',
+      custo_evitado_itens: [
+        { nome: 'Licença da ferramenta de monitoramento', valor: 2400, recorrencia: 'mensal', justificativa: 'SaaS de monitoramento cancelado após a automação passar a gerar os alertas.' },
+      ],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'crit-custo-evitado-puro-fonte-fraca',
+      nome: tag('Alertas de indisponibilidade (SaaS cancelado, fonte fraca)'),
+      tipos_projeto: ['saving'],
+      classificacaoEsperada: 'claro_sim',
+      meta: { ...metaPadrao, ferramenta: 'Python', contrafactual_afetados: 'time:Tecnologia', descricao_breve: 'Rotina que monitora os serviços internos e dispara alertas de indisponibilidade.' },
+      doc: DOC_BASE('Alertas de Indisponibilidade', {
+        oque: 'Monitora os endpoints dos serviços internos de minuto em minuto e dispara alerta no chat quando algum cai.',
+        fluxo: 'Cron a cada minuto faz health-check dos endpoints e posta no canal quando detecta falha.',
+        deps: 'Python, webhook do chat interno.',
+        config: 'Lista de endpoints e o canal de destino.',
+        atencao: 'Alertas repetidos são agrupados numa janela de 10 minutos.',
+      }),
+      briefing: `Projeto: rotina de alertas de indisponibilidade, rodando de minuto em minuto, em produção.
+NINGUÉM fazia isso manualmente — o que existia era um SaaS de monitoramento pago, R$ 2.400/mês, que JÁ FOI CANCELADO depois que a automação assumiu os alertas. Não é projeção, o contrato já acabou.
+NÃO há trabalho manual adicional além do que o SaaS cobria: o ganho é exclusivamente esse custo evitado, sem horas de pessoas.
+Se o agente perguntar ONDE se confere: na fatura do fornecedor, que deixou de vir. NÃO há painel nem KPI formal — não invente um.
+Aprove o memorial quando refletir isso (sem horas).`,
+      saving,
+      expected: {
+        hard: { 'Custo Evitado': c.custoEvitadoMensal, 'Saving Reais': c.savingReais, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Saving Horas': c.horas, 'Alguém Fazia?': 'externo' },
+      },
+    });
+  }
+
+  // G3 — CONTROLE ADVERSARIAL (o mais importante): peça ÚNICA, sem recorrência e com o
+  // contrafactual NEGADO, MAS com custo evitado declarado. A régua diz que recorrência +
+  // contrafactual falhando JUNTOS = claro_nao, "sem buscar salvação" numa evidência. Se
+  // a frase nova sobre contrato encerrado salvar este projeto, eu abri um buraco.
+  {
+    const saving = {
+      tipo_saving: 'pontual',
+      alguem_fazia: 'externo',
+      linhas: [],
+      tem_custo_evitado: 'sim',
+      custo_evitado_itens: [
+        { nome: 'Consultoria externa de diagramação', valor: 4000, recorrencia: 'pontual', justificativa: 'Consultoria que teria sido contratada para montar o material do evento.' },
+      ],
+    };
+    cenarios.push({
+      key: 'crit-peca-unica-com-custo',
+      nome: tag('Material do evento interno (peça única, sem recorrência)'),
+      tipos_projeto: ['saving'],
+      classificacaoEsperada: 'claro_nao',
+      meta: { ...metaPadrao, ferramenta: 'Python', contrafactual_afetados: 'time:Marketing', descricao_breve: 'Script que gerou os slides do evento interno de 2026 a partir das respostas de um formulário.' },
+      doc: DOC_BASE('Material do Evento Interno', {
+        oque: 'Gerou os slides de abertura do evento interno de 2026 a partir das respostas de um formulário.',
+        fluxo: 'Script leu o CSV do formulário uma vez e exportou as imagens usadas na apresentação.',
+        deps: 'Python, matplotlib.',
+        config: 'Caminho do CSV de entrada.',
+        atencao: 'Feito sob encomenda para aquele evento específico.',
+      }),
+      briefing: `Projeto: script que gerou os slides do evento interno de 2026 a partir de um formulário.
+Rodou UMA ÚNICA VEZ, sob encomenda, para aquele evento. NÃO roda de novo, não está agendado e ninguém executa de novo — o evento acabou.
+Se desligar hoje NADA piora e NINGUÉM reclama: o evento já passou e ninguém pediu de novo.
+Se tivesse que contratar, uma consultoria de diagramação custaria uns R$ 4.000 (pontual) — foi o que se deixou de gastar naquela ocasião.
+Se o agente perguntar ONDE se confere o ganho: dá para ver o resultado nos próprios slides do evento. Não há indicador, painel nem KPI.
+Aprove o memorial assim que ele refletir isso, sem inventar recorrência.`,
+      saving,
+      expected: { hard: { 'Status': 'Reprovado', 'Especial?': 'Não' }, soft: { 'Tipo de Saving': 'pontual' } },
+    });
+  }
+
+  // G4 — CONTROLE: recorrente e legítimo, mas SEM custo evitado e SEM fonte nomeável.
+  // A rastreabilidade falha sozinha → deve continuar caindo em zona cinzenta.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Analista Júnior', horas_antes: 12, horas_depois: 4 }],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'crit-recorrente-sem-fonte',
+      nome: tag('Organizador de anexos (recorrente, sem indicador)'),
+      tipos_projeto: ['saving'],
+      classificacaoEsperada: 'zona_cinzenta',
+      meta: { ...metaPadrao, ferramenta: 'Google Apps Script', contrafactual_afetados: 'time:Administrativo', descricao_breve: 'Rotina que organiza os anexos recebidos por e-mail em pastas do Drive.' },
+      doc: DOC_BASE('Organizador de Anexos', {
+        oque: 'Organiza os anexos recebidos por e-mail em pastas do Drive por remetente e mês.',
+        fluxo: 'Apps Script roda de hora em hora, varre a caixa e move os anexos para as pastas.',
+        deps: 'Google Apps Script, Gmail, Drive.',
+        config: 'Rótulo do Gmail e pasta raiz no Drive.',
+        atencao: 'Anexos acima de 25MB são ignorados.',
+      }),
+      briefing: `Projeto: rotina que organiza anexos de e-mail em pastas do Drive. Roda de hora em hora, em produção.
+Antes 1 Analista Júnior gastava 12h/mês organizando isso à mão; hoje gasta 4h/mês conferindo. Essa pessoa fazia mesmo (alguém fazia = sim).
+NÃO houve contrato, licença ou serviço externo cancelado — nenhum custo evitado.
+Se o agente perguntar QUAL ponteiro se moveu e ONDE conferir: responda honestamente que NÃO existe indicador, relatório, painel ou base onde isso apareça — o ganho é a percepção do time de que parou de perder tempo. NÃO invente uma fonte.
+Aprove o memorial quando refletir isso.`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Saving Reais': c.savingReais, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Alguém Fazia?': 'sim' },
+      },
+    });
+  }
+
+  // G5 — CONTROLE POSITIVO: recorrente com fonte FORTE e nomeada, sem custo evitado.
+  // Sanidade — se este não sair claro_sim, o problema é da régua, não do fix.
+  {
+    const saving = {
+      tipo_saving: 'mensal',
+      alguem_fazia: 'sim',
+      linhas: [{ cargo: 'Analista Pleno', horas_antes: 30, horas_depois: 6 }],
+    };
+    const c = calcSaving(saving);
+    cenarios.push({
+      key: 'crit-fonte-forte',
+      nome: tag('Fechamento de divergências (fonte forte nomeada)'),
+      tipos_projeto: ['saving'],
+      classificacaoEsperada: 'claro_sim',
+      meta: { ...metaPadrao, contrafactual_afetados: 'time:Fiscal;Financeiro', descricao_breve: 'Rotina que concilia lançamentos e derruba o retrabalho do fechamento mensal.' },
+      doc: DOC_BASE('Fechamento de Divergências', {
+        oque: 'Concilia os lançamentos do mês e lista as divergências para o time fiscal no primeiro dia útil.',
+        fluxo: 'Workflow roda todo dia 1º, cruza ERP × contábil e publica o relatório de divergências.',
+        deps: 'n8n, ERP, banco contábil, Metabase.',
+        config: 'Credenciais e o dia de execução.',
+        atencao: 'Divergências acima de R$100 vão para revisão manual.',
+      }),
+      briefing: `Projeto: rotina de conciliação que roda todo dia 1º, em produção há um ano.
+Antes 1 Analista Pleno gastava 30h/mês; hoje gasta 6h/mês. Essa pessoa fazia mesmo (alguém fazia = sim).
+NÃO houve contrato ou licença cancelada — nenhum custo evitado.
+Se o agente perguntar QUAL ponteiro se moveu: a taxa de retrabalho do fechamento e as horas do time fiscal.
+Se perguntar ONDE se confere: no painel "Fechamento Fiscal" do Metabase, que mostra divergências por mês, e no relatório de conciliação — dá para comparar antes e depois.
+Aprove o memorial quando refletir isso.`,
+      saving,
+      expected: {
+        hard: { 'Saving Horas': c.horas, 'Saving Reais': c.savingReais, 'Status': 'Pendente', 'Especial?': 'Não' },
+        soft: { 'Alguém Fazia?': 'sim' },
+      },
+    });
+  }
+
   for (const c of cenarios) {
     if (c.especial) {
       c.complexidade = { alvo: 'especial', gateHard: null }; // analisador não roda p/ especial
