@@ -14,11 +14,14 @@ for (const l of fs.readFileSync('/home/notebook/godocs-main/.env', 'utf8').split
 const { getAccessToken } = await import('@/lib/google/auth');
 const ID = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 const QUANTAS = Number(process.env.QUANTAS || 14);
+// ABA=STAGING para inspecionar a aba da staging (a planilha é a MESMA de prod — a aba é o
+// isolamento). Default `GoDocs` = PRODUÇÃO.
+const ABA = process.env.ABA || 'GoDocs';
 
-it('últimas linhas da aba GoDocs', async () => {
+it(`últimas linhas da aba ${ABA}`, async () => {
   const t = await getAccessToken();
   const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${ID}/values/${encodeURIComponent("'GoDocs'!A1:AZ100000")}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${ID}/values/${encodeURIComponent(`'${ABA}'!A1:BZ100000`)}`,
     { headers: { Authorization: `Bearer ${t}` } },
   );
   const j = (await r.json()) as { values?: string[][] };
