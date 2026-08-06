@@ -13,8 +13,23 @@
 // O Gomoon mantém o template interno como FALLBACK (se `mensagem` faltar, ele
 // renderiza o dele) — é o que permite os dois lados deployarem em qualquer ordem.
 //
-// ⚠️ Markup do Google Chat: `*negrito*`, `_itálico_`, `•`, `\n`, emoji inline. Sem
-// HTML, sem Markdown de link (`[texto](url)` não renderiza — a URL vai crua).
+// ⚠️ Markup: **HTML de CARD**, não o `*asterisco*` de mensagem de texto (06/08/2026).
+// O Google Chat tem DUAS sintaxes que não se conversam, e o Gomoon entrega o nosso
+// texto dentro de um `cardsV2`/`TextParagraph`:
+//   • mensagem de texto (campo `text`) → `*negrito*`, `_itálico_`, `~riscado~`;
+//   • card (`TextParagraph`)           → `<b>`, `<i>`, `<u>`, `<s>`, `<a href>`.
+// Asterisco dentro de card NÃO é interpretado — vira asterisco literal na tela (foi
+// exatamente o que chegou no 1º disparo de staging: "*Você tem projeto…*" cru). Se um
+// dia a entrega virar mensagem de texto simples, este arquivo TEM de voltar ao
+// asterisco: a sintaxe segue a superfície, não o gosto.
+// `\n` está comprovadamente preservado pelo card do Gomoon (conferido no print do
+// disparo de 06/08) — por isso não usamos `<br>`. `•` e emoji são caracteres literais.
+// Sem Markdown de link (`[texto](url)` não renderiza); a URL vai crua ou em `<a href>`.
+//
+// ⚠️ O aviso ao líder NÃO repete título nem link: o card do Gomoon já traz o cabeçalho
+// ("📋 Pré-aprovação pendente") e o botão "Abrir a fila" (que usa o `url` do payload,
+// campo separado). Escrever os dois aqui duplicava a frase e o link na mesma DM. O
+// ANÚNCIO mantém o título, porque lá o cabeçalho do card é genérico ("GoDocs").
 // ⚠️ NENHUM VALOR EM R$ nos textos (§7.1 do contrato) — DM se lê por cima do ombro.
 // Nome, e-mail e CONTAGEM de projetos são tudo o que pode aparecer.
 
@@ -44,23 +59,23 @@ export const ANUNCIO_CHAVE = `godocs:anuncio:pre-aprovacao-lider:${ANUNCIO_VERSA
  *    não um item de menu: não existe menu "GoDocs → Pré-aprovações".
  */
 export const TEXTO_ANUNCIO_PRE_APROVACAO = [
-  '*Novidade no GoDocs: os projetos agora passam por uma pré-aprovação do líder* 🚀',
+  '<b>Novidade no GoDocs: os projetos agora passam por uma pré-aprovação do líder</b> 🚀',
   '',
-  'Todo projeto submetido no GoDocs passa a ter uma *pré-aprovação do líder direto* ' +
+  'Todo projeto submetido no GoDocs passa a ter uma <b>pré-aprovação do líder direto</b> ' +
     'antes de chegar à validação do time de RPA & IA.',
   '',
-  '*Como funciona*',
+  '<b>Como funciona</b>',
   '• Você submete o projeto normalmente — o formulário não mudou.',
-  '• Seu líder é avisado por aqui e abre a fila dele pela faixa *Pré-aprovações do meu time*, ' +
+  '• Seu líder é avisado por aqui e abre a fila dele pela faixa <b>Pré-aprovações do meu time</b>, ' +
     'na página inicial do GoDocs.',
   '• Ele responde três perguntas rápidas (o projeto move um indicador da área? a área ' +
     'sentiria falta se ele parasse de rodar? o ganho declarado faz sentido?) e então ' +
-    '*pré-aprova* ou *pede um ajuste*.',
+    '<b>pré-aprova</b> ou <b>pede um ajuste</b>.',
   '• Pediu ajuste? O que precisa ser corrigido fica visível no seu projeto em ' +
-    '*Meus Projetos* — é só editar e reenviar.',
+    '<b>Meus Projetos</b> — é só editar e reenviar.',
   '',
-  '*O que muda para você*',
-  '• A pré-aprovação *não substitui* a validação do time de RPA & IA: ela vem antes e ' +
+  '<b>O que muda para você</b>',
+  '• A pré-aprovação <b>não substitui</b> a validação do time de RPA & IA: ela vem antes e ' +
     'traz o olhar de quem conhece a rotina da área.',
   '• Quem tem cargo de coordenação para cima não passa por essa etapa — o projeto segue ' +
     'direto para a validação.',
@@ -126,17 +141,17 @@ export function renderMensagemLider(
   const primeiro = primeiroNome(lider.nome);
   const saudacao = primeiro ? `Oi, ${primeiro}! ` : 'Oi! ';
 
-  const linhas = ['*Você tem projeto para pré-aprovar no GoDocs* 📋', ''];
+  const linhas: string[] = [];
 
   if (lider.liderados.length === 1) {
     const so = lider.liderados[0];
     const verbo = total > 1 ? 'estão aguardando' : 'está aguardando';
     linhas.push(
-      `${saudacao}*${plural(total, 'projeto')}* de *${so.nome}* ${verbo} a sua pré-aprovação.`,
+      `${saudacao}<b>${plural(total, 'projeto')}</b> de <b>${so.nome}</b> ${verbo} a sua pré-aprovação.`,
     );
   } else {
     linhas.push(
-      `${saudacao}*${plural(total, 'projeto')}* da sua equipe estão aguardando a sua pré-aprovação:`,
+      `${saudacao}<b>${plural(total, 'projeto')}</b> da sua equipe estão aguardando a sua pré-aprovação:`,
       '',
       ...lider.liderados.map((d) => `• ${d.nome} — ${plural(d.projetos_pendentes, 'projeto')}`),
     );
@@ -144,11 +159,9 @@ export function renderMensagemLider(
 
   linhas.push(
     '',
-    'São três perguntas rápidas por projeto, e você pode *pré-aprovar* ou *pedir ajuste* na própria tela.',
+    'São três perguntas rápidas por projeto, e você pode <b>pré-aprovar</b> ou <b>pedir ajuste</b> na própria tela.',
     '',
-    `👉 ${lider.url}`,
-    '',
-    `_Situação em ${dataHoraBRT(geradoEm)}. Se você já decidiu depois disso, pode ignorar esta mensagem._`,
+    `<i>Situação em ${dataHoraBRT(geradoEm)}. Se você já decidiu depois disso, pode ignorar esta mensagem.</i>`,
   );
 
   return linhas.join('\n');

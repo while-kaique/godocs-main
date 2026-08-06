@@ -86,7 +86,7 @@ Content-Type: application/json
 | `lideres[].idempotency_key` | string | `godocs:<email>:<YYYY-MM-DD>`. Ver §4 |
 | `lideres[].liderados[]` | array | Só quem tem projeto pendente. Nunca vazio |
 | `liderados[].projetos_pendentes` | number ≥ 1 | Quantos projetos daquela pessoa esperam parecer |
-| `lideres[].mensagem.texto` | string | **A DM já redigida** (markup do Chat). Ver **§13** |
+| `lideres[].mensagem.texto` | string | **A DM já redigida**, em **HTML de cartão** (`<b>`/`<i>`), sem título nem link. Ver **§13** |
 
 O total de projetos do líder é a **soma** dos `projetos_pendentes` dos liderados dele — não
 mandamos o total pré-calculado. Se a mensagem precisar dos **nomes** dos projetos, avisem:
@@ -419,12 +419,33 @@ cópia morando em dois repos — com o texto pronto, mexer numa vírgula é depl
 6. **Cartão:** se ele montar cartão, `mensagem.texto` é o corpo — não repetir o mesmo texto
    dentro e fora.
 
-**Duas regras sobre o texto (valem nos dois endpoints):**
+**Três regras sobre o texto (valem nos dois endpoints):**
 
-- Chega **pronto, em markup do Google Chat** (`*negrito*`, `_itálico_`, `•`, `\n`, emoji
-  inline). Não escapar, não reformatar. `[texto](url)` **não** renderiza — a URL vai crua.
-- **Não prefixar nem sufixar nada** (título, saudação, assinatura, rodapé): o texto já tem
-  título e fechamento, e o acréscimo sai duplicado.
+- ⚠️ **A ENTREGA É EM CARTÃO (`cardsV2`), e por isso o markup é HTML** — `<b>`, `<i>`,
+  `<u>`, `<s>`, `<a href>`; `\n` para quebra de linha; `•` e emoji literais. **Fechado em
+  06/08/2026, depois do 1º disparo de staging chegar com asterisco cru na tela.** O Google
+  Chat tem **duas sintaxes que não se conversam** e a nossa escolha tem de seguir a
+  superfície de entrega, não o gosto:
+
+  | Superfície | Negrito | Itálico | Quebra |
+  |---|---|---|---|
+  | mensagem de texto (campo `text`) | `*assim*` | `_assim_` | `\n` |
+  | **cartão (`TextParagraph`) ← é o nosso caso** | `<b>assim</b>` | `<i>assim</i>` | `\n` ou `<br>` |
+
+  Asterisco dentro de cartão **não** é interpretado: chega literal (`*Você tem projeto…*`).
+  Não escapar o HTML, não reformatar. `[texto](url)` **não** renderiza em nenhuma das duas.
+  ⚠️ **Se um dia a entrega deixar de ser cartão, avise** — `src/lib/gomoon-mensagens.ts`
+  tem de voltar ao asterisco no mesmo deploy, senão a DM vira `<b>` visível.
+- ⚠️ **O aviso ao líder NÃO traz título nem link na prosa** (desde 06/08/2026): quem mostra
+  o título é o **cabeçalho do cartão** ("📋 Pré-aprovação pendente") e quem leva à fila é o
+  **botão "Abrir a fila"**, montado do campo `lideres[].url` — que segue no payload por
+  isso. Escrever os dois no texto fazia a mesma frase e o mesmo link aparecerem **2× na
+  mesma DM**. O **anúncio**, ao contrário, mantém o título dentro do texto, porque lá o
+  cabeçalho do cartão é genérico ("GoDocs").
+- **Não prefixar nem sufixar mais nada** (saudação, assinatura, rodapé): o texto já tem
+  abertura e fechamento, e o acréscimo sai duplicado. _(O prefixo
+  `[STAGING — destinatário real: …]` é exceção combinada e só vale com `ambiente:"staging"`
+  — em produção não pode aparecer.)_
 
 Nosso lado: **`src/lib/gomoon-mensagens.ts`** (módulo PURO, fonte única das duas redações) →
 `renderMensagemLider()` é chamada dentro de `montarPayloadLideresPendentes`, **depois** de

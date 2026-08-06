@@ -5,7 +5,10 @@
 //    a data são responsabilidade nossa e têm de estar certos (do outro lado não há
 //    engine de template para consertar);
 //  • a data/hora sai em fuso de BRASÍLIA e do `gerado_em` — não é fixa em "09h";
-//  • NENHUM valor em R$ (§7.1 do contrato).
+//  • NENHUM valor em R$ (§7.1 do contrato);
+//  • o markup é o de CARD (`<b>`/`<i>`), NÃO o `*asterisco*` de mensagem de texto — o
+//    Gomoon entrega dentro de um `cardsV2`/`TextParagraph`, onde asterisco não é
+//    interpretado e chega literal na tela (foi o bug do 1º disparo, 06/08/2026).
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -33,22 +36,24 @@ describe('renderMensagemLider — as três formas', () => {
       ]),
       GERADO,
     );
-    expect(t).toContain('*Você tem projeto para pré-aprovar no GoDocs* 📋');
-    expect(t).toContain('Oi, Lucas! *5 projetos* da sua equipe estão aguardando a sua pré-aprovação:');
+    expect(t).toContain(
+      'Oi, Lucas! <b>5 projetos</b> da sua equipe estão aguardando a sua pré-aprovação:',
+    );
     expect(t).toContain('• Bruno Lima — 3 projetos');
     expect(t).toContain('• Ana Souza — 2 projetos');
-    expect(t).toContain(`👉 ${URL}`);
   });
 
   it('um liderado: nomeia a pessoa e NÃO abre lista de 1 item', () => {
     const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 3 }]), GERADO);
-    expect(t).toContain('Oi, Lucas! *3 projetos* de *Ana Souza* estão aguardando a sua pré-aprovação.');
+    expect(t).toContain(
+      'Oi, Lucas! <b>3 projetos</b> de <b>Ana Souza</b> estão aguardando a sua pré-aprovação.',
+    );
     expect(t).not.toContain('•');
   });
 
   it('um projeto só: concordância no singular', () => {
     const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }]), GERADO);
-    expect(t).toContain('*1 projeto* de *Ana Souza* está aguardando');
+    expect(t).toContain('<b>1 projeto</b> de <b>Ana Souza</b> está aguardando');
     expect(t).not.toContain('1 projetos');
     expect(t).not.toContain('estão aguardando');
   });
@@ -67,23 +72,51 @@ describe('renderMensagemLider — as três formas', () => {
 
   it('líder sem nome no banco: saudação sem nome, nunca "Oi, null!"', () => {
     const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }], null), GERADO);
-    expect(t).toContain('Oi! *1 projeto*');
+    expect(t).toContain('Oi! <b>1 projeto</b>');
     expect(t).not.toMatch(/null|undefined/);
   });
 
   it('carrega a data do snapshot em Brasília (§7.2) e a ressalva de que o número envelhece', () => {
     const t = renderMensagemLider(lider([{ nome: 'Ana Souza', projetos_pendentes: 1 }]), GERADO);
-    expect(t).toContain('_Situação em 06/08 às 09h.');
-    expect(t).toContain('pode ignorar esta mensagem._');
+    expect(t).toContain('<i>Situação em 06/08 às 09h.');
+    expect(t).toContain('pode ignorar esta mensagem.</i>');
   });
 
-  it('usa a URL do item — o link da staging não pode virar o de produção', () => {
+  it('⚠️ NÃO repete o que o card do Gomoon já mostra: título e link', () => {
+    // O card traz cabeçalho próprio ("📋 Pré-aprovação pendente") e o botão "Abrir a
+    // fila" (montado do campo `url` do payload). Redigir os dois aqui fazia a MESMA
+    // frase e o MESMO link aparecerem 2× na DM — foi o que o print do 1º disparo
+    // mostrou. O `url` continua no payload; só não vai na prosa.
     const t = renderMensagemLider(
-      { nome: 'Lucas', url: 'https://godocs-staging.devgogroup.com/aprovacoes', liderados: [{ nome: 'Ana', projetos_pendentes: 1 }] },
+      {
+        nome: 'Lucas',
+        url: 'https://godocs-staging.devgogroup.com/aprovacoes',
+        liderados: [{ nome: 'Ana', projetos_pendentes: 1 }],
+      },
       GERADO,
     );
-    expect(t).toContain('👉 https://godocs-staging.devgogroup.com/aprovacoes');
-    expect(t).not.toContain('godocs.devgogroup.com/aprovacoes');
+    expect(t).not.toContain('http');
+    expect(t).not.toContain('👉');
+    expect(t).not.toMatch(/Você tem projeto para pré-aprovar/i);
+  });
+
+  it('⚠️ markup de CARD (<b>/<i>), nunca o *asterisco* de mensagem de texto', () => {
+    // Dentro de um `TextParagraph` o asterisco NÃO é interpretado: chega literal na
+    // tela. Se algum dia a entrega virar mensagem de texto simples, este teste é o
+    // lugar de inverter a regra — de propósito, não por acidente.
+    const t = renderMensagemLider(
+      lider([
+        { nome: 'Bruno Lima', projetos_pendentes: 3 },
+        { nome: 'Ana Souza', projetos_pendentes: 2 },
+      ]),
+      GERADO,
+    );
+    expect(t).not.toContain('*');
+    expect(t).not.toMatch(/_[^_]+_/);
+    expect(t).toMatch(/<b>.+<\/b>/);
+    // `<br>` não: o card do Gomoon preserva o `\n` (conferido no disparo de 06/08).
+    expect(t).not.toContain('<br');
+    expect(t).toContain('\n');
   });
 
   it('⚠️ NENHUM valor em R$ atravessa a mensagem (§7.1)', () => {
@@ -131,7 +164,9 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
   it('não promete aviso ao autor: diz que o ajuste FICA VISÍVEL em Meus Projetos', () => {
     // O app mostra o parecer no card de "Meus Projetos", mas NÃO avisa o autor (não há
     // DM nem e-mail para ele). "você recebe o que precisa corrigir" seria promessa falsa.
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('fica visível no seu projeto em *Meus Projetos*');
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain(
+      'fica visível no seu projeto em <b>Meus Projetos</b>',
+    );
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toMatch(/você recebe/i);
   });
 
@@ -141,8 +176,13 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
   });
 
   it('não manda o líder a um menu que não existe — a entrada é a faixa da home', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('*Pré-aprovações do meu time*');
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('<b>Pré-aprovações do meu time</b>');
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('GoDocs → Pré-aprovações');
+  });
+
+  it('⚠️ markup de CARD também no anúncio — sem asterisco literal na tela', () => {
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('*');
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toMatch(/<b>.+<\/b>/);
   });
 
   it('não deixou placeholder de redação para trás', () => {

@@ -120,12 +120,15 @@ describe('montarPayloadLideresPendentes — formato do contrato (§3)', () => {
 
     // Saudação pelo PRIMEIRO nome, total somado por nós e a MESMA ordem dos bullets.
     expect(texto).toContain('Oi, Lucas!');
-    expect(texto).toContain('*5 projetos* da sua equipe');
+    expect(texto).toContain('<b>5 projetos</b> da sua equipe');
     expect(texto.indexOf('• Bruno Lima — 3 projetos')).toBeLessThan(
       texto.indexOf('• Ana Souza — 2 projetos'),
     );
-    // O link é o do próprio item — nunca um hardcode que ignore a staging.
-    expect(texto).toContain(p.lideres[0].url);
+    // ⚠️ O link NÃO vai no texto: o card do Gomoon monta o botão "Abrir a fila" a
+    // partir do campo `url` do item. Repetir a URL na prosa duplicava o link na DM —
+    // mas o campo tem de continuar existindo, senão o botão fica sem destino.
+    expect(texto).not.toContain(p.lideres[0].url);
+    expect(p.lideres[0].url).toBe(`${OPTS.appUrl}/aprovacoes`);
   });
 
   it('normaliza e-mail (caixa) e deriva o nome do liderado quando o banco não tem', () => {
