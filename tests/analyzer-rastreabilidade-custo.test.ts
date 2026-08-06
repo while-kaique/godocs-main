@@ -86,6 +86,45 @@ describe('itens do custo evitado chegam nomeados ao analisador', () => {
     const p = payload({ ...PROJETO_BASE, custo_evitado_itens: null }, { saving: { custo_evitado_reais: 0 } });
     expect(p.memorial_saving.custo_evitado_itens).toEqual([]);
   });
+
+  // O snapshot da documentação fica DEFASADO: submeterParaValidacao re-deriva o custo
+  // evitado dos itens e recomputa o líquido para o Sheets, mas não regrava a doc. Era o
+  // caso do "Bot de Faturamento V2": doc com custo evitado ausente e R$ 427,50 de líquido,
+  // planilha com R$ 3.600 de contrato encerrado e R$ 4.027,50.
+  it('RECOMPÕE o financeiro dos itens persistidos quando a doc está defasada', () => {
+    const p = payload(
+      { ...PROJETO_BASE, custo_evitado_itens: JSON.stringify(itens), custo_externo_mensal: 0 },
+      {
+        saving: {
+          linhas: [{ cargo: 'Supervisor', horas_antes: 10, horas_depois: 0, valor_hora: 42.75 }],
+          economia_horas_mes: 10,
+          economia_reais_mes: 427.5, // ← valor DEFASADO gravado na documentação
+          // custo_evitado_reais AUSENTE no snapshot — era o buraco
+        },
+      },
+    );
+
+    expect(p.memorial_saving.custo_evitado_reais).toBe(3600);
+    // Líquido = 427,50 (horas) + 3600 (contrato) − 0 − 0
+    expect(p.memorial_saving.economia_reais_mes).toBe(4027.5);
+    // …e as parcelas continuam batendo entre si (senão o analisador acusa "inconsistência").
+    const horas = p.memorial_saving.linhas.reduce((s: number, l: any) => s + l.economia_reais_mes, 0);
+    expect(horas + p.memorial_saving.custo_evitado_reais - p.memorial_saving.custo_externo_mensal
+      - p.memorial_saving.custo_projeto_reais).toBe(p.memorial_saving.economia_reais_mes);
+  });
+
+  it('custo do projeto também sai dos itens persistidos e ABATE o líquido', () => {
+    const p = payload(
+      {
+        ...PROJETO_BASE,
+        custo_evitado_itens: JSON.stringify(itens),
+        custo_projeto_itens: JSON.stringify([{ nome: 'OpenAI', valor: 100, recorrencia: 'mensal' }]),
+      },
+      { saving: { linhas: [], economia_horas_mes: 0, economia_reais_mes: 0 } },
+    );
+    expect(p.memorial_saving.custo_projeto_reais).toBe(100);
+    expect(p.memorial_saving.economia_reais_mes).toBe(3500); // 3600 − 100
+  });
 });
 
 describe('a régua declara que contrato encerrado é indicador nomeado', () => {

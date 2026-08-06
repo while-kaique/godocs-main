@@ -13,8 +13,16 @@ import type {
   CriterioResult,
   Complexidade,
   ClassificacaoAvaliacao,
+  SavingColetado,
 } from './types';
 import { detectarAiProxy } from './extractor';
+// Mesmas derivações que `submeterParaValidacao` aplica antes de gravar no Sheets — o
+// snapshot da documentação fica defasado no financeiro (ver comentário em buildUserMessage).
+import {
+  recomputarSavingFinanceiro,
+  custoEvitadoMensalFromItens,
+  custoProjetoMensalFromItens,
+} from './saving-calc';
 
 const log = (...args: unknown[]) => console.log('[analyzer]', ...args);
 const err = (...args: unknown[]) => console.error('[analyzer]', ...args);
@@ -385,24 +393,41 @@ export function buildUserMessage(
   }
 
   if (saving) {
+    // ⚠️ `documentacao.conteudo.saving` é um SNAPSHOT do chat e fica DEFASADO no
+    // financeiro: `submeterParaValidacao` re-deriva custo evitado e custo do projeto dos
+    // ITENS PERSISTIDOS (fonte da verdade) e recomputa o líquido para o Sheets, mas NÃO
+    // regrava a documentação. Sem repetir a mesma derivação aqui, o analisador recebia o
+    // custo evitado ZERADO e o líquido só das horas. _(caso "Bot de Faturamento V2",
+    // 05/08/2026: o analisador viu custo evitado 0 e R$ 427,50, enquanto a planilha tinha
+    // um contrato de R$ 3.600/mês encerrado e R$ 4.027,50 de líquido — e então classificou
+    // como zona cinzenta por "faltar indicador verificável".)_ Mesmas 3 linhas do submit.
+    const savingFonte = recomputarSavingFinanceiro(
+      {
+        ...(saving as unknown as SavingColetado),
+        custo_evitado_reais: custoEvitadoMensalFromItens(projeto.custo_evitado_itens) || null,
+        custo_projeto_reais: custoProjetoMensalFromItens(projeto.custo_projeto_itens) || null,
+      },
+      Number(projeto.custo_externo_mensal) || 0,
+    );
+
     dados.memorial_saving = {
-      linhas: saving.linhas ?? [],
-      economia_horas_mes: saving.economia_horas_mes ?? 0,
+      linhas: savingFonte.linhas ?? [],
+      economia_horas_mes: savingFonte.economia_horas_mes ?? 0,
       // economia_reais_mes é o LÍQUIDO = R$ das horas (soma das linhas) + custo_evitado_reais
-      // − custo_externo_mensal. Enviamos as parcelas para o analisador reconciliar e NÃO
-      // confundir a diferença (horas × líquido) com uma inconsistência do memorial.
-      economia_reais_mes: saving.economia_reais_mes ?? 0,
-      custo_evitado_reais: saving.custo_evitado_reais ?? 0,
+      // − custo_externo_mensal − custo_projeto_reais. Enviamos as parcelas para o analisador
+      // reconciliar e NÃO confundir a diferença (horas × líquido) com uma inconsistência.
+      economia_reais_mes: savingFonte.economia_reais_mes ?? 0,
+      custo_evitado_reais: savingFonte.custo_evitado_reais ?? 0,
       custo_evitado_tipo: saving.custo_evitado_tipo ?? null,
       // Itens NOMEADOS do custo evitado (mesma forma do custo_projeto_itens abaixo).
       // O total sozinho é um número solto; é o nome do contrato/serviço encerrado que
       // sustenta a RASTREABILIDADE pelo eixo custo (ver régua de critério, item 3).
       custo_evitado_itens: parseJson(projeto.custo_evitado_itens as string | null) ?? [],
-      custo_externo_mensal: saving.custo_externo_mensal ?? 0,
+      custo_externo_mensal: savingFonte.custo_externo_mensal ?? 0,
       // Custos do projeto DECLARADOS no formulário (serviços externos pagos que a
       // solução consome). Total mensalizado que ABATE + a lista de itens, para o
       // analisador cruzar com os serviços pagos que aparecem na doc enviada.
-      custo_projeto_reais: saving.custo_projeto_reais ?? 0,
+      custo_projeto_reais: savingFonte.custo_projeto_reais ?? 0,
       custo_projeto_itens: parseJson(projeto.custo_projeto_itens as string | null) ?? [],
       tipo_saving: saving.tipo_saving ?? null,
       memorial_calculo: saving.memorial_calculo ?? '(sem memorial)',
