@@ -4,10 +4,51 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🔴 06/08 (EM CURSO — PAROU NO MEIO) — D27: especial fora da fila + DISPARO RETROATIVO
+## 🚨 06/08 (SESSÃO MAIS RECENTE) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu
 
-**PRÓXIMO PASSO EXATO:** ⚠️ **retomar o disparo retroativo do passo 1 abaixo.** A staging já tem a D27; a
-**PROD NÃO** — o deploy foi interrompido pelo Luis na hora de pegar o token de upload.
+**PRÓXIMO PASSO EXATO:** ⚠️ **aplicar o deploy em PROD (`674a3710`) para RESTAURAR a pré-aprovação** —
+o build está pronto e validado (merge do `origin/main` + D27, **1112 testes**, staging `edf400b4`
+deployada 16:45 UTC e respondendo). Só falta `getUploadToken` → `scripts/deploy-godeploy.sh` →
+`updateApp` no `674a3710`. **Depois** dele: backfill → dry-run → disparo (passos 2-4 abaixo).
+
+### 🔥 O achado que interrompeu a sessão — prod ficou SEM a feature por um deploy de outra frente
+**A pré-aprovação do líder NÃO está no ar em produção agora.** Prova dura, não dedução:
+`getApp(674a3710)` → `updatedAt 2026-08-06 16:24:11 UTC` (**13:24 BRT**), **version 227**, com a
+`userDescription` dos **fixes do analisador** — exatamente os 2 commits (`41ac22e`+`76b22fb`) que
+estavam no `origin/main` e faltavam nesta branch. E `GET /api/aprovacoes/pendentes` em prod devolve
+**404 "Rota não encontrada"**. Ou seja: outra frente deployou o `main` (que **não tem**
+`aprovacoes.functions.ts`) em cima do deploy da D26 das ~12:20 e **apagou a feature inteira de prod**.
+- **Custo real, já materializado:** o **Gustavo Castro** submeteu "Hub de Importação"
+  (`9a71f410d3289dddd51e4a33acc2989d`) às **13:41:28 BRT — 17 min depois do atropelo** — e a líder
+  **Vitória Azevedo** nunca foi avisada. Não foi bug de régua: o projeto **não é especial**
+  (`Especial? = "Não"`), o autor é `Analista de Supply Chain Jr` (**não** isento pela D20) e a líder
+  derivada da TeamGuide **é** a Vitória. A fila devia ter aberto e não abriu porque o código não
+  estava lá. Auditoria do Gomoon (`GET ?email=vitoria.azevedo@gocase.com`): **1 item, `tipo:"anuncio"`**
+  (entregue 12:01 BRT) e **zero** aviso de pendência — o POST nunca saiu daqui.
+- ⚠️ **`/aprovacoes` ainda ABRE em prod e isso NÃO significa que a feature está lá** — é o fallback SPA
+  servindo o `index.html`, e uma aba antiga ainda carrega o bundle da D26 do cache do GoDeploy (o
+  GoDeploy **acumula** assets). A tela é casca: toda chamada dela bate no 404 acima. **O teste honesto
+  é o `GET /api/aprovacoes/pendentes`**, nunca a tela.
+- ✅ **O merge do `origin/main` (regra 10) salvou os fixes deles:** o build pronto tem feature + D27 +
+  os 2 fixes do analisador. Deployar a branch **sem** o merge teria apagado o trabalho da outra frente.
+- 🔁 **Vai repetir enquanto a branch não estiver no `main`** (já aconteceu 3× na staging em 04/08, agora
+  em PRODUÇÃO). O que fecha o buraco de verdade é **mesclar o PR #235**.
+- ⚠️ **A lista do backfill precisa ser RE-DERIVADA**: quando rodou eram **73 pendentes → 35 na fila**;
+  com o projeto do Gustavo já são **74**, e ele tem de entrar. Rodar de novo o
+  `scripts/dryrun-lider/ids-fila.ts` (novo nesta sessão) imediatamente antes do passo 2.
+
+### 🔎 Scripts de leitura pura criados nesta sessão (todos fora do `npm run test`)
+- **`scripts/dryrun-lider/ids-fila.ts`** + `.config.ts` — imprime o `projetoIds` do backfill com a MESMA
+  régua do `relatorio-sheet.ts`; `IDS_FILA_OUT=<arquivo>` grava o corpo do POST pronto.
+- **`scripts/dryrun-lider/diag-projeto.ts`** + `.config.ts` — `PROJETO=<id>`: linha da planilha nas
+  colunas que importam + cargo do autor + isenção D20 + líderes derivados. Foi ele que matou a hipótese
+  "era especial".
+- ⚠️ **Cabeçalho de prod conferido (`hdr.ts`): as colunas EXISTEM** — `AE "Aprovação do Líder"` e
+  `AF "Justificativa Aprovação do Lider"` (sem acento, resolvida pelo match tolerante da D18). Vazias
+  na linha do Gustavo porque `abrirPreAprovacao` não rodou, **não** por falta de coluna.
+- ⚠️ **O `rtk` engole a saída destes scripts** — redirecionar para arquivo e ler o arquivo.
+
+**PENDÊNCIA ANTERIOR AINDA VÁLIDA:** a staging já tem a D27; o que falta é prod (acima).
 
 **D27 (decisão do Luis, 06/08/2026) — projeto ESPECIAL não é pendência do líder.** Commit `5e40491`,
 **1102 testes**, staging `edf400b4` deployada 16:32 BRT. Motivo: especial **não tem memorial financeiro**,
@@ -29,8 +70,10 @@ cadastrado na TeamGuide". Só que a categoria mostra **1**, não 2 — provável
 especial (o filtro do especial roda ANTES, por ser característica do projeto). **Conferir qual está onde.**
 
 ### ⏭️ O disparo RETROATIVO — os 4 passos, NESTA ordem
-1. **Deploy da D27 em PROD (`674a3710`)** — ⚠️ **TEM de vir antes do backfill**, senão os 29 especiais entram
-   na fila. (A staging já está.)
+1. **Deploy em PROD (`674a3710`)** — agora ele faz DUAS coisas: **restaura a feature** (prod está sem ela
+   desde 13:24) e traz a D27. ⚠️ **TEM de vir antes do backfill**, senão os 29 especiais entram na fila.
+   O build já está pronto: merge do `main` + `npm run test` (1112) + `build` + `build:worker`, e a
+   **staging já foi deployada e validada** com este mesmo build (`/api/auth/me` → 200).
 2. **Popular a fila em prod** com os 35 projetos: hoje ela está **VAZIA** (`abrirPreAprovacao` só roda em
    submissão nova; não há importação retroativa). Usar `POST /api/admin/aprovacoes/reabrir` — ⚠️ **fail-closed**:
    exige `projetoIds` OU `autorEmail`, não existe "reabre tudo", e `dry` é o DEFAULT.
