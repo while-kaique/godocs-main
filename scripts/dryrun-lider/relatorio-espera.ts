@@ -16,15 +16,19 @@
 // as MESMAS da feature em produção, para o relatório não contar uma coisa e o sistema
 // fazer outra.
 //
-// ⚠️ DUAS RESSALVAS QUE O CABEÇALHO DA ABA REPETE, porque mudam a leitura dos números:
+// ⚠️ UMA TABELA SÓ, 5 colunas: Líder · E-mail · Projetos pendentes · **Dias pendentes**
+// (a lista, do mais antigo para o mais novo: `128, 40, 3`) · Mais antigo (dias). A 1ª
+// versão tinha 3 tabelas e 11 colunas e o Luis cortou: *"está com muita informação"*.
+// O que saiu, se algum dia voltar a fazer falta: cargo, espera média, detalhe projeto a
+// projeto (nome/ID/data/estado) e a tabela dos pendentes que não esperam líder nenhum.
 //
-// 1. O RELÓGIO é a coluna `Data Submissão`. Para projeto submetido pelo app é exatamente
-//    quando a fila do líder abriu; para LEGADO (a maioria dos pendentes hoje) é a data da
-//    planilha, e a fila nunca abriu — então ali "dias esperando" é a idade da pendência,
-//    não o tempo em que o líder viu o projeto.
-// 2. A coluna `Aprovação do Líder` está VAZIA nos 73 pendentes de hoje: a pré-aprovação
-//    entrou em produção em 06/08/2026 e SEM backfill — só projeto submetido/reenviado a
-//    partir dela nasce com estado. Vazio = ninguém deu parecer (não é erro).
+// ⚠️ O RELÓGIO é a coluna `Data Submissão` (o cabeçalho da aba repete isso, porque muda a
+// leitura do número): para projeto submetido pelo app é exatamente quando a fila do líder
+// abriu; para LEGADO (a maioria dos pendentes hoje) é a data da planilha e a fila nunca
+// abriu — ali o número é a idade da pendência, não o tempo em que o líder viu o projeto.
+// ⚠️ A coluna `Aprovação do Líder` está VAZIA nos 73 pendentes de hoje (produção entrou em
+// 06/08/2026 SEM backfill) — foi por isso que o estado saiu da aba: hoje é uma coluna com
+// o mesmo valor em todas as linhas.
 //
 // `Reenvio Pendente` fica FORA (mesma decisão do relatório líder↔liderado, 05/08/2026):
 // a relação é sobre a fila de pré-aprovação, e reenvio é assunto da triagem da RPA.
@@ -55,13 +59,6 @@ const LIMITE_DIAS = Number(process.env.ESPERA_LIMITE_DIAS || 5);
 const txt = (v: unknown) => String(v ?? '').trim();
 const low = (v: unknown) => txt(v).toLowerCase();
 
-// Estado que a planilha guarda; vazio/"—" = ninguém deu parecer (ver ressalva 2).
-const SEM_PARECER = 'Aguardando (sem parecer)';
-const estadoDaLinha = (v: unknown) => {
-  const s = txt(v);
-  return !s || s === '—' ? SEM_PARECER : s;
-};
-
 const AGORA = new Date();
 const DIA_MS = 86_400_000;
 const diasDesde = (valor: unknown): number | null => {
@@ -75,10 +72,7 @@ type Projeto = {
   nome: string;
   autorNome: string;
   autorEmail: string;
-  dataSubmissao: string;
   dias: number | null;
-  estado: string;
-  atualizadoEm: string;
 };
 
 async function main() {
@@ -91,10 +85,7 @@ async function main() {
       nome: txt(r['Projeto']) || '(sem nome)',
       autorNome: txt(r['Nome Completo']) || '—',
       autorEmail: low(r['Email']),
-      dataSubmissao: txt(r['Data Submissão']) || '—',
       dias: diasDesde(r['Data Submissão']),
-      estado: estadoDaLinha(r['Aprovação do Líder']),
-      atualizadoEm: txt(r['Atualizado Em']) || '—',
     }));
 
   // ── 2. Hierarquia + cargos da TeamGuide (mesma régua da feature) ───────────
@@ -105,7 +96,6 @@ async function main() {
   const naTeamGuide = new Set(pessoas.map((p) => p.email.toLowerCase()));
 
   const nome = (email: string, fallback = '') => nomePorEmail.get(email) || fallback || email || '—';
-  const cargo = (email: string) => cargoPorEmail.get(email) || '—';
 
   // ── 3. Quem está na fila de alguém (régua de produção, D20) ────────────────
   type LinhaFila = { liderEmail: string; liderNome: string; proj: Projeto };
@@ -141,25 +131,15 @@ async function main() {
   const linhas: (string | number)[][] = [];
   const push = (...cells: (string | number)[]) => linhas.push(cells);
 
-  const carimbo = AGORA.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  push(`Gerado em ${carimbo} (BRT) · corte de atenção: mais de ${LIMITE_DIAS} dias`);
-  push(
-    'Dias esperando conta da coluna "Data Submissão". Para projeto submetido pelo app é quando a fila do líder abriu; ' +
-      'para LEGADO é a data da planilha (a fila nunca abriu para ele).',
-  );
-  push(
-    `"${SEM_PARECER}" = a coluna "Aprovação do Líder" está vazia: ninguém deu parecer. ` +
-      'A pré-aprovação entrou em produção em 06/08/2026 sem backfill, então os projetos antigos nascem sem estado.',
-  );
-  push('Só Status = "Pendente". "Reenvio Pendente", "Descontinuado", "Aprovado" e "Reprovado" ficam fora.');
-  push('');
-
-  // Tabela 1 — um líder por linha, o mais atrasado no topo (é a pergunta do pedido).
+  // UMA tabela só (pedido do Luis, 06/08 — a 1ª versão tinha 3 tabelas e 11 colunas:
+  // "está com muita informação"). Fica o essencial: quem é o líder, quantos projetos
+  // esperam ele e HÁ QUANTOS DIAS cada um espera.
   const porLider = new Map<string, LinhaFila[]>();
   for (const f of fila) porLider.set(f.liderEmail, [...(porLider.get(f.liderEmail) ?? []), f]);
 
-  const esperaMax = (itens: LinhaFila[]) =>
-    itens.reduce((max, i) => Math.max(max, i.proj.dias ?? 0), 0);
+  const diasOrdenados = (itens: LinhaFila[]) =>
+    itens.map((i) => i.proj.dias ?? 0).sort((a, b) => b - a);
+  const esperaMax = (itens: LinhaFila[]) => diasOrdenados(itens)[0] ?? 0;
   const acimaDoLimite = (itens: LinhaFila[]) =>
     itens.filter((i) => (i.proj.dias ?? 0) > LIMITE_DIAS).length;
 
@@ -170,87 +150,20 @@ async function main() {
       a[0].localeCompare(b[0], 'pt-BR'),
   );
 
-  push('LÍDERES COM PROJETOS ESPERANDO PRÉ-APROVAÇÃO');
+  const carimbo = AGORA.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   push(
-    'Líder',
-    'E-mail do líder',
-    'Cargo do líder',
-    'Projetos pendentes',
-    `Esperando mais de ${LIMITE_DIAS} dias`,
-    'Espera máxima (dias)',
-    'Espera média (dias)',
-    'Estado dos pendentes',
+    `Gerado em ${carimbo} (BRT) · "Dias pendentes" = dias desde a submissão de cada projeto que espera esse líder, ` +
+      'do mais antigo para o mais novo · só Status = "Pendente".',
   );
+  push('');
+  push('Líder', 'E-mail do líder', 'Projetos pendentes', 'Dias pendentes', 'Mais antigo (dias)');
   for (const [email, itens] of ranking) {
-    const porEstado = new Map<string, number>();
-    for (const i of itens) porEstado.set(i.proj.estado, (porEstado.get(i.proj.estado) ?? 0) + 1);
-    const media = Math.round(itens.reduce((s, i) => s + (i.proj.dias ?? 0), 0) / itens.length);
     push(
       itens[0].liderNome,
       email,
-      cargo(email),
       itens.length,
-      acimaDoLimite(itens),
+      diasOrdenados(itens).join(', '),
       esperaMax(itens),
-      media,
-      [...porEstado].map(([e, n]) => `${n}× ${e}`).join(' · '),
-    );
-  }
-
-  // Tabela 2 — o detalhe projeto a projeto, para o líder saber O QUE cobrar.
-  push('');
-  push('DETALHE — UM PROJETO POR LINHA (mais antigo primeiro)');
-  push(
-    'Líder',
-    'E-mail do líder',
-    'Autor',
-    'E-mail do autor',
-    'Projeto',
-    'ID do projeto',
-    'Data submissão',
-    'Dias esperando',
-    `Mais de ${LIMITE_DIAS} dias?`,
-    'Estado da pré-aprovação',
-    'Última escrita do sistema',
-  );
-  for (const f of [...fila].sort(
-    (a, b) =>
-      (b.proj.dias ?? 0) - (a.proj.dias ?? 0) ||
-      a.liderNome.localeCompare(b.liderNome, 'pt-BR') ||
-      a.proj.nome.localeCompare(b.proj.nome, 'pt-BR'),
-  )) {
-    push(
-      f.liderNome,
-      f.liderEmail,
-      nome(f.proj.autorEmail, f.proj.autorNome),
-      f.proj.autorEmail,
-      f.proj.nome,
-      f.proj.id,
-      f.proj.dataSubmissao,
-      f.proj.dias ?? '—',
-      (f.proj.dias ?? 0) > LIMITE_DIAS ? 'SIM' : '—',
-      f.proj.estado,
-      f.proj.atualizadoEm,
-    );
-  }
-
-  // Tabela 3 — pendente que NÃO está na fila de ninguém: sem isso o total da aba não
-  // fecha com os pendentes da planilha e parece que faltou gente.
-  push('');
-  push('PENDENTES QUE NÃO ESPERAM NENHUM LÍDER (ninguém deve parecer)');
-  push('Autor', 'E-mail', 'Cargo', 'Motivo', 'Projeto', 'ID do projeto', 'Dias desde a submissão');
-  for (const f of foraDaFila.sort(
-    (a, b) =>
-      a.motivo.localeCompare(b.motivo, 'pt-BR') || (b.proj.dias ?? 0) - (a.proj.dias ?? 0),
-  )) {
-    push(
-      nome(f.proj.autorEmail, f.proj.autorNome),
-      f.proj.autorEmail || '—',
-      cargo(f.proj.autorEmail),
-      f.motivo,
-      f.proj.nome,
-      f.proj.id,
-      f.proj.dias ?? '—',
     );
   }
 
