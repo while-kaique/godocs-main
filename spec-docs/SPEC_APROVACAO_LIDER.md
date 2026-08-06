@@ -339,9 +339,10 @@ cópia morando em dois repos. Com o texto pronto, mexer numa vírgula é deploy 
 **Decisões fechadas que NÃO podem ser "corrigidas" por engano:**
 
 - **O anúncio NÃO viaja no payload diário.** Endpoint próprio (`/api/godocs/anuncio`), chave
-  `godocs:anuncio:pre-aprovacao-lider:v1` **SEM data** → o Gomoon entrega **1× por pessoa,
-  para sempre**. Pendurado no snapshot diário, o anúncio viraria DM de anúncio **todo dia**.
-  Mexer na redação **não** reenvia nada; só um `v2` explícito reabre o disparo.
+  `godocs:anuncio:pre-aprovacao-lider:<versão>` **SEM data** → o Gomoon entrega **1× por
+  pessoa, para sempre**. Pendurado no snapshot diário, o anúncio viraria DM de anúncio **todo
+  dia**. Mexer na redação **não** reenvia nada; só **subir a versão** reabre o disparo — ver
+  **D22** (a versão em vigor é a **`v2`**; o `v1` foi queimado ainda em teste).
 - **`dry` é o DEFAULT do anúncio** (`anunciarPreAprovacao` e a rota): enviar exige
   `{"dry":false}`. É a única rota do repo em que um POST distraído fala com a empresa inteira.
 - **A audiência é resolvida pelo Gomoon** (`destinatarios: "todos"`) — quem já resolve
@@ -358,6 +359,46 @@ cópia morando em dois repos. Com o texto pronto, mexer numa vírgula é deploy 
   aberta desde 03/08; se um dia for avisado, cabe no mesmo payload diário).
 - **O Gomoon mantém o template dele como fallback** (se `mensagem` faltar) — é o que deixa os
   dois lados deployarem em qualquer ordem.
+
+---
+
+## 10. D22 — o markup é HTML de CARTÃO, não `*asterisco*` (06/08/2026)
+
+**O que aconteceu:** o 1º disparo real na staging chegou ao Google Chat com o markup **cru na
+tela** — `*Você tem projeto para pré-aprovar no GoDocs*`, asterisco e tudo. Não era falta de
+formatação nossa nem bug do Gomoon: **o contrato v2 (D21) não fixava a SUPERFÍCIE de entrega**,
+e cada lado assumiu uma.
+
+O Google Chat tem **duas sintaxes que não se conversam**, e o Gomoon entrega o nosso texto
+dentro de um **cartão** (`cardsV2` → `TextParagraph`):
+
+| Superfície | Negrito | Itálico | Quebra |
+|---|---|---|---|
+| mensagem de texto (campo `text`) | `*assim*` | `_assim_` | `\n` |
+| **cartão (`TextParagraph`) ← é o nosso caso** | `<b>assim</b>` | `<i>assim</i>` | `\n` ou `<br>` |
+
+**Decisões fechadas que NÃO podem ser "corrigidas" por engano:**
+
+- **A redação usa HTML de cartão** (`<b>`, `<i>`, `<u>`, `<s>`, `<a href>`) em `gomoon-mensagens.ts`.
+  ⚠️ **A sintaxe segue a superfície, não o gosto:** se um dia a entrega deixar de ser cartão, este
+  arquivo tem de voltar ao asterisco **no mesmo deploy** — senão a DM passa a exibir `<b>` literal.
+  Dois testes prendem isso (um por mensagem), e o contrato pede que o Gomoon **avise** se mudar.
+- **`\n` fica, `<br>` não.** O cartão do Gomoon preserva a quebra de linha — conferido no print do
+  disparo de 06/08. Trocar por `<br>` sem necessidade só acopla mais ao renderizador dele.
+- **O aviso ao líder NÃO traz título nem link na prosa.** O cartão já mostra o **cabeçalho**
+  ("📋 Pré-aprovação pendente") e o **botão "Abrir a fila"** — que sai do campo `lideres[].url`,
+  por isso ele **continua no payload**. Escrever os dois no texto fazia a mesma frase e o mesmo
+  link aparecerem **2× na mesma DM**. O **anúncio mantém o título**, porque lá o cabeçalho do
+  cartão é genérico ("GoDocs").
+- **`ANUNCIO_VERSAO` está em `v2`, e bump NÃO é número de build.** Cada versão nova **fala com a
+  empresa de novo**. O `v1` foi entregue ao **destinatário de teste** no 1º disparo de staging e,
+  como a chave não tem data, virou **no-op eterno** — o texto corrigido não tinha como ser
+  revalidado sem uma versão nova. Ninguém da empresa recebeu o `v1`; **`v2` é a versão que vai
+  para produção**. O valor está **pinado no teste de propósito**: subir obriga a editar o teste,
+  e é essa a fricção. Histórico das versões no comentário de `ANUNCIO_VERSAO`.
+- **Re-disparar o aviso diário no MESMO dia não reentrega** (`ja_entregues: 1`) — é o §4 do
+  contrato funcionando, não falha. Para revalidar texto no mesmo dia, o Gomoon precisa limpar a
+  chave `godocs:<email>:<YYYY-MM-DD>` do lado dele; senão, espera-se o disparo seguinte.
 
 ---
 

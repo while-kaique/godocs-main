@@ -4,7 +4,58 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 06/08 (última sessão) — D21: quem REDIGE as 2 DMs é o GoDocs (texto pronto no payload + anúncio com endpoint próprio)
+## ✅ 06/08 (última sessão) — D21 DEPLOYADA e DISPARADA na staging + D22: o markup era o de superfície errada
+
+**Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
+**executado**; sessão de execução direta por cima dele (nenhum plano novo). A feature inteira continua
+**travada para prod** até a validação com a diretoria.
+
+**O que motivou:** o João Victor avisou que o lado dele estava pronto, e o Luis pediu para disparar o teste
+na staging — o **anúncio global** e o **aviso individual por líder** — para ver como chegam.
+
+**Parte 1 — o disparo.** A D21 estava só na branch. Sequência: 1107 testes → `build` + `build:worker` →
+`updateApp` no **staging `edf400b4`** (branch já 0 commits atrás do `main`) → dry-run das 2 rotas → disparo
+real. Resultado: **202 nos dois, `falhas: []`** · aviso ao líder com 1 líder / 1 liderado / 1 projeto ·
+anúncio com `itens: 0` (normal — o Gomoon expande `destinatarios:"todos"` de forma assíncrona).
+
+**Parte 2 — o bug que o print revelou (D22).** A DM chegou com o markup **cru na tela**
+(`*Você tem projeto…*`). **Não era falta de formatação nossa nem bug dele:** o contrato v2 não fixava a
+**superfície de entrega**. O Google Chat tem 2 sintaxes que não se conversam — mensagem de texto usa
+`*negrito*`; **cartão (`cardsV2`/`TextParagraph`) usa `<b>`** — e o Gomoon entrega em cartão (o print mostra
+cabeçalho, moldura e botão "Abrir a fila").
+
+**O que ficou pronto** (commits `33e6049` + `31cccb3`, **1109 testes**, staging redeployada 12:10):
+
+| Peça | Mudança |
+|---|---|
+| `src/lib/gomoon-mensagens.ts` | markup → HTML de cartão (`<b>`/`<i>`) nas 2 mensagens |
+| idem | aviso ao líder perdeu a **linha de título** e a **do link** (o cartão já mostra as duas) |
+| idem | `ANUNCIO_VERSAO` `v1` → **`v2`** + histórico das versões no comentário |
+| `docs/integracao-gomoon-chat.md` §13 | tabela das 2 sintaxes + regra de não duplicar título/link |
+| `spec-docs/SPEC_APROVACAO_LIDER.md` §10 | **D22** com as decisões fechadas |
+| Testes | +2 guardas (asterisco não volta sem decisão; texto do líder sem título/link) |
+
+**Decisões da sessão (todas na spec, §10 = D22):**
+- **A sintaxe segue a SUPERFÍCIE, não o gosto** — se a entrega deixar de ser cartão, `gomoon-mensagens.ts`
+  volta ao asterisco **no mesmo deploy**, senão a DM exibe `<b>` literal. O contrato pede que ele avise.
+- **`\n` fica, `<br>` não** — o cartão dele preserva a quebra (conferido no print).
+- **O `url` continua no payload** mesmo saindo da prosa: é dele que o botão "Abrir a fila" sai.
+- **Bump de versão do anúncio NÃO é número de build** — cada um fala com a empresa de novo. O valor está
+  **pinado no teste de propósito**, para subir só por edição consciente.
+
+**Estado do teste, e o que depende do João Victor:**
+- **Anúncio:** o `v1` foi queimado ainda em teste (chave sem data → no-op eterno depois da 1ª entrega), por
+  isso subimos para **`v2`** e redisparamos — **202, `ja_entregues: 0`**, ou seja a DM saiu formatada. É a
+  `v2` que vai para produção; **ninguém da empresa recebeu o `v1`**.
+- **Aviso ao líder:** re-disparo no mesmo dia devolveu **`ja_entregues: 1`** — sem 2ª DM, e está **correto**
+  (§4 do contrato). Para ele ver o texto novo **hoje**, precisa limpar a chave
+  `godocs:lucas.queiroz@gocase.com:2026-08-06` do lado dele; senão o disparo de amanhã já sai formatado.
+
+⚠️ **Deployado só na STAGING.** Prod segue sem `GOMOON_TOKEN`, sem cron e sem a feature.
+
+---
+
+## ✅ 06/08 — D21: quem REDIGE as 2 DMs é o GoDocs (texto pronto no payload + anúncio com endpoint próprio)
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
 **executado**; esta sessão foi um pedido direto do Luis por cima dele (nenhum plano novo). A feature inteira
