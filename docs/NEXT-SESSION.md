@@ -4,7 +4,58 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🚨 06/08 (SESSÃO MAIS RECENTE) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu
+## ✅ 06/08 (SESSÃO MAIS RECENTE) — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
+
+**PRÓXIMO PASSO EXATO:** **mesclar o PR #235** (`/ggsd:ship`) — é a única coisa que impede prod de ser
+atropelada de novo. O Luis foi perguntado ao fim da sessão e ainda **não respondeu**; sem o merge, o
+próximo deploy de qualquer outra frente derruba a feature outra vez — agora com **36 filas abertas e 28
+líderes já avisados**, ou seja, o custo do atropelo subiu.
+
+**O que a sessão executou, os 4 passos, em produção** (o Luis pediu: *"fazer o disparo de retroativo e
+que toda submissão que cair faça a comunicação para a api do gomoon"*):
+
+| Passo | Resultado |
+|---|---|
+| 1. Prod restaurada (`674a3710`) | entry `index-CpHphllJ.js` — o MESMO da staging; `GET /api/aprovacoes/pendentes` voltou de **404** para 200 |
+| 2. Backfill (`/api/admin/aprovacoes/reabrir`) | **36 reabertos · 0 isentos · 0 ignorados · 28 líderes** |
+| 3. Aba "Relação Líder-Liderado" regravada | 78 linhas, batendo **exatamente** com o payload (36 projetos · 40 linhas · 28 líderes) |
+| 4. Disparo (`/api/admin/notificar-lideres {dry:false}`) | **202** · 28 líderes / 33 liderados / 40 projetos · **0 falhas** · entrega conferida no `GET ?email=` (`entregue` + `messageName`) |
+
+**A segunda metade do pedido — submissão nova avisa na hora — já está no ar** (D26, restaurada por este
+deploy) e foi validada em prod por **dry-run com `projetoId`**: chave **por projeto**
+(`godocs:<email>:<projetoId>`), só o líder daquele projeto, `ambiente: producao`. Como as chaves (dia ×
+projeto) são independentes, o líder que recebeu o retroativo hoje **recebe de novo** numa submissão nova.
+⚠️ **Segue sem prova ponta a ponta o wiring dentro do `submeterParaValidacao`** — só uma submissão real
+fecha isso; acompanhar a próxima pelo `GET ?email=` do Gomoon.
+
+**Ensaio antes de falar com 28 pessoas (o Luis pediu):** o payload REAL da Kelly (3 projetos, a forma com
+bullets) foi POSTado direto na API do Gomoon com o destinatário trocado para o Luis e **chave própria**
+(`…:ensaio-retroativo-20260806`, para não queimar a chave de ninguém). Entregue; ele aprovou a formatação
+(*"recebi a msg do gomoon, perfeito. Pode enviar assim pros retroativos"*).
+
+**Decisão registrada — a PLANILHA é a fonte da verdade do que está pendente** (resposta do Luis a uma
+pergunta direta dele nesta sessão). Vale saber que são **duas fontes em dois momentos**: quem **entra** na
+lista sai do Sheets (`readAllRows`, `Status == "pendente"` + régua D27/D20/TeamGuide), mas quem é
+**reaberto** e quem **recebe** a DM sai do **SQLite** (`getProjetoById` → `projeto_aprovacoes` →
+`getPendenciasPorLider`, que nunca lê a planilha). Elas só coincidem porque o backfill copia uma na outra.
+⚠️ E `"Pendente"` no Sheets **não** quer dizer "esperando o líder": pela regra TEMPORÁRIA o sync grava
+"Pendente" em tudo, então o filtro é, na prática, *"submetido e ainda não triado pela RPA"*.
+
+**2 achados do caminho — o 2º virou correção (commit `2c577ec`, 1112 testes):**
+1. **Caixa do id divergente entre as duas fontes:** `LEGADO-184`/`185` existem na planilha em MAIÚSCULAS e
+   no SQLite em minúsculas; o `reabrir` casa por igualdade e devolveu *"projeto não existe no SQLite"* —
+   **sem erro, o item só some da lista**. Corrigido na chamada (minúsculas); a divergência em si continua.
+2. **O `reabrir` NÃO filtra `[E2E-…]`** — o filtro do runtime mora em quem monta o payload da DM
+   (`getPendenciasPorLider` + o guard do aviso imediato). Sem cortar, o backfill abriria **pendência falsa
+   na fila do líder do harness**, e a aba de conferência listaria uma linha que o disparo não cobre. O
+   filtro entrou nos DOIS scripts (`ids-fila.ts` e `relatorio-sheet.ts`).
+
+<details><summary>🚨 06/08 (sessão anterior) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu (RESOLVIDO)</summary>
+
+⚠️ **Resolvido às ~14:08 pelo deploy acima.** O risco estrutural, porém, **continua vivo enquanto o PR #235
+não for mesclado** — foi exatamente assim que aconteceu.
+
+## 🚨 06/08 — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu
 
 **PRÓXIMO PASSO EXATO:** ⚠️ **aplicar o deploy em PROD (`674a3710`) para RESTAURAR a pré-aprovação** —
 o build está pronto e validado (merge do `origin/main` + D27, **1112 testes**, staging `edf400b4`
@@ -87,7 +138,9 @@ durante esta) — conferir se as duas abas de relatório na planilha de prod nã
 
 ---
 
-## ✅ 06/08 (sessão MAIS RECENTE) — aba "Aprovações Pendentes por Líder" na planilha de PROD
+</details>
+
+## ✅ 06/08 — aba "Aprovações Pendentes por Líder" na planilha de PROD
 
 **Plano ativo:** [`docs/plans/teamguide-lideranca-e-areas.md`](plans/teamguide-lideranca-e-areas.md) — segue
 **executado**. Esta sessão não mexeu em código de aplicação: é **ferramenta de gestão** (script de relatório),
