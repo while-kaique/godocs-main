@@ -31,6 +31,7 @@ const { buildLiderancaIndex, listarPessoasTeamGuide } = await import(
   '@/lib/areas/teamguide.server'
 );
 const { ehCargoDeLideranca } = await import('@/lib/cargo-lideranca');
+const { ehProjetoTesteE2E } = await import('@/lib/google/chat');
 
 const ABA = 'Relação Líder-Liderado';
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
@@ -74,6 +75,14 @@ async function main() {
   const foraDaFila: { proj: Projeto; motivo: string }[] = [];
 
   for (const p of pendentes) {
+    // Projeto do harness E2E nunca é pendência de ninguém. O runtime já o descarta
+    // (`getPendenciasPorLider` + o guard do aviso imediato), então sem este filtro a
+    // aba mostraria uma linha que o disparo real NÃO cobre — e ela é justamente a
+    // conferência de quem vai receber.
+    if (ehProjetoTesteE2E(p.nome)) {
+      foraDaFila.push({ proj: p, motivo: 'Projeto de teste E2E — nunca vira pendência' });
+      continue;
+    }
     // D27 — projeto ESPECIAL fica fora, antes de qualquer pergunta sobre a pessoa:
     // não tem memorial financeiro para o líder julgar (a 3ª pergunta do checklist
     // não teria o que avaliar) e o destino dele é a validação humana da RPA.

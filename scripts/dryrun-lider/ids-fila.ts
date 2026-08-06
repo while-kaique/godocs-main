@@ -24,6 +24,7 @@ const { buildLiderancaIndex, listarPessoasTeamGuide } = await import(
   '@/lib/areas/teamguide.server'
 );
 const { ehCargoDeLideranca } = await import('@/lib/cargo-lideranca');
+const { ehProjetoTesteE2E } = await import('@/lib/google/chat');
 
 const SAIDA = process.env.IDS_FILA_OUT || '';
 const txt = (v: unknown) => String(v ?? '').trim();
@@ -51,6 +52,13 @@ async function main() {
   for (const p of pendentes) {
     if (!p.id) {
       fora.push({ id: '(sem id)', nome: p.nome, motivo: 'linha sem ID Projeto' });
+      continue;
+    }
+    // O `reabrir` NÃO filtra `[E2E-…]` (o filtro do runtime mora em quem monta o
+    // payload da DM), então sem este corte o backfill abriria uma pendência FALSA na
+    // fila do líder do harness. Descoberto no retroativo de 06/08/2026.
+    if (ehProjetoTesteE2E(p.nome)) {
+      fora.push({ id: p.id, nome: p.nome, motivo: 'projeto de teste E2E' });
       continue;
     }
     if (p.especial) {
