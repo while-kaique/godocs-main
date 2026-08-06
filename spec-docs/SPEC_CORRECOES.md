@@ -6,6 +6,59 @@
 
 ---
 
+## 2026-08-06 — Coluna "Aprovação do Líder" nascia VAZIA nos novos submetidos + o re-sync APAGAVA o parecer
+
+**Status:** ✅ codada e testada (1118 verdes) · **Branch:** `fix/pre-pendente-sempre-e-traco` → `worktree-plano-aprovacao-lider-teamguide` · **PR:** #235
+
+**Sintoma.** Reportado pelo Luis: "os novos submetidos estão sendo submetidos com essa linha sem nenhum
+status" — a coluna **`Aprovação do Líder` (AE)** chegava **em branco** na planilha (nem `Pré-pendente`, nem
+`—`), e a **`Justificativa Aprovação do Lider` (AF)** também vinha **sem o `—`**.
+
+**Causa-raiz — duas, e só a 2ª é bug de código:**
+
+1. **A prod estava rodando um build SEM a feature.** Um deploy de outra frente subiu o `main` (que não tem
+   `aprovacoes.functions.ts`) por cima do deploy da D26 — `getApp(674a3710)` mostrava **version 227**,
+   `updatedAt 2026-08-06 16:24 UTC`, e `GET /api/aprovacoes/pendentes` devolvia **404**. Sem o código, o
+   `syncSubmitToGoogle` nunca recebia as 2 chaves → `orderValuesByHeaders` escrevia `''` → **célula em
+   branco**. Não era mapeamento de coluna: o cabeçalho real de prod tem `AE "Aprovação do Líder"` e
+   `AF "Justificativa Aprovação do Lider"`, **sem ambiguidade** (conferido nesta sessão). Restaurado no
+   **version 228** (`updatedAt 17:08 UTC` = 14:08 BRT) — daí em diante a célula nasce preenchida.
+   ⚠️ O `—` que aparece na AF das linhas de 03–05/08 **não** foi o sistema (a feature não estava no ar):
+   foi preenchimento manual da planilha. A última linha da janela (E2E de 14:07 BRT, 1 min antes do
+   restore) tem as **duas** células vazias — a assinatura exata do build sem feature.
+2. **`resyncGoogle` apagava o parecer do líder.** Ele chama `syncSubmitToGoogle` **sem** passar
+   `aprovacaoLider`/`justificativaAprovacaoLider`, e a linha fazia `ouTraco(p.aprovacaoLider)` sem condição
+   — `undefined` virava **`—`** e o `updateRowByProjectId` gravava isso **por cima do parecer que o líder já
+   tinha dado** (estado + assinatura + checklist + comentário). O re-sync é justamente a ferramenta de
+   RECUPERAÇÃO (linha morta por cota 429), então rodá-lo para salvar um projeto destruía a pré-aprovação
+   dele. A coluna é espelho da tabela interna `projeto_aprovacoes`; quem não conhece a fila não pode zerá-la.
+
+**Fix.**
+- **`undefined` ≠ `null` nessas 2 colunas** (`SubmitSyncParams`, `sync.ts`): `null` = "não se aplica" → grava
+  `—`; **`undefined` = "não sei, não encoste"** → a coluna é **omitida do update**. No **append** a omissão
+  não existe — a linha nasce agora e a célula tem de nascer com `—` (padrão "texto vazio → —"), inclusive no
+  **append de RECUPERAÇÃO** (foi o teste que pegou esse ramo: ele monta a linha a partir do `row` do modo
+  `edicao`, que já não trazia as chaves).
+- **`resyncGoogle` passa o estado REAL**, derivado de `getAprovacoesDoProjeto` pelas funções puras que já
+  existem (`rotuloAprovacaoSheet`/`justificativaAprovacaoSheet`). Sem fila → `undefined` (preserva a célula).
+  O re-sync **não reabre fila** — isso é `reabrirPreAprovacoes`.
+
+**Decisões do Luis (06/08/2026), tomadas neste fix:**
+- **`Pré-pendente` só quando a fila REALMENTE abre.** As D12/D20/D27 ficam de pé: autor coordenador+ →
+  `Pré-aprovado`; especial · sem líder · TeamGuide fora → `—`. Escrever `Pré-pendente` em toda linha faria a
+  coluna dizer "esperando o líder" em projeto que **nunca** aparece na fila de ninguém, e quebraria o
+  relatório de espera por líder. O que a planilha ganha é a garantia de **nunca ficar vazia**.
+- **Sem retroativo:** a condição vale **só para os novos submetidos**. Os projetos da janela sem-feature
+  (incluindo o "Hub de Importação"/Gustavo Castro, 13:41 BRT) **não** são regularizados por backfill.
+
+**Onde aterrissou.** `src/lib/google/sync.ts` (tipo + linha condicional + ramo de recuperação) ·
+`src/lib/chat.functions.ts` (`resyncGoogle` deriva da fila) · `tests/sync-aprovacao-lider-colunas.test.ts`
+(**novo**, 6 casos: append com fila · append sem estado · append `null` · edição regravando · **re-sync não
+toca** · recuperação nasce preenchida) · scripts de leitura pura `scripts/dryrun-lider/ultimas-linhas.ts` e
+`cabecalho-full.ts` (fora do `npm run test`).
+
+---
+
 ## 2026-08-05 — Parecer do líder chegava MUTILADO na planilha (coluna sem acento + justificativa resumida)
 
 **Status:** ✅ codada e testada (945 verdes) · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** pendente

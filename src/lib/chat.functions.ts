@@ -29,6 +29,7 @@ import {
   updateValidacaoEmailEnviado,
   insertAnalise,
   gravarVersaoProjeto,
+  getAprovacoesDoProjeto,
   parseJson,
 } from "@/integrations/db/client.server";
 import { runBackground } from "@/lib/background";
@@ -86,7 +87,11 @@ import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
-import { abrirPreAprovacao } from "@/lib/aprovacoes.functions";
+import {
+  abrirPreAprovacao,
+  justificativaAprovacaoSheet,
+  rotuloAprovacaoSheet,
+} from "@/lib/aprovacoes.functions";
 import { notificarLideresDoProjeto } from "@/lib/gomoon-lideres.functions";
 import { isAdmin } from "@/lib/auth.functions";
 import type {
@@ -3469,6 +3474,16 @@ export async function resyncGoogle(rawData: unknown) {
   const membros = parseJson<string[]>(projeto.membros) ?? [];
   const membrosPapeis = parseJson<Record<string, string>>(projeto.membros_papeis) ?? {};
 
+  // Pré-aprovação do líder: o re-sync NÃO reabre fila (isso é `reabrirPreAprovacoes`),
+  // então ele espelha o que a tabela INTERNA `projeto_aprovacoes` já diz — inclusive
+  // um parecer JÁ DADO. Sem fila (isento/legado) manda `undefined`: a coluna fica como
+  // está, em vez de virar "—" e apagar o estado que o submit gravou.
+  const filaLider = await getAprovacoesDoProjeto(projeto_id);
+  const aprovacaoLider = filaLider.length ? rotuloAprovacaoSheet(filaLider) : undefined;
+  const justificativaAprovacaoLider = filaLider.length
+    ? justificativaAprovacaoSheet(filaLider)
+    : undefined;
+
   // 1. UPDATE da linha (por ID) + alerta no Chat — TEMPORÁRIO: status sempre "Pendente".
   await syncSubmitToGoogle({
     projetoId: projeto_id,
@@ -3487,6 +3502,8 @@ export async function resyncGoogle(rawData: unknown) {
     alocacaoGanhos,
     justificativaCargaEscala,
     ganhoTotalMensal,
+    aprovacaoLider,
+    justificativaAprovacaoLider,
   });
 
   // 2. Complexidade/Observações/Status (o que o analisador já havia gravado).
