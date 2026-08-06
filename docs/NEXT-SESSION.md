@@ -18,9 +18,30 @@ os achados de doc do review: **D27** (especial não abre fila) e **D28** entrara
 `abrirPreAprovacao` do caminho quente foi **recusada com motivo registrado** (mover ela move o **append da
 planilha** junto — o ponto frágil que já purgou projeto; ver §11.6 da spec).
 
-**⛔ PRÓXIMO PASSO — o fix precisa ir ao AR:** o código está no PR #235/`main`, mas **prod ainda tem o 403**.
-Regra 13: **staging `edf400b4` primeiro** (⚠️ conferir o que está no ar lá antes — `updateApp` substitui a app
-inteira), abrir `/projeto/$id` como líder com pendência, e só então **prod `674a3710`**.
+**✅ DEPLOY FEITO (06/08, 18:00–18:05 UTC) — staging `edf400b4` e prod `674a3710` estão com a `main`.** Os 2
+apps e o repo ficaram sincronizados (era o pedido do Luis: *"deixe tudo sincronizado aí"*). Para isso, antes do
+deploy, **2 branches que estavam fora da `main` foram integradas** (PR **#237**): `fix/pre-pendente-sempre-e-traco`
+— que **já estava no ar** e o deploy da `main` teria apagado (5º atropelo da mesma natureza) — e
+`fix/erro-validacao-amigavel` (caso Josiely). Os 2 planos que só existiam como arquivo não-commitado na raiz
+entraram no PR **#238**, e a raiz foi fast-forwardada (estava 143 commits atrás).
+
+**Como a staging foi validada** (o edge **não** aceita header de identidade injetado — não dá para se passar por
+líder, então a validação é indireta): (1) `POST /api/chat/iniciar-submissao` com `ferramenta` de 248 chars
+devolveu **400 com a frase em PT-BR** nomeando "Ferramenta utilizada" — código que só existe no build novo (o
+mesmo POST em prod, ANTES do deploy, devolvia **500 com o ZodError cru**); (2) `/api/aprovacoes/pendentes` 200;
+(3) o `index.html` servido aponta para o MESMO entry do `dist/` local e o chunk `projeto._id` contém o selo novo.
+Depois do deploy de prod, os 3 checks passaram lá também.
+
+**Prova de que o caso do Estevão está resolvido, sem depender de tela:** `GET /api/aprovacoes/pendentes?como=estevao.vidal@gocase.com`
+(preview de admin, em PROD) devolve **exatamente 1 item — o projeto `323278fc…` "INVENTÁRIO ESTÚDIO GOGROUP"
+(autora Joyce Lima)**, o mesmo do print. Ter linha em `projeto_aprovacoes` é a **única** condição da porta nova
+(D28), então `/projeto/323278fc…` agora responde 200 para ele.
+
+**⛔ PRÓXIMO PASSO — a única coisa que falta é olho humano de LÍDER (2 coisas, 1 clique cada):** pedir ao
+**Estevão** (ou ao Lucas) para abrir o link do card outra vez e confirmar que a doc aparece — e, na mesma
+passada, **provar o wiring do aviso na submissão** (o único pedaço da D26 nunca exercitado ponta a ponta):
+acompanhar a próxima submissão real de um liderado e conferir no `GET` do endpoint do Gomoon (`?email=`) que a
+DM saiu. Nada disso é código pendente.
 
 <details><summary>Histórico: o que o ship barrou (resolvido acima)</summary>
 
