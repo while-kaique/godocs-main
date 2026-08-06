@@ -39,8 +39,8 @@ describe('renderMensagemLider — as três formas', () => {
     expect(t).toContain(
       'Oi, Lucas! <b>5 projetos</b> da sua equipe estão aguardando a sua pré-aprovação:',
     );
-    expect(t).toContain('• Bruno Lima: 3 projetos');
-    expect(t).toContain('• Ana Souza: 2 projetos');
+    expect(t).toContain('• Bruno Lima — 3 projetos');
+    expect(t).toContain('• Ana Souza — 2 projetos');
   });
 
   it('um liderado: nomeia a pessoa e NÃO abre lista de 1 item', () => {
@@ -66,8 +66,8 @@ describe('renderMensagemLider — as três formas', () => {
       ]),
       GERADO,
     );
-    expect(t).toContain('• Ana Souza: 1 projeto\n');
-    expect(t).toContain('• Bruno Lima: 2 projetos');
+    expect(t).toContain('• Ana Souza — 1 projeto\n');
+    expect(t).toContain('• Bruno Lima — 2 projetos');
   });
 
   it('líder sem nome no banco: saudação sem nome, nunca "Oi, null!"', () => {
@@ -82,11 +82,11 @@ describe('renderMensagemLider — as três formas', () => {
     expect(t).toContain('pode ignorar esta mensagem.</i>');
   });
 
-  it('⚠️ NÃO repete o que o card do Gomoon já mostra: título e link', () => {
-    // O card traz cabeçalho próprio ("📋 Pré-aprovação pendente") e o botão "Abrir a
-    // fila" (montado do campo `url` do payload). Redigir os dois aqui fazia a MESMA
-    // frase e o MESMO link aparecerem 2× na DM — foi o que o print do 1º disparo
-    // mostrou. O `url` continua no payload; só não vai na prosa.
+  it('traz o título e a linha do link — formato do modelo do Luis (06/08/2026)', () => {
+    // ⚠️ Sabendo do custo: o cartão do Gomoon já mostra cabeçalho próprio ("📋
+    // Pré-aprovação pendente") e o botão "Abrir a fila" (do campo `url`), então título
+    // e link aparecem 2× na DM. Ele foi avisado disso e manteve o formato dele. Este
+    // teste existe para a remoção voltar a ser DECISÃO, não regressão silenciosa.
     const t = renderMensagemLider(
       {
         nome: 'Lucas',
@@ -95,9 +95,8 @@ describe('renderMensagemLider — as três formas', () => {
       },
       GERADO,
     );
-    expect(t).not.toContain('http');
-    expect(t).not.toContain('👉');
-    expect(t).not.toMatch(/Você tem projeto para pré-aprovar/i);
+    expect(t.startsWith('<b>Você tem projeto para pré-aprovar no GoDocs</b> 📋')).toBe(true);
+    expect(t).toContain('👉 https://godocs-staging.devgogroup.com/aprovacoes');
   });
 
   it('⚠️ markup de CARD (<b>/<i>), nunca o *asterisco* de mensagem de texto', () => {
@@ -117,20 +116,6 @@ describe('renderMensagemLider — as três formas', () => {
     // `<br>` não: o card do Gomoon preserva o `\n` (conferido no disparo de 06/08).
     expect(t).not.toContain('<br');
     expect(t).toContain('\n');
-  });
-
-  it('⚠️ SEM travessão no texto entregue (pedido do Luis, 06/08/2026)', () => {
-    // Vale inclusive nos bullets: "• Ana: 2 projetos", nunca "• Ana — 2 projetos".
-    const t = renderMensagemLider(
-      lider([
-        { nome: 'Bruno Lima', projetos_pendentes: 3 },
-        { nome: 'Ana Souza', projetos_pendentes: 2 },
-      ]),
-      GERADO,
-    );
-    expect(t).not.toContain('—');
-    expect(t).not.toContain('–');
-    expect(t).toContain('• Ana Souza: 2 projetos');
   });
 
   it('⚠️ NENHUM valor em R$ atravessa a mensagem (§7.1)', () => {
@@ -184,14 +169,24 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toMatch(/você recebe/i);
   });
 
+  it('é o texto que o Luis colou — a versão CURTA, não o §10.1 longo', () => {
+    // Eu errei nos dois sentidos em 06/08: condensei o §10.1 e depois "restaurei" o
+    // longo. O que ele quer é este. Se estas frases sumirem, alguém reescreveu de novo.
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('• Você submete o projeto normalmente.');
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('A relação líder ↔ liderado vem do organograma');
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('Por que estamos fazendo isso');
+  });
+
   it('a isenção descrita é a D20 (coordenação para cima), sem citar supervisor', () => {
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('cargo de coordenação para cima');
     expect(TEXTO_ANUNCIO_PRE_APROVACAO.toLowerCase()).not.toContain('supervisor');
   });
 
-  it('não manda o líder a um menu que não existe — a entrada é a faixa da home', () => {
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('<b>Pré-aprovações do meu time</b>');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('GoDocs → Pré-aprovações');
+  it('⚠️ cita "GoDocs → Pré-aprovações", que NÃO existe no app — decisão dele', () => {
+    // A entrada real é a FAIXA "Pré-aprovações do meu time" na home; esse item de menu
+    // não existe. Ele foi avisado (06/08/2026) e manteve a redação. O teste fixa a
+    // divergência CONHECIDA para ela não ser confundida com engano de quem ler depois.
+    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('<b>GoDocs → Pré-aprovações</b>');
   });
 
   it('⚠️ markup de CARD também no anúncio — sem asterisco literal na tela', () => {
@@ -204,16 +199,6 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toContain('–');
   });
 
-  it('mantém as seções do texto ORIGINAL do Luis (§10.1), que eu tinha condensado', () => {
-    // Voltaram em 06/08/2026 a pedido dele: encurtar a comunicação da empresa não é
-    // decisão de redação minha.
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('<b>Por que estamos fazendo isso</b>');
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain(
-      '<b>De onde vem a relação de líder e liderado</b>',
-    );
-    expect(TEXTO_ANUNCIO_PRE_APROVACAO).toContain('organograma da TeamGuide');
-  });
-
   it('não deixou placeholder de redação para trás', () => {
     expect(TEXTO_ANUNCIO_PRE_APROVACAO).not.toMatch(/<[A-ZÀ-Ú ]+>|\{\{|TODO/);
   });
@@ -222,7 +207,7 @@ describe('TEXTO_ANUNCIO_PRE_APROVACAO — o que ele PROMETE tem de existir no ap
     // ⚠️ Pin DE PROPÓSITO: subir a versão faz o Gomoon reentregar o anúncio para a
     // empresa inteira, então tem de ser uma edição consciente — e não carona num
     // commit que só mexeu na redação. `v1` e `v2` foram queimados ainda em teste (ver
-    // o histórico em ANUNCIO_VERSAO); `v3` é a versão que vai para produção.
-    expect(ANUNCIO_CHAVE).toBe('godocs:anuncio:pre-aprovacao-lider:v3');
+    // o histórico em ANUNCIO_VERSAO); `v4` é a versão que vai para produção.
+    expect(ANUNCIO_CHAVE).toBe('godocs:anuncio:pre-aprovacao-lider:v4');
   });
 });

@@ -121,13 +121,13 @@ describe('montarPayloadLideresPendentes — formato do contrato (§3)', () => {
     // Saudação pelo PRIMEIRO nome, total somado por nós e a MESMA ordem dos bullets.
     expect(texto).toContain('Oi, Lucas!');
     expect(texto).toContain('<b>5 projetos</b> da sua equipe');
-    expect(texto.indexOf('• Bruno Lima: 3 projetos')).toBeLessThan(
-      texto.indexOf('• Ana Souza: 2 projetos'),
+    expect(texto.indexOf('• Bruno Lima — 3 projetos')).toBeLessThan(
+      texto.indexOf('• Ana Souza — 2 projetos'),
     );
-    // ⚠️ O link NÃO vai no texto: o card do Gomoon monta o botão "Abrir a fila" a
-    // partir do campo `url` do item. Repetir a URL na prosa duplicava o link na DM —
-    // mas o campo tem de continuar existindo, senão o botão fica sem destino.
-    expect(texto).not.toContain(p.lideres[0].url);
+    // O link vai na prosa (formato do Luis) E no campo `url`, de onde o Gomoon monta o
+    // botão "Abrir a fila" — aparece 2× na DM, e é decisão dele (06/08/2026). O campo
+    // tem de existir de qualquer jeito, senão o botão fica sem destino.
+    expect(texto).toContain(`👉 ${p.lideres[0].url}`);
     expect(p.lideres[0].url).toBe(`${OPTS.appUrl}/aprovacoes`);
   });
 
@@ -366,7 +366,7 @@ describe('anunciarPreAprovacao — o disparo único', () => {
   it('a chave de idempotência é SEM DATA (entrega 1× por pessoa, para sempre — §13)', () => {
     const p = montarPayloadAnuncio({ ambiente: 'producao', geradoEm: '2026-08-06T12:00:00.000Z' });
     expect(p.anuncio.idempotency_key).toBe(ANUNCIO_CHAVE);
-    expect(p.anuncio.idempotency_key).toBe('godocs:anuncio:pre-aprovacao-lider:v3');
+    expect(p.anuncio.idempotency_key).toBe('godocs:anuncio:pre-aprovacao-lider:v4');
     // Se um YYYY-MM-DD vazar para cá, o anúncio vira aviso diário e a empresa recebe
     // o mesmo texto todo dia.
     expect(p.anuncio.idempotency_key).not.toMatch(/\d{4}-\d{2}-\d{2}/);

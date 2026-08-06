@@ -436,21 +436,20 @@ cópia morando em dois repos — com o texto pronto, mexer numa vírgula é depl
   Não escapar o HTML, não reformatar. `[texto](url)` **não** renderiza em nenhuma das duas.
   ⚠️ **Se um dia a entrega deixar de ser cartão, avise** — `src/lib/gomoon-mensagens.ts`
   tem de voltar ao asterisco no mesmo deploy, senão a DM vira `<b>` visível.
-- ⚠️ **O aviso ao líder NÃO traz título nem link na prosa** (desde 06/08/2026): quem mostra
-  o título é o **cabeçalho do cartão** ("📋 Pré-aprovação pendente") e quem leva à fila é o
-  **botão "Abrir a fila"**, montado do campo `lideres[].url` — que segue no payload por
-  isso. Escrever os dois no texto fazia a mesma frase e o mesmo link aparecerem **2× na
-  mesma DM**. O **anúncio**, ao contrário, mantém o título dentro do texto, porque lá o
-  cabeçalho do cartão é genérico ("GoDocs").
+- ⚠️ **O aviso ao líder TRAZ título e link na prosa** (decisão do Luis, 06/08/2026, contra
+  a minha recomendação): o cartão já mostra cabeçalho ("📋 Pré-aprovação pendente") e o
+  botão "Abrir a fila" (do campo `lideres[].url`), então **título e link aparecem 2× na
+  mesma DM**. Ele foi avisado e manteve o formato do §10.2. **Se der para o Gomoon suprimir
+  o cabeçalho do cartão quando vem `mensagem.texto`, a duplicação some sem mexer no texto**
+  — vale perguntar ao João Victor.
 - **Não prefixar nem sufixar mais nada** (saudação, assinatura, rodapé): o texto já tem
   abertura e fechamento, e o acréscimo sai duplicado. _(O prefixo
   `[STAGING — destinatário real: …]` é exceção combinada e só vale com `ambiente:"staging"`
   — em produção não pode aparecer.)_
-- **Sem travessão (`—`) no texto entregue** (pedido do Luis, 06/08/2026). Régua **nossa**,
-  de redação: vale nas duas mensagens e inclusive nos bullets (`• Ana: 2 projetos`, não
-  `• Ana — 2 projetos`). Nada muda do lado do Gomoon; fica registrado aqui porque o
-  template de fallback dele usa travessão e, se um dia ele entrar em cena, a DM sairá
-  fora do padrão. Teste que segura: `tests/gomoon-mensagens.test.ts`.
+- **Sem travessão (`—`) no ANÚNCIO** (pedido do Luis, 06/08/2026). Régua **nossa**, de
+  redação, e só sobre a prosa do anúncio. ⚠️ **Os bullets do aviso ao líder mantêm o
+  travessão** (`• Ana — 2 projetos`): é o formato do modelo dele no §10.2. Teste que
+  segura as duas redações: `tests/gomoon-mensagens.test.ts`.
 
 Nosso lado: **`src/lib/gomoon-mensagens.ts`** (módulo PURO, fonte única das duas redações) →
 `renderMensagemLider()` é chamada dentro de `montarPayloadLideresPendentes`, **depois** de
@@ -475,7 +474,7 @@ Authorization: Bearer <GOMOON_TOKEN>
   "ambiente": "producao",
   "gerado_em": "2026-08-06T12:00:00Z",
   "anuncio": {
-    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v3",
+    "idempotency_key": "godocs:anuncio:pre-aprovacao-lider:v4",
     "destinatarios": "todos",
     "mensagem": { "texto": "<b>Novidade no GoDocs…</b> 🚀\n\n…" }
   }
@@ -485,11 +484,11 @@ Authorization: Bearer <GOMOON_TOKEN>
 - **`idempotency_key` SEM data** → entregar **uma vez por pessoa, para sempre**. POST
   repetido é no-op (`ja_entregue`), nunca segunda DM. É a diferença de regra em relação ao
   diário. Subir a **versão** no fim da chave é o único jeito de reabrir o disparo.
-  ⚠️ **A versão em vigor é a `v3`** (06/08/2026). As duas anteriores morreram queimadas
+  ⚠️ **A versão em vigor é a `v4`** (06/08/2026). As três anteriores morreram queimadas
   **em teste**, sempre pelo mesmo motivo (chave sem data = no-op eterno depois do 1º
-  disparo de staging): o `v1` chegou com asterisco literal na tela, o `v2` corrigiu o
-  markup, e o `v3` traz a redação de volta ao texto original do §10.1 e tira os
-  travessões. Nenhuma pessoa da empresa recebeu `v1` nem `v2`.
+  disparo de staging): `v1` chegou com asterisco literal na tela, `v2` corrigiu o markup,
+  `v3` foi uma "restauração" errada do texto longo, e **`v4` é o texto que o Luis colou**.
+  Nenhuma pessoa da empresa recebeu nenhuma das três.
   Ninguém da empresa recebeu o `v1`.
 - ⚠️ **`ambiente: "staging"` tem de ser honrado aqui também**, com o mesmo roteamento para o
   destinatário de teste. Sem isso, um teste nosso vira DM para a **empresa inteira** — risco
