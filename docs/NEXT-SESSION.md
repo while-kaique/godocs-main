@@ -4,7 +4,55 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 06/08 (SESSÃO MAIS RECENTE) — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
+## 🧭 06/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO: dispensar a fila do líder quando o analisador reprova
+
+**Nenhum código alterado nesta sessão** (sessão de plano — Gate D armado o tempo todo). O que aconteceu:
+
+**1. Pergunta de origem (do chefe do Luis):** *por que a pré-aprovação usa "Pré-*" numa coluna separada em vez
+de entrar na coluna `Status` normal?* Resposta registrada: são **dois eixos independentes** (a RPA decide o
+`Status`; o líder dá um parecer **não vinculante**), e o caso NORMAL é `Pré-aprovado` + `Pendente` ao mesmo
+tempo — uma coluna só exigiria rótulos compostos. Somam-se 3 razões mecânicas: as duas escritas se
+atropelariam (o sync grava `Status` em toda submissão; o reenvio apagaria o parecer), a pré-aprovação **não é
+portão** (D3) e o disparo de e-mails segmenta lendo `Status` do Sheets. ⚠️ Ponto que provavelmente motivou a
+pergunta e vale dizer a ele: **hoje o `Status` grava "Pendente" em tudo** (regra TEMPORÁRIA), então na
+planilha ele parece inútil e o `Pré-status` parece o único com informação.
+
+**2. O Luis contra-argumentou** que faria sentido uma coluna só, *"pois o RPA não iria aprovar um status de um
+projeto com o pré-pendente"*. Isso está **certo — mas muda o PROCESSO, não a coluna**: uma coluna só é coerente
+se o líder for **bloqueante** (estados mutuamente exclusivos), o oposto da D3. A saída oferecida, que entrega o
+que ele quer sem fusão: a política vira **filtro na fila de triagem** (`Status = Pendente` **E**
+`Pré-status = Pré-aprovado`), preservando o relatório de espera por líder.
+
+**3. Achado real no caminho:** o líder é convocado **ANTES de existir veredito** — `abrirPreAprovacao` + o POST
+ao Gomoon rodam no fim de `submeterParaValidacao`, e o analisador só é disparado depois, pelo worker
+(`src/worker.ts:325-331`). Logo, projeto que o analisador **reprova** (`claro_nao` → `Status` "Reprovado")
+continua na fila do líder e volta no backlog das DMs seguintes.
+
+**4. Medição em prod antes de codar** (595 linhas da planilha; 32 projetos com parecer): **0** com
+`Status = Reprovado`, **0** com `claro_nao` na fila, **18/32 (56%) sem `Classificação` nenhuma**, 9
+`zona_cinzenta`, 5 `claro_sim`. Conclusões: o desperdício é **estrutural, não corrente**; e o **gate
+sequencial foi DESCARTADO** (seria inerte em 56% dos casos e acoplaria a submissão ao pipeline mais instável).
+⚠️ Os **56% sem `Classificação`** são um achado colateral **maior** e ficaram FORA desta fatia — o cron
+`reanalisar-pendentes` repõe Complexidade/Observações, **não** a Classificação.
+
+**5. Plano aprovado:** [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)
+(T1–T9). Worktree e branch **já criados**: `.claude/worktrees/dispensa-fila-lider`, branch
+`fix/dispensa-fila-lider-reprovado`, a partir de `origin/main` `df4b20c` (com `node_modules` linkado e `.env`
+copiado). ⚠️ **Risco nº 1 a não esquecer na implementação:** o fall-through de `rotuloAprovacaoSheet` devolve
+`Pré-reprovado` para qualquer veredito fora de `pendente`/`aprovado`/`ajuste` — sem o tratamento explícito, a
+planilha afirmaria que **o líder reprovou** um projeto que ele nunca abriu.
+
+**6. Fora do plano, já FEITO em produção:** `bruno.bezerra@gocase.com` e `luiza.rios@gocase.com` foram
+adicionados à tabela `admins` de prod (`POST /api/admin/admins`); `lucas.queiroz@gocase.com` já estava lá desde
+22/06. Os 8 admins agora estão na tabela — antes Bruno e Luiza dependiam **só** do secret `ADMIN_EMAILS`, cujo
+valor o Godeploy não deixa ler (por isso não era possível confirmar o acesso deles sem isso).
+
+**Próximo passo:** rodar **`/ggsd:code`** e implementar T1–T8 no worktree, parando antes do deploy.
+
+<details>
+<summary>Sessão anterior (06/08) — o disparo retroativo saiu: prod restaurada e 28 líderes avisados</summary>
+
+## ✅ 06/08 — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
 
 **✅ DECIDIDO E FEITO (06/08, decisão do Luis: _"vamos corrigir esses detalhes e fazer o merge"_):** o 403
 do líder foi **CORRIGIDO** antes do merge — o Estevão Vidal reportou o bug do lado do usuário no mesmo dia
@@ -126,6 +174,8 @@ lista sai do Sheets (`readAllRows`, `Status == "pendente"` + régua D27/D20/Team
    (`getPendenciasPorLider` + o guard do aviso imediato). Sem cortar, o backfill abriria **pendência falsa
    na fila do líder do harness**, e a aba de conferência listaria uma linha que o disparo não cobre. O
    filtro entrou nos DOIS scripts (`ids-fila.ts` e `relatorio-sheet.ts`).
+
+</details>
 
 <details><summary>🚨 06/08 (sessão anterior) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu (RESOLVIDO)</summary>
 
@@ -1346,7 +1396,20 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **executado** (código na branch `worktree-plano-aprovacao-lider-teamguide`, 2026-08-03)
+**→ [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)** · Status: ✅ **aprovado** (Luis, 2026-08-06)
+
+> **Dispensar a fila do líder quando o analisador reprova o projeto** (`claro_nao` → `Status` "Reprovado"):
+> as linhas **pendentes** viram `'dispensado'` (`decidido_por='sistema'`), o projeto sai do backlog das DMs do
+> Gomoon / do relatório de espera / da tela `/aprovacoes`, e a coluna passa a dizer **`Dispensado`** — nunca
+> `Pré-reprovado`, que afirmaria falsamente que o líder reprovou. ⚠️ O **gate sequencial** ("analisar antes de
+> convocar") foi **DESCARTADO** com medição em prod: **0** casos de `claro_nao` com fila aberta e **18 de 32**
+> projetos da fila **sem classificação nenhuma** (analisador cancelado) — o gate seria inerte em 56% dos casos
+> e acoplaria a submissão à parte mais instável do pipeline.
+
+<details>
+<summary>Plano anterior (executado) — F0+F1+F2 da pré-aprovação do líder</summary>
+
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **executado e EM PRODUÇÃO (06/08)**
 
 > **F0 + F1 + F2** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`, D1–**D12**):
 > índice de liderança da TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em
@@ -1362,6 +1425,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > continua sendo a MESMA validação humana pendente, agora com a tela nova.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
+
+</details>
 
 ### ⏭️ ANTES da F0 — entrega conjunta das 2 frentes fechadas (decisão do Luis, 2026-08-03)
 Duas frentes estão **prontas e não entregues**, e vão **juntas** (deploy de staging substitui a app INTEIRA —
