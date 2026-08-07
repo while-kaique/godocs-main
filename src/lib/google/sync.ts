@@ -162,6 +162,16 @@ export type UpdateSyncParams = {
   classificacao?: string | null;
   classificacaoJustificativa?: string | null;
   motivoReprovacao?: string | null;
+  // Pré-aprovação do líder (D29): quando a análise REPROVA por critério, ela dispensa a
+  // fila e reflete "Dispensado" + a justificativa do sistema no MESMO update que grava
+  // Status/Classificação — senão a planilha seguiria dizendo "Pré-pendente" para um
+  // projeto já recusado, e o relatório de espera por líder contaria um projeto morto.
+  //
+  // ⚠️ Mesma régua do `syncSubmitToGoogle`: `undefined` = "não sei, não encoste" e a
+  // coluna é OMITIDA — a análise que NÃO dispensou (o caso comum) não pode zerar o
+  // parecer que o líder já deu. `null` = "não se aplica" → "—" (padronizarLinha).
+  aprovacaoLider?: string | null;
+  justificativaAprovacaoLider?: string | null;
 };
 
 // ─── Split carga real × escala (derivação das colunas do Sheets) ────────────
@@ -544,6 +554,14 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
         // Vazio/null → "—" (padronizarLinha): limpa o motivo quando o projeto deixa
         // de ser reprovado num reenvio.
         cells['Motivo Reprovado'] = p.motivoReprovacao ?? '';
+      }
+      // Colunas do líder: só quando o chamador SABE o estado da fila (D29). Ver o
+      // comentário de `UpdateSyncParams` — `undefined` preserva a célula.
+      if (p.aprovacaoLider !== undefined) {
+        cells['Aprovação do Líder'] = p.aprovacaoLider ?? '';
+      }
+      if (p.justificativaAprovacaoLider !== undefined) {
+        cells['Justificativa Aprovação do Líder'] = p.justificativaAprovacaoLider ?? '';
       }
       await updateRowByProjectId(p.projetoId, padronizarLinha(cells));
     } catch (sheetsErr) {

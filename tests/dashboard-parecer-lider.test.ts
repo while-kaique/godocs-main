@@ -225,12 +225,47 @@ describe('coluna "Pré-status" da tabela (mapResumo)', () => {
     expect(mapResumo({ 'ID Projeto': 'x' } as never)?.aprovacaoLider).toBeNull();
   });
 
+  // D29 — fila DISPENSADA pelo sistema (o analisador reprovou o projeto por critério).
+  // Entra no harness de ida-e-volta, e não como literal solto, porque a garantia
+  // declarada é que mexer no formato do produtor QUEBRA teste em vez de degradar a
+  // tela calado: sem isto, renomear o rótulo em `rotuloAprovacaoSheet` faria o chip do
+  // /dashboard cair em `sem_parecer` sem nada ficar vermelho.
+  it('desmonta uma fila dispensada sem inventar assinatura de gente', () => {
+    const dispensada = linha({
+      veredito: 'dispensado',
+      comentario: 'O projeto foi reprovado pela análise automática de critério.',
+      decidido_por: 'sistema',
+      resp_move_kpi: null,
+      resp_sente_falta: null,
+      resp_saving_coerente: null,
+    });
+    const p = interpretarParecerLider(comoNaPlanilha([dispensada]));
+
+    expect(p.estadoChave).toBe('dispensado');
+    // Ninguém decidiu: não há assinatura nem checklist, e nada é descartado.
+    expect(p.assinatura).toBeNull();
+    expect(p.checklist).toEqual([]);
+    expect(p.cabecalho).toContain('sistema');
+    expect(p.outras.join(' ')).toMatch(/reabert/i);
+    expect([p.cabecalho, ...p.outras].join(' ')).not.toContain('Ana Lima');
+  });
+
+  it('parecer humano na fila vence a dispensa, ida e volta', () => {
+    const p = interpretarParecerLider(
+      comoNaPlanilha([linha({ veredito: 'dispensado', decidido_por: 'sistema' }), linha()]),
+    );
+
+    expect(p.estadoChave).toBe('aprovado');
+    expect(p.assinatura).toBe('Ana Lima (ana@gocase.com)');
+  });
+
   it('o chip da tabela usa a MESMA régua de estado do painel da ficha', () => {
     expect(chaveDoEstado('Pré-aprovado')).toBe('aprovado');
     expect(chaveDoEstado('Pre-aprovado')).toBe('aprovado'); // digitado sem acento na planilha
     expect(chaveDoEstado('Ajuste pedido')).toBe('ajuste');
     expect(chaveDoEstado('Pré-pendente')).toBe('pendente');
     expect(chaveDoEstado('Pré-reprovado')).toBe('reprovado');
+    expect(chaveDoEstado('Dispensado')).toBe('dispensado');
     expect(chaveDoEstado('Em conversa com o gestor')).toBe('sem_parecer');
     expect(chaveDoEstado(null)).toBe('sem_parecer');
   });

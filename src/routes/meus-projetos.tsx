@@ -8,6 +8,7 @@ import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
+import type { Veredito } from "@/lib/aprovacoes.functions";
 import {
   FileText,
   PencilLine,
@@ -24,6 +25,7 @@ import {
   CheckCircle2,
   MessageSquareWarning,
   ShieldCheck,
+  CircleSlash,
 } from "lucide-react";
 
 // Itens por página em cada filtro de "Meus Projetos".
@@ -94,8 +96,11 @@ type Projeto = {
   motivo_reenvio: string | null;
   // Pré-aprovação do líder (TeamGuide). null = não se aplica (o autor é liderança ou
   // não tem líder). Informativa: a validação da equipe RPA corre em paralelo.
+  // ⚠️ `veredito` vem da FONTE ÚNICA `Veredito` — esta era a 3ª cópia da união e já
+  // estava velha por 2 desfechos ('ajuste', 'dispensado'). `import type` é apagado no
+  // build, então nada de server-side entra no bundle do cliente.
   aprovacao: {
-    veredito: "pendente" | "aprovado" | "reprovado";
+    veredito: Veredito;
     aprovadores: string[];
     comentario: string | null;
   } | null;
@@ -849,6 +854,18 @@ function MeusProjetosPage() {
                                   >
                                     <MessageSquareWarning className="h-3.5 w-3.5" />
                                     Ajuste pedido pelo líder
+                                  </span>
+                                ) : p.aprovacao.veredito === "dispensado" ? (
+                                  // D29 — a fila foi fechada pelo sistema (o analisador
+                                  // reprovou por critério). Sem este ramo o card cairia no
+                                  // "Aguardando o líder", dizendo ao autor que alguém ainda
+                                  // vai opinar sobre um projeto já recusado.
+                                  <span
+                                    className="inline-flex items-center gap-1 font-semibold"
+                                    style={{ color: "#64748b" }}
+                                  >
+                                    <CircleSlash className="h-3.5 w-3.5" />
+                                    Pré-aprovação dispensada
                                   </span>
                                 ) : (
                                   <span

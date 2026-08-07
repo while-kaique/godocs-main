@@ -89,6 +89,7 @@ import { stripMarkdown } from "@/lib/strip-markdown";
 import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
 import {
   abrirPreAprovacao,
+  dispensarPreAprovacao,
   justificativaAprovacaoSheet,
   rotuloAprovacaoSheet,
 } from "@/lib/aprovacoes.functions";
@@ -2781,6 +2782,26 @@ export async function analisarProjetoFn(rawData: unknown) {
     `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`,
   );
 
+  // ── Dispensa da fila do líder (D29) ──
+  // O líder é convocado no fim da submissão, ANTES de existir veredito do analisador
+  // (que roda depois, em background). Quando o veredito é reprovar por critério, o
+  // parecer dele deixou de fazer sentido: fecha a fila e reflete nas 2 colunas.
+  // Nunca lança (D3) e o `undefined` de saída preserva a célula quando não dispensou —
+  // inclusive no caso do líder que decidiu ANTES da análise chegar.
+  let aprovacaoLiderSheet: string | undefined;
+  let justificativaAprovacaoLiderSheet: string | undefined;
+  if (reprovadoPorCriterio) {
+    try {
+      const dispensa = await dispensarPreAprovacao(projeto_id);
+      if (dispensa.dispensou) {
+        aprovacaoLiderSheet = dispensa.rotuloSheet;
+        justificativaAprovacaoLiderSheet = dispensa.justificativaSheet;
+      }
+    } catch (e) {
+      console.error("[analisarProjeto] falha ao dispensar a fila do líder (não-fatal):", e);
+    }
+  }
+
   // ── Sync Google (planilha + chat) — fire-and-forget ──
   {
     const projeto = await getProjetoById(projeto_id);
@@ -2811,6 +2832,9 @@ export async function analisarProjetoFn(rawData: unknown) {
       classificacao: resultado.classificacao_avaliacao ?? null,
       classificacaoJustificativa: resultado.classificacao_justificativa ?? null,
       motivoReprovacao: resultado.motivo_reprovacao ?? null,
+      // D29 — só definidas quando a fila foi realmente dispensada.
+      aprovacaoLider: aprovacaoLiderSheet,
+      justificativaAprovacaoLider: justificativaAprovacaoLiderSheet,
     });
   }
 

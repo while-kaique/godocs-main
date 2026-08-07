@@ -1,6 +1,16 @@
 # Plano — Dispensar a fila do líder quando o analisador reprova o projeto
 
-**Status:** ✅ aprovado (Luis, 2026-08-06)
+**Status:** ✅ **executado** (2026-08-06) — T1–T8 entregues, **1155 testes verdes**, `worker.js` rebuildado,
+spec **D29** + `CLAUDE.md` atualizados. **Falta a T9** (staging `edf400b4` → prod `674a3710` → PR).
+
+> **Entregue além das Tarefas (autorizado pelo operador na sessão):** o mesmo fall-through que o "Risco nº 1"
+> descreve existia em **mais duas telas** — o card do autor (`meus-projetos.tsx`, dizia *"Aguardando o líder"*)
+> e o selo do aprovador (`projeto.$id.tsx`, dizia *"✓ Parecer registrado"* a quem nunca abriu o projeto). As 3
+> superfícies foram tratadas. A união `Veredito` estava **copiada em 3 arquivos** e velha desde 04/08 (faltava
+> `'ajuste'`): unificada — fechou 2 dos 7 erros de `tsc` pré-existentes do repo.
+>
+> **Adiado com motivo (ADR-028):** extrair `Veredito` para um módulo PURO (padrão `coluna-chave.ts`). Hoje o
+> `import type` é apagado no build (bundle conferido, limpo); o risco é um refactor futuro perder o `type`.
 
 **Objetivo:** quando o analisador classifica um projeto como `claro_nao` (→ `Status` = "Reprovado"), as linhas
 **pendentes** da fila de pré-aprovação daquele projeto são **dispensadas** — o líder para de ser cobrado de um

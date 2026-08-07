@@ -19,6 +19,7 @@ import {
   resumoAprovacaoPorProjeto,
   acessoDeAprovador,
   type ResumoAprovacao,
+  type Veredito,
 } from '@/lib/aprovacoes.functions';
 
 export type MeuProjetoItem = {
@@ -68,8 +69,11 @@ export type MeuProjetoItem = {
   // Pré-aprovação do líder (TeamGuide). `null` quando não se aplica: o autor É
   // liderança (isento) ou não tem líder. NÃO é portão de nada — a triagem da RPA
   // roda em paralelo. Ver spec-docs/SPEC_APROVACAO_LIDER.md.
+  // ⚠️ `veredito` sai da FONTE ÚNICA `Veredito` (aprovacoes.functions.ts) — redigitar a
+  // união aqui já deixou o tipo velho por 2 desfechos ('ajuste' em 04/08, 'dispensado'
+  // em 06/08), porque nada obriga os dois lados a andarem juntos.
   aprovacao: {
-    veredito: 'pendente' | 'aprovado' | 'reprovado';
+    veredito: Veredito;
     aprovadores: string[];
     comentario: string | null;
   } | null;
