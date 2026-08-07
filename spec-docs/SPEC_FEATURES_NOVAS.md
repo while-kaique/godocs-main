@@ -843,3 +843,51 @@ interpretação, e as simulações anti-loop).
 
 **Escopo v1.** Só a fase de receita e só com itens de custo evitado presentes. A ordem
 inversa (receita declarada primeiro, custo evitado depois) fica de fora.
+
+---
+
+## Feature adicional — Ferramenta EDITÁVEL na Etapa 1 da edição (07/08/2026)
+
+**Pedido (Luis, 07/08/2026):** "na etapa 1 de edição dos projetos, quero que permita editar
+a ferramenta utilizada por um projeto, pois atualmente só dá pra editar os participantes.
+Dessa forma a pessoa vai poder editar uma mudança como Vercel → GoDeploy (mudou o ambiente
+de hospedagem)."
+
+**⚠️ Isto REVOGA em parte o refinamento R2 de 17/07/2026**
+(`docs/plans/edicao-etapa1-participantes.md`), que tinha jogado **escopo + status +
+ferramenta** para o card "🔒 Dados do projeto · somente leitura". Continuam read-only o
+**escopo** (interna/externa) e o **status de produção**; **só a ferramenta saiu do card**.
+Não "consertar" devolvendo a ferramenta ao card — é decisão do dono do produto.
+
+**Por que escopo e status seguem fixos:** trocar o escopo muda a regra financeira (custo
+externo entra/sai do saving líquido) e o status é a premissa nº 1 do formulário (só entra
+projeto em produção). A ferramenta não altera cálculo nenhum — é descrição da stack, e a
+stack de um projeto vivo muda de verdade.
+
+**O que mudou**
+- `src/lib/submeter/step1.tsx` — o campo virou o bloco compartilhado `blocoFerramenta`,
+  usado nos DOIS modos (submissão nova inalterada). Na edição ele aparece entre a
+  identidade e os participantes, com uma linha de ajuda ("Trocou de ferramenta desde a
+  submissão? Atualize aqui"). O card read-only ficou com Escopo + Status.
+- **Legado com ferramenta fora da lista** ("Power Automate", "VBA"…): o `<select>` injeta o
+  valor atual como opção. Sem isso ele abriria VAZIO na edição e a pessoa acharia que o
+  dado sumiu.
+- `src/lib/submeter/constants.ts` (`validarEtapa1`) — a ferramenta **segue opcional na
+  edição** (legado pode não tê-la, RF-103), mas escolher **"Outros" sem escrever o nome**
+  passa a bloquear nos DOIS modos: gravaria a string literal "Outros" na planilha.
+- `src/lib/chat.functions.ts` (`atualizarMetadados`) — schema aceita e persiste
+  **`servico_externo`**. No escopo EXTERNO o mesmo campo é o nome do serviço contratado, e
+  ele tem coluna própria que alimenta o prompt do orquestrador ("solução EXTERNA contratada
+  (X)"); sem isso, editar o serviço atualizava só `ferramenta` e o **agente seguia citando o
+  nome antigo**. O `escopo` em si continua **não** editável (por isso não entrou no schema).
+- `src/routes/submeter.tsx` — helper `servicoExternoEnviado()` e o campo adicionado nos **6**
+  payloads de `atualizar-metadados`.
+
+**Encanamento que já existia (nada novo):** a Etapa 1 → 3 sempre passa por
+`handleContinuarAgente`, que detecta `metaChanged` (o `ferramenta` já estava no
+`snapshotMeta`) e persiste via `atualizar-metadados`; a IDA para o Sheets grava a coluna
+**"Ferramenta"** a partir de `projetos.ferramenta`, e o sync reverso a tem em
+`SAFE_UPDATE_FIELDS`.
+
+**Testes:** `tests/validacao-etapa1.test.ts` — troca de ferramenta na edição não gera erro;
+"Outros" sem nome bloqueia nos 2 modos; escopo externo fora dessa regra.

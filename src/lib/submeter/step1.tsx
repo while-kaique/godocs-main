@@ -15,9 +15,10 @@ export function Step1({
   updateField: <K extends keyof FormData>(key: K, value: FormData[K]) => void;
   setError: (key: string, msg: string) => void;
   clearError: (key: string) => void;
-  // Edição: os dados do projeto (escopo/status/ferramenta) viram REFERÊNCIA read-only;
-  // só participantes/papéis (e o toggle "em equipe") permanecem editáveis. A submissão
-  // NOVA não passa esta prop → formulário completo editável, comportamento inalterado.
+  // Edição: escopo e status viram REFERÊNCIA read-only; ferramenta/serviço externo e
+  // participantes/papéis (com o toggle "em equipe") permanecem editáveis — a stack de um
+  // projeto muda de verdade depois de submetido. A submissão NOVA não passa esta prop →
+  // formulário completo editável, comportamento inalterado.
   readOnlyProjeto?: boolean;
 }) {
   const isExterno = form.escopo === "externo";
@@ -128,6 +129,76 @@ export function Step1({
     </FormGroup>
   );
 
+  // Bloco da ferramenta / serviço externo — EDITÁVEL nos dois modos. Na edição, a
+  // stack de um projeto muda de verdade (ex.: hospedagem Vercel → GoDeploy) e a pessoa
+  // precisa corrigir sem abrir chamado; o ESCOPO (interna/externa) segue fixo, porque
+  // trocá-lo muda a regra financeira (custo externo) — por isso só o campo do escopo
+  // vigente aparece aqui.
+  const blocoFerramenta = (
+    <FormGroup>
+      {isExterno ? (
+        <>
+          <FormLabel required>Serviço Externo Contrato</FormLabel>
+          {readOnlyProjeto && (
+            <p className="mb-1.5 text-[11px] leading-relaxed" style={{ color: "#8b8b9a" }}>
+              Trocou de serviço desde a submissão? Atualize aqui.
+            </p>
+          )}
+          <FormInput
+            type="text"
+            placeholder="Ex: Zapier, Make, HubSpot, Salesforce..."
+            maxLength={200} /* = `servico_externo` no schema */
+            value={form.servicoExterno}
+            onChange={(e) => updateField("servicoExterno", e.currentTarget.value)}
+            error={errors.servicoExterno}
+          />
+        </>
+      ) : (
+        <>
+          <FormLabel required>Ferramenta Utilizada</FormLabel>
+          {readOnlyProjeto && (
+            <p className="mb-1.5 text-[11px] leading-relaxed" style={{ color: "#8b8b9a" }}>
+              Trocou de ferramenta desde a submissão? Atualize aqui (ex.: Vercel → Claude + GoDeploy).
+            </p>
+          )}
+          <FormSelect
+            value={form.ferramenta}
+            onChange={(e) => updateField("ferramenta", e.currentTarget.value)}
+            error={errors.ferramenta}
+          >
+            <option value="">Selecione a ferramenta</option>
+            {/* Legado importado da planilha pode trazer uma ferramenta FORA da lista
+                ("Power Automate", "VBA"…). Sem esta opção o select abriria vazio na
+                edição e a pessoa acharia que o dado sumiu — o valor atual sempre aparece. */}
+            {form.ferramenta &&
+              !(FERRAMENTAS as readonly string[]).includes(form.ferramenta) && (
+              <option value={form.ferramenta}>{form.ferramenta}</option>
+            )}
+            {FERRAMENTAS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </FormSelect>
+          {form.ferramenta === "Outros" && (
+            <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
+              <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
+                ✏️ Especifique a ferramenta:
+              </label>
+              <FormInput
+                placeholder="Nome da ferramenta..."
+                /* 192 = 200 do schema (`ferramenta`) − os 8 chars do prefixo
+                   "Outros: " que o submeter concatena. Sem esta trava o backend
+                   devolvia erro de validação depois de tudo preenchido. */
+                maxLength={192}
+                value={form.ferramentaOutra}
+                onChange={(e) => updateField("ferramentaOutra", e.currentTarget.value)}
+                error={errors.ferramentaOutra}
+                className="!border-[rgba(215,219,0,0.35)] focus:!border-[#b8a600] focus:!shadow-[0_0_0_3px_rgba(215,219,0,0.08)]"
+              />
+            </div>
+          )}
+        </>
+      )}
+    </FormGroup>
+  );
+
   // Bloco de participantes + papéis — EDITÁVEL nos dois modos (é o foco da edição).
   const blocoParticipantes = (
     <FormGroup>
@@ -175,14 +246,10 @@ export function Step1({
           : form.prodStatus === "idle"
             ? "Pronto, sem uso"
             : "—";
-    const ferramentaLabel = isExterno
-      ? (form.servicoExterno || "—")
-      : form.ferramenta === "Outros"
-        ? (form.ferramentaOutra || "Outros")
-        : (form.ferramenta || "—");
+    // A ferramenta SAIU desta lista (virou campo editável abaixo) — só escopo e status
+    // continuam fixos na edição.
     const linhasProjeto = [
       { rotulo: "Escopo", valor: escopoLabel },
-      { rotulo: isExterno ? "Serviço externo" : "Ferramenta", valor: ferramentaLabel },
       { rotulo: "Status", valor: statusLabel },
     ];
 
@@ -211,11 +278,13 @@ export function Step1({
             ))}
           </dl>
           <p className="mt-3 text-[11px] leading-relaxed" style={{ color: "#8b8b9a" }}>
-            Na edição, estes dados ficam fixos. Aqui você ajusta os participantes e seus papéis.
+            Na edição, estes dados ficam fixos. Abaixo você ajusta a ferramenta, os
+            participantes e seus papéis.
           </p>
         </div>
 
         {blocoIdentidade}
+        {blocoFerramenta}
         {blocoParticipantes}
       </div>
     );
@@ -339,51 +408,7 @@ export function Step1({
               texto (não só cor), respeitando a11y. */}
           {blocoIdentidade}
 
-          <FormGroup>
-            {isExterno ? (
-                <>
-                  <FormLabel required>Serviço Externo Contrato</FormLabel>
-                  <FormInput
-                    type="text"
-                    placeholder="Ex: Zapier, Make, HubSpot, Salesforce..."
-                    maxLength={200} /* = `servico_externo` no schema */
-                    value={form.servicoExterno}
-                    onChange={(e) => updateField("servicoExterno", e.currentTarget.value)}
-                    error={errors.servicoExterno}
-                  />
-                </>
-              ) : (
-                <>
-                  <FormLabel required>Ferramenta Utilizada</FormLabel>
-                  <FormSelect
-                    value={form.ferramenta}
-                    onChange={(e) => updateField("ferramenta", e.currentTarget.value)}
-                    error={errors.ferramenta}
-                  >
-                    <option value="">Selecione a ferramenta</option>
-                    {FERRAMENTAS.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </FormSelect>
-                  {form.ferramenta === "Outros" && (
-                    <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
-                      <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
-                        ✏️ Especifique a ferramenta:
-                      </label>
-                      <FormInput
-                        placeholder="Nome da ferramenta..."
-                        /* 192 = 200 do schema (`ferramenta`) − os 8 chars do prefixo
-                           "Outros: " que o submeter concatena. Sem esta trava o backend
-                           devolvia erro de validação depois de tudo preenchido. */
-                        maxLength={192}
-                        value={form.ferramentaOutra}
-                        onChange={(e) => updateField("ferramentaOutra", e.currentTarget.value)}
-                        error={errors.ferramentaOutra}
-                        className="!border-[rgba(215,219,0,0.35)] focus:!border-[#b8a600] focus:!shadow-[0_0_0_3px_rgba(215,219,0,0.08)]"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-          </FormGroup>
+          {blocoFerramenta}
 
           {blocoParticipantes}
         </div>

@@ -4,7 +4,34 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🧭 06/08 (SESSÃO MAIS RECENTE) — CÓDIGO: a fila do líder é DISPENSADA quando o analisador reprova
+## 🟡 07/08 (SESSÃO MAIS RECENTE) — Ferramenta EDITÁVEL na Etapa 1 da edição — CODADA, falta STAGING
+
+**Pedido do Luis (07/08):** na edição, só dava pra mexer em participantes; ele quer poder trocar a
+**ferramenta utilizada** (caso real: **Vercel → GoDeploy**, mudou o ambiente de hospedagem).
+
+**Feito** (branch `feat/editar-ferramenta-na-edicao`, worktree `.claude/worktrees/editar-ferramenta`,
+commit `e678bf0`):
+- `step1.tsx` — campo virou o bloco compartilhado `blocoFerramenta` (mesmo componente nos 2 modos); na
+  edição fica entre identidade e participantes, com linha de ajuda. O card "🔒 somente leitura" ficou
+  **só com Escopo + Status** — ⚠️ **isto revoga em parte o R2 de 17/07** (emenda registrada no topo de
+  `docs/plans/edicao-etapa1-participantes.md`); escopo (regra financeira) e status (premissa nº 1) seguem
+  fixos **de propósito**.
+- **Legado com ferramenta fora da lista** ("Power Automate"): o `<select>` injeta o valor atual como opção
+  — senão abriria VAZIO e pareceria perda de dado.
+- `validarEtapa1` — ferramenta segue opcional na edição (RF-103), mas **"Outros" sem o nome bloqueia nos 2
+  modos** (gravava a string literal "Outros").
+- `atualizarMetadados` aceita/persiste **`servico_externo`** (escopo externo: o campo É o nome do serviço e
+  tem coluna própria que alimenta o prompt do orquestrador — sem isso o agente citaria o nome antigo).
+  `escopo` continua **NÃO** editável. Helper `servicoExternoEnviado()` nos **6** payloads do `submeter.tsx`.
+- **1141 testes verdes**, `build` + `build:worker` ok (worker.js commitado), typecheck sem erro novo
+  (os 7 são pré-existentes no `main`). Spec: `SPEC_FEATURES_NOVAS.md` (seção 07/08/2026).
+
+**Falta (nesta ordem):** (1) **deploy na STAGING `edf400b4`** (regra 13) e validação no navegador — abrir
+`/editar/<id>`, trocar a ferramenta, avançar até a Etapa 3, reenviar e conferir a coluna **"Ferramenta"** na
+aba `STAGING`; testar também um **legado** (select tem de mostrar o valor atual) e um projeto de **escopo
+externo**; (2) `git fetch origin` + merge do `main` (regra 10) e rebuild; (3) **PR** + prod.
+
+## 🧭 06/08 (anterior) — CÓDIGO: a fila do líder é DISPENSADA quando o analisador reprova
 
 **Plano ativo:** [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md) —
 **Status: ✅ executado**. Worktree `.claude/worktrees/dispensa-fila-lider`, branch

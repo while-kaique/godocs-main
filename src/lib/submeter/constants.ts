@@ -143,10 +143,14 @@ export function validarEtapa1(
         errs.servicoExterno = "Informe o nome do serviço externo";
     } else {
       if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
-      if (form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
-        errs.ferramentaOutra = "Especifique a ferramenta utilizada";
     }
   }
+
+  // A ferramenta É editável na edição (a stack muda: ex. Vercel → GoDeploy), mas segue
+  // sem ser obrigatória num legado que nunca a teve. O que vale nos DOIS modos: escolher
+  // "Outros" sem escrever o nome gravaria a string "Outros" — sempre exigimos o nome.
+  if (form.escopo !== "externo" && form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
+    errs.ferramentaOutra = "Especifique a ferramenta utilizada";
 
   // Participantes e papéis — exigidos SEMPRE quando "em equipe = sim" (nova e edição).
   if (!form.emEquipe) errs.emEquipe = "Selecione uma opção";

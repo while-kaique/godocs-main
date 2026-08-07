@@ -1128,6 +1128,14 @@ export function SubmeterPageContent({
         : form.ferramenta;
   }, [form.escopo, form.servicoExterno, form.ferramenta, form.ferramentaOutra]);
 
+  // Escopo EXTERNO: o nome do serviço vira a "ferramenta" do projeto E tem coluna própria
+  // no banco (`servico_externo`, que o orquestrador lê). Como a ferramenta é editável
+  // também na edição, os dois precisam viajar juntos em `atualizar-metadados` — senão o
+  // agente seguiria citando o serviço antigo. Escopo interno → não manda (undefined).
+  const servicoExternoEnviado = useCallback((): string | undefined => {
+    return form.escopo === "externo" ? form.servicoExterno.trim() : undefined;
+  }, [form.escopo, form.servicoExterno]);
+
   const snapshotMeta = useCallback((): AgentMeta => ({
     nomeProjeto: form.nomeProjeto.trim(),
     ferramenta: computeFerramenta(),
@@ -1510,6 +1518,7 @@ export function SubmeterPageContent({
           projeto_id: projetoId,
           nome_projeto: form.nomeProjeto.trim(),
           ferramenta: ferramentaEnviada,
+          servico_externo: servicoExternoEnviado(),
           membros: form.participantes,
           membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           data_criacao: form.dataCriacao,
@@ -1547,6 +1556,7 @@ export function SubmeterPageContent({
           projeto_id: existenteId,
           nome_projeto: form.nomeProjeto.trim(),
           ferramenta: ferramentaEnviada,
+          servico_externo: servicoExternoEnviado(),
           membros: form.participantes,
           membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
           data_criacao: form.dataCriacao,
@@ -1653,6 +1663,7 @@ export function SubmeterPageContent({
           projeto_id: projetoId,
           nome_projeto: meta.nomeProjeto,
           ferramenta: meta.ferramenta,
+          servico_externo: servicoExternoEnviado(),
           membros: meta.participantes,
           membros_papeis: meta.participantesPapeis,
           data_criacao: meta.dataCriacao,
@@ -1742,6 +1753,7 @@ export function SubmeterPageContent({
               projeto_id: projetoId,
               nome_projeto: meta.nomeProjeto,
               ferramenta: meta.ferramenta,
+              servico_externo: servicoExternoEnviado(),
               membros: meta.participantes,
           membros_papeis: meta.participantesPapeis,
               data_criacao: meta.dataCriacao,
@@ -1815,6 +1827,7 @@ export function SubmeterPageContent({
             projeto_id: projetoId,
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
+            servico_externo: servicoExternoEnviado(),
             membros: meta.participantes,
           membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
@@ -1914,6 +1927,7 @@ export function SubmeterPageContent({
             projeto_id: projetoId,
             nome_projeto: meta.nomeProjeto,
             ferramenta: meta.ferramenta,
+            servico_externo: servicoExternoEnviado(),
             membros: meta.participantes,
           membros_papeis: meta.participantesPapeis,
             data_criacao: meta.dataCriacao,
