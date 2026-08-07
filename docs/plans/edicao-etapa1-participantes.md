@@ -3,6 +3,13 @@
 (commits `ee9d3ed`, `e2b0e05`; staging `edf400b4` @15:20). T4 = limitação registrada. Falta só a validação no
 navegador (Luis) + o pré-req das colunas, e então prod. T5 em curso.
 
+## ⚠️ Emenda ao R2 (2026-08-07) — a FERRAMENTA voltou a ser editável
+Pedido do Luis: na edição, a pessoa precisa poder trocar a ferramenta (ex.: **Vercel → GoDeploy**, mudança de
+ambiente de hospedagem). O R2 abaixo mandou ferramenta/serviço externo para o card read-only junto com escopo e
+status — **só a ferramenta saiu de lá**. Escopo (regra financeira) e status de produção (premissa nº 1 do form)
+continuam read-only. Detalhe e onde aterrissou: `spec-docs/SPEC_FEATURES_NOVAS.md` — "Ferramenta EDITÁVEL na
+Etapa 1 da edição (07/08/2026)".
+
 ## Refinamento pós-validação em staging (2026-07-17) — APROVADO (Luis, via seletor)
 Ao validar a staging, o Luis pediu dois ajustes (decisões registradas por `AskUserQuestion`):
 - **R1 — Landing na Etapa 1:** a edição deve **abrir na Etapa 1** (Envio), e não aterrissar na Etapa 2 (revoga
