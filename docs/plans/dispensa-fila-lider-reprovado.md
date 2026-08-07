@@ -1,7 +1,13 @@
 # Plano — Dispensar a fila do líder quando o analisador reprova o projeto
 
-**Status:** ✅ **executado** (2026-08-06) — T1–T8 entregues, **1155 testes verdes**, `worker.js` rebuildado,
-spec **D29** + `CLAUDE.md` atualizados. **Falta a T9** (staging `edf400b4` → prod `674a3710` → PR).
+**Status:** ✅ **concluído — EM PRODUÇÃO** (T1–T8 em 2026-08-06; **T9 em 2026-08-07**). T1–T8: **1155 testes
+verdes**, `worker.js` rebuildado, spec **D29** + `CLAUDE.md` atualizados. **T9:** deploy **CONJUNTO** com a
+ferramenta editável da Etapa 1 (o `updateApp` substitui a app inteira, então as duas frentes tinham de ir
+juntas) — staging `edf400b4` **13:00 UTC** → prod `674a3710` **13:47 UTC**, **1161 testes verdes**, PR **#242**.
+⚠️ A validação foi **estrutural, não funcional**: o `E2E_COOKIE` expirou (302 → login nos 2 apps), então o
+build foi provado por `getApp` (`worker.js` byte-a-byte o local; `index.html` servido apontando para o mesmo
+entry do `dist/`) e o runtime **não** foi exercitado. Como a medição do plano achou **0** casos de `claro_nao`
+em prod, a dispensa só se observa quando o analisador reprovar o primeiro projeto de verdade.
 
 > **Entregue além das Tarefas (autorizado pelo operador na sessão):** o mesmo fall-through que o "Risco nº 1"
 > descreve existia em **mais duas telas** — o card do autor (`meus-projetos.tsx`, dizia *"Aguardando o líder"*)

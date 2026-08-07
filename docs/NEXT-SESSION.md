@@ -4,7 +4,64 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🟡 07/08 (SESSÃO MAIS RECENTE) — Ferramenta EDITÁVEL na Etapa 1 da edição — CODADA, falta STAGING
+## ✅ 07/08 (SESSÃO MAIS RECENTE) — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
+
+**Pedido do Luis:** *"fazer o deploy dos ajustes que fizemos e sincronizar repo local, github, deixar tudo
+sincronizado"*. Havia **duas** frentes prontas e **nenhuma** no ar: a dispensa da fila do líder (06/08, faltava
+a T9 = deploy) e a ferramenta editável (07/08, faltava a staging). Como o `updateApp` **substitui a app
+inteira**, as duas foram no MESMO deploy — decisão dele na abertura da sessão ("staging → prod nas duas").
+
+**Integração:** as 2 branches nasciam do MESMO `origin/main` (`df4b20c`), então **não havia regra 10 a
+cumprir** — nada de `main` novo a incorporar. Branch `chore/deploy-dispensa-e-ferramenta` (merge `a3b0a90`):
+conflito só em `ROADMAP.md` + `docs/NEXT-SESSION.md` (resolvidos **UNINDO os dois lados**, regra 7) e em
+`worker.js` (resolvido pelo **rebuild**, não à mão). O `src/lib/chat.functions.ts`, tocado pelas duas,
+**auto-mergeou** — regiões distintas (`servico_externo` no schema do `atualizarMetadados` × a dispensa em
+`analisarProjetoFn`). **1161 testes verdes** (1155 + 6, somam sem colidir), `worker.js` rebuildado =
+**993.081 bytes**.
+
+**Deploys:** staging `edf400b4` **13:00 UTC** (version 127) → prod `674a3710` **13:47 UTC** (vinha da version
+229 de 06/08 18:04). PR **#242**.
+
+### ⚠️ A validação foi ESTRUTURAL, não funcional — o `E2E_COOKIE` expirou
+O `E2E_COOKIE` do `.env` está **vencido**: `GET /api/auth/me` devolve **302** para
+`devgogroup.com/auth/login` nos **dois** apps. Sem ele não há checagem por HTTP nem harness E2E. O que ficou
+**provado** pelo caminho do `getApp` (que é o que o próprio handoff manda usar — *"diagnostique por `getApp`,
+nunca pela tela"*): o `worker.js` no ar tem **993.081 bytes, byte-a-byte** o local; o `index.html` servido
+aponta para `/assets/index-c-ahOAKR.js`, o MESMO entry do `dist/` local — e **o hash do Vite _é_ o
+conteúdo**, então hash igual = build igual; e os chunks novos estão no `assetManifest`. O que **não** foi
+provado: qualquer comportamento em runtime.
+
+### ✅ De propósito, antes de tocar prod: provei que prod era EXATAMENTE a `main`
+Este repo já foi atropelado **5×** pelo mesmo acidente (deploy da `main` apagando o que estava no ar). A
+prova, em 2 comandos: `getAppFile /index.html` em prod dava `index-Dgj_1Kpn.js`, e `npm run build` na `main`
+(`df4b20c`) produziu o MESMO hash — nada fora da `main` estava no ar, o deploy não perdeu nada. **Vale
+repetir esta checagem a cada deploy.**
+
+### 🧰 Nota de ferramenta: o gate de plano barra edições feitas de dentro de `.claude/worktrees/`
+O `plan-gate.sh` allowlista `docs/**` calculando o caminho **relativo ao `CLAUDE_PROJECT_DIR`**. Quando a
+sessão roda na RAIZ e o worktree fica em `.claude/worktrees/<x>/`, o `docs/NEXT-SESSION.md` do worktree vira
+`.claude/worktrees/<x>/docs/...` — **não casa o allowlist** e cai no bloqueio, mesmo sendo doc. Por isso este
+handoff foi escrito **pela raiz** (branch `docs/handoff-deploy-07-08` a partir da branch de integração), que é
+o padrão das branches `docs/handoff-*` deste repo. Não é bug do gate nem se contorna com Bash: é o custo de
+rodar a sessão na raiz com o worktree aninhado.
+
+### 🟢 Próximo passo — o que depende de humano
+1. **Renovar o `E2E_COOKIE`** no `.env` (bloqueia o harness E2E inteiro, não só esta validação).
+2. **O Luis validar no navegador** a ferramenta editável: `/editar/<id>` → trocar a ferramenta → avançar até
+   a Etapa 3 → reenviar → conferir a coluna **"Ferramenta"**; testar também um **legado** (o `<select>` tem
+   de mostrar o valor atual, fora da lista) e um projeto de **escopo externo** (`servico_externo`).
+3. **A dispensa da fila (D29) só se observa quando o analisador reprovar** alguém de verdade — a medição do
+   plano achou **0** casos de `claro_nao` em prod, então não há o que olhar hoje: é esperar o primeiro.
+4. Seguem de pé: 🟡 as **2 confirmações de líder** (Estevão/Lucas reabrirem "Ler a documentação completa"; e
+   acompanhar a próxima submissão real para provar o wiring do aviso do Gomoon) · o **backfill dos 35**
+   (SUSPENSO pela decisão "só com os novos submetidos") · as 3 perguntas ao João Victor · 🆕 o pedido do
+   Lucas (**"Alguém já fazia?"** no card da fila, começar por `/ggsd:plan`) · e os **56%** da fila sem
+   `Classificação` (achado colateral, fatia própria).
+
+<details>
+<summary>Sessão de 07/08 (mais cedo) — a ferramenta editável, quando ainda faltava o deploy</summary>
+
+## 🟡 07/08 — Ferramenta EDITÁVEL na Etapa 1 da edição — CODADA, falta STAGING
 
 **Pedido do Luis (07/08):** na edição, só dava pra mexer em participantes; ele quer poder trocar a
 **ferramenta utilizada** (caso real: **Vercel → GoDeploy**, mudou o ambiente de hospedagem).
@@ -30,6 +87,9 @@ commit `e678bf0`):
 `/editar/<id>`, trocar a ferramenta, avançar até a Etapa 3, reenviar e conferir a coluna **"Ferramenta"** na
 aba `STAGING`; testar também um **legado** (select tem de mostrar o valor atual) e um projeto de **escopo
 externo**; (2) `git fetch origin` + merge do `main` (regra 10) e rebuild; (3) **PR** + prod.
+_(1 e 2 feitos na sessão seguinte, no deploy conjunto acima; 3 = PR #242.)_
+
+</details>
 
 ## 🧭 06/08 (anterior) — CÓDIGO: a fila do líder é DISPENSADA quando o analisador reprova
 
@@ -1588,7 +1648,13 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)** · Status: ✅ **aprovado** (Luis, 2026-08-06)
+**Nenhum plano ativo** — o último (dispensa da fila do líder) está **concluído e em produção** (07/08, PR #242).
+O próximo a planejar é o **pedido do Lucas**: mostrar o "Alguém já fazia?" no card da fila (`/ggsd:plan`).
+
+<details>
+<summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>
+
+**→ [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)** · Status: ✅ **concluído e EM PRODUÇÃO** (07/08, PR #242)
 
 > **Dispensar a fila do líder quando o analisador reprova o projeto** (`claro_nao` → `Status` "Reprovado"):
 > as linhas **pendentes** viram `'dispensado'` (`decidido_por='sistema'`), o projeto sai do backlog das DMs do
@@ -1597,6 +1663,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > convocar") foi **DESCARTADO** com medição em prod: **0** casos de `claro_nao` com fila aberta e **18 de 32**
 > projetos da fila **sem classificação nenhuma** (analisador cancelado) — o gate seria inerte em 56% dos casos
 > e acoplaria a submissão à parte mais instável do pipeline.
+
+</details>
 
 <details>
 <summary>Plano anterior (executado) — F0+F1+F2 da pré-aprovação do líder</summary>
