@@ -32,7 +32,16 @@ import { valorDaColuna } from '@/lib/coluna-chave';
 export const COLUNA_ESTADO_LIDER = 'Aprovação do Líder';
 export const COLUNA_JUSTIFICATIVA_LIDER = 'Justificativa Aprovação do Líder';
 
-export type EstadoParecer = 'aprovado' | 'ajuste' | 'reprovado' | 'pendente' | 'sem_parecer';
+// 'dispensado' (D29) NÃO é um veredito: é a fila fechada pelo sistema porque o
+// analisador reprovou o projeto por critério. Fica separado de 'reprovado' de propósito —
+// dizer "Pré-reprovado" seria afirmar que o líder recusou algo que ele nunca abriu.
+export type EstadoParecer =
+  | 'aprovado'
+  | 'ajuste'
+  | 'reprovado'
+  | 'pendente'
+  | 'dispensado'
+  | 'sem_parecer';
 
 export type ItemParecer = { pergunta: string; resposta: RespostaChecklist };
 
@@ -84,6 +93,7 @@ export function chaveDoEstado(estado: string | null): EstadoParecer {
   if (k === 'ajuste pedido') return 'ajuste';
   if (k === 'pre-reprovado' || k === 'pre reprovado') return 'reprovado';
   if (k === 'pre-pendente' || k === 'pre pendente') return 'pendente';
+  if (k === 'dispensado') return 'dispensado';
   return 'sem_parecer';
 }
 

@@ -7,7 +7,15 @@ import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
-import { Loader2, FileText, PencilLine, Eye, Stamp, CheckCheck } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  PencilLine,
+  Eye,
+  Stamp,
+  CheckCheck,
+  CircleSlash,
+} from "lucide-react";
 
 const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
@@ -100,6 +108,11 @@ function ProjetoReadOnlyPage() {
   // O parecer dele ainda falta? A fila é resolvida pelo PRIMEIRO líder que decide (D4),
   // então "pendente" aqui significa que ninguém decidiu — inclusive ele.
   const parecerPendente = ehAprovador && (p?.aprovacao?.veredito ?? "pendente") === "pendente";
+  // D29 — a fila pode ter sido DISPENSADA pelo sistema (o analisador reprovou o projeto
+  // por critério). A linha continua dando leitura ao líder (D28), então ele chega aqui;
+  // sem este caso, o `else` do selo afirmaria "Parecer registrado" sobre um parecer que
+  // ele nunca deu. É a mesma afirmação falsa que a coluna do Sheets evita.
+  const parecerDispensado = ehAprovador && p?.aprovacao?.veredito === "dispensado";
 
   // Cada memorial guarda o tipo (saving/receita) para o acento certo no render.
   // normalizarMarcadoresMemorial troca os códigos [x.x] por títulos legíveis —
@@ -207,6 +220,11 @@ function ProjetoReadOnlyPage() {
                           <>
                             <Stamp className="h-3 w-3" aria-hidden="true" />
                             Aguarda seu parecer
+                          </>
+                        ) : parecerDispensado ? (
+                          <>
+                            <CircleSlash className="h-3 w-3" aria-hidden="true" />
+                            Pré-aprovação dispensada
                           </>
                         ) : (
                           <>

@@ -1123,7 +1123,7 @@ export type AprovacaoRow = {
   autor_email: string | null;
   aprovador_email: string;
   aprovador_nome: string | null;
-  veredito: string; // 'pendente' | 'aprovado' | 'ajuste' | 'reprovado'
+  veredito: string; // 'pendente' | 'aprovado' | 'ajuste' | 'reprovado' | 'dispensado'
   comentario: string | null;
   decidido_por: string | null;
   criado_em: string | null;
@@ -1291,6 +1291,28 @@ export function decidirAprovacoesDoProjeto(
       respostas?.saving_coerente ?? null,
       projetoId,
     ],
+  );
+}
+
+/**
+ * DISPENSA a fila do projeto (D29): o analisador reprovou por critério, então o parecer
+ * do líder deixou de ser necessário e ele para de ser cobrado por algo que o sistema já
+ * recusou. `decidido_por = 'sistema'` é o sentinela que distingue isto de uma decisão
+ * humana em toda a leitura (rótulos do Sheets, reabertura, card do autor).
+ *
+ * ⚠️ `AND veredito = 'pendente'` é a invariante: linha JÁ decidida por um líder fica
+ * INTACTA — a análise roda depois da submissão e pode chegar quando ele já opinou.
+ */
+export function dispensarAprovacoesPendentes(
+  projetoId: string,
+  comentario: string | null,
+): Promise<void> {
+  return exec(
+    `UPDATE projeto_aprovacoes
+        SET veredito = 'dispensado', comentario = ?, decidido_por = 'sistema',
+            decidido_em = datetime('now')
+      WHERE projeto_id = ? AND veredito = 'pendente'`,
+    [comentario, projetoId],
   );
 }
 

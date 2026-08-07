@@ -89,6 +89,7 @@ import { stripMarkdown } from "@/lib/strip-markdown";
 import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
 import {
   abrirPreAprovacao,
+  dispensarPreAprovacao,
   justificativaAprovacaoSheet,
   rotuloAprovacaoSheet,
 } from "@/lib/aprovacoes.functions";
@@ -2484,6 +2485,11 @@ const atualizarMetadadosSchema = z.object({
   nome_projeto: z.string().min(1).max(200).optional(),
   area: z.string().min(1).max(100).optional(),
   ferramenta: z.string().min(1).max(200).optional(),
+  // Escopo EXTERNO: a mesma edição da "ferramenta" é o nome do serviço contratado, e ele
+  // tem coluna própria (alimenta o prompt do orquestrador — "solução EXTERNA contratada
+  // (X)"). Sem persistir aqui, editar o serviço atualizava só `ferramenta` e o agente
+  // seguia lendo o nome antigo. O `escopo` em si NÃO é editável (regra financeira).
+  servico_externo: z.string().max(200).optional(),
   membros: z.array(z.string()).optional(),
   membros_papeis: membrosPapeisSchema,
   data_criacao: z.string().optional(),
@@ -2523,6 +2529,7 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.nome_projeto !== undefined) campos.nome = data.nome_projeto;
   if (data.area !== undefined) campos.area = data.area;
   if (data.ferramenta !== undefined) campos.ferramenta = data.ferramenta;
+  if (data.servico_externo !== undefined) campos.servico_externo = data.servico_externo;
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.membros_papeis !== undefined) campos.membros_papeis = data.membros_papeis;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
@@ -2781,6 +2788,26 @@ export async function analisarProjetoFn(rawData: unknown) {
     `Resultado: ${resultado.resultado} → status=${statusFinal} (${resultado.pontuacao_total}/${resultado.pontuacao_maxima}, complexidade=${resultado.complexidade})`,
   );
 
+  // ── Dispensa da fila do líder (D29) ──
+  // O líder é convocado no fim da submissão, ANTES de existir veredito do analisador
+  // (que roda depois, em background). Quando o veredito é reprovar por critério, o
+  // parecer dele deixou de fazer sentido: fecha a fila e reflete nas 2 colunas.
+  // Nunca lança (D3) e o `undefined` de saída preserva a célula quando não dispensou —
+  // inclusive no caso do líder que decidiu ANTES da análise chegar.
+  let aprovacaoLiderSheet: string | undefined;
+  let justificativaAprovacaoLiderSheet: string | undefined;
+  if (reprovadoPorCriterio) {
+    try {
+      const dispensa = await dispensarPreAprovacao(projeto_id);
+      if (dispensa.dispensou) {
+        aprovacaoLiderSheet = dispensa.rotuloSheet;
+        justificativaAprovacaoLiderSheet = dispensa.justificativaSheet;
+      }
+    } catch (e) {
+      console.error("[analisarProjeto] falha ao dispensar a fila do líder (não-fatal):", e);
+    }
+  }
+
   // ── Sync Google (planilha + chat) — fire-and-forget ──
   {
     const projeto = await getProjetoById(projeto_id);
@@ -2811,6 +2838,9 @@ export async function analisarProjetoFn(rawData: unknown) {
       classificacao: resultado.classificacao_avaliacao ?? null,
       classificacaoJustificativa: resultado.classificacao_justificativa ?? null,
       motivoReprovacao: resultado.motivo_reprovacao ?? null,
+      // D29 — só definidas quando a fila foi realmente dispensada.
+      aprovacaoLider: aprovacaoLiderSheet,
+      justificativaAprovacaoLider: justificativaAprovacaoLiderSheet,
     });
   }
 

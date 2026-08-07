@@ -79,6 +79,43 @@ describe('validarEtapa1 — EDIÇÃO de legado (modoEdicao=true, RF-103/D2)', ()
     const errs = validarEtapa1(baseForm({ email: '' }), { modoEdicao: true });
     expect(errs.email).toBeTruthy();
   });
+
+  // A ferramenta virou EDITÁVEL na Etapa 1 da edição (a stack muda: Vercel → GoDeploy).
+  // Trocar de uma opção da lista para outra não pode gerar erro nenhum.
+  it('trocar a ferramenta na edição não gera erro', () => {
+    const errs = validarEtapa1(baseForm({ ferramenta: 'Claude + GoDeploy' }), { modoEdicao: true });
+    expect(errs).toEqual({});
+  });
+});
+
+// "Outros" sem o nome gravaria a string literal "Outros" na planilha — é o único pedaço
+// da ferramenta cobrado nos DOIS modos (a ferramenta em si segue opcional no legado).
+describe('validarEtapa1 — "Outros" exige o nome da ferramenta nos DOIS modos', () => {
+  for (const modoEdicao of [false, true]) {
+    it(`bloqueia "Outros" sem especificar (modoEdicao=${modoEdicao})`, () => {
+      const errs = validarEtapa1(
+        baseForm({ ferramenta: 'Outros', ferramentaOutra: '  ' }),
+        { modoEdicao },
+      );
+      expect(errs.ferramentaOutra).toBeTruthy();
+    });
+
+    it(`aceita "Outros" com o nome preenchido (modoEdicao=${modoEdicao})`, () => {
+      const errs = validarEtapa1(
+        baseForm({ ferramenta: 'Outros', ferramentaOutra: 'Retool' }),
+        { modoEdicao },
+      );
+      expect(errs.ferramentaOutra).toBeUndefined();
+    });
+  }
+
+  it('escopo externo não é cobrado pela regra do "Outros"', () => {
+    const errs = validarEtapa1(
+      baseForm({ escopo: 'externo', ferramenta: 'Outros', ferramentaOutra: '', servicoExterno: 'Zapier' }),
+      { modoEdicao: true },
+    );
+    expect(errs.ferramentaOutra).toBeUndefined();
+  });
 });
 
 describe('validarEtapa1 — participantes/papéis exigidos nos DOIS modos (RF-101/RF-102)', () => {

@@ -4,7 +4,307 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 06/08 (SESSÃO MAIS RECENTE) — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
+## ✅ 07/08 (SESSÃO MAIS RECENTE) — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
+
+**Pedido do Luis:** *"fazer o deploy dos ajustes que fizemos e sincronizar repo local, github, deixar tudo
+sincronizado"*. Havia **duas** frentes prontas e **nenhuma** no ar: a dispensa da fila do líder (06/08, faltava
+a T9 = deploy) e a ferramenta editável (07/08, faltava a staging). Como o `updateApp` **substitui a app
+inteira**, as duas foram no MESMO deploy — decisão dele na abertura da sessão ("staging → prod nas duas").
+
+**Integração:** as 2 branches nasciam do MESMO `origin/main` (`df4b20c`), então **não havia regra 10 a
+cumprir** — nada de `main` novo a incorporar. Branch `chore/deploy-dispensa-e-ferramenta` (merge `a3b0a90`):
+conflito só em `ROADMAP.md` + `docs/NEXT-SESSION.md` (resolvidos **UNINDO os dois lados**, regra 7) e em
+`worker.js` (resolvido pelo **rebuild**, não à mão). O `src/lib/chat.functions.ts`, tocado pelas duas,
+**auto-mergeou** — regiões distintas (`servico_externo` no schema do `atualizarMetadados` × a dispensa em
+`analisarProjetoFn`). **1161 testes verdes** (1155 + 6, somam sem colidir), `worker.js` rebuildado =
+**993.081 bytes**.
+
+**Deploys:** staging `edf400b4` **13:00 UTC** (version 127) → prod `674a3710` **13:47 UTC** (vinha da version
+229 de 06/08 18:04). PR **#242**.
+
+### ⚠️ A validação foi ESTRUTURAL, não funcional — o `E2E_COOKIE` expirou
+O `E2E_COOKIE` do `.env` está **vencido**: `GET /api/auth/me` devolve **302** para
+`devgogroup.com/auth/login` nos **dois** apps. Sem ele não há checagem por HTTP nem harness E2E. O que ficou
+**provado** pelo caminho do `getApp` (que é o que o próprio handoff manda usar — *"diagnostique por `getApp`,
+nunca pela tela"*): o `worker.js` no ar tem **993.081 bytes, byte-a-byte** o local; o `index.html` servido
+aponta para `/assets/index-c-ahOAKR.js`, o MESMO entry do `dist/` local — e **o hash do Vite _é_ o
+conteúdo**, então hash igual = build igual; e os chunks novos estão no `assetManifest`. O que **não** foi
+provado: qualquer comportamento em runtime.
+
+### ✅ De propósito, antes de tocar prod: provei que prod era EXATAMENTE a `main`
+Este repo já foi atropelado **5×** pelo mesmo acidente (deploy da `main` apagando o que estava no ar). A
+prova, em 2 comandos: `getAppFile /index.html` em prod dava `index-Dgj_1Kpn.js`, e `npm run build` na `main`
+(`df4b20c`) produziu o MESMO hash — nada fora da `main` estava no ar, o deploy não perdeu nada. **Vale
+repetir esta checagem a cada deploy.**
+
+### 🧰 Nota de ferramenta: o gate de plano barra edições feitas de dentro de `.claude/worktrees/`
+O `plan-gate.sh` allowlista `docs/**` calculando o caminho **relativo ao `CLAUDE_PROJECT_DIR`**. Quando a
+sessão roda na RAIZ e o worktree fica em `.claude/worktrees/<x>/`, o `docs/NEXT-SESSION.md` do worktree vira
+`.claude/worktrees/<x>/docs/...` — **não casa o allowlist** e cai no bloqueio, mesmo sendo doc. Por isso este
+handoff foi escrito **pela raiz** (branch `docs/handoff-deploy-07-08` a partir da branch de integração), que é
+o padrão das branches `docs/handoff-*` deste repo. Não é bug do gate nem se contorna com Bash: é o custo de
+rodar a sessão na raiz com o worktree aninhado.
+
+### 🟢 Próximo passo — o que depende de humano
+1. **Renovar o `E2E_COOKIE`** no `.env` (bloqueia o harness E2E inteiro, não só esta validação).
+2. **O Luis validar no navegador** a ferramenta editável: `/editar/<id>` → trocar a ferramenta → avançar até
+   a Etapa 3 → reenviar → conferir a coluna **"Ferramenta"**; testar também um **legado** (o `<select>` tem
+   de mostrar o valor atual, fora da lista) e um projeto de **escopo externo** (`servico_externo`).
+3. **A dispensa da fila (D29) só se observa quando o analisador reprovar** alguém de verdade — a medição do
+   plano achou **0** casos de `claro_nao` em prod, então não há o que olhar hoje: é esperar o primeiro.
+4. Seguem de pé: 🟡 as **2 confirmações de líder** (Estevão/Lucas reabrirem "Ler a documentação completa"; e
+   acompanhar a próxima submissão real para provar o wiring do aviso do Gomoon) · o **backfill dos 35**
+   (SUSPENSO pela decisão "só com os novos submetidos") · as 3 perguntas ao João Victor · 🆕 o pedido do
+   Lucas (**"Alguém já fazia?"** no card da fila, começar por `/ggsd:plan`) · e os **56%** da fila sem
+   `Classificação` (achado colateral, fatia própria).
+
+<details>
+<summary>Sessão de 07/08 (mais cedo) — a ferramenta editável, quando ainda faltava o deploy</summary>
+
+## 🟡 07/08 — Ferramenta EDITÁVEL na Etapa 1 da edição — CODADA, falta STAGING
+
+**Pedido do Luis (07/08):** na edição, só dava pra mexer em participantes; ele quer poder trocar a
+**ferramenta utilizada** (caso real: **Vercel → GoDeploy**, mudou o ambiente de hospedagem).
+
+**Feito** (branch `feat/editar-ferramenta-na-edicao`, worktree `.claude/worktrees/editar-ferramenta`,
+commit `e678bf0`):
+- `step1.tsx` — campo virou o bloco compartilhado `blocoFerramenta` (mesmo componente nos 2 modos); na
+  edição fica entre identidade e participantes, com linha de ajuda. O card "🔒 somente leitura" ficou
+  **só com Escopo + Status** — ⚠️ **isto revoga em parte o R2 de 17/07** (emenda registrada no topo de
+  `docs/plans/edicao-etapa1-participantes.md`); escopo (regra financeira) e status (premissa nº 1) seguem
+  fixos **de propósito**.
+- **Legado com ferramenta fora da lista** ("Power Automate"): o `<select>` injeta o valor atual como opção
+  — senão abriria VAZIO e pareceria perda de dado.
+- `validarEtapa1` — ferramenta segue opcional na edição (RF-103), mas **"Outros" sem o nome bloqueia nos 2
+  modos** (gravava a string literal "Outros").
+- `atualizarMetadados` aceita/persiste **`servico_externo`** (escopo externo: o campo É o nome do serviço e
+  tem coluna própria que alimenta o prompt do orquestrador — sem isso o agente citaria o nome antigo).
+  `escopo` continua **NÃO** editável. Helper `servicoExternoEnviado()` nos **6** payloads do `submeter.tsx`.
+- **1141 testes verdes**, `build` + `build:worker` ok (worker.js commitado), typecheck sem erro novo
+  (os 7 são pré-existentes no `main`). Spec: `SPEC_FEATURES_NOVAS.md` (seção 07/08/2026).
+
+**Falta (nesta ordem):** (1) **deploy na STAGING `edf400b4`** (regra 13) e validação no navegador — abrir
+`/editar/<id>`, trocar a ferramenta, avançar até a Etapa 3, reenviar e conferir a coluna **"Ferramenta"** na
+aba `STAGING`; testar também um **legado** (select tem de mostrar o valor atual) e um projeto de **escopo
+externo**; (2) `git fetch origin` + merge do `main` (regra 10) e rebuild; (3) **PR** + prod.
+_(1 e 2 feitos na sessão seguinte, no deploy conjunto acima; 3 = PR #242.)_
+
+</details>
+
+## 🧭 06/08 (anterior) — CÓDIGO: a fila do líder é DISPENSADA quando o analisador reprova
+
+**Plano ativo:** [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md) —
+**Status: ✅ executado**. Worktree `.claude/worktrees/dispensa-fila-lider`, branch
+`fix/dispensa-fila-lider-reprovado`. **T1–T8 entregues · 1155 testes verdes · `worker.js` rebuildado ·
+spec §12/D29 + `CLAUDE.md`.** Commitado na branch (nada pushado — envio é `/ggsd:ship`).
+
+**Falta só a T9 (deploy)** — é o próximo passo, no fim deste bloco.
+
+### O que a fatia faz
+No ramo `reprovadoPorCriterio` de `analisarProjetoFn`, `dispensarPreAprovacao` fecha a fila: as linhas
+**`pendente`** de `projeto_aprovacoes` viram `'dispensado'` / `decidido_por='sistema'`. O projeto some
+sozinho de `/aprovacoes`, do payload do Gomoon e do relatório de espera — as 3 consultas já filtravam
+`veredito='pendente'`. As 2 colunas do Sheets recebem **`Dispensado`** + a justificativa do sistema, no
+MESMO update que grava Status/Classificação.
+
+### ⚠️ O achado que a próxima sessão precisa saber: o "Risco nº 1" tinha **3 telas**, não 1
+O plano previa o fall-through de `rotuloAprovacaoSheet`. A varredura achou a 2ª (card do autor:
+*"Aguardando o líder"*) e o **revisor de qualidade de contexto fresco** achou a 3ª: `/projeto/$id` dizia
+**"✓ Parecer registrado"** ao líder de uma fila dispensada — o padrão era
+`veredito ?? "pendente") === "pendente"`, que um grep de `veredito ===` **não casa**. Virou o invariante
+10 da D29: **ampliar o enum `veredito` obriga a varrer os LEITORES, não só os escritores.**
+
+### Outros 2 defeitos corrigidos pela revisão de contexto fresco
+1. O `try` único de `dispensarPreAprovacao` fazia *"gravou mas a re-leitura falhou"* virar *"não fez
+   nada"* → planilha travada em `Pré-pendente` com a fila já fechada no SQLite, e **nada reconcilia essas
+   2 colunas depois** (`reconciliarComplexidade` não as escreve; `resyncGoogle` é manual). Separado, com
+   teste de duplo-fault.
+2. Uma **contradição na spec** que eu mesmo escrevi (invariante 3 × 4). Corrigida.
+
+### De quebra + o que ficou registrado
+- A união `Veredito` estava **copiada em 3 arquivos**, velha desde 04/08 (faltava `'ajuste'`). Unificada
+  → fechou **2 dos 7** erros de `tsc` pré-existentes (sobram **5**, todos alheios à fatia — não são regressão).
+- **Adiado (ADR-028):** extrair `Veredito` para um módulo PURO (padrão `coluna-chave.ts` /
+  `cargo-lideranca.ts`). Hoje o `import type` é apagado no build e o bundle do cliente foi conferido
+  limpo; o risco é um refactor futuro perder o `type` e arrastar o grafo server para o bundle.
+- **Lacuna do repo (não da fatia):** `analisarProjetoFn` não tem teste algum, então o `try/catch` do hook
+  (T4) é redundância não coberta — as 2 pontas estão presas um nível abaixo.
+- **Ressalva dos gates:** `.review-status = diverge-baixa` · `.quality-status = sugestoes` (nada
+  barrante; os achados de alta foram fechados dentro da sessão).
+- **Fora do escopo, de propósito:** os **56%** da fila sem `Classificação`; e a triagem que reprova **à
+  mão** no `/dashboard` **não** dispensa a fila — só o analisador dispensa (registrado na D29).
+
+### 🟢 Próximo passo — T9 (deploy), nesta ordem
+1. `git fetch origin` + incorporar `origin/main` no worktree e **rebuildar `worker.js`/`dist` DEPOIS do
+   merge** (regra 10 — o `main` anda por causa da regra 8). ⚠️ `CLAUDE.md` é o alvo #1 de conflito:
+   resolver **UNINDO os dois lados** e conferir que `grep -n '^<<<<<<<' CLAUDE.md` volta vazio.
+2. `npm run test && npm run build && npm run build:worker`.
+3. **Staging `edf400b4` PRIMEIRO** (regra 13 — nunca prod antes), via `scripts/deploy-godeploy.sh`.
+4. **Validar de forma INDIRETA** — o edge não aceita header de identidade injetado, então não dá para se
+   passar por líder: confira `GET /api/aprovacoes/pendentes` (200) e que o `index.html` servido aponta
+   para o entry do `dist/` local. ⚠️ **Célula vazia nas colunas do líder = build sem a feature no ar**,
+   não bug de mapeamento — diagnostique por `getApp`, nunca pela tela.
+5. **Só então prod `674a3710`** → e aí sim `/ggsd:ship` (PR + merge).
+
+## 06/08 (anterior) — sessão de código aberta, sem código escrito
+
+
+**Plano ativo:** [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md) —
+segue **`✅ aprovado`** (NÃO executado). Worktree `.claude/worktrees/dispensa-fila-lider`, branch
+`fix/dispensa-fila-lider-reprovado`, em cima de `81e229f` (o commit do plano).
+
+**PRÓXIMO PASSO EXATO:** rodar **`/ggsd:code`** de novo no worktree e **implementar T1–T8 até o verde**.
+⚠️ **NÃO refazer o teste red — ele JÁ EXISTE e está confirmado.** Todo o trabalho de preparação abaixo
+**já está feito e não precisa ser refeito**.
+
+### ✅ O teste RED já está no disco (`red-confirmado`, confiança 0,92)
+
+O subagente `ggsd:test-writer` (contexto fresco, **cego** a qualquer implementação — é a trava anti-sicofância
+da RF-44) terminou **depois** do fechamento da sessão e gravou **2 arquivos não versionados**:
+
+| Arquivo | Casos | Cobre |
+|---|---|---|
+| `tests/dispensa-fila-lider.test.ts` (360 linhas) | 13 | T1 (dispensa só a linha pendente · parecer humano intacto) · critério nº 1 (some de `listarAprovacoesPendentes` **e** de `getPendenciasPorLider`) · T3 (no-op sem fila · no-op com parecer humano · **nunca lança** com o banco fora) · T7 (fila dispensada reabre sem `forcar`; com parecer humano segue exigindo) · T2 (os 2 rótulos + precedência em qualquer ordem) · T6 (`chaveDoEstado`) |
+| `tests/sync-dispensa-lider-update.test.ts` (80 linhas) | 3 | `syncUpdateToGoogle`: escreve as 2 colunas quando dispensou · `undefined` **não encosta** · `null` → `—` |
+
+**Estado da suíte: `Test Files 2 failed | 82 passed (84)` · `Tests 14 failed | 1137 passed (1151)`.** Os 82
+arquivos da baseline **seguem verdes** — as 14 falhas estão contidas nos 2 arquivos novos, e **todas falham
+por ASSERÇÃO**, não por crash de import (ele usou *namespace import* de propósito: um `import { … }` de
+export inexistente derrubaria o arquivo inteiro no carregamento e mataria todos os casos de uma vez).
+
+⚠️ **2 casos já nascem VERDES de propósito** (são guardas de regressão, não red): *"análise que NÃO dispensou
+(`undefined`): NÃO encosta nas 2 colunas"* e *"fila com PARECER HUMANO segue exigindo `forcar`"*.
+
+**O red mais eloquente é exatamente o risco nº 1 do plano** — hoje a planilha afirma, sobre uma pessoa que
+nunca abriu o projeto:
+
+```
+Received: "Pré-reprovado por Lucas Gonçalves Queiroz (sistema) em 06/08/2026"
+```
+
+⚠️ **REGRA DE OURO ao implementar:** não enfraquecer esses testes para a solução passar (não afrouxar
+asserção, não apagar caso, não trocar o esperado pelo que o código faz). Teste suspeito → avisar o humano.
+
+**Por que a sessão parou:** a janela de contexto encheu enquanto o `test-writer` ainda rodava. **Zero linha
+de produção escrita** — implementar antes do red seria o atalho que a trava existe para impedir.
+
+### O que esta sessão já resolveu (não re-derivar)
+
+1. **Baseline verde conferida:** 1135 testes / 82 arquivos no worktree; `docs/open-questions.md` vazio.
+2. **Blast-radius varrido (MÉDIO, confiança média-alta — subiu em relação ao plano).** O achado que
+   **economiza tempo**: as **4** consultas SQL que definem "pendente" (`getAprovacoesPendentesDe`,
+   `contarAprovacoesPendentesDe`, `getPendenciasPorLider` e o `WHERE` do `decidirAprovacoesDoProjeto`) já
+   filtram `veredito = 'pendente'` — o projeto dispensado **some sozinho** da fila, da DM do Gomoon e do
+   contador da home. O **critério de aceitação nº 1 sai de graça**, sem tocar em nenhuma delas.
+3. **`resolverAcessoAprovador` (D28) confirmado intacto:** a linha continua existindo, então o líder
+   **mantém** a leitura de `/projeto/$id` — é o comportamento desejado, não um efeito colateral.
+4. **`Veredito` local de `routes/aprovacoes.tsx:98` NÃO muda** — ele é só o que o líder **clica**
+   (`aprovado|ajuste|reprovado`), não o estado persistido.
+
+### ⚠️ O dependente que o plano NÃO previu — e que obriga uma mudança de UI
+
+`MeuProjetoItem['aprovacao'].veredito` (`meus-projetos.functions.ts:72`) é tipado
+`'pendente' | 'aprovado' | 'reprovado'`, **mais estreito** que `Veredito`. Adicionar `'dispensado'`
+**quebra o TypeScript** em `meus-projetos.functions.ts:537` — não dá para "deixar a UI para depois".
+E o fall-through do card (`meus-projetos.tsx:853`) é o **risco nº 1 do plano na outra ponta**: hoje ele
+mostraria **"Aguardando o líder (Fulano)"** para um projeto que o sistema já reprovou — afirmação falsa,
+agora para o **autor** em vez da planilha.
+
+**DECISÃO DO LUIS (06/08, nesta sessão):** o card mostra a dispensa **explícita**, não esconde a linha —
+*"Pré-aprovação dispensada — o projeto foi reprovado na análise"*. Motivo: sumir sem explicação deixaria o
+autor sem saber por que o líder nunca respondeu.
+
+### Plano visual fechado (regra 11 — skill `frontend-design` já rodada, não repetir)
+
+O estado `dispensado` **não é um veredito**, é a *ausência* de um, encerrada pelo sistema — então não pode
+competir visualmente com os 3 vereditos reais.
+
+| Eixo | Escolha | Por quê |
+|---|---|---|
+| Cor | cinza-ardósia (família `sem_parecer`/`Descontinuado`), **sem hue nova** | verde/âmbar/vermelho são vereditos, azul é espera — dispensado não é nenhum dos 4 |
+| Distinção do `sem_parecer` | **borda tracejada** (1px dashed) | carrega significado: a caixa foi **anulada**, não ficou vazia. Sem isso os 2 cinzas ficam indistinguíveis |
+| Ícone | `CircleSlash` (⊘) | separa de `MinusCircle` (sem parecer) e `XCircle` (reprovado) |
+| Rótulo | `Dispensado` (chip) · `Pré-aprovação dispensada — o projeto foi reprovado na análise` (card) | o chip espelha o valor da coluna (D14: só o estado) |
+
+### ⚠️ Armadilha já mapeada no texto da justificativa (custa 1 teste se esquecer)
+
+A 1ª linha do texto de dispensa **tem de dizer "Dispensado _pelo_ sistema"**, nunca "Dispensado _por_ …":
+`lerAssinatura` (`aprovacoes-parecer.ts:112`) casa `/^.*? por (.+) em (data)$/` e leria a frase como se uma
+**pessoa** tivesse decidido — quebrando o teste de ida-e-volta da D19 e mentindo na ficha do `/dashboard`.
+As linhas seguintes não podem conter `": "`, senão o parser as trata como o comentário do líder.
+
+### Contrato das assinaturas, já fixado (é o que o `test-writer` precisa receber de novo)
+
+- **T1** `dispensarAprovacoesPendentes(projetoId, comentario): Promise<void>` (`client.server.ts`) —
+  `UPDATE … SET veredito='dispensado', decidido_por='sistema', decidido_em=datetime('now')`
+  **`WHERE projeto_id = ? AND veredito = 'pendente'`**.
+- **T3** `dispensarPreAprovacao(projetoId): Promise<{ dispensou: boolean; rotuloSheet?: string; justificativaSheet?: string }>`
+  (`aprovacoes.functions.ts`) — sem pendente → `{ dispensou: false }` com os 2 rótulos **`undefined`**
+  (é o que faz o T5 **omitir** as colunas). **NUNCA lança** (D3).
+- **T5** `UpdateSyncParams` += `aprovacaoLider?` / `justificativaAprovacaoLider?`, escritas **só quando
+  `!== undefined`** — a análise que **não** dispensou não pode zerar o parecer que o líder já deu.
+- **Precedência (T2):** parecer **HUMANO vence** a dispensa em `rotuloAprovacaoSheet`, independente da
+  ordem das linhas no array.
+
+**Marcadores de gate:** `.review-status` e `.quality-status` estão em **`pendente`** nos dois `.claude/`
+(worktree e raiz) — gravados de propósito no §7 porque a mudança é não-trivial e toca gatilho da RF-27
+(banco/sync/caminho da análise). **Sessão SUJA por construção → nada foi commitado.** Não apagar os
+marcadores para destravar: eles se resolvem com os revisores do §9 depois que o código existir.
+
+<details>
+<summary>Sessão anterior (06/08) — o PLANEJAMENTO que produziu o plano aprovado</summary>
+
+## 🧭 06/08 — PLANEJAMENTO: dispensar a fila do líder quando o analisador reprova
+
+**Nenhum código alterado nesta sessão** (sessão de plano — Gate D armado o tempo todo). O que aconteceu:
+
+**1. Pergunta de origem (do chefe do Luis):** *por que a pré-aprovação usa "Pré-*" numa coluna separada em vez
+de entrar na coluna `Status` normal?* Resposta registrada: são **dois eixos independentes** (a RPA decide o
+`Status`; o líder dá um parecer **não vinculante**), e o caso NORMAL é `Pré-aprovado` + `Pendente` ao mesmo
+tempo — uma coluna só exigiria rótulos compostos. Somam-se 3 razões mecânicas: as duas escritas se
+atropelariam (o sync grava `Status` em toda submissão; o reenvio apagaria o parecer), a pré-aprovação **não é
+portão** (D3) e o disparo de e-mails segmenta lendo `Status` do Sheets. ⚠️ Ponto que provavelmente motivou a
+pergunta e vale dizer a ele: **hoje o `Status` grava "Pendente" em tudo** (regra TEMPORÁRIA), então na
+planilha ele parece inútil e o `Pré-status` parece o único com informação.
+
+**2. O Luis contra-argumentou** que faria sentido uma coluna só, *"pois o RPA não iria aprovar um status de um
+projeto com o pré-pendente"*. Isso está **certo — mas muda o PROCESSO, não a coluna**: uma coluna só é coerente
+se o líder for **bloqueante** (estados mutuamente exclusivos), o oposto da D3. A saída oferecida, que entrega o
+que ele quer sem fusão: a política vira **filtro na fila de triagem** (`Status = Pendente` **E**
+`Pré-status = Pré-aprovado`), preservando o relatório de espera por líder.
+
+**3. Achado real no caminho:** o líder é convocado **ANTES de existir veredito** — `abrirPreAprovacao` + o POST
+ao Gomoon rodam no fim de `submeterParaValidacao`, e o analisador só é disparado depois, pelo worker
+(`src/worker.ts:325-331`). Logo, projeto que o analisador **reprova** (`claro_nao` → `Status` "Reprovado")
+continua na fila do líder e volta no backlog das DMs seguintes.
+
+**4. Medição em prod antes de codar** (595 linhas da planilha; 32 projetos com parecer): **0** com
+`Status = Reprovado`, **0** com `claro_nao` na fila, **18/32 (56%) sem `Classificação` nenhuma**, 9
+`zona_cinzenta`, 5 `claro_sim`. Conclusões: o desperdício é **estrutural, não corrente**; e o **gate
+sequencial foi DESCARTADO** (seria inerte em 56% dos casos e acoplaria a submissão ao pipeline mais instável).
+⚠️ Os **56% sem `Classificação`** são um achado colateral **maior** e ficaram FORA desta fatia — o cron
+`reanalisar-pendentes` repõe Complexidade/Observações, **não** a Classificação.
+
+**5. Plano aprovado:** [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)
+(T1–T9). Worktree e branch **já criados**: `.claude/worktrees/dispensa-fila-lider`, branch
+`fix/dispensa-fila-lider-reprovado`, a partir de `origin/main` `df4b20c` (com `node_modules` linkado e `.env`
+copiado). ⚠️ **Risco nº 1 a não esquecer na implementação:** o fall-through de `rotuloAprovacaoSheet` devolve
+`Pré-reprovado` para qualquer veredito fora de `pendente`/`aprovado`/`ajuste` — sem o tratamento explícito, a
+planilha afirmaria que **o líder reprovou** um projeto que ele nunca abriu.
+
+**6. Fora do plano, já FEITO em produção:** `bruno.bezerra@gocase.com` e `luiza.rios@gocase.com` foram
+adicionados à tabela `admins` de prod (`POST /api/admin/admins`); `lucas.queiroz@gocase.com` já estava lá desde
+22/06. Os 8 admins agora estão na tabela — antes Bruno e Luiza dependiam **só** do secret `ADMIN_EMAILS`, cujo
+valor o Godeploy não deixa ler (por isso não era possível confirmar o acesso deles sem isso).
+
+**Próximo passo (à época):** rodar **`/ggsd:code`** e implementar T1–T8 no worktree, parando antes do deploy.
+
+</details>
+
+<details>
+<summary>Sessão anterior (06/08) — o disparo retroativo saiu: prod restaurada e 28 líderes avisados</summary>
+
+## ✅ 06/08 — O DISPARO RETROATIVO SAIU: prod restaurada e 28 líderes avisados
 
 **✅ DECIDIDO E FEITO (06/08, decisão do Luis: _"vamos corrigir esses detalhes e fazer o merge"_):** o 403
 do líder foi **CORRIGIDO** antes do merge — o Estevão Vidal reportou o bug do lado do usuário no mesmo dia
@@ -126,6 +426,8 @@ lista sai do Sheets (`readAllRows`, `Status == "pendente"` + régua D27/D20/Team
    (`getPendenciasPorLider` + o guard do aviso imediato). Sem cortar, o backfill abriria **pendência falsa
    na fila do líder do harness**, e a aba de conferência listaria uma linha que o disparo não cobre. O
    filtro entrou nos DOIS scripts (`ids-fila.ts` e `relatorio-sheet.ts`).
+
+</details>
 
 <details><summary>🚨 06/08 (sessão anterior) — PROD FOI ATROPELADA: a feature saiu do ar e uma submissão real se perdeu (RESOLVIDO)</summary>
 
@@ -1346,7 +1648,28 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **executado** (código na branch `worktree-plano-aprovacao-lider-teamguide`, 2026-08-03)
+**Nenhum plano ativo** — o último (dispensa da fila do líder) está **concluído e em produção** (07/08, PR #242).
+O próximo a planejar é o **pedido do Lucas**: mostrar o "Alguém já fazia?" no card da fila (`/ggsd:plan`).
+
+<details>
+<summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>
+
+**→ [docs/plans/dispensa-fila-lider-reprovado.md](plans/dispensa-fila-lider-reprovado.md)** · Status: ✅ **concluído e EM PRODUÇÃO** (07/08, PR #242)
+
+> **Dispensar a fila do líder quando o analisador reprova o projeto** (`claro_nao` → `Status` "Reprovado"):
+> as linhas **pendentes** viram `'dispensado'` (`decidido_por='sistema'`), o projeto sai do backlog das DMs do
+> Gomoon / do relatório de espera / da tela `/aprovacoes`, e a coluna passa a dizer **`Dispensado`** — nunca
+> `Pré-reprovado`, que afirmaria falsamente que o líder reprovou. ⚠️ O **gate sequencial** ("analisar antes de
+> convocar") foi **DESCARTADO** com medição em prod: **0** casos de `claro_nao` com fila aberta e **18 de 32**
+> projetos da fila **sem classificação nenhuma** (analisador cancelado) — o gate seria inerte em 56% dos casos
+> e acoplaria a submissão à parte mais instável do pipeline.
+
+</details>
+
+<details>
+<summary>Plano anterior (executado) — F0+F1+F2 da pré-aprovação do líder</summary>
+
+**→ [docs/plans/teamguide-lideranca-e-areas.md](plans/teamguide-lideranca-e-areas.md)** · Status: ✅ **executado e EM PRODUÇÃO (06/08)**
 
 > **F0 + F1 + F2** da pré-aprovação do líder (spec: `spec-docs/SPEC_APROVACAO_LIDER.md`, D1–**D12**):
 > índice de liderança da TeamGuide + os 2 bugs do caminho (paginação morta · "ÁREA NÃO IDENTIFICADA" em
@@ -1362,6 +1685,8 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 > continua sendo a MESMA validação humana pendente, agora com a tela nova.
 > ⚠️ Os hooks do GGSD resolvem o projeto pela **raiz** do repo — os docs vivos e a flag
 > `.claude/.planning-mode` ficam aqui; o código vai para worktree (regra 8). Ver "Nota de ambiente" no plano.
+
+</details>
 
 ### ⏭️ ANTES da F0 — entrega conjunta das 2 frentes fechadas (decisão do Luis, 2026-08-03)
 Duas frentes estão **prontas e não entregues**, e vão **juntas** (deploy de staging substitui a app INTEIRA —

@@ -14,7 +14,15 @@
  *    no mesmo overlay existe o Status do projeto e confundir os dois seria grave.
  *  • Nada é descartado: linha que o parser não reconhece aparece como veio.
  */
-import { CheckCircle2, XCircle, Clock, MinusCircle, PencilLine, Quote } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  CircleSlash,
+  MinusCircle,
+  PencilLine,
+  Quote,
+} from 'lucide-react';
 import { chaveDoEstado, type EstadoParecer, type ParecerLider } from '@/lib/aprovacoes-parecer';
 
 /** Aparência de cada estado. `icone` + `rotulo` garantem leitura sem depender da cor. */
@@ -49,6 +57,16 @@ const APARENCIA: Record<
     fundo: 'rgba(0,89,169,0.08)',
     borda: 'rgba(0,89,169,0.30)',
     Icone: Clock,
+  },
+  // Cinza-ardósia e ícone de "deixou de valer", não uma cor de veredito: ninguém julgou
+  // este projeto — o sistema fechou a fila porque o analisador o reprovou por critério.
+  // Distinto do vermelho `XCircle` (o líder recusou) e do `MinusCircle` (célula vazia).
+  dispensado: {
+    rotulo: 'Dispensado',
+    cor: '#475569',
+    fundo: 'rgba(71,85,105,0.10)',
+    borda: 'rgba(71,85,105,0.32)',
+    Icone: CircleSlash,
   },
   sem_parecer: {
     rotulo: 'Sem parecer',

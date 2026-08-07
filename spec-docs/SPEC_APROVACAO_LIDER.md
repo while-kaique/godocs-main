@@ -472,3 +472,87 @@ mudança **não exige nada do Gomoon**: mesmo endpoint, mesmo payload, mesmo tok
 - O heartbeat sumiu junto com o cron: silêncio agora é indistinguível de integração quebrada.
 - Perguntas ao João Victor (§16 de `docs/integracao-gomoon-chat.md`): descarte de item em retry
   quando chega POST novo, volume, e quem dispara o anúncio de abertura.
+
+## 12. D29 — o analisador reprovou: a fila do líder é DISPENSADA (06/08/2026)
+
+**Problema.** `abrirPreAprovacao` e o aviso ao Gomoon rodam no fim de `submeterParaValidacao`;
+o analisador só é disparado **depois**, pelo worker (`src/worker.ts:325-331`). O líder é
+convocado **antes de existir veredito** — e um projeto que o analisador reprova por critério
+(`claro_nao` → `Status` "Reprovado") continuava na fila dele, no backlog das DMs seguintes e no
+relatório de espera por líder.
+
+**Medição em produção ANTES de codar** (595 linhas da planilha; 32 projetos com parecer):
+`Status = Reprovado` **0** · fila com `claro_nao` **0** · fila **sem `Classificação` nenhuma**
+**18/32 (56%)** · `zona_cinzenta` 9 · `claro_sim` 5.
+
+**Duas decisões que saíram daí (Luis, 06/08/2026):**
+
+1. **O gate sequencial ("analisa → só então convoca") foi DESCARTADO.** Com 56% da fila sem
+   veredito nenhum, um gate fail-open seria inerte em mais da metade dos casos e teria acoplado
+   o caminho da submissão à parte mais instável do pipeline (o analisador é cancelado com
+   frequência — é por isso que existe o cron `reanalisar-pendentes`). **Não reordenar a
+   submissão.**
+2. O desperdício é **estrutural, não corrente** (0 casos hoje). Logo a fatia é pequena e
+   defensiva: fechar a fila quando o veredito chega, sem inventar dependência nova.
+
+**Como funciona.** No ramo `reprovadoPorCriterio` de `analisarProjetoFn` (`chat.functions.ts`),
+`dispensarPreAprovacao` (`aprovacoes.functions.ts`) fecha a fila: as linhas **`pendente`** de
+`projeto_aprovacoes` viram `veredito = 'dispensado'`, `decidido_por = 'sistema'`. O projeto some
+sozinho de `listarAprovacoesPendentes`, de `getPendenciasPorLider` (payload do Gomoon) e de
+`contarAprovacoesPendentesDe` — as três já filtram `veredito = 'pendente'`.
+
+**Invariantes que não podem regredir:**
+
+1. ⚠️ **`Dispensado` NUNCA pode virar `Pré-reprovado`.** O fall-through antigo de
+   `rotuloAprovacaoSheet` devolvia `Pré-reprovado` para qualquer veredito fora de
+   `pendente`/`aprovado`/`ajuste` — a planilha afirmaria que **o líder reprovou** um projeto que
+   ele nunca abriu, com o nome e o e-mail dele na célula do lado. A régua é o predicado
+   `ehParecerHumano` (`veredito !== 'pendente' && !== 'dispensado'`), e ele vive nas **3**
+   funções do arquivo (`rotuloAprovacaoSheet`, `justificativaAprovacaoSheet`,
+   `resumoAprovacaoPorProjeto`) — não redigitar `!== 'pendente'` numa quarta.
+2. **Precedência: parecer HUMANO vence a dispensa, em qualquer ordem das linhas.** A análise
+   roda depois da submissão e pode chegar quando o líder já opinou; o `AND veredito = 'pendente'`
+   do `UPDATE` protege a linha dele no banco, e os rótulos protegem as 2 colunas. No
+   `resumoAprovacaoPorProjeto` a régua tem **2 níveis**: humano vence sempre, a dispensa só vence
+   uma linha ainda `pendente`.
+3. **Nunca lança (D3).** `dispensarPreAprovacao` devolve `{dispensou:false}` quando falhou
+   **ANTES de gravar** (falhou depois → invariante 4 abaixo); o
+   hook em `analisarProjetoFn` ainda a envolve num `try/catch`. A análise, o sync e a submissão
+   não caem por causa disto.
+4. ⚠️ **Falha DEPOIS de gravar não vira "não fez nada".** Só a re-leitura pode falhar após o
+   `UPDATE`; devolver `dispensou:false` ali omitiria as 2 colunas e deixaria a planilha em
+   `Pré-pendente` com a fila já fechada no SQLite — o projeto morto seguiria contando no relatório
+   de espera, que é o que esta fatia existe para corrigir. **Nada reconcilia essas 2 colunas
+   depois** (`reconciliarComplexidade` não as escreve; `resyncGoogle` é manual). Por isso o
+   caminho de recuperação cai no rótulo constante do caso comum — fila inteira dispensada, que
+   é o que o `UPDATE` acabou de fazer. ⚠️ **Trade-off aceito:** num duplo-fault (um líder decide
+   ENTRE a leitura e o `UPDATE` **e** a re-leitura cai), as 2 colunas recebem `Dispensado` por
+   cima do parecer dele. O **banco** fica correto (o `AND veredito = 'pendente'` nunca tocou a
+   linha do líder) e um `resyncGoogle` reconcilia as colunas; o caso comum — planilha travada em
+   `Pré-pendente` para sempre — é bem mais provável que este.
+5. **`undefined` ≠ `null` também no `syncUpdateToGoogle`** (mesma régua de 06/08 do submit): a
+   análise que **não** dispensou manda `undefined` e a coluna é **omitida** — escrever ali
+   apagaria o parecer que o líder já deu. `null` → `—`.
+6. **A re-leitura antes de montar o rótulo NÃO é round-trip gratuito:** é ela que faz o rótulo
+   respeitar o líder que decidiu **entre** a leitura e o `UPDATE`. Não "otimizar" removendo.
+7. **Reabertura:** fila **toda dispensada** é reabrível por `reabrirPreAprovacoes` **sem**
+   `forcar: true` (dispensa do sistema não é parecer humano) — é o remédio para a triagem que
+   reverte a reprovação. Fila com parecer humano **segue exigindo** `forcar`. A reabertura
+   **não** é automática: gatilho no write-back do `/dashboard` ficou FORA de propósito.
+8. **Reenvio reabre normalmente (D10):** `abrirAprovacoesPendentes` faz `DELETE` incondicional
+   antes de inserir.
+9. **O líder mantém a LEITURA do projeto (D28):** a linha continua existindo, então
+   `resolverAcessoAprovador` segue concedendo acesso — desejado.
+10. **3 superfícies dizem o estado novo, com rótulo + ícone (nunca só cor):** o chip
+    `ChipEstadoParecer` do `/dashboard`, o card do autor em "Meus Projetos" e o selo do aprovador
+    em `/projeto/$id`. ⚠️ Nas **três** o fall-through anterior afirmava algo falso — "Pré-reprovado",
+    "Aguardando o líder" e "✓ Parecer registrado" sobre alguém que nunca abriu o projeto. Ampliar
+    o enum `veredito` de novo obriga a varrer os **leitores**, não só os escritores.
+11. **`Dispensado` entra no harness de ida-e-volta** (`tests/dashboard-parecer-lider.test.ts`,
+    `comoNaPlanilha`) e não como literal solto: renomear o rótulo no produtor tem de **quebrar
+    teste**, não fazer o chip cair calado em `sem_parecer`.
+
+**Fora desta fatia (de propósito):** os **56%** da fila sem `Classificação` (analisador cancelado)
+— achado colateral maior, fatia própria; o cron `reanalisar-pendentes` repõe Complexidade e
+Observações, **não** a Classificação. E a triagem que grava "Reprovado" **à mão** no `/dashboard`
+**não** dispensa a fila — só o analisador dispensa.

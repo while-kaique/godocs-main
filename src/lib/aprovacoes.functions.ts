@@ -40,6 +40,7 @@ import { runBackground } from '@/lib/background';
 import {
   abrirAprovacoesPendentes,
   decidirAprovacoesDoProjeto,
+  dispensarAprovacoesPendentes,
   getAprovacoesDoProjeto,
   getAprovacoesPendentesDe,
   getAprovacoesDeProjetos,
@@ -53,7 +54,35 @@ import {
 // 'reprovado' é recusa. Antes os dois eram 'reprovado' — linhas ANTIGAS com 'reprovado'
 // nasceram como "ajuste pedido" e seguem lidas como recusa (nada a migrar: são poucas e
 // só na staging).
-export type Veredito = 'pendente' | 'aprovado' | 'ajuste' | 'reprovado';
+// 'dispensado' (D29, 06/08/2026) NÃO é parecer: é o sistema fechando a fila porque o
+// analisador reprovou o projeto por critério. Ele nunca é escrito por `decidirAprovacao`.
+export type Veredito = 'pendente' | 'aprovado' | 'ajuste' | 'reprovado' | 'dispensado';
+
+/** Comentário gravado nas linhas dispensadas — vira a 2ª linha da justificativa. */
+export const MOTIVO_DISPENSA_CRITERIO =
+  'O projeto foi reprovado pela análise automática de critério.';
+
+/** Um veredito de GENTE? `pendente` ainda não é, `dispensado` nunca será. */
+function ehParecerHumano(veredito: string): boolean {
+  return veredito !== 'pendente' && veredito !== 'dispensado';
+}
+
+/**
+ * Texto da justificativa de uma fila DISPENSADA. FONTE ÚNICA — a redigem 2 caminhos
+ * (o normal, a partir da linha gravada, e o de recuperação quando a re-leitura falha
+ * depois do UPDATE), e escrevê-la duas vezes é como as réguas deste repo envelhecem.
+ * Não leva assinatura de gente: ninguém decidiu isto.
+ */
+function justificativaDispensaSheet(opts: {
+  decididoEm?: string | null;
+  comentario?: string | null;
+}): string {
+  return [
+    `Dispensado pelo sistema em ${dataBR(opts.decididoEm ?? null)}`,
+    (opts.comentario ?? '').trim() || MOTIVO_DISPENSA_CRITERIO,
+    'O parecer do líder deixou de ser necessário. Se a triagem reverter a reprovação, a fila pode ser reaberta pelo admin.',
+  ].join('\n');
+}
 
 // ─── Rótulos (Sheets + UI) ───────────────────────────────────────────────────
 
@@ -111,10 +140,17 @@ export function justificativaIsencaoSheet(motivo: ResultadoAbertura['motivo']): 
  */
 export function rotuloAprovacaoSheet(linhas: Pick<AprovacaoRow, 'veredito'>[]): string {
   if (!linhas.length) return '—';
-  const decidida = linhas.find((l) => l.veredito !== 'pendente');
-  if (!decidida) return 'Pré-pendente';
-  if (decidida.veredito === 'aprovado') return 'Pré-aprovado';
-  return decidida.veredito === 'ajuste' ? 'Ajuste pedido' : 'Pré-reprovado';
+  // ⚠️ O parecer HUMANO vence a dispensa do sistema, em QUALQUER ordem das linhas — e a
+  // busca é por `ehParecerHumano`, não por "!== 'pendente'": com o fall-through antigo,
+  // uma fila dispensada saía como **"Pré-reprovado"** e a planilha afirmaria que o líder
+  // reprovou um projeto que ele nunca abriu, com o nome dele na célula do lado.
+  const decidida = linhas.find((l) => ehParecerHumano(l.veredito));
+  if (decidida) {
+    if (decidida.veredito === 'aprovado') return 'Pré-aprovado';
+    return decidida.veredito === 'ajuste' ? 'Ajuste pedido' : 'Pré-reprovado';
+  }
+  if (linhas.some((l) => l.veredito === 'dispensado')) return 'Dispensado';
+  return 'Pré-pendente';
 }
 
 /**
@@ -169,8 +205,18 @@ export function justificativaAprovacaoSheet(
   >[],
 ): string {
   if (!linhas.length) return '—';
-  const decidida = linhas.find((l) => l.veredito !== 'pendente');
+  const decidida = linhas.find((l) => ehParecerHumano(l.veredito));
   if (!decidida) {
+    // Fila DISPENSADA (D29): ninguém decidiu nada, então não há assinatura de gente aqui —
+    // e "Aguardando …" seria falso, porque a fila não espera mais ninguém. O texto diz de
+    // quem foi a recusa e como a fila volta, para a triagem que reverter a reprovação.
+    const dispensada = linhas.find((l) => l.veredito === 'dispensado');
+    if (dispensada) {
+      return justificativaDispensaSheet({
+        decididoEm: dispensada.decidido_em,
+        comentario: dispensada.comentario,
+      });
+    }
     const nomes = linhas.map((l) => l.aprovador_nome || l.aprovador_email).join(', ');
     return `Aguardando ${nomes}`;
   }
@@ -291,6 +337,69 @@ export async function abrirPreAprovacao(
   }
 }
 
+// ─── DISPENSA: o analisador reprovou, o líder não precisa mais opinar (D29) ──
+
+export type ResultadoDispensa = {
+  /** Havia fila pendente e ela foi fechada? `false` = nada a refletir na planilha. */
+  dispensou: boolean;
+  /** Estado pronto para a coluna "Aprovação do Líder" (só quando `dispensou`). */
+  rotuloSheet?: string;
+  /** Detalhe pronto para a coluna "Justificativa Aprovação do Líder". */
+  justificativaSheet?: string;
+};
+
+/**
+ * Fecha a fila de pré-aprovação de um projeto que o analisador reprovou por critério
+ * (`claro_nao` → Status "Reprovado"). O projeto sai da tela `/aprovacoes`, do backlog das
+ * DMs do Gomoon e do relatório de espera por líder — as três já filtram `veredito =
+ * 'pendente'`, então basta a linha deixar de ser pendente.
+ *
+ * ⚠️ NUNCA lança (D3): a análise, o sync e a submissão não podem cair por causa disto.
+ * ⚠️ No-op sem fila pendente — inclusive quando o líder JÁ decidiu (a análise roda depois
+ * da submissão): nesse caso não devolve rótulo, e o chamador não encosta nas 2 colunas,
+ * preservando o parecer dele.
+ * ⚠️ NÃO reabre nada sozinho quando a triagem reverte a reprovação — o remédio é o
+ * `reabrirPreAprovacoes` (admin), que trata fila toda dispensada como reabrível.
+ */
+export async function dispensarPreAprovacao(projetoId: string): Promise<ResultadoDispensa> {
+  let gravou = false;
+  try {
+    const linhas = await getAprovacoesDoProjeto(projetoId);
+    if (!linhas.some((l) => l.veredito === 'pendente')) return { dispensou: false };
+
+    await dispensarAprovacoesPendentes(projetoId, MOTIVO_DISPENSA_CRITERIO);
+    gravou = true;
+
+    // ⚠️ A RE-LEITURA não é round-trip gratuito: é ela que faz o rótulo respeitar o
+    // líder que tenha decidido ENTRE a leitura acima e o UPDATE (o `AND veredito =
+    // 'pendente'` do SQL não toca a linha dele, e o rótulo tem de refletir isso).
+    const atualizadas = await getAprovacoesDoProjeto(projetoId);
+    console.log(`[aprovacoes] fila de ${projetoId} DISPENSADA (reprovado por critério).`);
+    return {
+      dispensou: true,
+      rotuloSheet: rotuloAprovacaoSheet(atualizadas),
+      justificativaSheet: justificativaAprovacaoSheet(atualizadas),
+    };
+  } catch (e) {
+    console.error('[aprovacoes] falha ao dispensar a fila (não-fatal):', e);
+    // ⚠️ Falha DEPOIS de gravar não pode virar "não fez nada": devolver `dispensou:false`
+    // aqui omitiria as 2 colunas e a planilha ficaria em "Pré-pendente" com a fila já
+    // fechada no SQLite — o projeto morto seguiria contando no relatório de espera do
+    // líder, que é justamente o que esta feature existe para corrigir. Nada reconcilia
+    // essas colunas depois (`reconciliarComplexidade` não as escreve). Como só a
+    // re-leitura pode ter falhado, caímos no rótulo CONSTANTE do caso comum — fila
+    // inteira dispensada, que é o que o UPDATE acabou de fazer.
+    if (gravou) {
+      return {
+        dispensou: true,
+        rotuloSheet: rotuloAprovacaoSheet([{ veredito: 'dispensado' }]),
+        justificativaSheet: justificativaDispensaSheet({}),
+      };
+    }
+    return { dispensou: false };
+  }
+}
+
 // ─── RECUPERAÇÃO: reabrir a fila de projetos já submetidos (admin) ───────────
 //
 // A fila mora em `projeto_aprovacoes`, tabela INTERNA: o Sheets é só espelho do
@@ -361,7 +470,11 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
     }
     if (!forcar) {
       const jaTem = await getAprovacoesDoProjeto(id);
-      if (jaTem.length) {
+      // Fila TODA dispensada (D29) é reabrível SEM `forcar`: a dispensa é do SISTEMA, não
+      // parecer humano — não há veredito de ninguém a preservar, e este é justamente o
+      // remédio para a triagem que reverte a reprovação do analisador.
+      const soDispensadas = jaTem.length > 0 && jaTem.every((a) => a.veredito === 'dispensado');
+      if (jaTem.length && !soDispensadas) {
         out.ignorados.push({
           projeto_id: id,
           nome,
@@ -766,7 +879,15 @@ export async function resumoAprovacaoPorProjeto(
     }
     atual.aprovadores.push(nome);
     // Uma linha decidida manda no resumo (D4 — a decisão vale para a fila toda).
-    if (r.veredito !== 'pendente') {
+    // ⚠️ Dois níveis, a MESMA precedência dos rótulos do Sheets: parecer humano vence
+    // sempre; a dispensa do sistema só vence uma linha ainda `pendente` — senão uma
+    // linha `dispensado` apagaria, no card do autor, o parecer que o líder já deu.
+    // (Hoje inalcançável: os 2 UPDATEs varrem todas as pendentes de uma vez. A régua
+    // fica explícita porque ela é uma só e vive nas 3 funções deste arquivo.)
+    const mandaNoResumo =
+      ehParecerHumano(r.veredito) ||
+      (r.veredito !== 'pendente' && !ehParecerHumano(atual.veredito));
+    if (mandaNoResumo) {
       atual.veredito = r.veredito as Veredito;
       atual.decidido_por = r.decidido_por;
       atual.comentario = r.comentario;
