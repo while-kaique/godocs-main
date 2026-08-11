@@ -1698,11 +1698,20 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **aprovado**
-(Luis, 11/08/2026) — em implementação na branch `feat/sqlite-fonte-de-leitura` (worktree
-`.claude/worktrees/sqlite-fonte-leitura`). As telas de listagem passam a ler um **espelho da planilha no
-SQLite** (cron de 5 min + remendo imediato das nossas escritas). ⚠️ **Push do Sheets é impossível** (edge
-devolve 302 no login) — a cadência é por cron.
+**→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **executado**
+(11/08/2026) — código na branch `feat/sqlite-fonte-de-leitura` (`b09b672` · `0ccb24c` · `e0097a4`), **1243
+testes verdes**, **staging no ar e provada por runtime**. ⛔ **O que falta:** (1) o **Luis validar na staging**
+(Meus Projetos rápido · `/dashboard` + ficha com as colunas manuais · botão "Atualizar" sincroniza · apagar
+linha da aba `STAGING` e ver o projeto sair); (2) **deploy em prod `674a3710`** + trocar o cron de `0 * * * *`
+para `*/5 * * * *` + **confirmar por `getAppLogs` que a linha traz `espelhados=`**; (3) **PR** (nada no `main`).
+
+⚠️ **Ressalva de verificação (o envio VAI barrar):** `.claude/.review-status` e `.claude/.quality-status`
+estão em **`pendente`** — os revisores de contexto fresco do `/ggsd:code §9` não rodaram porque a sessão foi
+instruída a **não usar subagentes**. O `git push`/`/ggsd:ship` barra nesse estado. Para destravar: rodar os
+revisores (`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade`, faixa **profunda** — módulos novos +
+caminho de dados) ou registrar waiver explícito. A revisão do próprio agente já pegou 2 defeitos reais
+(`INSERT OR REPLACE` por compatibilidade de SQLite; a tela dizia "Planilha sincronizada às…" com o espelho
+VAZIO logo após o deploy).
 
 Fila de planejamento depois desta fatia: o **pedido do Lucas** (mostrar "Alguém já fazia?" no card da fila).
 

@@ -1,6 +1,11 @@
 # Plano — SQLite como fonte de LEITURA das telas (espelho da planilha)
 
-**Status:** ✅ aprovado (Luis, 2026-08-11)
+**Status:** ✅ **executado** (2026-08-11) — T1–T11 entregues + **staging no ar e validada por RUNTIME**
+(`total=578 espelhados=578 erros=0`; corrida em regime `espelhados=0` em **1,3 s**, contra 23–27 s do código
+antigo). ⛔ **T12 pela metade:** falta a validação do Luis no navegador e o **deploy em prod** (`674a3710`)
+com o cron em `*/5`. ⚠️ Revisores de contexto fresco (§9 do `/ggsd:code`) **não rodaram** — a instrução da
+sessão foi não usar subagentes; a revisão do diff foi feita pelo próprio agente e achou 2 defeitos reais
+(`INSERT OR REPLACE` por compatibilidade e a tela mentindo "sincronizada" com espelho vazio).
 
 **Objetivo:** as telas de listagem (**Meus Projetos** e **/dashboard**) param de ler o Google Sheets em
 tempo de request e passam a ler um **espelho da planilha dentro do SQLite**, atualizado por **cron a cada
