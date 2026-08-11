@@ -60,6 +60,26 @@ import {
   NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
 } from "@/lib/agents/sobreposicao-receita";
 import {
+  mensagemSavingSemGanho,
+  mensagemReceitaZerada,
+  mensagemReceitaIncompleta,
+  mensagemDocAusente,
+  mensagemDuplicata,
+} from "@/lib/mensagens-submissao";
+import {
+  aplicaGateCustoEvitadoChat,
+  detectarCustoEvitadoNoChat,
+  deveBloquearPorCustoEvitadoChat,
+  interpretarCustoEvitadoChat,
+  perguntaCustoEvitadoChat,
+  perguntaCustoEvitadoChatFirme,
+  nudgeCustoEvitadoPago,
+  OPCOES_CUSTO_EVITADO_CHAT,
+  NUDGE_CUSTO_EVITADO_ESTIMADO,
+  NUDGE_CUSTO_EVITADO_SEM_RESPOSTA,
+  type EstadoCustoEvitadoChat,
+} from "@/lib/agents/custo-evitado-chat";
+import {
   aplicaGateGanhoProjetado,
   detectarGanhoProjetado,
   deveBloquearPorProjecao,
@@ -1287,6 +1307,20 @@ export async function enviarMensagem(rawData: unknown) {
       : faseGanhoReal === "receita"
         ? detectarGanhoProjetado(textosParaDeteccaoReceita(estado.receita, falasUsuarioFase))
         : null;
+  // Gate do CUSTO EVITADO DECLARADO NO CHAT. A detecção é TEXTUAL sobre as falas do usuário
+  // NESTA fase (valor em R$ + vocabulário de gasto evitado) e ignora o que já está cadastrado
+  // como item do formulário. Origem: SmartOnline/DIFAL — R$ 324.005,09 de multa e juros
+  // citados no chat, aceitos sem UMA pergunta e depois descartados no submit (o R$ do custo
+  // evitado vem dos itens do formulário). Ver `agents/custo-evitado-chat.ts`.
+  const gateCustoEvitadoChat = aplicaGateCustoEvitadoChat(estado.fase, ctx.alguem_fazia);
+  const detCustoEvitado = gateCustoEvitadoChat
+    ? detectarCustoEvitadoNoChat(
+        history.filter((m) => m.role === "user").map((m) => m.content),
+        ctx.custo_evitado_itens,
+      )
+    : null;
+  // ⚠️ SNAPSHOT — mesmo contrato dos demais: só para saber se ESTE turno é a resposta.
+  const custoEvitadoChatAtual = estado.saving.custo_evitado_chat ?? null;
   // ⚠️ SNAPSHOT — mesmo contrato dos dois acima: só para saber se ESTE turno é a resposta.
   const ganhoRealAtual =
     faseGanhoReal === "saving"
@@ -1542,6 +1576,39 @@ export async function enviarMensagem(rawData: unknown) {
             ? NUDGE_SOBREPOSICAO_AJUSTAR
             : NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
     });
+  } else if (
+    gateCustoEvitadoChat &&
+    (custoEvitadoChatAtual === "pendente" || custoEvitadoChatAtual === "reperguntado")
+  ) {
+    // (7) Turno de RESPOSTA ao gate do CUSTO EVITADO declarado no chat. ANTI-LOOP por
+    // construção: 'pendente' → ambíguo → 'reperguntado' → qualquer resposta cai em estado
+    // TERMINAL. Nunca uma terceira pergunta.
+    const racional = (data.content ?? "").trim();
+    const resp = interpretarCustoEvitadoChat(racional, data.selected_option ?? null);
+    const primeiraVez = custoEvitadoChatAtual === "pendente";
+    const novo: EstadoCustoEvitadoChat = resp ?? (primeiraVez ? "reperguntado" : "nao_respondido");
+    estado.saving = { ...estado.saving, custo_evitado_chat: novo };
+    log("enviarMensagem", `Custo evitado no chat: resposta → "${novo}"`);
+    if (novo === "reperguntado" && detCustoEvitado) {
+      reask = {
+        type: "options",
+        question: perguntaCustoEvitadoChatFirme(detCustoEvitado),
+        options: OPCOES_CUSTO_EVITADO_CHAT,
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
+    } else if (novo === "pago") {
+      history.push({
+        role: "user",
+        content: nudgeCustoEvitadoPago(detCustoEvitado?.valor ?? 0, racional),
+      });
+    } else if (novo === "estimado") {
+      history.push({ role: "user", content: NUDGE_CUSTO_EVITADO_ESTIMADO });
+    } else {
+      history.push({ role: "user", content: NUDGE_CUSTO_EVITADO_SEM_RESPOSTA });
+    }
   }
   // ── PRÉ-EMPÇÃO DO GATE GANHO REAL × PROJETADO (antes de gastar a chamada de LLM) ──
   // Roda DEPOIS da cadeia de respostas (não rouba o turno de resposta de outro gate) e só
@@ -1612,6 +1679,9 @@ export async function enviarMensagem(rawData: unknown) {
       // Gate ganho real × projetado: backend-only. Perder isto no round-trip re-armaria o
       // gate a cada turno — o loop clássico.
       ganho_real: estado.saving.ganho_real ?? null,
+      // Gate do custo evitado declarado no chat: backend-only, nunca ecoado pelo LLM (mesmo
+      // motivo — perder no round-trip re-armaria o gate a cada turno).
+      custo_evitado_chat: estado.saving.custo_evitado_chat ?? null,
     };
   }
   // Mesmo re-merge no lado da RECEITA — sem isto o 'ok' do gate do critério se perderia a
@@ -2057,6 +2127,57 @@ export async function enviarMensagem(rawData: unknown) {
         receita: {
           ...(resultado.receita ?? estado.receita),
           sobreposicao_custo_evitado: jaPerguntou ? "reperguntado" : "pendente",
+        },
+      });
+      delete (resultado as { content?: unknown }).content;
+    }
+  }
+
+  // ── GATE: CUSTO EVITADO DECLARADO NO CHAT ──────────────────────────────────
+  // Roda por ÚLTIMO na fase de saving e só se nenhum outro gate assumiu o turno (`!reask`) —
+  // um gate por turno. Foi exatamente aqui que o caso de origem escapou: a autora declarou
+  // R$ 324.005,09 de multa e juros e o LLM devolveu PREVIEW no turno seguinte, sem perguntar
+  // nada (o turno foi então consumido pelo gate da jornada, e o valor nunca mais foi tocado).
+  //
+  // ⚠️ ESTADO LIDO AGORA, nunca o `custoEvitadoChatAtual` do topo do turno — mesma armadilha
+  // que produziu o loop de 38 perguntas no gate do critério.
+  //
+  // ⚠️ MONOTÔNICO: null → 'pendente' → 'reperguntado' → terminal. Chegar aqui já em
+  // 'reperguntado' significa que a resposta foi consumida por OUTRO gate no mesmo turno —
+  // nesse caso NÃO se pergunta uma 3ª vez: encerra em 'nao_respondido' e libera com marca de
+  // triagem. Re-armar 'pendente' aqui seria um loop de verdade.
+  const custoEvitadoChatAgora = (resultado.saving ?? estado.saving).custo_evitado_chat;
+  if (
+    gateCustoEvitadoChat &&
+    detCustoEvitado &&
+    !reask &&
+    deveBloquearPorCustoEvitadoChat(custoEvitadoChatAgora, resultado.type)
+  ) {
+    if (custoEvitadoChatAgora === "reperguntado") {
+      log(
+        "enviarMensagem",
+        "Custo evitado no chat: 2 perguntas já feitas e sem resposta — liberando com marca de triagem",
+      );
+      resultado.saving = {
+        ...(resultado.saving ?? estado.saving),
+        custo_evitado_chat: "nao_respondido",
+      };
+    } else {
+      const jaPerguntou = custoEvitadoChatAgora === "pendente";
+      log(
+        "enviarMensagem",
+        `⛔ Preview do saving com gasto evitado de R$ ${detCustoEvitado.valor} citado só no chat (pistas: ${detCustoEvitado.marcas.join(",")}) — ${jaPerguntou ? "repergunta firme (2ª e última)" : "perguntando"}`,
+      );
+      Object.assign(resultado, {
+        type: "options",
+        question: jaPerguntou
+          ? perguntaCustoEvitadoChatFirme(detCustoEvitado)
+          : perguntaCustoEvitadoChat(detCustoEvitado),
+        options: OPCOES_CUSTO_EVITADO_CHAT,
+        fase: "saving",
+        saving: {
+          ...(resultado.saving ?? estado.saving),
+          custo_evitado_chat: jaPerguntou ? "reperguntado" : "pendente",
         },
       });
       delete (resultado as { content?: unknown }).content;
@@ -2994,7 +3115,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   const docRow = await getDocumentacao(projeto_id);
 
-  if (!docRow) throw new Error("Documentação ainda não foi gerada. Conclua o chat primeiro.");
+  if (!docRow) throw new Error(mensagemDocAusente());
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
     string,
@@ -3051,7 +3172,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
     if (duplicata) {
-      throw new Error(`Já existe um projeto submetido com o nome "${projeto.nome}".`);
+      throw new Error(mensagemDuplicata(projeto.nome));
     }
   }
 
@@ -3132,11 +3253,21 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     // o líquido seja positivo — é o caso "contrato externo cancelado, sem horas".
     // Bloqueia só quando NÃO há ganho algum (0h E sem custo evitado → líquido ≤ 0).
     if (tiposProjetoGate.includes("saving") && ((saving?.economia_reais_mes as number) ?? 0) <= 0) {
+      // ⚠️ A mensagem é MONTADA com os números reais do projeto (mensagens-submissao.ts). O
+      // texto fixo anterior dizia "sem redução concreta de horas" para uma submissão que
+      // tinha 60h/mês validadas no memorial — o que barra é o LÍQUIDO, e o abatimento dos
+      // custos declarados na Etapa 2 nunca era citado. Ver o caso SmartOnline/DIFAL.
       throw new Error(
-        "Não é possível submeter este projeto como saving sem ganho mensurável. " +
-          "O ganho precisa vir de uma redução concreta de horas OU de um custo externo evitado " +
-          "(contrato/serviço/licença que deixou de ser pago). Se nenhum dos dois se aplica, " +
-          "reclassifique como receita incremental ou projeto especial.",
+        mensagemSavingSemGanho({
+          horas: (saving?.economia_horas_mes as number) ?? 0,
+          unidade: unidadeHorasDe(
+            (saving?.tipo_saving as SavingColetado["tipo_saving"]) ?? null,
+          ).replace(/^h/, ""),
+          custoEvitado: (saving?.custo_evitado_reais as number) ?? 0,
+          custoExterno: projeto.custo_externo_mensal ?? 0,
+          custoProjeto: (saving?.custo_projeto_reais as number) ?? 0,
+          liquido: (saving?.economia_reais_mes as number) ?? 0,
+        }),
       );
     }
     // Gate de COMPLETUDE da receita (último porto antes de gravar): um projeto declarado
@@ -3148,22 +3279,14 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     if (tiposProjetoGate.includes("receita_incremental")) {
       const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? "").trim();
       if (((receita?.valor_ganho_mensal as number) ?? 0) <= 0) {
-        throw new Error(
-          "Não é possível submeter receita incremental com ganho de R$ 0. " +
-            "Revise o memorial de receita antes de enviar.",
-        );
+        throw new Error(mensagemReceitaZerada());
       }
       if (
         !receita?.tipo_saving ||
         memoReceita.length < 30 ||
         receitaMemorialEhSaving(memoReceita)
       ) {
-        throw new Error(
-          "Este projeto está marcado como Receita Incremental, mas a receita não está completa — " +
-            "são obrigatórios a periodicidade, o valor e um memorial de RECEITA. Se o que foi descrito " +
-            "é economia operacional (saving), volte à Etapa 2/3 e troque o tipo do projeto para Saving; " +
-            "se for receita nova, conclua o memorial de receita antes de enviar.",
-        );
+        throw new Error(mensagemReceitaIncompleta());
       }
     }
   }

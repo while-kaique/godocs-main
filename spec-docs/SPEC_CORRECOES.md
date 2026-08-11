@@ -1890,3 +1890,87 @@ manualmente… a carga humana real é 0h"* — mas a conversa e o memorial dizem
 (`'nao'` **+ com** custo evitado **+ com** linhas = 2c; `'nao'` **sem** custo evitado = contrafactual puro),
 mas o `'nao' → Real=0/Escalado=TOTAL` é **decisão fechada de 29/06/2026** — confirmar a intenção de produto
 antes de mexer.
+
+## Custo evitado de R$ 324 mil citado no chat: nem questionado, nem gravado — e o erro de submissão mentia sobre a causa (10/08/2026)
+
+**Sintoma (o que a usuária viu).** Stefany Costa, "Plataforma SmartOnline — Captura de XMLs e Recolhimento de
+DIFAL" (projeto `dba1cc1c23eb…`, FINANÇAS). Ao aprovar o memorial, o envio morria com:
+
+> "Não é possível submeter este projeto como saving sem ganho mensurável. O ganho precisa vir de uma redução
+> concreta de horas OU de um custo externo evitado…"
+
+O memorial aprovado na tela tinha **60h/mês** de redução (Analista Júnior 30h + Analista Sênior 30h, ambos
+para 0h). Ela tentou **6 vezes em 25 minutos** (18:37, 18:37, 18:38, 18:59, 19:00, 19:02), reabriu a fase de
+saving duas vezes e chegou a trocar o tipo do projeto para receita e voltar — a mensagem dizia que faltava
+exatamente o que estava na tela, então não havia o que corrigir.
+
+**Causa A — a mensagem descrevia o gate errado.** O gate é sobre o ganho **LÍQUIDO**
+(`economia_reais_mes = horas + custo evitado − custo externo − custo do projeto ≤ 0`), e o texto fixo nunca
+mencionava o abatimento. Como o projeto é de escopo externo (Plataforma SmartOnline), o formulário da Etapa 2
+**exigiu** o custo da ferramenta; qualquer valor ≥ R$ 1.631,70/mês (o valor das 60h pela tabela `CARGOS`)
+zera o líquido. A pessoa não tinha como descobrir isso pela mensagem.
+
+**Causa B — o maior ganho do projeto foi aceito sem uma pergunta e depois descartado.** No meio da fase de
+saving ela escreveu *"além dos analistas, quero incluir o saving de quanto **iríamos pagar** de multa e juros
+de difal, por não recolher no vencimento"* e, no turno seguinte, **R$ 324.005,09/mês** (média de DIFAL do grupo
+de R$ 2.234.517,87 × 14,5% de multa + SELIC). O agente respondeu só *"me informe o valor médio pago e a
+periodicidade"* e no turno seguinte **já devolveu o PREVIEW** (log das 18:54:56) — nenhuma pergunta sobre a
+natureza do valor. Três redes existiam e nenhuma cobria este caminho:
+
+- a validação de **realidade/atribuição/escopo** do custo evitado (`buildSavingCustoEvitadoPrompt` + backstop
+  de `iniciarSaving`) só roda no custo evitado **PURO** (`alguem_fazia === 'externo'`); aqui havia 60h junto,
+  então o prompt caiu no bloco de **anti-dupla-contagem** — que trata de sobreposição, não de veracidade;
+- o gate **ganho real × projetado** não armou: `PISTAS_PROJECAO` não tem o contrafactual "iríamos pagar" /
+  "seria pago", e ela escreveu "histórico real … observado", que lê como medido. (O "ainda está em andamento"
+  que ela disse na fase **doc** está fora do escopo do detector, que varre memorial + falas da fase financeira.);
+- e no submit o `custo_evitado_reais` é re-derivado dos **ITENS do formulário**
+  (`custoEvitadoMensalFromItens`) — com o formulário vazio, virou `null` e o memorial saiu com
+  "Custo evitado: N/A". **O valor nunca foi gravado.** Ou seja: o agente coletou um número que o backend não
+  tem como persistir, e o líquido continuou sendo só 60h − custo da ferramenta.
+
+⚠️ **A multa é REAL** — o financeiro paga DIFAL em atraso todo mês (confirmado com o autor do projeto). O
+defeito não é o número: é ninguém ter perguntado. Para o sistema, "iríamos pagar" tinha a mesma cara de uma
+projeção, e ele seguiu como se estivesse tudo resolvido.
+
+**Fix 1 — gate determinístico do custo evitado declarado no chat** (`src/lib/agents/custo-evitado-chat.ts`,
+estado `saving.custo_evitado_chat`). `detectarCustoEvitadoNoChat` varre as falas do usuário NESTA fase: valor
+em R$ na **mesma** mensagem que vocabulário de gasto (`TERMOS_GASTO`) e — quando o termo é ambíguo
+("contrato", "licença", que podem ser o CUSTO do projeto) — também um verbo de evitação (`VERBOS_EVITADO`,
+que inclui o contrafactual "iríamos pagar"). Valor já cadastrado como item do formulário **não** arma (lá o
+caminho é o certo). Casou → troca preview/complete por **1 pergunta de 2 botões**: *"É gasto real — a empresa
+paga (ou pagava) isso e dá para conferir"* × *"É uma estimativa do que aconteceria"*. `'pago'` injeta nudge
+[SISTEMA] cobrando as DUAS coisas que faltaram (a seção "Contratos/Serviços Evitados" com o que é, desde
+quando parou e **onde se confere**; e o aviso, em uma frase, de que o valor precisa ser cadastrado no campo de
+CUSTO EVITADO do formulário, porque valor citado só na conversa não é gravado). `'estimado'` proíbe somar e
+segue pelas horas. ⚠️ **Nenhum estado bloqueia para sempre** — diferente do gate de ganho projetado, aqui o
+projeto segue pelas horas, que são medidas. ANTI-LOOP pelas 4 travas de sempre: máx. 2 perguntas, máquina
+**monotônica** `null→pendente→reperguntado→terminal`, saída por **CLIQUE** e leitura do **estado VIVO** (nunca
+o snapshot do topo do turno — o loop de 38 perguntas do `[1.4]`). Fica FORA do custo evitado puro, que já tem
+a sua validação. Teste: simulação de 20 turnos ininteligíveis + os falsos positivos que ele não pode ter
+(percentual/horas viram valor; "contrato custa R$ X" sem verbo de evitação).
+
+**Fix 2 — mensagens de bloqueio alinhadas com a causa e com direcionamento**
+(`src/lib/mensagens-submissao.ts`, módulo PURO, fonte única dos 5 bloqueios). `mensagemSavingSemGanho` é
+MONTADA com os números do projeto e se adapta: com custos declarados, diz que *"as 60h/mês economizadas não
+cobrem os custos que você declarou na Etapa 2 — ferramenta externa (R$ 2.500,00/mês)"* e ensina o que fazer
+(conferir valor **e periodicidade** — a pegadinha do total do ANO marcado como mensal; cadastrar o gasto
+eliminado no campo de CUSTO EVITADO, avisando que valor citado só na conversa não é gravado; ou marcar o
+projeto como ESPECIAL); sem ganho nenhum, mantém o texto antigo, que só estava certo nesse caso. ⚠️ **O R$ das
+HORAS não aparece** — valor/hora por cargo é escondido do usuário de propósito (`step3-chat.tsx`), então a
+explicação é qualitativa de um lado e numérica do outro (os custos foram digitados pela própria pessoa).
+Idem para receita zerada, receita incompleta, doc ausente e nome duplicado: todas terminam em "Para
+corrigir…". No frontend, o toast perdeu o prefixo "Erro ao enviar projeto:" (empurrava a orientação para fora
+da vista) e ganhou 20s de duração.
+
+**Onde aterrissou:** `src/lib/agents/custo-evitado-chat.ts` (novo) · `src/lib/mensagens-submissao.ts` (novo) ·
+`src/lib/agents/types.ts` (`custo_evitado_chat` + `savingVazio`) · `src/lib/chat.functions.ts` (detecção,
+turno de resposta, re-merge do estado, bloqueio do preview, 5 mensagens de submissão) ·
+`src/routes/submeter.tsx` (toast) · `src/lib/testes/prompt-registry.ts` (regra 3) ·
+`tests/custo-evitado-chat.test.ts` + `tests/mensagens-submissao.test.ts` (novos, 34 casos) ·
+`tests/agents-types.test.ts` (contrato de campos) · `CLAUDE.md`.
+
+**Ponto cego que segue aberto.** O valor de custo evitado continua entrando **só pelo formulário** (decisão de
+arquitetura: o R$ é escondido do LLM e os itens são a fonte da verdade, inclusive para o gate de sobreposição
+receita × custo evitado). O gate agora AVISA a pessoa, mas não transporta o número do chat para o formulário —
+se ela ignorar o aviso, o valor continua não sendo gravado. Fazer o transporte exigiria o LLM escrever em
+`custo_evitado_itens`, o que reabre a porta que a decisão de 04/08/2026 fechou.
