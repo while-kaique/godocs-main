@@ -2370,10 +2370,14 @@ export function SubmeterPageContent({
       const msg = e instanceof Error ? e.message : "";
       if (msg.includes("Já existe um projeto submetido")) {
         toast.warning(msg, { duration: 8000 });
+      } else if (msg) {
+        // Mensagem REAL do servidor, SEM prefixo: os bloqueios de submissão já dizem o que
+        // aconteceu e trazem o "Para corrigir…" (ver `lib/mensagens-submissao.ts`) — o
+        // "Erro ao enviar projeto:" na frente só empurrava a orientação para fora da vista.
+        // Duração longa porque a orientação tem passos para ler.
+        toast.error(msg, { duration: 20000 });
       } else {
-        // Mostra a mensagem REAL do servidor (orienta a ação — ex.: "sem ganho
-        // mensurável, conclua o memorial") em vez do genérico que prendia o usuário.
-        toast.error(msg ? `Erro ao enviar projeto: ${msg}` : "Erro ao enviar projeto. Tente novamente.");
+        toast.error("Erro ao enviar projeto. Tente novamente.");
       }
       setSubmittingProject(false);
       return;

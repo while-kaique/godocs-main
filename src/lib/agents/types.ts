@@ -166,6 +166,20 @@ export type SavingColetado = {
   // ⚠️ 'projetado' segue BLOQUEANDO o preview — é a função do gate. Ver
   // `agents/ganho-projetado.ts` (inclui as duas saídas oferecidas à pessoa).
   ganho_real?: "pendente" | "reperguntado" | "real" | "projetado" | "nao_respondido" | null;
+  // Estado do GATE DETERMINÍSTICO do CUSTO EVITADO DECLARADO NO CHAT. Backend-only (não
+  // ecoado pelo LLM; re-mesclado a cada turno). null = nenhum valor de gasto evitado citado
+  // na conversa / ainda não avaliado · 'pendente' → 'reperguntado' → TERMINAL ('pago' |
+  // 'estimado' | 'nao_respondido'). ⚠️ NENHUM estado bloqueia para sempre: 'estimado' libera
+  // o preview e só impede o valor de entrar como custo evitado. Ver
+  // `agents/custo-evitado-chat.ts` (caso SmartOnline/DIFAL, 10/08/2026 — R$ 324.005,09
+  // aceitos sem uma única pergunta e descartados no submit por não existirem no formulário).
+  custo_evitado_chat?:
+    | "pendente"
+    | "reperguntado"
+    | "pago"
+    | "estimado"
+    | "nao_respondido"
+    | null;
 };
 
 export const savingVazio = (): SavingColetado => ({
@@ -192,6 +206,7 @@ export const savingVazio = (): SavingColetado => ({
   alocacao_ganhos_racional: null,
   criterio_secoes: null,
   ganho_real: null,
+  custo_evitado_chat: null,
 });
 
 // ─── Agente 3: Receita incremental ──────────────────────────────────────────
