@@ -4,6 +4,56 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+## ✅ 11/08 (SESSÃO MAIS RECENTE) — SQLite como fonte de LEITURA das telas: espelho da planilha (staging no ar, prod PENDENTE)
+
+**Pedido do Luis:** *"nosso godocs ta demorando mt pra puxar informações nas telas… tudo sqlite agora como
+fonte da verdade, porém não vamos mudar o ciclo de inserção dentro do sheets… várias vzs por dia"* + *"remover
+os mortos do sqlite"* (gente reclamou de projeto bugado na lista).
+
+**Causa medida (não era palpite):** `/api/meus-projetos` fazia um `readAllRows()` da planilha INTEIRA **a cada
+load de página** — está nos logs de prod, em todo GET (`[sync-reverse:owner] total=9 … ignorados=9`) — e o
+`/dashboard` escondia a mesma leitura de ~2 s atrás de cache de 60 s + SWR + patches em memória.
+
+**O que foi feito** (branch `feat/sqlite-fonte-de-leitura`, commits `b09b672` + `0ccb24c`, **1243 testes
+verdes** vindo de 1201): tabela **`sheet_espelho`** (linha crua da planilha em JSON + `linha_resumo` +
+`linha_hash` + `patch`/`escrito_em`) + **`sync_runs`**; módulo `src/lib/sheet-espelho.ts`; mappers extraídos
+para o módulo PURO `src/lib/dashboard-resumo.ts` (re-exportados, fonte única); as 2 telas lendo o espelho;
+**toda escrita nossa remenda o espelho na hora**; sync com **retry (3×)** e **carga em LOTE**; cron de
+**5 min**; aviso de espelho velho no cabeçalho + `GET /api/admin/sync-status`.
+
+### 📈 Medido na staging (não é teoria)
+| corrida | espelhados | duração |
+|---|---|---|
+| espelho vazio | 578 | 46,5 s |
+| nada mudou | **0** | **1,3 s** |
+
+O sync inteiro custava **23–27 s** antes (o diff fazia `getProjetoById` por linha, ~600 round-trips): lote +
+hash-gate deram ~**20×**.
+
+### ⚠️ 2 achados que valem mais que a feature
+1. **O 1º `updateApp` trocou os ASSETS e seguiu executando o worker ANTIGO.** O `getApp` mostrava o meu
+   `worker.js` (1.013.869 bytes, ≠ o da `main`) e o `index.html` servia o meu entry — tudo "provado" — mas
+   **duas corridas de cron** logaram o formato antigo da mensagem. Um 2º deploy idêntico resolveu. **A prova
+   por `getApp` é necessária e NÃO suficiente: exija um sinal de RUNTIME** (string nova num log que um cron
+   dispara) e redeploye se ele não aparecer.
+2. **Webhook do Sheets é impossível** — o edge do Godeploy exige OAuth em todas as rotas e devolve **302**
+   para o login (medido com curl). Apps Script não autentica. **Não tentar de novo**: a cadência do cron É a
+   frescura das telas.
+
+### 🟢 Próximo passo — o que depende de humano
+1. **Luis validar na staging** (`https://godocs-staging.devgogroup.com/`): "Meus Projetos" abre rápido e com
+   Status certo · `/dashboard` lista e a ficha abre com as colunas manuais · botão **"Atualizar"** sincroniza ·
+   apagar uma linha da aba `STAGING` e ver o projeto sair na corrida seguinte.
+2. **Prod `674a3710`**: deploy + **trocar o cron de `0 * * * *` para `*/5 * * * *`** (o de staging já está
+   assim, id `r3wtbbxd4nty`). ⚠️ Nos primeiros minutos o espelho de prod nasce VAZIO — a tela avisa "Ainda não
+   sincronizou" e o 1º cron (≤5 min) o preenche; quem abrir "Meus Projetos" antes disso dispara a auto-cura.
+   ⚠️ **Confirmar por `getAppLogs`** que a linha traz `espelhados=` (achado 1).
+3. **PR** da branch (nada foi para o `main` ainda).
+4. Fatia própria já mapeada: **`reconciliarComplexidade` faz um `readAllRows()` POR MINUTO** em prod — hoje o
+   maior consumidor da cota do Sheets. E `/email-legados` também lê ao vivo.
+5. Dívida conhecida: o `CLAUDE.md` está em **~90 kB** (a memória de "manter <40 kB" virou ficção); vale uma
+   fatia de enxugamento movendo detalhe para `docs/`.
+
 ## ✅ 07/08 (SESSÃO MAIS RECENTE) — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
 
 **Pedido do Luis:** *"fazer o deploy dos ajustes que fizemos e sincronizar repo local, github, deixar tudo
@@ -1649,11 +1699,10 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 
 ## Plano ativo
 **→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **aprovado**
-(Luis, 11/08/2026) — as telas de listagem (Meus Projetos + `/dashboard`) passam a ler um **espelho da
-planilha dentro do SQLite** (cron de 5 min + remendo imediato das nossas escritas), em vez de fazer
-`readAllRows()` no caminho de request. A planilha segue fonte da verdade e único lugar de edição.
-⚠️ **Push do Sheets é impossível** (edge do Godeploy devolve 302 para o login em rota sem sessão) — a
-cadência é por cron. Fora do escopo: `reconciliarComplexidade` e `/email-legados` (fatia própria).
+(Luis, 11/08/2026) — em implementação na branch `feat/sqlite-fonte-de-leitura` (worktree
+`.claude/worktrees/sqlite-fonte-leitura`). As telas de listagem passam a ler um **espelho da planilha no
+SQLite** (cron de 5 min + remendo imediato das nossas escritas). ⚠️ **Push do Sheets é impossível** (edge
+devolve 302 no login) — a cadência é por cron.
 
 Fila de planejamento depois desta fatia: o **pedido do Lucas** (mostrar "Alguém já fazia?" no card da fila).
 
