@@ -466,23 +466,10 @@ function Home() {
                   ))}
                 </ul>
 
-                {/* Rodapé só com o aviso institucional — a entrada da página é o botão
-                    do cabeçalho, e repetir o link aqui embaixo dava dois caminhos para
-                    a mesma coisa. */}
-                <p
-                  className="mt-5 text-center text-[11.5px] leading-relaxed"
-                  style={{ color: "#8b8b9a" }}
-                >
-                  Líderes e administradores acompanham todas as submissões na{" "}
-                  <Link
-                    to="/auth"
-                    className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
-                    style={{ color: "var(--go-blue)" }}
-                  >
-                    área administrativa
-                  </Link>
-                  .
-                </p>
+                {/* Sem rodapé: o antigo link para a área administrativa saiu daqui
+                    (decisão de produto, 11/08/2026). A tela é do público geral e só admin
+                    entra no painel — oferecer o caminho a todos convidava ao "Acesso
+                    restrito". Quem é admin tem o botão "Área Admin" no topo da home. */}
               </div>
             </section>
           )}
