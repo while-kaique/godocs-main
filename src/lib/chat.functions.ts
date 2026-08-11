@@ -73,6 +73,7 @@ import {
   interpretarCustoEvitadoChat,
   perguntaCustoEvitadoChat,
   perguntaCustoEvitadoChatFirme,
+  mensagemCustoEvitadoPago,
   nudgeCustoEvitadoPago,
   OPCOES_CUSTO_EVITADO_CHAT,
   NUDGE_CUSTO_EVITADO_ESTIMADO,
@@ -513,7 +514,7 @@ function getTiposProjeto(ctx: ProjetoContexto): ("saving" | "receita_incremental
 // cliente com cache antigo (version skew) — no sync eles caem em "Contribuidor".
 // Opcional (projeto individual/legado → ausente). O e-mail é a chave, como em `membros`.
 const membrosPapeisSchema = z
-  .record(z.enum(['coexecutor', 'planejador', 'contribuidor', 'idealizador', 'referencia_tecnica']))
+  .record(z.enum(["coexecutor", "planejador", "contribuidor", "idealizador", "referencia_tecnica"]))
   .optional();
 
 const iniciarSubmissaoSchema = z.object({
@@ -1298,9 +1299,7 @@ export async function enviarMensagem(rawData: unknown) {
   // exatamente o que falhou: ele perguntou duas vezes, ouviu "não é um número medido" e
   // gerou o preview com a ressalva escrita dentro do memorial.
   const faseGanhoReal = aplicaGateGanhoProjetado(estado.fase);
-  const falasUsuarioFase = [
-    ...history.filter((m) => m.role === "user").map((m) => m.content),
-  ];
+  const falasUsuarioFase = [...history.filter((m) => m.role === "user").map((m) => m.content)];
   const detProjecao =
     faseGanhoReal === "saving"
       ? detectarGanhoProjetado(textosParaDeteccaoSaving(estado.saving, falasUsuarioFase))
@@ -1336,12 +1335,18 @@ export async function enviarMensagem(rawData: unknown) {
     // um caminho" por 15 turnos (falha encontrada na staging, 04/08/2026).
     const racional = (data.content ?? "").trim();
     if (interpretarGanhoReal(racional, data.selected_option ?? null) === "real") {
-      log("enviarMensagem", `Ganho real × projetado (${faseGanhoReal}): usuário afirmou medição — reabrindo`);
+      log(
+        "enviarMensagem",
+        `Ganho real × projetado (${faseGanhoReal}): usuário afirmou medição — reabrindo`,
+      );
       if (faseGanhoReal === "saving") estado.saving = { ...estado.saving, ganho_real: "real" };
       else estado.receita = { ...estado.receita, ganho_real: "real" };
       history.push({ role: "user", content: nudgeGanhoRealConfirmado(racional) });
     } else {
-      log("enviarMensagem", `⛔ Ganho projetado confirmado (${faseGanhoReal}) — mantendo o bloqueio (sem LLM)`);
+      log(
+        "enviarMensagem",
+        `⛔ Ganho projetado confirmado (${faseGanhoReal}) — mantendo o bloqueio (sem LLM)`,
+      );
       reask = {
         type: "question",
         content: mensagemGanhoProjetadoRepetida(faseGanhoReal),
@@ -1351,7 +1356,10 @@ export async function enviarMensagem(rawData: unknown) {
         receita: estado.receita,
       };
     }
-  } else if (faseGanhoReal && (ganhoRealAtual === "pendente" || ganhoRealAtual === "reperguntado")) {
+  } else if (
+    faseGanhoReal &&
+    (ganhoRealAtual === "pendente" || ganhoRealAtual === "reperguntado")
+  ) {
     // (0) Turno de RESPOSTA ao gate GANHO REAL × PROJETADO. Vem PRIMEIRO na cadeia porque é
     // a premissa mais externa: não faz sentido validar horas ou base de cálculo de um ganho
     // que ainda não aconteceu. ANTI-LOOP por construção: 'pendente' → ambíguo → 'reperguntado'
@@ -1503,9 +1511,7 @@ export async function enviarMensagem(rawData: unknown) {
     // cinzenta no analisador, nunca reprovação automática). Marca 'ok' e injeta o nudge
     // [SISTEMA] com o texto do usuário para o LLM escrever as seções faltantes.
     const memorialAtual =
-      faseCriterio === "saving"
-        ? estado.saving.memorial_calculo
-        : estado.receita.memorial_calculo;
+      faseCriterio === "saving" ? estado.saving.memorial_calculo : estado.receita.memorial_calculo;
     const normalizado = normalizarMarcadoresMemorial(memorialAtual);
     const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
     const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
@@ -1539,7 +1545,10 @@ export async function enviarMensagem(rawData: unknown) {
     // Clique decide; texto livre cai no fallback por regex. Ambíguo → repergunta UMA vez.
     const resp = interpretarSobreposicao(data.content, data.selected_option ?? null);
     if (resp === null && detSobreposicao) {
-      log("enviarMensagem", "Sobreposição receita×custo evitado: resposta ambígua — 2ª e ÚLTIMA pergunta");
+      log(
+        "enviarMensagem",
+        "Sobreposição receita×custo evitado: resposta ambígua — 2ª e ÚLTIMA pergunta",
+      );
       estado.receita = { ...estado.receita, sobreposicao_custo_evitado: "reperguntado" };
       reask = {
         type: "options",
@@ -1552,7 +1561,10 @@ export async function enviarMensagem(rawData: unknown) {
       };
     } else {
       const decisao = resp ?? "nao_respondido";
-      log("enviarMensagem", `Sobreposição receita×custo evitado: decisão "${decisao}" — encerrando o gate`);
+      log(
+        "enviarMensagem",
+        `Sobreposição receita×custo evitado: decisão "${decisao}" — encerrando o gate`,
+      );
       estado.receita = { ...estado.receita, sobreposicao_custo_evitado: decisao };
       history.push({
         role: "user",
@@ -1565,7 +1577,10 @@ export async function enviarMensagem(rawData: unknown) {
     // 'nao_respondido' (libera + marca para a triagem). NUNCA uma terceira pergunta.
     const resp = interpretarSobreposicao(data.content, data.selected_option ?? null);
     const decisao = resp ?? "nao_respondido";
-    log("enviarMensagem", `Sobreposição receita×custo evitado: 2ª resposta "${decisao}" — encerrado (anti-loop)`);
+    log(
+      "enviarMensagem",
+      `Sobreposição receita×custo evitado: 2ª resposta "${decisao}" — encerrado (anti-loop)`,
+    );
     estado.receita = { ...estado.receita, sobreposicao_custo_evitado: decisao };
     history.push({
       role: "user",
@@ -1600,15 +1615,43 @@ export async function enviarMensagem(rawData: unknown) {
         receita: estado.receita,
       };
     } else if (novo === "pago") {
-      history.push({
-        role: "user",
-        content: nudgeCustoEvitadoPago(detCustoEvitado?.valor ?? 0, racional),
-      });
+      // ⚠️ O aviso NÃO vai por nudge: quem fala é o backend, sem gastar chamada de LLM. Na
+      // validação no staging (11/08/2026) o agente recebeu o nudge com as duas instruções,
+      // devolveu o preview no mesmo turno com "Contratos/Serviços Evitados: N/A" e NÃO avisou
+      // que o valor precisa ir ao formulário — ignorou as duas. Prompt não segura (3ª vez
+      // neste repo). O nudge do memorial entra no turno SEGUINTE, no ramo (7b).
+      log(
+        "enviarMensagem",
+        "Custo evitado no chat: gasto REAL confirmado — avisando sobre o formulário (sem LLM)",
+      );
+      reask = {
+        type: "question",
+        content: mensagemCustoEvitadoPago(detCustoEvitado?.valor ?? 0),
+        fase: "saving",
+        coletado: estado.coletado,
+        saving: estado.saving,
+        receita: estado.receita,
+      };
     } else if (novo === "estimado") {
       history.push({ role: "user", content: NUDGE_CUSTO_EVITADO_ESTIMADO });
     } else {
       history.push({ role: "user", content: NUDGE_CUSTO_EVITADO_SEM_RESPOSTA });
     }
+  } else if (gateCustoEvitadoChat && custoEvitadoChatAtual === "pago") {
+    // (7b) Turno seguinte ao aviso determinístico: a pessoa acabou de dizer ONDE o número se
+    // confere. Injeta o nudge do memorial UMA vez e fecha o gate em 'pago_registrado'.
+    // ⚠️ MONOTÔNICO e de passagem única: sem o estado próprio, o nudge seria reinjetado a
+    // cada turno (o LLM reescreveria a seção e repetiria o aviso para sempre).
+    const racional = (data.content ?? "").trim();
+    log(
+      "enviarMensagem",
+      "Custo evitado no chat: registrando a seção do memorial (nudge 1x) — gate encerrado",
+    );
+    estado.saving = { ...estado.saving, custo_evitado_chat: "pago_registrado" };
+    history.push({
+      role: "user",
+      content: nudgeCustoEvitadoPago(detCustoEvitado?.valor ?? 0, racional),
+    });
   }
   // ── PRÉ-EMPÇÃO DO GATE GANHO REAL × PROJETADO (antes de gastar a chamada de LLM) ──
   // Roda DEPOIS da cadeia de respostas (não rouba o turno de resposta de outro gate) e só
@@ -1620,7 +1663,11 @@ export async function enviarMensagem(rawData: unknown) {
   // "escolha: encerrar a submissão ou reclassificar como especial" por ~15 turnos seguidos,
   // o histórico foi de 38 a 56 mensagens e a submissão morreu em 500 — com o gate INERTE.
   // Pré-emptando, o backend faz UMA pergunta de dois botões e chega a estado terminal.
-  if (faseGanhoReal && reask === null && devePreemptarPorProjecao(ganhoRealAtual, detProjecao !== null)) {
+  if (
+    faseGanhoReal &&
+    reask === null &&
+    devePreemptarPorProjecao(ganhoRealAtual, detProjecao !== null)
+  ) {
     log(
       "enviarMensagem",
       `⛔ Pré-empção do gate ganho real × projetado (${faseGanhoReal}, pistas: ${detProjecao!.marcas.join(",")}) — perguntando antes do LLM`,
@@ -1844,15 +1891,16 @@ export async function enviarMensagem(rawData: unknown) {
         : (resultado.receita ?? estado.receita);
     const det =
       faseGanhoReal === "saving"
-        ? detectarGanhoProjetado(
-            textosParaDeteccaoSaving(alvo as SavingColetado, falasUsuarioFase),
-          )
+        ? detectarGanhoProjetado(textosParaDeteccaoSaving(alvo as SavingColetado, falasUsuarioFase))
         : detectarGanhoProjetado(
             textosParaDeteccaoReceita(alvo as ReceitaColetada, falasUsuarioFase),
           );
     if (ganhoRealResolvidoAgora === "projetado") {
       // Já confirmado como expectativa: o preview segue bloqueado (a função do gate).
-      log("enviarMensagem", `⛔ Preview de ${faseGanhoReal} com ganho PROJETADO confirmado — bloqueando`);
+      log(
+        "enviarMensagem",
+        `⛔ Preview de ${faseGanhoReal} com ganho PROJETADO confirmado — bloqueando`,
+      );
       Object.assign(resultado, {
         type: "question",
         content: mensagemGanhoProjetado(faseGanhoReal),
@@ -2018,10 +2066,7 @@ export async function enviarMensagem(rawData: unknown) {
     faseCriterio === "saving"
       ? ((resultado.saving ?? estado.saving).criterio_secoes ?? null)
       : ((resultado.receita ?? estado.receita).criterio_secoes ?? null);
-  if (
-    faseCriterio &&
-    deveBloquearPorCriterio(criterioResolvido, resultado.type)
-  ) {
+  if (faseCriterio && deveBloquearPorCriterio(criterioResolvido, resultado.type)) {
     const alvo = (
       faseCriterio === "saving"
         ? (resultado.saving ?? estado.saving)
@@ -2031,7 +2076,10 @@ export async function enviarMensagem(rawData: unknown) {
     const faltaProcesso = secaoProcessoVaga(extrairProcessoAlterado(normalizado));
     const faltaPonteiro = secaoPonteiroVaga(extrairPonteiroMovido(normalizado));
     if (!faltaProcesso && !faltaPonteiro) {
-      log("enviarMensagem", `Critério de projeto (${faseCriterio}): seções [1.3]/[1.4] presentes — liberado`);
+      log(
+        "enviarMensagem",
+        `Critério de projeto (${faseCriterio}): seções [1.3]/[1.4] presentes — liberado`,
+      );
       if (faseCriterio === "saving" && resultado.saving) {
         resultado.saving = { ...resultado.saving, criterio_secoes: "ok" };
       } else if (faseCriterio === "receita" && resultado.receita) {
@@ -2990,32 +3038,32 @@ export async function analisarProjetoFn(rawData: unknown) {
  */
 export function decidirReconciliacaoPlanilha(args: {
   /** Célula "Complexidade" da planilha (`undefined` = projeto não está na planilha). */
-  comp: string | undefined
+  comp: string | undefined;
   /** Célula "Classificação" da planilha. */
-  classif: string | undefined
+  classif: string | undefined;
   /** `projetos.complexidade` no SQLite. */
-  compSqlite: string
+  compSqlite: string;
   /** `projetos.classificacao_avaliacao` no SQLite. */
-  classifSqlite: string
-}): { acao: 'nada' | 'resync' | 'reanalisar'; colunas: Array<'complexidade' | 'classificacao'> } {
-  const { comp, classif, compSqlite, classifSqlite } = args
-  const nada = { acao: 'nada' as const, colunas: [] }
+  classifSqlite: string;
+}): { acao: "nada" | "resync" | "reanalisar"; colunas: Array<"complexidade" | "classificacao"> } {
+  const { comp, classif, compSqlite, classifSqlite } = args;
+  const nada = { acao: "nada" as const, colunas: [] };
   // Fora da planilha: a reconciliação não inventa linha (quem faz append é a IDA).
-  if (comp === undefined) return nada
-  const vazio = (v: string | undefined) => v === undefined || v === '' || v === '—'
+  if (comp === undefined) return nada;
+  const vazio = (v: string | undefined) => v === undefined || v === "" || v === "—";
 
-  const colunas: Array<'complexidade' | 'classificacao'> = []
-  if (vazio(comp) && compSqlite) colunas.push('complexidade')
-  if (vazio(classif) && classifSqlite) colunas.push('classificacao')
-  if (colunas.length) return { acao: 'resync', colunas }
+  const colunas: Array<"complexidade" | "classificacao"> = [];
+  if (vazio(comp) && compSqlite) colunas.push("complexidade");
+  if (vazio(classif) && classifSqlite) colunas.push("classificacao");
+  if (colunas.length) return { acao: "resync", colunas };
 
   // Sem nada para repor: só vale re-analisar se o SQLite está vazio nas DUAS pontas e
   // ao menos uma das colunas da planilha está esperando dado.
-  const faltaNaPlanilha = vazio(comp) || vazio(classif)
+  const faltaNaPlanilha = vazio(comp) || vazio(classif);
   if (faltaNaPlanilha && !compSqlite && !classifSqlite) {
-    return { acao: 'reanalisar', colunas: [] }
+    return { acao: "reanalisar", colunas: [] };
   }
-  return nada
+  return nada;
 }
 
 // ─── Reconciliação de Complexidade/Observações (rede de segurança) ───────────

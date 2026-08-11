@@ -13,6 +13,8 @@ import {
   perguntaCustoEvitadoChat,
   perguntaCustoEvitadoChatFirme,
   nudgeCustoEvitadoPago,
+  mensagemCustoEvitadoPago,
+  escolherValorDoGasto,
   deveBloquearPorCustoEvitadoChat,
   aplicaGateCustoEvitadoChat,
   custoEvitadoChatResolvido,
@@ -47,8 +49,11 @@ describe("detectarCustoEvitadoNoChat", () => {
   it("arma no caso real (multa + juros + valor), que passou batido em prod", () => {
     const det = detectarCustoEvitadoNoChat([FALA_PEDIDO, FALA_DIFAL], null);
     expect(det).not.toBeNull();
-    // O MAIOR valor citado é o principal do DIFAL; é o que dá a dimensão do que está em jogo.
-    expect(det!.valor).toBe(2234517.87);
+    // ⚠️ REGRESSÃO DO STAGING (11/08/2026): tem de citar o CUSTO EVITADO (R$ 324.005,09), não
+    // o maior número da fala — R$ 2.234.517,87 é a BASE DE CÁLCULO (o DIFAL total do grupo), e o
+    // gate perguntava por ele como se fosse o gasto evitado.
+    expect(det!.valor).toBe(324005.09);
+    expect(det!.valor).not.toBe(2234517.87);
     expect(det!.marcas).toContain("multa");
     expect(det!.marcas).toContain("juros");
     expect(det!.marcas).toContain("custo-evitado");
@@ -149,7 +154,12 @@ describe("escopo do gate", () => {
   });
 
   it('estados terminais liberam para sempre — inclusive "estimado"', () => {
-    for (const t of ["pago", "estimado", "nao_respondido"] as EstadoCustoEvitadoChat[]) {
+    for (const t of [
+      "pago",
+      "pago_registrado",
+      "estimado",
+      "nao_respondido",
+    ] as EstadoCustoEvitadoChat[]) {
       expect(custoEvitadoChatResolvido(t)).toBe(true);
       expect(deveBloquearPorCustoEvitadoChat(t, "preview")).toBe(false);
     }
@@ -161,7 +171,7 @@ describe("textos", () => {
 
   it("a pergunta cita o valor e as duas naturezas, com acentuação", () => {
     const p = perguntaCustoEvitadoChat(det);
-    expect(p).toContain("2.234.517,87");
+    expect(p).toContain("324.005,09");
     expect(p).toMatch(/já acontece e é medido/);
     expect(p).toMatch(/estimativa/);
   });
@@ -170,14 +180,16 @@ describe("textos", () => {
     expect(perguntaCustoEvitadoChatFirme(det)).toMatch(/escolha/i);
   });
 
-  it('o nudge de "pago" cobra a seção do memorial E o cadastro no formulário', () => {
+  it('o nudge de "pago" cobra a seção do memorial (o aviso do formulário é do backend)', () => {
     const n = nudgeCustoEvitadoPago(324005.09, "pagamos todo mês, sai no contas a pagar");
     expect(n).toContain("[SISTEMA]");
     expect(n).toContain("Contratos/Serviços Evitados");
-    // O ponto que faltava: valor citado só no chat NÃO é gravado (o R$ vem do formulário).
-    expect(n).toMatch(/CUSTO EVITADO/);
-    expect(n).toMatch(/não é gravado/);
     expect(n).toContain("324.005,09");
+    // ⚠️ O aviso "valor citado só no chat não é gravado" saiu do nudge e virou texto do
+    // BACKEND (mensagemCustoEvitadoPago) — o LLM ignorava a instrução (achado do staging).
+    const aviso = mensagemCustoEvitadoPago(324005.09);
+    expect(aviso).toMatch(/não é gravado/);
+    expect(aviso).toMatch(/custo evitado/i);
   });
 
   it("nenhum texto vaza marcador de roteiro interno ([x.y])", () => {
@@ -243,5 +255,65 @@ describe("anti-loop (simulação de 20 turnos ininteligíveis)", () => {
     const decidido: EstadoCustoEvitadoChat = interpretarCustoEvitadoChat("", 1) ?? "reperguntado";
     expect(decidido).toBe("pago");
     expect(deveBloquearPorCustoEvitadoChat(decidido, "complete")).toBe(false);
+  });
+});
+
+/**
+ * ACHADOS DA VALIDAÇÃO NO STAGING (11/08/2026) — os dois defeitos que só o chat real mostrou.
+ */
+describe("achados do staging", () => {
+  it("valor citado: escolhe o gasto evitado mesmo quando a base de cálculo é maior", () => {
+    const det = detectarCustoEvitadoNoChat([FALA_DIFAL], null)!;
+    expect(perguntaCustoEvitadoChat(det)).toContain("324.005,09");
+    expect(perguntaCustoEvitadoChat(det)).not.toContain("2.234.517,87");
+  });
+
+  it("com um único valor na fala, nada muda", () => {
+    const det = detectarCustoEvitadoNoChat(
+      [
+        "quero somar um gasto evitado: pagariamos cerca de R$ 45.000,00 por mes de cobranca indevida",
+      ],
+      null,
+    )!;
+    expect(det.valor).toBe(45000);
+  });
+
+  it("o aviso do formulário é TEXTO DO BACKEND, não instrução ao LLM", () => {
+    // O nudge não segurou no staging: o agente devolveu o preview com "Custo evitado: N/A" e
+    // sem avisar nada. Agora o backend fala, então o texto tem de ser autossuficiente.
+    const m = mensagemCustoEvitadoPago(324005.09);
+    expect(m).toContain("324.005,09");
+    expect(m).toMatch(/formulário/);
+    expect(m).toMatch(/custo evitado/i);
+    expect(m).toMatch(/não é gravado/);
+    // Termina perguntando ONDE se confere — a resposta alimenta o nudge do turno seguinte.
+    expect(m).toMatch(/onde esse número pode ser conferido/i);
+    // Não é mensagem de sistema: vai para o usuário, sem marcador interno.
+    expect(m).not.toContain("[SISTEMA]");
+    expect(m).not.toMatch(/\[\d+\.\d+\]/);
+  });
+
+  it("o nudge do memorial NÃO repete o aviso do formulário (o backend já deu)", () => {
+    const n = nudgeCustoEvitadoPago(324005.09, "no razão de multas e juros tributários");
+    expect(n).toContain("[SISTEMA]");
+    expect(n).toContain("Contratos/Serviços Evitados");
+    expect(n).toMatch(/NÃO repita o aviso sobre cadastrar/);
+    expect(n).toContain("razão de multas e juros tributários");
+  });
+
+  it("'pago' → 'pago_registrado': o nudge entra UMA vez e o gate encerra", () => {
+    // Simula a passagem única do ramo (7b): sem o estado próprio, o nudge voltaria a cada turno.
+    const st: { valor: EstadoCustoEvitadoChat | null } = { valor: "pago" };
+    let injecoes = 0;
+    for (let turno = 0; turno < 5; turno++) {
+      if (st.valor === "pago") {
+        injecoes++;
+        st.valor = "pago_registrado";
+      }
+      // Os dois estados liberam o preview — nenhum deles volta a perguntar.
+      expect(deveBloquearPorCustoEvitadoChat(st.valor, "preview")).toBe(false);
+    }
+    expect(injecoes).toBe(1);
+    expect(st.valor).toBe("pago_registrado");
   });
 });
