@@ -4,7 +4,47 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 07/08 (SESSÃO MAIS RECENTE) — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
+## 📋 11/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: o alerta do Chat passa a ser disparado pela PRÉ-APROVAÇÃO, não pela submissão
+
+**Pedido do Luis:** *"as notificações que rolam a cada submissão ou edição no grupo do Google Chat eu quero
+que só ocorram agora quando houver uma pré-aprovação do líder. Pois só a pessoa submeter ou editar e não
+tiver aprovação do líder ou validação nós vamos desconsiderar. Continuar mostrando submissão de projetos
+especiais de forma normal, porém de forma mais enxuta e objetiva."*
+
+**Nenhuma linha de código foi tocada** — sessão de planejamento (Gate D armado). Saída: o plano aprovado
+**[chat-notifica-so-pre-aprovacao](plans/chat-notifica-so-pre-aprovacao.md)** (T1–T8, critérios, fronteiras,
+blast-radius).
+
+### As 3 decisões tomadas na abertura (seletor)
+1. **Quem nunca terá parecer NOTIFICA na submissão, sinalizado** — autor sem líder na TeamGuide, ou TeamGuide
+   fora no momento da submissão. Silenciar sumiria com esses projetos do grupo **para sempre**, e a integração
+   já caiu antes. A mensagem leva uma linha dizendo *por que* não há parecer, para a triagem não a ler como
+   pré-aprovação de um líder que não existiu.
+2. **`ajuste`/`reprovado` do líder NÃO notificam** — é literalmente o "desconsiderar" do pedido; fica entre
+   líder e autor.
+3. **A 2ª mensagem por submissão é suprimida** — o `🚨 Novo fluxo de automação cadastrado – Análise Pendente`
+   do `syncUpdateToGoogle` (pós-análise) é a mesma notificação por submissão com outra roupa; mantê-la
+   anularia a mudança. Passa a ser **1 mensagem por projeto**.
+
+### O que a sessão de código precisa saber antes de começar
+- **Régua:** só `isento === false` (fila aberta de verdade) faz o alerta calar. **Qualquer** isenção —
+  `lideranca`, `sem_lider`, `teamguide_indisponivel`, `especial` e inclusive um motivo que o futuro
+  acrescente (o `default:`) — notifica na submissão. Projeto sem ninguém para aprová-lo não pode ficar invisível.
+- **Não reusar `resyncGoogle`** para remontar o payload na pré-aprovação: ele também **escreve** no Sheets, e
+  a notificação acabaria regravando a linha inteira. Daí o `notificacao-projeto.functions.ts` próprio.
+- **`notificarChat` entra OBRIGATÓRIO** em `SubmitSyncParams` (não opcional-com-default): são 2 chamadores hoje
+  (`submeterParaValidacao`, `resyncGoogle`) e um terceiro que nascesse notificaria por acidente.
+- **Sem `docs/INDEX.md`/`invariants.md` neste repo (RF-35):** o blast-radius do plano veio de leitura direta
+  dos 4 arquivos e de todos os call sites — a sessão de código deve **confirmar com varredura**.
+- Invariantes a não regredir: mute de `[E2E-…]` · o sync nunca propaga erro · fire-and-forget só via
+  `runBackground` · nada disso pode bloquear submissão nem a decisão do líder (D3).
+- **Worktree já criado e vazio, pronto para a sessão de código** (regra 8):
+  `.claude/worktrees/chat-so-pre-aprovacao`, branch `feat/chat-notifica-so-pre-aprovacao`, nascida de
+  `origin/main`. Os docs deste plano foram commitados **pela raiz**, na branch `docs/plano-chat-so-pre-aprovacao`
+  — é o padrão do repo (o `plan-gate.sh` calcula a allowlist `docs/**` relativa ao `CLAUDE_PROJECT_DIR`, então
+  `docs/` de dentro do worktree não casa).
+
+## ✅ 07/08 — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
 
 **Pedido do Luis:** *"fazer o deploy dos ajustes que fizemos e sincronizar repo local, github, deixar tudo
 sincronizado"*. Havia **duas** frentes prontas e **nenhuma** no ar: a dispensa da fila do líder (06/08, faltava
@@ -1648,8 +1688,10 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**Nenhum plano ativo** — o último (dispensa da fila do líder) está **concluído e em produção** (07/08, PR #242).
-O próximo a planejar é o **pedido do Lucas**: mostrar o "Alguém já fazia?" no card da fila (`/ggsd:plan`).
+**→ [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md)** · Status: ✅ aprovado (Luis, 2026-08-11)
+
+O alerta do grupo do Chat passa a ser disparado pela **pré-aprovação do líder**, não pela submissão/edição.
+Segue na fila para planejar: o **pedido do Lucas** — mostrar o "Alguém já fazia?" no card da fila.
 
 <details>
 <summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>
