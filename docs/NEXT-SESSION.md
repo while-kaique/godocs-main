@@ -1648,8 +1648,14 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**Nenhum plano ativo** — o último (dispensa da fila do líder) está **concluído e em produção** (07/08, PR #242).
-O próximo a planejar é o **pedido do Lucas**: mostrar o "Alguém já fazia?" no card da fila (`/ggsd:plan`).
+**→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **aprovado**
+(Luis, 11/08/2026) — as telas de listagem (Meus Projetos + `/dashboard`) passam a ler um **espelho da
+planilha dentro do SQLite** (cron de 5 min + remendo imediato das nossas escritas), em vez de fazer
+`readAllRows()` no caminho de request. A planilha segue fonte da verdade e único lugar de edição.
+⚠️ **Push do Sheets é impossível** (edge do Godeploy devolve 302 para o login em rota sem sessão) — a
+cadência é por cron. Fora do escopo: `reconciliarComplexidade` e `/email-legados` (fatia própria).
+
+Fila de planejamento depois desta fatia: o **pedido do Lucas** (mostrar "Alguém já fazia?" no card da fila).
 
 <details>
 <summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>
