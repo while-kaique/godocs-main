@@ -1,7 +1,11 @@
-// Dashboard do admin (triagem sobre a planilha): mapeamento de linha do Sheets, cache
-// com single-flight, contagem/ordenação das filas e o write-back de status — incluindo o
-// guard de que a tela NUNCA escreve "Atualizado Em" (aquela coluna é o carimbo do
-// sistema e é o que decide se um legado está regularizado).
+// Dashboard do admin (triagem sobre a planilha): mapeamento de linha do Sheets, leitura do
+// ESPELHO, contagem/ordenação das filas e o write-back de status — incluindo o guard de que
+// a tela NUNCA escreve "Atualizado Em" (aquela coluna é o carimbo do sistema e é o que
+// decide se um legado está regularizado).
+//
+// ⚠️ Desde 11/08/2026 a listagem NÃO lê a planilha em request: lê o espelho no SQLite. Aqui
+// o espelho é um fake em memória e a planilha (mockada) chega nele por um sync explícito —
+// `semearEspelho()`. O caminho com banco de verdade está em `tests/dashboard-espelho.test.ts`.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/google/sheets', () => ({
@@ -9,9 +13,34 @@ vi.mock('@/lib/google/sheets', () => ({
   updateRowByProjectId: vi.fn(),
 }));
 
-vi.mock('@/integrations/db/client.server', () => ({
+// `vi.hoisted` porque o factory do `vi.mock` é içado para o topo do arquivo e não pode
+// alcançar variáveis normais — o fake tem de nascer ANTES dos mocks.
+const espelhoFakeP = vi.hoisted(
+  async () => (await import('./helpers/espelho-fake')).criarEspelhoFake(),
+);
+
+vi.mock('@/integrations/db/client.server', async () => ({
   insertAdminStatusLog: vi.fn(),
   getAdminStatusLogs: vi.fn(async () => []),
+  ...(await espelhoFakeP).api,
+  // O `?refresh=1` dispara o sync reverso de verdade; aqui só o espelho interessa, então o
+  // lado de `projetos` é stub (quem cobre aquele lado é `tests/sync-reverse.test.ts`).
+  getAllProjetoIds: vi.fn(async () => []),
+  getProjetosParaSyncReverso: vi.fn(async () => []),
+  getProjetosNaoRascunho: vi.fn(async () => []),
+  getProjetosByOwnerEmail: vi.fn(async () => []),
+  getProjetoById: vi.fn(async () => undefined),
+  insertProjetoRaw: vi.fn(async () => undefined),
+  updateProjeto: vi.fn(async () => undefined),
+  excluirProjetoCascade: vi.fn(async () => undefined),
+  parseJson: (v: string | null) => {
+    if (!v) return null;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return null;
+    }
+  },
 }));
 
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
@@ -26,7 +55,6 @@ import {
   listarProjetosDashboard,
   getProjetoDashboard,
   definirStatusProjeto,
-  invalidarCacheDashboard,
   STATUS_GRAVAVEIS,
   type ProjetoDashboardResumo,
 } from '@/lib/dashboard-admin.functions';
@@ -56,11 +84,22 @@ function linha(over: Record<string, string> = {}) {
   } as Record<string, string>;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
-  invalidarCacheDashboard();
+  (await espelhoFakeP).limpar();
   mockInsertLog.mockResolvedValue(undefined);
 });
+
+/**
+ * Coloca linhas "na planilha" e sincroniza para o espelho — é o `?refresh=1` da tela.
+ * Depois disto, ler NÃO toca mais o Sheets (é o que esta fatia veio garantir).
+ */
+async function semearEspelho(rows: Record<string, string>[]) {
+  mockReadAllRows.mockResolvedValue(rows as never);
+  const r = await listarProjetosDashboard(true);
+  mockReadAllRows.mockClear();
+  return r;
+}
 
 describe('parsers de célula', () => {
   it('numero aceita os formatos que a planilha realmente produz', () => {
@@ -187,48 +226,56 @@ describe('busca e paginação (lógica da tabela)', () => {
 });
 
 describe('listarProjetosDashboard', () => {
-  it('lê a planilha, descarta linhas sem ID e ordena por data desc', async () => {
-    mockReadAllRows.mockResolvedValue([
+  it('descarta linhas sem ID e ordena por data desc', async () => {
+    const r = await semearEspelho([
       linha({ 'ID Projeto': 'a', 'Data Submissão': '01/05/2026' }),
       linha({ 'ID Projeto': '' }),
       linha({ 'ID Projeto': 'b', 'Data Submissão': '20/06/2026' }),
-    ] as never);
-
-    const r = await listarProjetosDashboard();
+    ]);
     expect(r.projetos.map((p) => p.id)).toEqual(['b', 'a']);
     expect(r.total).toBe(2);
     expect(r.contagem).toEqual({ pendente: 2 });
   });
 
-  it('serve do cache na segunda chamada e relê só com refresh', async () => {
-    mockReadAllRows.mockResolvedValue([linha()] as never);
-
-    const primeira = await listarProjetosDashboard();
-    expect(primeira.doCache).toBe(false);
-    const segunda = await listarProjetosDashboard();
-    expect(segunda.doCache).toBe(true);
-    expect(mockReadAllRows).toHaveBeenCalledTimes(1);
-
-    await listarProjetosDashboard(true);
-    expect(mockReadAllRows).toHaveBeenCalledTimes(2);
+  it('NUNCA lê a planilha na listagem — o dado vem do espelho', async () => {
+    await semearEspelho([linha()]);
+    const r = await listarProjetosDashboard();
+    expect(mockReadAllRows).not.toHaveBeenCalled();
+    expect(r.projetos).toHaveLength(1);
   });
 
-  it('single-flight: chamadas concorrentes geram UMA leitura', async () => {
-    mockReadAllRows.mockResolvedValue([linha()] as never);
+  it('chamadas concorrentes não geram leitura nenhuma da planilha', async () => {
+    await semearEspelho([linha()]);
     await Promise.all([
       listarProjetosDashboard(),
       listarProjetosDashboard(),
       listarProjetosDashboard(),
     ]);
+    expect(mockReadAllRows).not.toHaveBeenCalled();
+  });
+
+  it('`refresh` sincroniza de verdade (é o botão "Atualizar")', async () => {
+    await semearEspelho([linha()]);
+    mockReadAllRows.mockResolvedValue([linha({ Status: 'Aprovado' })] as never);
+    const r = await listarProjetosDashboard(true);
     expect(mockReadAllRows).toHaveBeenCalledTimes(1);
+    expect(r.projetos[0]!.statusChave).toBe('aprovado');
+  });
+
+  it('planilha fora do ar no `refresh` NÃO derruba a tela — serve o espelho e avisa', async () => {
+    await semearEspelho([linha()]);
+    mockReadAllRows.mockRejectedValue(new Error('429 cota'));
+    const r = await listarProjetosDashboard(true);
+    expect(r.projetos).toHaveLength(1); // o espelho anterior continua servindo
+    expect(r.syncFalhou).toBe(true);
   });
 });
 
 describe('getProjetoDashboard', () => {
   it('devolve todas as células preenchidas e ignora vazias/"—"', async () => {
-    mockReadAllRows.mockResolvedValue([
+    await semearEspelho([
       linha({ Descrição: 'Automatiza o reembolso', Complexidade: '—', Observações: '' }),
-    ] as never);
+    ]);
 
     const d = await getProjetoDashboard('LEGADO-148'); // match case-insensitive
     expect(d.campos['Descrição']).toBe('Automatiza o reembolso');
@@ -238,14 +285,14 @@ describe('getProjetoDashboard', () => {
   });
 
   it('404 quando o ID não está na planilha', async () => {
-    mockReadAllRows.mockResolvedValue([linha()] as never);
+    await semearEspelho([linha()]);
     await expect(getProjetoDashboard('nao-existe')).rejects.toThrow(/não encontrado/i);
   });
 });
 
 describe('definirStatusProjeto', () => {
-  beforeEach(() => {
-    mockReadAllRows.mockResolvedValue([linha()] as never);
+  beforeEach(async () => {
+    await semearEspelho([linha()]);
   });
 
   it('grava o Status na planilha e audita quem mudou', async () => {
@@ -364,12 +411,11 @@ describe('definirStatusProjeto', () => {
     expect(mockUpdateRow).not.toHaveBeenCalled();
   });
 
-  it('corrige o cache: a listagem seguinte já mostra o status novo, sem reler', async () => {
-    await listarProjetosDashboard();
+  it('remenda o espelho: a listagem seguinte mostra o status novo, sem ler a planilha', async () => {
     await definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado' }, 'a@b.com');
     const depois = await listarProjetosDashboard();
     expect(depois.projetos[0]!.statusChave).toBe('aprovado');
-    expect(mockReadAllRows).toHaveBeenCalledTimes(1);
+    expect(mockReadAllRows).not.toHaveBeenCalled();
   });
 
   it('falha da auditoria não desfaz a escrita já feita na planilha', async () => {

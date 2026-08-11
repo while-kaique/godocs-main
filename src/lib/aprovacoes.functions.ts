@@ -36,6 +36,7 @@ import {
   normalizarMarcadoresMemorial,
 } from '@/lib/agents/memorial-format';
 import { updateRowByProjectId } from '@/lib/google/sheets';
+import { espelharEscrita } from '@/lib/sheet-espelho';
 import { runBackground } from '@/lib/background';
 import {
   abrirAprovacoesPendentes,
@@ -511,12 +512,15 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
       out.reabertos.push({ projeto_id: id, nome, aprovadores: r.aprovadores.map((a) => a.email) });
     }
     // Espelha o estado no Sheets, como o submit faz (best-effort — a fonte é o SQLite).
+    // ⚠️ E remenda o ESPELHO junto: a coluna "Pré-status" da triagem é lida de lá, então
+    // sem isto o parecer só apareceria no /dashboard no próximo cron.
+    const colunasLider = {
+      'Aprovação do Líder': r.rotuloSheet,
+      'Justificativa Aprovação do Líder': r.justificativaSheet,
+    } as const;
     runBackground(
-      updateRowByProjectId(id, {
-        'Aprovação do Líder': r.rotuloSheet,
-        'Justificativa Aprovação do Líder': r.justificativaSheet,
-      })
-        .then(() => undefined)
+      updateRowByProjectId(id, colunasLider)
+        .then(() => espelharEscrita(id, colunasLider))
         .catch((e) => console.error('[aprovacoes/reabrir] falha ao gravar no Sheets:', e)),
     );
   }
@@ -783,12 +787,14 @@ export async function decidirAprovacao(
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
+  const colunasLiderDecidido = {
+    'Aprovação do Líder': rotuloAprovacaoSheet(atualizadas),
+    'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(atualizadas),
+  } as const;
   runBackground(
-    updateRowByProjectId(projeto_id, {
-      'Aprovação do Líder': rotuloAprovacaoSheet(atualizadas),
-      'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(atualizadas),
-    })
-      .then(() => undefined)
+    updateRowByProjectId(projeto_id, colunasLiderDecidido)
+      // Remenda o espelho: é dele que a coluna "Pré-status" da triagem é lida.
+      .then(() => espelharEscrita(projeto_id, colunasLiderDecidido))
       .catch((e) => console.error('[aprovacoes] falha ao gravar no Sheets (não-fatal):', e)),
   );
 

@@ -20,8 +20,10 @@ por fila, sem ver a linha inteira de um projeto num lugar organizado.
 
 ## 2. Decisões fechadas (NÃO "corrigir" por engano)
 
-- **D1 — A planilha é a fonte da listagem.** A tela lê `readAllRows()` (`google/sheets.ts`), a mesma
-  leitura que o disparo de e-mails usa. **Não voltar a ler o SQLite**: seria reintroduzir o bug.
+- **D1 — A planilha é a fonte da listagem.** A tela lista **a LINHA DA PLANILHA**, nunca o estado interno
+  de `projetos`. **Não voltar a ler o `projetos`**: seria reintroduzir o bug.
+  ⚠️ **Emenda 11/08/2026 (D11):** a linha deixou de vir de `readAllRows()` no request e passa a vir do
+  **espelho** (`sheet_espelho`, ver D11) — a fonte continua a planilha, mudou de onde se lê.
   Efeitos aceitos e desejados: rascunho não aparece; colunas manuais ("Diff Horas / Antes",
   "Diff Saving / Antes", "Observações") chegam de graça; um projeto que falhou o append de IDA não
   aparece aqui (é o mesmo buraco que a reconciliação de exclusão já trata).
@@ -36,10 +38,10 @@ por fila, sem ver a linha inteira de um projeto num lugar organizado.
 - **D4 — O `status` do SQLite não é tocado.** Pertence ao fluxo de submissão/análise, e o sync reverso o
   ignora. A única ponte que existe segue sendo a que já existia: "Descontinuado" na planilha → flag
   `descontinuado` no SQLite (mão única, `sync-reverse.ts`).
-- **D5 — Cache de 60 s com single-flight.** Ler a planilha custa ~1–3 s. N admins abrindo a tela ao mesmo
+- **D5 — ~~Cache de 60 s com single-flight~~ (SUPERADA pela D11, 11/08/2026 — mantida como registro do porquê).** Ler a planilha custa ~1–3 s. N admins abrindo a tela ao mesmo
   tempo geram **uma** leitura; o botão "Atualizar" (`?refresh=1`) fura o cache. Depois de gravar um
   status, a linha é **corrigida no cache** em vez de reler tudo — a tela reflete na hora.
-- **D9 — Cache vencido serve dado velho e revalida em background (stale-while-revalidate).** Medido em
+- **D9 — ~~Cache vencido serve dado velho e revalida em background (stale-while-revalidate)~~ (SUPERADA pela D11 — mas leia: as GARANTIAS dela continuam valendo, só mudaram de mecanismo).** Medido em
   28/07/2026: a leitura é **1.450–2.360 ms** para **2,65 MB** (544 linhas × 48 colunas) e **estreitar o
   range não ajuda** (`A1:ZZ` vs `A1:AV` dão o mesmo payload — o peso é volume de células). Com TTL puro, o
   primeiro admin que chegava depois do vencimento pagava a leitura inteira; a espera "aparecia do nada" a
@@ -81,6 +83,31 @@ por fila, sem ver a linha inteira de um projeto num lugar organizado.
 - **D8 — Auditoria própria.** A planilha não guarda autoria de célula. Tabela **`admin_status_log`**
   (projeto, de → para, motivo, admin, quando) responde "quem aprovou isto?". É registro paralelo: se a
   gravação da auditoria falhar, a escrita na planilha **não** é desfeita.
+
+- **D11 — A listagem lê o ESPELHO da planilha no SQLite, e o Sheets sai do caminho de request (11/08/2026).**
+  Motivo medido: a leitura custa **1.450–2.360 ms** para 2,65 MB (D9) e a cota de 60 leituras/min é
+  compartilhada com prod — e o mesmo problema era pior em "Meus Projetos", que fazia um `readAllRows()`
+  INTEIRO **por load de página de cada usuário**. O sync reverso (cron de **5 min**) copia a planilha para
+  **`sheet_espelho`** (linha crua em JSON + `linha_resumo` + hash + `patch`), e a tela lê de lá.
+  **O que caiu:** o cache de 60 s, o single-flight, o SWR, a máquina de `epoca`/`seqLeitura` e os
+  `patchesEscritos` em memória (D5/D9) — todos existiam para esconder a leitura lenta.
+  **O que NÃO caiu (as garantias da D9, agora no banco):** (a) o status recém-gravado **não volta atrás**
+  quando um sync que começou antes da escrita termina depois dela — o `patch`/`escrito_em` da linha é
+  reaplicado (empate por milissegundo **protege a nossa escrita**; a planilha vence no ciclo seguinte), e
+  agora vale **entre isolates**, não só dentro de um; (b) falha do Sheets **não** derruba a tela nem apaga
+  nada — o espelho anterior segue servindo e a resposta traz `syncFalhou`; (c) a listagem segue enxuta —
+  `linha_resumo` recortado pelas `COLUNAS_RESUMO` (D6 continua valendo, agora também no SQL: a listagem
+  **nunca** seleciona a coluna `linha`).
+  **`?refresh=1` mudou de significado:** era "furar o cache", virou "**sincronizar de verdade** agora"
+  (lê a planilha, regrava o espelho, relê) — é o botão "Atualizar".
+  ⚠️ **O risco desta decisão é o sync morrer em silêncio** (a tela mostraria dado velho com cara de novo),
+  então ele é **visível por construção**: `sync_runs` registra cada corrida, o cabeçalho diz "Planilha
+  sincronizada às HH:MM" e vira **aviso âmbar com ícone + texto** após 20 min (`ESPELHO_VELHO_MS`), e há
+  `GET /api/admin/sync-status`. ⚠️ **Push do Sheets (Apps Script → app) é IMPOSSÍVEL** e não deve ser
+  tentado de novo: o edge do Godeploy exige OAuth em TODAS as rotas e devolve **302** para o login
+  (medido em 11/08/2026 com `curl`). A cadência do cron É a frescura da tela.
+  Plano: `docs/plans/sqlite-fonte-de-leitura.md`. Testes: `tests/dashboard-espelho.test.ts` (banco real),
+  `tests/sheet-espelho.test.ts`, `tests/dashboard-admin.test.ts` (fake em memória).
 
 ## 3. O que a tela faz
 

@@ -226,10 +226,15 @@ describe('syncSheetsToSqlite (Sheets → SQLite)', () => {
   });
 
   it('falha de leitura da planilha não propaga (retorna erro contabilizado)', async () => {
-    mockedRead.mockRejectedValueOnce(new Error('429 rate limit'));
+    // ⚠️ `mockRejectedValue` (todas as tentativas), não `…Once`: desde 11/08/2026 a leitura
+    // tem RETRY — falhar uma vez agora RECUPERA na 2ª (é o ponto do retry: com as telas
+    // lendo o espelho, uma leitura perdida deixaria todo mundo com dado velho por um ciclo).
+    mockedRead.mockRejectedValue(new Error('429 rate limit'));
     const r = await syncSheetsToSqlite();
     expect(r.erros).toBe(1);
     expect(r.detalhes[0]).toContain('429');
+    expect(r.ok).toBe(false);
+    mockedRead.mockReset();
   });
 
   it('"Especial? = Não" no Sheet desmarca o flag, deriva tipos e limpa contexto (anti-especial-sticky)', async () => {
@@ -444,9 +449,11 @@ describe('syncOwnerRowsFromSheet (sync sob demanda por dono)', () => {
   });
 
   it('falha de leitura não propaga', async () => {
-    mockedRead.mockRejectedValueOnce(new Error('500 boom'));
+    // Idem: a leitura tem retry, então a falha precisa valer para todas as tentativas.
+    mockedRead.mockRejectedValue(new Error('500 boom'));
     const r = await syncOwnerRowsFromSheet('dono@gocase.com');
     expect(r.erros).toBe(1);
+    mockedRead.mockReset();
   });
 });
 
@@ -675,5 +682,91 @@ describe('pré-aprovação do líder NÃO volta da planilha (autorização, não
     const p = await getProjetoById('aprov-manual');
     expect(JSON.stringify(p)).not.toContain('Aprovado por mim mesmo');
     expect(JSON.stringify(p)).not.toContain('Pré-aprovado');
+  });
+});
+
+// ─── Robustez da corrida (fatia "SQLite como fonte de leitura", 11/08/2026) ────
+//
+// Com as TELAS lendo o espelho, uma leitura perdida deixa todo mundo vendo dado velho até a
+// próxima corrida — daí o retry — e o "sync morreu em silêncio" precisa ficar registrado.
+describe('leitura da planilha com retry + registro da corrida', () => {
+  beforeAll(async () => {
+    const db = new BetterSqlite3(':memory:');
+    db.pragma('foreign_keys = ON');
+    const { initSchema } = await import('@/integrations/db/schema');
+    const adapter = asyncAdapter(db);
+    await initSchema(adapter);
+    await setDb(adapter);
+  });
+
+  beforeEach(() => {
+    mockedRead.mockReset();
+  });
+
+  it('falha transiente na 1ª tentativa e sucesso na 2ª → a corrida termina OK', async () => {
+    mockedRead
+      .mockRejectedValueOnce(new Error('429 quota exceeded'))
+      .mockResolvedValueOnce([
+        {
+          'ID Projeto': 'RETRY-1',
+          Projeto: 'Projeto do retry',
+          'Nome Completo': 'Alguém',
+          Email: 'alguem@gocase.com',
+          Ferramenta: 'n8n',
+          Status: 'Pendente',
+        },
+      ]);
+
+    const r = await syncSheetsToSqlite('cron');
+    expect(r.ok).toBe(true);
+    expect(mockedRead).toHaveBeenCalledTimes(2);
+    expect(r.espelhados).toBe(1);
+    const { getUltimaSyncRunOk } = await import('@/integrations/db/client.server');
+    expect((await getUltimaSyncRunOk())?.gatilho).toBe('cron');
+  });
+
+  it('todas as tentativas falham → ok=false, nada removido e a falha REGISTRADA', async () => {
+    mockedRead.mockRejectedValue(new Error('503 Service Unavailable'));
+
+    const r = await syncSheetsToSqlite('cron');
+    expect(r.ok).toBe(false);
+    expect(r.removidos).toBe(0);
+    expect(mockedRead).toHaveBeenCalledTimes(3);
+
+    const { getUltimaSyncRun } = await import('@/integrations/db/client.server');
+    const run = await getUltimaSyncRun();
+    expect(run?.ok).toBe(0);
+    expect(run?.detalhe).toContain('503');
+  });
+
+  it('a corrida NÃO consulta o banco projeto por projeto (sem N+1 na listagem de linhas)', async () => {
+    const { getDb } = await import('@/integrations/db/client.server');
+    const real = getDb();
+    let selectsPorId = 0;
+    await setDb({
+      query: async (sql: string, params: unknown[] = []) => {
+        // O padrão do N+1 antigo era um SELECT * FROM projetos WHERE id = ? por linha.
+        if (/FROM projetos\s+WHERE id = \?/i.test(sql)) selectsPorId++;
+        return real.query(sql, params);
+      },
+      exec: async (sql: string, params: unknown[] = []) => real.exec(sql, params),
+    });
+
+    mockedRead.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        'ID Projeto': `LOTE-${i}`,
+        Projeto: `Projeto ${i}`,
+        'Nome Completo': 'Alguém',
+        Email: 'alguem@gocase.com',
+        Ferramenta: 'n8n',
+        Status: 'Pendente',
+      })),
+    );
+    await syncSheetsToSqlite('cron'); // 1ª: cria os 12 legados
+    selectsPorId = 0;
+    await syncSheetsToSqlite('cron'); // 2ª: só diff — é aqui que o N+1 aparecia
+    expect(selectsPorId).toBe(0);
+
+    await setDb(real);
   });
 });
