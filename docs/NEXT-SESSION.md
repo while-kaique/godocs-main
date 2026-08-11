@@ -1697,6 +1697,25 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 
 </details>
 
+## 🔄 11/08 (adendo, 18:28 UTC) — atts do Kaique incorporadas e staging RESUBIDA
+
+O Kaique deployou a staging por cima (PR **#246**, tela de apresentação antes do formulário) e o Luis não
+conseguiu validar. Ação: `git fetch` → `main` em **`c092df6`** → **merge na branch** (`d8dcaee`). Conflito
+**só** no `SPEC_FEATURES_NOVAS.md` (as duas seções nasceram no mesmo dia no fim do arquivo), resolvido
+**UNINDO os dois lados** (regra 7) — nenhum marcador sobrou aqui nem no `CLAUDE.md`, que auto-mergeou.
+**1248 testes verdes** (1243 + 5 da intro) e `dist`/`worker.js` rebuildados APÓS o merge (regra 10).
+
+Staging `edf400b4` resubida às **18:28 UTC** com as DUAS features. Desta vez o bundle novo entrou **no 1º
+deploy** — confirmado por log (`total=578 espelhados=0 … erros=0`), o método do achado de hoje. O espelho
+**sobreviveu** ao deploy dele (o SQLite é persistente), então a staging já está populada para validar.
+
+⚠️ **Transiente observado, a endurecer:** nessa corrida o `INSERT` em `sync_runs` falhou com
+`Durable Object storage operation exceeded timeout`. Não afeta dado (o sync espelhou; o registro é
+observabilidade e já é tolerado por construção) — o efeito é o cabeçalho poder mostrar hora antiga / aviso
+âmbar sem motivo, **sempre no lado seguro**. Fatia pequena: retry no `registrarCorrida`.
+
+⚠️ **A staging é disputada:** combinar com o Kaique quem a usa até o Luis validar, ou resubir a branch (2 min).
+
 ## Plano ativo
 **→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **executado**
 (11/08/2026) — código na branch `feat/sqlite-fonte-de-leitura` (`b09b672` · `0ccb24c` · `e0097a4`), **1243
