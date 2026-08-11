@@ -2008,3 +2008,50 @@ ambíguo sem verbo de evitação — não armou o gate em nenhum turno, até o p
 `extrairValoresComPosicao`, `mensagemCustoEvitadoPago`, estado `'pago_registrado'`) ·
 `src/lib/agents/types.ts` · `src/lib/chat.functions.ts` (ramo (7b) novo) ·
 `src/lib/testes/prompt-registry.ts` · `tests/custo-evitado-chat.test.ts` (+6 casos) · `CLAUDE.md`.
+
+## Fallback do LLM era a REGRA, não a exceção — e trocava o modelo por baixo (11/08/2026)
+
+**Sintoma.** Ao trocar o `LLM_MODEL` de prod para `gpt-5.6-sol`, a pergunta do Luis foi: *"sempre
+que o proxy demora mais de 25s vai para a IA mesmo? Ler documentação e montar memorial demoram
+bastante — esses sempre vão cair no fallback?"*. Sim. Medindo uma hora de logs de produção
+(18:01→19:05, 50 chamadas de LLM): **29 abortaram nos 25s = 58%**.
+
+| Etapa | Chamadas | Fallback |
+|---|---|---|
+| `atualizar-metadados` | 4 | **100%** |
+| fase `doc` | 2 | **100%** |
+| `doc_preview` (compilar doc) | 9 | 67% |
+| fase `saving` (montar memorial) | 30 | 50% |
+| `saving_preview` (turno curto) | 3 | 0% |
+
+**Causa.** `LLM_TIMEOUT_MS` era **25s para os dois lados** e a chamada **não é streaming**: o
+`AbortController` mede o tempo de gerar a **resposta inteira**, não o primeiro byte. Então o
+timeout funcionava como régua de **TAMANHO**, não de saúde do proxy — um memorial de ~3.800
+caracteres não sai em 25s. A distribuição prova: os turnos longos caíam quase sempre, os curtos
+nunca.
+
+**Por que isso importa além da latência.** No fallback o modelo passa a ser o
+`LLM_FALLBACK_MODEL` (default `gpt-5.4-mini`). Ou seja, **a metade pesada do produto —
+documentação e memorial — rodava no modelo do plano B mesmo com outro modelo em `LLM_MODEL`**.
+Trocar de modelo não surtia efeito justamente onde a qualidade mais importa, e o log dizia
+"Falha de TIMEOUT" como se fosse instabilidade do gateway.
+
+**Fix.** Relógios próprios: **proxy 60s** (`LLM_TIMEOUT_PROXY_MS`) e **fallback 25s**
+(`LLM_TIMEOUT_FALLBACK_MS`). Aguardar `fetch` não consome CPU no Worker, e a espera de quem está
+na tela **já era maior** — a pessoa pagava os 25s do proxy **mais** a geração inteira no
+fallback. O fallback fica curto de propósito: a `api.openai.com` direta é rápida (é o proxy que
+é lento) e os memoriais dele fechavam dentro dos 25s; assim o pior caso não é esperar 60s duas
+vezes quando o proxy está realmente pendurado.
+
+**O que NÃO foi feito (decisão do Luis).** Streaming, que resolveria de raiz: o relógio passaria
+a medir o **primeiro byte**, o fallback voltaria a ser só plano B, a pessoa veria o texto
+aparecendo em ~2s em vez de encarar 40s de tela parada, e pararíamos de pagar DUAS gerações nos
+turnos que hoje abortam. O custo é o contrato: o orquestrador consome um JSON **completo**
+(`{type, content, saving…}`), então streamear até a tela exige buffer + parse incremental ou
+mudar o protocolo. Fica como projeto separado — e há um meio-caminho barato: usar transporte
+streaming só para medir o primeiro byte, bufferizando no servidor (corrige o timeout sem tocar
+frontend nem contrato).
+
+**Onde aterrissou:** `src/lib/llm.ts` (2 constantes + comentários) ·
+`tests/llm-fallback.test.ts` (teste de regressão com fake timers: 25s NÃO derruba mais o proxy,
+60s derruba e cai no fallback) · `CLAUDE.md`.

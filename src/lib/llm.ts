@@ -17,10 +17,29 @@ export type LLMOptions = {
   model?: string;
 };
 
-// Timeout por tentativa de chamada ao LLM. Acima disso o proxy é considerado
-// "pendurado" — abortamos e (se houver) caímos no fallback direto. 25s cobre uma
-// geração lenta legítima sem deixar o usuário esperando indefinidamente.
-const LLM_TIMEOUT_MS = 25_000;
+// Timeout por tentativa de chamada ao LLM (AbortController). ⚠️ A chamada NÃO é streaming,
+// então este relógio mede o tempo de gerar a RESPOSTA INTEIRA — não o primeiro byte.
+//
+// ⚠️ Eram 25s para os dois lados, e isso fazia o fallback ser a REGRA, não a exceção: numa
+// hora de produção medida em 11/08/2026, **29 de 50 chamadas (58%)** abortaram nos 25s. E não
+// por instabilidade — por tamanho: `atualizar-metadados` 100%, fase `doc` 100%, compilação da
+// doc 67%, memorial de saving 50%; os turnos curtos (`saving_preview`) 0%. Um memorial de
+// ~3.800 caracteres não sai em 25s pelo proxy.
+//
+// Consequência silenciosa: no fallback o modelo passa a ser o `LLM_FALLBACK_MODEL`
+// (gpt-5.4-mini), então a metade pesada do produto — documentação e memorial — rodava no
+// modelo do fallback mesmo com outro modelo configurado em `LLM_MODEL`. Trocar `LLM_MODEL`
+// não surtia efeito justamente onde mais importa.
+//
+// Hoje os dois lados têm relógios PRÓPRIOS:
+//   - PROXY (60s): dá tempo de uma geração longa terminar no modelo escolhido. Aguardar
+//     `fetch` não consome CPU no Worker; o custo é a espera de quem está na tela — e ela
+//     hoje JÁ é maior, porque a pessoa paga os 25s do proxy MAIS a geração no fallback.
+//   - FALLBACK (25s): a `api.openai.com` direta é rápida (é o proxy que é lento) e os
+//     memoriais do fallback fechavam dentro dos 25s. Manter curto evita o pior caso de
+//     esperar 60s duas vezes quando o proxy está realmente pendurado.
+const LLM_TIMEOUT_PROXY_MS = 60_000;
+const LLM_TIMEOUT_FALLBACK_MS = 25_000;
 
 // Modelo usado no FALLBACK (OpenAI direto, fora do proxy). gpt-5.4-mini por padrão
 // (NÃO 5.5). Override opcional via env LLM_FALLBACK_MODEL (lido em runtime).
@@ -61,12 +80,15 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
   }
 
   // FALLBACK do LLM (só no modo proxy + provider openai): quando o proxy demora
-  // (>25s, abortamos) ou retorna erro de gateway, refazemos a MESMA chamada direto na
-  // OpenAI (sem proxy) com uma chave dedicada (LLM_FALLBACK) e um modelo leve
-  // (gpt-5.4-mini). Assim o usuário não vê o erro nem fica preso no "tente novamente".
+  // (> LLM_TIMEOUT_PROXY_MS, abortamos) ou retorna erro de gateway, refazemos a MESMA
+  // chamada direto na OpenAI (sem proxy) com uma chave dedicada (LLM_FALLBACK) e um modelo
+  // leve (gpt-5.4-mini). Assim o usuário não vê o erro nem fica preso no "tente novamente".
   // - Com fallback disponível, o proxy NÃO retenta gateway (gatewayRetries:0) → falha
-  //   rápido e cai no fallback (em vez de esperar ~3×25s antes de tentar o plano B).
+  //   rápido e cai no fallback (em vez de esperar 3× o timeout antes do plano B).
   // - Sem fallback, mantém a resiliência de antes (2 retries de gateway no proxy).
+  // ⚠️ O fallback é PLANO B, não caminho normal: ele troca o modelo por baixo
+  // (LLM_FALLBACK_MODEL). Se os logs voltarem a mostrar fallback na maioria dos turnos, o
+  // problema é o timeout do proxy estar curto para o tamanho da geração — não "instabilidade".
   const fallbackKey = usingProxy ? process.env.LLM_FALLBACK?.trim() || undefined : undefined;
 
   // `model` resolvido (opts.model ?? env) tem de VENCER o spread de opts — senão um
@@ -78,7 +100,7 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
       model,
       apiKey,
       baseUrl,
-      timeoutMs: LLM_TIMEOUT_MS,
+      timeoutMs: LLM_TIMEOUT_PROXY_MS,
       gatewayRetries: fallbackKey ? 0 : 2,
     });
   } catch (proxyErr) {
@@ -91,7 +113,7 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
       model: fallbackModel,
       apiKey: fallbackKey,
       baseUrl: undefined, // direto na api.openai.com (sem proxy)
-      timeoutMs: LLM_TIMEOUT_MS,
+      timeoutMs: LLM_TIMEOUT_FALLBACK_MS,
       gatewayRetries: 2,
     });
   }
@@ -172,8 +194,12 @@ async function callOpenAI(
       const aborted = netErr instanceof Error && netErr.name === "AbortError";
       lastErr = aborted
         ? new Error(`timeout após ${opts.timeoutMs}ms (proxy não respondeu)`)
-        : netErr instanceof Error ? netErr : new Error(String(netErr));
-      errLog(`Falha de ${aborted ? "TIMEOUT" : "rede"} na chamada OpenAI: ${lastErr.message.slice(0, 80)}`);
+        : netErr instanceof Error
+          ? netErr
+          : new Error(String(netErr));
+      errLog(
+        `Falha de ${aborted ? "TIMEOUT" : "rede"} na chamada OpenAI: ${lastErr.message.slice(0, 80)}`,
+      );
       if (gatewayRetriesLeft <= 0) throw lastErr;
       gatewayRetriesLeft--;
       await new Promise((r) => setTimeout(r, 2000));
@@ -195,13 +221,15 @@ async function callOpenAI(
       const set = unsupportedByModel.get(opts.model) ?? new Set<string>();
       set.add(dropped);
       unsupportedByModel.set(opts.model, set);
-      log(`Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`);
+      log(
+        `Parâmetro '${dropped}' não suportado por ${opts.model} — removido (memorizado p/ próximas)`,
+      );
       continue;
     }
 
     errLog(`OpenAI HTTP ${res.status}:`, errText);
     // Resposta HTML (ex: página de erro do Cloudflare 520/522) — não expõe o HTML.
-    const errSummary = errText.trimStart().startsWith('<')
+    const errSummary = errText.trimStart().startsWith("<")
       ? `gateway indisponível (HTTP ${res.status}) — tente novamente em instantes`
       : errText;
     lastErr = new Error(`OpenAI error ${res.status}: ${errSummary}`);
