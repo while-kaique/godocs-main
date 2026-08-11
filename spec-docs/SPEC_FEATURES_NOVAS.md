@@ -891,3 +891,79 @@ stack de um projeto vivo muda de verdade.
 
 **Testes:** `tests/validacao-etapa1.test.ts` — troca de ferramenta na edição não gera erro;
 "Outros" sem nome bloqueia nos 2 modos; escopo externo fora dessa regra.
+
+---
+
+## Feature adicional — Tela de apresentação antes do formulário (11/08/2026)
+
+**Pedido (Kaique, 11/08/2026):** "uma tela que aparece antes de aparecer a tela de
+submissão. essa tela é uma apresentação do forms, e deve ser bem clara, breve e objetiva
+com: o que é o forms, qual a finalidade e um guia rápido de como submeter. tudo isso com
+um botão abaixo de 'Ok, entendi' para prosseguir e ir para o forms real."
+
+**Por que ganha o clique extra:** a premissa nº 1 do GoDocs (só entra automação **já em
+produção**, com ganho **já medido**) só aparecia DEPOIS — no gate de ganho real ×
+projetado, no meio da fase financeira do chat. Quem chegava com projeção descobria a régua
+com a submissão já quase pronta e perdia o trabalho inteiro (caso "Automação cadastro de
+novos cliente"/Eduardo Santana, 28/07/2026). Dizer isso na primeira tela é a versão barata
+da mesma trava.
+
+**Onde mora**
+- **`src/lib/submeter/intro.tsx`** (novo) — `IntroSubmissao` + o predicado PURO
+  `deveMostrarIntro`.
+- `src/routes/submeter.tsx` — `showIntro` (`useState` com inicializador) + early return.
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **Aparece SEMPRE que se abre `/submeter` do zero — sem flag em localStorage**
+   (decisão de produto, 11/08/2026). Foram descartadas "só na primeira vez" e "checkbox
+   não mostrar de novo": quem submete 1× por mês esquece a régua, e a flag sumiria
+   justamente para quem já errou antes. Consequência aceita e coerente: **"Recomeçar"**
+   (`handleRecomecar`, que faz `location.assign("/submeter")` sem rascunho) e **"Submeter
+   outro projeto"** (`location.reload()` na tela de sucesso) voltam a mostrar a
+   apresentação.
+2. **NÃO é uma etapa do wizard.** `STEPS` e `WizardProgress` ficam intocados. Uma "etapa
+   0" apareceria também em `/editar/$id` (que renderiza o MESMO `SubmeterPageContent`) e
+   mexeria em `completedSteps`/`handleStepClick`.
+3. **NÃO é rota própria** (`/submeter/intro` foi descartada): `/submeter` está em favorito
+   das pessoas, e um redirect quebraria `?retomar=<id>` e duplicaria o fetch de
+   identidade.
+4. **Quem NÃO vê** (predicado `deveMostrarIntro`, mesmos 3 sinais do `seedLoading`):
+   **edição** (`editProjetoId` — senão vaza para quem só corrige um projeto já submetido) ·
+   **`?retomar=<id>`** (retomada explícita) · **rascunho local** (`hasLocalDraft()`; o
+   `rehydrateFromLocal` salta para `setStep(d.step ?? 3)`, e a intro ficaria na frente de
+   um chat em andamento).
+5. **O early return vem DEPOIS do `if (seedLoading)`.** Hoje os dois são mutuamente
+   exclusivos (sinais idênticos), mas se deixarem de ser, é a tela de carregamento que tem
+   de ganhar — a intro na frente de um seed em voo esconderia um projeto sendo restaurado.
+6. **A trilha das 3 etapas repete o desenho do `WizardProgress`** (círculo azul de 36px +
+   trilho de 2,5px), só na vertical: a pessoa reconhece na intro o mesmo stepper que verá
+   no topo do formulário. Os **rótulos saem de `STEPS`** (fonte única) — só o resumo de
+   cada etapa é texto próprio (`RESUMO_ETAPAS`), para a intro nunca divergir do stepper.
+7. **Foco no `<h2>`, não no botão** (`tabIndex={-1}` + `focus()`): autofocar o CTA faz o
+   leitor de tela anunciar "Ok, entendi, botão" antes de a pessoa ouvir uma linha da
+   apresentação.
+8. **"Entra / não entra" nunca depende só de cor** (regra 11): cada linha tem ícone
+   (`CircleCheck` / `CircleSlash2`) **e** rótulo em negrito ("Entra aqui:" / "Não entra:").
+9. **A tela INSTRUI: as 3 perguntas do critério** (pedido do Kaique, 11/08/2026) — o miolo é
+   "Seu projeto responde a estas 3 perguntas?" com **recorrência · contrafactual ·
+   rastreabilidade** (constante `CRITERIOS` em `intro.tsx`), em forma de pergunta para a
+   pessoa responder **a si mesma**. É a MESMA régua que o analisador aplica depois e que o
+   agente cobra nas seções "Processo alterado" / "Ponteiro movido e onde verificar"
+   (`SPEC_CRITERIOS_PROJETO.md` · `docs/criterios-projeto-recorrencia-evidencia.md`).
+   ⚠️ **Ao mudar a régua LÁ, mude o texto aqui** — uma intro que promete critério diferente
+   do que o agente cobra é pior que intro nenhuma. ⚠️ **NÃO importamos a constante do
+   prompt** (`BLOCO_SECOES_CRITERIO`, `orchestrator.ts`): é redação para LLM, roda no
+   worker e fala em códigos `[1.3]`/`[1.4]`, que são roteiro interno e **proibidos** na
+   tela. ⚠️ A 3ª pergunta manda **NOMEAR** relatório/painel/sistema/base de propósito: "dá
+   para ver no sistema" é a resposta vaga que o gate recusa, e é onde as pessoas mais
+   empacam. ⚠️ E a tela diz explicitamente que **não saber alguma não trava nada** (o
+   agente ajuda a montar; o que ficar em aberto vai à revisão humana) — a intenção é
+   preparar, não filtrar na porta.
+10. **Os critérios NÃO são numerados; as etapas são.** A numeração fica só onde a ordem é
+    real (as 3 etapas do wizard); os 3 critérios são testes independentes, separados pelo
+    NOME + uma barra lima. E o título da seção **não repete o eyebrow** "Antes de começar"
+    — ele é a própria pergunta, que é o que a pessoa deve fazer com a lista.
+
+**Testes:** `tests/intro-submissao.test.ts` — os 4 ramos do predicado + string vazia não
+contando como id.
