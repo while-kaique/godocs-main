@@ -44,12 +44,18 @@
  * projeto segue pelas horas, que são medidas.
  */
 
-/** Estado do gate. `null` = nunca avaliado. Os três últimos são TERMINAIS. */
+/** Estado do gate. `null` = nunca avaliado. Os quatro últimos são TERMINAIS. */
 export type EstadoCustoEvitadoChat =
   | "pendente"
   | "reperguntado"
-  /** Confirmado: gasto que a empresa paga/pagava de verdade e é medido. */
+  /**
+   * Confirmado: gasto que a empresa paga/pagava de verdade. O backend JÁ entregou o aviso
+   * determinístico (`mensagemCustoEvitadoPago`) e ainda precisa injetar o nudge do memorial
+   * no próximo turno — daí o estado seguinte.
+   */
   | "pago"
+  /** O nudge do memorial já foi injetado uma vez. Fim de linha deste gate. */
+  | "pago_registrado"
   /** Confirmado: é estimativa do que aconteceria — não entra como custo evitado. */
   | "estimado"
   /** Perguntado 2× sem escolha clara → libera, mas marca o memorial para a triagem. */
@@ -58,6 +64,7 @@ export type EstadoCustoEvitadoChat =
 /** Estados a partir dos quais o gate NUNCA mais pergunta. */
 export const ESTADOS_TERMINAIS_CUSTO_EVITADO: readonly EstadoCustoEvitadoChat[] = [
   "pago",
+  "pago_registrado",
   "estimado",
   "nao_respondido",
 ];
@@ -88,7 +95,12 @@ const quaseIgual = (a: number, b: number) => Math.abs(a - b) <= 0.01;
  * senão qualquer conversa de horas armaria o gate. "R$ 3.600" (sem centavos) conta.
  */
 export function extrairValoresMonetarios(texto: string): number[] {
-  const out: number[] = [];
+  return extrairValoresComPosicao(texto).map((v) => v.valor);
+}
+
+/** Mesmo varredor, preservando a POSIÇÃO — é ela que decide qual valor a pergunta cita. */
+export function extrairValoresComPosicao(texto: string): { valor: number; indice: number }[] {
+  const out: { valor: number; indice: number }[] = [];
   const t = String(texto ?? "");
   const re =
     /(?:r\$\s*)(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:,\d{2})?)|(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2})/gi;
@@ -96,7 +108,7 @@ export function extrairValoresMonetarios(texto: string): number[] {
   while ((m = re.exec(t)) !== null) {
     const cru = m[1] ?? m[2] ?? "";
     const v = parseFloat(cru.replace(/\./g, "").replace(",", "."));
-    if (isFinite(v) && v > 0) out.push(round2(v));
+    if (isFinite(v) && v > 0) out.push({ valor: round2(v), indice: m.index });
   }
   return out;
 }
@@ -197,8 +209,8 @@ export function detectarCustoEvitadoNoChat(
     const t = normalizarTexto(original);
     if (!t) continue;
 
-    const valores = extrairValoresMonetarios(t).filter(
-      (v) => !jaNoFormulario.some((f) => quaseIgual(f, v)),
+    const valores = extrairValoresComPosicao(t).filter(
+      (v) => !jaNoFormulario.some((f) => quaseIgual(f, v.valor)),
     );
     if (valores.length === 0) continue;
 
@@ -209,19 +221,59 @@ export function detectarCustoEvitadoNoChat(
     // Termo ambíguo ("contrato") só conta com verbo de evitação; termo forte dispensa.
     if (!temForte && verbos.length === 0) continue;
 
-    const valor = Math.max(...valores);
+    const escolhido = escolherValorDoGasto(t, valores, termos);
     const marcas = [...termos.map((x) => x.marca), ...verbos.map((x) => x.marca)];
-    const idx = t.search(termos[0].re);
     const candidato: CustoEvitadoNoChat = {
-      valor,
+      valor: escolhido.valor,
       marcas,
-      trecho: recortarTrecho(original, Math.max(0, idx)),
+      trecho: recortarTrecho(original, escolhido.indice),
     };
-    // Mantém o MAIOR valor citado — é o que dá a dimensão do que está em jogo.
+    // Entre falas diferentes, mantém a de MAIOR valor — é a que dá a dimensão do que está
+    // em jogo (dentro de uma fala, quem decide é a proximidade, não o tamanho).
     if (!melhor || candidato.valor > melhor.valor) melhor = candidato;
   }
 
   return melhor;
+}
+
+/**
+ * Qual dos valores citados na fala é o GASTO EVITADO?
+ *
+ * ⚠️ NÃO é o maior. Achado no staging (11/08/2026), com a fala real do caso de origem:
+ * *"com base na média de recolhimento de DIFAL das 7 empresas (R$ 2.234.517,87/mês) e no
+ * histórico de multa de 8% mais juros SELIC de 6,5%, o custo evitado é de R$ 324.005,09/mês"*.
+ * Pegando o maior, o gate perguntava por **R$ 2.234.517,87 de gasto evitado** — que é a BASE
+ * DE CÁLCULO, não o ganho. A pessoa lê um número que ela nunca chamou de gasto evitado.
+ *
+ * Régua: vence o valor mais PRÓXIMO (em caracteres) de um termo de gasto; empate → o maior.
+ * Na fala acima, "custo evitado" fica a ~18 chars de 324.005,09 e "multa" a ~35 de 2.234.517,87.
+ */
+export function escolherValorDoGasto(
+  texto: string,
+  valores: readonly { valor: number; indice: number }[],
+  termos: readonly { marca: string; re: RegExp }[],
+): { valor: number; indice: number } {
+  const posicoesTermos: number[] = [];
+  for (const termo of termos) {
+    const re = new RegExp(termo.re.source, "g");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(texto)) !== null) {
+      posicoesTermos.push(m.index);
+      if (m.index === re.lastIndex) re.lastIndex++; // guarda contra match vazio
+    }
+  }
+  if (posicoesTermos.length === 0) {
+    return valores.reduce((a, b) => (b.valor > a.valor ? b : a));
+  }
+  const distancia = (v: { indice: number }) =>
+    Math.min(...posicoesTermos.map((p) => Math.abs(p - v.indice)));
+  return valores.reduce((a, b) => {
+    const da = distancia(a);
+    const db = distancia(b);
+    if (db < da) return b;
+    if (db > da) return a;
+    return b.valor > a.valor ? b : a;
+  });
 }
 
 // ── Pergunta e interpretação ────────────────────────────────────────────────
@@ -297,27 +349,49 @@ export function interpretarCustoEvitadoChat(
   return null;
 }
 
+/**
+ * RESPOSTA DETERMINÍSTICA ao clique em "é gasto real" — o backend fala, SEM chamar o LLM.
+ *
+ * ⚠️ POR QUE não é só nudge (achado no staging, 11/08/2026): confirmado "gasto real", o
+ * agente devolveu o preview no mesmo turno com **"Contratos/Serviços Evitados: N/A"** e SEM
+ * o aviso de cadastrar o valor no formulário — ignorou as duas instruções do nudge. É a
+ * lição que este repo já pagou três vezes (Gostream, custo evitado puro, ganho projetado):
+ * **prompt não segura**. O aviso é a metade ÚTIL do gate — sem ele, a pessoa confirma que o
+ * gasto é real e continua sem saber que o número não vai ser gravado. Então quem diz isso é
+ * o backend, no texto exato, uma vez.
+ *
+ * Termina em pergunta (onde se confere) porque a resposta alimenta o nudge do turno
+ * seguinte, que é quem manda o LLM escrever a seção do memorial.
+ */
+export function mensagemCustoEvitadoPago(valor: number): string {
+  return (
+    `Anotado: os **R$ ${moedaBR(valor)}** são gasto real. Dois pontos antes de eu fechar o memorial:\n\n` +
+    `1. ⚠️ Para esse valor entrar no ganho do projeto, ele precisa estar cadastrado no ` +
+    `**formulário de dados de impacto desta etapa, no campo de custo evitado** — valor citado ` +
+    `só aqui na conversa **não é gravado** e não aparece na planilha.\n` +
+    `2. No memorial eu registro o que é esse gasto e onde ele pode ser conferido.\n\n` +
+    `Para o item 2: **onde esse número pode ser conferido?** (o nome do relatório, do razão ` +
+    `contábil, da guia, do extrato ou do sistema). Se não houver um lugar onde ele é medido, ` +
+    `me diga isso mesmo — eu registro a ausência em vez de inventar uma fonte.`
+  );
+}
+
 // ── Nudges [SISTEMA] — entram UMA vez, só quando o gate dispara ─────────────
 
 /**
- * 'pago' — o gasto é real. O nudge cobra as DUAS coisas que faltaram no caso de origem:
- * a seção do memorial com onde o número se confere, e o aviso de que valor citado só no
- * chat NÃO é gravado (tem de entrar no formulário desta etapa, que é a fonte da verdade
- * do R$ — ver `custoEvitadoMensalFromItens` em `saving-calc.ts`).
+ * 'pago' → injetado no turno SEGUINTE ao aviso determinístico (estado 'pago' →
+ * 'pago_registrado'), já com a resposta da pessoa sobre onde o número se confere. Cobra só a
+ * seção do memorial: o aviso do formulário já foi dado pelo backend, palavra por palavra.
  */
 export function nudgeCustoEvitadoPago(valor: number, racional: string): string {
   return (
     `[SISTEMA] O usuário CONFIRMOU que o gasto evitado de R$ ${moedaBR(valor)} é real — a empresa ` +
-    `paga (ou pagava) isso de fato. ${racional ? `Ele explicou: "${racional.slice(0, 300)}". ` : ""}` +
-    `Faça as DUAS coisas nesta resposta, sem repetir a pergunta:\n` +
-    `1. Escreva a seção "### Contratos/Serviços Evitados" do memorial dizendo O QUE é o gasto, ` +
-    `desde quando ele parou (ou deixou de crescer) por causa desta automação e ONDE o número se ` +
-    `confere. Se você ainda não sabe onde se confere, pergunte isso UMA vez — e aceite ` +
-    `"não sei" como resposta, registrando a ausência em vez de inventar uma fonte.\n` +
-    `2. Avise em UMA frase, com naturalidade: para esse valor entrar no ganho do projeto, ele ` +
-    `precisa ser cadastrado no formulário desta etapa, no campo de CUSTO EVITADO (valor citado ` +
-    `só na conversa não é gravado). Não invente botão nem caminho de tela: diga apenas que é no ` +
-    `formulário de dados de impacto desta etapa.`
+    `paga (ou pagava) isso de fato. ${racional ? `Sobre onde conferir, ele disse: "${racional.slice(0, 300)}". ` : ""}` +
+    `Escreva a seção "### Contratos/Serviços Evitados" do memorial dizendo O QUE é o gasto, desde ` +
+    `quando ele parou (ou deixou de crescer) por causa desta automação e ONDE o número se confere ` +
+    `— usando o que ele acabou de dizer. Se ele respondeu que não sabe onde conferir, REGISTRE a ` +
+    `ausência com essas palavras, em vez de inventar uma fonte. NÃO repita o aviso sobre cadastrar ` +
+    `o valor no formulário (o sistema já avisou) e NÃO volte a perguntar se o gasto é real.`
   );
 }
 

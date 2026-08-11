@@ -177,6 +177,7 @@ export type SavingColetado = {
     | "pendente"
     | "reperguntado"
     | "pago"
+    | "pago_registrado"
     | "estimado"
     | "nao_respondido"
     | null;

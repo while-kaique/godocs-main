@@ -1974,3 +1974,37 @@ arquitetura: o R$ é escondido do LLM e os itens são a fonte da verdade, inclus
 receita × custo evitado). O gate agora AVISA a pessoa, mas não transporta o número do chat para o formulário —
 se ela ignorar o aviso, o valor continua não sendo gravado. Fazer o transporte exigiria o LLM escrever em
 `custo_evitado_itens`, o que reabre a porta que a decisão de 04/08/2026 fechou.
+
+### Validação em chat real (staging, 11/08/2026) — 2 defeitos que os unitários não pegariam
+
+Os 3 cenários rodaram ponta a ponta no staging (`edf400b4`), pela API autenticada da própria
+página. **O gate armou no caso real** e a mensagem de submissão saiu com os números certos
+(`R$ -868,30` = 60h − R$ 2.500 da ferramenta). Dois defeitos apareceram:
+
+**(a) A pergunta citava a BASE DE CÁLCULO, não o ganho.** Com a fala real — *"média de
+recolhimento de DIFAL das 7 empresas (R$ 2.234.517,87/mês) … o custo evitado é de
+R$ 324.005,09/mês"* — o detector pegava o MAIOR valor e perguntava por *"R$ 2.234.517,87 de gasto
+evitado"*: um número que a autora nunca chamou de gasto evitado. Fix: `escolherValorDoGasto` —
+vence o valor mais **próximo** (em caracteres) de um termo de `TERMOS_GASTO`; empate → o maior.
+Só afeta o TEXTO da pergunta (nenhum R$ entra em cálculo por aqui), mas era o suficiente para a
+pessoa achar que o sistema não entendeu nada.
+
+**(b) O nudge não segurou — de novo.** Confirmado "é gasto real", o agente devolveu o preview no
+MESMO turno com **"Contratos/Serviços Evitados: N/A"** e **sem** avisar que o valor precisa ir ao
+formulário. Ignorou as duas instruções do nudge. É a 3ª vez que este repo paga por isso (Gostream
+no gate ≥44h; o portão do ganho projetado). E o aviso é a metade ÚTIL do gate: sem ele a pessoa
+confirma que o gasto é real e segue sem saber que o número não será gravado. Fix: no turno do
+clique, o backend responde **ele mesmo** (`mensagemCustoEvitadoPago`, sem chamada de LLM) com o
+aviso e a pergunta "onde esse número pode ser conferido?"; o nudge do memorial entra no turno
+SEGUINTE, uma única vez, com a resposta da pessoa. Isso exigiu o estado `'pago_registrado'` —
+sem ele o nudge seria reinjetado a cada turno e o LLM repetiria o aviso para sempre.
+
+**O que passou intacto:** o ramo `'estimado'` (R$ 45.000 citados como estimativa **não** entraram
+no memorial, custo evitado ficou N/A e o saving seguiu pelas 18h/mês) e a ausência de falso
+positivo (*"o contrato do Metabase custa R$ 3.600,00 por mês e continua sendo pago"* — termo
+ambíguo sem verbo de evitação — não armou o gate em nenhum turno, até o preview).
+
+**Onde aterrissou:** `src/lib/agents/custo-evitado-chat.ts` (`escolherValorDoGasto`,
+`extrairValoresComPosicao`, `mensagemCustoEvitadoPago`, estado `'pago_registrado'`) ·
+`src/lib/agents/types.ts` · `src/lib/chat.functions.ts` (ramo (7b) novo) ·
+`src/lib/testes/prompt-registry.ts` · `tests/custo-evitado-chat.test.ts` (+6 casos) · `CLAUDE.md`.
