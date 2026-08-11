@@ -406,14 +406,30 @@ function Home() {
               />
 
               <div className="px-8 pb-6 pt-7">
-                <div className="mb-5 flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4" style={{ color: "var(--go-blue)" }} />
-                  <span
-                    className="text-[11px] font-bold uppercase tracking-[0.08em]"
-                    style={{ color: "var(--go-blue)" }}
+                {/* O botão fica no CABEÇALHO, não só no rodapé: o link de texto miúdo
+                    embaixo da lista não se lê como "a entrada da página". */}
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4" style={{ color: "var(--go-blue)" }} />
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.08em]"
+                      style={{ color: "var(--go-blue)" }}
+                    >
+                      Perguntas frequentes
+                    </span>
+                  </div>
+                  <Link
+                    to="/faq"
+                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-semibold transition-all hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                    style={{
+                      background: "var(--go-blue)",
+                      color: "var(--go-white)",
+                      outlineColor: "var(--go-blue)",
+                    }}
                   >
-                    Perguntas frequentes
-                  </span>
+                    Abrir o FAQ
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
 
                 <ul className="flex flex-col gap-2.5">
@@ -450,27 +466,23 @@ function Home() {
                   ))}
                 </ul>
 
-                <div className="mt-5 text-center">
+                {/* Rodapé só com o aviso institucional — a entrada da página é o botão
+                    do cabeçalho, e repetir o link aqui embaixo dava dois caminhos para
+                    a mesma coisa. */}
+                <p
+                  className="mt-5 text-center text-[11.5px] leading-relaxed"
+                  style={{ color: "#8b8b9a" }}
+                >
+                  Líderes e administradores acompanham todas as submissões na{" "}
                   <Link
-                    to="/faq"
-                    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold underline decoration-1 underline-offset-2 transition-colors"
+                    to="/auth"
+                    className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
                     style={{ color: "var(--go-blue)" }}
                   >
-                    Ver todas as perguntas
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    área administrativa
                   </Link>
-                  <p className="mt-3 text-[11.5px] leading-relaxed" style={{ color: "#8b8b9a" }}>
-                    Líderes e administradores acompanham todas as submissões na{" "}
-                    <Link
-                      to="/auth"
-                      className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
-                      style={{ color: "var(--go-blue)" }}
-                    >
-                      área administrativa
-                    </Link>
-                    .
-                  </p>
-                </div>
+                  .
+                </p>
               </div>
             </section>
           )}
