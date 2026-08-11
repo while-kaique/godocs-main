@@ -35,7 +35,11 @@ describe("llm — fallback direto quando o proxy falha/demora", () => {
     process.env.API_PROXY_TOKEN = "gw-tok";
     process.env.LLM_FALLBACK = "sk-proj-FALLBACK";
     fetchMock
-      .mockResolvedValueOnce({ ok: false, status: 522, text: async () => "<html>bad gateway</html>" })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 522,
+        text: async () => "<html>bad gateway</html>",
+      })
       .mockResolvedValueOnce(okResponse);
 
     const out = await llmChat([{ role: "user", content: "oi" }], { model: "gpt-modelo-proxy" });
@@ -75,7 +79,56 @@ describe("llm — fallback direto quando o proxy falha/demora", () => {
       .mockResolvedValueOnce(okResponse);
 
     await llmChat([{ role: "user", content: "oi" }], {});
-    expect(JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string).model).toBe("gpt-5.4-mini-custom");
+    expect(JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string).model).toBe(
+      "gpt-5.4-mini-custom",
+    );
+  });
+
+  // ⚠️ REGRESSÃO MEDIDA EM PROD (11/08/2026): com 25s nos DOIS lados, 29 de 50 chamadas de uma
+  // hora caíam no fallback — não por instabilidade, por TAMANHO da geração (doc e memorial).
+  // E o fallback troca o modelo por baixo (LLM_FALLBACK_MODEL), então a metade pesada do
+  // produto rodava no modelo do plano B. O relógio do proxy tem de ser MAIOR que o do fallback.
+  it("o relógio do PROXY é maior que o do FALLBACK — 25s não derruba mais o proxy", async () => {
+    process.env.LLM_BASE_URL = "https://gw.exemplo.com/v1";
+    process.env.API_PROXY_TOKEN = "gw-tok";
+    process.env.LLM_FALLBACK = "sk-proj-FALLBACK";
+    vi.useFakeTimers();
+    try {
+      const sinais: AbortSignal[] = [];
+      fetchMock
+        // 1ª (proxy): pendura até o AbortController do próprio llm.ts cortar.
+        .mockImplementationOnce((_url: string, init: RequestInit) => {
+          const sinal = init.signal as AbortSignal;
+          sinais.push(sinal);
+          return new Promise((_resolve, reject) => {
+            sinal.addEventListener("abort", () =>
+              reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+            );
+          });
+        })
+        // 2ª (fallback): responde na hora.
+        .mockImplementationOnce((_url: string, init: RequestInit) => {
+          sinais.push(init.signal as AbortSignal);
+          return Promise.resolve(okResponse);
+        });
+
+      const promessa = llmChat([{ role: "user", content: "gere um memorial longo" }], {});
+
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(sinais[0].aborted).toBe(false); // era AQUI que o proxy morria
+
+      await vi.advanceTimersByTimeAsync(35_100); // total > 60s
+      expect(sinais[0].aborted).toBe(true);
+
+      await expect(promessa).resolves.toBe("resposta-mock");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // O fallback tem relógio PRÓPRIO (mais curto) — controller distinto do proxy. O valor
+      // em si não é observável daqui: o timer é limpo quando o fetch resolve.
+      expect(sinais[1]).not.toBe(sinais[0]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("proxy OK → NÃO aciona fallback (uma chamada só)", async () => {
