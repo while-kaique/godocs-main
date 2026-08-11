@@ -19,6 +19,36 @@ import { CircleCheck, CircleSlash2, ArrowRight } from "lucide-react";
 import { PageFrame, PageHeader, PageFooter, BrowserDots } from "./layout";
 import { STEPS } from "./constants";
 
+// A régua de "isto é projeto?", em forma de pergunta para a própria pessoa.
+//
+// ⚠️ Estas 3 perguntas são a MESMA régua que o analisador aplica depois e que o
+// agente cobra nas seções "Processo alterado" e "Ponteiro movido e onde verificar"
+// — a referência é `spec-docs/SPEC_CRITERIOS_PROJETO.md` +
+// `docs/criterios-projeto-recorrencia-evidencia.md`. Ao mudar a régua LÁ, mude o
+// texto aqui: uma intro que promete um critério diferente do que o agente cobra é
+// pior que intro nenhuma. (Não importamos a constante do prompt: a do
+// `orchestrator.ts` é redação para LLM, roda no worker e fala em códigos `[1.3]`/
+// `[1.4]`, que são roteiro interno e proibidos na tela.)
+//
+// A 3ª pergunta nomeia onde se confere (relatório/painel/sistema/base) de
+// propósito: "dá para ver no sistema" é justamente a resposta vaga que o gate
+// recusa, e é onde as pessoas mais empacam.
+const CRITERIOS = [
+  {
+    nome: "Recorrência",
+    pergunta: "Roda de novo sem alguém pedir — agendado, por evento ou em uso contínuo?",
+  },
+  {
+    nome: "Contrafactual",
+    pergunta: "Se desligar hoje, quem reclama e o que piora?",
+  },
+  {
+    nome: "Rastreabilidade",
+    pergunta:
+      "Qual indicador se move e onde isso é conferido? Nomeie o relatório, painel, sistema ou base.",
+  },
+];
+
 // O que cada etapa pede, na ordem do wizard. O RÓTULO não é redigitado aqui —
 // sai de `STEPS` (fonte única), para a intro nunca divergir do stepper.
 const RESUMO_ETAPAS: Record<number, string> = {
@@ -89,7 +119,7 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
           </h2>
 
           <p
-            className="mb-5"
+            className="mb-4"
             style={{ fontSize: 14.5, lineHeight: 1.65, color: "var(--go-text-primary)" }}
           >
             O GoDocs é onde o Gogroup documenta suas automações de RPA e IA. Você conta o que a sua
@@ -97,19 +127,19 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
             depois.
           </p>
 
-          {/* A régua de elegibilidade — a informação mais cara da tela: quem chega
-              com projeção só descobria isso no meio do chat. */}
+          {/* Entra / não entra: a premissa nº 1 (produção + ganho medido). Fica ACIMA
+              das 3 perguntas porque é objetiva — dá para responder sem pensar. */}
           <div
             style={{
               background: "rgba(199,233,253,0.4)",
               border: "1px solid rgba(0,89,169,0.14)",
               borderRadius: "var(--go-radius-md)",
-              padding: "14px 16px",
+              padding: "12px 14px",
             }}
           >
-            <p className="flex items-start gap-2.5" style={{ fontSize: 14, lineHeight: 1.5 }}>
+            <p className="flex items-start gap-2.5" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
               <CircleCheck
-                size={17}
+                size={16}
                 strokeWidth={2.4}
                 aria-hidden
                 className="mt-[2px] shrink-0"
@@ -121,9 +151,12 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
                 <strong style={{ fontWeight: 600 }}>já medido</strong>.
               </span>
             </p>
-            <p className="mt-2 flex items-start gap-2.5" style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <p
+              className="mt-1.5 flex items-start gap-2.5"
+              style={{ fontSize: 12.5, lineHeight: 1.5 }}
+            >
               <CircleSlash2
-                size={17}
+                size={16}
                 strokeWidth={2.2}
                 aria-hidden
                 className="mt-[2px] shrink-0"
@@ -135,6 +168,55 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
               </span>
             </p>
           </div>
+
+          <div className="my-6" style={{ height: 1, background: "rgba(0,89,169,0.08)" }} />
+
+          {/* A régua de "isto é projeto?" — recorrência · contrafactual ·
+              rastreabilidade. É a MESMA régua que o analisador aplica depois
+              (`SPEC_CRITERIOS_PROJETO.md`, docs/criterios-projeto-recorrencia-evidencia.md),
+              e a mais cara de descobrir tarde: quem não tem resposta para a 3ª
+              trava na seção "Ponteiro movido e onde verificar", no meio do chat.
+              Aqui elas são PERGUNTAS para a pessoa responder a si mesma — não um
+              formulário e não uma barreira. */}
+          {/* Não repetir o eyebrow "Antes de começar" — o título aqui é a PERGUNTA,
+              porque é o que a pessoa tem de fazer com a lista abaixo. */}
+          <h3 className="mb-1 font-bold" style={{ fontSize: 15, color: "var(--go-text-heading)" }}>
+            Seu projeto responde a estas 3 perguntas?
+          </h3>
+          <p className="mb-4" style={{ fontSize: 13, lineHeight: 1.55, color: "#475569" }}>
+            São as 3 perguntas que a equipe de RPA &amp; IA usa para julgar se algo é projeto. Ter a
+            resposta na ponta da língua encurta muito a conversa com o agente na Etapa 3.
+          </p>
+
+          {/* Sem numeração: os 3 critérios não são uma sequência (≠ as etapas
+              abaixo, onde a ordem é real). O que os separa é o NOME. */}
+          <ul className="mb-4 list-none">
+            {CRITERIOS.map((c) => (
+              <li
+                key={c.nome}
+                className="mb-3 last:mb-0"
+                style={{
+                  borderLeft: "2.5px solid var(--go-lime)",
+                  paddingLeft: 14,
+                }}
+              >
+                <p
+                  className="font-semibold"
+                  style={{ fontSize: 13.5, color: "var(--go-blue)", lineHeight: 1.45 }}
+                >
+                  {c.nome}
+                </p>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: "var(--go-text-primary)" }}>
+                  {c.pergunta}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <p style={{ fontSize: 12.5, lineHeight: 1.55, color: "#475569" }}>
+            Não travou nada se você ainda não souber alguma: o agente ajuda a montar a resposta, e o
+            que ficar em aberto vai para a revisão humana.
+          </p>
 
           <div className="my-6" style={{ height: 1, background: "rgba(0,89,169,0.08)" }} />
 

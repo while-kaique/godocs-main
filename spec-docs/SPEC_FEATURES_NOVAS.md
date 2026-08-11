@@ -945,6 +945,25 @@ da mesma trava.
    apresentação.
 8. **"Entra / não entra" nunca depende só de cor** (regra 11): cada linha tem ícone
    (`CircleCheck` / `CircleSlash2`) **e** rótulo em negrito ("Entra aqui:" / "Não entra:").
+9. **A tela INSTRUI: as 3 perguntas do critério** (pedido do Kaique, 11/08/2026) — o miolo é
+   "Seu projeto responde a estas 3 perguntas?" com **recorrência · contrafactual ·
+   rastreabilidade** (constante `CRITERIOS` em `intro.tsx`), em forma de pergunta para a
+   pessoa responder **a si mesma**. É a MESMA régua que o analisador aplica depois e que o
+   agente cobra nas seções "Processo alterado" / "Ponteiro movido e onde verificar"
+   (`SPEC_CRITERIOS_PROJETO.md` · `docs/criterios-projeto-recorrencia-evidencia.md`).
+   ⚠️ **Ao mudar a régua LÁ, mude o texto aqui** — uma intro que promete critério diferente
+   do que o agente cobra é pior que intro nenhuma. ⚠️ **NÃO importamos a constante do
+   prompt** (`BLOCO_SECOES_CRITERIO`, `orchestrator.ts`): é redação para LLM, roda no
+   worker e fala em códigos `[1.3]`/`[1.4]`, que são roteiro interno e **proibidos** na
+   tela. ⚠️ A 3ª pergunta manda **NOMEAR** relatório/painel/sistema/base de propósito: "dá
+   para ver no sistema" é a resposta vaga que o gate recusa, e é onde as pessoas mais
+   empacam. ⚠️ E a tela diz explicitamente que **não saber alguma não trava nada** (o
+   agente ajuda a montar; o que ficar em aberto vai à revisão humana) — a intenção é
+   preparar, não filtrar na porta.
+10. **Os critérios NÃO são numerados; as etapas são.** A numeração fica só onde a ordem é
+    real (as 3 etapas do wizard); os 3 critérios são testes independentes, separados pelo
+    NOME + uma barra lima. E o título da seção **não repete o eyebrow** "Antes de começar"
+    — ele é a própria pergunta, que é o que a pessoa deve fazer com a lista.
 
 **Testes:** `tests/intro-submissao.test.ts` — os 4 ramos do predicado + string vazia não
 contando como id.
