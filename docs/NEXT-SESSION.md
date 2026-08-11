@@ -1716,6 +1716,29 @@ observabilidade e já é tolerado por construção) — o efeito é o cabeçalho
 
 ⚠️ **A staging é disputada:** combinar com o Kaique quem a usa até o Luis validar, ou resubir a branch (2 min).
 
+## 📌 Estado do sync SQLite × Sheets (pergunta do Luis, 11/08 fim da sessão)
+
+**Staging (código novo):** cron de **5 min** atualiza espelho + `projetos` + remove o que sumiu. Última
+corrida: `578 linhas · 0 mudanças · 1,3 s`. Defasagem máxima: **5 min** para edição feita À MÃO na planilha;
+**~zero** para ação feita no app (toda escrita nossa remenda o espelho na hora).
+
+**Prod (código antigo ainda):** cron **1×/h** atualizando só `projetos`, sem espelho — e as telas ainda leem
+a planilha AO VIVO a cada load (~2 s). É o que o deploy pendente resolve.
+
+**Volta da planilha p/ o SQLite:** nome · dono/e-mail · área · descrição · ferramenta · escopo ·
+"alguém fazia" · saving horas/reais · tipo de saving · memorial · custo externo · ganho total ·
+complexidade · observações · contexto especial · "Atualizado Em" · participantes+papéis · `Especial?`/tipos ·
+"Descontinuado".
+
+**NÃO volta, de propósito:** **`status`** (a planilha grava sempre "Pendente" — o espelho resolve a exibição
+sem contaminar o banco) · **itens detalhados de custo evitado / custo do projeto** (sem coluna no SQLite — só
+a rotina `reconciliar-financeiro`, sob demanda; **este buraco continua igual**, fora do escopo da fatia) ·
+campos internos (editores delegados, fila de pré-aprovação).
+
+⚠️ Como o espelho guarda a **linha crua**, colunas sem equivalente no banco (Diff, `Classificação`, motivos,
+parecer do líder) ficam disponíveis às TELAS — mas o espelho é fonte de **leitura de tela**, nunca estado do
+app: quem manda segue sendo `projetos` para o que é nosso e a planilha para o que é da triagem.
+
 ## Plano ativo
 **→ [docs/plans/sqlite-fonte-de-leitura.md](plans/sqlite-fonte-de-leitura.md)** · Status: ✅ **executado**
 (11/08/2026) — código na branch `feat/sqlite-fonte-de-leitura` (`b09b672` · `0ccb24c` · `e0097a4`), **1243
