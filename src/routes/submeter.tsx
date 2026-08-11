@@ -10,7 +10,7 @@ import {
   filesToDocs, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, validarEtapa1,
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
-  limitarCoautorUnico,
+  limitarCoautorUnico, deveMostrarIntro,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -25,6 +25,7 @@ import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
 import { Etapa25 } from "@/lib/submeter/step25";
 import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
+import { IntroSubmissao } from "@/lib/submeter/intro";
 
 /* ──────────────────────────────────────────────
    Route
@@ -439,6 +440,18 @@ export function SubmeterPageContent({
   // retomada de rascunho (localStorage ou ?retomar).
   const [seedLoading, setSeedLoading] = useState(
     !!editProjetoId || !!resumeDraftId || hasLocalDraft(),
+  );
+  // Apresentação do formulário (antes da Etapa 1). Decidida UMA vez, no mount, com
+  // o mesmo trio de sinais do `seedLoading` acima — a intro só vale para submissão
+  // nova e limpa. Não persiste nada: por decisão de produto ela aparece SEMPRE que
+  // alguém abre /submeter do zero (inclusive depois de "Recomeçar" e de
+  // "Submeter outro projeto", que recarregam a página sem rascunho).
+  const [showIntro, setShowIntro] = useState(() =>
+    deveMostrarIntro({
+      editProjetoId,
+      resumeDraftId,
+      temRascunhoLocal: hasLocalDraft(),
+    }),
   );
   const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
   // O usuário removeu um arquivo já enviado (box "Arquivos enviados anteriormente").
@@ -2404,6 +2417,15 @@ export function SubmeterPageContent({
         </div>
       </PageFrame>
     );
+  }
+
+  /* ── Apresentação do formulário (submissão nova) ── */
+  // Depois do `seedLoading` de propósito: `showIntro` e o seed são mutuamente
+  // exclusivos (os 3 sinais são os mesmos), mas se um dia deixarem de ser, é a
+  // tela de carregamento que tem de ganhar — a intro na frente de um seed em voo
+  // esconderia um projeto sendo restaurado.
+  if (showIntro) {
+    return <IntroSubmissao onProsseguir={() => setShowIntro(false)} />;
   }
 
   /* ── Success Screen ── */

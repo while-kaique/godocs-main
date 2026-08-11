@@ -108,6 +108,28 @@ export const STEPS = [
   { id: 3, label: "Agente" },
 ];
 
+/**
+ * Quem vê a tela de apresentação (`IntroSubmissao`, antes da Etapa 1).
+ *
+ * Só a submissão NOVA e limpa passa — os 3 sinais são os mesmos do `seedLoading`
+ * em `submeter.tsx`, e cada exclusão tem motivo próprio:
+ * - `editProjetoId`  → `/editar/$id` renderiza o MESMO `SubmeterPageContent`; a
+ *   apresentação vazaria para quem só quer corrigir um projeto já submetido.
+ * - `resumeDraftId`  → `?retomar=<id>` é retomada explícita.
+ * - `temRascunhoLocal` → o `rehydrateFromLocal` salta para a etapa onde a pessoa
+ *   parou (`setStep(d.step ?? 3)`); a intro ficaria na frente de um chat em curso.
+ *
+ * Não há flag de "já vi": por decisão de produto a tela aparece SEMPRE que se abre
+ * /submeter do zero (inclusive após "Recomeçar" e "Submeter outro projeto").
+ */
+export function deveMostrarIntro(args: {
+  editProjetoId?: string;
+  resumeDraftId?: string;
+  temRascunhoLocal: boolean;
+}): boolean {
+  return !args.editProjetoId && !args.resumeDraftId && !args.temRascunhoLocal;
+}
+
 // Validação pura da Etapa 1 (Envio). Retorna o mapa de erros por campo (vazio = ok).
 // `modoEdicao` RELAXA os campos de "projeto legado" (escopo/status/ferramenta/serviço
 // externo): um legado que só quer corrigir participantes/papéis pode não tê-los
