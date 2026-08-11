@@ -9,6 +9,9 @@ SPA React com TanStack Router (file-based routing). Entry point: `src/main.tsx` 
 | `/` | `routes/index.tsx` | Público | Home com 3 cards de ação (Submeter, Editar, Reenviar) |
 | `/submeter` | `routes/submeter.tsx` | Público | Formulário 3 etapas + chat IA (página mais complexa) |
 | `/auth` | `routes/auth.tsx` | Público | Redireciona para `/dashboard` |
+| `/faq` | `routes/faq.tsx` (layout) + `faq.index.tsx` | Logado | **FAQ** — lista de categorias (título grande + descrição menor). A árvore é buscada 1× no layout e descida por contexto (`components/faq/faq-contexto.tsx`) |
+| `/faq/$categoria` | `routes/faq.$categoria.index.tsx` | Logado | Tópicos da categoria |
+| `/faq/$categoria/$item` | `routes/faq.$categoria.$item.tsx` | Logado | A resposta (ex.: `/faq/tipos_projetos/especiais`, linkada da Etapa 2.5). Admin edita **inline** nos 3 níveis; slug tolerante a `-`/`_`/acento/caixa. Ver `spec-docs/SPEC_FAQ.md` |
 | `/dashboard` | `_authenticated/dashboard.tsx` | Admin/Leader | **Triagem** — projetos da planilha: busca, filas de status, paginação, ficha em overlay + mudança de status (ver `spec-docs/SPEC_DASHBOARD_ADMIN.md`) |
 | `/usuarios` | `_authenticated/usuarios.tsx` | Admin Master | CRUD de usuários com roles e áreas |
 | `/areas` | `_authenticated/areas.tsx` | Admin Master | CRUD áreas + botão sync TeamGuide |

@@ -10,6 +10,32 @@ import {
   CardCheckboxGroup,
 } from "./form-components";
 
+/**
+ * Link para a explicação longa de projeto especial no FAQ.
+ *
+ * ⚠️ Abre em NOVA ABA de propósito: quem está aqui tem um formulário longo meio
+ * preenchido, e navegar na mesma aba custaria a sessão de submissão. O texto acima
+ * continua autocontido (a pessoa decide sem sair) — o FAQ é o aprofundamento, não a
+ * resposta que faltava. Ver spec-docs/SPEC_FAQ.md (D9).
+ */
+const URL_FAQ_ESPECIAL = "/faq/tipos_projetos/especiais";
+
+function LinkFaqEspecial() {
+  return (
+    <a
+      href={URL_FAQ_ESPECIAL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2.5 inline-flex items-center gap-1.5 text-[11.5px] font-semibold underline decoration-1 underline-offset-2"
+      style={{ color: "var(--go-blue)" }}
+    >
+      O que conta como projeto especial?
+      <span aria-hidden="true">↗</span>
+      <span className="sr-only">(abre em uma nova aba)</span>
+    </a>
+  );
+}
+
 /* Opções de tipo de projeto padrão (saving / receita) — cards selecionáveis. */
 const TIPOS_PROJETO = [
   {
@@ -109,6 +135,7 @@ export function Etapa25({
             diretamente na qualidade do produto ou da entrega etc. P.ex. Piapp, Agente
             Autônomo de Comentários.
           </p>
+          <LinkFaqEspecial />
           <FieldError message={errors.especial} />
         </div>
       </FormGroup>
@@ -274,6 +301,7 @@ function ConfirmEspecialModal({
             altíssimo impacto. Confirme apenas se o projeto realmente não se encaixa em uma
             mensuração objetiva de receita ou redução de custos.
           </p>
+          <LinkFaqEspecial />
         </div>
 
         {/* Ações */}

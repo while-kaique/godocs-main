@@ -6,12 +6,9 @@ import {
   FilePlus2,
   LayoutList,
   ShieldCheck,
-  Clock,
-  CheckCircle2,
-  RotateCcw,
   ArrowRight,
   AlertTriangle,
-  Zap,
+  HelpCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -92,6 +89,27 @@ function Home() {
       alive = false;
     };
   }, [comoPreview]);
+
+  // Categorias do FAQ para o bloco de perguntas frequentes (substituiu as pílulas de
+  // status). Busca silenciosa, como as duas acima: sem resposta, o bloco não aparece —
+  // a home nunca depende do FAQ para funcionar.
+  const [faq, setFaq] = useState<{ slug: string; titulo: string; resumo: string | null }[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch<{ categorias: { slug: string; titulo: string; resumo: string | null; arquivado: boolean }[] }>(
+      "/api/faq",
+    )
+      .then((r) => {
+        if (alive) setFaq((r.categorias ?? []).filter((c) => !c.arquivado));
+      })
+      .catch(() => {
+        // Silencioso: sem o FAQ, o bloco de perguntas não é pintado.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (acesso_negado) {
@@ -365,87 +383,97 @@ function Home() {
             />
           </section>
 
-          {/* Status section */}
-          <section
-            className="relative mx-auto mb-14 max-w-2xl overflow-hidden"
-            style={{
-              background: "var(--go-white)",
-              border: "1px solid rgba(0,89,169,0.08)",
-              borderRadius: "var(--go-radius-xl)",
-              boxShadow: "var(--go-shadow-sm)",
-            }}
-          >
-            {/* Gradient accent bar */}
-            <div
-              className="absolute top-0 left-0 right-0 h-[3px]"
+          {/* Perguntas frequentes — substituiu o antigo bloco "Ciclo de vida do projeto"
+              (as pílulas de status viraram a categoria "Acompanhamento e status" do FAQ).
+              Busca silenciosa: sem categorias publicadas, o bloco simplesmente não aparece. */}
+          {faq.length > 0 && (
+            <section
+              className="relative mx-auto mb-14 max-w-2xl overflow-hidden"
               style={{
-                background:
-                  "linear-gradient(90deg, var(--go-blue) 0%, var(--go-blue) 60%, var(--go-lime) 100%)",
+                background: "var(--go-white)",
+                border: "1px solid rgba(0,89,169,0.08)",
+                borderRadius: "var(--go-radius-xl)",
+                boxShadow: "var(--go-shadow-sm)",
               }}
-            />
+            >
+              {/* Gradient accent bar */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[3px]"
+                style={{
+                  background:
+                    "linear-gradient(90deg, var(--go-blue) 0%, var(--go-blue) 60%, var(--go-lime) 100%)",
+                }}
+              />
 
-            <div className="px-8 pb-6 pt-7">
-              <div className="mb-5 flex items-center gap-2">
-                <Zap
-                  className="h-4 w-4"
-                  style={{ color: "var(--go-blue)" }}
-                />
-                <span
-                  className="text-[11px] font-bold uppercase tracking-[0.08em]"
-                  style={{ color: "var(--go-blue)" }}
-                >
-                  Ciclo de vida do projeto
-                </span>
+              <div className="px-8 pb-6 pt-7">
+                <div className="mb-5 flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4" style={{ color: "var(--go-blue)" }} />
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.08em]"
+                    style={{ color: "var(--go-blue)" }}
+                  >
+                    Perguntas frequentes
+                  </span>
+                </div>
+
+                <ul className="flex flex-col gap-2.5">
+                  {faq.slice(0, 3).map((c) => (
+                    <li key={c.slug}>
+                      <Link
+                        to="/faq/$categoria"
+                        params={{ categoria: c.slug }}
+                        className="group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[rgba(0,89,169,0.03)] focus-visible:outline-2 focus-visible:outline-offset-2"
+                        style={{ outlineColor: "var(--go-blue)" }}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className="block text-[14px] font-bold"
+                            style={{ color: "var(--go-text-heading)" }}
+                          >
+                            {c.titulo}
+                          </span>
+                          {c.resumo && (
+                            <span
+                              className="mt-0.5 block text-[12px] leading-relaxed"
+                              style={{ color: "#8b8b9a" }}
+                            >
+                              {c.resumo}
+                            </span>
+                          )}
+                        </span>
+                        <ArrowRight
+                          className="mt-1 h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                          style={{ color: "var(--go-blue)" }}
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-5 text-center">
+                  <Link
+                    to="/faq"
+                    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold underline decoration-1 underline-offset-2 transition-colors"
+                    style={{ color: "var(--go-blue)" }}
+                  >
+                    Ver todas as perguntas
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <p className="mt-3 text-[11.5px] leading-relaxed" style={{ color: "#8b8b9a" }}>
+                    Líderes e administradores acompanham todas as submissões na{" "}
+                    <Link
+                      to="/auth"
+                      className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
+                      style={{ color: "var(--go-blue)" }}
+                    >
+                      área administrativa
+                    </Link>
+                    .
+                  </p>
+                </div>
               </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <StatusPill
-                  icon={<Clock className="h-3.5 w-3.5" />}
-                  label="Em análise"
-                  bg="rgba(0,89,169,0.06)"
-                  border="rgba(0,89,169,0.15)"
-                  color="var(--go-blue)"
-                />
-                <StepArrow />
-                <StatusPill
-                  icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                  label="Aprovado"
-                  bg="rgba(34,197,94,0.06)"
-                  border="rgba(34,197,94,0.18)"
-                  color="#16a34a"
-                />
-                <span
-                  className="hidden text-[10px] font-semibold sm:block"
-                  style={{ color: "#8b8b9a" }}
-                >
-                  ou
-                </span>
-                <StatusPill
-                  icon={<RotateCcw className="h-3.5 w-3.5" />}
-                  label="Reenvio Pendente"
-                  bg="rgba(215,219,0,0.08)"
-                  border="rgba(215,219,0,0.25)"
-                  color="#8a7d00"
-                />
-              </div>
-
-              <p
-                className="mt-5 text-center text-[12px] leading-relaxed"
-                style={{ color: "#8b8b9a" }}
-              >
-                Líderes e administradores acompanham todas as submissões
-                na{" "}
-                <Link
-                  to="/auth"
-                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
-                  style={{ color: "var(--go-blue)" }}
-                >
-                  área administrativa
-                </Link>
-                .
-              </p>
-            </div>
-          </section>
+            </section>
+          )}
         </main>
 
         {/* Footer */}
@@ -613,53 +641,3 @@ function ActionCard({
   );
 }
 
-/* ── Status Pill ── */
-
-function StatusPill({
-  icon,
-  label,
-  bg,
-  border,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  bg: string;
-  border: string;
-  color: string;
-}) {
-  return (
-    <span
-      className="inline-flex items-center gap-[6px] rounded-full px-3.5 py-[6px] text-[12px] font-semibold"
-      style={{
-        background: bg,
-        border: `1px solid ${border}`,
-        color,
-      }}
-    >
-      {icon}
-      {label}
-    </span>
-  );
-}
-
-/* ── Step Arrow ── */
-
-function StepArrow() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#8b8b9a"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="hidden shrink-0 sm:block"
-      style={{ opacity: 0.5 }}
-    >
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
-}

@@ -1,6 +1,10 @@
 # SPEC — Página de FAQ (categorias → tópicos, leitura para todos, edição para admin)
 
-**Status:** 📐 planejada (11/08/2026) · branch `feat/faq-page`
+**Status:** ✅ implementada (11/08/2026) · ⏳ pendente validar na staging · branch `feat/faq-page`
+**Aterrissou em:** `src/lib/faq/conteudo.ts` (PURO, `FAQ_SEED` + `chaveSlug`) · `src/lib/faq.functions.ts` ·
+`src/integrations/db/schema.ts` (+`client.server.ts`) · `src/worker.ts` (`/api/faq`, `/api/admin/faq/*`) ·
+`src/routes/faq*.tsx` (4 rotas) · `src/components/faq/*` · `src/routes/index.tsx` (bloco novo na home) ·
+`src/lib/submeter/step25.tsx` (link) · `tests/faq.test.ts` (18 casos)
 **Pedido:** substituir, na home, o campo de "etapas" por uma **página de FAQ** — membros só leem,
 admin edita (adiciona, remove, atualiza). Lista de **categorias** → cada categoria com **títulos
 grandes** e **descrições menores** abaixo. A primeira categoria é **"Tipos de Projeto"**, com a
