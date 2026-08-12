@@ -123,7 +123,7 @@ export function extrairValoresComPosicao(texto: string): { valor: number; indice
  * pode ser o CUSTO DO PROJETO — e só contam acompanhados de um VERBO_EVITADO.
  *
  * ⚠️ A lista acompanha os exemplos do FORMULÁRIO (a pergunta de custo evitado do form de
- * saving lista contrato · licença · serviço de terceiro · taxa · multa · juros · hora extra):
+ * saving lista contrato · licença · serviço de terceiro · taxa · multa · juros):
  * gasto que o formulário convida a cadastrar e o detector não reconhece volta a ser o buraco
  * do caso DIFAL. Dois cuidados ao ampliar:
  *   - `taxa`/`tarifa`/`encargo` entram como AMBÍGUOS, nunca `forte`: "taxa de conversão",

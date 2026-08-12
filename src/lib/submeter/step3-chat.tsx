@@ -1101,7 +1101,7 @@ function SavingForm({
   }
 
   // ── Custo evitado (lista de gastos que deixaram de ser pagos: contrato, licença,
-  //    serviço de terceiro, taxa, multa, juros, hora extra…) ──
+  //    serviço de terceiro, taxa, multa, juros…) ──
   function selectTemCustoEvitado(v: "sim" | "nao") {
     setTemCustoEvitado(v);
     if (v === "sim" && custoEvitadoItens.length === 0) {
@@ -1545,7 +1545,7 @@ function SavingForm({
                   Por causa desta automação, a empresa deixou de pagar algum gasto? <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  Não importa o nome do gasto (contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra):
+                  Não importa o nome do gasto (contrato, licença, serviço de terceiro, taxa, multa, juros):
                   se a empresa <strong>pagava e parou de pagar</strong> por causa disto, cadastre aqui.
                 </p>
                 <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
@@ -1768,7 +1768,7 @@ function SavingForm({
                 Além das horas, a empresa deixou de pagar algum gasto em dinheiro? <span style={{ color: "#e53e3e" }}>*</span>
               </label>
               <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                Qualquer gasto (contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra) <strong>diferente</strong> do
+                Qualquer gasto (contrato, licença, serviço de terceiro, taxa, multa, juros) <strong>diferente</strong> do
                 trabalho já contado nas horas acima. Se o que parou de ser pago é justamente esse trabalho, responda <strong>"Não"</strong>.
               </p>
               <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>

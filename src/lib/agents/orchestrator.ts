@@ -919,7 +919,7 @@ ${buildRespostasFormulario(ctx)}${detalhes}
 ═══════════════════════════════════════════════════════════════════
 PERFIL DESTE PROJETO — CUSTO EVITADO PURO (SEM HORAS DE PESSOAS)
 ═══════════════════════════════════════════════════════════════════
-O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualmente dentro da empresa; (2) a automação fez a empresa DEIXAR DE PAGAR um gasto em dinheiro — o rótulo não importa (contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra, retrabalho pago: qualquer gasto que a empresa pagava e parou de pagar por causa desta automação); e (3) NÃO há trabalho manual ADICIONAL que alguém faria à mão. Logo, o ganho é 100% o CUSTO EXTERNO ELIMINADO — NÃO há economia de horas de pessoas a calcular.
+O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualmente dentro da empresa; (2) a automação fez a empresa DEIXAR DE PAGAR um gasto em dinheiro — o rótulo não importa (contrato, licença, serviço de terceiro, taxa, multa, juros, retrabalho pago: qualquer gasto que a empresa pagava e parou de pagar por causa desta automação); e (3) NÃO há trabalho manual ADICIONAL que alguém faria à mão. Logo, o ganho é 100% o CUSTO EXTERNO ELIMINADO — NÃO há economia de horas de pessoas a calcular.
 
 ⛔ É TERMINANTEMENTE PROIBIDO:
 - Pedir "quem fazia", "quanto tempo levava", "qual a rotina", "quantas horas/mês" — NÃO há horas humanas aqui; perguntar isso contradiz o que o usuário já informou.
@@ -1222,7 +1222,7 @@ Para CADA pessoa/cargo listada acima, colete:
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
 [2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}${cargaEscalaBlock}
 
-SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS (qualquer gasto em dinheiro que a empresa deixou de pagar — o rótulo não importa: contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra, retrabalho pago)
+SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS (qualquer gasto em dinheiro que a empresa deixou de pagar — o rótulo não importa: contrato, licença, serviço de terceiro, taxa, multa, juros, retrabalho pago)
 [3.1] Gasto eliminado: QUAL gasto a empresa pagava e parou de pagar (ou que seria contratado e não foi) → INVESTIGUE COM O USUÁRIO
 [3.2] Custo evitado: valor e periodicidade → COLETE DO USUÁRIO (pode perguntar valor em R$)
 [3.3] Rateio: se pontual, explique que é um gasto único; se mensal, valor recorrente → REGISTRE
@@ -1307,7 +1307,7 @@ SINCRONIA OBRIGATÓRIA — AS LINHAS SÃO A FONTE DE VERDADE:
 - ANTES de emitir preview/complete, confira: a soma de (horas_antes − horas_depois) das linhas é igual ao "Economia total: Xh" que aparece no memorial? Se não, ajuste as \`linhas\` até bater.
 
 CUSTO EVITADO (SEÇÃO 3):
-- Além do tempo economizado, MUITOS projetos fazem a empresa DEIXAR DE PAGAR um gasto — e o rótulo dele NÃO importa: contrato, licença cancelada, serviço de terceiro que deixou de ser contratado, taxa, multa, juros, hora extra, retrabalho pago, cobrança pontual de implementação que não foi mais necessária. A régua é uma só: a empresa pagava e parou de pagar por causa desta automação.
+- Além do tempo economizado, MUITOS projetos fazem a empresa DEIXAR DE PAGAR um gasto — e o rótulo dele NÃO importa: contrato, licença cancelada, serviço de terceiro que deixou de ser contratado, taxa, multa, juros, retrabalho pago, cobrança pontual de implementação que não foi mais necessária. A régua é uma só: a empresa pagava e parou de pagar por causa desta automação.
 - O custo evitado AGORA é coletado no FORMULÁRIO (antes do chat), não por você. Se os campos \`custo_evitado_reais\`/\`custo_evitado_descricao\` JÁ vierem preenchidos no estado, NÃO pergunte de novo — apenas RECONHEÇA e descreva-o qualitativamente no memorial (o que foi evitado e a periodicidade), SEM citar R$.
 - NÃO altere \`custo_evitado_reais\`, \`custo_evitado_tipo\` nem \`custo_evitado_descricao\`: PRESERVE-os exatamente como vieram (são a fonte de verdade do formulário). O sistema soma o custo evitado ao saving automaticamente.
 - Isso é DIFERENTE de receita incremental (dinheiro novo entrando) e DIFERENTE de custo externo incorrido (gasto que a automação PASSOU a ter).

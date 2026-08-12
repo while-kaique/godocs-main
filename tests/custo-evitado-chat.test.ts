@@ -95,8 +95,15 @@ describe("detectarCustoEvitadoNoChat", () => {
 
   // ── Vocabulário alinhado ao FORMULÁRIO (12/08/2026) ──────────────────────
   // A pergunta do form passou a dizer "não importa o nome do gasto: contrato, licença,
-  // serviço de terceiro, taxa, multa, juros, hora extra". Gasto que o formulário convida a
-  // cadastrar e o detector não reconhece é o buraco do caso DIFAL de volta.
+  // serviço de terceiro, taxa, multa, juros". Gasto que o formulário convida a cadastrar e
+  // o detector não reconhece é o buraco do caso DIFAL de volta.
+  //
+  // ⚠️ "hora extra" saiu dos EXEMPLOS (decisão do Kaique, 12/08/2026) mas SEGUE no detector,
+  // e os dois fatos convivem de propósito: parar de pagar hora extra é dinheiro real, então
+  // quando alguém CITA isso no chat o gate ainda precisa perguntar se é gasto medido — o que
+  // saiu foi o CONVITE (exemplo na tela/nos prompts), porque hora extra é hora humana e
+  // convidá-la para o campo de custo evitado abre a porta para dupla contagem com as horas
+  // do saving (mesmo motivo que deixou "retrabalho" fora dos termos).
   it('arma com "taxa" quando vem com verbo de evitação', () => {
     const det = detectarCustoEvitadoNoChat(
       ["deixamos de pagar a taxa de cartorio de cada contrato, eram R$ 1.200,00 por mes"],
