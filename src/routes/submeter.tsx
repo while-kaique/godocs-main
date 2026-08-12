@@ -15,6 +15,7 @@ import {
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
   limitarCoautorUnico, deveMostrarIntro,
   validarEtapa25Especial, motivoBloqueioEspecial,
+  serializarFerramentas, desserializarFerramentas,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -567,13 +568,12 @@ export function SubmeterPageContent({
           (t): t is "saving" | "receita_incremental" =>
             t === "saving" || t === "receita_incremental"
         );
-        const ferramentaRaw = (data.ferramenta as string) ?? "";
-        let ferramenta = ferramentaRaw;
-        let ferramentaOutra = "";
-        if (ferramentaRaw.startsWith("Outros: ")) {
-          ferramenta = "Outros";
-          ferramentaOutra = ferramentaRaw.slice("Outros: ".length);
-        }
+        // Uma string no banco → lista de chips. Quebra por " + ", normaliza os valores
+        // legados de quando o campo era de escolha única ("Claude", "Claude + GoDeploy")
+        // e devolve o texto de "Outros: …" separado. Ver desserializarFerramentas.
+        const { ferramentas, ferramentaOutra } = desserializarFerramentas(
+          data.ferramenta as string | null,
+        );
 
         // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
         // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
@@ -601,7 +601,7 @@ export function SubmeterPageContent({
           prodStatus: "sim",
           nome: (data.responsavel_nome as string) ?? "",
           email: (data.responsavel_email as string) ?? "",
-          ferramenta,
+          ferramentas,
           ferramentaOutra,
           servicoExterno: (data.servico_externo as string) ?? "",
           emEquipe: membros.length > 0 ? "sim" : "nao",
@@ -776,9 +776,7 @@ export function SubmeterPageContent({
           nomeProjeto: newForm.nomeProjeto.trim(),
           ferramenta: newForm.escopo === "externo"
             ? newForm.servicoExterno.trim()
-            : newForm.ferramenta === "Outros" && newForm.ferramentaOutra.trim()
-              ? `Outros: ${newForm.ferramentaOutra.trim()}`
-              : newForm.ferramenta,
+            : serializarFerramentas(newForm.ferramentas, newForm.ferramentaOutra),
           participantes: newForm.participantes,
           participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
           dataCriacao: newForm.dataCriacao,
@@ -816,6 +814,12 @@ export function SubmeterPageContent({
       // Rascunho salvo antes da triagem do especial não tem as chaves → "" (não respondida).
       especialDashboard: d.form.especialDashboard ?? "",
       especialGanhoOrganizacional: d.form.especialGanhoOrganizacional ?? "",
+      // Rascunho salvo quando a ferramenta era ESCOLHA ÚNICA guardou `ferramenta: "Claude"`
+      // e não tem `ferramentas` — sem esta conversão o campo abriria vazio (perdendo o que
+      // a pessoa já tinha marcado) e o `.includes()` do seletor quebraria a tela.
+      ferramentas: d.form.ferramentas ?? desserializarFerramentas(
+        (d.form as unknown as { ferramenta?: string }).ferramenta,
+      ).ferramentas,
     });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
@@ -1004,7 +1008,7 @@ export function SubmeterPageContent({
     prodStatus: "",
     nome: "",
     email: "",
-    ferramenta: "",
+    ferramentas: [],
     ferramentaOutra: "",
     servicoExterno: "",
     emEquipe: "",
@@ -1177,13 +1181,14 @@ export function SubmeterPageContent({
   const motivoEspecialAtual = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
 
   /* ── Metadados do agente: snapshot + detecção de mudança ── */
+  // FONTE ÚNICA da string que vai para `projetos.ferramenta` (banco/Sheets). Antes esta
+  // mesma expressão estava reescrita à mão em 5 lugares; com multi-seleção seriam 5
+  // cópias de uma serialização não trivial, então todos passam por aqui.
   const computeFerramenta = useCallback((): string => {
     return form.escopo === "externo"
       ? form.servicoExterno.trim()
-      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-        ? `Outros: ${form.ferramentaOutra.trim()}`
-        : form.ferramenta;
-  }, [form.escopo, form.servicoExterno, form.ferramenta, form.ferramentaOutra]);
+      : serializarFerramentas(form.ferramentas ?? [], form.ferramentaOutra);
+  }, [form.escopo, form.servicoExterno, form.ferramentas, form.ferramentaOutra]);
 
   // Escopo EXTERNO: o nome do serviço vira a "ferramenta" do projeto E tem coluna própria
   // no banco (`servico_externo`, que o orquestrador lê). Como a ferramenta é editável
@@ -1230,11 +1235,7 @@ export function SubmeterPageContent({
     const run: Promise<string | null> = (async () => {
       try {
         const docs = await filesToDocs(arquivos);
-        const ferramentaEnviada = form.escopo === "externo"
-          ? form.servicoExterno.trim()
-          : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-            ? `Outros: ${form.ferramentaOutra.trim()}`
-            : form.ferramenta;
+        const ferramentaEnviada = computeFerramenta();
         const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
           "/api/chat/iniciar-submissao",
           {
@@ -1514,11 +1515,7 @@ export function SubmeterPageContent({
     try {
       const docs = await filesToDocs(arquivos);
 
-      const ferramentaEnviada = form.escopo === "externo"
-        ? form.servicoExterno.trim()
-        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-          ? `Outros: ${form.ferramentaOutra.trim()}`
-          : form.ferramenta;
+      const ferramentaEnviada = computeFerramenta();
 
       const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
         "/api/chat/iniciar-submissao",
@@ -1615,11 +1612,7 @@ export function SubmeterPageContent({
     setBloqueio(null);
     setEnviandoEspecial(true);
     try {
-      const ferramentaEnviada = form.escopo === "externo"
-        ? form.servicoExterno.trim()
-        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-          ? `Outros: ${form.ferramentaOutra.trim()}`
-          : form.ferramenta;
+      const ferramentaEnviada = computeFerramenta();
 
       if (editProjetoId && projetoId) {
         // Modo edição: atualiza metadados do projeto existente, reconstrói doc especial e reenvia.
@@ -2661,7 +2654,7 @@ export function SubmeterPageContent({
               <SummaryRow label="Projeto" value={form.nomeProjeto} />
               <SummaryRow
                 label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
-                value={form.escopo === "externo" ? form.servicoExterno : form.ferramenta}
+                value={form.escopo === "externo" ? form.servicoExterno : computeFerramenta()}
               />
               <SummaryRow label="Status" value={form.especial ? "Aguardando validação" : "Aguardando análise"} badge last />
             </div>
@@ -2900,11 +2893,7 @@ export function SubmeterPageContent({
                   novoResumo={{
                     nome: form.nomeProjeto.trim(),
                     descricaoBreve: form.descricaoBreve.trim(),
-                    ferramenta: form.escopo === "externo"
-                      ? form.servicoExterno.trim()
-                      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-                        ? `Outros: ${form.ferramentaOutra.trim()}`
-                        : form.ferramenta,
+                    ferramenta: computeFerramenta(),
                     tiposProjeto: form.tipoProjeto,
                   }}
                 />

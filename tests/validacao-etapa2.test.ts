@@ -21,7 +21,7 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     prodStatus: 'sim',
     nome: '',
     email: 'dono@gocase.com',
-    ferramenta: 'Python',
+    ferramentas: ['Python'],
     ferramentaOutra: '',
     servicoExterno: '',
     emEquipe: 'nao',

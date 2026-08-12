@@ -894,6 +894,154 @@ stack de um projeto vivo muda de verdade.
 **Testes:** `tests/validacao-etapa1.test.ts` — troca de ferramenta na edição não gera erro;
 "Outros" sem nome bloqueia nos 2 modos; escopo externo fora dessa regra.
 
+> ⚠️ **Superado em parte pela feature abaixo (12/08/2026):** o campo virou **multi-seleção
+> em grade de checkbox** e o `<select>` (com a `<option>` extra do legado) deixou de existir. O que
+> continua valendo desta seção: a ferramenta é **editável na edição**, escopo e status
+> seguem read-only, e o legado fora da lista nunca desaparece da tela.
+
+---
+
+## Feature adicional — Ferramentas em MULTI-seleção (grade 3×3) + o Claude dividido em 3 (12/08/2026)
+
+**Pedido (Luis, 12/08/2026):** "quero que torne o campo de ferramentas uma multi-seleção
+(pense de forma bem agradável e bonita de usar) e divida 'Claude' entre 'Claude.ai',
+'Claude Cowork' e 'Claude Code'. Além disso, bote uma frase dizendo que é a ferramenta usada
+para construção do projeto, e não a ferramenta na qual o projeto funciona (até pq isso fica
+na documentação, como supabase e tal)." Complemento no mesmo dia: **"godeploy pode ficar como
+ferramenta pq é exceção, só ele"**. E, depois de ver a tela: **"remova o 'só o godeploy é…'
+ninguém precisa saber disso"** + **"veja como a lista de ferramentas ficou estranha visualmente,
+repense e melhore"** (o que trocou pílulas por grade — item 5 abaixo).
+
+### Decisões fechadas (não "consertar" por engano)
+
+1. **A lista responde "com o que foi CONSTRUÍDO"**, não "do que depende para rodar". Banco,
+   APIs e integrações (Supabase, Shopify…) são conteúdo da **documentação**. A frase está na
+   tela, acima do campo — não é tooltip, porque era justamente o mal-entendido do campo.
+   ⚠️ **A frase NÃO diz que o GoDeploy é a exceção da regra** (pedido do Luis: "ninguém precisa
+   saber disso"): a exceção é decisão interna, e enunciá-la na tela só convida a pessoa a
+   discutir a régua em vez de responder à pergunta.
+2. **GoDeploy é a ÚNICA exceção** aceita na lista (é a nossa infra de execução). Decisão
+   explícita do dono do produto — **não abrir a exceção para mais nada**; o próximo pedido
+   será Supabase, e aí a lista deixa de responder à pergunta do item 1.
+3. **"Claude + GoDeploy" saiu da lista.** Era artefato da escolha ÚNICA: com multi-seleção, uma
+   opção que significa duas. GoDeploy virou opção própria, e o valor legado se desmonta sozinho
+   na leitura.
+4. **"Claude" sozinho (legado) → "Claude Code".** O campo pergunta com o que se CONSTRUIU e,
+   no GoGroup, o Claude que constrói é o Claude Code — é o que o glossário do `analyzer.ts` já
+   afirmava. É um chute *declarado*, registrado em `FERRAMENTAS_LEGADO`.
+5. **É uma GRADE 3×3 de checkbox, NÃO pílulas nem emoji** — as duas primeiras versões foram
+   reprovadas na validação visual no navegador e **não devem voltar**:
+   - **(a) emoji por opção** (🔗🐍📗…): com 9 itens a fileira virava cartela de adesivos,
+     ocupava 3 linhas e competia com a única informação do campo (o que está marcado).
+   - **(b) pílulas com `flex-wrap`**: larguras irregulares, última linha com **item órfão** e —
+     o pior — era o **único controle arredondado** numa tela em que todo radio é retângulo de
+     largura regular; sem caixa de check, liam como **"tags de leitura"**, não como "marque
+     vários". Parecia de outro sistema de design.
+   - **A grade resolve os três de uma vez:** colunas iguais (nada de ragged), retângulo com a
+     MESMA linguagem do `.go-radio-label`, e a **caixa de check visível** (a do
+     `CardCheckboxGroup`) devolve a afordância de checkbox. 9 opções em 3 colunas = 3 linhas
+     exatas.
+   - ⚠️ **O preenchimento é por COLUNA** (`grid-auto-flow: column`), não por linha, e o
+     **arranjo foi fechado pelo Luis olhando a tela**:
+
+     ```
+     Claude.ai      │ Python   │ Apps Script
+     Claude Cowork  │ n8n      │ Vercel
+     Claude Code    │ GoDeploy │ Outros
+     ```
+
+     A família Claude **empilhada na 1ª coluna** é o que a agrupa. O nº de linhas vai inline
+     (`Math.ceil(opções / colunas)`): fixá-lo em 3 faria uma opção LEGADA extra abrir uma 4ª
+     coluna e a grade transbordaria para o lado.
+   - ⚠️ **Esta ordem visual é TAMBÉM a ordem de serialização** — há uma lista só
+     (`FERRAMENTAS_OPCOES`), de propósito, para não existirem duas ordens divergindo. Mexer no
+     arranjo muda a ordem dos nomes dentro da string gravada; é inofensivo (nada lê a coluna
+     por posição), mas o teste de ida-e-volta compara a ordem CANÔNICA e vai apontar.
+6. **Quem agrupa as 3 superfícies do Claude é a TIPOGRAFIA + a POSIÇÃO**, nunca uma caixa em
+   volta: "Claude" em peso 500/opacidade .82 + a superfície em negrito
+   (`.go-grid-check-familia`) e, na grade de 3 colunas, as 3 ocupam **a linha do meio inteira**.
+   Opacidade .7/peso 400 foi testada e **lia como "desabilitado"** — não baixar de novo.
+7. **`label` encurta o rótulo EXIBIDO sem mexer no `value` gravado** ("Apps Script" na tela ×
+   "Google Apps Script" na planilha): o nome cheio não cabe numa coluna de ~150px.
+8. **As 3 do Claude usam a cor do logo dele** (pedido do Luis, 12/08/2026): `marca: "claude"` na
+   opção → `.go-grid-check-marca-claude`. Tokens `--go-claude` (#D97757) e `--go-claude-ink`
+   (#B45C3E). ⚠️ **Dois tons por acessibilidade, não por capricho:** #D97757 tem **3,1:1** contra
+   branco — serve para borda e preenchimento (mínimo 3:1 de componente) e **reprova** AA em texto
+   de 12,5px; o texto usa o #B45C3E (**4,6:1**). ⚠️ Marcado, a **caixa e o rótulo acompanham** a
+   borda: borda laranja com caixa azul dentro lê como bug, não como marca. ⚠️ `marca` é campo
+   PRÓPRIO em `FerramentaOpcao`, não derivado de `familia` (cor de marca e agrupamento de família
+   são coisas independentes), e é **puramente estético** — o estado marcado/não é comunicado pelo
+   "✓" + peso 700, nunca por cor, então nada de informação depende dela.
+   ⚠️ **Quem recebe a cor é a VARIANTE, não a família** (`.go-grid-check-variante`): "Claude" fica
+   no tom neutro e o `.ai`/`Cowork`/`Code` salta em laranja. O inverso foi testado no navegador e
+   descartado — deixava em evidência a palavra que é IGUAL nas três e apagava justamente a que
+   diferencia; a decisão real da pessoa é a superfície.
+9. **Ajuda "Qual a diferença entre os 3 Claudes?"** — `InfoTooltip` **abaixo da grade**, alinhada
+   à esquerda (embaixo da coluna dos Claudes), com 1 frase por superfície (navegador · arquivos e
+   ferramentas conectadas · terminal/IDE). ⚠️ É **pergunta visível**, não o ícone "i": ninguém
+   caça um ícone para descobrir uma diferença que não sabe que existe. Para isso o `InfoTooltip`
+   ganhou `trigger` e `largura` — o portal, o `tabIndex`, o `role` e os handlers seguem os MESMOS
+   (abre no hover **e no foco de teclado**), então não há balão novo duplicando a lógica. Gatilho
+   estilizado por `.go-hint-link` (sublinhado pontilhado + `cursor: help`, para não se confundir
+   com link de navegação — não leva a lugar nenhum).
+
+### A coluna continua sendo UMA string
+
+`projetos.ferramenta` (banco) e a coluna **"Ferramenta"** (Sheets) seguem com **200 chars** de
+texto. As escolhas são unidas por **`" + "`** — o **mesmo separador** que o valor legado
+"Claude + GoDeploy" já usava, então **nada precisou migrar na planilha** e nenhum consumidor
+(sync, analisador, dashboard, investigador) mudou.
+
+Ponte em 3 funções PURAS (`src/lib/submeter/constants.ts`):
+
+| Função | Papel | Detalhe que não pode regredir |
+|---|---|---|
+| `serializarFerramentas` | lista → string | Ordem **canônica da lista**, não a dos cliques: o `metaChanged` do wizard compara strings, e ordem por clique faria a mesma escolha parecer mudança (reprocessando o agente de graça). "Outros" viaja como `Outros: <texto>`. |
+| `desserializarFerramentas` | string → lista | Normaliza legado (`Claude`, `Claude + GoDeploy`, `python` minúsculo) e **preserva valor fora da lista** ("Power Automate") como chip extra. |
+| `limiteFerramentaOutra` | cap do campo "Especifique" | **Dinâmico**: 200 − o que as outras marcadas já ocupam. O cap fixo antigo (192) voltaria a estourar o zod **depois** de tudo preenchido — é a família do bug do caso Josiely (`erro-validacao.ts`). Com só "Outros" marcado dá exatamente 192. |
+
+### O que mudou
+
+- `src/lib/submeter/constants.ts` — `FERRAMENTAS_OPCOES` (9 opções + `familia`/`variante`),
+  `FERRAMENTAS` (ordem canônica), `FERRAMENTAS_LEGADO`, as 3 funções puras acima e as
+  constantes `FERRAMENTA_OUTROS`/`FERRAMENTA_SEP`/`PREFIXO_OUTROS`/`FERRAMENTA_MAX`.
+  **`FormData.ferramenta: string` → `FormData.ferramentas: string[]`**; `validarEtapa1` passa
+  a cobrar `errs.ferramentas` ("Selecione ao menos uma ferramenta").
+- `src/lib/submeter/form-components.tsx` — **`GridCheckboxGroup`** novo: grade
+  `repeat(auto-fit, minmax(150px, 1fr))`. Os 2 componentes que já existiam não servem para 9
+  opções curtas — `CheckboxGroup` divide a linha em partes iguais (`flex-1`) e aperta a partir
+  de 3; `CardCheckboxGroup` empilha um card por opção (9 cards para uma decisão de um clique).
+  A11y: estado **nunca só por cor** (a caixinha enche de azul com "✓" e o rótulo engrossa),
+  input `sr-only` (toggle por Espaço) + anel de foco na célula inteira
+  (`.go-grid-check-item:has(:focus-visible)`), animação curta que o CSS global neutraliza sob
+  `prefers-reduced-motion`. Em tela estreita a grade cai para 2/1 coluna sozinha.
+- `src/styles.css` — `.go-grid-check` / `-item` / `-on` / `-box` / `-familia`, mesma linguagem
+  do `.go-radio-label` (que fica intocado): retângulo, `--go-radius-sm`, borda 1.5px.
+- `src/lib/submeter/step1.tsx` — o `<select>` virou o `GridCheckboxGroup` + a frase de
+  construção × execução; `opcoesFerramentas` acrescenta o valor legado fora da lista.
+  ⚠️ Desmarcar uma opção legada a remove **de vez** (é a leitura correta de "não é isso"; a
+  pessoa a reescreve em "Outros").
+- `src/routes/submeter.tsx` — `computeFerramenta()` virou a **FONTE ÚNICA** da string: a mesma
+  expressão estava reescrita à mão em **5** lugares (payloads de `iniciar-submissao`, do
+  especial, o `applySeed` e o resumo da comparação), e com serialização não trivial seriam 5
+  cópias para divergir. O seed usa `desserializarFerramentas`; o `rehydrateFromLocal` converte
+  **rascunho local antigo** (`ferramenta: "Claude"`, sem a chave nova) — sem isso o campo
+  abriria vazio e o `.includes()` derrubaria a tela.
+- **Prompts** (`analyzer.ts`, `orchestrator.ts` + `prompt-registry.ts`, regra 3): o glossário
+  de ferramentas foi reescrito — declara CONSTRUÇÃO, lista as 3 superfícies do Claude, diz que
+  o campo aceita várias unidas por `" + "` e mantém a trava **"construir com Claude ≠ IA em
+  runtime"** (que é o que impede a ferramenta de inflar a complexidade), agora valendo para as
+  3 superfícies e para os valores legados.
+
+### Testes
+
+`tests/ferramentas-multi.test.ts` (novo, 30 casos) — **ida-e-volta** (marcar → gravar →
+reabrir devolve a MESMA escolha, incluindo o legado fora da lista), os valores legados um por
+um, a ordem canônica, o cap dinâmico gasto até o fim sem estourar 200 chars, e guardas da
+lista (as 3 superfícies existem, o "Claude" genérico e o "Claude + GoDeploy" **não**, nenhum
+rótulo contém `" + "`). `tests/validacao-etapa1.test.ts` e `validacao-etapa2.test.ts`
+migrados para o campo em array.
+
 ---
 
 ## Feature adicional — Tela de apresentação antes do formulário (11/08/2026)
