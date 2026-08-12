@@ -18,6 +18,12 @@ de velocidade pedido. ✅
 observada (19:05, build anterior) falhou com `Durable Object storage operation exceeded timeout`. Não capturei
 a das 21:20 na janela de logs.
 
+⚠️ **GOTCHA DE DIAGNÓSTICO (descoberto agora):** a janela do `getAppLogs` **não alcança** a corrida do
+`sync-sheets-to-sqlite`, porque o cron `reanalisar-pendentes` roda **a cada minuto** com ~7 linhas de log e
+empurra tudo para fora em poucos minutos. Tentei 4 vezes e só peguei a de 19:05 e a de 21:10. **Não insista
+pelo `getAppLogs` com `limit` baixo** — use `limit: 200+` e filtre, ou vá pelo caminho 2/3 abaixo
+(`/dashboard` ou `GET /api/admin/sync-status`, que leem a tabela `sync_runs` e não dependem de log nenhum).
+
 **Como fechar (qualquer um dos 3):**
 1. `getAppLogs` no `edf400b4` e achar a corrida do `sync-sheets-to-sqlite` mais recente.
 2. Abrir o **`/dashboard` da staging**: o cabeçalho diz *"Planilha sincronizada às HH:MM"* e vira âmbar após
