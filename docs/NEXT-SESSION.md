@@ -7,7 +7,40 @@
 ## Plano ativo
 **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: 🟡 **em execução** (T1–T5 feitas)
 
-### ➡️ PRÓXIMO PASSO — conferir a prova de RUNTIME na staging (T6), e só então seguir
+### ➡️ PRÓXIMO PASSO — o T6 VOLTOU VERMELHO: o espelho falha na staging com timeout de Durable Object
+
+**A prova de runtime saiu às 19:05:33 UTC e o diagnóstico MUDOU — não é worker antigo.** O campo
+`espelhados=` apareceu no log, o que **prova que o build novo ESTÁ no ar**. O problema é outro:
+
+```
+[sheet-espelho] falha ao espelhar 07231f652eba84dad02112594ecfc2ed:
+  Error: Durable Object storage operation exceeded timeout which caused object to be reset.
+An RPC result was not disposed properly. One of the RPC calls ... expects you to call dispose() ...
+[sync-reverse] total=578 espelhados=0 criados=0 atualizados=0 removidos=0 ignorados=578 erros=1
+```
+**Duração: 32,2 s** — PIOR que os ~24 s do código antigo, e muito longe do **1,3 s** que a sessão de
+11/08 mediu nesta mesma staging (`total=578 espelhados=578 erros=0`).
+
+⚠️ **Cuidado ao interpretar `espelhados=0`:** ele é o **estado normal em regime** (hash-gate: nada mudou →
+nada é escrito). O que denuncia a falha é o **`erros=1` + os 32 s**, não o zero. Não conclua "está ok"
+pelo zero.
+
+**Por onde investigar (nesta ordem):**
+1. O erro é de **plataforma** (`Durable Object storage operation exceeded timeout`), no caminho de ESCRITA
+   de UMA linha (`07231f65…`). Pode ser transitório — **rodar o sync manual** (`POST /api/admin/sync-sheets-now`)
+   e comparar 2–3 corridas antes de mexer em código.
+2. Hipótese principal: entre 11/08 e agora, a staging rodou a v146 **sem** o código do espelho, mas o
+   **`env.DB` persiste** — então a tabela `sheet_espelho` tem dados de 11/08 e as linhas divergiram. Se o
+   `INSERT OR REPLACE` estiver escrevendo linha grande demais numa transação só, o timeout do DO bate.
+   ⚠️ O plano do espelho já registrava `INSERT OR REPLACE` como ponto de compatibilidade.
+3. O `dispose()` não chamado no aviso de RPC pode ser **causa ou sintoma** — vale olhar `espelharLinhas`.
+4. ⛔ **NÃO deployar em prod** (T8) até isso fechar: em prod são ~600 linhas nas mesmas condições, e lá as
+   telas de gente real passariam a depender do espelho.
+
+Depois disso, na ordem original: **T7** validação no navegador → **T8** prod `674a3710` + cron `*/5` →
+**T9** push da branch (**nunca pushada**) + PR.
+
+### (superado) O passo anterior — conferir a prova de RUNTIME na staging
 Abrir os logs da staging (`getAppLogs` no **`edf400b4`**) e olhar a corrida do cron
 `POST /api/cron/sync-sheets-to-sqlite` das **19:05 UTC ou posterior**. **O sinal exigido:** o campo
 **`espelhados=`** na linha `[sync-reverse]` **E** a duração caindo de **~24 s para ~1,3 s**.
