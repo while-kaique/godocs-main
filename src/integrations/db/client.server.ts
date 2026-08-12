@@ -1380,6 +1380,110 @@ export async function getUltimosDisparosPorEmail(
   return map;
 }
 
+// ─── FAQ (categorias → tópicos) ─────────────────────────────────────────────
+//
+// Leitura pública (qualquer logado) e escrita só de admin. Tabelas INTERNAS: nada disso
+// vai para o Sheets nem participa do sync reverso. Ver spec-docs/SPEC_FAQ.md.
+
+export type FaqCategoriaRow = {
+  id: string;
+  slug: string;
+  titulo: string;
+  resumo: string | null;
+  /** Documento da categoria em markdown leve (SPEC_FAQ D13). */
+  corpo: string | null;
+  ordem: number;
+  arquivado: number;
+  criado_em: string | null;
+  atualizado_em: string | null;
+  atualizado_por: string | null;
+};
+
+/**
+ * O FAQ inteiro em **1 SELECT** — cada categoria é um documento, então não há nível
+ * filho para buscar. (A tabela `faq_itens` é LEGADO: guarda os textos da 1ª versão e
+ * não tem mais leitor.)
+ */
+export async function getFaqCategoriasRows(): Promise<FaqCategoriaRow[]> {
+  return queryAll<FaqCategoriaRow>(
+    'SELECT * FROM faq_categorias ORDER BY ordem ASC, criado_em ASC',
+    [],
+  );
+}
+
+export async function insertFaqCategoria(dados: {
+  slug: string;
+  titulo: string;
+  resumo?: string | null;
+  corpo?: string | null;
+  ordem?: number;
+  atualizado_por?: string | null;
+}): Promise<FaqCategoriaRow> {
+  const id = generateId();
+  await exec(
+    `INSERT INTO faq_categorias (id, slug, titulo, resumo, corpo, ordem, arquivado, criado_em, atualizado_em, atualizado_por)
+     VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'), ?)`,
+    [
+      id,
+      dados.slug,
+      dados.titulo,
+      dados.resumo ?? null,
+      dados.corpo ?? null,
+      dados.ordem ?? 0,
+      dados.atualizado_por ?? null,
+    ],
+  );
+  return (await queryOne<FaqCategoriaRow>('SELECT * FROM faq_categorias WHERE id = ?', [id]))!;
+}
+
+/** Atualiza título/resumo/corpo. ⚠️ NUNCA o slug — ele é imutável (D2: o link já circula). */
+export async function updateFaqCategoria(
+  id: string,
+  dados: {
+    titulo: string;
+    resumo?: string | null;
+    corpo?: string | null;
+    atualizado_por?: string | null;
+  },
+): Promise<void> {
+  await exec(
+    `UPDATE faq_categorias
+        SET titulo = ?, resumo = ?, corpo = ?, atualizado_em = datetime('now'), atualizado_por = ?
+      WHERE id = ?`,
+    [dados.titulo, dados.resumo ?? null, dados.corpo ?? null, dados.atualizado_por ?? null, id],
+  );
+}
+
+/**
+ * Preenche o `corpo` de uma categoria que existe com o campo VAZIO — o backfill da coluna
+ * nova (D13). ⚠️ O `AND (corpo IS NULL OR trim(corpo) = '')` é a trava: sem ele o seed
+ * passaria por cima do documento que o admin escreveu, quebrando a idempotência (D1).
+ */
+export async function backfillCorpoFaqCategoria(id: string, corpo: string): Promise<void> {
+  await exec(
+    `UPDATE faq_categorias
+        SET corpo = ?, atualizado_em = datetime('now'), atualizado_por = 'seed'
+      WHERE id = ? AND (corpo IS NULL OR trim(corpo) = '')`,
+    [corpo, id],
+  );
+}
+
+/** Arquivar/restaurar — o "remover" desta feature (D6). Não existe DELETE. */
+export async function setArquivadoFaqCategoria(
+  id: string,
+  arquivado: boolean,
+  email?: string | null,
+): Promise<void> {
+  await exec(
+    `UPDATE faq_categorias SET arquivado = ?, atualizado_em = datetime('now'), atualizado_por = ? WHERE id = ?`,
+    [arquivado ? 1 : 0, email ?? null, id],
+  );
+}
+
+export async function setOrdemFaqCategoria(id: string, ordem: number): Promise<void> {
+  await exec(`UPDATE faq_categorias SET ordem = ? WHERE id = ?`, [ordem, id]);
+}
+
 // --- Profiles ---
 
 export function getProfiles() {

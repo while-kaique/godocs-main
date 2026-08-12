@@ -280,6 +280,52 @@ const SCHEMA_SQL = `
     ON projeto_aprovacoes(aprovador_email);
   CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_projeto
     ON projeto_aprovacoes(projeto_id);
+
+  -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
+  -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
+  -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE
+  -- por slug -- deploy novo nunca sobrescreve o que o admin editou.
+  -- ⚠️ Tabelas INTERNAS: nada de coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync
+  -- reverso jamais as toca. Conteúdo do app, não dado de projeto.
+  -- ⚠️ O slug é IMUTÁVEL depois de criado (o link circula em Chat/e-mail/formulário) e
+  -- remover é ARQUIVAR (arquivado=1) -- não existe DELETE nesta feature.
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (o initSchema divide o SQL
+  -- por ponto-e-vírgula e partiria o CREATE TABLE ao meio).
+  -- Ver spec-docs/SPEC_FAQ.md.
+  CREATE TABLE IF NOT EXISTS faq_categorias (
+    id             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    slug           TEXT NOT NULL UNIQUE,
+    titulo         TEXT NOT NULL,
+    resumo         TEXT,
+    corpo          TEXT,
+    ordem          INTEGER NOT NULL DEFAULT 0,
+    arquivado      INTEGER NOT NULL DEFAULT 0,
+    criado_em      TEXT DEFAULT (datetime('now')),
+    atualizado_em  TEXT DEFAULT (datetime('now')),
+    atualizado_por TEXT
+  );
+
+  -- ⚠️ LEGADO (D13): o FAQ teve um nível de "tópico" por categoria, substituído pelo
+  -- documento único em faq_categorias.corpo. Nada lê nem escreve esta tabela hoje -- ela
+  -- fica de pé porque os textos da 1ª versão vivem aqui (remover é arquivar, jamais DROP).
+  CREATE TABLE IF NOT EXISTS faq_itens (
+    id             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    categoria_id   TEXT NOT NULL REFERENCES faq_categorias(id) ON DELETE CASCADE,
+    slug           TEXT NOT NULL,
+    titulo         TEXT NOT NULL,
+    resumo         TEXT,
+    corpo          TEXT,
+    ordem          INTEGER NOT NULL DEFAULT 0,
+    arquivado      INTEGER NOT NULL DEFAULT 0,
+    criado_em      TEXT DEFAULT (datetime('now')),
+    atualizado_em  TEXT DEFAULT (datetime('now')),
+    atualizado_por TEXT
+  );
+
+  -- Slug único DENTRO da categoria (nunca global): /tipos_projetos/especiais e um futuro
+  -- /glossario/especiais convivem.
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_faq_itens_slug ON faq_itens(categoria_id, slug);
+  CREATE INDEX IF NOT EXISTS idx_faq_itens_categoria ON faq_itens(categoria_id);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -425,6 +471,11 @@ const MIGRATIONS = [
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
+  // FAQ: a categoria virou UM documento (markdown leve) em vez de uma lista de tópicos
+  // (SPEC_FAQ D13). Bancos que já tinham as categorias recebem a coluna aqui, e o seed
+  // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
+  // nunca é sobrescrito.
+  'ALTER TABLE faq_categorias ADD COLUMN corpo TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
