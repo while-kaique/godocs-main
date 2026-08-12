@@ -61,6 +61,28 @@ VERDES** — são guarda, não red: ficam vermelhos exatamente se alguém "simpl
 **Achados 2–6 da revisão anterior seguem em aberto** (bloco de 12/08 mais abaixo) — nenhum é desta
 fatia; estão declarados nas Fronteiras do plano (ADR-028, captura-e-adia). O achado **nº 1 está FECHADO**.
 
+### ✅ O revisor de REUSO voltou (o único dos 3 que deu tempo): `duplicacao-intencional` (0,78)
+
+Só-sugestão — não grava marcador, não barra envio. **Nada reconstruído**: não existe na base outro helper
+que devolva contagem de linhas escritas (`ExecResult` nunca foi lido em produção), e `deveNotificarDecisao`
+entrou no módulo que já se declara fonte única do "quando notificar". **Nenhuma das duplicações já
+registradas foi agravada** — `ouTraco` segue em 3 cópias (não virou 4), `buildSubmitMessage` e
+`MotivoIsencaoNotificacao` intocados, e os 2 adaptadores de teste novos delegam ao local em vez de virarem
+a 10ª cópia do fake. Sobraram **2 sugestões de baixa severidade**, ambas para a próxima sessão decidir:
+
+1. **`exec` poderia DELEGAR a `execContando`** (`async function exec(...) { await execContando(...) }`) —
+   as duas assinaturas continuam (a coexistência é deliberada e está no plano), mas hoje há **2 call sites
+   diretos** de `getDb().exec` no arquivo, e instrumentação/retry/log futuro em `exec` não alcançaria o
+   `execContando`. Zero mudança de comportamento.
+2. **Os 4 casos de UNIDADE de `deveNotificarDecisao` nasceram fora do arquivo canônico do módulo** — foram
+   para `tests/aprovacoes-notifica-chat.test.ts` em vez de `tests/notificacao-chat.test.ts`, que é o home
+   de `src/lib/notificacao-chat.ts`. Quem editar o módulo abre o arquivo homônimo e não vê a cobertura do
+   predicado. Os testes de corrida/integração estão no lugar certo — é só a unidade pura. Movê-los também
+   dispensa o import por namespace.
+
+⚠️ **Os outros 2 revisores (conformidade e qualidade) NÃO voltaram** — são eles que gravam os marcadores
+que barram o envio. Ver o próximo passo acima.
+
 ## 📋 12/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: a duplicata do alerta do Chat virou fatia própria
 
 **Nenhuma linha de código tocada** (Gate D armado o tempo todo). Saída: o plano **aprovado**
