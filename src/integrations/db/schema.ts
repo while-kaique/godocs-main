@@ -298,6 +298,9 @@ const SCHEMA_SQL = `
     titulo         TEXT NOT NULL,
     resumo         TEXT,
     corpo          TEXT,
+    -- Snapshot da versão IMEDIATAMENTE anterior (JSON) para o botão "Voltar" do admin --
+    -- 1 nível só, por decisão (D14). NULL = não há para onde voltar.
+    versao_anterior TEXT,
     ordem          INTEGER NOT NULL DEFAULT 0,
     arquivado      INTEGER NOT NULL DEFAULT 0,
     criado_em      TEXT DEFAULT (datetime('now')),
@@ -476,6 +479,9 @@ const MIGRATIONS = [
   // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
   // nunca é sobrescrito.
   'ALTER TABLE faq_categorias ADD COLUMN corpo TEXT',
+  // Botão "Voltar à versão anterior" do FAQ (D14): snapshot JSON de UM nível
+  // (titulo/resumo/corpo + quando/quem). Restaurar consome o slot — não é histórico.
+  'ALTER TABLE faq_categorias ADD COLUMN versao_anterior TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

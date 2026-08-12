@@ -21,7 +21,13 @@ import {
   updateFaqCategoria,
   type FaqCategoriaRow,
 } from '@/integrations/db/client.server';
-import { FAQ_SEED, chaveSlug, slugDeTitulo, type FaqCategoria } from '@/lib/faq/conteudo';
+import {
+  FAQ_SEED,
+  chaveSlug,
+  slugDeTitulo,
+  type FaqCategoria,
+  type FaqVersaoAnterior,
+} from '@/lib/faq/conteudo';
 
 const log = (...args: unknown[]) => console.log('[faq.functions]', ...args);
 
@@ -36,7 +42,29 @@ function erro404(mensagem: string): never {
 
 /* ─────────────────────────── leitura ─────────────────────────── */
 
-function paraCategoria(c: FaqCategoriaRow): FaqCategoria {
+/**
+ * Lê o snapshot da versão anterior. JSON quebrado (edição manual no banco, migração
+ * malfeita) devolve `null` em vez de derrubar a leitura do FAQ inteiro — o pior caso é o
+ * botão "Voltar" não aparecer.
+ */
+function lerVersaoAnterior(json: string | null): FaqVersaoAnterior | null {
+  if (!json?.trim()) return null;
+  try {
+    const v = JSON.parse(json) as Partial<FaqVersaoAnterior>;
+    if (typeof v?.titulo !== 'string') return null;
+    return {
+      titulo: v.titulo,
+      resumo: typeof v.resumo === 'string' ? v.resumo : null,
+      corpo: typeof v.corpo === 'string' ? v.corpo : null,
+      em: typeof v.em === 'string' ? v.em : null,
+      por: typeof v.por === 'string' ? v.por : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function paraCategoria(c: FaqCategoriaRow, admin: boolean): FaqCategoria {
   return {
     id: c.id,
     slug: c.slug,
@@ -45,10 +73,17 @@ function paraCategoria(c: FaqCategoriaRow): FaqCategoria {
     corpo: c.corpo,
     ordem: c.ordem,
     arquivado: c.arquivado === 1,
+    atualizado_em: c.atualizado_em,
+    atualizado_por: c.atualizado_por,
+    // O texto anterior é ferramenta de edição: não vai no payload de quem só lê.
+    versao_anterior: admin ? lerVersaoAnterior(c.versao_anterior) : null,
   };
 }
 
 const vazio = (texto: string | null | undefined) => !texto || !texto.trim();
+
+const mesmoTexto = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? '').trim() === (b ?? '').trim();
 
 /**
  * Semeia o conteúdo inicial. **Idempotente por slug**: slug ausente → INSERT, slug
@@ -112,7 +147,7 @@ export async function listarFaq({ admin = false }: { admin?: boolean } = {}): Pr
   }
   const rows = await getFaqCategoriasRows();
   return {
-    categorias: rows.filter((c) => admin || c.arquivado !== 1).map(paraCategoria),
+    categorias: rows.filter((c) => admin || c.arquivado !== 1).map((c) => paraCategoria(c, admin)),
   };
 }
 
@@ -180,14 +215,33 @@ export async function salvarCategoria(email: string, body: unknown) {
   if (dados.id) {
     const atual = categorias.find((c) => c.id === dados.id);
     if (!atual) erro404('Assunto não encontrado.');
+
+    // Snapshot de 1 nível para o botão "Voltar" (D14).
+    // ⚠️ Só guarda quando algo REALMENTE mudou: salvar sem alterar nada gravaria um
+    // snapshot idêntico e QUEIMARIA o slot — o admin perderia o texto bom para onde ele
+    // ainda queria voltar, sem ter mudado uma letra.
+    const mudou =
+      !mesmoTexto(atual.titulo, dados.titulo) ||
+      !mesmoTexto(atual.resumo, dados.resumo) ||
+      !mesmoTexto(atual.corpo, dados.corpo);
+
+    const snapshot: FaqVersaoAnterior = {
+      titulo: atual.titulo,
+      resumo: atual.resumo,
+      corpo: atual.corpo,
+      em: atual.atualizado_em,
+      por: atual.atualizado_por,
+    };
+
     // ⚠️ slug NÃO entra: é imutável (o link já circula fora do app).
     await updateFaqCategoria(atual.id, {
       titulo: dados.titulo,
       resumo: dados.resumo ?? null,
       corpo: dados.corpo ?? null,
+      versao_anterior: mudou ? JSON.stringify(snapshot) : atual.versao_anterior,
       atualizado_por: email,
     });
-    return { ok: true as const, id: atual.id, slug: atual.slug };
+    return { ok: true as const, id: atual.id, slug: atual.slug, guardouVersao: mudou };
   }
 
   const slug = slugDisponivel(
@@ -204,6 +258,35 @@ export async function salvarCategoria(email: string, body: unknown) {
     atualizado_por: email,
   });
   return { ok: true as const, id: criada.id, slug: criada.slug };
+}
+
+export const desfazerSchema = z.object({ id: z.string().trim().min(1) });
+
+/**
+ * Restaura a versão imediatamente anterior (D14). O texto ATUAL é descartado de propósito —
+ * é o que o modal de confirmação avisa —, e o slot é **limpo**: o undo é de 1 nível, não um
+ * botão que fica alternando entre duas versões.
+ *
+ * ⚠️ Sem versão anterior → 400 com a razão. O botão não pinta nesse caso, mas o gate real é
+ * aqui (a UI não autoriza nada).
+ */
+export async function desfazerFaq(email: string, body: unknown) {
+  const dados = parse(desfazerSchema, body);
+  const atual = (await getFaqCategoriasRows()).find((c) => c.id === dados.id);
+  if (!atual) erro404('Assunto não encontrado.');
+
+  const anterior = lerVersaoAnterior(atual.versao_anterior);
+  if (!anterior) erro400('Não há versão anterior para voltar neste assunto.');
+
+  await updateFaqCategoria(atual.id, {
+    titulo: anterior.titulo,
+    resumo: anterior.resumo,
+    corpo: anterior.corpo,
+    versao_anterior: null,
+    atualizado_por: email,
+  });
+  log(`desfez a última edição de ${atual.slug} (por ${email})`);
+  return { ok: true as const, id: atual.id, slug: atual.slug };
 }
 
 export async function arquivarFaq(email: string, body: unknown) {

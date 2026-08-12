@@ -1392,6 +1392,8 @@ export type FaqCategoriaRow = {
   resumo: string | null;
   /** Documento da categoria em markdown leve (SPEC_FAQ D13). */
   corpo: string | null;
+  /** Snapshot JSON da versão imediatamente anterior — 1 nível só (SPEC_FAQ D14). */
+  versao_anterior: string | null;
   ordem: number;
   arquivado: number;
   criado_em: string | null;
@@ -1436,21 +1438,36 @@ export async function insertFaqCategoria(dados: {
   return (await queryOne<FaqCategoriaRow>('SELECT * FROM faq_categorias WHERE id = ?', [id]))!;
 }
 
-/** Atualiza título/resumo/corpo. ⚠️ NUNCA o slug — ele é imutável (D2: o link já circula). */
+/**
+ * Atualiza título/resumo/corpo. ⚠️ NUNCA o slug — ele é imutável (D2: o link já circula).
+ *
+ * `versao_anterior` é SEMPRE escrito com o valor recebido (quem chama decide): a regra de
+ * quando guardar o snapshot e quando limpar o slot é de negócio, não de acesso a dados
+ * (SPEC_FAQ D14).
+ */
 export async function updateFaqCategoria(
   id: string,
   dados: {
     titulo: string;
     resumo?: string | null;
     corpo?: string | null;
+    versao_anterior?: string | null;
     atualizado_por?: string | null;
   },
 ): Promise<void> {
   await exec(
     `UPDATE faq_categorias
-        SET titulo = ?, resumo = ?, corpo = ?, atualizado_em = datetime('now'), atualizado_por = ?
+        SET titulo = ?, resumo = ?, corpo = ?, versao_anterior = ?,
+            atualizado_em = datetime('now'), atualizado_por = ?
       WHERE id = ?`,
-    [dados.titulo, dados.resumo ?? null, dados.corpo ?? null, dados.atualizado_por ?? null, id],
+    [
+      dados.titulo,
+      dados.resumo ?? null,
+      dados.corpo ?? null,
+      dados.versao_anterior ?? null,
+      dados.atualizado_por ?? null,
+      id,
+    ],
   );
 }
 
