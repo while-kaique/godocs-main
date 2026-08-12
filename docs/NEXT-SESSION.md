@@ -4,7 +4,36 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🛠️ 12/08 (SESSÃO MAIS RECENTE) — CÓDIGO: o alerta do Chat passou a ser disparado pela pré-aprovação (T1–T7)
+## 📋 12/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: a duplicata do alerta do Chat virou fatia própria
+
+**Nenhuma linha de código tocada** (Gate D armado o tempo todo). Saída: o plano **aprovado**
+[chat-uma-mensagem-por-decisao](plans/chat-uma-mensagem-por-decisao.md) (T1–T6, tático, na MESMA branch
+`feat/chat-notifica-so-pre-aprovacao`), que fecha o **achado nº 1** da revisão de mais cedo.
+
+**A decisão do Luis na abertura:** corrigir a mensagem duplicada **antes** de deployar, em vez de subir o
+que já está verde e deixar a duplicata como waiver. Motivo: a corrida dispara com **duplo clique**, retry do
+cliente ou **2 líderes da mesma fila** (D4) — não é caso de laboratório.
+
+**O que a exploração acrescentou ao remédio que a revisão propôs** (e é a razão de existir um plano em vez
+de um patch de 3 linhas): `ExecResult = { rowsWritten: number }` está **declarado** no `db-adapter.ts`, o
+wrapper de dev devolve `result.changes` e **todos** os fakes de teste também — mas **nenhum caminho de
+produção lê esse campo hoje** (grep: só o tipo e os fakes), então o `env.DB` do Godeploy **nunca foi
+exercitado nisso**. Um `rowsWritten > 0` cru sobre um `undefined` avaliaria `false` **sempre** e o alerta
+**morreria calado em prod** — trocaríamos "2 mensagens" por "nenhuma", que é pior e invisível. Daí o
+contrato `number | null`, com **`null` = "o adaptador não reportou" → NOTIFICA**: o mesmo default invertido
+que já governa o `notificacao-chat.ts` (D30).
+
+**Blast-radius (confiança média-alta, sem `docs/INDEX.md` — RF-35):** `decidirAprovacoesDoProjeto` tem **1**
+call site de produção e 1 de teste, **ambos ignorando o retorno** → a mudança de assinatura é aditiva; o
+`exec` original fica intocado, então os outros **26** usos ficam fora do raio.
+
+⚠️ **Os marcadores de revisão no worktree ainda estão em `pendente`, apesar do handoff anterior dizer
+"gravados"** — conferido no disco (`.claude/.review-status` e `.claude/.quality-status` do worktree; a raiz
+não tem nenhum). Isso **barra o `git push`/`/ggsd:ship`**. Não é problema prático desta vez: a fatia **muda
+código**, então a sessão de código vai **re-rodar** os 2 revisores de qualquer jeito e gravar veredito fresco
+— o veredito antigo valia para o diff que eles viram.
+
+## 🛠️ 12/08 (mais cedo) — CÓDIGO: o alerta do Chat passou a ser disparado pela pré-aprovação (T1–T7)
 
 Executou o plano aprovado no dia anterior. **1242 testes verdes** (baseline 1206), `worker.js` rebuildado
 (983.5kb) e commitado, docs atualizados (**CLAUDE.md** na seção Sync Google + **SPEC_APROVACAO_LIDER §12 =
@@ -1718,7 +1747,17 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md)** · Status: ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente**
+**→ [docs/plans/chat-uma-mensagem-por-decisao.md](plans/chat-uma-mensagem-por-decisao.md)** · Status: ✅ **aprovado (12/08/2026)** — não executado
+
+Fatia curta e TÁTICA, na MESMA branch `feat/chat-notifica-so-pre-aprovacao`: fecha o **achado nº 1** da
+revisão (mensagem DUPLICADA no grupo do Chat). É o **passo 1 do T8** do plano abaixo — decidido pelo Luis
+nesta sessão, em vez de deployar já e deixar a duplicata como waiver. **Próximo comando: `/ggsd:code`**
+(sessão à parte, contexto fresco — a fronteira plan→code não se cruza na mesma sessão).
+⚠️ A sub-decisão que dá o desenho: **`rowsWritten` nunca foi exercitado em produção** (nenhum caminho lê
+esse campo hoje; só o tipo e os fakes), então `null` = "o adaptador não reportou" **notifica** — um `> 0`
+cru sobre `undefined` trocaria a duplicata por **silêncio permanente**, que é pior e invisível.
+
+**Plano anterior (mesma frente):** [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md) · ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente** (depois desta fatia: regra 10 → staging `edf400b4` → prod `674a3710` → PR)
 
 O alerta do grupo do Chat passa a ser disparado pela **pré-aprovação do líder**, não pela submissão/edição.
 O **código está pronto e verde na branch `feat/chat-notifica-so-pre-aprovacao`** (worktree
