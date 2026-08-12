@@ -30,6 +30,24 @@ export type FaqCategoria = {
   corpo: string | null;
   ordem: number;
   arquivado: boolean;
+  /** Carimbo da última escrita — vira o "Atualizado em …" no pé do documento (D15). */
+  atualizado_em: string | null;
+  /** E-mail de quem salvou, ou `seed` quando o texto nasceu com o deploy. */
+  atualizado_por: string | null;
+  /**
+   * A versão imediatamente anterior, para o botão "Voltar" do admin (D14). **1 nível
+   * só** — restaurar consome o slot, isto não é histórico. Só vai no payload de admin.
+   */
+  versao_anterior: FaqVersaoAnterior | null;
+};
+
+/** Snapshot do que é editável, com quando/quem — o que o modal de confirmação mostra. */
+export type FaqVersaoAnterior = {
+  titulo: string;
+  resumo: string | null;
+  corpo: string | null;
+  em: string | null;
+  por: string | null;
 };
 
 /** O que o seed precisa declarar (sem id/ordem/arquivado — quem grava resolve). */

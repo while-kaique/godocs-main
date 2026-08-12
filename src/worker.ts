@@ -66,7 +66,13 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
-import { listarFaq, salvarCategoria, arquivarFaq, reordenarFaq } from '@/lib/faq.functions'
+import {
+  listarFaq,
+  salvarCategoria,
+  arquivarFaq,
+  reordenarFaq,
+  desfazerFaq,
+} from '@/lib/faq.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
 import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
 import { traduzirErroValidacao } from '@/lib/erro-validacao'
@@ -433,6 +439,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const { email } = await requireAdmin(request)
       const body = await readBody(request)
       return json(await salvarCategoria(email, body))
+    }
+    // Volta para a versão imediatamente anterior do texto (1 nível — D14). O texto atual
+    // é descartado: a tela confirma isso antes de chamar.
+    if (pathname === '/api/admin/faq/desfazer' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await desfazerFaq(email, body))
     }
     if (pathname === '/api/admin/faq/arquivar' && method === 'POST') {
       const { email } = await requireAdmin(request)

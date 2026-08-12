@@ -163,6 +163,72 @@ metade do cansaço), cada seção aberta por um título com **filete lima à esq
 escaneamento), bullets com marcador quadrado azul e `>` como placa creme com borda azul. Sem sumário:
 com o texto nesse tamanho, os títulos já são o sumário.
 
+### D14 — "Voltar" guarda UMA versão, e restaurar CONSOME o slot (12/08/2026)
+**Pedido do Kaique:** em vez de um estado de rascunho, "salve a versão imediatamente anterior no
+banco sempre, assim se cometermos um erro é só apertar em voltar, aparecer um popup de confirmação
+avisando que essa versão será perdida e então retornar pro texto antigo. Não precisa salvar todos,
+só o imediatamente anterior."
+
+- Coluna **`faq_categorias.versao_anterior`** (JSON: `titulo`/`resumo`/`corpo` + `em`/`por`). Não é
+  histórico e não é auditoria — é **um** passo atrás.
+- `salvarCategoria` grava o snapshot do estado atual antes de sobrescrever. ⚠️ **Só quando algo
+  REALMENTE mudou** (comparação por `trim`): salvar sem alterar nada gravaria um snapshot idêntico e
+  **queimaria o slot** — o admin perderia o texto bom para onde ainda queria voltar, sem ter mudado
+  uma letra.
+- `desfazerFaq` (rota `POST /api/admin/faq/desfazer`, `requireAdmin`) aplica o snapshot e **limpa** o
+  slot. Descartar o texto atual é o combinado — é o que o modal avisa em negrito —, e limpar impede
+  que o botão vire um alterna-entre-duas-versões. Sem snapshot → **400 com a razão**; o botão não
+  pinta nesse caso, mas o gate real é no servidor.
+- O snapshot **não vai no payload de quem só lê** (`versao_anterior` só é serializado com
+  `admin: true`): é ferramenta de edição, não conteúdo.
+- JSON corrompido no banco devolve `null` em vez de derrubar a leitura do FAQ — o pior caso é o botão
+  "Voltar" não aparecer.
+- O modal mostra **o título, a data/autor e a prévia** do texto que voltará (`FaqDocumento` com
+  `comAncoras={false}`, senão os ids colidiriam com os da página atrás).
+
+### D15 — Rodapé "Atualizado em … por …" (12/08/2026)
+FAQ interno envelhece e quem lê precisa saber se o texto ainda vale. `atualizado_em`/`atualizado_por`
+passaram a ir no payload e viram uma linha discreta no pé do documento, montada pela FONTE ÚNICA
+PURA **`src/lib/faq/formato.ts`** (`linhaAtualizacaoFaq`). ⚠️ **Só a DATA** — o carimbo é UTC e o
+leitor é de Brasília; mostrar hora exigiria conversão de fuso para responder pergunta que ninguém
+faz. O autor **`seed`** não é pessoa: vira só "Atualizado em DD/MM/AAAA". Sem carimbo, a linha não
+aparece.
+
+### D16 — Busca no índice + âncora por seção (12/08/2026)
+- **Busca** (`filtrarAssuntosFaq`, mesmo módulo puro): casa em título, resumo **e no corpo**, porque
+  quem chega no FAQ chega com um termo ("220h", "custo evitado"), não com o nome do assunto. Sem
+  acento e sem caixa via `chaveColuna` (o normalizador do Sheets e do slug). Duas palavras exigem
+  **as duas** (E, não OU — com OU, dois termos devolveriam mais resultados que um). O campo só pinta
+  com mais de um assunto publicado; com um card, busca é ruído.
+- **Âncora por seção**: cada `##` recebe `id` derivado por `chaveSlug`, com sufixo quando o título
+  repete (dois `#pendente` na mesma página levariam sempre ao primeiro). Ao lado do título há um
+  "copiar link desta seção", visível no hover **e no foco de teclado** (`focus-visible`) — escondido
+  só por `group-hover`, ele existiria apenas para quem usa mouse.
+- ⚠️ **O scroll até a âncora tem DOIS passes** (`requestAnimationFrame` + `setTimeout`): o texto vem
+  de `GET /api/faq`, então o alvo não existe no 1º render, e a **restauração de scroll do router**
+  roda depois da montagem e engole um scroll único. Foi exatamente o que aconteceu na 1ª versão
+  (validado no navegador: a página abria no topo).
+
+### D17 — O FAQ é linkado nos pontos de dor, e NUNCA dentro do chat (12/08/2026)
+**Pedido do Kaique, corrigindo o plano no meio:** *"ele não deve ficar no chatbot, ele deve aparecer
+de maneira minimalista em algum lugar do fluxo de submissão de forma discreta"*.
+
+- **Fluxo de submissão** — uma linha no `PageFooter` (`src/lib/submeter/layout.tsx`): "Dúvidas?
+  Perguntas frequentes ↗". Escolhido porque esse rodapé já aparece na **intro e em todas as etapas**,
+  então um único ponto cobre o fluxo inteiro sem inventar card nem banner.
+- **`AvisoPendencia`** (card de Meus Projetos + `/projeto/$id`) — "O que cada status significa ↗"
+  apontando para a **seção** do documento conforme o tom (`#reprovado`, `#reenvio_pendente`), o que
+  só é possível por causa da D16. Fica **fora** da tira clicável: link dentro de `<button>` é HTML
+  inválido e roubaria o alvo de clique.
+- ⚠️ **Nada nos textos de gate, nada nas mensagens de bloqueio da submissão e nada na conversa com o
+  agente** — decisão explícita. Aqueles textos são fonte única, já testados por conteúdo, e o custo
+  de mexer neles é alto para o retorno.
+- Todos abrem em **nova aba**: clicar não pode custar um formulário meio preenchido nem o lugar na
+  lista.
+- ⚠️ Os ids das seções vêm dos TÍTULOS do documento: renomear "Reprovado" no painel muda o id e o
+  link cai no topo da página (**degrada, não quebra**). Há teste que trava os 2 ids que os avisos
+  usam.
+
 ---
 
 ## 3. Conteúdo semeado (o texto que vai no ar)

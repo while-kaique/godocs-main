@@ -8,6 +8,9 @@
 // montado como ELEMENTO React. Nunca use `dangerouslySetInnerHTML` aqui: é o que mantém o
 // texto do painel admin incapaz de virar HTML (SPEC_FAQ D13).
 
+import { useEffect, useState } from "react";
+import { Link2 } from "lucide-react";
+import { chaveSlug } from "@/lib/faq/conteudo";
 import { parseFaqMarkdown, partirNegrito, type BlocoFaq } from "@/lib/faq/markdown";
 
 /** Negrito é a única ênfase inline aceita. */
@@ -27,22 +30,87 @@ function Texto({ children }: { children: string }) {
   );
 }
 
-function Bloco({ bloco, primeiro }: { bloco: BlocoFaq; primeiro: boolean }) {
+/**
+ * Ids das seções de 1º nível, na ordem do documento. Título repetido ganha sufixo — dois
+ * `#pendente` na mesma página fariam o link levar sempre ao primeiro (SPEC_FAQ D16).
+ */
+function idsDasSecoes(blocos: BlocoFaq[]): Map<number, string> {
+  const usados = new Map<string, number>();
+  const ids = new Map<number, string>();
+  blocos.forEach((bloco, indice) => {
+    if (bloco.tipo !== "titulo" || bloco.nivel !== 2) return;
+    const base = chaveSlug(bloco.texto.replace(/\*\*/g, "")) || "secao";
+    const vezes = (usados.get(base) ?? 0) + 1;
+    usados.set(base, vezes);
+    ids.set(indice, vezes === 1 ? base : `${base}_${vezes}`);
+  });
+  return ids;
+}
+
+/**
+ * Título de seção + "copiar link desta seção".
+ *
+ * ⚠️ O botão aparece no hover E no foco de teclado (`focus-visible`): escondido só por
+ * `group-hover` ele existiria apenas para quem usa mouse.
+ */
+function TituloSecao({ id, texto }: { id: string; texto: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar() {
+    if (typeof window === "undefined") return;
+    const { origin, pathname } = window.location;
+    try {
+      await navigator.clipboard.writeText(`${origin}${pathname}#${id}`);
+      setCopiado(true);
+      window.setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sem permissão de área de transferência: o endereço fica na barra do navegador.
+    }
+  }
+
+  return (
+    <h2
+      id={id}
+      className="group flex items-center gap-2 text-[19px] font-extrabold leading-snug"
+      style={{
+        color: "var(--go-text-heading)",
+        borderLeft: "3px solid var(--go-lime)",
+        paddingLeft: 13,
+        scrollMarginTop: 24,
+      }}
+    >
+      <Texto>{texto}</Texto>
+      <button
+        type="button"
+        onClick={copiar}
+        title={copiado ? "Link copiado" : "Copiar link desta seção"}
+        aria-label={
+          copiado ? "Link desta seção copiado" : `Copiar link da seção ${texto.replace(/\*\*/g, "")}`
+        }
+        className="shrink-0 cursor-pointer rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ color: copiado ? "var(--go-blue)" : "#8b8b9a", outlineColor: "var(--go-blue)" }}
+      >
+        <Link2 className="h-3.5 w-3.5" />
+      </button>
+    </h2>
+  );
+}
+
+function Bloco({
+  bloco,
+  primeiro,
+  id,
+}: {
+  bloco: BlocoFaq;
+  primeiro: boolean;
+  id?: string;
+}) {
   switch (bloco.tipo) {
     case "titulo":
       return bloco.nivel === 2 ? (
-        <h2
-          className="text-[19px] font-extrabold leading-snug"
-          style={{
-            color: "var(--go-text-heading)",
-            borderLeft: "3px solid var(--go-lime)",
-            paddingLeft: 13,
-            marginTop: primeiro ? 0 : 38,
-            marginBottom: 12,
-          }}
-        >
-          <Texto>{bloco.texto}</Texto>
-        </h2>
+        <div style={{ marginTop: primeiro ? 0 : 38, marginBottom: 12 }}>
+          <TituloSecao id={id ?? chaveSlug(bloco.texto)} texto={bloco.texto} />
+        </div>
       ) : (
         <h3
           className="text-[14.5px] font-bold"
@@ -125,8 +193,36 @@ function Bloco({ bloco, primeiro }: { bloco: BlocoFaq; primeiro: boolean }) {
   }
 }
 
-export function FaqDocumento({ md }: { md: string | null }) {
+export function FaqDocumento({ md, comAncoras = true }: { md: string | null; comAncoras?: boolean }) {
   const blocos = parseFaqMarkdown(md);
+  const ids = comAncoras ? idsDasSecoes(blocos) : new Map<number, string>();
+
+  // Link com `#secao` colado de fora abre a página no topo: o alvo só existe depois deste
+  // render (o texto vem de `GET /api/faq`). Aqui, com o documento montado, levamos o leitor
+  // até a seção — respeitando `prefers-reduced-motion`, que é o piso de a11y do projeto.
+  //
+  // ⚠️ São DUAS tentativas de propósito: a restauração de scroll do router roda depois da
+  // montagem e devolve a página ao topo, engolindo um scroll único (foi o que aconteceu na
+  // 1ª versão). O 2º passe, após o próximo tick, é o que fica valendo.
+  useEffect(() => {
+    if (!comAncoras || typeof window === "undefined") return;
+    const id = window.location.hash.replace(/^#/, "");
+    if (!id) return;
+
+    const rolar = () => {
+      const alvo = document.getElementById(decodeURIComponent(id));
+      if (!alvo) return;
+      const semAnimacao = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      alvo.scrollIntoView({ behavior: semAnimacao ? "auto" : "smooth", block: "start" });
+    };
+
+    const quadro = window.requestAnimationFrame(rolar);
+    const atraso = window.setTimeout(rolar, 150);
+    return () => {
+      window.cancelAnimationFrame(quadro);
+      window.clearTimeout(atraso);
+    };
+  }, [md, comAncoras]);
 
   if (blocos.length === 0) {
     return (
@@ -139,7 +235,7 @@ export function FaqDocumento({ md }: { md: string | null }) {
   return (
     <div style={{ maxWidth: "68ch" }}>
       {blocos.map((bloco, i) => (
-        <Bloco key={i} bloco={bloco} primeiro={i === 0} />
+        <Bloco key={i} bloco={bloco} primeiro={i === 0} id={ids.get(i)} />
       ))}
     </div>
   );

@@ -19,9 +19,12 @@ import {
   Eye,
   PencilLine,
   Plus,
+  Undo2,
 } from "lucide-react";
 import { FaqDocumento } from "@/components/faq/faq-documento";
 import { useFaq } from "@/components/faq/faq-contexto";
+import { linhaAtualizacaoFaq } from "@/lib/faq/formato";
+import type { FaqVersaoAnterior } from "@/lib/faq/conteudo";
 
 /* ── Botõezinhos de controle ── */
 
@@ -67,10 +70,12 @@ export function ControlesFaq({
     resumo: string | null;
     corpo: string | null;
     arquivado: boolean;
+    versao_anterior?: FaqVersaoAnterior | null;
   };
   onMudou: () => void;
 }) {
   const [editando, setEditando] = useState(false);
+  const [desfazendo, setDesfazendo] = useState(false);
 
   async function chamar(rota: string, corpo: unknown) {
     try {
@@ -87,6 +92,15 @@ export function ControlesFaq({
         <PencilLine className="h-3.5 w-3.5" />
         Editar
       </BotaoControle>
+      {alvo.versao_anterior && (
+        <BotaoControle
+          onClick={() => setDesfazendo(true)}
+          titulo="Voltar ao texto anterior a esta edição"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+          Voltar
+        </BotaoControle>
+      )}
       <BotaoControle
         onClick={() => chamar("/api/admin/faq/reordenar", { id: alvo.id, direcao: "cima" })}
         titulo="Mover para cima"
@@ -134,7 +148,159 @@ export function ControlesFaq({
         />
       )}
 
+      {desfazendo && alvo.versao_anterior && (
+        <ConfirmarVoltar
+          id={alvo.id}
+          anterior={alvo.versao_anterior}
+          onFechar={() => setDesfazendo(false)}
+          onVoltou={() => {
+            setDesfazendo(false);
+            onMudou();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/* ── "Voltar à versão anterior": 1 nível, e o texto atual é descartado (D14) ── */
+
+function ConfirmarVoltar({
+  id,
+  anterior,
+  onFechar,
+  onVoltou,
+}: {
+  id: string;
+  anterior: FaqVersaoAnterior;
+  onFechar: () => void;
+  onVoltou: () => void;
+}) {
+  const [voltando, setVoltando] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onFechar();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onFechar]);
+
+  async function voltar() {
+    setVoltando(true);
+    try {
+      await apiFetch("/api/admin/faq/desfazer", { id });
+      toast.success("Texto anterior restaurado.");
+      onVoltou();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível voltar. Tente de novo.");
+    } finally {
+      setVoltando(false);
+    }
+  }
+
+  if (typeof document === "undefined") return null;
+
+  const origem = linhaAtualizacaoFaq(anterior.em, anterior.por);
+
+  return createPortal(
+    <div
+      onClick={onFechar}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 61,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        fontFamily: "'Poppins', sans-serif",
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="faq-voltar-titulo"
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full flex-col overflow-hidden"
+        style={{
+          maxWidth: 560,
+          background: "var(--go-white)",
+          borderRadius: "var(--go-radius-lg)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+        }}
+      >
+        <div className="px-6 py-4" style={{ borderBottom: "1px solid rgba(0,89,169,0.10)" }}>
+          <h2
+            id="faq-voltar-titulo"
+            className="text-[15px] font-extrabold"
+            style={{ color: "var(--go-text-heading)" }}
+          >
+            Voltar ao texto anterior?
+          </h2>
+          <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "#475569" }}>
+            O texto que está publicado agora <strong>será perdido</strong> — só a versão
+            imediatamente anterior é guardada, então não há como voltar duas vezes.
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <p
+            className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em]"
+            style={{ color: "#8b8b9a" }}
+          >
+            Vai voltar para
+          </p>
+          <p className="text-[13.5px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+            {anterior.titulo}
+          </p>
+          {origem && (
+            <p className="mt-0.5 text-[11.5px]" style={{ color: "#8b8b9a" }}>
+              {origem}
+            </p>
+          )}
+          <div
+            className="mt-3 max-h-56 overflow-y-auto rounded-lg px-4 py-3"
+            style={{ background: "var(--go-bg-page)", border: "1px solid rgba(0,89,169,0.12)" }}
+          >
+            {/* Sem âncoras: este documento é uma prévia dentro de um modal e os ids
+                colidiriam com os da página que está atrás. */}
+            <FaqDocumento md={anterior.corpo} comAncoras={false} />
+          </div>
+        </div>
+
+        <div
+          className="flex flex-col-reverse gap-2.5 px-6 py-4 sm:flex-row sm:justify-end"
+          style={{ borderTop: "1px solid rgba(0,89,169,0.10)" }}
+        >
+          <button
+            type="button"
+            onClick={onFechar}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold"
+            style={{
+              background: "transparent",
+              color: "#6b6b7a",
+              border: "1.5px solid rgba(0,0,0,0.12)",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={voltar}
+            disabled={voltando}
+            className="cursor-pointer rounded-lg px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-60"
+            style={{ background: "var(--go-blue)", border: "1.5px solid var(--go-blue)" }}
+          >
+            {voltando ? "Voltando…" : "Voltar a este texto"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -395,7 +561,7 @@ function EditorFaq({
               className="rounded-lg px-4 py-4"
               style={{ background: "var(--go-bg-page)", border: "1px solid rgba(0,89,169,0.12)" }}
             >
-              <FaqDocumento md={corpo} />
+              <FaqDocumento md={corpo} comAncoras={false} />
             </div>
           ) : (
             <>

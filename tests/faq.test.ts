@@ -14,7 +14,14 @@ import {
 } from '@/lib/faq/conteudo';
 import { parseFaqMarkdown, partirNegrito, titulosDoDocumento } from '@/lib/faq/markdown';
 import {
+  filtrarAssuntosFaq,
+  formatarDataFaq,
+  linhaAtualizacaoFaq,
+  nomeDeQuemFaq,
+} from '@/lib/faq/formato';
+import {
   arquivarFaq,
+  desfazerFaq,
   listarFaq,
   reordenarFaq,
   salvarCategoria,
@@ -60,6 +67,9 @@ describe('chaveSlug / resolução de rota', () => {
       corpo: '## Projeto especial\n\ntexto',
       ordem: 0,
       arquivado: false,
+      atualizado_em: null,
+      atualizado_por: null,
+      versao_anterior: null,
     },
   ];
 
@@ -323,6 +333,15 @@ describe('conteúdo semeado', () => {
     expect(tipos.corpo).toMatch(/real e medido/i);
   });
 
+  it('o documento de status tem as seções que os avisos de pendência linkam', () => {
+    // ⚠️ `AvisoPendencia` aponta para `#reprovado` e `#reenvio_pendente` (ids derivados
+    // por `chaveSlug` dos títulos). Renomear a seção aqui deixa o link cair no topo.
+    const acomp = FAQ_SEED.find((c) => c.slug === 'acompanhamento')!;
+    const ids = titulosDoDocumento(acomp.corpo).map(chaveSlug);
+    expect(ids).toContain('reprovado');
+    expect(ids).toContain('reenvio_pendente');
+  });
+
   it('o texto ficou OBJETIVO: nenhum assunto passa de 4.500 caracteres', () => {
     // A 1ª versão do FAQ tinha ~9.000 caracteres só em "Tipos de Projeto", em 3 páginas.
     // O limite existe para o documento continuar escaneável — se um assunto crescer além
@@ -330,5 +349,134 @@ describe('conteúdo semeado', () => {
     for (const categoria of FAQ_SEED) {
       expect((categoria.corpo ?? '').length, categoria.slug).toBeLessThan(4500);
     }
+  });
+});
+
+/* ── 8. undo de 1 nível (D14) ── */
+
+describe('desfazerFaq — voltar à versão anterior', () => {
+  async function assunto(slug: string) {
+    return resolverCategoria((await listarFaq({ admin: true })).categorias, slug)!;
+  }
+
+  it('guarda a versão anterior ao editar e a restaura, consumindo o slot', async () => {
+    const antes = await assunto('acompanhamento');
+    const textoOriginal = antes.corpo;
+
+    await salvarCategoria(ADMIN, {
+      id: antes.id,
+      titulo: antes.titulo,
+      resumo: antes.resumo,
+      corpo: '## Errado\n\nsalvei bobagem por cima do texto bom',
+    });
+
+    const editado = await assunto('acompanhamento');
+    expect(editado.corpo).toContain('salvei bobagem');
+    expect(editado.versao_anterior?.corpo).toBe(textoOriginal);
+
+    await desfazerFaq(ADMIN, { id: antes.id });
+
+    const voltou = await assunto('acompanhamento');
+    expect(voltou.corpo).toBe(textoOriginal);
+    // Slot consumido: undo é de 1 nível, não um botão que alterna entre 2 versões.
+    expect(voltou.versao_anterior).toBeNull();
+    await expect(desfazerFaq(ADMIN, { id: antes.id })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('salvar SEM mudar nada não queima o slot', async () => {
+    const base = await assunto('acompanhamento');
+    await salvarCategoria(ADMIN, {
+      id: base.id,
+      titulo: base.titulo,
+      resumo: base.resumo,
+      corpo: '## Versão boa\n\ntexto bom',
+    });
+    const comSlot = await assunto('acompanhamento');
+    const guardado = comSlot.versao_anterior?.corpo;
+    expect(guardado).toBeTruthy();
+
+    // Reabrir e salvar igual (com espaço a mais, que o trim ignora) não pode trocar o slot.
+    await salvarCategoria(ADMIN, {
+      id: base.id,
+      titulo: comSlot.titulo,
+      resumo: comSlot.resumo,
+      corpo: '## Versão boa\n\ntexto bom  ',
+    });
+    const depois = await assunto('acompanhamento');
+    expect(depois.versao_anterior?.corpo).toBe(guardado);
+
+    await desfazerFaq(ADMIN, { id: base.id }); // devolve o texto original do seed
+  });
+
+  it('a versão anterior NÃO vai no payload de quem só lê', async () => {
+    const base = await assunto('tipos_projetos');
+    await salvarCategoria(ADMIN, {
+      id: base.id,
+      titulo: base.titulo,
+      resumo: base.resumo,
+      corpo: `${base.corpo}\n\n## Seção nova\n\ntexto`,
+    });
+
+    const publico = resolverCategoria((await listarFaq()).categorias, 'tipos_projetos')!;
+    expect(publico.versao_anterior).toBeNull();
+    expect(resolverCategoria((await listarFaq({ admin: true })).categorias, 'tipos_projetos')!
+      .versao_anterior).not.toBeNull();
+
+    await desfazerFaq(ADMIN, { id: base.id });
+  });
+
+  it('id inexistente devolve 404', async () => {
+    await expect(desfazerFaq(ADMIN, { id: 'nao-existe' })).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+/* ── 9. busca do índice e o rodapé de atualização (D15, D16) ── */
+
+describe('filtrarAssuntosFaq', () => {
+  const assuntos = [
+    { titulo: 'Tipos de Projeto', resumo: 'saving e receita', corpo: '## Saving\n\nteto de 220h por pessoa' },
+    { titulo: 'Acompanhamento e status', resumo: 'o que cada status significa', corpo: '## Reenvio pendente\n\ncorrija e reenvie' },
+  ];
+
+  it('acha pelo TEXTO do documento, não só pelo título', () => {
+    expect(filtrarAssuntosFaq(assuntos, '220h')).toHaveLength(1);
+    expect(filtrarAssuntosFaq(assuntos, '220h')[0].titulo).toBe('Tipos de Projeto');
+  });
+
+  it('ignora acento e caixa', () => {
+    expect(filtrarAssuntosFaq(assuntos, 'REENVIO')).toHaveLength(1);
+    expect(filtrarAssuntosFaq(assuntos, 'significa')).toHaveLength(1);
+    // "pendencia" sem acento tem de achar "pendente"? Não — mas o termo com acento acha.
+    expect(filtrarAssuntosFaq(assuntos, 'Reenvio Pendente')).toHaveLength(1);
+  });
+
+  it('duas palavras exigem AS DUAS (E, não OU)', () => {
+    expect(filtrarAssuntosFaq(assuntos, 'saving 220h')).toHaveLength(1);
+    expect(filtrarAssuntosFaq(assuntos, 'saving reenvie')).toHaveLength(0);
+  });
+
+  it('termo vazio devolve tudo', () => {
+    expect(filtrarAssuntosFaq(assuntos, '   ')).toHaveLength(2);
+  });
+});
+
+describe('rodapé "Atualizado em / por"', () => {
+  it('formata a data do SQLite sem depender de fuso', () => {
+    expect(formatarDataFaq('2026-08-12 15:40:00')).toBe('12/08/2026');
+    expect(formatarDataFaq(null)).toBeNull();
+    expect(formatarDataFaq('nada disso')).toBeNull();
+  });
+
+  it('deriva o nome do e-mail e esconde o autor "seed"', () => {
+    expect(nomeDeQuemFaq('kaique.breno@gocase.com')).toBe('Kaique Breno');
+    expect(nomeDeQuemFaq('seed')).toBeNull();
+  });
+
+  it('monta a linha do rodapé — e sem carimbo não há linha', () => {
+    expect(linhaAtualizacaoFaq('2026-08-12 15:40:00', 'kaique.breno@gocase.com')).toBe(
+      'Atualizado em 12/08/2026 por Kaique Breno',
+    );
+    expect(linhaAtualizacaoFaq('2026-08-12 15:40:00', 'seed')).toBe('Atualizado em 12/08/2026');
+    expect(linhaAtualizacaoFaq(null, 'seed')).toBeNull();
   });
 });

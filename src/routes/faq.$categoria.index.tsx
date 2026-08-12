@@ -15,6 +15,7 @@ import {
 import { FaqDocumento } from "@/components/faq/faq-documento";
 import { CopiarLink, FaqShell, FaqVazio } from "@/components/faq/faq-ui";
 import { resolverCategoria } from "@/lib/faq/conteudo";
+import { linhaAtualizacaoFaq } from "@/lib/faq/formato";
 
 export const Route = createFileRoute("/faq/$categoria/")({
   head: () => ({
@@ -71,6 +72,7 @@ function FaqCategoriaPage() {
 
   const url =
     typeof window === "undefined" ? "" : `${window.location.origin}/faq/${categoria.slug}`;
+  const atualizacao = linhaAtualizacaoFaq(categoria.atualizado_em, categoria.atualizado_por);
 
   return (
     <FaqShell
@@ -103,6 +105,17 @@ function FaqCategoriaPage() {
         }}
       >
         <FaqDocumento md={categoria.corpo} />
+
+        {/* Sinal de frescor: FAQ interno envelhece, e quem lê precisa saber se o texto
+            ainda vale. Sem carimbo, a linha simplesmente não aparece. */}
+        {atualizacao && (
+          <p
+            className="mt-9 pt-4 text-[11.5px]"
+            style={{ borderTop: "1px solid rgba(0,89,169,0.10)", color: "#8b8b9a" }}
+          >
+            {atualizacao}
+          </p>
+        )}
       </article>
     </FaqShell>
   );
