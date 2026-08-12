@@ -6,6 +6,63 @@
 
 ---
 
+## 2026-08-12 — Bloqueio do ganho projetado: "volte quando houver medição" não dizia o que acontece, e "especial" virava o botão de fuga
+
+**Status:** ✅ codada e testada · **Branch:** `fix/mensagem-espere-medicao` · **PR:** _(pendente)_
+
+**Sintoma.** A mensagem de bloqueio do gate de ganho real × projetado (`mensagemGanhoProjetado`)
+oferecia as duas saídas como **dois bullets simétricos de uma linha cada**:
+
+> - **Volte quando houver medição.** Deixe o projeto rodando o tempo necessário, apure o número de
+>   verdade e reabra a submissão — a documentação técnica fica salva.
+> - **Submeta como projeto especial.** Se o impacto é alto mas difícil de medir agora, volte à
+>   Etapa 2 e marque o projeto como **especial**…
+
+Duas leituras erradas saíam daí, e nenhuma delas é culpa de quem lê:
+
+1. **"Volte" parecia uma pausa de minutos.** O texto não dizia a única coisa que importa: **a
+   submissão de hoje não se conclui**. Nem onde o projeto fica (aba **Rascunhos** de "Meus
+   Projetos" — o rascunho existe desde o `iniciarSubmissao`, com `status: 'rascunho'`, e guarda doc
+   + conversa), nem que na volta se refaz **só a etapa financeira**, nem que a escala é
+   semanas/meses. "Reabra a submissão" sozinho não informa nada disso.
+2. **"Especial" era o botão de fuga.** Apresentado como alternativa **simétrica**, especial é a
+   saída que **funciona agora** para quem está travado — e o texto até convidava com "difícil de
+   medir **agora**", que descreve exatamente quem só falta medir. Só que especial declara o projeto
+   como **imensurável por natureza** e entra na planilha **sem valor de ganho**: o ganho real
+   apurado dois meses depois nunca chega ao consolidado da gestão. A pessoa troca o resultado do
+   projeto pela possibilidade de sair da tela.
+
+**Causa-raiz.** Simetria na apresentação de duas opções que **não são equivalentes**, somada à
+omissão do estado do sistema. O gate estava correto (ele bloqueia, tem estado terminal e anti-loop);
+o defeito era 100% de COPY — a mensagem descrevia as saídas pelo nome, não pela consequência. É o
+mesmo padrão do bullet vizinho de 10/08 (`mensagemCustoEvitadoPago`): **bloqueio que não diz o que
+aconteceu com o trabalho da pessoa empurra a pessoa para o caminho errado**.
+
+**Fix.** As duas saídas passam a ser **numeradas, assimétricas e com o preço de cada uma escrito**:
+
+| | Antes | Depois |
+|---|---|---|
+| Abertura | "Dois caminhos daqui:" | "Há dois caminhos daqui — e eles **não** são equivalentes:" |
+| Saída 1 | 1 linha: "reabra a submissão — a documentação técnica fica salva" | bloco com o que acontece: **"não concluir esta submissão hoje"** · o projeto fica em **"Meus Projetos" → aba Rascunhos** com doc + conversa · apurar em **relatório/painel/base** · na volta refaz **só esta etapa financeira** · fecha com _"não é uma pausa de minutos — é 'este projeto entra no GoDocs quando existir medição'"_ |
+| Saída 2 | "Se o impacto é alto mas difícil de medir **agora**…" | elegibilidade PRIMEIRO ("só se o ganho **nunca** vai ter número objetivo… difícil de medir **por natureza**: engajamento, qualidade, base que destrava outras automações"), o preço explícito (**"entra na planilha sem valor de ganho"**) e o desvio: ⚠️ _"se o seu ganho **é** mensurável e só falta tempo de rodagem, especial é o caminho **ERRADO**… o seu resultado real nunca aparece no consolidado. Nesse caso, o caminho é o 1."_ |
+| Repetida (curta) | "reabra o formulário desta etapa quando tiver a medição, ou marque como especial" | mantém o tamanho curto (o teste de "repetir o texto longo lê como loop" segue valendo) mas carrega as 2 informações de ação: **Rascunhos** + "especial entra **sem valor de ganho**, só se o ganho nunca for ter número objetivo" |
+
+**O que NÃO mudou (de propósito).** Nenhuma mecânica: `devePreemptarPorProjecao`,
+`deveBloquearPorProjecao`, `PISTAS_PROJECAO`, os estados/terminais e o limite de 2 perguntas seguem
+idênticos — e as **duas** saídas continuam sendo oferecidas (tirar "especial" transformaria o gate no
+beco sem saída que ele existe para evitar). A mudança é 100% de texto. As pistas varrem memorial +
+falas do **usuário**, não as mensagens do assistente, então o vocabulário novo da mensagem não
+realimenta o detector.
+
+**Onde aterrissou.** `src/lib/agents/ganho-projetado.ts` (`mensagemGanhoProjetado`,
+`mensagemGanhoProjetadoRepetida` + o comentário que registra os 2 buracos) ·
+`tests/gate-ganho-projetado.test.ts` (2 testes novos travando (a) "não concluir esta submissão hoje"
++ Rascunhos + "só esta etapa financeira" e (b) elegibilidade + "sem valor de ganho" + "caminho
+ERRADO" + "não são equivalentes"; e 2 asserts novos na repetida). Voltar à simetria agora **quebra
+teste**, em vez de degradar a decisão em silêncio.
+
+---
+
 ## 2026-08-12 — Pergunta de custo evitado só falava de "contrato, serviço ou licença" (quem evitava MULTA não se reconhecia)
 
 **Status:** ✅ codada e testada · **Branch:** `fix/texto-custo-evitado` · **PR:** _(pendente)_
