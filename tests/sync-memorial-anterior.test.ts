@@ -10,7 +10,6 @@ vi.mock('@/lib/google/sheets', () => ({
 vi.mock('@/lib/google/chat', () => ({
   sendChatNotification: vi.fn().mockResolvedValue(undefined),
   buildSubmitMessage: vi.fn().mockReturnValue({}),
-  buildUpdateMessage: vi.fn().mockReturnValue({}),
 }));
 
 import { syncSubmitToGoogle } from '@/lib/google/sync';
@@ -28,6 +27,9 @@ const baseParams = {
   projetoId: 'p1', projeto: baseProjeto, conteudo: {}, saving: { economia_horas_mes: 10, economia_reais_mes: 100, linhas: [] },
   receita: null, membros: [], tiposProjeto: ['saving'], status: 'Pendente' as const,
   area: 'LOJAS', memorialLimpo: 'memo novo', receitaMemorialLimpo: '—', ganhoTotalMensal: 100,
+  // Estes testes olham a PLANILHA, não o Chat (que tem arquivo próprio,
+  // sync-notificar-chat.test.ts) — daí o gate desligado.
+  notificarChat: false,
 };
 
 describe('Memorial anterior no sync', () => {

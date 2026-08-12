@@ -556,3 +556,62 @@ sozinho de `listarAprovacoesPendentes`, de `getPendenciasPorLider` (payload do G
 — achado colateral maior, fatia própria; o cron `reanalisar-pendentes` repõe Complexidade e
 Observações, **não** a Classificação. E a triagem que grava "Reprovado" **à mão** no `/dashboard`
 **não** dispensa a fila — só o analisador dispensa.
+
+## 12. D30 — o alerta do grupo do Chat passa a ser disparado pela PRÉ-APROVAÇÃO (11/08/2026)
+
+**Pedido do Luis:** *"as notificações que rolam a cada submissão ou edição no grupo do Google Chat
+eu quero que só ocorram agora quando houver uma pré-aprovação do líder. Pois só a pessoa submeter ou
+editar e não tiver aprovação do líder ou validação nós vamos desconsiderar. Continuar mostrando
+submissão de projetos especiais de forma normal, porém de forma mais enxuta e objetiva."*
+
+**Régua (FONTE ÚNICA `decidirMomentoNotificacao`, `src/lib/notificacao-chat.ts` — módulo PURO):**
+o alerta sai quando o projeto está **liberado do lado do líder**.
+
+| Estado de `abrirPreAprovacao` | Quando o grupo é avisado |
+|---|---|
+| `isento: false` (fila REALMENTE aberta) | **Cala** na submissão; dispara no veredito `aprovado` |
+| `especial` (D27) | Na submissão, mensagem **própria e enxuta**, sem nota |
+| `lideranca` · `sem_lider` · `teamguide_indisponivel` | Na submissão, **com a nota** dizendo por que não há parecer |
+| motivo `null` **ou futuro/desconhecido** (`default`) | Na submissão, com nota genérica |
+
+### 3 decisões tomadas na abertura (seletor)
+
+1. **Quem nunca terá parecer NOTIFICA na submissão, sinalizado.** Silenciar sumiria com esses
+   projetos do grupo **para sempre**, e a integração da TeamGuide já caiu antes. A linha do
+   *porquê* existe para a triagem não ler a mensagem como pré-aprovação de um líder que não existiu.
+2. **`ajuste`/`reprovado` NÃO notificam** — é literalmente o "desconsiderar" do pedido; fica entre
+   líder e autor.
+3. **A 2ª mensagem por submissão foi SUPRIMIDA** — o `🚨 Novo fluxo de automação cadastrado –
+   Análise Pendente` que o `syncUpdateToGoogle` disparava pós-análise era a mesma notificação por
+   submissão com outra roupa; mantê-la anularia a mudança. Passa a ser **1 mensagem por projeto**.
+
+### Gotchas que não podem regredir
+
+1. ⚠️ **Só `isento === false` cala.** O `default:` do switch **notifica** — projeto sem ninguém
+   para aprová-lo não pode ficar invisível. Um motivo novo no enum entra sem quebrar nada, mas
+   entra pelo lado seguro. Teste: 1 caso por motivo + `null` + motivo `as never`.
+2. ⚠️ **`notificarChat` é OBRIGATÓRIO em `SubmitSyncParams`** (não opcional-com-default): são 2
+   chamadores hoje (`submeterParaValidacao`, `resyncGoogle`) e um terceiro que nascesse
+   notificaria o grupo por acidente. `resyncGoogle` passa **`false`** (reparo administrativo não
+   avisa ninguém).
+3. ⚠️ **`buildUpdateMessage` foi REMOVIDO** de `google/chat.ts` e o bloco de Chat saiu do
+   `syncUpdateToGoogle` — **não reimplementar**. O `projectName` do payload sobrou só para o log
+   de falha da escrita.
+4. ⚠️ **A pré-aprovação NÃO reusa `resyncGoogle`** para remontar o payload: aquele caminho também
+   **ESCREVE** a linha inteira na planilha (e mexe em "Atualizado Em"), então a notificação
+   regravaria o projeto. Daí o `src/lib/notificacao-projeto.functions.ts`, que só **LÊ**
+   (`getProjetoById` + `getDocumentacao`).
+5. ⚠️ **O aviso é acessório e nunca derruba a decisão do líder** (mesma régua do D3):
+   `notificarChatPreAprovacao` **nunca lança** (devolve `false`) e o gatilho em `decidirAprovacao`
+   vai por `runBackground` + `Promise.resolve().then(...)` — que converte até um throw **síncrono**
+   em rejeição — mais `catch`. Teste explícito dos dois modos de falha.
+6. ⚠️ **Mute de `[E2E-…]` vale nos DOIS caminhos** (o do sync e o da pré-aprovação).
+7. **Mensagem do especial ENXUTA:** saíram Ferramenta, Participantes, Data da submissão e os
+   separadores; descrição e "por que é especial" vão **truncados** (`LIMITE_TRECHO_ESPECIAL`).
+   O que já era omitido (saving/receita/escopo/tipos) segue omitido.
+8. **Nada de backfill:** projetos já submetidos antes desta mudança não recebem alerta retroativo.
+
+**Fora desta fatia (de propósito):** o webhook do **widget de Ajuda**
+(`GOOGLE_CHAT_WEBHOOK_URL_AJUDA`) e o próprio `sendChatNotification`; as **DMs do Gomoon** ao líder
+(outro canal, outro contrato); `Status`, colunas do Sheets, `projeto_aprovacoes` e o fluxo de
+decisão do líder — só o **canal Chat** mudou.

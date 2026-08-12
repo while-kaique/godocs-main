@@ -667,8 +667,10 @@ arquivo), que monta um alerta enxuto:
 caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
 `contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
 
-**Status.** ⏳ Implementado; testes verdes + `build:worker` OK. **Deploy pendente** (regra 13 —
-staging `edf400b4` antes de prod).
+**Status.** ✅ Em produção. ⚠️ **Revisitada em 11/08/2026** — a mensagem do especial encolheu de
+novo (saíram Ferramenta, Participantes, Data da submissão e os separadores; descrição e justificativa
+passaram a ser truncadas), porque com a mudança abaixo ela virou uma das poucas que ainda saem na
+submissão. Ver "Notificação do Chat só quando há pré-aprovação do líder".
 
 ## Feature adicional — Botão "Refazer" o memorial financeiro na revisão final · jul/2026
 
@@ -967,3 +969,42 @@ da mesma trava.
 
 **Testes:** `tests/intro-submissao.test.ts` — os 4 ramos do predicado + string vazia não
 contando como id.
+
+
+## Feature adicional — Notificação do Chat só quando há pré-aprovação do líder (11/08/2026)
+
+**Motivação.** O grupo do Google Chat recebia **uma mensagem por submissão e por edição** — e, logo
+depois, uma **segunda** do mesmo projeto (`🚨 Novo fluxo de automação cadastrado – Análise Pendente`,
+disparada pelo `syncUpdateToGoogle` no fim da análise). Como a pré-aprovação do líder passou a existir
+(D1–D29), a maior parte desse barulho é sobre projeto que **ainda não foi olhado por ninguém**. Pedido
+do Luis: *"que só ocorram agora quando houver uma pré-aprovação do líder … só a pessoa submeter ou
+editar e não tiver aprovação do líder ou validação nós vamos desconsiderar"*.
+
+**O que mudou.** O gatilho do alerta deixa de ser a submissão e passa a ser o projeto estar **liberado
+do lado do líder**. A régua é o módulo PURO `src/lib/notificacao-chat.ts`
+(`decidirMomentoNotificacao`), FONTE ÚNICA do "quando" e dos textos das notas:
+
+- fila REALMENTE aberta (`isento: false`) → **silêncio** na submissão; a mensagem sai quando o líder
+  clica em **Pré-aprovar** (`decidirAprovacao` → `notificarChatPreAprovacao`), com a **assinatura** de
+  quem pré-aprovou;
+- **`ajuste`/`reprovado`** → nada (é o "desconsiderar" do pedido; fica entre líder e autor);
+- **especial** (D27, não abre fila) → mensagem na submissão, **própria e enxuta**;
+- **liderança · sem líder · TeamGuide fora** → mensagem na submissão **com uma linha** dizendo por
+  que não há parecer, para a triagem não a ler como pré-aprovação de um líder que não existiu;
+- a 2ª mensagem por submissão foi **suprimida** (`buildUpdateMessage` REMOVIDO): **1 por projeto**.
+
+**Onde aterrissou.** `src/lib/notificacao-chat.ts` (novo, puro) · `src/lib/notificacao-projeto.functions.ts`
+(novo — remonta o payload do BANCO e envia; **não** reusa `resyncGoogle`, que também escreveria no
+Sheets) · `src/lib/google/chat.ts` (`notaPreAprovacao`/`preAprovacao` no `buildSubmitMessage`, especial
+enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarChat` **obrigatório** em
+`SubmitSyncParams`; Chat fora do `syncUpdateToGoogle`) · `src/lib/aprovacoes.functions.ts` (gatilho +
+`assinaturaDoParecer`) · `src/lib/chat.functions.ts` (2 call sites; `resyncGoogle` → `notificarChat: false`).
+
+**Testes.** `tests/notificacao-chat.test.ts` · `tests/sync-notificar-chat.test.ts` ·
+`tests/notificacao-projeto-pre-aprovacao.test.ts` · `tests/aprovacoes-notifica-chat.test.ts` +
+`tests/chat-message-especial.test.ts` atualizado.
+
+**Decisões e gotchas completos:** `SPEC_APROVACAO_LIDER.md` §12 (D30).
+
+**Status.** ⏳ Implementado; suíte verde + `build:worker` OK. **Deploy pendente** (regra 13 — staging
+`edf400b4` antes de prod).

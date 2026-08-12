@@ -4,7 +4,7 @@
 
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
-import { sendChatNotification, buildSubmitMessage, buildUpdateMessage, ehProjetoTesteE2E } from './chat';
+import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './chat';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -147,6 +147,16 @@ export type SubmitSyncParams = {
   // "Justificativa Aprovação do Líder". Separada para a planilha poder filtrar
   // pelo estado sem depender de texto livre. Mesma regra de `undefined` acima.
   justificativaAprovacaoLider?: string | null;
+  // Se ESTE sync avisa o grupo do Google Chat. OBRIGATÓRIO de propósito (não
+  // opcional-com-default): quem decide é o chamador, via `decidirMomentoNotificacao`
+  // (`src/lib/notificacao-chat.ts`) — com um default aqui, um terceiro chamador que
+  // nascesse amanhã notificaria o grupo por acidente. A gravação na PLANILHA não
+  // depende disto; só o Chat. Ver a régua na seção "Sync Google" do CLAUDE.md.
+  notificarChat: boolean;
+  // Linha explicando por que o projeto não tem parecer de líder (autor é liderança /
+  // sem líder / TeamGuide fora). Repassada ao `buildSubmitMessage`; só faz sentido
+  // junto de `notificarChat: true`.
+  notaPreAprovacao?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -495,8 +505,13 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
       console.error(`[google/sync] Falha ao ${etapa} na planilha:`, sheetsErr);
     }
 
-    // 2. Notificação Google Chat (mudo para projetos de teste E2E)
+    // 2. Notificação Google Chat — só quando o CHAMADOR pediu (11/08/2026).
+    // O grupo deixou de ser avisado a cada submissão/edição: quem entra na fila do
+    // líder só aparece lá quando ele pré-aprova (`notificarChatPreAprovacao`). Aqui
+    // notificam apenas os que nunca terão parecer — especial, autor liderança, sem
+    // líder, TeamGuide fora. Régua em `src/lib/notificacao-chat.ts`.
     try {
+      if (!p.notificarChat) return;
       if (ehProjetoTesteE2E(p.projeto.nome)) {
         console.warn(`[google/sync] Projeto de teste E2E "${p.projeto.nome}" — notificação Google Chat suprimida.`);
         return;
@@ -522,6 +537,8 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         // justificativa do porquê é especial. buildSubmitMessage desvia sozinho.
         especial: p.projeto.especial === 1,
         contextoEspecial: (p.projeto.contexto_especial as string | null) ?? undefined,
+        // Por que não há parecer de líder (vazia/null → nenhuma linha na mensagem).
+        notaPreAprovacao: p.notaPreAprovacao ?? null,
       });
       await sendChatNotification(message);
     } catch (chatErr) {
@@ -565,23 +582,16 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       }
       await updateRowByProjectId(p.projetoId, padronizarLinha(cells));
     } catch (sheetsErr) {
-      console.error('[google/sync] Falha ao update na planilha:', sheetsErr);
+      console.error(`[google/sync] Falha ao update na planilha (${p.projectName}):`, sheetsErr);
     }
 
-    // 2. Notificação Google Chat (mudo para projetos de teste E2E)
-    try {
-      if (ehProjetoTesteE2E(p.projectName)) {
-        console.warn(`[google/sync] Projeto de teste E2E "${p.projectName}" — notificação de update Google Chat suprimida.`);
-        return;
-      }
-      const message = buildUpdateMessage({
-        projeto: p.projectName,
-        status: p.status,
-      });
-      await sendChatNotification(message);
-    } catch (chatErr) {
-      console.error('[google/sync] Falha ao notificar Google Chat:', chatErr);
-    }
+    // ⚠️ Este sync NÃO fala no Google Chat (11/08/2026) — e não pode voltar a falar.
+    // Ele disparava o "🚨 Novo fluxo de automação cadastrado – Análise Pendente" logo
+    // após a análise: era a MESMA notificação por submissão com outra roupa (a 2ª do
+    // mesmo projeto), e mantê-la anularia a regra de o grupo só ser avisado quando o
+    // líder pré-aprova. Ver `src/lib/notificacao-chat.ts` e a seção "Sync Google" do
+    // CLAUDE.md. Com isso o `projectName` sobrou só para o log acima — mantido porque
+    // é o que identifica o projeto quando a escrita falha.
   } catch (e) {
     console.error('[google/sync] Erro inesperado no syncUpdateToGoogle:', e);
   }

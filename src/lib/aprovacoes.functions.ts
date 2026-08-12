@@ -36,6 +36,7 @@ import {
   normalizarMarcadoresMemorial,
 } from '@/lib/agents/memorial-format';
 import { updateRowByProjectId } from '@/lib/google/sheets';
+import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
 import { runBackground } from '@/lib/background';
 import {
   abrirAprovacoesPendentes,
@@ -248,6 +249,29 @@ export function justificativaAprovacaoSheet(
     ...(comentario ? [`${rotuloComentarioSheet(decidida.veredito, respostas)}: ${comentario}`] : []),
   ];
   return partes.join('\n');
+}
+
+/**
+ * Quem pré-aprovou e quando, pronto para assinar o aviso no grupo do Chat. Função PURA.
+ *
+ * Mesma derivação de nome da `justificativaAprovacaoSheet` (o `decidido_por` manda —
+ * D4: pode ter sido outro líder da mesma fila; na pré-visualização de admin `?como=`
+ * o e-mail não é de líder nenhum e cai no nome derivado). Sem linha decidida, assina
+ * com o próprio e-mail: o aviso nunca sai sem assinatura.
+ */
+export function assinaturaDoParecer(
+  linhas: Pick<AprovacaoRow, 'veredito' | 'aprovador_nome' | 'aprovador_email' | 'decidido_por' | 'decidido_em'>[],
+  quemDecidiu: string,
+): { por: string; em: string } {
+  const alvo = (quemDecidiu ?? '').trim().toLowerCase();
+  const decidida =
+    linhas.find((l) => (l.decidido_por ?? '').trim().toLowerCase() === alvo && ehParecerHumano(l.veredito)) ??
+    linhas.find((l) => ehParecerHumano(l.veredito));
+  const nome =
+    linhas.find((l) => (l.aprovador_email ?? '').trim().toLowerCase() === alvo)?.aprovador_nome ||
+    decidida?.aprovador_nome ||
+    (alvo ? derivarNomeDeEmail(alvo) : '');
+  return { por: nome || alvo || '—', em: dataBR(decidida?.decidido_em) };
 }
 
 // ─── Abertura da fila (chamada na submissão) ─────────────────────────────────
@@ -791,6 +815,24 @@ export async function decidirAprovacao(
       .then(() => undefined)
       .catch((e) => console.error('[aprovacoes] falha ao gravar no Sheets (não-fatal):', e)),
   );
+
+  // ── Aviso ao grupo do Chat (11/08/2026) ──
+  // A PRÉ-APROVAÇÃO é o gatilho: é aqui que o projeto fica "liberado do lado do líder"
+  // e o grupo passa a ter o que ler. `ajuste`/`reprovado` NÃO avisam nada — é
+  // literalmente o "desconsiderar" do pedido do Luis: fica entre líder e autor.
+  //
+  // ⚠️ Acessório, como o write-back acima: `runBackground` + `Promise.resolve().then`
+  // (converte até um throw SÍNCRONO da notificação em rejeição) + `catch`. A decisão do
+  // líder não pode cair porque o webhook do Chat está fora — mesma régua do D3.
+  if (veredito === 'aprovado') {
+    const parecer = assinaturaDoParecer(atualizadas, quemDecidiu);
+    runBackground(
+      Promise.resolve()
+        .then(() => notificarChatPreAprovacao(projeto_id, parecer))
+        .then(() => undefined)
+        .catch((e) => console.error('[aprovacoes] falha ao avisar o Chat (não-fatal):', e)),
+    );
+  }
 
   return { ok: true, veredito };
 }

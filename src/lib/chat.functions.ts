@@ -115,6 +115,7 @@ import {
   rotuloAprovacaoSheet,
 } from "@/lib/aprovacoes.functions";
 import { notificarLideresDoProjeto } from "@/lib/gomoon-lideres.functions";
+import { decidirMomentoNotificacao } from "@/lib/notificacao-chat";
 import { isAdmin } from "@/lib/auth.functions";
 import type {
   ChatFase,
@@ -3526,6 +3527,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // líder (D6), devolve "—" e segue a vida.
   const preAprovacao = await abrirPreAprovacao(projeto_id, { nomeProjeto: projeto.nome });
 
+  // Quando o grupo do Google Chat é avisado (11/08/2026). Fila REALMENTE aberta
+  // (`isento: false`) → o alerta cala aqui e sai quando o líder pré-aprovar; qualquer
+  // isenção → sai agora, com a nota dizendo por que não há parecer. A régua (e o
+  // default seguro invertido) mora em `src/lib/notificacao-chat.ts`.
+  const momentoNotificacao = decidirMomentoNotificacao(preAprovacao);
+
   // Aviso IMEDIATO ao líder (D26, 06/08/2026): o POST ao Gomoon sai agora, não na
   // manhã seguinte. Fire-and-forget via `runBackground` — o Godeploy cancelaria a
   // promise assim que a Response voltasse, e a submissão NÃO pode esperar uma DM.
@@ -3575,6 +3582,10 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // porquê da isenção vão na "Justificativa Aprovação do Líder" (D14).
         aprovacaoLider: preAprovacao.rotuloSheet,
         justificativaAprovacaoLider: preAprovacao.justificativaSheet,
+        // Só notifica quem nunca terá parecer de líder (especial, autor liderança, sem
+        // líder, TeamGuide fora). Quem entra em fila é anunciado na pré-aprovação.
+        notificarChat: momentoNotificacao.quando === 'submissao',
+        notaPreAprovacao: momentoNotificacao.nota,
       }),
     );
   }
@@ -3705,6 +3716,9 @@ export async function resyncGoogle(rawData: unknown) {
     ganhoTotalMensal,
     aprovacaoLider,
     justificativaAprovacaoLider,
+    // Re-sync é REPARO administrativo (regravar a linha da planilha) — não avisa
+    // ninguém. Antes disparava uma mensagem no grupo por projeto reparado.
+    notificarChat: false,
   });
 
   // 2. Complexidade/Observações/Status (o que o analisador já havia gravado).

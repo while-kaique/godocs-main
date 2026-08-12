@@ -12,7 +12,6 @@ vi.mock('@/lib/google/sheets', () => ({
 vi.mock('@/lib/google/chat', () => ({
   sendChatNotification: vi.fn().mockResolvedValue(undefined),
   buildSubmitMessage: vi.fn().mockReturnValue({}),
-  buildUpdateMessage: vi.fn().mockReturnValue({}),
   ehProjetoTesteE2E: vi.fn().mockReturnValue(false),
 }));
 
@@ -32,6 +31,9 @@ const baseParams = {
   saving: { economia_horas_mes: 10, economia_reais_mes: 100, linhas: [] },
   receita: null, membros: [], tiposProjeto: ['saving'], status: 'Pendente' as const,
   area: 'LOJAS', memorialLimpo: 'memo', receitaMemorialLimpo: '—', ganhoTotalMensal: 100,
+  // Estes testes olham a PLANILHA, não o Chat (que tem arquivo próprio,
+  // sync-notificar-chat.test.ts) — daí o gate desligado.
+  notificarChat: false,
 };
 
 const rowDoAppend = (i = 0) => (appendRow as ReturnType<typeof vi.fn>).mock.calls[i][0];
