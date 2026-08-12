@@ -214,6 +214,41 @@ criar **`Aprovação do Líder`** e **`Justificativa Aprovação do Líder`** no
 `STAGING`.
 
 ## Fase 3.5 — Pré-aprovação do líder (TeamGuide) 🟡
+
+✅ **D30 (decisão do Luis, 11/08) — o alerta do grupo do Google Chat passa a ser disparado pela
+PRÉ-APROVAÇÃO, não pela submissão/edição. EM PRODUÇÃO desde 12/08 (version 237).** Plano em
+[docs/plans/chat-notifica-so-pre-aprovacao.md](docs/plans/chat-notifica-so-pre-aprovacao.md);
+**T1–T7 ✅ codadas em 12/08** na branch `feat/chat-notifica-so-pre-aprovacao` (1242 testes verdes,
+`worker.js` rebuildado, `CLAUDE.md` + spec **D30** atualizados) — **⛔ nada no ar**. Régua: fila aberta → cala na submissão e dispara no veredito `aprovado`; `ajuste`/`reprovado`
+não notificam; quem **nunca** terá parecer (especial · autor liderança · sem líder · TeamGuide fora) notifica
+na submissão **com a linha do porquê** (silenciar sumiria com o projeto do grupo); o alerta do **especial**
+fica enxuto; e a 2ª mensagem por submissão (`Análise Pendente`, do `syncUpdateToGoogle`) é **suprimida** —
+passa a ser **1 mensagem por projeto**. ✅ **Os 3 revisores de contexto fresco voltaram e nenhum barra o
+envio** (conformidade `diverge-baixa` · qualidade `sugestoes` · reuso `possivel-duplicacao`): 4 achados
+corrigidos no commit `d7447eb` — o mais grave era o alerta lendo saving de fonte **stale** (`documentacao.conteudo`,
+que o submit corrige só em memória), o que anunciaria **R$ 0,00** num projeto de custo evitado — e **6 ficaram
+em aberto**. ⚠️ Os marcadores no disco do worktree, porém, **seguem em `pendente`** e barram o
+`git push`/`/ggsd:ship` — a sessão de código re-roda os 2 revisores (o veredito vale para o diff que eles viram).
+
+🟡 **12/08 — o achado nº 1 (mensagem DUPLICADA no grupo) virou fatia própria, com plano aprovado:**
+[docs/plans/chat-uma-mensagem-por-decisao.md](docs/plans/chat-uma-mensagem-por-decisao.md) (T1–T6, tático,
+MESMA branch). Decisão do Luis: corrigir **antes** de deployar. O gate de `decidirAprovacao` é
+**check-then-act** (SELECT da linha `pendente` → UPDATE), então duplo clique / retry / 2 líderes da mesma
+fila (**D4**) notificam **2×**; o `UPDATE` já serializa e falta o `rowsWritten` chegar ao gatilho. ⚠️ **"não
+sei" ≠ "zero"**: nenhum caminho de produção lê `rowsWritten` hoje, então `null` **notifica** — um `> 0` cru
+sobre `undefined` trocaria a duplicata por **silêncio permanente**.
+
+✅ **12/08 — AS 2 FATIAS ESTÃO EM PRODUÇÃO.** T8 fechada no mesmo deploy: staging `edf400b4` version 141
+(13:51 UTC, runtime validado 13:56) → **prod `674a3710` version 237, 14:32 UTC**. 1258 testes verdes,
+`worker.js` rebuildado **idêntico ao commitado**, runtime provado pelo cron das 14:33:03 (3909 ms = cold start
+do bundle novo, `200`/`ok`/`exceptions: []`). ⚠️ Antes de deployar ficou provado que **prod era o `main` puro** —
+a branch NÃO-mergeada do Kaique (`origin/feat/faq-page`) **não estava no ar** (zero ocorrências de `faq` nos
+4489 assets acumulados) e o entry buildado `index-Cqk-K4Ph.js` **bateu** com o que a prod já servia.
+
+**Próximo:** **PR** da branch `feat/chat-notifica-so-pre-aprovacao` (`/ggsd:ship` — a fatia fechou; a branch
+segue **local, não pushada**). ⚠️ E acompanhar a **1ª pré-aprovação REAL de líder em prod**: é o único
+momento em que o **conteúdo** da mensagem se confere (a staging não tem webhook, então nada era enviado lá).
+
 Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D16**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
 diretoria/passthrough (as 10 pessoas em "ÁREA NÃO IDENTIFICADA"), `deriveAreaFromEmail` por e-mail exato,

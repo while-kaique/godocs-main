@@ -4,7 +4,280 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 07/08 (SESSÃO MAIS RECENTE) — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
+## ✅ 12/08 (SESSÃO MAIS RECENTE) — DEPLOY EM PRODUÇÃO: a T8 fechou, o D30 está no ar
+
+**Plano ativo: NENHUM.** As 2 fatias da frente do Chat (`chat-notifica-so-pre-aprovacao` +
+`chat-uma-mensagem-por-decisao`) estão **concluídas e em produção** — não há plano `aprovado` órfão.
+
+### ➡️ PRÓXIMO PASSO
+**`/ggsd:ship`** da branch `feat/chat-notifica-so-pre-aprovacao` (push + PR + merge) — a fatia fechou, mas a
+branch segue **LOCAL, nunca pushada**. Ressalva de gates, **não barrante**: `.review-status = diverge-baixa` ·
+`.quality-status = sugestoes` no worktree. ⚠️ **Em paralelo, acompanhar a 1ª pré-aprovação REAL de líder em
+prod** — é o ÚNICO momento em que o **conteúdo** da mensagem se confere (a staging não tem webhook: lá nada
+chega a ser enviado). Não é código pendente, é olho humano.
+
+### O que foi para o ar
+**Prod `674a3710` version 236 → 237, 12/08 14:32 UTC.** A staging seguia na version 141 (13:51 UTC) com o
+**MESMO commit** já validado em runtime mais cedo, então **não** houve redeploy de staging — regra 13 cumprida
+sem repetir o passo. 1258 testes verdes · `worker.js` rebuildado **idêntico ao commitado** (983.8 kb) ·
+52 assets + worker.
+
+**Runtime provado:** o cron das **14:33:03** rodou em **3909 ms** (contra ~700–1200 ms de sempre) = cold start
+do isolate novo carregando o bundle novo, com `200` / `outcome: ok` / `exceptions: []`. Isso mata as 2 hipóteses
+conhecidas de uma vez: worker velho mantido pelo deploy, e `process.env` em escopo de módulo derrubando o boot.
+
+### 🎯 Como se provou que o deploy NÃO atropelou o Kaique (pedido explícito do Luis)
+Ele pediu para puxar do GitHub antes, porque o Kaique também edita o projeto. **`git fetch` não trouxe nada
+novo** (`origin/main` segue `c092df6`, já incorporado — 0 atrás, 13 à frente). Mas o Kaique tem uma branch
+**não-mergeada e grande**: **`origin/feat/faq-page`** (página de FAQ — rotas próprias, schema de banco,
+`worker.ts`, home reescrita, 3114 linhas). Como o `updateApp` substitui a app INTEIRA, ela morreria se
+estivesse no ar. **Duas provas independentes de que não estava:**
+1. **Zero ocorrências de `faq`** nos **4489** assets acumulados da prod. O GoDeploy **acumula** asset a cada
+   deploy, então se o FAQ já tivesse ido ao ar alguma vez os chunks estariam lá — a ausência é significativa.
+2. **O hash bateu.** Os 13 commits desta frente são **100% server-side** (`.functions.ts`, `client.server.ts`,
+   `google/`, `notificacao-chat.ts` — nenhuma rota, nenhum componente), então o bundle de cliente TINHA de sair
+   idêntico ao do `main`: o `npm run build` produziu **`index-Cqk-K4Ph.js`**, exatamente o entry que a prod já
+   servia. O hash do Vite **é** o conteúdo → prod era o `main` puro.
+
+⚠️ **Truque reutilizável, vale registrar:** quando a fatia é só server-side, **o entry do cliente é uma
+impressão digital do `main`** — se ele bate com o que está no ar, nada fora do `main` estava lá. É mais forte e
+muito mais barato que tentar ler o `worker.js` de 1 MB. (7º episódio da família "deploy da `main` apaga o que
+estava no ar"; os 6 anteriores custaram diagnóstico.)
+
+### ⚠️ O que o Luis estranhou — e a resposta (vale para a próxima pessoa que perguntar)
+Ele notou que **não viu notificação nenhuma no grupo** depois do deploy e avisou que não quer erro silencioso.
+**É o comportamento novo, não falha:** submissão de quem TEM líder agora **cala** (a fila abre); a mensagem sai
+quando o líder clica em **"Pré-aprovar"** — e só nesse veredito (`ajuste`/`reprovado` não avisam nada). Só os
+**isentos** (coordenador+ · sem líder · TeamGuide fora · especial) avisam na submissão.
+**Logs conferidos até 14:36 UTC:** zero exceções, **nenhuma submissão concluída** e **nenhum líder decidiu** —
+não houve gatilho, e a ausência de mensagem estava correta. Havia um chat em andamento (projeto `8baa83bd…`,
+fase saving) que não chegou a submeter.
+
+**E se falhar, falha calado? NÃO** — cada ramo tem log próprio: `[aprovacoes] UPDATE gravou 0 linhas` ·
+`[aprovacoes] adaptador não reportou rowsWritten` · `[aprovacoes] falha ao avisar o Chat (não-fatal)` ·
+`[notificacao-projeto] Projeto … não encontrado` · `[google/chat] webhook não configurado`. O secret
+`GOOGLE_CHAT_WEBHOOK_URL` **está** setado em prod (conferido). Diagnóstico é por `getAppLogs`, nunca pela tela.
+
+⚠️ **Não existe vigilância automática** — só se enxerga quando alguém roda a checagem. Foi oferecido montar um
+cron de checagem recorrente e o Luis **não respondeu** até o fim da sessão; **nada foi criado**.
+
+### 🧰 A armadilha de ferramenta bateu de novo (3º registro)
+O `plan-gate.sh` **barrou a edição dos docs feita de DENTRO do worktree** (`docs/**` é allowlistado relativo ao
+`CLAUDE_PROJECT_DIR`, então `.claude/worktrees/<x>/docs/…` não casa). Solução, que é o padrão do repo: escrever
+o handoff **pela RAIZ**. Desta vez a branch de docs nasceu **do tip da branch de código**
+(`docs/handoff-deploy-12-08` a partir de `feat/chat-notifica-so-pre-aprovacao`) para não divergir — e o commit
+de docs volta para a branch de código por `merge --ff-only`, mantendo o PR com uma fonte só.
+
+## 🛠️ 12/08 (mais cedo) — CÓDIGO: uma mensagem por decisão (T1–T6)
+
+**Plano ativo:** [docs/plans/chat-uma-mensagem-por-decisao.md](plans/chat-uma-mensagem-por-decisao.md) —
+**Status: ✅ executado (T1–T6)**. Worktree `.claude/worktrees/chat-so-pre-aprovacao`, branch
+`feat/chat-notifica-so-pre-aprovacao` (a mesma da fatia anterior — não nasceu branch nova).
+**1258 testes verdes** (baseline 1242, +16 casos), `worker.js` rebuildado (983.5kb) e commitado.
+
+### ✅ OS 3 REVISORES VOLTARAM — nenhum barra o envio
+
+Chegaram depois do handoff: **conformidade `diverge-baixa`** (0,93) · **qualidade `sugestoes`** (0,78) ·
+**reuso `duplicacao-intencional`** (0,78). Marcadores gravados → **`git push`/`/ggsd:ship` liberados**.
+**Não é preciso re-rodar revisor nenhum** — o bloco "⛔" abaixo está SUPERADO, mantido só como registro.
+
+⚠️ **A conformidade verificou por MUTAÇÃO** (é a razão de o `notificacao-chat.ts` ter aparecido alterado no
+meio da sessão, com o comentário `// MUTANTE: null vira zero` — ele restaura depois). Provou que os testes
+são *load-bearing*: tirar o predicado do gatilho derruba **3** testes (`got 2/2/3 times`); colapsar o `null`
+em zero derruba **5** (a unidade + os 4 formatos de adaptador cego). Não são testes decorativos.
+
+**Os 2 revisores convergiram no MESMO achado, e ele já foi corrigido (`8181772`):** a guarda de
+`execContando` pega o adaptador que **não reporta**, mas não distingue um `{ rowsWritten: 0 }` bem-formado e
+constante do perdedor legítimo da corrida — e esse regime **existe no próprio repo**
+(`vite-plugin-dev-api.ts` devolve `{ rowsWritten: 0 }` fixo no ramo sem params). Se o `env.DB` do Godeploy
+se comportar assim, o alerta do D30 morre para **todo** projeto não-isento, **e a staging não detecta**
+(Chat mudo lá) — a 1ª observação real da semântica de `rowsWritten` acontece em PROD. Não dá para detectar
+em código; agora deixa rastro: `console.warn` no ramo que não avisa + `console.info` nomeando o regime
+quando vier `null`. ⚠️ **Critério explícito para a validação da T8:** numa pré-aprovação real na staging,
+exigir no log o warn `[google/chat] webhook … pulando notificação` — é ele que **prova** que o gate deixou
+passar (sem ele, "não saiu mensagem" é ambíguo entre gate correto e gate mudo).
+
+**Sugestões low-sev que sobraram, para a próxima sessão decidir:** (a) `exec` delegar a `execContando`
+(um único ponto tocando o adaptador); (b) mover os 4 casos de unidade de `deveNotificarDecisao` para
+`tests/notificacao-chat.test.ts`, o arquivo canônico do módulo; (c) com `linhasGravadas === 0` o servidor
+sabe que o parecer daquela requisição foi descartado e ainda devolve `{ok:true}` — decisão de produto se
+vira 409/"outro líder já decidiu" (pré-existente, não agravado).
+
+**Próximo passo real: a T8** — regra 10 (`git fetch` + `origin/main` + rebuild) → staging `edf400b4` →
+prod `674a3710` → PR.
+
+### ⛔ (SUPERADO — ver acima) O bloco de quando os revisores ainda não tinham voltado
+
+Os 3 revisores de contexto fresco **foram disparados mas a janela de contexto fechou antes de eles
+voltarem**. `.claude/.review-status` e `.claude/.quality-status` do worktree seguem em **`pendente`**,
+e `pendente` **barra o `git push` e o `/ggsd:ship`** (o `git commit` na branch passa — ADR-053, e por
+isso o commit desta sessão saiu normalmente).
+
+Para destravar, na próxima sessão: rodar o **`ggsd:verificador-conformidade`** (grava
+`.review-status`) e o **`ggsd:revisor-qualidade`** (grava `.quality-status`) sobre o diff desta fatia,
+tratar o que vier de crítica/alta e **só então** seguir para a T8. **Não** apague os marcadores à mão —
+apagar é burlar o gate; quem os retira é a régua do `verify-tier.sh`, e ela mediu **`profunda`**
+(gatilho RF-27: a camada de dados foi tocada), que é exatamente a faixa que exige os dois.
+
+Depois disso, a **T8** do plano [chat-notifica-so-pre-aprovacao](plans/chat-notifica-so-pre-aprovacao.md):
+regra 10 (`git fetch` + incorporar `origin/main` + rebuildar) → staging **`edf400b4`** → prod
+**`674a3710`** → PR.
+
+### O que a fatia fez, em 1 parágrafo
+
+O gate de `decidirAprovacao` é **check-then-act** (lê a linha `pendente` por `SELECT`, só depois grava),
+então duplo clique, retry do cliente ou **2 líderes da mesma fila (D4)** passavam os dois e o grupo do
+Chat recebia **2 mensagens**. Quem serializa **já existia** — o `UPDATE … AND veredito = 'pendente'`,
+em que o perdedor escreve **0 linhas**; faltava o número chegar ao gatilho. Entraram: `execContando`
+(`client.server.ts`, ao lado do `exec`, que segue `Promise<void>` para os outros 26 call sites),
+`decidirAprovacoesDoProjeto` devolvendo `Promise<number | null>`, e o predicado PURO
+**`deveNotificarDecisao`** em `notificacao-chat.ts`. ⚠️ **`null` = "o adaptador não reportou" →
+NOTIFICA** (mesmo default invertido do D30): nenhum caminho de produção lia `rowsWritten` antes desta
+fatia, então um `> 0` cru sobre um `undefined` daria `false` **sempre** e o alerta morreria **calado em
+prod** — duplicata trocada por silêncio invisível. O write-back das 2 colunas do Sheets ficou
+**incondicional** (é idempotente). **Nenhuma tabela/coluna de idempotência** foi criada.
+
+### 3 coisas que não devem ser re-descobertas
+
+1. **O plano vive na branch de DOCS, o código na de CÓDIGO** — foi preciso mesclar
+   `docs/plano-chat-so-pre-aprovacao` dentro do worktree para o gate do RF-03 (e o hook `plan-gate`)
+   resolverem o ponteiro. O merge foi limpo; agora as duas convergem em `feat/chat-notifica-so-pre-aprovacao`.
+2. **`npx tsc --noEmit` = 5 erros PRÉ-EXISTENTES** (`chat.functions.ts` ×2, `submeter.tsx` ×3), idênticos
+   ao `origin/main`. O test-writer tinha deixado um 6º (cast `as GoDeployDB['exec']` que o TS recusa);
+   corrigido passando por `unknown`, **sem** tocar na asserção. Voltou a 5.
+3. **A corrida só reproduz com latência real no adaptador** — o test-writer pôs `setTimeout` antes de
+   cada `query`/`exec` (em prod o `env.DB` é rede). Com o fake síncrono, a corrida dependia da sorte do
+   agendador e o teste seria intermitente.
+
+⚠️ **Os 4 casos do "adaptador cego" (`exec` devolvendo `undefined`/`{}`/não-numérico/`NaN`) já nascem
+VERDES** — são guarda, não red: ficam vermelhos exatamente se alguém "simplificar" o predicado para um
+`rowsWritten > 0` cru. Não os remova por parecerem redundantes.
+
+**Achados 2–6 da revisão anterior seguem em aberto** (bloco de 12/08 mais abaixo) — nenhum é desta
+fatia; estão declarados nas Fronteiras do plano (ADR-028, captura-e-adia). O achado **nº 1 está FECHADO**.
+
+### ✅ O revisor de REUSO voltou (o único dos 3 que deu tempo): `duplicacao-intencional` (0,78)
+
+Só-sugestão — não grava marcador, não barra envio. **Nada reconstruído**: não existe na base outro helper
+que devolva contagem de linhas escritas (`ExecResult` nunca foi lido em produção), e `deveNotificarDecisao`
+entrou no módulo que já se declara fonte única do "quando notificar". **Nenhuma das duplicações já
+registradas foi agravada** — `ouTraco` segue em 3 cópias (não virou 4), `buildSubmitMessage` e
+`MotivoIsencaoNotificacao` intocados, e os 2 adaptadores de teste novos delegam ao local em vez de virarem
+a 10ª cópia do fake. Sobraram **2 sugestões de baixa severidade**, ambas para a próxima sessão decidir:
+
+1. **`exec` poderia DELEGAR a `execContando`** (`async function exec(...) { await execContando(...) }`) —
+   as duas assinaturas continuam (a coexistência é deliberada e está no plano), mas hoje há **2 call sites
+   diretos** de `getDb().exec` no arquivo, e instrumentação/retry/log futuro em `exec` não alcançaria o
+   `execContando`. Zero mudança de comportamento.
+2. **Os 4 casos de UNIDADE de `deveNotificarDecisao` nasceram fora do arquivo canônico do módulo** — foram
+   para `tests/aprovacoes-notifica-chat.test.ts` em vez de `tests/notificacao-chat.test.ts`, que é o home
+   de `src/lib/notificacao-chat.ts`. Quem editar o módulo abre o arquivo homônimo e não vê a cobertura do
+   predicado. Os testes de corrida/integração estão no lugar certo — é só a unidade pura. Movê-los também
+   dispensa o import por namespace.
+
+⚠️ **Os outros 2 revisores (conformidade e qualidade) NÃO voltaram** — são eles que gravam os marcadores
+que barram o envio. Ver o próximo passo acima.
+
+## 📋 12/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: a duplicata do alerta do Chat virou fatia própria
+
+**Nenhuma linha de código tocada** (Gate D armado o tempo todo). Saída: o plano **aprovado**
+[chat-uma-mensagem-por-decisao](plans/chat-uma-mensagem-por-decisao.md) (T1–T6, tático, na MESMA branch
+`feat/chat-notifica-so-pre-aprovacao`), que fecha o **achado nº 1** da revisão de mais cedo.
+
+**A decisão do Luis na abertura:** corrigir a mensagem duplicada **antes** de deployar, em vez de subir o
+que já está verde e deixar a duplicata como waiver. Motivo: a corrida dispara com **duplo clique**, retry do
+cliente ou **2 líderes da mesma fila** (D4) — não é caso de laboratório.
+
+**O que a exploração acrescentou ao remédio que a revisão propôs** (e é a razão de existir um plano em vez
+de um patch de 3 linhas): `ExecResult = { rowsWritten: number }` está **declarado** no `db-adapter.ts`, o
+wrapper de dev devolve `result.changes` e **todos** os fakes de teste também — mas **nenhum caminho de
+produção lê esse campo hoje** (grep: só o tipo e os fakes), então o `env.DB` do Godeploy **nunca foi
+exercitado nisso**. Um `rowsWritten > 0` cru sobre um `undefined` avaliaria `false` **sempre** e o alerta
+**morreria calado em prod** — trocaríamos "2 mensagens" por "nenhuma", que é pior e invisível. Daí o
+contrato `number | null`, com **`null` = "o adaptador não reportou" → NOTIFICA**: o mesmo default invertido
+que já governa o `notificacao-chat.ts` (D30).
+
+**Blast-radius (confiança média-alta, sem `docs/INDEX.md` — RF-35):** `decidirAprovacoesDoProjeto` tem **1**
+call site de produção e 1 de teste, **ambos ignorando o retorno** → a mudança de assinatura é aditiva; o
+`exec` original fica intocado, então os outros **26** usos ficam fora do raio.
+
+⚠️ **Os marcadores de revisão no worktree ainda estão em `pendente`, apesar do handoff anterior dizer
+"gravados"** — conferido no disco (`.claude/.review-status` e `.claude/.quality-status` do worktree; a raiz
+não tem nenhum). Isso **barra o `git push`/`/ggsd:ship`**. Não é problema prático desta vez: a fatia **muda
+código**, então a sessão de código vai **re-rodar** os 2 revisores de qualquer jeito e gravar veredito fresco
+— o veredito antigo valia para o diff que eles viram.
+
+## 🛠️ 12/08 (mais cedo) — CÓDIGO: o alerta do Chat passou a ser disparado pela pré-aprovação (T1–T7)
+
+Executou o plano aprovado no dia anterior. **1242 testes verdes** (baseline 1206), `worker.js` rebuildado
+(983.5kb) e commitado, docs atualizados (**CLAUDE.md** na seção Sync Google + **SPEC_APROVACAO_LIDER §12 =
+D30** + SPEC_FEATURES_NOVAS). Branch `feat/chat-notifica-so-pre-aprovacao`, worktree
+`.claude/worktrees/chat-so-pre-aprovacao`. **Nada foi deployado** — ver "O que a próxima sessão precisa
+fazer (T8)" no ponteiro abaixo.
+
+**O que existe agora, em 1 parágrafo:** a régua do "quando avisar o grupo" virou um módulo PURO
+(`src/lib/notificacao-chat.ts`, `decidirMomentoNotificacao`) com **default invertido** — só `isento === false`
+(fila realmente aberta) faz o alerta calar; **qualquer** isenção, inclusive um motivo futuro que caia no
+`default:`, notifica na submissão, porque projeto sem ninguém para aprová-lo não pode ficar invisível.
+`SubmitSyncParams` ganhou **`notificarChat` obrigatório** (não opcional-com-default: um 3º chamador
+notificaria por acidente) e `resyncGoogle` passa `false`. `buildUpdateMessage` e o bloco de Chat do
+`syncUpdateToGoogle` foram **removidos** (era a 2ª mensagem do mesmo projeto) → **1 mensagem por projeto**.
+O disparo novo mora em `src/lib/notificacao-projeto.functions.ts`, que **só LÊ** o banco (⚠️ não reusa
+`resyncGoogle` de propósito — aquele também ESCREVE a linha inteira no Sheets) e é chamado por
+`decidirAprovacao` no veredito `aprovado`, via `runBackground` + `Promise.resolve().then(...)` (converte
+throw **síncrono** em rejeição) para nunca derrubar a decisão do líder.
+
+**3 coisas que custaram tempo e não devem ser re-descobertas:**
+1. **`npx tsc --noEmit` acusa 5 erros — eles são PRÉ-EXISTENTES** (`chat.functions.ts`, `submeter.tsx`),
+   idênticos no `origin/main`, só com as linhas deslocadas. `npm run build` é `vite build` e **não**
+   typecheca, então isso nunca barrou nada. Não perca a sessão "consertando" o que não é seu.
+2. **O worktree nasce sem `node_modules`** — o padrão do repo é **symlink** para o da raiz
+   (`ln -s /home/notebook/godocs-main/node_modules <worktree>/node_modules`), não `npm install`.
+3. **O `Edit` corrompeu comentário com acento** ao casar trechos que no arquivo estão como `\u2705`:
+   escreveu `\u26a0\ufe0f` LITERAL no fonte. Em bloco denso de unicode, edite por script (python) e
+   **confira com `grep '\\u00'`** depois.
+
+## 📋 11/08 — PLANEJAMENTO puro: o alerta do Chat passa a ser disparado pela PRÉ-APROVAÇÃO, não pela submissão
+
+**Pedido do Luis:** *"as notificações que rolam a cada submissão ou edição no grupo do Google Chat eu quero
+que só ocorram agora quando houver uma pré-aprovação do líder. Pois só a pessoa submeter ou editar e não
+tiver aprovação do líder ou validação nós vamos desconsiderar. Continuar mostrando submissão de projetos
+especiais de forma normal, porém de forma mais enxuta e objetiva."*
+
+**Nenhuma linha de código foi tocada** — sessão de planejamento (Gate D armado). Saída: o plano aprovado
+**[chat-notifica-so-pre-aprovacao](plans/chat-notifica-so-pre-aprovacao.md)** (T1–T8, critérios, fronteiras,
+blast-radius).
+
+### As 3 decisões tomadas na abertura (seletor)
+1. **Quem nunca terá parecer NOTIFICA na submissão, sinalizado** — autor sem líder na TeamGuide, ou TeamGuide
+   fora no momento da submissão. Silenciar sumiria com esses projetos do grupo **para sempre**, e a integração
+   já caiu antes. A mensagem leva uma linha dizendo *por que* não há parecer, para a triagem não a ler como
+   pré-aprovação de um líder que não existiu.
+2. **`ajuste`/`reprovado` do líder NÃO notificam** — é literalmente o "desconsiderar" do pedido; fica entre
+   líder e autor.
+3. **A 2ª mensagem por submissão é suprimida** — o `🚨 Novo fluxo de automação cadastrado – Análise Pendente`
+   do `syncUpdateToGoogle` (pós-análise) é a mesma notificação por submissão com outra roupa; mantê-la
+   anularia a mudança. Passa a ser **1 mensagem por projeto**.
+
+### O que a sessão de código precisa saber antes de começar
+- **Régua:** só `isento === false` (fila aberta de verdade) faz o alerta calar. **Qualquer** isenção —
+  `lideranca`, `sem_lider`, `teamguide_indisponivel`, `especial` e inclusive um motivo que o futuro
+  acrescente (o `default:`) — notifica na submissão. Projeto sem ninguém para aprová-lo não pode ficar invisível.
+- **Não reusar `resyncGoogle`** para remontar o payload na pré-aprovação: ele também **escreve** no Sheets, e
+  a notificação acabaria regravando a linha inteira. Daí o `notificacao-projeto.functions.ts` próprio.
+- **`notificarChat` entra OBRIGATÓRIO** em `SubmitSyncParams` (não opcional-com-default): são 2 chamadores hoje
+  (`submeterParaValidacao`, `resyncGoogle`) e um terceiro que nascesse notificaria por acidente.
+- **Sem `docs/INDEX.md`/`invariants.md` neste repo (RF-35):** o blast-radius do plano veio de leitura direta
+  dos 4 arquivos e de todos os call sites — a sessão de código deve **confirmar com varredura**.
+- Invariantes a não regredir: mute de `[E2E-…]` · o sync nunca propaga erro · fire-and-forget só via
+  `runBackground` · nada disso pode bloquear submissão nem a decisão do líder (D3).
+- **Worktree já criado e vazio, pronto para a sessão de código** (regra 8):
+  `.claude/worktrees/chat-so-pre-aprovacao`, branch `feat/chat-notifica-so-pre-aprovacao`, nascida de
+  `origin/main`. Os docs deste plano foram commitados **pela raiz**, na branch `docs/plano-chat-so-pre-aprovacao`
+  — é o padrão do repo (o `plan-gate.sh` calcula a allowlist `docs/**` relativa ao `CLAUDE_PROJECT_DIR`, então
+  `docs/` de dentro do worktree não casa).
+
+## ✅ 07/08 — DEPLOY CONJUNTO: as 2 frentes estão NO AR (staging + prod) e o repo sincronizado
 
 **Pedido do Luis:** *"fazer o deploy dos ajustes que fizemos e sincronizar repo local, github, deixar tudo
 sincronizado"*. Havia **duas** frentes prontas e **nenhuma** no ar: a dispensa da fila do líder (06/08, faltava
@@ -1648,8 +1921,82 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**Nenhum plano ativo** — o último (dispensa da fila do líder) está **concluído e em produção** (07/08, PR #242).
-O próximo a planejar é o **pedido do Lucas**: mostrar o "Alguém já fazia?" no card da fila (`/ggsd:plan`).
+**→ [docs/plans/chat-uma-mensagem-por-decisao.md](plans/chat-uma-mensagem-por-decisao.md)** · Status: ✅ **aprovado (12/08/2026)** — não executado
+
+Fatia curta e TÁTICA, na MESMA branch `feat/chat-notifica-so-pre-aprovacao`: fecha o **achado nº 1** da
+revisão (mensagem DUPLICADA no grupo do Chat). É o **passo 1 do T8** do plano abaixo — decidido pelo Luis
+nesta sessão, em vez de deployar já e deixar a duplicata como waiver. **Próximo comando: `/ggsd:code`**
+(sessão à parte, contexto fresco — a fronteira plan→code não se cruza na mesma sessão).
+⚠️ A sub-decisão que dá o desenho: **`rowsWritten` nunca foi exercitado em produção** (nenhum caminho lê
+esse campo hoje; só o tipo e os fakes), então `null` = "o adaptador não reportou" **notifica** — um `> 0`
+cru sobre `undefined` trocaria a duplicata por **silêncio permanente**, que é pior e invisível.
+
+**Plano anterior (mesma frente):** [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md) · ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente** (depois desta fatia: regra 10 → staging `edf400b4` → prod `674a3710` → PR)
+
+O alerta do grupo do Chat passa a ser disparado pela **pré-aprovação do líder**, não pela submissão/edição.
+O **código está pronto e verde na branch `feat/chat-notifica-so-pre-aprovacao`** (worktree
+`.claude/worktrees/chat-so-pre-aprovacao`); falta **só a T8** — validar na staging e deployar.
+Segue na fila para planejar: o **pedido do Lucas** — mostrar o "Alguém já fazia?" no card da fila.
+
+### 🔎 Revisão: 2 dos 3 revisores voltaram (12/08) — 4 achados tratados, 6 em aberto
+
+**Os 3 voltaram e NENHUM é barrante:** conformidade **`diverge-baixa`** · qualidade **`sugestoes`** ·
+reuso **`possivel-duplicacao`** (só-sugestão). Marcadores gravados → **o `push`/`/ggsd:ship` está liberado**;
+não é preciso re-rodar revisor nenhum. A conformidade confirmou os 8 critérios de aceitação um a um, as
+Fronteiras respeitadas e o bundle (`worker.js` tem `notificarChat` e zero `buildUpdateMessage`).
+
+**Já corrigido no commit `d7447eb`** (suíte verde): o alerta lia saving do `documentacao.conteudo`, que o
+submit corrige só EM MEMÓRIA e nunca regrava — num projeto de custo evitado o grupo anunciaria **R$ 0,00**
+com a planilha em R$ 5.700 (passou a ler `projetos.saving_*`, que é o que foi ao Sheets); `dataSubmissaoBR`
+usava `new Date()` cru e lia `submitted_at` pt-BR de legado como MM/DD, imprimindo **data errada em
+silêncio** (agora `parseDataFlexivel`); `parseJson` local → canônico; `if (!notificarChat) return` encerrava
+`syncSubmitToGoogle` inteira → `if/else`.
+
+**Em aberto (decidir: corrigir ou registrar waiver em ADR):**
+1. **Mensagem DUPLICADA no grupo (média, `aprovacoes.functions.ts`)** — o gate lê a linha `pendente` por
+   SELECT e só depois roda o UPDATE; duplo clique / retry / 2 líderes da mesma fila (D4) passam os dois e
+   notificam 2×. Antes a corrida era inofensiva (o efeito era o write-back idempotente). **Default seguro:**
+   `decidirAprovacoesDoProjeto` devolver `rowsWritten` e notificar só se `> 0` — o UPDATE já é o ponto de
+   serialização.
+2. **`fetch` do webhook do Chat sem timeout** (`google/chat.ts`, pré-existente; o diff só criou um call site
+   novo dentro do `waitUntil`).
+3. **Duplicação: a montagem dos ~17 args de `buildSubmitMessage` existe agora em 2 lugares** (`sync.ts`
+   inline × `notificacao-projeto.functions.ts`) — extraível para um builder PURO **sem** tocar no Sheets (a
+   trava do plano era o `resyncGoogle`, que escreve; a montagem em si não). Drift já nasceu: `dataSubmissao`
+   é `nowFortaleza()` de um lado e `submitted_at` do outro.
+4. **`assinaturaDoParecer` × `justificativaAprovacaoSheet`** (mesmo arquivo, 30 linhas acima): mesma cascata
+   de derivação de assinante. Extrair `resolverAssinante(linhas, email)`; as saídas seguem diferentes.
+5. **`ouTraco` está em 3 cópias** (`sync.ts`, `dashboard-admin.functions.ts`, o novo).
+6. **`MotivoIsencaoNotificacao` foi COPIADO** em vez de `import type { ResultadoAbertura }` — um motivo
+   renomeado no canônico deixa um `case` morto compilando calado. (O plano dizia reusar o tipo.)
+
+⚠️ **Achado de PROCESSO (conformidade):** o plano aprovado vive na branch de **docs**
+(`docs/plano-chat-so-pre-aprovacao`), não na de **código** (`feat/chat-notifica-so-pre-aprovacao`) — se o PR
+sair só da branch de código, **o plano não acompanha o diff**. Levar as duas, ou mergear a de docs antes.
+
+⚠️ **Observação do revisor que vale checar com o Luis:** o CLAUDE.md afirma "1 mensagem por projeto", mas com
+o reenvio reabrindo a fila (D10) um projeto pré-aprovado 2× gera 2 mensagens. É decisão de produto, não bug.
+
+### ⛔ O que a próxima sessão precisa fazer (T8, nesta ordem)
+1. **Corrigir a mensagem DUPLICADA** (item 1 dos "em aberto" acima) — é o único achado da revisão que
+   ainda pode incomodar em produção, e o remédio é pequeno: `decidirAprovacoesDoProjeto` devolver
+   `rowsWritten` e o gatilho notificar só quando `> 0`. Os revisores já rodaram e **não barram**
+   (`.review-status: diverge-baixa`, `.quality-status: sugestoes`); se você mexer no código, **re-rode**
+   os dois — o veredito vale para o diff que eles viram. Faixa medida: **`profunda`**.
+2. **Regra 10 antes de subir:** `git fetch origin` + incorporar `origin/main` (o `main` anda por
+   causa da regra 8) e **rebuildar `worker.js`/`dist` depois do merge**. ⚠️ Conflito em `CLAUDE.md`
+   se resolve **UNINDO os dois lados** (regra 7) e `grep -n '^<<<<<<<' CLAUDE.md` tem de voltar vazio.
+3. **Regra 13 — staging ANTES:** `updateApp` no **`edf400b4`** (NUNCA `674a3710`), validar, e só
+   então prod. ⚠️ A staging é **Chat mudo**, então o efeito visível lá é o **negativo** (a submissão
+   deixou de mandar mensagem); o positivo (a mensagem da pré-aprovação) só se vê em prod ou apontando
+   o webhook de teste. ⚠️ Lembre da memória "deploy pode manter o worker ANTIGO": exija um sinal de
+   **runtime** nos logs, não só o `getApp`.
+4. **PR** (⚠️ `gh pr create` como `LuisEduardo100`, não `rpaiagogroup`).
+
+**Como validar que a mudança está no ar:** submeter um projeto **normal** (com líder na TeamGuide) →
+o grupo **não** recebe nada; o líder pré-aprova em `/aprovacoes` → sai **uma** mensagem com o
+cabeçalho `✅ Projeto pré-aprovado pelo líder` e a assinatura. Submeter um **especial** → mensagem
+curta na hora. Pedir **ajuste**/reprovar → silêncio.
 
 <details>
 <summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>

@@ -36,6 +36,8 @@ import {
   normalizarMarcadoresMemorial,
 } from '@/lib/agents/memorial-format';
 import { updateRowByProjectId } from '@/lib/google/sheets';
+import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
+import { deveNotificarDecisao } from '@/lib/notificacao-chat';
 import { runBackground } from '@/lib/background';
 import {
   abrirAprovacoesPendentes,
@@ -248,6 +250,29 @@ export function justificativaAprovacaoSheet(
     ...(comentario ? [`${rotuloComentarioSheet(decidida.veredito, respostas)}: ${comentario}`] : []),
   ];
   return partes.join('\n');
+}
+
+/**
+ * Quem pré-aprovou e quando, pronto para assinar o aviso no grupo do Chat. Função PURA.
+ *
+ * Mesma derivação de nome da `justificativaAprovacaoSheet` (o `decidido_por` manda —
+ * D4: pode ter sido outro líder da mesma fila; na pré-visualização de admin `?como=`
+ * o e-mail não é de líder nenhum e cai no nome derivado). Sem linha decidida, assina
+ * com o próprio e-mail: o aviso nunca sai sem assinatura.
+ */
+export function assinaturaDoParecer(
+  linhas: Pick<AprovacaoRow, 'veredito' | 'aprovador_nome' | 'aprovador_email' | 'decidido_por' | 'decidido_em'>[],
+  quemDecidiu: string,
+): { por: string; em: string } {
+  const alvo = (quemDecidiu ?? '').trim().toLowerCase();
+  const decidida =
+    linhas.find((l) => (l.decidido_por ?? '').trim().toLowerCase() === alvo && ehParecerHumano(l.veredito)) ??
+    linhas.find((l) => ehParecerHumano(l.veredito));
+  const nome =
+    linhas.find((l) => (l.aprovador_email ?? '').trim().toLowerCase() === alvo)?.aprovador_nome ||
+    decidida?.aprovador_nome ||
+    (alvo ? derivarNomeDeEmail(alvo) : '');
+  return { por: nome || alvo || '—', em: dataBR(decidida?.decidido_em) };
 }
 
 // ─── Abertura da fila (chamada na submissão) ─────────────────────────────────
@@ -779,7 +804,13 @@ export async function decidirAprovacao(
   // o clique é do admin, não do líder — a auditoria registra o admin, nunca finge que o
   // líder decidiu.
   const quemDecidiu = (opts?.atorReal ?? '').trim().toLowerCase() || alvo;
-  await decidirAprovacoesDoProjeto(projeto_id, veredito, comentario, quemDecidiu, respostas);
+  const linhasGravadas = await decidirAprovacoesDoProjeto(
+    projeto_id,
+    veredito,
+    comentario,
+    quemDecidiu,
+    respostas,
+  );
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
@@ -791,6 +822,53 @@ export async function decidirAprovacao(
       .then(() => undefined)
       .catch((e) => console.error('[aprovacoes] falha ao gravar no Sheets (não-fatal):', e)),
   );
+
+  // ── Aviso ao grupo do Chat (11/08/2026) ──
+  // A PRÉ-APROVAÇÃO é o gatilho: é aqui que o projeto fica "liberado do lado do líder"
+  // e o grupo passa a ter o que ler. `ajuste`/`reprovado` NÃO avisam nada — é
+  // literalmente o "desconsiderar" do pedido do Luis: fica entre líder e autor.
+  //
+  // ⚠️ Acessório, como o write-back acima: `runBackground` + `Promise.resolve().then`
+  // (converte até um throw SÍNCRONO da notificação em rejeição) + `catch`. A decisão do
+  // líder não pode cair porque o webhook do Chat está fora — mesma régua do D3.
+  //
+  // ⚠️ UMA mensagem por decisão: o gate lá em cima é check-then-act, então duas
+  // requisições concorrentes (duplo clique, retry, ou 2 líderes da mesma fila — D4)
+  // chegam as duas até aqui. Quem desempata é o `UPDATE`, que serializa: a perdedora
+  // escreve 0 linhas e cala. `deveNotificarDecisao` é a fonte única dessa régua — e
+  // NOTIFICA quando o adaptador não reporta o número (nunca troca duplicata por silêncio).
+  //
+  // O write-back das 2 colunas do Sheets acima fica INCONDICIONAL de propósito: é
+  // idempotente e a última escrita é a correta.
+  //
+  // ⚠️ O ramo NEGATIVO tem de fazer barulho no log. A guarda de `execContando` pega o
+  // adaptador que não reporta (`undefined`/`{}`/não-numérico/`NaN` → `null` → notifica),
+  // mas NÃO tem como distinguir um `{ rowsWritten: 0 }` bem-formado e constante do
+  // perdedor legítimo da corrida — e esse regime existe no próprio repo
+  // (`vite-plugin-dev-api.ts` devolve `{ rowsWritten: 0 }` fixo no ramo sem params).
+  // Se o `env.DB` do Godeploy se comportar assim, o alerta do D30 morre para TODO projeto
+  // não-isento. Não dá para detectar em código; dá para deixar rastro — e é a linha
+  // abaixo que transforma "sumiu sem explicação" em "está no log desde o 1º deploy".
+  if (veredito === 'aprovado' && !deveNotificarDecisao(linhasGravadas)) {
+    console.warn(
+      '[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado',
+      { projeto_id, quemDecidiu },
+    );
+  }
+  if (veredito === 'aprovado' && deveNotificarDecisao(linhasGravadas)) {
+    // Nomeia o regime do adaptador no 1º deploy: `null` = o `env.DB` não reportou o
+    // número e estamos notificando pelo default invertido, não por ter ganhado a corrida.
+    if (linhasGravadas === null) {
+      console.info('[aprovacoes] adaptador não reportou rowsWritten — avisando o grupo pelo default seguro');
+    }
+    const parecer = assinaturaDoParecer(atualizadas, quemDecidiu);
+    runBackground(
+      Promise.resolve()
+        .then(() => notificarChatPreAprovacao(projeto_id, parecer))
+        .then(() => undefined)
+        .catch((e) => console.error('[aprovacoes] falha ao avisar o Chat (não-fatal):', e)),
+    );
+  }
 
   return { ok: true, veredito };
 }
