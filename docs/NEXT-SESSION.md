@@ -11,7 +11,38 @@
 `feat/chat-notifica-so-pre-aprovacao` (a mesma da fatia anterior — não nasceu branch nova).
 **1258 testes verdes** (baseline 1242, +16 casos), `worker.js` rebuildado (983.5kb) e commitado.
 
-### ⛔ O PRÓXIMO PASSO EXATO — re-rodar os 2 revisores, senão o envio barra
+### ✅ OS 3 REVISORES VOLTARAM — nenhum barra o envio
+
+Chegaram depois do handoff: **conformidade `diverge-baixa`** (0,93) · **qualidade `sugestoes`** (0,78) ·
+**reuso `duplicacao-intencional`** (0,78). Marcadores gravados → **`git push`/`/ggsd:ship` liberados**.
+**Não é preciso re-rodar revisor nenhum** — o bloco "⛔" abaixo está SUPERADO, mantido só como registro.
+
+⚠️ **A conformidade verificou por MUTAÇÃO** (é a razão de o `notificacao-chat.ts` ter aparecido alterado no
+meio da sessão, com o comentário `// MUTANTE: null vira zero` — ele restaura depois). Provou que os testes
+são *load-bearing*: tirar o predicado do gatilho derruba **3** testes (`got 2/2/3 times`); colapsar o `null`
+em zero derruba **5** (a unidade + os 4 formatos de adaptador cego). Não são testes decorativos.
+
+**Os 2 revisores convergiram no MESMO achado, e ele já foi corrigido (`8181772`):** a guarda de
+`execContando` pega o adaptador que **não reporta**, mas não distingue um `{ rowsWritten: 0 }` bem-formado e
+constante do perdedor legítimo da corrida — e esse regime **existe no próprio repo**
+(`vite-plugin-dev-api.ts` devolve `{ rowsWritten: 0 }` fixo no ramo sem params). Se o `env.DB` do Godeploy
+se comportar assim, o alerta do D30 morre para **todo** projeto não-isento, **e a staging não detecta**
+(Chat mudo lá) — a 1ª observação real da semântica de `rowsWritten` acontece em PROD. Não dá para detectar
+em código; agora deixa rastro: `console.warn` no ramo que não avisa + `console.info` nomeando o regime
+quando vier `null`. ⚠️ **Critério explícito para a validação da T8:** numa pré-aprovação real na staging,
+exigir no log o warn `[google/chat] webhook … pulando notificação` — é ele que **prova** que o gate deixou
+passar (sem ele, "não saiu mensagem" é ambíguo entre gate correto e gate mudo).
+
+**Sugestões low-sev que sobraram, para a próxima sessão decidir:** (a) `exec` delegar a `execContando`
+(um único ponto tocando o adaptador); (b) mover os 4 casos de unidade de `deveNotificarDecisao` para
+`tests/notificacao-chat.test.ts`, o arquivo canônico do módulo; (c) com `linhasGravadas === 0` o servidor
+sabe que o parecer daquela requisição foi descartado e ainda devolve `{ok:true}` — decisão de produto se
+vira 409/"outro líder já decidiu" (pré-existente, não agravado).
+
+**Próximo passo real: a T8** — regra 10 (`git fetch` + `origin/main` + rebuild) → staging `edf400b4` →
+prod `674a3710` → PR.
+
+### ⛔ (SUPERADO — ver acima) O bloco de quando os revisores ainda não tinham voltado
 
 Os 3 revisores de contexto fresco **foram disparados mas a janela de contexto fechou antes de eles
 voltarem**. `.claude/.review-status` e `.claude/.quality-status` do worktree seguem em **`pendente`**,
