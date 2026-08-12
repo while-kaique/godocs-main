@@ -4,7 +4,71 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 🛠️ 12/08 (SESSÃO MAIS RECENTE) — CÓDIGO: uma mensagem por decisão (T1–T6) · ⚠️ revisão PENDENTE
+## ✅ 12/08 (SESSÃO MAIS RECENTE) — DEPLOY EM PRODUÇÃO: a T8 fechou, o D30 está no ar
+
+**Plano ativo: NENHUM.** As 2 fatias da frente do Chat (`chat-notifica-so-pre-aprovacao` +
+`chat-uma-mensagem-por-decisao`) estão **concluídas e em produção** — não há plano `aprovado` órfão.
+
+### ➡️ PRÓXIMO PASSO
+**`/ggsd:ship`** da branch `feat/chat-notifica-so-pre-aprovacao` (push + PR + merge) — a fatia fechou, mas a
+branch segue **LOCAL, nunca pushada**. Ressalva de gates, **não barrante**: `.review-status = diverge-baixa` ·
+`.quality-status = sugestoes` no worktree. ⚠️ **Em paralelo, acompanhar a 1ª pré-aprovação REAL de líder em
+prod** — é o ÚNICO momento em que o **conteúdo** da mensagem se confere (a staging não tem webhook: lá nada
+chega a ser enviado). Não é código pendente, é olho humano.
+
+### O que foi para o ar
+**Prod `674a3710` version 236 → 237, 12/08 14:32 UTC.** A staging seguia na version 141 (13:51 UTC) com o
+**MESMO commit** já validado em runtime mais cedo, então **não** houve redeploy de staging — regra 13 cumprida
+sem repetir o passo. 1258 testes verdes · `worker.js` rebuildado **idêntico ao commitado** (983.8 kb) ·
+52 assets + worker.
+
+**Runtime provado:** o cron das **14:33:03** rodou em **3909 ms** (contra ~700–1200 ms de sempre) = cold start
+do isolate novo carregando o bundle novo, com `200` / `outcome: ok` / `exceptions: []`. Isso mata as 2 hipóteses
+conhecidas de uma vez: worker velho mantido pelo deploy, e `process.env` em escopo de módulo derrubando o boot.
+
+### 🎯 Como se provou que o deploy NÃO atropelou o Kaique (pedido explícito do Luis)
+Ele pediu para puxar do GitHub antes, porque o Kaique também edita o projeto. **`git fetch` não trouxe nada
+novo** (`origin/main` segue `c092df6`, já incorporado — 0 atrás, 13 à frente). Mas o Kaique tem uma branch
+**não-mergeada e grande**: **`origin/feat/faq-page`** (página de FAQ — rotas próprias, schema de banco,
+`worker.ts`, home reescrita, 3114 linhas). Como o `updateApp` substitui a app INTEIRA, ela morreria se
+estivesse no ar. **Duas provas independentes de que não estava:**
+1. **Zero ocorrências de `faq`** nos **4489** assets acumulados da prod. O GoDeploy **acumula** asset a cada
+   deploy, então se o FAQ já tivesse ido ao ar alguma vez os chunks estariam lá — a ausência é significativa.
+2. **O hash bateu.** Os 13 commits desta frente são **100% server-side** (`.functions.ts`, `client.server.ts`,
+   `google/`, `notificacao-chat.ts` — nenhuma rota, nenhum componente), então o bundle de cliente TINHA de sair
+   idêntico ao do `main`: o `npm run build` produziu **`index-Cqk-K4Ph.js`**, exatamente o entry que a prod já
+   servia. O hash do Vite **é** o conteúdo → prod era o `main` puro.
+
+⚠️ **Truque reutilizável, vale registrar:** quando a fatia é só server-side, **o entry do cliente é uma
+impressão digital do `main`** — se ele bate com o que está no ar, nada fora do `main` estava lá. É mais forte e
+muito mais barato que tentar ler o `worker.js` de 1 MB. (7º episódio da família "deploy da `main` apaga o que
+estava no ar"; os 6 anteriores custaram diagnóstico.)
+
+### ⚠️ O que o Luis estranhou — e a resposta (vale para a próxima pessoa que perguntar)
+Ele notou que **não viu notificação nenhuma no grupo** depois do deploy e avisou que não quer erro silencioso.
+**É o comportamento novo, não falha:** submissão de quem TEM líder agora **cala** (a fila abre); a mensagem sai
+quando o líder clica em **"Pré-aprovar"** — e só nesse veredito (`ajuste`/`reprovado` não avisam nada). Só os
+**isentos** (coordenador+ · sem líder · TeamGuide fora · especial) avisam na submissão.
+**Logs conferidos até 14:36 UTC:** zero exceções, **nenhuma submissão concluída** e **nenhum líder decidiu** —
+não houve gatilho, e a ausência de mensagem estava correta. Havia um chat em andamento (projeto `8baa83bd…`,
+fase saving) que não chegou a submeter.
+
+**E se falhar, falha calado? NÃO** — cada ramo tem log próprio: `[aprovacoes] UPDATE gravou 0 linhas` ·
+`[aprovacoes] adaptador não reportou rowsWritten` · `[aprovacoes] falha ao avisar o Chat (não-fatal)` ·
+`[notificacao-projeto] Projeto … não encontrado` · `[google/chat] webhook não configurado`. O secret
+`GOOGLE_CHAT_WEBHOOK_URL` **está** setado em prod (conferido). Diagnóstico é por `getAppLogs`, nunca pela tela.
+
+⚠️ **Não existe vigilância automática** — só se enxerga quando alguém roda a checagem. Foi oferecido montar um
+cron de checagem recorrente e o Luis **não respondeu** até o fim da sessão; **nada foi criado**.
+
+### 🧰 A armadilha de ferramenta bateu de novo (3º registro)
+O `plan-gate.sh` **barrou a edição dos docs feita de DENTRO do worktree** (`docs/**` é allowlistado relativo ao
+`CLAUDE_PROJECT_DIR`, então `.claude/worktrees/<x>/docs/…` não casa). Solução, que é o padrão do repo: escrever
+o handoff **pela RAIZ**. Desta vez a branch de docs nasceu **do tip da branch de código**
+(`docs/handoff-deploy-12-08` a partir de `feat/chat-notifica-so-pre-aprovacao`) para não divergir — e o commit
+de docs volta para a branch de código por `merge --ff-only`, mantendo o PR com uma fonte só.
+
+## 🛠️ 12/08 (mais cedo) — CÓDIGO: uma mensagem por decisão (T1–T6)
 
 **Plano ativo:** [docs/plans/chat-uma-mensagem-por-decisao.md](plans/chat-uma-mensagem-por-decisao.md) —
 **Status: ✅ executado (T1–T6)**. Worktree `.claude/worktrees/chat-so-pre-aprovacao`, branch

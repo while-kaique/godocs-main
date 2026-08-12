@@ -1,5 +1,5 @@
 # Plano — Notificação do Chat só quando há pré-aprovação do líder
-**Status:** ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente** (staging `edf400b4` → prod `674a3710` → PR)
+**Status:** ✅ **CONCLUÍDO — T1–T8 (12/08/2026), EM PRODUÇÃO.** T8 fechada: staging `edf400b4` (version 141, 13:51 UTC, runtime validado 13:56) → **prod `674a3710` version 237, 14:32 UTC** (1258 testes verdes, `worker.js` rebuildado idêntico ao commitado). ⛔ Falta só o **PR** (`/ggsd:ship`) — a branch segue local. ⚠️ **O conteúdo da mensagem só se confere na 1ª pré-aprovação REAL em prod** (staging não tem webhook: nada é enviado).
 
 > **Execução (12/08/2026).** Worktree `.claude/worktrees/chat-so-pre-aprovacao`, branch
 > `feat/chat-notifica-so-pre-aprovacao`. Teste **red** autorado em contexto fresco pelo

@@ -1,6 +1,6 @@
 # Plano — uma mensagem por decisão: fechar a duplicata do alerta do Chat
 
-**Status:** ✅ **executado** (T1–T5, 12/08/2026) — falta só o T6 (commit), feito no handoff desta sessão.
+**Status:** ✅ **CONCLUÍDO — EM PRODUÇÃO (12/08/2026).** T1–T6 executados; foi ao ar junto com a fatia-mãe no deploy de prod `674a3710` **version 237, 14:32 UTC** (staging version 141 antes). ⚠️ **O `env.DB` do Godeploy REPORTA `rowsWritten`** — provado na staging em 12/08 13:56 (a linha `adaptador não reportou rowsWritten` NÃO apareceu), então a duplicata morre pelo **mecanismo forte** (o `UPDATE` serializando), não pelo default invertido.
 _(aprovado por Luis Albuquerque, 12/08/2026)_
 
 **Objetivo:** o grupo do Google Chat recebe **exatamente uma** mensagem por pré-aprovação, mesmo com duplo
