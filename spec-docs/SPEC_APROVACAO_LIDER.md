@@ -610,6 +610,25 @@ o alerta sai quando o projeto está **liberado do lado do líder**.
    separadores; descrição e "por que é especial" vão **truncados** (`LIMITE_TRECHO_ESPECIAL`).
    O que já era omitido (saving/receita/escopo/tipos) segue omitido.
 8. **Nada de backfill:** projetos já submetidos antes desta mudança não recebem alerta retroativo.
+9. ⚠️ **UMA mensagem por decisão, e "não sei" NOTIFICA** (12/08/2026). O gate de
+   `decidirAprovacao` é **check-then-act** — lê a linha `pendente` por `SELECT` e só depois grava —,
+   então duplo clique, retry do cliente ou **dois líderes da mesma fila (D4)** passavam os DOIS pelo
+   gate e disparavam DUAS mensagens no grupo que a triagem lê. Antes da D30 a corrida era inofensiva
+   (o efeito era um write-back idempotente no Sheets); com o alerta pendurado ali, virou duplicata.
+   Quem serializa **já existia**: o `UPDATE … AND veredito = 'pendente'` — quem chega depois escreve
+   **0 linhas**. Faltava o número chegar ao gatilho: `decidirAprovacoesDoProjeto` passou a devolver
+   `Promise<number | null>` (helper `execContando`, ao lado do `exec` que segue `void` para os outros
+   26 call sites) e o predicado PURO **`deveNotificarDecisao`** (mesmo módulo `notificacao-chat.ts`)
+   decide. ⚠️ **`null` = "o adaptador não reportou" → NOTIFICA**, o mesmo default invertido do gotcha 1:
+   `ExecResult` promete `{ rowsWritten: number }`, mas **nenhum caminho de produção lia esse campo**
+   até esta fatia (só o wrapper de dev e os fakes de teste), então o `env.DB` do Godeploy nunca foi
+   exercitado nisso — um `rowsWritten > 0` cru sobre um `undefined` daria `false` **sempre** e o alerta
+   morreria **calado em prod**, trocando "2 mensagens" por "nenhuma", que é pior e invisível.
+   ⚠️ O write-back das 2 colunas do Sheets fica **incondicional** (é idempotente; a última escrita é a
+   correta) — só o aviso é condicionado. **Nada de tabela/coluna de idempotência**: o ponto de
+   serialização já estava lá. Testes: corrida de 2 líderes · duplo clique · 3 retries · 2 projetos
+   distintos em paralelo (guarda contra "consertar" calando tudo) · adaptador cego em 4 formatos
+   (`undefined`, `{}`, não-numérico, `NaN`) · unidade do predicado.
 
 **Fora desta fatia (de propósito):** o webhook do **widget de Ajuda**
 (`GOOGLE_CHAT_WEBHOOK_URL_AJUDA`) e o próprio `sendChatNotification`; as **DMs do Gomoon** ao líder

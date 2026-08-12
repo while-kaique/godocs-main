@@ -73,3 +73,25 @@ export function decidirMomentoNotificacao(r: {
       return { quando: 'submissao', nota: NOTA_SEM_PARECER_DESCONHECIDO };
   }
 }
+
+/**
+ * Decide se ESTA decisão do líder é a que avisa o grupo, a partir de quantas linhas o
+ * `UPDATE` da fila escreveu (`decidirAprovacoesDoProjeto`).
+ *
+ * O gate de `decidirAprovacao` é check-then-act — lê a linha `pendente` por `SELECT` e só
+ * depois grava. Duas requisições que leem antes de qualquer uma escrever passam as DUAS
+ * pelo gate: duplo clique, retry do cliente, ou dois líderes da mesma fila (D4). Quem
+ * serializa de fato é o `UPDATE ... AND veredito = 'pendente'`, e é o número de linhas
+ * dele que diz quem chegou primeiro. Sem tabela nem coluna nova: o ponto de serialização
+ * já existia, faltava só ler o resultado.
+ *
+ * ⚠️ O default é INVERTIDO, pela mesma razão de `decidirMomentoNotificacao` acima:
+ * `null` (o adaptador não reportou) **NOTIFICA**. Silenciar no desconhecido trocaria
+ * "duas mensagens" por "nenhuma mensagem" — o dano barulhento pelo dano invisível. E o
+ * desconhecido aqui é real: nenhum caminho de produção lia `rowsWritten` antes desta
+ * mudança, então o comportamento do `env.DB` do Godeploy não foi observado.
+ */
+export function deveNotificarDecisao(linhasGravadas: number | null): boolean {
+  if (linhasGravadas === null) return true; // "não sei" ≠ "zero"
+  return linhasGravadas > 0;
+}

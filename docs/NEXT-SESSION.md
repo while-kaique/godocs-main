@@ -4,6 +4,63 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
+## 🛠️ 12/08 (SESSÃO MAIS RECENTE) — CÓDIGO: uma mensagem por decisão (T1–T6) · ⚠️ revisão PENDENTE
+
+**Plano ativo:** [docs/plans/chat-uma-mensagem-por-decisao.md](plans/chat-uma-mensagem-por-decisao.md) —
+**Status: ✅ executado (T1–T6)**. Worktree `.claude/worktrees/chat-so-pre-aprovacao`, branch
+`feat/chat-notifica-so-pre-aprovacao` (a mesma da fatia anterior — não nasceu branch nova).
+**1258 testes verdes** (baseline 1242, +16 casos), `worker.js` rebuildado (983.5kb) e commitado.
+
+### ⛔ O PRÓXIMO PASSO EXATO — re-rodar os 2 revisores, senão o envio barra
+
+Os 3 revisores de contexto fresco **foram disparados mas a janela de contexto fechou antes de eles
+voltarem**. `.claude/.review-status` e `.claude/.quality-status` do worktree seguem em **`pendente`**,
+e `pendente` **barra o `git push` e o `/ggsd:ship`** (o `git commit` na branch passa — ADR-053, e por
+isso o commit desta sessão saiu normalmente).
+
+Para destravar, na próxima sessão: rodar o **`ggsd:verificador-conformidade`** (grava
+`.review-status`) e o **`ggsd:revisor-qualidade`** (grava `.quality-status`) sobre o diff desta fatia,
+tratar o que vier de crítica/alta e **só então** seguir para a T8. **Não** apague os marcadores à mão —
+apagar é burlar o gate; quem os retira é a régua do `verify-tier.sh`, e ela mediu **`profunda`**
+(gatilho RF-27: a camada de dados foi tocada), que é exatamente a faixa que exige os dois.
+
+Depois disso, a **T8** do plano [chat-notifica-so-pre-aprovacao](plans/chat-notifica-so-pre-aprovacao.md):
+regra 10 (`git fetch` + incorporar `origin/main` + rebuildar) → staging **`edf400b4`** → prod
+**`674a3710`** → PR.
+
+### O que a fatia fez, em 1 parágrafo
+
+O gate de `decidirAprovacao` é **check-then-act** (lê a linha `pendente` por `SELECT`, só depois grava),
+então duplo clique, retry do cliente ou **2 líderes da mesma fila (D4)** passavam os dois e o grupo do
+Chat recebia **2 mensagens**. Quem serializa **já existia** — o `UPDATE … AND veredito = 'pendente'`,
+em que o perdedor escreve **0 linhas**; faltava o número chegar ao gatilho. Entraram: `execContando`
+(`client.server.ts`, ao lado do `exec`, que segue `Promise<void>` para os outros 26 call sites),
+`decidirAprovacoesDoProjeto` devolvendo `Promise<number | null>`, e o predicado PURO
+**`deveNotificarDecisao`** em `notificacao-chat.ts`. ⚠️ **`null` = "o adaptador não reportou" →
+NOTIFICA** (mesmo default invertido do D30): nenhum caminho de produção lia `rowsWritten` antes desta
+fatia, então um `> 0` cru sobre um `undefined` daria `false` **sempre** e o alerta morreria **calado em
+prod** — duplicata trocada por silêncio invisível. O write-back das 2 colunas do Sheets ficou
+**incondicional** (é idempotente). **Nenhuma tabela/coluna de idempotência** foi criada.
+
+### 3 coisas que não devem ser re-descobertas
+
+1. **O plano vive na branch de DOCS, o código na de CÓDIGO** — foi preciso mesclar
+   `docs/plano-chat-so-pre-aprovacao` dentro do worktree para o gate do RF-03 (e o hook `plan-gate`)
+   resolverem o ponteiro. O merge foi limpo; agora as duas convergem em `feat/chat-notifica-so-pre-aprovacao`.
+2. **`npx tsc --noEmit` = 5 erros PRÉ-EXISTENTES** (`chat.functions.ts` ×2, `submeter.tsx` ×3), idênticos
+   ao `origin/main`. O test-writer tinha deixado um 6º (cast `as GoDeployDB['exec']` que o TS recusa);
+   corrigido passando por `unknown`, **sem** tocar na asserção. Voltou a 5.
+3. **A corrida só reproduz com latência real no adaptador** — o test-writer pôs `setTimeout` antes de
+   cada `query`/`exec` (em prod o `env.DB` é rede). Com o fake síncrono, a corrida dependia da sorte do
+   agendador e o teste seria intermitente.
+
+⚠️ **Os 4 casos do "adaptador cego" (`exec` devolvendo `undefined`/`{}`/não-numérico/`NaN`) já nascem
+VERDES** — são guarda, não red: ficam vermelhos exatamente se alguém "simplificar" o predicado para um
+`rowsWritten > 0` cru. Não os remova por parecerem redundantes.
+
+**Achados 2–6 da revisão anterior seguem em aberto** (bloco de 12/08 mais abaixo) — nenhum é desta
+fatia; estão declarados nas Fronteiras do plano (ADR-028, captura-e-adia). O achado **nº 1 está FECHADO**.
+
 ## 📋 12/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: a duplicata do alerta do Chat virou fatia própria
 
 **Nenhuma linha de código tocada** (Gate D armado o tempo todo). Saída: o plano **aprovado**

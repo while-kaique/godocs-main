@@ -1,6 +1,7 @@
 # Plano — uma mensagem por decisão: fechar a duplicata do alerta do Chat
 
-**Status:** ✅ aprovado (Luis Albuquerque, 12/08/2026)
+**Status:** ✅ **executado** (T1–T5, 12/08/2026) — falta só o T6 (commit), feito no handoff desta sessão.
+_(aprovado por Luis Albuquerque, 12/08/2026)_
 
 **Objetivo:** o grupo do Google Chat recebe **exatamente uma** mensagem por pré-aprovação, mesmo com duplo
 clique, retry do cliente ou dois líderes da mesma fila (D4) decidindo em paralelo — sem nunca trocar a

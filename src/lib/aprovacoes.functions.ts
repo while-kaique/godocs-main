@@ -37,6 +37,7 @@ import {
 } from '@/lib/agents/memorial-format';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
+import { deveNotificarDecisao } from '@/lib/notificacao-chat';
 import { runBackground } from '@/lib/background';
 import {
   abrirAprovacoesPendentes,
@@ -803,7 +804,13 @@ export async function decidirAprovacao(
   // o clique é do admin, não do líder — a auditoria registra o admin, nunca finge que o
   // líder decidiu.
   const quemDecidiu = (opts?.atorReal ?? '').trim().toLowerCase() || alvo;
-  await decidirAprovacoesDoProjeto(projeto_id, veredito, comentario, quemDecidiu, respostas);
+  const linhasGravadas = await decidirAprovacoesDoProjeto(
+    projeto_id,
+    veredito,
+    comentario,
+    quemDecidiu,
+    respostas,
+  );
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
@@ -824,7 +831,16 @@ export async function decidirAprovacao(
   // ⚠️ Acessório, como o write-back acima: `runBackground` + `Promise.resolve().then`
   // (converte até um throw SÍNCRONO da notificação em rejeição) + `catch`. A decisão do
   // líder não pode cair porque o webhook do Chat está fora — mesma régua do D3.
-  if (veredito === 'aprovado') {
+  //
+  // ⚠️ UMA mensagem por decisão: o gate lá em cima é check-then-act, então duas
+  // requisições concorrentes (duplo clique, retry, ou 2 líderes da mesma fila — D4)
+  // chegam as duas até aqui. Quem desempata é o `UPDATE`, que serializa: a perdedora
+  // escreve 0 linhas e cala. `deveNotificarDecisao` é a fonte única dessa régua — e
+  // NOTIFICA quando o adaptador não reporta o número (nunca troca duplicata por silêncio).
+  //
+  // O write-back das 2 colunas do Sheets acima fica INCONDICIONAL de propósito: é
+  // idempotente e a última escrita é a correta.
+  if (veredito === 'aprovado' && deveNotificarDecisao(linhasGravadas)) {
     const parecer = assinaturaDoParecer(atualizadas, quemDecidiu);
     runBackground(
       Promise.resolve()
