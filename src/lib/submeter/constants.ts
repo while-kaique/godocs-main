@@ -58,7 +58,7 @@ export type FerramentaOpcao = {
 // ⚠️ **A ORDEM ABAIXO É A ORDEM VISUAL, e a grade preenche por COLUNA** (`grid-auto-flow:
 // column`, 3 linhas) — arranjo pedido pelo Luis em 12/08/2026:
 //
-//     Claude.ai       │ Python   │ Apps Script
+//     Claude AI       │ Python   │ Apps Script
 //     Claude Cowork   │ n8n      │ Vercel
 //     Claude Code     │ GoDeploy │ Outros
 //
@@ -69,7 +69,7 @@ export type FerramentaOpcao = {
 // porque nada lê a coluna por posição, mas a string de um mesmo projeto muda de forma.
 export const FERRAMENTAS_OPCOES: readonly FerramentaOpcao[] = [
   // Coluna 1 — a família Claude, de cima para baixo, na cor do logo dele (`marca`)
-  { value: "Claude.ai",     familia: "Claude", variante: ".ai",    marca: "claude" },
+  { value: "Claude AI",     familia: "Claude", variante: "AI",     marca: "claude" },
   { value: "Claude Cowork", familia: "Claude", variante: "Cowork", marca: "claude" },
   { value: "Claude Code",   familia: "Claude", variante: "Code",   marca: "claude" },
   // Coluna 2
@@ -94,8 +94,12 @@ export const FERRAMENTAS: readonly string[] = FERRAMENTAS_OPCOES.map((o) => o.va
 // no separador e cada metade cai aqui.
 export const FERRAMENTAS_LEGADO: Record<string, string> = {
   "claude": "Claude Code",
-  "claude ai": "Claude.ai",
-  "claude chat": "Claude.ai",
+  // ⚠️ `Claude.ai` esteve NO AR como valor da opção por ~1h em 12/08/2026 (a grafia foi
+  // corrigida para "Claude AI" no mesmo dia). Projeto submetido nessa janela tem a string
+  // antiga na planilha e no SQLite — sem esta linha ele reabriria com ZERO opção marcada.
+  "claude.ai": "Claude AI",
+  "claude ai": "Claude AI",
+  "claude chat": "Claude AI",
   "godeploy": "GoDeploy",
 };
 
