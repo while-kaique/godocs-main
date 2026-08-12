@@ -8,6 +8,7 @@ import {
   bloqueioEspecialInvalido,
 } from "@/lib/mensagens-submissao";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
+import { FAQ_URL } from "@/lib/faq/links";
 import {
   SectionTitle,
   FormGroup,
@@ -24,11 +25,12 @@ import {
  * continua autocontido (a pessoa decide sem sair) — o FAQ é o aprofundamento, não a
  * resposta que faltava. Ver spec-docs/SPEC_FAQ.md (D9).
  *
- * ⚠️ Aponta para o ASSUNTO, não para um tópico dentro dele: cada assunto do FAQ é um
- * documento único, e "Projeto especial" é uma seção de "Tipos de Projeto" (D13). O
- * endereço antigo (`/faq/tipos_projetos/especiais`) segue redirecionando para cá.
+ * ⚠️ Aponta para a SEÇÃO "Projeto especial" do assunto "Tipos de Projeto" — cada assunto do
+ * FAQ é um documento único (D13) e o caminho vem da FONTE ÚNICA `@/lib/faq/links` (D18),
+ * nunca escrito à mão aqui. O endereço antigo (`/faq/tipos_projetos/especiais`) segue
+ * redirecionando para o assunto.
  */
-const URL_FAQ_ESPECIAL = "/faq/tipos_projetos";
+const URL_FAQ_ESPECIAL = FAQ_URL.especial;
 
 function LinkFaqEspecial() {
   return (
