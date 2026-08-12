@@ -1108,3 +1108,62 @@ enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarCh
 
 **Status.** ⏳ Implementado; suíte verde + `build:worker` OK. **Deploy pendente** (regra 13 — staging
 `edf400b4` antes de prod).
+
+---
+
+## Feature adicional — Modal de exemplos no campo "trabalho manual ADICIONAL" (12/08/2026)
+
+**Pedido (Kaique, 12/08/2026):** a pergunta 2c — *"Além desse gasto eliminado, a automação
+substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse gasto NÃO cobria?"* —
+"pode ser muito confuso depois da pessoa já ter marcado que o projeto reduziu custos no campo
+anterior". Daí um botão de dúvida que abre um popup central, fundo embaçado, com **3 exemplos
+que valem e 3 que não valem**, no formato *Contexto → Custo eliminado → veredito*.
+
+**Por que o campo confunde:** ele vem logo DEPOIS de a pessoa cadastrar o gasto que a empresa
+deixou de pagar. Quem acabou de declarar "cortei R$ 3.200/mês do escritório contábil" lê a
+pergunta seguinte como "e esse trabalho conta?" e responde **sim** com o MESMO trabalho — que é
+exatamente a dupla contagem que a árvore de 3 desfechos existe para evitar (caso Portal de
+Reembolsos: contrato + horas-fantasma = R$ 7.597 em vez de R$ 5.700). Texto de ajuda genérico
+("conta só se for diferente") já existia e não bastava; o que separa as duas coisas é o caso
+concreto lado a lado.
+
+**Onde mora**
+- **`src/lib/submeter/exemplos-modal.tsx`** (novo) — `ExemplosCampoAjuda` (trigger + modal),
+  o tipo `ExemploCampo` e a constante **`EXEMPLOS_TRABALHO_ADICIONAL`** (os 6 exemplos).
+  Genérico de propósito: outro campo confuso reusa passando a própria lista.
+- `src/lib/submeter/step3-chat.tsx` — bloco 2c (`mostrarContrafactualAdicional`): o botão
+  entra abaixo do texto de ajuda. Nenhum estado do formulário muda.
+- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (3 + 3, motivo obrigatório,
+  R$ no gasto eliminado, os 3 erros cobertos).
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **Cada card leva o MOTIVO do veredito** — o formato pedido era Contexto / Custo eliminado /
+   Válido-ou-não; a linha de motivo foi acrescentada porque veredito sem porquê não ensina a
+   decidir o próprio caso. Teste exige `motivo` com >30 chars.
+2. **Os 3 "não vale" cobrem os 3 erros REAIS**, não variações do mesmo: (a) mesmo escopo do
+   gasto eliminado → dupla contagem; (b) horas que **alguém já fazia** → é o outro ramo do
+   formulário (a resposta certa é voltar em "Alguém já fazia?" e marcar **Sim**); (c) trabalho
+   que **nasceu com** a automação (monitorar painel, conferir log) → custo de operação, não
+   trabalho substituído. Trocar um deles por mais um exemplo de dupla contagem desperdiça o
+   card e derruba o teste.
+3. **É modal, não tooltip nem accordion.** `InfoTooltip` (`form-components.tsx`) some no
+   `mouseleave` e não caberia 6 casos; um accordion inline empurraria o resto do formulário
+   para fora da vista no meio de uma decisão. O modal é renderizado por **`createPortal` no
+   `document.body`** — o formulário vive dentro do container animado do chat, e um `transform`
+   ancestral quebraria o `position: fixed`.
+4. **Piso de a11y (regra 11):** veredito **nunca só por cor** (ícone + palavra "Válido"/"Não
+   vale"), `role="dialog"`/`aria-modal`/`aria-labelledby`, Esc e clique no fundo fecham, foco
+   inicial no "Fechar" e **devolvido ao botão que abriu**, Tab circula dentro do modal, scroll
+   do fundo travado. Movimento respeita `prefers-reduced-motion` pela regra global do
+   `styles.css`.
+5. **Copy do campo alinhada à decisão de 12/08/2026** (a pergunta do custo evitado é
+   GENÉRICA — tipos são só exemplos): "esse **contrato** NÃO cobria" → "esse **gasto** NÃO
+   cobria", no rótulo e no texto de ajuda. Falar em "contrato" excluía quem cortou multa,
+   juros ou taxa (caso SmartOnline/DIFAL).
+6. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
+   botão de exemplos (decisão do Kaique, 12/08/2026).
+
+**Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não
+precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 13 — staging
+`edf400b4` antes de prod).

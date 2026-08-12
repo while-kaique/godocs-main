@@ -4,6 +4,7 @@ import { CARGOS } from "@/lib/agents/types";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
+import { ExemplosCampoAjuda, EXEMPLOS_TRABALHO_ADICIONAL } from "./exemplos-modal";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput, CustoEvitadoItemInput } from "./constants";
 import { ocultarReaisSaving, formatMoedaBR, parseMoedaBR } from "./constants";
 
@@ -1590,11 +1591,18 @@ function SavingForm({
             {mostrarContrafactualAdicional && (
               <div style={revelar}>
                 <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  Além desse gasto eliminado, a automação substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse contrato NÃO cobria? <span style={{ color: "#e53e3e" }}>*</span>
+                  Além desse gasto eliminado, a automação substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse gasto NÃO cobria? <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  Conta só se for um trabalho <strong>diferente</strong> do que o contrato já fazia — senão é o mesmo ganho contado duas vezes.
+                  Conta só se for um trabalho <strong>diferente</strong> do que o gasto eliminado já cobria — senão é o mesmo ganho contado duas vezes.
                 </p>
+                {/* A pergunta vem logo depois de a pessoa cadastrar o gasto eliminado, e
+                    é aí que ela confunde as duas coisas — os exemplos separam. */}
+                <ExemplosCampoAjuda
+                  titulo="Trabalho manual adicional: o que conta"
+                  descricao="Só conta o trabalho que o gasto eliminado NÃO cobria e que ninguém fazia à mão."
+                  exemplos={EXEMPLOS_TRABALHO_ADICIONAL}
+                />
                 <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
                   {([["nao", "Não, só o custo eliminado"], ["sim", "Sim, há trabalho adicional"]] as const).map(([opt, lbl]) => (
                     <button
