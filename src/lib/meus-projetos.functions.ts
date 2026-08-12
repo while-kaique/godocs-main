@@ -13,6 +13,7 @@ import {
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
+import { lerLinhasDoDono, invalidarLinhasDoDono } from '@/lib/meus-projetos-cache';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { isAdmin } from '@/lib/auth.functions';
 import {
@@ -286,12 +287,17 @@ export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[
   // deste usuário (legados que só existem na planilha, edições manuais). Falha de
   // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
   // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
+  //
+  // ⚠️ A leitura passa por `lerLinhasDoDono` (cache 60 s em memória, single-flight,
+  // stale-while-revalidate). Ela NÃO pode virar um `runBackground` solto: Status,
+  // Motivo Reprovado, Motivo Reenvio e Atualizado Em saem DESTAS linhas, então sem elas
+  // a tela abriria com Status "—" e sem o aviso de reenvio. Ver `meus-projetos-cache.ts`.
   const atualizadoMap = new Map<string, string>();
   const statusMap = new Map<string, string>();
   const motivoReprovadoMap = new Map<string, string>();
   const motivoReenvioMap = new Map<string, string>();
   try {
-    const { rows } = await syncOwnerRowsFromSheet(email);
+    const { rows } = await lerLinhasDoDono(email);
     for (const r of rows) {
       const id = (r['ID Projeto'] ?? '').trim().toLowerCase();
       if (id) {
@@ -356,7 +362,9 @@ export async function contarPendentes(
 ): Promise<{ count: number; prazo: string }> {
   if (opts?.sync) {
     try {
-      await syncOwnerRowsFromSheet(email);
+      // Mesmo cache da listagem (60 s): a home chama este `?sync=1` logo depois do
+      // caminho rápido, e quem acabou de abrir "Meus Projetos" já pagou a leitura.
+      await lerLinhasDoDono(email);
     } catch (e) {
       console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
     }
@@ -431,6 +439,12 @@ export async function descontinuarProjeto(
   } catch (e) {
     console.error('[descontinuarProjeto] falha ao gravar Status no Sheets:', e);
   }
+
+  // Acabamos de mudar a linha na planilha: o cache de 60 s do dono ficaria com o Status
+  // anterior e a lista voltaria a mostrar o valor velho no próximo carregamento.
+  // (A flag `descontinuado` do SQLite tem precedência no badge, mas o cache também
+  // alimenta o aviso de reenvio e o "Atualizado Em" — invalidar é o comportamento certo.)
+  if (p.responsavel_email) invalidarLinhasDoDono(p.responsavel_email);
 
   return { ok: true, descontinuado: descontinuar };
 }

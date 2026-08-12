@@ -496,9 +496,13 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
 // "Participantes"), para o legado aparecer imediatamente sem esperar o cron
 // horário. Reusa criarLegado/atualizarExistente; nunca propaga erro (o caller
 // deve cair de volta no SQLite se a planilha falhar).
+// `leituraOk` distingue "a planilha respondeu" de "este usuário não tem projeto" —
+// os dois devolvem `rows: []`. Quem CACHEIA o resultado (`meus-projetos-cache.ts`)
+// precisa da diferença: instalar um `[]` de falha apagaria a coluna Status de todo
+// mundo por um minuto. Campo ADITIVO; os demais chamadores o ignoram.
 export async function syncOwnerRowsFromSheet(
   email: string,
-): Promise<ReverseSyncResult & { rows: SheetRow[] }> {
+): Promise<ReverseSyncResult & { rows: SheetRow[]; leituraOk: boolean }> {
   const result: ReverseSyncResult = {
     total: 0,
     criados: 0,
@@ -510,7 +514,7 @@ export async function syncOwnerRowsFromSheet(
   };
 
   const alvo = email.trim().toLowerCase();
-  if (!alvo) return { ...result, rows: [] };
+  if (!alvo) return { ...result, rows: [], leituraOk: false };
 
   let rows: SheetRow[];
   try {
@@ -519,7 +523,7 @@ export async function syncOwnerRowsFromSheet(
     console.error('[sync-reverse:owner] Falha ao ler a planilha:', e);
     result.erros = 1;
     result.detalhes.push(`Falha ao ler a planilha: ${(e as Error).message}`);
-    return { ...result, rows: [] };
+    return { ...result, rows: [], leituraOk: false };
   }
 
   const doDono = rows.filter((row) => {
@@ -568,5 +572,5 @@ export async function syncOwnerRowsFromSheet(
       `atualizados=${result.atualizados} removidos=${result.removidos} ` +
       `ignorados=${result.ignorados} erros=${result.erros}`,
   );
-  return { ...result, rows: doDono };
+  return { ...result, rows: doDono, leituraOk: true };
 }

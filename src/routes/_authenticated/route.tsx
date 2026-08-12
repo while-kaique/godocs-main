@@ -35,11 +35,15 @@ function revalidarAuth() {
 }
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ location, preload }) => {
     // A leitura da planilha do dashboard não depende do veredito do auth (o servidor
     // exige admin de qualquer jeito), então começa AGORA, em paralelo — era fila indiana:
     // esperava o auth e só então pedia os ~2 s de planilha.
-    if (location.pathname.startsWith("/dashboard")) iniciarPrefetchDashboard();
+    // ⚠️ `preload` (hover) NÃO dispara isto: com `defaultPreload: 'intent'` no router,
+    // passar o mouse pelo item "Dashboard" da sidebar viraria uma LEITURA DA PLANILHA,
+    // e a cota do Sheets é de 60 leituras/min COMPARTILHADA com produção. O preload
+    // serve para baixar o CHUNK da rota; I/O de verdade fica para a navegação real.
+    if (!preload && location.pathname.startsWith("/dashboard")) iniciarPrefetchDashboard();
 
     // Se já autenticou recentemente, usa o cache (memória → sessionStorage)
     const doCache = cachedUser && Date.now() - cachedAt < AUTH_CACHE_MS ? cachedUser : null;

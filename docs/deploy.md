@@ -55,6 +55,31 @@ Sempre incluir na configuração do app:
 ```
 Sem isso, rotas como `/submeter`, `/dashboard` retornam "Not Found".
 
+### Cada requisição custa ~750 ms — o que importa é a CONTAGEM, não o peso
+
+Medido em prod em 12/08/2026 (edge GIG/Rio, conexão já quente): a mesma máquina fala com
+`cloudflare.com` em **55 ms**, mas **qualquer** rota do GoDocs responde em **~800 ms** — inclusive o
+`/favicon.svg` e o `/api/auth/me`, que não fazem trabalho nenhum. É overhead fixo da plataforma
+(o gate de OAuth que o edge roda em TODAS as rotas), não latência de rede e não código nosso.
+
+Consequência prática, e é contraintuitiva: **1 arquivo de 300 KB é MUITO mais barato que 14 de
+1 KB.** Por isso o `vite.config.ts` agrupa o `lucide-react` num único `vendor-icons` e usa
+`experimentalMinChunkSize` — antes o build emitia 49 chunks, 23 deles com menos de 2 KB (um ícone
+`chevron-left` de **131 bytes** custava ~800 ms), e uma troca de página baixava 14 arquivos.
+⚠️ Ao mexer em code-splitting aqui, **meça a contagem de requisições**, não o tamanho do bundle.
+
+### ⛔ Pendente na PLATAFORMA: `cache-control: immutable` nos assets
+
+Os assets hasheados são servidos com `cache-control: public, max-age=0, must-revalidate`. Como não
+há validação por ETag que resolva, **todo refetch devolve `200`, nunca `304`** — cada navegação
+rebaixa os arquivos inteiros de novo. Nome com hash (`index-CMcHF74i.js`) é imutável por construção
+e deveria vir com `max-age=31536000, immutable`.
+
+**Não dá para consertar do nosso lado:** o `assetConfig` do `updateApp` só aceita `html_handling` e
+`not_found_handling`, e o worker não recebe binding de assets no Godeploy (`env.ASSETS` não existe —
+ver comentário no `src/worker.ts`). É **pedido para o time da plataforma**. Enquanto não houver,
+reduzir o número de arquivos é o que compensa.
+
 ## Polyfill de `process.env`
 
 O Godeploy **não expõe** `process` global (sem `nodejs_compat`). O `worker.ts` faz polyfill no início de cada request:

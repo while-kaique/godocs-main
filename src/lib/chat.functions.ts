@@ -33,6 +33,7 @@ import {
   parseJson,
 } from "@/integrations/db/client.server";
 import { runBackground } from "@/lib/background";
+import { invalidarLinhasDoDono } from "@/lib/meus-projetos-cache";
 import {
   runOrchestrator,
   aplicaConfirmacaoBaseHoras,
@@ -3590,6 +3591,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       }),
     );
   }
+
+  // A linha deste projeto acabou de mudar na planilha (append/update via `runBackground`).
+  // Sem invalidar, "Meus Projetos" serviria o cache de até 60 s de ANTES da submissão —
+  // o projeto novo apareceria com Status "—", porque ele existe no SQLite na hora mas o
+  // Status vem da linha do Sheets. Ver `meus-projetos-cache.ts`.
+  if (projeto.responsavel_email) invalidarLinhasDoDono(projeto.responsavel_email);
 
   // Números finais recalculados — o cliente usa para o comparativo antes×depois
   // na tela pós-envio (edição). São os MESMOS valores gravados no projeto/snapshot.

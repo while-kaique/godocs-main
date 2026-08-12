@@ -2156,3 +2156,72 @@ prompts REAIS via `getPromptText`, então não tem literal a atualizar) ·
 `tests/orchestrator-prompts.test.ts` (3 asserts novos: os 3 prompts usam a fonte única · nenhum diz
 "Memorial aprovado!"/"Sua submissão está completa" · a frase não tem aspas duplas) ·
 `tests/agents-types.test.ts` (fixture) · `CLAUDE.md`.
+
+## Navegação lenta entre páginas: ~750 ms de overhead da plataforma × requisições demais (12/08/2026)
+
+**Sintoma.** Trocar de página no GoDocs levava **7–8 s**. Reclamação sem número; a primeira hipótese
+óbvia ("o bundle está pesado") estava **errada**.
+
+**Medição (prod, edge GIG/Rio, conexão já quente).** O baseline externo separa rede de plataforma:
+
+| O quê | Tempo |
+|---|---|
+| `https://cloudflare.com/cdn-cgi/trace` (rede do usuário) | **55 ms** |
+| `/favicon.svg` do GoDocs (arquivo estático) | **~800 ms** |
+| `/api/auth/me` (endpoint que não faz trabalho nenhum) | **~800 ms** |
+| `/api/meus-projetos` | **~3.000 ms** |
+
+**Causa.** Três coisas se multiplicando:
+
+1. **~750 ms fixos por requisição, cobrados pela plataforma Godeploy** — não é rede (a mesma máquina
+   fala com a Cloudflare em 55 ms) e não é código nosso: um favicon estático custa o mesmo que uma
+   rota de API. É o preço do gate de OAuth que o edge roda em TODAS as rotas. **Não temos como
+   baixá-lo** — o que dá para mudar é o número de vezes que ele é pago.
+2. **Requisições demais.** O build emitia **49–52 chunks, 23 deles com menos de 2 KB**: cada ícone do
+   `lucide-react` é um módulo próprio e, usado em 2+ rotas, o Rollup o promove a chunk compartilhado
+   (`chevron-left` = **131 bytes**; `auth` = **41 bytes**). `/meus-projetos` puxava **14 arquivos** e
+   levava ~4 s **só de JS**. O peso total (1,4 MB) nunca foi o problema.
+3. **Cascata.** O `fetch` de `/api/meus-projetos` só começava **depois** que o chunk da rota chegava,
+   e ele mesmo gastava ~3 s porque `listarMeusProjetos` fazia `syncOwnerRowsFromSheet` (leitura da
+   planilha inteira) antes de qualquer coisa. 4 s + 3 s em série.
+
+**Fix.**
+
+- **`vite.config.ts`** — `lucide-react` inteiro num chunk `vendor-icons` (18 KB, 6 KB gzip, cacheado
+  entre todas as rotas) + `experimentalMinChunkSize: 20_000` para fundir o resto do miudinho.
+  **49 → 19 assets, zero abaixo de 2 KB, mesmo peso total.**
+- **`src/router.tsx`** — `defaultPreload: 'intent'` + `defaultPreloadDelay: 150`: o chunk da rota é
+  baixado no **hover**, não no clique. ⚠️ `_authenticated/route.tsx` passou a checar a flag `preload`
+  do `beforeLoad` antes de chamar `iniciarPrefetchDashboard()` — sem isso, **passar o mouse** pelo item
+  "Dashboard" da sidebar viraria uma **leitura da planilha**, e a cota do Sheets é de 60/min
+  COMPARTILHADA com produção.
+- **`src/lib/meus-projetos-cache.ts` (novo)** — TTL 60 s + *single-flight* + *stale-while-revalidate*
+  em volta de `syncOwnerRowsFromSheet`, por dono. ⚠️ **O sync NÃO podia simplesmente ir para o
+  background**: Status, Motivo Reprovado, Motivo Reenvio e Atualizado Em saem dessas MESMAS linhas
+  (`meus-projetos.functions.ts:289-302`) — a tela abriria com Status "—" e sem o aviso de reenvio.
+  ⚠️ **Leitura que falhou nunca entra no cache**: `syncOwnerRowsFromSheet` devolve `rows: []` tanto
+  para "a planilha não respondeu" quanto para "usuário sem projeto", então ganhou o campo aditivo
+  **`leituraOk`** — cachear o primeiro caso apagaria o Status de todo mundo por um minuto.
+  ⚠️ Quem **escreve** na planilha invalida o cache do dono (`submeterParaValidacao`,
+  `descontinuarProjeto`), senão o projeto recém-submetido apareceria com Status "—" por até 60 s.
+
+**Decisão fechada respeitada.** O cache é **em memória do isolate**, igual ao do `/dashboard`
+(PR #215). A decisão de produto de 28/07/2026 — *"cache da listagem em SQLite/localStorage é FORA"* —
+continua valendo e **não** foi tocada.
+
+**O que NÃO deu para fazer.** Os assets hasheados são servidos com
+`cache-control: public, max-age=0, must-revalidate` — refetch devolve **200, nunca 304**, então cada
+navegação rebaixa tudo de novo. Nome com hash é imutável por construção e deveria ser
+`max-age=31536000, immutable`. O `assetConfig` do `updateApp` do Godeploy só expõe `html_handling` e
+`not_found_handling`, e o worker não recebe binding de assets (`env.ASSETS` não existe lá) — **é
+pedido para a plataforma**, não código nosso. Enquanto não houver, o item 1 (menos arquivos) é o que
+compensa.
+
+**Resultado medido no staging.** Troca de página: **zero requisições de JS** (o chunk chega no hover)
+e `/api/meus-projetos` em **~1,1 s** contra os ~800 ms do piso da plataforma — ou seja, ~280 ms de
+trabalho real, contra os ~3 s de antes.
+
+**Onde aterrissou:** `vite.config.ts` · `src/router.tsx` · `src/routes/_authenticated/route.tsx` ·
+`src/lib/meus-projetos-cache.ts` (novo) · `src/lib/meus-projetos.functions.ts` ·
+`src/lib/google/sync-reverse.ts` (`leituraOk`) · `src/lib/chat.functions.ts` (invalidação) ·
+`tests/meus-projetos-cache.test.ts` (12 casos) · `docs/deploy.md` · `CLAUDE.md`.
