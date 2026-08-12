@@ -382,6 +382,46 @@ describe('Prompt fase receita (tipo receita_incremental)', () => {
   });
 });
 
+// A frase que FECHA o memorial financeiro é copy visível ao usuário e mora numa
+// FONTE ÚNICA (`mensagemMemorialPronto`), consumida pelos 3 prompts de preview
+// financeiro. Antes ela era digitada 3× como "Memorial aprovado! Sua submissão
+// está completa…" — texto que afirmava duas coisas falsas (aprovação pela empresa
+// e submissão concluída, quando ainda falta clicar em "Enviar para Triagem").
+// Este teste existe para que voltar ao "aprovado" seja uma DECISÃO, não um deslize.
+describe('Mensagem de fechamento do memorial (fonte única)', () => {
+  it('os 3 prompts de preview financeiro usam a frase da fonte única', async () => {
+    const orchestrator = await import('@/lib/agents/orchestrator');
+    const { mensagemMemorialPronto, buildSavingPreviewPrompt, buildReceitaPreviewPrompt, buildSavingCustoEvitadoPrompt } = orchestrator;
+
+    const prompts = [
+      buildSavingPreviewPrompt(savingVazio()),
+      buildSavingCustoEvitadoPrompt(makeCtx({ alguem_fazia: 'externo' }), documentacaoVazia(), savingVazio(), 'Resumo'),
+    ];
+    for (const p of prompts) expect(p).toContain(mensagemMemorialPronto());
+    expect(buildReceitaPreviewPrompt(receitaVazia())).toContain(mensagemMemorialPronto('receita'));
+  });
+
+  it('nenhum prompt manda dizer que o memorial foi APROVADO / que a submissão está completa', async () => {
+    const { buildSavingPreviewPrompt, buildReceitaPreviewPrompt, buildSavingCustoEvitadoPrompt } = await import('@/lib/agents/orchestrator');
+    const prompts = [
+      buildSavingPreviewPrompt(savingVazio()),
+      buildReceitaPreviewPrompt(receitaVazia()),
+      buildSavingCustoEvitadoPrompt(makeCtx({ alguem_fazia: 'externo' }), documentacaoVazia(), savingVazio(), 'Resumo'),
+    ];
+    for (const p of prompts) {
+      expect(p).not.toContain('Memorial aprovado!');
+      expect(p).not.toContain('Memorial de receita aprovado!');
+      expect(p).not.toContain('Sua submissão está completa');
+    }
+  });
+
+  it('a frase não tem aspas duplas (é interpolada dentro do exemplo de JSON do prompt)', async () => {
+    const { mensagemMemorialPronto } = await import('@/lib/agents/orchestrator');
+    expect(mensagemMemorialPronto()).not.toContain('"');
+    expect(mensagemMemorialPronto('receita')).not.toContain('"');
+  });
+});
+
 describe('Transições de fase', () => {
   it('doc → doc_preview quando type=preview', async () => {
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValueOnce(
@@ -461,7 +501,7 @@ describe('Transições de fase', () => {
   });
 
   it('saving_preview → completo mesmo com JSON truncado (type=complete recuperado)', async () => {
-    const truncado = '{"type":"complete","content":"Memorial aprovado e cortado no meio';
+    const truncado = '{"type":"complete","content":"Memorial pronto e cortado no meio';
     vi.mocked((await import('@/lib/llm')).llmChat).mockResolvedValue(truncado);
     const result = await runOrchestrator(makeCtx(), [{ role: 'user', content: 'Aprovado' }], 'saving_preview', documentacaoVazia(), savingVazio(), '', ['saving']);
     expect(result.type).toBe('complete');

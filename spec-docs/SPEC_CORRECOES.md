@@ -2055,3 +2055,47 @@ frontend nem contrato).
 **Onde aterrissou:** `src/lib/llm.ts` (2 constantes + comentários) ·
 `tests/llm-fallback.test.ts` (teste de regressão com fake timers: 25s NÃO derruba mais o proxy,
 60s derruba e cai no fallback) · `CLAUDE.md`.
+
+## "Memorial aprovado!" prometia uma aprovação que não existe (12/08/2026)
+
+**Sintoma.** Ao fechar o memorial financeiro, o agente respondia **"Memorial aprovado! Sua submissão
+está completa e será enviada para análise."** — e o usuário ficava sem saber o que tinha acontecido:
+a frase afirma **duas** coisas que não são verdade nessa altura. (1) Nada foi **APROVADO**: a triagem
+humana da RPA só olha o projeto depois de submetido, e o parecer do líder também. (2) A submissão
+**não** está completa: a tela seguinte é a revisão final, com o botão **"Enviar para Triagem"** ainda
+por clicar. Ou seja, a mensagem soava a veredito da empresa e a "já enviei", justo no ponto em que o
+usuário ainda tem trabalho a fazer.
+
+**Causa.** A frase é **copy do LLM**: ela vem do exemplo de `type:"complete"` dentro dos prompts de
+preview financeiro (`orchestrator.ts`), e o modelo a copia literalmente. Estava **digitada 3×** — uma
+em cada prompt (`buildSavingPreviewPrompt`, `buildSavingCustoEvitadoPrompt`,
+`buildReceitaPreviewPrompt`) —, sem fonte única, prontas para divergir. O sentido pretendido era
+"eu, o agente, consegui montar seu memorial de forma válida", mas o texto escolhido dizia outra coisa.
+Note que a tela de revisão final **já** usava o tom certo ("Tudo pronto! / Revise os documentos abaixo
+antes de enviar") — só a fala do bot destoava.
+
+**Fix.** FONTE ÚNICA `mensagemMemorialPronto(modo)` (`src/lib/agents/orchestrator.ts`, junto das outras
+constantes de prompt), consumida pelos 3 prompts por interpolação:
+
+> **Memorial pronto!** Revise abaixo e me diga se ficou algum problema — eu ajusto. Se estiver tudo
+> certo, é só enviar para a triagem.
+
+(`modo: 'receita'` troca só o título para "Memorial de receita pronto!".) Nenhum estado interno mudou —
+`type:'complete'`, `approvedSavingPreview`, `preview_aprovado`, `chatComplete`, os botões "Aprovar"/
+"Pedir ajustes" e o chip "Aprovado" do card da revisão final continuam iguais: "aprovado" ali é o
+registro do **clique do usuário**, não uma afirmação sobre a empresa. ⚠️ A frase **não pode ter aspas
+duplas** — ela é interpolada DENTRO do exemplo de JSON do prompt (`{"type":"complete","content":"…"}`)
+e uma aspa quebraria o exemplo (há teste para isso).
+
+⚠️ **Limite conhecido, aceito:** isto é **prompt, não gate** — o LLM pode redigir a frase à sua
+maneira. Diferente dos casos de "prompt não segura" deste repo (Gostream, ganho projetado,
+SmartOnline), aqui a falha é **cosmética** (uma frase antiga), não um número errado gravado na
+planilha; por isso não se trocou o `content` do turno por texto determinístico do backend, que
+apagaria os ajustes que o agente às vezes descreve no mesmo `content`.
+
+**Onde aterrissou:** `src/lib/agents/orchestrator.ts` (constante + 3 interpolações) ·
+`src/lib/testes/prompt-registry.ts` (3 descrições — regra 3; o `prompt-inspector.tsx` renderiza os
+prompts REAIS via `getPromptText`, então não tem literal a atualizar) ·
+`tests/orchestrator-prompts.test.ts` (3 asserts novos: os 3 prompts usam a fonte única · nenhum diz
+"Memorial aprovado!"/"Sua submissão está completa" · a frase não tem aspas duplas) ·
+`tests/agents-types.test.ts` (fixture) · `CLAUDE.md`.

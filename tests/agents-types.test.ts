@@ -173,7 +173,7 @@ describe("OrchestratorResult", () => {
     };
     const result: OrchestratorResult = {
       type: "complete",
-      content: "Memorial aprovado!",
+      content: "Memorial pronto!",
       fase: "completo",
       coletado: documentacaoVazia(),
       saving,
