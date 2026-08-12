@@ -1132,12 +1132,12 @@ concreto lado a lado.
 **Onde mora**
 - **`src/lib/submeter/exemplos-modal.tsx`** (novo) — `ExemplosCampoAjuda` (trigger + modal),
   o tipo `SinalCampo` (`vale` · `texto` · `detalhe?`) e a constante
-  **`SINAIS_TRABALHO_ADICIONAL`** (3 sinais ✕ + 3 ✓). Genérico de propósito: outro campo
+  **`SINAIS_TRABALHO_ADICIONAL`** (2 sinais ✕ + 2 ✓). Genérico de propósito: outro campo
   confuso reusa passando a própria lista.
 - `src/lib/submeter/step3-chat.tsx` — bloco 2c (`mostrarContrafactualAdicional`): o botão
   entra abaixo do texto de ajuda. Nenhum estado do formulário muda.
-- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (os dois lados, ✕ primeiro,
-  frase curta com teto de 110 chars, os 3 erros cobertos).
+- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (2 + 2, ✕ primeiro, frase
+  curta com teto de 110 chars, os 2 erros cobertos).
 
 ### Decisões fechadas (não "consertar" sem confirmar)
 
@@ -1172,7 +1172,14 @@ concreto lado a lado.
    indevido, então o que precisa ser lido primeiro é o que NÃO conta.
 8. **Fecha com a saída conservadora** — "na dúvida, responda 'Não, só o custo eliminado'".
    Sem esse fecho, quem não se decide tende ao "sim" (parece mais completo) e infla o ganho.
-9. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
+   A nota carrega também o 3º erro (tempo gasto **acompanhando** a automação), que saiu da
+   lista quando ela foi reduzida a **2 sinais por lado** (decisão de produto, 12/08/2026 —
+   a lista tem de ser lida de um olhar).
+9. **Todas as linhas com a MESMA altura** (`gridAutoRows: minmax(76px, auto)`, conteúdo
+   centrado): altura variável fazia a frase curta parecer menos importante que a longa. Não é
+   altura FIXA — em tela estreita a linha cresce em vez de cortar texto. ⚠️ `1fr` não serve
+   aqui: num grid de altura automática ele resolve para o conteúdo de cada linha.
+10. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
    botão de exemplos (decisão do Kaique, 12/08/2026).
 
 **Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não

@@ -1602,7 +1602,7 @@ function SavingForm({
                   titulo="Esse trabalho adicional existe no seu projeto?"
                   chamada="Para saber se o seu projeto tem esse trabalho que estamos falando, observe se:"
                   sinais={SINAIS_TRABALHO_ADICIONAL}
-                  nota="Na dúvida, responda “Não, só o custo eliminado” — é a resposta conservadora, e a validação humana confere depois."
+                  nota="Também não conta o tempo que o time passou a gastar acompanhando a automação. Na dúvida, responda “Não, só o custo eliminado”."
                 />
                 <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
                   {([["nao", "Não, só o custo eliminado"], ["sim", "Sim, há trabalho adicional"]] as const).map(([opt, lbl]) => (

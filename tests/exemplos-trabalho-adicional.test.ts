@@ -6,16 +6,17 @@
  * eliminado é dupla contagem. O popup de ajuda existe para separar, e faz isso com uma lista
  * curta de sinais: "não é esse caso se…" (✕) e "é esse caso se…" (✓).
  *
- * Estes testes travam o conteúdo (não a aparência): perder um dos lados, perder um dos 3 erros
+ * Estes testes travam o conteúdo (não a aparência): perder um dos lados, perder um dos 2 erros
  * reais ou virar um texto longo são regressões silenciosas na tela.
  */
 import { describe, it, expect } from "vitest";
 import { SINAIS_TRABALHO_ADICIONAL } from "@/lib/submeter/exemplos-modal";
 
 describe("sinais do trabalho manual adicional", () => {
-  it("mostra os dois lados", () => {
-    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => !s.vale).length).toBeGreaterThanOrEqual(3);
-    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => s.vale).length).toBeGreaterThanOrEqual(3);
+  it("mostra os dois lados, 2 de cada", () => {
+    // Dois por lado é decisão de produto: a lista tem de ser lida de um olhar.
+    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => !s.vale)).toHaveLength(2);
+    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => s.vale)).toHaveLength(2);
   });
 
   it("começa pelos casos que NÃO valem (é o erro que a pergunta produz)", () => {
@@ -31,7 +32,7 @@ describe("sinais do trabalho manual adicional", () => {
     }
   });
 
-  it("cobre os 3 erros que a pergunta produz na prática", () => {
+  it("cobre os 2 erros que a pergunta produz na prática", () => {
     const naoValem = SINAIS_TRABALHO_ADICIONAL.filter((s) => !s.vale)
       .map((s) => `${s.texto} ${s.detalhe ?? ""}`.toLowerCase())
       .join(" | ");
@@ -39,7 +40,5 @@ describe("sinais do trabalho manual adicional", () => {
     expect(naoValem).toMatch(/mesmo trabalho/);
     // 2. horas que ALGUÉM já fazia → manda de volta ao outro ramo do formulário
     expect(naoValem).toMatch(/alguém já fazia/);
-    // 3. trabalho que nasceu com a automação → custo de operação
-    expect(naoValem).toMatch(/nasceu com a automação/);
   });
 });

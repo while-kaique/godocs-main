@@ -31,8 +31,10 @@ export type SinalCampo = {
 };
 
 /* Sinais do campo 2c ("há trabalho manual ADICIONAL que o gasto eliminado não cobria?").
-   Os 3 primeiros são os 3 erros reais: mesmo escopo do gasto · horas que ALGUÉM já fazia
-   (é o outro ramo do formulário) · trabalho que nasceu com a automação. */
+   DOIS por lado, ✕ primeiro: o erro que a pergunta produz é o "sim" indevido — dupla
+   contagem do que o gasto já cobria, ou horas que ALGUÉM já fazia (que pertencem ao outro
+   ramo do formulário). O terceiro caso (tempo gasto acompanhando a automação) vive na nota
+   de fechamento, para a lista continuar sendo lida de um olhar. */
 export const SINAIS_TRABALHO_ADICIONAL: SinalCampo[] = [
   {
     vale: false,
@@ -45,21 +47,14 @@ export const SINAIS_TRABALHO_ADICIONAL: SinalCampo[] = [
     detalhe: "Volte na pergunta “Alguém já fazia ou mantinha isso manualmente antes?” e responda Sim.",
   },
   {
-    vale: false,
-    texto: "É o tempo que o time passou a gastar acompanhando a automação.",
-    detalhe: "Trabalho que nasceu com a automação é custo de operação, não ganho.",
-  },
-  {
     vale: true,
     texto: "A automação faz algo A MAIS, que o serviço cancelado nunca cobriu.",
+    detalhe: "E ninguém fazia esse algo a mais à mão — simplesmente ficava sem ser feito.",
   },
   {
     vale: true,
-    texto: "Esse algo a mais ninguém fazia — simplesmente ficava sem ser feito.",
-  },
-  {
-    vale: true,
-    texto: "Você consegue dizer quantas horas por mês levaria se alguém fosse fazer à mão.",
+    texto: "Você sabe dizer quantas horas por mês isso levaria à mão.",
+    detalhe: "É esse número que entra no memorial como economia de horas.",
   },
 ];
 
@@ -235,7 +230,11 @@ function AjudaModal({
           <p className="mb-3 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
             {chamada}
           </p>
-          <ul className="space-y-2">
+          {/* Piso de altura igual para todas as linhas (`minmax`) — a lista é para comparar,
+              e card de altura variável faz a frase curta parecer menos importante que a
+              longa. As frases são curtas o bastante para caberem no piso; em tela estreita
+              a linha cresce em vez de cortar texto. */}
+          <ul className="grid gap-2" style={{ gridAutoRows: "minmax(76px, auto)" }}>
             {sinais.map((s, i) => (
               <LinhaSinal key={i} sinal={s} />
             ))}
@@ -273,7 +272,7 @@ function LinhaSinal({ sinal }: { sinal: SinalCampo }) {
 
   return (
     <li
-      className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
+      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
       style={{
         background: "var(--go-white)",
         border: "1px solid rgba(8,20,40,0.08)",
