@@ -2191,10 +2191,19 @@ prompts REAIS via `getPromptText`, então não tem literal a atualizar) ·
   entre todas as rotas) + `experimentalMinChunkSize: 20_000` para fundir o resto do miudinho.
   **49 → 19 assets, zero abaixo de 2 KB, mesmo peso total.**
 - **`src/router.tsx`** — `defaultPreload: 'intent'` + `defaultPreloadDelay: 150`: o chunk da rota é
-  baixado no **hover**, não no clique. ⚠️ `_authenticated/route.tsx` passou a checar a flag `preload`
-  do `beforeLoad` antes de chamar `iniciarPrefetchDashboard()` — sem isso, **passar o mouse** pelo item
-  "Dashboard" da sidebar viraria uma **leitura da planilha**, e a cota do Sheets é de 60/min
-  COMPARTILHADA com produção.
+  baixado no **hover**, não no clique.
+  ⚠️ **Hover não pode disparar I/O — e foi preciso DUAS travas.** A primeira tentativa checava só a
+  flag `preload` do `beforeLoad` de `_authenticated` antes de `iniciarPrefetchDashboard()`. **Não
+  funcionou, e o staging provou:** passar o mouse pelo item "Dashboard" da sidebar seguia disparando
+  `/api/admin/dashboard/projetos`. Causa: no router-core,
+  `resolvePreload = !!(preload && !matchStores.has(matchId))` — a flag só vale `true` para um match
+  **NOVO**. Quem já está numa tela admin tem o layout `_authenticated` **montado**, então o
+  `beforeLoad` do PAI roda com `preload: false` mesmo no hover (e com `location.pathname` já
+  apontando para o destino). Fix: manter a flag (ela cobre quem entra na área admin **vindo de fora**,
+  onde o layout é match novo) **e** pôr `preload={false}` no link "Dashboard" da sidebar.
+  ⚠️ **Não** mover o `iniciarPrefetchDashboard()` para o `beforeLoad` do próprio `/dashboard`, onde a
+  flag funcionaria: os `beforeLoad` rodam em série pai→filho, então ele passaria a esperar o
+  `/api/auth/me` — a fila indiana que o PR #215 tinha desfeito.
 - **`src/lib/meus-projetos-cache.ts` (novo)** — TTL 60 s + *single-flight* + *stale-while-revalidate*
   em volta de `syncOwnerRowsFromSheet`, por dono. ⚠️ **O sync NÃO podia simplesmente ir para o
   background**: Status, Motivo Reprovado, Motivo Reenvio e Atualizado Em saem dessas MESMAS linhas

@@ -40,9 +40,17 @@ export const Route = createFileRoute("/_authenticated")({
     // exige admin de qualquer jeito), então começa AGORA, em paralelo — era fila indiana:
     // esperava o auth e só então pedia os ~2 s de planilha.
     // ⚠️ `preload` (hover) NÃO dispara isto: com `defaultPreload: 'intent'` no router,
-    // passar o mouse pelo item "Dashboard" da sidebar viraria uma LEITURA DA PLANILHA,
-    // e a cota do Sheets é de 60 leituras/min COMPARTILHADA com produção. O preload
-    // serve para baixar o CHUNK da rota; I/O de verdade fica para a navegação real.
+    // passar o mouse por um link viraria uma LEITURA DA PLANILHA, e a cota do Sheets é de
+    // 60 leituras/min COMPARTILHADA com produção. O preload serve para baixar o CHUNK da
+    // rota; I/O de verdade fica para a navegação real.
+    //
+    // ⚠️ Este guard cobre SÓ quem entra na área admin vindo de FORA (hover no "Área Admin"
+    // da home): `preload` é `!!(preload && !matchStores.has(matchId))` no router-core, ou
+    // seja, ele só vale `true` para um match NOVO. Quem já está numa tela admin tem este
+    // layout montado, então o `beforeLoad` do PAI roda com `preload: false` mesmo no hover
+    // e o guard não pega nada. Por isso o link "Dashboard" da sidebar leva `preload={false}`
+    // logo abaixo — as duas travas juntas é que fecham o caso. (Medido no staging: só com o
+    // guard, passar o mouse pelo item da sidebar disparava `/api/admin/dashboard/projetos`.)
     if (!preload && location.pathname.startsWith("/dashboard")) iniciarPrefetchDashboard();
 
     // Se já autenticou recentemente, usa o cache (memória → sessionStorage)
@@ -112,7 +120,15 @@ function AuthenticatedLayout() {
         </div>
 
         <nav className="flex-1 space-y-1">
-          <NavItem to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>
+          {/*
+            ⚠️ Único item da sidebar SEM preload no hover. Navegar para `/dashboard` dispara
+            `iniciarPrefetchDashboard()` no `beforeLoad` do layout, e ali não há como
+            distinguir hover de clique (ver a nota no `beforeLoad`): o mouse passando pelo
+            item viraria uma leitura da planilha, cuja cota é COMPARTILHADA com produção.
+            O chunk volta a carregar no clique — o que não custa quase nada aqui, porque o
+            tempo do `/dashboard` é dominado pelos ~2 s da planilha, não pelo JS.
+          */}
+          <NavItem to="/dashboard" preload={false} icon={<LayoutDashboard className="h-4 w-4" />}>
             Dashboard
           </NavItem>
           <NavItem to="/areas" icon={<Building2 className="h-4 w-4" />}>
@@ -159,14 +175,18 @@ function NavItem({
   to,
   icon,
   children,
+  preload,
 }: {
   to: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  /** `false` desliga o preload no hover deste item (ver o "Dashboard" acima). */
+  preload?: false;
 }) {
   return (
     <Link
       to={to}
+      preload={preload}
       activeProps={{
         className: "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
       }}
