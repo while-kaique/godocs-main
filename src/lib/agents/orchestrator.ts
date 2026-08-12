@@ -43,6 +43,22 @@ Exemplo de uma seção bem formatada:
 - **OpenAI / Anthropic** — LLM (env: \`LLM_API_KEY\`, \`LLM_MODEL\`).
 - **Google Chat** — notificação via webhook.`;
 
+// ─── Mensagem que FECHA o memorial financeiro ───────────────────────────────
+// FONTE ÚNICA da frase de encerramento dos 3 prompts de preview financeiro
+// (saving, custo evitado puro e receita) — ⚠️ não redigite nos prompts, altere AQUI.
+// ⚠️ Era "Memorial aprovado! Sua submissão está completa e será enviada para
+// análise." e as duas metades enganavam: "aprovado" soava a veredito da EMPRESA
+// (nada foi aprovado — a triagem só vê o projeto depois) e "submissão completa"
+// contradizia a tela, que ainda exige o clique em "Enviar para Triagem". O sentido
+// real é "eu, o agente, consegui montar seu memorial de forma válida" — daí
+// "pronto" + o convite a revisar/pedir ajuste + o próximo passo explícito.
+// ⚠️ Sem aspas duplas no texto: ele é interpolado DENTRO do exemplo de JSON dos
+// prompts (`{"type":"complete","content":"…"}`) e uma aspa quebraria o exemplo.
+export function mensagemMemorialPronto(modo: "saving" | "receita" = "saving"): string {
+  const titulo = modo === "receita" ? "Memorial de receita pronto!" : "Memorial pronto!";
+  return `${titulo} Revise abaixo e me diga se ficou algum problema — eu ajusto. Se estiver tudo certo, é só enviar para a triagem.`;
+}
+
 // ─── Bloco de contexto de revisão (edição) ──────────────────────────────────
 // Quando ctx.revisao existe, o projeto está sendo EDITADO: ele já foi submetido,
 // documentado e teve memorial aprovado. O agente DEVE partir desse contexto e
@@ -620,7 +636,7 @@ ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do mem
 FORMATO — APENAS JSON válido:
 
 Se aprovado (SOMENTE se valor_ganho_mensal > 0):
-{"type":"complete","content":"Memorial de receita aprovado! Sua submissão está completa e será enviada para análise.","receita":{...campos finais}}
+{"type":"complete","content":"${mensagemMemorialPronto("receita")}","receita":{...campos finais}}
 
 Se ajuste + novo preview:
 {"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n...\\n\\n### Como o projeto aumenta a receita\\n...\\n\\n### Comparação antes vs. depois\\n...\\n\\n### Base de cálculo\\n...\\n\\n### Resumo\\n...\\n\\nFiz os ajustes. Pode aprovar?","receita":{...campos corrigidos, "memorial_calculo": "<texto do memorial>"}}
@@ -944,7 +960,7 @@ Preview (quando o contexto estiver confirmado e o ganho for REAL):
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ...\\n**Custo evitado:** ... (sem R$)\\n**Rateio:** ...\\n\\n### Resumo\\n- Ganho: custo externo eliminado\\n- Tipo: ${saving.tipo_saving ?? "mensal"}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "linhas":[], "economia_horas_mes":0, "memorial_calculo":"<texto do memorial — OBRIGATÓRIO>"}}
 
 Se aprovado:
-{"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais, "linhas":[], "economia_horas_mes":0}}
+{"type":"complete","content":"${mensagemMemorialPronto()}","saving":{...campos finais, "linhas":[], "economia_horas_mes":0}}
 
 ATENÇÃO: "memorial_calculo" dentro do "saving" é OBRIGATÓRIO no preview e no complete (copie o texto do "content" sem o "Está correto?"). NUNCA escreva R$ no "content" nem no "memorial_calculo". NUNCA use linguagem de projeção ("vai", "pretende", "a expectativa é") — o ganho é JÁ realizado.`;
 }
@@ -1407,7 +1423,7 @@ ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do mem
 FORMATO — APENAS JSON válido:
 
 Se aprovado (SOMENTE se houver economia de horas > 0 OU custo evitado > 0):
-{"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais}}
+{"type":"complete","content":"${mensagemMemorialPronto()}","saving":{...campos finais}}
 
 Se ajuste + novo preview:
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n...\\n\\n### Saving de Pessoas\\n...\\n\\n### Contratos/Serviços Evitados\\n...\\n\\n### Custo da Automação\\n...\\n\\n### Resumo\\n...\\n\\nFiz os ajustes. Pode aprovar?","saving":{...campos corrigidos, "memorial_calculo": "<texto do memorial>"}}
