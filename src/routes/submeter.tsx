@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Loader2, Save, FolderClock, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
+import { AvisoBloqueio } from "@/components/aviso-bloqueio";
+import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 
 import {
   filesToDocs, TOKEN_BLOCK_CHARS,
@@ -19,6 +21,18 @@ import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 function hasLocalDraft(): boolean {
   return loadDraft() !== null;
 }
+
+/**
+ * Separa as duas naturezas de falha no ENVIO. Bloqueio de PREENCHIMENTO chega estruturado do
+ * servidor (`ApiError.bloqueio`) e vai para o painel âmbar; qualquer outra coisa é falha de
+ * sistema e segue no toast vermelho, que ali é verdade. Ver `spec-docs/SPEC_MENSAGENS_ERRO.md`.
+ */
+function bloqueioDoErro(e: unknown): BloqueioSubmissao | null {
+  return e instanceof ApiError && e.bloqueio ? e.bloqueio : null;
+}
+
+/** Toast curto que só aponta para o painel — o conteúdo do bloqueio mora na tela. */
+const TOAST_ENVIO_PAUSADO = "Envio pausado — veja na tela o que precisa ser corrigido.";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
@@ -465,6 +479,11 @@ export function SubmeterPageContent({
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [shaking, setShaking] = useState(false);
   const formCardRef = useRef<HTMLDivElement>(null);
+  // Bloqueio da última tentativa de ENVIO (preenchimento: saving sem ganho líquido, receita
+  // incompleta, doc ausente, nome duplicado). Vem estruturado do servidor e é renderizado
+  // como painel âmbar ancorado no botão — não como toast vermelho, que sumia em 20s e dizia
+  // "o sistema quebrou" para um problema de preenchimento. Ver `lib/mensagens-submissao.ts`.
+  const [bloqueio, setBloqueio] = useState<BloqueioSubmissao | null>(null);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -885,7 +904,10 @@ export function SubmeterPageContent({
         .catch((e) => {
           if (cancelled) return;
           console.error("[editar] falha ao carregar projeto:", e);
-          toast.error("Não foi possível carregar o projeto para edição.");
+          toast.error(
+            "Não foi possível carregar este projeto para edição. Recarregue a página; se continuar, fale com a equipe pelo botão de ajuda.",
+            { duration: 12000 },
+          );
         })
         .finally(finishSeed);
       return () => { cancelled = true; clearTimeout(safety); };
@@ -1417,9 +1439,11 @@ export function SubmeterPageContent({
       arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
     if (charsEstimados > TOKEN_BLOCK_CHARS) {
       const tokens = Math.round(charsEstimados / 4);
-      toast.error(
-        `Conteúdo muito grande (~${Math.round(tokens / 1000)}k tokens, limite ~200k). ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`
+      // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
+      toast.warning(
+        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        { duration: 10000 },
       );
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
@@ -1494,7 +1518,7 @@ export function SubmeterPageContent({
     } catch (err) {
       console.error('[submeter] iniciarAgente falhou:', err);
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Erro ao iniciar análise: ${msg}`);
+      toast.error(`Não foi possível iniciar o agente. ${msg}`, { duration: 12000 });
     } finally {
       setIniciandoChat(false);
     }
@@ -1513,6 +1537,7 @@ export function SubmeterPageContent({
     }
     if (!editProjetoId && arquivos.length === 0) return;
 
+    setBloqueio(null);
     setEnviandoEspecial(true);
     try {
       const ferramentaEnviada = form.escopo === "externo"
@@ -1625,11 +1650,15 @@ export function SubmeterPageContent({
       setSubmitted(true);
     } catch (err) {
       console.error('[submeter] envio de projeto especial falhou:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("Já existe um projeto submetido")) {
-        toast.warning(msg, { duration: 8000 });
+      const bloq = bloqueioDoErro(err);
+      if (bloq) {
+        // Mesmo painel da revisão final, aqui renderizado acima da navegação da Etapa 2.5
+        // (é onde mora o botão "Enviar Projeto" do fluxo especial).
+        setBloqueio(bloq);
+        toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
       } else {
-        toast.error(`Erro ao enviar projeto: ${msg}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Não foi possível enviar o projeto. ${msg}`, { duration: 12000 });
       }
     } finally {
       setEnviandoEspecial(false);
@@ -1645,9 +1674,11 @@ export function SubmeterPageContent({
       arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
     if (charsEstimados > TOKEN_BLOCK_CHARS) {
       const tokens = Math.round(charsEstimados / 4);
-      toast.error(
-        `Conteúdo muito grande (~${Math.round(tokens / 1000)}k tokens, limite ~200k). ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`
+      // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
+      toast.warning(
+        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        { duration: 10000 },
       );
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
@@ -1725,7 +1756,7 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao reprocessar arquivos:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(`Erro ao reprocessar os arquivos: ${msg}`);
+      toast.error(`Não foi possível reprocessar os arquivos. ${msg}`, { duration: 12000 });
     } finally {
       setContinuando(false);
     }
@@ -1736,8 +1767,9 @@ export function SubmeterPageContent({
     // Projeto especial não tem tipo financeiro — segue direto. Para projeto padrão,
     // não permite avançar sem ao menos um tipo selecionado.
     if (!form.especial && form.tipoProjeto.length === 0) {
+      // Só o erro inline + shake: o toast vermelho duplicava, em vermelho, uma frase que já
+      // está na tela ao lado do campo.
       setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
-      toast.error("Selecione ao menos um tipo de projeto para continuar.");
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
       return;
@@ -1806,7 +1838,7 @@ export function SubmeterPageContent({
         } catch (e) {
           console.error("[submeter] falha ao reavaliar projeto especial:", e);
           const msg = e instanceof Error ? e.message : String(e);
-          toast.error(`Erro ao reavaliar a documentação: ${msg}`);
+          toast.error(`Não foi possível reavaliar a documentação. ${msg}`, { duration: 12000 });
           setContinuando(false);
           return;
         } finally {
@@ -1855,7 +1887,7 @@ export function SubmeterPageContent({
         } catch (e) {
           console.error("[submeter] falha ao atualizar metadados:", e);
           const msg = e instanceof Error ? e.message : String(e);
-          toast.error(`Erro ao atualizar os dados do projeto: ${msg}`);
+          toast.error(`Não foi possível salvar os dados do projeto. ${msg}`, { duration: 12000 });
           return;
         }
       }
@@ -1913,7 +1945,7 @@ export function SubmeterPageContent({
       } catch (e) {
         console.error("[submeter] falha ao atualizar tipos:", e);
         const msg = e instanceof Error ? e.message : String(e);
-        toast.error(`Erro ao atualizar o tipo de projeto: ${msg}`);
+        toast.error(`Não foi possível salvar o tipo do projeto. ${msg}`, { duration: 12000 });
         return;
       }
     }
@@ -1967,7 +1999,7 @@ export function SubmeterPageContent({
       } catch (e) {
         console.error("[submeter] falha ao inicializar agente (edit fallback):", e);
         const msg = e instanceof Error ? e.message : String(e);
-        toast.error(`Erro ao inicializar análise: ${msg}`);
+        toast.error(`Não foi possível retomar o agente. ${msg}`, { duration: 12000 });
         setContinuando(false);
         return;
       } finally {
@@ -2013,6 +2045,8 @@ export function SubmeterPageContent({
     const userMsg: ChatMessage = { role: "user", content };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
+    // A pessoa voltou a agir → o bloqueio da tentativa anterior deixa de descrever a tela.
+    setBloqueio(null);
     setChatLoading(true);
     // Aprovar a doc dispara a compilação (operação pesada) — mostra passos nomeados
     // em vez do loading genérico. Turnos simples de conversa ficam com os 3 pontos.
@@ -2103,7 +2137,12 @@ export function SubmeterPageContent({
     } catch (err) {
       console.error('[submeter] enviarMensagem falhou:', err);
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Erro ao enviar mensagem: ${msg}`);
+      // Falha de sistema (o turno não chegou ao servidor) → vermelho, mas tranquilizando:
+      // a conversa até aqui está salva e a pessoa só reenvia a última mensagem.
+      toast.error(
+        `Sua mensagem não foi enviada. ${msg} O restante da conversa está salvo — reenvie a última mensagem.`,
+        { duration: 12000 },
+      );
       setChatMessages((prev) => prev.slice(0, -1));
     } finally {
       setChatLoading(false);
@@ -2247,7 +2286,10 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao iniciar saving:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(`Erro ao iniciar análise de impacto: ${msg}`);
+      toast.error(
+        `Não foi possível iniciar a análise de impacto. ${msg} Os dados que você preencheu continuam no formulário.`,
+        { duration: 12000 },
+      );
     } finally {
       setSavingFormLoading(false);
     }
@@ -2293,7 +2335,10 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao iniciar receita:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(`Erro ao iniciar análise de receita: ${msg}`);
+      toast.error(
+        `Não foi possível iniciar a análise de receita. ${msg} Os dados que você preencheu continuam no formulário.`,
+        { duration: 12000 },
+      );
     } finally {
       setReceitaFormLoading(false);
     }
@@ -2333,6 +2378,7 @@ export function SubmeterPageContent({
     const temSaving = form.tipoProjeto.includes("saving");
     const temReceita = form.tipoProjeto.includes("receita_incremental");
     if (!temSaving && !temReceita) return;
+    setBloqueio(null);
     setChatComplete(false);
     if (temSaving) openSavingForm();
     else openReceitaForm();
@@ -2351,21 +2397,32 @@ export function SubmeterPageContent({
     // preview (ex.: handoff doc→saving + reload), barramos aqui com orientação clara em
     // vez de deixar o servidor devolver 500 "sem ganho mensurável". Especial não tem
     // memorial financeiro, então não se aplica.
+    // Tom âmbar, não vermelho: falta um passo do preenchimento, e o próprio clique já reabre
+    // o formulário — a frase diz o que a pessoa vai encontrar na tela.
     if (!form.especial) {
       if (form.tipoProjeto.includes("saving") && approvedSavingPreview === null) {
-        toast.error("Conclua o memorial de saving no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        toast.warning(
+          "Falta aprovar o memorial de saving. Reabri o formulário de impacto — conclua as perguntas do agente até o memorial aparecer.",
+          { duration: 10000 },
+        );
         setChatComplete(false);
         openSavingForm();
         return;
       }
       if (form.tipoProjeto.includes("receita_incremental") && approvedReceitaPreview === null) {
-        toast.error("Conclua o memorial de receita no chat (responda as perguntas até aprovar o preview) antes de enviar.");
+        toast.warning(
+          "Falta aprovar o memorial de receita. Reabri o formulário de receita — conclua as perguntas do agente até o memorial aparecer.",
+          { duration: 10000 },
+        );
         setChatComplete(false);
         openReceitaForm();
         return;
       }
     }
 
+    // Tentativa nova → o bloqueio anterior deixa de valer (um aviso velho ao lado de uma
+    // tentativa nova é pior que nenhum aviso).
+    setBloqueio(null);
     setSubmittingProject(true);
 
     // Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
@@ -2380,17 +2437,23 @@ export function SubmeterPageContent({
       if (res?.ganho) setGanhoFinal(res.ganho);
     } catch (e) {
       console.error("[submeter] envio falhou:", e);
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("Já existe um projeto submetido")) {
-        toast.warning(msg, { duration: 8000 });
-      } else if (msg) {
-        // Mensagem REAL do servidor, SEM prefixo: os bloqueios de submissão já dizem o que
-        // aconteceu e trazem o "Para corrigir…" (ver `lib/mensagens-submissao.ts`) — o
-        // "Erro ao enviar projeto:" na frente só empurrava a orientação para fora da vista.
-        // Duração longa porque a orientação tem passos para ler.
-        toast.error(msg, { duration: 20000 });
+      const bloq = bloqueioDoErro(e);
+      if (bloq) {
+        // Preenchimento: o texto inteiro (veredito + por que + caminhos) vai para o painel
+        // âmbar ancorado no botão, e o toast só chama a atenção para ele. Antes o parágrafo
+        // inteiro morava num toast vermelho de 20s.
+        setBloqueio(bloq);
+        toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
       } else {
-        toast.error("Erro ao enviar projeto. Tente novamente.");
+        const msg = e instanceof Error ? e.message : "";
+        // Falha de sistema — aqui o vermelho é informação correta. Sem prefixo "Erro ao…",
+        // que empurrava a orientação do servidor para fora da vista.
+        toast.error(
+          msg
+            ? `Não foi possível enviar o projeto. ${msg}`
+            : "Não foi possível enviar o projeto: o servidor não respondeu. Nada se perdeu — tente novamente em alguns segundos.",
+          { duration: 12000 },
+        );
       }
       setSubmittingProject(false);
       return;
@@ -2727,6 +2790,7 @@ export function SubmeterPageContent({
                       ? handleReiniciarMemorial
                       : undefined
                   }
+                  bloqueio={bloqueio}
                   versaoAnterior={versaoAnterior}
                   novoResumo={{
                     nome: form.nomeProjeto.trim(),
@@ -2742,6 +2806,15 @@ export function SubmeterPageContent({
               </StepAnimation>
             )}
           </div>
+
+          {/* Bloqueio de envio do fluxo ESPECIAL (o botão "Enviar Projeto" fica na navegação
+              da Etapa 2.5). Na etapa 3 o painel é renderizado dentro da revisão final, junto
+              do botão "Enviar para Triagem". */}
+          {bloqueio && step === 2 && showEtapa25 && (
+            <div style={{ padding: "0 32px" }}>
+              <AvisoBloqueio bloqueio={bloqueio} />
+            </div>
+          )}
 
           {/* Navigation */}
           {step !== 3 && (

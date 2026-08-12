@@ -60,11 +60,12 @@ import {
   NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
 } from "@/lib/agents/sobreposicao-receita";
 import {
-  mensagemSavingSemGanho,
-  mensagemReceitaZerada,
-  mensagemReceitaIncompleta,
-  mensagemDocAusente,
-  mensagemDuplicata,
+  bloqueioSavingSemGanho,
+  bloqueioReceitaZerada,
+  bloqueioReceitaIncompleta,
+  bloqueioDocAusente,
+  bloqueioDuplicata,
+  erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
 import {
   aplicaGateCustoEvitadoChat,
@@ -3163,7 +3164,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   const docRow = await getDocumentacao(projeto_id);
 
-  if (!docRow) throw new Error(mensagemDocAusente());
+  if (!docRow) throw erroDeBloqueio(bloqueioDocAusente());
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
     string,
@@ -3220,7 +3221,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
     if (duplicata) {
-      throw new Error(mensagemDuplicata(projeto.nome));
+      throw erroDeBloqueio(bloqueioDuplicata(projeto.nome));
     }
   }
 
@@ -3305,8 +3306,8 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       // texto fixo anterior dizia "sem redução concreta de horas" para uma submissão que
       // tinha 60h/mês validadas no memorial — o que barra é o LÍQUIDO, e o abatimento dos
       // custos declarados na Etapa 2 nunca era citado. Ver o caso SmartOnline/DIFAL.
-      throw new Error(
-        mensagemSavingSemGanho({
+      throw erroDeBloqueio(
+        bloqueioSavingSemGanho({
           horas: (saving?.economia_horas_mes as number) ?? 0,
           unidade: unidadeHorasDe(
             (saving?.tipo_saving as SavingColetado["tipo_saving"]) ?? null,
@@ -3327,14 +3328,14 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     if (tiposProjetoGate.includes("receita_incremental")) {
       const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? "").trim();
       if (((receita?.valor_ganho_mensal as number) ?? 0) <= 0) {
-        throw new Error(mensagemReceitaZerada());
+        throw erroDeBloqueio(bloqueioReceitaZerada());
       }
       if (
         !receita?.tipo_saving ||
         memoReceita.length < 30 ||
         receitaMemorialEhSaving(memoReceita)
       ) {
-        throw new Error(mensagemReceitaIncompleta());
+        throw erroDeBloqueio(bloqueioReceitaIncompleta());
       }
     }
   }

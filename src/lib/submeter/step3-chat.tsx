@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { CARGOS } from "@/lib/agents/types";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
+import { AvisoBloqueio } from "@/components/aviso-bloqueio";
+import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput, CustoEvitadoItemInput } from "./constants";
 import { ocultarReaisSaving, formatMoedaBR, parseMoedaBR } from "./constants";
 
@@ -691,6 +693,7 @@ function FinalReview({
   onSubmit,
   submitting,
   onReiniciarMemorial,
+  bloqueio,
   versaoAnterior,
   novoResumo,
 }: {
@@ -700,6 +703,8 @@ function FinalReview({
   onSubmit: () => void;
   submitting: boolean;
   onReiniciarMemorial?: () => void;
+  /** Bloqueio devolvido pelo servidor na última tentativa de envio (preenchimento). */
+  bloqueio?: BloqueioSubmissao | null;
   versaoAnterior?: VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -795,6 +800,10 @@ function FinalReview({
           refazerDisabled={submitting}
         />
       )}
+
+      {/* Bloqueio de envio fica ANCORADO ao botão que falhou (e não num toast que some):
+          a pessoa lê o veredito e o caminho de correção sem sair de onde clicou. */}
+      {bloqueio && <AvisoBloqueio bloqueio={bloqueio} />}
 
       <button
         type="button"
@@ -2178,6 +2187,7 @@ export function Step3Chat({
   onReceitaFormVoltar,
   receitaFormVoltarLabel,
   onReiniciarMemorial,
+  bloqueio,
   versaoAnterior,
   novoResumo,
 }: {
@@ -2222,6 +2232,9 @@ export function Step3Chat({
   // Refazer o memorial financeiro a partir da revisão final (reabre o formulário
   // de cargos/horas/valores). Ausente quando não há memorial financeiro (especial).
   onReiniciarMemorial?: () => void;
+  // Bloqueio da última tentativa de envio (ver `AvisoBloqueio`). O pai o limpa assim que a
+  // pessoa age (refaz o memorial, manda mensagem, tenta enviar de novo).
+  bloqueio?: BloqueioSubmissao | null;
   versaoAnterior?: import("@/lib/meus-projetos.functions").VersaoSnapshot | null;
   novoResumo?: {
     nome: string;
@@ -2646,6 +2659,7 @@ export function Step3Chat({
           onSubmit={onSubmit}
           submitting={submitting}
           onReiniciarMemorial={onReiniciarMemorial}
+          bloqueio={bloqueio}
           versaoAnterior={versaoAnterior}
           novoResumo={novoResumo}
         />
