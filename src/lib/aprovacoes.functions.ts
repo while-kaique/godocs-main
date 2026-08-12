@@ -840,7 +840,27 @@ export async function decidirAprovacao(
   //
   // O write-back das 2 colunas do Sheets acima fica INCONDICIONAL de propósito: é
   // idempotente e a última escrita é a correta.
+  //
+  // ⚠️ O ramo NEGATIVO tem de fazer barulho no log. A guarda de `execContando` pega o
+  // adaptador que não reporta (`undefined`/`{}`/não-numérico/`NaN` → `null` → notifica),
+  // mas NÃO tem como distinguir um `{ rowsWritten: 0 }` bem-formado e constante do
+  // perdedor legítimo da corrida — e esse regime existe no próprio repo
+  // (`vite-plugin-dev-api.ts` devolve `{ rowsWritten: 0 }` fixo no ramo sem params).
+  // Se o `env.DB` do Godeploy se comportar assim, o alerta do D30 morre para TODO projeto
+  // não-isento. Não dá para detectar em código; dá para deixar rastro — e é a linha
+  // abaixo que transforma "sumiu sem explicação" em "está no log desde o 1º deploy".
+  if (veredito === 'aprovado' && !deveNotificarDecisao(linhasGravadas)) {
+    console.warn(
+      '[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado',
+      { projeto_id, quemDecidiu },
+    );
+  }
   if (veredito === 'aprovado' && deveNotificarDecisao(linhasGravadas)) {
+    // Nomeia o regime do adaptador no 1º deploy: `null` = o `env.DB` não reportou o
+    // número e estamos notificando pelo default invertido, não por ter ganhado a corrida.
+    if (linhasGravadas === null) {
+      console.info('[aprovacoes] adaptador não reportou rowsWritten — avisando o grupo pelo default seguro');
+    }
     const parecer = assinaturaDoParecer(atualizadas, quemDecidiu);
     runBackground(
       Promise.resolve()
