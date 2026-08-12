@@ -21,6 +21,8 @@ import {
   formatarBloqueio,
   erroDeBloqueio,
   type BloqueioSubmissao,
+  mensagemEspecialDashboard,
+  mensagemEspecialGanhoOrganizacional,
 } from "@/lib/mensagens-submissao";
 
 // O caso real: 60h/mês (2 analistas) contra a Plataforma SmartOnline.
@@ -112,6 +114,9 @@ describe("as outras mensagens de bloqueio", () => {
       mensagemDocAusente(),
       mensagemDuplicata("Automação de DIFAL"),
       mensagemSavingSemGanho(CASO_SMARTONLINE),
+      // Triagem do especial (Etapa 2.5) — detalhe em tests/especial-triagem.test.ts.
+      mensagemEspecialDashboard(),
+      mensagemEspecialGanhoOrganizacional(),
     ]) {
       expect(msg).toMatch(/Para corrigir/);
       // Sem "producao"/"submissao" sem acento e sem marcador de roteiro interno.

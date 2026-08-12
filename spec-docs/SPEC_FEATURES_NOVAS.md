@@ -967,3 +967,103 @@ da mesma trava.
 
 **Testes:** `tests/intro-submissao.test.ts` — os 4 ramos do predicado + string vazia não
 contando como id.
+
+---
+
+## Feature adicional — Triagem do projeto ESPECIAL: dashboard e ganho organizacional (12/08/2026)
+
+**Pedido (Kaique, 12/08/2026):** ao marcar o projeto como **especial** na Etapa 2.5, aparecem
+**duas perguntas novas, em sequência, ANTES dos campos que já existem** (contexto especial),
+cada uma com 2 botões (sim/não) e a segunda só depois de responder a primeira:
+
+1. *"Este projeto é, objetivamente (ou principalmente), um dashboard ou um painel de
+   controle?"* — se SIM, **não é especial** (dashboard não é projeto especial).
+2. *"O ganho principal deste projeto é prioritariamente organizacional?"* — se SIM, quase
+   certamente **não é um especial válido**: sem saving considerado nem receita real medida é
+   muito difícil ser um especial legítimo.
+
+**Qualquer "sim" BLOQUEIA a submissão**, com mensagem que diz o que foi respondido, por que
+isso não caracteriza um especial e o que fazer (padrão "Para corrigir…").
+
+**Por que na porta, e determinístico:** o especial **pula o memorial financeiro** e vai direto
+à validação humana — é a rota mais barata do formulário e, por isso, a mais atraente para quem
+não quer levantar horas. Dashboard/painel é uma ENTREGA (o ganho aparece nas horas que ninguém
+gasta mais montando o relatório, na conferência que sumiu, no erro que parou de acontecer) e
+"organizar" é MEIO para o impacto, não o impacto: os dois são mensuráveis pelo caminho normal.
+E o bloqueio **não pode ser prompt** — este repo já queimou 3× confiando no LLM para segurar
+regra (Gostream, ganho projetado, custo evitado no chat: *avisar não é trava*). Aqui, porém, o
+gate é de **FORMULÁRIO**: 2 cliques, sem máquina de estados de chat, sem risco de loop.
+
+**Onde mora**
+- **`src/lib/mensagens-submissao.ts`** (FONTE ÚNICA, módulo PURO) — `PERGUNTAS_ESPECIAL` (o
+  texto das 2 perguntas + os rótulos dos 4 botões), `MotivoBloqueioEspecial`,
+  `mensagemEspecialDashboard()`, `mensagemEspecialGanhoOrganizacional()` e o dispatcher
+  `mensagemEspecialInvalido(motivo)`.
+- **`src/lib/submeter/constants.ts`** — os 2 campos em `FormData`
+  (`especialDashboard`/`especialGanhoOrganizacional`) + as funções PURAS
+  `motivoBloqueioEspecial(form)` (o predicado do bloqueio) e `validarEtapa25Especial(form)`
+  (perguntas não respondidas + o bloqueio, em `FieldErrors`).
+- **`src/lib/submeter/step25.tsx`** — a UI: bloco "Duas checagens antes de seguir" com
+  `PerguntaSimNao` (numeração 1/2, `fieldset`/`legend`, input `peer sr-only` + indicador
+  redondo) e `BloqueioEspecial` (ícone `Ban` + veredito + a mensagem da fonte única).
+- **`src/routes/submeter.tsx`** — estado inicial, seed da edição, `rehydrateFromLocal`,
+  `handleRespTriagemEspecial`, a triagem dentro de `validateEtapa25` e o **gate** no topo de
+  `handleEnviarEspecial` **e** de `handleSubmitProjeto`.
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **O gate é SÓ DO FRONTEND, como o `prodStatus`** — e isso é escolha, não esquecimento. As
+   2 respostas não vão ao backend, a nenhum prompt e a nenhuma coluna do Sheets: o que
+   sobrevive ao envio é a NATUREZA do projeto (`especial`/`tipos_projeto`), que já é gravada,
+   e um especial que passasse por engano é pego pela validação humana (que é o destino de
+   todo especial). Um campo server-side exigiria payload em `iniciar-submissao` +
+   `atualizar-metadados`, coluna nova, `ProjetoContexto`/`getProjetoContextoData`,
+   `buildRespostasFormulario` e coluna no Sheets — custo alto para uma resposta que ninguém
+   lê depois. ⚠️ **Se um dia a triagem tiver de constar na planilha/auditoria, aí sim** ela
+   entra por esse caminho completo (regra do `CLAUDE.md`), nunca solta num prompt.
+2. **A 2ª pergunta só existe depois de a 1ª ser "não"** — e a validação cobra exatamente o
+   que a tela mostra (`validarEtapa25Especial`). Com a 1ª em "sim" o projeto já está
+   bloqueado; cobrar a resposta de uma pergunta invisível travaria o formulário sem dizer
+   onde. Por isso `handleRespTriagemEspecial` também **zera** a 2ª resposta quando a 1ª volta
+   para "sim".
+3. **Precedência: dashboard vence** quando as duas seriam "sim" — é o critério OBJETIVO (não
+   depende de julgar a natureza do ganho).
+4. **O bloqueio aparece no CLIQUE, não só no envio.** O painel vermelho com o "Para corrigir…"
+   nasce no instante do "sim" (e o **contexto especial deixa de ser exibido**: escrever 20+
+   caracteres para uma submissão que não vai sair é trabalho jogado fora). No clique em
+   "Enviar Projeto" o **toast repete a MESMA mensagem** (fonte única, 20s, sem prefixo "Erro
+   ao enviar" — é orientação, não falha técnica).
+5. **O botão "Enviar Projeto" continua HABILITADO.** Desabilitar economiza um clique e tira a
+   explicação: quem não entende por que o botão morreu não descobre sozinho. O gate está no
+   handler.
+6. **O gate roda nos DOIS caminhos de envio** (`handleEnviarEspecial` da Etapa 2.5 e
+   `handleSubmitProjeto` da Etapa 3, que um especial alcança pela navegação do topo) —
+   bloqueio não pode depender de qual botão a pessoa achou primeiro. Na Etapa 3 o bloqueio
+   **devolve a pessoa à Etapa 2.5** (`setShowEtapa25(true)` + `goToStep(2)`), onde as
+   perguntas estão.
+7. **Marcar "Não. É um projeto padrão…" LIMPA as 2 respostas** (como já acontece com o
+   contexto especial): resposta guardada para pergunta que a tela não mostra mais é dado
+   obsoleto, e voltar a "Sim" tem de exigir reafirmar.
+8. **Na EDIÇÃO as perguntas nascem em branco** (os campos não existem no servidor) — efeito
+   desejado: um especial LEGADO passa pela triagem que não existia quando ele entrou. Rascunho
+   local salvo antes desta feature também cai em `""` (default no `rehydrateFromLocal`, como
+   manda o comentário-armadilha de lá).
+9. **UI: nada de linguagem visual nova.** Reusa `.go-radio-label`/`go-radio-checked`,
+   `FieldError` e o painel arredondado da própria Etapa 2.5; o vermelho do bloqueio é o
+   `#dc2626`/`#b91c1c` já usado nos erros e o ícone é o `Ban` do "Projeto reprovado"
+   (`aviso-pendencia.tsx`). A11y (regra 11): o estado **não é só cor** (o disco do indicador
+   aparece/desaparece + rótulo em negrito), o foco de teclado acende no indicador
+   (`peer-focus-visible`, com o input `sr-only`), `fieldset`/`legend` amarram as opções à
+   pergunta, o painel de bloqueio é `role="alert"` com medida travada em 72ch e as animações
+   respeitam `prefers-reduced-motion` (bloco global em `styles.css`). ⚠️ Os overrides de
+   `justify-content`/`gap` do rótulo vão em `style` inline **de propósito**: `.go-radio-label`
+   é CSS não-camadado e venceria a utilitária do Tailwind v4 (onde, aliás, `!classe` com "!"
+   na frente não existe mais).
+10. **A numeração 1/2 é legítima** (a ordem é real: uma destrava a outra) — não é enfeite,
+    ao contrário dos `01 / 02 / 03` decorativos.
+
+**Testes:** `tests/especial-triagem.test.ts` — texto exato das 2 perguntas (mudar tem de ser
+DECISÃO), os 6 ramos de `motivoBloqueioEspecial` (incluindo "projeto padrão nunca é afetado" e
+"em branco não bloqueia"), o que `validarEtapa25Especial` cobra em cada estado e as 2
+mensagens (o que foi respondido · por que · "Para corrigir…" · sem R$). As 2 mensagens também
+entram no laço de invariantes de `tests/mensagens-submissao.test.ts`.
