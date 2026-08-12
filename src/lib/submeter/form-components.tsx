@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR,
@@ -63,14 +64,18 @@ export function FormSelect({ error, children, className, ...props }: React.Selec
   );
 }
 
+// Erro de CAMPO — o canal certo para "falta preencher isto": fica junto do campo, não
+// num toast. ⚠️ Ícone junto do texto porque estado nunca é comunicado só por cor (a borda
+// vermelha do input e o vermelho do texto eram os únicos sinais).
 export function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
     <p
-      className="mt-1 text-[11px] font-semibold"
+      className="mt-1 flex items-start gap-1 text-[11px] font-semibold"
       style={{ color: "#dc2626", animation: "go-slide-down 0.2s ease" }}
     >
-      {message}
+      <AlertCircle className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
+      <span>{message}</span>
     </p>
   );
 }

@@ -43,6 +43,22 @@ Exemplo de uma seção bem formatada:
 - **OpenAI / Anthropic** — LLM (env: \`LLM_API_KEY\`, \`LLM_MODEL\`).
 - **Google Chat** — notificação via webhook.`;
 
+// ─── Mensagem que FECHA o memorial financeiro ───────────────────────────────
+// FONTE ÚNICA da frase de encerramento dos 3 prompts de preview financeiro
+// (saving, custo evitado puro e receita) — ⚠️ não redigite nos prompts, altere AQUI.
+// ⚠️ Era "Memorial aprovado! Sua submissão está completa e será enviada para
+// análise." e as duas metades enganavam: "aprovado" soava a veredito da EMPRESA
+// (nada foi aprovado — a triagem só vê o projeto depois) e "submissão completa"
+// contradizia a tela, que ainda exige o clique em "Enviar para Triagem". O sentido
+// real é "eu, o agente, consegui montar seu memorial de forma válida" — daí
+// "pronto" + o convite a revisar/pedir ajuste + o próximo passo explícito.
+// ⚠️ Sem aspas duplas no texto: ele é interpolado DENTRO do exemplo de JSON dos
+// prompts (`{"type":"complete","content":"…"}`) e uma aspa quebraria o exemplo.
+export function mensagemMemorialPronto(modo: "saving" | "receita" = "saving"): string {
+  const titulo = modo === "receita" ? "Memorial de receita pronto!" : "Memorial pronto!";
+  return `${titulo} Revise abaixo e me diga se ficou algum problema — eu ajusto. Se estiver tudo certo, é só enviar para a triagem.`;
+}
+
 // ─── Bloco de contexto de revisão (edição) ──────────────────────────────────
 // Quando ctx.revisao existe, o projeto está sendo EDITADO: ele já foi submetido,
 // documentado e teve memorial aprovado. O agente DEVE partir desse contexto e
@@ -620,7 +636,7 @@ ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do mem
 FORMATO — APENAS JSON válido:
 
 Se aprovado (SOMENTE se valor_ganho_mensal > 0):
-{"type":"complete","content":"Memorial de receita aprovado! Sua submissão está completa e será enviada para análise.","receita":{...campos finais}}
+{"type":"complete","content":"${mensagemMemorialPronto("receita")}","receita":{...campos finais}}
 
 Se ajuste + novo preview:
 {"type":"preview","content":"## Memorial de Receita Incremental\\n\\n### O que gera a receita\\n...\\n\\n### Como o projeto aumenta a receita\\n...\\n\\n### Comparação antes vs. depois\\n...\\n\\n### Base de cálculo\\n...\\n\\n### Resumo\\n...\\n\\nFiz os ajustes. Pode aprovar?","receita":{...campos corrigidos, "memorial_calculo": "<texto do memorial>"}}
@@ -903,7 +919,7 @@ ${buildRespostasFormulario(ctx)}${detalhes}
 ═══════════════════════════════════════════════════════════════════
 PERFIL DESTE PROJETO — CUSTO EVITADO PURO (SEM HORAS DE PESSOAS)
 ═══════════════════════════════════════════════════════════════════
-O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualmente dentro da empresa; (2) a automação ELIMINOU um gasto externo (contrato/serviço/licença de terceiro que era pago); e (3) NÃO há trabalho manual ADICIONAL que alguém faria à mão. Logo, o ganho é 100% o CUSTO EXTERNO ELIMINADO — NÃO há economia de horas de pessoas a calcular.
+O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualmente dentro da empresa; (2) a automação fez a empresa DEIXAR DE PAGAR um gasto em dinheiro — o rótulo não importa (contrato, licença, serviço de terceiro, taxa, multa, juros, retrabalho pago: qualquer gasto que a empresa pagava e parou de pagar por causa desta automação); e (3) NÃO há trabalho manual ADICIONAL que alguém faria à mão. Logo, o ganho é 100% o CUSTO EXTERNO ELIMINADO — NÃO há economia de horas de pessoas a calcular.
 
 ⛔ É TERMINANTEMENTE PROIBIDO:
 - Pedir "quem fazia", "quanto tempo levava", "qual a rotina", "quantas horas/mês" — NÃO há horas humanas aqui; perguntar isso contradiz o que o usuário já informou.
@@ -911,13 +927,13 @@ O usuário informou no formulário que: (1) NINGUÉM fazia este trabalho manualm
 - Estimar um "equivalente manual" (contrafactual) — o usuário já disse que NÃO há trabalho adicional; o ganho é só o contrato eliminado.
 
 CUSTO EVITADO JÁ COLETADO NO FORMULÁRIO (não pergunte de novo, não peça R$):
-${saving.custo_evitado_descricao ? saving.custo_evitado_descricao : "(o usuário marcou que eliminou um gasto externo — o detalhe veio nos itens do formulário)"}
+${saving.custo_evitado_descricao ? saving.custo_evitado_descricao : "(o usuário marcou que a empresa deixou de pagar um gasto — o detalhe veio nos itens do formulário)"}
 
 SUA MISSÃO — VALIDAÇÃO OBRIGATÓRIA (faça SEMPRE, mesmo que o briefing pareça claro — aqui o custo evitado é o GANHO INTEIRO do projeto, então NÃO pode ser carimbado sem argumentação):
 ⛔ É PROIBIDO gerar o preview sem ANTES perguntar ao usuário e obter resposta para os 3 pontos abaixo. Faça as perguntas que faltarem (pode agrupar numa única mensagem); só depois monte o memorial.
-1. REALIDADE: esse contrato/serviço JÁ foi encerrado ou reduzido na PRÁTICA? (não "vamos cancelar" — ver PORTÃO abaixo).
-2. ATRIBUIÇÃO: o encerramento foi POR CAUSA desta automação (ela assumiu o trabalho), e não um corte por outro motivo?
-3. ESCOPO: o que esse contrato cobria, em termos concretos? (ex.: quantos agentes/pessoas, qual volume — "1 agente terceirizado, ~1.200 atendimentos/mês"). Isso dá SUBSTÂNCIA ao memorial para o validador humano cruzar com o valor.
+1. REALIDADE: esse gasto JÁ parou (ou já caiu) na PRÁTICA — contrato encerrado, licença cancelada, taxa/multa que não é mais devida? (não "vamos cancelar" — ver PORTÃO abaixo).
+2. ATRIBUIÇÃO: a parada foi POR CAUSA desta automação (ela assumiu o trabalho ou removeu a causa do gasto), e não um corte por outro motivo?
+3. ESCOPO: o que esse gasto cobria (ou por que ele existia), em termos concretos? (ex.: "1 agente terceirizado, ~1.200 atendimentos/mês"; "multa de 14,5% por recolher o imposto após o vencimento"). Isso dá SUBSTÂNCIA ao memorial para o validador humano cruzar com o valor.
 Registre as respostas dos 3 pontos na seção "Contratos/Serviços Evitados" do memorial. NÃO peça o valor em R$ (já veio do formulário).
 
 ${blocoGanhoRealProjetado("custo_evitado")}
@@ -944,7 +960,7 @@ Preview (quando o contexto estiver confirmado e o ganho for REAL):
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n**Resumo:** ...\\n\\n### Contratos/Serviços Evitados\\n**Serviço evitado:** ...\\n**Custo evitado:** ... (sem R$)\\n**Rateio:** ...\\n\\n### Resumo\\n- Ganho: custo externo eliminado\\n- Tipo: ${saving.tipo_saving ?? "mensal"}\\n\\nEstá correto? Pode aprovar ou pedir ajustes.","saving":{...todos os campos, "linhas":[], "economia_horas_mes":0, "memorial_calculo":"<texto do memorial — OBRIGATÓRIO>"}}
 
 Se aprovado:
-{"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais, "linhas":[], "economia_horas_mes":0}}
+{"type":"complete","content":"${mensagemMemorialPronto()}","saving":{...campos finais, "linhas":[], "economia_horas_mes":0}}
 
 ATENÇÃO: "memorial_calculo" dentro do "saving" é OBRIGATÓRIO no preview e no complete (copie o texto do "content" sem o "Está correto?"). NUNCA escreva R$ no "content" nem no "memorial_calculo". NUNCA use linguagem de projeção ("vai", "pretende", "a expectativa é") — o ganho é JÁ realizado.`;
 }
@@ -1206,8 +1222,8 @@ Para CADA pessoa/cargo listada acima, colete:
 [2.3] Totais de horas: soma de todas as economias por pessoa → CALCULE VOCÊ
 [2.4] O que mudou após a automação (justificativa de validade do ganho): OBRIGATÓRIO somente quando a economia mensal é alta (≥44h/mês no total OU em algum cargo) — ver bloco "SEÇÃO 2.4" abaixo, que só aparece quando o gatilho dispara. Quando não disparar, NÃO crie esta seção no memorial.${blocoEconomiaAlta}${cargaEscalaBlock}
 
-SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS
-[3.1] Serviço/contrato evitado: o que seria contratado/foi cancelado → INVESTIGUE COM O USUÁRIO
+SEÇÃO 3 — SAVING DE CONTRATOS / SERVIÇOS EVITADOS (qualquer gasto em dinheiro que a empresa deixou de pagar — o rótulo não importa: contrato, licença, serviço de terceiro, taxa, multa, juros, retrabalho pago)
+[3.1] Gasto eliminado: QUAL gasto a empresa pagava e parou de pagar (ou que seria contratado e não foi) → INVESTIGUE COM O USUÁRIO
 [3.2] Custo evitado: valor e periodicidade → COLETE DO USUÁRIO (pode perguntar valor em R$)
 [3.3] Rateio: se pontual, explique que é um gasto único; se mensal, valor recorrente → REGISTRE
 Se não se aplica → preencha "N/A" nos três pontos.
@@ -1291,7 +1307,7 @@ SINCRONIA OBRIGATÓRIA — AS LINHAS SÃO A FONTE DE VERDADE:
 - ANTES de emitir preview/complete, confira: a soma de (horas_antes − horas_depois) das linhas é igual ao "Economia total: Xh" que aparece no memorial? Se não, ajuste as \`linhas\` até bater.
 
 CUSTO EVITADO (SEÇÃO 3):
-- Além do tempo economizado, MUITOS projetos passam a EVITAR um custo: licença cancelada, serviço externo que deixou de ser contratado, cobrança pontual de implementação que não foi mais necessária, etc.
+- Além do tempo economizado, MUITOS projetos fazem a empresa DEIXAR DE PAGAR um gasto — e o rótulo dele NÃO importa: contrato, licença cancelada, serviço de terceiro que deixou de ser contratado, taxa, multa, juros, retrabalho pago, cobrança pontual de implementação que não foi mais necessária. A régua é uma só: a empresa pagava e parou de pagar por causa desta automação.
 - O custo evitado AGORA é coletado no FORMULÁRIO (antes do chat), não por você. Se os campos \`custo_evitado_reais\`/\`custo_evitado_descricao\` JÁ vierem preenchidos no estado, NÃO pergunte de novo — apenas RECONHEÇA e descreva-o qualitativamente no memorial (o que foi evitado e a periodicidade), SEM citar R$.
 - NÃO altere \`custo_evitado_reais\`, \`custo_evitado_tipo\` nem \`custo_evitado_descricao\`: PRESERVE-os exatamente como vieram (são a fonte de verdade do formulário). O sistema soma o custo evitado ao saving automaticamente.
 - Isso é DIFERENTE de receita incremental (dinheiro novo entrando) e DIFERENTE de custo externo incorrido (gasto que a automação PASSOU a ter).
@@ -1407,7 +1423,7 @@ ESTRUTURA PADRONIZADA: ao ajustar, mantenha a mesma estrutura de seções do mem
 FORMATO — APENAS JSON válido:
 
 Se aprovado (SOMENTE se houver economia de horas > 0 OU custo evitado > 0):
-{"type":"complete","content":"Memorial aprovado! Sua submissão está completa e será enviada para análise.","saving":{...campos finais}}
+{"type":"complete","content":"${mensagemMemorialPronto()}","saving":{...campos finais}}
 
 Se ajuste + novo preview:
 {"type":"preview","content":"## Memorial de Cálculo\\n\\n### Contexto\\n...\\n\\n### Saving de Pessoas\\n...\\n\\n### Contratos/Serviços Evitados\\n...\\n\\n### Custo da Automação\\n...\\n\\n### Resumo\\n...\\n\\nFiz os ajustes. Pode aprovar?","saving":{...campos corrigidos, "memorial_calculo": "<texto do memorial>"}}
