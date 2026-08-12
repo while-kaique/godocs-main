@@ -1725,6 +1725,39 @@ O **código está pronto e verde na branch `feat/chat-notifica-so-pre-aprovacao`
 `.claude/worktrees/chat-so-pre-aprovacao`); falta **só a T8** — validar na staging e deployar.
 Segue na fila para planejar: o **pedido do Lucas** — mostrar o "Alguém já fazia?" no card da fila.
 
+### 🔎 Revisão: 2 dos 3 revisores voltaram (12/08) — 4 achados tratados, 6 em aberto
+
+**Qualidade: `sugestoes`** · **Reuso: `possivel-duplicacao`** (só-sugestão) · **Conformidade: NÃO voltou
+antes do fim da sessão** — por isso `.review-status` segue `pendente` e **barra o push/ship**.
+
+**Já corrigido no commit `d7447eb`** (suíte verde): o alerta lia saving do `documentacao.conteudo`, que o
+submit corrige só EM MEMÓRIA e nunca regrava — num projeto de custo evitado o grupo anunciaria **R$ 0,00**
+com a planilha em R$ 5.700 (passou a ler `projetos.saving_*`, que é o que foi ao Sheets); `dataSubmissaoBR`
+usava `new Date()` cru e lia `submitted_at` pt-BR de legado como MM/DD, imprimindo **data errada em
+silêncio** (agora `parseDataFlexivel`); `parseJson` local → canônico; `if (!notificarChat) return` encerrava
+`syncSubmitToGoogle` inteira → `if/else`.
+
+**Em aberto (decidir: corrigir ou registrar waiver em ADR):**
+1. **Mensagem DUPLICADA no grupo (média, `aprovacoes.functions.ts`)** — o gate lê a linha `pendente` por
+   SELECT e só depois roda o UPDATE; duplo clique / retry / 2 líderes da mesma fila (D4) passam os dois e
+   notificam 2×. Antes a corrida era inofensiva (o efeito era o write-back idempotente). **Default seguro:**
+   `decidirAprovacoesDoProjeto` devolver `rowsWritten` e notificar só se `> 0` — o UPDATE já é o ponto de
+   serialização.
+2. **`fetch` do webhook do Chat sem timeout** (`google/chat.ts`, pré-existente; o diff só criou um call site
+   novo dentro do `waitUntil`).
+3. **Duplicação: a montagem dos ~17 args de `buildSubmitMessage` existe agora em 2 lugares** (`sync.ts`
+   inline × `notificacao-projeto.functions.ts`) — extraível para um builder PURO **sem** tocar no Sheets (a
+   trava do plano era o `resyncGoogle`, que escreve; a montagem em si não). Drift já nasceu: `dataSubmissao`
+   é `nowFortaleza()` de um lado e `submitted_at` do outro.
+4. **`assinaturaDoParecer` × `justificativaAprovacaoSheet`** (mesmo arquivo, 30 linhas acima): mesma cascata
+   de derivação de assinante. Extrair `resolverAssinante(linhas, email)`; as saídas seguem diferentes.
+5. **`ouTraco` está em 3 cópias** (`sync.ts`, `dashboard-admin.functions.ts`, o novo).
+6. **`MotivoIsencaoNotificacao` foi COPIADO** em vez de `import type { ResultadoAbertura }` — um motivo
+   renomeado no canônico deixa um `case` morto compilando calado. (O plano dizia reusar o tipo.)
+
+⚠️ **Observação do revisor que vale checar com o Luis:** o CLAUDE.md afirma "1 mensagem por projeto", mas com
+o reenvio reabrindo a fila (D10) um projeto pré-aprovado 2× gera 2 mensagens. É decisão de produto, não bug.
+
 ### ⛔ O que a próxima sessão precisa fazer (T8, nesta ordem)
 1. **Rodar os 3 revisores de contexto fresco antes de qualquer envio.** Eles foram disparados no fim
    da sessão de 12/08 e **não voltaram antes do fechamento** — os marcadores `.review-status` e
