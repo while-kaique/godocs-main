@@ -191,6 +191,36 @@ export function Step1({
             onChange={(v) => { updateField("ferramentas", v); clearError("ferramentas"); }}
             error={errors.ferramentas}
           />
+          {/* Ajuda das 3 superfícies do Claude — LOGO ABAIXO da grade, alinhada à esquerda
+              (ou seja, embaixo da coluna dos Claudes), porque é ali que a dúvida nasce. Vem
+              como PERGUNTA visível em vez do ícone "i": ninguém vai caçar um ícone para
+              descobrir uma diferença que nem sabe que existe. Abre no hover E no foco de
+              teclado (o gatilho é o mesmo span do InfoTooltip). */}
+          <div className="mt-2">
+            <InfoTooltip
+              largura={370}
+              trigger={<>Qual a diferença entre os 3 Claudes?</>}
+            >
+              <strong className="mb-1.5 block text-white">
+                Os 3 são o mesmo Claude, em lugares diferentes
+              </strong>
+              <span className="mb-1.5 block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude.ai</strong> — o Claude no
+                navegador. Você conversa, cola texto ou planilha e pede análise, rascunho ou um
+                trecho de código para copiar na mão.
+              </span>
+              <span className="mb-1.5 block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude Cowork</strong> — o Claude
+                trabalhando sobre os seus arquivos e ferramentas conectadas: você delega uma
+                tarefa de várias etapas e acompanha ele executando. Não precisa ser código.
+              </span>
+              <span className="block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude Code</strong> — o Claude
+                dentro do terminal ou da IDE, lendo e editando o código do projeto direto no
+                repositório.
+              </span>
+            </InfoTooltip>
+          </div>
           {(form.ferramentas ?? []).includes(FERRAMENTA_OUTROS) && (
             <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
               <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>

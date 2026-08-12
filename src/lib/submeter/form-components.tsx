@@ -361,7 +361,9 @@ export function GridCheckboxGroup({
                     <span className="go-grid-check-familia">{opt.familia}</span>
                     {/* "Claude" + ".ai" cola; "Claude" + "Cowork" precisa do espaço. */}
                     {opt.variante?.startsWith(".") ? "" : " "}
-                    {opt.variante}
+                    {/* Span próprio porque é a VARIANTE que recebe a cor de `marca`: é a parte
+                        que diferencia uma opção da outra dentro da mesma família. */}
+                    <span className="go-grid-check-variante">{opt.variante}</span>
                   </>
                 ) : (
                   opt.label ?? opt.value
@@ -376,7 +378,23 @@ export function GridCheckboxGroup({
   );
 }
 
-export function InfoTooltip({ children }: { children: React.ReactNode }) {
+/**
+ * Balão de ajuda em portal, aberto no HOVER e no FOCO (teclado) do gatilho.
+ *
+ * `trigger` troca o ícone "i" por qualquer conteúdo — usado quando a ajuda precisa de uma
+ * PERGUNTA visível ("Qual a diferença entre os 3 Claudes?") em vez de um ícone que a pessoa
+ * tem de adivinhar que existe. Os handlers, o `tabIndex` e o `role` ficam no MESMO span nos
+ * dois casos, então o gatilho de texto é tão alcançável por teclado quanto o ícone.
+ * `largura` sobe o padrão de 300px quando o conteúdo é uma lista curta.
+ */
+export function InfoTooltip({
+  children, trigger, largura = 300, ariaLabel,
+}: {
+  children: React.ReactNode;
+  trigger?: React.ReactNode;
+  largura?: number;
+  ariaLabel?: string;
+}) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ bottom: 0, left: 0 });
@@ -404,7 +422,7 @@ export function InfoTooltip({ children }: { children: React.ReactNode }) {
             left: coords.left,
             transform: "translateX(-50%)",
             zIndex: 9999,
-            width: 300,
+            width: largura,
             maxWidth: "90vw",
             padding: "12px 14px",
             background: "var(--go-blue)",
@@ -438,16 +456,16 @@ export function InfoTooltip({ children }: { children: React.ReactNode }) {
     <>
       <span
         ref={iconRef}
-        className="go-info-icon"
+        className={trigger ? "go-hint-link" : "go-info-icon"}
         tabIndex={0}
         role="button"
-        aria-label="Mais informações"
+        aria-label={ariaLabel ?? "Mais informações"}
         onMouseEnter={show}
         onFocus={show}
         onMouseLeave={() => setVisible(false)}
         onBlur={() => setVisible(false)}
       >
-        i
+        {trigger ?? "i"}
       </span>
       {tooltip}
     </>

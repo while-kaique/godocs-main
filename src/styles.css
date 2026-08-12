@@ -292,6 +292,24 @@
   color: var(--go-blue);
 }
 
+/* Gatilho de TEXTO do InfoTooltip: uma pergunta clicável/hoverável, não um ícone que a
+   pessoa precisa descobrir. Sublinhado pontilhado + cursor de ajuda para não se confundir com
+   link de navegação (não leva a lugar nenhum, abre o balão ali mesmo). */
+.go-hint-link {
+  display: inline;
+  color: var(--go-blue);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+  outline-offset: 2px;
+}
+.go-hint-link:hover {
+  text-decoration-style: solid;
+}
+
 /* Multisseleção em GRADE (GridCheckboxGroup) — para lista longa de opções curtas.
    ⚠️ A 1ª versão eram PÍLULAS que embrulhavam (`flex-wrap`) e ficou visualmente estranha
    dentro deste formulário: larguras irregulares, 3 linhas com um item órfão na última, e
@@ -390,6 +408,14 @@
 }
 .go-grid-check-marca-claude:has(:focus-visible) {
   box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.35);
+}
+/* Na opção de marca, quem recebe a cor da borda é a VARIANTE (o ".ai"/"Cowork"/"Code"), não a
+   família: "Claude" fica no tom normal do rótulo e a superfície — a parte que de fato
+   diferencia uma opção da outra — salta em negrito na cor da marca. A regra genérica de
+   `.go-grid-check-familia` (peso 500, opacidade .82) segue valendo. */
+.go-grid-check-marca-claude .go-grid-check-variante {
+  font-weight: 700;
+  color: var(--go-claude);
 }
 
 /* A "família" do rótulo (o "Claude" de "Claude Code") recua para o segundo plano: são a

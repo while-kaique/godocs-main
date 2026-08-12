@@ -972,6 +972,18 @@ repense e melhore"** (o que trocou pílulas por grade — item 5 abaixo).
    PRÓPRIO em `FerramentaOpcao`, não derivado de `familia` (cor de marca e agrupamento de família
    são coisas independentes), e é **puramente estético** — o estado marcado/não é comunicado pelo
    "✓" + peso 700, nunca por cor, então nada de informação depende dela.
+   ⚠️ **Quem recebe a cor é a VARIANTE, não a família** (`.go-grid-check-variante`): "Claude" fica
+   no tom neutro e o `.ai`/`Cowork`/`Code` salta em laranja. O inverso foi testado no navegador e
+   descartado — deixava em evidência a palavra que é IGUAL nas três e apagava justamente a que
+   diferencia; a decisão real da pessoa é a superfície.
+9. **Ajuda "Qual a diferença entre os 3 Claudes?"** — `InfoTooltip` **abaixo da grade**, alinhada
+   à esquerda (embaixo da coluna dos Claudes), com 1 frase por superfície (navegador · arquivos e
+   ferramentas conectadas · terminal/IDE). ⚠️ É **pergunta visível**, não o ícone "i": ninguém
+   caça um ícone para descobrir uma diferença que não sabe que existe. Para isso o `InfoTooltip`
+   ganhou `trigger` e `largura` — o portal, o `tabIndex`, o `role` e os handlers seguem os MESMOS
+   (abre no hover **e no foco de teclado**), então não há balão novo duplicando a lógica. Gatilho
+   estilizado por `.go-hint-link` (sublinhado pontilhado + `cursor: help`, para não se confundir
+   com link de navegação — não leva a lugar nenhum).
 
 ### A coluna continua sendo UMA string
 
