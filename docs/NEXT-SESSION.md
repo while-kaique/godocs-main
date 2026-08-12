@@ -7,7 +7,33 @@
 ## Plano ativo
 **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: 🟡 **em execução** (T1–T5 feitas)
 
-### ➡️ PRÓXIMO PASSO — ler a corrida do cron das 21:20+ na staging (v151, deploy 21:18:29 UTC)
+### ➡️ PRÓXIMO PASSO — 1 sinal separa a staging da PROD (o Luis quer prod pela velocidade)
+
+**A LEITURA já está provada em runtime (21:20:58):** `GET /api/meus-projetos` voltou `outcome: ok` com
+**ZERO linhas de log**. O código antigo SEMPRE imprimia `[sync-reverse:owner] email=… total=578` nessa rota
+(lia a planilha inteira por load). A ausência da linha **prova que a tela não lê mais o Sheets** — é o ganho
+de velocidade pedido. ✅
+
+**Falta só a ESCRITA:** uma corrida do cron `sync-sheets-to-sqlite` com **`espelhados=` e `erros=0`**. A única
+observada (19:05, build anterior) falhou com `Durable Object storage operation exceeded timeout`. Não capturei
+a das 21:20 na janela de logs.
+
+**Como fechar (qualquer um dos 3):**
+1. `getAppLogs` no `edf400b4` e achar a corrida do `sync-sheets-to-sqlite` mais recente.
+2. Abrir o **`/dashboard` da staging**: o cabeçalho diz *"Planilha sincronizada às HH:MM"* e vira âmbar após
+   20 min. Responde na hora e **já é a T7**.
+3. `POST /api/admin/sync-sheets-now` — ⚠️ **exige `E2E_COOKIE` renovado no `.env`** (o atual está VENCIDO;
+   o edge pede OAuth em toda rota). Foi por isso que o disparo manual não aconteceu nesta sessão.
+
+**Verde → T8 PROD `674a3710` está LIBERADA e o build já existe** (nada a recompilar além do rebuild pós-merge
+se o `main` andar): mesmo fluxo do "Deploy rápido" + conferir o cron `*/5` em prod. **Vermelho → defeito real**:
+alvo é `espelharLinhas` (`src/lib/sheet-espelho.ts`) — `INSERT OR REPLACE` numa transação só + o `dispose()`
+não chamado do aviso de RPC.
+
+⚠️ **Ainda em aberto para o `/ggsd:ship`:** os 3 revisores NÃO rodaram nesta fatia e a branch
+**`feat/espelho-e-perf-navegacao` nunca foi pushada** (T9). O ship vai recusar até a revisão rodar.
+
+### (superado) O bloco anterior — ler a corrida das 21:20
 
 **Estado:** a staging foi redeployada às **21:18:29** com **TUDO junto** — `origin/main` 100% incorporado
 (24 commits: FAQ, multi-seleção de ferramentas, mensagem do gate de ganho projetado) + o espelho + a perf de
