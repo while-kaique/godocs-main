@@ -94,6 +94,24 @@ async function exec(sql: string, params: unknown[] = []): Promise<void> {
   await getDb().exec(sql, params);
 }
 
+/**
+ * INSERT/UPDATE/DELETE que devolve QUANTAS linhas foram escritas — ou `null` quando o
+ * adaptador não informa. Existe para quem usa o `UPDATE ... WHERE <condição>` como ponto
+ * de SERIALIZAÇÃO: quem chega depois escreve 0 linhas e sabe que perdeu a corrida.
+ *
+ * ⚠️ `null` NÃO é 0 — é "não sei". O tipo `ExecResult` promete `{ rowsWritten: number }`,
+ * mas até 12/08/2026 NENHUM caminho de produção lia esse campo: só o wrapper de dev e os
+ * fakes de teste. O `env.DB` do Godeploy nunca foi exercitado nisso, então tratar o que
+ * ele devolve como número garantido é uma aposta. Quem consome tem de decidir o que fazer
+ * com o desconhecido — e a decisão nunca pode ser silenciar (ver `deveNotificarDecisao`
+ * em `src/lib/notificacao-chat.ts`).
+ */
+async function execContando(sql: string, params: unknown[] = []): Promise<number | null> {
+  const resultado = (await getDb().exec(sql, params)) as { rowsWritten?: unknown } | null | undefined;
+  const linhas = resultado?.rowsWritten;
+  return typeof linhas === 'number' && Number.isFinite(linhas) ? linhas : null;
+}
+
 // ─── Helpers genéricos ─────────────────────────────────────────────────────
 
 function generateId(): string {
@@ -1268,6 +1286,12 @@ export function getAprovacoesDoProjeto(projetoId: string) {
 /**
  * Grava a decisão em TODAS as linhas do projeto (D4: o primeiro que decide resolve).
  * `decidido_por` guarda quem realmente decidiu, mesmo nas linhas dos outros líderes.
+ *
+ * Devolve QUANTAS linhas escreveu (`null` = o adaptador não informou). O
+ * `AND veredito = 'pendente'` faz deste `UPDATE` o ponto de serialização da decisão:
+ * duas requisições que passaram juntas pelo gate check-then-act de `decidirAprovacao`
+ * chegam aqui, mas só a primeira escreve — a segunda escreve **0**. É por esse número
+ * que o aviso ao grupo do Chat sai UMA vez só (D30).
  */
 export function decidirAprovacoesDoProjeto(
   projetoId: string,
@@ -1276,8 +1300,8 @@ export function decidirAprovacoesDoProjeto(
   comentario: string | null,
   decididoPor: string,
   respostas?: { move_kpi: string; sente_falta: string; saving_coerente: string } | null,
-): Promise<void> {
-  return exec(
+): Promise<number | null> {
+  return execContando(
     `UPDATE projeto_aprovacoes
         SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now'),
             resp_move_kpi = ?, resp_sente_falta = ?, resp_saving_coerente = ?

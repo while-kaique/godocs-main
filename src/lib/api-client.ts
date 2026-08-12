@@ -1,7 +1,15 @@
+import type { BloqueioSubmissao } from '@/lib/mensagens-submissao'
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /**
+     * Bloqueio de submissão ESTRUTURADO (veredito + por que + caminhos de correção), quando o
+     * servidor manda um. A tela o renderiza no painel `AvisoBloqueio` — o `message` plano é só
+     * o fallback. Ver `src/lib/mensagens-submissao.ts`.
+     */
+    public readonly bloqueio?: BloqueioSubmissao,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -37,8 +45,9 @@ export async function apiFetch<T>(path: string, body?: unknown, method?: string)
   }
 
   if (!response.ok) {
-    const msg = (data as { error?: string } | null)?.error ?? 'Erro desconhecido'
-    throw new ApiError(response.status, msg)
+    const corpo = data as { error?: string; bloqueio?: BloqueioSubmissao } | null
+    const msg = corpo?.error ?? 'Erro desconhecido'
+    throw new ApiError(response.status, msg, corpo?.bloqueio)
   }
 
   return data as T

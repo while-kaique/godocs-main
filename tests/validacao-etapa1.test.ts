@@ -31,6 +31,8 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     contrafactualAfetados: [],
     especial: false,
     contextoEspecial: '',
+    especialDashboard: '',
+    especialGanhoOrganizacional: '',
     ...over,
   };
 }

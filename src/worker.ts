@@ -88,8 +88,11 @@ function json(data: unknown, status = 200): Response {
   })
 }
 
-function errorJson(message: string, status = 400): Response {
-  return json({ error: message }, status)
+// `extra` é ADITIVO no corpo do erro — hoje só o `bloqueio` estruturado da submissão
+// (`src/lib/mensagens-submissao.ts`), que a tela renderiza num painel âmbar ancorado no botão
+// em vez de um toast vermelho. Quem só lê `error` continua funcionando.
+function errorJson(message: string, status = 400, extra?: Record<string, unknown>): Response {
+  return json({ error: message, ...(extra ?? {}) }, status)
 }
 
 function getEmailFromRequest(request: Request): string | null {
@@ -357,7 +360,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         }).catch(() => {})
         return new Response(resJson, { status: 200, headers: { 'Content-Type': 'application/json' } })
       } catch (e) {
-        const err = e as Error & { status?: number }
+        const err = e as Error & { status?: number; bloqueio?: unknown }
         // Erro de VALIDAÇÃO (ZodError) → 400 com frase em PT-BR nomeando o campo e o
         // limite. Antes subia o JSON cru do Zod (`{"code":"too_big",…}`) como 500 e o
         // toast mostrava isso em inglês — a pessoa não tinha o que corrigir (bug real,
@@ -378,7 +381,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           request_body: reqJson,
           response_body: null,
         }).catch(() => {})
-        return errorJson(amigavel?.mensagem ?? err.message, statusCode)
+        // Bloqueio de submissão (preenchimento, não falha): vai ESTRUTURADO para a tela, que
+        // o mostra como painel âmbar com os caminhos de correção. `status` já vem 400 do
+        // `erroDeBloqueio` — nunca 5xx, senão o Investigador leria como instabilidade.
+        return errorJson(
+          amigavel?.mensagem ?? err.message,
+          statusCode,
+          err.bloqueio ? { bloqueio: err.bloqueio } : undefined,
+        )
       }
     }
 

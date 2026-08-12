@@ -667,8 +667,10 @@ arquivo), que monta um alerta enxuto:
 caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
 `contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
 
-**Status.** ⏳ Implementado; testes verdes + `build:worker` OK. **Deploy pendente** (regra 13 —
-staging `edf400b4` antes de prod).
+**Status.** ⏳ Implementado (jul/2026); **este doc não comprova o deploy** — conferir no app antes de afirmar. ⚠️ **Revisitada em 11/08/2026** — a mensagem do especial encolheu de
+novo (saíram Ferramenta, Participantes, Data da submissão e os separadores; descrição e justificativa
+passaram a ser truncadas), porque com a mudança abaixo ela virou uma das poucas que ainda saem na
+submissão. Ver "Notificação do Chat só quando há pré-aprovação do líder".
 
 ## Feature adicional — Botão "Refazer" o memorial financeiro na revisão final · jul/2026
 
@@ -891,3 +893,218 @@ stack de um projeto vivo muda de verdade.
 
 **Testes:** `tests/validacao-etapa1.test.ts` — troca de ferramenta na edição não gera erro;
 "Outros" sem nome bloqueia nos 2 modos; escopo externo fora dessa regra.
+
+---
+
+## Feature adicional — Tela de apresentação antes do formulário (11/08/2026)
+
+**Pedido (Kaique, 11/08/2026):** "uma tela que aparece antes de aparecer a tela de
+submissão. essa tela é uma apresentação do forms, e deve ser bem clara, breve e objetiva
+com: o que é o forms, qual a finalidade e um guia rápido de como submeter. tudo isso com
+um botão abaixo de 'Ok, entendi' para prosseguir e ir para o forms real."
+
+**Por que ganha o clique extra:** a premissa nº 1 do GoDocs (só entra automação **já em
+produção**, com ganho **já medido**) só aparecia DEPOIS — no gate de ganho real ×
+projetado, no meio da fase financeira do chat. Quem chegava com projeção descobria a régua
+com a submissão já quase pronta e perdia o trabalho inteiro (caso "Automação cadastro de
+novos cliente"/Eduardo Santana, 28/07/2026). Dizer isso na primeira tela é a versão barata
+da mesma trava.
+
+**Onde mora**
+- **`src/lib/submeter/intro.tsx`** (novo) — `IntroSubmissao` + o predicado PURO
+  `deveMostrarIntro`.
+- `src/routes/submeter.tsx` — `showIntro` (`useState` com inicializador) + early return.
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **Aparece SEMPRE que se abre `/submeter` do zero — sem flag em localStorage**
+   (decisão de produto, 11/08/2026). Foram descartadas "só na primeira vez" e "checkbox
+   não mostrar de novo": quem submete 1× por mês esquece a régua, e a flag sumiria
+   justamente para quem já errou antes. Consequência aceita e coerente: **"Recomeçar"**
+   (`handleRecomecar`, que faz `location.assign("/submeter")` sem rascunho) e **"Submeter
+   outro projeto"** (`location.reload()` na tela de sucesso) voltam a mostrar a
+   apresentação.
+2. **NÃO é uma etapa do wizard.** `STEPS` e `WizardProgress` ficam intocados. Uma "etapa
+   0" apareceria também em `/editar/$id` (que renderiza o MESMO `SubmeterPageContent`) e
+   mexeria em `completedSteps`/`handleStepClick`.
+3. **NÃO é rota própria** (`/submeter/intro` foi descartada): `/submeter` está em favorito
+   das pessoas, e um redirect quebraria `?retomar=<id>` e duplicaria o fetch de
+   identidade.
+4. **Quem NÃO vê** (predicado `deveMostrarIntro`, mesmos 3 sinais do `seedLoading`):
+   **edição** (`editProjetoId` — senão vaza para quem só corrige um projeto já submetido) ·
+   **`?retomar=<id>`** (retomada explícita) · **rascunho local** (`hasLocalDraft()`; o
+   `rehydrateFromLocal` salta para `setStep(d.step ?? 3)`, e a intro ficaria na frente de
+   um chat em andamento).
+5. **O early return vem DEPOIS do `if (seedLoading)`.** Hoje os dois são mutuamente
+   exclusivos (sinais idênticos), mas se deixarem de ser, é a tela de carregamento que tem
+   de ganhar — a intro na frente de um seed em voo esconderia um projeto sendo restaurado.
+6. **A trilha das 3 etapas repete o desenho do `WizardProgress`** (círculo azul de 36px +
+   trilho de 2,5px), só na vertical: a pessoa reconhece na intro o mesmo stepper que verá
+   no topo do formulário. Os **rótulos saem de `STEPS`** (fonte única) — só o resumo de
+   cada etapa é texto próprio (`RESUMO_ETAPAS`), para a intro nunca divergir do stepper.
+7. **Foco no `<h2>`, não no botão** (`tabIndex={-1}` + `focus()`): autofocar o CTA faz o
+   leitor de tela anunciar "Ok, entendi, botão" antes de a pessoa ouvir uma linha da
+   apresentação.
+8. **"Entra / não entra" nunca depende só de cor** (regra 11): cada linha tem ícone
+   (`CircleCheck` / `CircleSlash2`) **e** rótulo em negrito ("Entra aqui:" / "Não entra:").
+9. **A tela INSTRUI: as 3 perguntas do critério** (pedido do Kaique, 11/08/2026) — o miolo é
+   "Seu projeto responde a estas 3 perguntas?" com **recorrência · contrafactual ·
+   rastreabilidade** (constante `CRITERIOS` em `intro.tsx`), em forma de pergunta para a
+   pessoa responder **a si mesma**. É a MESMA régua que o analisador aplica depois e que o
+   agente cobra nas seções "Processo alterado" / "Ponteiro movido e onde verificar"
+   (`SPEC_CRITERIOS_PROJETO.md` · `docs/criterios-projeto-recorrencia-evidencia.md`).
+   ⚠️ **Ao mudar a régua LÁ, mude o texto aqui** — uma intro que promete critério diferente
+   do que o agente cobra é pior que intro nenhuma. ⚠️ **NÃO importamos a constante do
+   prompt** (`BLOCO_SECOES_CRITERIO`, `orchestrator.ts`): é redação para LLM, roda no
+   worker e fala em códigos `[1.3]`/`[1.4]`, que são roteiro interno e **proibidos** na
+   tela. ⚠️ A 3ª pergunta manda **NOMEAR** relatório/painel/sistema/base de propósito: "dá
+   para ver no sistema" é a resposta vaga que o gate recusa, e é onde as pessoas mais
+   empacam. ⚠️ E a tela diz explicitamente que **não saber alguma não trava nada** (o
+   agente ajuda a montar; o que ficar em aberto vai à revisão humana) — a intenção é
+   preparar, não filtrar na porta.
+10. **Os critérios NÃO são numerados; as etapas são.** A numeração fica só onde a ordem é
+    real (as 3 etapas do wizard); os 3 critérios são testes independentes, separados pelo
+    NOME + uma barra lima. E o título da seção **não repete o eyebrow** "Antes de começar"
+    — ele é a própria pergunta, que é o que a pessoa deve fazer com a lista.
+
+**Testes:** `tests/intro-submissao.test.ts` — os 4 ramos do predicado + string vazia não
+contando como id.
+
+---
+
+## Feature adicional — Triagem do projeto ESPECIAL: dashboard e ganho organizacional (12/08/2026)
+
+**Pedido (Kaique, 12/08/2026):** ao marcar o projeto como **especial** na Etapa 2.5, aparecem
+**duas perguntas novas, em sequência, ANTES dos campos que já existem** (contexto especial),
+cada uma com 2 botões (sim/não) e a segunda só depois de responder a primeira:
+
+1. *"Este projeto é, objetivamente (ou principalmente), um dashboard ou um painel de
+   controle?"* — se SIM, **não é especial** (dashboard não é projeto especial).
+2. *"O ganho principal deste projeto é prioritariamente organizacional?"* — se SIM, quase
+   certamente **não é um especial válido**: sem saving considerado nem receita real medida é
+   muito difícil ser um especial legítimo.
+
+**Qualquer "sim" BLOQUEIA a submissão**, com mensagem que diz o que foi respondido, por que
+isso não caracteriza um especial e o que fazer (padrão "Para corrigir…").
+
+**Por que na porta, e determinístico:** o especial **pula o memorial financeiro** e vai direto
+à validação humana — é a rota mais barata do formulário e, por isso, a mais atraente para quem
+não quer levantar horas. Dashboard/painel é uma ENTREGA (o ganho aparece nas horas que ninguém
+gasta mais montando o relatório, na conferência que sumiu, no erro que parou de acontecer) e
+"organizar" é MEIO para o impacto, não o impacto: os dois são mensuráveis pelo caminho normal.
+E o bloqueio **não pode ser prompt** — este repo já queimou 3× confiando no LLM para segurar
+regra (Gostream, ganho projetado, custo evitado no chat: *avisar não é trava*). Aqui, porém, o
+gate é de **FORMULÁRIO**: 2 cliques, sem máquina de estados de chat, sem risco de loop.
+
+**Onde mora**
+- **`src/lib/mensagens-submissao.ts`** (FONTE ÚNICA, módulo PURO) — `PERGUNTAS_ESPECIAL` (o
+  texto das 2 perguntas + os rótulos dos 4 botões), `MotivoBloqueioEspecial`,
+  `mensagemEspecialDashboard()`, `mensagemEspecialGanhoOrganizacional()` e o dispatcher
+  `mensagemEspecialInvalido(motivo)`.
+- **`src/lib/submeter/constants.ts`** — os 2 campos em `FormData`
+  (`especialDashboard`/`especialGanhoOrganizacional`) + as funções PURAS
+  `motivoBloqueioEspecial(form)` (o predicado do bloqueio) e `validarEtapa25Especial(form)`
+  (perguntas não respondidas + o bloqueio, em `FieldErrors`).
+- **`src/lib/submeter/step25.tsx`** — a UI: bloco "Duas checagens antes de seguir" com
+  `PerguntaSimNao` (numeração 1/2, `fieldset`/`legend`, input `peer sr-only` + indicador
+  redondo) e `BloqueioEspecial` (ícone `Ban` + veredito + a mensagem da fonte única).
+- **`src/routes/submeter.tsx`** — estado inicial, seed da edição, `rehydrateFromLocal`,
+  `handleRespTriagemEspecial`, a triagem dentro de `validateEtapa25` e o **gate** no topo de
+  `handleEnviarEspecial` **e** de `handleSubmitProjeto`.
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **O gate é SÓ DO FRONTEND, como o `prodStatus`** — e isso é escolha, não esquecimento. As
+   2 respostas não vão ao backend, a nenhum prompt e a nenhuma coluna do Sheets: o que
+   sobrevive ao envio é a NATUREZA do projeto (`especial`/`tipos_projeto`), que já é gravada,
+   e um especial que passasse por engano é pego pela validação humana (que é o destino de
+   todo especial). Um campo server-side exigiria payload em `iniciar-submissao` +
+   `atualizar-metadados`, coluna nova, `ProjetoContexto`/`getProjetoContextoData`,
+   `buildRespostasFormulario` e coluna no Sheets — custo alto para uma resposta que ninguém
+   lê depois. ⚠️ **Se um dia a triagem tiver de constar na planilha/auditoria, aí sim** ela
+   entra por esse caminho completo (regra do `CLAUDE.md`), nunca solta num prompt.
+2. **A 2ª pergunta só existe depois de a 1ª ser "não"** — e a validação cobra exatamente o
+   que a tela mostra (`validarEtapa25Especial`). Com a 1ª em "sim" o projeto já está
+   bloqueado; cobrar a resposta de uma pergunta invisível travaria o formulário sem dizer
+   onde. Por isso `handleRespTriagemEspecial` também **zera** a 2ª resposta quando a 1ª volta
+   para "sim".
+3. **Precedência: dashboard vence** quando as duas seriam "sim" — é o critério OBJETIVO (não
+   depende de julgar a natureza do ganho).
+4. **O bloqueio aparece no CLIQUE, não só no envio.** O painel vermelho com o "Para corrigir…"
+   nasce no instante do "sim" (e o **contexto especial deixa de ser exibido**: escrever 20+
+   caracteres para uma submissão que não vai sair é trabalho jogado fora). No clique em
+   "Enviar Projeto" o **toast repete a MESMA mensagem** (fonte única, 20s, sem prefixo "Erro
+   ao enviar" — é orientação, não falha técnica).
+5. **O botão "Enviar Projeto" continua HABILITADO.** Desabilitar economiza um clique e tira a
+   explicação: quem não entende por que o botão morreu não descobre sozinho. O gate está no
+   handler.
+6. **O gate roda nos DOIS caminhos de envio** (`handleEnviarEspecial` da Etapa 2.5 e
+   `handleSubmitProjeto` da Etapa 3, que um especial alcança pela navegação do topo) —
+   bloqueio não pode depender de qual botão a pessoa achou primeiro. Na Etapa 3 o bloqueio
+   **devolve a pessoa à Etapa 2.5** (`setShowEtapa25(true)` + `goToStep(2)`), onde as
+   perguntas estão.
+7. **Marcar "Não. É um projeto padrão…" LIMPA as 2 respostas** (como já acontece com o
+   contexto especial): resposta guardada para pergunta que a tela não mostra mais é dado
+   obsoleto, e voltar a "Sim" tem de exigir reafirmar.
+8. **Na EDIÇÃO as perguntas nascem em branco** (os campos não existem no servidor) — efeito
+   desejado: um especial LEGADO passa pela triagem que não existia quando ele entrou. Rascunho
+   local salvo antes desta feature também cai em `""` (default no `rehydrateFromLocal`, como
+   manda o comentário-armadilha de lá).
+9. **UI: nada de linguagem visual nova.** Reusa `.go-radio-label`/`go-radio-checked`,
+   `FieldError` e o painel arredondado da própria Etapa 2.5; o vermelho do bloqueio é o
+   `#dc2626`/`#b91c1c` já usado nos erros e o ícone é o `Ban` do "Projeto reprovado"
+   (`aviso-pendencia.tsx`). A11y (regra 11): o estado **não é só cor** (o disco do indicador
+   aparece/desaparece + rótulo em negrito), o foco de teclado acende no indicador
+   (`peer-focus-visible`, com o input `sr-only`), `fieldset`/`legend` amarram as opções à
+   pergunta, o painel de bloqueio é `role="alert"` com medida travada em 72ch e as animações
+   respeitam `prefers-reduced-motion` (bloco global em `styles.css`). ⚠️ Os overrides de
+   `justify-content`/`gap` do rótulo vão em `style` inline **de propósito**: `.go-radio-label`
+   é CSS não-camadado e venceria a utilitária do Tailwind v4 (onde, aliás, `!classe` com "!"
+   na frente não existe mais).
+10. **A numeração 1/2 é legítima** (a ordem é real: uma destrava a outra) — não é enfeite,
+    ao contrário dos `01 / 02 / 03` decorativos.
+
+**Testes:** `tests/especial-triagem.test.ts` — texto exato das 2 perguntas (mudar tem de ser
+DECISÃO), os 6 ramos de `motivoBloqueioEspecial` (incluindo "projeto padrão nunca é afetado" e
+"em branco não bloqueia"), o que `validarEtapa25Especial` cobra em cada estado e as 2
+mensagens (o que foi respondido · por que · "Para corrigir…" · sem R$). As 2 mensagens também
+entram no laço de invariantes de `tests/mensagens-submissao.test.ts`.
+
+
+## Feature adicional — Notificação do Chat só quando há pré-aprovação do líder (11/08/2026)
+
+**Motivação.** O grupo do Google Chat recebia **uma mensagem por submissão e por edição** — e, logo
+depois, uma **segunda** do mesmo projeto (`🚨 Novo fluxo de automação cadastrado – Análise Pendente`,
+disparada pelo `syncUpdateToGoogle` no fim da análise). Como a pré-aprovação do líder passou a existir
+(D1–D29), a maior parte desse barulho é sobre projeto que **ainda não foi olhado por ninguém**. Pedido
+do Luis: *"que só ocorram agora quando houver uma pré-aprovação do líder … só a pessoa submeter ou
+editar e não tiver aprovação do líder ou validação nós vamos desconsiderar"*.
+
+**O que mudou.** O gatilho do alerta deixa de ser a submissão e passa a ser o projeto estar **liberado
+do lado do líder**. A régua é o módulo PURO `src/lib/notificacao-chat.ts`
+(`decidirMomentoNotificacao`), FONTE ÚNICA do "quando" e dos textos das notas:
+
+- fila REALMENTE aberta (`isento: false`) → **silêncio** na submissão; a mensagem sai quando o líder
+  clica em **Pré-aprovar** (`decidirAprovacao` → `notificarChatPreAprovacao`), com a **assinatura** de
+  quem pré-aprovou;
+- **`ajuste`/`reprovado`** → nada (é o "desconsiderar" do pedido; fica entre líder e autor);
+- **especial** (D27, não abre fila) → mensagem na submissão, **própria e enxuta**;
+- **liderança · sem líder · TeamGuide fora** → mensagem na submissão **com uma linha** dizendo por
+  que não há parecer, para a triagem não a ler como pré-aprovação de um líder que não existiu;
+- a 2ª mensagem por submissão foi **suprimida** (`buildUpdateMessage` REMOVIDO): **1 por projeto**.
+
+**Onde aterrissou.** `src/lib/notificacao-chat.ts` (novo, puro) · `src/lib/notificacao-projeto.functions.ts`
+(novo — remonta o payload do BANCO e envia; **não** reusa `resyncGoogle`, que também escreveria no
+Sheets) · `src/lib/google/chat.ts` (`notaPreAprovacao`/`preAprovacao` no `buildSubmitMessage`, especial
+enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarChat` **obrigatório** em
+`SubmitSyncParams`; Chat fora do `syncUpdateToGoogle`) · `src/lib/aprovacoes.functions.ts` (gatilho +
+`assinaturaDoParecer`) · `src/lib/chat.functions.ts` (2 call sites; `resyncGoogle` → `notificarChat: false`).
+
+**Testes.** `tests/notificacao-chat.test.ts` · `tests/sync-notificar-chat.test.ts` ·
+`tests/notificacao-projeto-pre-aprovacao.test.ts` · `tests/aprovacoes-notifica-chat.test.ts` +
+`tests/chat-message-especial.test.ts` atualizado.
+
+**Decisões e gotchas completos:** `SPEC_APROVACAO_LIDER.md` §12 (D30).
+
+**Status.** ⏳ Implementado; suíte verde + `build:worker` OK. **Deploy pendente** (regra 13 — staging
+`edf400b4` antes de prod).

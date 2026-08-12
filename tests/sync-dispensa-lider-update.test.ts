@@ -18,7 +18,6 @@ vi.mock('@/lib/google/sheets', () => ({
 vi.mock('@/lib/google/chat', () => ({
   sendChatNotification: vi.fn().mockResolvedValue(undefined),
   buildSubmitMessage: vi.fn().mockReturnValue({}),
-  buildUpdateMessage: vi.fn().mockReturnValue({}),
   ehProjetoTesteE2E: vi.fn().mockReturnValue(false),
 }));
 

@@ -1,3 +1,8 @@
+import {
+  mensagemEspecialInvalido,
+  type MotivoBloqueioEspecial,
+} from "@/lib/mensagens-submissao";
+
 export const AREAS = [
   "AZ", "B2B Gobeauté", "B2B Gocase", "Contabilidade", "CSC", "CX",
   "CX - Agentes", "Dados", "Departamento Pessoal", "E-commerce", "Facilities",
@@ -107,6 +112,28 @@ export const STEPS = [
   { id: 2, label: "Projeto" },
   { id: 3, label: "Agente" },
 ];
+
+/**
+ * Quem vê a tela de apresentação (`IntroSubmissao`, antes da Etapa 1).
+ *
+ * Só a submissão NOVA e limpa passa — os 3 sinais são os mesmos do `seedLoading`
+ * em `submeter.tsx`, e cada exclusão tem motivo próprio:
+ * - `editProjetoId`  → `/editar/$id` renderiza o MESMO `SubmeterPageContent`; a
+ *   apresentação vazaria para quem só quer corrigir um projeto já submetido.
+ * - `resumeDraftId`  → `?retomar=<id>` é retomada explícita.
+ * - `temRascunhoLocal` → o `rehydrateFromLocal` salta para a etapa onde a pessoa
+ *   parou (`setStep(d.step ?? 3)`); a intro ficaria na frente de um chat em curso.
+ *
+ * Não há flag de "já vi": por decisão de produto a tela aparece SEMPRE que se abre
+ * /submeter do zero (inclusive após "Recomeçar" e "Submeter outro projeto").
+ */
+export function deveMostrarIntro(args: {
+  editProjetoId?: string;
+  resumeDraftId?: string;
+  temRascunhoLocal: boolean;
+}): boolean {
+  return !args.editProjetoId && !args.resumeDraftId && !args.temRascunhoLocal;
+}
 
 // Validação pura da Etapa 1 (Envio). Retorna o mapa de erros por campo (vazio = ok).
 // `modoEdicao` RELAXA os campos de "projeto legado" (escopo/status/ferramenta/serviço
@@ -227,6 +254,51 @@ export function validarEtapa2(
   return errs;
 }
 
+/**
+ * TRIAGEM DO ESPECIAL (Etapa 2.5) — qual pergunta desqualificou o projeto.
+ *
+ * Só se aplica a quem marcou `especial`; projeto padrão (saving/receita) nunca é
+ * afetado. Precedência: **dashboard primeiro**, porque é o critério OBJETIVO (não
+ * depende de julgar a natureza do ganho). Devolve `null` quando nada bloqueia —
+ * inclusive com as perguntas ainda em branco (aí o que cobra a resposta é
+ * `validarEtapa25Especial`, não este predicado). Função pura — testável.
+ */
+export function motivoBloqueioEspecial(
+  form: Pick<FormData, "especial" | "especialDashboard" | "especialGanhoOrganizacional">,
+): MotivoBloqueioEspecial | null {
+  if (!form.especial) return null;
+  if (form.especialDashboard === "sim") return "dashboard";
+  if (form.especialGanhoOrganizacional === "sim") return "organizacional";
+  return null;
+}
+
+/**
+ * Erros da triagem do especial: perguntas não respondidas + o BLOQUEIO em si.
+ *
+ * O que é exigido acompanha exatamente o que a tela mostra: a 2ª pergunta só é
+ * cobrada quando a 1ª foi respondida com "não" (com "sim" o projeto já está
+ * bloqueado e a 2ª pergunta não aparece — cobrar uma resposta invisível travaria o
+ * formulário sem dizer onde). A mensagem do bloqueio vem da FONTE ÚNICA
+ * `mensagens-submissao.ts` (nunca texto solto na tela). Função pura — testável.
+ */
+export function validarEtapa25Especial(
+  form: Pick<FormData, "especial" | "especialDashboard" | "especialGanhoOrganizacional">,
+): FieldErrors {
+  if (!form.especial) return {};
+  const errs: FieldErrors = {};
+
+  if (!form.especialDashboard) {
+    errs.especialDashboard = "Responda esta pergunta para continuar";
+  } else if (form.especialDashboard === "nao" && !form.especialGanhoOrganizacional) {
+    errs.especialGanhoOrganizacional = "Responda esta pergunta para continuar";
+  }
+
+  const motivo = motivoBloqueioEspecial(form);
+  if (motivo) errs.especialBloqueio = mensagemEspecialInvalido(motivo);
+
+  return errs;
+}
+
 // Campos mínimos para começar a gerar a documentação em segundo plano (fase de doc):
 // só o que o servidor PRECISA para criar o projeto e extrair o texto do documento —
 // Etapa 1 concluída (escopo) + nome ≥3. Deliberadamente NÃO exige `descricaoBreve` nem
@@ -277,6 +349,16 @@ export interface FormData {
   // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
   especial: boolean;
   contextoEspecial: string;
+  // ─── Triagem do especial (Etapa 2.5, só quando `especial` é true) ───
+  // Duas perguntas sim/não, EM SEQUÊNCIA (a 2ª só aparece depois da 1ª), antes do
+  // contexto especial. Qualquer "sim" DESQUALIFICA o especial e bloqueia o envio
+  // (ver `motivoBloqueioEspecial` + `mensagens-submissao.ts`). '' = não respondida.
+  // ⚠️ São campos SÓ DO FRONTEND (como `prodStatus`): não vão ao backend, a nenhum
+  // prompt e a nenhuma coluna do Sheets — o papel delas é impedir a submissão
+  // errada na porta, e o que sobrevive ao envio é a natureza do projeto
+  // (`especial`/`tipos_projeto`), que já é gravada.
+  especialDashboard: "sim" | "nao" | "";
+  especialGanhoOrganizacional: "sim" | "nao" | "";
 }
 
 // Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área

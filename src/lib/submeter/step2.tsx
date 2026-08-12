@@ -410,11 +410,17 @@ export function Step2({
       if (zipsExpandidos > 0) {
         toast.info(`${zipsExpandidos} arquivo(s) .zip descompactado(s) — ${arquivosExtraidos} arquivo(s) extraído(s) para análise`);
       }
+      // Âmbar, não vermelho: são arquivos que ficaram de fora da análise, não falha do
+      // sistema. Cada frase diz o que aconteceu com QUAIS arquivos.
       if (grandes.length > 0) {
-        toast.error(`.zip acima de ${MAX_ZIP_MB}MB ignorado(s): ${grandes.join(", ")}`);
+        toast.warning(
+          `Deixei de fora o(s) .zip acima de ${MAX_ZIP_MB}MB: ${grandes.join(", ")}. Suba os arquivos soltos, se precisar deles.`,
+        );
       }
       if (falharam.length > 0) {
-        toast.error(`Não consegui abrir o(s) .zip: ${falharam.join(", ")} (arquivo corrompido?)`);
+        toast.warning(
+          `Não consegui abrir o(s) .zip ${falharam.join(", ")} (arquivo corrompido?). Suba os arquivos soltos.`,
+        );
       }
     }
 
@@ -462,7 +468,7 @@ export function Step2({
           console.log(`🗑️  vazio (0 bytes), ignorado: ${relPath}`);
         } else if (file.size > MAX_FILE_MB * 1024 * 1024) {
           rejected.push({ name: relPath, ext, reason: `excede ${MAX_FILE_MB}MB`, size: file.size });
-          toast.error(`"${file.name}" excede ${MAX_FILE_MB}MB`);
+          toast.warning(`"${file.name}" ficou de fora: passa de ${MAX_FILE_MB}MB.`);
         } else if (existentes.has(relPath)) {
           console.log(`⏭️  duplicado, ignorado: ${relPath}`);
         } else {
@@ -523,7 +529,7 @@ export function Step2({
     // Cap de segurança altíssimo (não é um limite prático) — só evita payload absurdo
     if (merged.length > MAX_FILES) {
       console.warn(`[Step2/addFiles] Cap de segurança de ${MAX_FILES} arquivos atingido — ${merged.length - MAX_FILES} descartado(s)`);
-      toast.error(`Muitos arquivos (${merged.length}). Mantidos os primeiros ${MAX_FILES}.`);
+      toast.warning(`São ${merged.length} arquivos — mantive os primeiros ${MAX_FILES}.`);
       merged = merged.slice(0, MAX_FILES);
     }
 

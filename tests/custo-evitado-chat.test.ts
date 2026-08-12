@@ -93,6 +93,59 @@ describe("detectarCustoEvitadoNoChat", () => {
     expect(det?.valor).toBe(3600);
   });
 
+  // ── Vocabulário alinhado ao FORMULÁRIO (12/08/2026) ──────────────────────
+  // A pergunta do form passou a dizer "não importa o nome do gasto: contrato, licença,
+  // serviço de terceiro, taxa, multa, juros". Gasto que o formulário convida a cadastrar e
+  // o detector não reconhece é o buraco do caso DIFAL de volta.
+  //
+  // ⚠️ "hora extra" saiu dos EXEMPLOS (decisão do Kaique, 12/08/2026) mas SEGUE no detector,
+  // e os dois fatos convivem de propósito: parar de pagar hora extra é dinheiro real, então
+  // quando alguém CITA isso no chat o gate ainda precisa perguntar se é gasto medido — o que
+  // saiu foi o CONVITE (exemplo na tela/nos prompts), porque hora extra é hora humana e
+  // convidá-la para o campo de custo evitado abre a porta para dupla contagem com as horas
+  // do saving (mesmo motivo que deixou "retrabalho" fora dos termos).
+  it('arma com "taxa" quando vem com verbo de evitação', () => {
+    const det = detectarCustoEvitadoNoChat(
+      ["deixamos de pagar a taxa de cartorio de cada contrato, eram R$ 1.200,00 por mes"],
+      null,
+    );
+    expect(det?.valor).toBe(1200);
+    expect(det!.marcas).toContain("taxa");
+  });
+
+  it('NÃO arma com "taxa" sem verbo de evitação (taxa de conversão, taxa/hora)', () => {
+    // Sem esse cuidado, "taxa" viraria um gatilho em qualquer projeto que cite um R$.
+    expect(
+      detectarCustoEvitadoNoChat(
+        ["a taxa de conversao subiu e a plataforma custa R$ 3.600,00 por mes"],
+        null,
+      ),
+    ).toBeNull();
+    expect(
+      detectarCustoEvitadoNoChat(["a taxa/hora do analista senior e de R$ 45,00"], null),
+    ).toBeNull();
+  });
+
+  it('arma com "hora extra" que a empresa parou de pagar', () => {
+    const det = detectarCustoEvitadoNoChat(
+      ["paramos de pagar hora extra no fechamento, eram uns R$ 2.800,00 por mes"],
+      null,
+    );
+    expect(det?.valor).toBe(2800);
+    expect(det!.marcas).toContain("hora-extra");
+  });
+
+  it('"retrabalho" fica FORA do vocabulário (já está nas horas — evita dupla contagem)', () => {
+    // "evitamos retrabalho" é a frase mais comum da fase de saving; o retrabalho evitado é
+    // tempo, e tempo já entra pelas horas.
+    expect(
+      detectarCustoEvitadoNoChat(
+        ["com isso evitamos retrabalho, o projeto consome R$ 1.500,00 de API por mes"],
+        null,
+      ),
+    ).toBeNull();
+  });
+
   it("NÃO arma numa conversa normal de horas, sem dinheiro", () => {
     expect(
       detectarCustoEvitadoNoChat(

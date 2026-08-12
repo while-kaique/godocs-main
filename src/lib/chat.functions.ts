@@ -60,11 +60,12 @@ import {
   NUDGE_SOBREPOSICAO_SEM_RESPOSTA,
 } from "@/lib/agents/sobreposicao-receita";
 import {
-  mensagemSavingSemGanho,
-  mensagemReceitaZerada,
-  mensagemReceitaIncompleta,
-  mensagemDocAusente,
-  mensagemDuplicata,
+  bloqueioSavingSemGanho,
+  bloqueioReceitaZerada,
+  bloqueioReceitaIncompleta,
+  bloqueioDocAusente,
+  bloqueioDuplicata,
+  erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
 import {
   aplicaGateCustoEvitadoChat,
@@ -115,6 +116,7 @@ import {
   rotuloAprovacaoSheet,
 } from "@/lib/aprovacoes.functions";
 import { notificarLideresDoProjeto } from "@/lib/gomoon-lideres.functions";
+import { decidirMomentoNotificacao } from "@/lib/notificacao-chat";
 import { isAdmin } from "@/lib/auth.functions";
 import type {
   ChatFase,
@@ -3163,7 +3165,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   const docRow = await getDocumentacao(projeto_id);
 
-  if (!docRow) throw new Error(mensagemDocAusente());
+  if (!docRow) throw erroDeBloqueio(bloqueioDocAusente());
 
   const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
     string,
@@ -3220,7 +3222,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   if (projeto.nome) {
     const duplicata = await findDuplicateProjeto(projeto.nome, projeto_id);
     if (duplicata) {
-      throw new Error(mensagemDuplicata(projeto.nome));
+      throw erroDeBloqueio(bloqueioDuplicata(projeto.nome));
     }
   }
 
@@ -3305,8 +3307,8 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       // texto fixo anterior dizia "sem redução concreta de horas" para uma submissão que
       // tinha 60h/mês validadas no memorial — o que barra é o LÍQUIDO, e o abatimento dos
       // custos declarados na Etapa 2 nunca era citado. Ver o caso SmartOnline/DIFAL.
-      throw new Error(
-        mensagemSavingSemGanho({
+      throw erroDeBloqueio(
+        bloqueioSavingSemGanho({
           horas: (saving?.economia_horas_mes as number) ?? 0,
           unidade: unidadeHorasDe(
             (saving?.tipo_saving as SavingColetado["tipo_saving"]) ?? null,
@@ -3327,14 +3329,14 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     if (tiposProjetoGate.includes("receita_incremental")) {
       const memoReceita = ((receita?.memorial_calculo as string | null | undefined) ?? "").trim();
       if (((receita?.valor_ganho_mensal as number) ?? 0) <= 0) {
-        throw new Error(mensagemReceitaZerada());
+        throw erroDeBloqueio(bloqueioReceitaZerada());
       }
       if (
         !receita?.tipo_saving ||
         memoReceita.length < 30 ||
         receitaMemorialEhSaving(memoReceita)
       ) {
-        throw new Error(mensagemReceitaIncompleta());
+        throw erroDeBloqueio(bloqueioReceitaIncompleta());
       }
     }
   }
@@ -3526,6 +3528,12 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // líder (D6), devolve "—" e segue a vida.
   const preAprovacao = await abrirPreAprovacao(projeto_id, { nomeProjeto: projeto.nome });
 
+  // Quando o grupo do Google Chat é avisado (11/08/2026). Fila REALMENTE aberta
+  // (`isento: false`) → o alerta cala aqui e sai quando o líder pré-aprovar; qualquer
+  // isenção → sai agora, com a nota dizendo por que não há parecer. A régua (e o
+  // default seguro invertido) mora em `src/lib/notificacao-chat.ts`.
+  const momentoNotificacao = decidirMomentoNotificacao(preAprovacao);
+
   // Aviso IMEDIATO ao líder (D26, 06/08/2026): o POST ao Gomoon sai agora, não na
   // manhã seguinte. Fire-and-forget via `runBackground` — o Godeploy cancelaria a
   // promise assim que a Response voltasse, e a submissão NÃO pode esperar uma DM.
@@ -3575,6 +3583,10 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // porquê da isenção vão na "Justificativa Aprovação do Líder" (D14).
         aprovacaoLider: preAprovacao.rotuloSheet,
         justificativaAprovacaoLider: preAprovacao.justificativaSheet,
+        // Só notifica quem nunca terá parecer de líder (especial, autor liderança, sem
+        // líder, TeamGuide fora). Quem entra em fila é anunciado na pré-aprovação.
+        notificarChat: momentoNotificacao.quando === 'submissao',
+        notaPreAprovacao: momentoNotificacao.nota,
       }),
     );
   }
@@ -3705,6 +3717,9 @@ export async function resyncGoogle(rawData: unknown) {
     ganhoTotalMensal,
     aprovacaoLider,
     justificativaAprovacaoLider,
+    // Re-sync é REPARO administrativo (regravar a linha da planilha) — não avisa
+    // ninguém. Antes disparava uma mensagem no grupo por projeto reparado.
+    notificarChat: false,
   });
 
   // 2. Complexidade/Observações/Status (o que o analisador já havia gravado).
@@ -3744,9 +3759,12 @@ export async function resyncGoogle(rawData: unknown) {
 //    e, se não der pra parsear, cai no fallback ×12 (valor atual × 12). Legado pontual que
 //    NÃO seja puro (tem horas/custo) vai para `flagged` (revisão manual) — não arrisca.
 //
-// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho dispara UMA
-// notificação no Google Chat por projeto (mudo no staging, mas em PROD seria spam de N
-// mensagens). Aqui escrevemos direto via updateRowByProjectId (batch parcial, sem Chat).
+// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho REGRAVA a
+// linha inteira da planilha (incl. "Atualizado Em", que regulariza legado) por projeto.
+// Aqui escrevemos direto via updateRowByProjectId (batch parcial, só as colunas afetadas).
+// _(Até 11/08/2026 o motivo principal era outro — o caminho também disparava UMA
+// notificação no Google Chat por projeto, o que em PROD seria spam de N mensagens. Isso
+// deixou de valer: `resyncGoogle` passa `notificarChat: false` desde o D30.)_
 //
 // Idempotente: só toca quem de fato MUDA; pula os já corretos (re-run seguro). `dry`
 // (default TRUE) só relata (projetos + flagged), sem escrever nada.
