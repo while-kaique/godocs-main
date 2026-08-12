@@ -511,11 +511,14 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     // notificam apenas os que nunca terão parecer — especial, autor liderança, sem
     // líder, TeamGuide fora. Régua em `src/lib/notificacao-chat.ts`.
     try {
-      if (!p.notificarChat) return;
-      if (ehProjetoTesteE2E(p.projeto.nome)) {
+      // ⚠️ `if (...)` e NÃO `if (!...) return`: o `return` encerraria a
+      // `syncSubmitToGoogle` INTEIRA, e um "passo 3" futuro seria pulado justamente no
+      // caminho que virou MAJORITÁRIO (projeto que entra em fila e não notifica).
+      if (!p.notificarChat) {
+        // nada a fazer aqui — o alerta deste projeto sai na pré-aprovação do líder.
+      } else if (ehProjetoTesteE2E(p.projeto.nome)) {
         console.warn(`[google/sync] Projeto de teste E2E "${p.projeto.nome}" — notificação Google Chat suprimida.`);
-        return;
-      }
+      } else {
       const message = buildSubmitMessage({
         projeto: ouTraco(p.projeto.nome),
         area: p.area,
@@ -541,6 +544,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         notaPreAprovacao: p.notaPreAprovacao ?? null,
       });
       await sendChatNotification(message);
+      }
     } catch (chatErr) {
       console.error('[google/sync] Falha ao notificar Google Chat:', chatErr);
     }
