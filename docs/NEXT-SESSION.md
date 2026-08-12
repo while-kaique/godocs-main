@@ -4,7 +4,37 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## 📋 11/08 (SESSÃO MAIS RECENTE) — PLANEJAMENTO puro: o alerta do Chat passa a ser disparado pela PRÉ-APROVAÇÃO, não pela submissão
+## 🛠️ 12/08 (SESSÃO MAIS RECENTE) — CÓDIGO: o alerta do Chat passou a ser disparado pela pré-aprovação (T1–T7)
+
+Executou o plano aprovado no dia anterior. **1242 testes verdes** (baseline 1206), `worker.js` rebuildado
+(983.5kb) e commitado, docs atualizados (**CLAUDE.md** na seção Sync Google + **SPEC_APROVACAO_LIDER §12 =
+D30** + SPEC_FEATURES_NOVAS). Branch `feat/chat-notifica-so-pre-aprovacao`, worktree
+`.claude/worktrees/chat-so-pre-aprovacao`. **Nada foi deployado** — ver "O que a próxima sessão precisa
+fazer (T8)" no ponteiro abaixo.
+
+**O que existe agora, em 1 parágrafo:** a régua do "quando avisar o grupo" virou um módulo PURO
+(`src/lib/notificacao-chat.ts`, `decidirMomentoNotificacao`) com **default invertido** — só `isento === false`
+(fila realmente aberta) faz o alerta calar; **qualquer** isenção, inclusive um motivo futuro que caia no
+`default:`, notifica na submissão, porque projeto sem ninguém para aprová-lo não pode ficar invisível.
+`SubmitSyncParams` ganhou **`notificarChat` obrigatório** (não opcional-com-default: um 3º chamador
+notificaria por acidente) e `resyncGoogle` passa `false`. `buildUpdateMessage` e o bloco de Chat do
+`syncUpdateToGoogle` foram **removidos** (era a 2ª mensagem do mesmo projeto) → **1 mensagem por projeto**.
+O disparo novo mora em `src/lib/notificacao-projeto.functions.ts`, que **só LÊ** o banco (⚠️ não reusa
+`resyncGoogle` de propósito — aquele também ESCREVE a linha inteira no Sheets) e é chamado por
+`decidirAprovacao` no veredito `aprovado`, via `runBackground` + `Promise.resolve().then(...)` (converte
+throw **síncrono** em rejeição) para nunca derrubar a decisão do líder.
+
+**3 coisas que custaram tempo e não devem ser re-descobertas:**
+1. **`npx tsc --noEmit` acusa 5 erros — eles são PRÉ-EXISTENTES** (`chat.functions.ts`, `submeter.tsx`),
+   idênticos no `origin/main`, só com as linhas deslocadas. `npm run build` é `vite build` e **não**
+   typecheca, então isso nunca barrou nada. Não perca a sessão "consertando" o que não é seu.
+2. **O worktree nasce sem `node_modules`** — o padrão do repo é **symlink** para o da raiz
+   (`ln -s /home/notebook/godocs-main/node_modules <worktree>/node_modules`), não `npm install`.
+3. **O `Edit` corrompeu comentário com acento** ao casar trechos que no arquivo estão como `\u2705`:
+   escreveu `\u26a0\ufe0f` LITERAL no fonte. Em bloco denso de unicode, edite por script (python) e
+   **confira com `grep '\\u00'`** depois.
+
+## 📋 11/08 — PLANEJAMENTO puro: o alerta do Chat passa a ser disparado pela PRÉ-APROVAÇÃO, não pela submissão
 
 **Pedido do Luis:** *"as notificações que rolam a cada submissão ou edição no grupo do Google Chat eu quero
 que só ocorram agora quando houver uma pré-aprovação do líder. Pois só a pessoa submeter ou editar e não
@@ -1688,10 +1718,34 @@ SQLite). Ver "Sessão de 2026-07-31" abaixo.
 </details>
 
 ## Plano ativo
-**→ [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md)** · Status: ✅ aprovado (Luis, 2026-08-11)
+**→ [docs/plans/chat-notifica-so-pre-aprovacao.md](plans/chat-notifica-so-pre-aprovacao.md)** · Status: ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente**
 
 O alerta do grupo do Chat passa a ser disparado pela **pré-aprovação do líder**, não pela submissão/edição.
+O **código está pronto e verde na branch `feat/chat-notifica-so-pre-aprovacao`** (worktree
+`.claude/worktrees/chat-so-pre-aprovacao`); falta **só a T8** — validar na staging e deployar.
 Segue na fila para planejar: o **pedido do Lucas** — mostrar o "Alguém já fazia?" no card da fila.
+
+### ⛔ O que a próxima sessão precisa fazer (T8, nesta ordem)
+1. **Rodar os 3 revisores de contexto fresco antes de qualquer envio.** Eles foram disparados no fim
+   da sessão de 12/08 e **não voltaram antes do fechamento** — os marcadores `.review-status` e
+   `.quality-status` seguem em **`pendente`**, e com `pendente` o **`git push`/`/ggsd:ship` é
+   BARRADO** pelos hooks (ADR-038/039/053). Destrava rodando `ggsd:verificador-conformidade` +
+   `ggsd:revisor-qualidade` (+ `ggsd:revisor-reuso`, que é só-sugestão) e gravando o veredito nos
+   marcadores. A faixa medida foi **`profunda`** (`verify-tier.sh`).
+2. **Regra 10 antes de subir:** `git fetch origin` + incorporar `origin/main` (o `main` anda por
+   causa da regra 8) e **rebuildar `worker.js`/`dist` depois do merge**. ⚠️ Conflito em `CLAUDE.md`
+   se resolve **UNINDO os dois lados** (regra 7) e `grep -n '^<<<<<<<' CLAUDE.md` tem de voltar vazio.
+3. **Regra 13 — staging ANTES:** `updateApp` no **`edf400b4`** (NUNCA `674a3710`), validar, e só
+   então prod. ⚠️ A staging é **Chat mudo**, então o efeito visível lá é o **negativo** (a submissão
+   deixou de mandar mensagem); o positivo (a mensagem da pré-aprovação) só se vê em prod ou apontando
+   o webhook de teste. ⚠️ Lembre da memória "deploy pode manter o worker ANTIGO": exija um sinal de
+   **runtime** nos logs, não só o `getApp`.
+4. **PR** (⚠️ `gh pr create` como `LuisEduardo100`, não `rpaiagogroup`).
+
+**Como validar que a mudança está no ar:** submeter um projeto **normal** (com líder na TeamGuide) →
+o grupo **não** recebe nada; o líder pré-aprova em `/aprovacoes` → sai **uma** mensagem com o
+cabeçalho `✅ Projeto pré-aprovado pelo líder` e a assinatura. Submeter um **especial** → mensagem
+curta na hora. Pedir **ajuste**/reprovar → silêncio.
 
 <details>
 <summary>Plano recém-concluído — dispensa da fila do líder quando o analisador reprova</summary>

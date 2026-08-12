@@ -1,5 +1,22 @@
 # Plano — Notificação do Chat só quando há pré-aprovação do líder
-**Status:** ✅ aprovado (Luis, 2026-08-11)
+**Status:** ✅ **executado — T1–T7 (12/08/2026)** · ⛔ **T8 pendente** (staging `edf400b4` → prod `674a3710` → PR)
+
+> **Execução (12/08/2026).** Worktree `.claude/worktrees/chat-so-pre-aprovacao`, branch
+> `feat/chat-notifica-so-pre-aprovacao`. Teste **red** autorado em contexto fresco pelo
+> `ggsd:test-writer` (12 asserções vermelhas + 3 módulos inexistentes) **antes** da implementação.
+> Suíte: **91 arquivos / 1242 testes verdes** (baseline 87/1206). `npm run build` + `build:worker` OK
+> (worker.js 983.5kb, commitado — regra 1). `npx tsc --noEmit` acusa **os mesmos 5 erros do
+> `origin/main`** (linhas deslocadas) — nenhum erro de tipo novo.
+>
+> **Ajustes de rota durante a execução (nada fora das Fronteiras):**
+> • `assinaturaDoParecer` (função nova, pura, em `aprovacoes.functions.ts`) — o plano não a previa;
+>   deriva "quem pré-aprovou e quando" com a MESMA régua da `justificativaAprovacaoSheet` (o
+>   `decidido_por` manda, D4) em vez de redigitá-la no gatilho.
+> • `syncUpdateToGoogle` ficou com `projectName` sem uso ao perder o bloco de Chat — em vez de
+>   remover o campo (churn em 4 call sites), ele entrou no `console.error` da falha de escrita, que
+>   não identificava o projeto.
+> • Os **5 testes de sync existentes** passaram a declarar `notificarChat: false` e perderam a chave
+>   morta `buildUpdateMessage` do mock (item do próprio Blast-radius).
 
 **Objetivo:** o grupo do Google Chat deixa de ser notificado a cada submissão/edição e passa a ser notificado quando o projeto está **liberado do lado do líder** — a pré-aprovação vira o gatilho; quem nunca terá parecer (especial, autor liderança, sem líder, TeamGuide fora) notifica na submissão, **sinalizado**.
 

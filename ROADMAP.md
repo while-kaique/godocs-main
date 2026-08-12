@@ -217,12 +217,15 @@ criar **`Aprovação do Líder`** e **`Justificativa Aprovação do Líder`** no
 
 🟡 **D30 (decisão do Luis, 11/08) — o alerta do grupo do Google Chat passa a ser disparado pela
 PRÉ-APROVAÇÃO, não pela submissão/edição.** Plano **aprovado** em
-[docs/plans/chat-notifica-so-pre-aprovacao.md](docs/plans/chat-notifica-so-pre-aprovacao.md), **código ainda
-não começou**. Régua: fila aberta → cala na submissão e dispara no veredito `aprovado`; `ajuste`/`reprovado`
+[docs/plans/chat-notifica-so-pre-aprovacao.md](docs/plans/chat-notifica-so-pre-aprovacao.md);
+**T1–T7 ✅ codadas em 12/08** na branch `feat/chat-notifica-so-pre-aprovacao` (1242 testes verdes,
+`worker.js` rebuildado, `CLAUDE.md` + spec **D30** atualizados) — **⛔ nada no ar**. Régua: fila aberta → cala na submissão e dispara no veredito `aprovado`; `ajuste`/`reprovado`
 não notificam; quem **nunca** terá parecer (especial · autor liderança · sem líder · TeamGuide fora) notifica
 na submissão **com a linha do porquê** (silenciar sumiria com o projeto do grupo); o alerta do **especial**
 fica enxuto; e a 2ª mensagem por submissão (`Análise Pendente`, do `syncUpdateToGoogle`) é **suprimida** —
-passa a ser **1 mensagem por projeto**. **Próximo:** rodar `/ggsd:code` sobre esse plano.
+passa a ser **1 mensagem por projeto**. **Próximo:** a **T8** — rodar os 3 revisores de contexto fresco
+(os marcadores `.review-status`/`.quality-status` ficaram em `pendente` e **barram o `git push`/`/ggsd:ship`**),
+incorporar `origin/main` (regra 10), validar na **staging `edf400b4`** (regra 13) e só então prod `674a3710` + PR.
 
 Spec `spec-docs/SPEC_APROVACAO_LIDER.md` (D1–**D16**). **F0 + F1 + F2 ✅ codadas, commitadas e na staging**
 (2026-08-03, `c9991be`): paginação real (`pageNumber`/`pageSize`), fallback de área para os nós de
