@@ -9,6 +9,9 @@ SPA React com TanStack Router (file-based routing). Entry point: `src/main.tsx` 
 | `/` | `routes/index.tsx` | Público | Home com 3 cards de ação (Submeter, Editar, Reenviar) |
 | `/submeter` | `routes/submeter.tsx` | Público | Formulário 3 etapas + chat IA (página mais complexa) |
 | `/auth` | `routes/auth.tsx` | Público | Redireciona para `/dashboard` |
+| `/faq` | `routes/faq.tsx` (layout) + `faq.index.tsx` | Logado | **FAQ** — índice com um card por assunto (título grande + descrição + seções do documento). É o ÚNICO nível com lista; o conteúdo é buscado 1× no layout e descido por contexto (`components/faq/faq-contexto.tsx`) |
+| `/faq/$categoria` | `routes/faq.$categoria.index.tsx` | Logado | O assunto inteiro em **UM documento** (markdown leve → `components/faq/faq-documento.tsx`). É o endereço linkado da Etapa 2.5 (`/faq/tipos_projetos`). Admin edita **inline** e tem "Ver como usuário"; slug tolerante a `-`/`_`/acento/caixa. Ver `spec-docs/SPEC_FAQ.md` (D13) |
+| `/faq/$categoria/$item` | `routes/faq.$categoria.$item.tsx` | Logado | **LEGADO** — só redireciona para o assunto (o endereço já circulou em Chat/e-mail) |
 | `/dashboard` | `_authenticated/dashboard.tsx` | Admin/Leader | **Triagem** — projetos da planilha: busca, filas de status, paginação, ficha em overlay + mudança de status (ver `spec-docs/SPEC_DASHBOARD_ADMIN.md`) |
 | `/usuarios` | `_authenticated/usuarios.tsx` | Admin Master | CRUD de usuários com roles e áreas |
 | `/areas` | `_authenticated/areas.tsx` | Admin Master | CRUD áreas + botão sync TeamGuide |

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Ban, CalendarClock, ChevronDown, RotateCcw } from "lucide-react";
+import { FAQ_URL } from "@/lib/faq/links";
 
 // Aviso de pendência/veredito exibido no card de "Meus Projetos" e na tela read-only
 // do projeto. Três tons, MESMO desenho — antes cada tela redigia o seu (11px na lista,
@@ -33,6 +34,10 @@ type Tema = {
   legenda: string;
   // Rótulo do botão que abre a tira. Diz o que a pessoa vai ler, não "expandir".
   acao: string;
+  // Seção do FAQ que explica ESTE estado (âncora do documento "Acompanhamento e status").
+  // ⚠️ Os ids vêm de `chaveSlug` sobre os títulos do documento — renomear a seção no
+  // painel admin muda o id e o link cai no topo da página (degrada, não quebra).
+  faq: string;
 };
 
 const ICONE = "h-3.5 w-3.5";
@@ -49,6 +54,7 @@ const TEMAS: Record<TomAviso, Tema> = {
     icone: <CalendarClock className={ICONE} />,
     legenda: "Observação",
     acao: "Ver observação",
+    faq: FAQ_URL.status,
   },
   reprovado: {
     bar: "#475569",
@@ -63,6 +69,7 @@ const TEMAS: Record<TomAviso, Tema> = {
     // QUEM escreveu o texto, que é a informação que falta ao autor.
     legenda: "Parecer da análise",
     acao: "Ver motivo",
+    faq: FAQ_URL.statusReprovado,
   },
   reenvio: {
     bar: "#dc2626",
@@ -75,12 +82,38 @@ const TEMAS: Record<TomAviso, Tema> = {
     icone: <RotateCcw className={ICONE} />,
     legenda: "O que precisa ser ajustado",
     acao: "Ver o que ajustar",
+    faq: FAQ_URL.statusReenvio,
   },
 };
 
 // Medida legível do parecer aberto: o card ocupa a largura toda em desktop e o texto
 // corrido chegava a 120+ caracteres por linha.
 const MEDIDA = "72ch";
+
+/**
+ * Link para a seção do FAQ que explica o estado (D17). Discreto de propósito: o aviso já
+ * diz o que fazer, o FAQ responde "por que estou nisso".
+ *
+ * ⚠️ NOVA ABA — a pessoa pode estar com um card aberto ou no meio de uma leitura, e
+ * navegar na mesma aba faria perder o lugar da lista.
+ * ⚠️ Fica FORA da tira clicável (`<button>`): link dentro de botão é HTML inválido e
+ * rouba o alvo de clique da tira.
+ */
+function LinkFaqEstado({ href, cor }: { href: string; cor: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold underline decoration-1 underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+      style={{ color: cor, outlineColor: cor }}
+    >
+      O que cada status significa
+      <span aria-hidden="true">↗</span>
+      <span className="sr-only">(abre o FAQ em uma nova aba)</span>
+    </a>
+  );
+}
 
 export function AvisoPendencia({
   tone,
@@ -123,6 +156,7 @@ export function AvisoPendencia({
             {texto}
           </p>
         )}
+        <LinkFaqEstado href={tema.faq} cor={tema.rotulo} />
       </div>
     );
   }
@@ -183,6 +217,7 @@ export function AvisoPendencia({
               {texto}
             </p>
           )}
+          <LinkFaqEstado href={tema.faq} cor={tema.rotulo} />
         </div>
       )}
     </div>

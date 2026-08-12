@@ -1244,3 +1244,80 @@ enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarCh
 
 **Status.** ⏳ Implementado; suíte verde + `build:worker` OK. **Deploy pendente** (regra 13 — staging
 `edf400b4` antes de prod).
+
+---
+
+## Feature adicional — Modal de exemplos no campo "trabalho manual ADICIONAL" (12/08/2026)
+
+**Pedido (Kaique, 12/08/2026):** a pergunta 2c — *"Além desse gasto eliminado, a automação
+substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse gasto NÃO cobria?"* —
+"pode ser muito confuso depois da pessoa já ter marcado que o projeto reduziu custos no campo
+anterior". Daí um botão de dúvida que abre um popup central, fundo embaçado. A 1ª versão trazia
+6 exemplos em cards (*Contexto → Custo eliminado → veredito*); o formato final, pedido no mesmo
+dia depois de ver a tela, é **uma lista curta de sinais** — *"para saber se o seu projeto tem
+esse trabalho, observe se:"* + frases marcadas ✕ (não é esse caso) e ✓ (é esse caso).
+
+**Por que o campo confunde:** ele vem logo DEPOIS de a pessoa cadastrar o gasto que a empresa
+deixou de pagar. Quem acabou de declarar "cortei R$ 3.200/mês do escritório contábil" lê a
+pergunta seguinte como "e esse trabalho conta?" e responde **sim** com o MESMO trabalho — que é
+exatamente a dupla contagem que a árvore de 3 desfechos existe para evitar (caso Portal de
+Reembolsos: contrato + horas-fantasma = R$ 7.597 em vez de R$ 5.700). Texto de ajuda genérico
+("conta só se for diferente") já existia e não bastava; o que separa as duas coisas é o caso
+concreto lado a lado.
+
+**Onde mora**
+- **`src/lib/submeter/exemplos-modal.tsx`** (novo) — `ExemplosCampoAjuda` (trigger + modal),
+  o tipo `SinalCampo` (`vale` · `texto` · `detalhe?`) e a constante
+  **`SINAIS_TRABALHO_ADICIONAL`** (2 sinais ✕ + 2 ✓). Genérico de propósito: outro campo
+  confuso reusa passando a própria lista.
+- `src/lib/submeter/step3-chat.tsx` — bloco 2c (`mostrarContrafactualAdicional`): o botão
+  entra abaixo do texto de ajuda. Nenhum estado do formulário muda.
+- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (2 + 2, ✕ primeiro, frase
+  curta com teto de 110 chars, os 2 erros cobertos).
+
+### Decisões fechadas (não "consertar" sem confirmar)
+
+1. **É uma LISTA de sinais, não exemplos em card** (decisão de produto, 12/08/2026, depois de
+   ver as duas versões na tela): cada linha é uma frase que a pessoa confere contra o próprio
+   projeto, com um `detalhe` curto só onde há o que fazer em vez disso ("volte e responda Sim").
+   Os cards de exemplo pediam leitura de 3 informações para extrair 1 conclusão.
+2. **Os 3 "não vale" cobrem os 3 erros REAIS**, não variações do mesmo: (a) mesmo escopo do
+   gasto eliminado → dupla contagem; (b) horas que **alguém já fazia** → é o outro ramo do
+   formulário (a resposta certa é voltar em "Alguém já fazia?" e marcar **Sim**); (c) trabalho
+   que **nasceu com** a automação (monitorar painel, conferir log) → custo de operação, não
+   trabalho substituído. Trocar um deles por mais um exemplo de dupla contagem desperdiça o
+   card e derruba o teste.
+3. **É modal, não tooltip nem accordion.** `InfoTooltip` (`form-components.tsx`) some no
+   `mouseleave` e não caberia 6 casos; um accordion inline empurraria o resto do formulário
+   para fora da vista no meio de uma decisão. O modal é renderizado por **`createPortal` no
+   `document.body`** — o formulário vive dentro do container animado do chat, e um `transform`
+   ancestral quebraria o `position: fixed`.
+4. **Piso de a11y (regra 11):** veredito **nunca só por cor** (ícone + palavra "Válido"/"Não
+   vale"), `role="dialog"`/`aria-modal`/`aria-labelledby`, Esc e clique no fundo fecham, foco
+   inicial no "Fechar" e **devolvido ao botão que abriu**, Tab circula dentro do modal, scroll
+   do fundo travado. Movimento respeita `prefers-reduced-motion` pela regra global do
+   `styles.css`.
+5. **Copy do campo alinhada à decisão de 12/08/2026** (a pergunta do custo evitado é
+   GENÉRICA — tipos são só exemplos): "esse **contrato** NÃO cobria" → "esse **gasto** NÃO
+   cobria", no rótulo e no texto de ajuda. Falar em "contrato" excluía quem cortou multa,
+   juros ou taxa (caso SmartOnline/DIFAL).
+6. **Uma coluna de 580px, sem rolagem** — a lista de 6 frases cabe inteira; as duas colunas de
+   900px existiram só enquanto o conteúdo eram cards. O corpo mantém `overflow-y-auto` como
+   rede para viewport curto.
+7. **A ORDEM é ✕ antes de ✓** (travada em teste): o erro que a pergunta produz é o "sim"
+   indevido, então o que precisa ser lido primeiro é o que NÃO conta.
+8. **Fecha com a saída conservadora** — "na dúvida, responda 'Não, só o custo eliminado'".
+   Sem esse fecho, quem não se decide tende ao "sim" (parece mais completo) e infla o ganho.
+   A nota carrega também o 3º erro (tempo gasto **acompanhando** a automação), que saiu da
+   lista quando ela foi reduzida a **2 sinais por lado** (decisão de produto, 12/08/2026 —
+   a lista tem de ser lida de um olhar).
+9. **Todas as linhas com a MESMA altura** (`gridAutoRows: minmax(76px, auto)`, conteúdo
+   centrado): altura variável fazia a frase curta parecer menos importante que a longa. Não é
+   altura FIXA — em tela estreita a linha cresce em vez de cortar texto. ⚠️ `1fr` não serve
+   aqui: num grid de altura automática ele resolve para o conteúdo de cada linha.
+10. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
+   botão de exemplos (decisão do Kaique, 12/08/2026).
+
+**Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não
+precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 13 — staging
+`edf400b4` antes de prod).

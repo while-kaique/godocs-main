@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { STEPS } from "./constants";
+import { FAQ_RODAPE, type LinkFaq } from "@/lib/faq/links";
 
 export function PageFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -64,17 +65,34 @@ export function PageHeader({ subtitle }: { subtitle?: string }) {
   );
 }
 
-export function PageFooter() {
+export function PageFooter({ faq = FAQ_RODAPE.indice }: { faq?: LinkFaq }) {
   return (
-    <footer
-      className="mt-6 text-center text-[11px] opacity-70"
-      style={{ color: "var(--go-text-primary)" }}
-    >
-      Desenvolvido pela equipe de{" "}
-      <span className="font-semibold" style={{ color: "var(--go-blue)" }}>
-        RPA & IA
-      </span>{" "}
-      &middot; GoGroup &copy; {new Date().getFullYear()}
+    <footer className="mt-6 text-center" style={{ color: "var(--go-text-primary)" }}>
+      {/* A dúvida nasce DENTRO do formulário ("isto conta como saving?", "220h de quê?"),
+          e até aqui não havia onde ler. É uma linha discreta de propósito: o texto de cada
+          etapa continua autocontido, o FAQ é o aprofundamento — e nada disso entra na
+          conversa com o agente. Ver spec-docs/SPEC_FAQ.md (D17, D18).
+          ⚠️ O destino MUDA por etapa (`FAQ_RODAPE`), e o rótulo acompanha: "Perguntas
+          frequentes" levando a uma seção específica prometeria outra coisa.
+          ⚠️ NOVA ABA: clicar não pode custar um formulário meio preenchido. */}
+      <a
+        href={faq.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[11px] font-semibold underline decoration-1 underline-offset-2 opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ color: "var(--go-blue)", outlineColor: "var(--go-blue)" }}
+      >
+        {faq.label}
+        <span aria-hidden="true">↗</span>
+        <span className="sr-only">(abre em uma nova aba)</span>
+      </a>
+      <p className="mt-2 text-[11px] opacity-70">
+        Desenvolvido pela equipe de{" "}
+        <span className="font-semibold" style={{ color: "var(--go-blue)" }}>
+          RPA & IA
+        </span>{" "}
+        &middot; GoGroup &copy; {new Date().getFullYear()}
+      </p>
     </footer>
   );
 }

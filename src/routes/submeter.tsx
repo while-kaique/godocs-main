@@ -37,6 +37,7 @@ function bloqueioDoErro(e: unknown): BloqueioSubmissao | null {
 /** Toast curto que só aponta para o painel — o conteúdo do bloqueio mora na tela. */
 const TOAST_ENVIO_PAUSADO = "Envio pausado — veja na tela o que precisa ser corrigido.";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
+import { FAQ_RODAPE } from "@/lib/faq/links";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
@@ -2684,13 +2685,28 @@ export function SubmeterPageContent({
               </button>
             </div>
           </div>
-          <PageFooter />
+          {/* Tela de sucesso: a dúvida deixa de ser "como preencho" e passa a ser "e
+              agora?" — daí o link ir para "Acompanhamento e status" (D18). */}
+          <PageFooter faq={FAQ_RODAPE.status} />
         </div>
       </PageFrame>
     );
   }
 
   /* ── Main Form ── */
+
+  // Destino do link do FAQ no rodapé, por etapa (SPEC_FAQ D18). Decidido aqui, e não
+  // dentro do `PageFooter`, porque quem sabe em que ponto do formulário a pessoa está é
+  // esta tela — o rodapé é só quem desenha.
+  const faqDoRodape =
+    step === 3
+      ? FAQ_RODAPE.memorial
+      : step === 2 && showEtapa25
+        ? FAQ_RODAPE.especial
+        : step === 2
+          ? FAQ_RODAPE.financeiro
+          : FAQ_RODAPE.indice;
+
   return (
     <PageFrame>
       <div className="relative z-[1] mx-auto w-full max-w-[680px] px-[var(--space-5,24px)] py-[var(--space-7,48px)] pb-[var(--space-6,32px)]">
@@ -2996,7 +3012,10 @@ export function SubmeterPageContent({
           )}
         </div>
 
-        <PageFooter />
+        {/* O rodapé aponta para a seção do FAQ que responde a dúvida DESTA etapa (D18):
+            Etapa 1 → índice · Etapa 2 → como o ganho é medido · Etapa 2.5 → projeto
+            especial · Etapa 3 → o ganho tem de ser real e medido. */}
+        <PageFooter faq={faqDoRodape} />
       </div>
 
       {showRascunhoConfirm && (
