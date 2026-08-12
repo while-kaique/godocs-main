@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FormData, FieldErrors } from "./constants";
+import { motivoBloqueioEspecial } from "./constants";
+import {
+  PERGUNTAS_ESPECIAL,
+  mensagemEspecialInvalido,
+} from "@/lib/mensagens-submissao";
 import {
   SectionTitle,
   FormGroup,
@@ -40,6 +46,7 @@ export function Etapa25({
   clearError,
   resp,
   onResp,
+  onRespTriagem,
 }: {
   form: FormData;
   errors: FieldErrors;
@@ -48,8 +55,28 @@ export function Etapa25({
   // Resposta da pergunta sim/não. "" = ainda não respondida.
   resp: "sim" | "nao" | "";
   onResp: (r: "sim" | "nao") => void;
+  // Resposta de uma das 2 perguntas de triagem do especial (ver PERGUNTAS_ESPECIAL).
+  onRespTriagem: (
+    campo: "especialDashboard" | "especialGanhoOrganizacional",
+    valor: "sim" | "nao",
+  ) => void;
 }) {
   const contextoChars = form.contextoEspecial.length;
+
+  // Triagem do especial: a régua é a MESMA função pura que a validação do envio usa
+  // (`motivoBloqueioEspecial`) — a tela não redige critério próprio. `especial` sai de
+  // `resp`, que é a verdade desta tela (o form é atualizado no mesmo clique).
+  const motivoBloqueio = motivoBloqueioEspecial({
+    especial: resp === "sim",
+    especialDashboard: form.especialDashboard,
+    especialGanhoOrganizacional: form.especialGanhoOrganizacional,
+  });
+  // Contexto do especial só depois das 2 respostas e sem bloqueio: escrever 20+
+  // caracteres para uma submissão que não vai sair é trabalho jogado fora.
+  const triagemLiberada =
+    !motivoBloqueio &&
+    form.especialDashboard === "nao" &&
+    form.especialGanhoOrganizacional === "nao";
 
   // Modal de confirmação ao marcar "Sim": avisa que o projeto pulará a
   // verificação de saving/receita e irá para avaliação humana rigorosa.
@@ -113,9 +140,68 @@ export function Etapa25({
         </div>
       </FormGroup>
 
-      {/* SIM → projeto especial: contexto breve */}
+      {/* SIM → projeto especial: TRIAGEM (2 perguntas em sequência) antes do contexto */}
       {resp === "sim" && (
         <div style={{ animation: "go-step-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both" }}>
+          <FormGroup>
+            <div
+              className="rounded-xl p-4"
+              style={{ background: "var(--go-white)", border: "1.5px solid rgba(0,89,169,0.15)" }}
+            >
+              <div className="mb-3.5 flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "block",
+                    width: 3,
+                    height: 14,
+                    borderRadius: 2,
+                    background: "var(--go-lime)",
+                  }}
+                />
+                <span
+                  className="text-[10.5px] font-extrabold uppercase"
+                  style={{ color: "var(--go-blue)", letterSpacing: "0.08em" }}
+                >
+                  Duas checagens antes de seguir
+                </span>
+              </div>
+
+              {/* A 1ª pergunta é o critério OBJETIVO; a 2ª só aparece depois dela. A
+                  numeração existe porque a ordem é real (uma destrava a outra). */}
+              <PerguntaSimNao
+                numero={1}
+                indice={0}
+                valor={form.especialDashboard}
+                onResp={(v) => onRespTriagem("especialDashboard", v)}
+                erro={errors.especialDashboard}
+              />
+
+              {form.especialDashboard === "nao" && (
+                <div
+                  className="mt-4"
+                  style={{ animation: "go-field-up 0.25s ease both" }}
+                >
+                  <PerguntaSimNao
+                    numero={2}
+                    indice={1}
+                    valor={form.especialGanhoOrganizacional}
+                    onResp={(v) => onRespTriagem("especialGanhoOrganizacional", v)}
+                    erro={errors.especialGanhoOrganizacional}
+                  />
+                </div>
+              )}
+            </div>
+          </FormGroup>
+
+          {/* Bloqueio — aparece no instante do "sim", sem esperar o clique em enviar */}
+          {motivoBloqueio && <BloqueioEspecial mensagem={mensagemEspecialInvalido(motivoBloqueio)} />}
+        </div>
+      )}
+
+      {/* SIM + triagem aprovada → contexto breve do especial */}
+      {resp === "sim" && triagemLiberada && (
+        <div style={{ animation: "go-field-up 0.25s ease both" }}>
           <FormGroup>
             <FormLabel
               required
@@ -194,6 +280,147 @@ export function Etapa25({
           onFechar={() => setConfirmarEspecial(false)}
         />
       )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   Pergunta sim/não da TRIAGEM do especial
+   Uma pergunta + 2 opções. O texto vem de `PERGUNTAS_ESPECIAL`
+   (`mensagens-submissao.ts`) — fonte única com as mensagens de bloqueio.
+   A11y: `<fieldset>/<legend>` amarram as opções à pergunta; o input é
+   `peer sr-only` com indicador redondo (o estado NÃO é só cor: o disco interno
+   aparece/desaparece e o rótulo fica em negrito) e o anel de foco de teclado
+   acende no indicador via `peer-focus-visible`.
+   ────────────────────────────────────────────── */
+function PerguntaSimNao({
+  numero,
+  indice,
+  valor,
+  onResp,
+  erro,
+}: {
+  numero: number;
+  indice: 0 | 1;
+  valor: "sim" | "nao" | "";
+  onResp: (v: "sim" | "nao") => void;
+  erro?: string;
+}) {
+  const item = PERGUNTAS_ESPECIAL[indice];
+  const opcoes: { value: "sim" | "nao"; label: string }[] = [
+    { value: "sim", label: item.sim },
+    { value: "nao", label: item.nao },
+  ];
+
+  return (
+    <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
+      <legend className="mb-2.5 flex gap-2.5 p-0">
+        <span
+          aria-hidden="true"
+          className="flex flex-shrink-0 items-center justify-center rounded-full text-[10.5px] font-extrabold"
+          style={{
+            width: 19,
+            height: 19,
+            marginTop: 1,
+            color: "var(--go-blue)",
+            border: "1.5px solid rgba(0,89,169,0.3)",
+          }}
+        >
+          {numero}
+        </span>
+        <span
+          className="text-[13.5px] font-bold leading-relaxed"
+          style={{ color: "var(--go-text-heading)" }}
+        >
+          {item.pergunta}
+        </span>
+      </legend>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:gap-2.5">
+        {opcoes.map((opt) => {
+          const marcado = valor === opt.value;
+          return (
+            <label
+              key={opt.value}
+              className={cn(
+                "go-radio-label flex-1 cursor-pointer select-none",
+                marcado && "go-radio-checked",
+              )}
+              // `.go-radio-label` centraliza o conteúdo; aqui o indicador fica à esquerda e o
+              // rótulo alinhado com ele. Vai em `style` porque a classe do design system é CSS
+              // não-camadado e venceria a utilitária do Tailwind (v4).
+              style={{ justifyContent: "flex-start", textAlign: "left", gap: 10 }}
+            >
+              <input
+                type="radio"
+                name={`especial-${item.id}`}
+                value={opt.value}
+                checked={marcado}
+                onChange={() => onResp(opt.value)}
+                className="peer sr-only"
+              />
+              {/* Indicador redondo — muda de FORMA, não só de cor */}
+              <span
+                aria-hidden="true"
+                className="flex h-[15px] w-[15px] flex-shrink-0 items-center justify-center rounded-full transition-all duration-150 peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
+                style={{
+                  border: marcado
+                    ? "1.5px solid var(--go-blue)"
+                    : "1.5px solid rgba(0,89,169,0.3)",
+                  background: "var(--go-white)",
+                }}
+              >
+                {marcado && (
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "var(--go-blue)",
+                      animation: "go-chip-in 0.15s ease",
+                    }}
+                  />
+                )}
+              </span>
+              <span className={marcado ? "font-extrabold" : undefined}>{opt.label}</span>
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={erro} />
+    </fieldset>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   Bloqueio da triagem do especial
+   Veredito + o que fazer. O texto INTEIRO vem de `mensagens-submissao.ts`
+   (fonte única: o mesmo que o toast do envio mostra). Ícone + veredito em
+   negrito: o estado não é comunicado só pela cor.
+   ────────────────────────────────────────────── */
+function BloqueioEspecial({ mensagem }: { mensagem: string }) {
+  return (
+    <div
+      role="alert"
+      className="mb-5 rounded-xl p-4"
+      style={{
+        background: "rgba(220,38,38,0.05)",
+        border: "1.5px solid rgba(220,38,38,0.22)",
+        animation: "go-slide-down 0.25s ease both",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <Ban size={16} strokeWidth={2.5} color="#b91c1c" aria-hidden="true" />
+        <span className="text-[13px] font-extrabold" style={{ color: "#b91c1c" }}>
+          Este projeto não segue como especial
+        </span>
+      </div>
+      <p
+        className="mt-2 text-[12.5px]"
+        style={{ color: "var(--go-text-heading)", lineHeight: 1.6, maxWidth: "72ch" }}
+      >
+        {mensagem}
+      </p>
     </div>
   );
 }

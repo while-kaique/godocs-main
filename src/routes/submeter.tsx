@@ -11,7 +11,9 @@ import {
   parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, validarEtapa1,
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
   limitarCoautorUnico, deveMostrarIntro,
+  validarEtapa25Especial, motivoBloqueioEspecial,
 } from "@/lib/submeter/constants";
+import { mensagemEspecialInvalido } from "@/lib/mensagens-submissao";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
@@ -594,6 +596,12 @@ export function SubmeterPageContent({
           contrafactualAfetados: afetadosSeed.lista,
           especial: data.especial === true,
           contextoEspecial: (data.contexto_especial as string) ?? "",
+          // Triagem do especial: campos SÓ DO FRONTEND (não existem no servidor), então a
+          // edição de um especial já submetido começa em branco e as 2 perguntas são
+          // respondidas de novo antes do reenvio — é o efeito desejado (especial legado
+          // passa pela triagem que não existia quando ele entrou).
+          especialDashboard: "",
+          especialGanhoOrganizacional: "",
         };
 
         setForm(newForm);
@@ -785,6 +793,9 @@ export function SubmeterPageContent({
       participantesPapeis: d.form.participantesPapeis ?? {},
       contrafactualAfetadosTipo: d.form.contrafactualAfetadosTipo ?? "pessoa",
       contrafactualAfetados: d.form.contrafactualAfetados ?? [],
+      // Rascunho salvo antes da triagem do especial não tem as chaves → "" (não respondida).
+      especialDashboard: d.form.especialDashboard ?? "",
+      especialGanhoOrganizacional: d.form.especialGanhoOrganizacional ?? "",
     });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
@@ -985,6 +996,8 @@ export function SubmeterPageContent({
     contrafactualAfetados: [],
     especial: false,
     contextoEspecial: "",
+    especialDashboard: "",
+    especialGanhoOrganizacional: "",
   });
 
   // Identidade automática: nome + e-mail vêm da conta logada (Godeploy, via
@@ -1365,10 +1378,37 @@ export function SubmeterPageContent({
     updateField("especial", r === "sim");
     // Limpa o campo da opção oposta para não enviar dado obsoleto.
     if (r === "sim") updateField("tipoProjeto", []);
-    else updateField("contextoEspecial", "");
+    else {
+      updateField("contextoEspecial", "");
+      // Projeto padrão não passa pela triagem do especial — zera as respostas para
+      // não guardar resposta de pergunta que a tela não mostra mais (e para que
+      // voltar a "Sim" exija reafirmar as duas).
+      updateField("especialDashboard", "");
+      updateField("especialGanhoOrganizacional", "");
+      clearError("especialDashboard");
+      clearError("especialGanhoOrganizacional");
+      clearError("especialBloqueio");
+    }
     clearError("especial");
     clearError("contextoEspecial");
     clearError("tipoProjeto");
+  }
+
+  /* ── Etapa 2.5: resposta de uma das 2 perguntas de triagem do especial ── */
+  function handleRespTriagemEspecial(
+    campo: "especialDashboard" | "especialGanhoOrganizacional",
+    valor: "sim" | "nao",
+  ) {
+    updateField(campo, valor);
+    clearError(campo);
+    clearError("especialBloqueio");
+    // Trocar a 1ª resposta para "sim" torna a 2ª pergunta invisível (o projeto já está
+    // bloqueado) — a resposta dela deixa de valer e é zerada, para nunca sobrar juízo
+    // sobre uma pergunta que a pessoa não está mais vendo.
+    if (campo === "especialDashboard" && valor === "sim") {
+      updateField("especialGanhoOrganizacional", "");
+      clearError("especialGanhoOrganizacional");
+    }
   }
 
   /* ── Valida a Etapa 2.5 antes de iniciar o agente ── */
@@ -1378,6 +1418,13 @@ export function SubmeterPageContent({
       return false;
     }
     if (respEspecial === "sim") {
+      // Triagem do especial (dashboard/painel · ganho organizacional): perguntas não
+      // respondidas + o BLOQUEIO, tudo da função pura em `constants.ts`.
+      const errsTriagem = validarEtapa25Especial({ ...form, especial: true });
+      if (Object.keys(errsTriagem).length > 0) {
+        setErrors((prev) => ({ ...prev, ...errsTriagem }));
+        return false;
+      }
       if (!form.contextoEspecial.trim() || form.contextoEspecial.trim().length < 20) {
         setError("contextoEspecial", "Descreva o contexto do projeto em pelo menos 20 caracteres");
         return false;
@@ -1506,6 +1553,17 @@ export function SubmeterPageContent({
   // contexto especial (sem IA) e segue direto para a base (planilha + banco). A
   // validação é humana.
   async function handleEnviarEspecial() {
+    // Triagem do especial (Etapa 2.5): dashboard/painel ou ganho apenas organizacional
+    // NÃO é projeto especial. Bloqueio determinístico — a tela já mostra o motivo no
+    // clique do "sim", e aqui o toast repete a MESMA mensagem (fonte única), sem prefixo
+    // "Erro ao enviar" e com tempo de leitura, porque é orientação e não falha técnica.
+    const motivoEspecial = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
+    if (motivoEspecial) {
+      toast.error(mensagemEspecialInvalido(motivoEspecial), { duration: 20000 });
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
     if (!validateStep(2) || !validateEtapa25()) {
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
@@ -2346,6 +2404,18 @@ export function SubmeterPageContent({
   async function handleSubmitProjeto() {
     if (!projetoId) return;
 
+    // Triagem do especial (Etapa 2.5) — mesma régua e mesma mensagem do
+    // `handleEnviarEspecial`. Está aqui porque um projeto marcado como especial também
+    // alcança a Etapa 3 (navegação pelo topo / conversão de tipo), e o bloqueio não pode
+    // depender de qual botão a pessoa achou primeiro.
+    const motivoEspecialSubmit = motivoBloqueioEspecial(form);
+    if (motivoEspecialSubmit) {
+      toast.error(mensagemEspecialInvalido(motivoEspecialSubmit), { duration: 20000 });
+      setShowEtapa25(true);
+      goToStep(2, "back");
+      return;
+    }
+
     // Rede de segurança (defesa em profundidade): o botão "Enviar" só deveria aparecer
     // com o memorial aprovado, mas se algum caminho marcar a conversa como concluída sem
     // preview (ex.: handoff doc→saving + reload), barramos aqui com orientação clara em
@@ -2655,6 +2725,7 @@ export function SubmeterPageContent({
                   clearError={clearError}
                   resp={respEspecial}
                   onResp={handleRespEspecial}
+                  onRespTriagem={handleRespTriagemEspecial}
                 />
               </StepAnimation>
             )}

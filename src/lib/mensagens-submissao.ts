@@ -127,6 +127,99 @@ export function mensagemDocAusente(): string {
   );
 }
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   TRIAGEM DO PROJETO ESPECIAL (Etapa 2.5) — 2 perguntas que DESQUALIFICAM
+   ──────────────────────────────────────────────────────────────────────────────
+   O "especial" existe para altíssimo impacto que NÃO se consegue medir em saving
+   nem em receita — e por isso pula o memorial financeiro e vai direto à validação
+   humana. Dois perfis chegavam por essa porta sem serem especiais:
+
+     1. **dashboard/painel de controle** — é uma ENTREGA; o valor dela aparece no
+        que as pessoas passam a fazer com ela (menos horas montando o relatório à
+        mão, decisão mais rápida, erro que deixou de acontecer), então é medível
+        pelo caminho normal;
+     2. **ganho prioritariamente organizacional** — organizar/padronizar é MEIO
+        para o impacto, não o impacto: sem saving considerado nem receita real
+        medida, é quase impossível ser um especial legítimo.
+
+   As perguntas são de FORMULÁRIO (não do chat) e o bloqueio é determinístico —
+   este repo já aprendeu 3× que prompt não segura nada (Gostream, ganho projetado,
+   custo evitado no chat). Os textos abaixo são a FONTE ÚNICA consumida pela tela
+   (`submeter/step25.tsx`) e pelas mensagens de bloqueio — não redigitar.
+   ────────────────────────────────────────────────────────────────────────────── */
+
+export const PERGUNTAS_ESPECIAL = [
+  {
+    id: "dashboard",
+    pergunta:
+      "Este projeto é, objetivamente (ou principalmente), um dashboard ou um painel de controle?",
+    sim: "Sim, é um dashboard ou painel",
+    nao: "Não, não é um dashboard",
+  },
+  {
+    id: "organizacional",
+    pergunta: "O ganho principal deste projeto é prioritariamente organizacional?",
+    sim: "Sim, o ganho é organizacional",
+    nao: "Não, o ganho principal é outro",
+  },
+] as const;
+
+/** Qual das 2 perguntas desqualificou o especial. */
+export type MotivoBloqueioEspecial = (typeof PERGUNTAS_ESPECIAL)[number]["id"];
+
+/**
+ * A saída oferecida nas duas mensagens: o botão "Não" da pergunta de tipo, na Etapa 2.5.
+ * Citado TRUNCADO ("…") de propósito — o rótulo cheio do botão é longo e mudá-lo não pode
+ * transformar esta frase numa citação errada.
+ */
+const SAIDA_PROJETO_PADRAO = "Não. É um projeto padrão…";
+
+/** Respondeu que o projeto É um dashboard/painel → não é especial. */
+export function mensagemEspecialDashboard(): string {
+  return (
+    `Este projeto não pode ser enviado como especial porque você respondeu que ele é, ` +
+    `objetivamente, um dashboard ou um painel de controle — e dashboard não é projeto ` +
+    `especial. Um painel é uma ENTREGA, e o ganho dele aparece no que as pessoas passam a ` +
+    `fazer com ele: as horas que ninguém gasta mais montando o relatório à mão, a ` +
+    `conferência que deixou de existir, o erro que parou de acontecer. Isso é mensurável ` +
+    `pelo caminho normal. ` +
+    `Para corrigir, volte à pergunta do tipo de projeto e marque "${SAIDA_PROJETO_PADRAO}": ` +
+    `se o painel eliminou trabalho manual recorrente (planilha montada à mão, conferência, ` +
+    `relatório periódico), envie como Saving Operacional e informe as horas de antes e de ` +
+    `hoje; se ele fez a empresa parar de pagar uma ferramenta ou um serviço, cadastre esse ` +
+    `valor em CUSTO EVITADO; se destravou receita já apurada, envie como Receita ` +
+    `Incremental. Se nada disso foi medido ainda, espere a medição em vez de enviar como ` +
+    `especial — o GoDocs documenta ganho já realizado.`
+  );
+}
+
+/** Respondeu que o ganho principal é organizacional → quase certamente não é especial. */
+export function mensagemEspecialGanhoOrganizacional(): string {
+  return (
+    `Este projeto não pode ser enviado como especial porque você respondeu que o ganho ` +
+    `principal dele é prioritariamente organizacional (organizar informação, padronizar um ` +
+    `processo, deixar tudo no lugar). Organização é o MEIO para o impacto, não o impacto: ` +
+    `sem saving considerado nem receita real medida, é muito difícil um projeto assim ser um ` +
+    `especial legítimo — e o especial pula o memorial financeiro justamente por ser ` +
+    `altíssimo impacto sem medição possível. ` +
+    `Para corrigir, volte à pergunta do tipo de projeto, marque "${SAIDA_PROJETO_PADRAO}" e ` +
+    `mostre o EFEITO do que foi organizado: horas que alguém deixou de gastar (Saving ` +
+    `Operacional, com as horas de antes e de hoje), gasto externo que parou de ser pago ` +
+    `(CUSTO EVITADO) ou receita nova já apurada (Receita Incremental). Se o efeito existe ` +
+    `mas ainda não foi medido, espere a medição — o GoDocs documenta ganho já realizado.`
+  );
+}
+
+/**
+ * Mensagem do bloqueio, pelo motivo. Ordem de precedência (quando as duas seriam "sim"):
+ * o dashboard vem primeiro por ser o critério OBJETIVO — não depende de julgar o ganho.
+ */
+export function mensagemEspecialInvalido(motivo: MotivoBloqueioEspecial): string {
+  return motivo === "dashboard"
+    ? mensagemEspecialDashboard()
+    : mensagemEspecialGanhoOrganizacional();
+}
+
 /** Nome de projeto já submetido por outra pessoa/outro registro. */
 export function mensagemDuplicata(nome: string): string {
   return (
