@@ -13,6 +13,7 @@ import {
   type FaqCategoria,
 } from '@/lib/faq/conteudo';
 import { parseFaqMarkdown, partirNegrito, titulosDoDocumento } from '@/lib/faq/markdown';
+import { FAQ_RODAPE, FAQ_URL } from '@/lib/faq/links';
 import {
   filtrarAssuntosFaq,
   formatarDataFaq,
@@ -478,5 +479,39 @@ describe('rodapé "Atualizado em / por"', () => {
     );
     expect(linhaAtualizacaoFaq('2026-08-12 15:40:00', 'seed')).toBe('Atualizado em 12/08/2026');
     expect(linhaAtualizacaoFaq(null, 'seed')).toBeNull();
+  });
+});
+
+/* ── 10. os links que o app usa apontam para seções que EXISTEM (D18) ── */
+
+describe('FAQ_URL / FAQ_RODAPE', () => {
+  // Uma seção renomeada no painel muda o id e o link cai no topo da página. Isto é o que
+  // faz essa regressão aparecer no CI em vez de na cara do usuário.
+  const comAncora = Object.entries(FAQ_URL).filter(([, url]) => url.includes('#'));
+
+  it('há links com âncora para validar (senão o teste passaria vazio)', () => {
+    expect(comAncora.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it.each(comAncora)('%s aponta para um assunto e uma seção do seed', (_nome, url) => {
+    const [caminho, ancora] = url.split('#');
+    const slug = caminho.replace(/^\/faq\//, '');
+    const assunto = FAQ_SEED.find((c) => chaveSlug(c.slug) === chaveSlug(slug));
+    expect(assunto, `assunto ${slug}`).toBeTruthy();
+    expect(titulosDoDocumento(assunto!.corpo).map(chaveSlug)).toContain(ancora);
+  });
+
+  it('todo destino do rodapé tem rótulo e endereço dentro do FAQ', () => {
+    for (const [contexto, link] of Object.entries(FAQ_RODAPE)) {
+      expect(link.label.trim(), contexto).not.toBe('');
+      expect(link.href, contexto).toMatch(/^\/faq(\/|$|#)/);
+    }
+  });
+
+  it('os assuntos sem âncora existem no seed', () => {
+    for (const url of [FAQ_URL.tipos, FAQ_URL.status]) {
+      const slug = url.replace(/^\/faq\//, '');
+      expect(FAQ_SEED.some((c) => chaveSlug(c.slug) === chaveSlug(slug)), url).toBe(true);
+    }
   });
 });

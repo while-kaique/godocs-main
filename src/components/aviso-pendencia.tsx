@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Ban, CalendarClock, ChevronDown, RotateCcw } from "lucide-react";
+import { FAQ_URL } from "@/lib/faq/links";
 
 // Aviso de pendência/veredito exibido no card de "Meus Projetos" e na tela read-only
 // do projeto. Três tons, MESMO desenho — antes cada tela redigia o seu (11px na lista,
@@ -53,7 +54,7 @@ const TEMAS: Record<TomAviso, Tema> = {
     icone: <CalendarClock className={ICONE} />,
     legenda: "Observação",
     acao: "Ver observação",
-    faq: "/faq/acompanhamento",
+    faq: FAQ_URL.status,
   },
   reprovado: {
     bar: "#475569",
@@ -68,7 +69,7 @@ const TEMAS: Record<TomAviso, Tema> = {
     // QUEM escreveu o texto, que é a informação que falta ao autor.
     legenda: "Parecer da análise",
     acao: "Ver motivo",
-    faq: "/faq/acompanhamento#reprovado",
+    faq: FAQ_URL.statusReprovado,
   },
   reenvio: {
     bar: "#dc2626",
@@ -81,7 +82,7 @@ const TEMAS: Record<TomAviso, Tema> = {
     icone: <RotateCcw className={ICONE} />,
     legenda: "O que precisa ser ajustado",
     acao: "Ver o que ajustar",
-    faq: "/faq/acompanhamento#reenvio_pendente",
+    faq: FAQ_URL.statusReenvio,
   },
 };
 
