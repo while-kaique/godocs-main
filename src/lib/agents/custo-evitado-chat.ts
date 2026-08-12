@@ -121,6 +121,17 @@ export function extrairValoresComPosicao(texto: string): { valor: number; indice
  * `forte: true` = o termo já é, por si, um gasto que se evita (multa, juros, mora, a própria
  * expressão "custo evitado"). Os demais ("contrato", "licença") são ambíguos — um contrato
  * pode ser o CUSTO DO PROJETO — e só contam acompanhados de um VERBO_EVITADO.
+ *
+ * ⚠️ A lista acompanha os exemplos do FORMULÁRIO (a pergunta de custo evitado do form de
+ * saving lista contrato · licença · serviço de terceiro · taxa · multa · juros · hora extra):
+ * gasto que o formulário convida a cadastrar e o detector não reconhece volta a ser o buraco
+ * do caso DIFAL. Dois cuidados ao ampliar:
+ *   - `taxa`/`tarifa`/`encargo` entram como AMBÍGUOS, nunca `forte`: "taxa de conversão",
+ *     "taxa de erro" e "taxa/hora" aparecem em conversa de saving toda hora e não são gasto.
+ *   - `retrabalho` fica FORA de propósito: "evitamos retrabalho" é a frase mais comum da fase
+ *     e o retrabalho evitado normalmente JÁ está contado nas HORAS — perguntar por ele como
+ *     gasto evitado convidaria à dupla contagem. Retrabalho PAGO a terceiro cai em
+ *     `terceiro`/`contrato`.
  */
 export const TERMOS_GASTO: readonly { marca: string; re: RegExp; forte?: boolean }[] = [
   { marca: "multa", re: /\bmultas?\b/, forte: true },
@@ -130,6 +141,8 @@ export const TERMOS_GASTO: readonly { marca: string; re: RegExp; forte?: boolean
   { marca: "contrato", re: /\bcontratos?\b/ },
   { marca: "licenca", re: /\b(?:licenca|licencas|mensalidade|assinatura)s?\b/ },
   { marca: "terceiro", re: /\b(?:terceirizad|prestador|fornecedor|honorario|consultoria)/ },
+  { marca: "taxa", re: /\b(?:taxas?|tarifas?|encargos?)\b/ },
+  { marca: "hora-extra", re: /\b(?:horas? extras?|sobreaviso|adicional noturno)\b/ },
 ];
 
 /**
@@ -367,8 +380,9 @@ export function mensagemCustoEvitadoPago(valor: number): string {
   return (
     `Anotado: os **R$ ${moedaBR(valor)}** são gasto real. Dois pontos antes de eu fechar o memorial:\n\n` +
     `1. ⚠️ Para esse valor entrar no ganho do projeto, ele precisa estar cadastrado no ` +
-    `**formulário de dados de impacto desta etapa, no campo de custo evitado** — valor citado ` +
-    `só aqui na conversa **não é gravado** e não aparece na planilha.\n` +
+    `**formulário de dados de impacto desta etapa**, na pergunta sobre o gasto que a empresa ` +
+    `deixou de pagar (o custo evitado) — vale qualquer gasto, inclusive multa e juros. Valor ` +
+    `citado só aqui na conversa **não é gravado** e não aparece na planilha.\n` +
     `2. No memorial eu registro o que é esse gasto e onde ele pode ser conferido.\n\n` +
     `Para o item 2: **onde esse número pode ser conferido?** (o nome do relatório, do razão ` +
     `contábil, da guia, do extrato ou do sistema). Se não houver um lugar onde ele é medido, ` +

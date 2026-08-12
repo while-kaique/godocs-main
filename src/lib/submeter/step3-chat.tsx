@@ -1100,7 +1100,8 @@ function SavingForm({
     setErrors({});
   }
 
-  // ── Custo evitado (lista de ferramentas/serviços que deixaram de ser pagos) ──
+  // ── Custo evitado (lista de gastos que deixaram de ser pagos: contrato, licença,
+  //    serviço de terceiro, taxa, multa, juros, hora extra…) ──
   function selectTemCustoEvitado(v: "sim" | "nao") {
     setTemCustoEvitado(v);
     if (v === "sim" && custoEvitadoItens.length === 0) {
@@ -1190,7 +1191,7 @@ function SavingForm({
       // pergunta "elimina gasto externo?". Itens validados sempre que são coletados.
       if (isSimBranch && !temCustoEvitado) errs.temCustoEvitado = "Selecione uma opção";
       if (coletaCustoEvitado) {
-        if (custoEvitadoItens.length === 0) errs.temCustoEvitado = "Adicione ao menos um item evitado";
+        if (custoEvitadoItens.length === 0) errs.temCustoEvitado = "Adicione ao menos um gasto eliminado";
         custoEvitadoItens.forEach((it, i) => {
           const v = parseMoedaBR(it.valor);
           if (!it.nome.trim()) errs[`ce${i}nome`] = "Informe o nome";
@@ -1255,7 +1256,7 @@ function SavingForm({
         className="mb-1 hidden gap-2.5 px-1 text-[10px] font-semibold uppercase tracking-wide sm:grid"
         style={{ gridTemplateColumns: "1fr 96px 104px 28px", color: "#9a9aa8" }}
       >
-        <span>Ferramenta / serviço</span>
+        <span>Gasto eliminado</span>
         <span className="text-center">Valor (R$)</span>
         <span className="text-center">Recorrência</span>
         <span />
@@ -1276,8 +1277,8 @@ function SavingForm({
                 {/* Nome da ferramenta */}
                 <input
                   type="text"
-                  placeholder="Ex: Zapier"
-                  aria-label="Nome da ferramenta evitada"
+                  placeholder="Ex: multa por atraso · licença do Zapier"
+                  aria-label="Nome do gasto eliminado"
                   value={it.nome}
                   onChange={(e) => updateCustoEvitado(i, { nome: e.target.value })}
                   className="go-input w-full"
@@ -1323,7 +1324,7 @@ function SavingForm({
                   <button
                     type="button"
                     onClick={() => removeCustoEvitado(i)}
-                    aria-label="Remover ferramenta evitada"
+                    aria-label="Remover gasto eliminado"
                     className="flex h-[38px] w-7 items-center justify-center rounded-lg transition-colors"
                     style={{ color: "#b4313b", background: "transparent" }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180,49,59,0.08)"; }}
@@ -1339,7 +1340,7 @@ function SavingForm({
               {/* Justificativa breve */}
               <input
                 type="text"
-                placeholder="Justificativa breve (ex: substituída pelo fluxo no n8n)"
+                placeholder="Justificativa breve (ex: contrato encerrado em maio, o fluxo no n8n assumiu)"
                 aria-label="Justificativa do custo evitado"
                 value={it.justificativa}
                 onChange={(e) => updateCustoEvitado(i, { justificativa: e.target.value })}
@@ -1373,7 +1374,7 @@ function SavingForm({
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
           <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        Adicionar item evitado
+        Adicionar outro gasto
       </button>
     </div>
   );
@@ -1541,14 +1542,14 @@ function SavingForm({
             {mostrarEliminaGastoExterno && (
               <div style={revelar}>
                 <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  Essa automação eliminou um gasto externo (contrato, serviço ou licença)? <span style={{ color: "#e53e3e" }}>*</span>
+                  Por causa desta automação, a empresa deixou de pagar algum gasto? <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  Um contrato/serviço de terceiro que a empresa <strong>deixou de pagar</strong> porque a automação assumiu o trabalho
-                  (ex: um agente terceirizado, uma licença SaaS).
+                  Não importa o nome do gasto (contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra):
+                  se a empresa <strong>pagava e parou de pagar</strong> por causa disto, cadastre aqui.
                 </p>
                 <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
-                  {([["sim", "Sim, eliminou"], ["nao", "Não eliminou"]] as const).map(([opt, lbl]) => (
+                  {([["sim", "Sim, deixou de pagar"], ["nao", "Não deixou"]] as const).map(([opt, lbl]) => (
                     <button
                       key={opt}
                       type="button"
@@ -1576,10 +1577,10 @@ function SavingForm({
             {isNaoBranch && eliminaGastoExterno === "sim" && (
               <div style={revelar}>
                 <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                  Qual gasto externo foi eliminado? <span style={{ color: "#e53e3e" }}>*</span>
+                  Qual gasto a empresa deixou de pagar? <span style={{ color: "#e53e3e" }}>*</span>
                 </label>
                 <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                  Liste o(s) contrato(s)/serviço(s) que deixaram de ser pagos — este é o ganho do projeto.
+                  Liste cada gasto que parou de sair do caixa, com valor e recorrência — este é o ganho do projeto.
                 </p>
                 {custoEvitadoItensUI}
               </div>
@@ -1764,14 +1765,14 @@ function SavingForm({
             {mostrarCustoEvitadoPergunta && (
             <div style={revelar}>
               <label className="mb-1.5 block text-[12px] font-semibold" style={{ color: "var(--go-text-heading)" }}>
-                Além das horas, a automação eliminou algum gasto externo DISTINTO (contrato/serviço/licença)? <span style={{ color: "#e53e3e" }}>*</span>
+                Além das horas, a empresa deixou de pagar algum gasto em dinheiro? <span style={{ color: "#e53e3e" }}>*</span>
               </label>
               <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
-                Um gasto <strong>diferente</strong> do trabalho já contado nas horas acima (ex: uma licença SaaS cancelada).
-                Se o que foi eliminado é justamente o trabalho dessas horas, responda <strong>"Não"</strong>.
+                Qualquer gasto (contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra) <strong>diferente</strong> do
+                trabalho já contado nas horas acima. Se o que parou de ser pago é justamente esse trabalho, responda <strong>"Não"</strong>.
               </p>
               <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
-                {([["sim", "Sim, evitou"], ["nao", "Não evitou"]] as const).map(([opt, lbl]) => (
+                {([["sim", "Sim, deixou de pagar"], ["nao", "Não deixou"]] as const).map(([opt, lbl]) => (
                   <button
                     key={opt}
                     type="button"
