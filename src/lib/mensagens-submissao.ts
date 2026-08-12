@@ -73,6 +73,18 @@ export type CodigoBloqueio =
   | "especial_dashboard"
   | "especial_organizacional";
 
+/**
+ * Os 2 bloqueios da TRIAGEM DO ESPECIAL. Eles são os únicos derivados de resposta de
+ * formulário (não vêm da API), e por isso quem os renderiza é a Etapa 2.5, a partir da
+ * resposta viva. Esta lista existe para o painel de ESTADO poder ignorá-los: os dois
+ * juntos na tela davam o mesmo aviso DUPLICADO, e o do estado sobrevivia à correção da
+ * resposta. ⚠️ Bloqueio novo derivado de formulário entra AQUI também.
+ */
+export const CODIGOS_TRIAGEM_ESPECIAL: CodigoBloqueio[] = [
+  "especial_dashboard",
+  "especial_organizacional",
+];
+
 export type BloqueioSubmissao = {
   codigo: CodigoBloqueio;
   /** Veredito em uma linha, sem "Erro"/"Falha" — o que aconteceu. */
