@@ -51,6 +51,23 @@ function formatBRL(value: number): string {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Teto dos textos livres na mensagem ENXUTA do especial (descrição e "por que é
+// especial"). O alerta é para bater o olho e decidir se abre o projeto — o texto
+// inteiro está na planilha e na tela do projeto.
+const LIMITE_TRECHO_ESPECIAL = 400;
+
+function truncar(texto: string, limite = LIMITE_TRECHO_ESPECIAL): string {
+  const t = texto.trim();
+  return t.length <= limite ? t : `${t.slice(0, limite).trimEnd()}…`;
+}
+
+// Linha (+ linha em branco) da nota de "não há parecer de líder". Ausente/vazia → NADA:
+// a mensagem tem de ficar byte a byte igual à de antes quando a nota não se aplica.
+function linhasNota(nota: string | null | undefined): string[] {
+  const t = (nota ?? '').trim();
+  return t ? [`ℹ️ ${t}`, ''] : [];
+}
+
 export function buildSubmitMessage(p: {
   projeto: string;
   area: string;
@@ -75,14 +92,23 @@ export function buildSubmitMessage(p: {
   // especial (`contextoEspecial`). Ver buildEspecialMessage.
   especial?: boolean;
   contextoEspecial?: string;
+  // Por que este projeto NÃO tem parecer de líder (autor é liderança / sem líder na
+  // TeamGuide / TeamGuide fora). Vem pronta de `decidirMomentoNotificacao`
+  // (`src/lib/notificacao-chat.ts` — FONTE ÚNICA do texto). Vazia/null → nenhuma linha:
+  // quem entra em fila não recebe alerta na submissão, e sim quando o líder libera.
+  notaPreAprovacao?: string | null;
+  // Parecer do líder que DISPAROU esta mensagem. Presente → o alerta deixa de ser
+  // "aguardando análise" e passa a anunciar a pré-aprovação, assinada.
+  preAprovacao?: { por: string; em: string } | null;
 }): string {
   // Projeto especial → alerta enxuto, sem os campos financeiros que não se aplicam.
   if (p.especial) {
     return buildEspecialMessage(p);
   }
 
-  const cabecalho =
-    p.modo === 'edicao'
+  const cabecalho = p.preAprovacao
+    ? '✅ *Projeto pré-aprovado pelo líder – aguardando análise*'
+    : p.modo === 'edicao'
       ? '✏️ *Edição de automação – aprovação aguardando análise*'
       : '\u{1F6A8} *Submissão de automação – aprovação aguardando análise*';
 
@@ -91,6 +117,10 @@ export function buildSubmitMessage(p: {
     '',
     cabecalho,
     '',
+    ...(p.preAprovacao
+      ? [`\u{1F44D} *Pré-aprovado por:* ${p.preAprovacao.por} em ${p.preAprovacao.em}`, '']
+      : []),
+    ...linhasNota(p.notaPreAprovacao),
     `\u{1F4CC} *Projeto:* ${p.projeto}`,
     `\u{1F3F7}\uFE0F *Área:* ${p.area}`,
     `\u{1F6E0}\uFE0F *Ferramenta:* ${p.ferramenta}`,
@@ -127,86 +157,53 @@ export function buildSubmitMessage(p: {
   return lines.join('\n');
 }
 
-// Alerta de projeto ESPECIAL. Projetos especiais não têm saving/receita/escopo/tipos
-// financeiros (pulam o analisador e vão direto à avaliação humana), então o alerta
-// omite essas linhas — que seriam sempre zero/irrelevantes — e destaca a justificativa
-// do porquê o projeto é especial. Mantém os metadados que fazem sentido (projeto, área,
-// ferramenta, solicitante, participantes, descrição, data).
+// Alerta de projeto ESPECIAL — ENXUTO (decisão do Luis, 11/08/2026: "continuar mostrando
+// submissão de projetos especiais de forma normal, porém de forma mais enxuta e objetiva").
+//
+// Projetos especiais não têm saving/receita/escopo/tipos financeiros (pulam o analisador e
+// vão direto à avaliação humana) e, pela D27, também NÃO abrem fila de pré-aprovação — o que
+// faz deles o caso que CONTINUA avisando o grupo na submissão. Como essa passou a ser a
+// mensagem do dia a dia, ela encolhe ao que a triagem precisa para decidir se abre o projeto:
+// saíram Ferramenta, Participantes, Data da submissão e os separadores; descrição e
+// justificativa vão TRUNCADAS (o texto inteiro está na planilha e em /projeto/$id).
 function buildEspecialMessage(p: {
   projeto: string;
   area: string;
-  ferramenta: string;
   nomeCompleto: string;
   email: string;
-  participantes: string;
   descricao: string;
-  dataSubmissao: string;
   contextoEspecial?: string;
   modo: 'novo' | 'edicao';
+  notaPreAprovacao?: string | null;
 }): string {
   const cabecalho =
     p.modo === 'edicao'
       ? '✏️ *Edição de projeto especial – avaliação humana necessária*'
       : '\u{2B50} *Projeto especial – avaliação humana necessária*';
 
-  const contexto = (p.contextoEspecial ?? '').trim() || '—';
-
-  const lines = [
-    SEPARATOR,
-    '',
-    cabecalho,
-    '',
-    `\u{1F4CC} *Projeto:* ${p.projeto}`,
-    `\u{1F3F7}️ *Área:* ${p.area}`,
-    `\u{1F6E0}️ *Ferramenta:* ${p.ferramenta}`,
-    '',
-    `\u{1F464} *Solicitante:* ${p.nomeCompleto}`,
-    `\u{1F4E7} *E-mail:* ${p.email}`,
-    `\u{1F465} *Participantes:* ${p.participantes || '—'}`,
-    '',
-    `\u{1F4DD} *Descrição resumida:*`,
-    p.descricao,
-    '',
-    `\u{2B50} *Por que é um projeto especial:*`,
-    contexto,
-    '',
-    `\u{1F4C5} *Data da submissão:* ${p.dataSubmissao}`,
-    '',
-    `*Link da planilha de automações*: ${SHEETS_URL}`,
-    '',
-    SEPARATOR,
-  ];
-
-  return lines.join('\n');
-}
-
-export function buildUpdateMessage(p: {
-  projeto: string;
-  status: string;
-}): string {
-  let emoji: string;
-  let label: string;
-
-  if (p.status === 'Aprovado') {
-    emoji = '\u2705';
-    label = 'Fluxo de automação aprovado';
-  } else if (p.status === 'Pendente') {
-    emoji = '\u{1F6A8}';
-    label = 'Novo fluxo de automação cadastrado – Análise Pendente';
-  } else {
-    emoji = '\u{1F504}';
-    label = 'Fluxo de automação reenviado para aprovação';
-  }
+  const contexto = truncar(p.contextoEspecial ?? '') || '—';
 
   return [
-    SEPARATOR,
+    cabecalho,
     '',
-    `${emoji} *${label}*`,
+    ...linhasNota(p.notaPreAprovacao),
     `\u{1F4CC} *Projeto:* ${p.projeto}`,
+    `\u{1F3F7}️ *Área:* ${p.area}`,
+    `\u{1F464} *Solicitante:* ${p.nomeCompleto} (${p.email})`,
     '',
-    SEPARATOR,
+    `\u{1F4DD} *Descrição:* ${truncar(p.descricao ?? '')}`,
+    `\u{2B50} *Por que é um projeto especial:* ${contexto}`,
+    '',
+    `*Link da planilha de automações*: ${SHEETS_URL}`,
   ].join('\n');
 }
+
+// ⚠️ `buildUpdateMessage` foi REMOVIDO em 11/08/2026 — não reimplementar aqui.
+// Ele montava o "🚨 Novo fluxo de automação cadastrado – Análise Pendente" que o
+// `syncUpdateToGoogle` disparava depois do analisador: era a MESMA notificação por
+// submissão com outra roupa, e mantê-la anularia a mudança de o grupo só ser avisado
+// quando o líder pré-aprova. Passou a ser 1 mensagem por projeto (ver
+// `src/lib/notificacao-chat.ts` e a seção "Sync Google" do CLAUDE.md).
 
 // Mensagem do widget de Ajuda & Suporte. Mão única: a pessoa envia, Luis+Kaique
 // leem no espaço dedicado. O print (quando há) vai como LINK do Drive — texto plain,
