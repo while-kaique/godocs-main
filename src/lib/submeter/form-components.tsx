@@ -270,6 +270,112 @@ export function CardCheckboxGroup({
   );
 }
 
+/**
+ * Multisseleção em GRADE de checkboxes. É o padrão para lista LONGA de opções CURTAS: o
+ * `CheckboxGroup` acima divide a linha em partes iguais (`flex-1`) e aperta tudo a partir de
+ * 3 itens, e o `CardCheckboxGroup` empilha um card por opção — com 9 opções viraria uma
+ * parede de 9 cards para uma decisão de um clique.
+ *
+ * ⚠️ A 1ª versão eram PÍLULAS que embrulhavam, e ficou visualmente estranha dentro do
+ * formulário de submissão: larguras irregulares, uma última linha com item órfão, e era o
+ * único controle arredondado numa tela em que todo radio é retângulo de largura regular —
+ * as pílulas liam como "tags de leitura", não como "marque vários". A grade de colunas
+ * iguais resolve os três problemas de uma vez. Não voltar para pílulas aqui.
+ *
+ * ⚠️ A grade preenche por **COLUNA** (`grid-auto-flow: column`), não por linha: a ordem das
+ * `options` é lida de cima para baixo na 1ª coluna, depois na 2ª, depois na 3ª. É o que permite
+ * empilhar opções irmãs numa coluna só. O nº de linhas é calculado aqui e vai inline — sem ele,
+ * uma opção a mais abriria uma 4ª coluna e a grade transbordaria para o lado.
+ *
+ * `familia`/`variante`: quando várias opções são superfícies da MESMA ferramenta
+ * (Claude.ai · Claude Cowork · Claude Code), quem agrupa é a TIPOGRAFIA — "Claude" em peso
+ * leve, a superfície em negrito — somada à POSIÇÃO (as 3 empilhadas na mesma coluna). Nenhuma
+ * caixa desenhada em volta.
+ *
+ * `label` mostra um rótulo mais curto que o `value` gravado (ex.: "Apps Script" para
+ * "Google Apps Script"), para o texto não quebrar dentro da coluna.
+ *
+ * `marca` troca o azul GoGroup pela cor do logo da ferramenta (`.go-grid-check-marca-<marca>`
+ * no CSS). É campo PRÓPRIO, não derivado de `familia`, porque cor de marca e agrupamento de
+ * família são coisas independentes. ⚠️ Puramente estético: o estado (marcado/não) nunca é
+ * comunicado por cor, então nenhuma informação depende dela.
+ *
+ * A11y: o estado NUNCA é só cor — a caixinha enche de azul com um "✓" e o rótulo engrossa;
+ * o input é `sr-only` (o toggle responde a Espaço) e o anel de foco de teclado envolve a
+ * célula inteira via `:has(:focus-visible)`; a animação do check é curta e o CSS global a
+ * neutraliza sob `prefers-reduced-motion`.
+ */
+export function GridCheckboxGroup({
+  options, value, onChange, error, ariaLabel, colunas = 3,
+}: {
+  options: { value: string; label?: string; familia?: string; variante?: string; marca?: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  error?: string;
+  ariaLabel?: string;
+  colunas?: number;
+}) {
+  const linhas = Math.max(1, Math.ceil(options.length / colunas));
+  return (
+    <>
+      <div
+        className="go-grid-check"
+        role="group"
+        aria-label={ariaLabel}
+        style={{ gridTemplateRows: `repeat(${linhas}, auto)` }}
+      >
+        {options.map((opt) => {
+          const checked = value.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className={cn(
+                "go-grid-check-item",
+                checked && "go-grid-check-on",
+                opt.marca && `go-grid-check-marca-${opt.marca}`,
+              )}
+            >
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={checked}
+                onChange={() =>
+                  onChange(checked ? value.filter((x) => x !== opt.value) : [...value, opt.value])
+                }
+              />
+              <span aria-hidden="true" className="go-grid-check-box">
+                {checked && (
+                  <svg
+                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke="#fff" strokeWidth="4"
+                    strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: "go-step-in 0.15s ease" }}
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span>
+                {opt.familia ? (
+                  <>
+                    <span className="go-grid-check-familia">{opt.familia}</span>
+                    {/* "Claude" + ".ai" cola; "Claude" + "Cowork" precisa do espaço. */}
+                    {opt.variante?.startsWith(".") ? "" : " "}
+                    {opt.variante}
+                  </>
+                ) : (
+                  opt.label ?? opt.value
+                )}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </>
+  );
+}
+
 export function InfoTooltip({ children }: { children: React.ReactNode }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);

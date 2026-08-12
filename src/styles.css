@@ -52,6 +52,14 @@
   --go-text-on-blue: #FFFFFF;
   --go-text-heading: #0059A9;
 
+  /* Cor de MARCA de terceiro (não é do design system GoGroup): o laranja do logo do
+     Claude. Usada só para diferenciar as 3 superfícies do Claude na multisseleção de
+     ferramentas — ver `.go-grid-check-marca-claude`. ⚠️ `--go-claude` (#D97757) tem 3,1:1
+     contra branco: serve para BORDA e preenchimento (mínimo 3:1 de componente), NÃO para
+     texto. Texto usa `--go-claude-ink` (#B45C3E, 4,6:1), que passa AA em corpo pequeno. */
+  --go-claude: #D97757;
+  --go-claude-ink: #B45C3E;
+
   /* Semanticas */
   --go-bg-page: var(--go-cream);
   --go-bg-section-alt: var(--go-light-blue);
@@ -282,6 +290,115 @@
   background: rgba(0, 89, 169, 0.05);
   border-color: var(--go-blue);
   color: var(--go-blue);
+}
+
+/* Multisseleção em GRADE (GridCheckboxGroup) — para lista longa de opções curtas.
+   ⚠️ A 1ª versão eram PÍLULAS que embrulhavam (`flex-wrap`) e ficou visualmente estranha
+   dentro deste formulário: larguras irregulares, 3 linhas com um item órfão na última, e
+   era o único controle arredondado numa tela em que todo radio é retângulo de largura
+   regular — lia como "tags de leitura", não como "marque vários". A grade resolve os três:
+   colunas iguais (nada de ragged), retângulo com a MESMA linguagem do .go-radio-label, e a
+   caixa de check visível dá a affordância de checkbox (a mesma do CardCheckboxGroup). */
+.go-grid-check {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* ⚠️ Preenchimento por COLUNA (não por linha): é o que empilha as 3 superfícies do Claude
+     uma embaixo da outra na 1ª coluna. O nº de linhas vem inline do componente
+     (`Math.ceil(opções / 3)`), senão uma opção LEGADA extra abriria uma 4ª coluna e a grade
+     transbordaria para o lado. */
+  grid-auto-flow: column;
+  gap: 8px;
+}
+/* Tela estreita: uma coluna só, na ordem de declaração (a família Claude vem primeiro). */
+@media (max-width: 520px) {
+  .go-grid-check {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-flow: row;
+    grid-template-rows: none !important;
+  }
+}
+.go-grid-check-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1.5px solid rgba(0, 89, 169, 0.18);
+  border-radius: var(--go-radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--go-text-primary);
+  font-family: 'Poppins', sans-serif;
+}
+.go-grid-check-item:hover {
+  border-color: rgba(0, 89, 169, 0.4);
+  background: rgba(0, 89, 169, 0.03);
+}
+.go-grid-check-on {
+  background: rgba(0, 89, 169, 0.05);
+  border-color: var(--go-blue);
+  color: var(--go-blue);
+  font-weight: 700;
+}
+.go-grid-check-item:has(:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(0, 89, 169, 0.3);
+}
+/* A caixinha: vazia = por marcar, azul com "✓" = marcada. O estado nunca é só cor. */
+.go-grid-check-box {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid rgba(0, 89, 169, 0.3);
+  border-radius: 4px;
+  background: var(--go-white);
+}
+.go-grid-check-on .go-grid-check-box {
+  background: var(--go-blue);
+  border-color: var(--go-blue);
+}
+/* Opção de MARCA: a borda (e o que precisa acompanhar para não brigar com ela) sai do azul
+   GoGroup e assume a cor do logo da ferramenta. Hoje só o Claude usa. ⚠️ O preenchimento da
+   caixa e o rótulo TAMBÉM viram laranja quando marcado — não é decoração: borda laranja com
+   caixa azul dentro lê como bug, não como marca. O estado segue não sendo comunicado só por
+   cor (o "✓" entra/sai e o peso vai a 700), então a distinção de marca é puramente estética
+   e não carrega significado nenhum. */
+.go-grid-check-marca-claude {
+  border-color: rgba(217, 119, 87, 0.4);
+}
+.go-grid-check-marca-claude .go-grid-check-box {
+  border-color: rgba(217, 119, 87, 0.5);
+}
+.go-grid-check-marca-claude:hover {
+  border-color: rgba(217, 119, 87, 0.7);
+  background: rgba(217, 119, 87, 0.04);
+}
+.go-grid-check-marca-claude.go-grid-check-on {
+  border-color: var(--go-claude);
+  background: rgba(217, 119, 87, 0.07);
+  color: var(--go-claude-ink);
+}
+.go-grid-check-marca-claude.go-grid-check-on .go-grid-check-box {
+  background: var(--go-claude);
+  border-color: var(--go-claude);
+}
+.go-grid-check-marca-claude:has(:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.35);
+}
+
+/* A "família" do rótulo (o "Claude" de "Claude Code") recua para o segundo plano: são a
+   tipografia + a POSIÇÃO (as 3 superfícies ocupam uma linha inteira da grade) que agrupam,
+   sem caixa desenhada em volta. ⚠️ Peso 400/opacidade .7 foi testado e lia como
+   "desabilitado" — não baixar de novo. */
+.go-grid-check-familia {
+  font-weight: 500;
+  opacity: 0.82;
 }
 
 /* Buttons */
