@@ -17,8 +17,12 @@ import {
  * preenchido, e navegar na mesma aba custaria a sessão de submissão. O texto acima
  * continua autocontido (a pessoa decide sem sair) — o FAQ é o aprofundamento, não a
  * resposta que faltava. Ver spec-docs/SPEC_FAQ.md (D9).
+ *
+ * ⚠️ Aponta para o ASSUNTO, não para um tópico dentro dele: cada assunto do FAQ é um
+ * documento único, e "Projeto especial" é uma seção de "Tipos de Projeto" (D13). O
+ * endereço antigo (`/faq/tipos_projetos/especiais`) segue redirecionando para cá.
  */
-const URL_FAQ_ESPECIAL = "/faq/tipos_projetos/especiais";
+const URL_FAQ_ESPECIAL = "/faq/tipos_projetos";
 
 function LinkFaqEspecial() {
   return (

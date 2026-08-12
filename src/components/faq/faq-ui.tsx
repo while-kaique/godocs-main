@@ -95,6 +95,7 @@ export function FaqCard({
   params,
   titulo,
   resumo,
+  secoes,
   rodape,
   arquivado,
   controles,
@@ -103,6 +104,8 @@ export function FaqCard({
   params: Record<string, string>;
   titulo: string;
   resumo?: string | null;
+  /** Títulos das seções do documento — diz o que tem lá dentro, em vez de uma contagem. */
+  secoes?: string[];
   rodape?: string;
   arquivado?: boolean;
   controles?: React.ReactNode;
@@ -147,6 +150,15 @@ export function FaqCard({
             {resumo}
           </p>
         )}
+        {secoes && secoes.length > 0 && (
+          <p
+            className="mt-2.5 text-[11.5px] font-semibold leading-relaxed"
+            style={{ color: "var(--go-blue)", opacity: 0.75 }}
+          >
+            {secoes.slice(0, 4).join(" · ")}
+            {secoes.length > 4 && ` · +${secoes.length - 4}`}
+          </p>
+        )}
         <span
           className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold"
           style={{ color: "var(--go-blue)" }}
@@ -167,27 +179,7 @@ export function FaqCard({
   );
 }
 
-/* ── Corpo do tópico: TEXTO PURO (D10 — sem markdown, sem HTML) ── */
-
-export function FaqCorpo({ texto }: { texto: string | null }) {
-  if (!texto?.trim()) {
-    return (
-      <p className="text-[13.5px] italic" style={{ color: "#8b8b9a" }}>
-        Este tópico ainda não tem texto.
-      </p>
-    );
-  }
-  return (
-    <div
-      className="whitespace-pre-wrap text-[15px] leading-[1.75]"
-      style={{ color: "var(--go-text-primary)", maxWidth: "72ch" }}
-    >
-      {texto}
-    </div>
-  );
-}
-
-/* ── "Copiar link": a razão de o FAQ ter rota própria por tópico ── */
+/* ── "Copiar link": a razão de o FAQ ter rota própria por assunto ── */
 
 export function CopiarLink({ url }: { url: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -214,7 +206,7 @@ export function CopiarLink({ url }: { url: string }) {
       }}
     >
       {copiado ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
-      {copiado ? "Link copiado" : "Copiar link deste tópico"}
+      {copiado ? "Link copiado" : "Copiar link"}
     </button>
   );
 }

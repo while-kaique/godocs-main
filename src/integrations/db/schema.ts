@@ -281,9 +281,10 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_projeto
     ON projeto_aprovacoes(projeto_id);
 
-  -- FAQ (categorias -> tópicos). Todo mundo LÊ em /faq, admin edita inline. O conteúdo
-  -- inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE por slug --
-  -- deploy novo nunca sobrescreve o que o admin editou.
+  -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
+  -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
+  -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE
+  -- por slug -- deploy novo nunca sobrescreve o que o admin editou.
   -- ⚠️ Tabelas INTERNAS: nada de coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync
   -- reverso jamais as toca. Conteúdo do app, não dado de projeto.
   -- ⚠️ O slug é IMUTÁVEL depois de criado (o link circula em Chat/e-mail/formulário) e
@@ -296,6 +297,7 @@ const SCHEMA_SQL = `
     slug           TEXT NOT NULL UNIQUE,
     titulo         TEXT NOT NULL,
     resumo         TEXT,
+    corpo          TEXT,
     ordem          INTEGER NOT NULL DEFAULT 0,
     arquivado      INTEGER NOT NULL DEFAULT 0,
     criado_em      TEXT DEFAULT (datetime('now')),
@@ -303,6 +305,9 @@ const SCHEMA_SQL = `
     atualizado_por TEXT
   );
 
+  -- ⚠️ LEGADO (D13): o FAQ teve um nível de "tópico" por categoria, substituído pelo
+  -- documento único em faq_categorias.corpo. Nada lê nem escreve esta tabela hoje -- ela
+  -- fica de pé porque os textos da 1ª versão vivem aqui (remover é arquivar, jamais DROP).
   CREATE TABLE IF NOT EXISTS faq_itens (
     id             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     categoria_id   TEXT NOT NULL REFERENCES faq_categorias(id) ON DELETE CASCADE,
@@ -466,6 +471,11 @@ const MIGRATIONS = [
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
+  // FAQ: a categoria virou UM documento (markdown leve) em vez de uma lista de tópicos
+  // (SPEC_FAQ D13). Bancos que já tinham as categorias recebem a coluna aqui, e o seed
+  // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
+  // nunca é sobrescrito.
+  'ALTER TABLE faq_categorias ADD COLUMN corpo TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

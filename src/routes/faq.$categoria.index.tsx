@@ -1,11 +1,19 @@
-// /faq/$categoria — a categoria com seus tópicos (título grande, descrição menor abaixo).
+// /faq/$categoria — o assunto inteiro em UM documento (título → explicação → título →
+// explicação). É esta a página que os links de fora abrem: Google Chat, e-mail e a Etapa 2.5
+// do formulário. Ver spec-docs/SPEC_FAQ.md (D3, D13).
+//
 // Slug desconhecido não dá tela branca: explica e oferece a volta ao índice.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useFaq } from "@/components/faq/faq-contexto";
-import { BotaoNovoFaq, ControlesFaq } from "@/components/faq/faq-admin";
-import { FaqCard, FaqShell, FaqVazio } from "@/components/faq/faq-ui";
+import {
+  AvisoVerComoUsuario,
+  BotaoVerComoUsuario,
+  ControlesFaq,
+} from "@/components/faq/faq-admin";
+import { FaqDocumento } from "@/components/faq/faq-documento";
+import { CopiarLink, FaqShell, FaqVazio } from "@/components/faq/faq-ui";
 import { resolverCategoria } from "@/lib/faq/conteudo";
 
 export const Route = createFileRoute("/faq/$categoria/")({
@@ -17,12 +25,17 @@ export const Route = createFileRoute("/faq/$categoria/")({
 
 function FaqCategoriaPage() {
   const { categoria: slug } = Route.useParams();
-  const { categorias, ehAdmin, carregando, erro, recarregar } = useFaq();
+  const { categorias, ehAdmin, podeEditar, verComoUsuario, carregando, erro, recarregar } =
+    useFaq();
   const categoria = resolverCategoria(categorias, slug);
 
   if (carregando) {
     return (
-      <FaqShell voltar={{ to: "/faq", label: "← Perguntas frequentes" }} eyebrow="Ajuda" titulo="Carregando…">
+      <FaqShell
+        voltar={{ to: "/faq", label: "← Perguntas frequentes" }}
+        eyebrow="Ajuda"
+        titulo="Carregando…"
+      >
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin" style={{ color: "var(--go-blue)" }} />
         </div>
@@ -56,71 +69,41 @@ function FaqCategoriaPage() {
     );
   }
 
-  const ativos = categoria.itens.filter((i) => !i.arquivado);
-  const arquivados = categoria.itens.filter((i) => i.arquivado);
+  const url =
+    typeof window === "undefined" ? "" : `${window.location.origin}/faq/${categoria.slug}`;
 
   return (
     <FaqShell
       voltar={{ to: "/faq", label: "← Perguntas frequentes" }}
-      eyebrow={categoria.arquivado ? "Categoria arquivada" : "Ajuda"}
+      eyebrow={categoria.arquivado ? "Assunto arquivado" : "Ajuda"}
       titulo={categoria.titulo}
       resumo={categoria.resumo}
       acoes={
-        ehAdmin ? <BotaoNovoFaq tipo="item" categoria={categoria} onCriado={recarregar} /> : undefined
+        <>
+          <CopiarLink url={url} />
+          {podeEditar && <BotaoVerComoUsuario />}
+        </>
       }
     >
-      {ehAdmin && (
+      {ehAdmin && verComoUsuario && <AvisoVerComoUsuario />}
+
+      {podeEditar && (
         <div className="mb-5 flex flex-wrap items-center gap-1.5">
-          <ControlesFaq tipo="categoria" alvo={categoria} onMudou={recarregar} />
+          <ControlesFaq alvo={categoria} onMudou={recarregar} />
         </div>
       )}
 
-      {ativos.length === 0 && arquivados.length === 0 && (
-        <FaqVazio mensagem="Nenhum tópico publicado nesta categoria ainda." />
-      )}
-
-      <div className="flex flex-col gap-4">
-        {ativos.map((item) => (
-          <FaqCard
-            key={item.id}
-            to="/faq/$categoria/$item"
-            params={{ categoria: categoria.slug, item: item.slug }}
-            titulo={item.titulo}
-            resumo={item.resumo}
-            rodape="Ler"
-            controles={
-              ehAdmin ? (
-                <ControlesFaq tipo="item" alvo={item} onMudou={recarregar} />
-              ) : undefined
-            }
-          />
-        ))}
-      </div>
-
-      {ehAdmin && arquivados.length > 0 && (
-        <section className="mt-8">
-          <h2
-            className="mb-3 text-[11.5px] font-bold uppercase tracking-[0.1em]"
-            style={{ color: "#8b8b9a" }}
-          >
-            Arquivados — só admin vê
-          </h2>
-          <div className="flex flex-col gap-3">
-            {arquivados.map((item) => (
-              <FaqCard
-                key={item.id}
-                to="/faq/$categoria/$item"
-                params={{ categoria: categoria.slug, item: item.slug }}
-                titulo={item.titulo}
-                resumo={item.resumo}
-                arquivado
-                rodape="Ler"
-                controles={<ControlesFaq tipo="item" alvo={item} onMudou={recarregar} />}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <article
+        className="px-6 py-7 md:px-9 md:py-8"
+        style={{
+          background: "var(--go-white)",
+          border: "1px solid rgba(0,89,169,0.10)",
+          borderRadius: "var(--go-radius-lg)",
+          boxShadow: "var(--go-shadow-sm)",
+        }}
+      >
+        <FaqDocumento md={categoria.corpo} />
+      </article>
     </FaqShell>
   );
 }

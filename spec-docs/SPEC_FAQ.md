@@ -1,10 +1,13 @@
-# SPEC — Página de FAQ (categorias → tópicos, leitura para todos, edição para admin)
+# SPEC — Página de FAQ (índice de assuntos → um documento por assunto, leitura para todos, edição para admin)
 
-**Status:** ✅ implementada (11/08/2026) · ⏳ pendente validar na staging · branch `feat/faq-page`
-**Aterrissou em:** `src/lib/faq/conteudo.ts` (PURO, `FAQ_SEED` + `chaveSlug`) · `src/lib/faq.functions.ts` ·
+**Status:** ✅ implementada (11/08/2026) · ♻️ **remodelada em 12/08/2026 (D13 — documento único)** ·
+⏳ pendente validar na staging · branch `feat/faq-page`
+**Aterrissou em:** `src/lib/faq/conteudo.ts` (PURO, `FAQ_SEED` + `chaveSlug`) ·
+**`src/lib/faq/markdown.ts`** (PURO, parser do markdown leve) · `src/lib/faq.functions.ts` ·
 `src/integrations/db/schema.ts` (+`client.server.ts`) · `src/worker.ts` (`/api/faq`, `/api/admin/faq/*`) ·
-`src/routes/faq*.tsx` (4 rotas) · `src/components/faq/*` · `src/routes/index.tsx` (bloco novo na home) ·
-`src/lib/submeter/step25.tsx` (link) · `tests/faq.test.ts` (18 casos)
+`src/routes/faq*.tsx` (índice, documento e o redirect do endereço legado) · `src/components/faq/*`
+(+**`faq-documento.tsx`**) · `src/routes/index.tsx` (bloco novo na home) ·
+`src/lib/submeter/step25.tsx` (link) · `tests/faq.test.ts` (23 casos)
 **Pedido:** substituir, na home, o campo de "etapas" por uma **página de FAQ** — membros só leem,
 admin edita (adiciona, remove, atualiza). Lista de **categorias** → cada categoria com **títulos
 grandes** e **descrições menores** abaixo. A primeira categoria é **"Tipos de Projeto"**, com a
@@ -54,11 +57,11 @@ o link; a rota simplesmente resolve.
 futuro `.../glossario/especiais` convivem).
 
 ### D3 — Deep link é PÁGINA, não âncora
-`/faq/tipos_projetos/especiais` renderiza uma página própria (título grande + corpo), com
-breadcrumb `FAQ / Tipos de Projeto / Projeto Especial` e a lista dos itens irmãos ao lado.
-Motivo: o link vai circular em Google Chat, e-mail e dentro do formulário — âncora (`#especiais`)
-depende de o acordeão estar aberto e de o scroll acertar; página é determinística e dá título de
-aba próprio. A categoria (`/faq/tipos_projetos`) lista os itens dela com título grande + resumo.
+`/faq/tipos_projetos` renderiza uma página própria (título grande + documento). Motivo: o link vai
+circular em Google Chat, e-mail e dentro do formulário — âncora (`#especiais`) depende de o acordeão
+estar aberto e de o scroll acertar; página é determinística e dá título de aba próprio.
+⚠️ **Revisado pela D13:** a unidade de deep link é o **assunto**, não o tópico. O endereço antigo
+`/faq/$categoria/$item` continua existindo **só como redirect** para o assunto.
 
 ### D4 — Leitura para todo logado, escrita só admin, gate SERVER-SIDE
 `GET /api/faq` exige apenas o e-mail do edge (como `/api/areas`, o edge Godeploy já exige OAuth em
@@ -98,12 +101,12 @@ submissão). O mesmo link entra no modal de confirmação.
 ⚠️ O texto do formulário **não é substituído** pelo link: a pergunta segue autocontida (a pessoa
 decide sem sair), o FAQ é o aprofundamento.
 
-### D10 — Corpo é TEXTO PURO, sem markdown e sem HTML
-Renderiza com `whitespace-pre-wrap` (idiom já usado em `aviso-pendencia.tsx`, `projeto.$id.tsx`).
-Sem lib de markdown (não há nenhuma no `package.json`) e **sem `dangerouslySetInnerHTML`** — o corpo
-é digitado por um humano no painel e ir para HTML cru abriria XSS armazenado por conta de uma
-formatação. Parágrafo = linha em branco. Negrito/lista, se um dia forem necessários, são decisão
-nova (renderer próprio, allowlist fechada).
+### D10 — Corpo é TEXTO PURO, sem markdown e sem HTML — ♻️ SUBSTITUÍDA PELA D13
+Renderizava com `whitespace-pre-wrap`. Sem lib de markdown e **sem `dangerouslySetInnerHTML`** — o
+corpo é digitado por um humano no painel e ir para HTML cru abriria XSS armazenado por conta de uma
+formatação. A própria D10 previa a saída: "negrito/lista, se um dia forem necessários, são decisão
+nova (renderer próprio, allowlist fechada)". É exatamente o que a **D13** fez.
+⚠️ O que NÃO mudou e não pode mudar: **`dangerouslySetInnerHTML` continua proibido** no FAQ.
 
 ### D11 — Tabelas INTERNAS: nada de Sheets, nada de sync reverso
 `faq_categorias`/`faq_itens` são conteúdo do app, não dado de projeto: **fora** de
@@ -113,8 +116,52 @@ prod — o seed é o que garante que os dois nascem iguais; edições feitas na 
 (e é bom que fiquem).
 
 ### D12 — Sem cache, sem prefetch
-`GET /api/faq` é uma leitura de SQLite (2 SELECTs) — nada do custo do Sheets que justificou o cache
-SWR do dashboard. Adicionar cache aqui é complexidade sem sintoma.
+`GET /api/faq` é uma leitura de SQLite (hoje **1** SELECT) — nada do custo do Sheets que justificou o
+cache SWR do dashboard. Adicionar cache aqui é complexidade sem sintoma.
+
+### D13 — A parte interna é UM DOCUMENTO, não uma lista de tópicos (12/08/2026)
+**Pedido do Kaique, olhando a 1ª versão no localhost:** cards só no índice; dentro do assunto, um
+texto único no formato `TÍTULO → explicação → TÍTULO 2 → explicação 2`, editável pelo admin. E os
+textos estavam **longos demais** — objetivos e diretos, sem ficar chatos de ler.
+
+**O que muda:**
+1. **Um nível a menos.** O conteúdo mora em **`faq_categorias.corpo`** (coluna nova). A tabela
+   `faq_itens` fica **LEGADO**: nada lê nem escreve, e ela continua de pé porque guarda os textos da
+   1ª versão (remover é arquivar — jamais `DROP`). Saíram `salvarItem`, a rota
+   `POST /api/admin/faq/item` e as 5 funções de item do `client.server.ts`.
+2. **Markdown leve com allowlist FECHADA** — `src/lib/faq/markdown.ts` (PURO) devolve blocos
+   tipados e `faq-documento.tsx` monta **elementos React** a partir deles. Aceita `## título`,
+   `### subtítulo`, `- item`, `1. item`, `> destaque` e `**negrito**`. ⚠️ Todo o resto é parágrafo
+   **literal**: `<b>` e `<script>` chegam ao React como texto e são escapados. É o que permite dar
+   formatação ao admin **sem** reabrir o XSS armazenado que a D10 barrava (o proibido segue proibido:
+   nenhum `dangerouslySetInnerHTML` no FAQ). Teste explícito com `<script>`.
+3. **Seed com BACKFILL.** O seed segue idempotente por slug (D1) e ganhou uma exceção estreita: se o
+   assunto **já existe com o corpo vazio**, ele grava o texto do código. ⚠️ Sem isso, todo banco que
+   já tinha "Tipos de Projeto" ficaria com o documento **vazio para sempre** (o slug está presente, e
+   a regra da D1 é não tocar em slug presente). A trava é dupla — o `WHERE corpo IS NULL OR
+   trim(corpo) = ''` no SQL e a checagem em memória —, porque passar por cima do documento do admin é
+   exatamente o que a D1 existe para impedir. Teste cobre os dois lados (preenche vazio · não
+   sobrescreve o do admin).
+4. **"Ver como usuário"** (pedido no mesmo dia): botão no cabeçalho que apaga TODOS os controles de
+   admin e deixa a página como o liderado a vê, com uma faixa "Voltar a editar". ⚠️ O interruptor é
+   **um só** (`podeEditar` no contexto, = `ehAdmin && !verComoUsuario`): se cada tela combinasse as
+   duas flags, uma esqueceria e o modo de visualização mostraria um botão de admin. O editor também
+   ganhou **Pré-visualizar**, porque escrever markdown sem ver o resultado é adivinhação.
+5. **O card do índice diz o que tem dentro** — os títulos de 1º nível do documento
+   ("Saving operacional · Receita incremental · …") em vez de uma contagem de tópicos, que não
+   informava nada.
+6. **Textos reescritos.** "Tipos de Projeto" saiu de ~9.000 caracteres em 3 páginas para **~2.400 em
+   uma**, cobrindo saving · receita · especial · ganho real × projetado · na dúvida. ⚠️ Há um **teste
+   de teto (4.500 caracteres por assunto)**: assunto que cresce além disso quer ser **dois assuntos**,
+   não um texto mais longo — é o que impede o FAQ de voltar a ser cansativo.
+7. **O link da Etapa 2.5 passou a apontar para `/faq/tipos_projetos`** (o assunto), e
+   `/faq/tipos_projetos/especiais` **redireciona** (`beforeLoad` + `replace`), porque esse endereço já
+   foi colado em Chat e e-mail e um 404 ali é link morto para quem só queria ler a resposta.
+
+**Visual (regra 11):** documento em coluna única com medida travada em **68ch** (linha longa era
+metade do cansaço), cada seção aberta por um título com **filete lima à esquerda** (o ritmo de
+escaneamento), bullets com marcador quadrado azul e `>` como placa creme com borda azul. Sem sumário:
+com o texto nesse tamanho, os títulos já são o sumário.
 
 ---
 

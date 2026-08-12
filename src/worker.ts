@@ -66,13 +66,7 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
-import {
-  listarFaq,
-  salvarCategoria,
-  salvarItem,
-  arquivarFaq,
-  reordenarFaq,
-} from '@/lib/faq.functions'
+import { listarFaq, salvarCategoria, arquivarFaq, reordenarFaq } from '@/lib/faq.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
 import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
 import { traduzirErroValidacao } from '@/lib/erro-validacao'
@@ -421,17 +415,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     }
 
     // ── FAQ: escrita (só admin) ──
-    // "Remover" é ARQUIVAR (não existe DELETE aqui — os links do FAQ circulam em Chat,
-    // e-mail e dentro do formulário). Slug é imutável na edição. Ver SPEC_FAQ.md (D2, D6).
+    // Cada assunto do FAQ é UM documento (título + resumo + corpo em markdown leve), então
+    // há uma rota de escrita só. "Remover" é ARQUIVAR (não existe DELETE aqui — os links do
+    // FAQ circulam em Chat, e-mail e dentro do formulário) e o slug é imutável na edição.
+    // Ver SPEC_FAQ.md (D2, D6, D13).
     if (pathname === '/api/admin/faq/categoria' && method === 'POST') {
       const { email } = await requireAdmin(request)
       const body = await readBody(request)
       return json(await salvarCategoria(email, body))
-    }
-    if (pathname === '/api/admin/faq/item' && method === 'POST') {
-      const { email } = await requireAdmin(request)
-      const body = await readBody(request)
-      return json(await salvarItem(email, body))
     }
     if (pathname === '/api/admin/faq/arquivar' && method === 'POST') {
       const { email } = await requireAdmin(request)

@@ -1366,19 +1366,7 @@ export type FaqCategoriaRow = {
   slug: string;
   titulo: string;
   resumo: string | null;
-  ordem: number;
-  arquivado: number;
-  criado_em: string | null;
-  atualizado_em: string | null;
-  atualizado_por: string | null;
-};
-
-export type FaqItemRow = {
-  id: string;
-  categoria_id: string;
-  slug: string;
-  titulo: string;
-  resumo: string | null;
+  /** Documento da categoria em markdown leve (SPEC_FAQ D13). */
   corpo: string | null;
   ordem: number;
   arquivado: number;
@@ -1388,8 +1376,9 @@ export type FaqItemRow = {
 };
 
 /**
- * Árvore inteira do FAQ em **2 SELECTs** (nunca 1 por categoria — a lição do Investigador:
- * I/O dentro de laço matou o endpoint da listagem). A montagem é em memória.
+ * O FAQ inteiro em **1 SELECT** — cada categoria é um documento, então não há nível
+ * filho para buscar. (A tabela `faq_itens` é LEGADO: guarda os textos da 1ª versão e
+ * não tem mais leitor.)
  */
 export async function getFaqCategoriasRows(): Promise<FaqCategoriaRow[]> {
   return queryAll<FaqCategoriaRow>(
@@ -1398,62 +1387,20 @@ export async function getFaqCategoriasRows(): Promise<FaqCategoriaRow[]> {
   );
 }
 
-export async function getFaqItensRows(): Promise<FaqItemRow[]> {
-  return queryAll<FaqItemRow>('SELECT * FROM faq_itens ORDER BY ordem ASC, criado_em ASC', []);
-}
-
 export async function insertFaqCategoria(dados: {
-  slug: string;
-  titulo: string;
-  resumo?: string | null;
-  ordem?: number;
-  atualizado_por?: string | null;
-}): Promise<FaqCategoriaRow> {
-  const id = generateId();
-  await exec(
-    `INSERT INTO faq_categorias (id, slug, titulo, resumo, ordem, arquivado, criado_em, atualizado_em, atualizado_por)
-     VALUES (?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'), ?)`,
-    [
-      id,
-      dados.slug,
-      dados.titulo,
-      dados.resumo ?? null,
-      dados.ordem ?? 0,
-      dados.atualizado_por ?? null,
-    ],
-  );
-  return (await queryOne<FaqCategoriaRow>('SELECT * FROM faq_categorias WHERE id = ?', [id]))!;
-}
-
-/** Atualiza título/resumo. ⚠️ NUNCA o slug — ele é imutável (D2: o link já circula). */
-export async function updateFaqCategoria(
-  id: string,
-  dados: { titulo: string; resumo?: string | null; atualizado_por?: string | null },
-): Promise<void> {
-  await exec(
-    `UPDATE faq_categorias
-        SET titulo = ?, resumo = ?, atualizado_em = datetime('now'), atualizado_por = ?
-      WHERE id = ?`,
-    [dados.titulo, dados.resumo ?? null, dados.atualizado_por ?? null, id],
-  );
-}
-
-export async function insertFaqItem(dados: {
-  categoria_id: string;
   slug: string;
   titulo: string;
   resumo?: string | null;
   corpo?: string | null;
   ordem?: number;
   atualizado_por?: string | null;
-}): Promise<FaqItemRow> {
+}): Promise<FaqCategoriaRow> {
   const id = generateId();
   await exec(
-    `INSERT INTO faq_itens (id, categoria_id, slug, titulo, resumo, corpo, ordem, arquivado, criado_em, atualizado_em, atualizado_por)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'), ?)`,
+    `INSERT INTO faq_categorias (id, slug, titulo, resumo, corpo, ordem, arquivado, criado_em, atualizado_em, atualizado_por)
+     VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'), ?)`,
     [
       id,
-      dados.categoria_id,
       dados.slug,
       dados.titulo,
       dados.resumo ?? null,
@@ -1462,11 +1409,11 @@ export async function insertFaqItem(dados: {
       dados.atualizado_por ?? null,
     ],
   );
-  return (await queryOne<FaqItemRow>('SELECT * FROM faq_itens WHERE id = ?', [id]))!;
+  return (await queryOne<FaqCategoriaRow>('SELECT * FROM faq_categorias WHERE id = ?', [id]))!;
 }
 
-/** Atualiza título/resumo/corpo. ⚠️ NUNCA o slug nem a categoria (D2). */
-export async function updateFaqItem(
+/** Atualiza título/resumo/corpo. ⚠️ NUNCA o slug — ele é imutável (D2: o link já circula). */
+export async function updateFaqCategoria(
   id: string,
   dados: {
     titulo: string;
@@ -1476,10 +1423,24 @@ export async function updateFaqItem(
   },
 ): Promise<void> {
   await exec(
-    `UPDATE faq_itens
+    `UPDATE faq_categorias
         SET titulo = ?, resumo = ?, corpo = ?, atualizado_em = datetime('now'), atualizado_por = ?
       WHERE id = ?`,
     [dados.titulo, dados.resumo ?? null, dados.corpo ?? null, dados.atualizado_por ?? null, id],
+  );
+}
+
+/**
+ * Preenche o `corpo` de uma categoria que existe com o campo VAZIO — o backfill da coluna
+ * nova (D13). ⚠️ O `AND (corpo IS NULL OR trim(corpo) = '')` é a trava: sem ele o seed
+ * passaria por cima do documento que o admin escreveu, quebrando a idempotência (D1).
+ */
+export async function backfillCorpoFaqCategoria(id: string, corpo: string): Promise<void> {
+  await exec(
+    `UPDATE faq_categorias
+        SET corpo = ?, atualizado_em = datetime('now'), atualizado_por = 'seed'
+      WHERE id = ? AND (corpo IS NULL OR trim(corpo) = '')`,
+    [corpo, id],
   );
 }
 
@@ -1495,23 +1456,8 @@ export async function setArquivadoFaqCategoria(
   );
 }
 
-export async function setArquivadoFaqItem(
-  id: string,
-  arquivado: boolean,
-  email?: string | null,
-): Promise<void> {
-  await exec(
-    `UPDATE faq_itens SET arquivado = ?, atualizado_em = datetime('now'), atualizado_por = ? WHERE id = ?`,
-    [arquivado ? 1 : 0, email ?? null, id],
-  );
-}
-
 export async function setOrdemFaqCategoria(id: string, ordem: number): Promise<void> {
   await exec(`UPDATE faq_categorias SET ordem = ? WHERE id = ?`, [ordem, id]);
-}
-
-export async function setOrdemFaqItem(id: string, ordem: number): Promise<void> {
-  await exec(`UPDATE faq_itens SET ordem = ? WHERE id = ?`, [ordem, id]);
 }
 
 // --- Profiles ---
