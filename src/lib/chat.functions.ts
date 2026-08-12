@@ -3758,9 +3758,12 @@ export async function resyncGoogle(rawData: unknown) {
 //    e, se não der pra parsear, cai no fallback ×12 (valor atual × 12). Legado pontual que
 //    NÃO seja puro (tem horas/custo) vai para `flagged` (revisão manual) — não arrisca.
 //
-// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho dispara UMA
-// notificação no Google Chat por projeto (mudo no staging, mas em PROD seria spam de N
-// mensagens). Aqui escrevemos direto via updateRowByProjectId (batch parcial, sem Chat).
+// ⚠️ NÃO reusa resyncGoogle/syncSubmitToGoogle de propósito: aquele caminho REGRAVA a
+// linha inteira da planilha (incl. "Atualizado Em", que regulariza legado) por projeto.
+// Aqui escrevemos direto via updateRowByProjectId (batch parcial, só as colunas afetadas).
+// _(Até 11/08/2026 o motivo principal era outro — o caminho também disparava UMA
+// notificação no Google Chat por projeto, o que em PROD seria spam de N mensagens. Isso
+// deixou de valer: `resyncGoogle` passa `notificarChat: false` desde o D30.)_
 //
 // Idempotente: só toca quem de fato MUDA; pula os já corretos (re-run seguro). `dry`
 // (default TRUE) só relata (projetos + flagged), sem escrever nada.

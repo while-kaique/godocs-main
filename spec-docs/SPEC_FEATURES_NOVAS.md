@@ -667,7 +667,7 @@ arquivo), que monta um alerta enxuto:
 caller `src/lib/google/sync.ts` (`syncSubmitToGoogle`) passa `especial: p.projeto.especial === 1` e
 `contextoEspecial: p.projeto.contexto_especial`. Teste: `tests/chat-message-especial.test.ts`.
 
-**Status.** ✅ Em produção. ⚠️ **Revisitada em 11/08/2026** — a mensagem do especial encolheu de
+**Status.** ⏳ Implementado (jul/2026); **este doc não comprova o deploy** — conferir no app antes de afirmar. ⚠️ **Revisitada em 11/08/2026** — a mensagem do especial encolheu de
 novo (saíram Ferramenta, Participantes, Data da submissão e os separadores; descrição e justificativa
 passaram a ser truncadas), porque com a mudança abaixo ela virou uma das poucas que ainda saem na
 submissão. Ver "Notificação do Chat só quando há pré-aprovação do líder".
