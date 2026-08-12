@@ -1161,7 +1161,11 @@ concreto lado a lado.
    GENÉRICA — tipos são só exemplos): "esse **contrato** NÃO cobria" → "esse **gasto** NÃO
    cobria", no rótulo e no texto de ajuda. Falar em "contrato" excluía quem cortou multa,
    juros ou taxa (caso SmartOnline/DIFAL).
-6. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
+6. **Duas colunas (vale × não vale), 900px, sem rolagem** — com uma coluna de 560px os 6
+   cards não caíam na tela: quem abria via os 3 primeiros e precisava rolar para descobrir
+   que existia o outro lado, e é a COMPARAÇÃO lado a lado que ensina a responder. Em tela
+   estreita as colunas empilham e o corpo volta a rolar (`sm:grid-cols-2` + `overflow-y-auto`).
+7. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
    botão de exemplos (decisão do Kaique, 12/08/2026).
 
 **Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não
