@@ -44,6 +44,15 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | POST | `/api/cron/sync-areas` | Header `X-Godeploy-Cron` | Cron diário + limpeza api_logs >30d |
 | POST | `/api/cron/sync-sheets-to-sqlite` | Header `X-Godeploy-Cron` | Cron **horário**: sync reverso Sheets → SQLite (cria legados faltantes + reflete edições manuais em campos seguros) |
 
+### FAQ
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/api/faq` | OAuth (edge) | Árvore do FAQ (categorias → tópicos). Semeia o `FAQ_SEED` na 1ª leitura (idempotente por slug) e, **para admin**, inclui os arquivados marcados |
+| POST | `/api/admin/faq/categoria` | Admin | Cria/atualiza categoria (⚠️ **slug imutável** na edição) |
+| POST | `/api/admin/faq/item` | Admin | Cria/atualiza tópico (idem) |
+| POST | `/api/admin/faq/arquivar` | Admin | Arquiva/restaura — é o "remover" desta feature (**não existe DELETE**) |
+| POST | `/api/admin/faq/reordenar` | Admin | Troca a posição com o vizinho (ordem manual) |
+
 ### Admin (todas requerem `requireAdmin`)
 | Método | Rota | Descrição |
 |---|---|---|

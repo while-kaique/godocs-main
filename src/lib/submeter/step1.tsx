@@ -1,9 +1,11 @@
-import { useEffect } from "react";
-import { FERRAMENTAS } from "./constants";
+import { useEffect, useMemo } from "react";
+import {
+  FERRAMENTAS, FERRAMENTAS_OPCOES, FERRAMENTA_OUTROS, limiteFerramentaOutra,
+} from "./constants";
 import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
-  SectionTitle, FormGroup, FormLabel, FormInput, FormSelect,
-  RadioGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
+  SectionTitle, FormGroup, FormLabel, FormInput,
+  RadioGroup, GridCheckboxGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
 } from "./form-components";
 import { useSugestoesParticipantes, prefetchSugestoesParticipantes } from "./participantes-sugestoes";
 
@@ -129,6 +131,19 @@ export function Step1({
     </FormGroup>
   );
 
+  // Opções do seletor = a lista canônica + qualquer valor LEGADO que o projeto já
+  // carrega e não está nela ("Power Automate", "VBA"… importados da planilha). Sem esse
+  // acréscimo o chip do valor atual simplesmente não existiria e a pessoa acharia que o
+  // dado sumiu na edição — era o papel da `<option>` extra do antigo `<select>`.
+  // ⚠️ Desmarcar um chip legado o remove de vez (não volta à lista): é a leitura correta
+  // de "não é isso", e a pessoa pode reescrevê-lo em "Outros".
+  const opcoesFerramentas = useMemo(() => {
+    const extras = (form.ferramentas ?? [])
+      .filter((f) => !FERRAMENTAS.includes(f))
+      .map((f) => ({ value: f }));
+    return [...FERRAMENTAS_OPCOES, ...extras];
+  }, [form.ferramentas]);
+
   // Bloco da ferramenta / serviço externo — EDITÁVEL nos dois modos. Na edição, a
   // stack de um projeto muda de verdade (ex.: hospedagem Vercel → GoDeploy) e a pessoa
   // precisa corrigir sem abrir chamado; o ESCOPO (interna/externa) segue fixo, porque
@@ -155,38 +170,68 @@ export function Step1({
         </>
       ) : (
         <>
-          <FormLabel required>Ferramenta Utilizada</FormLabel>
-          {readOnlyProjeto && (
-            <p className="mb-1.5 text-[11px] leading-relaxed" style={{ color: "#8b8b9a" }}>
-              Trocou de ferramenta desde a submissão? Atualize aqui (ex.: Vercel → Claude + GoDeploy).
-            </p>
-          )}
-          <FormSelect
-            value={form.ferramenta}
-            onChange={(e) => updateField("ferramenta", e.currentTarget.value)}
-            error={errors.ferramenta}
-          >
-            <option value="">Selecione a ferramenta</option>
-            {/* Legado importado da planilha pode trazer uma ferramenta FORA da lista
-                ("Power Automate", "VBA"…). Sem esta opção o select abriria vazio na
-                edição e a pessoa acharia que o dado sumiu — o valor atual sempre aparece. */}
-            {form.ferramenta &&
-              !(FERRAMENTAS as readonly string[]).includes(form.ferramenta) && (
-              <option value={form.ferramenta}>{form.ferramenta}</option>
-            )}
-            {FERRAMENTAS.map((f) => <option key={f} value={f}>{f}</option>)}
-          </FormSelect>
-          {form.ferramenta === "Outros" && (
+          <FormLabel required>Ferramentas utilizadas</FormLabel>
+          {/* A frase que separa CONSTRUÇÃO de EXECUÇÃO. Antes não existia e a lista era
+              lida como "a stack do projeto", então vinha Supabase/APIs no campo — isso é
+              conteúdo da DOCUMENTAÇÃO. ⚠️ NÃO explicar aqui que o GoDeploy é a exceção da
+              regra (pedido do Luis, 12/08/2026: "ninguém precisa saber disso") — a exceção
+              é decisão interna, e citá-la só convida a pessoa a discutir a régua. */}
+          <p className="mb-2 text-[11.5px] leading-relaxed" style={{ color: "#8b8b9a" }}>
+            Marque tudo que você usou para{" "}
+            <strong style={{ color: "var(--go-text-primary)" }}>construir</strong> o projeto. O
+            que ele usa para{" "}
+            <strong style={{ color: "var(--go-text-primary)" }}>funcionar</strong> (Supabase,
+            APIs, integrações) fica na documentação.
+            {readOnlyProjeto && " Mudou desde a submissão? Atualize aqui."}
+          </p>
+          <GridCheckboxGroup
+            ariaLabel="Ferramentas utilizadas para construir o projeto"
+            options={opcoesFerramentas}
+            value={form.ferramentas ?? []}
+            onChange={(v) => { updateField("ferramentas", v); clearError("ferramentas"); }}
+            error={errors.ferramentas}
+          />
+          {/* Ajuda das 3 superfícies do Claude — LOGO ABAIXO da grade, alinhada à esquerda
+              (ou seja, embaixo da coluna dos Claudes), porque é ali que a dúvida nasce. Vem
+              como PERGUNTA visível em vez do ícone "i": ninguém vai caçar um ícone para
+              descobrir uma diferença que nem sabe que existe. Abre no hover E no foco de
+              teclado (o gatilho é o mesmo span do InfoTooltip). */}
+          <div className="mt-2">
+            <InfoTooltip
+              largura={370}
+              trigger={<>Qual a diferença entre os 3 Claudes?</>}
+            >
+              <strong className="mb-1.5 block text-white">
+                Os 3 são o mesmo Claude, em lugares diferentes
+              </strong>
+              <span className="mb-1.5 block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude.ai</strong> — o Claude no
+                navegador. Você conversa, cola texto ou planilha e pede análise, rascunho ou um
+                trecho de código para copiar na mão.
+              </span>
+              <span className="mb-1.5 block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude Cowork</strong> — o Claude
+                trabalhando sobre os seus arquivos e ferramentas conectadas: você delega uma
+                tarefa de várias etapas e acompanha ele executando. Não precisa ser código.
+              </span>
+              <span className="block" style={{ color: "rgba(255,255,255,0.88)" }}>
+                <strong style={{ color: "var(--go-lime)" }}>Claude Code</strong> — o Claude
+                dentro do terminal ou da IDE, lendo e editando o código do projeto direto no
+                repositório.
+              </span>
+            </InfoTooltip>
+          </div>
+          {(form.ferramentas ?? []).includes(FERRAMENTA_OUTROS) && (
             <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
               <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
                 ✏️ Especifique a ferramenta:
               </label>
               <FormInput
                 placeholder="Nome da ferramenta..."
-                /* 192 = 200 do schema (`ferramenta`) − os 8 chars do prefixo
-                   "Outros: " que o submeter concatena. Sem esta trava o backend
-                   devolvia erro de validação depois de tudo preenchido. */
-                maxLength={192}
+                /* Cap DINÂMICO: o que sobra dos 200 chars de `ferramenta` depois das
+                   outras marcadas. Um cap fixo (era 192) voltaria a estourar o zod
+                   depois de tudo preenchido — ver limiteFerramentaOutra. */
+                maxLength={limiteFerramentaOutra(form.ferramentas ?? [])}
                 value={form.ferramentaOutra}
                 onChange={(e) => updateField("ferramentaOutra", e.currentTarget.value)}
                 error={errors.ferramentaOutra}
@@ -320,7 +365,7 @@ export function Step1({
             updateField("escopo", v as FormData["escopo"]);
             // Resetar campos dependentes ao trocar escopo
             updateField("prodStatus", "");
-            updateField("ferramenta", "");
+            updateField("ferramentas", []);
             updateField("ferramentaOutra", "");
             updateField("servicoExterno", "");
           }}

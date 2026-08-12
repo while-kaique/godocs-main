@@ -67,6 +67,13 @@ import {
 } from '@/lib/email-legados.functions'
 import { runBackground } from '@/lib/background'
 import { criarChamadoAjuda } from '@/lib/ajuda.functions'
+import {
+  listarFaq,
+  salvarCategoria,
+  arquivarFaq,
+  reordenarFaq,
+  desfazerFaq,
+} from '@/lib/faq.functions'
 import { listarAprovacoesPendentes, decidirAprovacao, reabrirPreAprovacoes } from '@/lib/aprovacoes.functions'
 import { notificarLideresPendentes, notificarLideresDoProjeto } from '@/lib/gomoon-lideres.functions'
 import { traduzirErroValidacao } from '@/lib/erro-validacao'
@@ -276,6 +283,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await criarChamadoAjuda(email, body))
     }
 
+    // ── FAQ (leitura: qualquer pessoa logada) ──
+    // A escrita mora em /api/admin/faq/* atrás de requireAdmin. O frontend usa
+    // /api/auth/me só para decidir o que PINTA — nunca como autorização (SPEC_FAQ D4).
+    if (pathname === '/api/faq' && method === 'GET') {
+      const email = getEmailFromRequest(request)
+      if (!email) return errorJson('Não autorizado.', 401)
+      return json(await listarFaq({ admin: await isAdmin(email) }))
+    }
+
     // ── Pré-aprovação do líder (autenticado, NÃO admin) ──
     // A fila é do LÍDER do autor (derivada da TeamGuide na submissão). O gate real é
     // server-side: `decidirAprovacao` só grava se existir linha pendente para o e-mail
@@ -421,6 +437,34 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const { email } = await requireAdmin(request)
       const id = pathname.split('/').pop()!
       return json(await deleteArea(id, email))
+    }
+
+    // ── FAQ: escrita (só admin) ──
+    // Cada assunto do FAQ é UM documento (título + resumo + corpo em markdown leve), então
+    // há uma rota de escrita só. "Remover" é ARQUIVAR (não existe DELETE aqui — os links do
+    // FAQ circulam em Chat, e-mail e dentro do formulário) e o slug é imutável na edição.
+    // Ver SPEC_FAQ.md (D2, D6, D13).
+    if (pathname === '/api/admin/faq/categoria' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await salvarCategoria(email, body))
+    }
+    // Volta para a versão imediatamente anterior do texto (1 nível — D14). O texto atual
+    // é descartado: a tela confirma isso antes de chamar.
+    if (pathname === '/api/admin/faq/desfazer' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await desfazerFaq(email, body))
+    }
+    if (pathname === '/api/admin/faq/arquivar' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await arquivarFaq(email, body))
+    }
+    if (pathname === '/api/admin/faq/reordenar' && method === 'POST') {
+      const { email } = await requireAdmin(request)
+      const body = await readBody(request)
+      return json(await reordenarFaq(email, body))
     }
 
     if (pathname === '/api/admin/admins' && method === 'GET') {

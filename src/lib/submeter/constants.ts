@@ -15,10 +15,146 @@ export const AREAS = [
   "Sourcing & Procurement Gobeauté", "Supply Gogroup", "Tecnologia",
 ] as const;
 
-export const FERRAMENTAS = [
-  "n8n", "Python", "Google Apps Script", "Claude + GoDeploy",
-  "Claude", "Vercel", "Outros"
+// ─── Ferramentas de CONSTRUÇÃO do projeto (MULTI-seleção) ────────────────────
+// O campo responde "com o que isto foi CONSTRUÍDO", não "do que isto depende para
+// rodar": banco, APIs e integrações (Supabase, Shopify…) são conteúdo da
+// DOCUMENTAÇÃO, não desta lista. ⚠️ **GoDeploy é a ÚNICA exceção aceita aqui**
+// (decisão 12/08/2026) — é a nossa infra de deploy e antes só existia grudada na
+// opção "Claude + GoDeploy", de quando o campo era de escolha ÚNICA. Não abrir a
+// exceção para mais nada (o próximo pedido será Supabase, e aí a lista deixa de
+// responder "com o que foi construído").
+//
+// ⚠️ Multi-seleção desde 12/08/2026 (antes: um `<select>`). A coluna do banco e do
+// Sheets segue sendo UMA string (`projetos.ferramenta`, 200 chars) — as escolhas são
+// unidas por `FERRAMENTA_SEP` (" + "), o MESMO separador que o valor legado
+// "Claude + GoDeploy" já usava, então nada precisou migrar na planilha e o valor
+// antigo se desmonta sozinho na leitura (`desserializarFerramentas`).
+//
+// `familia`/`variante` existem só para a TIPOGRAFIA do seletor: as 3 superfícies do
+// Claude aparecem com "Claude" em peso leve e a superfície em negrito, o que agrupa os
+// três chips sem precisar desenhar uma caixa em volta deles.
+export const FERRAMENTA_OUTROS = "Outros";
+export const FERRAMENTA_SEP = " + ";
+export const PREFIXO_OUTROS = "Outros: ";
+// = `ferramenta` no schema do banco e no zod de `chat.functions.ts`.
+export const FERRAMENTA_MAX = 200;
+
+export type FerramentaOpcao = {
+  value: string;
+  // Rótulo EXIBIDO quando o `value` não cabe na coluna da grade. O gravado é sempre o
+  // `value` (a planilha e o glossário dos prompts dependem dele).
+  label?: string;
+  familia?: string;
+  variante?: string;
+  // Cor do logo da ferramenta no seletor (`.go-grid-check-marca-<marca>` em styles.css).
+  // Só estético — o estado marcado/não nunca depende de cor.
+  marca?: string;
+};
+
+// ⚠️ SEM ícone/emoji de propósito. A primeira versão dava um emoji a cada opção e a fileira
+// virava uma cartela de adesivos que competia com a única coisa que o campo precisa mostrar:
+// quais estão marcados e que as 3 superfícies do Claude são a mesma família.
+//
+// ⚠️ **A ORDEM ABAIXO É A ORDEM VISUAL, e a grade preenche por COLUNA** (`grid-auto-flow:
+// column`, 3 linhas) — arranjo pedido pelo Luis em 12/08/2026:
+//
+//     Claude.ai       │ Python   │ Apps Script
+//     Claude Cowork   │ n8n      │ Vercel
+//     Claude Code     │ GoDeploy │ Outros
+//
+// As 3 superfícies do Claude ficam **empilhadas na 1ª coluna** (é o que agrupa a família, sem
+// caixa em volta); o GoDeploy fecha a 2ª e o Vercel vai para a última, ao lado do Apps Script,
+// com "Outros" sempre por último. ⚠️ Mexer nesta ordem muda TAMBÉM a ordem
+// dos nomes dentro da string gravada (`serializarFerramentas` usa esta lista) — é inofensivo,
+// porque nada lê a coluna por posição, mas a string de um mesmo projeto muda de forma.
+export const FERRAMENTAS_OPCOES: readonly FerramentaOpcao[] = [
+  // Coluna 1 — a família Claude, de cima para baixo, na cor do logo dele (`marca`)
+  { value: "Claude.ai",     familia: "Claude", variante: ".ai",    marca: "claude" },
+  { value: "Claude Cowork", familia: "Claude", variante: "Cowork", marca: "claude" },
+  { value: "Claude Code",   familia: "Claude", variante: "Code",   marca: "claude" },
+  // Coluna 2
+  { value: "Python" },
+  { value: "n8n" },
+  { value: "GoDeploy" },
+  // Coluna 3
+  { value: "Google Apps Script", label: "Apps Script" },
+  { value: "Vercel" },
+  { value: FERRAMENTA_OUTROS },
 ] as const;
+
+// Ordem canônica das opções (a mesma da lista acima, que é a ordem VISUAL) — é a ordem em que
+// a string é montada, para que a mesma escolha gere SEMPRE a mesma string.
+export const FERRAMENTAS: readonly string[] = FERRAMENTAS_OPCOES.map((o) => o.value);
+
+// Valores gravados por versões anteriores do formulário (escolha única) e pela
+// planilha, mapeados para as opções atuais. Chave comparada em MINÚSCULAS.
+// "Claude" sozinho vira **Claude Code**: o campo pergunta com o que se CONSTRUIU e, no
+// GoGroup, o Claude que constrói é o Claude Code — é o que o glossário do analisador
+// (`analyzer.ts`) já dizia. "Claude + GoDeploy" não precisa de entrada própria: quebra
+// no separador e cada metade cai aqui.
+export const FERRAMENTAS_LEGADO: Record<string, string> = {
+  "claude": "Claude Code",
+  "claude ai": "Claude.ai",
+  "claude chat": "Claude.ai",
+  "godeploy": "GoDeploy",
+};
+
+// "n8n + Claude Code" → ["n8n", "Claude Code"]. `Outros: <texto>` volta separado em
+// `ferramentaOutra`. ⚠️ Valor LEGADO fora da lista (a planilha traz "Power Automate",
+// "VBA"…) é preservado como escolha EXTRA — o seletor o desenha como chip próprio, para
+// a edição nunca dar a impressão de que o dado sumiu (era o papel da `<option>` extra
+// do antigo `<select>`). Função pura — testável.
+export function desserializarFerramentas(bruto: string | null | undefined): {
+  ferramentas: string[];
+  ferramentaOutra: string;
+} {
+  const tokens = (bruto ?? "").split(FERRAMENTA_SEP).map((t) => t.trim()).filter(Boolean);
+  const ferramentas: string[] = [];
+  let ferramentaOutra = "";
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (lower.startsWith(PREFIXO_OUTROS.toLowerCase())) {
+      ferramentaOutra = token.slice(PREFIXO_OUTROS.length).trim();
+      if (!ferramentas.includes(FERRAMENTA_OUTROS)) ferramentas.push(FERRAMENTA_OUTROS);
+      continue;
+    }
+    const canonico =
+      FERRAMENTAS.find((f) => f.toLowerCase() === lower) ??
+      FERRAMENTAS_LEGADO[lower] ??
+      token;
+    if (!ferramentas.includes(canonico)) ferramentas.push(canonico);
+  }
+  return { ferramentas, ferramentaOutra };
+}
+
+// Inverso: junta as escolhas em UMA string para o banco/Sheets, na ordem canônica da
+// lista — NÃO na ordem dos cliques, senão a mesma escolha geraria strings diferentes e
+// o `metaChanged` do wizard acusaria mudança fantasma (reprocessando o agente de graça).
+// Valor legado fora da lista vai no fim. "Outros" viaja como "Outros: <texto>".
+// Função pura — testável.
+export function serializarFerramentas(ferramentas: string[], ferramentaOutra: string): string {
+  const escolhidas = ferramentas ?? [];
+  const conhecidas = FERRAMENTAS.filter((f) => escolhidas.includes(f));
+  const extras = escolhidas.filter((f) => !FERRAMENTAS.includes(f));
+  const outra = (ferramentaOutra ?? "").trim();
+  return [...conhecidas, ...extras]
+    .map((f) => (f === FERRAMENTA_OUTROS && outra ? `${PREFIXO_OUTROS}${outra}` : f))
+    .join(FERRAMENTA_SEP);
+}
+
+// Quantos caracteres ainda cabem em "Especifique a ferramenta". Antes era um 192 fixo
+// (200 do schema − os 8 chars de "Outros: "); com multi-seleção o RESTO da string também
+// ocupa espaço, e um cap fixo voltaria a produzir erro de validação DEPOIS de tudo
+// preenchido (é a família do bug do caso Josiely — ver `erro-validacao.ts`).
+// Função pura — testável.
+export function limiteFerramentaOutra(ferramentas: string[]): number {
+  const semTexto = serializarFerramentas(ferramentas, "");
+  // O token cru "Outros" (6) vira o prefixo "Outros: " (8) quando há texto.
+  const extra = (ferramentas ?? []).includes(FERRAMENTA_OUTROS)
+    ? PREFIXO_OUTROS.length - FERRAMENTA_OUTROS.length
+    : 0;
+  return Math.max(0, FERRAMENTA_MAX - semTexto.length - extra);
+}
 
 // Extensões de documentos legíveis
 export const ACCEPTED_DOC_EXT_BASE = [".pdf", ".docx", ".doc", ".txt", ".md"];
@@ -169,14 +305,19 @@ export function validarEtapa1(
       if (!form.servicoExterno.trim())
         errs.servicoExterno = "Informe o nome do serviço externo";
     } else {
-      if (!form.ferramenta) errs.ferramenta = "Selecione a ferramenta";
+      if ((form.ferramentas ?? []).length === 0)
+        errs.ferramentas = "Selecione ao menos uma ferramenta";
     }
   }
 
-  // A ferramenta É editável na edição (a stack muda: ex. Vercel → GoDeploy), mas segue
-  // sem ser obrigatória num legado que nunca a teve. O que vale nos DOIS modos: escolher
-  // "Outros" sem escrever o nome gravaria a string "Outros" — sempre exigimos o nome.
-  if (form.escopo !== "externo" && form.ferramenta === "Outros" && !form.ferramentaOutra.trim())
+  // As ferramentas SÃO editáveis na edição (a stack muda: ex. Vercel → GoDeploy), mas
+  // seguem sem ser obrigatórias num legado que nunca as teve. O que vale nos DOIS modos:
+  // marcar "Outros" sem escrever o nome gravaria a string "Outros" — sempre exigimos o nome.
+  if (
+    form.escopo !== "externo" &&
+    (form.ferramentas ?? []).includes(FERRAMENTA_OUTROS) &&
+    !form.ferramentaOutra.trim()
+  )
     errs.ferramentaOutra = "Especifique a ferramenta utilizada";
 
   // Participantes e papéis — exigidos SEMPRE quando "em equipe = sim" (nova e edição).
@@ -319,7 +460,9 @@ export interface FormData {
   prodStatus: "sim" | "dev" | "idle" | "";
   nome: string;
   email: string;
-  ferramenta: string;
+  // Ferramentas com que o projeto foi CONSTRUÍDO — multi-seleção (12/08/2026). Vira UMA
+  // string no banco/Sheets via `serializarFerramentas`; ver o bloco no topo do arquivo.
+  ferramentas: string[];
   ferramentaOutra: string;
   servicoExterno: string;
   emEquipe: "sim" | "nao" | "";

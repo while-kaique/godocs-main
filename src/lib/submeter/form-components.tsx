@@ -270,7 +270,131 @@ export function CardCheckboxGroup({
   );
 }
 
-export function InfoTooltip({ children }: { children: React.ReactNode }) {
+/**
+ * Multisseleção em GRADE de checkboxes. É o padrão para lista LONGA de opções CURTAS: o
+ * `CheckboxGroup` acima divide a linha em partes iguais (`flex-1`) e aperta tudo a partir de
+ * 3 itens, e o `CardCheckboxGroup` empilha um card por opção — com 9 opções viraria uma
+ * parede de 9 cards para uma decisão de um clique.
+ *
+ * ⚠️ A 1ª versão eram PÍLULAS que embrulhavam, e ficou visualmente estranha dentro do
+ * formulário de submissão: larguras irregulares, uma última linha com item órfão, e era o
+ * único controle arredondado numa tela em que todo radio é retângulo de largura regular —
+ * as pílulas liam como "tags de leitura", não como "marque vários". A grade de colunas
+ * iguais resolve os três problemas de uma vez. Não voltar para pílulas aqui.
+ *
+ * ⚠️ A grade preenche por **COLUNA** (`grid-auto-flow: column`), não por linha: a ordem das
+ * `options` é lida de cima para baixo na 1ª coluna, depois na 2ª, depois na 3ª. É o que permite
+ * empilhar opções irmãs numa coluna só. O nº de linhas é calculado aqui e vai inline — sem ele,
+ * uma opção a mais abriria uma 4ª coluna e a grade transbordaria para o lado.
+ *
+ * `familia`/`variante`: quando várias opções são superfícies da MESMA ferramenta
+ * (Claude.ai · Claude Cowork · Claude Code), quem agrupa é a TIPOGRAFIA — "Claude" em peso
+ * leve, a superfície em negrito — somada à POSIÇÃO (as 3 empilhadas na mesma coluna). Nenhuma
+ * caixa desenhada em volta.
+ *
+ * `label` mostra um rótulo mais curto que o `value` gravado (ex.: "Apps Script" para
+ * "Google Apps Script"), para o texto não quebrar dentro da coluna.
+ *
+ * `marca` troca o azul GoGroup pela cor do logo da ferramenta (`.go-grid-check-marca-<marca>`
+ * no CSS). É campo PRÓPRIO, não derivado de `familia`, porque cor de marca e agrupamento de
+ * família são coisas independentes. ⚠️ Puramente estético: o estado (marcado/não) nunca é
+ * comunicado por cor, então nenhuma informação depende dela.
+ *
+ * A11y: o estado NUNCA é só cor — a caixinha enche de azul com um "✓" e o rótulo engrossa;
+ * o input é `sr-only` (o toggle responde a Espaço) e o anel de foco de teclado envolve a
+ * célula inteira via `:has(:focus-visible)`; a animação do check é curta e o CSS global a
+ * neutraliza sob `prefers-reduced-motion`.
+ */
+export function GridCheckboxGroup({
+  options, value, onChange, error, ariaLabel, colunas = 3,
+}: {
+  options: { value: string; label?: string; familia?: string; variante?: string; marca?: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  error?: string;
+  ariaLabel?: string;
+  colunas?: number;
+}) {
+  const linhas = Math.max(1, Math.ceil(options.length / colunas));
+  return (
+    <>
+      <div
+        className="go-grid-check"
+        role="group"
+        aria-label={ariaLabel}
+        style={{ gridTemplateRows: `repeat(${linhas}, auto)` }}
+      >
+        {options.map((opt) => {
+          const checked = value.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className={cn(
+                "go-grid-check-item",
+                checked && "go-grid-check-on",
+                opt.marca && `go-grid-check-marca-${opt.marca}`,
+              )}
+            >
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={checked}
+                onChange={() =>
+                  onChange(checked ? value.filter((x) => x !== opt.value) : [...value, opt.value])
+                }
+              />
+              <span aria-hidden="true" className="go-grid-check-box">
+                {checked && (
+                  <svg
+                    width="11" height="11" viewBox="0 0 24 24" fill="none"
+                    stroke="#fff" strokeWidth="4"
+                    strokeLinecap="round" strokeLinejoin="round"
+                    style={{ animation: "go-step-in 0.15s ease" }}
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span>
+                {opt.familia ? (
+                  <>
+                    <span className="go-grid-check-familia">{opt.familia}</span>
+                    {/* "Claude" + ".ai" cola; "Claude" + "Cowork" precisa do espaço. */}
+                    {opt.variante?.startsWith(".") ? "" : " "}
+                    {/* Span próprio porque é a VARIANTE que recebe a cor de `marca`: é a parte
+                        que diferencia uma opção da outra dentro da mesma família. */}
+                    <span className="go-grid-check-variante">{opt.variante}</span>
+                  </>
+                ) : (
+                  opt.label ?? opt.value
+                )}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <FieldError message={error} />
+    </>
+  );
+}
+
+/**
+ * Balão de ajuda em portal, aberto no HOVER e no FOCO (teclado) do gatilho.
+ *
+ * `trigger` troca o ícone "i" por qualquer conteúdo — usado quando a ajuda precisa de uma
+ * PERGUNTA visível ("Qual a diferença entre os 3 Claudes?") em vez de um ícone que a pessoa
+ * tem de adivinhar que existe. Os handlers, o `tabIndex` e o `role` ficam no MESMO span nos
+ * dois casos, então o gatilho de texto é tão alcançável por teclado quanto o ícone.
+ * `largura` sobe o padrão de 300px quando o conteúdo é uma lista curta.
+ */
+export function InfoTooltip({
+  children, trigger, largura = 300, ariaLabel,
+}: {
+  children: React.ReactNode;
+  trigger?: React.ReactNode;
+  largura?: number;
+  ariaLabel?: string;
+}) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
   const [coords, setCoords] = useState({ bottom: 0, left: 0 });
@@ -298,7 +422,7 @@ export function InfoTooltip({ children }: { children: React.ReactNode }) {
             left: coords.left,
             transform: "translateX(-50%)",
             zIndex: 9999,
-            width: 300,
+            width: largura,
             maxWidth: "90vw",
             padding: "12px 14px",
             background: "var(--go-blue)",
@@ -332,16 +456,16 @@ export function InfoTooltip({ children }: { children: React.ReactNode }) {
     <>
       <span
         ref={iconRef}
-        className="go-info-icon"
+        className={trigger ? "go-hint-link" : "go-info-icon"}
         tabIndex={0}
         role="button"
-        aria-label="Mais informações"
+        aria-label={ariaLabel ?? "Mais informações"}
         onMouseEnter={show}
         onFocus={show}
         onMouseLeave={() => setVisible(false)}
         onBlur={() => setVisible(false)}
       >
-        i
+        {trigger ?? "i"}
       </span>
       {tooltip}
     </>
