@@ -219,7 +219,7 @@ Os campos em null representam informações que o código não revelou — podem
 
 FERRAMENTAS INTERNAS DO GOGROUP (contexto para você):
 O campo declara com o que o projeto foi CONSTRUÍDO (o que ele usa para FUNCIONAR — banco, APIs, integrações — é conteúdo da documentação) e aceita VÁRIAS ferramentas, unidas por " + ".
-- **Claude.ai · Claude Cowork · Claude Code**: as 3 superfícies do Claude (LLM da Anthropic) usadas para construir — conversa no navegador, ambiente de trabalho e agente de código. Construir com Claude não significa que a automação use IA ao rodar.
+- **Claude AI · Claude Cowork · Claude Code**: as 3 superfícies do Claude (LLM da Anthropic) usadas para construir — conversa no navegador, ambiente de trabalho e agente de código. Construir com Claude não significa que a automação use IA ao rodar.
 - **GoDeploy**: plataforma interna de deploy do GoGroup (hospeda SPAs + Workers/APIs, SQLite gerenciado, cron jobs, edge auth). Única ferramenta de execução aceita no campo.
 - **n8n**: plataforma de automação de workflows (low-code) para integrações, webhooks e orquestração.
 - **Python**: scripts e aplicações para automações, análise de dados, ML, scrapers.

@@ -904,7 +904,7 @@ stack de um projeto vivo muda de verdade.
 ## Feature adicional — Ferramentas em MULTI-seleção (grade 3×3) + o Claude dividido em 3 (12/08/2026)
 
 **Pedido (Luis, 12/08/2026):** "quero que torne o campo de ferramentas uma multi-seleção
-(pense de forma bem agradável e bonita de usar) e divida 'Claude' entre 'Claude.ai',
+(pense de forma bem agradável e bonita de usar) e divida 'Claude' entre 'Claude AI',
 'Claude Cowork' e 'Claude Code'. Além disso, bote uma frase dizendo que é a ferramenta usada
 para construção do projeto, e não a ferramenta na qual o projeto funciona (até pq isso fica
 na documentação, como supabase e tal)." Complemento no mesmo dia: **"godeploy pode ficar como
@@ -945,7 +945,7 @@ repense e melhore"** (o que trocou pílulas por grade — item 5 abaixo).
      **arranjo foi fechado pelo Luis olhando a tela**:
 
      ```
-     Claude.ai      │ Python   │ Apps Script
+     Claude AI      │ Python   │ Apps Script
      Claude Cowork  │ n8n      │ Vercel
      Claude Code    │ GoDeploy │ Outros
      ```

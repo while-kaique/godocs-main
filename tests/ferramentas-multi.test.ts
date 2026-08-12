@@ -54,7 +54,7 @@ describe('serializarFerramentas — lista → a string que vai para o Sheets', (
 
   // A grade é preenchida por COLUNA, então a ordem visual (= canônica) começa pelos Claudes.
   it('a ordem canônica abre pela família Claude (1ª coluna da grade)', () => {
-    expect(serializarFerramentas(['Vercel', 'Claude.ai'], '')).toBe('Claude.ai + Vercel');
+    expect(serializarFerramentas(['Vercel', 'Claude AI'], '')).toBe('Claude AI + Vercel');
   });
 
   it('"Outros" sem texto não inventa prefixo', () => {
@@ -88,6 +88,17 @@ describe('desserializarFerramentas — a string do banco → os chips da ediçã
     expect(desserializarFerramentas('Claude').ferramentas).toEqual(['Claude Code']);
   });
 
+  // ⚠️ A opção nasceu como "Claude.ai" e ficou NO AR em prod por ~1h em 12/08/2026 antes de a
+  // grafia virar "Claude AI". Projeto submetido nessa janela carrega a string antiga: sem o
+  // mapeamento, ele reabriria na edição com ZERO opção marcada.
+  it('"Claude.ai" (grafia que esteve em prod) vira "Claude AI"', () => {
+    expect(desserializarFerramentas('Claude.ai').ferramentas).toEqual(['Claude AI']);
+    expect(desserializarFerramentas('Claude.ai + GoDeploy').ferramentas).toEqual([
+      'Claude AI',
+      'GoDeploy',
+    ]);
+  });
+
   it('caixa da planilha não importa ("python" → "Python")', () => {
     expect(desserializarFerramentas('python').ferramentas).toEqual(['Python']);
   });
@@ -119,7 +130,7 @@ describe('ida-e-volta: marcar → gravar → reabrir devolve a MESMA escolha', (
   const casos: { ferramentas: string[]; outra: string }[] = [
     { ferramentas: ['Python'], outra: '' },
     { ferramentas: ['Claude Code', 'n8n'], outra: '' },
-    { ferramentas: ['Claude.ai', 'Claude Cowork', 'Claude Code'], outra: '' },
+    { ferramentas: ['Claude AI', 'Claude Cowork', 'Claude Code'], outra: '' },
     { ferramentas: ['GoDeploy', 'Google Apps Script', 'Vercel'], outra: '' },
     { ferramentas: ['n8n', 'Outros'], outra: 'Retool' },
     { ferramentas: ['Power Automate'], outra: '' },
@@ -137,9 +148,9 @@ describe('ida-e-volta: marcar → gravar → reabrir devolve a MESMA escolha', (
 
   // Clicar fora de ordem não perde nem embaralha nada: a volta entrega a ordem canônica.
   it('marcar em ordem qualquer reabre na ordem canônica, com o mesmo conjunto', () => {
-    const gravado = serializarFerramentas(['Outros', 'GoDeploy', 'Claude.ai'], 'Retool');
+    const gravado = serializarFerramentas(['Outros', 'GoDeploy', 'Claude AI'], 'Retool');
     expect(desserializarFerramentas(gravado)).toEqual({
-      ferramentas: ['Claude.ai', 'GoDeploy', 'Outros'],
+      ferramentas: ['Claude AI', 'GoDeploy', 'Outros'],
       ferramentaOutra: 'Retool',
     });
   });
@@ -178,7 +189,7 @@ describe('a lista de opções em si', () => {
   // O pedido que originou a feature: "Claude" deixou de ser uma opção só e virou 3
   // superfícies. Voltar a ter um "Claude" genérico desfaz a razão da mudança.
   it('as 3 superfícies do Claude existem e o "Claude" genérico não', () => {
-    expect(FERRAMENTAS).toContain('Claude.ai');
+    expect(FERRAMENTAS).toContain('Claude AI');
     expect(FERRAMENTAS).toContain('Claude Cowork');
     expect(FERRAMENTAS).toContain('Claude Code');
     expect(FERRAMENTAS).not.toContain('Claude');

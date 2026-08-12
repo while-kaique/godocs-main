@@ -1502,7 +1502,7 @@ export function SubmeterPageContent({
       // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
       toast.warning(
         `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
         { duration: 10000 },
       );
       setShaking(true);
@@ -1745,7 +1745,7 @@ export function SubmeterPageContent({
       // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
       toast.warning(
         `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
         { duration: 10000 },
       );
       setShaking(true);

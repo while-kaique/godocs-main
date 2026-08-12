@@ -288,7 +288,7 @@ export function CardCheckboxGroup({
  * uma opção a mais abriria uma 4ª coluna e a grade transbordaria para o lado.
  *
  * `familia`/`variante`: quando várias opções são superfícies da MESMA ferramenta
- * (Claude.ai · Claude Cowork · Claude Code), quem agrupa é a TIPOGRAFIA — "Claude" em peso
+ * (Claude AI · Claude Cowork · Claude Code), quem agrupa é a TIPOGRAFIA — "Claude" em peso
  * leve, a superfície em negrito — somada à POSIÇÃO (as 3 empilhadas na mesma coluna). Nenhuma
  * caixa desenhada em volta.
  *
@@ -359,7 +359,9 @@ export function GridCheckboxGroup({
                 {opt.familia ? (
                   <>
                     <span className="go-grid-check-familia">{opt.familia}</span>
-                    {/* "Claude" + ".ai" cola; "Claude" + "Cowork" precisa do espaço. */}
+                    {/* Variante que começa com "." colaria na família ("Claude" + ".ai"); as
+                        demais levam espaço ("Claude" + "AI"/"Cowork"). Hoje nenhuma usa a forma
+                        com ponto, mas a regra fica no dado, não no layout. */}
                     {opt.variante?.startsWith(".") ? "" : " "}
                     {/* Span próprio porque é a VARIANTE que recebe a cor de `marca`: é a parte
                         que diferencia uma opção da outra dentro da mesma família. */}
