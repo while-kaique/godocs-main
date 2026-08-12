@@ -303,6 +303,21 @@ export const NUDGE_GANHO_REAL_SEM_RESPOSTA =
  * Mensagem de BLOQUEIO ('projetado'). Precisa fazer três coisas ao mesmo tempo: dizer o
  * porquê sem culpar quem foi honesto, deixar claro que não dá para seguir, e oferecer as
  * DUAS saídas reais — senão a pessoa fica presa e o gate vira o bug que ele deveria evitar.
+ *
+ * ⚠️ As duas saídas NÃO são equivalentes, e a versão anterior deste texto as apresentava como
+ * dois bullets simétricos de uma linha ("volte quando houver medição" × "marque especial"). Dois
+ * problemas reais nisso:
+ *
+ *  1. **"Volte" não dizia o que acontece com a submissão de hoje.** Quem lia entendia uma pausa
+ *     de minutos, não "esta submissão não se conclui agora; o projeto fica em Rascunhos". O
+ *     rascunho existe desde o `iniciarSubmissao` (`status: 'rascunho'`), aparece em "Meus
+ *     Projetos" → aba Rascunhos e guarda doc + conversa — mas nada disso estava escrito.
+ *  2. **"Especial" virava o botão de fuga.** Especial é para impacto que por NATUREZA não tem
+ *     número objetivo (engajamento, qualidade, base que destrava outras automações) — e entra na
+ *     planilha SEM valor de ganho. Oferecido como alternativa simétrica a quem só falta medir, ele
+ *     convida a pessoa travada a se declarar imensurável para conseguir sair da tela: o ganho real
+ *     de 2 meses depois nunca aparece no consolidado. Por isso a elegibilidade vem ANTES do
+ *     convite, e o texto diz explicitamente que, faltando só tempo de rodagem, especial é ERRADO.
  */
 export function mensagemGanhoProjetado(modo: 'saving' | 'receita'): string {
   const oQue = modo === 'receita' ? 'a receita incremental' : 'o saving'
@@ -311,12 +326,23 @@ export function mensagemGanhoProjetado(modo: 'saving' | 'receita'): string {
     `GoDocs registra apenas ganho **já realizado e medido**: é a premissa da Etapa 1 ("o projeto ` +
     `já está em produção e sendo utilizado"). Um número que ainda vai se confirmar entraria na ` +
     `planilha como resultado apurado, e a gestão soma esses valores como ganho real.\n\n` +
-    `Dois caminhos daqui:\n\n` +
-    `- **Volte quando houver medição.** Deixe o projeto rodando o tempo necessário, apure o ` +
-    `número de verdade e reabra a submissão — a documentação técnica fica salva.\n` +
-    `- **Submeta como projeto especial.** Se o impacto é alto mas difícil de medir agora, volte à ` +
-    `Etapa 2 e marque o projeto como **especial**: ele vai direto para a validação humana, sem ` +
-    `memorial financeiro.\n\n` +
+    `Há dois caminhos daqui — e eles **não** são equivalentes:\n\n` +
+    `**1. Volte quando houver medição** — é o caminho da maioria dos casos.\n` +
+    `Isto significa **não concluir esta submissão hoje**. O que acontece:\n` +
+    `- o projeto fica salvo em **"Meus Projetos" → aba Rascunhos**, com a documentação técnica e ` +
+    `esta conversa;\n` +
+    `- você deixa a automação rodando o tempo necessário (semanas, meses) e apura o número de ` +
+    `verdade em algo conferível — um relatório, painel ou base;\n` +
+    `- depois retoma o rascunho e refaz **só esta etapa financeira**: a documentação não precisa ` +
+    `ser reescrita.\n` +
+    `Não é uma pausa de minutos — é "este projeto entra no GoDocs quando existir medição".\n\n` +
+    `**2. Submeta como projeto especial** — só se o ganho **nunca** vai ter número objetivo.\n` +
+    `Especial é para impacto alto que é difícil de medir **por natureza**: engajamento, qualidade ` +
+    `do produto, uma base que destrava outras automações. Ele pula esta etapa financeira, vai ` +
+    `direto para a validação humana e entra na planilha **sem valor de ganho**.\n` +
+    `⚠️ Se o seu ganho **é** mensurável e só falta tempo de rodagem, especial é o caminho ERRADO: ` +
+    `ele declara o projeto como imensurável e o seu resultado real nunca aparece no consolidado da ` +
+    `gestão. Nesse caso, o caminho é o 1.\n\n` +
     `Se eu entendi errado e o ganho JÁ foi apurado, me diga há quanto tempo a solução roda e onde ` +
     `esse número é medido — aí eu sigo.`
   )
@@ -332,9 +358,12 @@ export function mensagemGanhoProjetadoRepetida(modo: 'saving' | 'receita'): stri
   const oQue = modo === 'receita' ? 'a receita' : 'o saving'
   return (
     `Sigo sem poder fechar ${oQue} com um número que ainda não foi medido — isso não muda ` +
-    `conversando. Para retomar: reabra o formulário desta etapa quando tiver a medição, ou ` +
-    `marque o projeto como **especial** na Etapa 2. Se o ganho JÁ foi apurado, me diga há ` +
-    `quanto tempo a solução roda e onde o número é medido, e eu sigo daqui.`
+    `conversando. Esta submissão não se conclui hoje: o projeto está salvo em **"Meus Projetos" → ` +
+    `aba Rascunhos**, com a documentação e esta conversa, e você o retoma quando tiver a medição ` +
+    `de verdade. A outra saída é marcar o projeto como **especial** na Etapa 2 — mas só se o ganho ` +
+    `nunca for ter número objetivo, porque especial entra na planilha sem valor de ganho. Se o ` +
+    `ganho JÁ foi apurado, me diga há quanto tempo a solução roda e onde o número é medido, e eu ` +
+    `sigo daqui.`
   )
 }
 
