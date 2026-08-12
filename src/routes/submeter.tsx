@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch, ApiError } from "@/lib/api-client";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
+import { CODIGOS_TRIAGEM_ESPECIAL } from "@/lib/mensagens-submissao";
 
 import {
   filesToDocs, TOKEN_BLOCK_CHARS,
@@ -15,7 +16,6 @@ import {
   limitarCoautorUnico, deveMostrarIntro,
   validarEtapa25Especial, motivoBloqueioEspecial,
 } from "@/lib/submeter/constants";
-import { bloqueioEspecialInvalido } from "@/lib/mensagens-submissao";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
@@ -1167,6 +1167,14 @@ export function SubmeterPageContent({
 
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
+  /* Triagem do especial: MESMA régua pura da tela e dos handlers de envio (fonte única
+     `motivoBloqueioEspecial`). Fica aqui, derivada do form a cada render, por dois motivos:
+     (1) o botão de envio precisa nascer DESABILITADO enquanto a triagem bloqueia — antes ele
+     seguia clicável e cada clique era mais um caminho para o mesmo bloqueio; (2) sendo
+     derivado, ele SOME sozinho quando a pessoa troca a resposta para "não" — o painel que
+     vinha de estado (`bloqueio`) sobrevivia à correção e mentia na tela. */
+  const motivoEspecialAtual = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
+
   /* ── Metadados do agente: snapshot + detecção de mudança ── */
   const computeFerramenta = useCallback((): string => {
     return form.escopo === "externo"
@@ -1424,6 +1432,9 @@ export function SubmeterPageContent({
     updateField(campo, valor);
     clearError(campo);
     clearError("especialBloqueio");
+    // Trocar a resposta é uma tentativa NOVA: um painel de bloqueio anterior (inclusive um
+    // vindo da API, como doc ausente) não pode ficar na tela contradizendo a resposta atual.
+    setBloqueio(null);
     // Trocar a 1ª resposta para "sim" torna a 2ª pergunta invisível (o projeto já está
     // bloqueado) — a resposta dela deixa de valer e é zerada, para nunca sobrar juízo
     // sobre uma pergunta que a pessoa não está mais vendo.
@@ -1582,9 +1593,12 @@ export function SubmeterPageContent({
     // clique do "sim", e aqui ele vai pelo MESMO canal dos outros bloqueios de
     // preenchimento (painel âmbar ancorado ao botão + toast curto): é orientação, não
     // falha do sistema, então nunca em vermelho.
-    const motivoEspecial = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
-    if (motivoEspecial) {
-      setBloqueio(bloqueioEspecialInvalido(motivoEspecial));
+    // ⚠️ NÃO chame `setBloqueio` aqui: na Etapa 2.5 o painel do especial é renderizado pelo
+    // `step25`, DERIVADO da resposta. Duplicar o mesmo aviso no estado dava DOIS painéis
+    // idênticos no primeiro clique e um painel que sobrevivia à troca da resposta.
+    // Este ramo é defesa em profundidade — o botão já nasce desabilitado com a triagem
+    // bloqueada, então só se chega aqui por teclado/automação.
+    if (motivoEspecialAtual) {
       toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
@@ -2456,9 +2470,10 @@ export function SubmeterPageContent({
     // `handleEnviarEspecial`. Está aqui porque um projeto marcado como especial também
     // alcança a Etapa 3 (navegação pelo topo / conversão de tipo), e o bloqueio não pode
     // depender de qual botão a pessoa achou primeiro.
+    // Idem: quem renderiza o aviso é a Etapa 2.5, para onde devolvemos a pessoa. Sem o
+    // `setBloqueio`, o painel de lá é o único e acompanha a resposta.
     const motivoEspecialSubmit = motivoBloqueioEspecial(form);
     if (motivoEspecialSubmit) {
-      setBloqueio(bloqueioEspecialInvalido(motivoEspecialSubmit));
       toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
       setShowEtapa25(true);
       goToStep(2, "back");
@@ -2884,7 +2899,7 @@ export function SubmeterPageContent({
           {/* Bloqueio de envio do fluxo ESPECIAL (o botão "Enviar Projeto" fica na navegação
               da Etapa 2.5). Na etapa 3 o painel é renderizado dentro da revisão final, junto
               do botão "Enviar para Triagem". */}
-          {bloqueio && step === 2 && showEtapa25 && (
+          {bloqueio && step === 2 && showEtapa25 && !CODIGOS_TRIAGEM_ESPECIAL.includes(bloqueio.codigo) && (
             <div style={{ padding: "0 32px" }}>
               <AvisoBloqueio bloqueio={bloqueio} />
             </div>
@@ -2930,7 +2945,15 @@ export function SubmeterPageContent({
                 <button
                   type="button"
                   onClick={handleEnviarEspecial}
-                  disabled={enviandoEspecial}
+                  // Com a triagem bloqueando, o botão fica QUIETO: o painel âmbar logo acima
+                  // é a explicação, e um botão que só devolve o mesmo aviso a cada clique
+                  // (duplicando-o) não ensina nada. `title` cobre quem chega pelo teclado.
+                  disabled={enviandoEspecial || !!motivoEspecialAtual}
+                  title={
+                    motivoEspecialAtual
+                      ? "Envio pausado: revise as respostas da triagem acima."
+                      : undefined
+                  }
                   className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
                 >
                   {enviandoEspecial ? (

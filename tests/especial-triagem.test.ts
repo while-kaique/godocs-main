@@ -17,9 +17,12 @@ import {
 } from "@/lib/submeter/constants";
 import {
   PERGUNTAS_ESPECIAL,
+  CODIGOS_TRIAGEM_ESPECIAL,
   mensagemEspecialDashboard,
   mensagemEspecialGanhoOrganizacional,
   mensagemEspecialInvalido,
+  bloqueioEspecialInvalido,
+  type MotivoBloqueioEspecial,
 } from "@/lib/mensagens-submissao";
 
 type Triagem = Parameters<typeof motivoBloqueioEspecial>[0];
@@ -174,5 +177,38 @@ describe("as 2 mensagens de bloqueio", () => {
     for (const msg of [dashboard, organizacional]) {
       expect(msg).not.toMatch(/R\$\s*[\d.,]+/);
     }
+  });
+});
+
+/**
+ * Regressão do painel DUPLICADO (12/08/2026, relatado em prod pelo Kaique): a Etapa 2.5
+ * renderiza o aviso da triagem DERIVADO da resposta, e o `submeter.tsx` renderiza o painel
+ * que vem do ESTADO (`bloqueio`, usado pelos bloqueios da API). Enquanto os handlers de envio
+ * também faziam `setBloqueio` com o aviso da triagem, os dois apareciam juntos — e o do
+ * estado ficava na tela mesmo depois de a pessoa trocar a resposta para "não".
+ *
+ * A separação depende desta lista: o painel de estado IGNORA os códigos da triagem. Se um
+ * bloqueio novo de FORMULÁRIO nascer sem entrar aqui, o aviso volta a duplicar — por isso o
+ * teste cobre a lista contra as mensagens realmente produzidas, e não a lista contra si mesma.
+ */
+describe("CODIGOS_TRIAGEM_ESPECIAL — o painel de estado sabe quais avisos NÃO são dele", () => {
+  it("cobre o código dos 2 motivos da triagem", () => {
+    const motivos: MotivoBloqueioEspecial[] = ["dashboard", "organizacional"];
+    for (const m of motivos) {
+      expect(CODIGOS_TRIAGEM_ESPECIAL).toContain(bloqueioEspecialInvalido(m).codigo);
+    }
+  });
+
+  it("cobre TODOS os motivos declarados em PERGUNTAS_ESPECIAL (pergunta nova não escapa)", () => {
+    for (const p of PERGUNTAS_ESPECIAL) {
+      expect(CODIGOS_TRIAGEM_ESPECIAL).toContain(bloqueioEspecialInvalido(p.id).codigo);
+    }
+    expect(CODIGOS_TRIAGEM_ESPECIAL).toHaveLength(PERGUNTAS_ESPECIAL.length);
+  });
+
+  it("não engole bloqueio da API (doc ausente / nome duplicado seguem no painel de estado)", () => {
+    expect(CODIGOS_TRIAGEM_ESPECIAL).not.toContain("doc_ausente");
+    expect(CODIGOS_TRIAGEM_ESPECIAL).not.toContain("nome_duplicado");
+    expect(CODIGOS_TRIAGEM_ESPECIAL).not.toContain("saving_sem_ganho");
   });
 });
