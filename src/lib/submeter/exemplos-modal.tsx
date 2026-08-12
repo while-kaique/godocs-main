@@ -1,19 +1,18 @@
 /* ──────────────────────────────────────────────
-   Ajuda por exemplos (campo do formulário)
+   Ajuda de campo (formulário de saving)
    ─────────────────────────────────────────────
 
-   Alguns campos do formulário de saving são conceitualmente escorregadios:
-   a pessoa acabou de marcar que a automação eliminou um gasto externo e, no
-   campo seguinte, é perguntada se AINDA há um trabalho manual adicional que
-   o contrato não cobria. Sem exemplos concretos, o "sim" vira dupla contagem.
+   Alguns campos do formulário são conceitualmente escorregadios: a pessoa acabou de
+   cadastrar o gasto que a empresa deixou de pagar e, no campo seguinte, é perguntada se
+   AINDA há um trabalho manual adicional que aquele gasto não cobria. Sem ajuda, o "sim"
+   vira dupla contagem.
 
-   `ExemplosCampoAjuda` é o par trigger + popup: um botão discreto abaixo do
-   texto de ajuda do campo que abre um modal centralizado (fundo embaçado) com
-   casos que VALEM e casos que NÃO VALEM, no mesmo esqueleto de 3 linhas
-   (contexto → custo eliminado → veredito), para dar pra comparar.
+   `ExemplosCampoAjuda` é o par trigger + popup: um botão discreto abaixo do texto de
+   ajuda do campo abre um modal centralizado (fundo embaçado) com uma LISTA CURTA de
+   sinais — "não é esse caso se…" seguido de "é esse caso se…" —, cada linha marcada com
+   ✕ ou ✓. Sem exemplos longos: a pessoa lê 6 frases e sabe responder.
 
-   Genérico de propósito: outros campos confusos podem reusar passando a
-   própria lista de exemplos. */
+   Genérico de propósito: outros campos confusos podem reusar passando a própria lista. */
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -22,68 +21,45 @@ import { Check, HelpCircle, X } from "lucide-react";
 const OLIVA = "#6b6e00";
 const VERMELHO = "#c53030";
 
-export type ExemploCampo = {
-  /** Situação em 1 frase — o que a automação faz. */
-  contexto: string;
-  /** O gasto externo que deixou de ser pago (com valor, para ancorar). */
-  custoEliminado: string;
-  /** true = conta como trabalho adicional; false = não conta. */
+export type SinalCampo = {
+  /** true = é esse caso (responda Sim); false = não é esse caso. */
   vale: boolean;
-  /** Por que vale / por que não vale. Veredito sem motivo não ensina nada. */
-  motivo: string;
+  /** A frase principal, em linguagem de quem preenche o formulário. */
+  texto: string;
+  /** Complemento curto: o porquê ou o que fazer em vez disso. */
+  detalhe?: string;
 };
 
-/* Exemplos do campo 2c ("há trabalho manual ADICIONAL que o contrato não
-   cobria?"). Os 3 que NÃO valem cobrem os 3 erros reais: mesmo escopo do
-   contrato (dupla contagem), horas que alguém JÁ fazia (é o outro ramo do
-   formulário) e trabalho que nasceu com a automação (custo, não ganho). */
-export const EXEMPLOS_TRABALHO_ADICIONAL: ExemploCampo[] = [
+/* Sinais do campo 2c ("há trabalho manual ADICIONAL que o gasto eliminado não cobria?").
+   Os 3 primeiros são os 3 erros reais: mesmo escopo do gasto · horas que ALGUÉM já fazia
+   (é o outro ramo do formulário) · trabalho que nasceu com a automação. */
+export const SINAIS_TRABALHO_ADICIONAL: SinalCampo[] = [
   {
-    contexto:
-      "O robô emite as notas de devolução e ainda cruza nota × pedido, gerando um relatório de divergências.",
-    custoEliminado: "Escritório contábil terceirizado que só emitia as notas — R$ 3.200/mês.",
-    vale: true,
-    motivo:
-      "A conferência de divergências nunca esteve no contrato e ninguém fazia. Se alguém fosse fazer à mão, seriam ~20h/mês.",
-  },
-  {
-    contexto:
-      "O bot do WhatsApp responde o cliente e também abre o ticket e atualiza o pedido no ERP.",
-    custoEliminado: "Licença de chatbot que cobria apenas as perguntas frequentes — R$ 1.500/mês.",
-    vale: true,
-    motivo:
-      "Abrir ticket e mexer no ERP estava fora do escopo da licença e ninguém fazia isso manualmente.",
-  },
-  {
-    contexto:
-      "O monitoramento de preço de concorrente passou de 3 para 9 marketplaces.",
-    custoEliminado: "Ferramenta de monitoramento que cobria 3 marketplaces — R$ 2.000/mês.",
-    vale: true,
-    motivo:
-      "Os 6 marketplaces novos ninguém acompanhava e a ferramenta não cobria — ~30h/mês se alguém fosse acompanhar.",
-  },
-  {
-    contexto: "O robô emite as mesmas notas fiscais que o escritório emitia.",
-    custoEliminado: "Escritório contábil terceirizado — R$ 3.200/mês.",
     vale: false,
-    motivo:
-      "É o mesmo trabalho que o contrato já fazia. Somar as duas coisas conta o mesmo ganho duas vezes.",
+    texto: "A automação faz o mesmo trabalho que o serviço cancelado já fazia.",
+    detalhe: "Esse ganho já está no valor do gasto que você cadastrou — contar de novo dobraria.",
   },
   {
-    contexto:
-      "A automação monta o relatório mensal que uma analista montava em 5h/mês.",
-    custoEliminado: "Licença do BI — R$ 900/mês.",
     vale: false,
-    motivo:
-      "Alguém fazia essas horas. Volte em “Alguém já fazia ou mantinha isso manualmente antes?” e responda Sim para lançar as horas reais.",
+    texto: "Alguém da empresa já gastava horas nisso antes da automação.",
+    detalhe: "Volte na pergunta “Alguém já fazia ou mantinha isso manualmente antes?” e responda Sim.",
   },
   {
-    contexto:
-      "Depois do robô, o time passou a gastar 2h/mês olhando o painel e conferindo o log de erros.",
-    custoEliminado: "Agência de cobrança — R$ 5.000/mês.",
     vale: false,
-    motivo:
-      "Trabalho que nasceu com a automação é custo de operação, não trabalho substituído.",
+    texto: "É o tempo que o time passou a gastar acompanhando a automação.",
+    detalhe: "Trabalho que nasceu com a automação é custo de operação, não ganho.",
+  },
+  {
+    vale: true,
+    texto: "A automação faz algo A MAIS, que o serviço cancelado nunca cobriu.",
+  },
+  {
+    vale: true,
+    texto: "Esse algo a mais ninguém fazia — simplesmente ficava sem ser feito.",
+  },
+  {
+    vale: true,
+    texto: "Você consegue dizer quantas horas por mês levaria se alguém fosse fazer à mão.",
   },
 ];
 
@@ -93,13 +69,15 @@ export const EXEMPLOS_TRABALHO_ADICIONAL: ExemploCampo[] = [
 
 export function ExemplosCampoAjuda({
   titulo,
-  descricao,
-  exemplos,
-  rotulo = "Em dúvida? Veja exemplos do que vale e do que não vale",
+  chamada,
+  sinais,
+  nota,
+  rotulo = "Em dúvida? Veja como saber se é o seu caso",
 }: {
   titulo: string;
-  descricao: string;
-  exemplos: ExemploCampo[];
+  chamada: string;
+  sinais: SinalCampo[];
+  nota?: string;
   rotulo?: string;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -126,20 +104,24 @@ export function ExemplosCampoAjuda({
         {rotulo}
       </button>
 
-      {aberto && <ExemplosModal titulo={titulo} descricao={descricao} exemplos={exemplos} onClose={fechar} />}
+      {aberto && (
+        <AjudaModal titulo={titulo} chamada={chamada} sinais={sinais} nota={nota} onClose={fechar} />
+      )}
     </>
   );
 }
 
-function ExemplosModal({
+function AjudaModal({
   titulo,
-  descricao,
-  exemplos,
+  chamada,
+  sinais,
+  nota,
   onClose,
 }: {
   titulo: string;
-  descricao: string;
-  exemplos: ExemploCampo[];
+  chamada: string;
+  sinais: SinalCampo[];
+  nota?: string;
   onClose: () => void;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -191,9 +173,6 @@ function ExemplosModal({
     };
   }, []);
 
-  const valem = exemplos.filter((e) => e.vale);
-  const naoValem = exemplos.filter((e) => !e.vale);
-
   const conteudo = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
@@ -209,10 +188,10 @@ function ExemplosModal({
         ref={cardRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="exemplos-campo-titulo"
+        aria-labelledby="ajuda-campo-titulo"
         className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl"
         style={{
-          maxWidth: 900,
+          maxWidth: 580,
           background: "var(--go-white)",
           boxShadow: "0 24px 64px rgba(8,20,40,0.35)",
           animation: "go-pop-in 0.22s ease",
@@ -220,7 +199,7 @@ function ExemplosModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho */}
-        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-4 sm:px-6">
           <div className="flex items-start gap-3">
             <span
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
@@ -228,24 +207,19 @@ function ExemplosModal({
             >
               <HelpCircle aria-hidden="true" style={{ width: 18, height: 18 }} />
             </span>
-            <div className="min-w-0">
-              <h2
-                id="exemplos-campo-titulo"
-                className="font-extrabold leading-tight"
-                style={{ color: "var(--go-text-heading)", fontSize: 15.5 }}
-              >
-                {titulo}
-              </h2>
-              <p className="mt-1 text-[12px] leading-snug" style={{ color: "#8b8b9a" }}>
-                {descricao}
-              </p>
-            </div>
+            <h2
+              id="ajuda-campo-titulo"
+              className="min-w-0 font-extrabold leading-tight"
+              style={{ color: "var(--go-text-heading)", fontSize: 15.5 }}
+            >
+              {titulo}
+            </h2>
           </div>
           <button
             ref={fecharRef}
             type="button"
             onClick={onClose}
-            aria-label="Fechar os exemplos"
+            aria-label="Fechar a ajuda"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all hover:opacity-80"
             style={{ background: "rgba(0,0,0,0.05)", color: "#5b5b6a" }}
           >
@@ -253,14 +227,24 @@ function ExemplosModal({
           </button>
         </div>
 
-        {/* Corpo — duas colunas lado a lado (vale × não vale) para caber sem rolagem;
-            em tela estreita as colunas empilham e o corpo volta a rolar. */}
+        {/* Corpo — a chamada + a lista de sinais */}
         <div
-          className="grid flex-1 gap-x-5 gap-y-5 overflow-y-auto px-5 py-4 sm:grid-cols-2 sm:px-6"
+          className="flex-1 overflow-y-auto px-5 py-4 sm:px-6"
           style={{ background: "var(--go-cream)", borderTop: "1px solid rgba(8,20,40,0.07)" }}
         >
-          <GrupoExemplos titulo="Conta como trabalho adicional" vale exemplos={valem} />
-          <GrupoExemplos titulo="Não conta" vale={false} exemplos={naoValem} />
+          <p className="mb-3 text-[12.5px] leading-snug" style={{ color: "#5b5b6a" }}>
+            {chamada}
+          </p>
+          <ul className="space-y-2">
+            {sinais.map((s, i) => (
+              <LinhaSinal key={i} sinal={s} />
+            ))}
+          </ul>
+          {nota && (
+            <p className="mt-3.5 text-[11.5px] leading-snug" style={{ color: "#8b8b9a" }}>
+              {nota}
+            </p>
+          )}
         </div>
 
         {/* Rodapé */}
@@ -284,89 +268,43 @@ function ExemplosModal({
   return montado ? createPortal(conteudo, document.body) : null;
 }
 
-function GrupoExemplos({
-  titulo,
-  vale,
-  exemplos,
-}: {
-  titulo: string;
-  vale: boolean;
-  exemplos: ExemploCampo[];
-}) {
-  if (exemplos.length === 0) return null;
-  const cor = vale ? OLIVA : VERMELHO;
+function LinhaSinal({ sinal }: { sinal: SinalCampo }) {
+  const cor = sinal.vale ? OLIVA : VERMELHO;
 
   return (
-    <section>
-      <h3
-        className="mb-2 flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider"
-        style={{ color: cor }}
-      >
-        <IconeVeredito vale={vale} />
-        {titulo}
-      </h3>
-      <div className="space-y-2">
-        {exemplos.map((ex, i) => (
-          <CardExemplo key={i} exemplo={ex} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CardExemplo({ exemplo }: { exemplo: ExemploCampo }) {
-  const cor = exemplo.vale ? OLIVA : VERMELHO;
-
-  return (
-    <article
-      className="overflow-hidden rounded-xl"
+    <li
+      className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
       style={{
         background: "var(--go-white)",
         border: "1px solid rgba(8,20,40,0.08)",
         borderLeft: `3px solid ${cor}`,
       }}
     >
-      <div className="space-y-1.5 px-3.5 py-2.5">
-        <Linha rotulo="Contexto" texto={exemplo.contexto} />
-        <Linha rotulo="Custo eliminado" texto={exemplo.custoEliminado} />
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
-          <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide"
-            style={{ background: exemplo.vale ? "rgba(107,110,0,0.12)" : "rgba(197,48,48,0.1)", color: cor }}
-          >
-            <IconeVeredito vale={exemplo.vale} />
-            {exemplo.vale ? "Válido" : "Não vale"}
-          </span>
-          <span className="text-[11.5px] leading-snug" style={{ color: "#5b5b6a" }}>
-            {exemplo.motivo}
-          </span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function Linha({ rotulo, texto }: { rotulo: string; texto: string }) {
-  return (
-    <div>
+      {/* O sinal nunca é só cor: o ícone diz ✓ ou ✕, e tem rótulo para leitor de tela. */}
       <span
-        className="block text-[9.5px] font-bold uppercase tracking-wider"
-        style={{ color: "#9a9aa8" }}
+        className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+        style={{ background: sinal.vale ? "rgba(107,110,0,0.12)" : "rgba(197,48,48,0.1)", color: cor }}
       >
-        {rotulo}
+        {sinal.vale ? (
+          <Check aria-hidden="true" style={{ width: 12, height: 12, strokeWidth: 3 }} />
+        ) : (
+          <X aria-hidden="true" style={{ width: 12, height: 12, strokeWidth: 3 }} />
+        )}
       </span>
-      <span className="block text-[12px] leading-snug" style={{ color: "var(--go-text-heading)" }}>
-        {texto}
+      <span className="min-w-0">
+        <span className="sr-only">{sinal.vale ? "É esse caso: " : "Não é esse caso: "}</span>
+        <span
+          className="block text-[12.5px] font-semibold leading-snug"
+          style={{ color: "var(--go-text-heading)" }}
+        >
+          {sinal.texto}
+        </span>
+        {sinal.detalhe && (
+          <span className="mt-0.5 block text-[11.5px] leading-snug" style={{ color: "#6b6b7a" }}>
+            {sinal.detalhe}
+          </span>
+        )}
       </span>
-    </div>
-  );
-}
-
-/* O veredito nunca é só cor: vem sempre com ícone + palavra (piso de a11y). */
-function IconeVeredito({ vale }: { vale: boolean }) {
-  return vale ? (
-    <Check aria-hidden="true" style={{ width: 12, height: 12, strokeWidth: 3 }} />
-  ) : (
-    <X aria-hidden="true" style={{ width: 12, height: 12, strokeWidth: 3 }} />
+    </li>
   );
 }

@@ -1,46 +1,45 @@
 /**
- * EXEMPLOS DO CAMPO "trabalho manual ADICIONAL" (formulário de saving, ramo do custo evitado).
+ * AJUDA DO CAMPO "trabalho manual ADICIONAL" (formulário de saving, ramo do custo evitado).
  *
  * A pergunta 2c vem logo depois de a pessoa cadastrar o gasto que a empresa deixou de pagar,
  * e é aí que ela confunde as duas coisas — responder "sim" com o MESMO trabalho do gasto
- * eliminado é dupla contagem. O modal de exemplos existe para separar, então ele só cumpre
- * o papel se mostrar os DOIS lados: o que vale e o que não vale.
+ * eliminado é dupla contagem. O popup de ajuda existe para separar, e faz isso com uma lista
+ * curta de sinais: "não é esse caso se…" (✕) e "é esse caso se…" (✓).
  *
- * Estes testes travam o conteúdo (não a aparência): perder um dos lados, ficar sem o motivo
- * ou enumerar tipos de gasto como lista fechada são regressões silenciosas na tela.
+ * Estes testes travam o conteúdo (não a aparência): perder um dos lados, perder um dos 3 erros
+ * reais ou virar um texto longo são regressões silenciosas na tela.
  */
 import { describe, it, expect } from "vitest";
-import { EXEMPLOS_TRABALHO_ADICIONAL } from "@/lib/submeter/exemplos-modal";
+import { SINAIS_TRABALHO_ADICIONAL } from "@/lib/submeter/exemplos-modal";
 
-describe("exemplos do trabalho manual adicional", () => {
-  it("mostra os dois lados, 3 de cada", () => {
-    expect(EXEMPLOS_TRABALHO_ADICIONAL.filter((e) => e.vale)).toHaveLength(3);
-    expect(EXEMPLOS_TRABALHO_ADICIONAL.filter((e) => !e.vale)).toHaveLength(3);
+describe("sinais do trabalho manual adicional", () => {
+  it("mostra os dois lados", () => {
+    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => !s.vale).length).toBeGreaterThanOrEqual(3);
+    expect(SINAIS_TRABALHO_ADICIONAL.filter((s) => s.vale).length).toBeGreaterThanOrEqual(3);
   });
 
-  it("todo exemplo tem contexto, gasto eliminado e MOTIVO do veredito", () => {
-    for (const ex of EXEMPLOS_TRABALHO_ADICIONAL) {
-      expect(ex.contexto.trim().length).toBeGreaterThan(20);
-      expect(ex.custoEliminado.trim().length).toBeGreaterThan(15);
-      // Veredito sem motivo não ensina nada — é o que o campo precisa explicar.
-      expect(ex.motivo.trim().length).toBeGreaterThan(30);
-    }
+  it("começa pelos casos que NÃO valem (é o erro que a pergunta produz)", () => {
+    expect(SINAIS_TRABALHO_ADICIONAL[0].vale).toBe(false);
   });
 
-  it("o gasto eliminado sempre traz um valor em R$ (ancora o exemplo)", () => {
-    for (const ex of EXEMPLOS_TRABALHO_ADICIONAL) {
-      expect(ex.custoEliminado).toMatch(/R\$/);
+  it("cada sinal é uma frase curta, legível de um olhar", () => {
+    for (const s of SINAIS_TRABALHO_ADICIONAL) {
+      expect(s.texto.trim().length).toBeGreaterThan(20);
+      // Piso de leitura rápida: passando disso já não é mais uma lista para escanear.
+      expect(s.texto.length).toBeLessThanOrEqual(110);
+      if (s.detalhe) expect(s.detalhe.length).toBeLessThanOrEqual(130);
     }
   });
 
   it("cobre os 3 erros que a pergunta produz na prática", () => {
-    const naoValem = EXEMPLOS_TRABALHO_ADICIONAL.filter((e) => !e.vale);
-    const texto = naoValem.map((e) => `${e.contexto} ${e.motivo}`.toLowerCase()).join(" | ");
+    const naoValem = SINAIS_TRABALHO_ADICIONAL.filter((s) => !s.vale)
+      .map((s) => `${s.texto} ${s.detalhe ?? ""}`.toLowerCase())
+      .join(" | ");
     // 1. mesmo escopo do gasto eliminado → dupla contagem
-    expect(texto).toMatch(/duas vezes|mesmo trabalho/);
-    // 2. horas que ALGUÉM já fazia → é o outro ramo do formulário
-    expect(texto).toMatch(/alguém já fazia|alguém fazia/);
+    expect(naoValem).toMatch(/mesmo trabalho/);
+    // 2. horas que ALGUÉM já fazia → manda de volta ao outro ramo do formulário
+    expect(naoValem).toMatch(/alguém já fazia/);
     // 3. trabalho que nasceu com a automação → custo de operação
-    expect(texto).toMatch(/nasceu com a automação/);
+    expect(naoValem).toMatch(/nasceu com a automação/);
   });
 });

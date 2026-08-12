@@ -1116,8 +1116,10 @@ enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarCh
 **Pedido (Kaique, 12/08/2026):** a pergunta 2c — *"Além desse gasto eliminado, a automação
 substitui um trabalho manual ADICIONAL — que ninguém fazia e que esse gasto NÃO cobria?"* —
 "pode ser muito confuso depois da pessoa já ter marcado que o projeto reduziu custos no campo
-anterior". Daí um botão de dúvida que abre um popup central, fundo embaçado, com **3 exemplos
-que valem e 3 que não valem**, no formato *Contexto → Custo eliminado → veredito*.
+anterior". Daí um botão de dúvida que abre um popup central, fundo embaçado. A 1ª versão trazia
+6 exemplos em cards (*Contexto → Custo eliminado → veredito*); o formato final, pedido no mesmo
+dia depois de ver a tela, é **uma lista curta de sinais** — *"para saber se o seu projeto tem
+esse trabalho, observe se:"* + frases marcadas ✕ (não é esse caso) e ✓ (é esse caso).
 
 **Por que o campo confunde:** ele vem logo DEPOIS de a pessoa cadastrar o gasto que a empresa
 deixou de pagar. Quem acabou de declarar "cortei R$ 3.200/mês do escritório contábil" lê a
@@ -1129,18 +1131,20 @@ concreto lado a lado.
 
 **Onde mora**
 - **`src/lib/submeter/exemplos-modal.tsx`** (novo) — `ExemplosCampoAjuda` (trigger + modal),
-  o tipo `ExemploCampo` e a constante **`EXEMPLOS_TRABALHO_ADICIONAL`** (os 6 exemplos).
-  Genérico de propósito: outro campo confuso reusa passando a própria lista.
+  o tipo `SinalCampo` (`vale` · `texto` · `detalhe?`) e a constante
+  **`SINAIS_TRABALHO_ADICIONAL`** (3 sinais ✕ + 3 ✓). Genérico de propósito: outro campo
+  confuso reusa passando a própria lista.
 - `src/lib/submeter/step3-chat.tsx` — bloco 2c (`mostrarContrafactualAdicional`): o botão
   entra abaixo do texto de ajuda. Nenhum estado do formulário muda.
-- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (3 + 3, motivo obrigatório,
-  R$ no gasto eliminado, os 3 erros cobertos).
+- `tests/exemplos-trabalho-adicional.test.ts` — trava o CONTEÚDO (os dois lados, ✕ primeiro,
+  frase curta com teto de 110 chars, os 3 erros cobertos).
 
 ### Decisões fechadas (não "consertar" sem confirmar)
 
-1. **Cada card leva o MOTIVO do veredito** — o formato pedido era Contexto / Custo eliminado /
-   Válido-ou-não; a linha de motivo foi acrescentada porque veredito sem porquê não ensina a
-   decidir o próprio caso. Teste exige `motivo` com >30 chars.
+1. **É uma LISTA de sinais, não exemplos em card** (decisão de produto, 12/08/2026, depois de
+   ver as duas versões na tela): cada linha é uma frase que a pessoa confere contra o próprio
+   projeto, com um `detalhe` curto só onde há o que fazer em vez disso ("volte e responda Sim").
+   Os cards de exemplo pediam leitura de 3 informações para extrair 1 conclusão.
 2. **Os 3 "não vale" cobrem os 3 erros REAIS**, não variações do mesmo: (a) mesmo escopo do
    gasto eliminado → dupla contagem; (b) horas que **alguém já fazia** → é o outro ramo do
    formulário (a resposta certa é voltar em "Alguém já fazia?" e marcar **Sim**); (c) trabalho
@@ -1161,11 +1165,14 @@ concreto lado a lado.
    GENÉRICA — tipos são só exemplos): "esse **contrato** NÃO cobria" → "esse **gasto** NÃO
    cobria", no rótulo e no texto de ajuda. Falar em "contrato" excluía quem cortou multa,
    juros ou taxa (caso SmartOnline/DIFAL).
-6. **Duas colunas (vale × não vale), 900px, sem rolagem** — com uma coluna de 560px os 6
-   cards não caíam na tela: quem abria via os 3 primeiros e precisava rolar para descobrir
-   que existia o outro lado, e é a COMPARAÇÃO lado a lado que ensina a responder. Em tela
-   estreita as colunas empilham e o corpo volta a rolar (`sm:grid-cols-2` + `overflow-y-auto`).
-7. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
+6. **Uma coluna de 580px, sem rolagem** — a lista de 6 frases cabe inteira; as duas colunas de
+   900px existiram só enquanto o conteúdo eram cards. O corpo mantém `overflow-y-auto` como
+   rede para viewport curto.
+7. **A ORDEM é ✕ antes de ✓** (travada em teste): o erro que a pergunta produz é o "sim"
+   indevido, então o que precisa ser lido primeiro é o que NÃO conta.
+8. **Fecha com a saída conservadora** — "na dúvida, responda 'Não, só o custo eliminado'".
+   Sem esse fecho, quem não se decide tende ao "sim" (parece mais completo) e infla o ganho.
+9. **Só o campo 2c** — o campo anterior ("Qual gasto a empresa deixou de pagar?") **não** leva
    botão de exemplos (decisão do Kaique, 12/08/2026).
 
 **Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não

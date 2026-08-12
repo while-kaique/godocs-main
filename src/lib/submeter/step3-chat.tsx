@@ -4,7 +4,7 @@ import { CARGOS } from "@/lib/agents/types";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
-import { ExemplosCampoAjuda, EXEMPLOS_TRABALHO_ADICIONAL } from "./exemplos-modal";
+import { ExemplosCampoAjuda, SINAIS_TRABALHO_ADICIONAL } from "./exemplos-modal";
 import type { ChatFase, ChatMessage, SavingFormData, SavingLinhaInput, CustoEvitadoItemInput } from "./constants";
 import { ocultarReaisSaving, formatMoedaBR, parseMoedaBR } from "./constants";
 
@@ -1599,9 +1599,10 @@ function SavingForm({
                 {/* A pergunta vem logo depois de a pessoa cadastrar o gasto eliminado, e
                     é aí que ela confunde as duas coisas — os exemplos separam. */}
                 <ExemplosCampoAjuda
-                  titulo="Trabalho manual adicional: o que conta"
-                  descricao="Só conta o trabalho que o gasto eliminado NÃO cobria e que ninguém fazia à mão."
-                  exemplos={EXEMPLOS_TRABALHO_ADICIONAL}
+                  titulo="Esse trabalho adicional existe no seu projeto?"
+                  chamada="Para saber se o seu projeto tem esse trabalho que estamos falando, observe se:"
+                  sinais={SINAIS_TRABALHO_ADICIONAL}
+                  nota="Na dúvida, responda “Não, só o custo eliminado” — é a resposta conservadora, e a validação humana confere depois."
                 />
                 <div className="flex gap-0 rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}>
                   {([["nao", "Não, só o custo eliminado"], ["sim", "Sim, há trabalho adicional"]] as const).map(([opt, lbl]) => (
