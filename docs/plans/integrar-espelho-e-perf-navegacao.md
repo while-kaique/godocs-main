@@ -1,6 +1,39 @@
 # Plano — Integrar o espelho da planilha com a perf de navegação (e fechar a T12)
 
-**Status:** ✅ aprovado (Luis, 2026-08-12)
+**Status:** 🟡 **em execução** — T1–T5 entregues (12/08); **T6 com a prova de runtime PENDENTE**; T7–T9 abertas.
+Aprovado por Luis em 2026-08-12.
+
+> ### Registro de execução (12/08, sessão da integração)
+> **Branch:** `feat/espelho-e-perf-navegacao` (worktree `.claude/worktrees/espelho-e-perf`), criada de
+> `origin/main` `d0652a4` → merge da perf do Kaique (**limpo**) → merge do espelho (**8 conflitos**, todos
+> resolvidos, merge commit **`8d14c02`**). ⚠️ **A branch NUNCA foi pushada.**
+>
+> **Verificações (T1–T4):** **1346 testes / 94 arquivos** verdes (baseline `main` = 1258/91) · `tsc` com os
+> **MESMOS 5** erros da baseline, **0 novos** · `worker.js` regenerado (**995,9 kb**) e commitado ·
+> **0 commits** do Kaique, do espelho e do `main` fora da branch · no artefato: `vendor-icons-CcRl8KEQ.js`
+> no `dist/` (dele) e `sheet_espelho` no `worker.js` (nosso).
+>
+> **4 resoluções que valem memória:**
+> 1. ⚠️ **O espelho importava `buildUpdateMessage`, que o D30 REMOVEU horas antes** — aceitar o lado do
+>    espelho no `sync.ts` ressuscitaria a notificação duplicada que o PR #248 acabou de matar. Ficou a
+>    versão do `main` + o import de `espelharEscrita`.
+> 2. `listarMeusProjetos` lê o **espelho**, mas `contarPendentes({sync:true})` **mantém** o cache de 60 s do
+>    Kaique — é o **único caminho de request que ainda lê o Sheets** (o selo da home precisa de legado que
+>    só existe na planilha e que não está no espelho deste dono até o cron rodar).
+> 3. Um comentário virou **falso** no merge (`"mesmo cache da listagem"`) e foi reescrito — mesma classe de
+>    defeito que o revisor pegou no `d7447eb`.
+> 4. Artefato real do merge: `tests/sync-reverse.test.ts` usava `beforeEach` **sem importar** (pego pelo
+>    `tsc`, não pelos testes).
+>
+> **T5:** staging `edf400b4` no ar em **19:00:17 UTC** (guarda cumprida: a version ainda era **146** logo
+> antes de subir → ninguém deployou no meio, o merge seguia válido).
+>
+> ⛔ **T6 — o que FALTA e é o próximo gesto:** o cron `*/5` já existe e está `enabled`, mas as corridas de
+> **18:55 e 19:00** levaram **23,2 s / 24,0 s** e logaram `total=578 … ignorados=578` **SEM o campo
+> `espelhados=`** → é o código **ANTIGO** (a de 19:00 começou 16 s antes do deploy pousar). **O sinal a
+> exigir na corrida das 19:05+:** o campo **`espelhados=`** no log **E** a duração caindo de ~24 s para
+> **~1,3 s**. Sem esse sinal, suspeite do bug conhecido deste repo (deploy que mantém o **worker antigo**
+> com assets novos) e **redeploye** — nunca conclua pelo `getApp`.
 
 **Objetivo:** juntar numa única branch o **espelho da planilha no SQLite**
 ([sqlite-fonte-de-leitura](sqlite-fonte-de-leitura.md), executado mas **nunca pushado**) e a **perf de

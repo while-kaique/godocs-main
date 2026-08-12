@@ -201,7 +201,7 @@ reprova **à mão** no `/dashboard` **não** dispensa a fila (só o analisador d
 
 **07/08 — 🟡 Ferramenta EDITÁVEL na Etapa 1 da edição (codada, falta staging).** Pedido do Luis: na edição só dava pra mexer em participantes, e ele quer poder trocar a **ferramenta** (caso real **Vercel → GoDeploy**). Branch `feat/editar-ferramenta-na-edicao` (`e678bf0`): o card "somente leitura" ficou só com **Escopo + Status** (⚠️ revoga em parte o R2 de 17/07 — emenda no plano), o `<select>` mostra a ferramenta de legado que está fora da lista, "Outros" sem nome passa a bloquear nos 2 modos, e `atualizarMetadados` passou a persistir `servico_externo` (escopo externo alimenta o prompt do orquestrador). **1141 testes verdes**; falta **staging `edf400b4`** + validação no navegador, depois PR e prod.
 
-**Próximo:** 🟢 **renovar o `E2E_COOKIE`** do `.env` (vencido — bloqueia o harness E2E inteiro, não só a validação deste deploy) e **validar no navegador** o que subiu. _Em paralelo, segue de pé:_ 🟡 **olho humano de LÍDER — 2 confirmações, 1 clique cada:** o Estevão (ou o Lucas) reabrir "Ler a documentação completa" e ver a doc; e acompanhar a próxima submissão real de um liderado para **provar o wiring do aviso** (único pedaço da D26 nunca exercitado ponta a ponta), conferindo no `GET` do endpoint do Gomoon. 🟡 **O Luis validar no navegador** a ferramenta editável na staging (trocar a ferramenta em `/editar/<id>`, reenviar, conferir a coluna "Ferramenta" na aba `STAGING`; testar um legado e um projeto de escopo externo). _Depois:_ decidir sobre o **backfill dos 35** (SUSPENSO pela decisão "só com os novos submetidos") · 3 perguntas ao João Victor (§16 de `docs/integracao-gomoon-chat.md`). 🆕 **Pedido novo do Lucas (não planejado):** o card da fila precisa mostrar o que a pessoa marcou em **"Alguém já fazia?"** (`alguem_fazia` hoje não vai no payload do card) — mudança de payload + UI, começar por `/ggsd:plan`; 2 perguntas de escopo para ele no `docs/NEXT-SESSION.md`.
+**Próximo:** 🔴 **conferir a prova de RUNTIME do espelho na staging** (`getAppLogs` no `edf400b4`, corrida do cron `sync-sheets-to-sqlite` das 19:05 UTC+): exigir o campo **`espelhados=`** e a duração caindo de ~24s para ~1,3s — as de 18:55/19:00 vieram **sem** ele (código antigo). Sem o sinal, é o bug do **worker antigo mantido pelo deploy** → redeploye. Depois: validação no navegador → **prod `674a3710`** + cron `*/5` → **push da branch `feat/espelho-e-perf-navegacao` (nunca pushada) + PR**, avisando o **Kaique** (os commits dele vão DENTRO desse PR). ⚠️ Os 3 revisores não rodaram nesta fatia → o `/ggsd:ship` vai barrar até rodarem. _Em paralelo, segue de pé:_ 🟢 **renovar o `E2E_COOKIE`** do `.env` (vencido — bloqueia o harness E2E inteiro, não só a validação deste deploy) e **validar no navegador** o que subiu. _Em paralelo, segue de pé:_ 🟡 **olho humano de LÍDER — 2 confirmações, 1 clique cada:** o Estevão (ou o Lucas) reabrir "Ler a documentação completa" e ver a doc; e acompanhar a próxima submissão real de um liderado para **provar o wiring do aviso** (único pedaço da D26 nunca exercitado ponta a ponta), conferindo no `GET` do endpoint do Gomoon. 🟡 **O Luis validar no navegador** a ferramenta editável na staging (trocar a ferramenta em `/editar/<id>`, reenviar, conferir a coluna "Ferramenta" na aba `STAGING`; testar um legado e um projeto de escopo externo). _Depois:_ decidir sobre o **backfill dos 35** (SUSPENSO pela decisão "só com os novos submetidos") · 3 perguntas ao João Victor (§16 de `docs/integracao-gomoon-chat.md`). 🆕 **Pedido novo do Lucas (não planejado):** o card da fila precisa mostrar o que a pessoa marcou em **"Alguém já fazia?"** (`alguem_fazia` hoje não vai no payload do card) — mudança de payload + UI, começar por `/ggsd:plan`; 2 perguntas de escopo para ele no `docs/NEXT-SESSION.md`.
 paralelo, segue de pé: **o Luis escolher como proteger a staging de ser atropelada** (3× em 04/08 — ver o topo do
 `docs/NEXT-SESSION.md`: combinar com o Kaique · app de staging separado · redeployar quando cair) e, em
 paralelo, **o Lucas validar a fila de 3 itens na staging com a própria conta** (04/08 — a fila foi
@@ -298,28 +298,6 @@ lê a planilha; o cache do servidor é in-memory sem revalidação em background
   não mostra "Verificando permissões"; as duas requisições saem em paralelo no 1º acesso; skeleton interativo
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
-
-## Fase 6 — SQLite como fonte de LEITURA das telas (espelho da planilha) 🟡
-Pedido do Luis (11/08/2026): *"nosso godocs ta demorando mt pra puxar informações nas telas… precisamos fazer
-com que seja tudo sqlite agora como fonte da verdade, porém não vamos mudar o ciclo de inserção dentro do
-sheets"*. Causa medida: **`/api/meus-projetos` fazia um `readAllRows()` da planilha INTEIRA a cada load de
-página** (nos logs de prod, em todo GET) e o `/dashboard` escondia a mesma leitura atrás de cache de 60 s. Ver
-a Fase 4, que atacou o sintoma sem tirar a leitura do request.
-- ✅ Planejar (`docs/plans/sqlite-fonte-de-leitura.md` — aprovado pelo Luis em 11/08/2026).
-- ✅ Implementar T1–T11: tabela **`sheet_espelho`** + **`sync_runs`**, módulo `sheet-espelho.ts`, mappers no
-  módulo PURO `dashboard-resumo.ts`, sync com **retry + carga em lote** e cadência de **5 min**, as 2 telas
-  lendo o espelho, **remendo imediato** de toda escrita nossa, aviso de espelho velho no cabeçalho e
-  `GET /api/admin/sync-status`. **1243 testes verdes** (era 1201); `worker.js` rebuildado.
-- ✅ Staging `edf400b4` (version 131, 11/08 17:27 UTC) — deploy provado byte-a-byte + cron de 5 min ligado lá.
-- ⬜ **Validação de runtime pelo Luis** na staging (Meus Projetos abre rápido · triagem lista · botão
-  "Atualizar" sincroniza · projeto apagado da aba desaparece) → **prod `674a3710`** + trocar o cron de prod
-  para `*/5` → PR.
-- **DoD:** nenhuma rota de listagem lê o Sheets em request; projeto apagado da planilha sai das telas no ciclo
-  seguinte; status da triagem não volta atrás; sync falho não apaga nada e fica registrado; submissão nova
-  aparece com Status sem esperar o cron.
-- **Fronteira:** `reconciliarComplexidade` (cron de 1 min, hoje o maior consumidor de cota do Sheets) e
-  `/email-legados` seguem lendo a planilha ao vivo — fatia própria. Webhook do Sheets é **impossível** (o edge
-  exige OAuth; 302 medido).
 
 ## Fase 5 — Critério de projeto: "isto é projeto?" ✅
 Pedido da gestão (Rafa) após submissões que não deveriam ter entrado — o caso-símbolo é a **nuvem de

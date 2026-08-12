@@ -5,13 +5,44 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: ✅ aprovado (Luis, 2026-08-12)
+**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: 🟡 **em execução** (T1–T5 feitas)
 
-Junta o **espelho da planilha** (executado em 11/08, mas as 7 commits **nunca saíram desta máquina**) com a
-**perf de navegação do Kaique** (`origin/perf/navegacao-chunks-e-swr`) sobre o `main` atual, e fecha a **T12**
-(staging → validação → prod). ⚠️ Contexto que originou a fatia: os dois trabalhos resolviam a MESMA dor,
-nenhum estava no `main`, e como o `updateApp` substitui a app INTEIRA cada deploy apagava o outro do ar
-(staging v141 ↔ v146). O `main` também andou 2 PRs (#249, #250) depois do #248.
+### ➡️ PRÓXIMO PASSO — conferir a prova de RUNTIME na staging (T6), e só então seguir
+Abrir os logs da staging (`getAppLogs` no **`edf400b4`**) e olhar a corrida do cron
+`POST /api/cron/sync-sheets-to-sqlite` das **19:05 UTC ou posterior**. **O sinal exigido:** o campo
+**`espelhados=`** na linha `[sync-reverse]` **E** a duração caindo de **~24 s para ~1,3 s**.
+
+⚠️ **Por que isto não é formalidade:** as corridas de **18:55 e 19:00** levaram 23,2 s / 24,0 s e logaram
+`total=578 … ignorados=578` **sem `espelhados=`** — código **ANTIGO** (a de 19:00 começou 16 s antes do
+deploy das **19:00:17** pousar). Se a corrida nova também vier sem `espelhados=`, o caso é o bug conhecido
+deste repo (**deploy que mantém o worker antigo** com assets novos): **redeploye**, e não conclua nada pelo
+`getApp` — ele mostra o source novo e mente sobre o runtime.
+
+Depois disso, na ordem: **T7** validação do Luis no navegador (Meus Projetos + `/dashboard`) → **T8** prod
+`674a3710` + conferir o cron `*/5` lá → **T9** push da branch (**nunca pushada**) + PR.
+
+⚠️ **Ressalva de gates (não barrante para commit, MAS barra o `/ggsd:ship`):** os **3 revisores de contexto
+fresco NÃO rodaram** nesta fatia — `.review-status` e `.quality-status` estão **ausentes**. O `/ggsd:ship`
+vai **recusar o envio** até rodarem. Destravar = rodar a verificação do **`/ggsd:code §9`**
+(`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade`) sobre o diff `origin/main...HEAD`. ⚠️ Vale notar
+que o código do **espelho nunca passou por revisor independente** (a sessão de 11/08 proibiu subagentes), então
+essa seria a **primeira**.
+
+⚠️ **Risco SOCIAL aberto, e é o mais perigoso:** até o PR da T9 entrar, **deployar a `main` volta a ser
+destrutivo** para um dos dois lados — o trabalho do Kaique e o espelho só existem juntos **nesta branch**.
+**Avisar o Kaique**: os commits dele vão **DENTRO** deste PR, então ele não deve abrir um segundo PR sobre a
+mesma coisa.
+
+**Contexto que originou a fatia:** os dois trabalhos resolviam a MESMA dor (leitura do Sheets em request),
+**nenhum** estava no `main`, e como o `updateApp` substitui a app INTEIRA cada deploy apagava o outro do ar
+(staging v141 ↔ v146). O Claude do Kaique estava **correto** ao dizer que não havia nada no repositório.
+O `main` também andou 2 PRs (**#249**, **#250**) depois do #248.
+
+### Nota de processo (armadilha de ferramenta, 4º registro)
+O `plan-gate.sh` bloqueia escrita em `docs/**` **de dentro de um worktree** (a allowlist é relativa ao
+`CLAUDE_PROJECT_DIR`). Por isso o worktree **raiz** ficou na branch **`docs/plano-espelho-e-perf`** (saiu da
+`docs/handoff-deploy-12-08`, já mergeada), o plano foi commitado lá e o conteúdo levado à branch da feature
+por `git checkout <branch> -- docs/`.
 
 ## ✅ 12/08 (sessão anterior) — DEPLOY EM PRODUÇÃO: a T8 fechou, o D30 está no ar
 
