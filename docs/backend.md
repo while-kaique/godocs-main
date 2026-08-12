@@ -41,16 +41,16 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | GET | `/api/areas` | Nenhuma | Lista áreas (formulador) |
 | GET | `/api/participantes/sugestoes` | OAuth (edge) | Lista pessoas da TeamGuide (`/employees/refs?unpaged=true`, ~440) para o autocomplete de participantes; cache em memória 10 min; falha → `[]` (campo segue aceitando e-mail livre) |
 | POST | `/api/admin/areas/sync` | Admin | Sincroniza áreas do TeamGuide |
-| POST | `/api/cron/sync-areas` | Header `X-Godeploy-Cron` | Cron diário + limpeza api_logs >30d |
-| POST | `/api/cron/sync-sheets-to-sqlite` | Header `X-Godeploy-Cron` | Cron **horário**: sync reverso Sheets → SQLite (cria legados faltantes + reflete edições manuais em campos seguros) |
+| POST | `/api/cron/sync-areas` | Header `X-Godeploy-Cron` | Cron diário + limpeza api_logs >30d e sync_runs >7d |
+| POST | `/api/cron/sync-sheets-to-sqlite` | Header `X-Godeploy-Cron` | Cron **a cada 5 min**: atualiza o **espelho** da planilha (é dele que as telas leem), cria legados faltantes, reflete edições manuais em campos seguros e remove o que sumiu da aba. ⚠️ Webhook do Sheets é impossível (o edge exige OAuth — 302), então a cadência do cron É a frescura das telas |
 
 ### Admin (todas requerem `requireAdmin`)
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/api/admin/projetos` | Lista projetos com área (**SQLite** — usado pelo resto do admin) |
 | GET | `/api/admin/projetos/:id` | Detalhes completos (chat + doc + validações) |
-| GET | `/api/admin/dashboard/projetos` | **Triagem** — lista da **PLANILHA** (`readAllRows`), campos de tabela + índice de busca + contagem por status. `?refresh=1` fura o cache de 60 s |
-| GET | `/api/admin/dashboard/projetos/:id` | Linha inteira da planilha (todas as células preenchidas) + histórico de status. Sai do mesmo cache |
+| GET | `/api/admin/dashboard/projetos` | **Triagem** — lista a LINHA DA PLANILHA lida do **espelho no SQLite** (`sheet_espelho`), nunca o Sheets em request: campos de tabela + índice de busca + contagem por status + idade do espelho. `?refresh=1` **sincroniza de verdade** (lê a planilha e regrava o espelho) |
+| GET | `/api/admin/dashboard/projetos/:id` | Linha inteira da planilha (todas as células preenchidas, incl. colunas manuais) + histórico de status — também do espelho |
 | POST | `/api/admin/dashboard/status` | Grava "Status" (+"Observações") na planilha e audita em `admin_status_log`. **Nunca** escreve "Atualizado Em" |
 | GET/POST | `/api/admin/usuarios` | CRUD de usuários |
 | POST | `/api/admin/users` | Cria usuário (profile + roles + leader_areas) |
@@ -68,7 +68,8 @@ para worker.ts via ssrLoadModule, usando better-sqlite3 como DB.
 | GET | `/api/admin/investigador/edicoes` | Lista de reenvios (1 linha por edição) com métricas da janela daquela edição |
 | GET | `/api/admin/investigador/log/:id` | Corpo (request/response) de um log de API específico |
 | GET | `/api/admin/resync-google` | Re-dispara sync de IDA (Sheets+Chat) de um projeto, sem reanálise (`?projeto_id=`) |
-| POST | `/api/admin/sync-sheets-now` | Dispara o sync reverso Sheets → SQLite sob demanda (mesmo trabalho do cron) |
+| POST | `/api/admin/sync-sheets-now` | Dispara o sync reverso Sheets → SQLite sob demanda (mesmo trabalho do cron; é o que a STAGING usa, onde o cron não dispara) |
+| GET | `/api/admin/sync-status` | Saúde do **espelho** da planilha: última corrida (ok, contadores, duração), idade e as 20 últimas. Existe porque o risco da arquitetura do espelho é o sync morrer em silêncio |
 
 ## Investigador (`src/lib/investigador.functions.ts`)
 

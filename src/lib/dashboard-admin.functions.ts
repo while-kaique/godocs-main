@@ -1,31 +1,66 @@
 /**
- * Dashboard do admin — a planilha como fonte de verdade.
+ * Dashboard do admin — a planilha como fonte de verdade, lida do ESPELHO.
  *
- * A tela antiga lia `getProjetosWithArea()` (SQLite) e por isso mostrava rascunho e
+ * A tela original lia `getProjetosWithArea()` (SQLite) e por isso mostrava rascunho e
  * status interno desatualizado: o "Status" que vale é o da coluna do Sheets, mantido
  * à mão pela triagem (o sync reverso inclusive EXCLUI `status` dos campos que voltam
- * para o SQLite). Aqui a lista vem de `readAllRows()` — a mesma leitura que o disparo
- * de e-mails usa — então o dashboard reflete exatamente o que a triagem vê.
+ * para o SQLite). A correção foi passar a listar **a planilha** — e isso continua valendo:
+ * o que a tela mostra é a LINHA DA PLANILHA, nunca o estado interno de `projetos`.
  *
- * Consequências dessa escolha:
+ * O que mudou (11/08/2026): a linha não vem mais de um `readAllRows()` no meio do request,
+ * e sim do **espelho** da planilha no SQLite (`sheet-espelho.ts`), atualizado pelo cron de
+ * 5 min e remendado na hora por toda escrita nossa. Com isso caiu o cache de 60 s com SWR
+ * e a máquina de patches em memória, que existiam só para esconder uma leitura de ~2 s —
+ * o remendo agora mora no banco (coluna `patch`), então vale para qualquer isolate.
+ *
+ * Consequências (as mesmas de antes, pelo mesmo motivo):
  * - **Rascunho não aparece** (nunca vai à planilha) — é o comportamento desejado.
- * - Colunas manuais (Diff Horas / Diff Saving, Observações da revisão) chegam junto,
- *   sem precisar de espelho no banco.
+ * - Colunas manuais (Diff Horas / Diff Saving, Observações da revisão) chegam junto: o
+ *   espelho guarda a linha CRUA, inteira.
  * - Toda coluna é chaveada pelo NOME REAL do cabeçalho, então reordenar/inserir coluna
  *   na planilha não quebra a tela (mesma garantia de `google/sheets.ts`).
- *
- * Custo: uma leitura de planilha é lenta (~1–3 s). Por isso há cache curto em memória
- * com *single-flight* (N admins carregando ao mesmo tempo = 1 leitura), **revalidação em
- * background** quando o cache vence (ver `lerPlanilha`), e a mudança de status corrige a
- * linha no cache em vez de reler tudo.
+ * - `?refresh=1` deixou de "furar cache" e passou a **sincronizar de verdade** (lê a
+ *   planilha agora e regrava o espelho) — é o botão "Atualizar" da triagem.
  */
 import { z } from 'zod';
-import { readAllRows, updateRowByProjectId, type SheetRow } from '@/lib/google/sheets';
-import { parseDataFlexivel } from '@/lib/format-date';
-import { runBackground } from '@/lib/background';
+import { updateRowByProjectId, type SheetRow } from '@/lib/google/sheets';
 import { insertAdminStatusLog, getAdminStatusLogs } from '@/integrations/db/client.server';
-import { valorDaColuna } from '@/lib/coluna-chave';
-import { COLUNA_ESTADO_LIDER } from '@/lib/aprovacoes-parecer';
+import {
+  lerResumosEspelho,
+  lerLinhaEspelho,
+  espelharEscrita,
+  statusEspelho,
+} from '@/lib/sheet-espelho';
+import { syncSheetsToSqlite } from '@/lib/google/sync-reverse';
+import {
+  texto,
+  ouTraco,
+  numero,
+  chaveStatus,
+  chaveBusca,
+  mapResumo,
+  ordenarPorDataDesc,
+  contarPorStatus,
+  type ProjetoDashboardResumo,
+} from '@/lib/dashboard-resumo';
+
+// Os mappers moram no módulo PURO `dashboard-resumo.ts` (o espelho recorta as MESMAS
+// colunas, e um módulo de servidor importando esta tela criaria ciclo). Re-exportados aqui
+// porque os call sites e os testes de sempre os esperam neste módulo — fonte única, sem
+// nada redigitado.
+export {
+  texto,
+  ouTraco,
+  numero,
+  chaveStatus,
+  chaveBusca,
+  mapResumo,
+  ordenarPorDataDesc,
+  contarPorStatus,
+  COLUNAS_RESUMO,
+  recortarResumo,
+} from '@/lib/dashboard-resumo';
+export type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -45,117 +80,18 @@ export const STATUS_GRAVAVEIS = [
 ] as const;
 export type StatusGravavel = (typeof STATUS_GRAVAVEIS)[number];
 
-/**
- * Chave normalizada do status (minúsculas, sem espaço sobrando) — é a mesma chave que
- * o `StatusBadge` consome, então rótulo/ícone/cor saem de um lugar só. Célula vazia
- * (ou "—") → `null`, que o badge mostra como "—". NUNCA cai no status do SQLite.
- */
-export function chaveStatus(valor: string | null | undefined): string | null {
-  if (valor == null) return null;
-  const s = String(valor).trim();
-  if (s === '' || s === '—' || s === '-') return null;
-  return s.toLowerCase();
-}
-
-// ─── Parsers de célula ───────────────────────────────────────────────────────
-
-/** Texto da célula: trim, tratando vazio / "—" / "-" como ausência. */
-export function texto(valor: string | undefined): string | null {
-  if (valor == null) return null;
-  const s = String(valor).trim();
-  return s === '' || s === '—' || s === '-' ? null : s;
-}
-
-/**
- * Inverso do `texto` para ESCRITA: o que a triagem grava numa coluna de TEXTO nunca vai
- * como célula em branco — vazio (ou já "—"/"-") vira **"—"**, o mesmo padrão do
- * `padronizarLinha` do sync (`src/lib/google/sync.ts`). Sem isso, o admin que APAGA o
- * motivo deixava a célula suja/vazia, fora do padrão da planilha. Pura.
- */
-export function ouTraco(valor: string | null | undefined): string {
-  return texto(valor ?? undefined) ?? '—';
-}
-
-/**
- * Número pt-BR tolerante: "R$ 1.234,56", "418,2" e "10.5". Regra: se há vírgula, ela é
- * o decimal e o ponto é milhar; só ponto → decimal. (Mesma regra do sync reverso.)
- */
-export function numero(valor: string | undefined): number | null {
-  if (valor == null) return null;
-  let s = String(valor)
-    .trim()
-    .replace(/r\$\s*/gi, '')
-    .replace(/\s/g, '');
-  if (s === '' || s === '—' || s === '-') return null;
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : null;
-}
-
-function ehSim(valor: string | undefined): boolean {
-  const s = texto(valor)?.toLowerCase() ?? '';
-  return s === 'sim' || s === 's' || s === 'true' || s === '1';
-}
-
-/**
- * Índice de busca: minúsculas e SEM acento, para "reembolso" achar "Reembôlso" e
- * "helen" achar "Helén". É pré-computado no servidor (uma vez por leitura) para a
- * filtragem no cliente ser só `includes` — a busca precisa responder na tecla.
- */
-export function chaveBusca(...partes: (string | null | undefined)[]): string {
-  return partes
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
-// ─── Tipos expostos ao frontend ──────────────────────────────────────────────
-
-/**
- * Linha da tabela. Deliberadamente ENXUTA: os memoriais e as justificativas somam
- * vários KB por projeto e só são necessários no detalhe — mandar tudo na listagem
- * faria a tela baixar megabytes para exibir 25 linhas.
- */
-export type ProjetoDashboardResumo = {
-  id: string;
-  nome: string | null;
-  autor: string | null;
-  email: string | null;
-  area: string | null;
-  status: string | null; // valor cru da planilha (para regravar sem perder o texto)
-  statusChave: string | null; // normalizado (StatusBadge)
-  dataSubmissao: string | null;
-  dataOrdenacao: number | null; // epoch ms — ordenação estável no cliente
-  ganhoTotal: number | null;
-  savingReais: number | null;
-  receitaMensal: number | null;
-  savingHoras: number | null;
-  complexidade: string | null;
-  tipos: string | null;
-  ferramenta: string | null;
-  especial: boolean;
-  atualizadoEm: string | null;
-  observacoes: string | null;
-  /**
-   * Estado da pré-aprovação do líder — coluna "Pré-status" da tabela (pedido do Luis,
-   * 05/08/2026: dar para saber se o líder já decidiu sem abrir a ficha). É o rótulo CRU
-   * da planilha; quem traduz para chip é `ChipEstadoParecer`. Cabe na listagem enxuta
-   * porque é um rótulo curto — a JUSTIFICATIVA (multi-linha) segue só no detalhe.
-   */
-  aprovacaoLider: string | null;
-  busca: string;
-};
-
 export type ListagemDashboard = {
   projetos: ProjetoDashboardResumo[];
   contagem: Record<string, number>; // statusChave → total ('sem_status' quando vazio)
   total: number;
-  lidoEm: string; // ISO — quando a planilha foi lida (o cache pode servir leitura anterior)
-  doCache: boolean;
-  /** Dado servido do cache enquanto uma releitura acontece em background (SWR). */
-  revalidando: boolean;
+  /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
+  lidoEm: string;
+  /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
+  espelhoVelho: boolean;
+  /** A última corrida do sync falhou (a anterior pode ter dado certo). */
+  syncFalhou: boolean;
+  /** Nunca sincronizou (banco novo / primeiro deploy) — a tela pede "Atualizar". */
+  semEspelho: boolean;
 };
 
 export type DetalheDashboard = {
@@ -172,231 +108,66 @@ export type DetalheDashboard = {
   }[];
 };
 
-// ─── Cache com single-flight ─────────────────────────────────────────────────
-
-const CACHE_TTL_MS = 60_000;
-/**
- * Teto de idade do dado velho. Enquanto o Sheets falha, a revalidação não repõe nada e o
- * cache continua servindo — passado esse teto é melhor voltar a BLOQUEAR (e propagar o
- * erro) do que deixar a triagem decidir status sobre uma planilha de horas atrás.
- */
-const STALE_MAX_MS = 10 * CACHE_TTL_MS;
-
-type Cache = { rows: SheetRow[]; lidoEm: number };
-let cache: Cache | null = null;
-let leituraEmCurso: Promise<Cache> | null = null;
-/** Incrementado por `invalidarCacheDashboard()`: leitura em voo de uma era anterior não instala. */
-let epoca = 0;
-/** Sequência das leituras: impede uma leitura mais VELHA sobrescrever o resultado de outra mais nova. */
-let seqLeitura = 0;
-let seqInstalada = 0;
+// ─── Leitura do espelho ──────────────────────────────────────────────────────
 
 /**
- * Escritas já confirmadas na planilha, por projeto. Existem porque a escrita e a
- * revalidação correm juntas: `definirStatusProjeto` grava no Sheets e corrige a linha no
- * cache, mas uma releitura que COMEÇOU antes da escrita traz a célula antiga e, ao
- * instalar, apagaria a correção — o status recém-decidido "voltava atrás" por até 60 s.
- * Toda leitura reaplica os patches carimbados depois do seu início.
+ * Idade a partir da qual a tela avisa que o espelho está velho. O cron roda a cada 5 min,
+ * então 20 min sem sincronizar significa que **4 corridas** falharam ou pararam — é sinal
+ * de problema, não de cadência. É o antídoto para o único jeito de esta arquitetura mentir:
+ * o sync morrer em silêncio e a tela seguir mostrando dado velho com cara de novo.
  */
-type Patch = { valores: Record<string, string>; at: number };
-const patchesEscritos = new Map<string, Patch>();
-
-function registrarPatch(projetoId: string, valores: Record<string, string>) {
-  patchesEscritos.set(projetoId.trim().toLowerCase(), { valores, at: Date.now() });
-  // Patch mais velho que o teto de stale já foi lido do Sheets por qualquer leitura viva.
-  const limite = Date.now() - STALE_MAX_MS;
-  for (const [k, v] of patchesEscritos) if (v.at < limite) patchesEscritos.delete(k);
-}
-
-/** Reaplica nas linhas novas as escritas que aterrissaram DEPOIS do início desta leitura. */
-function reaplicarPatches(rows: SheetRow[], inicioLeitura: number) {
-  for (const [id, patch] of patchesEscritos) {
-    if (patch.at < inicioLeitura) continue;
-    const linha = acharLinha(rows, id) as Record<string, string> | undefined;
-    if (!linha) continue;
-    for (const [col, val] of Object.entries(patch.valores)) linha[col] = val;
-  }
-}
-
-/**
- * Dispara (ou reaproveita) a leitura real da planilha. *Single-flight*: enquanto uma
- * leitura está em curso, todo mundo compartilha a MESMA promise — três admins abrindo a
- * tela juntos geram uma requisição ao Sheets, não três.
- *
- * Falha NÃO envenena o cache: o `cache` anterior fica intacto e a próxima chamada tenta
- * de novo (é o que mantém a tela viva quando o Sheets dá 503).
- */
-function iniciarLeitura(forcar = false): Promise<Cache> {
-  // `forcar` = pedido explícito de dado fresco (`?refresh=1`): não pode herdar uma
-  // revalidação que começou ANTES do clique, senão o botão "Atualizar" devolve um
-  // snapshot anterior à edição manual que a pessoa acabou de fazer na planilha.
-  if (leituraEmCurso && !forcar) return leituraEmCurso;
-  const epocaInicio = epoca;
-  const seq = ++seqLeitura;
-  const inicio = Date.now();
-  const promessa = (async () => {
-    const rows = await readAllRows();
-    const novo: Cache = { rows, lidoEm: Date.now() };
-    reaplicarPatches(rows, inicio);
-    // Não instala se o cache foi invalidado no meio (era anterior) nem se uma leitura
-    // mais NOVA já instalou o resultado dela.
-    if (epocaInicio === epoca && seq >= seqInstalada) {
-      cache = novo;
-      seqInstalada = seq;
-    }
-    return novo;
-  })();
-  leituraEmCurso = promessa;
-  // O finally roda mesmo em erro; o `catch` vazio evita "unhandled rejection" quando
-  // ninguém está esperando esta promise (caminho de revalidação em background).
-  void promessa
-    .catch(() => undefined)
-    .finally(() => {
-      if (leituraEmCurso === promessa) leituraEmCurso = null;
-    });
-  return promessa;
-}
-
-/**
- * Lê a planilha respeitando o cache, em modo **stale-while-revalidate**.
- *
- * A leitura custa ~1,5–2,5 s. Com TTL simples, o primeiro admin que chegasse depois do
- * vencimento pagava a leitura inteira — a espera aparecia "do nada" a cada minuto. Agora:
- * - cache **fresco** → devolve na hora;
- * - cache **vencido** → devolve o dado VELHO na hora e revalida em background
- *   (`runBackground` → `ctx.waitUntil`, obrigatório no Godeploy para a promise não ser
- *   cancelada quando a Response retorna). `revalidando: true` avisa a UI;
- * - **sem cache** (isolate frio) ou `refresh` explícito → aí sim bloqueia.
- *
- * Servir dado de até ~1 min de idade é aceitável para triagem, e a escrita de status já
- * corrige a linha no cache — quem acabou de mudar o status vê o valor novo na hora.
- */
-async function lerPlanilha(
-  refresh: boolean,
-): Promise<{ cache: Cache; doCache: boolean; revalidando: boolean }> {
-  if (refresh) {
-    return { cache: await iniciarLeitura(true), doCache: false, revalidando: false };
-  }
-  if (cache) {
-    const idade = Date.now() - cache.lidoEm;
-    if (idade < CACHE_TTL_MS) return { cache, doCache: true, revalidando: leituraEmCurso != null };
-    if (idade < STALE_MAX_MS) {
-      const jaEmCurso = leituraEmCurso != null;
-      const promessa = iniciarLeitura();
-      if (!jaEmCurso) runBackground(promessa);
-      return { cache, doCache: true, revalidando: true };
-    }
-    // Velho demais (revalidação falhando há muito): volta a bloquear e propaga o erro.
-    return { cache: await iniciarLeitura(), doCache: false, revalidando: false };
-  }
-  return { cache: await iniciarLeitura(), doCache: false, revalidando: false };
-}
-
-/** Descarta o cache (botão de atualizar força pelo `refresh`; usado também nos testes). */
-export function invalidarCacheDashboard() {
-  cache = null;
-  leituraEmCurso = null;
-  patchesEscritos.clear();
-  seqInstalada = 0;
-  epoca += 1; // leitura em voo desta era não instala mais nada
-}
-
-// ─── Mapeamento ──────────────────────────────────────────────────────────────
-
-export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
-  const id = texto(row['ID Projeto']);
-  if (!id) return null; // linha sem ID não é projeto (separador, rodapé, lixo)
-
-  const nome = texto(row['Projeto']);
-  const autor = texto(row['Nome Completo']);
-  const email = texto(row['Email']);
-  const area = texto(row['Área']);
-  const ferramenta = texto(row['Ferramenta']);
-  const dataSubmissao = texto(row['Data Submissão']);
-  const d = parseDataFlexivel(dataSubmissao);
-
-  return {
-    id,
-    nome,
-    autor,
-    email,
-    area,
-    status: texto(row['Status']),
-    statusChave: chaveStatus(row['Status']),
-    dataSubmissao,
-    dataOrdenacao: d ? d.getTime() : null,
-    ganhoTotal: numero(row['Ganho Total']),
-    savingReais: numero(row['Saving Reais']),
-    receitaMensal: numero(row['Receita Mensal']),
-    savingHoras: numero(row['Saving Horas']),
-    complexidade: texto(row['Complexidade']),
-    tipos: texto(row['Tipos Projeto']),
-    ferramenta,
-    especial: ehSim(row['Especial?']),
-    atualizadoEm: texto(row['Atualizado Em']),
-    observacoes: texto(row['Observações']),
-    // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"
-    // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna
-    // nasceria vazia para todo projeto. Ver `coluna-chave.ts`.
-    aprovacaoLider: texto(valorDaColuna(row as Record<string, string>, COLUNA_ESTADO_LIDER)),
-    // O que a busca alcança: nome do projeto, autor, e-mail, id, área e ferramenta.
-    busca: chaveBusca(nome, autor, email, id, area, ferramenta),
-  };
-}
-
-/** Ordena por data de submissão (mais recente primeiro); sem data vai para o fim. */
-export function ordenarPorDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboardResumo): number {
-  if (a.dataOrdenacao == null && b.dataOrdenacao == null) {
-    return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
-  }
-  if (a.dataOrdenacao == null) return 1;
-  if (b.dataOrdenacao == null) return -1;
-  return b.dataOrdenacao - a.dataOrdenacao;
-}
-
-export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const p of projetos) {
-    const k = p.statusChave ?? 'sem_status';
-    out[k] = (out[k] ?? 0) + 1;
-  }
-  return out;
-}
+export const ESPELHO_VELHO_MS = 20 * 60 * 1000;
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Listagem da triagem — lê o ESPELHO da planilha (SQLite), nunca o Sheets em request e
+ * nunca o estado interno de `projetos`.
+ *
+ * @param refresh `?refresh=1` — o botão "Atualizar" da tela. Não é mais "furar cache": roda
+ *                um **sync de verdade** (lê a planilha, regrava o espelho) e só então lê.
+ *                Falha do Sheets aqui **não** derruba a tela: o espelho anterior segue
+ *                servindo e a resposta avisa por `syncFalhou`.
+ */
 export async function listarProjetosDashboard(refresh = false): Promise<ListagemDashboard> {
-  const { cache: c, doCache, revalidando } = await lerPlanilha(refresh);
-  const projetos = c.rows
+  if (refresh) {
+    try {
+      await syncSheetsToSqlite('manual');
+    } catch (e) {
+      // `syncSheetsToSqlite` já não propaga por si; este catch é o cinto do cinto.
+      console.error('[dashboard-admin] sync manual falhou (servindo o espelho atual):', e);
+    }
+  }
+
+  const [{ linhas, lidoEmMs }, saude] = await Promise.all([lerResumosEspelho(), statusEspelho()]);
+  const projetos = linhas
     .map(mapResumo)
     .filter((p): p is ProjetoDashboardResumo => p != null)
     .sort(ordenarPorDataDesc);
 
+  // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
+  // linhas (o espelho pode ter linhas de antes de `sync_runs` existir).
+  const idadeRef = saude.ultimoSyncOkMs ?? lidoEmMs;
   return {
     projetos,
     contagem: contarPorStatus(projetos),
     total: projetos.length,
-    lidoEm: new Date(c.lidoEm).toISOString(),
-    doCache,
-    revalidando,
+    lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
+    espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
+    syncFalhou: saude.ultimaFalhou,
+    semEspelho: idadeRef == null || projetos.length === 0,
   };
 }
 
-function acharLinha(rows: SheetRow[], id: string): SheetRow | undefined {
-  const alvo = id.trim().toLowerCase();
-  return rows.find((r) => (r['ID Projeto'] ?? '').trim().toLowerCase() === alvo);
-}
-
 /**
- * Detalhe de um projeto: a linha INTEIRA da planilha (todas as células preenchidas).
- * Sai do mesmo cache da listagem, então abrir o detalhe é instantâneo e não gera
- * leitura nova. O frontend agrupa os campos; colunas que não conhecemos aparecem
- * numa seção "Outras colunas" em vez de desaparecerem.
+ * Detalhe de um projeto: a linha INTEIRA da planilha (todas as células preenchidas), vinda
+ * do espelho — inclusive as colunas MANUAIS (Diff Horas/Saving) e a justificativa do
+ * parecer do líder, que a listagem não carrega. O frontend agrupa os campos; colunas que
+ * não conhecemos aparecem numa seção "Outras colunas" em vez de desaparecerem.
  */
 export async function getProjetoDashboard(id: string): Promise<DetalheDashboard> {
   z.string().min(1).max(120).parse(id);
-  const { cache: c } = await lerPlanilha(false);
-  const alvo = acharLinha(c.rows, id);
+  const alvo = await lerLinhaEspelho(id);
   if (!alvo) {
     throw Object.assign(new Error('Projeto não encontrado na planilha.'), { status: 404 });
   }
@@ -463,8 +234,7 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado } =
     statusSchema.parse(raw);
 
-  const { cache: c } = await lerPlanilha(false);
-  const linha = acharLinha(c.rows, projeto_id);
+  const linha = await lerLinhaEspelho(projeto_id);
   if (!linha) {
     throw Object.assign(new Error('Projeto não encontrado na planilha.'), { status: 404 });
   }
@@ -477,16 +247,11 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
 
   await updateRowByProjectId(projeto_id, updates);
 
-  // Corrige a linha no cache em vez de reler a planilha inteira: a tela reflete a
-  // mudança na hora e a próxima leitura real acontece no TTL normal.
-  const valores: Record<string, string> = { Status: status };
-  if (observacoes !== undefined) valores['Observações'] = ouTraco(observacoes);
-  if (motivo_reenvio !== undefined) valores['Motivo Reenvio'] = ouTraco(motivo_reenvio);
-  if (motivo_reprovado !== undefined) valores['Motivo Reprovado'] = ouTraco(motivo_reprovado);
-  const mutavel = linha as Record<string, string>;
-  Object.assign(mutavel, valores);
-  // Sobrevive a uma releitura que começou antes desta escrita (ver `patchesEscritos`).
-  registrarPatch(projeto_id, valores);
+  // Remenda o espelho com o que acabou de ser gravado: a tela reflete a mudança na hora,
+  // sem esperar o cron. ⚠️ O remendo fica marcado com `escrito_em`, então um sync que
+  // COMEÇOU antes desta escrita (e portanto leu a célula antiga) não a desfaz — era o
+  // "status voltava atrás" que os patches em memória resolviam só dentro de um isolate.
+  await espelharEscrita(projeto_id, updates);
 
   try {
     await insertAdminStatusLog({

@@ -1,10 +1,13 @@
 /**
  * Dashboard do admin — a esteira de triagem.
  *
- * De onde vêm os dados: `GET /api/admin/dashboard/projetos`, que lê a PLANILHA
- * (`readAllRows`), não o SQLite. Foi a correção de fundo desta tela: lendo o banco, ela
- * mostrava rascunho (estado interno que nunca vai à planilha) e um "Status" que não é
- * fonte de verdade. Ver `src/lib/dashboard-admin.functions.ts`.
+ * De onde vêm os dados: `GET /api/admin/dashboard/projetos`, que devolve a LINHA DA
+ * PLANILHA — não o estado interno de `projetos`. Foi a correção de fundo desta tela: lendo
+ * o banco, ela mostrava rascunho (estado interno que nunca vai à planilha) e um "Status"
+ * que não é fonte de verdade. Desde 11/08/2026 a linha vem do ESPELHO da planilha no SQLite
+ * (atualizado por cron de 5 min), não de um `readAllRows()` no meio do request: a tela abre
+ * na hora, e o cabeçalho mostra a IDADE do espelho — se o sync parar, a pessoa vê.
+ * Ver `src/lib/dashboard-admin.functions.ts` e `src/lib/sheet-espelho.ts`.
  *
  * Por que filtrar e paginar no cliente: a planilha tem centenas de linhas, e o servidor
  * já manda um índice de busca normalizado por projeto. Filtrar em memória responde na
@@ -52,9 +55,14 @@ type Listagem = {
   projetos: ProjetoDashboardResumo[];
   contagem: Record<string, number>;
   total: number;
+  /** ISO da última sincronização com a planilha (a idade do espelho). */
   lidoEm: string;
-  doCache: boolean;
-  revalidando: boolean;
+  /** Passou de 20 min sem sincronizar = 4 corridas de cron perdidas → avisa. */
+  espelhoVelho: boolean;
+  /** A última corrida do sync falhou (a anterior pode ter dado certo). */
+  syncFalhou: boolean;
+  /** Nunca sincronizou (banco novo) — o botão "Atualizar" resolve. */
+  semEspelho: boolean;
 };
 
 const TAMANHOS = [25, 50, 100] as const;
@@ -208,29 +216,39 @@ function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {dados && (
+          {/* Idade do ESPELHO da planilha. Em dia, é uma legenda discreta; atrasado, vira
+              aviso âmbar com ÍCONE + TEXTO (nunca só cor). É o antídoto para o único jeito
+              de esta arquitetura mentir: o sync parar e a tela seguir com dado velho. */}
+          {/* ⚠️ `semEspelho` entra aqui: logo depois de um deploy o espelho está VAZIO e, sem
+              esta condição, a tela dizia "Planilha sincronizada às <agora>" — uma mentira,
+              porque nada foi sincronizado ainda. */}
+          {dados && !dados.espelhoVelho && !dados.syncFalhou && !dados.semEspelho && (
             <span className="text-xs text-muted-foreground">
-              Planilha lida às{' '}
+              Planilha sincronizada às{' '}
               {new Date(dados.lidoEm).toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
             </span>
           )}
-          {/* SWR: a lista já está na tela e a planilha está sendo relida no servidor.
-              Ícone + texto (nunca só cor) e sem bloquear nada. */}
-          {dados?.revalidando && !atualizando && (
+          {dados && (dados.espelhoVelho || dados.syncFalhou || dados.semEspelho) && (
             <span
-              className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+              className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
               aria-live="polite"
+              title="A cópia local da planilha não está sendo atualizada. Clique em Atualizar para sincronizar agora."
             >
-              <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
-              Atualizando em segundo plano
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {dados.semEspelho
+                ? 'Ainda não sincronizou com a planilha'
+                : `Sem sincronizar desde ${new Date(dados.lidoEm).toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`}
             </span>
           )}
           <Button variant="outline" onClick={() => carregar(true)} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Atualizar
+            {atualizando ? 'Sincronizando…' : 'Atualizar'}
           </Button>
         </div>
       </header>

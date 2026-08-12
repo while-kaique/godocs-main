@@ -1106,5 +1106,68 @@ enxuto, `buildUpdateMessage` removido) · `src/lib/google/sync.ts` (`notificarCh
 
 **Decisões e gotchas completos:** `SPEC_APROVACAO_LIDER.md` §12 (D30).
 
-**Status.** ⏳ Implementado; suíte verde + `build:worker` OK. **Deploy pendente** (regra 13 — staging
-`edf400b4` antes de prod).
+**Status.** ✅ **EM PRODUÇÃO** — staging `edf400b4` version 141 (12/08, 13:51 UTC, runtime validado) →
+prod `674a3710` **version 237** (14:32 UTC), e mergeado na `main` pelo **PR #248** (`4a361f2`). ⚠️ O
+**conteúdo** da mensagem só se confere na 1ª pré-aprovação REAL em prod: a staging não tem webhook de Chat.
+---
+
+## Espelho da planilha no SQLite — as telas param de ler o Google Sheets em request (11/08/2026)
+
+**Pedido do Luis:** *"nosso godocs ta demorando mt pra puxar informações nas telas… precisamos fazer com
+que seja tudo sqlite agora como fonte da verdade, porém não vamos mudar o ciclo de inserção dentro do
+sheets, nosso sqlite deve ser atualizado rotineiramente, várias vzs por dia… Edições devem ser feitas
+sempre na planilha, e o sqlite se atualizar com essas edições/inserções"*.
+
+### O problema, medido
+- **`/api/meus-projetos` fazia um `readAllRows()` da planilha INTEIRA a cada load de página.** Está nos
+  logs de prod: `[sync-reverse:owner] email=… total=9 … ignorados=9` em **todo** GET da tela. A leitura
+  custa ~1,5–2,5 s (2,65 MB) e a cota de 60 leituras/min é **compartilhada com produção**.
+- O `/dashboard` escondia a mesma leitura atrás de cache de 60 s + SWR + patches em memória (~120 linhas
+  de máquina de estado que só existiam por causa da lentidão).
+- Efeito colateral que gerou reclamação de usuário (**"tinha projeto bugado na lista"**): a listagem
+  dependia de um sync sob demanda rodando **dentro** do request; quando ele falhava (cota/timeout), a tela
+  caía num estado parcial — status "—", projeto morto que não saía.
+
+### A decisão
+Uma tabela **`sheet_espelho`** guarda a **linha crua da planilha** (JSON chaveado pelo nome REAL da
+coluna). O sync reverso (cron de **5 min**, era 1×/h) a mantém; **as telas leem só dela**. A planilha
+segue **fonte da verdade e único lugar onde se edita** — o espelho é derivado e descartável.
+
+Por que a linha crua e não colunas novas em `projetos`: `mapResumo`, a ficha de triagem e o parser do
+parecer do líder (`interpretarParecerLider`) continuam operando sobre um `SheetRow`. Nenhuma regra de
+negócio mudou de lugar — é o que torna a troca de baixo risco.
+
+### Invariantes (não podem regredir)
+1. **Toda escrita nossa no Sheets remenda o espelho na hora** (`espelharEscrita`): triagem de status ·
+   descontinuar · IDA (append/update) · analisador · as 2 colunas do líder. Sem isso, **submissão nova
+   apareceria sem Status** até o próximo cron. O cron é a REDE: esquecer um ponto custa ≤5 min de atraso,
+   não uma mentira permanente.
+2. **O remendo sobrevive a um sync que começou ANTES dele** (`patch` + `escrito_em` ≥ início da leitura).
+   Empate por milissegundo **protege a nossa escrita** — a falha oposta é o status voltar atrás na cara da
+   triagem; a planilha vence no ciclo seguinte. Era o que os `patchesEscritos` em memória faziam, agora no
+   banco e válido entre isolates.
+3. **A listagem nunca seleciona a coluna `linha`** — só `linha_resumo`, recortado pelas `COLUNAS_RESUMO`
+   (`src/lib/dashboard-resumo.ts`, módulo PURO; `dashboard-admin.functions.ts` re-exporta). Puxar os
+   memoriais de ~600 projetos numa consulta é o gotcha dos **32 MiB de RPC** do Investigador. Coluna nova
+   lida pelo `mapResumo` entra em `COLUNAS_RESUMO` no MESMO commit — há teste de ida-e-volta.
+4. **O recorte casa por chave TOLERANTE** (o cabeçalho real é `Aprovação do **Lider**`, sem acento).
+5. **Leitura da planilha com retry (3×)** e, se falhar de vez, **nada é espelhado nem removido** —
+   `ok:false` em `sync_runs`.
+6. **O sync é auditável**: `sync_runs` por corrida, "Planilha sincronizada às HH:MM" no cabeçalho, aviso
+   âmbar (ícone + texto) após 20 min, `GET /api/admin/sync-status`. O único jeito de esta arquitetura
+   mentir é o sync morrer em silêncio.
+
+### Descartado (não tentar de novo)
+- **Webhook do Sheets** (Apps Script → nosso endpoint, "sincronizar na hora que a linha entra"): o edge do
+  Godeploy exige OAuth em **todas** as rotas e devolve **302** para `devgogroup.com/auth/login` — medido
+  com `curl` em 11/08/2026. Um trigger de planilha não tem como autenticar. A cadência do cron é o
+  substituto (a plataforma aceita até 1 min).
+- **Colunas novas em `projetos` espelhando a planilha**: obrigaria a mapear ~48 colunas (incluindo as
+  manuais e as que ainda não existem) e duplicaria as regras de leitura.
+
+### Fora do escopo desta fatia
+`reconciliarComplexidade` (cron de 1 min — hoje o **maior** consumidor de cota: um `readAllRows()` por
+minuto) e `/email-legados` seguem lendo a planilha ao vivo. `reconciliar-financeiro` continua no Sheets de
+propósito (é reparo *fail-closed*, precisa do dado vivo).
+
+Plano: `docs/plans/sqlite-fonte-de-leitura.md` · Spec da triagem: `SPEC_DASHBOARD_ADMIN.md` **D11**.

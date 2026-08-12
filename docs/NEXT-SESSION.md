@@ -4,10 +4,20 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## ✅ 12/08 (SESSÃO MAIS RECENTE) — DEPLOY EM PRODUÇÃO: a T8 fechou, o D30 está no ar
+## Plano ativo
+**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: ✅ aprovado (Luis, 2026-08-12)
 
-**Plano ativo: NENHUM.** As 2 fatias da frente do Chat (`chat-notifica-so-pre-aprovacao` +
-`chat-uma-mensagem-por-decisao`) estão **concluídas e em produção** — não há plano `aprovado` órfão.
+Junta o **espelho da planilha** (executado em 11/08, mas as 7 commits **nunca saíram desta máquina**) com a
+**perf de navegação do Kaique** (`origin/perf/navegacao-chunks-e-swr`) sobre o `main` atual, e fecha a **T12**
+(staging → validação → prod). ⚠️ Contexto que originou a fatia: os dois trabalhos resolviam a MESMA dor,
+nenhum estava no `main`, e como o `updateApp` substitui a app INTEIRA cada deploy apagava o outro do ar
+(staging v141 ↔ v146). O `main` também andou 2 PRs (#249, #250) depois do #248.
+
+## ✅ 12/08 (sessão anterior) — DEPLOY EM PRODUÇÃO: a T8 fechou, o D30 está no ar
+
+As 2 fatias da frente do Chat (`chat-notifica-so-pre-aprovacao` + `chat-uma-mensagem-por-decisao`) estão
+**concluídas e em produção**, e agora também **mergeadas na `main`** (PR **#248**, merge commit `4a361f2`,
+12/08 14:51 UTC — o auto-review voltou `diverge-baixa` 0,87, sem achado crítico/alto).
 
 ### ➡️ PRÓXIMO PASSO
 **`/ggsd:ship`** da branch `feat/chat-notifica-so-pre-aprovacao` (push + PR + merge) — a fatia fechou, mas a

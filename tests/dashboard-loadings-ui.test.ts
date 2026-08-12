@@ -40,10 +40,32 @@ describe('T4 — skeleton no lugar do spinner', () => {
   });
 });
 
-describe('T1 — a UI sinaliza a revalidação em background', () => {
-  it('mostra ícone + texto (nunca só cor) quando revalidando', () => {
-    expect(dashboard).toMatch(/dados\?\.revalidando/);
-    expect(dashboard).toContain('Atualizando em segundo plano');
+// A antiga T1 guardava o selo "Atualizando em segundo plano" do stale-while-revalidate.
+// Aquele SWR existia para esconder uma leitura de ~2 s da planilha DENTRO do request; a
+// leitura saiu do request (o dado vem do espelho no SQLite) e o selo saiu com ela. O que
+// ficou no lugar — e é o que precisa de guarda — é o aviso de que o espelho está VELHO:
+// sem ele, o sync pode morrer em silêncio e a triagem decide status sobre dado de horas
+// atrás sem desconfiar. Ver docs/plans/sqlite-fonte-de-leitura.md.
+describe('T9 — a UI avisa quando o espelho da planilha está velho', () => {
+  it('mostra ícone + texto (nunca só cor) quando o sync está atrasado ou falhou', () => {
+    expect(dashboard).toMatch(/dados\.espelhoVelho \|\| dados\.syncFalhou \|\| dados\.semEspelho/);
+    expect(dashboard).toContain('Sem sincronizar desde');
+    expect(dashboard).toContain('<AlertTriangle');
+  });
+
+  it('em dia, a legenda diz quando a planilha foi sincronizada', () => {
+    expect(dashboard).toContain('Planilha sincronizada às');
+  });
+
+  it('espelho VAZIO (recém-deployado) não finge sincronização — cai no aviso', () => {
+    // Sem o `!dados.semEspelho`, a tela dizia "Planilha sincronizada às <agora>" com o
+    // espelho vazio, antes de a 1ª corrida do cron acontecer.
+    expect(dashboard).toContain('!dados.semEspelho');
+    expect(dashboard).toContain('Ainda não sincronizou com a planilha');
+  });
+
+  it('o botão "Atualizar" avisa que está sincronizando (o clique agora lê a planilha)', () => {
+    expect(dashboard).toContain("'Sincronizando…'");
   });
 });
 

@@ -299,6 +299,28 @@ lê a planilha; o cache do servidor é in-memory sem revalidação em background
   no lugar do spinner; planilha segue fonte única e "Atualizado Em" intacta; testes verdes; staging antes de prod.
 - **Fronteira:** sem cache em SQLite — o 1º acesso após isolate frio segue custando ~2,5 s (agora com skeleton).
 
+## Fase 6 — SQLite como fonte de LEITURA das telas (espelho da planilha) 🟡
+Pedido do Luis (11/08/2026): *"nosso godocs ta demorando mt pra puxar informações nas telas… precisamos fazer
+com que seja tudo sqlite agora como fonte da verdade, porém não vamos mudar o ciclo de inserção dentro do
+sheets"*. Causa medida: **`/api/meus-projetos` fazia um `readAllRows()` da planilha INTEIRA a cada load de
+página** (nos logs de prod, em todo GET) e o `/dashboard` escondia a mesma leitura atrás de cache de 60 s. Ver
+a Fase 4, que atacou o sintoma sem tirar a leitura do request.
+- ✅ Planejar (`docs/plans/sqlite-fonte-de-leitura.md` — aprovado pelo Luis em 11/08/2026).
+- ✅ Implementar T1–T11: tabela **`sheet_espelho`** + **`sync_runs`**, módulo `sheet-espelho.ts`, mappers no
+  módulo PURO `dashboard-resumo.ts`, sync com **retry + carga em lote** e cadência de **5 min**, as 2 telas
+  lendo o espelho, **remendo imediato** de toda escrita nossa, aviso de espelho velho no cabeçalho e
+  `GET /api/admin/sync-status`. **1243 testes verdes** (era 1201); `worker.js` rebuildado.
+- ✅ Staging `edf400b4` (version 131, 11/08 17:27 UTC) — deploy provado byte-a-byte + cron de 5 min ligado lá.
+- ⬜ **Validação de runtime pelo Luis** na staging (Meus Projetos abre rápido · triagem lista · botão
+  "Atualizar" sincroniza · projeto apagado da aba desaparece) → **prod `674a3710`** + trocar o cron de prod
+  para `*/5` → PR.
+- **DoD:** nenhuma rota de listagem lê o Sheets em request; projeto apagado da planilha sai das telas no ciclo
+  seguinte; status da triagem não volta atrás; sync falho não apaga nada e fica registrado; submissão nova
+  aparece com Status sem esperar o cron.
+- **Fronteira:** `reconciliarComplexidade` (cron de 1 min, hoje o maior consumidor de cota do Sheets) e
+  `/email-legados` seguem lendo a planilha ao vivo — fatia própria. Webhook do Sheets é **impossível** (o edge
+  exige OAuth; 302 medido).
+
 ## Fase 5 — Critério de projeto: "isto é projeto?" ✅
 Pedido da gestão (Rafa) após submissões que não deveriam ter entrado — o caso-símbolo é a **nuvem de
 palavras** gerada uma vez para uma apresentação. Régua de 3 critérios (**recorrência · contrafactual ·

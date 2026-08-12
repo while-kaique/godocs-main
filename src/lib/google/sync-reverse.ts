@@ -21,12 +21,15 @@ import {
   getProjetoById,
   getProjetosByOwnerEmail,
   getProjetosNaoRascunho,
+  getProjetosParaSyncReverso,
   insertProjetoRaw,
+  insertSyncRun,
   updateProjeto,
   excluirProjetoCascade,
   parseJson,
   type ProjetoRow,
 } from '@/integrations/db/client.server';
+import { espelharLinhas, removerEspelhoAusentes } from '@/lib/sheet-espelho';
 
 export type ReverseSyncResult = {
   total: number;
@@ -36,7 +39,42 @@ export type ReverseSyncResult = {
   ignorados: number;
   erros: number;
   detalhes: string[];
+  /** Linhas gravadas no ESPELHO (as demais estavam idênticas — ver `sheet-espelho.ts`). */
+  espelhados?: number;
+  /** A leitura da planilha teve sucesso? `false` = nada foi espelhado nem removido. */
+  ok?: boolean;
 };
+
+// ─── Leitura da planilha com RETRY ───────────────────────────────────────────
+//
+// Com as telas lendo o espelho, uma leitura perdida deixa TODO MUNDO vendo dado velho até
+// a próxima corrida. E a falha mais comum aqui é transiente por natureza: `429` de cota
+// (60 leituras/min compartilhadas com prod) e `503` do Sheets. Uma segunda tentativa 1 s
+// depois resolve a maioria — sem retry, o incidente durava um ciclo inteiro de cron.
+
+const TENTATIVAS_LEITURA = 3;
+const ESPERA_RETRY_MS = [1000, 3000];
+
+function dormir(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function lerPlanilhaComRetry(
+  tentativas = TENTATIVAS_LEITURA,
+): Promise<{ rows: SheetRow[] } | { erro: Error }> {
+  let ultimo: Error = new Error('leitura não tentada');
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return { rows: await readAllRows() };
+    } catch (e) {
+      ultimo = e as Error;
+      console.error(`[sync-reverse] leitura da planilha falhou (tentativa ${i + 1}/${tentativas}):`, e);
+      const espera = ESPERA_RETRY_MS[i];
+      if (i < tentativas - 1 && espera) await dormir(espera);
+    }
+  }
+  return { erro: ultimo };
+}
 
 // ─── Parsers ─────────────────────────────────────────────────────────────────
 
@@ -259,8 +297,21 @@ function jaConvertidoParaFinanceiro(current: ProjetoRow): boolean {
   return tipos.length > 0 && !tipos.includes('especial');
 }
 
-async function atualizarExistente(id: string, row: SheetRow): Promise<boolean> {
-  const current = await getProjetoById(id);
+/**
+ * Projeto do banco como o diff precisa dele. Vem da carga em LOTE
+ * (`getProjetosParaSyncReverso`) — ver o `atualizarExistente`.
+ */
+type ProjetoParaDiff = Partial<ProjetoRow> & { id: string };
+
+async function atualizarExistente(
+  id: string,
+  row: SheetRow,
+  // ⚠️ Injetado pela carga em LOTE do orquestrador. O fallback `getProjetoById` só existe
+  // para o caminho de UM dono (`syncOwnerRowsFromSheet`, que não vale carregar a tabela
+  // inteira) — nunca para dentro do laço do sync global, que era o N+1 de antes.
+  currentInjetado?: ProjetoParaDiff,
+): Promise<boolean> {
+  const current = (currentInjetado ?? (await getProjetoById(id))) as ProjetoRow | undefined;
   if (!current) return false;
 
   const updates: Record<string, unknown> = {};
@@ -429,7 +480,17 @@ function idsDaPlanilha(rows: ReadonlyArray<SheetRow>): Set<string> {
 
 // ─── Orquestrador ────────────────────────────────────────────────────────────
 
-export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
+/**
+ * Corrida completa da volta: planilha → **espelho** (o que as telas leem) + planilha →
+ * `projetos` (criação de legado, campos seguros, especial/descontinuado) + remoção do que
+ * sumiu da aba, dos dois lados.
+ *
+ * @param gatilho de onde veio a corrida — só para o registro em `sync_runs`, que é como se
+ *                descobre "o sync parou de rodar" sem abrir log.
+ */
+export async function syncSheetsToSqlite(
+  gatilho: 'cron' | 'manual' | 'sob-demanda' = 'cron',
+): Promise<ReverseSyncResult> {
   const result: ReverseSyncResult = {
     total: 0,
     criados: 0,
@@ -438,19 +499,36 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
     ignorados: 0,
     erros: 0,
     detalhes: [],
+    espelhados: 0,
+    ok: false,
   };
+  // ⚠️ Carimbado ANTES da leitura: é o relógio que decide se um remendo nosso
+  // (`espelharEscrita`) é mais novo que o snapshot que temos em mãos. Ver `sheet-espelho.ts`.
+  const inicio = Date.now();
 
-  let rows: SheetRow[];
-  try {
-    rows = await readAllRows();
-  } catch (e) {
-    console.error('[sync-reverse] Falha ao ler a planilha:', e);
+  const leitura = await lerPlanilhaComRetry();
+  if ('erro' in leitura) {
+    // Leitura falhou → NÃO espelha e NÃO remove nada (o espelho antigo segue servindo).
     result.erros = 1;
-    result.detalhes.push(`Falha ao ler a planilha: ${(e as Error).message}`);
+    result.detalhes.push(`Falha ao ler a planilha: ${leitura.erro.message}`);
+    await registrarCorrida(gatilho, result, inicio, leitura.erro.message);
     return result;
   }
+  const rows = leitura.rows;
 
+  // ─── 1. ESPELHO (o que as telas leem) ──────────────────────────────────────
+  // Vem primeiro de propósito: é o caminho de que a UI depende, e ele não precisa de
+  // nenhuma escrita em `projetos` para servir a tela.
+  const espelho = await espelharLinhas(rows, inicio);
+  result.espelhados = espelho.espelhados;
+  result.erros += espelho.erros;
+
+  // ─── 2. `projetos` (legados, campos seguros, especial/descontinuado) ───────
   const existingIds = new Set((await getAllProjetoIds()).map((x) => x.toLowerCase()));
+  // Carga em LOTE: uma consulta para o diff de todas as linhas, em vez de um
+  // `getProjetoById` por linha (eram ~600 round-trips por corrida).
+  const porId = new Map<string, ProjetoParaDiff>();
+  for (const p of await getProjetosParaSyncReverso()) porId.set(p.id.toLowerCase(), p);
 
   for (const row of rows) {
     const rawId = row['ID Projeto'];
@@ -459,7 +537,7 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
     result.total++;
     try {
       if (existingIds.has(id)) {
-        const changed = await atualizarExistente(id, row);
+        const changed = await atualizarExistente(id, row, porId.get(id));
         if (changed) result.atualizados++;
         else result.ignorados++;
       } else {
@@ -474,19 +552,56 @@ export async function syncSheetsToSqlite(): Promise<ReverseSyncResult> {
     }
   }
 
-  // Reconciliação de exclusão: projeto NÃO-rascunho que sumiu da planilha sai do
-  // SQLite. Só roda se a leitura trouxe linhas (planilha vazia = suspeito → não apaga).
+  // ─── 3. Reconciliação de exclusão (Sheets = fonte do que APARECE) ──────────
+  // Projeto NÃO-rascunho que sumiu da planilha sai do SQLite **e** do espelho. Só roda se
+  // a leitura trouxe linhas (planilha vazia = suspeito → não apaga nada).
   const sheetIds = idsDaPlanilha(rows);
   if (sheetIds.size > 0) {
     await reconciliarExclusoes(sheetIds, await getProjetosNaoRascunho(), Date.now(), result);
+    // O espelho é o que a tela LÊ: se a linha do espelho ficasse para trás, o projeto
+    // apagado da aba continuaria aparecendo na triagem (era o "projeto morto na lista").
+    // Aqui não há carência: sem linha na planilha não há o que mostrar.
+    const foraDoEspelho = await removerEspelhoAusentes(sheetIds);
+    if (foraDoEspelho > 0) result.detalhes.push(`espelho: ${foraDoEspelho} linha(s) removida(s)`);
   }
 
+  result.ok = true;
+  await registrarCorrida(gatilho, result, inicio, null);
+
   console.log(
-    `[sync-reverse] total=${result.total} criados=${result.criados} ` +
+    `[sync-reverse] total=${result.total} espelhados=${result.espelhados} criados=${result.criados} ` +
       `atualizados=${result.atualizados} removidos=${result.removidos} ` +
       `ignorados=${result.ignorados} erros=${result.erros}`,
   );
   return result;
+}
+
+/**
+ * Registra a corrida em `sync_runs`. Nunca propaga erro: o registro é observabilidade — não
+ * pode desfazer um sync que já aconteceu (mesma régua da auditoria de status do dashboard).
+ */
+async function registrarCorrida(
+  gatilho: string,
+  r: ReverseSyncResult,
+  inicio: number,
+  detalhe: string | null,
+): Promise<void> {
+  try {
+    await insertSyncRun({
+      gatilho,
+      ok: r.ok ? 1 : 0,
+      total: r.total,
+      espelhados: r.espelhados ?? 0,
+      criados: r.criados,
+      atualizados: r.atualizados,
+      removidos: r.removidos,
+      erros: r.erros,
+      duracao_ms: Date.now() - inicio,
+      detalhe,
+    });
+  } catch (e) {
+    console.error('[sync-reverse] falha ao registrar a corrida em sync_runs:', e);
+  }
 }
 
 // ─── Sync sob demanda dos projetos de UM dono ────────────────────────────────
@@ -515,16 +630,15 @@ export async function syncOwnerRowsFromSheet(
 
   const alvo = email.trim().toLowerCase();
   if (!alvo) return { ...result, rows: [], leituraOk: false };
+  const inicio = Date.now();
 
-  let rows: SheetRow[];
-  try {
-    rows = await readAllRows();
-  } catch (e) {
-    console.error('[sync-reverse:owner] Falha ao ler a planilha:', e);
+  const leitura = await lerPlanilhaComRetry();
+  if ('erro' in leitura) {
     result.erros = 1;
-    result.detalhes.push(`Falha ao ler a planilha: ${(e as Error).message}`);
+    result.detalhes.push(`Falha ao ler a planilha: ${leitura.erro.message}`);
     return { ...result, rows: [], leituraOk: false };
   }
+  const rows = leitura.rows;
 
   const doDono = rows.filter((row) => {
     const responsavel = (row['Email'] ?? '').trim().toLowerCase();
@@ -566,6 +680,13 @@ export async function syncOwnerRowsFromSheet(
   if (sheetIds.size > 0) {
     await reconciliarExclusoes(sheetIds, await getProjetosByOwnerEmail(email), Date.now(), result);
   }
+
+  // Espelha as linhas DESTE dono (não a planilha toda: isto roda no caminho de um request,
+  // e a corrida completa é do cron). Sem remoção no espelho aqui — quem reconcilia o
+  // espelho inteiro é `syncSheetsToSqlite`, com a planilha inteira em mãos.
+  const espelho = await espelharLinhas(doDono, inicio);
+  result.espelhados = espelho.espelhados;
+  result.erros += espelho.erros;
 
   console.log(
     `[sync-reverse:owner] email=${alvo} total=${result.total} criados=${result.criados} ` +
