@@ -7,7 +7,35 @@
 ## Plano ativo
 **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: 🟡 **em execução** (T1–T5 feitas)
 
-### ➡️ PRÓXIMO PASSO — o T6 VOLTOU VERMELHO: o espelho falha na staging com timeout de Durable Object
+### ➡️ PRÓXIMO PASSO — ler a corrida do cron das 21:20+ na staging (v151, deploy 21:18:29 UTC)
+
+**Estado:** a staging foi redeployada às **21:18:29** com **TUDO junto** — `origin/main` 100% incorporado
+(24 commits: FAQ, multi-seleção de ferramentas, mensagem do gate de ganho projetado) + o espelho + a perf de
+navegação. Merge `8eae24e`, **1427 testes / 97 arquivos** verdes, `tsc` nos 5 da baseline, `worker.js` 1.036 kb.
+
+**O que ler (`getAppLogs` no `edf400b4`, cron `sync-sheets-to-sqlite` das 21:20 UTC ou depois):**
+- ✅ **Verde** = campo `espelhados=` presente **com `erros=0`** e duração caindo para **~1,3 s** → o timeout de
+  19:05 era transitório, o T6 fecha e libera **T7** (validação no navegador) → **T8 prod**.
+- ❌ **Vermelho** = `erros=1` com `Durable Object storage operation exceeded timeout` de novo → é DEFEITO, não
+  hipótese. Investigar `espelharLinhas` (`src/lib/sheet-espelho.ts`): o `INSERT OR REPLACE` numa transação só e
+  o `dispose()` não chamado que aparece no aviso de RPC. **Prod segue BLOQUEADA.**
+
+⚠️ **Armadilha de leitura (não esquecer):** `espelhados=0` é o estado **NORMAL em regime** (hash-gate: linha
+que não mudou não é reescrita). Quem denuncia falha é o **`erros=1` + a duração**, NUNCA o zero. E o campo
+`espelhados=` **AUSENTE** significa outra coisa: código antigo no ar (foi o que aconteceu às 21:10, depois de
+um deploy alheio).
+
+### ⚠️ A lição operacional desta sessão: 5 deploys de staging em 6 horas, 3 apagando o trabalho do outro
+v141 (espelho) → v146 (perf do Kaique) → v147 (minha integração) → **v149 (ferramentas dele, apagou o
+espelho)** → v150 (mensagem do gate) → v151 (tudo junto). O `updateApp` **substitui a app INTEIRA** e não
+avisa, então cada deploy a partir de branch local apaga o experimento do outro — e nenhuma validação de
+staging sobrevive tempo suficiente para virar decisão. **O que resolveu:** o Kaique mergeou tudo no `main`
+(#251–#255), então incorporar `origin/main` (regra 10) passou a trazer o trabalho dele em vez de destruí-lo.
+**Régua daqui pra frente:** antes de qualquer `updateApp`, conferir a version E se o `origin/main` está
+incorporado; se a version mudou, checar se o conteúdo dela já está no `main` que você mergeou (foi o que
+salvou o deploy da v151 — a v150 era o PR #255, já dentro).
+
+### (superado — a hipótese do worker antigo está MORTA) O bloco anterior do T6
 
 **A prova de runtime saiu às 19:05:33 UTC e o diagnóstico MUDOU — não é worker antigo.** O campo
 `espelhados=` apareceu no log, o que **prova que o build novo ESTÁ no ar**. O problema é outro:
