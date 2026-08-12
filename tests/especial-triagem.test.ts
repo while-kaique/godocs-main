@@ -173,6 +173,30 @@ describe("as 2 mensagens de bloqueio", () => {
     }
   });
 
+  // A 2ª saída ("não tenho número hoje") era só "Ou espere a medição — O GoDocs documenta
+  // ganho já realizado", e ninguém entendia esperar até O QUÊ nem por qual porta voltar. Do
+  // lado do especial a leitura natural era a ERRADA ("não tenho número, então mando como
+  // especial"), que é o desvio que estas 2 perguntas existem para fechar.
+  it("a saída sem medição manda voltar como projeto PADRÃO com o ganho já apurado", () => {
+    for (const msg of [dashboard, organizacional]) {
+      expect(msg).toMatch(/quando o ganho estiver medido/i); // esperar até O QUÊ
+      expect(msg).toMatch(/submeta como projeto PADRÃO/); // por qual porta se volta
+      expect(msg).toMatch(/ganho já validado/i); // com o quê
+      expect(msg).toMatch(/o especial não é a saída/i); // fecha a leitura errada
+    }
+  });
+
+  // O painel foi ENCURTADO de propósito (12/08/2026: o texto virava um bloco na tela).
+  // Detalhar a 2ª saída não é licença para voltar aos ~4 caminhos + resumo de 5 linhas.
+  it("seguem curtas: 1 frase de resumo e 2 caminhos", () => {
+    for (const b of [bloqueioEspecialInvalido("dashboard"), bloqueioEspecialInvalido("organizacional")]) {
+      expect(b.caminhos).toHaveLength(2);
+    }
+    for (const msg of [dashboard, organizacional]) {
+      expect(msg.length).toBeLessThan(900);
+    }
+  });
+
   it("NÃO expõem R$ (a triagem é qualitativa; valor/hora é escondido do usuário)", () => {
     for (const msg of [dashboard, organizacional]) {
       expect(msg).not.toMatch(/R\$\s*[\d.,]+/);
