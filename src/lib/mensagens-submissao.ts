@@ -332,36 +332,20 @@ const SAIDA_PROJETO_PADRAO = "Não. É um projeto padrão…";
 export function bloqueioEspecialDashboard(): BloqueioSubmissao {
   return {
     codigo: "especial_dashboard",
-    titulo: "Dashboard e painel de controle não entram como projeto especial",
+    titulo: "Dashboard ou painel de controle não entra como projeto especial",
     resumo:
-      `Você respondeu que este projeto é, objetivamente, um dashboard ou um painel de ` +
-      `controle. Um painel é uma ENTREGA, e o ganho dele aparece no que as pessoas passam a ` +
-      `fazer com ele: as horas que ninguém gasta mais montando o relatório à mão, a ` +
-      `conferência que deixou de existir, o erro que parou de acontecer. Isso é mensurável ` +
-      `pelo caminho normal.`,
+      `Um painel é uma ENTREGA: o ganho está no que as pessoas deixaram de fazer à mão por ` +
+      `causa dele — e isso é mensurável pelo caminho normal.`,
     caminhos: [
       {
-        rotulo: "Envie como Saving Operacional",
+        rotulo: `Marque "${SAIDA_PROJETO_PADRAO}" e informe o ganho`,
         detalhe:
-          `Volte à pergunta do tipo de projeto, marque "${SAIDA_PROJETO_PADRAO}" e informe as ` +
-          `horas de antes e de hoje — vale se o painel eliminou trabalho manual recorrente ` +
-          `(planilha montada à mão, conferência, relatório periódico).`,
+          `Horas que ninguém gasta mais: Saving Operacional. Gasto que a empresa parou de ` +
+          `pagar: CUSTO EVITADO. Receita já apurada: Receita Incremental.`,
       },
       {
-        rotulo: "Ou cadastre o gasto que parou de ser pago",
-        detalhe:
-          `Se o painel fez a empresa parar de pagar uma ferramenta ou um serviço, cadastre ` +
-          `esse valor em CUSTO EVITADO, no ${FORM_IMPACTO}.`,
-      },
-      {
-        rotulo: "Ou envie como Receita Incremental",
-        detalhe: `Se ele destravou receita JÁ APURADA, este é o caminho.`,
-      },
-      {
-        rotulo: "Se nada disso foi medido ainda, espere a medição",
-        detalhe:
-          `O GoDocs documenta ganho já realizado — o especial não é a saída para o que ainda ` +
-          `não tem número.`,
+        rotulo: "Ou espere a medição",
+        detalhe: `O GoDocs documenta ganho já realizado.`,
       },
     ],
   };
@@ -377,29 +361,17 @@ export function bloqueioEspecialOrganizacional(): BloqueioSubmissao {
     codigo: "especial_organizacional",
     titulo: "Ganho organizacional não sustenta um projeto especial",
     resumo:
-      `Você respondeu que o ganho principal deste projeto é prioritariamente organizacional ` +
-      `(organizar informação, padronizar um processo, deixar tudo no lugar). Organizar é o ` +
-      `MEIO para o impacto, não o impacto: sem saving considerado nem receita real medida é ` +
-      `muito difícil um especial legítimo — e o especial é justamente a rota que PULA o ` +
-      `memorial financeiro.`,
+      `Organizar é o MEIO para o impacto, não o impacto: sem saving considerado nem receita ` +
+      `real medida é muito difícil um especial legítimo.`,
     caminhos: [
       {
-        rotulo: "Mostre o EFEITO do que foi organizado",
+        rotulo: `Marque "${SAIDA_PROJETO_PADRAO}" e mostre o EFEITO`,
         detalhe:
-          `Volte à pergunta do tipo de projeto e marque "${SAIDA_PROJETO_PADRAO}": horas que ` +
-          `alguém deixou de gastar entram como Saving Operacional (com as horas de antes e de ` +
-          `hoje).`,
+          `Horas que alguém deixou de gastar: Saving Operacional. Gasto que parou de ser ` +
+          `pago: CUSTO EVITADO. Receita nova já apurada: Receita Incremental.`,
       },
       {
-        rotulo: "Ou cadastre o gasto que parou de ser pago",
-        detalhe: `Gasto externo eliminado entra em CUSTO EVITADO, no ${FORM_IMPACTO}.`,
-      },
-      {
-        rotulo: "Ou envie como Receita Incremental",
-        detalhe: `Se a organização destravou receita nova JÁ APURADA, este é o caminho.`,
-      },
-      {
-        rotulo: "Se o efeito existe mas não foi medido, espere a medição",
+        rotulo: "Ou espere a medição",
         detalhe: `O GoDocs documenta ganho já realizado.`,
       },
     ],
