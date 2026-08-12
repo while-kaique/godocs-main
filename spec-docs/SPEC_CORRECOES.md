@@ -6,6 +6,63 @@
 
 ---
 
+## 2026-08-12 — Pergunta de custo evitado só falava de "contrato, serviço ou licença" (quem evitava MULTA não se reconhecia)
+
+**Status:** ✅ codada e testada · **Branch:** `fix/texto-custo-evitado` · **PR:** _(pendente)_
+
+**Sintoma.** A pergunta do formulário de saving era **"Essa automação eliminou um gasto externo
+(contrato, serviço ou licença)?"**, com o apoio *"Um contrato/serviço de terceiro que a empresa deixou de
+pagar… (ex: um agente terceirizado, uma licença SaaS)"*. Quem eliminou um gasto que **não tem esse nome**
+— o caso real é a **multa e juros de DIFAL** paga todo mês pelo financeiro (projeto "Plataforma
+SmartOnline", Stefany, 10/08/2026) — lia a pergunta, não se reconhecia em nenhum dos três rótulos e
+**deixava de cadastrar o corte de gasto**, por medo de "não se encaixar". O ganho ia embora antes de
+qualquer gate: o R$ do custo evitado vem dos **itens do formulário** (`custoEvitadoMensalFromItens`), então
+gasto não cadastrado é gasto que não existe para a planilha.
+
+**Causa-raiz.** Enquadramento estreito na COPY, repetido em cascata: os três pontos do formulário, os
+prompts do agente (perfil do custo evitado puro, Seção 3 do saving, bloco "CUSTO EVITADO") e o
+`MEMORIAL_ESQUELETO` nomeavam **exemplos** (contrato · serviço · licença) no lugar da **régua** (dinheiro
+que a empresa pagava e parou de pagar por causa desta automação). Exemplo em lugar de régua vira teto: o
+usuário lê a lista como enumeração fechada. O detector do gate de custo evitado no chat já cobria
+`multa`/`juros`/`mora` (foi escrito a partir do caso DIFAL), mas **não** `taxa`/`tarifa`/`hora extra`.
+
+**Fix.** Copy genérica e objetiva, com a régua explícita e os rótulos como exemplos:
+
+| Onde | Antes | Depois |
+|---|---|---|
+| Form, ramo "ninguém fazia" | "Essa automação eliminou um gasto externo (contrato, serviço ou licença)?" | "**Por causa desta automação, a empresa deixou de pagar algum gasto?**" + apoio "Não importa o nome do gasto — contrato, licença, serviço de terceiro, taxa, multa, juros, hora extra: se a empresa **pagava e parou de pagar** por causa disto, cadastre aqui." |
+| Form, lista do ramo "Não" | "Qual gasto externo foi eliminado?" | "**Qual gasto a empresa deixou de pagar?**" + "Liste cada gasto que parou de sair do caixa, com valor e recorrência — este é o ganho do projeto." |
+| Form, ramo "Sim, alguém fazia" | "Além das horas, a automação eliminou algum gasto externo DISTINTO (contrato/serviço/licença)?" | "**Além das horas, a empresa deixou de pagar algum gasto em dinheiro?**" + apoio que mantém o anti-dupla-contagem ("…**diferente** do trabalho já contado nas horas acima. Se o que parou de ser pago é justamente esse trabalho, responda **Não**") |
+| Botões dos 2 ramos | "Sim, eliminou"/"Não eliminou" · "Sim, evitou"/"Não evitou" | "Sim, deixou de pagar"/"Não deixou" (mesmo verbo da pergunta nos dois ramos) |
+| Cabeçalho/campos da lista | "Ferramenta / serviço" · "Ex: Zapier" · "Adicionar item evitado" | "Gasto eliminado" · "Ex: multa por atraso · licença do Zapier" · "Adicionar outro gasto" (+ `aria-label`s e o erro "Adicione ao menos um gasto eliminado") |
+| Prompts (`orchestrator.ts`) | perfil puro "ELIMINOU um gasto externo (contrato/serviço/licença de terceiro)"; Seção 3 "[3.1] Serviço/contrato evitado"; bloco "CUSTO EVITADO" listando licença/serviço | "DEIXAR DE PAGAR um gasto em dinheiro — o rótulo não importa (…taxa, multa, juros, hora extra, retrabalho pago)"; "[3.1] **Gasto eliminado**: QUAL gasto a empresa pagava e parou de pagar"; régua única "pagava e parou de pagar por causa desta automação". Os 3 pontos de validação do perfil puro passam a falar de **gasto** (REALIDADE = "já parou/caiu de fato", ESCOPO = "o que cobria **ou por que existia**", ex. da multa) |
+| `MEMORIAL_ESQUELETO` | "(a) QUAL contrato/serviço foi evitado" | "(a) QUAL gasto a empresa deixou de pagar, com o rótulo que ele tem de verdade (…)" |
+| `mensagemCustoEvitadoPago` | "no campo de custo evitado" | aponta a pergunta como ela aparece na tela ("o gasto que a empresa deixou de pagar (o custo evitado) — vale qualquer gasto, inclusive multa e juros") |
+
+**`TERMOS_GASTO` (detector do gate) — 2 termos novos, os dois AMBÍGUOS:** `taxa|tarifa|encargo` e
+`hora extra|sobreaviso|adicional noturno`. Ambíguo = só arma acompanhado de um `VERBOS_EVITADO`, porque
+**"taxa de conversão", "taxa de erro" e "taxa/hora" aparecem em conversa de saving toda hora** e não são
+gasto (`forte: true` ali armaria o gate em qualquer projeto que citasse um R$ — o mesmo cuidado do "Frete"
+com ≥8 chars no gate de sobreposição). ⚠️ **`retrabalho` ficou FORA de propósito:** "evitamos retrabalho" é
+a frase mais comum da fase, e retrabalho evitado é **tempo** — já contado nas horas; perguntar por ele como
+gasto evitado convidaria à dupla contagem. Retrabalho **pago a terceiro** cai em `terceiro`/`contrato`.
+
+**O que NÃO mudou (de propósito).** O nome da seção do memorial **"Contratos/Serviços Evitados"** e as
+chaves `custo_evitado_*` — `extrairJustificativaCargaEscala` e os extratores/colunas do Sheets casam por
+esses nomes; renomear a seção quebraria parser e planilha sem ganho nenhum para o usuário (o rótulo interno
+não é lido por quem preenche). A árvore do formulário, os valores `sim/nao/externo` e a mecânica dos gates
+seguem idênticas — a mudança é 100% de texto + vocabulário do detector.
+
+**Onde aterrissou.** `src/lib/submeter/step3-chat.tsx` (3 perguntas, 4 botões, cabeçalho/placeholders/
+`aria-label`s/erro da lista) · `src/lib/agents/orchestrator.ts` (`buildSavingCustoEvitadoPrompt`, Seção 3 e
+bloco "CUSTO EVITADO" de `buildSavingPrompt`) · `src/lib/agents/memorial-format.ts` (`MEMORIAL_ESQUELETO`,
+modos `saving` e `custo_evitado`) · `src/lib/agents/custo-evitado-chat.ts` (`TERMOS_GASTO`,
+`mensagemCustoEvitadoPago`) · `src/lib/testes/prompt-registry.ts` (regra 3) · `tests/custo-evitado-chat.test.ts`
+(4 testes novos: taxa com verbo arma · taxa sem verbo NÃO arma · hora extra arma · retrabalho fica fora) ·
+`worker.js` rebuildado. `npm run test`: **87 arquivos, 1210 testes, verdes**.
+
+---
+
 ## 2026-08-06 — Líder levava "Acesso negado." ao abrir a documentação do projeto que precisa aprovar
 
 **Status:** ✅ codada e testada · **Branch:** `worktree-plano-aprovacao-lider-teamguide` · **PR:** #235
