@@ -210,9 +210,9 @@ function ExemplosModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="exemplos-campo-titulo"
-        className="relative flex max-h-[86vh] w-full flex-col overflow-hidden rounded-2xl"
+        className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl"
         style={{
-          maxWidth: 560,
+          maxWidth: 900,
           background: "var(--go-white)",
           boxShadow: "0 24px 64px rgba(8,20,40,0.35)",
           animation: "go-pop-in 0.22s ease",
@@ -253,9 +253,10 @@ function ExemplosModal({
           </button>
         </div>
 
-        {/* Corpo */}
+        {/* Corpo — duas colunas lado a lado (vale × não vale) para caber sem rolagem;
+            em tela estreita as colunas empilham e o corpo volta a rolar. */}
         <div
-          className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6"
+          className="grid flex-1 gap-x-5 gap-y-5 overflow-y-auto px-5 py-4 sm:grid-cols-2 sm:px-6"
           style={{ background: "var(--go-cream)", borderTop: "1px solid rgba(8,20,40,0.07)" }}
         >
           <GrupoExemplos titulo="Conta como trabalho adicional" vale exemplos={valem} />
@@ -264,7 +265,7 @@ function ExemplosModal({
 
         {/* Rodapé */}
         <div
-          className="flex justify-end px-5 py-3.5 sm:px-6"
+          className="flex justify-end px-5 py-2.5 sm:px-6"
           style={{ borderTop: "1px solid rgba(8,20,40,0.07)", background: "var(--go-white)" }}
         >
           <button
@@ -304,7 +305,7 @@ function GrupoExemplos({
         <IconeVeredito vale={vale} />
         {titulo}
       </h3>
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {exemplos.map((ex, i) => (
           <CardExemplo key={i} exemplo={ex} />
         ))}
@@ -325,7 +326,7 @@ function CardExemplo({ exemplo }: { exemplo: ExemploCampo }) {
         borderLeft: `3px solid ${cor}`,
       }}
     >
-      <div className="space-y-2 px-3.5 py-3">
+      <div className="space-y-1.5 px-3.5 py-2.5">
         <Linha rotulo="Contexto" texto={exemplo.contexto} />
         <Linha rotulo="Custo eliminado" texto={exemplo.custoEliminado} />
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-0.5">
@@ -336,7 +337,7 @@ function CardExemplo({ exemplo }: { exemplo: ExemploCampo }) {
             <IconeVeredito vale={exemplo.vale} />
             {exemplo.vale ? "Válido" : "Não vale"}
           </span>
-          <span className="text-[12px] leading-snug" style={{ color: "#5b5b6a" }}>
+          <span className="text-[11.5px] leading-snug" style={{ color: "#5b5b6a" }}>
             {exemplo.motivo}
           </span>
         </div>
@@ -354,7 +355,7 @@ function Linha({ rotulo, texto }: { rotulo: string; texto: string }) {
       >
         {rotulo}
       </span>
-      <span className="block text-[12.5px] leading-snug" style={{ color: "var(--go-text-heading)" }}>
+      <span className="block text-[12px] leading-snug" style={{ color: "var(--go-text-heading)" }}>
         {texto}
       </span>
     </div>
