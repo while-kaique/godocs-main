@@ -1727,8 +1727,10 @@ Segue na fila para planejar: o **pedido do Lucas** — mostrar o "Alguém já fa
 
 ### 🔎 Revisão: 2 dos 3 revisores voltaram (12/08) — 4 achados tratados, 6 em aberto
 
-**Qualidade: `sugestoes`** · **Reuso: `possivel-duplicacao`** (só-sugestão) · **Conformidade: NÃO voltou
-antes do fim da sessão** — por isso `.review-status` segue `pendente` e **barra o push/ship**.
+**Os 3 voltaram e NENHUM é barrante:** conformidade **`diverge-baixa`** · qualidade **`sugestoes`** ·
+reuso **`possivel-duplicacao`** (só-sugestão). Marcadores gravados → **o `push`/`/ggsd:ship` está liberado**;
+não é preciso re-rodar revisor nenhum. A conformidade confirmou os 8 critérios de aceitação um a um, as
+Fronteiras respeitadas e o bundle (`worker.js` tem `notificarChat` e zero `buildUpdateMessage`).
 
 **Já corrigido no commit `d7447eb`** (suíte verde): o alerta lia saving do `documentacao.conteudo`, que o
 submit corrige só EM MEMÓRIA e nunca regrava — num projeto de custo evitado o grupo anunciaria **R$ 0,00**
@@ -1755,16 +1757,19 @@ silêncio** (agora `parseDataFlexivel`); `parseJson` local → canônico; `if (!
 6. **`MotivoIsencaoNotificacao` foi COPIADO** em vez de `import type { ResultadoAbertura }` — um motivo
    renomeado no canônico deixa um `case` morto compilando calado. (O plano dizia reusar o tipo.)
 
+⚠️ **Achado de PROCESSO (conformidade):** o plano aprovado vive na branch de **docs**
+(`docs/plano-chat-so-pre-aprovacao`), não na de **código** (`feat/chat-notifica-so-pre-aprovacao`) — se o PR
+sair só da branch de código, **o plano não acompanha o diff**. Levar as duas, ou mergear a de docs antes.
+
 ⚠️ **Observação do revisor que vale checar com o Luis:** o CLAUDE.md afirma "1 mensagem por projeto", mas com
 o reenvio reabrindo a fila (D10) um projeto pré-aprovado 2× gera 2 mensagens. É decisão de produto, não bug.
 
 ### ⛔ O que a próxima sessão precisa fazer (T8, nesta ordem)
-1. **Rodar os 3 revisores de contexto fresco antes de qualquer envio.** Eles foram disparados no fim
-   da sessão de 12/08 e **não voltaram antes do fechamento** — os marcadores `.review-status` e
-   `.quality-status` seguem em **`pendente`**, e com `pendente` o **`git push`/`/ggsd:ship` é
-   BARRADO** pelos hooks (ADR-038/039/053). Destrava rodando `ggsd:verificador-conformidade` +
-   `ggsd:revisor-qualidade` (+ `ggsd:revisor-reuso`, que é só-sugestão) e gravando o veredito nos
-   marcadores. A faixa medida foi **`profunda`** (`verify-tier.sh`).
+1. **Corrigir a mensagem DUPLICADA** (item 1 dos "em aberto" acima) — é o único achado da revisão que
+   ainda pode incomodar em produção, e o remédio é pequeno: `decidirAprovacoesDoProjeto` devolver
+   `rowsWritten` e o gatilho notificar só quando `> 0`. Os revisores já rodaram e **não barram**
+   (`.review-status: diverge-baixa`, `.quality-status: sugestoes`); se você mexer no código, **re-rode**
+   os dois — o veredito vale para o diff que eles viram. Faixa medida: **`profunda`**.
 2. **Regra 10 antes de subir:** `git fetch origin` + incorporar `origin/main` (o `main` anda por
    causa da regra 8) e **rebuildar `worker.js`/`dist` depois do merge**. ⚠️ Conflito em `CLAUDE.md`
    se resolve **UNINDO os dois lados** (regra 7) e `grep -n '^<<<<<<<' CLAUDE.md` tem de voltar vazio.
