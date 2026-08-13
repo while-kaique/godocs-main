@@ -5,7 +5,74 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: ✅ **executado — EM PRODUÇÃO (13/08)**; falta só a **T9 (push + PR)**
+**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção. **Nenhum plano em aberto.**
+
+### ➡️ PRÓXIMO PASSO — `git push` + PR da **`feat/espelho-e-perf-navegacao`** (a T9, agora a ÚNICA pendência grave do repo)
+
+⛔ **O que está em PRODUÇÃO só existe numa branch local.** O `main` não tem nem o espelho da planilha
+(`b09b672`) nem os **2 commits de perf do Kaique** (`85ca230`, `896c26a`) nem a ficha instantânea
+(`14d94e0`) — **qualquer deploy a partir do `main` REGRIDE a prod**, apagando as três coisas de uma vez.
+O push + PR é o que tira esse risco. Avisar o Kaique de que os commits dele vão DENTRO deste PR.
+
+⛔ **A REVISÃO SEGUE PENDENTE e o `/ggsd:ship` VAI BARRAR o envio.** Os marcadores `.review-status` e
+`.quality-status` continuam **ausentes** — os 3 revisores de contexto fresco
+(`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` + `ggsd:revisor-reuso`) **nunca rodaram** sobre
+o espelho nem sobre a ficha instantânea, porque o usuário instruiu, em TRÊS sessões seguidas, a não
+disparar subagentes. Destravar = rodar a verificação do **`/ggsd:code §9`** sobre o diff
+`origin/main...HEAD` da branch da feature, ou o operador dispensar explicitamente.
+
+### O que ESTA sessão fechou (13/08)
+
+1. **Deploy em staging E produção** da ficha de triagem instantânea (`14d94e0`): staging `edf400b4`
+   **v156** às 13:24 UTC, **prod `674a3710`** às 13:29 UTC. Build com **1443 testes verdes**,
+   `origin/main` já incorporado, `worker.js` 1.010,7 kb. Sinal de runtime pós-deploy verde nos dois:
+   `[sync-reverse] … erros=0` em ~1,4 s (staging `total=578`, prod `total=626`), sem exceções, SPA 200.
+   ⚠️ **A T7 (validação de navegador) foi DISPENSADA pelo Luis** — *"Deployar a prod agora"*. Ninguém
+   confirmou de olho que a ficha abre **sem spinner**; o que está provado é que o worker novo está no ar
+   e saudável. Se ao abrir uma linha ainda demorar ~1 s, o alvo é `src/lib/dashboard-detalhe-cache.ts`.
+2. **Aba "Especiais Pendentes +15 dias"** gravada na planilha de prod (plano acima). 19 projetos acima do
+   corte, o mais antigo com **53 dias**. Reexecutar: `ESPECIAIS_WRITE=1 npx vitest run --config
+   scripts/dryrun-lider/especiais.config.ts` (a aba é limpa e regravada — rodar 2× não duplica, e
+   comentários que o Luis deixar nela sobrevivem).
+
+⚠️ **Atenção ao worktree:** o código deployado vive em `.claude/worktrees/espelho-e-perf`
+(`feat/espelho-e-perf-navegacao`); o **script do relatório** foi commitado na `docs/plano-espelho-e-perf`
+(a pasta principal), a pedido do Luis — *"pode até codar aqui já"*. São **duas branches diferentes**, e o
+PR da T9 é o da **feature**, não o desta.
+
+### (superado — deployado em 13/08) O bloco anterior — deployar a ficha de triagem
+
+O código da ficha instantânea está **commitado e verde, mas só na máquina** (worktree
+`.claude/worktrees/espelho-e-perf`). O que fazer, na ordem:
+
+1. **Staging `edf400b4`** — fluxo do "Deploy rápido" do `CLAUDE.md` (`getUploadToken` →
+   `scripts/deploy-godeploy.sh "<TOKEN>"` → `updateApp` com o `ASSETS_JSON` impresso). O build já
+   existe (`dist/` + `worker.js` de 1.010,7 kb) e **`origin/main` (`05e6692`) já está incorporado** —
+   nada a rebuildar por merge. ⚠️ **NUNCA `674a3710` neste passo** (regra 13).
+2. **Validar no navegador** (é o que a T7 pede, e o que nenhum teste prova): passar o mouse ~0,2 s
+   numa linha e clicar → a ficha abre **sem spinner perceptível**; rolar a tabela rápido **não**
+   deve encher a aba de requisições (olhar a Network); **gravar um status e reabrir** a ficha tem de
+   mostrar o valor **novo** (é a invalidação); e o "Atualizar" segue dizendo *"Planilha sincronizada
+   às HH:MM"*.
+3. **Prod `674a3710`** — só depois do item 2.
+4. **`git push` + PR** da branch (a **T9 herdada**), que continua sendo a pendência mais grave do
+   repo: **o que está em produção só existe nesta branch local**, e o `main` não tem nem o espelho
+   nem os 2 commits de perf do Kaique — **deployar do `main` regride a prod**. Avisar o Kaique de
+   que os commits dele vão DENTRO deste PR.
+
+⛔ **A REVISÃO ESTÁ PENDENTE e o `/ggsd:ship` VAI BARRAR o envio.** Os 3 revisores de contexto fresco
+(`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` + `ggsd:revisor-reuso`) **nunca rodaram**
+sobre este código — nem sobre o espelho, nem sobre esta fatia — porque o usuário instruiu, nas duas
+sessões, a **não disparar subagentes**. Marcadores `.review-status`/`.quality-status` **ausentes** nos
+dois worktrees. Destravar = rodar a verificação do **`/ggsd:code §9`** sobre o diff
+`origin/main...HEAD`, ou o operador dispensar explicitamente.
+
+**Onde olhar primeiro no código, se a validação der problema:** `src/lib/dashboard-detalhe-cache.ts`
+(o cabeçalho explica cada invariante e por que o I/O no hover é aceitável aqui) e o `Promise.all` de
+`getProjetoDashboard` em `src/lib/dashboard-admin.functions.ts`.
+
+> **Fatia anterior (ainda com pendência de processo):**
+> **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · ✅ **executado — EM PRODUÇÃO (13/08)**; falta a **T9 (push + PR)** e os 3 revisores. A fatia nova nasce **sobre** essa branch (é o mesmo assunto: perf de navegação) e o `worker.js`/PR saem juntos.
 
 ### ➡️ PRÓXIMO PASSO — rodar os 3 revisores e então `/ggsd:ship` (push + PR) da `feat/espelho-e-perf-navegacao`
 
