@@ -904,7 +904,7 @@ stack de um projeto vivo muda de verdade.
 ## Feature adicional — Ferramentas em MULTI-seleção (grade 3×3) + o Claude dividido em 3 (12/08/2026)
 
 **Pedido (Luis, 12/08/2026):** "quero que torne o campo de ferramentas uma multi-seleção
-(pense de forma bem agradável e bonita de usar) e divida 'Claude' entre 'Claude.ai',
+(pense de forma bem agradável e bonita de usar) e divida 'Claude' entre 'Claude AI',
 'Claude Cowork' e 'Claude Code'. Além disso, bote uma frase dizendo que é a ferramenta usada
 para construção do projeto, e não a ferramenta na qual o projeto funciona (até pq isso fica
 na documentação, como supabase e tal)." Complemento no mesmo dia: **"godeploy pode ficar como
@@ -945,7 +945,7 @@ repense e melhore"** (o que trocou pílulas por grade — item 5 abaixo).
      **arranjo foi fechado pelo Luis olhando a tela**:
 
      ```
-     Claude.ai      │ Python   │ Apps Script
+     Claude AI      │ Python   │ Apps Script
      Claude Cowork  │ n8n      │ Vercel
      Claude Code    │ GoDeploy │ Outros
      ```
@@ -1212,11 +1212,26 @@ gate é de **FORMULÁRIO**: 2 cliques, sem máquina de estados de chat, sem risc
 10. **A numeração 1/2 é legítima** (a ordem é real: uma destrava a outra) — não é enfeite,
     ao contrário dos `01 / 02 / 03` decorativos.
 
+11. **A 2ª saída diz "volte como projeto PADRÃO", não "espere"** (Kaique, 12/08/2026, olhando a
+    tela). Ela nasceu como `Ou espere a medição — O GoDocs documenta ganho já realizado.`, e
+    isso não informa **esperar até o quê** nem **por qual porta se volta**. Pior: do lado do
+    especial a leitura natural é a ERRADA — *"não tenho número, então mando como especial"* —,
+    que é precisamente o desvio que estas 2 perguntas fecham. Hoje é a constante
+    **`CAMINHO_SEM_MEDICAO`** (FONTE ÚNICA dos 2 bloqueios — o texto era digitado 2× idêntico)
+    e diz as 3 coisas: sem número **o especial não é a saída** (ele registra o projeto **sem
+    valor de ganho**) · apure o resultado · **submeta como projeto PADRÃO, com o ganho já
+    validado**. ⚠️ **Detalhar isso NÃO reabre o painel-bloco:** o encurtamento do mesmo dia
+    (resumo de 1 frase + 2 caminhos, no lugar de ~4 caminhos + resumo de 5 linhas) continua
+    valendo, e o teste prende os dois lados — o conteúdo da saída **e** o teto de tamanho/nº
+    de caminhos.
+
 **Testes:** `tests/especial-triagem.test.ts` — texto exato das 2 perguntas (mudar tem de ser
 DECISÃO), os 6 ramos de `motivoBloqueioEspecial` (incluindo "projeto padrão nunca é afetado" e
 "em branco não bloqueia"), o que `validarEtapa25Especial` cobra em cada estado e as 2
-mensagens (o que foi respondido · por que · "Para corrigir…" · sem R$). As 2 mensagens também
-entram no laço de invariantes de `tests/mensagens-submissao.test.ts`.
+mensagens (o que foi respondido · por que · "Para corrigir…" · sem R$ · a saída sem medição
+mandando voltar como PADRÃO · e o teto "2 caminhos, < 900 chars", que preserva o
+encurtamento). As 2 mensagens também entram no laço de invariantes de
+`tests/mensagens-submissao.test.ts`.
 
 
 ## Feature adicional — Notificação do Chat só quando há pré-aprovação do líder (11/08/2026)

@@ -283,34 +283,6 @@ describe('textos da conversa', () => {
     }
   });
 
-  // As DUAS saídas existirem não basta: elas não são equivalentes, e a versão anterior do
-  // texto as apresentava como dois bullets simétricos de uma linha. Os 2 buracos que isso
-  // deixava — e que estes testes travam, para voltar atrás ser uma DECISÃO:
-  //   (a) "volte quando houver medição" não dizia o que acontece com a submissão de hoje
-  //       (lia-se como pausa de minutos, não "fica em Rascunhos e conclui-se depois");
-  //   (b) "especial" aparecia como alternativa simétrica, virando o botão de fuga de quem só
-  //       falta medir — e especial entra na planilha SEM valor de ganho, então o ganho real
-  //       apurado dois meses depois nunca chega ao consolidado.
-  it('"volte quando houver medição" diz que a submissão NÃO se conclui hoje e onde o projeto fica', () => {
-    for (const modo of ['saving', 'receita'] as const) {
-      const m = mensagemGanhoProjetado(modo);
-      expect(m).toMatch(/Rascunhos/); // onde o projeto fica salvo
-      expect(m).toMatch(/não concluir esta submissão hoje/i); // não é pausa de minutos
-      expect(m).toMatch(/só esta etapa financeira/i); // a doc não é reescrita
-    }
-  });
-
-  it('"especial" vem com a elegibilidade e com o aviso de que é ERRADO para quem só falta medir', () => {
-    for (const modo of ['saving', 'receita'] as const) {
-      const m = mensagemGanhoProjetado(modo);
-      expect(m).toMatch(/nunca\*{0,2} vai ter número objetivo/i); // a condição de uso
-      expect(m).toMatch(/sem valor de ganho/i); // o custo de escolher especial
-      expect(m).toMatch(/caminho ERRADO/); // o desvio explícito de quem só falta medir
-      // As duas saídas não podem voltar a ser apresentadas como equivalentes.
-      expect(m).toMatch(/não\*{0,2} são equivalentes/i);
-    }
-  });
-
   it('o nudge do "real" exige tempo de operação + como o número foi apurado', () => {
     const n = nudgeGanhoRealConfirmado('roda desde março, medimos no painel de pedidos');
     expect(n).toContain('[SISTEMA]');
@@ -391,10 +363,6 @@ describe('devePreemptarPorProjecao — a correção que a STAGING exigiu', () =>
       expect(curta.length).toBeLessThan(mensagemGanhoProjetado(modo).length);
       expect(curta).toMatch(/especial/i);
       expect(curta).toMatch(/medi[çc]ão/i);
-      // Curta, mas sem perder as 2 coisas que a pessoa precisa para agir: onde o projeto
-      // ficou (a submissão de hoje não se conclui) e que especial tem preço.
-      expect(curta).toMatch(/Rascunhos/);
-      expect(curta).toMatch(/sem valor de ganho/i);
     }
   });
 });

@@ -205,7 +205,7 @@ export function Step1({
                 Os 3 são o mesmo Claude, em lugares diferentes
               </strong>
               <span className="mb-1.5 block" style={{ color: "rgba(255,255,255,0.88)" }}>
-                <strong style={{ color: "var(--go-lime)" }}>Claude.ai</strong> — o Claude no
+                <strong style={{ color: "var(--go-lime)" }}>Claude AI</strong> — o Claude no
                 navegador. Você conversa, cola texto ou planilha e pede análise, rascunho ou um
                 trecho de código para copiar na mão.
               </span>
