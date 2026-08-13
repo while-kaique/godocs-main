@@ -281,6 +281,55 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_projeto_aprovacoes_projeto
     ON projeto_aprovacoes(projeto_id);
 
+  -- ESPELHO da planilha dentro do SQLite — uma linha por "ID Projeto" da aba.
+  -- Existe para as TELAS não lerem o Google Sheets em tempo de request: "Meus Projetos"
+  -- fazia um readAllRows() INTEIRO por load de página (~2 s, e a cota de 60 leituras/min
+  -- é compartilhada com prod) e a triagem do /dashboard escondia a mesma leitura atrás de
+  -- um cache de 60 s. A planilha continua sendo a fonte da verdade e o ÚNICO lugar onde se
+  -- edita — este espelho é reconstruído pelo sync reverso (cron) e remendado pelas nossas
+  -- próprias escritas. É dele que as telas leem.
+  --   linha        JSON do SheetRow COMPLETO (chaveado pelo NOME REAL da coluna) — é o que
+  --                a ficha de triagem abre e o que o parser do parecer do líder lê
+  --   linha_resumo JSON só com as colunas curtas da LISTAGEM (COLUNAS_RESUMO). A listagem
+  --                NUNCA seleciona "linha": os memoriais de todos os projetos de uma vez
+  --                são o mesmo risco de payload do gotcha de 32 MiB do Investigador
+  --   linha_hash   impressão digital do que veio da planilha — linha igual não gera UPDATE,
+  --                o que deixa o cron de 5 min quase sem escrita
+  --   patch        colunas que NÓS gravamos na planilha (com escrito_em) — protege a
+  --                escrita recém-feita de ser desfeita por um sync que começou ANTES dela
+  --                e leu a célula antiga
+  -- ⚠️ Tabela DERIVADA: pode ser apagada e o próximo sync a reconstrói inteira. Nada de
+  -- estado do app mora aqui (isso é "projetos").
+  CREATE TABLE IF NOT EXISTS sheet_espelho (
+    projeto_id   TEXT PRIMARY KEY,                  -- id em minúsculas (match case-insensitive)
+    linha        TEXT NOT NULL,
+    linha_resumo TEXT NOT NULL,
+    linha_hash   TEXT,
+    patch        TEXT,
+    escrito_em   TEXT,                              -- quando NÓS gravamos por último
+    lido_em      TEXT DEFAULT (datetime('now'))     -- quando veio da planilha
+  );
+
+  -- Uma linha por execução do sync Sheets → SQLite. Serve para a tela dizer "espelho de
+  -- HH:MM" e para saber, sem abrir log, se o sync parou de rodar — o risco real desta
+  -- arquitetura é o sync morrer em silêncio e as telas seguirem mostrando dado velho como
+  -- se fosse novo. Append-only, nada aqui alimenta regra de negócio.
+  CREATE TABLE IF NOT EXISTS sync_runs (
+    id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    gatilho       TEXT NOT NULL,                    -- 'cron'|'manual'|'sob-demanda'
+    ok            INTEGER NOT NULL DEFAULT 0,       -- 1 = leu a planilha e espelhou
+    total         INTEGER DEFAULT 0,                -- linhas com ID na planilha
+    espelhados    INTEGER DEFAULT 0,                -- linhas gravadas no espelho
+    criados       INTEGER DEFAULT 0,
+    atualizados   INTEGER DEFAULT 0,
+    removidos     INTEGER DEFAULT 0,
+    erros         INTEGER DEFAULT 0,
+    duracao_ms    INTEGER,
+    detalhe       TEXT,                             -- 1ª causa quando ok = 0
+    iniciado_em   TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sync_runs_iniciado ON sync_runs(iniciado_em);
   -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
   -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
   -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE

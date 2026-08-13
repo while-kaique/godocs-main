@@ -4,7 +4,13 @@
 
 import type { ProjetoRow } from '@/integrations/db/client.server';
 import { appendRow, updateRowByProjectId, type SheetColumn } from './sheets';
+// ⚠️ `buildUpdateMessage` NÃO entra aqui: o D30 (12/08) removeu o `🚨 … Análise Pendente`
+// — era a MESMA notificação por submissão com outra roupa. Agora o grupo é avisado na
+// pré-aprovação do líder (`notificacao-chat.ts`). Não reimplementar.
 import { sendChatNotification, buildSubmitMessage, ehProjetoTesteE2E } from './chat';
+// Espelho da planilha: quem escreve no Sheets remenda o espelho na hora, senão o efeito da
+// escrita só apareceria na tela no próximo cron (as telas leem o espelho — `sheet-espelho.ts`).
+import { espelharEscrita } from '@/lib/sheet-espelho';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -477,6 +483,9 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     try {
       if (p.modo === 'edicao') {
         const linhaAtualizada = await updateRowByProjectId(p.projetoId, rowPadronizada);
+        // Espelho: a EDIÇÃO altera células de uma linha que já existe → remendo (as colunas
+        // omitidas de propósito, como "Data Submissão" e "Motivo Reenvio", ficam intactas).
+        await espelharEscrita(p.projetoId, rowPadronizada);
         if (deveRecuperarPorAppend(p.modo, linhaAtualizada)) {
           etapa = 'recuperar (append)';
           console.warn(
@@ -488,18 +497,22 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
           // antiga já se foi junto com ela; não há motivo de triagem para preservar).
           // As 2 colunas do líder seguem a mesma régua: omitir preserva a célula, mas
           // aqui NÃO HÁ célula a preservar — a linha nasce agora e não pode nascer vazia.
-          await appendRow(
-            padronizarLinha({
-              ...row,
-              'Data Submissão': dataSubmissao,
-              'Motivo Reenvio': '—',
-              'Aprovação do Líder': ouTraco(p.aprovacaoLider),
-              'Justificativa Aprovação do Líder': ouTraco(p.justificativaAprovacaoLider),
-            }),
-          );
+          const recuperada = padronizarLinha({
+            ...row,
+            'Data Submissão': dataSubmissao,
+            'Motivo Reenvio': '—',
+            'Aprovação do Líder': ouTraco(p.aprovacaoLider),
+            'Justificativa Aprovação do Líder': ouTraco(p.justificativaAprovacaoLider),
+          });
+          await appendRow(recuperada);
+          // A linha NASCEU agora → o espelho recebe a linha inteira (`novaLinha`).
+          await espelharEscrita(p.projetoId, recuperada, { novaLinha: true });
         }
       } else {
         await appendRow(rowPadronizada);
+        // ⚠️ Sem este remendo, uma submissão NOVA apareceria em "Meus Projetos" sem Status
+        // (badge "—") até o próximo cron: a lista lê o espelho, e a linha acabou de nascer.
+        await espelharEscrita(p.projetoId, rowPadronizada, { novaLinha: true });
       }
     } catch (sheetsErr) {
       console.error(`[google/sync] Falha ao ${etapa} na planilha:`, sheetsErr);
@@ -584,7 +597,12 @@ export async function syncUpdateToGoogle(p: UpdateSyncParams): Promise<void> {
       if (p.justificativaAprovacaoLider !== undefined) {
         cells['Justificativa Aprovação do Líder'] = p.justificativaAprovacaoLider ?? '';
       }
-      await updateRowByProjectId(p.projetoId, padronizarLinha(cells));
+      const celulasPadronizadas = padronizarLinha(cells);
+      await updateRowByProjectId(p.projetoId, celulasPadronizadas);
+      // Espelho: Complexidade/Observações/Classificação do analisador aparecem na triagem
+      // sem esperar o cron. As colunas OMITIDAS (o `undefined` que preserva o parecer do
+      // líder — D29) continuam de fora aqui, porque `espelharEscrita` ignora ausentes.
+      await espelharEscrita(p.projetoId, celulasPadronizadas);
     } catch (sheetsErr) {
       console.error(`[google/sync] Falha ao update na planilha (${p.projectName}):`, sheetsErr);
     }

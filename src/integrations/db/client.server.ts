@@ -317,6 +317,36 @@ export function getProjetosNaoRascunho() {
   );
 }
 
+/**
+ * Os campos que o SYNC REVERSO precisa para fazer o diff planilha × banco — TODOS os
+ * projetos numa consulta só.
+ *
+ * ⚠️ Existe para o sync não fazer `getProjetoById` DENTRO do laço das linhas: eram N
+ * round-trips por corrida (~600 em prod), o que tornava o sync lento o bastante para só
+ * caber 1×/hora e o deixava perto do teto de tempo do runtime. Selecionamos apenas as
+ * colunas comparadas (`SAFE_UPDATE_FIELDS` + as de efeito colateral), nunca `SELECT *`.
+ */
+export function getProjetosParaSyncReverso() {
+  return queryAll<
+    Pick<
+      ProjetoRow,
+      | 'id' | 'nome' | 'responsavel_email' | 'responsavel_nome' | 'area' | 'descricao_breve'
+      | 'ferramenta' | 'escopo' | 'alguem_fazia' | 'saving_horas' | 'saving_reais' | 'tipo_saving'
+      | 'memorial_calculo' | 'custo_externo_mensal' | 'ganho_total_mensal' | 'complexidade'
+      | 'observacoes' | 'custo_evitado_justificativa' | 'contexto_especial' | 'atualizado_em'
+      | 'membros' | 'membros_papeis' | 'especial' | 'tipos_projeto' | 'tipo_projeto' | 'descontinuado'
+    >
+  >(
+    `SELECT id, nome, responsavel_email, responsavel_nome, area, descricao_breve, ferramenta,
+            escopo, alguem_fazia, saving_horas, saving_reais, tipo_saving, memorial_calculo,
+            custo_externo_mensal, ganho_total_mensal, complexidade, observacoes,
+            custo_evitado_justificativa, contexto_especial, atualizado_em, membros,
+            membros_papeis, especial, tipos_projeto, tipo_projeto, descontinuado
+     FROM projetos`,
+    [],
+  );
+}
+
 export async function getProjetoWithRelations(id: string) {
   const projeto = await queryOne<ProjetoRow & { area_nome: string | null }>(`
     SELECT p.*, a.nome as area_nome
@@ -1647,6 +1677,150 @@ export function getProjetosLinkInfo() {
 export function cleanupOldApiLogs(daysToKeep = 30) {
   return exec(
     "DELETE FROM api_logs WHERE created_at < datetime('now', '-' || ? || ' days')", [daysToKeep]
+  );
+}
+
+// ─── Espelho da planilha (sheet_espelho) + corridas do sync (sync_runs) ─────
+//
+// A camada de SQL do espelho: quem dá sentido a estes campos é `@/lib/sheet-espelho`
+// (ver o cabeçalho de lá e o comentário da tabela no schema). Aqui só há acesso a
+// dados — nenhuma regra.
+
+export type EspelhoRow = {
+  projeto_id: string;
+  linha: string;
+  linha_resumo: string;
+  linha_hash: string | null;
+  patch: string | null;
+  escrito_em: string | null;
+  lido_em: string | null;
+};
+
+/**
+ * Hash + `escrito_em`/`patch` de TODAS as linhas do espelho — sem os JSONs.
+ *
+ * ⚠️ É de propósito que esta consulta não traga `linha`/`linha_resumo`: ela existe para o
+ * sync decidir o que mudou, e trazer os blobs de ~600 projetos só para comparar hash é o
+ * anti-padrão de payload que já derrubou o Investigador (limite de 32 MiB de RPC).
+ */
+export function getEspelhoIndice() {
+  return queryAll<{ projeto_id: string; linha_hash: string | null; patch: string | null; escrito_em: string | null }>(
+    'SELECT projeto_id, linha_hash, patch, escrito_em FROM sheet_espelho', []
+  );
+}
+
+/** Só os resumos (JSON curto) — é o que a LISTAGEM do dashboard consome. */
+export function getEspelhoResumos() {
+  return queryAll<{ projeto_id: string; linha_resumo: string; lido_em: string | null }>(
+    'SELECT projeto_id, linha_resumo, lido_em FROM sheet_espelho', []
+  );
+}
+
+/** Linha COMPLETA de um projeto (ficha de triagem, parecer do líder). */
+export function getEspelhoLinha(projetoId: string) {
+  return queryOne<EspelhoRow>('SELECT * FROM sheet_espelho WHERE projeto_id = ?', [
+    projetoId.trim().toLowerCase(),
+  ]);
+}
+
+/**
+ * Linhas completas de um conjunto de ids (os projetos de UM usuário em "Meus Projetos").
+ * Filtra por `IN` para não trazer a tabela inteira. Lista vazia → nenhuma consulta.
+ */
+export async function getEspelhoLinhasPorIds(projetoIds: string[]): Promise<EspelhoRow[]> {
+  const ids = [...new Set(projetoIds.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  return queryAll<EspelhoRow>(
+    `SELECT * FROM sheet_espelho WHERE projeto_id IN (${placeholders})`,
+    ids,
+  );
+}
+
+/** Grava (ou substitui) a linha espelhada de um projeto. */
+export function upsertEspelhoLinha(v: {
+  projeto_id: string;
+  linha: string;
+  linha_resumo: string;
+  linha_hash: string;
+  patch: string | null;
+  escrito_em: string | null;
+  lido_em: string;
+}) {
+  // ⚠️ `INSERT OR REPLACE`, não `ON CONFLICT … DO UPDATE`: a linha é sempre gravada por
+  // inteiro (o chamador já mesclou o que precisava), e o `OR REPLACE` é a forma que roda
+  // em qualquer SQLite — inclusive num datasource do Godeploy mais antigo que o upsert de
+  // 2018. Não há FK apontando para esta tabela, então o REPLACE não cascateia nada.
+  return exec(
+    `INSERT OR REPLACE INTO sheet_espelho
+       (projeto_id, linha, linha_resumo, linha_hash, patch, escrito_em, lido_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [v.projeto_id, v.linha, v.linha_resumo, v.linha_hash, v.patch, v.escrito_em, v.lido_em],
+  );
+}
+
+/** Remove uma linha do espelho (projeto que saiu da planilha). */
+export function deleteEspelhoLinha(projetoId: string) {
+  return exec('DELETE FROM sheet_espelho WHERE projeto_id = ?', [projetoId.trim().toLowerCase()]);
+}
+
+/** Registra uma corrida do sync (append-only) — alimenta o "espelho de HH:MM" da tela. */
+export function insertSyncRun(v: {
+  gatilho: string;
+  ok: number;
+  total: number;
+  espelhados: number;
+  criados: number;
+  atualizados: number;
+  removidos: number;
+  erros: number;
+  duracao_ms: number;
+  detalhe: string | null;
+}) {
+  return exec(
+    `INSERT INTO sync_runs (gatilho, ok, total, espelhados, criados, atualizados, removidos, erros, duracao_ms, detalhe)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [v.gatilho, v.ok, v.total, v.espelhados, v.criados, v.atualizados, v.removidos, v.erros, v.duracao_ms, v.detalhe],
+  );
+}
+
+export type SyncRunRow = {
+  id: string;
+  gatilho: string;
+  ok: number;
+  total: number | null;
+  espelhados: number | null;
+  criados: number | null;
+  atualizados: number | null;
+  removidos: number | null;
+  erros: number | null;
+  duracao_ms: number | null;
+  detalhe: string | null;
+  iniciado_em: string | null;
+};
+
+/** Última corrida do sync (qualquer desfecho) — para diagnóstico/tela. */
+export function getUltimaSyncRun() {
+  return queryOne<SyncRunRow>('SELECT * FROM sync_runs ORDER BY iniciado_em DESC LIMIT 1', []);
+}
+
+/** Última corrida BEM-SUCEDIDA — é ela que define a idade real do espelho. */
+export function getUltimaSyncRunOk() {
+  return queryOne<SyncRunRow>(
+    'SELECT * FROM sync_runs WHERE ok = 1 ORDER BY iniciado_em DESC LIMIT 1', []
+  );
+}
+
+export function getSyncRunsRecentes(limite = 20) {
+  return queryAll<SyncRunRow>(
+    'SELECT * FROM sync_runs ORDER BY iniciado_em DESC LIMIT ?', [limite]
+  );
+}
+
+/** Higiene: o log de corridas cresce ~288/dia com o cron de 5 min. */
+export function cleanupOldSyncRuns(daysToKeep = 7) {
+  return exec(
+    "DELETE FROM sync_runs WHERE iniciado_em < datetime('now', '-' || ? || ' days')", [daysToKeep]
   );
 }
 

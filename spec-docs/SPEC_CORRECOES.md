@@ -6,6 +6,71 @@
 
 ---
 
+## 2026-08-13 — abrir uma linha do `/dashboard` ainda esperava ~1 s DEPOIS do espelho
+
+**Status:** ✅ corrigido · **Branch:** `feat/espelho-e-perf-navegacao` (mesma do espelho, por
+decisão do Luis — 1 PR só) · **Plano:** `docs/plans/detalhe-triagem-abre-instantaneo.md`
+
+**Sintoma.** Com o espelho no ar, a **listagem** do `/dashboard` ficou rápida (deixou de ler o
+Google Sheets no request), mas **clicar numa linha para abrir a ficha de triagem continuava
+esperando** — o overlay abria com o spinner *"Carregando a linha da planilha…"* por ~1 s, e
+fechar e reabrir a MESMA ficha esperava de novo, igual.
+
+**Causa-raiz — duas, e a primeira é a que dominava.**
+1. **Uma requisição inteira no caminho crítico do clique.** O `ProjetoDetalheDialog` só disparava
+   o `apiFetch` no `useEffect` do `id`, isto é, **depois** do clique. E neste ambiente qualquer
+   rota do GoDocs custa **~750–800 ms de overhead FIXO da plataforma** (o gate de OAuth do edge)
+   antes de o nosso código rodar — número já medido e registrado no `CLAUDE.md` (a mesma máquina
+   fala com `cloudflare.com` em 55 ms, e `/favicon.svg`, que não faz trabalho nenhum, custa ~800 ms).
+   Ou seja: **a espera não era a planilha nem o SQLite** — o espelho já tinha resolvido isso, a
+   ficha é um `SELECT` por PRIMARY KEY (`lerLinhaEspelho`). Era a **CONTAGEM de requisições**, a
+   mesma lição do code-splitting (49 → 19 assets), aplicada a DADO em vez de JS.
+2. **Duas leituras SQLite em SÉRIE no servidor.** `getProjetoDashboard` fazia
+   `await lerLinhaEspelho(id)` e só então `await getAdminStatusLogs(id)` — independentes entre si,
+   mas o histórico só começava depois de a linha chegar (cada round-trip é RPC de Durable Object).
+
+**Fix.**
+- **Servidor:** as 2 leituras num `Promise.all`. ⚠️ O `catch` do histórico foi para **DENTRO** do
+  `Promise.all`, não num `try` em volta: ele é acessório (auditoria fora do ar não impede a ficha
+  de abrir) e, no caminho do 404, quem lança é a checagem da linha — uma rejeição solta do log
+  viraria *unhandled rejection* no worker, porque ninguém mais estaria esperando por ela.
+- **Cliente:** novo `src/lib/dashboard-detalhe-cache.ts`, irmão do `dashboard-prefetch.ts` (herda
+  as decisões dele; **não** foi enfiado no mesmo módulo porque a semântica difere de propósito —
+  aquele é um slot ÚNICO de consumo único para a listagem, este é um mapa por id, multi-consumo,
+  com invalidação). O `hover`/`focus` da `<tr>` agenda a ficha com **150 ms** (a régua do
+  `defaultPreloadDelay` do router) e o `mouseleave`/`blur` cancela; o clique consome a requisição
+  **já em voo**.
+
+**Invariantes declarados (o que não pode regredir).** Erro **NUNCA** fica cacheado (403/rede/edge
+soltam a entrada, senão a tela herdaria a falha e não tentaria de novo) · **TTL de 30 s**, curto de
+propósito: a ficha semeia os campos **Observações / Motivo Reenvio / Motivo Reprovado** que a
+triagem **regrava**, e servir ficha velha alargaria a janela de sobrescrever texto mais novo da
+planilha · **`invalidarDetalhe` depois de gravar** e **`limparDetalhes` no `?refresh=1`** (que
+sincroniza de verdade) · **timer único** para a tabela inteira, então atravessar 25 linhas rolando
+**não** vira 25 requisições · cache **em memória, por aba** — a decisão de produto de 28/07/2026
+(*"cache da listagem em SQLite/localStorage é FORA"*) segue intacta: isto é a **ficha**, não a
+listagem, e não persiste nada.
+
+⚠️ **Por que este I/O no hover não contradiz o *"`preload` NÃO pode disparar I/O"*** (as 2 travas
+do link "Dashboard", `docs/deploy.md`): lá o hover disparava `/api/admin/dashboard/projetos` numa
+época em que essa rota **lia o Google Sheets**, cuja cota de 60 leituras/min é compartilhada com
+prod. Aqui o alvo é o **espelho** (SQLite local), sem cota nenhuma. A condição que inverte o
+veredito está escrita no cabeçalho do módulo: **se a rota do detalhe voltar a ler a planilha, o
+prefetch por hover sai no MESMO commit.**
+
+**Onde aterrissou.** `src/lib/dashboard-admin.functions.ts` (só `getProjetoDashboard`) ·
+`src/lib/dashboard-detalhe-cache.ts` (novo) ·
+`src/components/dashboard/projeto-detalhe-dialog.tsx` · `src/routes/_authenticated/dashboard.tsx` ·
+`tests/dashboard-detalhe-cache.test.ts` (15 casos: hover→clique = 1 fetch, hover curto não busca,
+N linhas deixam 1 intenção viva, erro não cacheado, invalidação ao gravar, TTL, teto do cache) ·
+`CLAUDE.md` (gotcha **3b** do Dashboard do admin) · `worker.js` rebuildado. **1443 testes verdes**
+(baseline 1428).
+
+**Ficou FORA (declarado):** render progressivo dos campos do resumo enquanto a ficha carrega (é
+fatia de UI) e qualquer cache persistente.
+
+---
+
 ## 2026-08-12 — REVERTIDA: a mensagem do CHAT do ganho projetado foi reescrita sem ser o alvo do pedido
 
 **Status:** ⏪ revertida no mesmo dia · **Branch:** `revert/mensagem-chat-ganho-projetado` ·
@@ -2185,3 +2250,81 @@ prompts REAIS via `getPromptText`, então não tem literal a atualizar) ·
 `tests/orchestrator-prompts.test.ts` (3 asserts novos: os 3 prompts usam a fonte única · nenhum diz
 "Memorial aprovado!"/"Sua submissão está completa" · a frase não tem aspas duplas) ·
 `tests/agents-types.test.ts` (fixture) · `CLAUDE.md`.
+
+## Navegação lenta entre páginas: ~750 ms de overhead da plataforma × requisições demais (12/08/2026)
+
+**Sintoma.** Trocar de página no GoDocs levava **7–8 s**. Reclamação sem número; a primeira hipótese
+óbvia ("o bundle está pesado") estava **errada**.
+
+**Medição (prod, edge GIG/Rio, conexão já quente).** O baseline externo separa rede de plataforma:
+
+| O quê | Tempo |
+|---|---|
+| `https://cloudflare.com/cdn-cgi/trace` (rede do usuário) | **55 ms** |
+| `/favicon.svg` do GoDocs (arquivo estático) | **~800 ms** |
+| `/api/auth/me` (endpoint que não faz trabalho nenhum) | **~800 ms** |
+| `/api/meus-projetos` | **~3.000 ms** |
+
+**Causa.** Três coisas se multiplicando:
+
+1. **~750 ms fixos por requisição, cobrados pela plataforma Godeploy** — não é rede (a mesma máquina
+   fala com a Cloudflare em 55 ms) e não é código nosso: um favicon estático custa o mesmo que uma
+   rota de API. É o preço do gate de OAuth que o edge roda em TODAS as rotas. **Não temos como
+   baixá-lo** — o que dá para mudar é o número de vezes que ele é pago.
+2. **Requisições demais.** O build emitia **49–52 chunks, 23 deles com menos de 2 KB**: cada ícone do
+   `lucide-react` é um módulo próprio e, usado em 2+ rotas, o Rollup o promove a chunk compartilhado
+   (`chevron-left` = **131 bytes**; `auth` = **41 bytes**). `/meus-projetos` puxava **14 arquivos** e
+   levava ~4 s **só de JS**. O peso total (1,4 MB) nunca foi o problema.
+3. **Cascata.** O `fetch` de `/api/meus-projetos` só começava **depois** que o chunk da rota chegava,
+   e ele mesmo gastava ~3 s porque `listarMeusProjetos` fazia `syncOwnerRowsFromSheet` (leitura da
+   planilha inteira) antes de qualquer coisa. 4 s + 3 s em série.
+
+**Fix.**
+
+- **`vite.config.ts`** — `lucide-react` inteiro num chunk `vendor-icons` (18 KB, 6 KB gzip, cacheado
+  entre todas as rotas) + `experimentalMinChunkSize: 20_000` para fundir o resto do miudinho.
+  **49 → 19 assets, zero abaixo de 2 KB, mesmo peso total.**
+- **`src/router.tsx`** — `defaultPreload: 'intent'` + `defaultPreloadDelay: 150`: o chunk da rota é
+  baixado no **hover**, não no clique.
+  ⚠️ **Hover não pode disparar I/O — e foi preciso DUAS travas.** A primeira tentativa checava só a
+  flag `preload` do `beforeLoad` de `_authenticated` antes de `iniciarPrefetchDashboard()`. **Não
+  funcionou, e o staging provou:** passar o mouse pelo item "Dashboard" da sidebar seguia disparando
+  `/api/admin/dashboard/projetos`. Causa: no router-core,
+  `resolvePreload = !!(preload && !matchStores.has(matchId))` — a flag só vale `true` para um match
+  **NOVO**. Quem já está numa tela admin tem o layout `_authenticated` **montado**, então o
+  `beforeLoad` do PAI roda com `preload: false` mesmo no hover (e com `location.pathname` já
+  apontando para o destino). Fix: manter a flag (ela cobre quem entra na área admin **vindo de fora**,
+  onde o layout é match novo) **e** pôr `preload={false}` no link "Dashboard" da sidebar.
+  ⚠️ **Não** mover o `iniciarPrefetchDashboard()` para o `beforeLoad` do próprio `/dashboard`, onde a
+  flag funcionaria: os `beforeLoad` rodam em série pai→filho, então ele passaria a esperar o
+  `/api/auth/me` — a fila indiana que o PR #215 tinha desfeito.
+- **`src/lib/meus-projetos-cache.ts` (novo)** — TTL 60 s + *single-flight* + *stale-while-revalidate*
+  em volta de `syncOwnerRowsFromSheet`, por dono. ⚠️ **O sync NÃO podia simplesmente ir para o
+  background**: Status, Motivo Reprovado, Motivo Reenvio e Atualizado Em saem dessas MESMAS linhas
+  (`meus-projetos.functions.ts:289-302`) — a tela abriria com Status "—" e sem o aviso de reenvio.
+  ⚠️ **Leitura que falhou nunca entra no cache**: `syncOwnerRowsFromSheet` devolve `rows: []` tanto
+  para "a planilha não respondeu" quanto para "usuário sem projeto", então ganhou o campo aditivo
+  **`leituraOk`** — cachear o primeiro caso apagaria o Status de todo mundo por um minuto.
+  ⚠️ Quem **escreve** na planilha invalida o cache do dono (`submeterParaValidacao`,
+  `descontinuarProjeto`), senão o projeto recém-submetido apareceria com Status "—" por até 60 s.
+
+**Decisão fechada respeitada.** O cache é **em memória do isolate**, igual ao do `/dashboard`
+(PR #215). A decisão de produto de 28/07/2026 — *"cache da listagem em SQLite/localStorage é FORA"* —
+continua valendo e **não** foi tocada.
+
+**O que NÃO deu para fazer.** Os assets hasheados são servidos com
+`cache-control: public, max-age=0, must-revalidate` — refetch devolve **200, nunca 304**, então cada
+navegação rebaixa tudo de novo. Nome com hash é imutável por construção e deveria ser
+`max-age=31536000, immutable`. O `assetConfig` do `updateApp` do Godeploy só expõe `html_handling` e
+`not_found_handling`, e o worker não recebe binding de assets (`env.ASSETS` não existe lá) — **é
+pedido para a plataforma**, não código nosso. Enquanto não houver, o item 1 (menos arquivos) é o que
+compensa.
+
+**Resultado medido no staging.** Troca de página: **zero requisições de JS** (o chunk chega no hover)
+e `/api/meus-projetos` em **~1,1 s** contra os ~800 ms do piso da plataforma — ou seja, ~280 ms de
+trabalho real, contra os ~3 s de antes.
+
+**Onde aterrissou:** `vite.config.ts` · `src/router.tsx` · `src/routes/_authenticated/route.tsx` ·
+`src/lib/meus-projetos-cache.ts` (novo) · `src/lib/meus-projetos.functions.ts` ·
+`src/lib/google/sync-reverse.ts` (`leituraOk`) · `src/lib/chat.functions.ts` (invalidação) ·
+`tests/meus-projetos-cache.test.ts` (12 casos) · `docs/deploy.md` · `CLAUDE.md`.

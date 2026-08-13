@@ -44,13 +44,14 @@ import {
 import { getAreasPublicas, sincronizarAreas } from '@/lib/areas.functions'
 import { getSugestoesParticipantes } from '@/lib/participantes.functions'
 import { syncSheetsToSqlite } from '@/lib/google/sync-reverse'
+import { statusEspelho } from '@/lib/sheet-espelho'
 import {
   getProjetosInvestigador,
   getProjetoInvestigadorDetalhes,
   getInvestigadorStats,
   getEdicoesInvestigador,
 } from '@/lib/investigador.functions'
-import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, deleteProjetosTesteE2E, excluirProjetoCascade, getProjetoById, getAprovacoesDoProjeto } from '@/integrations/db/client.server'
+import { setDb, insertApiLog, getApiLogById, cleanupOldApiLogs, cleanupOldSyncRuns, getSyncRunsRecentes, deleteProjetosTesteE2E, excluirProjetoCascade, getProjetoById, getAprovacoesDoProjeto } from '@/integrations/db/client.server'
 import { listarMeusProjetos, getMeuProjeto, getHistoricoMeuProjeto, contarPendentes, excluirRascunho, definirEditoresDelegados, descontinuarProjeto } from '@/lib/meus-projetos.functions'
 import { assessDocsBackfill } from '@/lib/docs-backfill'
 import { reconciliarFinanceiroDoSheet } from '@/lib/reconciliar-financeiro'
@@ -172,17 +173,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       }
       // Limpa logs de API com mais de 30 dias (em segundo plano, via waitUntil)
       runBackground(cleanupOldApiLogs(30))
+      // E o log de corridas do sync, que cresce ~288 linhas/dia com o cron de 5 min.
+      runBackground(cleanupOldSyncRuns(7))
       return json(await sincronizarAreas())
     }
 
     // ── Cron: sync reverso Sheets → SQLite (planilha = fonte de verdade) ──
-    // Importa legados que só existem na planilha e reflete edições manuais nos
-    // campos seguros. Agendado de hora em hora pela plataforma Godeploy.
+    // Atualiza o ESPELHO da planilha (é dele que "Meus Projetos" e o /dashboard leem),
+    // importa legados que só existem na aba, reflete edições manuais nos campos seguros e
+    // remove dos dois lados o que sumiu da planilha.
+    // ⚠️ Agendado a cada 5 MIN (era 1×/h): as telas não leem mais o Sheets em request, então
+    // a cadência do cron É a frescura do que todo mundo vê. Sai barato porque o espelho só
+    // grava linha que mudou de verdade (hash) — ver `sheet-espelho.ts`.
+    // ⚠️ Um webhook do Sheets (Apps Script → aqui) seria melhor e é IMPOSSÍVEL: o edge do
+    // Godeploy exige OAuth em TODAS as rotas e devolve 302 para o login (medido 11/08/2026).
     if (pathname === '/api/cron/sync-sheets-to-sqlite' && method === 'POST') {
       if (!request.headers.get('x-godeploy-cron')) {
         return errorJson('Rota exclusiva de cron.', 403)
       }
-      return json(await syncSheetsToSqlite())
+      return json(await syncSheetsToSqlite('cron'))
     }
 
     // ── Cron: reconcilia a coluna "Complexidade" da planilha ──
@@ -483,9 +492,10 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await getProjetoDetalhes(id))
     }
 
-    // ── Dashboard do admin (triagem sobre a PLANILHA, não o SQLite) ──
-    // Ver src/lib/dashboard-admin.functions.ts: a listagem vem de readAllRows() porque
-    // o "Status" que vale é o da coluna do Sheets. `?refresh=1` fura o cache de 60s.
+    // ── Dashboard do admin (triagem sobre a PLANILHA, não o estado interno) ──
+    // Ver src/lib/dashboard-admin.functions.ts: a listagem é a LINHA DA PLANILHA (o "Status"
+    // que vale é o da coluna do Sheets), lida do ESPELHO no SQLite — não do Sheets em
+    // request. `?refresh=1` não "fura cache": roda um sync de verdade e relê o espelho.
     if (pathname === '/api/admin/dashboard/projetos' && method === 'GET') {
       await requireAdmin(request)
       const refresh = url.searchParams.get('refresh') === '1'
@@ -651,10 +661,22 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
 
     // ── Sync reverso manual (admin) ──
     // Dispara o sync Sheets → SQLite sob demanda (mesmo trabalho do cron), útil
-    // para validar antes de confiar no agendamento horário.
+    // para validar antes de confiar no agendamento, e é o que a STAGING usa (lá o cron
+    // não dispara). É a mesma coisa que o botão "Atualizar" do /dashboard faz.
     if (pathname === '/api/admin/sync-sheets-now' && method === 'POST') {
       await requireAdmin(request)
-      return json(await syncSheetsToSqlite())
+      return json(await syncSheetsToSqlite('manual'))
+    }
+
+    // ── Saúde do ESPELHO da planilha (admin) ──
+    // Com as telas lendo o espelho, o único jeito de o sistema MENTIR é o sync morrer em
+    // silêncio: a tela seguiria mostrando dado velho com cara de novo. Esta rota (e o aviso
+    // no cabeçalho do /dashboard) é o que torna isso visível — última corrida, se deu certo,
+    // contadores e há quanto tempo.
+    if (pathname === '/api/admin/sync-status' && method === 'GET') {
+      await requireAdmin(request)
+      const [saude, recentes] = await Promise.all([statusEspelho(), getSyncRunsRecentes(20)])
+      return json({ ...saude, recentes })
     }
 
     // ── Reconciliação da análise sob demanda (admin) ──

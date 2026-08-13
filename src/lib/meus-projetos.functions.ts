@@ -12,8 +12,11 @@ import {
   parseJson,
 } from '@/integrations/db/client.server';
 import type { ProjetoRow } from '@/integrations/db/client.server';
-import { syncOwnerRowsFromSheet } from '@/lib/google/sync-reverse';
+import { syncOwnerRowsFromSheet, syncSheetsToSqlite } from '@/lib/google/sync-reverse';
+import { lerLinhasDoDono, invalidarLinhasDoDono } from '@/lib/meus-projetos-cache';
 import { updateRowByProjectId } from '@/lib/google/sheets';
+import { lerLinhasEspelho, espelharEscrita, statusEspelho } from '@/lib/sheet-espelho';
+import { runBackground } from '@/lib/background';
 import { isAdmin } from '@/lib/auth.functions';
 import {
   resumoAprovacaoPorProjeto,
@@ -281,30 +284,68 @@ export function mapItem(
   };
 }
 
+/**
+ * Idade a partir da qual a listagem dispara um sync em BACKGROUND. Com o cron de 5 min isto
+ * quase nunca acontece — é a auto-cura para o caso de o cron estar atrasado/parado: a
+ * resposta sai na hora com o espelho que existe, e a próxima já vem fresca.
+ */
+const ESPELHO_ESTAGNADO_MS = 30 * 60 * 1000;
+/** Single-flight por isolate: 50 pessoas abrindo a tela não viram 50 syncs. */
+let syncDeCuraEmCurso = false;
+
+async function curarEspelhoSePreciso(): Promise<void> {
+  if (syncDeCuraEmCurso) return;
+  const { idadeMs } = await statusEspelho();
+  if (idadeMs != null && idadeMs <= ESPELHO_ESTAGNADO_MS) return;
+  syncDeCuraEmCurso = true;
+  // ⚠️ `runBackground` (→ ctx.waitUntil) é obrigatório: sem ele o Godeploy cancela a
+  // promise quando a Response retorna. E o sync NÃO é aguardado de propósito — a tela não
+  // pode voltar a esperar uma leitura da planilha (foi o que esta fatia veio remover).
+  runBackground(
+    syncSheetsToSqlite('sob-demanda')
+      .catch((e) => console.error('[meus-projetos] sync de cura falhou:', e))
+      .finally(() => {
+        syncDeCuraEmCurso = false;
+      }),
+  );
+}
+
 export async function listarMeusProjetos(email: string): Promise<MeuProjetoItem[]> {
-  // Sheets é a fonte da verdade: antes de listar, espelha do Sheets os projetos
-  // deste usuário (legados que só existem na planilha, edições manuais). Falha de
-  // leitura da planilha não pode quebrar a tela — cai de volta no SQLite.
-  // Reaproveita as linhas lidas para mapear o "Atualizado Em" de cada projeto.
+  // A planilha segue sendo a fonte da verdade — mas é lida pelo CRON, não aqui: esta função
+  // fazia um `readAllRows()` da planilha INTEIRA a cada load de página (~2 s, com a cota de
+  // 60 leituras/min compartilhada com prod). Agora Status/motivos/"Atualizado Em" vêm do
+  // ESPELHO (`sheet-espelho.ts`), por uma consulta com `IN` nos ids DESTE usuário.
+  //
+  // ⚠️ Status, Motivo Reprovado, Motivo Reenvio e "Atualizado Em" saem DESTAS linhas — por
+  // isso a leitura do espelho é AGUARDADA (nunca um `runBackground` solto): sem ela a tela
+  // abriria com Status "—" e sem o aviso de reenvio. O que saiu do caminho crítico foi a
+  // leitura da PLANILHA, não a das colunas. (O cache de 60 s de `meus-projetos-cache.ts`
+  // segue cobrindo o único ponto que ainda lê o Sheets em request: `contarPendentes`.)
   const atualizadoMap = new Map<string, string>();
   const statusMap = new Map<string, string>();
   const motivoReprovadoMap = new Map<string, string>();
   const motivoReenvioMap = new Map<string, string>();
+
+  const rows = await getProjetosByOwnerEmail(email);
   try {
-    const { rows } = await syncOwnerRowsFromSheet(email);
-    for (const r of rows) {
-      const id = (r['ID Projeto'] ?? '').trim().toLowerCase();
-      if (id) {
-        atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
-        statusMap.set(id, (r['Status'] ?? '').trim());
-        motivoReprovadoMap.set(id, (r['Motivo Reprovado'] ?? '').trim());
-        motivoReenvioMap.set(id, (r['Motivo Reenvio'] ?? '').trim());
-      }
+    const linhas = await lerLinhasEspelho(rows.map((p) => p.id));
+    for (const [id, r] of linhas) {
+      atualizadoMap.set(id, (r['Atualizado Em'] ?? '').trim());
+      statusMap.set(id, (r['Status'] ?? '').trim());
+      motivoReprovadoMap.set(id, (r['Motivo Reprovado'] ?? '').trim());
+      motivoReenvioMap.set(id, (r['Motivo Reenvio'] ?? '').trim());
     }
   } catch (e) {
-    console.error('[meus-projetos] sync sob demanda falhou, usando SQLite:', e);
+    // Espelho ilegível → a lista ainda sai (sem Status/motivos), como já acontecia quando
+    // a leitura da planilha falhava. Nunca cai no `status` do SQLite (ver `mapItem`).
+    console.error('[meus-projetos] falha ao ler o espelho da planilha:', e);
   }
-  const rows = await getProjetosByOwnerEmail(email);
+  // Auto-cura, sempre por último e sem bloquear: se o espelho está estagnado, agenda um sync.
+  try {
+    await curarEspelhoSePreciso();
+  } catch (e) {
+    console.error('[meus-projetos] falha ao avaliar a idade do espelho:', e);
+  }
   // Refiltro em JS para evitar falso-positivo de LIKE com emails que são substring de outro.
   // "Status": usa o valor recém-lido da planilha (Sheets é a fonte da verdade).
   // "Atualizado Em": resolverAtualizadoEm — planilha quando preenchida, senão o espelho
@@ -356,7 +397,13 @@ export async function contarPendentes(
 ): Promise<{ count: number; prazo: string }> {
   if (opts?.sync) {
     try {
-      await syncOwnerRowsFromSheet(email);
+      // ⚠️ Este é o ÚNICO caminho de request que ainda lê o Google Sheets de verdade —
+      // `listarMeusProjetos` passou a ler o ESPELHO (`sheet-espelho.ts`), mas o selo da
+      // home precisa dos legados que só existem na planilha, e um legado novo não está
+      // no espelho de projetos deste dono até o cron rodar. Daí o cache de 60 s de
+      // `meus-projetos-cache.ts` (single-flight + SWR + `leituraOk`) continuar aqui:
+      // ele deixou de servir a listagem, não deixou de ser útil.
+      await lerLinhasDoDono(email);
     } catch (e) {
       console.error('[contarPendentes] sync sob demanda falhou, usando SQLite:', e);
     }
@@ -426,11 +473,22 @@ export async function descontinuarProjeto(
   // Reflete na planilha (fonte que o time acompanha na aba). Reativar grava "Pendente"
   // — o valor que a regra TEMPORÁRIA usa hoje para todos os submetidos. Best-effort: a
   // flag no SQLite já governa o app, então falha aqui não trava a ação do usuário.
+  const statusSheet = descontinuar ? 'Descontinuado' : 'Pendente';
   try {
-    await updateRowByProjectId(projetoId, { Status: descontinuar ? 'Descontinuado' : 'Pendente' });
+    await updateRowByProjectId(projetoId, { Status: statusSheet });
+    // Remenda o espelho: é dele que a lista lê o Status, então sem isto o badge só mudaria
+    // no próximo cron. (A flag `descontinuado` do SQLite já tem precedência no `mapItem`,
+    // mas o espelho é o que a triagem vê no /dashboard.)
+    await espelharEscrita(projetoId, { Status: statusSheet });
   } catch (e) {
     console.error('[descontinuarProjeto] falha ao gravar Status no Sheets:', e);
   }
+
+  // Acabamos de mudar a linha na planilha: o cache de 60 s do dono ficaria com o Status
+  // anterior e a lista voltaria a mostrar o valor velho no próximo carregamento.
+  // (A flag `descontinuado` do SQLite tem precedência no badge, mas o cache também
+  // alimenta o aviso de reenvio e o "Atualizado Em" — invalidar é o comportamento certo.)
+  if (p.responsavel_email) invalidarLinhasDoDono(p.responsavel_email);
 
   return { ok: true, descontinuado: descontinuar };
 }
