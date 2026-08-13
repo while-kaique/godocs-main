@@ -5,9 +5,29 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: 🟡 **em execução** (T1–T5 feitas)
+**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: ✅ **executado — EM PRODUÇÃO (13/08)**; falta só a **T9 (push + PR)**
 
-### ➡️ PRÓXIMO PASSO — 1 sinal separa a staging da PROD (o Luis quer prod pela velocidade)
+### ➡️ PRÓXIMO PASSO — rodar os 3 revisores e então `/ggsd:ship` (push + PR) da `feat/espelho-e-perf-navegacao`
+
+**O espelho está EM PRODUÇÃO** (deploy `674a3710` em 13/08 **11:40:17 UTC**, cron `*/5`, cold start verde —
+detalhes no Registro de execução do plano). O que sobrou é **social e de processo**, não técnico:
+
+1. **Os 3 revisores de contexto fresco NUNCA rodaram sobre o espelho** (`.review-status` e `.quality-status`
+   **ausentes** nos dois worktrees). O `/ggsd:ship` **vai recusar o envio** até rodarem. Destravar = a
+   verificação do **`/ggsd:code §9`** (`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade`) sobre o diff
+   `origin/main...HEAD`. ⚠️ Esta seria a **primeira** revisão independente daquele código (a sessão de 11/08
+   proibiu subagentes).
+2. **A branch `feat/espelho-e-perf-navegacao` nunca foi pushada** — e agora isso é mais grave do que era: o
+   que está no ar em PROD **só existe nessa branch local**. O `main` não tem nem o espelho (`b09b672`) nem os
+   **2 commits de perf do Kaique** (`85ca230`, `896c26a`). ⛔ **Qualquer deploy a partir do `main` REGRIDE a
+   produção**, apagando as duas coisas de uma vez. O push + PR é o que tira esse risco.
+3. **Avisar o Kaique** de que os commits dele vão **DENTRO** deste PR — para ele não abrir um segundo por cima.
+
+**Validação que ainda vale a pena (não bloqueante):** confirmar no `/dashboard` de prod que o cabeçalho diz
+*"Planilha sincronizada às HH:MM"* sem o âmbar, e que mudar um status grava (a triagem escreve na planilha **e**
+remenda o espelho; `projetos.status` **não** é tocado, de propósito — as telas não o leem).
+
+### (superado — a T6 fechou VERDE e a T8 foi ao ar) O bloco anterior — 1 sinal separava a staging da PROD
 
 **A LEITURA já está provada em runtime (21:20:58):** `GET /api/meus-projetos` voltou `outcome: ok` com
 **ZERO linhas de log**. O código antigo SEMPRE imprimia `[sync-reverse:owner] email=… total=578` nessa rota

@@ -1,7 +1,34 @@
 # Plano — Integrar o espelho da planilha com a perf de navegação (e fechar a T12)
 
-**Status:** 🟡 **em execução** — T1–T5 entregues (12/08); **T6 com a prova de runtime PENDENTE**; T7–T9 abertas.
-Aprovado por Luis em 2026-08-12.
+**Status:** ✅ **executado — EM PRODUÇÃO (13/08, prod `674a3710`, deploy 11:40:17 UTC)** — T1–T8 entregues; **T9 (push + PR) ABERTA** e a branch segue **local**.
+Aprovado por Luis em 2026-08-12. ⚠️ **Ressalva de processo:** a Fronteira "não deployar prod antes da validação humana da T7" **não foi cumprida na ordem** — o Luis deu o go explícito ("go") e o deploy saiu antes de uma T7 formal; a validação de fato foi ele usando o `/dashboard` às 11:49 (2 requests `ok`).
+
+> ### Registro de execução (13/08, sessão do deploy em prod)
+> **`origin/main` reincorporado ANTES do build** (merge **`fa5ef97`**): o `main` havia andado **7 commits**
+> (#256/#257/#258) e um deles é o **revert do #255** — que estava DENTRO da nossa branch (foi à staging na
+> v151). Buildar antes do merge teria levado a prod uma mensagem que o Kaique já desfez. **1428 testes / 97
+> arquivos** verdes · `worker.js` **1.010,7 kb** · `grep` de sanidade no bundle: `sheet_espelho` presente e
+> **`buildUpdateMessage` ausente** (o merge não ressuscitou a notificação duplicada do D30).
+>
+> **Pareamento provado por grafo, não por memória:** `rev-list --count HEAD..origin/main` = **0** e
+> `merge-base --is-ancestor origin/perf/navegacao-chunks-e-swr HEAD` = SIM (ponta `896c26a`, 12/08 14:49).
+> ⚠️ Uma contagem minha anterior sugeriu "1 commit do Kaique faltando" — **era erro de contagem**, nada falta.
+>
+> **T6 FECHADA (verde):** a staging acumulou **18 corridas** consecutivas com `espelhados=` e `erros=0`
+> (19:10→20:35 de 12/08) — o `Durable Object storage operation exceeded timeout` das 19:05 era **transitório**,
+> não defeito. ⚠️ E os logs mostraram que entre 10:50 e 11:30 de 13/08 a staging estava **sem** o espelho
+> (mais um deploy alheio) — o redeploy desta sessão o restaurou, com prova de runtime às **11:35**.
+>
+> **T8 (prod):** deploy 11:40:17 → cron trocado de `0 * * * *` para **`*/5`** (`mzsxhqmsj19r` criado ANTES de
+> remover o horário `nd2c170ykcg8`, para não abrir janela sem sync). **Cold start OK:** 11:45
+> `total=626 espelhados=382 erros=0` e 11:50 `total=626 espelhados=0 erros=0` (regime) — **sem timeout de DO**
+> com 626 linhas, 48 mais que a staging. ⚠️ O `382 < 626` da 1ª corrida não foi explicado pelos logs (linhas
+> sem "ID Projeto" são puladas em silêncio por `if (!id) continue`, ou parte já viera de um sync de cura); o
+> que **prova completude** é a corrida seguinte escrever **0** — toda linha com ID bate hash.
+>
+> **⚠️ Ordem que virou régua:** o cron `*/5` vai **DEPOIS** do deploy. Antes, o sync ANTIGO (23–27 s, com o
+> N+1) rodaria 12× mais e pressionaria a cota de 60 leituras/min compartilhada com prod, **sem** popular
+> espelho nenhum.
 
 > ### Registro de execução (12/08, sessão da integração)
 > **Branch:** `feat/espelho-e-perf-navegacao` (worktree `.claude/worktrees/espelho-e-perf`), criada de
