@@ -5,11 +5,42 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **aprovado (Luis, 13/08/2026)**
+**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção. **Nenhum plano em aberto.**
 
-> **Fatia anterior:** [detalhe-triagem-abre-instantaneo](plans/detalhe-triagem-abre-instantaneo.md) · ✅ **executado E DEPLOYADO (13/08)** — staging `edf400b4` v156 (13:24 UTC) e **prod `674a3710` (13:29 UTC)**, com o Luis dispensando a validação de navegador da T7. Seguem abertas a **T9 (push + PR)** e os **3 revisores**.
+### ➡️ PRÓXIMO PASSO — `git push` + PR da **`feat/espelho-e-perf-navegacao`** (a T9, agora a ÚNICA pendência grave do repo)
 
-### ➡️ PRÓXIMO PASSO — deployar a `feat/espelho-e-perf-navegacao` na **staging `edf400b4`** e validar a ficha de triagem; então o push + PR
+⛔ **O que está em PRODUÇÃO só existe numa branch local.** O `main` não tem nem o espelho da planilha
+(`b09b672`) nem os **2 commits de perf do Kaique** (`85ca230`, `896c26a`) nem a ficha instantânea
+(`14d94e0`) — **qualquer deploy a partir do `main` REGRIDE a prod**, apagando as três coisas de uma vez.
+O push + PR é o que tira esse risco. Avisar o Kaique de que os commits dele vão DENTRO deste PR.
+
+⛔ **A REVISÃO SEGUE PENDENTE e o `/ggsd:ship` VAI BARRAR o envio.** Os marcadores `.review-status` e
+`.quality-status` continuam **ausentes** — os 3 revisores de contexto fresco
+(`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` + `ggsd:revisor-reuso`) **nunca rodaram** sobre
+o espelho nem sobre a ficha instantânea, porque o usuário instruiu, em TRÊS sessões seguidas, a não
+disparar subagentes. Destravar = rodar a verificação do **`/ggsd:code §9`** sobre o diff
+`origin/main...HEAD` da branch da feature, ou o operador dispensar explicitamente.
+
+### O que ESTA sessão fechou (13/08)
+
+1. **Deploy em staging E produção** da ficha de triagem instantânea (`14d94e0`): staging `edf400b4`
+   **v156** às 13:24 UTC, **prod `674a3710`** às 13:29 UTC. Build com **1443 testes verdes**,
+   `origin/main` já incorporado, `worker.js` 1.010,7 kb. Sinal de runtime pós-deploy verde nos dois:
+   `[sync-reverse] … erros=0` em ~1,4 s (staging `total=578`, prod `total=626`), sem exceções, SPA 200.
+   ⚠️ **A T7 (validação de navegador) foi DISPENSADA pelo Luis** — *"Deployar a prod agora"*. Ninguém
+   confirmou de olho que a ficha abre **sem spinner**; o que está provado é que o worker novo está no ar
+   e saudável. Se ao abrir uma linha ainda demorar ~1 s, o alvo é `src/lib/dashboard-detalhe-cache.ts`.
+2. **Aba "Especiais Pendentes +15 dias"** gravada na planilha de prod (plano acima). 19 projetos acima do
+   corte, o mais antigo com **53 dias**. Reexecutar: `ESPECIAIS_WRITE=1 npx vitest run --config
+   scripts/dryrun-lider/especiais.config.ts` (a aba é limpa e regravada — rodar 2× não duplica, e
+   comentários que o Luis deixar nela sobrevivem).
+
+⚠️ **Atenção ao worktree:** o código deployado vive em `.claude/worktrees/espelho-e-perf`
+(`feat/espelho-e-perf-navegacao`); o **script do relatório** foi commitado na `docs/plano-espelho-e-perf`
+(a pasta principal), a pedido do Luis — *"pode até codar aqui já"*. São **duas branches diferentes**, e o
+PR da T9 é o da **feature**, não o desta.
+
+### (superado — deployado em 13/08) O bloco anterior — deployar a ficha de triagem
 
 O código da ficha instantânea está **commitado e verde, mas só na máquina** (worktree
 `.claude/worktrees/espelho-e-perf`). O que fazer, na ordem:

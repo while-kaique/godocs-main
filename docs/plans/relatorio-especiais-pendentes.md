@@ -1,5 +1,17 @@
 # Plano — Relatório de projetos ESPECIAIS pendentes há mais de 15 dias
-**Status:** ✅ aprovado (Luis, 13/08/2026)
+**Status:** ✅ **executado — T1–T3 (13/08, `9d351c8` na `docs/plano-espelho-e-perf`)** · a aba
+**"Especiais Pendentes +15 dias"** está GRAVADA na planilha de produção.
+
+**Primeira corrida (13/08, 13:33 BRT):** 65 especiais na planilha · **30 pendentes** · **19 acima
+de 15 dias** · 0 sem data · 2 em reenvio (fora do corte). Mais antigo: **CTR Machine Gocase -
+Admaker** (João Carlos), **53 dias** — depois GDI 51d, BB Indústria QC 48d, 2 do André Vasconcelos
+45d, Bot de Faturamento 40d.
+
+⚠️ **Escopo confirmado pelo Luis no meio da sessão:** *"a aba no Sheets é só pra eu poder me guiar
+na hora de aprovar os projetos, vou dar mais importância pros projetos mais antigos pra aprovar
+logo, galera tá reclamando aqui"* — é **fila de trabalho**, não painel. Daí a ordenação do mais
+antigo para o mais novo e o **link do Drive na linha** (aprovar sem sair da aba). A coluna
+`Tipos Projeto` saiu na redação final: num especial ela é sempre "especial" e só ocupava largura.
 
 **Objetivo:** uma aba dedicada na planilha de produção listando os projetos **especiais** com
 Status `Pendente` há **mais de 15 dias**, para a gestão ver o que a triagem ainda não olhou.
