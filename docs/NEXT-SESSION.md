@@ -5,7 +5,10 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · Status: ✅ **executado — EM PRODUÇÃO (13/08)**; falta só a **T9 (push + PR)**
+**→ [docs/plans/detalhe-triagem-abre-instantaneo.md](plans/detalhe-triagem-abre-instantaneo.md)** · Status: ✅ **aprovado (Luis, 13/08)** — implementar na branch `feat/espelho-e-perf-navegacao` (worktree `.claude/worktrees/espelho-e-perf`)
+
+> **Fatia anterior (ainda com pendência de processo):**
+> **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · ✅ **executado — EM PRODUÇÃO (13/08)**; falta a **T9 (push + PR)** e os 3 revisores. A fatia nova nasce **sobre** essa branch (é o mesmo assunto: perf de navegação) e o `worker.js`/PR saem juntos.
 
 ### ➡️ PRÓXIMO PASSO — rodar os 3 revisores e então `/ggsd:ship` (push + PR) da `feat/espelho-e-perf-navegacao`
 
