@@ -5,7 +5,38 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/detalhe-triagem-abre-instantaneo.md](plans/detalhe-triagem-abre-instantaneo.md)** · Status: ✅ **aprovado (Luis, 13/08)** — implementar na branch `feat/espelho-e-perf-navegacao` (worktree `.claude/worktrees/espelho-e-perf`)
+**→ [docs/plans/detalhe-triagem-abre-instantaneo.md](plans/detalhe-triagem-abre-instantaneo.md)** · Status: ✅ **executado — T1–T6 (13/08, `14d94e0`)**; falta a **T7 (staging → prod)**
+
+### ➡️ PRÓXIMO PASSO — deployar a `feat/espelho-e-perf-navegacao` na **staging `edf400b4`** e validar a ficha de triagem; então o push + PR
+
+O código da ficha instantânea está **commitado e verde, mas só na máquina** (worktree
+`.claude/worktrees/espelho-e-perf`). O que fazer, na ordem:
+
+1. **Staging `edf400b4`** — fluxo do "Deploy rápido" do `CLAUDE.md` (`getUploadToken` →
+   `scripts/deploy-godeploy.sh "<TOKEN>"` → `updateApp` com o `ASSETS_JSON` impresso). O build já
+   existe (`dist/` + `worker.js` de 1.010,7 kb) e **`origin/main` (`05e6692`) já está incorporado** —
+   nada a rebuildar por merge. ⚠️ **NUNCA `674a3710` neste passo** (regra 13).
+2. **Validar no navegador** (é o que a T7 pede, e o que nenhum teste prova): passar o mouse ~0,2 s
+   numa linha e clicar → a ficha abre **sem spinner perceptível**; rolar a tabela rápido **não**
+   deve encher a aba de requisições (olhar a Network); **gravar um status e reabrir** a ficha tem de
+   mostrar o valor **novo** (é a invalidação); e o "Atualizar" segue dizendo *"Planilha sincronizada
+   às HH:MM"*.
+3. **Prod `674a3710`** — só depois do item 2.
+4. **`git push` + PR** da branch (a **T9 herdada**), que continua sendo a pendência mais grave do
+   repo: **o que está em produção só existe nesta branch local**, e o `main` não tem nem o espelho
+   nem os 2 commits de perf do Kaique — **deployar do `main` regride a prod**. Avisar o Kaique de
+   que os commits dele vão DENTRO deste PR.
+
+⛔ **A REVISÃO ESTÁ PENDENTE e o `/ggsd:ship` VAI BARRAR o envio.** Os 3 revisores de contexto fresco
+(`ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` + `ggsd:revisor-reuso`) **nunca rodaram**
+sobre este código — nem sobre o espelho, nem sobre esta fatia — porque o usuário instruiu, nas duas
+sessões, a **não disparar subagentes**. Marcadores `.review-status`/`.quality-status` **ausentes** nos
+dois worktrees. Destravar = rodar a verificação do **`/ggsd:code §9`** sobre o diff
+`origin/main...HEAD`, ou o operador dispensar explicitamente.
+
+**Onde olhar primeiro no código, se a validação der problema:** `src/lib/dashboard-detalhe-cache.ts`
+(o cabeçalho explica cada invariante e por que o I/O no hover é aceitável aqui) e o `Promise.all` de
+`getProjetoDashboard` em `src/lib/dashboard-admin.functions.ts`.
 
 > **Fatia anterior (ainda com pendência de processo):**
 > **→ [docs/plans/integrar-espelho-e-perf-navegacao.md](plans/integrar-espelho-e-perf-navegacao.md)** · ✅ **executado — EM PRODUÇÃO (13/08)**; falta a **T9 (push + PR)** e os 3 revisores. A fatia nova nasce **sobre** essa branch (é o mesmo assunto: perf de navegação) e o `worker.js`/PR saem juntos.

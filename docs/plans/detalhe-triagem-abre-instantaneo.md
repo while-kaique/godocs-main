@@ -1,5 +1,29 @@
 # Plano — abrir a ficha de triagem sem espera (`/dashboard`)
-**Status:** ✅ aprovado (Luis, 13/08/2026)
+**Status:** ✅ **executado — T1–T6 feitas (13/08, commit `14d94e0`)** · ⛔ **T7 (staging → prod) ABERTA**
+_(aprovado por Luis, 13/08/2026)_
+
+## Registro de execução (13/08/2026)
+- **T1** ✅ `Promise.all` em `getProjetoDashboard`, com o `catch` do histórico **dentro** do
+  `Promise.all` (no caminho do 404 quem lança é a linha — rejeição solta do log viraria
+  *unhandled rejection* no worker).
+- **T2** ✅ `src/lib/dashboard-detalhe-cache.ts` + **15 testes** em
+  `tests/dashboard-detalhe-cache.test.ts` (hover→clique = 1 fetch · hover curto não busca · N
+  linhas deixam 1 intenção viva · erro não cacheado · invalidação ao gravar · TTL · teto do
+  cache · id sem caixa · fetcher síncrono que lança · zero unhandled rejection).
+- **T3** ✅ o dialog pede por `obterDetalhe` e chama `invalidarDetalhe` depois de gravar.
+- **T4** ✅ `hover`/`focus` da `<tr>` agendam, `mouseleave`/`blur` cancelam; `?refresh=1` chama
+  `limparDetalhes`.
+- **T5** ✅ **1443 testes verdes** (baseline 1428), `npm run build` + `build:worker`, `worker.js`
+  commitado (1.010,7 kb). Os 5 erros de `tsc` são **pré-existentes** (`chat.functions.ts`,
+  `submeter.tsx`) — nenhum nos arquivos tocados.
+- **T6** ✅ `CLAUDE.md` (gotcha **3b** do *Dashboard do admin* + ponteiro no bullet de performance
+  de navegação) e `spec-docs/SPEC_CORRECOES.md` (entrada de 13/08). Sem marcador de conflito.
+- **T7** ⛔ **aberta:** staging `edf400b4` → validar abrindo fichas (hover→clique sem spinner;
+  gravar status e reabrir mostra o valor novo) → prod `674a3710`. `origin/main` (`05e6692`) já
+  está incorporado, então **não** há rebuild por merge a fazer.
+- ⚠️ **Os 3 revisores de contexto fresco NÃO rodaram** — instrução explícita do usuário nesta
+  sessão de não disparar subagentes. A pendência é a MESMA que a fatia do espelho já carregava, e
+  o `/ggsd:ship` vai barrar o envio até ela ser resolvida.
 
 **Objetivo:** tirar a espera perceptível de **abrir uma linha** no `/dashboard`: começar a
 requisição da ficha **antes do clique** (prefetch por intenção) e parar de pagar duas idas
