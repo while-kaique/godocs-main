@@ -5,7 +5,9 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/detalhe-triagem-abre-instantaneo.md](plans/detalhe-triagem-abre-instantaneo.md)** · Status: ✅ **executado — T1–T6 (13/08, `14d94e0`)**; falta a **T7 (staging → prod)**
+**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **aprovado (Luis, 13/08/2026)**
+
+> **Fatia anterior:** [detalhe-triagem-abre-instantaneo](plans/detalhe-triagem-abre-instantaneo.md) · ✅ **executado E DEPLOYADO (13/08)** — staging `edf400b4` v156 (13:24 UTC) e **prod `674a3710` (13:29 UTC)**, com o Luis dispensando a validação de navegador da T7. Seguem abertas a **T9 (push + PR)** e os **3 revisores**.
 
 ### ➡️ PRÓXIMO PASSO — deployar a `feat/espelho-e-perf-navegacao` na **staging `edf400b4`** e validar a ficha de triagem; então o push + PR
 
