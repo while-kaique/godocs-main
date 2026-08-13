@@ -23,7 +23,7 @@ import {
 import { useSugestoesParticipantes } from "./participantes-sugestoes";
 import { useAreas } from "./areas-sugestoes";
 
-// ── Prompt para Claude.ai quando arquivos são muito grandes ──────────────────
+// ── Prompt para Claude AI quando arquivos são muito grandes ──────────────────
 
 const REDIRECT_PROMPT = `Você é um especialista em documentação de automações RPA/IA.
 Com base no contexto abaixo, gere uma documentação técnica condensada com exatamente estas 7 seções:

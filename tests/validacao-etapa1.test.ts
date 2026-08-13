@@ -16,7 +16,7 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     prodStatus: 'sim',
     nome: '',
     email: 'dono@gocase.com',
-    ferramenta: 'Python',
+    ferramentas: ['Python'],
     ferramentaOutra: '',
     servicoExterno: '',
     emEquipe: 'nao',
@@ -43,8 +43,8 @@ describe('validarEtapa1 — submissão NOVA (modoEdicao=false, RF-106)', () => {
   });
 
   it('bloqueia por ferramenta ausente (validação cheia)', () => {
-    const errs = validarEtapa1(baseForm({ ferramenta: '' }), { modoEdicao: false });
-    expect(errs.ferramenta).toBeTruthy();
+    const errs = validarEtapa1(baseForm({ ferramentas: [] }), { modoEdicao: false });
+    expect(errs.ferramentas).toBeTruthy();
   });
 
   it('bloqueia por escopo ausente', () => {
@@ -59,7 +59,7 @@ describe('validarEtapa1 — submissão NOVA (modoEdicao=false, RF-106)', () => {
 
   it('externo exige nome do serviço', () => {
     const errs = validarEtapa1(
-      baseForm({ escopo: 'externo', ferramenta: '', servicoExterno: '' }),
+      baseForm({ escopo: 'externo', ferramentas: [], servicoExterno: '' }),
       { modoEdicao: false },
     );
     expect(errs.servicoExterno).toBeTruthy();
@@ -68,7 +68,7 @@ describe('validarEtapa1 — submissão NOVA (modoEdicao=false, RF-106)', () => {
 
 describe('validarEtapa1 — EDIÇÃO de legado (modoEdicao=true, RF-103/D2)', () => {
   it('legado sem ferramenta/escopo/status passa (só participantes é o foco)', () => {
-    const legado = baseForm({ escopo: '', prodStatus: '', ferramenta: '', emEquipe: 'nao' });
+    const legado = baseForm({ escopo: '', prodStatus: '', ferramentas: [], emEquipe: 'nao' });
     expect(validarEtapa1(legado, { modoEdicao: true })).toEqual({});
   });
 
@@ -83,9 +83,9 @@ describe('validarEtapa1 — EDIÇÃO de legado (modoEdicao=true, RF-103/D2)', ()
   });
 
   // A ferramenta virou EDITÁVEL na Etapa 1 da edição (a stack muda: Vercel → GoDeploy).
-  // Trocar de uma opção da lista para outra não pode gerar erro nenhum.
-  it('trocar a ferramenta na edição não gera erro', () => {
-    const errs = validarEtapa1(baseForm({ ferramenta: 'Claude + GoDeploy' }), { modoEdicao: true });
+  // Trocar de uma opção da lista para outra — ou marcar VÁRIAS — não pode gerar erro.
+  it('trocar/acumular ferramentas na edição não gera erro', () => {
+    const errs = validarEtapa1(baseForm({ ferramentas: ['Claude Code', 'GoDeploy'] }), { modoEdicao: true });
     expect(errs).toEqual({});
   });
 });
@@ -96,7 +96,7 @@ describe('validarEtapa1 — "Outros" exige o nome da ferramenta nos DOIS modos',
   for (const modoEdicao of [false, true]) {
     it(`bloqueia "Outros" sem especificar (modoEdicao=${modoEdicao})`, () => {
       const errs = validarEtapa1(
-        baseForm({ ferramenta: 'Outros', ferramentaOutra: '  ' }),
+        baseForm({ ferramentas: ['Outros'], ferramentaOutra: '  ' }),
         { modoEdicao },
       );
       expect(errs.ferramentaOutra).toBeTruthy();
@@ -104,7 +104,7 @@ describe('validarEtapa1 — "Outros" exige o nome da ferramenta nos DOIS modos',
 
     it(`aceita "Outros" com o nome preenchido (modoEdicao=${modoEdicao})`, () => {
       const errs = validarEtapa1(
-        baseForm({ ferramenta: 'Outros', ferramentaOutra: 'Retool' }),
+        baseForm({ ferramentas: ['Outros'], ferramentaOutra: 'Retool' }),
         { modoEdicao },
       );
       expect(errs.ferramentaOutra).toBeUndefined();
@@ -113,7 +113,7 @@ describe('validarEtapa1 — "Outros" exige o nome da ferramenta nos DOIS modos',
 
   it('escopo externo não é cobrado pela regra do "Outros"', () => {
     const errs = validarEtapa1(
-      baseForm({ escopo: 'externo', ferramenta: 'Outros', ferramentaOutra: '', servicoExterno: 'Zapier' }),
+      baseForm({ escopo: 'externo', ferramentas: ['Outros'], ferramentaOutra: '', servicoExterno: 'Zapier' }),
       { modoEdicao: true },
     );
     expect(errs.ferramentaOutra).toBeUndefined();

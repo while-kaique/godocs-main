@@ -328,6 +328,28 @@ export type MotivoBloqueioEspecial = (typeof PERGUNTAS_ESPECIAL)[number]["id"];
  */
 const SAIDA_PROJETO_PADRAO = "Não. É um projeto padrão…";
 
+/**
+ * A 2ª saída das duas mensagens: **não tem número hoje**.
+ *
+ * ⚠️ O rótulo era "Ou espere a medição" e o detalhe, uma frase só: _"O GoDocs documenta ganho
+ * já realizado."_ Ninguém entende o que fazer com isso (perguntado pelo Kaique olhando a tela,
+ * 12/08/2026): "esperar" não diz **esperar até o quê**, nem por qual porta se volta. Pior, do
+ * lado do especial a leitura natural é a errada — "não tenho número, então mando como especial",
+ * que é exatamente o desvio que estas 2 perguntas existem para fechar.
+ *
+ * O que a saída tem de dizer, então: sem ganho metrificável hoje **o especial não é a porta**;
+ * quando o ganho estiver medido, o projeto volta como **PADRÃO** e é submetido com o valor
+ * apurado. Duas frases — o painel foi encurtado de propósito no mesmo dia (o texto virava um
+ * bloco), então detalhar aqui **não** é licença para voltar aos 4 caminhos + resumo de 5 linhas.
+ */
+const CAMINHO_SEM_MEDICAO: CaminhoCorrecao = {
+  rotulo: "Ou volte quando o ganho estiver medido",
+  detalhe:
+    `O GoDocs documenta ganho já realizado, e sem número o especial não é a saída: ele ` +
+    `registra o projeto sem valor de ganho. Deixe a automação rodando, apure o resultado e ` +
+    `então submeta como projeto PADRÃO, com o ganho já validado.`,
+};
+
 /** Respondeu que o projeto É um dashboard/painel → não é especial. */
 export function bloqueioEspecialDashboard(): BloqueioSubmissao {
   return {
@@ -343,10 +365,7 @@ export function bloqueioEspecialDashboard(): BloqueioSubmissao {
           `Horas que ninguém gasta mais: Saving Operacional. Gasto que a empresa parou de ` +
           `pagar: CUSTO EVITADO. Receita já apurada: Receita Incremental.`,
       },
-      {
-        rotulo: "Ou espere a medição",
-        detalhe: `O GoDocs documenta ganho já realizado.`,
-      },
+      CAMINHO_SEM_MEDICAO,
     ],
   };
 }
@@ -370,10 +389,7 @@ export function bloqueioEspecialOrganizacional(): BloqueioSubmissao {
           `Horas que alguém deixou de gastar: Saving Operacional. Gasto que parou de ser ` +
           `pago: CUSTO EVITADO. Receita nova já apurada: Receita Incremental.`,
       },
-      {
-        rotulo: "Ou espere a medição",
-        detalhe: `O GoDocs documenta ganho já realizado.`,
-      },
+      CAMINHO_SEM_MEDICAO,
     ],
   };
 }

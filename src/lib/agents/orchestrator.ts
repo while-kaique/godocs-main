@@ -218,12 +218,13 @@ Porém, o código enviado pode ser PARCIAL (apenas trechos, um módulo, só o fr
 Os campos em null representam informações que o código não revelou — podem ser regras de negócio ou simplesmente partes do projeto que não foram enviadas.
 
 FERRAMENTAS INTERNAS DO GOGROUP (contexto para você):
-- **Claude**: modelo de IA da Anthropic, usado como LLM para projetos de IA (análise de texto, geração, classificação, agentes, etc.). Acessado via API. Ferramenta legítima e amplamente usada na empresa.
-- **Claude + GoDeploy**: Claude (LLM) + GoDeploy, a plataforma interna de deploy do GoGroup (hospeda SPAs + Workers/APIs, SQLite gerenciado, cron jobs, edge auth). Projetos completos hospedados no GoDeploy que usam Claude como IA.
+O campo declara com o que o projeto foi CONSTRUÍDO (o que ele usa para FUNCIONAR — banco, APIs, integrações — é conteúdo da documentação) e aceita VÁRIAS ferramentas, unidas por " + ".
+- **Claude AI · Claude Cowork · Claude Code**: as 3 superfícies do Claude (LLM da Anthropic) usadas para construir — conversa no navegador, ambiente de trabalho e agente de código. Construir com Claude não significa que a automação use IA ao rodar.
+- **GoDeploy**: plataforma interna de deploy do GoGroup (hospeda SPAs + Workers/APIs, SQLite gerenciado, cron jobs, edge auth). Única ferramenta de execução aceita no campo.
 - **n8n**: plataforma de automação de workflows (low-code) para integrações, webhooks e orquestração.
 - **Python**: scripts e aplicações para automações, análise de dados, ML, scrapers.
-- **Google Apps Script**: scripts no ecossistema Google.
-Todas essas ferramentas são válidas e reconhecidas. NÃO questione se a ferramenta é legítima.
+- **Google Apps Script**: scripts no ecossistema Google. **Vercel**: hospedagem externa de frontends.
+Qualquer combinação delas é válida e reconhecida — inclusive o valor legado "Claude" sozinho. NÃO questione se a ferramenta é legítima.
 
 METADADOS DO PROJETO:
 - Nome: ${ctx.nome_projeto}

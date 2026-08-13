@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-08-12 — REVERTIDA: a mensagem do CHAT do ganho projetado foi reescrita sem ser o alvo do pedido
+
+**Status:** ⏪ revertida no mesmo dia · **Branch:** `revert/mensagem-chat-ganho-projetado` ·
+**desfaz o PR #255**
+
+**O que aconteceu.** O pedido era esclarecer o **"Ou espere a medição"** que aparece no **card de
+bloqueio do projeto ESPECIAL na Etapa 2.5** — `bloqueioEspecialDashboard()` /
+`bloqueioEspecialOrganizacional()` em `src/lib/mensagens-submissao.ts`, cujos 2 caminhos são
+_"Marque «Não. É um projeto padrão…» e informe o ganho"_ × _"Ou espere a medição"_. A frase
+"espere a medição" existe **nos dois lugares**, e a reescrita (PR #255) caiu no errado: as mensagens
+do **chat** (`mensagemGanhoProjetado`/`mensagemGanhoProjetadoRepetida`, `agents/ganho-projetado.ts`),
+que **não** estavam em discussão e já estavam boas. Chegou a ir a staging + prod e foi revertida no
+mesmo dia.
+
+**Fix.** `git checkout 79554c6 --` dos 2 arquivos: textos do chat e teste voltaram **idênticos** ao
+aprovado (a mudança era 100% copy — nenhuma mecânica do gate foi tocada em nenhum momento, então o
+revert também não toca). `CLAUDE.md` passou a registrar que **o texto do chat está aprovado como
+está** e que o pedido de clareza era do card da Etapa 2.5.
+
+**Lição (não é sobre este texto).** Duas telas diferentes usam a MESMA frase-chave. Copy pedida por
+citação vem sempre do que a pessoa VÊ, não do arquivo — então **procure a frase no repo inteiro e
+confirme QUAL superfície é** antes de editar: `git grep "espere a medi"` devolvia
+`mensagens-submissao.ts` em 1 segundo, e perguntar "é este card da Etapa 2.5?" custava uma linha.
+
+**Onde aterrissou.** `src/lib/agents/ganho-projetado.ts` + `tests/gate-ganho-projetado.test.ts`
+(restaurados) · `CLAUDE.md` (bullet do gate) · `worker.js` rebuildado · deploy staging → prod.
+
+---
+
 ## 2026-08-12 — Pergunta de custo evitado só falava de "contrato, serviço ou licença" (quem evitava MULTA não se reconhecia)
 
 **Status:** ✅ codada e testada · **Branch:** `fix/texto-custo-evitado` · **PR:** _(pendente)_

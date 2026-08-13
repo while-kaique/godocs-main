@@ -15,6 +15,7 @@ import {
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
   limitarCoautorUnico, deveMostrarIntro,
   validarEtapa25Especial, motivoBloqueioEspecial,
+  serializarFerramentas, desserializarFerramentas,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -36,6 +37,7 @@ function bloqueioDoErro(e: unknown): BloqueioSubmissao | null {
 /** Toast curto que só aponta para o painel — o conteúdo do bloqueio mora na tela. */
 const TOAST_ENVIO_PAUSADO = "Envio pausado — veja na tela o que precisa ser corrigido.";
 import { PageFrame, PageHeader, PageFooter, BrowserDots, WizardProgress, StepAnimation } from "@/lib/submeter/layout";
+import { FAQ_RODAPE } from "@/lib/faq/links";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
@@ -566,13 +568,12 @@ export function SubmeterPageContent({
           (t): t is "saving" | "receita_incremental" =>
             t === "saving" || t === "receita_incremental"
         );
-        const ferramentaRaw = (data.ferramenta as string) ?? "";
-        let ferramenta = ferramentaRaw;
-        let ferramentaOutra = "";
-        if (ferramentaRaw.startsWith("Outros: ")) {
-          ferramenta = "Outros";
-          ferramentaOutra = ferramentaRaw.slice("Outros: ".length);
-        }
+        // Uma string no banco → lista de chips. Quebra por " + ", normaliza os valores
+        // legados de quando o campo era de escolha única ("Claude", "Claude + GoDeploy")
+        // e devolve o texto de "Outros: …" separado. Ver desserializarFerramentas.
+        const { ferramentas, ferramentaOutra } = desserializarFerramentas(
+          data.ferramenta as string | null,
+        );
 
         // Papel de cada membro já existente: usa o papel conhecido (projetos novos)
         // ou, na falta (legado importado antes desta feature), "coexecutor" — que é a
@@ -600,7 +601,7 @@ export function SubmeterPageContent({
           prodStatus: "sim",
           nome: (data.responsavel_nome as string) ?? "",
           email: (data.responsavel_email as string) ?? "",
-          ferramenta,
+          ferramentas,
           ferramentaOutra,
           servicoExterno: (data.servico_externo as string) ?? "",
           emEquipe: membros.length > 0 ? "sim" : "nao",
@@ -775,9 +776,7 @@ export function SubmeterPageContent({
           nomeProjeto: newForm.nomeProjeto.trim(),
           ferramenta: newForm.escopo === "externo"
             ? newForm.servicoExterno.trim()
-            : newForm.ferramenta === "Outros" && newForm.ferramentaOutra.trim()
-              ? `Outros: ${newForm.ferramentaOutra.trim()}`
-              : newForm.ferramenta,
+            : serializarFerramentas(newForm.ferramentas, newForm.ferramentaOutra),
           participantes: newForm.participantes,
           participantesPapeis: montarMembrosPapeis(newForm.participantes, newForm.participantesPapeis),
           dataCriacao: newForm.dataCriacao,
@@ -815,6 +814,12 @@ export function SubmeterPageContent({
       // Rascunho salvo antes da triagem do especial não tem as chaves → "" (não respondida).
       especialDashboard: d.form.especialDashboard ?? "",
       especialGanhoOrganizacional: d.form.especialGanhoOrganizacional ?? "",
+      // Rascunho salvo quando a ferramenta era ESCOLHA ÚNICA guardou `ferramenta: "Claude"`
+      // e não tem `ferramentas` — sem esta conversão o campo abriria vazio (perdendo o que
+      // a pessoa já tinha marcado) e o `.includes()` do seletor quebraria a tela.
+      ferramentas: d.form.ferramentas ?? desserializarFerramentas(
+        (d.form as unknown as { ferramenta?: string }).ferramenta,
+      ).ferramentas,
     });
     setNomesExistentes(d.nomesExistentes ?? []);
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
@@ -1003,7 +1008,7 @@ export function SubmeterPageContent({
     prodStatus: "",
     nome: "",
     email: "",
-    ferramenta: "",
+    ferramentas: [],
     ferramentaOutra: "",
     servicoExterno: "",
     emEquipe: "",
@@ -1176,13 +1181,14 @@ export function SubmeterPageContent({
   const motivoEspecialAtual = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
 
   /* ── Metadados do agente: snapshot + detecção de mudança ── */
+  // FONTE ÚNICA da string que vai para `projetos.ferramenta` (banco/Sheets). Antes esta
+  // mesma expressão estava reescrita à mão em 5 lugares; com multi-seleção seriam 5
+  // cópias de uma serialização não trivial, então todos passam por aqui.
   const computeFerramenta = useCallback((): string => {
     return form.escopo === "externo"
       ? form.servicoExterno.trim()
-      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-        ? `Outros: ${form.ferramentaOutra.trim()}`
-        : form.ferramenta;
-  }, [form.escopo, form.servicoExterno, form.ferramenta, form.ferramentaOutra]);
+      : serializarFerramentas(form.ferramentas ?? [], form.ferramentaOutra);
+  }, [form.escopo, form.servicoExterno, form.ferramentas, form.ferramentaOutra]);
 
   // Escopo EXTERNO: o nome do serviço vira a "ferramenta" do projeto E tem coluna própria
   // no banco (`servico_externo`, que o orquestrador lê). Como a ferramenta é editável
@@ -1229,11 +1235,7 @@ export function SubmeterPageContent({
     const run: Promise<string | null> = (async () => {
       try {
         const docs = await filesToDocs(arquivos);
-        const ferramentaEnviada = form.escopo === "externo"
-          ? form.servicoExterno.trim()
-          : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-            ? `Outros: ${form.ferramentaOutra.trim()}`
-            : form.ferramenta;
+        const ferramentaEnviada = computeFerramenta();
         const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
           "/api/chat/iniciar-submissao",
           {
@@ -1500,7 +1502,7 @@ export function SubmeterPageContent({
       // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
       toast.warning(
         `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
         { duration: 10000 },
       );
       setShaking(true);
@@ -1513,11 +1515,7 @@ export function SubmeterPageContent({
     try {
       const docs = await filesToDocs(arquivos);
 
-      const ferramentaEnviada = form.escopo === "externo"
-        ? form.servicoExterno.trim()
-        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-          ? `Outros: ${form.ferramentaOutra.trim()}`
-          : form.ferramenta;
+      const ferramentaEnviada = computeFerramenta();
 
       const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
         "/api/chat/iniciar-submissao",
@@ -1614,11 +1612,7 @@ export function SubmeterPageContent({
     setBloqueio(null);
     setEnviandoEspecial(true);
     try {
-      const ferramentaEnviada = form.escopo === "externo"
-        ? form.servicoExterno.trim()
-        : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-          ? `Outros: ${form.ferramentaOutra.trim()}`
-          : form.ferramenta;
+      const ferramentaEnviada = computeFerramenta();
 
       if (editProjetoId && projetoId) {
         // Modo edição: atualiza metadados do projeto existente, reconstrói doc especial e reenvia.
@@ -1751,7 +1745,7 @@ export function SubmeterPageContent({
       // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
       toast.warning(
         `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude.ai (painel acima).`,
+        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
         { duration: 10000 },
       );
       setShaking(true);
@@ -2660,7 +2654,7 @@ export function SubmeterPageContent({
               <SummaryRow label="Projeto" value={form.nomeProjeto} />
               <SummaryRow
                 label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
-                value={form.escopo === "externo" ? form.servicoExterno : form.ferramenta}
+                value={form.escopo === "externo" ? form.servicoExterno : computeFerramenta()}
               />
               <SummaryRow label="Status" value={form.especial ? "Aguardando validação" : "Aguardando análise"} badge last />
             </div>
@@ -2691,13 +2685,28 @@ export function SubmeterPageContent({
               </button>
             </div>
           </div>
-          <PageFooter />
+          {/* Tela de sucesso: a dúvida deixa de ser "como preencho" e passa a ser "e
+              agora?" — daí o link ir para "Acompanhamento e status" (D18). */}
+          <PageFooter faq={FAQ_RODAPE.status} />
         </div>
       </PageFrame>
     );
   }
 
   /* ── Main Form ── */
+
+  // Destino do link do FAQ no rodapé, por etapa (SPEC_FAQ D18). Decidido aqui, e não
+  // dentro do `PageFooter`, porque quem sabe em que ponto do formulário a pessoa está é
+  // esta tela — o rodapé é só quem desenha.
+  const faqDoRodape =
+    step === 3
+      ? FAQ_RODAPE.memorial
+      : step === 2 && showEtapa25
+        ? FAQ_RODAPE.especial
+        : step === 2
+          ? FAQ_RODAPE.financeiro
+          : FAQ_RODAPE.indice;
+
   return (
     <PageFrame>
       <div className="relative z-[1] mx-auto w-full max-w-[680px] px-[var(--space-5,24px)] py-[var(--space-7,48px)] pb-[var(--space-6,32px)]">
@@ -2884,11 +2893,7 @@ export function SubmeterPageContent({
                   novoResumo={{
                     nome: form.nomeProjeto.trim(),
                     descricaoBreve: form.descricaoBreve.trim(),
-                    ferramenta: form.escopo === "externo"
-                      ? form.servicoExterno.trim()
-                      : form.ferramenta === "Outros" && form.ferramentaOutra.trim()
-                        ? `Outros: ${form.ferramentaOutra.trim()}`
-                        : form.ferramenta,
+                    ferramenta: computeFerramenta(),
                     tiposProjeto: form.tipoProjeto,
                   }}
                 />
@@ -3007,7 +3012,10 @@ export function SubmeterPageContent({
           )}
         </div>
 
-        <PageFooter />
+        {/* O rodapé aponta para a seção do FAQ que responde a dúvida DESTA etapa (D18):
+            Etapa 1 → índice · Etapa 2 → como o ganho é medido · Etapa 2.5 → projeto
+            especial · Etapa 3 → o ganho tem de ser real e medido. */}
+        <PageFooter faq={faqDoRodape} />
       </div>
 
       {showRascunhoConfirm && (

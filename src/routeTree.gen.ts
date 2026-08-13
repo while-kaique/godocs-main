@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubmeterRouteImport } from './routes/submeter'
 import { Route as MeusProjetosRouteImport } from './routes/meus-projetos'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AprovacoesRouteImport } from './routes/aprovacoes'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FaqIndexRouteImport } from './routes/faq.index'
 import { Route as ProjetoIdRouteImport } from './routes/projeto.$id'
 import { Route as EditarIdRouteImport } from './routes/editar.$id'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
@@ -23,7 +25,9 @@ import { Route as AuthenticatedEmailLegadosRouteImport } from './routes/_authent
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
 import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
+import { Route as FaqCategoriaIndexRouteImport } from './routes/faq.$categoria.index'
 import { Route as AuthenticatedTestesIndexRouteImport } from './routes/_authenticated/testes/index'
+import { Route as FaqCategoriaItemRouteImport } from './routes/faq.$categoria.$item'
 import { Route as AuthenticatedTestesPromptsRouteImport } from './routes/_authenticated/testes/prompts'
 import { Route as AuthenticatedTestesCenariosRouteImport } from './routes/_authenticated/testes/cenarios'
 
@@ -35,6 +39,11 @@ const SubmeterRoute = SubmeterRouteImport.update({
 const MeusProjetosRoute = MeusProjetosRouteImport.update({
   id: '/meus-projetos',
   path: '/meus-projetos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -55,6 +64,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FaqIndexRoute = FaqIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FaqRoute,
 } as any)
 const ProjetoIdRoute = ProjetoIdRouteImport.update({
   id: '/projeto/$id',
@@ -99,12 +113,22 @@ const AuthenticatedTestesRouteRoute =
     path: '/testes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const FaqCategoriaIndexRoute = FaqCategoriaIndexRouteImport.update({
+  id: '/$categoria/',
+  path: '/$categoria/',
+  getParentRoute: () => FaqRoute,
+} as any)
 const AuthenticatedTestesIndexRoute =
   AuthenticatedTestesIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedTestesRouteRoute,
   } as any)
+const FaqCategoriaItemRoute = FaqCategoriaItemRouteImport.update({
+  id: '/$categoria/$item',
+  path: '/$categoria/$item',
+  getParentRoute: () => FaqRoute,
+} as any)
 const AuthenticatedTestesPromptsRoute =
   AuthenticatedTestesPromptsRouteImport.update({
     id: '/prompts',
@@ -122,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aprovacoes': typeof AprovacoesRoute
   '/auth': typeof AuthRoute
+  '/faq': typeof FaqRouteWithChildren
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
@@ -132,9 +157,12 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
   '/projeto/$id': typeof ProjetoIdRoute
+  '/faq/': typeof FaqIndexRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/faq/$categoria/$item': typeof FaqCategoriaItemRoute
   '/testes/': typeof AuthenticatedTestesIndexRoute
+  '/faq/$categoria/': typeof FaqCategoriaIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,9 +177,12 @@ export interface FileRoutesByTo {
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
   '/projeto/$id': typeof ProjetoIdRoute
+  '/faq': typeof FaqIndexRoute
   '/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/faq/$categoria/$item': typeof FaqCategoriaItemRoute
   '/testes': typeof AuthenticatedTestesIndexRoute
+  '/faq/$categoria': typeof FaqCategoriaIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -159,6 +190,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/aprovacoes': typeof AprovacoesRoute
   '/auth': typeof AuthRoute
+  '/faq': typeof FaqRouteWithChildren
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
@@ -169,9 +201,12 @@ export interface FileRoutesById {
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
   '/projeto/$id': typeof ProjetoIdRoute
+  '/faq/': typeof FaqIndexRoute
   '/_authenticated/testes/cenarios': typeof AuthenticatedTestesCenariosRoute
   '/_authenticated/testes/prompts': typeof AuthenticatedTestesPromptsRoute
+  '/faq/$categoria/$item': typeof FaqCategoriaItemRoute
   '/_authenticated/testes/': typeof AuthenticatedTestesIndexRoute
+  '/faq/$categoria/': typeof FaqCategoriaIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -179,6 +214,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aprovacoes'
     | '/auth'
+    | '/faq'
     | '/meus-projetos'
     | '/submeter'
     | '/testes'
@@ -189,9 +225,12 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/editar/$id'
     | '/projeto/$id'
+    | '/faq/'
     | '/testes/cenarios'
     | '/testes/prompts'
+    | '/faq/$categoria/$item'
     | '/testes/'
+    | '/faq/$categoria/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -206,15 +245,19 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/editar/$id'
     | '/projeto/$id'
+    | '/faq'
     | '/testes/cenarios'
     | '/testes/prompts'
+    | '/faq/$categoria/$item'
     | '/testes'
+    | '/faq/$categoria'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/aprovacoes'
     | '/auth'
+    | '/faq'
     | '/meus-projetos'
     | '/submeter'
     | '/_authenticated/testes'
@@ -225,9 +268,12 @@ export interface FileRouteTypes {
     | '/_authenticated/usuarios'
     | '/editar/$id'
     | '/projeto/$id'
+    | '/faq/'
     | '/_authenticated/testes/cenarios'
     | '/_authenticated/testes/prompts'
+    | '/faq/$categoria/$item'
     | '/_authenticated/testes/'
+    | '/faq/$categoria/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -235,6 +281,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AprovacoesRoute: typeof AprovacoesRoute
   AuthRoute: typeof AuthRoute
+  FaqRoute: typeof FaqRouteWithChildren
   MeusProjetosRoute: typeof MeusProjetosRoute
   SubmeterRoute: typeof SubmeterRoute
   EditarIdRoute: typeof EditarIdRoute
@@ -255,6 +302,13 @@ declare module '@tanstack/react-router' {
       path: '/meus-projetos'
       fullPath: '/meus-projetos'
       preLoaderRoute: typeof MeusProjetosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -284,6 +338,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/faq/': {
+      id: '/faq/'
+      path: '/'
+      fullPath: '/faq/'
+      preLoaderRoute: typeof FaqIndexRouteImport
+      parentRoute: typeof FaqRoute
     }
     '/projeto/$id': {
       id: '/projeto/$id'
@@ -341,12 +402,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTestesRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/faq/$categoria/': {
+      id: '/faq/$categoria/'
+      path: '/$categoria'
+      fullPath: '/faq/$categoria/'
+      preLoaderRoute: typeof FaqCategoriaIndexRouteImport
+      parentRoute: typeof FaqRoute
+    }
     '/_authenticated/testes/': {
       id: '/_authenticated/testes/'
       path: '/'
       fullPath: '/testes/'
       preLoaderRoute: typeof AuthenticatedTestesIndexRouteImport
       parentRoute: typeof AuthenticatedTestesRouteRoute
+    }
+    '/faq/$categoria/$item': {
+      id: '/faq/$categoria/$item'
+      path: '/$categoria/$item'
+      fullPath: '/faq/$categoria/$item'
+      preLoaderRoute: typeof FaqCategoriaItemRouteImport
+      parentRoute: typeof FaqRoute
     }
     '/_authenticated/testes/prompts': {
       id: '/_authenticated/testes/prompts'
@@ -404,11 +479,26 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface FaqRouteChildren {
+  FaqIndexRoute: typeof FaqIndexRoute
+  FaqCategoriaItemRoute: typeof FaqCategoriaItemRoute
+  FaqCategoriaIndexRoute: typeof FaqCategoriaIndexRoute
+}
+
+const FaqRouteChildren: FaqRouteChildren = {
+  FaqIndexRoute: FaqIndexRoute,
+  FaqCategoriaItemRoute: FaqCategoriaItemRoute,
+  FaqCategoriaIndexRoute: FaqCategoriaIndexRoute,
+}
+
+const FaqRouteWithChildren = FaqRoute._addFileChildren(FaqRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AprovacoesRoute: AprovacoesRoute,
   AuthRoute: AuthRoute,
+  FaqRoute: FaqRouteWithChildren,
   MeusProjetosRoute: MeusProjetosRoute,
   SubmeterRoute: SubmeterRoute,
   EditarIdRoute: EditarIdRoute,

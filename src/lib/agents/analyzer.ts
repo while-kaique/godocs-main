@@ -107,15 +107,18 @@ Você receberá TODOS os dados do projeto: metadados (título, área, ferramenta
 
 As ferramentas abaixo são usadas internamente no GoGroup e são opções válidas no cadastro de projetos. Conhecê-las é essencial para avaliar corretamente o critério de ferramenta:
 
-- **Claude**: modelo de IA da Anthropic. ATENÇÃO: no GoGroup o Claude é MUITAS VEZES usado só para **construir** o projeto (Claude Code — escrever o código), o que **NÃO** é IA como funcionalidade. Em outros casos ele roda **em tempo de execução** (LLM que gera/classifica/extrai/decide durante a automação) — aí sim é funcionalidade. A presença de "Claude" como ferramenta, por si só, NÃO indica IA no processo.
-- **Claude + GoDeploy**: o app foi **construído** com Claude (Claude Code) e **hospedado** no GoDeploy (infra interna: SPAs+Workers/APIs, SQLite, cron, edge auth). Isso descreve **construção + hospedagem** — NÃO implica que a automação use IA ao rodar. Muitos são CRUDs/dashboards/plataformas **determinísticas** apenas hospedadas no GoDeploy.
+⚠️ O campo "ferramenta" declara **com o que o projeto foi CONSTRUÍDO**, não do que ele depende para rodar (banco, APIs e integrações são conteúdo da documentação). Ele aceita **VÁRIAS** ferramentas, unidas por " + " — ex.: "Claude Code + GoDeploy", "n8n + Python".
+
+- **Claude AI · Claude Cowork · Claude Code**: as 3 superfícies do Claude (modelo de IA da Anthropic) usadas para **construir** o projeto — conversa no navegador, ambiente de trabalho e agente de código, respectivamente. ⚠️ Construir com Claude **NÃO** é IA como funcionalidade. IA como funcionalidade é o LLM rodando **em tempo de execução** (gera/classifica/extrai/decide durante a automação), e isso se lê no FLUXO descrito, não neste campo. A presença de qualquer "Claude" aqui, por si só, NÃO indica IA no processo.
+- **GoDeploy**: infra interna de hospedagem (SPAs + Workers/APIs, SQLite gerenciado, cron, edge auth). É a ÚNICA ferramenta de execução aceita no campo. "Claude Code + GoDeploy" descreve **construção + hospedagem** e não implica IA ao rodar: muitos são CRUDs/dashboards/plataformas **determinísticas** apenas hospedadas no GoDeploy.
 - **n8n**: Plataforma de automação de workflows (low-code). Amplamente usada no GoGroup para integrações, ETL, webhooks e orquestração de processos.
 - **Python**: Scripts e aplicações em Python — usado para automações, análise de dados, ML, scrapers, etc.
 - **Google Apps Script**: Scripts dentro do ecossistema Google (Sheets, Docs, Drive, Gmail).
+- **Vercel**: hospedagem externa de frontends. **Outros: <nome>** = ferramenta digitada pelo autor.
 
-Quando a ferramenta for "Claude", "Claude + GoDeploy" ou qualquer outra listada acima, ela é VÁLIDA e RECONHECIDA pela empresa. NÃO penalize por "ferramenta desconhecida".
+Qualquer combinação das ferramentas acima é VÁLIDA e RECONHECIDA pela empresa. NÃO penalize por "ferramenta desconhecida" — inclusive valores legados como "Claude" sozinho (é o Claude Code de antes do campo separar as superfícies).
 
-⚠️ **A FERRAMENTA NÃO DEFINE A COMPLEXIDADE.** Para classificar a complexidade, avalie **SOMENTE a automação em si**: quando ela **EXECUTA**, usa IA em algum passo do processo (gera texto, classifica, extrai com LLM, decide o rumo, resolve uma condicional com IA)? As ferramentas usadas para **construir/hospedar** (Claude Code, GoDeploy) **NÃO contam** — IA para desenvolver ≠ IA na execução. Um projeto com ferramenta "Claude + GoDeploy" que, ao rodar, só faz CRUD/dashboards/alertas por regra (sem IA no fluxo) é **automacao**.
+⚠️ **A FERRAMENTA NÃO DEFINE A COMPLEXIDADE.** Para classificar a complexidade, avalie **SOMENTE a automação em si**: quando ela **EXECUTA**, usa IA em algum passo do processo (gera texto, classifica, extrai com LLM, decide o rumo, resolve uma condicional com IA)? As ferramentas usadas para **construir/hospedar** (qualquer Claude, GoDeploy) **NÃO contam** — IA para desenvolver ≠ IA na execução. Um projeto com ferramenta "Claude Code + GoDeploy" que, ao rodar, só faz CRUD/dashboards/alertas por regra (sem IA no fluxo) é **automacao**.
 
 ## POSTURA
 
