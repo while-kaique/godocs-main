@@ -6,6 +6,71 @@
 
 ---
 
+## 2026-08-13 — abrir uma linha do `/dashboard` ainda esperava ~1 s DEPOIS do espelho
+
+**Status:** ✅ corrigido · **Branch:** `feat/espelho-e-perf-navegacao` (mesma do espelho, por
+decisão do Luis — 1 PR só) · **Plano:** `docs/plans/detalhe-triagem-abre-instantaneo.md`
+
+**Sintoma.** Com o espelho no ar, a **listagem** do `/dashboard` ficou rápida (deixou de ler o
+Google Sheets no request), mas **clicar numa linha para abrir a ficha de triagem continuava
+esperando** — o overlay abria com o spinner *"Carregando a linha da planilha…"* por ~1 s, e
+fechar e reabrir a MESMA ficha esperava de novo, igual.
+
+**Causa-raiz — duas, e a primeira é a que dominava.**
+1. **Uma requisição inteira no caminho crítico do clique.** O `ProjetoDetalheDialog` só disparava
+   o `apiFetch` no `useEffect` do `id`, isto é, **depois** do clique. E neste ambiente qualquer
+   rota do GoDocs custa **~750–800 ms de overhead FIXO da plataforma** (o gate de OAuth do edge)
+   antes de o nosso código rodar — número já medido e registrado no `CLAUDE.md` (a mesma máquina
+   fala com `cloudflare.com` em 55 ms, e `/favicon.svg`, que não faz trabalho nenhum, custa ~800 ms).
+   Ou seja: **a espera não era a planilha nem o SQLite** — o espelho já tinha resolvido isso, a
+   ficha é um `SELECT` por PRIMARY KEY (`lerLinhaEspelho`). Era a **CONTAGEM de requisições**, a
+   mesma lição do code-splitting (49 → 19 assets), aplicada a DADO em vez de JS.
+2. **Duas leituras SQLite em SÉRIE no servidor.** `getProjetoDashboard` fazia
+   `await lerLinhaEspelho(id)` e só então `await getAdminStatusLogs(id)` — independentes entre si,
+   mas o histórico só começava depois de a linha chegar (cada round-trip é RPC de Durable Object).
+
+**Fix.**
+- **Servidor:** as 2 leituras num `Promise.all`. ⚠️ O `catch` do histórico foi para **DENTRO** do
+  `Promise.all`, não num `try` em volta: ele é acessório (auditoria fora do ar não impede a ficha
+  de abrir) e, no caminho do 404, quem lança é a checagem da linha — uma rejeição solta do log
+  viraria *unhandled rejection* no worker, porque ninguém mais estaria esperando por ela.
+- **Cliente:** novo `src/lib/dashboard-detalhe-cache.ts`, irmão do `dashboard-prefetch.ts` (herda
+  as decisões dele; **não** foi enfiado no mesmo módulo porque a semântica difere de propósito —
+  aquele é um slot ÚNICO de consumo único para a listagem, este é um mapa por id, multi-consumo,
+  com invalidação). O `hover`/`focus` da `<tr>` agenda a ficha com **150 ms** (a régua do
+  `defaultPreloadDelay` do router) e o `mouseleave`/`blur` cancela; o clique consome a requisição
+  **já em voo**.
+
+**Invariantes declarados (o que não pode regredir).** Erro **NUNCA** fica cacheado (403/rede/edge
+soltam a entrada, senão a tela herdaria a falha e não tentaria de novo) · **TTL de 30 s**, curto de
+propósito: a ficha semeia os campos **Observações / Motivo Reenvio / Motivo Reprovado** que a
+triagem **regrava**, e servir ficha velha alargaria a janela de sobrescrever texto mais novo da
+planilha · **`invalidarDetalhe` depois de gravar** e **`limparDetalhes` no `?refresh=1`** (que
+sincroniza de verdade) · **timer único** para a tabela inteira, então atravessar 25 linhas rolando
+**não** vira 25 requisições · cache **em memória, por aba** — a decisão de produto de 28/07/2026
+(*"cache da listagem em SQLite/localStorage é FORA"*) segue intacta: isto é a **ficha**, não a
+listagem, e não persiste nada.
+
+⚠️ **Por que este I/O no hover não contradiz o *"`preload` NÃO pode disparar I/O"*** (as 2 travas
+do link "Dashboard", `docs/deploy.md`): lá o hover disparava `/api/admin/dashboard/projetos` numa
+época em que essa rota **lia o Google Sheets**, cuja cota de 60 leituras/min é compartilhada com
+prod. Aqui o alvo é o **espelho** (SQLite local), sem cota nenhuma. A condição que inverte o
+veredito está escrita no cabeçalho do módulo: **se a rota do detalhe voltar a ler a planilha, o
+prefetch por hover sai no MESMO commit.**
+
+**Onde aterrissou.** `src/lib/dashboard-admin.functions.ts` (só `getProjetoDashboard`) ·
+`src/lib/dashboard-detalhe-cache.ts` (novo) ·
+`src/components/dashboard/projeto-detalhe-dialog.tsx` · `src/routes/_authenticated/dashboard.tsx` ·
+`tests/dashboard-detalhe-cache.test.ts` (15 casos: hover→clique = 1 fetch, hover curto não busca,
+N linhas deixam 1 intenção viva, erro não cacheado, invalidação ao gravar, TTL, teto do cache) ·
+`CLAUDE.md` (gotcha **3b** do Dashboard do admin) · `worker.js` rebuildado. **1443 testes verdes**
+(baseline 1428).
+
+**Ficou FORA (declarado):** render progressivo dos campos do resumo enquanto a ficha carrega (é
+fatia de UI) e qualquer cache persistente.
+
+---
+
 ## 2026-08-12 — REVERTIDA: a mensagem do CHAT do ganho projetado foi reescrita sem ser o alvo do pedido
 
 **Status:** ⏪ revertida no mesmo dia · **Branch:** `revert/mensagem-chat-ganho-projetado` ·

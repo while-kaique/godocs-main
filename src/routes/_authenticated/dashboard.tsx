@@ -43,6 +43,11 @@ import {
 } from '@/components/dashboard/tabela-utils';
 import { apiFetch } from '@/lib/api-client';
 import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
+import {
+  agendarPrefetchDetalhe,
+  cancelarPrefetchDetalhe,
+  limparDetalhes,
+} from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
@@ -98,6 +103,10 @@ function Dashboard() {
     if (refresh) setAtualizando(true);
     else setCarregando(true);
     setErro(null);
+    // ⚠️ `refresh` SINCRONIZA de verdade (lê a planilha e regrava o espelho), então toda ficha
+    // guardada passa a ser anterior à planilha em mãos — esquecê-las é o que impede o overlay
+    // de mostrar a célula velha logo depois de a triagem pedir dado fresco.
+    if (refresh) limparDetalhes();
     try {
       // O `beforeLoad` do layout admin já disparou esta leitura em paralelo com o auth
       // (ver `dashboard-prefetch.ts`). Se a promise existe, consome; senão, pede agora.
@@ -417,6 +426,16 @@ function Dashboard() {
                         setAberto(p);
                       }
                     }}
+                    // Prefetch por INTENÇÃO (150 ms, a régua do `defaultPreloadDelay` do
+                    // router): a ficha começa a ser buscada enquanto o validador ainda decide
+                    // clicar, porque aqui cada requisição carrega ~750 ms de overhead fixo do
+                    // edge. Cancela ao sair, senão rolar a tabela viraria 25 requisições.
+                    // ⚠️ Isto SÓ é aceitável porque a rota do detalhe lê o espelho (SQLite) e
+                    // nunca o Sheets — ver o cabeçalho de `dashboard-detalhe-cache.ts`.
+                    onMouseEnter={() => agendarPrefetchDetalhe(p.id)}
+                    onMouseLeave={cancelarPrefetchDetalhe}
+                    onFocus={() => agendarPrefetchDetalhe(p.id)}
+                    onBlur={cancelarPrefetchDetalhe}
                     className="group cursor-pointer border-b border-border/70 outline-none transition-colors last:border-0 hover:bg-muted/40 focus-visible:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset motion-reduce:transition-none"
                     style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
                   >

@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
 import { ParecerLiderPainel } from '@/components/dashboard/parecer-lider';
 import { apiFetch } from '@/lib/api-client';
+import { obterDetalhe, invalidarDetalhe } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
 import {
   COLUNA_ESTADO_LIDER,
@@ -214,7 +215,12 @@ export function ProjetoDetalheDialog({
     setCarregando(true);
     setErro(null);
     setDetalhe(null);
-    apiFetch<Detalhe>(`/api/admin/dashboard/projetos/${encodeURIComponent(id)}`)
+    // `obterDetalhe` aproveita a requisição que o HOVER da linha já disparou (ver
+    // `dashboard-detalhe-cache.ts`): neste ambiente cada requisição carrega ~750 ms de
+    // overhead fixo do edge, e começar depois do clique é o que fazia a ficha abrir num
+    // spinner. Sem hover (clique direto, teclado, deep link) o comportamento é o de antes:
+    // um fetch normal.
+    obterDetalhe<Detalhe>(id)
       .then((d) => {
         if (!vivo) return;
         setDetalhe(d);
@@ -253,6 +259,10 @@ export function ProjetoDetalheDialog({
       obsOriginal.current = observacoes;
       motivoReenvioOriginal.current = motivoReenvio;
       motivoReprovadoOriginal.current = motivoReprovado;
+      // ⚠️ A ficha guardada acabou de ficar velha: o espelho foi remendado com o status/motivo
+      // novos e uma reabertura servida do cache afirmaria o valor ANTERIOR — e, pior, semearia
+      // de volta o texto antigo nos campos que a triagem regrava.
+      invalidarDetalhe(projeto.id);
       onStatusSalvo(projeto.id, statusEscolhido, obsMudou ? observacoes : undefined);
       toast.success(`Status salvo na planilha: ${statusEscolhido}`);
     } catch (e) {

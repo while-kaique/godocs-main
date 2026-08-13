@@ -167,7 +167,32 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
  */
 export async function getProjetoDashboard(id: string): Promise<DetalheDashboard> {
   z.string().min(1).max(120).parse(id);
-  const alvo = await lerLinhaEspelho(id);
+
+  // As duas leituras são INDEPENDENTES e cada round-trip ao SQLite do Godeploy entra no tempo
+  // de abrir a ficha — em série, o histórico só começava depois de a linha chegar.
+  //
+  // ⚠️ O `catch` do histórico fica DENTRO do `Promise.all`, e não num `try` em volta: ele é
+  // acessório (auditoria fora do ar não pode impedir a triagem de abrir a ficha) e, no caminho
+  // do 404, quem lança é a checagem da linha — uma rejeição solta do log viraria "unhandled
+  // rejection" no worker, porque ninguém mais estaria esperando por ela.
+  const [alvo, historico] = await Promise.all([
+    lerLinhaEspelho(id),
+    getAdminStatusLogs(id)
+      .then((logs): DetalheDashboard['historico'] =>
+        logs.map((l) => ({
+          status_anterior: l.status_anterior,
+          status_novo: l.status_novo,
+          observacoes: l.observacoes,
+          admin_email: l.admin_email,
+          created_at: l.created_at,
+        })),
+      )
+      .catch((e): DetalheDashboard['historico'] => {
+        console.error('[dashboard-admin] falha ao ler histórico de status:', e);
+        return [];
+      }),
+  ]);
+
   if (!alvo) {
     throw Object.assign(new Error('Projeto não encontrado na planilha.'), { status: 404 });
   }
@@ -175,20 +200,6 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   for (const [k, v] of Object.entries(alvo)) {
     const val = texto(v as string | undefined);
     if (val) campos[k] = val;
-  }
-
-  // O histórico é acessório: se a tabela de auditoria falhar, o detalhe ainda abre.
-  let historico: DetalheDashboard['historico'] = [];
-  try {
-    historico = (await getAdminStatusLogs(id)).map((l) => ({
-      status_anterior: l.status_anterior,
-      status_novo: l.status_novo,
-      observacoes: l.observacoes,
-      admin_email: l.admin_email,
-      created_at: l.created_at,
-    }));
-  } catch (e) {
-    console.error('[dashboard-admin] falha ao ler histórico de status:', e);
   }
 
   return { id, campos, historico };
