@@ -39,7 +39,41 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
-### ✅ DEPLOYADO NA STAGING (17/08 14:04) — `edf400b4` **v156 → v157**
+### ✅ 2ª ENTREGA NA STAGING (17/08 14:26) — `edf400b4` **v159**: payload −38% + nota "Estrelas"
+
+Pedido do Luis depois de aprovar os filtros: *"na `/dashboard` em prod está demorando muito para
+carregar os projetos, parece que ainda busca da planilha"* + *"adicione a capacidade de editar a
+coluna de estrelas pela edição"*. Commit `8c2103e`.
+
+**A lentidão NÃO era a planilha** — a listagem lê o espelho (SQLite) desde 11/08. Era **VOLUME**.
+Medido em prod com `scripts/dryrun-lider/peso-dashboard.ts` (639 projetos, script NOVO e
+reproduzível): resposta **563,6 → 346,1 KB (−38%)** e `linha_resumo` **460,9 → 257,8 KB (−44%)**.
+O maior item era **`observacoes`: 160 KB, 28% da resposta** — parecer do analisador que a TABELA
+nunca desenhou e que a ficha já relê do detalhe. Saíram também `Atualizado Em`, `Saving Horas` e
+`Ferramenta` (esta **continua lida**, alimenta o índice de busca; só não viaja como campo).
+⚠️ Régua que fica: **campo que a listagem não DESENHA não entra no resumo** (×600 projetos).
+Canário em `tests/dashboard-filtros.test.ts` trava a lista de chaves.
+⚠️ **NÃO** se forçou rewrite do espelho inteiro para colher os 203 KB do lado do SQLite: a
+gravação é hash-gated e um rewrite total voltaria aos ~23 s da 1ª corrida. Encolhe sozinho.
+
+**Estrelas:** a coluna **Q "Estrelas"** existe nas DUAS abas (`GoDocs` e `STAGING` — conferido com
+`GOOGLE_SHEETS_TAB=STAGING npx vitest run --config scripts/dryrun-lider/cabecalho-full.config.ts`)
+e o código não a conhecia. Agora: `SHEET_COLUMNS` + `COLUNAS_ESCRITAS` + `estrelas` no
+`statusSchema`, com um `radiogroup` de 5 estrelas ao lado do Status na ficha, salvo pelo mesmo
+botão. ⚠️ Coluna **MANUAL** (nenhum fluxo automático escreve) · **`undefined` = não encostar**
+(quem só muda status não zera a nota alheia) · grava **NÚMERO, nunca "—"** (0 = sem nota, 426 das
+639 linhas) · notas legadas fora da escala (7/8/10) preservadas com aviso na tela.
+
+⚠️ **`worker.js` FOI rebuildado e commitado** (regra 1 — mudança server-side desta vez, ao
+contrário da 1ª entrega). 1492 testes verdes.
+
+**Próximo passo:** aguardar o Luis confirmar na staging (carregamento mais rápido + nota gravando
+na planilha, aba STAGING linha do projeto testado); com o OK, deployar em **prod (`674a3710`, hoje
+v247)** e abrir o PR da branch `feat/dashboard-filtros-calendario` (4 commits + este).
+
+---
+
+### ✅ 1ª ENTREGA NA STAGING (17/08 14:04) — `edf400b4` **v156 → v157**
 
 O Luis abriu a staging e não viu as mudanças; as duas perguntas dele foram checadas antes de subir:
 - **Eu não tinha subido** — a staging estava na **v156 de 13/08 13:24**, exatamente o `main`.
@@ -57,9 +91,8 @@ deploy não saiu.
 calendário e da faixa de filtros só passou por leitura de código e testes de fonte. É o Luis quem fecha
 esse ponto agora, na staging.
 
-**Próximo passo:** aguardar o retorno visual do Luis na staging (filtros somando + contagem das pílulas
-mudando junto + o calendário de um mês na `/dashboard` e na Etapa 2); com o OK, deployar em prod
-(`674a3710`, hoje na v247, intocada) e abrir o PR da branch `feat/dashboard-filtros-calendario`.
+_(Os filtros e o calendário foram APROVADOS pelo Luis — "ficou muito bom" —, o que abriu a 2ª
+entrega acima.)_
 
 ---
 

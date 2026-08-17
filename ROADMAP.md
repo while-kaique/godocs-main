@@ -95,8 +95,12 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - 🟡 **Filtros combináveis + calendário próprio (17/08, branch `feat/dashboard-filtros-calendario`)** —
   natureza (especiais) · ganho (saving/receita) · área · período, todos somando em AND com a fila de status;
   contagens das pílulas passam a ser do recorte. Calendário de um mês só (1º clique = início, 2º = fim) com
-  atalhos, reusado como campo de data da Etapa 2. Código pronto e testado (1486 verdes) e
-  **na staging desde 17/08 (v157)**; falta o retorno visual do Luis → depois prod + PR.
+  atalhos, reusado como campo de data da Etapa 2. Filtros e calendário **aprovados
+  pelo Luis** na staging (17/08).
+- 🟡 **Payload da listagem −38% + nota "Estrelas" editável (17/08, staging v159)** — a lentidão em
+  prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
+  28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
+  Falta o Luis confirmar na staging → prod + PR.
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
