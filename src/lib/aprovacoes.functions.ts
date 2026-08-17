@@ -31,6 +31,7 @@ import {
   type ChaveChecklist,
 } from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
+import { compararVersoes, type CampoComparado, type SnapshotVersao } from '@/lib/diff-versoes';
 import {
   extrairResumoMemorial,
   normalizarMarcadoresMemorial,
@@ -50,7 +51,9 @@ import {
   getUltimaVersaoNum,
   getProjetoById,
   getProjetosByOwnerEmail,
+  getVersoesRecentesDe,
   type AprovacaoRow,
+  type VersaoParaComparacao,
 } from '@/integrations/db/client.server';
 
 // 3 desfechos (decisão do Lucas, 04/08/2026): 'ajuste' devolve ao autor para corrigir,
@@ -586,6 +589,34 @@ export type ItemAprovacao = {
   memorial: string | null;
   /** Resumo do projeto: a seção [1.2] do memorial (preferida) ou, na falta, o da análise. */
   resumo: string | null;
+  /**
+   * Preenchido SÓ quando o que espera parecer é uma EDIÇÃO (reenvio). `null` = submissão
+   * nova → a tela usa o card padrão, que apresenta o projeto do zero.
+   */
+  edicao: EdicaoAprovacao | null;
+};
+
+/**
+ * O reenvio como o líder precisa vê-lo: qual versão ele está julgando, quando ela chegou e
+ * o que mudou desde a anterior.
+ *
+ * `comparavel: false` quando não há snapshot da versão anterior para comparar — acontece de
+ * verdade, porque `gravarVersaoProjeto` é NÃO-BLOQUEANTE na submissão (um erro ali não
+ * derruba o envio, só deixa a versão sem cópia) e porque projeto legado importado da
+ * planilha nunca teve versão 1. Nesse caso a tela **diz isso** e mostra o card completo:
+ * inventar um "antes" seria pior que admitir que ele não existe.
+ */
+export type EdicaoAprovacao = {
+  /** Versão que está na fila (a que o líder julga). */
+  versao: number;
+  /** Versão usada como "antes" (null quando não há). */
+  versao_anterior: number | null;
+  /** Quando esta versão foi reenviada / quando a anterior foi enviada. */
+  reenviado_em: string | null;
+  anterior_em: string | null;
+  comparavel: boolean;
+  mudancas: CampoComparado[];
+  iguais: CampoComparado[];
 };
 
 /** Rótulo do papel do participante (mesmos 3 papéis da Etapa 1). */
@@ -671,11 +702,79 @@ function parseJson<T>(texto: string | null | undefined, padrao: T): T {
  * ninguém nunca vê a tela). Falha da TeamGuide não quebra a fila: `lidera` cai para
  * "tem pendência?" (o dado do banco basta para o líder trabalhar).
  */
+/**
+ * Monta o "antes → depois" de UM item da fila, a partir das versões que o banco tem.
+ *
+ * PURA (recebe as linhas já lidas), para o teste poder exercitar os casos que doem: versão
+ * sem snapshot anterior, snapshot ilegível e o reenvio cuja versão nem chegou a ser gravada.
+ *
+ * `versaoNaFila` é o `projeto_aprovacoes.versao` — a versão que o líder está julgando. É
+ * ela, e não "a maior versão da tabela", que decide se isto é uma edição: a fila é aberta
+ * DEPOIS de gravar a versão (`submeterParaValidacao`), então v1 = submissão nova e v2+ =
+ * reenvio, mesmo que o snapshot tenha falhado.
+ */
+export function montarEdicao(
+  versaoNaFila: number,
+  versoes: VersaoParaComparacao[],
+): EdicaoAprovacao | null {
+  const versao = Number(versaoNaFila) || 1;
+  if (versao <= 1) return null; // submissão nova → card padrão
+
+  const ordenadas = [...versoes].sort((a, b) => Number(b.versao_num) - Number(a.versao_num));
+  const atual = ordenadas.find((v) => Number(v.versao_num) === versao) ?? ordenadas[0] ?? null;
+  const anterior = ordenadas.find((v) => Number(v.versao_num) < Number(atual?.versao_num ?? versao));
+
+  const snapAtual = lerSnapshotVersao(atual);
+  const snapAnterior = lerSnapshotVersao(anterior);
+
+  const base: EdicaoAprovacao = {
+    versao,
+    versao_anterior: anterior ? Number(anterior.versao_num) : null,
+    reenviado_em: atual?.created_at ?? null,
+    anterior_em: anterior?.created_at ?? null,
+    comparavel: false,
+    mudancas: [],
+    iguais: [],
+  };
+  if (!snapAtual || !snapAnterior) return base;
+
+  const { mudancas, iguais } = compararVersoes(snapAnterior, snapAtual);
+  return { ...base, comparavel: true, mudancas, iguais };
+}
+
+function lerSnapshotVersao(v: VersaoParaComparacao | null | undefined): SnapshotVersao | null {
+  if (!v) return null;
+  const projeto = parseJson<Record<string, unknown> | null>(v.snapshot_projeto, null);
+  if (!projeto || typeof projeto !== 'object' || Object.keys(projeto).length === 0) return null;
+  const doc = parseJson<Record<string, unknown> | null>(v.snapshot_doc, null);
+  return { projeto, doc: doc && typeof doc === 'object' ? doc : null };
+}
+
 export async function listarAprovacoesPendentes(
   email: string,
 ): Promise<{ lidera: boolean; itens: ItemAprovacao[] }> {
   const alvo = (email ?? '').trim().toLowerCase();
   const rows = await getAprovacoesPendentesDe(alvo);
+
+  // As 2 últimas versões de CADA reenvio da fila, em UMA consulta. "Uma consulta por item
+  // dentro do laço" é exatamente o que matou o endpoint do Investigador (ver CLAUDE.md),
+  // e não vamos repetir o padrão só porque esta fila é curta.
+  const reenvios = rows.filter((r) => Number(r.versao) > 1).map((r) => r.projeto_id);
+  const porProjeto = new Map<string, VersaoParaComparacao[]>();
+  if (reenvios.length > 0) {
+    try {
+      for (const v of await getVersoesRecentesDe(reenvios)) {
+        const lista = porProjeto.get(v.projeto_id) ?? [];
+        lista.push(v);
+        porProjeto.set(v.projeto_id, lista);
+      }
+    } catch (e) {
+      // Sem as versões o card cai no modo "não comparável" (que a tela explica). A fila
+      // NUNCA deixa de abrir por causa da comparação.
+      console.error('[aprovacoes] falha ao ler versões para o card de edição:', e);
+    }
+  }
+
   const itens: ItemAprovacao[] = rows.map((r) => {
     const memorial = r.memorial_calculo?.trim()
       ? normalizarMarcadoresMemorial(r.memorial_calculo)
@@ -704,6 +803,7 @@ export async function listarAprovacoesPendentes(
     resumo: extrairResumoMemorial(memorial) ?? (r.resumo_ia?.trim() || null),
     ...extrairNumeros(r),
     memorial,
+    edicao: montarEdicao(Number(r.versao) || 1, porProjeto.get(r.projeto_id) ?? []),
     };
   });
 

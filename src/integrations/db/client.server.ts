@@ -1164,6 +1164,45 @@ export async function getUltimaVersaoNum(projetoId: string): Promise<number> {
   return Number(row?.n ?? 1) || 1;
 }
 
+export type VersaoParaComparacao = {
+  projeto_id: string;
+  versao_num: number;
+  acao: string; // 'submit_inicial' | 'reenvio'
+  snapshot_projeto: string | null;
+  snapshot_doc: string | null;
+  submetido_por: string | null;
+  created_at: string | null;
+};
+
+/**
+ * As DUAS versões mais recentes de cada projeto informado — é o insumo do card de EDIÇÃO
+ * da fila do líder ("antes → depois"). UMA consulta para a fila inteira, nunca uma por
+ * projeto.
+ *
+ * ⚠️ **`snapshot_chat` fica FORA do SELECT, sempre.** É o blob mais gordo da tabela, e
+ * somá-lo em N projetos foi o que estourou o teto de 32 MiB de serialização RPC do
+ * Godeploy e derrubou o Investigador (`getAllReenvios`, jul/2026). As colunas aqui são
+ * explícitas justamente para que um `SELECT *` não volte por engano.
+ */
+export async function getVersoesRecentesDe(projetoIds: string[]): Promise<VersaoParaComparacao[]> {
+  const ids = [...new Set(projetoIds.filter((id) => !!id))];
+  if (ids.length === 0) return [];
+  const marcas = ids.map(() => '?').join(', ');
+  return queryAll<VersaoParaComparacao>(
+    `SELECT projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, submetido_por, created_at
+       FROM (
+         SELECT projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, submetido_por,
+                created_at,
+                ROW_NUMBER() OVER (PARTITION BY projeto_id ORDER BY versao_num DESC) AS rn
+           FROM projeto_versions
+          WHERE projeto_id IN (${marcas})
+       )
+      WHERE rn <= 2
+      ORDER BY projeto_id, versao_num DESC`,
+    ids,
+  );
+}
+
 export type AprovacaoRow = {
   id: string;
   projeto_id: string;
