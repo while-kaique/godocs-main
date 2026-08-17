@@ -174,7 +174,10 @@ function Dashboard() {
     setPagina(1);
   }, [filtros, buscaAplicada, porPagina]);
 
-  const projetos = dados?.projetos ?? [];
+  // ⚠️ Memoizado: `dados?.projetos ?? []` cria um array novo a cada render, e como ele é
+  // dependência de quatro `useMemo` abaixo, a lista inteira seria refiltrada e reordenada
+  // a cada tecla digitada em qualquer campo da tela.
+  const projetos = useMemo(() => dados?.projetos ?? [], [dados]);
   const hoje = hojeIso();
 
   // Contagem por pílula (agrega os rótulos legados no equivalente atual) — já RECORTADA
