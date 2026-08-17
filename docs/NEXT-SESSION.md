@@ -39,6 +39,30 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
+### ✅ 3ª ENTREGA NA STAGING (17/08 14:43) — filtro de **pré-status do líder**
+
+Pedido do Luis: *"faltou filtro de pré aprovado tb"*. Commit `be20e48`. `<select>` ao lado do de
+área, com os estados **PRESENTES** na listagem + contagem, na `ORDEM_ESTADO_PARECER` (pendente
+primeiro — é a fila que espera decisão), somando em AND com as outras 4 dimensões.
+
+⚠️ **Os rótulos ganharam fonte única:** `ROTULO_ESTADO_PARECER` (`src/lib/aprovacoes-parecer.ts`),
+agora consumida TAMBÉM pelo `ChipEstadoParecer` — o texto estava digitado só dentro da aparência
+do chip, e um 2º lugar redigitando faria a tabela dizer "Ajuste pedido" e o filtro, "Ajustes".
+**Não redigitar no chip.**
+
+⚠️ **Isenção NÃO é pré-aprovação:** `Pré-aprovado (liderança)` (D12, coordenador para cima) cai em
+`sem_parecer` porque `chaveDoEstado` só casa o rótulo exato. É INTENCIONAL e tem teste — devolver
+o isento em "Pré-aprovado" afirmaria que um líder olhou o projeto.
+
+`worker.js` rebuildado. **1498 testes verdes.**
+
+**Próximo passo:** aguardar o Luis confirmar na staging as 3 coisas — (a) o filtro de pré-status
+recortando junto com os outros, (b) o carregamento da lista mais rápido, (c) a nota de estrelas
+gravando na aba STAGING da planilha. Com o OK: deploy em **prod (`674a3710`, hoje v247)** e PR da
+branch `feat/dashboard-filtros-calendario` (7 commits).
+
+---
+
 ### ✅ 2ª ENTREGA NA STAGING (17/08 14:26) — `edf400b4` **v159**: payload −38% + nota "Estrelas"
 
 Pedido do Luis depois de aprovar os filtros: *"na `/dashboard` em prod está demorando muito para
@@ -67,9 +91,7 @@ botão. ⚠️ Coluna **MANUAL** (nenhum fluxo automático escreve) · **`undefi
 ⚠️ **`worker.js` FOI rebuildado e commitado** (regra 1 — mudança server-side desta vez, ao
 contrário da 1ª entrega). 1492 testes verdes.
 
-**Próximo passo:** aguardar o Luis confirmar na staging (carregamento mais rápido + nota gravando
-na planilha, aba STAGING linha do projeto testado); com o OK, deployar em **prod (`674a3710`, hoje
-v247)** e abrir o PR da branch `feat/dashboard-filtros-calendario` (4 commits + este).
+_(Ainda pendente de confirmação do Luis — cobrada junto com a 3ª entrega acima.)_
 
 ---
 

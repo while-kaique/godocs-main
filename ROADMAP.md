@@ -101,6 +101,9 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
   28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
   Falta o Luis confirmar na staging → prod + PR.
+- 🟡 **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
+  `ROTULO_ESTADO_PARECER` (fonte única com o chip da tabela) e a ISENÇÃO "(liderança)" fica fora
+  de "Pré-aprovado" de propósito. Na staging; falta o OK → prod + PR.
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.
