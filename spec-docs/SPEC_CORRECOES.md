@@ -2389,3 +2389,52 @@ ficha ganha um `radiogroup` de 5 estrelas ao lado do Status, salvo pelo mesmo bo
 
 **Testes.** 4 casos em `tests/dashboard-admin.test.ts` (grava número · `0` nunca vira "—" ·
 quem só muda status não toca a coluna · recusa fora de 0–5).
+
+---
+
+## Abrir a ficha e entrar no `/dashboard` — duas esperas de ~750 ms cada (17/08/2026)
+
+**Sintoma (Luis).** *"Você subiu a att no SQLite que melhora o carregamento dos projetos quando
+eu abro eles dentro do dashboard? Até quando eu entro na dashboard, 'verificando permissões'
+demora um pouco também — ninguém gosta de esperar muito loading."*
+
+**Diagnóstico.** As duas telas já liam o **espelho (SQLite)** — nenhuma lia a planilha. O que
+sobrava era a **contagem de requisições**, cada uma com ~750 ms de overhead fixo do edge:
+
+1. **Abrir uma ficha** = 1 requisição por projeto. O prefetch por hover (13/08) só cobre quem
+   passa o mouse e espera 150 ms; clique direto, teclado e deep link pagavam integral.
+2. **Entrar no `/dashboard`** = o `beforeLoad` dava `await` no `/api/auth/me`, prendendo a rota
+   em *"Verificando permissões…"*, e **só então** o dashboard montava e começava a própria
+   carga: duas esperas em fila para um clique só.
+
+**Fix 1 — a página visível é semeada em UMA requisição.** `semearLote` (cliente) +
+`POST /api/admin/dashboard/projetos/lote` → `getProjetosDashboardLote`. Medição em prod (641
+linhas): ficha **5,5 KB em média**, mediana 4,7, p90 9,4, maior 29 — uma página de 25 ≈ **137 KB**.
+Abrir qualquer linha daquela página passa a custar **zero requisição**. Teto `LOTE_MAX_FICHAS = 30`.
+Servidor: **2 consultas por `IN`** (`lerLinhasEspelho` + `getAdminStatusLogsPorIds` — nova), nunca
+uma por projeto (o erro que já derrubou o Investigador).
+
+*Invariantes preservados do cache de detalhe:* lote que **falha não vira entrada**; id com ficha
+fresca não é resemeado (não atropela requisição em voo); mesmo TTL de 30 s; em memória, por aba.
+
+**Fix 2 — a tela não espera o auth para pintar.** O veredito virou **promessa** no contexto
+(`{ user: null, verificacao: buscarAuth() }`) e o `GuardaAcesso` redireciona quem não é admin.
+O gate REAL sempre foi o `requireAdmin` server-side — o `beforeLoad` nunca protegeu dado, só
+decidia o que pintar (é o que o cabeçalho de `auth-cache.ts` já dizia).
+
+**Decisões fechadas.**
+1. **Não-admin vê o esqueleto por instantes** — aceito: nenhuma chamada de dados responde sem
+   `requireAdmin`, e a alternativa é cobrar ~750 ms de TODO admin em toda entrada.
+2. **`user` do contexto passa a ser anulável.** `usuarios.tsx` usava `user.email` e quebraria numa
+   entrada direta; virou `user?.email`.
+3. **Nada de `await` no `beforeLoad`** — o teste de `dashboard-loadings-ui` passou a proibir
+   qualquer `await` antes do prefetch (antes ele só checava a ORDEM).
+4. **O histórico do lote é acessório**: falha dele não derruba o lote (a ficha abre sem o
+   histórico), senão a tela voltaria ao caminho de 25 requisições por causa da auditoria.
+5. **Projeto ausente do espelho fica FORA do lote** em vez de entrar como ficha vazia — a
+   abertura cai no caminho individual e mostra o 404 de verdade.
+
+**Testes.** 4 casos novos em `tests/dashboard-detalhe-cache.test.ts` (semeia e não busca de novo ·
+não atropela requisição em voo · falha não vira entrada · lista vazia não dispara) e 3 em
+`tests/calendario-ui.test.ts` (a tela não espera o auth · o redirect continua · o lote depende dos
+ids). Medição reproduzível: `scripts/dryrun-lider/peso-ficha.ts`.

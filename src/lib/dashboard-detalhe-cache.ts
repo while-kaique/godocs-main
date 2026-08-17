@@ -36,7 +36,7 @@
  * SQLite/localStorage é FORA"* — segue valendo e não está sendo revisitada: isto não é a
  * listagem e não persiste nada.
  */
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch } from "@/lib/api-client";
 
 /** Rota do detalhe — fonte única (a tela e o prefetch não redigitam a URL). */
 export function rotaDetalheDashboard(id: string): string {
@@ -58,7 +58,7 @@ let timerIntencao: ReturnType<typeof setTimeout> | null = null;
 
 /** O servidor casa o id sem caixa (`projeto_id` do espelho é minúsculo). */
 function chave(id: string | null | undefined): string {
-  return String(id ?? '')
+  return String(id ?? "")
     .trim()
     .toLowerCase();
 }
@@ -74,6 +74,54 @@ function podar(): void {
     if (maisVelha.done) return;
     cache.delete(maisVelha.value);
   }
+}
+
+/** Rota do LOTE — semeia as fichas da página visível numa requisição só. */
+export const ROTA_LOTE_DASHBOARD = "/api/admin/dashboard/projetos/lote";
+
+/**
+ * Semeia o cache com as fichas da PÁGINA visível, em UMA requisição.
+ *
+ * Por que existe, se já há o prefetch por hover: o hover só cobre quem passa o mouse e
+ * espera 150 ms — quem clica direto, navega por teclado ou chega por deep link pagava os
+ * ~750 ms de overhead fixo do edge a cada ficha aberta. Uma requisição de ~137 KB (25 fichas
+ * × 5,5 KB medidos em prod) faz TODAS as linhas da página abrirem sem requisição nenhuma.
+ *
+ * Invariantes preservados: só semeia id que **não** tem entrada fresca (nunca atropela uma
+ * requisição em voo), **falha não vira entrada** (o cache não guarda erro — a abertura cai
+ * no caminho individual e mostra o erro real), e o TTL é o mesmo dos demais.
+ */
+export function semearLote<T>(
+  ids: string[],
+  fetcher?: (ids: string[]) => Promise<Record<string, T>>,
+): void {
+  const agora = Date.now();
+  const faltando = [...new Set(ids.map(chave).filter(Boolean))].filter((k) => {
+    const atual = cache.get(k);
+    return !atual || agora - atual.at > DETALHE_TTL_MS;
+  });
+  if (faltando.length === 0) return;
+
+  const buscar =
+    fetcher ??
+    ((alvos: string[]) => apiFetch<Record<string, T>>(ROTA_LOTE_DASHBOARD, { ids: alvos }));
+  void Promise.resolve()
+    .then(() => buscar(faltando))
+    .then((fichas) => {
+      const at = Date.now();
+      for (const [id, ficha] of Object.entries(fichas ?? {})) {
+        const k = chave(id);
+        const atual = cache.get(k);
+        // Quem chegou primeiro manda: uma abertura em voo não pode ser trocada por baixo.
+        if (atual && Date.now() - atual.at <= DETALHE_TTL_MS) continue;
+        cache.set(k, { p: Promise.resolve(ficha), at });
+      }
+      podar();
+    })
+    .catch(() => {
+      // Lote é otimização, não caminho crítico: falhou, cada ficha volta a ser buscada
+      // individualmente na abertura. Nada de entrada rejeitada no cache.
+    });
 }
 
 /**

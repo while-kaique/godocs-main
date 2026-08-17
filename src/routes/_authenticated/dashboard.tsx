@@ -65,6 +65,7 @@ import {
   agendarPrefetchDetalhe,
   cancelarPrefetchDetalhe,
   limparDetalhes,
+  semearLote,
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
@@ -202,6 +203,16 @@ function Dashboard() {
   const paginaSegura = Math.min(pagina, totalPaginas);
   const inicio = (paginaSegura - 1) * porPagina;
   const visiveis = filtrados.slice(inicio, inicio + porPagina);
+
+  // Semeia as fichas da PÁGINA VISÍVEL numa requisição só, logo depois de a tabela pintar.
+  // ⚠️ Depende dos IDS, não do array: reordenar a mesma página não pode disparar de novo.
+  // Com isso, abrir qualquer linha desta página custa ZERO requisição — o prefetch por hover
+  // continua valendo para quem trocou de página antes de o lote chegar.
+  const idsVisiveis = visiveis.map((p) => p.id).join(',');
+  useEffect(() => {
+    if (!idsVisiveis) return;
+    semearLote(idsVisiveis.split(','));
+  }, [idsVisiveis]);
 
   function alternarOrdem(nova: Ordem) {
     if (ordem === nova) {

@@ -102,7 +102,7 @@ function UsuariosPage() {
                   key={r.id}
                   row={r}
                   areas={areas}
-                  isSelf={r.email === user.email}
+                  isSelf={!!user?.email && r.email === user.email}
                   onChanged={load}
                 />
               ))

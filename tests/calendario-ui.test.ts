@@ -87,3 +87,26 @@ describe('calendário — piso de acessibilidade', () => {
     expect(calendario).toContain('createPortal');
   });
 });
+
+describe('carregamento do admin', () => {
+  const layout = ler('src/routes/_authenticated/route.tsx');
+
+  it('a tela NÃO espera o veredito do auth para pintar', () => {
+    // O `await fetch('/api/auth/me')` dentro do beforeLoad é o que segurava a rota inteira
+    // em "Verificando permissões..." por ~750 ms de overhead fixo do edge — e só então o
+    // dashboard começava o próprio carregamento (duas esperas em fila para um clique).
+    expect(layout).toContain('return { user: null, verificacao: buscarAuth() }');
+    expect(layout).not.toMatch(/const response = await fetch\("\/api\/auth\/me"\)/);
+  });
+
+  it('quem não é admin continua sendo redirecionado (o guarda só saiu do caminho crítico)', () => {
+    expect(layout).toContain('GuardaAcesso');
+    expect(layout).toContain('acesso_negado: true');
+  });
+
+  it('a página visível semeia as fichas em UMA requisição', () => {
+    expect(dashboard).toContain('semearLote(idsVisiveis.split(\',\'))');
+    // ⚠️ Depende dos IDS, não do array: reordenar a mesma página não pode refazer o lote.
+    expect(dashboard).toMatch(/\}, \[idsVisiveis\]\)/);
+  });
+});

@@ -1,8 +1,18 @@
-import { createFileRoute, Outlet, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { CurrentUser } from "@/lib/auth.functions";
 import { lerAuthCache, gravarAuthCache, limparAuthCache, AUTH_CACHE_MS } from "@/lib/auth-cache";
 import { iniciarPrefetchDashboard } from "@/lib/dashboard-prefetch";
-import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Search, Loader2, Mail } from "lucide-react";
+import {
+  LayoutDashboard,
+  Building2,
+  Settings,
+  ExternalLink,
+  FlaskConical,
+  Search,
+  Loader2,
+  Mail,
+} from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
 // Dois níveis: memória (mais rápido, morre no reload) e `sessionStorage` (sobrevive ao
@@ -12,10 +22,15 @@ import { LayoutDashboard, Building2, Settings, ExternalLink, FlaskConical, Searc
 // que a SPA pinta enquanto revalida.
 let cachedUser: CurrentUser | null = null;
 let cachedAt = 0;
+/** Verificação em voo — uma só por aba, compartilhada entre navegações. */
+let verificacaoEmVoo: Promise<CurrentUser | null> | null = null;
 
-/** Revalida o auth em segundo plano para o cache não fixar permissão revogada. */
-function revalidarAuth() {
-  void (async () => {
+/**
+ * Busca o auth e atualiza os dois níveis de cache. Devolve `null` para "não é admin" —
+ * quem decide o que fazer com isso é a tela (redirecionar), não esta função.
+ */
+function buscarAuth(): Promise<CurrentUser | null> {
+  verificacaoEmVoo ??= (async () => {
     try {
       const r = await fetch("/api/auth/me");
       const u: CurrentUser | null = r.ok ? ((await r.json()) as CurrentUser | null) : null;
@@ -23,15 +38,23 @@ function revalidarAuth() {
         cachedUser = u;
         cachedAt = Date.now();
         gravarAuthCache(u);
-      } else {
-        cachedUser = null;
-        cachedAt = 0;
-        limparAuthCache();
+        return u;
       }
-    } catch {
-      // Rede instável não deve derrubar quem já está com a tela aberta.
+      cachedUser = null;
+      cachedAt = 0;
+      limparAuthCache();
+      return null;
+    } finally {
+      verificacaoEmVoo = null;
     }
   })();
+  return verificacaoEmVoo;
+}
+
+/** Revalida o auth em segundo plano para o cache não fixar permissão revogada. */
+function revalidarAuth() {
+  // Rede instável não deve derrubar quem já está com a tela aberta.
+  void buscarAuth().catch(() => {});
 }
 
 export const Route = createFileRoute("/_authenticated")({
@@ -65,28 +88,24 @@ export const Route = createFileRoute("/_authenticated")({
       return { user: daSessao };
     }
 
-    console.log("[_authenticated] beforeLoad — chamando /api/auth/me...");
-    const response = await fetch("/api/auth/me");
-    console.log("[_authenticated] /api/auth/me status:", response.status);
-    const user: CurrentUser | null = response.ok ? ((await response.json()) as CurrentUser | null) : null;
-    console.log("[_authenticated] user:", JSON.stringify(user));
-    if (!user) {
-      console.log("[_authenticated] user=null → redirecionando para /");
-      cachedUser = null;
-      limparAuthCache();
-      throw redirect({ to: "/", search: { acesso_negado: true } });
-    }
-    if (!user.isAdmin) {
-      console.log("[_authenticated] user.isAdmin=false → redirecionando para /");
-      cachedUser = null;
-      limparAuthCache();
-      throw redirect({ to: "/", search: { acesso_negado: true } });
-    }
-    console.log("[_authenticated] Auth OK — admin:", user.email);
-    cachedUser = user;
-    cachedAt = Date.now();
-    gravarAuthCache(user);
-    return { user };
+    // ⚠️ SEM cache, a tela NÃO espera o veredito para pintar (17/08/2026).
+    //
+    // Antes, este `beforeLoad` dava `await` no `/api/auth/me` e a rota inteira ficava em
+    // "Verificando permissões..." por uma requisição que, neste ambiente, custa ~750 ms de
+    // overhead FIXO do edge — e só DEPOIS o dashboard montava e começava o próprio
+    // carregamento. Eram duas esperas em fila para o mesmo clique.
+    //
+    // Agora o veredito viaja como PROMESSA no contexto: o layout pinta na hora (com o
+    // esqueleto da tela filha) e o `GuardaAcesso` redireciona se a resposta for negativa.
+    //
+    // Por que isto é seguro: o gate REAL é server-side (`requireAdmin` em TODA `/api/admin/*`)
+    // e sempre foi — este `beforeLoad` nunca protegeu dado nenhum, só decidia o que pintar
+    // (é o que o cabeçalho de `auth-cache.ts` já dizia). Quem não é admin vê o esqueleto do
+    // layout por instantes, recebe 403 em qualquer chamada de dados e é redirecionado.
+    //
+    // ⚠️ Só o caminho `/dashboard` ganha o prefetch da listagem acima; aqui não se dispara
+    // I/O novo — `buscarAuth` é a MESMA requisição que já seria feita, sem o `await`.
+    return { user: null, verificacao: buscarAuth() };
   },
   pendingComponent: AuthLoadingScreen,
   component: AuthenticatedLayout,
@@ -95,19 +114,45 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
-      <Loader2
-        className="h-8 w-8 animate-spin"
-        style={{ color: "var(--go-blue)" }}
-      />
-      <p className="text-sm font-medium text-muted-foreground">
-        Verificando permissões...
-      </p>
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--go-blue)" }} />
+      <p className="text-sm font-medium text-muted-foreground">Verificando permissões...</p>
     </div>
   );
 }
 
+/**
+ * Espera o veredito do auth sem segurar a pintura. Não renderiza nada: existe só para
+ * redirecionar quem não é admin. (O gate de verdade é o `requireAdmin` do servidor.)
+ */
+function GuardaAcesso({
+  verificacao,
+  aoConfirmar,
+}: {
+  verificacao: Promise<CurrentUser | null>;
+  aoConfirmar: (u: CurrentUser) => void;
+}) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    let vivo = true;
+    void verificacao
+      .then((u) => {
+        if (!vivo) return;
+        if (u?.isAdmin) aoConfirmar(u);
+        else void navigate({ to: "/", search: { acesso_negado: true }, replace: true });
+      })
+      // Falha de rede não expulsa quem está com a tela aberta: as chamadas de dados
+      // devolverão 403 e a tela mostra o erro real.
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [verificacao, aoConfirmar, navigate]);
+  return null;
+}
+
 function AuthenticatedLayout() {
-  const { user } = Route.useRouteContext();
+  const { user, verificacao } = Route.useRouteContext();
+  const [confirmado, setConfirmado] = useState<CurrentUser | null>(user);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -156,17 +201,20 @@ function AuthenticatedLayout() {
 
         <div className="mt-6 border-t border-sidebar-border pt-4 px-2">
           <div className="text-sm font-medium text-sidebar-foreground truncate">
-            {user.email}
+            {/* Enquanto o veredito não chega, o rodapé fica discreto em vez de vazio —
+                a identidade não é o que a pessoa veio ver. */}
+            {confirmado?.email ?? "Verificando acesso…"}
           </div>
-          <div className="text-xs text-sidebar-foreground/60 mt-0.5">
-            Admin
-          </div>
+          <div className="text-xs text-sidebar-foreground/60 mt-0.5">Admin</div>
         </div>
       </aside>
 
       <main className="flex flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
+      {verificacao && !confirmado && (
+        <GuardaAcesso verificacao={verificacao} aoConfirmar={setConfirmado} />
+      )}
     </div>
   );
 }
