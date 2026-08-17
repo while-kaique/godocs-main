@@ -45,15 +45,19 @@ import { SeletorPeriodo } from '@/components/calendario/calendario';
 import {
   FILTROS_VAZIOS,
   TODAS_AS_AREAS,
+  TODOS_OS_PARECERES,
   aplicarFiltros,
   areasDisponiveis,
   contarFiltrosAtivos,
   contarPorPilula,
+  pareceresDisponiveis,
   totalSemStatus,
   type FiltroEspecial,
   type FiltroGanho,
+  type FiltroParecer,
   type FiltrosDashboard,
 } from '@/lib/dashboard-filtros';
+import { ROTULO_ESTADO_PARECER } from '@/lib/aprovacoes-parecer';
 import { hojeIso } from '@/lib/calendario-datas';
 import { apiFetch } from '@/lib/api-client';
 import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
@@ -102,8 +106,8 @@ function Dashboard() {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Os filtros somam entre si (AND): status × natureza × ganho × área × período. A
-  // composição mora em `aplicarFiltros` (módulo puro) — a tela só guarda o estado.
+  // Os filtros somam entre si (AND): status × natureza × ganho × área × pré-status × período.
+  // A composição mora em `aplicarFiltros` (módulo puro) — a tela só guarda o estado.
   const [filtros, setFiltros] = useState<FiltrosDashboard>(FILTROS_VAZIOS);
   const filtro = filtros.status;
   const setFiltro = (status: string) => setFiltros((f) => ({ ...f, status }));
@@ -185,6 +189,7 @@ function Dashboard() {
   const contagemPilula = useMemo(() => contarPorPilula(projetos, filtros), [projetos, filtros]);
   const totalDasPilulas = useMemo(() => totalSemStatus(projetos, filtros), [projetos, filtros]);
   const areas = useMemo(() => areasDisponiveis(projetos), [projetos]);
+  const pareceres = useMemo(() => pareceresDisponiveis(projetos), [projetos]);
   const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
@@ -365,6 +370,34 @@ function Dashboard() {
           {areas.map((a) => (
             <option key={a} value={a}>
               {a}
+            </option>
+          ))}
+        </select>
+        {/* Pré-aprovação do líder — a mesma coluna "Pré-status" da tabela, agora filtrável
+            (pedido do Luis, 17/08). Os rótulos vêm de `ROTULO_ESTADO_PARECER`, a fonte única
+            que o chip da linha usa: o filtro e a célula não podem chamar o mesmo estado por
+            nomes diferentes. Só aparecem os estados presentes na listagem, com a contagem. */}
+        <label className="sr-only" htmlFor="filtro-parecer">
+          Filtrar pela pré-aprovação do líder
+        </label>
+        <select
+          id="filtro-parecer"
+          value={filtros.parecer}
+          onChange={(e) =>
+            setFiltros((f) => ({ ...f, parecer: e.target.value as FiltroParecer }))
+          }
+          className="h-9 max-w-[220px] rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+            borderColor: filtros.parecer !== TODOS_OS_PARECERES ? 'var(--go-blue)' : undefined,
+            color: filtros.parecer !== TODOS_OS_PARECERES ? 'var(--go-blue)' : undefined,
+            fontWeight: filtros.parecer !== TODOS_OS_PARECERES ? 600 : 400,
+          }}
+        >
+          <option value={TODOS_OS_PARECERES}>Qualquer pré-status</option>
+          {pareceres.map(({ estado, total }) => (
+            <option key={estado} value={estado}>
+              {ROTULO_ESTADO_PARECER[estado]} ({total})
             </option>
           ))}
         </select>

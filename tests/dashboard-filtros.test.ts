@@ -10,12 +10,15 @@ import {
   TODAS_AS_AREAS,
   aplicarFiltros,
   areasDisponiveis,
+  casaParecer,
   casaPeriodo,
   contarFiltrosAtivos,
   contarPorPilula,
+  pareceresDisponiveis,
   totalSemStatus,
   type FiltrosDashboard,
 } from '@/lib/dashboard-filtros';
+import { ROTULO_ESTADO_PARECER, chaveDoEstado } from '@/lib/aprovacoes-parecer';
 import {
   PRESETS_PERIODO,
   contarDias,
@@ -321,5 +324,77 @@ describe('peso do payload da listagem', () => {
     for (const morto of ['observacoes', 'atualizadoEm', 'savingHoras', 'ferramenta']) {
       expect(Object.keys(proj())).not.toContain(morto);
     }
+  });
+});
+
+describe('filtro de pré-aprovação do líder', () => {
+  const base = [
+    proj({ id: 'AP', aprovacaoLider: 'Pré-aprovado' }),
+    proj({ id: 'PEND', aprovacaoLider: 'Pré-pendente' }),
+    proj({ id: 'AJU', aprovacaoLider: 'Ajuste pedido' }),
+    proj({ id: 'REP', aprovacaoLider: 'Pré-reprovado' }),
+    proj({ id: 'DISP', aprovacaoLider: 'Dispensado' }),
+    proj({ id: 'VAZIO', aprovacaoLider: null }),
+    // Isenção D12: quem é coordenador para cima nunca entra em fila.
+    proj({ id: 'ISENTO', aprovacaoLider: 'Pré-aprovado (liderança)' }),
+  ];
+
+  it('recorta por estado do parecer', () => {
+    expect(aplicarFiltros(base, filtros({ parecer: 'aprovado' })).map((p) => p.id)).toEqual(['AP']);
+    expect(aplicarFiltros(base, filtros({ parecer: 'pendente' })).map((p) => p.id)).toEqual(['PEND']);
+    expect(aplicarFiltros(base, filtros({ parecer: 'ajuste' })).map((p) => p.id)).toEqual(['AJU']);
+    expect(aplicarFiltros(base, filtros({ parecer: 'reprovado' })).map((p) => p.id)).toEqual(['REP']);
+    expect(aplicarFiltros(base, filtros({ parecer: 'dispensado' })).map((p) => p.id)).toEqual(['DISP']);
+  });
+
+  it('ISENÇÃO não é pré-aprovação — "Pré-aprovado (liderança)" fica fora de "Pré-aprovado"', () => {
+    // Se casasse, filtrar "Pré-aprovado" daria a impressão de que um líder olhou o projeto.
+    expect(chaveDoEstado('Pré-aprovado (liderança)')).toBe('sem_parecer');
+    const semParecer = aplicarFiltros(base, filtros({ parecer: 'sem_parecer' })).map((p) => p.id);
+    expect(semParecer).toEqual(['VAZIO', 'ISENTO']);
+  });
+
+  it('aceita a grafia da planilha sem acento (o cabeçalho real já mordeu antes)', () => {
+    expect(casaParecer(proj({ aprovacaoLider: 'pre aprovado' }), 'aprovado')).toBe(true);
+    expect(casaParecer(proj({ aprovacaoLider: 'PRE-APROVADO' }), 'aprovado')).toBe(true);
+  });
+
+  it('soma com status, natureza e área (AND, como as outras dimensões)', () => {
+    const misto = [
+      proj({ id: 'A', aprovacaoLider: 'Pré-aprovado', statusChave: 'pendente', especial: true }),
+      proj({ id: 'B', aprovacaoLider: 'Pré-aprovado', statusChave: 'aprovado', especial: true }),
+      proj({ id: 'C', aprovacaoLider: 'Pré-pendente', statusChave: 'pendente', especial: true }),
+    ];
+    const r = aplicarFiltros(
+      misto,
+      filtros({ parecer: 'aprovado', status: 'pendente', especial: 'apenas' }),
+    );
+    expect(r.map((p) => p.id)).toEqual(['A']);
+  });
+
+  it('entra na contagem de filtros ativos e no recorte das pílulas', () => {
+    expect(contarFiltrosAtivos(filtros({ parecer: 'aprovado' }))).toBe(1);
+    const misto = [
+      proj({ id: 'A', aprovacaoLider: 'Pré-aprovado', statusChave: 'pendente' }),
+      proj({ id: 'B', aprovacaoLider: 'Pré-pendente', statusChave: 'pendente' }),
+    ];
+    expect(contarPorPilula(misto, filtros({ parecer: 'aprovado' }))).toEqual({ pendente: 1 });
+  });
+
+  it('o campo só oferece estados PRESENTES, na ordem de leitura e com a contagem', () => {
+    const disponiveis = pareceresDisponiveis([
+      proj({ aprovacaoLider: 'Pré-aprovado' }),
+      proj({ aprovacaoLider: 'Pré-aprovado' }),
+      proj({ aprovacaoLider: 'Pré-pendente' }),
+    ]);
+    // `pendente` vem antes de `aprovado`: o que espera decisão primeiro.
+    expect(disponiveis).toEqual([
+      { estado: 'pendente', total: 1 },
+      { estado: 'aprovado', total: 2 },
+    ]);
+    expect(disponiveis.map((d) => ROTULO_ESTADO_PARECER[d.estado])).toEqual([
+      'Pré-pendente',
+      'Pré-aprovado',
+    ]);
   });
 });

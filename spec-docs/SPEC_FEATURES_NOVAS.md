@@ -1469,10 +1469,22 @@ mês, últimos dias) **dentro** dele —, filtros por **saving** e **receita inc
     da janela permitida (antes de 2024, depois de hoje) aparecem apagados e não clicáveis,
     em vez de virarem erro depois do envio.
 
-**Testes.** `tests/dashboard-filtros.test.ts` (31 casos: AND das dimensões, ganho positivo,
+13. **Pré-status do líder é a 5ª dimensão (17/08, pedido do Luis: "faltou filtro de pré-aprovado
+    também")** — `<select>` com os estados PRESENTES na listagem, contagem ao lado, na
+    `ORDEM_ESTADO_PARECER` (pendente primeiro: é a fila que espera decisão). A régua é
+    `chaveDoEstado` e os rótulos vêm de **`ROTULO_ESTADO_PARECER`**, extraída para
+    `aprovacoes-parecer.ts` e passada a ser consumida TAMBÉM pelo `ChipEstadoParecer` — o texto
+    estava digitado só dentro da aparência do chip, e um segundo lugar redigitando-o faria a
+    tabela dizer "Ajuste pedido" e o filtro, "Ajustes".
+14. **Isenção NÃO é pré-aprovação.** "Pré-aprovado (liderança)" (D12 — coordenador para cima)
+    cai em `sem_parecer`, porque `chaveDoEstado` só casa o rótulo exato. É intencional: filtrar
+    "Pré-aprovado" e receber os isentos afirmaria que um líder olhou o projeto.
+
+**Testes.** `tests/dashboard-filtros.test.ts` (37 casos: AND das dimensões, ganho positivo,
 pontas inclusivas do período, contagens recortadas, aritmética de mês/ano bissexto, atalhos,
-fuso) e `tests/calendario-ui.test.ts` (11 guardas de fiação: fonte única do filtro, Etapa 2
-sem `type="date"`, piso de acessibilidade).
+fuso, os 6 estados de parecer + a isenção que não é pré-aprovação) e
+`tests/calendario-ui.test.ts` (11 guardas de fiação: fonte única do filtro e dos rótulos de
+parecer, Etapa 2 sem `type="date"`, piso de acessibilidade).
 
 **Status.** ⏳ Implementado; suíte verde (1486 testes) + `npm run build` OK (19 assets JS, o
 mesmo número de antes — a régua de performance é a CONTAGEM de requisições). **`worker.js`

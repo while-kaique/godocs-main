@@ -28,11 +28,15 @@ describe('/dashboard — barra de filtros', () => {
     expect(dashboard).toContain('totalSemStatus(projetos, filtros)');
   });
 
-  it('oferece as quatro dimensões novas', () => {
+  it('oferece as cinco dimensões novas', () => {
     expect(dashboard).toContain('<SeletorPeriodo');
     expect(dashboard).toMatch(/especial: v as FiltroEspecial/);
     expect(dashboard).toMatch(/ganho: v as FiltroGanho/);
     expect(dashboard).toContain('Todas as áreas');
+    expect(dashboard).toContain('Qualquer pré-status');
+    // ⚠️ O rótulo do estado sai da fonte única que o chip da linha usa — filtro e célula
+    // não podem chamar o mesmo estado por nomes diferentes.
+    expect(dashboard).toContain('ROTULO_ESTADO_PARECER[estado]');
   });
 
   it('"Limpar filtros" preserva a fila de status escolhida', () => {

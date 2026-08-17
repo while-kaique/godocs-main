@@ -22,57 +22,66 @@ import {
   MinusCircle,
   PencilLine,
   Quote,
-} from 'lucide-react';
-import { chaveDoEstado, type EstadoParecer, type ParecerLider } from '@/lib/aprovacoes-parecer';
+} from "lucide-react";
+import {
+  ROTULO_ESTADO_PARECER,
+  chaveDoEstado,
+  type EstadoParecer,
+  type ParecerLider,
+} from "@/lib/aprovacoes-parecer";
 
-/** Aparência de cada estado. `icone` + `rotulo` garantem leitura sem depender da cor. */
+/**
+ * Aparência de cada estado. `icone` + `rotulo` garantem leitura sem depender da cor.
+ * ⚠️ O `rotulo` vem de `ROTULO_ESTADO_PARECER` (fonte única com o filtro de pré-status do
+ * `/dashboard`) — não redigitar o texto aqui.
+ */
 const APARENCIA: Record<
   EstadoParecer,
   { rotulo: string; cor: string; fundo: string; borda: string; Icone: typeof CheckCircle2 }
 > = {
   aprovado: {
-    rotulo: 'Pré-aprovado',
-    cor: '#186a3b',
-    fundo: 'rgba(24,106,59,0.10)',
-    borda: 'rgba(24,106,59,0.35)',
+    rotulo: ROTULO_ESTADO_PARECER.aprovado,
+    cor: "#186a3b",
+    fundo: "rgba(24,106,59,0.10)",
+    borda: "rgba(24,106,59,0.35)",
     Icone: CheckCircle2,
   },
   ajuste: {
-    rotulo: 'Ajuste pedido',
-    cor: '#8a5a00',
-    fundo: 'rgba(214,158,46,0.14)',
-    borda: 'rgba(214,158,46,0.45)',
+    rotulo: ROTULO_ESTADO_PARECER.ajuste,
+    cor: "#8a5a00",
+    fundo: "rgba(214,158,46,0.14)",
+    borda: "rgba(214,158,46,0.45)",
     Icone: PencilLine,
   },
   reprovado: {
-    rotulo: 'Pré-reprovado',
-    cor: '#a4262c',
-    fundo: 'rgba(164,38,44,0.10)',
-    borda: 'rgba(164,38,44,0.35)',
+    rotulo: ROTULO_ESTADO_PARECER.reprovado,
+    cor: "#a4262c",
+    fundo: "rgba(164,38,44,0.10)",
+    borda: "rgba(164,38,44,0.35)",
     Icone: XCircle,
   },
   pendente: {
-    rotulo: 'Pré-pendente',
-    cor: 'var(--go-blue)',
-    fundo: 'rgba(0,89,169,0.08)',
-    borda: 'rgba(0,89,169,0.30)',
+    rotulo: ROTULO_ESTADO_PARECER.pendente,
+    cor: "var(--go-blue)",
+    fundo: "rgba(0,89,169,0.08)",
+    borda: "rgba(0,89,169,0.30)",
     Icone: Clock,
   },
   // Cinza-ardósia e ícone de "deixou de valer", não uma cor de veredito: ninguém julgou
   // este projeto — o sistema fechou a fila porque o analisador o reprovou por critério.
   // Distinto do vermelho `XCircle` (o líder recusou) e do `MinusCircle` (célula vazia).
   dispensado: {
-    rotulo: 'Dispensado',
-    cor: '#475569',
-    fundo: 'rgba(71,85,105,0.10)',
-    borda: 'rgba(71,85,105,0.32)',
+    rotulo: ROTULO_ESTADO_PARECER.dispensado,
+    cor: "#475569",
+    fundo: "rgba(71,85,105,0.10)",
+    borda: "rgba(71,85,105,0.32)",
     Icone: CircleSlash,
   },
   sem_parecer: {
-    rotulo: 'Sem parecer',
-    cor: '#5b6470',
-    fundo: 'rgba(91,100,112,0.08)',
-    borda: 'rgba(91,100,112,0.30)',
+    rotulo: ROTULO_ESTADO_PARECER.sem_parecer,
+    cor: "#5b6470",
+    fundo: "rgba(91,100,112,0.08)",
+    borda: "rgba(91,100,112,0.30)",
     Icone: MinusCircle,
   },
 };
@@ -94,46 +103,49 @@ export function ChipEstadoParecer({
   const chave = chaveDoEstado(estado);
   const a = APARENCIA[chave];
   const { Icone } = a;
-  const rotulo = chave === 'sem_parecer' ? (estado ?? a.rotulo) : a.rotulo;
+  const rotulo = chave === "sem_parecer" ? (estado ?? a.rotulo) : a.rotulo;
   return (
     <span
       className={
         compacto
-          ? 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold'
-          : 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold'
+          ? "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+          : "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
       }
       style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
     >
-      <Icone className={compacto ? 'h-3 w-3 shrink-0' : 'h-3.5 w-3.5'} aria-hidden />
+      <Icone className={compacto ? "h-3 w-3 shrink-0" : "h-3.5 w-3.5"} aria-hidden />
       {rotulo}
     </span>
   );
 }
 
-function Resposta({ valor }: { valor: 'sim' | 'nao' }) {
-  const nao = valor === 'nao';
+function Resposta({ valor }: { valor: "sim" | "nao" }) {
+  const nao = valor === "nao";
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-bold uppercase tracking-[0.04em]"
       style={
         nao
-          ? { background: '#8a5a00', color: '#fff' }
+          ? { background: "#8a5a00", color: "#fff" }
           : {
-              background: 'transparent',
-              color: '#186a3b',
-              border: '1px solid rgba(24,106,59,0.35)',
+              background: "transparent",
+              color: "#186a3b",
+              border: "1px solid rgba(24,106,59,0.35)",
             }
       }
     >
-      {nao ? <XCircle className="h-3.5 w-3.5" aria-hidden /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}
-      {nao ? 'não' : 'sim'}
+      {nao ? (
+        <XCircle className="h-3.5 w-3.5" aria-hidden />
+      ) : (
+        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+      )}
+      {nao ? "não" : "sim"}
     </span>
   );
 }
 
 export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
-  const semRespostas =
-    !parecer.checklist.length && !parecer.comentario && !parecer.outras.length;
+  const semRespostas = !parecer.checklist.length && !parecer.comentario && !parecer.outras.length;
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -142,7 +154,7 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
         {parecer.assinatura && (
           <p className="text-[12.5px] text-muted-foreground">
             por <span className="font-medium text-foreground">{parecer.assinatura}</span>
-            {parecer.decididoEm ? ` em ${parecer.decididoEm}` : ''}
+            {parecer.decididoEm ? ` em ${parecer.decididoEm}` : ""}
           </p>
         )}
         {/* Fila aberta ("Aguardando…") ou motivo da isenção (D12) — é o que separa
@@ -154,9 +166,9 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
           <span
             className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
             style={{
-              background: 'rgba(138,90,0,0.12)',
-              border: '1px solid rgba(138,90,0,0.4)',
-              color: '#8a5a00',
+              background: "rgba(138,90,0,0.12)",
+              border: "1px solid rgba(138,90,0,0.4)",
+              color: "#8a5a00",
             }}
           >
             <XCircle className="h-3 w-3" aria-hidden />
@@ -170,16 +182,16 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
         // linha do "não" para quem varre a ficha rolando.
         <ul
           className="mt-3.5 space-y-px border-l-2 pl-3"
-          style={{ borderColor: 'rgba(0,89,169,0.25)' }}
+          style={{ borderColor: "rgba(0,89,169,0.25)" }}
         >
           {parecer.checklist.map((c) => (
             <li
               key={c.pergunta}
               className="flex items-start justify-between gap-3 rounded-r-md py-1.5 pr-2"
               style={
-                c.resposta === 'nao'
-                  ? { background: 'rgba(138,90,0,0.07)', paddingLeft: '0.5rem' }
-                  : { paddingLeft: '0.5rem' }
+                c.resposta === "nao"
+                  ? { background: "rgba(138,90,0,0.07)", paddingLeft: "0.5rem" }
+                  : { paddingLeft: "0.5rem" }
               }
             >
               <span className="text-[13px] leading-snug">{c.pergunta}</span>
@@ -192,11 +204,11 @@ export function ParecerLiderPainel({ parecer }: { parecer: ParecerLider }) {
       {parecer.comentario && (
         <figure className="mt-3.5">
           <figcaption className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-            {parecer.comentarioRotulo ?? 'Texto do líder'}
+            {parecer.comentarioRotulo ?? "Texto do líder"}
           </figcaption>
           <blockquote
             className="mt-1 flex gap-2 rounded-lg border-l-2 bg-muted/40 p-2.5 text-[13px] leading-relaxed"
-            style={{ borderColor: 'var(--go-lime)' }}
+            style={{ borderColor: "var(--go-lime)" }}
           >
             <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <span className="whitespace-pre-wrap">{parecer.comentario}</span>

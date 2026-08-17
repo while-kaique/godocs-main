@@ -24,24 +24,53 @@
  * deixam de casar e caem em `outras` (aparecem na tela como vieram, nunca somem).
  * O teste de ida-e-volta em `tests/dashboard-parecer-lider.test.ts` prende os dois lados.
  */
-import { CHECKLIST_APROVACAO, type RespostaChecklist } from '@/lib/aprovacoes-checklist';
-import { valorDaColuna } from '@/lib/coluna-chave';
+import { CHECKLIST_APROVACAO, type RespostaChecklist } from "@/lib/aprovacoes-checklist";
+import { valorDaColuna } from "@/lib/coluna-chave";
 
 /** Nomes das colunas como o CÓDIGO os escreve (acentuados, regra 4). O casamento com o
  *  cabeçalho real é tolerante — em prod/staging a segunda é "…do Lider". */
-export const COLUNA_ESTADO_LIDER = 'Aprovação do Líder';
-export const COLUNA_JUSTIFICATIVA_LIDER = 'Justificativa Aprovação do Líder';
+export const COLUNA_ESTADO_LIDER = "Aprovação do Líder";
+export const COLUNA_JUSTIFICATIVA_LIDER = "Justificativa Aprovação do Líder";
 
 // 'dispensado' (D29) NÃO é um veredito: é a fila fechada pelo sistema porque o
 // analisador reprovou o projeto por critério. Fica separado de 'reprovado' de propósito —
 // dizer "Pré-reprovado" seria afirmar que o líder recusou algo que ele nunca abriu.
 export type EstadoParecer =
-  | 'aprovado'
-  | 'ajuste'
-  | 'reprovado'
-  | 'pendente'
-  | 'dispensado'
-  | 'sem_parecer';
+  | "aprovado"
+  | "ajuste"
+  | "reprovado"
+  | "pendente"
+  | "dispensado"
+  | "sem_parecer";
+
+/**
+ * Rótulo de cada estado do parecer — FONTE ÚNICA, consumida pelo chip (`parecer-lider.tsx`,
+ * na ficha e na coluna "Pré-status") **e** pelo filtro de pré-status do `/dashboard`. Estava
+ * digitada só dentro da aparência do chip; o filtro precisava dos mesmos textos e um segundo
+ * lugar redigitando-os é o que faz a tabela dizer "Ajuste pedido" e o filtro "Ajustes".
+ *
+ * ⚠️ `sem_parecer` é o balde de quem **nunca entrou em fila**: célula vazia, mas também os
+ * rótulos de ISENÇÃO com sufixo ("Pré-aprovado (liderança)", D12), que de propósito NÃO
+ * casam com `aprovado` em `chaveDoEstado` — isenção não é parecer de líder.
+ */
+export const ROTULO_ESTADO_PARECER: Record<EstadoParecer, string> = {
+  aprovado: "Pré-aprovado",
+  ajuste: "Ajuste pedido",
+  reprovado: "Pré-reprovado",
+  pendente: "Pré-pendente",
+  dispensado: "Dispensado",
+  sem_parecer: "Sem parecer",
+};
+
+/** Ordem de leitura dos estados: o que espera decisão primeiro, o que não tem fila no fim. */
+export const ORDEM_ESTADO_PARECER: EstadoParecer[] = [
+  "pendente",
+  "aprovado",
+  "ajuste",
+  "reprovado",
+  "dispensado",
+  "sem_parecer",
+];
 
 export type ItemParecer = { pergunta: string; resposta: RespostaChecklist };
 
@@ -71,12 +100,12 @@ export type ParecerLider = {
   vazio: boolean;
 };
 
-const SEPARADOR = ' — '; // o mesmo que `detalharChecklist` usa
+const SEPARADOR = " — "; // o mesmo que `detalharChecklist` usa
 
 /** "—", "-" e vazio são ausência de valor na planilha (mesma régua do dashboard). */
 function limpo(v: string | undefined | null): string | null {
-  const s = String(v ?? '').trim();
-  return s === '' || s === '—' || s === '-' ? null : s;
+  const s = String(v ?? "").trim();
+  return s === "" || s === "—" || s === "-" ? null : s;
 }
 
 /**
@@ -84,17 +113,17 @@ function limpo(v: string | undefined | null): string | null {
  * dashboard mostra a mesma coluna ("Pré-status") e não pode ter uma segunda régua.
  */
 export function chaveDoEstado(estado: string | null): EstadoParecer {
-  const k = (estado ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  const k = (estado ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-  if (k === 'pre-aprovado' || k === 'pre aprovado') return 'aprovado';
-  if (k === 'ajuste pedido') return 'ajuste';
-  if (k === 'pre-reprovado' || k === 'pre reprovado') return 'reprovado';
-  if (k === 'pre-pendente' || k === 'pre pendente') return 'pendente';
-  if (k === 'dispensado') return 'dispensado';
-  return 'sem_parecer';
+  if (k === "pre-aprovado" || k === "pre aprovado") return "aprovado";
+  if (k === "ajuste pedido") return "ajuste";
+  if (k === "pre-reprovado" || k === "pre reprovado") return "reprovado";
+  if (k === "pre-pendente" || k === "pre pendente") return "pendente";
+  if (k === "dispensado") return "dispensado";
+  return "sem_parecer";
 }
 
 /**
@@ -107,8 +136,8 @@ function lerLinhaChecklist(linha: string): ItemParecer | null {
     if (!linha.startsWith(prefixo)) continue;
     const resp = linha.slice(prefixo.length).trim().toLowerCase();
     // A planilha guarda "não" com acento (regra 4); aceita "nao" por segurança.
-    if (resp === 'não' || resp === 'nao') return { pergunta: p.pergunta, resposta: 'nao' };
-    if (resp === 'sim') return { pergunta: p.pergunta, resposta: 'sim' };
+    if (resp === "não" || resp === "nao") return { pergunta: p.pergunta, resposta: "nao" };
+    if (resp === "sim") return { pergunta: p.pergunta, resposta: "sim" };
     return null; // pergunta conhecida com resposta que não entendemos: cai em `outras`
   }
   return null;
@@ -146,10 +175,10 @@ export function interpretarParecerLider(campos: Record<string, string>): Parecer
   };
   if (bruto == null) return out;
 
-  const linhas = bruto.split('\n').map((l) => l.trim());
+  const linhas = bruto.split("\n").map((l) => l.trim());
 
   // 1ª linha: assinatura da decisão, ou o texto de fila aberta / isenção.
-  const primeira = linhas[0] ?? '';
+  const primeira = linhas[0] ?? "";
   const assinado = lerAssinatura(primeira);
   if (assinado) {
     out.assinatura = assinado.assinatura;
@@ -170,16 +199,16 @@ export function interpretarParecerLider(campos: Record<string, string>): Parecer
       out.checklist.push(item);
       continue;
     }
-    const sep = linha.indexOf(': ');
+    const sep = linha.indexOf(": ");
     if (sep > 0) {
       out.comentarioRotulo = linha.slice(0, sep).trim();
-      const resto = [linha.slice(sep + 2), ...linhas.slice(i + 1)].join('\n').trim();
+      const resto = [linha.slice(sep + 2), ...linhas.slice(i + 1)].join("\n").trim();
       out.comentario = resto || null;
       break; // o resto do texto é do líder, não são campos
     }
     out.outras.push(linha);
   }
 
-  out.temNao = out.checklist.some((c) => c.resposta === 'nao');
+  out.temNao = out.checklist.some((c) => c.resposta === "nao");
   return out;
 }
