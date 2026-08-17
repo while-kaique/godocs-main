@@ -33,7 +33,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
-import { STATUS_TRIAGEM, pilulaDe, corDaRegua } from '@/components/dashboard/status-triagem';
+import { STATUS_TRIAGEM, corDaRegua } from '@/components/dashboard/status-triagem';
 import {
   filtrarPorTermo,
   compararProjetos,
@@ -41,6 +41,20 @@ import {
   type Ordem,
   type Direcao,
 } from '@/components/dashboard/tabela-utils';
+import { SeletorPeriodo } from '@/components/calendario/calendario';
+import {
+  FILTROS_VAZIOS,
+  TODAS_AS_AREAS,
+  aplicarFiltros,
+  areasDisponiveis,
+  contarFiltrosAtivos,
+  contarPorPilula,
+  totalSemStatus,
+  type FiltroEspecial,
+  type FiltroGanho,
+  type FiltrosDashboard,
+} from '@/lib/dashboard-filtros';
+import { hojeIso } from '@/lib/calendario-datas';
 import { apiFetch } from '@/lib/api-client';
 import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
 import {
@@ -88,7 +102,11 @@ function Dashboard() {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<string>('todos');
+  // Os filtros somam entre si (AND): status × natureza × ganho × área × período. A
+  // composição mora em `aplicarFiltros` (módulo puro) — a tela só guarda o estado.
+  const [filtros, setFiltros] = useState<FiltrosDashboard>(FILTROS_VAZIOS);
+  const filtro = filtros.status;
+  const setFiltro = (status: string) => setFiltros((f) => ({ ...f, status }));
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
   const [ordem, setOrdem] = useState<Ordem>('data');
@@ -154,27 +172,23 @@ function Dashboard() {
 
   useEffect(() => {
     setPagina(1);
-  }, [filtro, buscaAplicada, porPagina]);
+  }, [filtros, buscaAplicada, porPagina]);
 
   const projetos = dados?.projetos ?? [];
+  const hoje = hojeIso();
 
-  // Contagem por pílula (agrega os rótulos legados no equivalente atual).
-  const contagemPilula = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const p of projetos) {
-      const k = pilulaDe(p.statusChave);
-      out[k] = (out[k] ?? 0) + 1;
-    }
-    return out;
-  }, [projetos]);
+  // Contagem por pílula (agrega os rótulos legados no equivalente atual) — já RECORTADA
+  // pelos demais filtros, senão "Pendente 40" abriria uma lista de 3 com "Especiais" ligado.
+  const contagemPilula = useMemo(() => contarPorPilula(projetos, filtros), [projetos, filtros]);
+  const totalDasPilulas = useMemo(() => totalSemStatus(projetos, filtros), [projetos, filtros]);
+  const areas = useMemo(() => areasDisponiveis(projetos), [projetos]);
+  const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
-    const porStatus =
-      filtro === 'todos' ? projetos : projetos.filter((p) => pilulaDe(p.statusChave) === filtro);
-    const buscados = filtrarPorTermo(porStatus, buscaAplicada);
+    const buscados = filtrarPorTermo(aplicarFiltros(projetos, filtros), buscaAplicada);
     const sinal = direcao === 'asc' ? 1 : -1;
     return [...buscados].sort((a, b) => compararProjetos(a, b, ordem) * sinal);
-  }, [projetos, filtro, buscaAplicada, ordem, direcao]);
+  }, [projetos, filtros, buscaAplicada, ordem, direcao]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
   const paginaSegura = Math.min(pagina, totalPaginas);
@@ -273,13 +287,15 @@ function Dashboard() {
       )}
 
       {/* Filtros por status — são também a contagem de cada fila da triagem.
-          Estado ativo tem ícone + borda + fundo, nunca só cor. */}
+          Estado ativo tem ícone + borda + fundo, nunca só cor.
+          ⚠️ As contagens já refletem os demais filtros (natureza/ganho/área/período): a
+          faixa é a fila DENTRO do recorte atual, não o total da planilha. */}
       <div className="mt-6 flex flex-wrap gap-2">
         <PilulaFiltro
           ativa={filtro === 'todos'}
           cor="var(--go-blue)"
           rotulo="Todos"
-          contagem={carregando ? null : projetos.length}
+          contagem={carregando ? null : totalDasPilulas}
           onClick={() => setFiltro('todos')}
         />
         {STATUS_TRIAGEM.map((s) => {
@@ -301,6 +317,69 @@ function Dashboard() {
             />
           );
         })}
+      </div>
+
+      {/* Segunda faixa: os recortes que SOMAM com a fila escolhida acima. Ficam numa
+          linha própria porque respondem a outra pergunta — a de cima é "em que pé está",
+          esta é "qual fatia da planilha". */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Segmentado
+          rotulo="Natureza"
+          valor={filtros.especial}
+          opcoes={[
+            { valor: 'todos', label: 'Todos' },
+            { valor: 'apenas', label: 'Especiais', icone: <Sparkles className="h-3 w-3" /> },
+            { valor: 'sem', label: 'Padrão' },
+          ]}
+          onChange={(v) => setFiltros((f) => ({ ...f, especial: v as FiltroEspecial }))}
+        />
+        <Segmentado
+          rotulo="Ganho"
+          valor={filtros.ganho}
+          opcoes={[
+            { valor: 'todos', label: 'Todos' },
+            { valor: 'saving', label: 'Com saving' },
+            { valor: 'receita', label: 'Com receita' },
+          ]}
+          onChange={(v) => setFiltros((f) => ({ ...f, ganho: v as FiltroGanho }))}
+        />
+        <SeletorPeriodo
+          valor={filtros.periodo}
+          maximo={hoje}
+          onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
+        />
+        <label className="sr-only" htmlFor="filtro-area">
+          Filtrar por área
+        </label>
+        <select
+          id="filtro-area"
+          value={filtros.area}
+          onChange={(e) => setFiltros((f) => ({ ...f, area: e.target.value }))}
+          className="h-9 max-w-[220px] rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+            borderColor: filtros.area !== TODAS_AS_AREAS ? 'var(--go-blue)' : undefined,
+            color: filtros.area !== TODAS_AS_AREAS ? 'var(--go-blue)' : undefined,
+            fontWeight: filtros.area !== TODAS_AS_AREAS ? 600 : 400,
+          }}
+        >
+          <option value={TODAS_AS_AREAS}>Todas as áreas</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        {ativos > 0 && (
+          <button
+            type="button"
+            onClick={() => setFiltros((f) => ({ ...FILTROS_VAZIOS, status: f.status }))}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar {ativos} {ativos === 1 ? 'filtro' : 'filtros'}
+          </button>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -607,6 +686,58 @@ function PilulaFiltro({
         {contagem ?? '—'}
       </span>
     </button>
+  );
+}
+
+/**
+ * Grupo de escolha única em forma de trilho — para dimensões de 3 estados que precisam
+ * mostrar as opções que NÃO estão ativas (é a diferença entre "Especiais" ligado e
+ * "Padrão" ligado, que um botão de liga-desliga esconderia). O rótulo fica dentro do
+ * trilho, em caixa alta discreta: sem ele, três trilhos lado a lado viram uma sopa de
+ * palavras sem dizer a que pergunta cada um responde.
+ */
+function Segmentado({
+  rotulo,
+  valor,
+  opcoes,
+  onChange,
+}: {
+  rotulo: string;
+  valor: string;
+  opcoes: { valor: string; label: string; icone?: React.ReactNode }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={rotulo}
+      className="inline-flex items-center gap-1 rounded-full border border-input bg-card p-0.5 shadow-sm"
+    >
+      <span className="pl-2.5 pr-0.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+        {rotulo}
+      </span>
+      {opcoes.map((o) => {
+        const ativa = valor === o.valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            aria-pressed={ativa}
+            onClick={() => onChange(o.valor)}
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            style={{
+              background: ativa ? 'var(--go-blue)' : 'transparent',
+              color: ativa ? '#fff' : 'var(--muted-foreground)',
+              fontWeight: ativa ? 600 : 500,
+              ['--tw-ring-color' as string]: 'var(--go-blue)',
+            }}
+          >
+            {o.icone}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
