@@ -105,7 +105,8 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   1 requisição por projeto e a entrada no `/dashboard` esperava o `/api/auth/me`; nenhum dos dois
   lia a planilha, era contagem de requisições (~750 ms cada).
 - ✅ **PR [#262](https://github.com/while-kaique/godocs-main/pull/262) aberto** (MERGEABLE/CLEAN,
-  12 commits) — **falta só o merge**, que é do Luis/revisor.
+  13 commits) — **falta só o merge**, autorizado pelo Luis mas **barrado por outage do GitHub**
+  (API em 503; git puro funcionando). Retry em segundo plano; senão, `gh pr merge 262 --merge`.
 - ✅ **Filtros + calendário + payload + Estrelas EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
   merge do `origin/main` foi feito ANTES do empacotamento, senão o deploy o teria apagado.
   **Falta só o push + PR da branch `feat/dashboard-filtros-calendario`.**

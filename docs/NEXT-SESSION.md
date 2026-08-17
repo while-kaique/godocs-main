@@ -60,9 +60,30 @@ mergeado** (o merge é do Luis/revisor).
 (563,6 → 346,1 KB) · nota **"Estrelas"** editável · **ficha em LOTE** (25 fichas em 1 requisição) e
 **auth fora do caminho crítico**.
 
-**Próximo passo:** **nenhuma tarefa em aberto neste tema.** O que resta é decisão de terceiro —
-**mergear o PR #262** (e, depois do merge, esta branch e o worktree `~/godocs-wt-filtros` podem ser
-removidos). Se aparecer frente nova, planejar com `/ggsd:plan`.
+### ⛔ MERGE DO #262 BLOQUEADO POR OUTAGE DO GITHUB (17/08 ~18:30)
+
+O Luis autorizou o merge ("pode mergear as atts e deixar sincronizado") e ele **não passou**: o
+GitHub estava em **"Partial System Outage"** (indicador *major*, confirmado em
+`githubstatus.com/api/v2/status.json`). `gh pr merge` devolveu **503** em 8 tentativas, REST e
+GraphQL. ⚠️ **O git puro (fetch/push) funcionava** — é só a camada de API que caiu; não confundir
+com problema de conta/permissão (a ativa é a `LuisEduardo100`, com WRITE).
+
+Ficou um **retry em segundo plano** (`scratchpad/merge-262.sh`, a cada 2 min por ~40 min, para no
+1º sucesso). Se ele tiver expirado, **rode o merge de novo à mão**:
+`cd ~/godocs-wt-filtros && gh pr merge 262 --merge`.
+
+⚠️ **NÃO contornar mergeando local + `push` no `main`.** O git estava funcionando e daria certo,
+mas a regra do repo é explícita (nunca commit direto na `main`, merge pela PR) e o bloqueio é
+transitório. Furar a trava para ganhar minutos é exatamente o que ela existe para impedir. Se um
+dia for decisão consciente do Luis, que seja dita — não por conveniência de uma sessão.
+
+**Estado real:** prod **v251** roda exatamente o código da branch (com o card de edição do Kaique
+dentro); branch **pushada**; PR **#262 OPEN, MERGEABLE/CLEAN, 13 commits**. Nada mora só na máquina
+— falta só o clique do merge.
+
+**Próximo passo:** mergear o **PR #262** assim que a API do GitHub voltar; depois, `git fetch` +
+atualizar o `main` local e (opcional) remover a branch e o worktree `~/godocs-wt-filtros`.
+Nenhuma tarefa de CÓDIGO em aberto neste tema — frente nova entra por `/ggsd:plan`.
 
 ---
 
