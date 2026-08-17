@@ -91,7 +91,7 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
-## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+## Fase 3 — Dashboard do admin = triagem sobre a planilha ✅
 - 🟡 **Filtros combináveis + calendário próprio (17/08, branch `feat/dashboard-filtros-calendario`)** —
   natureza (especiais) · ganho (saving/receita) · área · período, todos somando em AND com a fila de status;
   contagens das pílulas passam a ser do recorte. Calendário de um mês só (1º clique = início, 2º = fim) com
@@ -101,6 +101,9 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
   28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
   Falta o Luis confirmar na staging → prod + PR.
+- ✅ **TUDO EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
+  merge do `origin/main` foi feito ANTES do empacotamento, senão o deploy o teria apagado.
+  **Falta só o push + PR da branch `feat/dashboard-filtros-calendario`.**
 - 🟡 **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
   `ROTULO_ESTADO_PARECER` (fonte única com o chip da tabela) e a ISENÇÃO "(liderança)" fica fora
   de "Pré-aprovado" de propósito. Na staging; falta o OK → prod + PR.

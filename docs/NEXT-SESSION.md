@@ -39,6 +39,37 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
+### 🚀 EM PRODUÇÃO (17/08 15:58) — `674a3710` **v248 → v249** · staging = prod
+
+⚠️ **QUASE ATROPELAMOS O KAIQUE.** Ao pedir o deploy, o Luis perguntou "subiu pra prod? pode subir"
+— e a checagem de rotina do `origin/main` (regra 10) revelou que **o Kaique tinha subido para prod
+20 min antes** (v248, PR #261 `fb6d27a`, *card de EDIÇÃO na fila do líder*, `origin/main` 2 commits
+à frente). Deployar direto teria **apagado a feature dele**, porque `updateApp` substitui a app
+INTEIRA. **Esta checagem NÃO é opcional: rode `git fetch` + `getApp` ANTES de todo empacotamento.**
+
+Sincronização: `git merge origin/main` na branch → único conflito foi o **`worker.js`** (artefato;
+resolvido com `npm run build:worker` sobre os fontes já merjados) → `CLAUDE.md` uniu os dois lados
+sozinho, sem marcador. **Prova de que nada dele se perdeu** (4 verificações, não uma afirmação):
+`git diff origin/main HEAD` nos 7 arquivos dele = **vazio** · `tests/diff-versoes.test.ts` = **14
+passando** · chunk `aprovacoes` **24,9 → 34,5 kB** · suíte **1512** (1498 meus + 14 dele).
+⚠️ O `worker.js` **não** cita `diff-versoes` porque a feature dele é de **FRONTEND** — conferir no
+chunk do `dist`, não no worker (a busca no worker dá falso negativo).
+
+Deploy: staging com o build merjado ANTES de prod (regra 13) → **staging e prod agora iguais**.
+Foi para prod: filtros combináveis (especial · saving/receita · área · pré-status · período),
+calendário próprio (+ Etapa 2), payload da listagem **−38%**, nota **"Estrelas"** editável e o
+card de edição do Kaique intacto.
+
+⚠️ **A branch `feat/dashboard-filtros-calendario` (9 commits) NÃO foi pushada e NÃO tem PR** — o
+código está em PRODUÇÃO mas não no `main`. É exatamente a situação que gerou o PR #259.
+
+**Próximo passo:** abrir o PR da branch (o Luis foi perguntado e ainda não respondeu). ⚠️ `gh pr
+create` falha como `rpaiagogroup` (READ) — trocar para `LuisEduardo100` (WRITE) e restaurar depois
+(memória *gh-pr-conta-writer*). Antes do push, refazer o `git fetch origin` — o Kaique subiu 2×
+hoje.
+
+---
+
 ### ✅ 3ª ENTREGA NA STAGING (17/08 14:43) — filtro de **pré-status do líder**
 
 Pedido do Luis: *"faltou filtro de pré aprovado tb"*. Commit `be20e48`. `<select>` ao lado do de
@@ -56,10 +87,7 @@ o isento em "Pré-aprovado" afirmaria que um líder olhou o projeto.
 
 `worker.js` rebuildado. **1498 testes verdes.**
 
-**Próximo passo:** aguardar o Luis confirmar na staging as 3 coisas — (a) o filtro de pré-status
-recortando junto com os outros, (b) o carregamento da lista mais rápido, (c) a nota de estrelas
-gravando na aba STAGING da planilha. Com o OK: deploy em **prod (`674a3710`, hoje v247)** e PR da
-branch `feat/dashboard-filtros-calendario` (7 commits).
+_(O Luis liberou o deploy sem pedir a validação item a item — ver a entrega em produção acima.)_
 
 ---
 
