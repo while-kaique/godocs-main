@@ -101,13 +101,15 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
   28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
   Falta o Luis confirmar na staging → prod + PR.
-- 🟡 **Ficha em LOTE + auth fora do caminho crítico (17/08, staging)** — abrir ficha era 1
-  requisição por projeto e a entrada no `/dashboard` esperava o `/api/auth/me`; nenhum dos dois
-  lia a planilha, era contagem de requisições. Falta validar → prod.
+- ✅ **Ficha em LOTE + auth fora do caminho crítico — EM PRODUÇÃO (17/08, v251)**: abrir ficha era
+  1 requisição por projeto e a entrada no `/dashboard` esperava o `/api/auth/me`; nenhum dos dois
+  lia a planilha, era contagem de requisições (~750 ms cada).
+- ✅ **PR [#262](https://github.com/while-kaique/godocs-main/pull/262) aberto** (MERGEABLE/CLEAN,
+  12 commits) — **falta só o merge**, que é do Luis/revisor.
 - ✅ **Filtros + calendário + payload + Estrelas EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
   merge do `origin/main` foi feito ANTES do empacotamento, senão o deploy o teria apagado.
   **Falta só o push + PR da branch `feat/dashboard-filtros-calendario`.**
-- 🟡 **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
+- ✅ **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
   `ROTULO_ESTADO_PARECER` (fonte única com o chip da tabela) e a ISENÇÃO "(liderança)" fica fora
   de "Pré-aprovado" de propósito. Na staging; falta o OK → prod + PR.
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um

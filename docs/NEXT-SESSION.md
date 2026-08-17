@@ -39,7 +39,34 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
-### ⏳ NA STAGING (17/08 17:31) — ficha em LOTE + a tela para de esperar o auth · commit `e8dc4fa`
+### ✅ CICLO FECHADO (17/08 18:18) — prod **v251** + **[PR #262](https://github.com/while-kaique/godocs-main/pull/262)** aberto
+
+Tudo o que foi pedido em 17/08 está **em produção** e, por fim, **também num PR** — o código
+deixou de existir só na máquina. PR #262: **MERGEABLE/CLEAN**, 12 commits, 31 arquivos, **NÃO
+mergeado** (o merge é do Luis/revisor).
+
+**Gotchas do deploy desta rodada, que valem para a próxima:**
+- ⚠️ A 1ª chamada de `updateApp` foi **rejeitada** e, nesse intervalo, o **`uploadId` EXPIROU**
+  ("not found or expired"). Retomar exige `getUploadToken` + rodar o script de novo — não dá para
+  reusar o id. A versão de prod pulou **249 → 251** por causa disso (a tentativa interrompida
+  queimou uma versão); o pacote servido é o certo (`index-MN-EdLdZ.js`, o mesmo da staging).
+- ⚠️ `gh pr create` devolveu **HTTP 503** na 1ª tentativa (GraphQL do GitHub). Transitório —
+  criou na segunda. Não é problema de conta (a ativa já era a `LuisEduardo100`, com WRITE).
+- ✅ As 2 checagens antes de empacotar (`git fetch` + `getApp`) foram refeitas e vieram limpas:
+  `main` 0 commits à frente, prod na v249 como esperado.
+
+**O que foi para produção nesta rodada** (as 5 frentes): filtros combináveis (natureza · ganho ·
+área · pré-status · período) · calendário próprio (+ Etapa 2) · payload da listagem **−38%**
+(563,6 → 346,1 KB) · nota **"Estrelas"** editável · **ficha em LOTE** (25 fichas em 1 requisição) e
+**auth fora do caminho crítico**.
+
+**Próximo passo:** **nenhuma tarefa em aberto neste tema.** O que resta é decisão de terceiro —
+**mergear o PR #262** (e, depois do merge, esta branch e o worktree `~/godocs-wt-filtros` podem ser
+removidos). Se aparecer frente nova, planejar com `/ggsd:plan`.
+
+---
+
+### ⏳ FOI PARA A STAGING EM 17/08 17:31 — ficha em LOTE + a tela para de esperar o auth · commit `e8dc4fa`
 
 Pergunta do Luis: *"subiu a att no SQLite que melhora o carregamento dos projetos quando abro eles
 dentro do dashboard? Até entrar na dashboard, 'verificando permissões' demora um pouco também"*.
@@ -71,9 +98,7 @@ sobrava era a **CONTAGEM de requisições**, a ~750 ms de overhead fixo do edge 
 
 `worker.js` rebuildado. **1519 testes verdes** (7 novos). **Prod segue na v249** (sem estas 2).
 
-**Próximo passo:** o Luis validar na staging (entrar no `/dashboard` deve cair direto no esqueleto
-da tabela; abrir várias fichas da mesma página deve ser instantâneo) → deploy em prod
-(`674a3710`) → **push + PR** da branch (12 commits, ainda sem PR).
+_(Validado pelo Luis e promovido a produção — ver o ciclo fechado acima.)_
 ⚠️ **Antes de empacotar, SEMPRE `git fetch` + `getApp`** — ver o quase-acidente abaixo.
 
 ---
