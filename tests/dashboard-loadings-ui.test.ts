@@ -76,15 +76,19 @@ describe('T2/T3 — o layout admin liga cache de auth e prefetch', () => {
     expect(layout).toContain('limparAuthCache');
   });
 
-  it('dispara o prefetch da planilha ANTES de esperar /api/auth/me', () => {
-    // Dentro do beforeLoad — a revalidação em background, declarada acima, também
-    // chama /api/auth/me e não conta para esta ordem.
+  it('o prefetch da planilha não fica atrás de NENHUMA espera de auth', () => {
+    // Este teste nasceu para garantir a ORDEM (prefetch antes do `await fetch(/api/auth/me)`)
+    // e ficou mais forte em 17/08/2026: o `beforeLoad` deixou de esperar o auth para pintar,
+    // então não há mais `await` algum antes do prefetch. O que ele guarda hoje é isso —
+    // reintroduzir um `await` de auth no beforeLoad recria a fila indiana que o PR #215
+    // desfez, agora com a tela inteira em "Verificando permissões...".
     const corpo = layout.slice(layout.indexOf('beforeLoad:'));
     const iPrefetch = corpo.indexOf('iniciarPrefetchDashboard(');
-    const iAuth = corpo.indexOf('await fetch("/api/auth/me")');
     expect(iPrefetch).toBeGreaterThan(-1);
-    expect(iAuth).toBeGreaterThan(-1);
-    expect(iPrefetch).toBeLessThan(iAuth);
+    const antesDoPrefetch = corpo.slice(0, iPrefetch);
+    expect(antesDoPrefetch).not.toContain('await ');
+    // E o veredito viaja como PROMESSA, não como valor esperado.
+    expect(corpo).toContain('verificacao: buscarAuth()');
   });
 
   it('a tela consome a promise do prefetch em vez de refazer o fetch', () => {

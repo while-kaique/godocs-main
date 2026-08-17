@@ -330,6 +330,38 @@ describe('definirStatusProjeto', () => {
     expect(Object.keys(mockUpdateRow.mock.calls[0]![1])).toEqual(['Status']);
   });
 
+  // ── Nota da triagem (coluna manual "Estrelas") ─────────────────────────────
+  it('grava a nota como NÚMERO na coluna "Estrelas"', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Aprovado', estrelas: 4 },
+      'admin@gocase.com',
+    );
+    const escritas = mockUpdateRow.mock.calls[0]![1] as Record<string, string>;
+    expect(escritas['Estrelas']).toBe('4');
+  });
+
+  it('nota 0 é uma nota — grava "0", nunca "—" (a coluna é numérica)', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Aprovado', estrelas: 0 },
+      'admin@gocase.com',
+    );
+    expect((mockUpdateRow.mock.calls[0]![1] as Record<string, string>)['Estrelas']).toBe('0');
+  });
+
+  it('quem só muda o status NÃO encosta na nota (preserva a de outra pessoa)', async () => {
+    await definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado' }, 'a@b.com');
+    expect(Object.keys(mockUpdateRow.mock.calls[0]![1])).not.toContain('Estrelas');
+  });
+
+  it('recusa nota fora da escala de 0 a 5', async () => {
+    await expect(
+      definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: 8 }, 'a@b.com'),
+    ).rejects.toThrow();
+    await expect(
+      definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: -1 }, 'a@b.com'),
+    ).rejects.toThrow();
+  });
+
   // ── Motivos da triagem em COLUNA PRÓPRIA (critério de projeto) ──────────────
   it('grava "Motivo Reenvio" em coluna própria, SEM tocar "Observações"', async () => {
     await definirStatusProjeto(

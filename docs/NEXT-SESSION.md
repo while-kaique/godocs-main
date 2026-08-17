@@ -5,7 +5,234 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção. **Nenhum plano em aberto.**
+**Nenhum plano ativo** — a última sessão (17/08) foi de código direto, sem `/ggsd:plan` (pedido pontual de
+UI do Luis, escopo fechado na própria mensagem). Próximo é **validar na staging**; se surgir frente nova,
+planejar com `/ggsd:plan`.
+
+### 🆕 17/08 — filtros combináveis do `/dashboard` + calendário próprio (branch `feat/dashboard-filtros-calendario`)
+
+**Worktree:** `~/godocs-wt-filtros` · **branch:** `feat/dashboard-filtros-calendario` (de `origin/main`) ·
+**commits:** `b7eb01d` (feature) + `84dfd4c` (memoiza a lista base). **Não pushada, sem PR.**
+
+Pedido do Luis: filtro de projetos **especiais** que **soma** com os outros ("todos + especiais",
+"pendentes + especiais"…), **filtro rápido de data** com calendário personalizado — **um** calendário só,
+1º clique no início e 2º no fim, com os atalhos dentro dele —, filtro por **saving/receita incremental** e
+por **área**; e o `type="date"` da **Etapa 2** virando o mesmo calendário.
+
+O que aterrissou:
+- `src/lib/dashboard-filtros.ts` (PURO) — **fonte única da composição AND**. A tela não refiltra por fora.
+- `src/lib/calendario-datas.ts` (PURO) — aritmética de dia civil em **UTC**, grade de 42 células, rótulos
+  pt-BR, `PRESETS_PERIODO`. ⚠️ `hojeIso()` é a exceção deliberada: relógio **LOCAL** (às 22h de Brasília o
+  UTC já virou e "Hoje" seria amanhã).
+- `src/components/calendario/calendario.tsx` — grade + popover em **portal** (não é modal: a lista filtrada
+  continua à vista). `SeletorPeriodo` (intervalo, no dashboard) e `CampoData` (dia único, na Etapa 2).
+- `src/routes/_authenticated/dashboard.tsx` — 2ª faixa de filtros (natureza · ganho · período · área) +
+  `Segmentado`; **as contagens das pílulas passaram a ser do RECORTE** (`contarPorPilula`/`totalSemStatus`).
+- `src/lib/submeter/step2.tsx` — `CampoData` no lugar do `<input type="date">`; valor gravado segue
+  `YYYY-MM-DD` (schema, `validarEtapa2` e sync intocados).
+- Testes: `tests/dashboard-filtros.test.ts` (31) + `tests/calendario-ui.test.ts` (11).
+- Docs: `CLAUDE.md` (gotchas **9** e **10** da seção *Dashboard do admin*) + `spec-docs/SPEC_FEATURES_NOVAS.md`
+  ("Filtros combináveis do `/dashboard` + calendário próprio", 12 decisões fechadas).
+
+Estado: **1486 testes verdes**, `npm run build` OK (**19 assets JS — mesma contagem de antes**, a régua de
+performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existentes do `main`. **`worker.js` NÃO
+precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
+rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
+
+### ✅ CICLO FECHADO (17/08 18:18) — prod **v251** + **[PR #262](https://github.com/while-kaique/godocs-main/pull/262)** aberto
+
+Tudo o que foi pedido em 17/08 está **em produção** e, por fim, **também num PR** — o código
+deixou de existir só na máquina. PR #262: **MERGEABLE/CLEAN**, 12 commits, 31 arquivos, **NÃO
+mergeado** (o merge é do Luis/revisor).
+
+**Gotchas do deploy desta rodada, que valem para a próxima:**
+- ⚠️ A 1ª chamada de `updateApp` foi **rejeitada** e, nesse intervalo, o **`uploadId` EXPIROU**
+  ("not found or expired"). Retomar exige `getUploadToken` + rodar o script de novo — não dá para
+  reusar o id. A versão de prod pulou **249 → 251** por causa disso (a tentativa interrompida
+  queimou uma versão); o pacote servido é o certo (`index-MN-EdLdZ.js`, o mesmo da staging).
+- ⚠️ `gh pr create` devolveu **HTTP 503** na 1ª tentativa (GraphQL do GitHub). Transitório —
+  criou na segunda. Não é problema de conta (a ativa já era a `LuisEduardo100`, com WRITE).
+- ✅ As 2 checagens antes de empacotar (`git fetch` + `getApp`) foram refeitas e vieram limpas:
+  `main` 0 commits à frente, prod na v249 como esperado.
+
+**O que foi para produção nesta rodada** (as 5 frentes): filtros combináveis (natureza · ganho ·
+área · pré-status · período) · calendário próprio (+ Etapa 2) · payload da listagem **−38%**
+(563,6 → 346,1 KB) · nota **"Estrelas"** editável · **ficha em LOTE** (25 fichas em 1 requisição) e
+**auth fora do caminho crítico**.
+
+### ⛔ MERGE DO #262 BLOQUEADO POR OUTAGE DO GITHUB (17/08 ~18:30)
+
+O Luis autorizou o merge ("pode mergear as atts e deixar sincronizado") e ele **não passou**: o
+GitHub estava em **"Partial System Outage"** (indicador *major*, confirmado em
+`githubstatus.com/api/v2/status.json`). `gh pr merge` devolveu **503** em 8 tentativas, REST e
+GraphQL. ⚠️ **O git puro (fetch/push) funcionava** — é só a camada de API que caiu; não confundir
+com problema de conta/permissão (a ativa é a `LuisEduardo100`, com WRITE).
+
+Ficou um **retry em segundo plano** (`scratchpad/merge-262.sh`, a cada 2 min por ~40 min, para no
+1º sucesso). Se ele tiver expirado, **rode o merge de novo à mão**:
+`cd ~/godocs-wt-filtros && gh pr merge 262 --merge`.
+
+⚠️ **NÃO contornar mergeando local + `push` no `main`.** O git estava funcionando e daria certo,
+mas a regra do repo é explícita (nunca commit direto na `main`, merge pela PR) e o bloqueio é
+transitório. Furar a trava para ganhar minutos é exatamente o que ela existe para impedir. Se um
+dia for decisão consciente do Luis, que seja dita — não por conveniência de uma sessão.
+
+**Estado real:** prod **v251** roda exatamente o código da branch (com o card de edição do Kaique
+dentro); branch **pushada**; PR **#262 OPEN, MERGEABLE/CLEAN, 13 commits**. Nada mora só na máquina
+— falta só o clique do merge.
+
+**Próximo passo:** mergear o **PR #262** assim que a API do GitHub voltar; depois, `git fetch` +
+atualizar o `main` local e (opcional) remover a branch e o worktree `~/godocs-wt-filtros`.
+Nenhuma tarefa de CÓDIGO em aberto neste tema — frente nova entra por `/ggsd:plan`.
+
+---
+
+### ⏳ FOI PARA A STAGING EM 17/08 17:31 — ficha em LOTE + a tela para de esperar o auth · commit `e8dc4fa`
+
+Pergunta do Luis: *"subiu a att no SQLite que melhora o carregamento dos projetos quando abro eles
+dentro do dashboard? Até entrar na dashboard, 'verificando permissões' demora um pouco também"*.
+
+**Diagnóstico: nenhuma das duas telas lia a planilha** (já era o espelho desde 11/08). O que
+sobrava era a **CONTAGEM de requisições**, a ~750 ms de overhead fixo do edge cada.
+
+1. **Ficha em LOTE.** Abrir ficha era 1 requisição por projeto; o prefetch por hover (13/08) só
+   cobre quem passa o mouse e espera 150 ms — clique direto, teclado e deep link pagavam integral.
+   Agora `semearLote` (cliente) + `POST /api/admin/dashboard/projetos/lote` →
+   `getProjetosDashboardLote` semeiam a PÁGINA VISÍVEL numa requisição. Medido em prod
+   (`scripts/dryrun-lider/peso-ficha.ts`, 641 linhas): ficha **5,5 KB** média / 4,7 mediana /
+   9,4 p90 / 29 maior → **25 fichas ≈ 137 KB**. Abrir qualquer linha da página custa **ZERO**.
+   Teto `LOTE_MAX_FICHAS = 30`. Servidor: **2 consultas por `IN`** (`lerLinhasEspelho` +
+   `getAdminStatusLogsPorIds`, NOVA), nunca uma por projeto.
+   ⚠️ Invariantes do cache mantidos: **falha não vira entrada** · id com ficha fresca não é
+   resemeado (não atropela requisição em voo) · TTL de 30 s · em memória, por aba.
+
+2. **"Verificando permissões" saiu do caminho crítico.** O `beforeLoad` de `/_authenticated`
+   dava `await` no `/api/auth/me` e prendia a rota — e só DEPOIS o dashboard montava e começava
+   a própria carga (**duas esperas em fila para um clique**). O veredito virou **PROMESSA** no
+   contexto (`{ user: null, verificacao: buscarAuth() }`) + `GuardaAcesso` para redirecionar.
+   ⚠️ **Seguro porque o gate REAL sempre foi o `requireAdmin` server-side** — o `beforeLoad`
+   nunca protegeu dado, só decidia o que PINTAR.
+   ⚠️ **Corolário: `user` do contexto é ANULÁVEL** — `usuarios.tsx` usava `user.email` e
+   quebraria numa entrada direta (virou `user?.email`). Varra `useRouteContext` ao mexer nisso.
+   ⚠️ **Não reintroduzir `await` no `beforeLoad`**: o teste de `dashboard-loadings-ui` passou a
+   proibir QUALQUER `await` antes do prefetch (antes só checava a ordem).
+
+`worker.js` rebuildado. **1519 testes verdes** (7 novos). **Prod segue na v249** (sem estas 2).
+
+_(Validado pelo Luis e promovido a produção — ver o ciclo fechado acima.)_
+⚠️ **Antes de empacotar, SEMPRE `git fetch` + `getApp`** — ver o quase-acidente abaixo.
+
+---
+
+### 🚀 EM PRODUÇÃO (17/08 15:58) — `674a3710` **v248 → v249** · staging = prod
+
+⚠️ **QUASE ATROPELAMOS O KAIQUE.** Ao pedir o deploy, o Luis perguntou "subiu pra prod? pode subir"
+— e a checagem de rotina do `origin/main` (regra 10) revelou que **o Kaique tinha subido para prod
+20 min antes** (v248, PR #261 `fb6d27a`, *card de EDIÇÃO na fila do líder*, `origin/main` 2 commits
+à frente). Deployar direto teria **apagado a feature dele**, porque `updateApp` substitui a app
+INTEIRA. **Esta checagem NÃO é opcional: rode `git fetch` + `getApp` ANTES de todo empacotamento.**
+
+Sincronização: `git merge origin/main` na branch → único conflito foi o **`worker.js`** (artefato;
+resolvido com `npm run build:worker` sobre os fontes já merjados) → `CLAUDE.md` uniu os dois lados
+sozinho, sem marcador. **Prova de que nada dele se perdeu** (4 verificações, não uma afirmação):
+`git diff origin/main HEAD` nos 7 arquivos dele = **vazio** · `tests/diff-versoes.test.ts` = **14
+passando** · chunk `aprovacoes` **24,9 → 34,5 kB** · suíte **1512** (1498 meus + 14 dele).
+⚠️ O `worker.js` **não** cita `diff-versoes` porque a feature dele é de **FRONTEND** — conferir no
+chunk do `dist`, não no worker (a busca no worker dá falso negativo).
+
+Deploy: staging com o build merjado ANTES de prod (regra 13) → **staging e prod agora iguais**.
+Foi para prod: filtros combináveis (especial · saving/receita · área · pré-status · período),
+calendário próprio (+ Etapa 2), payload da listagem **−38%**, nota **"Estrelas"** editável e o
+card de edição do Kaique intacto.
+
+⚠️ **A branch `feat/dashboard-filtros-calendario` (9 commits) NÃO foi pushada e NÃO tem PR** — o
+código está em PRODUÇÃO mas não no `main`. É exatamente a situação que gerou o PR #259.
+
+_(O PR segue pendente — cobrado no próximo passo da entrega mais recente, acima. ⚠️ `gh pr create`
+falha como `rpaiagogroup` (READ): trocar para `LuisEduardo100` (WRITE) e restaurar depois —
+memória *gh-pr-conta-writer*.)_
+
+---
+
+### ✅ 3ª ENTREGA NA STAGING (17/08 14:43) — filtro de **pré-status do líder**
+
+Pedido do Luis: *"faltou filtro de pré aprovado tb"*. Commit `be20e48`. `<select>` ao lado do de
+área, com os estados **PRESENTES** na listagem + contagem, na `ORDEM_ESTADO_PARECER` (pendente
+primeiro — é a fila que espera decisão), somando em AND com as outras 4 dimensões.
+
+⚠️ **Os rótulos ganharam fonte única:** `ROTULO_ESTADO_PARECER` (`src/lib/aprovacoes-parecer.ts`),
+agora consumida TAMBÉM pelo `ChipEstadoParecer` — o texto estava digitado só dentro da aparência
+do chip, e um 2º lugar redigitando faria a tabela dizer "Ajuste pedido" e o filtro, "Ajustes".
+**Não redigitar no chip.**
+
+⚠️ **Isenção NÃO é pré-aprovação:** `Pré-aprovado (liderança)` (D12, coordenador para cima) cai em
+`sem_parecer` porque `chaveDoEstado` só casa o rótulo exato. É INTENCIONAL e tem teste — devolver
+o isento em "Pré-aprovado" afirmaria que um líder olhou o projeto.
+
+`worker.js` rebuildado. **1498 testes verdes.**
+
+_(O Luis liberou o deploy sem pedir a validação item a item — ver a entrega em produção acima.)_
+
+---
+
+### ✅ 2ª ENTREGA NA STAGING (17/08 14:26) — `edf400b4` **v159**: payload −38% + nota "Estrelas"
+
+Pedido do Luis depois de aprovar os filtros: *"na `/dashboard` em prod está demorando muito para
+carregar os projetos, parece que ainda busca da planilha"* + *"adicione a capacidade de editar a
+coluna de estrelas pela edição"*. Commit `8c2103e`.
+
+**A lentidão NÃO era a planilha** — a listagem lê o espelho (SQLite) desde 11/08. Era **VOLUME**.
+Medido em prod com `scripts/dryrun-lider/peso-dashboard.ts` (639 projetos, script NOVO e
+reproduzível): resposta **563,6 → 346,1 KB (−38%)** e `linha_resumo` **460,9 → 257,8 KB (−44%)**.
+O maior item era **`observacoes`: 160 KB, 28% da resposta** — parecer do analisador que a TABELA
+nunca desenhou e que a ficha já relê do detalhe. Saíram também `Atualizado Em`, `Saving Horas` e
+`Ferramenta` (esta **continua lida**, alimenta o índice de busca; só não viaja como campo).
+⚠️ Régua que fica: **campo que a listagem não DESENHA não entra no resumo** (×600 projetos).
+Canário em `tests/dashboard-filtros.test.ts` trava a lista de chaves.
+⚠️ **NÃO** se forçou rewrite do espelho inteiro para colher os 203 KB do lado do SQLite: a
+gravação é hash-gated e um rewrite total voltaria aos ~23 s da 1ª corrida. Encolhe sozinho.
+
+**Estrelas:** a coluna **Q "Estrelas"** existe nas DUAS abas (`GoDocs` e `STAGING` — conferido com
+`GOOGLE_SHEETS_TAB=STAGING npx vitest run --config scripts/dryrun-lider/cabecalho-full.config.ts`)
+e o código não a conhecia. Agora: `SHEET_COLUMNS` + `COLUNAS_ESCRITAS` + `estrelas` no
+`statusSchema`, com um `radiogroup` de 5 estrelas ao lado do Status na ficha, salvo pelo mesmo
+botão. ⚠️ Coluna **MANUAL** (nenhum fluxo automático escreve) · **`undefined` = não encostar**
+(quem só muda status não zera a nota alheia) · grava **NÚMERO, nunca "—"** (0 = sem nota, 426 das
+639 linhas) · notas legadas fora da escala (7/8/10) preservadas com aviso na tela.
+
+⚠️ **`worker.js` FOI rebuildado e commitado** (regra 1 — mudança server-side desta vez, ao
+contrário da 1ª entrega). 1492 testes verdes.
+
+_(Ainda pendente de confirmação do Luis — cobrada junto com a 3ª entrega acima.)_
+
+---
+
+### ✅ 1ª ENTREGA NA STAGING (17/08 14:04) — `edf400b4` **v156 → v157**
+
+O Luis abriu a staging e não viu as mudanças; as duas perguntas dele foram checadas antes de subir:
+- **Eu não tinha subido** — a staging estava na **v156 de 13/08 13:24**, exatamente o `main`.
+- **O Kaique não subiu nada** — `origin/main` segue em `71e2821` (merge do PR #259, 13/08) e a branch
+  estava **0 commits atrás**. Nada a sincronizar, e nenhuma branch alheia atropelada pelo `updateApp`
+  (é o cheque que a memória *staging-pode-ter-branch-nao-mergeada* manda fazer).
+
+Deploy: `npm run test` (1486 verdes) + `npm run build` limpo → `scripts/deploy-godeploy.sh` (22 assets +
+`worker.js`) → `updateApp` no `edf400b4`. **`worker.js` NÃO foi rebuildado de propósito** — é idêntico ao do
+`main` (`git diff origin/main -- worker.js` vazio), porque a mudança é 100% frontend.
+⚠️ Depois de subir, **peça refresh forte (Ctrl+Shift+R)**: o `index.html` velho fica na aba e parece que o
+deploy não saiu.
+
+⚠️ **Ainda NÃO validado em navegador** — o repo não tem Playwright/Puppeteer, então a aparência do
+calendário e da faixa de filtros só passou por leitura de código e testes de fonte. É o Luis quem fecha
+esse ponto agora, na staging.
+
+_(Os filtros e o calendário foram APROVADOS pelo Luis — "ficou muito bom" —, o que abriu a 2ª
+entrega acima.)_
+
+---
+
+#### Histórico anterior
+
+**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção.
 
 ### ✅ A T9 FOI FEITA — push + [PR #259](https://github.com/while-kaique/godocs-main/pull/259) aberto (13/08)
 

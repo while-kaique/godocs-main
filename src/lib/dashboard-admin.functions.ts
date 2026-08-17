@@ -22,16 +22,21 @@
  * - `?refresh=1` deixou de "furar cache" e passou a **sincronizar de verdade** (lê a
  *   planilha agora e regrava o espelho) — é o botão "Atualizar" da triagem.
  */
-import { z } from 'zod';
-import { updateRowByProjectId, type SheetRow } from '@/lib/google/sheets';
-import { insertAdminStatusLog, getAdminStatusLogs } from '@/integrations/db/client.server';
+import { z } from "zod";
+import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
+import {
+  insertAdminStatusLog,
+  getAdminStatusLogs,
+  getAdminStatusLogsPorIds,
+} from "@/integrations/db/client.server";
 import {
   lerResumosEspelho,
   lerLinhaEspelho,
+  lerLinhasEspelho,
   espelharEscrita,
   statusEspelho,
-} from '@/lib/sheet-espelho';
-import { syncSheetsToSqlite } from '@/lib/google/sync-reverse';
+} from "@/lib/sheet-espelho";
+import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
 import {
   texto,
   ouTraco,
@@ -42,7 +47,7 @@ import {
   ordenarPorDataDesc,
   contarPorStatus,
   type ProjetoDashboardResumo,
-} from '@/lib/dashboard-resumo';
+} from "@/lib/dashboard-resumo";
 
 // Os mappers moram no módulo PURO `dashboard-resumo.ts` (o espelho recorta as MESMAS
 // colunas, e um módulo de servidor importando esta tela criaria ciclo). Re-exportados aqui
@@ -59,8 +64,8 @@ export {
   contarPorStatus,
   COLUNAS_RESUMO,
   recortarResumo,
-} from '@/lib/dashboard-resumo';
-export type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+} from "@/lib/dashboard-resumo";
+export type { ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 
@@ -71,12 +76,12 @@ export type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
  * marcada como inválida para quem abre a planilha.
  */
 export const STATUS_GRAVAVEIS = [
-  'Pendente',
-  'Em validação',
-  'Aprovado',
-  'Reenvio Pendente',
-  'Reprovado',
-  'Descontinuado',
+  "Pendente",
+  "Em validação",
+  "Aprovado",
+  "Reenvio Pendente",
+  "Reprovado",
+  "Descontinuado",
 ] as const;
 export type StatusGravavel = (typeof STATUS_GRAVAVEIS)[number];
 
@@ -132,10 +137,10 @@ export const ESPELHO_VELHO_MS = 20 * 60 * 1000;
 export async function listarProjetosDashboard(refresh = false): Promise<ListagemDashboard> {
   if (refresh) {
     try {
-      await syncSheetsToSqlite('manual');
+      await syncSheetsToSqlite("manual");
     } catch (e) {
       // `syncSheetsToSqlite` já não propaga por si; este catch é o cinto do cinto.
-      console.error('[dashboard-admin] sync manual falhou (servindo o espelho atual):', e);
+      console.error("[dashboard-admin] sync manual falhou (servindo o espelho atual):", e);
     }
   }
 
@@ -178,7 +183,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   const [alvo, historico] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
-      .then((logs): DetalheDashboard['historico'] =>
+      .then((logs): DetalheDashboard["historico"] =>
         logs.map((l) => ({
           status_anterior: l.status_anterior,
           status_novo: l.status_novo,
@@ -187,14 +192,14 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
           created_at: l.created_at,
         })),
       )
-      .catch((e): DetalheDashboard['historico'] => {
-        console.error('[dashboard-admin] falha ao ler histórico de status:', e);
+      .catch((e): DetalheDashboard["historico"] => {
+        console.error("[dashboard-admin] falha ao ler histórico de status:", e);
         return [];
       }),
   ]);
 
   if (!alvo) {
-    throw Object.assign(new Error('Projeto não encontrado na planilha.'), { status: 404 });
+    throw Object.assign(new Error("Projeto não encontrado na planilha."), { status: 404 });
   }
   const campos: Record<string, string> = {};
   for (const [k, v] of Object.entries(alvo)) {
@@ -203,6 +208,71 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   }
 
   return { id, campos, historico };
+}
+
+/**
+ * Teto de fichas por lote. Uma ficha pesa **5,5 KB em média** (medido em prod, 17/08/2026,
+ * 641 linhas; p90 = 9,4 KB), então 25 ≈ 137 KB — o tamanho de uma página da tabela, que é
+ * exatamente o alvo. Com `porPagina = 100` o lote para nos 30 primeiros e o resto continua
+ * caindo no prefetch por hover: melhor semear a maior parte do que baixar meio megabyte.
+ */
+export const LOTE_MAX_FICHAS = 30;
+
+/**
+ * As fichas de VÁRIOS projetos numa requisição só — o que faz abrir uma linha da tabela não
+ * custar requisição nenhuma.
+ *
+ * Por que em lote: neste ambiente **cada requisição carrega ~750 ms de overhead fixo do
+ * edge** (ver o bullet de performance de navegação no `CLAUDE.md`), e abrir 25 fichas de uma
+ * página eram 25 requisições — o prefetch por hover só escondia isso para quem passa o mouse
+ * e espera 150 ms. Uma requisição de ~137 KB paga as 25.
+ *
+ * ⚠️ Só o ESPELHO (SQLite), nunca o Sheets: são 2 consultas por `IN` (linhas + histórico),
+ * não uma por projeto. Round-trip por item dentro de um laço é o erro que já derrubou o
+ * Investigador.
+ */
+export async function getProjetosDashboardLote(
+  raw: unknown,
+): Promise<Record<string, DetalheDashboard>> {
+  const { ids } = z.object({ ids: z.array(z.string().min(1).max(120)).max(200) }).parse(raw);
+  const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
+  if (alvos.length === 0) return {};
+
+  const [linhas, historicos] = await Promise.all([
+    lerLinhasEspelho(alvos),
+    // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
+    // lote inteiro e devolver a tela ao caminho de 25 requisições.
+    getAdminStatusLogsPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler histórico em lote:", e);
+      return new Map<string, Awaited<ReturnType<typeof getAdminStatusLogs>>>();
+    }),
+  ]);
+
+  const out: Record<string, DetalheDashboard> = {};
+  for (const id of alvos) {
+    const chave = id.trim().toLowerCase();
+    const linha = linhas.get(chave);
+    // Projeto que não está no espelho fica FORA do lote (em vez de entrar como ficha
+    // vazia): a abertura cai no caminho normal e mostra o 404 de verdade.
+    if (!linha) continue;
+    const campos: Record<string, string> = {};
+    for (const [k, v] of Object.entries(linha)) {
+      const val = texto(v as string | undefined);
+      if (val) campos[k] = val;
+    }
+    out[id] = {
+      id,
+      campos,
+      historico: (historicos.get(chave) ?? []).map((l) => ({
+        status_anterior: l.status_anterior,
+        status_novo: l.status_novo,
+        observacoes: l.observacoes,
+        admin_email: l.admin_email,
+        created_at: l.created_at,
+      })),
+    };
+  }
+  return out;
 }
 
 const statusSchema = z.object({
@@ -217,16 +287,22 @@ const statusSchema = z.object({
   // `undefined` = não mexer na célula.
   motivo_reenvio: z.string().max(4000).optional(),
   motivo_reprovado: z.string().max(4000).optional(),
+  // Nota da triagem (coluna manual "Estrelas"). `undefined` = não mexer na célula — é o
+  // que preserva as notas legadas fora da escala (7, 8, 10) de quem só veio mudar o status.
+  estrelas: z.number().int().min(0).max(5).optional(),
 });
 
 /** Colunas que este módulo escreve — o teste garante que a lista não cresce por descuido. */
 export const COLUNAS_ESCRITAS = [
-  'Status',
-  'Observações',
+  "Status",
+  "Observações",
   // Motivos da triagem humana. "Motivo Reenvio" é escrita SÓ aqui (o sistema nunca a
   // toca); "Motivo Reprovado" também é escrita pelo analisador e a triagem sobrepõe.
-  'Motivo Reenvio',
-  'Motivo Reprovado',
+  "Motivo Reenvio",
+  "Motivo Reprovado",
+  // Nota de 0 a 5 da triagem. Coluna MANUAL da planilha: esta tela é o único lugar do
+  // sistema que a escreve (ver `SHEET_COLUMNS`).
+  "Estrelas",
 ] as const;
 
 /**
@@ -242,19 +318,23 @@ export const COLUNAS_ESCRITAS = [
  * `descontinuado` do projeto.
  */
 export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
-  const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado } =
+  const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado, estrelas } =
     statusSchema.parse(raw);
 
   const linha = await lerLinhaEspelho(projeto_id);
   if (!linha) {
-    throw Object.assign(new Error('Projeto não encontrado na planilha.'), { status: 404 });
+    throw Object.assign(new Error("Projeto não encontrado na planilha."), { status: 404 });
   }
 
-  const statusAnterior = texto(linha['Status']);
+  const statusAnterior = texto(linha["Status"]);
   const updates: Partial<Record<(typeof COLUNAS_ESCRITAS)[number], string>> = { Status: status };
-  if (observacoes !== undefined) updates['Observações'] = ouTraco(observacoes);
-  if (motivo_reenvio !== undefined) updates['Motivo Reenvio'] = ouTraco(motivo_reenvio);
-  if (motivo_reprovado !== undefined) updates['Motivo Reprovado'] = ouTraco(motivo_reprovado);
+  if (observacoes !== undefined) updates["Observações"] = ouTraco(observacoes);
+  if (motivo_reenvio !== undefined) updates["Motivo Reenvio"] = ouTraco(motivo_reenvio);
+  if (motivo_reprovado !== undefined) updates["Motivo Reprovado"] = ouTraco(motivo_reprovado);
+  // ⚠️ NÃO passa por `ouTraco`: a coluna é NUMÉRICA e "sem estrela" é **0**, o valor que 426
+  // das 639 linhas de prod já têm. Gravar "—" aqui transformaria a coluna em texto e
+  // quebraria a soma/ordenação de quem usa a planilha.
+  if (estrelas !== undefined) updates["Estrelas"] = String(estrelas);
 
   await updateRowByProjectId(projeto_id, updates);
 
@@ -267,7 +347,7 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   try {
     await insertAdminStatusLog({
       projeto_id,
-      projeto_nome: texto(linha['Projeto']),
+      projeto_nome: texto(linha["Projeto"]),
       status_anterior: statusAnterior,
       status_novo: status,
       // A auditoria guarda o texto que justificou a mudança: o parecer, se houver, ou
@@ -279,7 +359,7 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
     });
   } catch (e) {
     // Auditoria é registro paralelo — não pode desfazer uma escrita que já aconteceu.
-    console.error('[dashboard-admin] falha ao registrar auditoria de status:', e);
+    console.error("[dashboard-admin] falha ao registrar auditoria de status:", e);
   }
 
   return { ok: true, projeto_id, status, statusAnterior };

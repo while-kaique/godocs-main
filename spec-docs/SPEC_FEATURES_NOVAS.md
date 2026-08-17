@@ -1413,3 +1413,80 @@ concreto lado a lado.
 **Status.** ⏳ Implementado; suíte verde (1296 testes) + `npm run build` OK. **`worker.js` não
 precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 13 — staging
 `edf400b4` antes de prod).
+
+---
+
+## Feature adicional — Filtros combináveis do `/dashboard` + calendário próprio (17/08/2026)
+
+**Pedido (Luis).** Na triagem: filtro de projetos **especiais** que **soma** com os demais
+("todos + especiais", "pendentes + especiais", "descontinuados + especiais"), filtro **rápido
+de data** com um calendário "personalizado e bem organizado" — **um** calendário só, 1º clique
+na data inicial e 2º na final (nada de duas caixas de-para), com os **atalhos** (hoje, semana,
+mês, últimos dias) **dentro** dele —, filtros por **saving** e **receita incremental**, e por
+**área**. E o calendário padrão da **Etapa 2** da submissão deve virar o mesmo.
+
+**Onde aterrissou.**
+
+| Arquivo | Papel |
+|---|---|
+| `src/lib/calendario-datas.ts` | PURO — aritmética de dia civil (UTC), grade do mês, rótulos pt-BR, `PRESETS_PERIODO` |
+| `src/lib/dashboard-filtros.ts` | PURO — composição AND dos filtros, contagens recortadas, áreas disponíveis |
+| `src/components/calendario/calendario.tsx` | Grade + popover; `SeletorPeriodo` (intervalo) e `CampoData` (dia único) |
+| `src/routes/_authenticated/dashboard.tsx` | 2ª faixa de filtros + `Segmentado`; contagens passam a ser do recorte |
+| `src/lib/submeter/step2.tsx` | `CampoData` no lugar do `<input type="date">` |
+
+**Decisões fechadas.**
+
+1. **Os filtros somam (AND), e a composição tem UM lugar** — `aplicarFiltros`. A tela não
+   refiltra por fora; se refiltrasse, a contagem exibida e a lista deixariam de concordar.
+2. **A contagem das pílulas de status é do RECORTE**, não da planilha (`contarPorPilula`
+   ignora só a dimensão de status). Pílula anunciando 40 e abrindo 3 linhas seria pior do
+   que não ter contagem.
+3. **"Limpar filtros" preserva a fila de status** — ela é a faixa de cima, tem contagem
+   própria e é o eixo principal da triagem.
+4. **A régua do filtro de ganho é o VALOR**, não o rótulo de "Tipos Projeto": projeto marcado
+   como saving que terminou com R$ 0 não pertence à fila de quem confere saving. Zero e
+   célula vazia ficam de fora.
+5. **Natureza tem 3 estados** (Todos · Especiais · Padrão), não um liga-desliga: excluir os
+   especiais é uso real da triagem e um toggle esconderia essa metade.
+6. **Nenhum filtro custa leitura nova.** Todos saem de campos que o resumo do espelho já
+   carrega. ⚠️ Filtro que exija coluna fora de `COLUNAS_RESUMO` entra na lista no MESMO
+   commit (o teste de ida-e-volta do espelho cobra).
+7. **Período compara em UTC e é inclusivo nas duas pontas**; projeto **sem data fica FORA**
+   de qualquer janela (não se afirma que ele está no período).
+8. **`hojeIso()` usa o relógio LOCAL** — exceção deliberada ao resto do módulo, que é todo
+   UTC: às 22h de Brasília o UTC já virou o dia seguinte, e "Hoje" tem de ser o dia da pessoa.
+9. **A grade tem sempre 42 células.** Altura variável faria o popover pular ao trocar de mês
+   e o cursor cairia no botão errado.
+10. **Tabindex móvel com parada garantida no mês visível** (`paradaTab`). Preso ao dia focado,
+    trocar de mês deixava a grade inalcançável pelo teclado — e 42 paradas de Tab seriam
+    uma armadilha pior.
+11. **Popover em portal, e NÃO é modal** (≠ o exemplo que o Luis mandou, que era um diálogo
+    sobre a tela): a triagem precisa continuar vendo a lista que está filtrando. Portal
+    porque o cartão da Etapa 2 tem rolagem e cortaria o painel.
+12. **A Etapa 2 usa o MESMO componente** em modo `unico`. O valor gravado continua
+    `YYYY-MM-DD` — schema, `validarEtapa2` e sync intocados. Ganho colateral: os dias fora
+    da janela permitida (antes de 2024, depois de hoje) aparecem apagados e não clicáveis,
+    em vez de virarem erro depois do envio.
+
+13. **Pré-status do líder é a 5ª dimensão (17/08, pedido do Luis: "faltou filtro de pré-aprovado
+    também")** — `<select>` com os estados PRESENTES na listagem, contagem ao lado, na
+    `ORDEM_ESTADO_PARECER` (pendente primeiro: é a fila que espera decisão). A régua é
+    `chaveDoEstado` e os rótulos vêm de **`ROTULO_ESTADO_PARECER`**, extraída para
+    `aprovacoes-parecer.ts` e passada a ser consumida TAMBÉM pelo `ChipEstadoParecer` — o texto
+    estava digitado só dentro da aparência do chip, e um segundo lugar redigitando-o faria a
+    tabela dizer "Ajuste pedido" e o filtro, "Ajustes".
+14. **Isenção NÃO é pré-aprovação.** "Pré-aprovado (liderança)" (D12 — coordenador para cima)
+    cai em `sem_parecer`, porque `chaveDoEstado` só casa o rótulo exato. É intencional: filtrar
+    "Pré-aprovado" e receber os isentos afirmaria que um líder olhou o projeto.
+
+**Testes.** `tests/dashboard-filtros.test.ts` (37 casos: AND das dimensões, ganho positivo,
+pontas inclusivas do período, contagens recortadas, aritmética de mês/ano bissexto, atalhos,
+fuso, os 6 estados de parecer + a isenção que não é pré-aprovação) e
+`tests/calendario-ui.test.ts` (11 guardas de fiação: fonte única do filtro e dos rótulos de
+parecer, Etapa 2 sem `type="date"`, piso de acessibilidade).
+
+**Status.** ⏳ Implementado; suíte verde (1486 testes) + `npm run build` OK (19 assets JS, o
+mesmo número de antes — a régua de performance é a CONTAGEM de requisições). **`worker.js`
+não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 13 — staging
+`edf400b4` antes de prod).

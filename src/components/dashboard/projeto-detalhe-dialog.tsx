@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, ExternalLink, Save, History, FileText } from 'lucide-react';
+import { Loader2, ExternalLink, Save, History, FileText, Star } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -132,7 +132,84 @@ const MEMORIAIS = ['Memorial de Saving', 'Receita Memorial', 'Memorial anterior'
 const DESCRICAO = 'Descrição';
 
 /** Colunas já exibidas no cabeçalho — não repetir no corpo. */
-const NO_CABECALHO = ['Projeto'];
+// "Estrelas" tem controle PRÓPRIO na Decisão da triagem — sem isto, apareceria também
+// como texto cru em "Outras colunas", e a pessoa teria dois lugares dizendo a mesma nota.
+const NO_CABECALHO = ['Projeto', 'Estrelas'];
+
+/** Máximo da escala. Notas legadas acima disso (7, 8, 10) existem e são preservadas. */
+const MAX_ESTRELAS = 5;
+
+function lerEstrelas(valor: string | undefined): number {
+  const n = Number(String(valor ?? '').trim().replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+}
+
+/**
+ * Nota da triagem — grupo de rádio de 0 a 5 (`radiogroup`, com as setas do teclado),
+ * não cinco botões soltos: é UMA escolha entre opções mutuamente exclusivas.
+ *
+ * ⚠️ A nota nunca é dita só pelo preenchimento da estrela: o número fica ao lado, em
+ * texto, e cada estrela tem `aria-label` própria.
+ */
+function NotaEstrelas({
+  valor,
+  onChange,
+  legado,
+}: {
+  valor: number;
+  onChange: (n: number) => void;
+  /** Nota fora da escala vinda da planilha (7, 8, 10) — mostrada em vez de apagada. */
+  legado: number | null;
+}) {
+  const [previa, setPrevia] = useState<number | null>(null);
+  const mostrado = previa ?? valor;
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      <div
+        role="radiogroup"
+        aria-label="Nota do projeto, de 0 a 5 estrelas"
+        className="flex items-center gap-0.5"
+        onMouseLeave={() => setPrevia(null)}
+      >
+        {Array.from({ length: MAX_ESTRELAS }, (_, i) => i + 1).map((n) => {
+          const cheia = n <= mostrado;
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={valor === n}
+              aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'}`}
+              // Clicar de novo na estrela atual zera — é como se tira a nota sem um
+              // "limpar" extra ocupando a linha.
+              onClick={() => onChange(valor === n ? 0 : n)}
+              onMouseEnter={() => setPrevia(n)}
+              onFocus={() => setPrevia(n)}
+              onBlur={() => setPrevia(null)}
+              className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+              style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
+            >
+              <Star
+                className="h-5 w-5"
+                style={{ color: cheia ? '#e0a800' : 'var(--muted-foreground)', opacity: cheia ? 1 : 0.45 }}
+                fill={cheia ? '#f5c518' : 'none'}
+                aria-hidden
+              />
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-[12px] tabular-nums text-muted-foreground">
+        {valor === 0 ? 'sem nota' : `${valor}/${MAX_ESTRELAS}`}
+      </span>
+      {legado != null && (
+        <span className="text-[11px] text-amber-700 dark:text-amber-400">
+          (na planilha está {legado} — salvar substitui)
+        </span>
+      )}
+    </div>
+  );
+}
 
 const LIMITE_CURTO = 90; // acima disso o campo ocupa a linha inteira
 
@@ -189,7 +266,7 @@ export function ProjetoDetalheDialog({
 }: {
   projeto: ProjetoDashboardResumo | null;
   onFechar: () => void;
-  onStatusSalvo: (id: string, status: string, observacoes: string | undefined) => void;
+  onStatusSalvo: (id: string, status: string) => void;
 }) {
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -200,6 +277,11 @@ export function ProjetoDetalheDialog({
   // pelo disparo de e-mails de reenvio).
   const [motivoReenvio, setMotivoReenvio] = useState('');
   const [motivoReprovado, setMotivoReprovado] = useState('');
+  // Nota da triagem (coluna manual "Estrelas"). `estrelasOriginal` guarda o valor CRU da
+  // planilha: só mandamos a coluna quando o validador realmente mexeu nela — é o que
+  // impede um "salvar status" de zerar a nota de outra pessoa.
+  const [estrelas, setEstrelas] = useState(0);
+  const estrelasOriginal = useRef(0);
   const [salvando, setSalvando] = useState(false);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
@@ -233,6 +315,9 @@ export function ProjetoDetalheDialog({
         motivoReprovadoOriginal.current = mReprovado;
         setMotivoReenvio(mReenvio);
         setMotivoReprovado(mReprovado);
+        const nota = lerEstrelas(d.campos['Estrelas']);
+        estrelasOriginal.current = nota;
+        setEstrelas(Math.min(nota, MAX_ESTRELAS));
         setStatusEscolhido(d.campos['Status'] ?? '');
       })
       .catch((e: Error) => vivo && setErro(e.message))
@@ -248,6 +333,7 @@ export function ProjetoDetalheDialog({
     const obsMudou = observacoes !== obsOriginal.current;
     const reenvioMudou = motivoReenvio !== motivoReenvioOriginal.current;
     const reprovadoMudou = motivoReprovado !== motivoReprovadoOriginal.current;
+    const estrelasMudou = estrelas !== estrelasOriginal.current;
     try {
       await apiFetch('/api/admin/dashboard/status', {
         projeto_id: projeto.id,
@@ -255,15 +341,17 @@ export function ProjetoDetalheDialog({
         ...(obsMudou ? { observacoes } : {}),
         ...(reenvioMudou ? { motivo_reenvio: motivoReenvio } : {}),
         ...(reprovadoMudou ? { motivo_reprovado: motivoReprovado } : {}),
+        ...(estrelasMudou ? { estrelas } : {}),
       });
       obsOriginal.current = observacoes;
       motivoReenvioOriginal.current = motivoReenvio;
       motivoReprovadoOriginal.current = motivoReprovado;
+      estrelasOriginal.current = estrelas;
       // ⚠️ A ficha guardada acabou de ficar velha: o espelho foi remendado com o status/motivo
       // novos e uma reabertura servida do cache afirmaria o valor ANTERIOR — e, pior, semearia
       // de volta o texto antigo nos campos que a triagem regrava.
       invalidarDetalhe(projeto.id);
-      onStatusSalvo(projeto.id, statusEscolhido, obsMudou ? observacoes : undefined);
+      onStatusSalvo(projeto.id, statusEscolhido);
       toast.success(`Status salvo na planilha: ${statusEscolhido}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível salvar o status.');
@@ -292,6 +380,9 @@ export function ProjetoDetalheDialog({
   );
   const statusMudou = detalhe != null && statusEscolhido !== (campos['Status'] ?? '');
   const obsMudou = detalhe != null && observacoes !== obsOriginal.current;
+  const estrelasMudou = detalhe != null && estrelas !== estrelasOriginal.current;
+  const notaLegado =
+    estrelasOriginal.current > MAX_ESTRELAS ? estrelasOriginal.current : null;
   const motivosMudaram =
     detalhe != null &&
     (motivoReenvio !== motivoReenvioOriginal.current ||
@@ -373,6 +464,12 @@ export function ProjetoDetalheDialog({
                       </option>
                     ))}
                   </select>
+                  {/* A nota mora junto do status porque é a MESMA decisão: a triagem
+                      olha o projeto uma vez e registra as duas coisas no mesmo salvar. */}
+                  <span className="mt-3 block text-[11px] font-semibold text-muted-foreground">
+                    Nota da triagem — coluna "Estrelas" da planilha
+                  </span>
+                  <NotaEstrelas valor={estrelas} onChange={setEstrelas} legado={notaLegado} />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-semibold text-muted-foreground">
@@ -420,13 +517,13 @@ export function ProjetoDetalheDialog({
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button
                   onClick={salvarStatus}
-                  disabled={salvando || (!statusMudou && !obsMudou && !motivosMudaram)}
+                  disabled={salvando || (!statusMudou && !obsMudou && !motivosMudaram && !estrelasMudou)}
                 >
                   {salvando ? <Loader2 className="animate-spin" /> : <Save />}
                   Salvar na planilha
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  {statusMudou || obsMudou || motivosMudaram
+                  {statusMudou || obsMudou || motivosMudaram || estrelasMudou
                     ? 'Há mudanças não salvas.'
                     : 'Nada mudou desde a última leitura.'}
                 </span>

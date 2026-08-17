@@ -2328,3 +2328,113 @@ trabalho real, contra os ~3 s de antes.
 `src/lib/meus-projetos-cache.ts` (novo) · `src/lib/meus-projetos.functions.ts` ·
 `src/lib/google/sync-reverse.ts` (`leituraOk`) · `src/lib/chat.functions.ts` (invalidação) ·
 `tests/meus-projetos-cache.test.ts` (12 casos) · `docs/deploy.md` · `CLAUDE.md`.
+
+---
+
+## `/dashboard` lento em produção — era o PAYLOAD, não a planilha (17/08/2026)
+
+**Sintoma (Luis).** "Na `/dashboard` em prod está demorando muito para carregar os projetos,
+parece que ele ainda está buscando da planilha."
+
+**Causa.** Não era leitura da planilha — a listagem lê o **espelho** (SQLite) desde 11/08. Era
+**volume**. Medido em prod com `scripts/dryrun-lider/peso-dashboard.ts` (639 projetos):
+
+| | antes | depois |
+|---|---|---|
+| resposta de `/api/admin/dashboard/projetos` | **563,6 KB** | **346,1 KB** (−38%) |
+| `linha_resumo` guardado no espelho | 460,9 KB | 257,8 KB (−44%) |
+
+O maior item era **`observacoes`: 160 KB, 28% da resposta** — o parecer do analisador, que a
+**tabela nunca desenhou** e que a ficha já relê do detalhe. Junto saíram `Atualizado Em`,
+`Saving Horas` e `Ferramenta` (esta última **continua sendo lida**, porque alimenta o índice
+de busca, mas não viaja como campo próprio).
+
+**Fix.** `ProjetoDashboardResumo`/`mapResumo` perdem os 4 campos; `COLUNAS_RESUMO` perde
+`Observações`, `Atualizado Em` e `Saving Horas` (o espelho passa a guardar menos, e a leitura
+do SQLite encolhe conforme o cron reescreve as linhas). `aplicarStatusSalvo` deixa de espelhar
+as observações na listagem.
+
+**Régua que fica.** *Campo que a listagem não DESENHA não entra no resumo* — aqui cada campo é
+multiplicado por ~600. Canário em `tests/dashboard-filtros.test.ts` (a lista de chaves do
+resumo é travada); para remedir, `npx vitest run --config scripts/dryrun-lider/peso-dashboard.config.ts`.
+
+**O que NÃO foi feito, e por quê.** Não se forçou a reescrita do espelho inteiro para colher os
+203 KB do `linha_resumo` de uma vez: a gravação é *hash-gated* e um rewrite total voltaria ao
+tempo da primeira corrida (~23 s). Ele encolhe sozinho conforme as linhas mudam.
+
+---
+
+## Coluna "Estrelas" não era editável pelo app (17/08/2026)
+
+**Sintoma.** A planilha tem a coluna **"Estrelas"** (Q) — nota de 0 a 5 que a triagem dá ao
+projeto —, mas o código não a conhecia: aparecia como texto cru em "Outras colunas" na ficha e
+só dava para editar abrindo a planilha.
+
+**Fix.** `'Estrelas'` entra em `SHEET_COLUMNS` (para o `updateRowByProjectId` alcançá-la por
+NOME) e em `COLUNAS_ESCRITAS`; `statusSchema` ganha `estrelas` (inteiro 0–5, **opcional**); a
+ficha ganha um `radiogroup` de 5 estrelas ao lado do Status, salvo pelo mesmo botão.
+
+**Decisões fechadas.**
+1. **Coluna MANUAL** — nenhum fluxo automático escreve nela (nem append, nem analisador, nem
+   sync reverso). Esta ficha é o único ponto do sistema que grava lá.
+2. **`undefined` = não encostar.** Quem só muda o status não pode zerar a nota de outra pessoa
+   (mesma régua das 2 colunas do líder).
+3. **Não passa por `ouTraco`.** A coluna é numérica e "sem nota" é **`0`** — o valor que 426 das
+   639 linhas de prod já têm. Gravar "—" a transformaria em texto e quebraria soma/ordenação.
+4. **Notas legadas fora da escala são preservadas.** Existem 7, 8 e 10 (1 linha cada); a ficha
+   mostra "na planilha está 8 — salvar substitui" em vez de apagar em silêncio.
+5. **Fora do resumo da listagem**, de propósito: não é desenhada na tabela, e o item acima
+   acabou de tirar 217 KB de campos não desenhados do payload.
+6. **Clicar de novo na estrela atual zera** — tirar a nota sem um botão "limpar" extra.
+
+**Testes.** 4 casos em `tests/dashboard-admin.test.ts` (grava número · `0` nunca vira "—" ·
+quem só muda status não toca a coluna · recusa fora de 0–5).
+
+---
+
+## Abrir a ficha e entrar no `/dashboard` — duas esperas de ~750 ms cada (17/08/2026)
+
+**Sintoma (Luis).** *"Você subiu a att no SQLite que melhora o carregamento dos projetos quando
+eu abro eles dentro do dashboard? Até quando eu entro na dashboard, 'verificando permissões'
+demora um pouco também — ninguém gosta de esperar muito loading."*
+
+**Diagnóstico.** As duas telas já liam o **espelho (SQLite)** — nenhuma lia a planilha. O que
+sobrava era a **contagem de requisições**, cada uma com ~750 ms de overhead fixo do edge:
+
+1. **Abrir uma ficha** = 1 requisição por projeto. O prefetch por hover (13/08) só cobre quem
+   passa o mouse e espera 150 ms; clique direto, teclado e deep link pagavam integral.
+2. **Entrar no `/dashboard`** = o `beforeLoad` dava `await` no `/api/auth/me`, prendendo a rota
+   em *"Verificando permissões…"*, e **só então** o dashboard montava e começava a própria
+   carga: duas esperas em fila para um clique só.
+
+**Fix 1 — a página visível é semeada em UMA requisição.** `semearLote` (cliente) +
+`POST /api/admin/dashboard/projetos/lote` → `getProjetosDashboardLote`. Medição em prod (641
+linhas): ficha **5,5 KB em média**, mediana 4,7, p90 9,4, maior 29 — uma página de 25 ≈ **137 KB**.
+Abrir qualquer linha daquela página passa a custar **zero requisição**. Teto `LOTE_MAX_FICHAS = 30`.
+Servidor: **2 consultas por `IN`** (`lerLinhasEspelho` + `getAdminStatusLogsPorIds` — nova), nunca
+uma por projeto (o erro que já derrubou o Investigador).
+
+*Invariantes preservados do cache de detalhe:* lote que **falha não vira entrada**; id com ficha
+fresca não é resemeado (não atropela requisição em voo); mesmo TTL de 30 s; em memória, por aba.
+
+**Fix 2 — a tela não espera o auth para pintar.** O veredito virou **promessa** no contexto
+(`{ user: null, verificacao: buscarAuth() }`) e o `GuardaAcesso` redireciona quem não é admin.
+O gate REAL sempre foi o `requireAdmin` server-side — o `beforeLoad` nunca protegeu dado, só
+decidia o que pintar (é o que o cabeçalho de `auth-cache.ts` já dizia).
+
+**Decisões fechadas.**
+1. **Não-admin vê o esqueleto por instantes** — aceito: nenhuma chamada de dados responde sem
+   `requireAdmin`, e a alternativa é cobrar ~750 ms de TODO admin em toda entrada.
+2. **`user` do contexto passa a ser anulável.** `usuarios.tsx` usava `user.email` e quebraria numa
+   entrada direta; virou `user?.email`.
+3. **Nada de `await` no `beforeLoad`** — o teste de `dashboard-loadings-ui` passou a proibir
+   qualquer `await` antes do prefetch (antes ele só checava a ORDEM).
+4. **O histórico do lote é acessório**: falha dele não derruba o lote (a ficha abre sem o
+   histórico), senão a tela voltaria ao caminho de 25 requisições por causa da auditoria.
+5. **Projeto ausente do espelho fica FORA do lote** em vez de entrar como ficha vazia — a
+   abertura cai no caminho individual e mostra o 404 de verdade.
+
+**Testes.** 4 casos novos em `tests/dashboard-detalhe-cache.test.ts` (semeia e não busca de novo ·
+não atropela requisição em voo · falha não vira entrada · lista vazia não dispara) e 3 em
+`tests/calendario-ui.test.ts` (a tela não espera o auth · o redirect continua · o lote depende dos
+ids). Medição reproduzível: `scripts/dryrun-lider/peso-ficha.ts`.

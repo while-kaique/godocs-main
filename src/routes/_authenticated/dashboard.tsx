@@ -33,7 +33,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
-import { STATUS_TRIAGEM, pilulaDe, corDaRegua } from '@/components/dashboard/status-triagem';
+import { STATUS_TRIAGEM, corDaRegua } from '@/components/dashboard/status-triagem';
 import {
   filtrarPorTermo,
   compararProjetos,
@@ -41,12 +41,31 @@ import {
   type Ordem,
   type Direcao,
 } from '@/components/dashboard/tabela-utils';
+import { SeletorPeriodo } from '@/components/calendario/calendario';
+import {
+  FILTROS_VAZIOS,
+  TODAS_AS_AREAS,
+  TODOS_OS_PARECERES,
+  aplicarFiltros,
+  areasDisponiveis,
+  contarFiltrosAtivos,
+  contarPorPilula,
+  pareceresDisponiveis,
+  totalSemStatus,
+  type FiltroEspecial,
+  type FiltroGanho,
+  type FiltroParecer,
+  type FiltrosDashboard,
+} from '@/lib/dashboard-filtros';
+import { ROTULO_ESTADO_PARECER } from '@/lib/aprovacoes-parecer';
+import { hojeIso } from '@/lib/calendario-datas';
 import { apiFetch } from '@/lib/api-client';
 import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
 import {
   agendarPrefetchDetalhe,
   cancelarPrefetchDetalhe,
   limparDetalhes,
+  semearLote,
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
@@ -88,7 +107,11 @@ function Dashboard() {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<string>('todos');
+  // Os filtros somam entre si (AND): status × natureza × ganho × área × pré-status × período.
+  // A composição mora em `aplicarFiltros` (módulo puro) — a tela só guarda o estado.
+  const [filtros, setFiltros] = useState<FiltrosDashboard>(FILTROS_VAZIOS);
+  const filtro = filtros.status;
+  const setFiltro = (status: string) => setFiltros((f) => ({ ...f, status }));
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
   const [ordem, setOrdem] = useState<Ordem>('data');
@@ -154,32 +177,42 @@ function Dashboard() {
 
   useEffect(() => {
     setPagina(1);
-  }, [filtro, buscaAplicada, porPagina]);
+  }, [filtros, buscaAplicada, porPagina]);
 
-  const projetos = dados?.projetos ?? [];
+  // ⚠️ Memoizado: `dados?.projetos ?? []` cria um array novo a cada render, e como ele é
+  // dependência de quatro `useMemo` abaixo, a lista inteira seria refiltrada e reordenada
+  // a cada tecla digitada em qualquer campo da tela.
+  const projetos = useMemo(() => dados?.projetos ?? [], [dados]);
+  const hoje = hojeIso();
 
-  // Contagem por pílula (agrega os rótulos legados no equivalente atual).
-  const contagemPilula = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const p of projetos) {
-      const k = pilulaDe(p.statusChave);
-      out[k] = (out[k] ?? 0) + 1;
-    }
-    return out;
-  }, [projetos]);
+  // Contagem por pílula (agrega os rótulos legados no equivalente atual) — já RECORTADA
+  // pelos demais filtros, senão "Pendente 40" abriria uma lista de 3 com "Especiais" ligado.
+  const contagemPilula = useMemo(() => contarPorPilula(projetos, filtros), [projetos, filtros]);
+  const totalDasPilulas = useMemo(() => totalSemStatus(projetos, filtros), [projetos, filtros]);
+  const areas = useMemo(() => areasDisponiveis(projetos), [projetos]);
+  const pareceres = useMemo(() => pareceresDisponiveis(projetos), [projetos]);
+  const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
-    const porStatus =
-      filtro === 'todos' ? projetos : projetos.filter((p) => pilulaDe(p.statusChave) === filtro);
-    const buscados = filtrarPorTermo(porStatus, buscaAplicada);
+    const buscados = filtrarPorTermo(aplicarFiltros(projetos, filtros), buscaAplicada);
     const sinal = direcao === 'asc' ? 1 : -1;
     return [...buscados].sort((a, b) => compararProjetos(a, b, ordem) * sinal);
-  }, [projetos, filtro, buscaAplicada, ordem, direcao]);
+  }, [projetos, filtros, buscaAplicada, ordem, direcao]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
   const paginaSegura = Math.min(pagina, totalPaginas);
   const inicio = (paginaSegura - 1) * porPagina;
   const visiveis = filtrados.slice(inicio, inicio + porPagina);
+
+  // Semeia as fichas da PÁGINA VISÍVEL numa requisição só, logo depois de a tabela pintar.
+  // ⚠️ Depende dos IDS, não do array: reordenar a mesma página não pode disparar de novo.
+  // Com isso, abrir qualquer linha desta página custa ZERO requisição — o prefetch por hover
+  // continua valendo para quem trocou de página antes de o lote chegar.
+  const idsVisiveis = visiveis.map((p) => p.id).join(',');
+  useEffect(() => {
+    if (!idsVisiveis) return;
+    semearLote(idsVisiveis.split(','));
+  }, [idsVisiveis]);
 
   function alternarOrdem(nova: Ordem) {
     if (ordem === nova) {
@@ -191,20 +224,15 @@ function Dashboard() {
   }
 
   // Reflete na tela a mudança que já foi gravada na planilha, sem reler tudo.
-  function aplicarStatusSalvo(id: string, status: string, observacoes: string | undefined) {
+  // ⚠️ As "Observações" saíram do resumo (160 KB por listagem, nenhuma célula na tabela):
+  // quem as mostra é a ficha, que as relê do detalhe. Não voltar a espelhá-las aqui.
+  function aplicarStatusSalvo(id: string, status: string) {
     setDados((d) =>
       d
         ? {
             ...d,
             projetos: d.projetos.map((p) =>
-              p.id === id
-                ? {
-                    ...p,
-                    status,
-                    statusChave: status.toLowerCase(),
-                    observacoes: observacoes !== undefined ? observacoes : p.observacoes,
-                  }
-                : p,
+              p.id === id ? { ...p, status, statusChave: status.toLowerCase() } : p,
             ),
           }
         : d,
@@ -273,13 +301,15 @@ function Dashboard() {
       )}
 
       {/* Filtros por status — são também a contagem de cada fila da triagem.
-          Estado ativo tem ícone + borda + fundo, nunca só cor. */}
+          Estado ativo tem ícone + borda + fundo, nunca só cor.
+          ⚠️ As contagens já refletem os demais filtros (natureza/ganho/área/período): a
+          faixa é a fila DENTRO do recorte atual, não o total da planilha. */}
       <div className="mt-6 flex flex-wrap gap-2">
         <PilulaFiltro
           ativa={filtro === 'todos'}
           cor="var(--go-blue)"
           rotulo="Todos"
-          contagem={carregando ? null : projetos.length}
+          contagem={carregando ? null : totalDasPilulas}
           onClick={() => setFiltro('todos')}
         />
         {STATUS_TRIAGEM.map((s) => {
@@ -301,6 +331,97 @@ function Dashboard() {
             />
           );
         })}
+      </div>
+
+      {/* Segunda faixa: os recortes que SOMAM com a fila escolhida acima. Ficam numa
+          linha própria porque respondem a outra pergunta — a de cima é "em que pé está",
+          esta é "qual fatia da planilha". */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Segmentado
+          rotulo="Natureza"
+          valor={filtros.especial}
+          opcoes={[
+            { valor: 'todos', label: 'Todos' },
+            { valor: 'apenas', label: 'Especiais', icone: <Sparkles className="h-3 w-3" /> },
+            { valor: 'sem', label: 'Padrão' },
+          ]}
+          onChange={(v) => setFiltros((f) => ({ ...f, especial: v as FiltroEspecial }))}
+        />
+        <Segmentado
+          rotulo="Ganho"
+          valor={filtros.ganho}
+          opcoes={[
+            { valor: 'todos', label: 'Todos' },
+            { valor: 'saving', label: 'Com saving' },
+            { valor: 'receita', label: 'Com receita' },
+          ]}
+          onChange={(v) => setFiltros((f) => ({ ...f, ganho: v as FiltroGanho }))}
+        />
+        <SeletorPeriodo
+          valor={filtros.periodo}
+          maximo={hoje}
+          onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
+        />
+        <label className="sr-only" htmlFor="filtro-area">
+          Filtrar por área
+        </label>
+        <select
+          id="filtro-area"
+          value={filtros.area}
+          onChange={(e) => setFiltros((f) => ({ ...f, area: e.target.value }))}
+          className="h-9 max-w-[220px] rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+            borderColor: filtros.area !== TODAS_AS_AREAS ? 'var(--go-blue)' : undefined,
+            color: filtros.area !== TODAS_AS_AREAS ? 'var(--go-blue)' : undefined,
+            fontWeight: filtros.area !== TODAS_AS_AREAS ? 600 : 400,
+          }}
+        >
+          <option value={TODAS_AS_AREAS}>Todas as áreas</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        {/* Pré-aprovação do líder — a mesma coluna "Pré-status" da tabela, agora filtrável
+            (pedido do Luis, 17/08). Os rótulos vêm de `ROTULO_ESTADO_PARECER`, a fonte única
+            que o chip da linha usa: o filtro e a célula não podem chamar o mesmo estado por
+            nomes diferentes. Só aparecem os estados presentes na listagem, com a contagem. */}
+        <label className="sr-only" htmlFor="filtro-parecer">
+          Filtrar pela pré-aprovação do líder
+        </label>
+        <select
+          id="filtro-parecer"
+          value={filtros.parecer}
+          onChange={(e) =>
+            setFiltros((f) => ({ ...f, parecer: e.target.value as FiltroParecer }))
+          }
+          className="h-9 max-w-[220px] rounded-full border border-input bg-card px-3 text-[12.5px] shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+            borderColor: filtros.parecer !== TODOS_OS_PARECERES ? 'var(--go-blue)' : undefined,
+            color: filtros.parecer !== TODOS_OS_PARECERES ? 'var(--go-blue)' : undefined,
+            fontWeight: filtros.parecer !== TODOS_OS_PARECERES ? 600 : 400,
+          }}
+        >
+          <option value={TODOS_OS_PARECERES}>Qualquer pré-status</option>
+          {pareceres.map(({ estado, total }) => (
+            <option key={estado} value={estado}>
+              {ROTULO_ESTADO_PARECER[estado]} ({total})
+            </option>
+          ))}
+        </select>
+        {ativos > 0 && (
+          <button
+            type="button"
+            onClick={() => setFiltros((f) => ({ ...FILTROS_VAZIOS, status: f.status }))}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar {ativos} {ativos === 1 ? 'filtro' : 'filtros'}
+          </button>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -607,6 +728,58 @@ function PilulaFiltro({
         {contagem ?? '—'}
       </span>
     </button>
+  );
+}
+
+/**
+ * Grupo de escolha única em forma de trilho — para dimensões de 3 estados que precisam
+ * mostrar as opções que NÃO estão ativas (é a diferença entre "Especiais" ligado e
+ * "Padrão" ligado, que um botão de liga-desliga esconderia). O rótulo fica dentro do
+ * trilho, em caixa alta discreta: sem ele, três trilhos lado a lado viram uma sopa de
+ * palavras sem dizer a que pergunta cada um responde.
+ */
+function Segmentado({
+  rotulo,
+  valor,
+  opcoes,
+  onChange,
+}: {
+  rotulo: string;
+  valor: string;
+  opcoes: { valor: string; label: string; icone?: React.ReactNode }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={rotulo}
+      className="inline-flex items-center gap-1 rounded-full border border-input bg-card p-0.5 shadow-sm"
+    >
+      <span className="pl-2.5 pr-0.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+        {rotulo}
+      </span>
+      {opcoes.map((o) => {
+        const ativa = valor === o.valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            aria-pressed={ativa}
+            onClick={() => onChange(o.valor)}
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+            style={{
+              background: ativa ? 'var(--go-blue)' : 'transparent',
+              color: ativa ? '#fff' : 'var(--muted-foreground)',
+              fontWeight: ativa ? 600 : 500,
+              ['--tw-ring-color' as string]: 'var(--go-blue)',
+            }}
+          >
+            {o.icone}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

@@ -20,6 +20,8 @@ import {
   RadioGroup,
   AfetadosInput,
 } from "./form-components";
+import { CampoData } from "@/components/calendario/calendario";
+import { hojeIso } from "@/lib/calendario-datas";
 import { useSugestoesParticipantes } from "./participantes-sugestoes";
 import { useAreas } from "./areas-sugestoes";
 
@@ -590,15 +592,20 @@ export function Step2({
         <FormLabel required hint="Quando o projeto foi desenvolvido e colocado em produção">
           Data de Criação do Projeto
         </FormLabel>
-        <FormInput
-          type="date"
-          value={form.dataCriacao}
-          min="2024-01-01"
-          max={new Date().toISOString().split("T")[0]}
-          onChange={(e) => updateField("dataCriacao", e.currentTarget.value)}
-          error={errors.dataCriacao}
-          className="cursor-pointer"
+        {/* ⚠️ Calendário do GoDocs, não o do sistema operacional: o `type="date"` nativo
+            abria em cinza (e em inglês em algumas máquinas), sem os limites visíveis. Aqui
+            os dias fora da janela permitida aparecem apagados e não clicáveis, então
+            "01/01/2023" deixa de ser um erro que só o `validarEtapa2` conta depois.
+            O valor gravado segue sendo `YYYY-MM-DD` — nada mudou para o schema. */}
+        <CampoData
+          valor={form.dataCriacao}
+          minimo="2024-01-01"
+          maximo={hojeIso()}
+          ariaLabel="Data de criação do projeto"
+          onChange={(iso) => updateField("dataCriacao", iso)}
+          erro={errors.dataCriacao}
         />
+        <FieldError message={errors.dataCriacao} />
       </FormGroup>
 
       {/* Contexto de negócio */}

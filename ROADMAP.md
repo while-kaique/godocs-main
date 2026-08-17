@@ -91,7 +91,28 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
 - **DoD:** nenhum R$ no card p/ qualquer usuário; API devolve `ganho_total_mensal: null`; investigador
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
-## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+## Fase 3 — Dashboard do admin = triagem sobre a planilha ✅
+- 🟡 **Filtros combináveis + calendário próprio (17/08, branch `feat/dashboard-filtros-calendario`)** —
+  natureza (especiais) · ganho (saving/receita) · área · período, todos somando em AND com a fila de status;
+  contagens das pílulas passam a ser do recorte. Calendário de um mês só (1º clique = início, 2º = fim) com
+  atalhos, reusado como campo de data da Etapa 2. Filtros e calendário **aprovados
+  pelo Luis** na staging (17/08).
+- 🟡 **Payload da listagem −38% + nota "Estrelas" editável (17/08, staging v159)** — a lentidão em
+  prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
+  28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
+  Falta o Luis confirmar na staging → prod + PR.
+- ✅ **Ficha em LOTE + auth fora do caminho crítico — EM PRODUÇÃO (17/08, v251)**: abrir ficha era
+  1 requisição por projeto e a entrada no `/dashboard` esperava o `/api/auth/me`; nenhum dos dois
+  lia a planilha, era contagem de requisições (~750 ms cada).
+- ✅ **PR [#262](https://github.com/while-kaique/godocs-main/pull/262) aberto** (MERGEABLE/CLEAN,
+  13 commits) — **falta só o merge**, autorizado pelo Luis mas **barrado por outage do GitHub**
+  (API em 503; git puro funcionando). Retry em segundo plano; senão, `gh pr merge 262 --merge`.
+- ✅ **Filtros + calendário + payload + Estrelas EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
+  merge do `origin/main` foi feito ANTES do empacotamento, senão o deploy o teria apagado.
+  **Falta só o push + PR da branch `feat/dashboard-filtros-calendario`.**
+- ✅ **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
+  `ROTULO_ESTADO_PARECER` (fonte única com o chip da tabela) e a ISENÇÃO "(liderança)" fica fora
+  de "Pré-aprovado" de propósito. Na staging; falta o OK → prod + PR.
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.

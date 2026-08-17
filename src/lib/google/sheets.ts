@@ -55,6 +55,12 @@ export const SHEET_COLUMNS = [
   'Escopo',                         // O
   'Tipos Projeto',                  // P
   'Alguém Fazia?',                  // Q
+  // Nota de 0 a 5 dada pela TRIAGEM humana — coluna **manual**, como as de Diff: nenhum
+  // fluxo automático a escreve (nem o append, nem o analisador, nem o sync reverso), e o
+  // único ponto que grava aqui é a ficha do `/dashboard`. Está mapeada só para o
+  // `updateRowByProjectId` poder alcançá-la por NOME. Valores fora de 0-5 existem em
+  // linhas antigas (7, 8, 10) e são PRESERVADOS até alguém regravar a nota.
+  'Estrelas',
   'Saving Horas',                   // R
   'Horas em Reais',                 // S  (R$ das horas economizadas — bruto)
   'Custo Evitado',                  // T  (valor R$ mensal do custo evitado)

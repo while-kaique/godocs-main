@@ -90,6 +90,14 @@ export function chaveBusca(...partes: (string | null | undefined)[]): string {
  * Linha da tabela. Deliberadamente ENXUTA: os memoriais e as justificativas somam
  * vários KB por projeto e só são necessários no detalhe — mandar tudo na listagem
  * faria a tela baixar megabytes para exibir 25 linhas.
+ *
+ * ⚠️ **Campo que a LISTAGEM não desenha não entra aqui** (medido em prod, 17/08/2026, 639
+ * projetos): a resposta pesava **563,6 KB** e `observacoes` sozinho era **160 KB (28%)** —
+ * o parecer do analisador, que a tabela nunca mostrou e que a ficha relê do detalhe. Com
+ * `Atualizado Em`, `Saving Horas` e `Ferramenta` (esta ainda LIDA, mas só para o índice de
+ * busca) fora do payload, caiu para ~352 KB. Aqui cada campo é multiplicado por ~600, e o
+ * caminho é lento por VOLUME, não por leitura da planilha — a listagem lê o espelho
+ * (SQLite) desde 11/08. Antes de acrescentar campo, pergunte onde ele é DESENHADO.
  */
 export type ProjetoDashboardResumo = {
   id: string;
@@ -104,13 +112,9 @@ export type ProjetoDashboardResumo = {
   ganhoTotal: number | null;
   savingReais: number | null;
   receitaMensal: number | null;
-  savingHoras: number | null;
   complexidade: string | null;
   tipos: string | null;
-  ferramenta: string | null;
   especial: boolean;
-  atualizadoEm: string | null;
-  observacoes: string | null;
   /**
    * Estado da pré-aprovação do líder — coluna "Pré-status" da tabela (pedido do Luis,
    * 05/08/2026: dar para saber se o líder já decidiu sem abrir a ficha). É o rótulo CRU
@@ -144,12 +148,9 @@ export const COLUNAS_RESUMO: readonly string[] = [
   'Ganho Total',
   'Saving Reais',
   'Receita Mensal',
-  'Saving Horas',
   'Complexidade',
   'Tipos Projeto',
   'Especial?',
-  'Atualizado Em',
-  'Observações',
   COLUNA_ESTADO_LIDER,
 ];
 
@@ -181,6 +182,9 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
   const autor = texto(row['Nome Completo']);
   const email = texto(row['Email']);
   const area = texto(row['Área']);
+  // ⚠️ Lida, mas NÃO devolvida: a ferramenta só serve ao índice de busca (é por isso que
+  // "n8n" acha o projeto), e mandá-la também como campo próprio custava 18 KB por listagem
+  // sem nenhuma célula na tabela. Por isso `Ferramenta` continua em `COLUNAS_RESUMO`.
   const ferramenta = texto(row['Ferramenta']);
   const dataSubmissao = texto(row['Data Submissão']);
   const d = parseDataFlexivel(dataSubmissao);
@@ -198,13 +202,9 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     ganhoTotal: numero(row['Ganho Total']),
     savingReais: numero(row['Saving Reais']),
     receitaMensal: numero(row['Receita Mensal']),
-    savingHoras: numero(row['Saving Horas']),
     complexidade: texto(row['Complexidade']),
     tipos: texto(row['Tipos Projeto']),
-    ferramenta,
     especial: ehSim(row['Especial?']),
-    atualizadoEm: texto(row['Atualizado Em']),
-    observacoes: texto(row['Observações']),
     // ⚠️ Casamento TOLERANTE: o cabeçalho real de prod/staging é "Aprovação do Lider"
     // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna
     // nasceria vazia para todo projeto. Ver `coluna-chave.ts`.
