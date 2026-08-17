@@ -92,6 +92,11 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   intacto; cálculo/Sheets inalterados; testes verdes; validado em staging antes de prod.
 
 ## Fase 3 — Dashboard do admin = triagem sobre a planilha 🟡
+- 🟡 **Filtros combináveis + calendário próprio (17/08, branch `feat/dashboard-filtros-calendario`)** —
+  natureza (especiais) · ganho (saving/receita) · área · período, todos somando em AND com a fila de status;
+  contagens das pílulas passam a ser do recorte. Calendário de um mês só (1º clique = início, 2º = fim) com
+  atalhos, reusado como campo de data da Etapa 2. Código pronto e testado (1486 verdes);
+  **falta validar na staging e no navegador** → depois prod + PR.
 Tirar a validação da planilha e trazê-la para o app: `/dashboard` lia o **SQLite** (mostrava rascunho e um
 status que não é fonte de verdade) e passa a ler `readAllRows()`, com busca instantânea, filas de status,
 paginação, ficha com todas as colunas e **mudança de status gravando no Sheets** + auditoria.

@@ -5,7 +5,54 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção. **Nenhum plano em aberto.**
+**Nenhum plano ativo** — a última sessão (17/08) foi de código direto, sem `/ggsd:plan` (pedido pontual de
+UI do Luis, escopo fechado na própria mensagem). Próximo é **validar na staging**; se surgir frente nova,
+planejar com `/ggsd:plan`.
+
+### 🆕 17/08 — filtros combináveis do `/dashboard` + calendário próprio (branch `feat/dashboard-filtros-calendario`)
+
+**Worktree:** `~/godocs-wt-filtros` · **branch:** `feat/dashboard-filtros-calendario` (de `origin/main`) ·
+**commits:** `b7eb01d` (feature) + `84dfd4c` (memoiza a lista base). **Não pushada, sem PR.**
+
+Pedido do Luis: filtro de projetos **especiais** que **soma** com os outros ("todos + especiais",
+"pendentes + especiais"…), **filtro rápido de data** com calendário personalizado — **um** calendário só,
+1º clique no início e 2º no fim, com os atalhos dentro dele —, filtro por **saving/receita incremental** e
+por **área**; e o `type="date"` da **Etapa 2** virando o mesmo calendário.
+
+O que aterrissou:
+- `src/lib/dashboard-filtros.ts` (PURO) — **fonte única da composição AND**. A tela não refiltra por fora.
+- `src/lib/calendario-datas.ts` (PURO) — aritmética de dia civil em **UTC**, grade de 42 células, rótulos
+  pt-BR, `PRESETS_PERIODO`. ⚠️ `hojeIso()` é a exceção deliberada: relógio **LOCAL** (às 22h de Brasília o
+  UTC já virou e "Hoje" seria amanhã).
+- `src/components/calendario/calendario.tsx` — grade + popover em **portal** (não é modal: a lista filtrada
+  continua à vista). `SeletorPeriodo` (intervalo, no dashboard) e `CampoData` (dia único, na Etapa 2).
+- `src/routes/_authenticated/dashboard.tsx` — 2ª faixa de filtros (natureza · ganho · período · área) +
+  `Segmentado`; **as contagens das pílulas passaram a ser do RECORTE** (`contarPorPilula`/`totalSemStatus`).
+- `src/lib/submeter/step2.tsx` — `CampoData` no lugar do `<input type="date">`; valor gravado segue
+  `YYYY-MM-DD` (schema, `validarEtapa2` e sync intocados).
+- Testes: `tests/dashboard-filtros.test.ts` (31) + `tests/calendario-ui.test.ts` (11).
+- Docs: `CLAUDE.md` (gotchas **9** e **10** da seção *Dashboard do admin*) + `spec-docs/SPEC_FEATURES_NOVAS.md`
+  ("Filtros combináveis do `/dashboard` + calendário próprio", 12 decisões fechadas).
+
+Estado: **1486 testes verdes**, `npm run build` OK (**19 assets JS — mesma contagem de antes**, a régua de
+performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existentes do `main`. **`worker.js` NÃO
+precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
+rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
+
+⚠️ **Não validado em navegador nenhum** (o repo não tem Playwright/Puppeteer): a aparência do calendário e
+da faixa de filtros ainda não foi vista por olho humano. É o primeiro passo da próxima sessão.
+
+⚠️ **Antes de deployar a staging (`edf400b4`), confira o que está no ar** — `updateApp` substitui a app
+INTEIRA e sobrescreveria outra branch em validação (ver memória *staging-pode-ter-branch-nao-mergeada*).
+
+**Próximo passo:** conferir o que está no ar na staging, deployar a branch `feat/dashboard-filtros-calendario`
+lá (`edf400b4`) e validar no navegador com o Luis — só então prod (`674a3710`, regra 13) e PR.
+
+---
+
+#### Histórico anterior
+
+**→ [docs/plans/relatorio-especiais-pendentes.md](plans/relatorio-especiais-pendentes.md)** · Status: ✅ **executado (13/08, `9d351c8`)** — a aba está gravada em produção.
 
 ### ✅ A T9 FOI FEITA — push + [PR #259](https://github.com/while-kaique/godocs-main/pull/259) aberto (13/08)
 
