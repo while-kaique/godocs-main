@@ -39,6 +39,45 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
+### ⏳ NA STAGING (17/08 17:31) — ficha em LOTE + a tela para de esperar o auth · commit `e8dc4fa`
+
+Pergunta do Luis: *"subiu a att no SQLite que melhora o carregamento dos projetos quando abro eles
+dentro do dashboard? Até entrar na dashboard, 'verificando permissões' demora um pouco também"*.
+
+**Diagnóstico: nenhuma das duas telas lia a planilha** (já era o espelho desde 11/08). O que
+sobrava era a **CONTAGEM de requisições**, a ~750 ms de overhead fixo do edge cada.
+
+1. **Ficha em LOTE.** Abrir ficha era 1 requisição por projeto; o prefetch por hover (13/08) só
+   cobre quem passa o mouse e espera 150 ms — clique direto, teclado e deep link pagavam integral.
+   Agora `semearLote` (cliente) + `POST /api/admin/dashboard/projetos/lote` →
+   `getProjetosDashboardLote` semeiam a PÁGINA VISÍVEL numa requisição. Medido em prod
+   (`scripts/dryrun-lider/peso-ficha.ts`, 641 linhas): ficha **5,5 KB** média / 4,7 mediana /
+   9,4 p90 / 29 maior → **25 fichas ≈ 137 KB**. Abrir qualquer linha da página custa **ZERO**.
+   Teto `LOTE_MAX_FICHAS = 30`. Servidor: **2 consultas por `IN`** (`lerLinhasEspelho` +
+   `getAdminStatusLogsPorIds`, NOVA), nunca uma por projeto.
+   ⚠️ Invariantes do cache mantidos: **falha não vira entrada** · id com ficha fresca não é
+   resemeado (não atropela requisição em voo) · TTL de 30 s · em memória, por aba.
+
+2. **"Verificando permissões" saiu do caminho crítico.** O `beforeLoad` de `/_authenticated`
+   dava `await` no `/api/auth/me` e prendia a rota — e só DEPOIS o dashboard montava e começava
+   a própria carga (**duas esperas em fila para um clique**). O veredito virou **PROMESSA** no
+   contexto (`{ user: null, verificacao: buscarAuth() }`) + `GuardaAcesso` para redirecionar.
+   ⚠️ **Seguro porque o gate REAL sempre foi o `requireAdmin` server-side** — o `beforeLoad`
+   nunca protegeu dado, só decidia o que PINTAR.
+   ⚠️ **Corolário: `user` do contexto é ANULÁVEL** — `usuarios.tsx` usava `user.email` e
+   quebraria numa entrada direta (virou `user?.email`). Varra `useRouteContext` ao mexer nisso.
+   ⚠️ **Não reintroduzir `await` no `beforeLoad`**: o teste de `dashboard-loadings-ui` passou a
+   proibir QUALQUER `await` antes do prefetch (antes só checava a ordem).
+
+`worker.js` rebuildado. **1519 testes verdes** (7 novos). **Prod segue na v249** (sem estas 2).
+
+**Próximo passo:** o Luis validar na staging (entrar no `/dashboard` deve cair direto no esqueleto
+da tabela; abrir várias fichas da mesma página deve ser instantâneo) → deploy em prod
+(`674a3710`) → **push + PR** da branch (12 commits, ainda sem PR).
+⚠️ **Antes de empacotar, SEMPRE `git fetch` + `getApp`** — ver o quase-acidente abaixo.
+
+---
+
 ### 🚀 EM PRODUÇÃO (17/08 15:58) — `674a3710` **v248 → v249** · staging = prod
 
 ⚠️ **QUASE ATROPELAMOS O KAIQUE.** Ao pedir o deploy, o Luis perguntou "subiu pra prod? pode subir"
@@ -63,10 +102,9 @@ card de edição do Kaique intacto.
 ⚠️ **A branch `feat/dashboard-filtros-calendario` (9 commits) NÃO foi pushada e NÃO tem PR** — o
 código está em PRODUÇÃO mas não no `main`. É exatamente a situação que gerou o PR #259.
 
-**Próximo passo:** abrir o PR da branch (o Luis foi perguntado e ainda não respondeu). ⚠️ `gh pr
-create` falha como `rpaiagogroup` (READ) — trocar para `LuisEduardo100` (WRITE) e restaurar depois
-(memória *gh-pr-conta-writer*). Antes do push, refazer o `git fetch origin` — o Kaique subiu 2×
-hoje.
+_(O PR segue pendente — cobrado no próximo passo da entrega mais recente, acima. ⚠️ `gh pr create`
+falha como `rpaiagogroup` (READ): trocar para `LuisEduardo100` (WRITE) e restaurar depois —
+memória *gh-pr-conta-writer*.)_
 
 ---
 

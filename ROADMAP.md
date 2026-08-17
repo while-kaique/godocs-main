@@ -101,7 +101,10 @@ SQLite e Sheets inalterados; admin segue vendo no investigador.
   prod era VOLUME, não leitura da planilha: 563,6 → 346,1 KB (`observacoes` sozinho eram 160 KB,
   28%, e a tabela nunca os desenhou). Coluna manual "Estrelas" (Q) passa a ser editável na ficha.
   Falta o Luis confirmar na staging → prod + PR.
-- ✅ **TUDO EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
+- 🟡 **Ficha em LOTE + auth fora do caminho crítico (17/08, staging)** — abrir ficha era 1
+  requisição por projeto e a entrada no `/dashboard` esperava o `/api/auth/me`; nenhum dos dois
+  lia a planilha, era contagem de requisições. Falta validar → prod.
+- ✅ **Filtros + calendário + payload + Estrelas EM PRODUÇÃO em 17/08 (v249)**, junto com o card de edição do Kaique (PR #261) — o
   merge do `origin/main` foi feito ANTES do empacotamento, senão o deploy o teria apagado.
   **Falta só o push + PR da branch `feat/dashboard-filtros-calendario`.**
 - 🟡 **Filtro de pré-status do líder (17/08)** — 5ª dimensão dos filtros; rótulos passam a sair de
