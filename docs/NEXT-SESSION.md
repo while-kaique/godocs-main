@@ -39,14 +39,27 @@ performance é o NÚMERO de requisições), `tsc` só com os 5 erros pré-existe
 precisa de rebuild** (mudança 100% frontend). Revisão de contexto fresco (`revisor-qualidade`/`reuso`) **não
 rodou** — sem harness de render no repo, a camada visual foi conferida por leitura + testes de fonte.
 
-⚠️ **Não validado em navegador nenhum** (o repo não tem Playwright/Puppeteer): a aparência do calendário e
-da faixa de filtros ainda não foi vista por olho humano. É o primeiro passo da próxima sessão.
+### ✅ DEPLOYADO NA STAGING (17/08 14:04) — `edf400b4` **v156 → v157**
 
-⚠️ **Antes de deployar a staging (`edf400b4`), confira o que está no ar** — `updateApp` substitui a app
-INTEIRA e sobrescreveria outra branch em validação (ver memória *staging-pode-ter-branch-nao-mergeada*).
+O Luis abriu a staging e não viu as mudanças; as duas perguntas dele foram checadas antes de subir:
+- **Eu não tinha subido** — a staging estava na **v156 de 13/08 13:24**, exatamente o `main`.
+- **O Kaique não subiu nada** — `origin/main` segue em `71e2821` (merge do PR #259, 13/08) e a branch
+  estava **0 commits atrás**. Nada a sincronizar, e nenhuma branch alheia atropelada pelo `updateApp`
+  (é o cheque que a memória *staging-pode-ter-branch-nao-mergeada* manda fazer).
 
-**Próximo passo:** conferir o que está no ar na staging, deployar a branch `feat/dashboard-filtros-calendario`
-lá (`edf400b4`) e validar no navegador com o Luis — só então prod (`674a3710`, regra 13) e PR.
+Deploy: `npm run test` (1486 verdes) + `npm run build` limpo → `scripts/deploy-godeploy.sh` (22 assets +
+`worker.js`) → `updateApp` no `edf400b4`. **`worker.js` NÃO foi rebuildado de propósito** — é idêntico ao do
+`main` (`git diff origin/main -- worker.js` vazio), porque a mudança é 100% frontend.
+⚠️ Depois de subir, **peça refresh forte (Ctrl+Shift+R)**: o `index.html` velho fica na aba e parece que o
+deploy não saiu.
+
+⚠️ **Ainda NÃO validado em navegador** — o repo não tem Playwright/Puppeteer, então a aparência do
+calendário e da faixa de filtros só passou por leitura de código e testes de fonte. É o Luis quem fecha
+esse ponto agora, na staging.
+
+**Próximo passo:** aguardar o retorno visual do Luis na staging (filtros somando + contagem das pílulas
+mudando junto + o calendário de um mês na `/dashboard` e na Etapa 2); com o OK, deployar em prod
+(`674a3710`, hoje na v247, intocada) e abrir o PR da branch `feat/dashboard-filtros-calendario`.
 
 ---
 
