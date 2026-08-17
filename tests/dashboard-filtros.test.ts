@@ -46,13 +46,9 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     ganhoTotal: 1000,
     savingReais: 1000,
     receitaMensal: null,
-    savingHoras: 10,
     complexidade: 'Média',
     tipos: 'Saving',
-    ferramenta: 'n8n',
     especial: false,
-    atualizadoEm: null,
-    observacoes: null,
     aprovacaoLider: null,
     busca: 'projeto fulano',
     ...over,
@@ -286,5 +282,44 @@ describe('aritmética do calendário', () => {
     // 17/08/2026 22:30 em UTC-3 = 18/08 01:30 UTC. "Hoje" tem de ser 17.
     const local = new Date(2026, 7, 17, 22, 30);
     expect(hojeIso(local)).toBe('2026-08-17');
+  });
+});
+
+describe('peso do payload da listagem', () => {
+  // Medido em prod (17/08/2026, 639 projetos): a resposta pesava 563,6 KB e `observacoes`
+  // sozinho era 160 KB (28%) — o parecer do analisador, que a TABELA nunca desenhou. Cada
+  // campo aqui é multiplicado por ~600, então campo que ninguém desenha é lentidão pura.
+  // Este teste é o canário: recolocar um campo desses falha aqui em vez de degradar a tela.
+  it('o resumo carrega SÓ o que a tabela e os filtros desenham', () => {
+    const chaves = Object.keys(proj()).sort();
+    expect(chaves).toEqual(
+      [
+        'aprovacaoLider',
+        'area',
+        'autor',
+        'busca',
+        'complexidade',
+        'dataOrdenacao',
+        'dataSubmissao',
+        'email',
+        'especial',
+        'ganhoTotal',
+        'id',
+        'nome',
+        'receitaMensal',
+        'savingReais',
+        'status',
+        'statusChave',
+        'tipos',
+      ].sort(),
+    );
+  });
+
+  it('os campos removidos não voltam por engano', () => {
+    // `Ferramenta` CONTINUA sendo lida (alimenta o índice de busca), mas não viaja
+    // como campo próprio — por isso ela some daqui e permanece em `COLUNAS_RESUMO`.
+    for (const morto of ['observacoes', 'atualizadoEm', 'savingHoras', 'ferramenta']) {
+      expect(Object.keys(proj())).not.toContain(morto);
+    }
   });
 });

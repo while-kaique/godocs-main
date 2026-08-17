@@ -2328,3 +2328,64 @@ trabalho real, contra os ~3 s de antes.
 `src/lib/meus-projetos-cache.ts` (novo) · `src/lib/meus-projetos.functions.ts` ·
 `src/lib/google/sync-reverse.ts` (`leituraOk`) · `src/lib/chat.functions.ts` (invalidação) ·
 `tests/meus-projetos-cache.test.ts` (12 casos) · `docs/deploy.md` · `CLAUDE.md`.
+
+---
+
+## `/dashboard` lento em produção — era o PAYLOAD, não a planilha (17/08/2026)
+
+**Sintoma (Luis).** "Na `/dashboard` em prod está demorando muito para carregar os projetos,
+parece que ele ainda está buscando da planilha."
+
+**Causa.** Não era leitura da planilha — a listagem lê o **espelho** (SQLite) desde 11/08. Era
+**volume**. Medido em prod com `scripts/dryrun-lider/peso-dashboard.ts` (639 projetos):
+
+| | antes | depois |
+|---|---|---|
+| resposta de `/api/admin/dashboard/projetos` | **563,6 KB** | **346,1 KB** (−38%) |
+| `linha_resumo` guardado no espelho | 460,9 KB | 257,8 KB (−44%) |
+
+O maior item era **`observacoes`: 160 KB, 28% da resposta** — o parecer do analisador, que a
+**tabela nunca desenhou** e que a ficha já relê do detalhe. Junto saíram `Atualizado Em`,
+`Saving Horas` e `Ferramenta` (esta última **continua sendo lida**, porque alimenta o índice
+de busca, mas não viaja como campo próprio).
+
+**Fix.** `ProjetoDashboardResumo`/`mapResumo` perdem os 4 campos; `COLUNAS_RESUMO` perde
+`Observações`, `Atualizado Em` e `Saving Horas` (o espelho passa a guardar menos, e a leitura
+do SQLite encolhe conforme o cron reescreve as linhas). `aplicarStatusSalvo` deixa de espelhar
+as observações na listagem.
+
+**Régua que fica.** *Campo que a listagem não DESENHA não entra no resumo* — aqui cada campo é
+multiplicado por ~600. Canário em `tests/dashboard-filtros.test.ts` (a lista de chaves do
+resumo é travada); para remedir, `npx vitest run --config scripts/dryrun-lider/peso-dashboard.config.ts`.
+
+**O que NÃO foi feito, e por quê.** Não se forçou a reescrita do espelho inteiro para colher os
+203 KB do `linha_resumo` de uma vez: a gravação é *hash-gated* e um rewrite total voltaria ao
+tempo da primeira corrida (~23 s). Ele encolhe sozinho conforme as linhas mudam.
+
+---
+
+## Coluna "Estrelas" não era editável pelo app (17/08/2026)
+
+**Sintoma.** A planilha tem a coluna **"Estrelas"** (Q) — nota de 0 a 5 que a triagem dá ao
+projeto —, mas o código não a conhecia: aparecia como texto cru em "Outras colunas" na ficha e
+só dava para editar abrindo a planilha.
+
+**Fix.** `'Estrelas'` entra em `SHEET_COLUMNS` (para o `updateRowByProjectId` alcançá-la por
+NOME) e em `COLUNAS_ESCRITAS`; `statusSchema` ganha `estrelas` (inteiro 0–5, **opcional**); a
+ficha ganha um `radiogroup` de 5 estrelas ao lado do Status, salvo pelo mesmo botão.
+
+**Decisões fechadas.**
+1. **Coluna MANUAL** — nenhum fluxo automático escreve nela (nem append, nem analisador, nem
+   sync reverso). Esta ficha é o único ponto do sistema que grava lá.
+2. **`undefined` = não encostar.** Quem só muda o status não pode zerar a nota de outra pessoa
+   (mesma régua das 2 colunas do líder).
+3. **Não passa por `ouTraco`.** A coluna é numérica e "sem nota" é **`0`** — o valor que 426 das
+   639 linhas de prod já têm. Gravar "—" a transformaria em texto e quebraria soma/ordenação.
+4. **Notas legadas fora da escala são preservadas.** Existem 7, 8 e 10 (1 linha cada); a ficha
+   mostra "na planilha está 8 — salvar substitui" em vez de apagar em silêncio.
+5. **Fora do resumo da listagem**, de propósito: não é desenhada na tabela, e o item acima
+   acabou de tirar 217 KB de campos não desenhados do payload.
+6. **Clicar de novo na estrela atual zera** — tirar a nota sem um botão "limpar" extra.
+
+**Testes.** 4 casos em `tests/dashboard-admin.test.ts` (grava número · `0` nunca vira "—" ·
+quem só muda status não toca a coluna · recusa fora de 0–5).

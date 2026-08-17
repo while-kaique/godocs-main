@@ -208,20 +208,15 @@ function Dashboard() {
   }
 
   // Reflete na tela a mudança que já foi gravada na planilha, sem reler tudo.
-  function aplicarStatusSalvo(id: string, status: string, observacoes: string | undefined) {
+  // ⚠️ As "Observações" saíram do resumo (160 KB por listagem, nenhuma célula na tabela):
+  // quem as mostra é a ficha, que as relê do detalhe. Não voltar a espelhá-las aqui.
+  function aplicarStatusSalvo(id: string, status: string) {
     setDados((d) =>
       d
         ? {
             ...d,
             projetos: d.projetos.map((p) =>
-              p.id === id
-                ? {
-                    ...p,
-                    status,
-                    statusChave: status.toLowerCase(),
-                    observacoes: observacoes !== undefined ? observacoes : p.observacoes,
-                  }
-                : p,
+              p.id === id ? { ...p, status, statusChave: status.toLowerCase() } : p,
             ),
           }
         : d,

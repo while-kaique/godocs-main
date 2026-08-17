@@ -217,6 +217,9 @@ const statusSchema = z.object({
   // `undefined` = não mexer na célula.
   motivo_reenvio: z.string().max(4000).optional(),
   motivo_reprovado: z.string().max(4000).optional(),
+  // Nota da triagem (coluna manual "Estrelas"). `undefined` = não mexer na célula — é o
+  // que preserva as notas legadas fora da escala (7, 8, 10) de quem só veio mudar o status.
+  estrelas: z.number().int().min(0).max(5).optional(),
 });
 
 /** Colunas que este módulo escreve — o teste garante que a lista não cresce por descuido. */
@@ -227,6 +230,9 @@ export const COLUNAS_ESCRITAS = [
   // toca); "Motivo Reprovado" também é escrita pelo analisador e a triagem sobrepõe.
   'Motivo Reenvio',
   'Motivo Reprovado',
+  // Nota de 0 a 5 da triagem. Coluna MANUAL da planilha: esta tela é o único lugar do
+  // sistema que a escreve (ver `SHEET_COLUMNS`).
+  'Estrelas',
 ] as const;
 
 /**
@@ -242,7 +248,7 @@ export const COLUNAS_ESCRITAS = [
  * `descontinuado` do projeto.
  */
 export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
-  const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado } =
+  const { projeto_id, status, observacoes, motivo_reenvio, motivo_reprovado, estrelas } =
     statusSchema.parse(raw);
 
   const linha = await lerLinhaEspelho(projeto_id);
@@ -255,6 +261,10 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   if (observacoes !== undefined) updates['Observações'] = ouTraco(observacoes);
   if (motivo_reenvio !== undefined) updates['Motivo Reenvio'] = ouTraco(motivo_reenvio);
   if (motivo_reprovado !== undefined) updates['Motivo Reprovado'] = ouTraco(motivo_reprovado);
+  // ⚠️ NÃO passa por `ouTraco`: a coluna é NUMÉRICA e "sem estrela" é **0**, o valor que 426
+  // das 639 linhas de prod já têm. Gravar "—" aqui transformaria a coluna em texto e
+  // quebraria a soma/ordenação de quem usa a planilha.
+  if (estrelas !== undefined) updates['Estrelas'] = String(estrelas);
 
   await updateRowByProjectId(projeto_id, updates);
 
