@@ -10,6 +10,13 @@
 // Nomenclatura: é PRÉ-aprovação, nunca "aprovação". O parecer do líder não decide o
 // projeto e não trava a triagem da RPA (D3) — a copy repete isso onde o líder decide.
 //
+// DOIS CARDS, UMA FILA (17/08/2026): submissão nova e EDIÇÃO não se leem do mesmo jeito.
+// Na submissão o líder conhece o projeto agora, então o card apresenta tudo. No reenvio ele
+// JÁ leu — o que ele precisa é a diferença. `CardEdicao` inverte a hierarquia: o que mudou
+// vem na frente, em "antes → depois"; o que não mudou vai para um bloco fechado; e texto
+// longo (memorial, documentação) abre só quando ele pede. Quem escolhe o card é o SERVIDOR
+// (`item.edicao`), nunca o líder — ele não deveria ter de saber em que caso está.
+//
 // UM PROJETO POR VEZ (slider, 04/08/2026): com 12 projetos na fila, a lista empilhada
 // obrigava o líder a rolar procurando onde parou. Agora a fila avança como as etapas do
 // formulário — decide, cai no próximo pendente — e a barra de posição no topo diz onde
@@ -38,6 +45,8 @@ import {
   type ChaveChecklist,
   type RespostaChecklist,
 } from "@/lib/aprovacoes-checklist";
+import { TIPOS_PROJETO_LABEL, TIPO_SAVING_LABEL, fmtHoras, fmtReais } from "@/lib/projeto-rotulos";
+import type { CampoComparado } from "@/lib/diff-versoes";
 import {
   ArrowRight,
   BadgeCheck,
@@ -46,13 +55,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Equal,
   ExternalLink,
   Eye,
   FileText,
   Loader2,
   CircleX,
   MessageSquareWarning,
+  Minus,
+  PencilLine,
+  Plus,
   Sparkles,
+  TrendingDown,
+  TrendingUp,
+  TriangleAlert,
   User,
   Users,
 } from "lucide-react";
@@ -80,6 +96,20 @@ type ItemAprovacao = {
   receita_mensal: number | null;
   memorial: string | null;
   resumo: string | null;
+  /** Preenchido só quando o item é uma EDIÇÃO (reenvio) — ver `CardEdicao`. */
+  edicao: Edicao | null;
+};
+
+/** O reenvio como o servidor o entrega (`EdicaoAprovacao` em aprovacoes.functions.ts). */
+type Edicao = {
+  versao: number;
+  versao_anterior: number | null;
+  reenviado_em: string | null;
+  anterior_em: string | null;
+  /** false = não há snapshot da versão anterior; a tela DIZ isso e mostra o card completo. */
+  comparavel: boolean;
+  mudancas: CampoComparado[];
+  iguais: CampoComparado[];
 };
 
 type Fila = {
@@ -100,39 +130,40 @@ type Veredito = "aprovado" | "ajuste" | "reprovado";
 /** Caixa de texto aberta no card. Cada modo tem título, cor e destino próprios. */
 type CaixaTexto = "ajuste" | "reprovar" | "justificar" | null;
 
-const TIPO_LABEL: Record<string, string> = {
-  saving: "Saving",
-  receita_incremental: "Receita incremental",
-  especial: "Especial",
+/**
+ * Tudo que a zona do parecer precisa. Vive num objeto só porque os DOIS cards (submissão e
+ * edição) montam a MESMA zona — o checklist, o bloqueio e a caixa de texto são regra de
+ * negócio, não decoração de layout, e não podem divergir entre os cards.
+ */
+type ParecerProps = {
+  projetoId: string;
+  decidido: Veredito | null;
+  respostas: Respostas;
+  onResponder: (chave: ChaveChecklist, valor: RespostaChecklist) => void;
+  ocupado: boolean;
+  caixa: CaixaTexto;
+  onAbrirCaixa: (modo: Exclude<CaixaTexto, null>) => void;
+  onFecharCaixa: () => void;
+  comentario: string;
+  onComentario: (v: string) => void;
+  onAprovar: () => void;
+  onPedirAjuste: () => void;
+  onReprovar: () => void;
+  /** Salta para o próximo projeto sem parecer (null quando não há mais nenhum). */
+  proximoPendente: (() => void) | null;
 };
 
-// Recorrência do ganho, com o mesmo vocabulário do formulário (Etapa 2).
-const TIPO_SAVING_LABEL: Record<string, string> = {
-  mensal: "Recorrente (mensal)",
-  pontual: "Pontual (uma vez)",
-  trimestral: "A cada trimestre",
-  semestral: "A cada semestre",
+/** Pé do card: sair deste projeto sem decidir. Igual nos dois cards. */
+type NavegacaoProps = {
+  podeVoltar: boolean;
+  podeAvancar: boolean;
+  onVoltar: () => void;
+  onAvancar: () => void;
 };
 
-// Mesma régua de unidade do saving usada no chat: trimestral/semestral mostram o
-// acumulado do período, pontual é total único.
-function unidadeHoras(tipo: string | null): string {
-  if (tipo === "trimestral") return "h/trimestre";
-  if (tipo === "semestral") return "h/semestre";
-  if (tipo === "pontual") return "h (total único)";
-  return "h/mês";
-}
-
-function fmtHoras(h: number | null, tipo: string | null): string | null {
-  if (!h || h <= 0) return null;
-  const n = h.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  return `${n} ${unidadeHoras(tipo)}`;
-}
-
-function fmtReais(v: number | null): string | null {
-  if (!v || v <= 0) return null;
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-}
+// Rótulos e formatação (`TIPOS_PROJETO_LABEL`, `TIPO_SAVING_LABEL`, `fmtHoras`, `fmtReais`)
+// moram em `@/lib/projeto-rotulos` — FONTE ÚNICA compartilhada com a comparação de versões
+// (`diff-versoes.ts`), que fala dos MESMOS números. Não redigitar aqui.
 
 function fmtDate(iso: string | null): string {
   return iso ? fmtDataBR(iso) : "—";
@@ -269,6 +300,56 @@ function AprovacoesPage() {
     } finally {
       setEnviando(null);
     }
+  }
+
+  /** A zona do parecer do projeto em foco — os dois cards recebem a MESMA. */
+  function parecerDoAtual(item: ItemAprovacao): ParecerProps {
+    return {
+      projetoId: item.projeto_id,
+      decidido: decididos[item.projeto_id] ?? null,
+      respostas: respostas[item.projeto_id] ?? {},
+      onResponder: (chave, valor) => marcar(item.projeto_id, chave, valor),
+      ocupado: enviando === item.projeto_id,
+      caixa,
+      onAbrirCaixa: (modo) => {
+        setCaixa(caixa === modo ? null : modo);
+        setComentario("");
+      },
+      onFecharCaixa: () => {
+        setCaixa(null);
+        setComentario("");
+      },
+      comentario,
+      onComentario: setComentario,
+      // Com um "não" no checklist, "Pré-aprovar" NÃO grava direto: abre a caixa para o
+      // líder explicar. Quem garante é o servidor.
+      onAprovar: () => {
+        const resp = respostas[item.projeto_id] ?? {};
+        if (chavesQueExigemJustificativa(resp).length > 0 && !comentario.trim()) {
+          setCaixa("justificar");
+          return;
+        }
+        decidir(item.projeto_id, "aprovado", comentario.trim() || undefined);
+      },
+      onPedirAjuste: () => decidir(item.projeto_id, "ajuste", comentario.trim()),
+      onReprovar: () => decidir(item.projeto_id, "reprovado", comentario.trim()),
+      proximoPendente:
+        pendentes > 0
+          ? () => {
+              const p = proximoPendente(indice);
+              if (p !== null) irPara(p);
+            }
+          : null,
+    };
+  }
+
+  function navegacaoDoAtual(): NavegacaoProps {
+    return {
+      podeVoltar: indice > 0,
+      podeAvancar: indice < total - 1,
+      onVoltar: () => irPara(indice - 1),
+      onAvancar: () => irPara(indice + 1),
+    };
   }
 
   return (
@@ -414,53 +495,31 @@ function AprovacoesPage() {
                       animation: `${voltando ? "go-step-in-back" : "go-step-in"} 0.28s ease-out`,
                     }}
                   >
-                    <CardAprovacao
-                      item={atual}
-                      decidido={decididos[atual.projeto_id] ?? null}
-                      respostas={respostas[atual.projeto_id] ?? {}}
-                      onResponder={(chave, valor) => marcar(atual.projeto_id, chave, valor)}
-                      memorialAberto={!!memorialAberto[atual.projeto_id]}
-                      onToggleMemorial={() =>
-                        setMemorialAberto((p) => ({
-                          ...p,
-                          [atual.projeto_id]: !p[atual.projeto_id],
-                        }))
-                      }
-                      ocupado={enviando === atual.projeto_id}
-                      caixa={caixa}
-                      onAbrirCaixa={(modo) => {
-                        setCaixa(caixa === modo ? null : modo);
-                        setComentario("");
-                      }}
-                      onFecharCaixa={() => {
-                        setCaixa(null);
-                        setComentario("");
-                      }}
-                      comentario={comentario}
-                      onComentario={setComentario}
-                      // Com um "não" no checklist, "Pré-aprovar" NÃO grava direto: abre a
-                      // caixa para o líder explicar. Quem garante é o servidor.
-                      onAprovar={() => {
-                        const resp = respostas[atual.projeto_id] ?? {};
-                        if (chavesQueExigemJustificativa(resp).length > 0 && !comentario.trim()) {
-                          setCaixa("justificar");
-                          return;
+                    {/* EDIÇÃO comparável → card do diff. Edição SEM versão anterior
+                        gravada → card padrão com o aviso do porquê (nunca um "antes"
+                        inventado). Submissão nova → card padrão. */}
+                    {atual.edicao?.comparavel ? (
+                      <CardEdicao
+                        item={atual}
+                        edicao={atual.edicao}
+                        parecer={parecerDoAtual(atual)}
+                        navegacao={navegacaoDoAtual()}
+                      />
+                    ) : (
+                      <CardAprovacao
+                        item={atual}
+                        edicaoSemComparacao={atual.edicao ?? null}
+                        parecer={parecerDoAtual(atual)}
+                        navegacao={navegacaoDoAtual()}
+                        memorialAberto={!!memorialAberto[atual.projeto_id]}
+                        onToggleMemorial={() =>
+                          setMemorialAberto((p) => ({
+                            ...p,
+                            [atual.projeto_id]: !p[atual.projeto_id],
+                          }))
                         }
-                        decidir(atual.projeto_id, "aprovado", comentario.trim() || undefined);
-                      }}
-                      onPedirAjuste={() => decidir(atual.projeto_id, "ajuste", comentario.trim())}
-                      onReprovar={() => decidir(atual.projeto_id, "reprovado", comentario.trim())}
-                      proximoPendente={
-                        pendentes > 0 ? () => {
-                          const p = proximoPendente(indice);
-                          if (p !== null) irPara(p);
-                        } : null
-                      }
-                      podeVoltar={indice > 0}
-                      podeAvancar={indice < total - 1}
-                      onVoltar={() => irPara(indice - 1)}
-                      onAvancar={() => irPara(indice + 1)}
-                    />
+                      />
+                    )}
                   </div>
                 </>
               )}
@@ -650,63 +709,33 @@ function BarraFila({
   );
 }
 
-// ─── Card de um projeto ──────────────────────────────────────────────────────
+// ─── Card de uma SUBMISSÃO nova ──────────────────────────────────────────────
+//
+// Apresenta o projeto do zero: é a primeira vez que o líder o lê. Para o reenvio, ver
+// `CardEdicao` mais abaixo.
 
 function CardAprovacao({
   item: i,
-  decidido,
-  respostas,
-  onResponder,
+  parecer,
+  navegacao,
+  edicaoSemComparacao,
   memorialAberto,
   onToggleMemorial,
-  ocupado,
-  caixa,
-  onAbrirCaixa,
-  onFecharCaixa,
-  comentario,
-  onComentario,
-  onAprovar,
-  onPedirAjuste,
-  onReprovar,
-  proximoPendente,
-  podeVoltar,
-  podeAvancar,
-  onVoltar,
-  onAvancar,
 }: {
   item: ItemAprovacao;
-  /** Parecer já dado nesta sessão — o card fica na fila, em modo leitura. */
-  decidido: Veredito | null;
-  respostas: Respostas;
-  onResponder: (chave: ChaveChecklist, valor: RespostaChecklist) => void;
+  parecer: ParecerProps;
+  navegacao: NavegacaoProps;
+  /**
+   * Preenchido quando o item É uma edição mas o "antes" não existe no banco (snapshot da
+   * versão anterior nunca gravado, ou legado importado da planilha). O card então é o
+   * padrão — só com um aviso dizendo por que não há comparação.
+   */
+  edicaoSemComparacao: Edicao | null;
   memorialAberto: boolean;
   onToggleMemorial: () => void;
-  ocupado: boolean;
-  /** Caixa de texto aberta: pedido de ajuste ou explicação do "não" no checklist. */
-  caixa: CaixaTexto;
-  onAbrirCaixa: (modo: Exclude<CaixaTexto, null>) => void;
-  onFecharCaixa: () => void;
-  comentario: string;
-  onComentario: (v: string) => void;
-  onAprovar: () => void;
-  onPedirAjuste: () => void;
-  onReprovar: () => void;
-  /** Salta para o próximo projeto sem parecer (null quando não há mais nenhum). */
-  proximoPendente: (() => void) | null;
-  podeVoltar: boolean;
-  podeAvancar: boolean;
-  onVoltar: () => void;
-  onAvancar: () => void;
 }) {
-  const completo = checklistCompleto(respostas);
-  const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
-  // Perguntas respondidas com "não" — nomeadas no título da caixa de explicação, que é
-  // onde o líder fica sabendo que precisa escrever (o texto vai para a coluna
-  // "Justificativa Aprovação do Líder", junto do checklist).
-  const naos = CHECKLIST_APROVACAO.filter((p) => respostas[p.chave] === "nao");
-  // Saving incoerente é PRÉ-REQUISITO, não algo a justificar: some o "Pré-aprovar".
-  const bloqueado = bloqueiaPreAprovacao(respostas);
-  const chavesJustificar = chavesQueExigemJustificativa(respostas);
+  const { podeVoltar, podeAvancar, onVoltar, onAvancar } = navegacao;
+  const decidido = parecer.decidido;
   const horas = fmtHoras(i.saving_horas, i.tipo_saving);
   const reais = fmtReais(i.saving_reais);
 
@@ -721,6 +750,25 @@ function CardAprovacao({
     >
       {/* ── Zona 1: o que é o projeto ───────────────────────────────────────── */}
       <div className="p-5">
+        {/* Edição sem "antes" gravado: dizer o que aconteceu, em vez de fingir uma
+            comparação. O líder lê o projeto inteiro — é o que sobra de honesto. */}
+        {edicaoSemComparacao && (
+          <p
+            className="mb-3 flex items-start gap-2 rounded-lg px-3.5 py-2.5 text-[12px] leading-snug"
+            style={{
+              background: "rgba(180,83,9,0.07)",
+              border: "1px solid rgba(180,83,9,0.22)",
+              color: "#8a4708",
+            }}
+          >
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "#b45309" }} />
+            <span>
+              <strong>Reenvio (versão {edicaoSemComparacao.versao}).</strong> Não há cópia da versão
+              anterior guardada, então não é possível mostrar o que mudou — o projeto está completo
+              abaixo.
+            </span>
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <span
             className="font-bold"
@@ -744,7 +792,7 @@ function CardAprovacao({
                 className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
                 style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
               >
-                {TIPO_LABEL[t] ?? t}
+                {TIPOS_PROJETO_LABEL[t] ?? t}
               </span>
             ))}
           <span
@@ -764,9 +812,7 @@ function CardAprovacao({
 
         {/* Dono e participantes. Sem participantes, a coluna nem aparece — o projeto é
             só do dono e uma coluna vazia só rouba espaço. */}
-        <div
-          className={`mt-4 grid gap-3 ${i.participantes.length > 0 ? "sm:grid-cols-2" : ""}`}
-        >
+        <div className={`mt-4 grid gap-3 ${i.participantes.length > 0 ? "sm:grid-cols-2" : ""}`}>
           <Bloco icone={<User className="h-3.5 w-3.5" />} titulo="Dono">
             <span className="font-semibold" style={{ color: "var(--go-text-heading)" }}>
               {i.autor_nome || i.autor_email || "—"}
@@ -878,248 +924,472 @@ function CardAprovacao({
         )}
       </div>
 
-      {/* ── Zona 2: o parecer do líder ──────────────────────────────────────── */}
+      {/* ── Zona 2: o parecer do líder (mesma dos dois cards) ─────────────── */}
+      <ZonaParecer {...parecer} />
+
+      {/* ── Zona 3: sair deste projeto sem decidir ──────────────────────────── */}
+      <PeNavegacao {...navegacao} decidido={decidido} />
+    </div>
+  );
+}
+
+// ─── Card de uma EDIÇÃO (reenvio) ────────────────────────────────────────────
+//
+// A pergunta do líder aqui é outra: não "o que é este projeto?", e sim "o que mudou desde
+// que eu li?". Então a hierarquia inverte — o diff ocupa o corpo do card, o resto encolhe:
+//
+//   • o que mudou fica ABERTO, uma linha por campo, "antes → depois";
+//   • texto longo (memorial, documentação) mostra só o rótulo e abre sob clique — memorial
+//     tem 2.000 caracteres e dois deles lado a lado seriam uma parede;
+//   • o que NÃO mudou vai para um bloco fechado com a contagem na etiqueta, porque o líder
+//     precisa poder conferir, não reler;
+//   • variação numérica ganha um chip com direção (▲/▼) e o valor da diferença: "o saving
+//     dobrou entre versões" é justamente o que a 3ª pergunta do checklist cobra.
+//
+// Estado nunca só por cor: cada linha diz "Alterado"/"Adicionado"/"Removido" por escrito,
+// com ícone, e o chip de variação diz "subiu"/"caiu" no `aria-label`.
+
+function CardEdicao({
+  item: i,
+  edicao,
+  parecer,
+  navegacao,
+}: {
+  item: ItemAprovacao;
+  edicao: Edicao;
+  parecer: ParecerProps;
+  navegacao: NavegacaoProps;
+}) {
+  const [verIguais, setVerIguais] = useState(false);
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
+  const curtas = edicao.mudancas.filter((m) => !m.longo);
+  const longas = edicao.mudancas.filter((m) => m.longo);
+  const nMudou = edicao.mudancas.length;
+
+  return (
+    <div
+      className="overflow-hidden rounded-xl"
+      style={{
+        background: "var(--go-white)",
+        border: "1px solid rgba(0,89,169,0.08)",
+        boxShadow: "var(--go-shadow-sm)",
+      }}
+    >
+      {/* ── Zona 1: que reenvio é este ─────────────────────────────────────── */}
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
+            style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+          >
+            <PencilLine className="h-3 w-3" />
+            Edição · versão {edicao.versao}
+          </span>
+          <span className="text-[11px]" style={{ color: "#8b8b9a" }}>
+            comparando com a versão {edicao.versao_anterior} de {fmtDate(edicao.anterior_em)}
+          </span>
+          <span
+            className="ml-auto inline-flex items-center gap-1 text-[11px]"
+            style={{ color: "#a5a5b3" }}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Reenviado em {fmtDate(edicao.reenviado_em ?? i.submitted_at)}
+          </span>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <span
+            className="font-bold"
+            style={{ color: "var(--go-text-heading)", fontSize: 16, lineHeight: 1.3 }}
+          >
+            {i.projeto_nome ?? "(sem nome)"}
+          </span>
+          {i.tipos_projeto
+            .filter((t) => t !== "especial")
+            .map((t) => (
+              <span
+                key={t}
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+              >
+                {TIPOS_PROJETO_LABEL[t] ?? t}
+              </span>
+            ))}
+        </div>
+
+        {/* Identidade do projeto em uma linha: no reenvio ela é referência, não conteúdo
+            para julgar — quem julga o quê está nas mudanças abaixo. */}
+        <p
+          className="mt-1 flex flex-wrap items-center gap-x-2 text-[12px]"
+          style={{ color: "#6b6b7a" }}
+        >
+          <span className="inline-flex items-center gap-1">
+            <User className="h-3.5 w-3.5" style={{ color: "#a5a5b3" }} />
+            {i.autor_nome || i.autor_email || "—"}
+          </span>
+          {i.area && <span style={{ color: "#a5a5b3" }}>· {i.area}</span>}
+          {i.participantes.length > 0 && (
+            <span style={{ color: "#a5a5b3" }}>
+              · {i.participantes.length}{" "}
+              {i.participantes.length === 1 ? "participante" : "participantes"}
+            </span>
+          )}
+          <a
+            href={`/projeto/${i.projeto_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-semibold underline"
+            style={{ color: "var(--go-blue)" }}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ler a documentação completa
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </p>
+      </div>
+
+      {/* ── Zona 2: o que mudou ────────────────────────────────────────────── */}
       <div
-        className="px-5 py-4"
-        style={{ background: "rgba(0,89,169,0.03)", borderTop: "1px solid rgba(0,89,169,0.08)" }}
+        className="px-5 pb-5"
+        style={{ borderTop: "1px solid rgba(0,89,169,0.08)", paddingTop: 16 }}
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
-            Seu parecer
-          </p>
-          {!decidido && (
-            <p className="text-[11px]" style={{ color: completo ? "#15803d" : "#8b8b9a" }}>
-              {completo ? "3 de 3 respondidas" : `Faltam ${faltam} de 3 perguntas`}
-            </p>
-          )}
-        </div>
-
-        {/* Já decidido: o card continua na fila para o líder rever o que registrou, sem
-            poder mudar (a decisão foi gravada e o autor já foi avisado). */}
-        {decidido && (
-          <div
-            className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg px-3.5 py-3"
-            style={
-              decidido === "aprovado"
-                ? { background: "rgba(21,128,61,0.07)", border: "1.5px solid rgba(21,128,61,0.22)" }
-                : decidido === "ajuste"
-                  ? { background: "rgba(180,83,9,0.07)", border: "1.5px solid rgba(180,83,9,0.22)" }
-                  : { background: "rgba(220,38,38,0.07)", border: "1.5px solid rgba(220,38,38,0.22)" }
-            }
-          >
-            {decidido === "aprovado" ? (
-              <BadgeCheck className="h-4 w-4 shrink-0" style={{ color: "#15803d" }} />
-            ) : decidido === "ajuste" ? (
-              <MessageSquareWarning className="h-4 w-4 shrink-0" style={{ color: "#b45309" }} />
-            ) : (
-              <CircleX className="h-4 w-4 shrink-0" style={{ color: "#b91c1c" }} />
-            )}
-            <p
-              className="text-[12.5px] font-semibold"
-              style={{
-                color:
-                  decidido === "aprovado" ? "#15803d" : decidido === "ajuste" ? "#b45309" : "#b91c1c",
-              }}
-            >
-              {decidido === "aprovado"
-                ? "Você pré-aprovou este projeto. O autor e a equipe RPA já veem o parecer."
-                : decidido === "ajuste"
-                  ? "Você pediu ajuste. O autor recebeu o seu comentário."
-                  : "Você reprovou este projeto. O autor recebeu o seu motivo."}
-            </p>
-            {proximoPendente && (
-              <button
-                type="button"
-                onClick={proximoPendente}
-                className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold transition-all"
-                style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-              >
-                Ir para o próximo sem parecer
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="mt-2.5 space-y-2">
-          {CHECKLIST_APROVACAO.map((p) => {
-            const marcada = respostas[p.chave];
-            return (
-              <div
-                key={p.chave}
-                className="flex flex-col gap-2 rounded-lg px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                style={{
-                  background: "var(--go-white)",
-                  border: marcada
-                    ? "1.5px solid rgba(0,89,169,0.25)"
-                    : "1.5px solid rgba(0,0,0,0.07)",
-                }}
-              >
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="flex items-start gap-1.5 text-[13px] font-semibold"
-                    style={{ color: "var(--go-text-heading)" }}
-                  >
-                    {/* Estado por ícone + borda, nunca só por cor */}
-                    {marcada && (
-                      <Check
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                        style={{ color: "var(--go-blue)" }}
-                      />
-                    )}
-                    {p.pergunta}
-                  </p>
-                  <p className="mt-0.5 text-[11px]" style={{ color: "#8b8b9a" }}>
-                    {p.ajuda}
-                  </p>
-                </div>
-                <div
-                  className="flex shrink-0 gap-1 self-start rounded-full p-1 sm:self-auto"
-                  style={{ background: "rgba(0,0,0,0.04)" }}
-                  role="group"
-                  aria-label={p.pergunta}
-                >
-                  {(["sim", "nao"] as RespostaChecklist[]).map((v) => {
-                    const ativo = marcada === v;
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => onResponder(p.chave, v)}
-                        disabled={!!decidido}
-                        aria-pressed={ativo}
-                        className="cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60"
-                        style={{
-                          background: ativo ? "var(--go-blue)" : "transparent",
-                          color: ativo ? "var(--go-white)" : "#6b6b7a",
-                        }}
-                      >
-                        {v === "sim" ? "Sim" : "Não"}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Sem aviso antecipado sobre o "Não" (04/08/2026): quem clica em "Pré-aprovar"
-            já cai na caixa de explicação, e o texto solto aqui só poluía a tela. */}
-        {/* Saving incoerente = erro de submissão, não algo a justificar: o
-            "Pré-aprovar" sai de cena e sobram ajuste/reprovação. */}
-        {!decidido && bloqueado && (
           <p
-            className="mt-2.5 flex items-start gap-1.5 rounded-lg px-3 py-2.5 text-[11.5px] leading-snug"
+            className="text-[10px] font-bold uppercase tracking-[0.14em]"
+            style={{ color: "#8b8b9a" }}
+          >
+            O que mudou nesta versão
+          </p>
+          <p className="text-[11px]" style={{ color: "#8b8b9a" }}>
+            {nMudou === 0
+              ? "nenhum campo"
+              : `${nMudou} ${nMudou === 1 ? "campo" : "campos"} · ${edicao.iguais.length} sem mudança`}
+          </p>
+        </div>
+
+        {nMudou === 0 ? (
+          <p
+            className="mt-2 flex items-start gap-2 rounded-lg px-3.5 py-3 text-[12.5px] leading-snug"
             style={{
-              background: "rgba(220,38,38,0.06)",
-              border: "1px solid rgba(220,38,38,0.18)",
-              color: "#b91c1c",
+              background: "rgba(0,89,169,0.05)",
+              border: "1px solid rgba(0,89,169,0.15)",
+              color: "#4b4b5a",
             }}
           >
-            <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>{AVISO_SAVING_INCOERENTE}</span>
+            <Equal className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--go-blue)" }} />
+            <span>
+              Nenhum dos dados comparados mudou entre a versão {edicao.versao_anterior} e esta. O
+              reenvio pode ter sido só para corrigir a documentação ou refazer o envio — abra a
+              documentação completa se quiser conferir.
+            </span>
           </p>
+        ) : (
+          <>
+            {curtas.length > 0 && (
+              <div className="mt-2.5 space-y-1.5">
+                {curtas.map((m) => (
+                  <LinhaMudanca key={m.chave} campo={m} />
+                ))}
+              </div>
+            )}
+
+            {longas.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {longas.map((m) => (
+                  <BlocoLongo
+                    key={m.chave}
+                    campo={m}
+                    aberto={!!abertos[m.chave]}
+                    onToggle={() => setAbertos((p) => ({ ...p, [m.chave]: !p[m.chave] }))}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
-        {!decidido && (
-          <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {/* O que a comparação NÃO cobre. Dito aqui porque o silêncio pareceria garantia. */}
+        <p className="mt-2.5 text-[10.5px] leading-snug" style={{ color: "#a5a5b3" }}>
+          A comparação cobre os dados do formulário, o memorial e a documentação. Participantes e
+          arquivos anexados não entram nela.
+        </p>
+
+        {/* ── O que não mudou: fechado, com a contagem na etiqueta ─────────── */}
+        {edicao.iguais.length > 0 && (
+          <div className="mt-3">
             <button
               type="button"
-              onClick={() => onAbrirCaixa("reprovar")}
-              disabled={ocupado || !completo}
-              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "rgba(220,38,38,0.1)", color: "#b91c1c" }}
+              onClick={() => setVerIguais((v) => !v)}
+              aria-expanded={verIguais}
+              className="inline-flex w-full cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2.5 text-left text-[12px] font-semibold transition-all motion-reduce:transition-none"
+              style={{
+                background: "rgba(0,0,0,0.03)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                color: "#6b6b7a",
+              }}
             >
-              <CircleX className="h-3.5 w-3.5" />
-              Reprovar
+              <Equal className="h-3.5 w-3.5 shrink-0" style={{ color: "#8b8b9a" }} />
+              {verIguais ? "Fechar o que não mudou" : "Ver o que não mudou"}
+              <span className="text-[11px] font-normal" style={{ color: "#a5a5b3" }}>
+                ({edicao.iguais.length} {edicao.iguais.length === 1 ? "campo" : "campos"})
+              </span>
+              <ChevronDown
+                className="ml-auto h-4 w-4 transition-transform motion-reduce:transition-none"
+                style={{ transform: verIguais ? "rotate(180deg)" : "none" }}
+              />
             </button>
-            <button
-              type="button"
-              onClick={() => onAbrirCaixa("ajuste")}
-              disabled={ocupado || !completo}
-              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "rgba(180,83,9,0.12)", color: "#b45309" }}
-            >
-              <MessageSquareWarning className="h-3.5 w-3.5" />
-              Pedir ajuste
-            </button>
-            {!bloqueado && (
-              <button
-                type="button"
-                onClick={onAprovar}
-                disabled={ocupado || !completo}
-                className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: "#15803d" }}
-              >
-                {ocupado ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <BadgeCheck className="h-3.5 w-3.5" />
+
+            {verIguais && (
+              <div className="mt-1.5 space-y-1.5">
+                {edicao.iguais.map((m) =>
+                  m.longo ? (
+                    <BlocoLongo
+                      key={m.chave}
+                      campo={m}
+                      aberto={!!abertos[m.chave]}
+                      onToggle={() => setAbertos((p) => ({ ...p, [m.chave]: !p[m.chave] }))}
+                    />
+                  ) : (
+                    <LinhaMudanca key={m.chave} campo={m} />
+                  ),
                 )}
-                Pré-aprovar
-              </button>
+              </div>
             )}
           </div>
-        )}
-        {!decidido && !completo && (
-          <p className="mt-2 text-right text-[11px]" style={{ color: "#8b8b9a" }}>
-            Responda as 3 perguntas para liberar o parecer.
-          </p>
-        )}
-
-        {/* Caixa de texto: obrigatória nos 3 caminhos, com título/exemplo próprios.
-            - "ajuste"/"reprovar": o texto é lido pelo AUTOR;
-            - "justificar": o texto é lido pela TRIAGEM, e a pergunta + o exemplo vêm da
-              CHAVE que ficou "não" (`JUSTIFICATIVA_POR_CHAVE`) — exemplo genérico do
-              saving em cima de um "não" de KPI foi o que o Lucas reprovou. Com 2 "nãos",
-              um bullet por pergunta e um campo só (duas caixas empilhadas cansam). */}
-        {!decidido && caixa && (
-          <CaixaParecer
-            projetoId={i.projeto_id}
-            modo={caixa}
-            chavesJustificar={chavesJustificar}
-            comentario={comentario}
-            onComentario={onComentario}
-            ocupado={ocupado}
-            onCancelar={onFecharCaixa}
-            onConfirmar={
-              caixa === "ajuste" ? onPedirAjuste : caixa === "reprovar" ? onReprovar : onAprovar
-            }
-          />
         )}
       </div>
 
-      {/* ── Zona 3: sair deste projeto sem decidir ──────────────────────────── */}
-      {/* Card longo: quem chega ao fim e quer pular não deveria ter de rolar de volta
-          até a barra do topo. */}
-      {(podeVoltar || podeAvancar) && (
-        <div
-          className="flex items-center justify-between gap-2 px-5 py-3"
-          style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+      {/* ── Zona 3: o parecer (a MESMA do card de submissão) ──────────────── */}
+      <ZonaParecer {...parecer} />
+
+      <PeNavegacao {...navegacao} decidido={parecer.decidido} />
+    </div>
+  );
+}
+
+/** Cor + ícone + rótulo escrito de cada estado de mudança (nunca só a cor). */
+const ESTADO_MUDANCA: Record<
+  CampoComparado["estado"],
+  { rotulo: string; cor: string; Icone: typeof ArrowRight }
+> = {
+  alterado: { rotulo: "Alterado", cor: "var(--go-blue)", Icone: ArrowRight },
+  adicionado: { rotulo: "Adicionado", cor: "#6b6d00", Icone: Plus },
+  removido: { rotulo: "Removido", cor: "#b91c1c", Icone: Minus },
+  igual: { rotulo: "Sem mudança", cor: "#8b8b9a", Icone: Equal },
+};
+
+/**
+ * Uma mudança de valor curto: rótulo, antes → depois e, quando é número, o quanto variou.
+ *
+ * O "antes" fica em cinza e o "depois" em azul forte — mas a diferença entre eles NÃO é a
+ * cor: são as etiquetas "antes"/"agora", que sobrevivem a daltonismo e a print em preto e
+ * branco.
+ */
+function LinhaMudanca({ campo }: { campo: CampoComparado }) {
+  const e = ESTADO_MUDANCA[campo.estado];
+  return (
+    <div
+      className="rounded-lg px-3.5 py-2.5"
+      style={{
+        background: campo.estado === "igual" ? "rgba(0,0,0,0.02)" : "rgba(0,89,169,0.04)",
+        border: `1px solid ${campo.estado === "igual" ? "rgba(0,0,0,0.06)" : "rgba(0,89,169,0.14)"}`,
+        borderLeft: `3px solid ${e.cor}`,
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "#8b8b9a" }}>
+          {campo.rotulo}
+        </p>
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: e.cor }}
         >
-          <button
-            type="button"
-            onClick={onVoltar}
-            disabled={!podeVoltar}
-            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
-            style={{ color: "var(--go-blue)" }}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Projeto anterior
-          </button>
-          <button
-            type="button"
-            onClick={onAvancar}
-            disabled={!podeAvancar}
-            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
-            style={{ color: "var(--go-blue)" }}
-          >
-            {decidido ? "Próximo projeto" : "Decidir depois"}
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+          <e.Icone className="h-3 w-3" />
+          {e.rotulo}
+        </span>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        {/* A etiqueta "antes" só faz sentido quando existe um "agora" diferente. No campo
+            sem mudança ela mentiria: o valor não é o antigo, é o de sempre. */}
+        {campo.estado !== "igual" && (
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: "#a5a5b3" }}>
+            antes
+          </span>
+        )}
+        <span
+          className="text-[13px] font-medium tabular-nums"
+          style={{
+            color: "#8b8b9a",
+            textDecoration: campo.estado === "removido" ? "line-through" : undefined,
+          }}
+        >
+          {campo.antes ?? "não informado"}
+        </span>
+        {campo.estado !== "igual" && (
+          <>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: "#a5a5b3" }} />
+            <span className="text-[10px] uppercase tracking-wide" style={{ color: "#a5a5b3" }}>
+              agora
+            </span>
+            <span
+              className="text-[13.5px] font-bold tabular-nums"
+              style={{ color: "var(--go-text-heading)" }}
+            >
+              {campo.depois ?? "não informado"}
+            </span>
+          </>
+        )}
+        {campo.delta && <ChipVariacao delta={campo.delta} />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "▲ + 42 h/mês" — o tamanho do salto, que é o que faz o líder desconfiar ou concordar.
+ *
+ * ⚠️ O chip é NEUTRO de propósito (azul nas duas direções, a direção sai do ícone e do
+ * `aria-label`). Verde para "subiu" e âmbar para "caiu" pareceu óbvio na 1ª versão e estava
+ * errado por dois motivos: **custo externo** subindo é PIOR, e sairia verde; e um saving que
+ * dobra de uma versão para a outra é exatamente o que o líder tem de DUVIDAR — pintá-lo de
+ * verde empurraria o carimbo. A comparação relata, não opina.
+ */
+function ChipVariacao({ delta }: { delta: NonNullable<CampoComparado["delta"]> }) {
+  const subiu = delta.direcao === "subiu";
+  const Icone = subiu ? TrendingUp : TrendingDown;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums"
+      style={{ background: "rgba(0,89,169,0.1)", color: "var(--go-blue)" }}
+      aria-label={`${subiu ? "subiu" : "caiu"} ${delta.texto}`}
+    >
+      <Icone className="h-3 w-3" />
+      {delta.texto}
+    </span>
+  );
+}
+
+/**
+ * Texto longo (memorial, documentação, itens de custo evitado): fechado por padrão, com o
+ * rótulo e o estado à vista. Aberto, o "antes" vem em creme e o "agora" em branco com a
+ * barra azul — empilhados, não em colunas: o memorial tem parágrafos, e duas colunas
+ * estreitas de prosa se leem pior que duas caixas largas.
+ */
+function BlocoLongo({
+  campo,
+  aberto,
+  onToggle,
+}: {
+  campo: CampoComparado;
+  aberto: boolean;
+  onToggle: () => void;
+}) {
+  const e = ESTADO_MUDANCA[campo.estado];
+  const ehMemorial = campo.chave === "memorial_calculo";
+  return (
+    <div
+      className="overflow-hidden rounded-lg"
+      style={{
+        background: campo.estado === "igual" ? "rgba(0,0,0,0.02)" : "rgba(0,89,169,0.04)",
+        border: `1px solid ${campo.estado === "igual" ? "rgba(0,0,0,0.06)" : "rgba(0,89,169,0.14)"}`,
+        borderLeft: `3px solid ${e.cor}`,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={aberto}
+        className="flex w-full cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 px-3.5 py-2.5 text-left"
+      >
+        <span
+          className="text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: "#8b8b9a" }}
+        >
+          {campo.rotulo}
+        </span>
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: e.cor }}
+        >
+          <e.Icone className="h-3 w-3" />
+          {e.rotulo}
+        </span>
+        <span className="text-[11px]" style={{ color: "#a5a5b3" }}>
+          texto longo
+        </span>
+        <span
+          className="ml-auto inline-flex items-center gap-1 text-[11.5px] font-bold"
+          style={{ color: "var(--go-blue)" }}
+        >
+          {aberto ? "Fechar" : campo.estado === "igual" ? "Ver o texto" : "Ver antes e agora"}
+          <ChevronDown
+            className="h-3.5 w-3.5 transition-transform motion-reduce:transition-none"
+            style={{ transform: aberto ? "rotate(180deg)" : "none" }}
+          />
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="space-y-2 px-3.5 pb-3.5">
+          {/* Campo igual não repete o texto duas vezes — mostra uma vez só. */}
+          {campo.estado !== "igual" && (
+            <TextoVersao
+              etiqueta={`Antes (versão anterior)`}
+              texto={campo.antes}
+              tom="antes"
+              markdown={ehMemorial}
+            />
+          )}
+          <TextoVersao
+            etiqueta={campo.estado === "igual" ? "Texto (não mudou)" : "Agora (esta versão)"}
+            texto={campo.depois}
+            tom={campo.estado === "igual" ? "antes" : "agora"}
+            markdown={ehMemorial}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+function TextoVersao({
+  etiqueta,
+  texto,
+  tom,
+  markdown,
+}: {
+  etiqueta: string;
+  texto: string | null;
+  tom: "antes" | "agora";
+  markdown: boolean;
+}) {
+  return (
+    <div>
+      <p
+        className="mb-1 text-[10px] font-bold uppercase tracking-wide"
+        style={{ color: tom === "agora" ? "var(--go-blue)" : "#a5a5b3" }}
+      >
+        {etiqueta}
+      </p>
+      <div
+        className="max-h-72 overflow-y-auto rounded-lg px-3.5 py-2.5 text-[12.5px] leading-relaxed"
+        style={{
+          background: tom === "agora" ? "var(--go-white)" : "var(--go-cream)",
+          border: "1px solid rgba(0,89,169,0.1)",
+          borderLeft: tom === "agora" ? "3px solid var(--go-blue)" : "3px solid rgba(0,0,0,0.08)",
+          color: tom === "agora" ? "var(--go-text-heading)" : "#6b6b7a",
+          whiteSpace: markdown ? undefined : "pre-wrap",
+        }}
+      >
+        {texto === null ? (
+          <span style={{ color: "#a5a5b3" }}>não informado nesta versão</span>
+        ) : markdown ? (
+          <SimpleMarkdown text={texto} isSaving />
+        ) : (
+          texto
+        )}
+      </div>
     </div>
   );
 }
@@ -1159,8 +1429,10 @@ function CaixaParecer({
   const primeira = chavesJustificar[0];
   const titulo = justificando
     ? chavesJustificar.length > 1
-      ? "Dois pontos ficaram como \"Não\". Explique cada um:"
-      : (primeira ? JUSTIFICATIVA_POR_CHAVE[primeira].pergunta : "Explique o seu parecer")
+      ? 'Dois pontos ficaram como "Não". Explique cada um:'
+      : primeira
+        ? JUSTIFICATIVA_POR_CHAVE[primeira].pergunta
+        : "Explique o seu parecer"
     : modo === "ajuste"
       ? "O que precisa ser ajustado?"
       : "Por que este projeto está sendo reprovado?";
@@ -1171,7 +1443,10 @@ function CaixaParecer({
       : "Confirmar reprovação";
 
   return (
-    <div className="mt-3 rounded-lg p-4" style={{ background: fundo, border: `1px solid ${cor}33` }}>
+    <div
+      className="mt-3 rounded-lg p-4"
+      style={{ background: fundo, border: `1px solid ${cor}33` }}
+    >
       <label
         htmlFor={`comentario-${projetoId}`}
         className="mb-1.5 block text-[12px] font-semibold"
@@ -1214,7 +1489,11 @@ function CaixaParecer({
           type="button"
           onClick={onCancelar}
           className="cursor-pointer rounded-lg px-4 py-2 text-[12px] font-bold transition-colors"
-          style={{ background: "transparent", color: "#6b6b7a", border: "1.5px solid rgba(0,0,0,0.12)" }}
+          style={{
+            background: "transparent",
+            color: "#6b6b7a",
+            border: "1.5px solid rgba(0,0,0,0.12)",
+          }}
         >
           Cancelar
         </button>
@@ -1223,7 +1502,10 @@ function CaixaParecer({
           onClick={onConfirmar}
           disabled={ocupado || comentario.trim().length === 0}
           className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
-          style={{ background: justificando ? "#15803d" : cor, border: `1.5px solid ${justificando ? "#15803d" : cor}` }}
+          style={{
+            background: justificando ? "#15803d" : cor,
+            border: `1.5px solid ${justificando ? "#15803d" : cor}`,
+          }}
         >
           {ocupado ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1314,5 +1596,291 @@ function Bloco({
       </p>
       <div className="mt-0.5 text-[13px]">{children}</div>
     </div>
+  );
+}
+
+// ─── Zona do parecer (compartilhada pelos dois cards) ────────────────────────
+//
+// O checklist, o bloqueio do saving incoerente e a caixa de texto são REGRA, não
+// layout: submissão e edição têm de cobrar exatamente as mesmas 3 respostas e os
+// mesmos textos. Por isso a zona vive aqui, e não copiada em cada card.
+
+function ZonaParecer({
+  projetoId,
+  decidido,
+  respostas,
+  onResponder,
+  ocupado,
+  caixa,
+  onAbrirCaixa,
+  onFecharCaixa,
+  comentario,
+  onComentario,
+  onAprovar,
+  onPedirAjuste,
+  onReprovar,
+  proximoPendente,
+}: ParecerProps) {
+  const completo = checklistCompleto(respostas);
+  const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
+  // Saving incoerente é PRÉ-REQUISITO, não algo a justificar: some o "Pré-aprovar".
+  const bloqueado = bloqueiaPreAprovacao(respostas);
+  const chavesJustificar = chavesQueExigemJustificativa(respostas);
+
+  return (
+    <div
+      className="px-5 py-4"
+      style={{ background: "rgba(0,89,169,0.03)", borderTop: "1px solid rgba(0,89,169,0.08)" }}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+          Seu parecer
+        </p>
+        {!decidido && (
+          <p className="text-[11px]" style={{ color: completo ? "#15803d" : "#8b8b9a" }}>
+            {completo ? "3 de 3 respondidas" : `Faltam ${faltam} de 3 perguntas`}
+          </p>
+        )}
+      </div>
+
+      {/* Já decidido: o card continua na fila para o líder rever o que registrou, sem
+            poder mudar (a decisão foi gravada e o autor já foi avisado). */}
+      {decidido && (
+        <div
+          className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg px-3.5 py-3"
+          style={
+            decidido === "aprovado"
+              ? { background: "rgba(21,128,61,0.07)", border: "1.5px solid rgba(21,128,61,0.22)" }
+              : decidido === "ajuste"
+                ? { background: "rgba(180,83,9,0.07)", border: "1.5px solid rgba(180,83,9,0.22)" }
+                : { background: "rgba(220,38,38,0.07)", border: "1.5px solid rgba(220,38,38,0.22)" }
+          }
+        >
+          {decidido === "aprovado" ? (
+            <BadgeCheck className="h-4 w-4 shrink-0" style={{ color: "#15803d" }} />
+          ) : decidido === "ajuste" ? (
+            <MessageSquareWarning className="h-4 w-4 shrink-0" style={{ color: "#b45309" }} />
+          ) : (
+            <CircleX className="h-4 w-4 shrink-0" style={{ color: "#b91c1c" }} />
+          )}
+          <p
+            className="text-[12.5px] font-semibold"
+            style={{
+              color:
+                decidido === "aprovado" ? "#15803d" : decidido === "ajuste" ? "#b45309" : "#b91c1c",
+            }}
+          >
+            {decidido === "aprovado"
+              ? "Você pré-aprovou este projeto. O autor e a equipe RPA já veem o parecer."
+              : decidido === "ajuste"
+                ? "Você pediu ajuste. O autor recebeu o seu comentário."
+                : "Você reprovou este projeto. O autor recebeu o seu motivo."}
+          </p>
+          {proximoPendente && (
+            <button
+              type="button"
+              onClick={proximoPendente}
+              className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-bold transition-all"
+              style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+            >
+              Ir para o próximo sem parecer
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="mt-2.5 space-y-2">
+        {CHECKLIST_APROVACAO.map((p) => {
+          const marcada = respostas[p.chave];
+          return (
+            <div
+              key={p.chave}
+              className="flex flex-col gap-2 rounded-lg px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+              style={{
+                background: "var(--go-white)",
+                border: marcada
+                  ? "1.5px solid rgba(0,89,169,0.25)"
+                  : "1.5px solid rgba(0,0,0,0.07)",
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <p
+                  className="flex items-start gap-1.5 text-[13px] font-semibold"
+                  style={{ color: "var(--go-text-heading)" }}
+                >
+                  {/* Estado por ícone + borda, nunca só por cor */}
+                  {marcada && (
+                    <Check
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                      style={{ color: "var(--go-blue)" }}
+                    />
+                  )}
+                  {p.pergunta}
+                </p>
+                <p className="mt-0.5 text-[11px]" style={{ color: "#8b8b9a" }}>
+                  {p.ajuda}
+                </p>
+              </div>
+              <div
+                className="flex shrink-0 gap-1 self-start rounded-full p-1 sm:self-auto"
+                style={{ background: "rgba(0,0,0,0.04)" }}
+                role="group"
+                aria-label={p.pergunta}
+              >
+                {(["sim", "nao"] as RespostaChecklist[]).map((v) => {
+                  const ativo = marcada === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => onResponder(p.chave, v)}
+                      disabled={!!decidido}
+                      aria-pressed={ativo}
+                      className="cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        background: ativo ? "var(--go-blue)" : "transparent",
+                        color: ativo ? "var(--go-white)" : "#6b6b7a",
+                      }}
+                    >
+                      {v === "sim" ? "Sim" : "Não"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Sem aviso antecipado sobre o "Não" (04/08/2026): quem clica em "Pré-aprovar"
+            já cai na caixa de explicação, e o texto solto aqui só poluía a tela. */}
+      {/* Saving incoerente = erro de submissão, não algo a justificar: o
+            "Pré-aprovar" sai de cena e sobram ajuste/reprovação. */}
+      {!decidido && bloqueado && (
+        <p
+          className="mt-2.5 flex items-start gap-1.5 rounded-lg px-3 py-2.5 text-[11.5px] leading-snug"
+          style={{
+            background: "rgba(220,38,38,0.06)",
+            border: "1px solid rgba(220,38,38,0.18)",
+            color: "#b91c1c",
+          }}
+        >
+          <MessageSquareWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{AVISO_SAVING_INCOERENTE}</span>
+        </p>
+      )}
+
+      {!decidido && (
+        <div className="mt-3.5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => onAbrirCaixa("reprovar")}
+            disabled={ocupado || !completo}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: "rgba(220,38,38,0.1)", color: "#b91c1c" }}
+          >
+            <CircleX className="h-3.5 w-3.5" />
+            Reprovar
+          </button>
+          <button
+            type="button"
+            onClick={() => onAbrirCaixa("ajuste")}
+            disabled={ocupado || !completo}
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ background: "rgba(180,83,9,0.12)", color: "#b45309" }}
+          >
+            <MessageSquareWarning className="h-3.5 w-3.5" />
+            Pedir ajuste
+          </button>
+          {!bloqueado && (
+            <button
+              type="button"
+              onClick={onAprovar}
+              disabled={ocupado || !completo}
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[12px] font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: "#15803d" }}
+            >
+              {ocupado ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <BadgeCheck className="h-3.5 w-3.5" />
+              )}
+              Pré-aprovar
+            </button>
+          )}
+        </div>
+      )}
+      {!decidido && !completo && (
+        <p className="mt-2 text-right text-[11px]" style={{ color: "#8b8b9a" }}>
+          Responda as 3 perguntas para liberar o parecer.
+        </p>
+      )}
+
+      {/* Caixa de texto: obrigatória nos 3 caminhos, com título/exemplo próprios.
+            - "ajuste"/"reprovar": o texto é lido pelo AUTOR;
+            - "justificar": o texto é lido pela TRIAGEM, e a pergunta + o exemplo vêm da
+              CHAVE que ficou "não" (`JUSTIFICATIVA_POR_CHAVE`) — exemplo genérico do
+              saving em cima de um "não" de KPI foi o que o Lucas reprovou. Com 2 "nãos",
+              um bullet por pergunta e um campo só (duas caixas empilhadas cansam). */}
+      {!decidido && caixa && (
+        <CaixaParecer
+          projetoId={projetoId}
+          modo={caixa}
+          chavesJustificar={chavesJustificar}
+          comentario={comentario}
+          onComentario={onComentario}
+          ocupado={ocupado}
+          onCancelar={onFecharCaixa}
+          onConfirmar={
+            caixa === "ajuste" ? onPedirAjuste : caixa === "reprovar" ? onReprovar : onAprovar
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/** Pé do card: pular para outro projeto sem decidir este. */
+function PeNavegacao({
+  podeVoltar,
+  podeAvancar,
+  onVoltar,
+  onAvancar,
+  decidido,
+}: NavegacaoProps & { decidido: Veredito | null }) {
+  return (
+    <>
+      {/* ── Zona 3: sair deste projeto sem decidir ──────────────────────────── */}
+      {/* Card longo: quem chega ao fim e quer pular não deveria ter de rolar de volta
+          até a barra do topo. */}
+      {(podeVoltar || podeAvancar) && (
+        <div
+          className="flex items-center justify-between gap-2 px-5 py-3"
+          style={{ borderTop: "1px solid rgba(0,89,169,0.08)" }}
+        >
+          <button
+            type="button"
+            onClick={onVoltar}
+            disabled={!podeVoltar}
+            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+            style={{ color: "var(--go-blue)" }}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Projeto anterior
+          </button>
+          <button
+            type="button"
+            onClick={onAvancar}
+            disabled={!podeAvancar}
+            className="inline-flex cursor-pointer items-center gap-1 text-[12px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+            style={{ color: "var(--go-blue)" }}
+          >
+            {decidido ? "Próximo projeto" : "Decidir depois"}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
