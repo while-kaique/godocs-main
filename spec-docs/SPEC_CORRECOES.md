@@ -2390,6 +2390,65 @@ ficha ganha um `radiogroup` de 5 estrelas ao lado do Status, salvo pelo mesmo bo
 **Testes.** 4 casos em `tests/dashboard-admin.test.ts` (grava número · `0` nunca vira "—" ·
 quem só muda status não toca a coluna · recusa fora de 0–5).
 
+### Revisão no MESMO dia — a escala não tem teto, e passa a ser filtrável (17/08/2026)
+
+**Sintoma.** Duas coisas, ditas pelo Luis depois de usar a ficha: (a) *"tire o limite de 5
+estrelas, podemos dar N estrelas"* — o teto tratava as notas 7/8/10 que JÁ existem na planilha
+como legado a substituir, e o `setEstrelas(Math.min(nota, 5))` fazia o salvar **rebaixar** a
+nota de outra pessoa (a decisão 4 acima avisava, mas avisar não segura); (b) não havia como
+**filtrar por quantidade de estrelas**, que é justamente o que a nota serve para fazer.
+
+**Fix.** (a) `max(5)` sai do `statusSchema` — sobra `MAX_ESTRELAS_GRAVAVEL = 100`, sanidade de
+CÉLULA e não escala; a fileira da ficha nasce com 5, cresce até a nota gravada e ganha um botão
+**"+ estrela"** (que já dá a estrela que abre — pedir 2 cliques faria parecer quebrado); o
+rótulo passa a ser "8 estrelas" em vez de "8/5". (b) `estrelas` entra no
+`ProjetoDashboardResumo` + `COLUNAS_RESUMO`, vira **coluna ordenável** na tabela e **filtro por
+FAIXA** (`estrelasMin`/`estrelasMax`, `casaEstrelas`).
+
+**Decisões fechadas.**
+1. **A decisão 5 acima é REVERTIDA de propósito** — `estrelas` entra no resumo porque agora é
+   DESENHADA (coluna) e filtrável. O canário do payload (`tests/dashboard-filtros.test.ts`)
+   passou a conhecer a chave: é um número curto, não um blob como `observacoes`.
+2. **Faixa com pontas ABERTAS, não lista de opções.** Sem teto na escala, um `<select>` de
+   "1★/2★/3★…" reinventaria o teto. Só a mínima = "1 ou mais"; **`0 a 0` = a fila do que ninguém
+   avaliou**, porque **célula vazia conta como 0** (tratá-la como "fora de toda faixa" deixaria
+   essa fila inalcançável). Conta como UMA dimensão no "Limpar filtros".
+3. **`VERSAO_RECORTE_RESUMO` entra no `hashLinha`.** O espelho é *hash-gated*: sem bumpar, as
+   ~600 linhas que ninguém editou ficariam com o recorte ANTIGO e a coluna nasceria vazia **para
+   sempre**. O re-espelhamento é único, na 1ª corrida do cron depois do deploy.
+4. **Célula vazia é "—" na tabela, ≠ `0`**: "ainda não avaliei" não é "avaliei e não dei
+   estrela" (a ordenação segue a mesma régua, vazio abaixo do zero).
+5. **O número é o que se lê.** Ninguém conta 12 estrelas desenhadas — daí o número ao lado na
+   ficha e a célula da tabela ser `★ n`, não N ícones.
+
+**Testes.** `tests/dashboard-admin.test.ts` (aceita 8; recusa negativo, fracionado e > 100) +
+6 casos de faixa em `tests/dashboard-filtros.test.ts` (pontas abertas · inclusiva · nota > 5 ·
+vazio = 0 · AND com as outras dimensões · uma dimensão no contador).
+
+---
+
+## Ficha ainda parava em "Carregando a linha da planilha…" logo depois de buscar (17/08/2026)
+
+**Sintoma.** Com o lote da página já implementado, buscar um projeto e clicar nele **ainda**
+mostrava o spinner por ~1 s. Relato do Luis: *"era pra ficar mais rápido como um SPA"*.
+
+**Causa.** `semearLote` só criava as entradas do cache **quando o lote CHEGAVA**. A busca troca
+a página visível, o lote da nova página sai (após os 120 ms de debounce) e o clique acontece
+*durante* a viagem: `obterDetalhe` não achava entrada nenhuma e abria uma **2ª requisição pela
+MESMA ficha** — mais ~750 ms de overhead fixo do edge, em paralelo com o lote que já a trazia.
+
+**Fix.** O lote é registrado no cache **em voo**: cada id ganha, na hora, uma entrada apontando
+para a promise do lote. Clique e hover no meio da viagem passam a esperar a requisição que já
+existe. Id que o lote não devolveu (teto de 30, projeto fora do espelho) cai no caminho
+individual — nunca num `undefined` servido como ficha. E o `pointerdown` da linha aquece na
+hora, sem os 150 ms do hover (quem clica direto não paga a intenção).
+
+**Invariantes preservados.** Falha (do lote OU do individual) **não fica retida** no cache; id
+com ficha fresca não é resemeado (não atropela requisição em voo); TTL de 30 s inalterado.
+
+**Testes.** 2 casos novos em `tests/dashboard-detalhe-cache.test.ts` (clique durante o lote =
+1 requisição só · id ausente do lote não vira ficha vazia nem entrada retida).
+
 ---
 
 ## Abrir a ficha e entrar no `/dashboard` — duas esperas de ~750 ms cada (17/08/2026)

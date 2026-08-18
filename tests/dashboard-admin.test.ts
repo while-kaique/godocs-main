@@ -353,12 +353,25 @@ describe('definirStatusProjeto', () => {
     expect(Object.keys(mockUpdateRow.mock.calls[0]![1])).not.toContain('Estrelas');
   });
 
-  it('recusa nota fora da escala de 0 a 5', async () => {
-    await expect(
-      definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: 8 }, 'a@b.com'),
-    ).rejects.toThrow();
+  // A escala NÃO tem teto de 5 (pedido do Luis, 17/08/2026: "podemos dar N estrelas") — o
+  // teto antigo tratava as notas 7/8/10 que já existem na planilha como legado a substituir.
+  it('aceita nota acima de 5 (a escala é aberta)', async () => {
+    await definirStatusProjeto(
+      { projeto_id: 'legado-148', status: 'Aprovado', estrelas: 8 },
+      'admin@gocase.com',
+    );
+    expect((mockUpdateRow.mock.calls[0]![1] as Record<string, string>)['Estrelas']).toBe('8');
+  });
+
+  it('recusa nota negativa, fracionada ou absurda (sanidade da célula)', async () => {
     await expect(
       definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: -1 }, 'a@b.com'),
+    ).rejects.toThrow();
+    await expect(
+      definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: 2.5 }, 'a@b.com'),
+    ).rejects.toThrow();
+    await expect(
+      definirStatusProjeto({ projeto_id: 'legado-148', status: 'Aprovado', estrelas: 101 }, 'a@b.com'),
     ).rejects.toThrow();
   });
 

@@ -27,6 +27,7 @@ import {
   ArrowDown,
   AlertTriangle,
   Sparkles,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
@@ -65,6 +66,7 @@ import {
   agendarPrefetchDetalhe,
   cancelarPrefetchDetalhe,
   limparDetalhes,
+  prefetchDetalhe,
   semearLote,
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
@@ -362,6 +364,16 @@ function Dashboard() {
           maximo={hoje}
           onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
         />
+        {/* Faixa da nota da triagem (pedido do Luis, 17/08). Duas pontas abertas em vez de
+            uma lista fixa de opções, porque a escala NÃO tem teto: "de 1" já é "1 ou mais",
+            e "de 0 a 0" é a fila do que ninguém avaliou ainda. */}
+        <FiltroEstrelas
+          min={filtros.estrelasMin}
+          max={filtros.estrelasMax}
+          onChange={(estrelasMin, estrelasMax) =>
+            setFiltros((f) => ({ ...f, estrelasMin, estrelasMax }))
+          }
+        />
         <label className="sr-only" htmlFor="filtro-area">
           Filtrar por área
         </label>
@@ -502,6 +514,16 @@ function Dashboard() {
                 {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
                     ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
                 <Th className="hidden md:table-cell">Pré-status</Th>
+                {/* A nota na tabela é o que torna o filtro conferível — sem ela, "de 3 a 5"
+                    devolveria uma lista sem nada que a explique. */}
+                <Th
+                  className="hidden md:table-cell"
+                  onClick={() => alternarOrdem('estrelas')}
+                  ativa={ordem === 'estrelas'}
+                  direcao={direcao}
+                >
+                  Estrelas
+                </Th>
                 <Th className="hidden xl:table-cell">Complexidade</Th>
                 <Th
                   className="text-right"
@@ -527,7 +549,7 @@ function Dashboard() {
                 <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="p-10 text-center text-sm text-muted-foreground">
                     {projetos.length === 0
                       ? 'A planilha não devolveu nenhum projeto.'
                       : 'Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila.'}
@@ -554,6 +576,10 @@ function Dashboard() {
                     // ⚠️ Isto SÓ é aceitável porque a rota do detalhe lê o espelho (SQLite) e
                     // nunca o Sheets — ver o cabeçalho de `dashboard-detalhe-cache.ts`.
                     onMouseEnter={() => agendarPrefetchDetalhe(p.id)}
+                    // O apertar do botão vem ANTES do `click`: quem clica direto (sem
+                    // esperar os 150 ms do hover) já sai do zero, sem esperar o `onClick`
+                    // montar o overlay para só então pedir a ficha.
+                    onPointerDown={() => prefetchDetalhe(p.id)}
                     onMouseLeave={cancelarPrefetchDetalhe}
                     onFocus={() => agendarPrefetchDetalhe(p.id)}
                     onBlur={cancelarPrefetchDetalhe}
@@ -606,6 +632,24 @@ function Dashboard() {
                         // Projeto sem fila nenhuma (legado, isento): "—" quieto em vez de
                         // um chip "Sem parecer" repetido em centenas de linhas.
                         <span className="text-[12.5px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    {/* Nota como NÚMERO + uma estrela de rótulo: 12 estrelas desenhadas em
+                        600 linhas ninguém conta (e a escala não tem teto). Célula vazia é
+                        "—", diferente do 0 explícito. */}
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-[12.5px] md:table-cell">
+                      {p.estrelas == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 tabular-nums">
+                          <Star
+                            className="h-3.5 w-3.5"
+                            style={{ color: p.estrelas > 0 ? '#e0a800' : 'var(--muted-foreground)' }}
+                            fill={p.estrelas > 0 ? '#f5c518' : 'none'}
+                            aria-hidden
+                          />
+                          {p.estrelas}
+                        </span>
                       )}
                     </td>
                     <td className="hidden px-3 py-2.5 text-[12.5px] xl:table-cell">
@@ -779,6 +823,88 @@ function Segmentado({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Faixa de estrelas — duas pontas numéricas em vez de uma lista de opções, porque a escala
+ * da nota é ABERTA (a ficha dá N estrelas): uma lista fixa voltaria a inventar um teto.
+ * Ponta vazia = aberta, então preencher só a mínima já responde "1 estrela ou mais".
+ */
+function FiltroEstrelas({
+  min,
+  max,
+  onChange,
+}: {
+  min: number | null;
+  max: number | null;
+  onChange: (min: number | null, max: number | null) => void;
+}) {
+  const ativo = min != null || max != null;
+  // Campo vazio é ponta ABERTA (`null`), não zero: "de 0" incluiria quem não tem nota.
+  const ler = (v: string): number | null => {
+    const n = Number.parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const campo =
+    'h-7 w-[52px] rounded-full border border-input bg-background px-2 text-center text-[12px] tabular-nums shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none';
+  return (
+    <div
+      role="group"
+      aria-label="Filtrar pela nota em estrelas"
+      className="inline-flex items-center gap-1 rounded-full border bg-card p-0.5 shadow-sm"
+      style={{
+        borderColor: ativo ? 'var(--go-blue)' : 'var(--input)',
+      }}
+    >
+      <span
+        className="inline-flex items-center gap-1 pl-2.5 pr-0.5 text-[10px] font-bold uppercase tracking-[0.07em]"
+        style={{ color: ativo ? 'var(--go-blue)' : 'var(--muted-foreground)' }}
+      >
+        <Star className="h-3 w-3" aria-hidden />
+        Estrelas
+      </span>
+      <label className="sr-only" htmlFor="estrelas-min">
+        Nota mínima
+      </label>
+      <input
+        id="estrelas-min"
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        placeholder="mín"
+        value={min ?? ''}
+        onChange={(e) => onChange(ler(e.target.value), max)}
+        className={campo}
+        style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
+      />
+      <span className="text-[11px] text-muted-foreground">a</span>
+      <label className="sr-only" htmlFor="estrelas-max">
+        Nota máxima
+      </label>
+      <input
+        id="estrelas-max"
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        placeholder="máx"
+        value={max ?? ''}
+        onChange={(e) => onChange(min, ler(e.target.value))}
+        className={campo}
+        style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
+      />
+      <button
+        type="button"
+        onClick={() => onChange(null, null)}
+        aria-label="Limpar o filtro de estrelas"
+        disabled={!ativo}
+        className="mr-0.5 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-0 motion-reduce:transition-none"
+      >
+        <X className="h-3 w-3" />
+      </button>
     </div>
   );
 }

@@ -235,6 +235,39 @@ describe("semearLote — a página inteira numa requisição", () => {
     expect(individual).toHaveBeenCalledTimes(1);
   });
 
+  // Este é o "ainda demora em 'Carregando a linha da planilha…'" depois de buscar um projeto:
+  // o lote da página recém-filtrada tinha acabado de sair e o clique o IGNORAVA, pagando de
+  // novo os ~750 ms de overhead do edge numa 2ª requisição pela MESMA ficha.
+  it("clique DURANTE o lote em voo espera o lote — não abre uma 2ª requisição", async () => {
+    let liberar!: (v: Record<string, { id: string }>) => void;
+    const lote = vi.fn(
+      () => new Promise<Record<string, { id: string }>>((res) => (liberar = res)),
+    );
+    semearLote(["a", "b"], lote);
+    await drenar();
+
+    const individual = vi.fn();
+    const aberta = obterDetalhe("A", individual); // clique no meio da viagem
+    expect(individual).not.toHaveBeenCalled();
+
+    liberar({ a: { id: "a" }, b: { id: "b" } });
+    await expect(aberta).resolves.toEqual({ id: "a" });
+    expect(lote).toHaveBeenCalledTimes(1);
+    expect(individual).not.toHaveBeenCalled();
+  });
+
+  it("id que o lote NÃO devolveu não vira ficha vazia — e a entrada não fica retida", async () => {
+    const lote = vi.fn().mockResolvedValue({ a: { id: "a" } });
+    semearLote(["a", "ausente"], lote);
+    await drenar();
+    // Sem ficha no lote, o fallback é o caminho individual (aqui o `fetcherPadrao`, que
+    // falha fora do browser) — nunca um `undefined` servido como ficha.
+    await expect(obterDetalhe("ausente")).rejects.toBeTruthy();
+    const depois = vi.fn().mockResolvedValue({ id: "ausente" });
+    await expect(obterDetalhe("ausente", depois)).resolves.toEqual({ id: "ausente" });
+    expect(depois).toHaveBeenCalledTimes(1);
+  });
+
   it("lista vazia não dispara requisição", () => {
     const lote = vi.fn();
     semearLote([], lote);

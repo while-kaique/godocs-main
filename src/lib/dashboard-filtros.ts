@@ -54,6 +54,13 @@ export type FiltrosDashboard = {
   parecer: FiltroParecer;
   /** Janela de "Data Submissão", inclusiva nas duas pontas. `null` = sem recorte. */
   periodo: Intervalo | null;
+  /**
+   * Faixa da nota da triagem (coluna "Estrelas"), inclusiva nas duas pontas. `null` em uma
+   * ponta = ponta aberta, então `min:1` sozinho já é "1 estrela ou mais" — o pedido do Luis
+   * de "filtrar de 1 a N". A escala não tem teto (ver `dashboard-resumo`).
+   */
+  estrelasMin: number | null;
+  estrelasMax: number | null;
 };
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
@@ -63,6 +70,8 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   area: TODAS_AS_AREAS,
   parecer: TODOS_OS_PARECERES,
   periodo: null,
+  estrelasMin: null,
+  estrelasMax: null,
 };
 
 /** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
@@ -108,6 +117,23 @@ export function casaParecer(p: ProjetoDashboardResumo, filtro: FiltroParecer): b
   return filtro === TODOS_OS_PARECERES || chaveDoEstado(p.aprovacaoLider) === filtro;
 }
 
+/**
+ * A nota cai na faixa? Célula VAZIA conta como **0**: quem filtra "1 ou mais" quer os
+ * avaliados, e quem filtra "0 a 0" quer justamente a fila do que ainda não recebeu nota —
+ * tratar vazio como "fora de qualquer faixa" deixaria essa fila inalcançável.
+ */
+export function casaEstrelas(
+  p: ProjetoDashboardResumo,
+  min: number | null,
+  max: number | null,
+): boolean {
+  if (min == null && max == null) return true;
+  const n = p.estrelas ?? 0;
+  if (min != null && n < min) return false;
+  if (max != null && n > max) return false;
+  return true;
+}
+
 export function casaStatus(p: ProjetoDashboardResumo, status: string): boolean {
   return status === "todos" || pilulaDe(p.statusChave) === status;
 }
@@ -124,7 +150,8 @@ export function aplicarFiltros(
       casaGanho(p, f.ganho) &&
       casaArea(p, f.area) &&
       casaParecer(p, f.parecer) &&
-      casaPeriodo(p, f.periodo),
+      casaPeriodo(p, f.periodo) &&
+      casaEstrelas(p, f.estrelasMin, f.estrelasMax),
   );
 }
 
@@ -138,7 +165,9 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     (f.ganho !== "todos" ? 1 : 0) +
     (f.area !== TODAS_AS_AREAS ? 1 : 0) +
     (f.parecer !== TODOS_OS_PARECERES ? 1 : 0) +
-    (f.periodo ? 1 : 0)
+    (f.periodo ? 1 : 0) +
+    // A faixa de estrelas é UMA dimensão, mesmo com as duas pontas preenchidas.
+    (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0)
   );
 }
 
@@ -187,6 +216,7 @@ export function contarPorPilula(
     if (!casaArea(p, f.area)) continue;
     if (!casaParecer(p, f.parecer)) continue;
     if (!casaPeriodo(p, f.periodo)) continue;
+    if (!casaEstrelas(p, f.estrelasMin, f.estrelasMax)) continue;
     const k = pilulaDe(p.statusChave);
     out[k] = (out[k] ?? 0) + 1;
   }

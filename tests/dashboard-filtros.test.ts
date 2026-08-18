@@ -10,6 +10,7 @@ import {
   TODAS_AS_AREAS,
   aplicarFiltros,
   areasDisponiveis,
+  casaEstrelas,
   casaParecer,
   casaPeriodo,
   contarFiltrosAtivos,
@@ -53,6 +54,7 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     tipos: 'Saving',
     especial: false,
     aprovacaoLider: null,
+    estrelas: null,
     busca: 'projeto fulano',
     ...over,
   };
@@ -306,6 +308,8 @@ describe('peso do payload da listagem', () => {
         'dataSubmissao',
         'email',
         'especial',
+        // Número curto e DESENHADO (coluna "Estrelas" + filtro por faixa) — passa no canário.
+        'estrelas',
         'ganhoTotal',
         'id',
         'nome',
@@ -396,5 +400,57 @@ describe('filtro de pré-aprovação do líder', () => {
       'Pré-pendente',
       'Pré-aprovado',
     ]);
+  });
+});
+
+// ─── Faixa de estrelas (nota da triagem) ───────────────────────────────────────
+// A escala NÃO tem teto (17/08/2026), então o filtro é uma FAIXA com pontas abertas: um
+// `<select>` de opções fixas voltaria a inventar o teto que a ficha acabou de perder.
+describe('filtro por quantidade de estrelas', () => {
+  it('ponta aberta: só a mínima já é "1 estrela ou mais"', () => {
+    expect(casaEstrelas(proj({ estrelas: 1 }), 1, null)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 12 }), 1, null)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 0 }), 1, null)).toBe(false);
+    // Só a máxima = "até 2", incluindo quem não tem nota.
+    expect(casaEstrelas(proj({ estrelas: 2 }), null, 2)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 3 }), null, 2)).toBe(false);
+  });
+
+  it('faixa fechada é INCLUSIVA nas duas pontas', () => {
+    expect(casaEstrelas(proj({ estrelas: 3 }), 3, 5)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 5 }), 3, 5)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 6 }), 3, 5)).toBe(false);
+  });
+
+  it('nota acima de 5 entra (não há teto na escala)', () => {
+    expect(casaEstrelas(proj({ estrelas: 10 }), 6, null)).toBe(true);
+  });
+
+  it('célula VAZIA conta como 0 — senão a fila do "ainda sem nota" seria inalcançável', () => {
+    expect(casaEstrelas(proj({ estrelas: null }), 0, 0)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: null }), 1, null)).toBe(false);
+  });
+
+  it('sem faixa não recorta nada', () => {
+    expect(casaEstrelas(proj({ estrelas: null }), null, null)).toBe(true);
+    expect(contarFiltrosAtivos(filtros())).toBe(0);
+  });
+
+  it('soma (AND) com as outras dimensões e conta como UM filtro ativo', () => {
+    const misto = [
+      proj({ id: 'A', estrelas: 5, statusChave: 'pendente' }),
+      proj({ id: 'B', estrelas: 1, statusChave: 'pendente' }),
+      proj({ id: 'C', estrelas: 8, statusChave: 'aprovado' }),
+    ];
+    const f = filtros({ estrelasMin: 4, status: 'pendente' });
+    expect(aplicarFiltros(misto, f).map((p) => p.id)).toEqual(['A']);
+    // Duas pontas preenchidas seguem sendo UMA dimensão no "Limpar filtros".
+    expect(contarFiltrosAtivos(filtros({ estrelasMin: 1, estrelasMax: 3 }))).toBe(1);
+    // E a contagem das pílulas respeita o recorte (senão "Pendente 3" abriria lista de 1).
+    expect(contarPorPilula(misto, filtros({ estrelasMin: 4 }))).toEqual({
+      pendente: 1,
+      aprovado: 1,
+    });
+    expect(totalSemStatus(misto, filtros({ estrelasMin: 4 }))).toBe(2);
   });
 });

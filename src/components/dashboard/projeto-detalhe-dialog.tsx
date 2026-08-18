@@ -136,8 +136,19 @@ const DESCRICAO = 'Descrição';
 // como texto cru em "Outras colunas", e a pessoa teria dois lugares dizendo a mesma nota.
 const NO_CABECALHO = ['Projeto', 'Estrelas'];
 
-/** Máximo da escala. Notas legadas acima disso (7, 8, 10) existem e são preservadas. */
-const MAX_ESTRELAS = 5;
+/**
+ * Quantas estrelas a fileira mostra quando a nota é baixa. **Não é teto da escala** — a
+ * escala é ABERTA (pedido do Luis, 17/08/2026: "podemos dar N estrelas"): a fileira sempre
+ * cresce até a nota atual e o botão "+" acrescenta mais uma.
+ */
+const ESTRELAS_BASE = 5;
+
+/**
+ * Sanidade da célula, espelhando o `MAX_ESTRELAS_GRAVAVEL` do servidor (replicado, não
+ * importado, para o bundle do cliente não arrastar o módulo server-only — mesma razão do
+ * `STATUS_OPCOES` acima).
+ */
+const MAX_ESTRELAS_GRAVAVEL = 100;
 
 function lerEstrelas(valor: string | undefined): number {
   const n = Number(String(valor ?? '').trim().replace(',', '.'));
@@ -145,33 +156,33 @@ function lerEstrelas(valor: string | undefined): number {
 }
 
 /**
- * Nota da triagem — grupo de rádio de 0 a 5 (`radiogroup`, com as setas do teclado),
- * não cinco botões soltos: é UMA escolha entre opções mutuamente exclusivas.
+ * Nota da triagem — grupo de rádio SEM teto (`radiogroup`, com as setas do teclado), não N
+ * botões soltos: é UMA escolha entre opções mutuamente exclusivas.
+ *
+ * A fileira nasce com 5 estrelas (o caso comum), cresce até a nota gravada — nota 8 da
+ * planilha aparece como 8 estrelas, não como "legado a substituir" — e o "+" adiciona uma.
  *
  * ⚠️ A nota nunca é dita só pelo preenchimento da estrela: o número fica ao lado, em
  * texto, e cada estrela tem `aria-label` própria.
  */
-function NotaEstrelas({
-  valor,
-  onChange,
-  legado,
-}: {
-  valor: number;
-  onChange: (n: number) => void;
-  /** Nota fora da escala vinda da planilha (7, 8, 10) — mostrada em vez de apagada. */
-  legado: number | null;
-}) {
+function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number) => void }) {
   const [previa, setPrevia] = useState<number | null>(null);
+  const [extras, setExtras] = useState(0);
   const mostrado = previa ?? valor;
+  // A fileira acompanha a maior das três: a base, a nota atual e o que o "+" abriu.
+  const quantas = Math.min(
+    MAX_ESTRELAS_GRAVAVEL,
+    Math.max(ESTRELAS_BASE, valor, previa ?? 0, extras),
+  );
   return (
-    <div className="mt-1 flex items-center gap-2">
+    <div className="mt-1 flex flex-wrap items-center gap-2">
       <div
         role="radiogroup"
-        aria-label="Nota do projeto, de 0 a 5 estrelas"
-        className="flex items-center gap-0.5"
+        aria-label={`Nota do projeto, de 0 a ${quantas} estrelas (a escala não tem teto)`}
+        className="flex flex-wrap items-center gap-0.5"
         onMouseLeave={() => setPrevia(null)}
       >
-        {Array.from({ length: MAX_ESTRELAS }, (_, i) => i + 1).map((n) => {
+        {Array.from({ length: quantas }, (_, i) => i + 1).map((n) => {
           const cheia = n <= mostrado;
           return (
             <button
@@ -199,13 +210,28 @@ function NotaEstrelas({
           );
         })}
       </div>
+      {/* Sem teto, a nota só é legível pelo NÚMERO — contar 12 estrelas na tela ninguém
+          conta. Daí o texto ao lado ser "12 estrelas", não "12/N". */}
       <span className="text-[12px] tabular-nums text-muted-foreground">
-        {valor === 0 ? 'sem nota' : `${valor}/${MAX_ESTRELAS}`}
+        {valor === 0 ? 'sem nota' : `${valor} ${valor === 1 ? 'estrela' : 'estrelas'}`}
       </span>
-      {legado != null && (
-        <span className="text-[11px] text-amber-700 dark:text-amber-400">
-          (na planilha está {legado} — salvar substitui)
-        </span>
+      {quantas < MAX_ESTRELAS_GRAVAVEL && (
+        <button
+          type="button"
+          onClick={() => {
+            const nova = quantas + 1;
+            setExtras(nova);
+            // O "+" JÁ dá a estrela: pedir dois cliques (abrir a vaga, depois marcá-la) é o
+            // tipo de passo que faz a pessoa achar que o botão não funcionou.
+            onChange(nova);
+          }}
+          aria-label={`Dar ${quantas + 1} estrelas`}
+          title="Mais uma estrela (a escala não tem teto)"
+          className="rounded-full border border-dashed px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
+        >
+          + estrela
+        </button>
       )}
     </div>
   );
@@ -317,7 +343,9 @@ export function ProjetoDetalheDialog({
         setMotivoReprovado(mReprovado);
         const nota = lerEstrelas(d.campos['Estrelas']);
         estrelasOriginal.current = nota;
-        setEstrelas(Math.min(nota, MAX_ESTRELAS));
+        // ⚠️ Sem `Math.min`: a escala é aberta, então nota 8 da planilha entra como 8 (antes
+        // ela era recortada para 5 e o "salvar" REBAIXAVA a nota de outra pessoa).
+        setEstrelas(nota);
         setStatusEscolhido(d.campos['Status'] ?? '');
       })
       .catch((e: Error) => vivo && setErro(e.message))
@@ -381,8 +409,6 @@ export function ProjetoDetalheDialog({
   const statusMudou = detalhe != null && statusEscolhido !== (campos['Status'] ?? '');
   const obsMudou = detalhe != null && observacoes !== obsOriginal.current;
   const estrelasMudou = detalhe != null && estrelas !== estrelasOriginal.current;
-  const notaLegado =
-    estrelasOriginal.current > MAX_ESTRELAS ? estrelasOriginal.current : null;
   const motivosMudaram =
     detalhe != null &&
     (motivoReenvio !== motivoReenvioOriginal.current ||
@@ -469,7 +495,7 @@ export function ProjetoDetalheDialog({
                   <span className="mt-3 block text-[11px] font-semibold text-muted-foreground">
                     Nota da triagem — coluna "Estrelas" da planilha
                   </span>
-                  <NotaEstrelas valor={estrelas} onChange={setEstrelas} legado={notaLegado} />
+                  <NotaEstrelas valor={estrelas} onChange={setEstrelas} />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-semibold text-muted-foreground">

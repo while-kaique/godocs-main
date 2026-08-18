@@ -87,6 +87,11 @@ export const ROTA_LOTE_DASHBOARD = "/api/admin/dashboard/projetos/lote";
  * ~750 ms de overhead fixo do edge a cada ficha aberta. Uma requisição de ~137 KB (25 fichas
  * × 5,5 KB medidos em prod) faz TODAS as linhas da página abrirem sem requisição nenhuma.
  *
+ * O lote é registrado no cache **enquanto ainda está em voo**: quem clica no meio da viagem
+ * espera a requisição que já existe, em vez de abrir uma segunda (e pagar de novo os ~750 ms
+ * de overhead do edge). É o que se sentia ao buscar um projeto e clicar em seguida — o lote
+ * da página recém-filtrada tinha acabado de sair e o clique o ignorava.
+ *
  * Invariantes preservados: só semeia id que **não** tem entrada fresca (nunca atropela uma
  * requisição em voo), **falha não vira entrada** (o cache não guarda erro — a abertura cai
  * no caminho individual e mostra o erro real), e o TTL é o mesmo dos demais.
@@ -105,23 +110,34 @@ export function semearLote<T>(
   const buscar =
     fetcher ??
     ((alvos: string[]) => apiFetch<Record<string, T>>(ROTA_LOTE_DASHBOARD, { ids: alvos }));
-  void Promise.resolve()
+  // Uma leitura só do lote, indexada pela MESMA chave normalizada das entradas (o servidor
+  // devolve o id como recebeu; um fetcher de teste pode devolver em outra caixa).
+  const emVoo = Promise.resolve()
     .then(() => buscar(faltando))
-    .then((fichas) => {
-      const at = Date.now();
-      for (const [id, ficha] of Object.entries(fichas ?? {})) {
-        const k = chave(id);
-        const atual = cache.get(k);
-        // Quem chegou primeiro manda: uma abertura em voo não pode ser trocada por baixo.
-        if (atual && Date.now() - atual.at <= DETALHE_TTL_MS) continue;
-        cache.set(k, { p: Promise.resolve(ficha), at });
-      }
-      podar();
-    })
-    .catch(() => {
-      // Lote é otimização, não caminho crítico: falhou, cada ficha volta a ser buscada
-      // individualmente na abertura. Nada de entrada rejeitada no cache.
+    .then((fichas) => new Map(Object.entries(fichas ?? {}).map(([id, f]) => [chave(id), f])));
+
+  // ⚠️ Cada id ganha entrada JÁ AGORA, apontando para o lote EM VOO — não só quando ele
+  // chega. Sem isto, clicar (ou passar o mouse) num projeto enquanto o lote viaja não
+  // encontrava nada no cache e disparava uma requisição individual: mais ~750 ms de overhead
+  // fixo do edge por cima de um lote que ia trazer aquela mesma ficha. Era o "ainda demora
+  // no 'Carregando a linha da planilha…'" logo depois de buscar um projeto, quando o lote da
+  // página filtrada tinha acabado de sair.
+  const at = Date.now();
+  for (const k of faltando) {
+    const p = emVoo.then((fichas) => {
+      const ficha = fichas.get(k);
+      // Id fora do lote (o servidor corta em `LOTE_MAX_FICHAS`, e projeto ausente do espelho
+      // fica de fora de propósito): cai no caminho individual, que mostra o erro real.
+      return ficha == null ? apiFetch<T>(rotaDetalheDashboard(k)) : ficha;
     });
+    const entrada: Entrada = { p, at };
+    cache.set(k, entrada);
+    // Falha (do lote ou do individual) NUNCA fica retida — a invariante de sempre.
+    void p.catch(() => {
+      if (cache.get(k) === entrada) cache.delete(k);
+    });
+  }
+  podar();
 }
 
 /**
