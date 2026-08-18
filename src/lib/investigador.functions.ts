@@ -16,6 +16,7 @@ import {
   getAllReenvios,
   getVersionsByProjeto,
   getFormEventsByProjeto,
+  getTodasAprovacoesPendentes,
   parseJson,
   type ChatMetricsRow,
   type ChatMessageRow,
@@ -514,4 +515,59 @@ export async function getInvestigadorStats() {
     chamadas_lentas: lentos,
     endpoints,
   }
+}
+
+// ── Pendentes de pré-aprovação do líder — alimenta a aba "Pendentes" ─────────
+
+export type ProjetoPendenteAprovacao = {
+  projeto_id: string
+  nome: string | null
+  responsavel_nome: string
+  responsavel_email: string
+  area_nome: string | null
+  ferramenta: string | null
+  submitted_at: string | null
+  // Quando a fila foi aberta/reaberta (todas as linhas do projeto nascem juntas).
+  aguardando_desde: string | null
+  lideres_pendentes: { nome: string | null; email: string }[]
+}
+
+/**
+ * Projetos com pré-aprovação do líder ainda pendente — diagnóstico admin, para
+ * ver quem está travado esperando parecer (não é a fila de UM líder, essa é a
+ * tela `/aprovacoes`). Agrupa as linhas de `getTodasAprovacoesPendentes` por
+ * projeto: como a decisão de qualquer líder resolve TODAS as linhas de uma vez
+ * (D4), "tem linha pendente" já basta para dizer "ninguém decidiu ainda".
+ */
+export async function getProjetosPendentesAprovacaoInvestigador(): Promise<ProjetoPendenteAprovacao[]> {
+  const linhas = await getTodasAprovacoesPendentes()
+
+  const porProjeto = new Map<string, typeof linhas>()
+  for (const l of linhas) {
+    const arr = porProjeto.get(l.projeto_id) ?? []
+    arr.push(l)
+    porProjeto.set(l.projeto_id, arr)
+  }
+
+  const result: ProjetoPendenteAprovacao[] = []
+  for (const [projetoId, doProjeto] of porProjeto) {
+    const primeira = doProjeto[0]
+    result.push({
+      projeto_id: projetoId,
+      nome: primeira.projeto_nome,
+      responsavel_nome: primeira.autor_nome ?? '',
+      responsavel_email: primeira.autor_email ?? '',
+      area_nome: primeira.area,
+      ferramenta: primeira.ferramenta,
+      submitted_at: primeira.submitted_at,
+      aguardando_desde: doProjeto.reduce<string | null>(
+        (min, l) => (l.criado_em && (!min || l.criado_em < min) ? l.criado_em : min),
+        null,
+      ),
+      lideres_pendentes: doProjeto.map((l) => ({ nome: l.aprovador_nome, email: l.aprovador_email })),
+    })
+  }
+
+  // Mais antigo esperando primeiro — é quem mais precisa de atenção.
+  return result.sort((a, b) => (a.aguardando_desde ?? '').localeCompare(b.aguardando_desde ?? ''))
 }
