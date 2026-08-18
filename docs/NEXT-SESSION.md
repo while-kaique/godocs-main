@@ -6,25 +6,41 @@
 
 ## Plano ativo — AGENTE CLASSIFICADOR DE ESPECIAIS (peça 4)
 
-**Estado (18/08, fim do dia) — na STAGING:** `/especiais` agrupa os especiais por NÍVEL com a
-régua 0–10 no cabeçalho da coluna (definição da faixa + raridade na base, de `especiais-regua.ts`,
-FONTE ÚNICA vinda da rubrica do JV) e a **recomendação da auditoria por projeto** (nota sugerida,
-confiança, leitura, botão "Aplicar" — o clique de gente é que grava). As 99 recomendações da
-força-tarefa entram por SEED idempotente (`especiais-seed.ts`), curva 0:8 1:43 2:40 3:6 4:2 travada
-em teste. Filtros de busca/período/só-divergentes, paginação de 7+5 por coluna, cabeçalho em placas.
-1558 testes verdes.
+**Estado (18/08, fim do dia) — EM PRODUÇÃO (`/especiais`):** régua 0–10 como FONTE ÚNICA
+(`especiais-regua.ts`, da rubrica do JV) com definição da faixa + raridade no cabeçalho da coluna ·
+as 99 recomendações da força-tarefa por SEED idempotente (`especiais-seed.ts`, curva 0:8 1:43 2:40
+3:6 4:2 travada em teste) mostradas no cartão com confiança, leitura e "Aplicar" · ±1 estrela
+gravando na planilha · as 3 decisões no cartão (Aprovar/Pedir reenvio/Reprovar, motivo obrigatório
+nas negativas, ação redundante escondida) pela MESMA rota do `/dashboard` · duplo clique abre o
+`ProjetoDetalheDialog` · divisão da validação por ÁREA (tabela interna `especial_area_dono`) com
+carga por pessoa · descontinuados fora · chip de espera 60d/30d só em quem aguarda decisão ·
+filtros de busca, status, validador, período e só-divergentes · 7+5 cartões por coluna.
+1582 testes verdes.
 
-⚠️ **A "Régua deste nível" (prateleira com projeto-âncora) foi REMOVIDA** no mesmo dia — decisão do
-Luis: o agente ocupou esse lugar. A tabela `especial_referencia` fica de pé sem leitor (arquivar,
-nunca DROP) e as rotas de referência saíram.
+⚠️ Saíram por decisão: a prateleira "Régua deste nível" (o agente ocupou o lugar), o filtro de
+**pré-status** e o de **fila** (especial não passa por líder — D27 —, então os dois listavam
+distinções que não existem nesta tela). `filaDe` continua no módulo, testada.
 
-⚠️ A staging roda o branch `deploy/staging-especiais` = feature + `origin/worktree-feat+investigador-aba-pre-aprovacao`
-(branch não-mergeada de outra pessoa) — refazer esse merge a cada deploy enquanto ela não entrar no main.
+⚠️ A staging e a prod rodam o branch `deploy/staging-especiais` = feature + `origin/worktree-feat+investigador-aba-pre-aprovacao`
+(branch não-mergeada de outra pessoa, que JÁ ESTAVA em prod) — refazer esse merge a cada deploy
+enquanto ela não entrar no `main`.
 
-**O QUE FALTA, na ordem recomendada:** (1) **o AGENTE classificador** — hoje NENHUM agente roda no
-app: um especial submetido agora chega sem recomendação; (2) validação do Luis → prod → PR;
-(3) etapa (b) da fusão: modo FILA (filas derivadas de Status+Líder+Especial, tempo de espera, ações,
-dono/progresso) + ponte "posicionar" da fila para a régua.
+## O QUE FALTA — fazer TUDO JUNTO na próxima sessão (decisão do Luis, 18/08)
+
+1. **O AGENTE classificador** (o grande item) — ver o prompt abaixo.
+2. **Ordenar as colunas por TEMPO DE ESPERA** (hoje é data desc, mais recente primeiro; no painel
+   do JV quem espera há mais tempo vem primeiro). É defeito, não escolha — o chip de espera já
+   está na tela.
+3. **Contador de progresso por pessoa** ("18 de 25 decididos") — hoje só a carga.
+4. **Filtro de dono com default no usuário logado** (hoje abre em "todos").
+5. **Escopo da tela — DECISÃO PENDENTE do Luis:** a `/especiais` cobre só os especiais (28 dos 99
+   do snapshot do JV). Os outros 71 (fila do RPA com líder pré-aprovado, aguardando líder, reenvios
+   não-especiais) não têm espera nem divisão por pessoa em lugar nenhum. Ou (a) estender esta tela
+   para todos os projetos, virando o painel do JV dentro do GoDocs — e aí os filtros de fila e
+   pré-status VOLTAM a fazer sentido —, ou (b) manter `/especiais` focada e levar espera+divisão
+   para o `/dashboard`.
+6. `fatores` e `alerta` do contrato de dados dele — só passam a importar com o agente, que é quem
+   os produz.
 
 ### O prompt da próxima sessão
 

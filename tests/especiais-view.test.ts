@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ESPERA_ATENCAO,
   ESPERA_CRITICA,
+  aguardaDecisao,
   TETO_REENVIO,
   areasDosProjetos,
   cargaPorDono,
@@ -182,6 +183,13 @@ describe('tempo de espera', () => {
 
   it('sem data não inventa espera', () => {
     expect(diasDeEspera(projeto({ id: 'a' }), agora)).toBeNull();
+  });
+
+  it('projeto já decidido não tem espera — o número viraria idade da submissão', () => {
+    expect(aguardaDecisao(projeto({ id: 'a', statusChave: 'aprovado' }))).toBe(false);
+    expect(aguardaDecisao(projeto({ id: 'b', statusChave: 'reprovado' }))).toBe(false);
+    expect(aguardaDecisao(projeto({ id: 'c', statusChave: 'pendente', especial: true }))).toBe(true);
+    expect(aguardaDecisao(projeto({ id: 'd', statusChave: 'reenvio pendente' }))).toBe(true);
   });
 
   it('as faixas do painel: 60d é crítico, 30d é atenção', () => {

@@ -283,6 +283,17 @@ export function diasDeEspera(p: ProjetoDashboardResumo, agoraMs: number): number
   return Math.max(0, Math.round((agoraMs - p.dataOrdenacao) / 86_400_000));
 }
 
+/**
+ * O chip de espera só faz sentido em quem AGUARDA decisão.
+ *
+ * Em projeto já decidido (aprovado, reprovado) o número continuaria correndo e passaria a
+ * medir "quanto tempo desde que foi submetido" — que não é espera nenhuma, e ainda ficaria
+ * vermelho aos 60 dias como se houvesse algo atrasado. Quem já foi decidido não espera.
+ */
+export function aguardaDecisao(p: ProjetoDashboardResumo): boolean {
+  return filaDe(p) !== 'decidido';
+}
+
 /** Faixas de urgência do chip de espera (do painel do JV: 60d vermelho, 30d âmbar). */
 export const ESPERA_CRITICA = 60;
 export const ESPERA_ATENCAO = 30;

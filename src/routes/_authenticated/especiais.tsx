@@ -42,7 +42,6 @@ import {
   FILAS_DO_RPA,
   FILTROS_ESPECIAIS_VAZIOS,
   MAX_COMPARAR,
-  ROTULO_FILA,
   TETO_REENVIO,
   agruparEspeciais,
   areasDosProjetos,
@@ -52,7 +51,7 @@ import {
   diasDeEspera,
   donoDoProjeto,
   excedeTetoDeReenvio,
-  filaDe,
+  aguardaDecisao,
   rotuloValidador,
   urgenciaDaEspera,
   type ColunaEspeciais,
@@ -759,9 +758,9 @@ function Cartao({
 }) {
   const [acaoAberta, setAcaoAberta] = useState<AcaoTriagem | null>(null);
   const nota = projeto.estrelas;
-  const dias = diasDeEspera(projeto, agoraMs);
+  // Só quem aguarda decisão tem "espera": num aprovado o número viraria idade da submissão.
+  const dias = aguardaDecisao(projeto) ? diasDeEspera(projeto, agoraMs) : null;
   const urgencia = urgenciaDaEspera(dias);
-  const fila = filaDe(projeto);
   const avisoTeto = avaliacao != null && excedeTetoDeReenvio(projeto, avaliacao.estrelas_recomendada);
 
   return (
@@ -810,9 +809,6 @@ function Cartao({
             {dias}d de espera
           </span>
         )}
-        <span className="rounded px-1.5 py-0.5 text-[11px]" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
-          {ROTULO_FILA[fila]}
-        </span>
         {dono && (
           <span
             className="rounded-full border px-1.5 py-0.5 text-[11px]"
