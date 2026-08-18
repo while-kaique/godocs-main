@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Check,
+  Users,
   ChevronDown,
   Loader2,
   Search,
@@ -35,12 +36,27 @@ import { fmtDataBR } from '@/lib/format-date';
 import {
   CARTOES_INCREMENTO,
   CARTOES_INICIAIS,
+  FILAS_DO_RPA,
   FILTROS_ESPECIAIS_VAZIOS,
   MAX_COMPARAR,
+  ROTULO_FILA,
+  TETO_REENVIO,
   agruparEspeciais,
+  areasDosProjetos,
+  cargaPorDono,
+  chaveArea,
   contarFiltrosEspeciais,
+  diasDeEspera,
+  donoDoProjeto,
+  excedeTetoDeReenvio,
+  filaDe,
+  rotuloValidador,
+  urgenciaDaEspera,
   type ColunaEspeciais,
+  type DonoDeArea,
+  type Fila,
   type FiltrosEspeciais,
+  type ValidadorEspeciais,
 } from '@/lib/especiais-view';
 import { casaPeriodo } from '@/lib/dashboard-filtros';
 import { filtrarPorTermo } from '@/components/dashboard/tabela-utils';
@@ -65,6 +81,8 @@ export const Route = createFileRoute('/_authenticated/especiais')({
 type Listagem = {
   projetos: ProjetoDashboardResumo[];
   avaliacoes: AvaliacaoEspecial[];
+  donos: DonoDeArea[];
+  validadores: ValidadorEspeciais[];
   lidoEm: string;
   espelhoVelho: boolean;
 };
@@ -100,6 +118,10 @@ function Especiais() {
   const [filtros, setFiltros] = useState<FiltrosEspeciais>(FILTROS_ESPECIAIS_VAZIOS);
   // Quantos cartões cada coluna mostra. Chaveado pela coluna, e zerado a cada filtro novo.
   const [mostrando, setMostrando] = useState<Record<string, number>>({});
+  const [divisaoAberta, setDivisaoAberta] = useState(false);
+  // "Agora" congelado no carregamento: recalcular a cada render faria o chip de espera mudar
+  // de faixa no meio de um clique.
+  const [agoraMs] = useState(() => Date.now());
 
   const carregar = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
@@ -117,6 +139,11 @@ function Especiais() {
     void carregar();
   }, [carregar]);
 
+  const donoPor = useMemo(
+    () => new Map((dados?.donos ?? []).map((d) => [chaveArea(d.area), d])),
+    [dados],
+  );
+
   const avaliacaoPor = useMemo(
     () => new Map((dados?.avaliacoes ?? []).map((a) => [a.projeto_id, a])),
     [dados],
@@ -130,10 +157,17 @@ function Especiais() {
         (p) => deltaRecomendacao(p.estrelas, avaliacaoPor.get(p.id)) != null,
       );
     }
+    if (filtros.dono) {
+      visiveis = visiveis.filter((p) => {
+        const dono = donoDoProjeto(p, donoPor);
+        return filtros.dono === 'sem-dono' ? dono == null : dono === filtros.dono;
+      });
+    }
+    if (filtros.fila) visiveis = visiveis.filter((p) => filaDe(p) === filtros.fila);
     if (filtros.periodo) visiveis = visiveis.filter((p) => casaPeriodo(p, filtros.periodo));
     if (filtros.termo.trim()) visiveis = filtrarPorTermo(visiveis, filtros.termo);
     return agruparEspeciais(visiveis);
-  }, [dados, filtros, avaliacaoPor]);
+  }, [dados, filtros, avaliacaoPor, donoPor]);
 
   // Filtro novo = lista nova: manter o "carregar mais" antigo mostraria 12 cartões numa coluna
   // que a pessoa acabou de reduzir a 3.
@@ -175,6 +209,26 @@ function Especiais() {
     }
   }
 
+  /** Nome de quem valida este projeto (`null` quando ninguém pegou a área ainda). */
+  function rotuloDono(p: ProjetoDashboardResumo): string | null {
+    const email = donoDoProjeto(p, donoPor);
+    return email ? rotuloValidador(email, dados?.validadores ?? []) : null;
+  }
+
+  async function definirDono(area: string, email: string | null) {
+    const validador = (dados?.validadores ?? []).find((v) => v.email === email);
+    try {
+      await apiFetch('/api/admin/especiais/dono', {
+        area,
+        dono_email: email,
+        dono_nome: validador?.nome ?? undefined,
+      });
+      await carregar(true);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível salvar a divisão.');
+    }
+  }
+
   function alternarComparacao(id: string) {
     setSelecionados((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_COMPARAR ? s : [...s, id],
@@ -200,9 +254,14 @@ function Especiais() {
               faixa e cada projeto, a leitura da auditoria que sustenta a recomendação.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void carregar(true)}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDivisaoAberta(true)}>
+              <Users className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Divisão por pessoa
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void carregar(true)}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Atualizar
+            </Button>
+          </div>
         </div>
 
         {/* Os números em placas, não em linha de texto: são 4 quantidades que a pessoa
@@ -250,6 +309,38 @@ function Especiais() {
               style={{ ['--tw-ring-color' as string]: AZUL }}
             />
           </div>
+
+          <select
+            value={filtros.dono ?? ''}
+            onChange={(e) => setFiltros((f) => ({ ...f, dono: e.target.value || null }))}
+            aria-label="Filtrar por quem valida"
+            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
+            style={{ ['--tw-ring-color' as string]: AZUL }}
+          >
+            <option value="">Todos os validadores</option>
+            {(dados?.validadores ?? []).map((v) => (
+              <option key={v.email} value={v.email}>
+                {v.nome?.trim() || v.email}
+              </option>
+            ))}
+            <option value="sem-dono">Sem dono</option>
+          </select>
+
+          <select
+            value={filtros.fila ?? ''}
+            onChange={(e) => setFiltros((f) => ({ ...f, fila: (e.target.value || null) as Fila | null }))}
+            aria-label="Filtrar por fila"
+            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
+            style={{ ['--tw-ring-color' as string]: AZUL }}
+          >
+            <option value="">Todas as filas</option>
+            {(Object.keys(ROTULO_FILA) as Fila[]).map((f) => (
+              <option key={f} value={f}>
+                {ROTULO_FILA[f]}
+                {FILAS_DO_RPA.includes(f) ? ' · exige você' : ''}
+              </option>
+            ))}
+          </select>
 
           <SeletorPeriodo
             valor={filtros.periodo}
@@ -327,6 +418,8 @@ function Especiais() {
                 key={coluna.chave}
                 coluna={coluna}
                 avaliacaoPor={avaliacaoPor}
+                rotuloDono={rotuloDono}
+                agoraMs={agoraMs}
                 selecionados={selecionados}
                 salvando={salvando}
                 mostrando={mostrando[coluna.chave] ?? CARTOES_INICIAIS}
@@ -342,6 +435,20 @@ function Especiais() {
             ))}
           </div>
         </div>
+      )}
+
+      {divisaoAberta && dados && (
+        <PainelDivisao
+          projetos={dados.projetos}
+          donoPor={donoPor}
+          validadores={dados.validadores}
+          onFechar={() => setDivisaoAberta(false)}
+          onDefinir={definirDono}
+          onFiltrarPor={(email) => {
+            setFiltros((f) => ({ ...f, dono: email }));
+            setDivisaoAberta(false);
+          }}
+        />
       )}
 
       {selecionados.length > 0 && (
@@ -423,6 +530,8 @@ function fmtHora(iso: string) {
 function Coluna({
   coluna,
   avaliacaoPor,
+  rotuloDono,
+  agoraMs,
   selecionados,
   salvando,
   mostrando,
@@ -432,6 +541,8 @@ function Coluna({
 }: {
   coluna: ColunaEspeciais;
   avaliacaoPor: Map<string, AvaliacaoEspecial>;
+  rotuloDono: (p: ProjetoDashboardResumo) => string | null;
+  agoraMs: number;
   selecionados: string[];
   salvando: string | null;
   mostrando: number;
@@ -496,6 +607,8 @@ function Coluna({
             key={p.id}
             projeto={p}
             avaliacao={avaliacaoPor.get(p.id)}
+            dono={rotuloDono(p)}
+            agoraMs={agoraMs}
             selecionado={selecionados.includes(p.id)}
             podeSelecionar={selecionados.length < MAX_COMPARAR || selecionados.includes(p.id)}
             salvando={salvando === p.id}
@@ -530,6 +643,8 @@ function Coluna({
 function Cartao({
   projeto,
   avaliacao,
+  dono,
+  agoraMs,
   selecionado,
   podeSelecionar,
   salvando,
@@ -538,6 +653,8 @@ function Cartao({
 }: {
   projeto: ProjetoDashboardResumo;
   avaliacao: AvaliacaoEspecial | undefined;
+  dono: string | null;
+  agoraMs: number;
   selecionado: boolean;
   podeSelecionar: boolean;
   salvando: boolean;
@@ -545,6 +662,10 @@ function Cartao({
   onNota: (n: number) => void;
 }) {
   const nota = projeto.estrelas;
+  const dias = diasDeEspera(projeto, agoraMs);
+  const urgencia = urgenciaDaEspera(dias);
+  const fila = filaDe(projeto);
+  const avisoTeto = avaliacao != null && excedeTetoDeReenvio(projeto, avaliacao.estrelas_recomendada);
 
   return (
     <article
@@ -559,10 +680,35 @@ function Cartao({
         {[projeto.autor, projeto.area].filter(Boolean).join(' · ') || '—'}
       </p>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <StatusBadge status={projeto.statusChave} />
-        {projeto.dataSubmissao && (
-          <span className="text-[11px] text-muted-foreground">{fmtDataBR(projeto.dataSubmissao)}</span>
+        {/* Espera: o eixo de urgência do painel da força-tarefa. Nunca só cor — o número de
+            dias está escrito, e o título diz desde quando. */}
+        {dias != null && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+            title={projeto.dataSubmissao ? `Submetido em ${fmtDataBR(projeto.dataSubmissao)}` : undefined}
+            style={
+              urgencia === 'critica'
+                ? { background: 'rgba(179,38,30,0.12)', color: '#b3261e' }
+                : urgencia === 'atencao'
+                  ? { background: 'rgba(154,98,6,0.12)', color: '#9a6206' }
+                  : { background: 'var(--muted)', color: 'var(--muted-foreground)' }
+            }
+          >
+            {dias}d de espera
+          </span>
+        )}
+        <span className="rounded px-1.5 py-0.5 text-[11px]" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+          {ROTULO_FILA[fila]}
+        </span>
+        {dono && (
+          <span
+            className="rounded-full border px-1.5 py-0.5 text-[11px]"
+            style={{ borderColor: 'rgba(0,89,169,0.35)', color: AZUL }}
+          >
+            {dono}
+          </span>
         )}
       </div>
 
@@ -570,6 +716,7 @@ function Cartao({
         <RecomendacaoAuditoria
           avaliacao={avaliacao}
           atual={nota}
+          avisoTeto={avisoTeto}
           onAplicar={() => onNota(avaliacao.estrelas_recomendada)}
         />
       )}
@@ -625,10 +772,13 @@ function Cartao({
 function RecomendacaoAuditoria({
   avaliacao,
   atual,
+  avisoTeto,
   onAplicar,
 }: {
   avaliacao: AvaliacaoEspecial;
   atual: number | null;
+  /** A recomendação passa do teto de 2★ de quem está em reenvio (régua da auditoria). */
+  avisoTeto: boolean;
   onAplicar: () => void;
 }) {
   const delta = deltaRecomendacao(atual, avaliacao);
@@ -660,6 +810,13 @@ function RecomendacaoAuditoria({
       </div>
       {avaliacao.leitura && (
         <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{avaliacao.leitura}</p>
+      )}
+      {avisoTeto && (
+        <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-700">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+          Em reenvio o teto é {TETO_REENVIO}★ até a documentação ser refeita — só passe disso
+          com evidência forte.
+        </p>
       )}
       {delta != null && (
         <button
@@ -697,6 +854,133 @@ function BotaoNota({
     >
       {children}
     </button>
+  );
+}
+
+// ─── Divisão da validação por pessoa ────────────────────────────────────────
+
+/**
+ * Quem valida o quê. A unidade é a **ÁREA** — herdado da força-tarefa do JV pelo motivo dele:
+ * contexto não se parte, e projeto novo da área já nasce com dono sem ninguém redistribuir.
+ *
+ * ⚠️ Aqui a divisão é DEFINIDA à mão, não derivada por algoritmo de carga: quem coordena sabe
+ * o que a contagem não sabe (quem conhece o time, quem está de férias). A carga por pessoa
+ * aparece ao lado para a divisão torta ficar visível — inclusive a linha **Sem dono**, que é
+ * o que some de vista numa lista organizada por pessoa.
+ */
+function PainelDivisao({
+  projetos,
+  donoPor,
+  validadores,
+  onFechar,
+  onDefinir,
+  onFiltrarPor,
+}: {
+  projetos: ProjetoDashboardResumo[];
+  donoPor: Map<string, DonoDeArea>;
+  validadores: ValidadorEspeciais[];
+  onFechar: () => void;
+  onDefinir: (area: string, email: string | null) => void;
+  onFiltrarPor: (email: string) => void;
+}) {
+  const areas = areasDosProjetos(projetos);
+  const carga = cargaPorDono(projetos, donoPor);
+
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [onFechar]);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-auto bg-black/40 p-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Divisão da validação por pessoa"
+      onClick={(e) => e.target === e.currentTarget && onFechar()}
+    >
+      <div className="w-full max-w-3xl rounded-xl border bg-card p-5 shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[15px] font-semibold">Divisão por pessoa</h2>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">
+              Cada área inteira fica com uma pessoa. Projeto novo daquela área já entra com dono.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onFechar}>
+            <X className="mr-1 h-3.5 w-3.5" aria-hidden /> Fechar
+          </Button>
+        </div>
+
+        {/* Carga: quem está com quantos. Clicar filtra a tela por essa pessoa. */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {validadores.map((v) => (
+            <button
+              key={v.email}
+              type="button"
+              onClick={() => onFiltrarPor(v.email)}
+              className="rounded-lg border px-3 py-2 text-left transition-colors hover:border-[var(--go-blue)] focus-visible:outline-none focus-visible:ring-2"
+              style={{ ['--tw-ring-color' as string]: AZUL }}
+            >
+              <span className="block text-[17px] font-semibold leading-none tabular-nums">
+                {carga.get(v.email) ?? 0}
+              </span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                {v.nome?.trim() || v.email}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => onFiltrarPor('sem-dono')}
+            className="rounded-lg border border-dashed px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2"
+            style={{ ['--tw-ring-color' as string]: AZUL }}
+          >
+            <span className="block text-[17px] font-semibold leading-none tabular-nums">
+              {carga.get(null) ?? 0}
+            </span>
+            <span className="mt-1 block text-[11px] text-muted-foreground">Sem dono</span>
+          </button>
+        </div>
+
+        <div className="mt-4 max-h-[46vh] overflow-auto rounded-lg border">
+          <table className="w-full text-[12.5px]">
+            <thead className="sticky top-0 bg-muted/60 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">Área</th>
+                <th className="w-20 px-3 py-2 text-right font-medium">Projetos</th>
+                <th className="w-56 px-3 py-2 font-medium">Quem valida</th>
+              </tr>
+            </thead>
+            <tbody>
+              {areas.map(({ area, total }) => (
+                <tr key={area} className="border-t">
+                  <td className="px-3 py-1.5">{area}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{total}</td>
+                  <td className="px-3 py-1.5">
+                    <select
+                      value={donoPor.get(area)?.dono_email ?? ''}
+                      onChange={(e) => onDefinir(area, e.target.value || null)}
+                      aria-label={`Quem valida a área ${area}`}
+                      className="h-8 w-full rounded-md border bg-card px-2 text-[12px] focus-visible:outline-none focus-visible:ring-2"
+                      style={{ ['--tw-ring-color' as string]: AZUL }}
+                    >
+                      <option value="">Sem dono</option>
+                      {validadores.map((v) => (
+                        <option key={v.email} value={v.email}>
+                          {v.nome?.trim() || v.email}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 

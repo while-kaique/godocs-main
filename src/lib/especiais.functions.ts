@@ -18,8 +18,20 @@ import {
   ordenarPorDataDesc,
   type ProjetoDashboardResumo,
 } from '@/lib/dashboard-resumo';
-import { getAvaliacoesEspeciais, upsertAvaliacaoEspecial } from '@/integrations/db/client.server';
-import { apenasEspeciais } from '@/lib/especiais-view';
+import {
+  getAvaliacoesEspeciais,
+  upsertAvaliacaoEspecial,
+  getDonosDeArea,
+  upsertDonoDeArea,
+  deleteDonoDeArea,
+  getAdmins,
+} from '@/integrations/db/client.server';
+import {
+  apenasEspeciais,
+  chaveArea,
+  type DonoDeArea,
+  type ValidadorEspeciais,
+} from '@/lib/especiais-view';
 import { NOTA_MAX, type AvaliacaoEspecial, type Confianca } from '@/lib/especiais-regua';
 import { AVALIACOES_SEED, ORIGEM_SEED_FORCA_TAREFA } from '@/lib/especiais-seed';
 import { MAX_ESTRELAS_GRAVAVEL, ESPELHO_VELHO_MS } from '@/lib/dashboard-admin.functions';
@@ -28,6 +40,10 @@ export type ListagemEspeciais = {
   projetos: ProjetoDashboardResumo[];
   /** Recomendações da auditoria (lote importado hoje, agente classificador amanhã). */
   avaliacoes: AvaliacaoEspecial[];
+  /** Quem valida cada área (a divisão da força-tarefa, definida à mão). */
+  donos: DonoDeArea[];
+  /** Admins elegíveis a receber áreas — a lista do seletor da divisão. */
+  validadores: ValidadorEspeciais[];
   /** ISO da última sincronização com a planilha (a idade do espelho), como no /dashboard. */
   lidoEm: string;
   espelhoVelho: boolean;
@@ -71,10 +87,12 @@ export async function semearAvaliacoesEspeciais(
 }
 
 export async function listarEspeciais(): Promise<ListagemEspeciais> {
-  const [{ linhas, lidoEmMs }, saude, avaliacoesIniciais] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, avaliacoesIniciais, donos, admins] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
     getAvaliacoesEspeciais(),
+    getDonosDeArea(),
+    getAdmins(),
   ]);
 
   // Seed: uma vez por isolate, e nunca bloqueia a tela se falhar (é dado de apoio, não estado).
@@ -106,9 +124,44 @@ export async function listarEspeciais(): Promise<ListagemEspeciais> {
       modelo: a.modelo,
       criado_em: a.criado_em,
     })),
+    donos: donos.map((d) => ({ area: d.area, dono_email: d.dono_email, dono_nome: d.dono_nome })),
+    // A lista vem da tabela `admins`. Quem é admin só pela env `ADMIN_EMAILS` (bootstrap) não
+    // aparece aqui — e isso é aceito: para RECEBER uma área é preciso estar cadastrado, o que
+    // dá nome à pessoa em vez de um e-mail solto no seletor.
+    validadores: admins.map((a) => ({ email: a.email, nome: a.nome ?? null })),
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
   };
+}
+
+/**
+ * Define (ou tira) quem valida uma ÁREA inteira.
+ *
+ * ⚠️ Nada disso vai para a planilha: a divisão é combinação interna de quem coordena, não
+ * atributo do projeto — e é por isso que ela pode mudar sem carimbar "Atualizado Em" em
+ * dezenas de linhas.
+ */
+const donoSchema = z.object({
+  area: z.string().min(1).max(120),
+  // `null` = tirar o dono (a área volta para "sem dono").
+  dono_email: z.string().email().max(160).nullable(),
+  dono_nome: z.string().max(160).optional(),
+});
+
+export async function definirDonoDeArea(raw: unknown, adminEmail: string) {
+  const { area, dono_email, dono_nome } = donoSchema.parse(raw);
+  const chave = chaveArea(area);
+  if (!dono_email) {
+    await deleteDonoDeArea(chave);
+    return { ok: true, area: chave, dono_email: null };
+  }
+  await upsertDonoDeArea({
+    area: chave,
+    dono_email,
+    dono_nome: dono_nome?.trim() || null,
+    definido_por: adminEmail,
+  });
+  return { ok: true, area: chave, dono_email };
 }
 
 /**

@@ -45,6 +45,7 @@ import {
 import {
   listarEspeciais,
   definirEstrelasEspecial,
+  definirDonoDeArea,
   importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -582,6 +583,12 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = await readBody(request);
       return json(await definirEstrelasEspecial(body));
+    }
+    // Divisão da validação: qual admin cuida de cada ÁREA. Interno, nunca vai à planilha.
+    if (pathname === "/api/admin/especiais/dono" && method === "POST") {
+      const { email: adminEmail } = await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await definirDonoDeArea(body, adminEmail));
     }
     // Lote de recomendações da auditoria (hoje o JSON da força-tarefa, amanhã o agente
     // classificador). NUNCA toca a planilha — a nota só muda por clique de gente.

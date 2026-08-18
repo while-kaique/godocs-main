@@ -403,6 +403,19 @@ const SCHEMA_SQL = `
   -- ⚠️ A coluna modelo existe porque o llm.ts troca de modelo sozinho no fallback -- sem gravar qual
   -- produziu a nota, "de quem é esta recomendação" vira pergunta sem resposta.
   -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  -- Divisão da validação: qual admin cuida de cada ÁREA (a força-tarefa do JV, mas definida
+  -- à mão em vez de derivada por algoritmo -- quem valida o quê é decisão de quem coordena).
+  -- ⚠️ Tabela INTERNA: sem coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync não a toca.
+  -- ⚠️ A chave é a ÁREA, não o projeto: contexto não se parte, e projeto novo da área já
+  -- nasce com dono sem ninguém ter de redistribuir nada.
+  CREATE TABLE IF NOT EXISTS especial_area_dono (
+    area         TEXT PRIMARY KEY,
+    dono_email   TEXT NOT NULL,
+    dono_nome    TEXT,
+    definido_por TEXT,
+    definido_em  TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS especial_avaliacao (
     projeto_id            TEXT PRIMARY KEY,
     estrelas_recomendada  REAL NOT NULL,

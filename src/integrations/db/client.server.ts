@@ -2417,3 +2417,41 @@ export async function upsertAvaliacaoEspecial(dados: {
     ],
   );
 }
+
+// ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────
+
+export type EspecialAreaDonoRow = {
+  area: string;
+  dono_email: string;
+  dono_nome: string | null;
+  definido_por: string | null;
+  definido_em: string | null;
+};
+
+export async function getDonosDeArea(): Promise<EspecialAreaDonoRow[]> {
+  return queryAll<EspecialAreaDonoRow>('SELECT * FROM especial_area_dono ORDER BY area', []);
+}
+
+/** Define (ou troca) o dono de uma área. UPSERT: redistribuir é o gesto normal. */
+export async function upsertDonoDeArea(dados: {
+  area: string;
+  dono_email: string;
+  dono_nome: string | null;
+  definido_por: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_area_dono (area, dono_email, dono_nome, definido_por, definido_em)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(area) DO UPDATE SET
+       dono_email = excluded.dono_email,
+       dono_nome = excluded.dono_nome,
+       definido_por = excluded.definido_por,
+       definido_em = excluded.definido_em`,
+    [dados.area, dados.dono_email, dados.dono_nome, dados.definido_por],
+  );
+}
+
+/** Tira o dono de uma área (volta para "sem dono"). */
+export async function deleteDonoDeArea(area: string): Promise<void> {
+  await exec('DELETE FROM especial_area_dono WHERE area = ?', [area]);
+}
