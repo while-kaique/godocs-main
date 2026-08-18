@@ -18,21 +18,14 @@ import {
   ordenarPorDataDesc,
   type ProjetoDashboardResumo,
 } from '@/lib/dashboard-resumo';
-import {
-  getReferenciasEspeciais,
-  upsertReferenciaEspecial,
-  deleteReferenciaEspecial,
-  getAvaliacoesEspeciais,
-  upsertAvaliacaoEspecial,
-} from '@/integrations/db/client.server';
-import { apenasEspeciais, type ReferenciaEspecial } from '@/lib/especiais-view';
+import { getAvaliacoesEspeciais, upsertAvaliacaoEspecial } from '@/integrations/db/client.server';
+import { apenasEspeciais } from '@/lib/especiais-view';
 import { NOTA_MAX, type AvaliacaoEspecial, type Confianca } from '@/lib/especiais-regua';
 import { AVALIACOES_SEED, ORIGEM_SEED_FORCA_TAREFA } from '@/lib/especiais-seed';
 import { MAX_ESTRELAS_GRAVAVEL, ESPELHO_VELHO_MS } from '@/lib/dashboard-admin.functions';
 
 export type ListagemEspeciais = {
   projetos: ProjetoDashboardResumo[];
-  referencias: ReferenciaEspecial[];
   /** Recomendações da auditoria (lote importado hoje, agente classificador amanhã). */
   avaliacoes: AvaliacaoEspecial[];
   /** ISO da última sincronização com a planilha (a idade do espelho), como no /dashboard. */
@@ -78,10 +71,9 @@ export async function semearAvaliacoesEspeciais(
 }
 
 export async function listarEspeciais(): Promise<ListagemEspeciais> {
-  const [{ linhas, lidoEmMs }, saude, referencias, avaliacoesIniciais] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, avaliacoesIniciais] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
-    getReferenciasEspeciais(),
     getAvaliacoesEspeciais(),
   ]);
 
@@ -104,13 +96,6 @@ export async function listarEspeciais(): Promise<ListagemEspeciais> {
   const idadeRef = saude.ultimoSyncOkMs ?? lidoEmMs;
   return {
     projetos,
-    referencias: referencias.map((r) => ({
-      projeto_id: r.projeto_id,
-      nota: r.nota,
-      motivo: r.motivo,
-      definido_por: r.definido_por,
-      definido_em: r.definido_em,
-    })),
     avaliacoes: avaliacoes.map((a) => ({
       projeto_id: a.projeto_id,
       estrelas_recomendada: a.estrelas_recomendada,
@@ -185,29 +170,4 @@ export async function definirEstrelasEspecial(raw: unknown) {
   // Remendo do espelho com carimbo: um sync que COMEÇOU antes desta escrita não a desfaz.
   await espelharEscrita(projeto_id, updates);
   return { ok: true, projeto_id, estrelas };
-}
-
-const referenciaSchema = z.object({
-  projeto_id: z.string().min(1).max(120),
-  nota: z.number().int().min(0).max(MAX_ESTRELAS_GRAVAVEL),
-  // A frase da régua. Curta de propósito: é rótulo de nível, não parecer — o teto obriga a
-  // dizer o que distingue o nível em vez de resumir o projeto.
-  motivo: z.string().max(280).optional(),
-});
-
-export async function definirReferenciaEspecial(raw: unknown, adminEmail: string) {
-  const { projeto_id, nota, motivo } = referenciaSchema.parse(raw);
-  await upsertReferenciaEspecial({
-    projeto_id,
-    nota,
-    motivo: motivo?.trim() || null,
-    definido_por: adminEmail,
-  });
-  return { ok: true };
-}
-
-export async function removerReferenciaEspecial(raw: unknown) {
-  const { projeto_id } = z.object({ projeto_id: z.string().min(1).max(120) }).parse(raw);
-  await deleteReferenciaEspecial(projeto_id);
-  return { ok: true };
 }

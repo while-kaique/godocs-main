@@ -1,36 +1,25 @@
 /**
- * Comparador de projetos ESPECIAIS — módulo PURO (agrupamento por nota + âncoras).
+ * Comparador de projetos ESPECIAIS — agrupamento por NÍVEL de estrela (módulo PURO).
  *
- * ## O problema que esta view resolve
- * A coluna "Estrelas" é um número sem denominador: 1, 2 e 3 não têm definição escrita, só o
- * número é gravado (nenhuma justificativa) e comparar dois especiais exige abrir duas
- * documentações longas. O resultado apareceu na discussão GoBrands × PIAPP (18/08/2026): um
- * projeto saiu de 8 estrelas para "será que vale alguma?" — não por erro de julgamento, mas
- * porque a escala não existe fora da cabeça de quem tria naquele dia.
+ * ## O problema
+ * A coluna "Estrelas" é um número sem denominador: 1, 2 e 3 não têm definição escrita e
+ * comparar dois especiais exige abrir duas documentações longas. Foi o que apareceu na
+ * discussão GoBrands × PIAPP (18/08/2026): um projeto saiu de 8 estrelas para "será que vale
+ * alguma?" numa conversa só.
  *
- * ## A régua: ÂNCORA, não rubrica absoluta
- * Gente é ruim em nota absoluta e boa em comparação. Por isso a unidade desta tela não é
- * "quantas estrelas isto vale?" e sim "isto é maior ou menor que o PIAPP?". Cada nível pode
- * ter uma ou mais **referências** (os "flagships") fixadas no topo da coluna, com a frase que
- * diz o que aquele nível significa. A nota de um projeto novo passa a ser posicionamento
- * contra âncoras visíveis — e a frase da âncora é a definição do nível, escrita por quem tria.
+ * ## Quem responde a isso agora
+ * A **recomendação da auditoria** (`especiais-regua.ts` + `especial_avaliacao`): cada projeto
+ * chega com nota sugerida, confiança e a leitura que diz por que a faixa, por que não sobe e o
+ * que faria subir. A tela agrupa por nível e mostra a régua da ESCALA no cabeçalho da coluna
+ * (definição da faixa + quão rara ela é na base).
  *
- * ⚠️ A referência é um projeto REAL da base, nunca um texto solto: é o que impede a régua de
- * virar teoria e o que dá à próxima pessoa (e, na fase seguinte, ao agente) um caso concreto
- * com que comparar.
+ * ⚠️ A **"régua deste nível"** — prateleira com um projeto-âncora fixado por nível — foi
+ * REMOVIDA em 18/08/2026, no mesmo dia em que nasceu: ela existia para dar contra o que
+ * comparar enquanto não havia avaliação automática, e o agente ocupou esse lugar com um texto
+ * por projeto. Manter as duas deixaria duas réguas concorrentes na mesma tela. A tabela
+ * `especial_referencia` fica de pé, sem leitor (remover é arquivar, jamais DROP).
  */
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
-
-/** Uma âncora: o projeto-referência de um nível + a frase que define o nível. */
-export type ReferenciaEspecial = {
-  projeto_id: string;
-  /** Nível que este projeto ancora. Casa com a nota gravada na planilha. */
-  nota: number;
-  /** A régua em uma frase ("dashboard que atende várias áreas e move um KPI"). */
-  motivo: string | null;
-  definido_por: string | null;
-  definido_em: string | null;
-};
 
 /**
  * Colunas que a tela SEMPRE mostra, mesmo vazias — a régua tem de ser visível inteira, senão
@@ -51,11 +40,7 @@ export type ColunaEspeciais = {
   /** `null` = coluna dos sem nota. */
   nota: number | null;
   rotulo: string;
-  /** A frase da régua, herdada da 1ª âncora do nível. `null` = nível ainda sem definição. */
-  regua: string | null;
-  /** Âncoras do nível, no topo da coluna. */
-  ancoras: ProjetoDashboardResumo[];
-  /** Os demais projetos do nível. */
+  /** Os projetos do nível, do mais recente para o mais antigo. */
   projetos: ProjetoDashboardResumo[];
   total: number;
 };
@@ -82,72 +67,58 @@ function porDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboardResumo): numb
   return b.dataOrdenacao - a.dataOrdenacao;
 }
 
-/**
- * Monta as colunas: uma por nível, âncoras no topo.
- *
- * ⚠️ Uma âncora é mostrada na coluna da NOTA DO PROJETO, não na `nota` da referência: quem
- * regrava a estrela de um projeto-âncora na ficha do `/dashboard` moveria o cartão para uma
- * coluna e a régua para outra, e a tela afirmaria que o nível 3 é definido por um projeto que
- * está no nível 2. A `nota` da referência serve de intenção declarada — a divergência aparece
- * como aviso no cartão, em vez de sumir.
- */
-export function agruparEspeciais(
-  projetos: ProjetoDashboardResumo[],
-  referencias: ReferenciaEspecial[],
-): ColunaEspeciais[] {
+/** Monta as colunas: uma por nível, com os projetos daquele nível. */
+export function agruparEspeciais(projetos: ProjetoDashboardResumo[]): ColunaEspeciais[] {
   const especiais = apenasEspeciais(projetos);
-  const ancoraDe = new Map(referencias.map((r) => [r.projeto_id, r]));
 
   const notas = new Set<number>(NOTAS_BASE);
   for (const p of especiais) if (p.estrelas != null && p.estrelas > 0) notas.add(p.estrelas);
-  for (const r of referencias) notas.add(r.nota);
 
   const chaves: (number | null)[] = [null, ...[...notas].sort((a, b) => a - b)];
 
   return chaves.map((nota) => {
-    const doNivel = especiais.filter((p) =>
-      nota == null ? p.estrelas == null : p.estrelas === nota,
-    );
-    const ancoras = doNivel.filter((p) => ancoraDe.has(p.id)).sort(porDataDesc);
-    const resto = doNivel.filter((p) => !ancoraDe.has(p.id)).sort(porDataDesc);
-    // A régua do nível vem da 1ª âncora que tenha frase — âncora sem motivo não apaga a
-    // definição que outra escreveu.
-    const regua = ancoras.map((a) => ancoraDe.get(a.id)?.motivo).find((m) => m) ?? null;
+    const doNivel = especiais
+      .filter((p) => (nota == null ? p.estrelas == null : p.estrelas === nota))
+      .sort(porDataDesc);
     return {
       chave: nota == null ? SEM_NOTA : String(nota),
       nota,
       rotulo: rotuloNota(nota),
-      regua,
-      ancoras,
-      projetos: resto,
+      projetos: doNivel,
       total: doNivel.length,
     };
   });
 }
 
-/**
- * O que o modo comparar deve mostrar: os selecionados + a âncora do nível de cada um, para a
- * comparação nunca ser só "projeto novo × projeto novo". Sem duplicar e respeitando o teto.
- */
-export function alvosDaComparacao(
-  selecionados: string[],
-  colunas: ColunaEspeciais[],
-): string[] {
-  const out: string[] = [];
-  for (const id of selecionados.slice(0, MAX_COMPARAR)) if (!out.includes(id)) out.push(id);
-  for (const id of selecionados.slice(0, MAX_COMPARAR)) {
-    const coluna = colunas.find((c) => c.ancoras.some((a) => a.id === id) || c.projetos.some((p) => p.id === id));
-    const ancora = coluna?.ancoras[0];
-    if (ancora && !out.includes(ancora.id)) out.push(ancora.id);
-  }
-  return out;
-}
+// ─── Filtros e paginação da coluna ───────────────────────────────────────────
 
-/** Marca a divergência "âncora do nível 3 com nota 2 gravada" (ver `agruparEspeciais`). */
-export function ancoraForaDoNivel(
-  projeto: ProjetoDashboardResumo,
-  referencia: ReferenciaEspecial | undefined,
-): boolean {
-  if (!referencia) return false;
-  return (projeto.estrelas ?? null) !== referencia.nota;
+/**
+ * Quantos cartões uma coluna mostra de cara, e quantos entram a cada "Carregar mais".
+ *
+ * Por que 7: a coluna tem de caber na tela sem virar rolagem infinita — com a base inteira,
+ * o nível 1 sozinho passa de 40 cartões e a comparação entre colunas (o ponto da tela) some.
+ * O incremento é menor que o inicial de propósito: quem clica está procurando UM projeto, não
+ * lendo a coluna inteira.
+ */
+export const CARTOES_INICIAIS = 7;
+export const CARTOES_INCREMENTO = 5;
+
+export type FiltrosEspeciais = {
+  /** Texto livre — casa nome, autor, e-mail, id, área e ferramenta (índice do resumo). */
+  termo: string;
+  /** Janela de Data Submissão, ou `null` para todas. */
+  periodo: { inicio: string; fim: string } | null;
+  /** Só onde a auditoria discorda da nota gravada. */
+  soDivergentes: boolean;
+};
+
+export const FILTROS_ESPECIAIS_VAZIOS: FiltrosEspeciais = {
+  termo: '',
+  periodo: null,
+  soDivergentes: false,
+};
+
+/** Quantos filtros estão ativos — o número no gatilho do painel. */
+export function contarFiltrosEspeciais(f: FiltrosEspeciais): number {
+  return (f.termo.trim() ? 1 : 0) + (f.periodo ? 1 : 0) + (f.soDivergentes ? 1 : 0);
 }

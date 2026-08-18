@@ -7,15 +7,16 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  CARTOES_INCREMENTO,
+  CARTOES_INICIAIS,
+  FILTROS_ESPECIAIS_VAZIOS,
+  contarFiltrosEspeciais,
   NOTAS_BASE,
   SEM_NOTA,
   MAX_COMPARAR,
   agruparEspeciais,
-  alvosDaComparacao,
-  ancoraForaDoNivel,
   apenasEspeciais,
   rotuloNota,
-  type ReferenciaEspecial,
 } from '@/lib/especiais-view';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 
@@ -42,10 +43,6 @@ function projeto(over: Partial<ProjetoDashboardResumo> & { id: string }): Projet
   } as ProjetoDashboardResumo;
 }
 
-function ref(projeto_id: string, nota: number, motivo: string | null = null): ReferenciaEspecial {
-  return { projeto_id, nota, motivo, definido_por: null, definido_em: null };
-}
-
 describe('apenasEspeciais', () => {
   it('deixa de fora os projetos financeiros (lá o R$ é a régua)', () => {
     const lista = [projeto({ id: 'a' }), projeto({ id: 'b', especial: false })];
@@ -54,107 +51,45 @@ describe('apenasEspeciais', () => {
 });
 
 describe('agruparEspeciais', () => {
-  it('mostra os níveis 0–5 mesmo vazios (a régua tem de ser visível inteira)', () => {
-    const colunas = agruparEspeciais([], []);
+  it('mostra os níveis 0–5 mesmo vazios (a régua da escala tem de ser visível inteira)', () => {
+    const colunas = agruparEspeciais([]);
     expect(colunas[0].chave).toBe(SEM_NOTA);
     expect(colunas.map((c) => c.nota).slice(1)).toEqual([...NOTAS_BASE]);
   });
 
   it('abre coluna para nota acima de 5 quando existe projeto nela (escala aberta)', () => {
-    const colunas = agruparEspeciais([projeto({ id: 'piapp', estrelas: 8 })], []);
+    const colunas = agruparEspeciais([projeto({ id: 'piapp', estrelas: 8 })]);
     expect(colunas.at(-1)?.nota).toBe(8);
     expect(colunas.at(-1)?.projetos.map((p) => p.id)).toEqual(['piapp']);
   });
 
   it('separa "sem nota" (null) de "zero" — são coisas diferentes', () => {
-    const colunas = agruparEspeciais(
-      [projeto({ id: 'novo' }), projeto({ id: 'olhado', estrelas: 0 })],
-      [],
-    );
+    const colunas = agruparEspeciais([
+      projeto({ id: 'novo' }),
+      projeto({ id: 'olhado', estrelas: 0 }),
+    ]);
     expect(colunas.find((c) => c.chave === SEM_NOTA)?.projetos.map((p) => p.id)).toEqual(['novo']);
     expect(colunas.find((c) => c.nota === 0)?.projetos.map((p) => p.id)).toEqual(['olhado']);
   });
 
-  it('põe a âncora no topo do nível e herda a frase da régua', () => {
-    const colunas = agruparEspeciais(
-      [projeto({ id: 'comum', estrelas: 3 }), projeto({ id: 'piapp', estrelas: 3 })],
-      [ref('piapp', 3, 'atende várias áreas e move um KPI conferível')],
-    );
-    const nivel3 = colunas.find((c) => c.nota === 3)!;
-    expect(nivel3.ancoras.map((p) => p.id)).toEqual(['piapp']);
-    expect(nivel3.projetos.map((p) => p.id)).toEqual(['comum']);
-    expect(nivel3.regua).toBe('atende várias áreas e move um KPI conferível');
-    expect(nivel3.total).toBe(2);
-  });
-
-  it('a âncora segue a NOTA GRAVADA, não a nota declarada na referência', () => {
-    // Regravar a estrela do projeto-âncora na ficha do /dashboard não pode deixar o cartão
-    // numa coluna e a régua em outra.
-    const colunas = agruparEspeciais([projeto({ id: 'piapp', estrelas: 2 })], [ref('piapp', 3, 'x')]);
-    expect(colunas.find((c) => c.nota === 3)?.ancoras).toEqual([]);
-    expect(colunas.find((c) => c.nota === 2)?.ancoras.map((p) => p.id)).toEqual(['piapp']);
-  });
-
-  it('âncora sem frase não apaga a régua escrita por outra do mesmo nível', () => {
-    const colunas = agruparEspeciais(
-      [
-        projeto({ id: 'sem-frase', estrelas: 5, dataOrdenacao: 2 }),
-        projeto({ id: 'com-frase', estrelas: 5, dataOrdenacao: 1 }),
-      ],
-      [ref('sem-frase', 5, null), ref('com-frase', 5, 'o teto da base')],
-    );
-    expect(colunas.find((c) => c.nota === 5)?.regua).toBe('o teto da base');
-  });
-
-  it('ordena os candidatos do mais recente para o mais antigo', () => {
-    const colunas = agruparEspeciais(
-      [
-        projeto({ id: 'velho', estrelas: 1, dataOrdenacao: 10 }),
-        projeto({ id: 'novo', estrelas: 1, dataOrdenacao: 99 }),
-      ],
-      [],
-    );
+  it('ordena os projetos do mais recente para o mais antigo', () => {
+    const colunas = agruparEspeciais([
+      projeto({ id: 'velho', estrelas: 1, dataOrdenacao: 10 }),
+      projeto({ id: 'novo', estrelas: 1, dataOrdenacao: 99 }),
+    ]);
     expect(colunas.find((c) => c.nota === 1)?.projetos.map((p) => p.id)).toEqual(['novo', 'velho']);
   });
-});
 
-describe('ancoraForaDoNivel', () => {
-  it('acusa a divergência entre a nota gravada e o nível que a âncora dizia definir', () => {
-    expect(ancoraForaDoNivel(projeto({ id: 'p', estrelas: 2 }), ref('p', 3))).toBe(true);
-    expect(ancoraForaDoNivel(projeto({ id: 'p', estrelas: 3 }), ref('p', 3))).toBe(false);
-    expect(ancoraForaDoNivel(projeto({ id: 'p', estrelas: 3 }), undefined)).toBe(false);
-  });
-});
-
-describe('alvosDaComparacao', () => {
-  const colunas = () =>
-    agruparEspeciais(
-      [
-        projeto({ id: 'candidato', estrelas: 3 }),
-        projeto({ id: 'piapp', estrelas: 3 }),
-        projeto({ id: 'outro', estrelas: 1 }),
-      ],
-      [ref('piapp', 3, 'régua do 3')],
-    );
-
-  it('traz a âncora do nível junto de cada selecionado', () => {
-    expect(alvosDaComparacao(['candidato'], colunas())).toEqual(['candidato', 'piapp']);
+  it('conta o total do nível', () => {
+    const colunas = agruparEspeciais([
+      projeto({ id: 'a', estrelas: 2 }),
+      projeto({ id: 'b', estrelas: 2 }),
+    ]);
+    expect(colunas.find((c) => c.nota === 2)?.total).toBe(2);
   });
 
-  it('não duplica quando o próprio selecionado é a âncora', () => {
-    expect(alvosDaComparacao(['piapp'], colunas())).toEqual(['piapp']);
-  });
-
-  it('nível sem âncora compara só o que foi escolhido', () => {
-    expect(alvosDaComparacao(['outro'], colunas())).toEqual(['outro']);
-  });
-
-  it('respeita o teto de selecionados', () => {
-    const muitos = Array.from({ length: 6 }, (_, i) => `p${i}`);
-    expect(alvosDaComparacao(muitos, colunas()).length).toBeLessThanOrEqual(MAX_COMPARAR * 2);
-    expect(alvosDaComparacao(muitos, colunas()).slice(0, MAX_COMPARAR)).toEqual(
-      muitos.slice(0, MAX_COMPARAR),
-    );
+  it('o teto do modo comparar continua sendo 3 cartões', () => {
+    expect(MAX_COMPARAR).toBe(3);
   });
 });
 
@@ -164,5 +99,25 @@ describe('rotuloNota', () => {
     expect(rotuloNota(0)).toBe('Zero');
     expect(rotuloNota(1)).toBe('1 estrela');
     expect(rotuloNota(8)).toBe('8 estrelas');
+  });
+});
+
+describe('filtros e paginação da coluna', () => {
+  it('a coluna abre com 7 e cresce de 5 em 5 — quem clica procura UM projeto', () => {
+    expect(CARTOES_INICIAIS).toBe(7);
+    expect(CARTOES_INCREMENTO).toBeLessThan(CARTOES_INICIAIS);
+  });
+
+  it('conta só os filtros realmente ativos (espaço em branco não conta)', () => {
+    expect(contarFiltrosEspeciais(FILTROS_ESPECIAIS_VAZIOS)).toBe(0);
+    expect(contarFiltrosEspeciais({ ...FILTROS_ESPECIAIS_VAZIOS, termo: '   ' })).toBe(0);
+    expect(contarFiltrosEspeciais({ ...FILTROS_ESPECIAIS_VAZIOS, termo: 'piapp' })).toBe(1);
+    expect(
+      contarFiltrosEspeciais({
+        termo: 'piapp',
+        periodo: { inicio: '2026-08-01', fim: '2026-08-18' },
+        soDivergentes: true,
+      }),
+    ).toBe(3);
   });
 });
