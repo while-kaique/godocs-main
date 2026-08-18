@@ -11,11 +11,13 @@ import {
   aplicarFiltros,
   areasDisponiveis,
   casaEstrelas,
+  casaFiltrosExceto,
   casaParecer,
   casaPeriodo,
   contarFiltrosAtivos,
   contarPorPilula,
   pareceresDisponiveis,
+  rotuloFaixaEstrelas,
   totalSemStatus,
   type FiltrosDashboard,
 } from '@/lib/dashboard-filtros';
@@ -452,5 +454,82 @@ describe('filtro por quantidade de estrelas', () => {
       aprovado: 1,
     });
     expect(totalSemStatus(misto, filtros({ estrelasMin: 4 }))).toBe(2);
+  });
+});
+
+// ─── Contagem do campo de PRÉ-STATUS (casamento com os outros filtros) ─────────
+// Bug relatado pelo Luis: o campo dizia "Pré-pendente (26)" e abria uma lista de 3 quando
+// havia outro filtro ligado — ele contava sobre a planilha INTEIRA, ao contrário das pílulas.
+describe('contagem do campo de pré-status', () => {
+  const base = [
+    proj({ id: 'A', aprovacaoLider: 'Pré-pendente', especial: true, statusChave: 'pendente' }),
+    proj({ id: 'B', aprovacaoLider: 'Pré-pendente', especial: false, statusChave: 'pendente' }),
+    proj({ id: 'C', aprovacaoLider: 'Pré-aprovado', especial: true, statusChave: 'aprovado' }),
+  ];
+
+  it('respeita os DEMAIS filtros (era o que dava contagem errada)', () => {
+    expect(pareceresDisponiveis(base, filtros())).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+    // Com "Especiais" ligado, "Pré-pendente" tem 1 — e não 2, como antes.
+    expect(pareceresDisponiveis(base, filtros({ especial: 'apenas' }))).toEqual([
+      { estado: 'pendente', total: 1 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+    // Some junto com o recorte de status/estrelas.
+    expect(pareceresDisponiveis(base, filtros({ status: 'aprovado' }))).toEqual([
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('IGNORA a própria dimensão — escolher um estado não apaga os outros do campo', () => {
+    expect(pareceresDisponiveis(base, filtros({ parecer: 'pendente' }))).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('o estado SELECIONADO nunca desaparece, mesmo com 0 no recorte', () => {
+    // Recorte sem nenhum "Pré-aprovado": o campo mantém a opção (com 0) para o select não
+    // renderizar em branco e a pessoa saber o que desfazer.
+    const r = pareceresDisponiveis(base, filtros({ parecer: 'aprovado', especial: 'sem' }));
+    expect(r).toEqual([
+      { estado: 'pendente', total: 1 },
+      { estado: 'aprovado', total: 0 },
+    ]);
+  });
+
+  it('a contagem do campo CONCORDA com o tamanho da lista filtrada', () => {
+    for (const estado of ['pendente', 'aprovado'] as const) {
+      const f = filtros({ parecer: estado, especial: 'apenas' });
+      const doCampo = pareceresDisponiveis(base, f).find((e) => e.estado === estado)!.total;
+      expect(aplicarFiltros(base, f).length).toBe(doCampo);
+    }
+  });
+
+  it('sem argumento de filtros, conta a listagem inteira (compatível com o call antigo)', () => {
+    expect(pareceresDisponiveis(base)).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('casaFiltrosExceto é a fonte única do "ignora a própria dimensão"', () => {
+    const p = proj({ statusChave: 'pendente', especial: true, estrelas: 4 });
+    const f = filtros({ status: 'aprovado', especial: 'apenas', estrelasMin: 4 });
+    expect(casaFiltrosExceto(p, f, 'status')).toBe(true); // só o status desencaixava
+    expect(casaFiltrosExceto(p, f, 'estrelas')).toBe(false); // o status continua barrando
+  });
+});
+
+describe('rótulo da faixa de estrelas', () => {
+  it('diz a faixa em texto (o estado nunca é só cor na pílula)', () => {
+    expect(rotuloFaixaEstrelas(null, null)).toBe('Estrelas');
+    expect(rotuloFaixaEstrelas(0, 0)).toBe('Sem nota');
+    expect(rotuloFaixaEstrelas(3, null)).toBe('3+');
+    expect(rotuloFaixaEstrelas(null, 3)).toBe('até 3');
+    expect(rotuloFaixaEstrelas(2, 4)).toBe('2–4');
+    expect(rotuloFaixaEstrelas(3, 3)).toBe('3');
   });
 });

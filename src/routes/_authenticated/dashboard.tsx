@@ -43,6 +43,7 @@ import {
   type Direcao,
 } from '@/components/dashboard/tabela-utils';
 import { SeletorPeriodo } from '@/components/calendario/calendario';
+import { FiltroEstrelas } from '@/components/dashboard/filtro-estrelas';
 import {
   FILTROS_VAZIOS,
   TODAS_AS_AREAS,
@@ -192,7 +193,10 @@ function Dashboard() {
   const contagemPilula = useMemo(() => contarPorPilula(projetos, filtros), [projetos, filtros]);
   const totalDasPilulas = useMemo(() => totalSemStatus(projetos, filtros), [projetos, filtros]);
   const areas = useMemo(() => areasDisponiveis(projetos), [projetos]);
-  const pareceres = useMemo(() => pareceresDisponiveis(projetos), [projetos]);
+  // ⚠️ Depende dos FILTROS: a contagem de cada pré-status é a do recorte atual (menos a
+  // própria dimensão), igual à das pílulas. Contando sobre a planilha inteira, o campo dizia
+  // "Pré-pendente (26)" e abria uma lista de 3 com outro filtro ligado.
+  const pareceres = useMemo(() => pareceresDisponiveis(projetos, filtros), [projetos, filtros]);
   const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
@@ -638,16 +642,18 @@ function Dashboard() {
                         600 linhas ninguém conta (e a escala não tem teto). Célula vazia é
                         "—", diferente do 0 explícito. */}
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-[12.5px] md:table-cell">
-                      {p.estrelas == null ? (
-                        <span className="text-muted-foreground">—</span>
+                      {p.estrelas == null || p.estrelas === 0 ? (
+                        // Vazio e 0 se PARECEM na tabela de propósito (a distinção mora na
+                        // ficha e na ordenação): aqui os dois querem dizer "não avaliado
+                        // ainda" para quem varre a lista, e um chip dourado com "0" gritaria.
+                        <span className="text-muted-foreground">{p.estrelas == null ? '—' : '0'}</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 tabular-nums">
-                          <Star
-                            className="h-3.5 w-3.5"
-                            style={{ color: p.estrelas > 0 ? '#e0a800' : 'var(--muted-foreground)' }}
-                            fill={p.estrelas > 0 ? '#f5c518' : 'none'}
-                            aria-hidden
-                          />
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11.5px] font-semibold tabular-nums"
+                          style={{ background: 'rgba(224,168,0,0.14)', color: '#8a6a00' }}
+                          title={`${p.estrelas} ${p.estrelas === 1 ? 'estrela' : 'estrelas'}`}
+                        >
+                          <Star className="h-3 w-3" style={{ color: '#e0a800' }} fill="#f5c518" aria-hidden />
                           {p.estrelas}
                         </span>
                       )}
@@ -823,88 +829,6 @@ function Segmentado({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-/**
- * Faixa de estrelas — duas pontas numéricas em vez de uma lista de opções, porque a escala
- * da nota é ABERTA (a ficha dá N estrelas): uma lista fixa voltaria a inventar um teto.
- * Ponta vazia = aberta, então preencher só a mínima já responde "1 estrela ou mais".
- */
-function FiltroEstrelas({
-  min,
-  max,
-  onChange,
-}: {
-  min: number | null;
-  max: number | null;
-  onChange: (min: number | null, max: number | null) => void;
-}) {
-  const ativo = min != null || max != null;
-  // Campo vazio é ponta ABERTA (`null`), não zero: "de 0" incluiria quem não tem nota.
-  const ler = (v: string): number | null => {
-    const n = Number.parseInt(v, 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-  const campo =
-    'h-7 w-[52px] rounded-full border border-input bg-background px-2 text-center text-[12px] tabular-nums shadow-sm focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none';
-  return (
-    <div
-      role="group"
-      aria-label="Filtrar pela nota em estrelas"
-      className="inline-flex items-center gap-1 rounded-full border bg-card p-0.5 shadow-sm"
-      style={{
-        borderColor: ativo ? 'var(--go-blue)' : 'var(--input)',
-      }}
-    >
-      <span
-        className="inline-flex items-center gap-1 pl-2.5 pr-0.5 text-[10px] font-bold uppercase tracking-[0.07em]"
-        style={{ color: ativo ? 'var(--go-blue)' : 'var(--muted-foreground)' }}
-      >
-        <Star className="h-3 w-3" aria-hidden />
-        Estrelas
-      </span>
-      <label className="sr-only" htmlFor="estrelas-min">
-        Nota mínima
-      </label>
-      <input
-        id="estrelas-min"
-        type="number"
-        min={0}
-        step={1}
-        inputMode="numeric"
-        placeholder="mín"
-        value={min ?? ''}
-        onChange={(e) => onChange(ler(e.target.value), max)}
-        className={campo}
-        style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
-      />
-      <span className="text-[11px] text-muted-foreground">a</span>
-      <label className="sr-only" htmlFor="estrelas-max">
-        Nota máxima
-      </label>
-      <input
-        id="estrelas-max"
-        type="number"
-        min={0}
-        step={1}
-        inputMode="numeric"
-        placeholder="máx"
-        value={max ?? ''}
-        onChange={(e) => onChange(min, ler(e.target.value))}
-        className={campo}
-        style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
-      />
-      <button
-        type="button"
-        onClick={() => onChange(null, null)}
-        aria-label="Limpar o filtro de estrelas"
-        disabled={!ativo}
-        className="mr-0.5 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-0 motion-reduce:transition-none"
-      >
-        <X className="h-3 w-3" />
-      </button>
     </div>
   );
 }

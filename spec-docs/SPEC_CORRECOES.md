@@ -2427,6 +2427,59 @@ vazio = 0 · AND com as outras dimensões · uma dimensão no contador).
 
 ---
 
+## Contagem do campo de pré-status não casava com os outros filtros (17/08/2026)
+
+**Sintoma.** Relato do Luis: *"a contagem do pré-status, no casamento dela com os outros filtros,
+às vezes indica contagem errada"*. Com "Especiais" (ou período/área/estrelas) ligado, o campo dizia
+"Pré-pendente (26)" e escolher esse estado abria uma lista de 3.
+
+**Causa.** `pareceresDisponiveis(projetos)` contava sobre a listagem **crua**, enquanto as pílulas
+de status já contavam sobre o **recorte** (`contarPorPilula`). Duas réguas para a mesma pergunta.
+
+**Fix.** A contagem passa a respeitar todas as dimensões **menos a própria** (`parecer`), via a
+função pura nova **`casaFiltrosExceto(p, f, dimensão)`** — que também virou o corpo do
+`contarPorPilula` (ele tinha a lista de dimensões digitada à mão, e uma dimensão nova teria de ser
+lembrada em dois lugares).
+
+**Decisões fechadas.**
+1. **Ignorar a própria dimensão é obrigatório**, não detalhe: contando com ela, escolher
+   "Pré-pendente" zeraria os outros estados e o campo viraria uma lista de um item.
+2. **O estado selecionado nunca sai do campo**, mesmo com 0 no recorte — um `<select>` cujo `value`
+   não está entre as `<option>` renderiza **em branco**, e a pessoa perde como desfazer.
+3. **Filtro novo entra em `casaFiltrosExceto` no mesmo commit**, senão ele recorta a lista sem
+   recortar as contagens (é este bug de novo).
+
+**Testes.** 6 casos em `tests/dashboard-filtros.test.ts`, incluindo o invariante que o bug violava:
+**a contagem do campo == o tamanho da lista filtrada** por aquele estado.
+
+---
+
+## Filtro de estrelas "muito default" — pílula + painel em vez de dois campos numéricos (17/08/2026)
+
+**Sintoma.** *"Ficou feio, deixe mais modernizado mas sem fugir do padrão de design da página. Tá
+muito default embora funcional."* A 1ª versão do filtro eram dois `<input type="number">` crus
+dentro de uma pílula, na mesma barra em que todo o resto fala por pílulas e trilhos.
+
+**Fix.** `src/components/dashboard/filtro-estrelas.tsx`: gatilho igual ao do `SeletorPeriodo`
+(ativo = preenchido em `--go-blue`, com "×" embutido) abrindo um **painel ancorado** com a
+**fileira de estrelas como controle** (clicar na 3ª pede "3 ou mais"; clicar de novo desfaz),
+dois atalhos (Qualquer · Sem nota) e a **faixa exata** embaixo.
+
+**Decisões fechadas.**
+1. **Reusa o `Popover` do calendário** (exportado para isso). Dois popovers na mesma barra abririam,
+   fechariam e posicionariam diferente — duplicação que se paga em bug.
+2. **A faixa exata FICA.** Ela é o que preserva a escala aberta (pedir "6 a 10"); trocar tudo por
+   uma escada "1+/2+/3+" deixaria a tela mais bonita tirando função.
+3. **Estado nunca só por cor:** a pílula diz "3+"/"2–4"/"Sem nota" em texto (fonte única
+   `rotuloFaixaEstrelas`) e o painel repete em frase (`descreverFaixaEstrelas`).
+4. **O widget nativo do `number` sai, o `type="number"` fica** (`.go-nota-campo`): as setas do
+   teclado continuam funcionando; só as setinhas desenhadas do navegador saem.
+5. **Na tabela, vazio e `0` se parecem** (cinza "—"/"0") e só nota ≥ 1 ganha o chip dourado: um chip
+   de destaque com "0" gritaria em centenas de linhas. A distinção vazio ≠ 0 segue na ficha e na
+   ordenação.
+
+---
+
 ## Ficha ainda parava em "Carregando a linha da planilha…" logo depois de buscar (17/08/2026)
 
 **Sintoma.** Com o lote da página já implementado, buscar um projeto e clicar nele **ainda**

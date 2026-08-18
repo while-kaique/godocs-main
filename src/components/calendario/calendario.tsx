@@ -414,7 +414,16 @@ function Painel({ modo, selecao, minimo, maximo, onAplicar, onFechar }: PainelPr
  * ⚠️ Não é modal e não cobre a tela: a triagem precisa continuar vendo a lista que está
  * filtrando enquanto escolhe a janela.
  */
-function Popover({
+/**
+ * Painel ancorado ao gatilho, em portal — não é modal (não cobre a lista que está sendo
+ * filtrada), fecha no Esc e no clique fora, e vira para cima quando não cabe embaixo.
+ *
+ * ⚠️ **Exportado de propósito**: o filtro de estrelas do `/dashboard`
+ * (`components/dashboard/filtro-estrelas.tsx`) usa ESTE painel. Um segundo popover na mesma
+ * barra de filtros abriria diferente, fecharia diferente e posicionaria diferente — é uma
+ * duplicação que se paga em bug, não em código.
+ */
+export function Popover({
   ancoraRef,
   onFechar,
   rotulo,

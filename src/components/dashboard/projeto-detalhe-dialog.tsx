@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, ExternalLink, Save, History, FileText, Star } from 'lucide-react';
+import { Loader2, ExternalLink, Save, History, FileText, Star, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -197,12 +197,12 @@ function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number
               onMouseEnter={() => setPrevia(n)}
               onFocus={() => setPrevia(n)}
               onBlur={() => setPrevia(null)}
-              className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+              className="rounded-md p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
               style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
             >
               <Star
-                className="h-5 w-5"
-                style={{ color: cheia ? '#e0a800' : 'var(--muted-foreground)', opacity: cheia ? 1 : 0.45 }}
+                className="h-6 w-6"
+                style={{ color: cheia ? '#e0a800' : 'var(--muted-foreground)', opacity: cheia ? 1 : 0.4 }}
                 fill={cheia ? '#f5c518' : 'none'}
                 aria-hidden
               />
@@ -211,10 +211,17 @@ function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number
         })}
       </div>
       {/* Sem teto, a nota só é legível pelo NÚMERO — contar 12 estrelas na tela ninguém
-          conta. Daí o texto ao lado ser "12 estrelas", não "12/N". */}
-      <span className="text-[12px] tabular-nums text-muted-foreground">
-        {valor === 0 ? 'sem nota' : `${valor} ${valor === 1 ? 'estrela' : 'estrelas'}`}
-      </span>
+          conta. Daí o valor vir num chip ao lado ("12 estrelas"), não como "12/N". */}
+      {valor === 0 ? (
+        <span className="text-[12px] text-muted-foreground">sem nota</span>
+      ) : (
+        <span
+          className="inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-semibold tabular-nums"
+          style={{ background: 'rgba(224,168,0,0.14)', color: '#8a6a00' }}
+        >
+          {valor} {valor === 1 ? 'estrela' : 'estrelas'}
+        </span>
+      )}
       {quantas < MAX_ESTRELAS_GRAVAVEL && (
         <button
           type="button"
@@ -227,10 +234,10 @@ function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number
           }}
           aria-label={`Dar ${quantas + 1} estrelas`}
           title="Mais uma estrela (a escala não tem teto)"
-          className="rounded-full border border-dashed px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
-          style={{ ['--tw-ring-color' as string]: 'var(--go-blue)' }}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-transparent hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+          style={{ borderColor: 'var(--border)', ['--tw-ring-color' as string]: 'var(--go-blue)' }}
         >
-          + estrela
+          <Plus className="h-3.5 w-3.5" aria-hidden />
         </button>
       )}
     </div>
