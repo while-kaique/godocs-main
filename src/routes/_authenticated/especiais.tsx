@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
+import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { apiFetch } from '@/lib/api-client';
 import { fmtDataBR } from '@/lib/format-date';
 import {
@@ -60,9 +61,8 @@ import {
   type FiltrosEspeciais,
   type ValidadorEspeciais,
 } from '@/lib/especiais-view';
-import { casaPeriodo, casaParecer, casaStatus, pareceresDisponiveis } from '@/lib/dashboard-filtros';
+import { casaPeriodo, casaStatus } from '@/lib/dashboard-filtros';
 import { STATUS_TRIAGEM } from '@/components/dashboard/status-triagem';
-import { ROTULO_ESTADO_PARECER, type EstadoParecer } from '@/lib/aprovacoes-parecer';
 import {
   PERGUNTA_MOTIVO,
   STATUS_GRAVAVEIS_ESPECIAIS,
@@ -132,6 +132,8 @@ function Especiais() {
   // Quantos cartões cada coluna mostra. Chaveado pela coluna, e zerado a cada filtro novo.
   const [mostrando, setMostrando] = useState<Record<string, number>>({});
   const [divisaoAberta, setDivisaoAberta] = useState(false);
+  // Ficha completa (o MESMO diálogo do /dashboard): abre no duplo clique do cartão.
+  const [fichaAberta, setFichaAberta] = useState<ProjetoDashboardResumo | null>(null);
   // "Agora" congelado no carregamento: recalcular a cada render faria o chip de espera mudar
   // de faixa no meio de um clique.
   const [agoraMs] = useState(() => Date.now());
@@ -176,12 +178,8 @@ function Especiais() {
         return filtros.dono === 'sem-dono' ? dono == null : dono === filtros.dono;
       });
     }
-    if (filtros.fila) visiveis = visiveis.filter((p) => filaDe(p) === filtros.fila);
     // Status e pré-status são dimensões independentes e somam por E (igual ao /dashboard).
     if (filtros.status !== 'todos') visiveis = visiveis.filter((p) => casaStatus(p, filtros.status));
-    if (filtros.parecer !== 'todos') {
-      visiveis = visiveis.filter((p) => casaParecer(p, filtros.parecer as EstadoParecer));
-    }
     if (filtros.periodo) visiveis = visiveis.filter((p) => casaPeriodo(p, filtros.periodo));
     if (filtros.termo.trim()) visiveis = filtrarPorTermo(visiveis, filtros.termo);
     return agruparEspeciais(visiveis);
@@ -394,22 +392,6 @@ function Especiais() {
           </select>
 
           <select
-            value={filtros.fila ?? ''}
-            onChange={(e) => setFiltros((f) => ({ ...f, fila: (e.target.value || null) as Fila | null }))}
-            aria-label="Filtrar por fila"
-            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
-            style={{ ['--tw-ring-color' as string]: AZUL }}
-          >
-            <option value="">Todas as filas</option>
-            {(Object.keys(ROTULO_FILA) as Fila[]).map((f) => (
-              <option key={f} value={f}>
-                {ROTULO_FILA[f]}
-                {FILAS_DO_RPA.includes(f) ? ' · exige você' : ''}
-              </option>
-            ))}
-          </select>
-
-          <select
             value={filtros.status}
             onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}
             aria-label="Filtrar por status"
@@ -420,23 +402,6 @@ function Especiais() {
             {STATUS_TRIAGEM.map((st) => (
               <option key={st.chave} value={st.chave}>
                 {st.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Pré-status é OUTRA dimensão: soma por E com o status. "Pendente" + "Pré-aprovado"
-              é a fila do RPA — o líder já opinou e falta a validação. */}
-          <select
-            value={filtros.parecer}
-            onChange={(e) => setFiltros((f) => ({ ...f, parecer: e.target.value }))}
-            aria-label="Filtrar por pré-aprovação do líder"
-            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
-            style={{ ['--tw-ring-color' as string]: AZUL }}
-          >
-            <option value="todos">Todos os pré-status</option>
-            {pareceresDisponiveis(dados?.projetos ?? []).map(({ estado, total }) => (
-              <option key={estado} value={estado}>
-                {ROTULO_ESTADO_PARECER[estado]} ({total})
               </option>
             ))}
           </select>
@@ -520,6 +485,7 @@ function Especiais() {
                 rotuloDono={rotuloDono}
                 agoraMs={agoraMs}
                 onDecidir={decidir}
+                onAbrirFicha={setFichaAberta}
                 selecionados={selecionados}
                 salvando={salvando}
                 mostrando={mostrando[coluna.chave] ?? CARTOES_INICIAIS}
@@ -536,6 +502,26 @@ function Especiais() {
           </div>
         </div>
       )}
+
+      {/* Reusa o diálogo da triagem inteiro — a ficha é a linha da planilha, e ter duas
+          telas de "todos os dados" seria duas verdades sobre o mesmo projeto. O status
+          salvo lá reflete aqui na hora, sem recarregar a lista. */}
+      <ProjetoDetalheDialog
+        projeto={fichaAberta}
+        onFechar={() => setFichaAberta(null)}
+        onStatusSalvo={(id, status) =>
+          setDados((d) =>
+            d
+              ? {
+                  ...d,
+                  projetos: d.projetos.map((p) =>
+                    p.id === id ? { ...p, status, statusChave: status.toLowerCase() } : p,
+                  ),
+                }
+              : d,
+          )
+        }
+      />
 
       {divisaoAberta && dados && (
         <PainelDivisao
@@ -639,6 +625,7 @@ function Coluna({
   onComparar,
   onNota,
   onDecidir,
+  onAbrirFicha,
 }: {
   coluna: ColunaEspeciais;
   avaliacaoPor: Map<string, AvaliacaoEspecial>;
@@ -651,6 +638,7 @@ function Coluna({
   onComparar: (id: string) => void;
   onNota: (p: ProjetoDashboardResumo, nota: number) => void;
   onDecidir: (p: ProjetoDashboardResumo, acao: AcaoTriagem, motivo: string) => void;
+  onAbrirFicha: (p: ProjetoDashboardResumo) => void;
 }) {
   const visiveis = coluna.projetos.slice(0, mostrando);
   const restantes = coluna.projetos.length - visiveis.length;
@@ -717,6 +705,7 @@ function Coluna({
             onComparar={() => onComparar(p.id)}
             onNota={(n) => onNota(p, n)}
             onDecidir={(acao, motivo) => onDecidir(p, acao, motivo)}
+            onAbrirFicha={() => onAbrirFicha(p)}
           />
         ))}
         {restantes > 0 && (
@@ -754,6 +743,7 @@ function Cartao({
   onComparar,
   onNota,
   onDecidir,
+  onAbrirFicha,
 }: {
   projeto: ProjetoDashboardResumo;
   avaliacao: AvaliacaoEspecial | undefined;
@@ -765,6 +755,7 @@ function Cartao({
   onComparar: () => void;
   onNota: (n: number) => void;
   onDecidir: (acao: AcaoTriagem, motivo: string) => void;
+  onAbrirFicha: () => void;
 }) {
   const [acaoAberta, setAcaoAberta] = useState<AcaoTriagem | null>(null);
   const nota = projeto.estrelas;
@@ -775,8 +766,22 @@ function Cartao({
 
   return (
     <article
-      className="rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow motion-reduce:transition-none"
-      style={selecionado ? { borderColor: AZUL, boxShadow: `0 0 0 2px rgba(0,89,169,0.18)` } : undefined}
+      // Duplo clique abre a ficha completa. Não é clique simples de propósito: o cartão tem
+      // controles dentro (±1 estrela, comparar, decidir) e um clique só abriria a ficha por
+      // acidente o tempo todo. Enter no cartão faz o mesmo, para quem navega por teclado.
+      onDoubleClick={onAbrirFicha}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) onAbrirFicha();
+      }}
+      tabIndex={0}
+      role="group"
+      aria-label={`${projeto.nome ?? projeto.id} — Enter abre a ficha completa`}
+      title="Duplo clique abre a ficha completa"
+      className="cursor-default rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+      style={{
+        ['--tw-ring-color' as string]: AZUL,
+        ...(selecionado ? { borderColor: AZUL, boxShadow: `0 0 0 2px rgba(0,89,169,0.18)` } : {}),
+      }}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-[13px] font-semibold leading-snug">{projeto.nome ?? projeto.id}</h3>
