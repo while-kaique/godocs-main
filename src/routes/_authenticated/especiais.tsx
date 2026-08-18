@@ -18,7 +18,9 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Ban,
   Check,
+  RotateCcw,
   Users,
   ChevronDown,
   Loader2,
@@ -58,7 +60,17 @@ import {
   type FiltrosEspeciais,
   type ValidadorEspeciais,
 } from '@/lib/especiais-view';
-import { casaPeriodo } from '@/lib/dashboard-filtros';
+import { casaPeriodo, casaParecer, casaStatus, pareceresDisponiveis } from '@/lib/dashboard-filtros';
+import { STATUS_TRIAGEM } from '@/components/dashboard/status-triagem';
+import { ROTULO_ESTADO_PARECER, type EstadoParecer } from '@/lib/aprovacoes-parecer';
+import {
+  PERGUNTA_MOTIVO,
+  STATUS_GRAVAVEIS_ESPECIAIS,
+  campoDoMotivo,
+  precisaMotivo,
+  rotuloAcao,
+  type AcaoTriagem,
+} from '@/lib/especiais-acoes';
 import { filtrarPorTermo } from '@/components/dashboard/tabela-utils';
 import { SeletorPeriodo } from '@/components/calendario/calendario';
 import { hojeIso } from '@/lib/calendario-datas';
@@ -164,6 +176,11 @@ function Especiais() {
       });
     }
     if (filtros.fila) visiveis = visiveis.filter((p) => filaDe(p) === filtros.fila);
+    // Status e pré-status são dimensões independentes e somam por E (igual ao /dashboard).
+    if (filtros.status !== 'todos') visiveis = visiveis.filter((p) => casaStatus(p, filtros.status));
+    if (filtros.parecer !== 'todos') {
+      visiveis = visiveis.filter((p) => casaParecer(p, filtros.parecer as EstadoParecer));
+    }
     if (filtros.periodo) visiveis = visiveis.filter((p) => casaPeriodo(p, filtros.periodo));
     if (filtros.termo.trim()) visiveis = filtrarPorTermo(visiveis, filtros.termo);
     return agruparEspeciais(visiveis);
@@ -213,6 +230,55 @@ function Especiais() {
   function rotuloDono(p: ProjetoDashboardResumo): string | null {
     const email = donoDoProjeto(p, donoPor);
     return email ? rotuloValidador(email, dados?.validadores ?? []) : null;
+  }
+
+  /**
+   * Decide o projeto DAQUI — mesma escrita do `/dashboard`
+   * (`POST /api/admin/dashboard/status` → `definirStatusProjeto`), então a auditoria em
+   * `admin_status_log` e a regra de nunca tocar "Atualizado Em" continuam valendo.
+   *
+   * Otimista: o cartão muda de status na hora e volta atrás se a planilha recusar — a mesma
+   * disciplina do ±1 estrela logo acima.
+   */
+  async function decidir(projeto: ProjetoDashboardResumo, acao: AcaoTriagem, motivo: string) {
+    const status = STATUS_GRAVAVEIS_ESPECIAIS[acao];
+    const campo = campoDoMotivo(acao);
+    const anterior = { status: projeto.status, statusChave: projeto.statusChave };
+    setSalvando(projeto.id);
+    setDados((d) =>
+      d
+        ? {
+            ...d,
+            projetos: d.projetos.map((p) =>
+              p.id === projeto.id ? { ...p, status, statusChave: status.toLowerCase() } : p,
+            ),
+          }
+        : d,
+    );
+    try {
+      await apiFetch('/api/admin/dashboard/status', {
+        projeto_id: projeto.id,
+        status,
+        ...(campo ? { [campo]: motivo } : {}),
+      });
+      setErro(null);
+    } catch (e) {
+      setDados((d) =>
+        d
+          ? {
+              ...d,
+              projetos: d.projetos.map((p) => (p.id === projeto.id ? { ...p, ...anterior } : p)),
+            }
+          : d,
+      );
+      setErro(
+        `"${projeto.nome ?? projeto.id}" continua como estava — a planilha não aceitou a mudança. ${
+          e instanceof Error ? e.message : ''
+        }`.trim(),
+      );
+    } finally {
+      setSalvando(null);
+    }
   }
 
   async function definirDono(area: string, email: string | null) {
@@ -342,6 +408,38 @@ function Especiais() {
             ))}
           </select>
 
+          <select
+            value={filtros.status}
+            onChange={(e) => setFiltros((f) => ({ ...f, status: e.target.value }))}
+            aria-label="Filtrar por status"
+            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
+            style={{ ['--tw-ring-color' as string]: AZUL }}
+          >
+            <option value="todos">Todos os status</option>
+            {STATUS_TRIAGEM.map((st) => (
+              <option key={st.chave} value={st.chave}>
+                {st.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Pré-status é OUTRA dimensão: soma por E com o status. "Pendente" + "Pré-aprovado"
+              é a fila do RPA — o líder já opinou e falta a validação. */}
+          <select
+            value={filtros.parecer}
+            onChange={(e) => setFiltros((f) => ({ ...f, parecer: e.target.value }))}
+            aria-label="Filtrar por pré-aprovação do líder"
+            className="h-9 rounded-full border bg-card px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2"
+            style={{ ['--tw-ring-color' as string]: AZUL }}
+          >
+            <option value="todos">Todos os pré-status</option>
+            {pareceresDisponiveis(dados?.projetos ?? []).map(({ estado, total }) => (
+              <option key={estado} value={estado}>
+                {ROTULO_ESTADO_PARECER[estado]} ({total})
+              </option>
+            ))}
+          </select>
+
           <SeletorPeriodo
             valor={filtros.periodo}
             onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
@@ -420,6 +518,7 @@ function Especiais() {
                 avaliacaoPor={avaliacaoPor}
                 rotuloDono={rotuloDono}
                 agoraMs={agoraMs}
+                onDecidir={decidir}
                 selecionados={selecionados}
                 salvando={salvando}
                 mostrando={mostrando[coluna.chave] ?? CARTOES_INICIAIS}
@@ -538,6 +637,7 @@ function Coluna({
   onMostrarMais,
   onComparar,
   onNota,
+  onDecidir,
 }: {
   coluna: ColunaEspeciais;
   avaliacaoPor: Map<string, AvaliacaoEspecial>;
@@ -549,6 +649,7 @@ function Coluna({
   onMostrarMais: () => void;
   onComparar: (id: string) => void;
   onNota: (p: ProjetoDashboardResumo, nota: number) => void;
+  onDecidir: (p: ProjetoDashboardResumo, acao: AcaoTriagem, motivo: string) => void;
 }) {
   const visiveis = coluna.projetos.slice(0, mostrando);
   const restantes = coluna.projetos.length - visiveis.length;
@@ -614,6 +715,7 @@ function Coluna({
             salvando={salvando === p.id}
             onComparar={() => onComparar(p.id)}
             onNota={(n) => onNota(p, n)}
+            onDecidir={(acao, motivo) => onDecidir(p, acao, motivo)}
           />
         ))}
         {restantes > 0 && (
@@ -650,6 +752,7 @@ function Cartao({
   salvando,
   onComparar,
   onNota,
+  onDecidir,
 }: {
   projeto: ProjetoDashboardResumo;
   avaliacao: AvaliacaoEspecial | undefined;
@@ -660,7 +763,9 @@ function Cartao({
   salvando: boolean;
   onComparar: () => void;
   onNota: (n: number) => void;
+  onDecidir: (acao: AcaoTriagem, motivo: string) => void;
 }) {
+  const [acaoAberta, setAcaoAberta] = useState<AcaoTriagem | null>(null);
   const nota = projeto.estrelas;
   const dias = diasDeEspera(projeto, agoraMs);
   const urgencia = urgenciaDaEspera(dias);
@@ -754,7 +859,121 @@ function Cartao({
         </label>
       </div>
 
+      <AcoesTriagem
+        aberta={acaoAberta}
+        onAbrir={setAcaoAberta}
+        onDecidir={(acao, motivo) => {
+          setAcaoAberta(null);
+          onDecidir(acao, motivo);
+        }}
+      />
     </article>
+  );
+}
+
+/**
+ * As três decisões, no próprio cartão.
+ *
+ * Aprovar grava direto (é o caminho sem texto obrigatório). Reprovar e pedir reenvio abrem o
+ * campo de motivo ANTES de gravar — e o botão de confirmar fica desabilitado enquanto o texto
+ * estiver vazio, porque decisão negativa sem explicação é um "não" mudo para quem submeteu.
+ */
+function AcoesTriagem({
+  aberta,
+  onAbrir,
+  onDecidir,
+}: {
+  aberta: AcaoTriagem | null;
+  onAbrir: (a: AcaoTriagem | null) => void;
+  onDecidir: (acao: AcaoTriagem, motivo: string) => void;
+}) {
+  const [motivo, setMotivo] = useState('');
+
+  if (aberta && precisaMotivo(aberta)) {
+    return (
+      <form
+        className="mt-2 space-y-2 border-t pt-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (motivo.trim()) {
+            onDecidir(aberta, motivo.trim());
+            setMotivo('');
+          }
+        }}
+      >
+        <label className="block text-[11px] font-medium text-muted-foreground" htmlFor={`motivo-${aberta}`}>
+          {PERGUNTA_MOTIVO[aberta as 'reenviar' | 'reprovar']}
+        </label>
+        <textarea
+          id={`motivo-${aberta}`}
+          autoFocus
+          rows={3}
+          maxLength={4000}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          className="w-full rounded-md border px-2 py-1.5 text-[12px] focus-visible:outline-none focus-visible:ring-2"
+          style={{ ['--tw-ring-color' as string]: AZUL }}
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              onAbrir(null);
+              setMotivo('');
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button type="submit" size="sm" disabled={!motivo.trim()}>
+            {rotuloAcao(aberta)}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5 border-t pt-2">
+      <BotaoAcao onClick={() => onDecidir('aprovar', '')} tom="ok">
+        <Check className="h-3 w-3" aria-hidden /> Aprovar
+      </BotaoAcao>
+      <BotaoAcao onClick={() => onAbrir('reenviar')} tom="atencao">
+        <RotateCcw className="h-3 w-3" aria-hidden /> Pedir reenvio
+      </BotaoAcao>
+      <BotaoAcao onClick={() => onAbrir('reprovar')} tom="critico">
+        <Ban className="h-3 w-3" aria-hidden /> Reprovar
+      </BotaoAcao>
+    </div>
+  );
+}
+
+const TOM_ACAO = {
+  ok: { cor: '#17714f', fundo: 'rgba(23,113,79,0.10)' },
+  atencao: { cor: '#8a6a00', fundo: 'rgba(224,168,0,0.14)' },
+  critico: { cor: '#b3261e', fundo: 'rgba(179,38,30,0.10)' },
+} as const;
+
+function BotaoAcao({
+  onClick,
+  tom,
+  children,
+}: {
+  onClick: () => void;
+  tom: keyof typeof TOM_ACAO;
+  children: React.ReactNode;
+}) {
+  const { cor, fundo } = TOM_ACAO[tom];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
+      style={{ color: cor, background: fundo, ['--tw-ring-color' as string]: AZUL }}
+    >
+      {children}
+    </button>
   );
 }
 

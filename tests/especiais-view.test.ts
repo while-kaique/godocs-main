@@ -133,6 +133,13 @@ describe('filtros e paginação da coluna', () => {
         soDivergentes: true,
       }),
     ).toBe(3);
+    expect(
+      contarFiltrosEspeciais({
+        ...FILTROS_ESPECIAIS_VAZIOS,
+        status: 'pendente',
+        parecer: 'aprovado',
+      }),
+    ).toBe(2);
   });
 });
 
