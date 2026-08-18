@@ -46,6 +46,21 @@ export function campoDoMotivo(acao: AcaoTriagem): 'motivo_reenvio' | 'motivo_rep
   return null;
 }
 
+/**
+ * As ações que fazem sentido para o estado atual.
+ *
+ * ⚠️ Some a ação que o projeto JÁ é: "Aprovar" num projeto aprovado não é inofensivo — é um
+ * botão que promete mudança e regrava o mesmo status, gerando linha de auditoria e ruído para
+ * quem lê o histórico. As outras continuam (aprovado pode ser reprovado depois de uma
+ * conferência, e é isso que a triagem faz).
+ */
+export function acoesDisponiveis(statusChave: string | null): AcaoTriagem[] {
+  const atual = (statusChave ?? '').trim().toLowerCase();
+  return (['aprovar', 'reenviar', 'reprovar'] as AcaoTriagem[]).filter(
+    (a) => STATUS_GRAVAVEIS_ESPECIAIS[a].toLowerCase() !== atual,
+  );
+}
+
 /** O que a pergunta acima do campo de texto diz, por ação. */
 export const PERGUNTA_MOTIVO: Record<'reenviar' | 'reprovar', string> = {
   reenviar: 'O que precisa ser corrigido? O autor recebe este texto por e-mail.',

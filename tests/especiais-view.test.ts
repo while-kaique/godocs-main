@@ -61,6 +61,16 @@ describe('apenasEspeciais', () => {
     const lista = [projeto({ id: 'a' }), projeto({ id: 'b', especial: false })];
     expect(apenasEspeciais(lista).map((p) => p.id)).toEqual(['a']);
   });
+
+  it('deixa de fora os DESCONTINUADOS — automação que não roda mais não se valida', () => {
+    const lista = [projeto({ id: 'a' }), projeto({ id: 'b', statusChave: 'descontinuado' })];
+    expect(apenasEspeciais(lista).map((p) => p.id)).toEqual(['a']);
+  });
+
+  it('e some das colunas também (o agrupamento passa pelo mesmo corte)', () => {
+    const colunas = agruparEspeciais([projeto({ id: 'b', estrelas: 2, statusChave: 'descontinuado' })]);
+    expect(colunas.every((c) => c.total === 0)).toBe(true);
+  });
 });
 
 describe('agruparEspeciais', () => {

@@ -52,9 +52,20 @@ export function rotuloNota(nota: number | null): string {
   return `${nota} ${nota === 1 ? 'estrela' : 'estrelas'}`;
 }
 
-/** Só os especiais entram nesta tela — os financeiros têm o R$ como régua. */
+/**
+ * Quem aparece nesta tela: os especiais, **menos os descontinuados**.
+ *
+ * Os financeiros ficam de fora porque lá o R$ é a régua. E descontinuado é automação que não
+ * roda mais — não há o que validar nem que pontuar, e ele só ocuparia coluna competindo por
+ * atenção com o que ainda espera decisão. (A flag continua na planilha e no card do autor: o
+ * que muda é só a esteira de triagem não mostrá-lo.)
+ */
 export function apenasEspeciais(projetos: ProjetoDashboardResumo[]): ProjetoDashboardResumo[] {
-  return projetos.filter((p) => p.especial);
+  return projetos.filter((p) => p.especial && !ehDescontinuado(p));
+}
+
+export function ehDescontinuado(p: ProjetoDashboardResumo): boolean {
+  return (p.statusChave ?? '').trim().toLowerCase() === 'descontinuado';
 }
 
 /** Mais recente primeiro; sem data vai para o fim (mesma regra da listagem). */
