@@ -395,6 +395,24 @@ const SCHEMA_SQL = `
     definido_em  TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_especial_referencia_nota ON especial_referencia(nota);
+
+  -- Recomendação de estrelas por projeto (auditoria): o lote importado da força-tarefa e, na
+  -- fase seguinte, a saída do agente classificador.
+  -- ⚠️ Tabela INTERNA e ela NUNCA vira a nota: a coluna "Estrelas" da planilha só muda por
+  -- clique de gente. Aqui fica a SUGESTÃO + a leitura que a justifica.
+  -- ⚠️ A coluna modelo existe porque o llm.ts troca de modelo sozinho no fallback -- sem gravar qual
+  -- produziu a nota, "de quem é esta recomendação" vira pergunta sem resposta.
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  CREATE TABLE IF NOT EXISTS especial_avaliacao (
+    projeto_id            TEXT PRIMARY KEY,
+    estrelas_recomendada  REAL NOT NULL,
+    confianca             TEXT,
+    leitura               TEXT,
+    contestada            INTEGER NOT NULL DEFAULT 0,
+    origem                TEXT,
+    modelo                TEXT,
+    criado_em             TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

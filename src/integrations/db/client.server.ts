@@ -2394,3 +2394,59 @@ export async function upsertReferenciaEspecial(dados: {
 export async function deleteReferenciaEspecial(projetoId: string): Promise<void> {
   await exec('DELETE FROM especial_referencia WHERE projeto_id = ?', [projetoId]);
 }
+
+// ─── Recomendações de estrelas (auditoria / agente classificador) ────────────
+// Tabela INTERNA: a sugestão vive aqui, a NOTA vive na planilha. Ver o CREATE TABLE.
+
+export type EspecialAvaliacaoRow = {
+  projeto_id: string;
+  estrelas_recomendada: number;
+  confianca: string | null;
+  leitura: string | null;
+  contestada: number;
+  origem: string | null;
+  modelo: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesEspeciais(): Promise<EspecialAvaliacaoRow[]> {
+  return queryAll<EspecialAvaliacaoRow>('SELECT * FROM especial_avaliacao', []);
+}
+
+/**
+ * Grava (ou substitui) a recomendação de um projeto. UPSERT porque reavaliar é o caso normal:
+ * o agente roda de novo a cada reenvio, e uma recomendação nova sobre a mesma linha vale mais
+ * que a anterior. O histórico não é objetivo desta tabela — quem guarda decisão é a planilha.
+ */
+export async function upsertAvaliacaoEspecial(dados: {
+  projeto_id: string;
+  estrelas_recomendada: number;
+  confianca: string | null;
+  leitura: string | null;
+  contestada: boolean;
+  origem: string | null;
+  modelo: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_avaliacao
+       (projeto_id, estrelas_recomendada, confianca, leitura, contestada, origem, modelo, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       estrelas_recomendada = excluded.estrelas_recomendada,
+       confianca = excluded.confianca,
+       leitura = excluded.leitura,
+       contestada = excluded.contestada,
+       origem = excluded.origem,
+       modelo = excluded.modelo,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.estrelas_recomendada,
+      dados.confianca,
+      dados.leitura,
+      dados.contestada ? 1 : 0,
+      dados.origem,
+      dados.modelo,
+    ],
+  );
+}

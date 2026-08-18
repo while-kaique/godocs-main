@@ -22,13 +22,18 @@ import {
   getReferenciasEspeciais,
   upsertReferenciaEspecial,
   deleteReferenciaEspecial,
+  getAvaliacoesEspeciais,
+  upsertAvaliacaoEspecial,
 } from '@/integrations/db/client.server';
 import { apenasEspeciais, type ReferenciaEspecial } from '@/lib/especiais-view';
+import { NOTA_MAX, type AvaliacaoEspecial, type Confianca } from '@/lib/especiais-regua';
 import { MAX_ESTRELAS_GRAVAVEL, ESPELHO_VELHO_MS } from '@/lib/dashboard-admin.functions';
 
 export type ListagemEspeciais = {
   projetos: ProjetoDashboardResumo[];
   referencias: ReferenciaEspecial[];
+  /** Recomendações da auditoria (lote importado hoje, agente classificador amanhã). */
+  avaliacoes: AvaliacaoEspecial[];
   /** ISO da última sincronização com a planilha (a idade do espelho), como no /dashboard. */
   lidoEm: string;
   espelhoVelho: boolean;
@@ -39,10 +44,11 @@ export type ListagemEspeciais = {
  * mandar a base inteira para a tela filtrar duplicaria o payload da triagem sem ninguém ver.
  */
 export async function listarEspeciais(): Promise<ListagemEspeciais> {
-  const [{ linhas, lidoEmMs }, saude, referencias] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, referencias, avaliacoes] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
     getReferenciasEspeciais(),
+    getAvaliacoesEspeciais(),
   ]);
 
   const projetos = apenasEspeciais(
@@ -59,9 +65,59 @@ export async function listarEspeciais(): Promise<ListagemEspeciais> {
       definido_por: r.definido_por,
       definido_em: r.definido_em,
     })),
+    avaliacoes: avaliacoes.map((a) => ({
+      projeto_id: a.projeto_id,
+      estrelas_recomendada: a.estrelas_recomendada,
+      confianca: (a.confianca ?? 'media') as Confianca,
+      leitura: a.leitura,
+      contestada: a.contestada === 1,
+      origem: a.origem,
+      modelo: a.modelo,
+      criado_em: a.criado_em,
+    })),
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
   };
+}
+
+/**
+ * Importa um LOTE de recomendações (o pipeline da força-tarefa roda fora do app e entrega um
+ * JSON). Idempotente por projeto: reimportar o mesmo lote substitui, nunca duplica.
+ *
+ * ⚠️ **Não escreve nada na planilha.** A recomendação é sugestão — a nota só muda por clique
+ * de gente na tela. É a mesma régua que vai valer para o agente classificador.
+ */
+const loteSchema = z.object({
+  origem: z.string().min(1).max(80),
+  modelo: z.string().max(80).optional(),
+  avaliacoes: z
+    .array(
+      z.object({
+        projeto_id: z.string().min(1).max(120),
+        estrelas_recomendada: z.number().min(0).max(NOTA_MAX),
+        confianca: z.enum(['alta', 'media', 'baixa']).optional(),
+        leitura: z.string().max(2000).optional(),
+        contestada: z.boolean().optional(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
+export async function importarAvaliacoesEspeciais(raw: unknown) {
+  const { origem, modelo, avaliacoes } = loteSchema.parse(raw);
+  for (const a of avaliacoes) {
+    await upsertAvaliacaoEspecial({
+      projeto_id: a.projeto_id,
+      estrelas_recomendada: a.estrelas_recomendada,
+      confianca: a.confianca ?? 'media',
+      leitura: a.leitura?.trim() || null,
+      contestada: a.contestada ?? false,
+      origem,
+      modelo: modelo ?? null,
+    });
+  }
+  return { ok: true, importadas: avaliacoes.length, origem };
 }
 
 const estrelasSchema = z.object({

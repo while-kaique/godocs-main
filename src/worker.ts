@@ -47,6 +47,7 @@ import {
   definirEstrelasEspecial,
   definirReferenciaEspecial,
   removerReferenciaEspecial,
+  importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
@@ -589,6 +590,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const { email: adminEmail } = await requireAdmin(request);
       const body = await readBody(request);
       return json(await definirReferenciaEspecial(body, adminEmail));
+    }
+    // Lote de recomendações da auditoria (hoje o JSON da força-tarefa, amanhã o agente
+    // classificador). NUNCA toca a planilha — a nota só muda por clique de gente.
+    if (pathname === "/api/admin/especiais/avaliacoes" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await importarAvaliacoesEspeciais(body));
     }
     if (pathname === "/api/admin/especiais/referencia/remover" && method === "POST") {
       await requireAdmin(request);
