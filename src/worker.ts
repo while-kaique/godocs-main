@@ -42,6 +42,12 @@ import {
   getProjetosDashboardLote,
   definirStatusProjeto,
 } from "@/lib/dashboard-admin.functions";
+import {
+  listarEspeciais,
+  definirEstrelasEspecial,
+  definirReferenciaEspecial,
+  removerReferenciaEspecial,
+} from "@/lib/especiais.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
@@ -563,6 +569,30 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const { email: adminEmail } = await requireAdmin(request);
       const body = await readBody(request);
       return json(await definirStatusProjeto(body, adminEmail));
+    }
+
+    // ── Comparador de projetos ESPECIAIS (a régua por ÂNCORA) ───────────────
+    // Ver src/lib/especiais.functions.ts: lê o MESMO espelho da triagem, só que agrupado por
+    // NÍVEL, e acrescenta as âncoras (tabela interna `especial_referencia`). A nota segue na
+    // coluna manual "Estrelas" da planilha — a rota de estrelas escreve SÓ ela.
+    if (pathname === "/api/admin/especiais" && method === "GET") {
+      await requireAdmin(request);
+      return json(await listarEspeciais());
+    }
+    if (pathname === "/api/admin/especiais/estrelas" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await definirEstrelasEspecial(body));
+    }
+    if (pathname === "/api/admin/especiais/referencia" && method === "POST") {
+      const { email: adminEmail } = await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await definirReferenciaEspecial(body, adminEmail));
+    }
+    if (pathname === "/api/admin/especiais/referencia/remover" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await removerReferenciaEspecial(body));
     }
 
     if (pathname === "/api/admin/usuarios" && method === "GET") {

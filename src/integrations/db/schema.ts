@@ -378,6 +378,23 @@ const SCHEMA_SQL = `
   -- /glossario/especiais convivem.
   CREATE UNIQUE INDEX IF NOT EXISTS idx_faq_itens_slug ON faq_itens(categoria_id, slug);
   CREATE INDEX IF NOT EXISTS idx_faq_itens_categoria ON faq_itens(categoria_id);
+
+  -- Âncoras da régua dos projetos ESPECIAIS (comparador em /especiais). Cada linha diz
+  -- "este projeto REAL é o que define o nível N", com a frase da régua.
+  -- ⚠️ Tabela INTERNA: nenhuma coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync reverso
+  -- jamais a toca. A NOTA continua morando na planilha (coluna manual "Estrelas") -- aqui só
+  -- fica o papel de referência, que é decisão da triagem sobre a régua, não dado do projeto.
+  -- ⚠️ Um nível pode ter MAIS DE UMA âncora (o topo da base é PIAPP e companhia), por isso a
+  -- chave é o projeto e não a nota.
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  CREATE TABLE IF NOT EXISTS especial_referencia (
+    projeto_id   TEXT PRIMARY KEY,
+    nota         INTEGER NOT NULL,
+    motivo       TEXT,
+    definido_por TEXT,
+    definido_em  TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_especial_referencia_nota ON especial_referencia(nota);
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

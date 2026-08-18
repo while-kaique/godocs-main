@@ -2315,3 +2315,49 @@ export type ApiLogRow = {
   response_body: string | null;
   created_at: string | null;
 };
+
+// ─── Âncoras da régua dos projetos ESPECIAIS (comparador em /especiais) ──────
+// Tabela INTERNA (ver o comentário do CREATE TABLE): a NOTA vive na planilha, aqui fica só
+// o papel de referência de um nível + a frase da régua.
+
+export type EspecialReferenciaRow = {
+  projeto_id: string;
+  nota: number;
+  motivo: string | null;
+  definido_por: string | null;
+  definido_em: string | null;
+};
+
+export async function getReferenciasEspeciais(): Promise<EspecialReferenciaRow[]> {
+  return queryAll<EspecialReferenciaRow>(
+    'SELECT projeto_id, nota, motivo, definido_por, definido_em FROM especial_referencia ORDER BY nota ASC',
+    [],
+  );
+}
+
+/**
+ * Marca (ou remarca) um projeto como âncora do seu nível. É UPSERT porque reescrever a frase
+ * da régua é o gesto comum — a triagem calibra o texto com o tempo, e um INSERT que falhasse
+ * na 2ª vez obrigaria a desmarcar antes de reescrever.
+ */
+export async function upsertReferenciaEspecial(dados: {
+  projeto_id: string;
+  nota: number;
+  motivo: string | null;
+  definido_por: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_referencia (projeto_id, nota, motivo, definido_por, definido_em)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       nota = excluded.nota,
+       motivo = excluded.motivo,
+       definido_por = excluded.definido_por,
+       definido_em = excluded.definido_em`,
+    [dados.projeto_id, dados.nota, dados.motivo, dados.definido_por],
+  );
+}
+
+export async function deleteReferenciaEspecial(projetoId: string): Promise<void> {
+  await exec('DELETE FROM especial_referencia WHERE projeto_id = ?', [projetoId]);
+}
