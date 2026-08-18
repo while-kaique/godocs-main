@@ -163,7 +163,11 @@ export function descreverFaixaEstrelas(min: number | null, max: number | null): 
 }
 
 export function casaStatus(p: ProjetoDashboardResumo, status: string): boolean {
-  return status === "todos" || pilulaDe(p.statusChave) === status;
+  const pilula = pilulaDe(p.statusChave);
+  // Descontinuados saem da FILA: não aparecem em "Todos" nem em nenhuma outra pílula —
+  // só quando a pílula "Descontinuado" é escolhida de propósito (clicar para visualizar).
+  if (pilula === "descontinuado") return status === "descontinuado";
+  return status === "todos" || pilula === status;
 }
 
 /**
@@ -298,5 +302,11 @@ export function contarPorPilula(
 
 /** Total que a pílula "Todos" mostra — o mesmo recorte, sem o status. */
 export function totalSemStatus(projetos: ProjetoDashboardResumo[], f: FiltrosDashboard): number {
-  return Object.values(contarPorPilula(projetos, f)).reduce((a, b) => a + b, 0);
+  // "Todos" é a fila — sem os descontinuados (que têm pílula própria). Sem esta exclusão o
+  // total contaria projetos que a pílula "Todos" agora esconde (casaStatus), e o número não
+  // bateria com a lista.
+  return Object.entries(contarPorPilula(projetos, f)).reduce(
+    (a, [k, v]) => (k === "descontinuado" ? a : a + v),
+    0,
+  );
 }

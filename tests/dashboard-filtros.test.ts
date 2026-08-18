@@ -533,3 +533,34 @@ describe('rótulo da faixa de estrelas', () => {
     expect(rotuloFaixaEstrelas(3, 3)).toBe('3');
   });
 });
+
+describe('descontinuados fora da fila (só na pílula própria)', () => {
+  const base = [
+    proj({ id: 'PEND', statusChave: 'pendente' }),
+    proj({ id: 'APR', statusChave: 'aprovado' }),
+    proj({ id: 'DESC', statusChave: 'descontinuado' }),
+  ];
+
+  it('"Todos" esconde os descontinuados', () => {
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'todos' }).map((p) => p.id);
+    expect(ids).toEqual(['PEND', 'APR']);
+  });
+
+  it('nenhuma outra pílula mostra descontinuado', () => {
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'aprovado' }).map((p) => p.id);
+    expect(ids).toEqual(['APR']);
+  });
+
+  it('a pílula "Descontinuado" mostra só eles', () => {
+    const ids = aplicarFiltros(base, { ...FILTROS_VAZIOS, status: 'descontinuado' }).map((p) => p.id);
+    expect(ids).toEqual(['DESC']);
+  });
+
+  it('o total de "Todos" não conta descontinuados', () => {
+    expect(totalSemStatus(base, FILTROS_VAZIOS)).toBe(2);
+  });
+
+  it('a pílula "Descontinuado" mantém a própria contagem', () => {
+    expect(contarPorPilula(base, FILTROS_VAZIOS).descontinuado).toBe(1);
+  });
+})
