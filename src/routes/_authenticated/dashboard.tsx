@@ -63,6 +63,7 @@ import { ROTULO_ESTADO_PARECER } from '@/lib/aprovacoes-parecer';
 import { hojeIso } from '@/lib/calendario-datas';
 import { apiFetch } from '@/lib/api-client';
 import { consumirPrefetchDashboard } from '@/lib/dashboard-prefetch';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   agendarPrefetchDetalhe,
   cancelarPrefetchDetalhe,
@@ -105,10 +106,36 @@ function fmtGanho(v: number | null) {
 }
 
 function Dashboard() {
-  const [dados, setDados] = useState<Listagem | null>(null);
-  const [carregando, setCarregando] = useState(true);
+  const queryClient = useQueryClient();
+  // React Query cacheia a listagem (mesmo padrão do /meus-projetos). staleTime de 60s:
+  // sair do /dashboard e voltar dentro desse intervalo serve do CACHE — instantâneo, sem
+  // nova leitura do espelho nem spinner. O prefetch do beforeLoad continua sendo consumido
+  // no 1º carregamento (ver a queryFn), então a primeira pintura segue paralela ao auth.
+  const {
+    data: dados = null,
+    isLoading: carregando,
+    error,
+  } = useQuery<Listagem>({
+    queryKey: ['dashboard-projetos'],
+    queryFn: () => {
+      const pre = consumirPrefetchDashboard<Listagem>();
+      return pre
+        ? pre.then((d) => d ?? apiFetch<Listagem>('/api/admin/dashboard/projetos'))
+        : apiFetch<Listagem>('/api/admin/dashboard/projetos');
+    },
+    staleTime: 60_000,
+  });
+  // `atualizando` é SÓ o refresh explícito (?refresh=1 sincroniza a planilha e regrava o
+  // espelho); guardo o erro dele à parte para não apagar a lista já em tela.
   const [atualizando, setAtualizando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  const [erroAtualizar, setErroAtualizar] = useState<string | null>(null);
+  const erro =
+    erroAtualizar ??
+    (error
+      ? error instanceof Error
+        ? error.message
+        : 'Não foi possível ler a planilha.'
+      : null);
 
   // Os filtros somam entre si (AND): status × natureza × ganho × área × pré-status × período.
   // A composição mora em `aplicarFiltros` (módulo puro) — a tela só guarda o estado.
@@ -125,35 +152,23 @@ function Dashboard() {
 
   const inputBusca = useRef<HTMLInputElement>(null);
 
-  async function carregar(refresh = false) {
-    if (refresh) setAtualizando(true);
-    else setCarregando(true);
-    setErro(null);
-    // ⚠️ `refresh` SINCRONIZA de verdade (lê a planilha e regrava o espelho), então toda ficha
-    // guardada passa a ser anterior à planilha em mãos — esquecê-las é o que impede o overlay
-    // de mostrar a célula velha logo depois de a triagem pedir dado fresco.
-    if (refresh) limparDetalhes();
+  // Refresh EXPLÍCITO: sincroniza a planilha (?refresh=1), regrava o espelho e atualiza o
+  // cache do React Query. Esquece as fichas guardadas (limparDetalhes) para o overlay não
+  // mostrar célula velha logo após pedir dado fresco. O 1º carregamento e o cache entre
+  // navegações são responsabilidade do useQuery acima.
+  async function atualizar() {
+    setAtualizando(true);
+    setErroAtualizar(null);
+    limparDetalhes();
     try {
-      // O `beforeLoad` do layout admin já disparou esta leitura em paralelo com o auth
-      // (ver `dashboard-prefetch.ts`). Se a promise existe, consome; senão, pede agora.
-      const prefetchado = refresh ? null : consumirPrefetchDashboard<Listagem>();
-      const d =
-        (prefetchado ? await prefetchado : null) ??
-        (await apiFetch<Listagem>(
-          `/api/admin/dashboard/projetos${refresh ? '?refresh=1' : ''}`,
-        ));
-      setDados(d);
+      const d = await apiFetch<Listagem>('/api/admin/dashboard/projetos?refresh=1');
+      queryClient.setQueryData(['dashboard-projetos'], d);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não foi possível ler a planilha.');
+      setErroAtualizar(e instanceof Error ? e.message : 'Não foi possível ler a planilha.');
     } finally {
-      setCarregando(false);
       setAtualizando(false);
     }
   }
-
-  useEffect(() => {
-    void carregar();
-  }, []);
 
   // Debounce curto: o filtro é local, então 120 ms já basta para não recalcular a lista
   // a cada tecla em listas grandes, sem a busca parecer travada.
@@ -233,7 +248,7 @@ function Dashboard() {
   // ⚠️ As "Observações" saíram do resumo (160 KB por listagem, nenhuma célula na tabela):
   // quem as mostra é a ficha, que as relê do detalhe. Não voltar a espelhá-las aqui.
   function aplicarStatusSalvo(id: string, status: string) {
-    setDados((d) =>
+    queryClient.setQueryData<Listagem>(['dashboard-projetos'], (d) =>
       d
         ? {
             ...d,
@@ -289,7 +304,7 @@ function Dashboard() {
                   })}`}
             </span>
           )}
-          <Button variant="outline" onClick={() => carregar(true)} disabled={atualizando}>
+          <Button variant="outline" onClick={() => void atualizar()} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             {atualizando ? 'Sincronizando…' : 'Atualizar'}
           </Button>
