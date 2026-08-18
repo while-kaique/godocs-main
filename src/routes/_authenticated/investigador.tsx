@@ -35,6 +35,7 @@ import {
   Minus,
   Equal,
   GitCompare,
+  UserCheck,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/investigador')({
@@ -108,6 +109,18 @@ type EdicaoInvestigador = {
   tem_erro: boolean
   status: string | null
   ganho_total_mensal: number | null
+}
+
+type ProjetoPendenteAprovacao = {
+  projeto_id: string
+  nome: string | null
+  responsavel_nome: string
+  responsavel_email: string
+  area_nome: string | null
+  ferramenta: string | null
+  submitted_at: string | null
+  aguardando_desde: string | null
+  lideres_pendentes: { nome: string | null; email: string }[]
 }
 
 type ChatMsg = {
@@ -387,7 +400,7 @@ function isAbandonado(p: ProjetoInvestigador): boolean {
   return min != null && min > ABANDONO_MIN
 }
 
-type AbaInvestigador = 'submetidos' | 'edicoes' | 'abandonados'
+type AbaInvestigador = 'submetidos' | 'edicoes' | 'abandonados' | 'pendentes_aprovacao'
 
 /** Carimbo → epoch ms (aceita ISO com Z/offset ou datetime SQLite). NaN se inválido. */
 function tsToEpoch(iso: string | null | undefined): number {
@@ -436,6 +449,7 @@ function detectMsgPhase(msg: ChatMsg): PhaseGroup {
 function Investigador() {
   const [projetos, setProjetos] = useState<ProjetoInvestigador[]>([])
   const [edicoes, setEdicoes] = useState<EdicaoInvestigador[]>([])
+  const [pendentesAprovacao, setPendentesAprovacao] = useState<ProjetoPendenteAprovacao[]>([])
   const [stats, setStats] = useState<InvestigadorStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [aba, setAba] = useState<AbaInvestigador>('submetidos')
@@ -465,20 +479,23 @@ function Investigador() {
       // estourando algum limite), os outros continuam populando a tela. Com Promise.all,
       // a rejeição de QUALQUER um caía no catch e zerava TODAS as listas (Investigador
       // aparecia vazio mesmo com /projetos respondendo 200).
-      const [pRes, sRes, eRes] = await Promise.allSettled([
+      const [pRes, sRes, eRes, aRes] = await Promise.allSettled([
         apiFetch<ProjetoInvestigador[]>('/api/admin/investigador/projetos'),
         apiFetch<InvestigadorStats>('/api/admin/investigador/stats'),
         apiFetch<EdicaoInvestigador[]>('/api/admin/investigador/edicoes'),
+        apiFetch<ProjetoPendenteAprovacao[]>('/api/admin/investigador/pendentes-aprovacao'),
       ])
       if (pRes.status === 'fulfilled') setProjetos(pRes.value ?? [])
       if (sRes.status === 'fulfilled') setStats(sRes.value ?? null)
       if (eRes.status === 'fulfilled') setEdicoes(eRes.value ?? [])
+      if (aRes.status === 'fulfilled') setPendentesAprovacao(aRes.value ?? [])
       // Mantém o dado velho na tela (não zera), mas AVISA que está desatualizado.
       setFalhas(
         [
           pRes.status === 'rejected' ? 'projetos' : null,
           sRes.status === 'rejected' ? 'estatísticas' : null,
           eRes.status === 'rejected' ? 'edições' : null,
+          aRes.status === 'rejected' ? 'pendentes de pré-aprovação' : null,
         ].filter((x): x is string => x !== null),
       )
       setLastRefresh(new Date())
@@ -512,6 +529,7 @@ function Investigador() {
   }, [])
 
   const ehEdicoes = aba === 'edicoes'
+  const ehPendentesAprovacao = aba === 'pendentes_aprovacao'
 
   // Projetos da aba atual (Submetidos × Abandonados). Edições têm lista própria.
   const projetosDaAba = projetos.filter((p) =>
@@ -560,10 +578,24 @@ function Investigador() {
     )
   })
 
+  // Pendentes de pré-aprovação filtradas por busca textual (aba Pré-aprovação)
+  const pendentesFiltradas = pendentesAprovacao.filter((p) => {
+    if (!busca) return true
+    const q = busca.toLowerCase()
+    return (
+      (p.nome ?? '').toLowerCase().includes(q) ||
+      p.responsavel_nome.toLowerCase().includes(q) ||
+      p.responsavel_email.toLowerCase().includes(q) ||
+      (p.area_nome ?? '').toLowerCase().includes(q) ||
+      p.lideres_pendentes.some((l) => (l.nome ?? l.email).toLowerCase().includes(q))
+    )
+  })
+
   // Contagens por aba
   const countSubmetidos = projetos.filter(isSubmetido).length
   const countAbandonados = projetos.filter(isAbandonado).length
   const countEdicoes = edicoes.length
+  const countPendentesAprovacao = pendentesAprovacao.length
 
   // Valores dinâmicos para filtros (extraídos dos projetos carregados)
   const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
@@ -589,6 +621,7 @@ function Investigador() {
     ['submetidos', 'Submetidos', countSubmetidos],
     ['edicoes', 'Edições', countEdicoes],
     ['abandonados', 'Abandonados', countAbandonados],
+    ['pendentes_aprovacao', 'Pré-aprovação', countPendentesAprovacao],
   ]
 
   return (
@@ -605,7 +638,7 @@ function Investigador() {
                 Investigador
               </h1>
               <p className="text-[13px] text-[var(--go-text-primary)]/45">
-                Submissões, edições e abandonos
+                Submissões, edições, abandonos e pré-aprovações pendentes
               </p>
             </div>
           </div>
@@ -620,10 +653,11 @@ function Investigador() {
 
       {/* Stats globais */}
       {stats && (
-        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-6">
           <StatCard label="Submetidos" value={countSubmetidos} icon={<CheckCircle2 className="h-4 w-4" />} color="#16a34a" />
           <StatCard label="Edições" value={countEdicoes} icon={<RefreshCw className="h-4 w-4" />} color="var(--go-blue)" />
           <StatCard label="Abandonados" value={countAbandonados} icon={<AlertTriangle className="h-4 w-4" />} color="#ea580c" highlight={countAbandonados > 0} />
+          <StatCard label="Pré-aprovação" value={countPendentesAprovacao} icon={<UserCheck className="h-4 w-4" />} color="#f59e0b" highlight={countPendentesAprovacao > 0} />
           <StatCard label="Erros API" value={stats.total_erros} icon={<XCircle className="h-4 w-4" />} color="#dc2626" highlight={stats.total_erros > 0} />
           <StatCard label="Tempo médio" value="—" icon={<Timer className="h-4 w-4" />} color="#7c3aed" />
         </div>
@@ -651,34 +685,36 @@ function Investigador() {
 
       {/* Filtros + busca */}
       <div className="mt-4 flex flex-wrap items-center gap-2.5">
-        <div className="flex items-center gap-0.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-0.5">
-          {([
-            ['todos', 'Todos', null],
-            ['com_erros', 'Com erros', ehEdicoes ? edicoes.filter((e) => e.tem_erro).length : projetosDaAba.filter((p) => p.tem_erro).length],
-            ['lentos', 'Lentos (>5s)', ehEdicoes ? edicoes.filter((e) => (e.media_duracao_api_ms ?? 0) > 5000).length : projetosDaAba.filter((p) => (p.max_duracao_api_ms ?? 0) > 5000).length],
-          ] as [Filtro, string, number | null][]).map(([key, label, count]) => (
-            <button
-              key={key}
-              onClick={() => setFiltro(key)}
-              className={`rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all ${
-                filtro === key
-                  ? 'bg-[var(--go-blue)] text-white shadow-sm'
-                  : 'text-[var(--go-text-primary)]/50 hover:text-[var(--go-text-primary)] hover:bg-[var(--go-blue)]/5'
-              }`}
-            >
-              {label}
-              {count != null && count > 0 && (
-                <span
-                  className={`ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
-                    filtro === key ? 'bg-white/25 text-white' : 'bg-[var(--go-blue)]/10 text-[var(--go-blue)]'
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {!ehPendentesAprovacao && (
+          <div className="flex items-center gap-0.5 rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-0.5">
+            {([
+              ['todos', 'Todos', null],
+              ['com_erros', 'Com erros', ehEdicoes ? edicoes.filter((e) => e.tem_erro).length : projetosDaAba.filter((p) => p.tem_erro).length],
+              ['lentos', 'Lentos (>5s)', ehEdicoes ? edicoes.filter((e) => (e.media_duracao_api_ms ?? 0) > 5000).length : projetosDaAba.filter((p) => (p.max_duracao_api_ms ?? 0) > 5000).length],
+            ] as [Filtro, string, number | null][]).map(([key, label, count]) => (
+              <button
+                key={key}
+                onClick={() => setFiltro(key)}
+                className={`rounded-[6px] px-3 py-1.5 text-xs font-medium transition-all ${
+                  filtro === key
+                    ? 'bg-[var(--go-blue)] text-white shadow-sm'
+                    : 'text-[var(--go-text-primary)]/50 hover:text-[var(--go-text-primary)] hover:bg-[var(--go-blue)]/5'
+                }`}
+              >
+                {label}
+                {count != null && count > 0 && (
+                  <span
+                    className={`ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
+                      filtro === key ? 'bg-white/25 text-white' : 'bg-[var(--go-blue)]/10 text-[var(--go-blue)]'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--go-text-primary)]/30" />
@@ -691,7 +727,7 @@ function Investigador() {
           />
         </div>
 
-        {!ehEdicoes && (
+        {!ehEdicoes && !ehPendentesAprovacao && (
           <FiltroPopover filtros={filtrosAv} onChange={setFiltrosAv} areas={areasUnicas} ferramentas={ferramentasUnicas} />
         )}
 
@@ -704,7 +740,7 @@ function Investigador() {
         </button>
       </div>
       {/* Chips de filtros avançados ativos */}
-      {!ehEdicoes && <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />}
+      {!ehEdicoes && !ehPendentesAprovacao && <FiltroChips filtros={filtrosAv} onChange={setFiltrosAv} />}
 
       {/* Falha de carregamento — os contadores abaixo NÃO podem ser lidos como
           verdade quando a fonte deles não respondeu. Rótulo + ícone além da cor. */}
@@ -738,6 +774,19 @@ function Investigador() {
             <div className="space-y-1.5">
               {edicoesFiltradas.map((e) => (
                 <EdicaoCard key={`${e.projeto_id}-${e.versao_num}`} edicao={e} onClick={() => loadDetalhes(e.projeto_id, e.versao_num)} />
+              ))}
+            </div>
+          )
+        ) : ehPendentesAprovacao ? (
+          pendentesFiltradas.length === 0 ? (
+            <div className="rounded-[var(--go-radius-md)] border border-dashed border-[var(--go-blue)]/15 bg-white/50 p-8 text-center text-sm text-[var(--go-text-primary)]/40">
+              <UserCheck className="mx-auto mb-2 h-5 w-5" />
+              Nenhum projeto pendente de pré-aprovação do líder.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {pendentesFiltradas.map((p) => (
+                <PendenteAprovacaoCard key={p.projeto_id} pendente={p} onClick={() => loadDetalhes(p.projeto_id)} />
               ))}
             </div>
           )
@@ -931,6 +980,61 @@ function EdicaoCard({ edicao: e, onClick }: { edicao: EdicaoInvestigador; onClic
               {formatDuration(e.media_duracao_api_ms)}
             </div>
             <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">API</div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/15 group-hover:text-[var(--go-blue)]/40 group-hover:translate-x-0.5 transition-all" />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ── Card de um projeto pendente de pré-aprovação — aba "Pré-aprovação" ──────
+
+function PendenteAprovacaoCard({ pendente: p, onClick }: { pendente: ProjetoPendenteAprovacao; onClick: () => void }) {
+  const esperandoMin = minutesSince(p.aguardando_desde)
+  const muitoTempo = esperandoMin != null && esperandoMin > 24 * 60 // >1 dia parado, chama atenção
+
+  return (
+    <button
+      onClick={onClick}
+      className="group relative w-full text-left overflow-hidden rounded-[var(--go-radius-md)] border border-[var(--go-blue)]/8 bg-white pl-0 pr-4 py-3 transition-all hover:border-[var(--go-blue)]/18 hover:shadow-[var(--go-shadow-sm)]"
+    >
+      <div className="absolute top-0 left-0 h-full w-1 bg-[#f59e0b]" />
+      <div className="flex items-center gap-3 pl-4">
+        <div className="flex-shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#f59e0b]/12 text-[#b45309]">
+          <UserCheck className="h-3.5 w-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[14px] font-semibold text-[var(--go-text-primary)] truncate group-hover:text-[var(--go-blue)] transition-colors">
+              {p.nome ?? 'Projeto sem nome'}
+            </span>
+            <span
+              className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                muitoTempo ? 'bg-[#dc2626]/8 text-[#dc2626]' : 'bg-[#f59e0b]/12 text-[#b45309]'
+              }`}
+            >
+              {muitoTempo && <AlertTriangle className="h-3 w-3" />}
+              Aguardando {p.lideres_pendentes.length} líder{p.lideres_pendentes.length !== 1 ? 'es' : ''}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[12px] text-[var(--go-text-primary)]/40">
+            {p.responsavel_nome} · {p.area_nome ?? 'Sem área'} · {p.ferramenta ?? '—'}
+          </div>
+          <div className="mt-0.5 text-[11px] text-[var(--go-text-primary)]/35 truncate">
+            Líder{p.lideres_pendentes.length !== 1 ? 'es' : ''}: {p.lideres_pendentes.map((l) => l.nome ?? l.email).join(', ')}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs flex-shrink-0">
+          <div className="text-center" title="Enviado em">
+            <div className="font-semibold text-[var(--go-text-primary)]/80 tabular-nums text-[13px]">{formatDateTime(p.submitted_at)}</div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">enviado</div>
+          </div>
+          <div className="text-center" title="Tempo esperando o parecer do líder">
+            <div className={`font-semibold tabular-nums text-[13px] ${muitoTempo ? 'text-[#dc2626]' : 'text-[#b45309]'}`}>
+              {formatTimeSince(esperandoMin)}
+            </div>
+            <div className="text-[10px] text-[var(--go-text-primary)]/30 font-medium">esperando</div>
           </div>
           <ChevronRight className="h-4 w-4 text-[var(--go-text-primary)]/15 group-hover:text-[var(--go-blue)]/40 group-hover:translate-x-0.5 transition-all" />
         </div>
