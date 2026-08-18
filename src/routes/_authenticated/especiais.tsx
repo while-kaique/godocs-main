@@ -66,6 +66,7 @@ import { ROTULO_ESTADO_PARECER, type EstadoParecer } from '@/lib/aprovacoes-pare
 import {
   PERGUNTA_MOTIVO,
   STATUS_GRAVAVEIS_ESPECIAIS,
+  acoesDisponiveis,
   campoDoMotivo,
   precisaMotivo,
   rotuloAcao,
@@ -860,6 +861,7 @@ function Cartao({
       </div>
 
       <AcoesTriagem
+        disponiveis={acoesDisponiveis(projeto.statusChave)}
         aberta={acaoAberta}
         onAbrir={setAcaoAberta}
         onDecidir={(acao, motivo) => {
@@ -879,10 +881,13 @@ function Cartao({
  * estiver vazio, porque decisão negativa sem explicação é um "não" mudo para quem submeteu.
  */
 function AcoesTriagem({
+  disponiveis,
   aberta,
   onAbrir,
   onDecidir,
 }: {
+  /** As ações que cabem no estado atual — a que o projeto já é não aparece. */
+  disponiveis: AcaoTriagem[];
   aberta: AcaoTriagem | null;
   onAbrir: (a: AcaoTriagem | null) => void;
   onDecidir: (acao: AcaoTriagem, motivo: string) => void;
@@ -936,15 +941,21 @@ function AcoesTriagem({
 
   return (
     <div className="mt-2 flex flex-wrap gap-1.5 border-t pt-2">
-      <BotaoAcao onClick={() => onDecidir('aprovar', '')} tom="ok">
-        <Check className="h-3 w-3" aria-hidden /> Aprovar
-      </BotaoAcao>
-      <BotaoAcao onClick={() => onAbrir('reenviar')} tom="atencao">
-        <RotateCcw className="h-3 w-3" aria-hidden /> Pedir reenvio
-      </BotaoAcao>
-      <BotaoAcao onClick={() => onAbrir('reprovar')} tom="critico">
-        <Ban className="h-3 w-3" aria-hidden /> Reprovar
-      </BotaoAcao>
+      {disponiveis.includes('aprovar') && (
+        <BotaoAcao onClick={() => onDecidir('aprovar', '')} tom="ok">
+          <Check className="h-3 w-3" aria-hidden /> Aprovar
+        </BotaoAcao>
+      )}
+      {disponiveis.includes('reenviar') && (
+        <BotaoAcao onClick={() => onAbrir('reenviar')} tom="atencao">
+          <RotateCcw className="h-3 w-3" aria-hidden /> Pedir reenvio
+        </BotaoAcao>
+      )}
+      {disponiveis.includes('reprovar') && (
+        <BotaoAcao onClick={() => onAbrir('reprovar')} tom="critico">
+          <Ban className="h-3 w-3" aria-hidden /> Reprovar
+        </BotaoAcao>
+      )}
     </div>
   );
 }

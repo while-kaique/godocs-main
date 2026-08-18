@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   STATUS_GRAVAVEIS_ESPECIAIS,
+  acoesDisponiveis,
   PERGUNTA_MOTIVO,
   campoDoMotivo,
   precisaMotivo,
@@ -41,5 +42,22 @@ describe('ações de triagem', () => {
     for (const acao of ACOES) expect(rotuloAcao(acao)).toBeTruthy();
     expect(PERGUNTA_MOTIVO.reenviar).toBeTruthy();
     expect(PERGUNTA_MOTIVO.reprovar).toBeTruthy();
+  });
+});
+
+describe('ações disponíveis por estado', () => {
+  it('some a ação que o projeto JÁ é — "Aprovar" num aprovado só gera ruído de auditoria', () => {
+    expect(acoesDisponiveis('aprovado')).toEqual(['reenviar', 'reprovar']);
+    expect(acoesDisponiveis('reenvio pendente')).toEqual(['aprovar', 'reprovar']);
+    expect(acoesDisponiveis('reprovado')).toEqual(['aprovar', 'reenviar']);
+  });
+
+  it('pendente e sem status mantêm as três', () => {
+    expect(acoesDisponiveis('pendente')).toHaveLength(3);
+    expect(acoesDisponiveis(null)).toHaveLength(3);
+  });
+
+  it('reprovado pode ser aprovado depois — só a ação redundante some', () => {
+    expect(acoesDisponiveis('reprovado')).toContain('aprovar');
   });
 });
