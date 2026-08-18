@@ -4,10 +4,48 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## Plano ativo
-**Nenhum plano ativo** — a sessão de 17/08 (noite) também foi código direto, a partir de um pedido de escopo
-fechado do Luis. Próximo é **o Luis validar as estrelas em prod** e, com o OK, **mergear o PR #263**
-(`/ggsd:ship` só se sobrar algo além do merge). Frente nova → `/ggsd:plan`.
+## Plano ativo — AGENTE CLASSIFICADOR DE ESPECIAIS (peça 4)
+
+**Estado:** a view `/especiais` está **codada, testada (1549 verdes) e commitada** na branch
+`feat/view-especiais-estrelas` (worktree `~/godocs-wt-especiais`). **Falta:** deploy no STAGING
+(regra 13) → validação visual do Luis → prod → PR. Fazer isso ANTES de começar o agente.
+
+### O prompt da próxima sessão
+
+> Implementar o **agente classificador de projetos especiais**. Ele roda quando um projeto
+> **especial** é submetido e, ANTES da triagem humana, propõe em que caixa (nível de estrelas)
+> o projeto cai, **comparando-o com as ÂNCORAS da base** (PIAPP e as demais referências de 5, 6
+> e 7 estrelas) — as âncoras e as frases da régua já existem em `especial_referencia`, escritas
+> pela triagem na `/especiais`.
+
+**Contexto que a próxima sessão precisa ter em mãos:**
+- A régua desta feature é **ÂNCORA, não rubrica absoluta** (ver `SPEC_FEATURES_NOVAS.md`,
+  "Comparador de projetos ESPECIAIS por ÂNCORA"): gente é ruim em nota absoluta e boa em
+  comparação. O agente tem de herdar isso — a saída dele é *"fica entre a âncora de 2 e a de 3,
+  mais perto da de 2, porque X"*, não uma nota tirada do nada.
+- **O agente NUNCA grava a nota.** Ele PROPÕE, com justificativa e citando as âncoras que usou;
+  quem decide é a triagem, na `/especiais`. Este repo já queimou 3× com "prompt não segura"
+  (Gostream, ganho projetado, SmartOnline) — o determinístico é o agrupamento, não o juízo.
+- Os 3 papéis desenhados no brainstorm de 18/08, em ordem de valor: **(a)** ficha comparável de
+  ~5 linhas (o que faz · quem usa · o que quebra se sumir · abrangência · o ponteiro) — é o que
+  torna a coluna escaneável e é pré-requisito dos outros dois; **(b)** vizinhos mais próximos com
+  a diferença NOMEADA; **(c)** advogado do diabo ("por que este NÃO é N estrelas").
+- Material de entrada disponível: `Descrição`, `Contexto do Projeto Especial`, a documentação
+  compilada, `Área`, `Ferramenta` e as âncoras + frases da régua.
+- ⚠️ Especial **pula o analisador** hoje (`analisarProjetoFn`) — decidir se este agente entra
+  naquele caminho ou num próprio, e lembrar do D27 (especial não abre fila de líder).
+- ⚠️ **Decisão do Luis ainda em aberto** (peça 1 do brainstorm, não bloqueia a view mas
+  reaparece aqui): a estrela mede **impacto para a empresa** ou **mérito do projeto**? Foi a
+  ambiguidade exata do GoBrands (grande para Dados, pequeno em termos gerais).
+
+### Antes disso, o operacional da view
+1. `npm run test && npm run build && npm run build:worker` no worktree.
+2. Deploy **STAGING** (`edf400b4`) — `scripts/deploy-godeploy.sh` + `updateApp`. ⚠️ `git fetch` +
+   `getApp` ANTES de empacotar (o `updateApp` substitui a app INTEIRA e o Kaique sobe em paralelo).
+3. Validar `/especiais` no navegador: colunas, prateleira da régua, fixar/tirar régua, ±1 estrela
+   gravando na planilha, modo comparar trazendo a âncora junto.
+4. Prod (`674a3710`) → PR.
+
 
 ### 🆕 17/08 (noite) — estrelas SEM teto + filtro por faixa + ficha instantânea depois da busca (PR #263, **JÁ EM PROD**)
 
