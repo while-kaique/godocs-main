@@ -2469,14 +2469,50 @@ dois atalhos (Qualquer · Sem nota) e a **faixa exata** embaixo.
 1. **Reusa o `Popover` do calendário** (exportado para isso). Dois popovers na mesma barra abririam,
    fechariam e posicionariam diferente — duplicação que se paga em bug.
 2. **A faixa exata FICA.** Ela é o que preserva a escala aberta (pedir "6 a 10"); trocar tudo por
-   uma escada "1+/2+/3+" deixaria a tela mais bonita tirando função.
+   uma escada "1+/2+/3+" deixaria a tela mais bonita tirando função. ⚠️ **REVISTA em 18/08/2026**
+   (entrada "Escala de estrelas fechada em 10", abaixo): com a escala fechada em 10 e as 10 na
+   tela, a faixa exata perdeu o que ela preservava e SAIU — a premissa desta decisão caiu, não a
+   régua dela.
 3. **Estado nunca só por cor:** a pílula diz "3+"/"2–4"/"Sem nota" em texto (fonte única
    `rotuloFaixaEstrelas`) e o painel repete em frase (`descreverFaixaEstrelas`).
 4. **O widget nativo do `number` sai, o `type="number"` fica** (`.go-nota-campo`): as setas do
-   teclado continuam funcionando; só as setinhas desenhadas do navegador saem.
+   teclado continuam funcionando; só as setinhas desenhadas do navegador saem. ⚠️ **Obsoleta em
+   18/08/2026** — os campos saíram e a classe foi removida.
 5. **Na tabela, vazio e `0` se parecem** (cinza "—"/"0") e só nota ≥ 1 ganha o chip dourado: um chip
    de destaque com "0" gritaria em centenas de linhas. A distinção vazio ≠ 0 segue na ficha e na
    ordenação.
+
+---
+
+## Escala de estrelas fechada em 10 — todas visíveis, e os campos "de/até" saem (18/08/2026)
+
+**Pedido.** *"O máximo de estrela do GoDocs é 10 estrelas, então já quero que fique visível na
+tela de edição as 10 estrelas e no filtro, quando eu clico pra abrir o select, fique as 10
+estrelas ali já visível, e tire as boxes de 0 até N e deixe só o clique em estrelas."*
+
+**O que havia.** A escala era **aberta** (17/08): a fileira nascia com 5 e crescia por um botão
+"+ estrela"; quem quisesse pedir "6 a 10" no filtro digitava nos dois `<input type="number">` da
+"faixa exata". Metade da escala usável ficava atrás de um clique de descoberta, nos dois lugares.
+
+**Fix.** `ESCALA_ESTRELAS = 10` na ficha (`projeto-detalhe-dialog.tsx`) e `DEGRAUS = 10` no painel
+do filtro (`filtro-estrelas.tsx`); o botão "+" e o bloco "Faixa exata" saem, e a classe
+`.go-nota-campo` sai do `styles.css` com eles. As 10 ficam em **duas linhas de 5** (`grid-cols-5`
+nos dois lugares): em fileira corrida ninguém distingue a 7ª da 8ª de relance, e a quebra em 5 + 5
+dá o ponto de apoio da conta. Nota legada acima de 10 vira uma 3ª linha, sem caso especial.
+
+**Decisões fechadas.**
+1. **10 é teto de ESCALA, não recorte de VALOR.** A fileira ainda cresce além de 10 quando a nota
+   GRAVADA é maior (legado da escala aberta): `Math.max(ESCALA_ESTRELAS, valor)`. Recortar aqui é o
+   `Math.min(nota, 5)` do 1º dia de volta — o "salvar status" **rebaixaria** a nota de outra pessoa.
+2. **O `MAX_ESTRELAS_GRAVAVEL = 100` do zod FICA.** É sanidade de célula, não escala; baixá-lo a 10
+   faria a triagem levar **400** ao salvar o status de uma linha legada com nota 12.
+3. **O estado do filtro continua sendo faixa** (`estrelasMin`/`estrelasMax`): a URL e o rótulo
+   ("2–4", "até 3") seguem entendendo teto — o que saiu foi o **jeito de pedi-lo pela tela**. Se
+   um dia a triagem quiser teto de novo, é um gesto de clique a projetar, não estes 2 campos.
+4. **Duas linhas de 5, não uma de 10** (ajuste do Luis no mesmo dia, sobre a 1ª versão com só um
+   respiro depois da 5ª): a quebra de linha é o que torna a contagem desnecessária.
+5. **A pergunta do clique continua sendo "N ou mais"** — o clique não virou
+   "exatamente N", que é o filtro que quase ninguém quer.
 
 ---
 

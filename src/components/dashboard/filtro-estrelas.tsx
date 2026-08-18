@@ -1,15 +1,16 @@
 /**
  * Filtro pela NOTA da triagem (coluna "Estrelas") — pílula + painel ancorado.
  *
- * ## Por que não são dois campos numéricos na barra
- * A 1ª versão punha dois `<input type="number">` crus dentro de uma pílula: funcionava e lia
- * como formulário de configuração no meio de uma barra que, no resto, fala por **pílulas e
- * trilhos** (`Segmentado`, `SeletorPeriodo`). Dois campos de digitação também são o gesto
- * errado para o caso comum — "me mostre os de 3 ou mais" é um CLIQUE, não uma digitação.
+ * ## Por que só estrelas, sem campo de digitar
+ * O painel já teve dois `<input type="number">` ("de __ até __") embaixo da fileira, para o
+ * caso raro de querer um teto. Saíram (decisão do Luis, 18/08/2026): com as **10 estrelas da
+ * escala** todas na tela (duas linhas de 5), elas sozinhas respondem a pergunta que a triagem
+ * faz de verdade — "me mostre os de 3 ou mais" é um CLIQUE, não uma digitação —, e dois campos
+ * de formulário no meio de uma barra de pílulas liam como configuração.
  *
- * Aqui a fileira de estrelas É o controle: clicar na 3ª estrela pede "3 ou mais", clicar de
- * novo desfaz. A faixa exata (de/até) fica embaixo, para o caso raro de querer um teto — e é
- * ela que preserva a escala ABERTA (nota 8, 10) que a ficha permite dar.
+ * As estrelas SÃO o controle: clicar na 3ª pede "3 ou mais", clicar de novo desfaz. As
+ * duas pílulas cobrem as pontas ("Qualquer", "Sem nota"). Faixa com teto (`estrelasMax`)
+ * continua entendida pelo filtro e pelo rótulo — só não há mais como pedi-la aqui.
  *
  * ## Padrão da página
  * Reusa o `Popover` do calendário (mesmo posicionamento, Esc, clique fora) e o mesmo gatilho
@@ -27,8 +28,8 @@ const AZUL = 'var(--go-blue)';
 const OURO = '#f5c518';
 const OURO_BORDA = '#e0a800';
 
-/** Quantas estrelas a fileira do painel oferece. Não é teto da escala (ver a ficha). */
-const DEGRAUS = 5;
+/** A escala da triagem: 10 estrelas, todas visíveis (o mesmo teto da ficha). */
+const DEGRAUS = 10;
 
 export function FiltroEstrelas({
   min,
@@ -108,17 +109,12 @@ function Painel({
   onChange: (min: number | null, max: number | null) => void;
 }) {
   const [previa, setPrevia] = useState<number | null>(null);
-  // A fileira reflete o piso da faixa; com só um teto ("até 3"), nada acende — o teto é o
-  // caso raro e quem o explica é a frase, não as estrelas.
+  // A fileira reflete o piso da faixa; com só um teto ("até 3") vindo da URL, nada acende —
+  // quem explica esse caso é a frase, não as estrelas.
   const base = min ?? 0;
   const aceso = previa ?? base;
   // "Sem nota" é a fila 0–0 e não pode acender estrela nenhuma.
   const semNota = min === 0 && max === 0;
-
-  const ler = (v: string): number | null => {
-    const n = Number.parseInt(v, 10);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
 
   return (
     <div className="w-[252px] p-3.5">
@@ -126,11 +122,12 @@ function Painel({
         Nota da triagem
       </p>
 
-      {/* A fileira É o filtro: cada estrela pede "N ou mais". Clicar na mesma desfaz. */}
+      {/* As estrelas SÃO o filtro: cada uma pede "N ou mais". Clicar na mesma desfaz.
+          Duas linhas de 5 (não 10 corridas): a quebra é o que faz a 8ª ser lida como 8. */}
       <div
         role="group"
         aria-label="Nota mínima"
-        className="mt-2 flex items-center gap-1"
+        className="mt-2 grid w-max grid-cols-5 gap-1"
         onMouseLeave={() => setPrevia(null)}
       >
         {Array.from({ length: DEGRAUS }, (_, i) => i + 1).map((n) => {
@@ -173,38 +170,6 @@ function Painel({
         </Atalho>
       </div>
 
-      <div className="mt-3.5 border-t pt-3" style={{ borderColor: 'rgba(0,89,169,0.12)' }}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-muted-foreground">
-          Faixa exata
-        </p>
-        {/* Escala aberta: aqui é onde se pede "6 a 10". Campo vazio = ponta aberta. */}
-        <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
-          de
-          <input
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            placeholder="—"
-            aria-label="Nota mínima da faixa"
-            value={min ?? ''}
-            onChange={(e) => onChange(ler(e.target.value), max)}
-            className="go-nota-campo"
-          />
-          até
-          <input
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            placeholder="—"
-            aria-label="Nota máxima da faixa"
-            value={max ?? ''}
-            onChange={(e) => onChange(min, ler(e.target.value))}
-            className="go-nota-campo"
-          />
-        </div>
-      </div>
     </div>
   );
 }

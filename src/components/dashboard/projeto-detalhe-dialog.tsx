@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, ExternalLink, Save, History, FileText, Star, Plus } from 'lucide-react';
+import { Loader2, ExternalLink, Save, History, FileText, Star } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -137,11 +137,15 @@ const DESCRICAO = 'Descrição';
 const NO_CABECALHO = ['Projeto', 'Estrelas'];
 
 /**
- * Quantas estrelas a fileira mostra quando a nota é baixa. **Não é teto da escala** — a
- * escala é ABERTA (pedido do Luis, 17/08/2026: "podemos dar N estrelas"): a fileira sempre
- * cresce até a nota atual e o botão "+" acrescenta mais uma.
+ * A escala da triagem vai até **10 estrelas** (decisão do Luis, 18/08/2026) e as 10 ficam
+ * TODAS visíveis — antes a fileira nascia com 5 e crescia por um botão "+", o que escondia
+ * metade da escala atrás de um clique de descoberta.
+ *
+ * ⚠️ Não é um recorte do valor: nota LEGADA acima de 10 (a planilha aceitava mais) continua
+ * desenhando a fileira inteira até ela, senão salvar rebaixaria a nota de outra pessoa — foi
+ * exatamente o bug do `Math.min(nota, 5)`.
  */
-const ESTRELAS_BASE = 5;
+const ESCALA_ESTRELAS = 10;
 
 /**
  * Sanidade da célula, espelhando o `MAX_ESTRELAS_GRAVAVEL` do servidor (replicado, não
@@ -156,30 +160,27 @@ function lerEstrelas(valor: string | undefined): number {
 }
 
 /**
- * Nota da triagem — grupo de rádio SEM teto (`radiogroup`, com as setas do teclado), não N
- * botões soltos: é UMA escolha entre opções mutuamente exclusivas.
+ * Nota da triagem — grupo de rádio (`radiogroup`, com as setas do teclado), não N botões
+ * soltos: é UMA escolha entre opções mutuamente exclusivas.
  *
- * A fileira nasce com 5 estrelas (o caso comum), cresce até a nota gravada — nota 8 da
- * planilha aparece como 8 estrelas, não como "legado a substituir" — e o "+" adiciona uma.
+ * As 10 estrelas da escala aparecem de uma vez, em **duas linhas de 5** (decisão do Luis,
+ * 18/08/2026): numa fileira corrida de 10 ninguém distingue a 7ª da 8ª de relance, e a
+ * quebra em 5 + 5 dá o ponto de apoio da conta. Nota legada acima de 10 vira uma 3ª linha.
  *
  * ⚠️ A nota nunca é dita só pelo preenchimento da estrela: o número fica ao lado, em
  * texto, e cada estrela tem `aria-label` própria.
  */
 function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number) => void }) {
   const [previa, setPrevia] = useState<number | null>(null);
-  const [extras, setExtras] = useState(0);
   const mostrado = previa ?? valor;
-  // A fileira acompanha a maior das três: a base, a nota atual e o que o "+" abriu.
-  const quantas = Math.min(
-    MAX_ESTRELAS_GRAVAVEL,
-    Math.max(ESTRELAS_BASE, valor, previa ?? 0, extras),
-  );
+  // 10 é a escala; a fileira só passa disso para não rebaixar uma nota legada já gravada.
+  const quantas = Math.min(MAX_ESTRELAS_GRAVAVEL, Math.max(ESCALA_ESTRELAS, valor));
   return (
     <div className="mt-1 flex flex-wrap items-center gap-2">
       <div
         role="radiogroup"
-        aria-label={`Nota do projeto, de 0 a ${quantas} estrelas (a escala não tem teto)`}
-        className="flex flex-wrap items-center gap-0.5"
+        aria-label={`Nota do projeto, de 0 a ${quantas} estrelas`}
+        className="grid w-max grid-cols-5 gap-1"
         onMouseLeave={() => setPrevia(null)}
       >
         {Array.from({ length: quantas }, (_, i) => i + 1).map((n) => {
@@ -210,8 +211,8 @@ function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number
           );
         })}
       </div>
-      {/* Sem teto, a nota só é legível pelo NÚMERO — contar 12 estrelas na tela ninguém
-          conta. Daí o valor vir num chip ao lado ("12 estrelas"), não como "12/N". */}
+      {/* A nota também vem em número, num chip ao lado: com 10 casas, contar estrela por
+          estrela é trabalho que a tela pode poupar. */}
       {valor === 0 ? (
         <span className="text-[12px] text-muted-foreground">sem nota</span>
       ) : (
@@ -221,24 +222,6 @@ function NotaEstrelas({ valor, onChange }: { valor: number; onChange: (n: number
         >
           {valor} {valor === 1 ? 'estrela' : 'estrelas'}
         </span>
-      )}
-      {quantas < MAX_ESTRELAS_GRAVAVEL && (
-        <button
-          type="button"
-          onClick={() => {
-            const nova = quantas + 1;
-            setExtras(nova);
-            // O "+" JÁ dá a estrela: pedir dois cliques (abrir a vaga, depois marcá-la) é o
-            // tipo de passo que faz a pessoa achar que o botão não funcionou.
-            onChange(nova);
-          }}
-          aria-label={`Dar ${quantas + 1} estrelas`}
-          title="Mais uma estrela (a escala não tem teto)"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-transparent hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 motion-reduce:transition-none"
-          style={{ borderColor: 'var(--border)', ['--tw-ring-color' as string]: 'var(--go-blue)' }}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-        </button>
       )}
     </div>
   );
@@ -350,8 +333,8 @@ export function ProjetoDetalheDialog({
         setMotivoReprovado(mReprovado);
         const nota = lerEstrelas(d.campos['Estrelas']);
         estrelasOriginal.current = nota;
-        // ⚠️ Sem `Math.min`: a escala é aberta, então nota 8 da planilha entra como 8 (antes
-        // ela era recortada para 5 e o "salvar" REBAIXAVA a nota de outra pessoa).
+        // ⚠️ Sem `Math.min`: a nota da planilha entra como está — mesmo acima de 10 (legado),
+        // porque recortá-la aqui faz o "salvar" REBAIXAR a nota de outra pessoa.
         setEstrelas(nota);
         setStatusEscolhido(d.campos['Status'] ?? '');
       })
