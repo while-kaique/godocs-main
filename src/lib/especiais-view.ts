@@ -106,6 +106,10 @@ export const CARTOES_INCREMENTO = 5;
 export type FiltrosEspeciais = {
   /** Texto livre — casa nome, autor, e-mail, id, área e ferramenta (índice do resumo). */
   termo: string;
+  /** E-mail de quem valida, `'sem-dono'` para as áreas órfãs, ou `null` para todos. */
+  dono: string | null;
+  /** Fila (quem depende de quem), ou `null` para todas. */
+  fila: Fila | null;
   /** Janela de Data Submissão, ou `null` para todas. */
   periodo: { inicio: string; fim: string } | null;
   /** Só onde a auditoria discorda da nota gravada. */
@@ -114,11 +118,169 @@ export type FiltrosEspeciais = {
 
 export const FILTROS_ESPECIAIS_VAZIOS: FiltrosEspeciais = {
   termo: '',
+  dono: null,
+  fila: null,
   periodo: null,
   soDivergentes: false,
 };
 
 /** Quantos filtros estão ativos — o número no gatilho do painel. */
 export function contarFiltrosEspeciais(f: FiltrosEspeciais): number {
-  return (f.termo.trim() ? 1 : 0) + (f.periodo ? 1 : 0) + (f.soDivergentes ? 1 : 0);
+  return (
+    (f.termo.trim() ? 1 : 0) +
+    (f.periodo ? 1 : 0) +
+    (f.soDivergentes ? 1 : 0) +
+    (f.dono ? 1 : 0) +
+    (f.fila ? 1 : 0)
+  );
+}
+
+// ─── Divisão da validação por pessoa ─────────────────────────────────────────
+
+/**
+ * Quem valida o quê, por ÁREA.
+ *
+ * A força-tarefa do JV derivava isso por algoritmo (área inteira para quem tem menos carga).
+ * Aqui é **definido à mão**: quem coordena a validação sabe coisas que a contagem não sabe —
+ * quem conhece Growth, quem está de férias, quem já falou com aquele time. O que herdamos da
+ * ideia dele é o que importa: **a unidade é a ÁREA, não o projeto** (contexto não se parte, e
+ * projeto novo já nasce com dono sem ninguém redistribuir nada).
+ */
+export type DonoDeArea = {
+  area: string;
+  dono_email: string;
+  dono_nome: string | null;
+};
+
+/** Um admin elegível a receber áreas. */
+export type ValidadorEspeciais = { email: string; nome: string | null };
+
+/** Filtro por dono: `null` = todos. */
+export const TODOS_OS_DONOS = null;
+
+/**
+ * Chave da área: MAIÚSCULA e sem espaço sobrando, sem tirar acento.
+ *
+ * ⚠️ Acento fica: "OPERAÇÕES GOCASE" e "OPERACOES GOBEAUTE" são áreas DIFERENTES na planilha
+ * (uma tem cedilha e til, a outra não) — normalizar acento juntaria as duas num dono só.
+ */
+export function chaveArea(area: string | null | undefined): string {
+  return (area ?? '').trim().toUpperCase();
+}
+
+/** As áreas presentes na base, com quantos projetos cada uma tem. Ordem: maior primeiro. */
+export function areasDosProjetos(
+  projetos: ProjetoDashboardResumo[],
+): { area: string; total: number }[] {
+  const conta = new Map<string, number>();
+  for (const p of projetos) {
+    const a = chaveArea(p.area) || 'SEM ÁREA';
+    conta.set(a, (conta.get(a) ?? 0) + 1);
+  }
+  return [...conta.entries()]
+    .map(([area, total]) => ({ area, total }))
+    .sort((a, b) => b.total - a.total || a.area.localeCompare(b.area, 'pt-BR'));
+}
+
+/** O e-mail de quem valida este projeto, ou `null` quando a área não tem dono. */
+export function donoDoProjeto(
+  projeto: ProjetoDashboardResumo,
+  donos: Map<string, DonoDeArea>,
+): string | null {
+  return donos.get(chaveArea(projeto.area) || 'SEM ÁREA')?.dono_email ?? null;
+}
+
+/**
+ * Quantos projetos cada pessoa tem na mão. É o número que mostra se a divisão ficou torta —
+ * e por isso conta também os **sem dono**, sob a chave `null`: área que ninguém pegou é
+ * exatamente o que some de vista numa lista organizada por pessoa.
+ */
+export function cargaPorDono(
+  projetos: ProjetoDashboardResumo[],
+  donos: Map<string, DonoDeArea>,
+): Map<string | null, number> {
+  const carga = new Map<string | null, number>();
+  for (const p of projetos) {
+    const dono = donoDoProjeto(p, donos);
+    carga.set(dono, (carga.get(dono) ?? 0) + 1);
+  }
+  return carga;
+}
+
+/** Nome de exibição de um validador (nunca o e-mail cru quando há nome). */
+export function rotuloValidador(
+  email: string | null,
+  validadores: ValidadorEspeciais[],
+): string {
+  if (!email) return 'Sem dono';
+  const v = validadores.find((x) => x.email.toLowerCase() === email.toLowerCase());
+  return v?.nome?.trim() || email;
+}
+
+// ─── Filas e tempo de espera (adaptado da força-tarefa do JV) ────────────────
+
+/**
+ * Em que fila o projeto está — quem depende de quem para ele andar.
+ *
+ * ⚠️ **É derivada, não é campo.** Sai de `Status` + `Aprovação do Líder` + `Especial?`, e a
+ * ORDEM dos testes é a regra de negócio: reenvio vence tudo (a bola está com o autor), e
+ * **especial vence a marcação de líder** — projeto especial não passa por líder (D27), então
+ * a coluna do parecer vem vazia nele e isso não é falha de integração.
+ *
+ * Só `rpa` e `especial` dependem do time de RPA agora; as outras esperam outra pessoa.
+ */
+export type Fila = 'reenvio' | 'especial' | 'rpa' | 'lider' | 'autor' | 'sem_lider' | 'decidido';
+
+export const ROTULO_FILA: Record<Fila, string> = {
+  reenvio: 'Reenvio pendente',
+  especial: 'Decisão central',
+  rpa: 'Fila do RPA',
+  lider: 'Aguardando o líder',
+  autor: 'Aguardando o autor',
+  sem_lider: 'Sem líder acionado',
+  decidido: 'Já decidido',
+};
+
+/** As filas que exigem ação de quem valida — as outras esperam outra pessoa. */
+export const FILAS_DO_RPA: Fila[] = ['especial', 'rpa'];
+
+export function filaDe(p: ProjetoDashboardResumo): Fila {
+  const status = (p.statusChave ?? '').trim();
+  const lider = (p.aprovacaoLider ?? '').trim().toLowerCase();
+
+  if (status === 'reenvio pendente') return 'reenvio';
+  if (status !== 'pendente' && status !== '') return 'decidido';
+  if (p.especial) return 'especial';
+  if (lider.startsWith('pré-aprovado') || lider.startsWith('pre-aprovado')) return 'rpa';
+  if (lider.startsWith('pré-pendente') || lider.startsWith('pre-pendente')) return 'lider';
+  if (lider.startsWith('ajuste')) return 'autor';
+  return 'sem_lider';
+}
+
+/** Dias desde a submissão. `null` quando não há data — não se inventa espera. */
+export function diasDeEspera(p: ProjetoDashboardResumo, agoraMs: number): number | null {
+  if (p.dataOrdenacao == null) return null;
+  return Math.max(0, Math.round((agoraMs - p.dataOrdenacao) / 86_400_000));
+}
+
+/** Faixas de urgência do chip de espera (do painel do JV: 60d vermelho, 30d âmbar). */
+export const ESPERA_CRITICA = 60;
+export const ESPERA_ATENCAO = 30;
+
+export function urgenciaDaEspera(dias: number | null): 'critica' | 'atencao' | 'normal' {
+  if (dias == null) return 'normal';
+  if (dias >= ESPERA_CRITICA) return 'critica';
+  if (dias >= ESPERA_ATENCAO) return 'atencao';
+  return 'normal';
+}
+
+/**
+ * Teto de 2 estrelas enquanto o projeto está em reenvio (régua do JV): documentação
+ * incompleta não sustenta nota alta. Não é trava — é o aviso que aparece quando alguém vai
+ * aplicar mais que isso, porque evidência forte pode justificar.
+ */
+export const TETO_REENVIO = 2;
+
+export function excedeTetoDeReenvio(p: ProjetoDashboardResumo, nota: number): boolean {
+  return filaDe(p) === 'reenvio' && nota > TETO_REENVIO;
 }

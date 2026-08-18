@@ -7,6 +7,19 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  ESPERA_ATENCAO,
+  ESPERA_CRITICA,
+  TETO_REENVIO,
+  areasDosProjetos,
+  cargaPorDono,
+  chaveArea,
+  diasDeEspera,
+  donoDoProjeto,
+  excedeTetoDeReenvio,
+  filaDe,
+  rotuloValidador,
+  urgenciaDaEspera,
+  type DonoDeArea,
   CARTOES_INCREMENTO,
   CARTOES_INICIAIS,
   FILTROS_ESPECIAIS_VAZIOS,
@@ -114,10 +127,108 @@ describe('filtros e paginação da coluna', () => {
     expect(contarFiltrosEspeciais({ ...FILTROS_ESPECIAIS_VAZIOS, termo: 'piapp' })).toBe(1);
     expect(
       contarFiltrosEspeciais({
+        ...FILTROS_ESPECIAIS_VAZIOS,
         termo: 'piapp',
         periodo: { inicio: '2026-08-01', fim: '2026-08-18' },
         soDivergentes: true,
       }),
     ).toBe(3);
+  });
+});
+
+describe('filas derivadas (Status + parecer do líder + Especial?)', () => {
+  it('reenvio vence tudo — a bola está com o autor', () => {
+    expect(filaDe(projeto({ id: 'a', statusChave: 'reenvio pendente', aprovacaoLider: 'Pré-aprovado' }))).toBe('reenvio');
+  });
+
+  it('especial vence a marcação de líder (especial não passa por líder — D27)', () => {
+    expect(filaDe(projeto({ id: 'a', statusChave: 'pendente', especial: true }))).toBe('especial');
+  });
+
+  it('não-especial pendente segue o parecer do líder', () => {
+    const base = { statusChave: 'pendente', especial: false } as const;
+    expect(filaDe(projeto({ id: 'a', ...base, aprovacaoLider: 'Pré-aprovado' }))).toBe('rpa');
+    expect(filaDe(projeto({ id: 'b', ...base, aprovacaoLider: 'Pré-pendente' }))).toBe('lider');
+    expect(filaDe(projeto({ id: 'c', ...base, aprovacaoLider: 'Ajuste pedido' }))).toBe('autor');
+    expect(filaDe(projeto({ id: 'd', ...base, aprovacaoLider: null }))).toBe('sem_lider');
+  });
+
+  it('o cabeçalho sem acento da planilha ("Pre-aprovado") casa igual', () => {
+    expect(filaDe(projeto({ id: 'a', statusChave: 'pendente', especial: false, aprovacaoLider: 'Pre-aprovado' }))).toBe('rpa');
+  });
+
+  it('status decidido sai das filas de espera', () => {
+    expect(filaDe(projeto({ id: 'a', statusChave: 'aprovado', especial: true }))).toBe('decidido');
+  });
+});
+
+describe('tempo de espera', () => {
+  const agora = Date.UTC(2026, 7, 18);
+
+  it('conta os dias desde a submissão', () => {
+    expect(diasDeEspera(projeto({ id: 'a', dataOrdenacao: Date.UTC(2026, 6, 9) }), agora)).toBe(40);
+  });
+
+  it('sem data não inventa espera', () => {
+    expect(diasDeEspera(projeto({ id: 'a' }), agora)).toBeNull();
+  });
+
+  it('as faixas do painel: 60d é crítico, 30d é atenção', () => {
+    expect(urgenciaDaEspera(ESPERA_CRITICA)).toBe('critica');
+    expect(urgenciaDaEspera(ESPERA_ATENCAO)).toBe('atencao');
+    expect(urgenciaDaEspera(ESPERA_ATENCAO - 1)).toBe('normal');
+    expect(urgenciaDaEspera(null)).toBe('normal');
+  });
+});
+
+describe('teto de estrelas no reenvio', () => {
+  it('avisa acima de 2 só quando o projeto está em reenvio', () => {
+    const emReenvio = projeto({ id: 'a', statusChave: 'reenvio pendente' });
+    expect(excedeTetoDeReenvio(emReenvio, TETO_REENVIO + 1)).toBe(true);
+    expect(excedeTetoDeReenvio(emReenvio, TETO_REENVIO)).toBe(false);
+    expect(excedeTetoDeReenvio(projeto({ id: 'b', statusChave: 'pendente' }), 5)).toBe(false);
+  });
+});
+
+describe('divisão por pessoa', () => {
+  const donos = new Map<string, DonoDeArea>([
+    ['GROWTH', { area: 'GROWTH', dono_email: 'jg@x.com', dono_nome: 'João Gabriel' }],
+  ]);
+
+  it('a área é a unidade: projeto novo da área já nasce com dono', () => {
+    expect(donoDoProjeto(projeto({ id: 'a', area: 'Growth' }), donos)).toBe('jg@x.com');
+    expect(donoDoProjeto(projeto({ id: 'b', area: 'CX' }), donos)).toBeNull();
+  });
+
+  it('mantém o acento na chave — OPERAÇÕES GOCASE ≠ OPERACOES GOBEAUTE', () => {
+    expect(chaveArea(' Operações Gocase ')).toBe('OPERAÇÕES GOCASE');
+    expect(chaveArea('Operacoes Gobeaute')).not.toBe(chaveArea('Operações Gobeauté'));
+  });
+
+  it('a carga conta os SEM DONO também — área órfã é o que some de vista', () => {
+    const carga = cargaPorDono(
+      [projeto({ id: 'a', area: 'GROWTH' }), projeto({ id: 'b', area: 'CX' })],
+      donos,
+    );
+    expect(carga.get('jg@x.com')).toBe(1);
+    expect(carga.get(null)).toBe(1);
+  });
+
+  it('lista as áreas da base, maior primeiro', () => {
+    const areas = areasDosProjetos([
+      projeto({ id: 'a', area: 'CX' }),
+      projeto({ id: 'b', area: 'CX' }),
+      projeto({ id: 'c', area: 'GROWTH' }),
+      projeto({ id: 'd', area: null }),
+    ]);
+    expect(areas[0]).toEqual({ area: 'CX', total: 2 });
+    expect(areas.map((a) => a.area)).toContain('SEM ÁREA');
+  });
+
+  it('mostra o nome de quem valida, nunca o e-mail cru quando há nome', () => {
+    const validadores = [{ email: 'jg@x.com', nome: 'João Gabriel' }];
+    expect(rotuloValidador('jg@x.com', validadores)).toBe('João Gabriel');
+    expect(rotuloValidador('outro@x.com', validadores)).toBe('outro@x.com');
+    expect(rotuloValidador(null, validadores)).toBe('Sem dono');
   });
 });

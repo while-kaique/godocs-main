@@ -6,19 +6,29 @@
 
 ## Plano ativo — AGENTE CLASSIFICADOR DE ESPECIAIS (peça 4)
 
-**Estado (18/08, fim do dia):** a view `/especiais` **está na STAGING (version 170)** com a etapa (a)
-da fusão com o material do JV já dentro: régua 0–10 como FONTE ÚNICA (`especiais-regua.ts`), tabela
-`especial_avaliacao`, as **99 recomendações da força-tarefa como SEED idempotente** (o import por HTTP
-não serve: o `E2E_COOKIE` expira e o edge devolve login), recomendação no cartão com "Aplicar" e o
-filtro "Só divergentes". 1562 testes verdes. **Falta:** validação visual do Luis → prod → PR.
+**Estado (18/08, fim do dia) — na STAGING:** `/especiais` agrupa os especiais por NÍVEL com a
+régua 0–10 no cabeçalho da coluna (definição da faixa + raridade na base, de `especiais-regua.ts`,
+FONTE ÚNICA vinda da rubrica do JV) e a **recomendação da auditoria por projeto** (nota sugerida,
+confiança, leitura, botão "Aplicar" — o clique de gente é que grava). As 99 recomendações da
+força-tarefa entram por SEED idempotente (`especiais-seed.ts`), curva 0:8 1:43 2:40 3:6 4:2 travada
+em teste. Filtros de busca/período/só-divergentes, paginação de 7+5 por coluna, cabeçalho em placas.
+1558 testes verdes.
+
+⚠️ **A "Régua deste nível" (prateleira com projeto-âncora) foi REMOVIDA** no mesmo dia — decisão do
+Luis: o agente ocupou esse lugar. A tabela `especial_referencia` fica de pé sem leitor (arquivar,
+nunca DROP) e as rotas de referência saíram.
+
 ⚠️ A staging roda o branch `deploy/staging-especiais` = feature + `origin/worktree-feat+investigador-aba-pre-aprovacao`
-(branch não-mergeada de outra pessoa) — refazer esse merge a cada deploy de staging enquanto ela não entrar no main.
-**Etapas b–d da fusão (pendentes):** modo FILA (filas derivadas de Status+Líder+Especial, espera, ações,
-dono/progresso) · ponte "posicionar" da fila para a régua · o AGENTE abaixo.
+(branch não-mergeada de outra pessoa) — refazer esse merge a cada deploy enquanto ela não entrar no main.
+
+**O QUE FALTA, na ordem recomendada:** (1) **o AGENTE classificador** — hoje NENHUM agente roda no
+app: um especial submetido agora chega sem recomendação; (2) validação do Luis → prod → PR;
+(3) etapa (b) da fusão: modo FILA (filas derivadas de Status+Líder+Especial, tempo de espera, ações,
+dono/progresso) + ponte "posicionar" da fila para a régua.
 
 ### O prompt da próxima sessão
 
-> Implementar o **agente classificador de projetos especiais**. Ele roda quando um projeto
+> Implementar o **agente classificador de projetos especiais** (proxy, modelo **gpt-5.6-sol** no `LLM_MODEL`). Ele roda quando um projeto
 > **especial** é submetido e, ANTES da triagem humana, propõe em que caixa (nível de estrelas)
 > o projeto cai, **comparando-o com as ÂNCORAS da base** (PIAPP e as demais referências de 5, 6
 > e 7 estrelas) — as âncoras e as frases da régua já existem em `especial_referencia`, escritas
