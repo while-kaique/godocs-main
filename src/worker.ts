@@ -122,10 +122,14 @@ interface Env {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function json(data: unknown, status = 200): Response {
+function json(
+  data: unknown,
+  status = 200,
+  extraHeaders?: Record<string, string>,
+): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(extraHeaders ?? {}) },
   });
 }
 
@@ -551,7 +555,12 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/dashboard/projetos" && method === "GET") {
       await requireAdmin(request);
       const refresh = url.searchParams.get("refresh") === "1";
-      return json(await listarProjetosDashboard(refresh));
+      // no-store: dado de triagem tem de vir SEMPRE fresco do espelho — sem
+      // Cache-Control o browser/edge pode servir payload velho e a triagem olha
+      // dado defasado sem perceber (handoff Ytalo, 17/08).
+      return json(await listarProjetosDashboard(refresh), 200, {
+        "Cache-Control": "no-store",
+      });
     }
     // Lote de fichas da PÁGINA visível: 1 requisição no lugar de 25 (cada uma custa
     // ~750 ms de overhead fixo do edge). POST porque 25 ids não cabem num querystring
@@ -564,7 +573,9 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname.startsWith("/api/admin/dashboard/projetos/") && method === "GET") {
       await requireAdmin(request);
       const id = decodeURIComponent(pathname.split("/").pop()!);
-      return json(await getProjetoDashboard(id));
+      return json(await getProjetoDashboard(id), 200, {
+        "Cache-Control": "no-store",
+      });
     }
     if (pathname === "/api/admin/dashboard/status" && method === "POST") {
       const { email: adminEmail } = await requireAdmin(request);
