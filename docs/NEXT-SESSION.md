@@ -54,6 +54,28 @@ negativo/fracionado/>100). `npm run build` + `npm run build:worker` OK, **`worke
 **Docs atualizados no mesmo commit:** `CLAUDE.md` (gotchas 3b/4/9/11 do dashboard) + `spec-docs/SPEC_CORRECOES.md`
 (2 entradas: revisão da escala de estrelas · o clique durante o lote em voo).
 
+**Rodada 2 da MESMA sessão (commit `2cd3437`, também EM PROD — entry `index-C3KoseU8.js`):** o Luis
+olhou e disse *"ficou feio, muito default embora funcional"* + *"a contagem de pré-status, no casamento
+com os outros filtros, às vezes indica errado"*.
+- **Filtro de estrelas redesenhado:** saíram os 2 `<input type="number">` crus da barra; virou
+  **pílula (igual à do Período) + painel ancorado** em `src/components/dashboard/filtro-estrelas.tsx`,
+  **reusando o `Popover` do calendário** (agora exportado — 2 popovers na mesma barra abririam/
+  fechariam/posicionariam diferente). A **fileira de estrelas É o controle** (3ª estrela = "3 ou mais",
+  clique de novo desfaz), com atalhos Qualquer/Sem nota e a **faixa exata (de/até)** embaixo — é ela que
+  preserva a escala ABERTA (6–10); trocar tudo por escada "1+/2+/3+" seria embelezar tirando função.
+  Rótulo/frase nas puras `rotuloFaixaEstrelas`/`descreverFaixaEstrelas` (texto, nunca só cor). Campo
+  numérico sem o widget nativo (`.go-nota-campo` em `styles.css`), setas do TECLADO intactas.
+  Ficha: estrelas maiores + nota em chip dourado + "+" circular. Tabela: vazio e `0` em cinza, só ≥1 com chip.
+- **Contagem do pré-status corrigida:** `pareceresDisponiveis` contava sobre a listagem **CRUA** enquanto
+  as pílulas já contavam o **recorte** — daí "Pré-pendente (26)" abrindo 3. Agora conta pelo recorte via a
+  pura **`casaFiltrosExceto(p, f, dimensão)`**, que virou também o corpo do `contarPorPilula` (havia 2
+  listas de dimensões à mão). ⚠️ **Filtro novo entra em `casaFiltrosExceto` no MESMO commit**, senão
+  recorta a lista sem recortar as contagens. Ignora a própria dimensão + o estado selecionado nunca sai
+  do campo (`select` com `value` fora das `option` renderiza em branco). **1535 testes** verdes.
+- ⚠️ **Deixado de fora, é DECISÃO do Luis:** o `<select>` de **área** segue listando as áreas da planilha
+  inteira (sem recorte). Não "mente" com número porque não mostra contagem — se ele pedir, aplicar a
+  mesma régua (`casaFiltrosExceto(..., 'area')`).
+
 **Pendências desta entrega:** (1) o Luis validar em prod — nota > 5, filtro por faixa, abrir ficha logo depois
 de buscar; (2) **mergear o PR #263** (a branch já está pushada; nada de commit direto na `main`); (3) se a
 validação reprovar algo visual, corrigir na MESMA branch e redeployar (staging → prod).

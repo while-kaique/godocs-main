@@ -21,6 +21,9 @@ com ele** usando casos reais, agora pós-deploy.
 ficha). Branch `feat/estrelas-n-e-filtro` (`0e10d10`), **PR #263 aberto**, staging + prod deployados,
 1528 testes verdes. ⚠️ Coluna nova em `COLUNAS_RESUMO` exige bumpar `VERSAO_RECORTE_RESUMO` (entra no
 `hashLinha` do espelho) — foi o que forçou o re-espelhamento único (`espelhados=643`).
+Rodada 2 (`2cd3437`, também em prod): filtro de estrelas virou **pílula + painel ancorado** (reusa o
+`Popover` do calendário) e a **contagem do pré-status passou a respeitar os demais filtros** (fonte única
+`casaFiltrosExceto`) — 1535 testes verdes.
 **Próximo:** o Luis validar em prod → **mergear o PR #263**.
 
 **Fase 6 — perguntas do agente, fatia A1 🟡 (plano ✅ APROVADO em 2026-07-30, código não começou):**
