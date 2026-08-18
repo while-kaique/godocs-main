@@ -645,7 +645,6 @@ const SEED_ADMINS = [
   'joao.gabriel@gocase.com',
   'joaovictor.esteves@gocase.com',
   'kaique.breno@gocase.com',
-  'luciano.cavalcante@gocase.com',
   'luis.albuquerque@gocase.com',
 ];
 
