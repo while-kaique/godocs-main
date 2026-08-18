@@ -119,18 +119,17 @@ export type FiltrosEspeciais = {
   termo: string;
   /** E-mail de quem valida, `'sem-dono'` para as áreas órfãs, ou `null` para todos. */
   dono: string | null;
-  /** Fila (quem depende de quem), ou `null` para todas. */
-  fila: Fila | null;
   /**
-   * Status da triagem (chave da pílula do `/dashboard`) ou `'todos'`, e o estado da
-   * pré-aprovação do líder ou `'todos'`.
+   * Status da triagem (a chave da pílula do `/dashboard`) ou `'todos'`.
    *
-   * ⚠️ São dimensões INDEPENDENTES e somam por E — "Pendente" + "Pré-aprovado" é a fila do
-   * RPA (o líder já opinou, falta a validação), e é justamente esse cruzamento que a pessoa
-   * quer. Um filtro só, misturando as duas colunas, não diria isso.
+   * ⚠️ **Não há filtro de pré-status aqui, e não é esquecimento:** projeto especial não passa
+   * pelo líder (D27), então a coluna do parecer vem vazia em todos eles — o filtro listaria
+   * um estado que nenhum projeto desta tela tem. Pelo mesmo motivo saiu o filtro de FILA:
+   * sem parecer de líder, a fila de um especial é decalque do status (pendente → decisão
+   * central, reenvio → reenvio). A régua `filaDe` continua aqui, testada, para quando a tela
+   * crescer para os não-especiais.
    */
   status: string;
-  parecer: string;
   /** Janela de Data Submissão, ou `null` para todas. */
   periodo: { inicio: string; fim: string } | null;
   /** Só onde a auditoria discorda da nota gravada. */
@@ -140,9 +139,7 @@ export type FiltrosEspeciais = {
 export const FILTROS_ESPECIAIS_VAZIOS: FiltrosEspeciais = {
   termo: '',
   dono: null,
-  fila: null,
   status: 'todos',
-  parecer: 'todos',
   periodo: null,
   soDivergentes: false,
 };
@@ -154,9 +151,7 @@ export function contarFiltrosEspeciais(f: FiltrosEspeciais): number {
     (f.periodo ? 1 : 0) +
     (f.soDivergentes ? 1 : 0) +
     (f.dono ? 1 : 0) +
-    (f.fila ? 1 : 0) +
-    (f.status !== 'todos' ? 1 : 0) +
-    (f.parecer !== 'todos' ? 1 : 0)
+    (f.status !== 'todos' ? 1 : 0)
   );
 }
 
