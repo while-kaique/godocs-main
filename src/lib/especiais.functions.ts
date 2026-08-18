@@ -27,6 +27,7 @@ import {
 } from '@/integrations/db/client.server';
 import { apenasEspeciais, type ReferenciaEspecial } from '@/lib/especiais-view';
 import { NOTA_MAX, type AvaliacaoEspecial, type Confianca } from '@/lib/especiais-regua';
+import { AVALIACOES_SEED, ORIGEM_SEED_FORCA_TAREFA } from '@/lib/especiais-seed';
 import { MAX_ESTRELAS_GRAVAVEL, ESPELHO_VELHO_MS } from '@/lib/dashboard-admin.functions';
 
 export type ListagemEspeciais = {
@@ -43,13 +44,58 @@ export type ListagemEspeciais = {
  * Só os ESPECIAIS. O corte é no servidor de propósito: são ~dezenas de linhas contra ~640, e
  * mandar a base inteira para a tela filtrar duplicaria o payload da triagem sem ninguém ver.
  */
+/**
+ * Semeia o lote da força-tarefa — só o que FALTA.
+ *
+ * ⚠️ Nunca sobrescreve: uma recomendação já gravada é mais nova que este retrato (pode ter
+ * vindo do agente classificador ou de uma reavaliação), e um seed que atualizasse a desfaria a
+ * cada deploy. Mesma disciplina do `semearFaq`.
+ *
+ * Roda no caminho de leitura da tela porque não há migração/boot onde pendurá-lo — e sai
+ * barato: uma vez por isolate, e só faz `INSERT` do que não existe.
+ */
+let seedTentado = false;
+
+export async function semearAvaliacoesEspeciais(
+  existentes: Set<string>,
+): Promise<number> {
+  let novas = 0;
+  for (const s of AVALIACOES_SEED) {
+    if (existentes.has(s.projeto_id)) continue;
+    await upsertAvaliacaoEspecial({
+      projeto_id: s.projeto_id,
+      estrelas_recomendada: s.estrelas_recomendada,
+      confianca: s.confianca,
+      leitura: s.leitura,
+      contestada: s.contestada,
+      origem: ORIGEM_SEED_FORCA_TAREFA,
+      modelo: null,
+    });
+    novas++;
+  }
+  if (novas) console.log(`[especiais] seed: +${novas} recomendação(ões) da força-tarefa`);
+  return novas;
+}
+
 export async function listarEspeciais(): Promise<ListagemEspeciais> {
-  const [{ linhas, lidoEmMs }, saude, referencias, avaliacoes] = await Promise.all([
+  const [{ linhas, lidoEmMs }, saude, referencias, avaliacoesIniciais] = await Promise.all([
     lerResumosEspelho(),
     statusEspelho(),
     getReferenciasEspeciais(),
     getAvaliacoesEspeciais(),
   ]);
+
+  // Seed: uma vez por isolate, e nunca bloqueia a tela se falhar (é dado de apoio, não estado).
+  let avaliacoes = avaliacoesIniciais;
+  if (!seedTentado) {
+    seedTentado = true;
+    try {
+      const novas = await semearAvaliacoesEspeciais(new Set(avaliacoes.map((a) => a.projeto_id)));
+      if (novas) avaliacoes = await getAvaliacoesEspeciais();
+    } catch (e) {
+      console.error('[especiais] seed de recomendações falhou (seguindo sem ele):', e);
+    }
+  }
 
   const projetos = apenasEspeciais(
     linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),

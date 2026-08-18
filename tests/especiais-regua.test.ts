@@ -96,3 +96,28 @@ describe('delta da recomendação', () => {
     expect(rotuloDelta(null)).toBeNull();
   });
 });
+
+describe('lote da força-tarefa (seed)', () => {
+  it('tem os 99 projetos e a curva que o pipeline produziu — se inflar, o bug é a régua', async () => {
+    const { AVALIACOES_SEED } = await import('@/lib/especiais-seed');
+    expect(AVALIACOES_SEED).toHaveLength(99);
+    const curva = AVALIACOES_SEED.reduce<Record<number, number>>((m, a) => {
+      m[a.estrelas_recomendada] = (m[a.estrelas_recomendada] ?? 0) + 1;
+      return m;
+    }, {});
+    expect(curva).toEqual({ 0: 8, 1: 43, 2: 40, 3: 6, 4: 2 });
+  });
+
+  it('nenhuma recomendação passa do teto da escala e toda nota ≥3 tem leitura', async () => {
+    const { AVALIACOES_SEED } = await import('@/lib/especiais-seed');
+    for (const a of AVALIACOES_SEED) {
+      expect(a.estrelas_recomendada).toBeLessThanOrEqual(NOTA_MAX);
+      if (a.estrelas_recomendada >= 3) expect(a.leitura).toBeTruthy();
+    }
+  });
+
+  it('não repete projeto (o seed é chaveado por projeto)', async () => {
+    const { AVALIACOES_SEED } = await import('@/lib/especiais-seed');
+    expect(new Set(AVALIACOES_SEED.map((a) => a.projeto_id)).size).toBe(AVALIACOES_SEED.length);
+  });
+});
