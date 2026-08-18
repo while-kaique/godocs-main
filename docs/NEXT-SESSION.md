@@ -5,7 +5,62 @@
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
 ## Plano ativo
-**Nenhum plano ativo** — a última sessão (17/08) foi de código direto, sem `/ggsd:plan` (pedido pontual de
+**Nenhum plano ativo** — a sessão de 17/08 (noite) também foi código direto, a partir de um pedido de escopo
+fechado do Luis. Próximo é **o Luis validar as estrelas em prod** e, com o OK, **mergear o PR #263**
+(`/ggsd:ship` só se sobrar algo além do merge). Frente nova → `/ggsd:plan`.
+
+### 🆕 17/08 (noite) — estrelas SEM teto + filtro por faixa + ficha instantânea depois da busca (PR #263, **JÁ EM PROD**)
+
+**Worktree:** `~/godocs-wt-estrelas` · **branch:** `feat/estrelas-n-e-filtro` (de `origin/main` = `3d1c485`) ·
+**commit:** `0e10d10` · **PR:** #263 (aberto, aguardando merge) · **deploy:** staging `edf400b4` **e prod
+`674a3710`** (o Luis pediu prod direto para validar).
+
+**Pedido (3 itens, todos entregues):**
+1. **Tirar o limite de 5 estrelas** na edição da ficha do `/dashboard` — "podemos dar N estrelas".
+2. **Filtro por quantidade de estrelas** (1–N).
+3. A ficha **ainda** parava em "Carregando a linha da planilha…" ao clicar num projeto **recém-buscado**.
+
+**O que ficou no código:**
+- `max(5)` fora do `statusSchema`; sobrou `MAX_ESTRELAS_GRAVAVEL = 100` (**sanidade de célula, não escala**,
+  replicado como literal no componente para não arrastar o `.functions.ts` ao bundle). Fileira nasce com 5,
+  **cresce até a nota gravada**, botão **"+ estrela"** já dá a estrela que abre.
+  ⚠️ **Bug silencioso corrigido de tabela:** a ficha carregava `setEstrelas(Math.min(nota, 5))`, então salvar
+  um projeto com nota 8 **rebaixava para 5** — o aviso "na planilha está 8" nunca segurou nada.
+- `estrelas` entra em `ProjetoDashboardResumo` + `COLUNAS_RESUMO` → **coluna ordenável** na tabela (`★ n`;
+  vazio = "—" ≠ `0`) + **filtro por FAIXA** (`estrelasMin`/`estrelasMax`, `casaEstrelas` em
+  `dashboard-filtros.ts`, pontas ABERTAS: só o mín = "1 ou mais"; **`0 a 0` = fila do não-avaliado**, porque
+  célula vazia conta como 0). Conta como UMA dimensão no "Limpar filtros".
+- ⚠️ **`VERSAO_RECORTE_RESUMO` (novo, em `dashboard-resumo.ts`) entra no `hashLinha` do espelho.** O espelho é
+  *hash-gated*: sem o bump, as ~640 linhas que ninguém editou ficariam com o recorte ANTIGO e a coluna
+  nasceria **vazia para sempre**. Isso **contraria de propósito** o "não force rewrite do espelho" da entrega
+  anterior — o rewrite único é o preço de coluna nova na listagem. **Coluna nova em `COLUNAS_RESUMO` ⇒ bumpar
+  a versão no MESMO commit.**
+- `semearLote` registra as entradas do cache **EM VOO** (antes só quando o lote CHEGAVA): buscar troca a página,
+  o lote da página filtrada sai, e o clique no meio da viagem abria uma **2ª requisição pela MESMA ficha**
+  (+~750 ms de overhead fixo do edge) — era exatamente o sintoma relatado. Id fora do lote cai no individual
+  (nunca `undefined` servido como ficha), falha nunca fica retida, e o `pointerdown` da linha aquece sem os
+  150 ms do hover.
+
+**Prova de RUNTIME do deploy** (a armadilha do "worker antigo" já documentada): `index.html` de prod serve
+`index-Duoh787p.js`, e a corrida do cron às **01:30 UTC de 18/08 logou `espelhados=643`** — em regime esse
+número é **0** (hash-gated), então 643 = re-espelhamento único = **worker novo no ar**. Custou 35 s de corrida.
+
+**Verificação:** `npm run test` = **1528 passando** (2 casos novos em `tests/dashboard-detalhe-cache.test.ts`
+— clique durante o lote = 1 requisição; id ausente não vira ficha vazia —, 6 na faixa de estrelas em
+`tests/dashboard-filtros.test.ts`, schema revisto em `tests/dashboard-admin.test.ts`: aceita 8, recusa
+negativo/fracionado/>100). `npm run build` + `npm run build:worker` OK, **`worker.js` commitado**.
+**Não** houve validação em navegador (o repo não tem Playwright) — a camada visual é do Luis.
+
+**Docs atualizados no mesmo commit:** `CLAUDE.md` (gotchas 3b/4/9/11 do dashboard) + `spec-docs/SPEC_CORRECOES.md`
+(2 entradas: revisão da escala de estrelas · o clique durante o lote em voo).
+
+**Pendências desta entrega:** (1) o Luis validar em prod — nota > 5, filtro por faixa, abrir ficha logo depois
+de buscar; (2) **mergear o PR #263** (a branch já está pushada; nada de commit direto na `main`); (3) se a
+validação reprovar algo visual, corrigir na MESMA branch e redeployar (staging → prod).
+
+---
+
+**(histórico abaixo)** **Nenhum plano ativo** — a última sessão (17/08) foi de código direto, sem `/ggsd:plan` (pedido pontual de
 UI do Luis, escopo fechado na própria mensagem). Próximo é **validar na staging**; se surgir frente nova,
 planejar com `/ggsd:plan`.
 

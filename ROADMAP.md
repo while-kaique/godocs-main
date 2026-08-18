@@ -15,6 +15,14 @@ foram a produção **dentro do PR #216**.
 **Pendência HUMANA da Fase 5:** avisar o **Rafa** (a reprovação é visível ao autor — D10) e **calibrar a régua
 com ele** usando casos reais, agora pós-deploy.
 
+**Triagem do `/dashboard` — 4ª entrega ✅ EM PROD (2026-08-17, noite):** **estrelas sem teto** na ficha
+(o `Math.min(nota,5)` rebaixava nota 8 ao salvar), **filtro por FAIXA de estrelas** + coluna ordenável, e o
+**lote de fichas registrado EM VOO** (o clique num projeto recém-buscado abria uma 2ª requisição pela mesma
+ficha). Branch `feat/estrelas-n-e-filtro` (`0e10d10`), **PR #263 aberto**, staging + prod deployados,
+1528 testes verdes. ⚠️ Coluna nova em `COLUNAS_RESUMO` exige bumpar `VERSAO_RECORTE_RESUMO` (entra no
+`hashLinha` do espelho) — foi o que forçou o re-espelhamento único (`espelhados=643`).
+**Próximo:** o Luis validar em prod → **mergear o PR #263**.
+
 **Fase 6 — perguntas do agente, fatia A1 🟡 (plano ✅ APROVADO em 2026-07-30, código não começou):**
 **taxonomia de destino do ganho + anti-loop no juiz do preview**. A régua do critério entrou (Fase 5), mas a
 **poda** das perguntas antigas não: o gate da alocação ainda **recusa "menos custo"** (o caso real da redução
