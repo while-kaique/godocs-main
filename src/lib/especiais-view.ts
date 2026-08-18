@@ -110,6 +110,16 @@ export type FiltrosEspeciais = {
   dono: string | null;
   /** Fila (quem depende de quem), ou `null` para todas. */
   fila: Fila | null;
+  /**
+   * Status da triagem (chave da pílula do `/dashboard`) ou `'todos'`, e o estado da
+   * pré-aprovação do líder ou `'todos'`.
+   *
+   * ⚠️ São dimensões INDEPENDENTES e somam por E — "Pendente" + "Pré-aprovado" é a fila do
+   * RPA (o líder já opinou, falta a validação), e é justamente esse cruzamento que a pessoa
+   * quer. Um filtro só, misturando as duas colunas, não diria isso.
+   */
+  status: string;
+  parecer: string;
   /** Janela de Data Submissão, ou `null` para todas. */
   periodo: { inicio: string; fim: string } | null;
   /** Só onde a auditoria discorda da nota gravada. */
@@ -120,6 +130,8 @@ export const FILTROS_ESPECIAIS_VAZIOS: FiltrosEspeciais = {
   termo: '',
   dono: null,
   fila: null,
+  status: 'todos',
+  parecer: 'todos',
   periodo: null,
   soDivergentes: false,
 };
@@ -131,7 +143,9 @@ export function contarFiltrosEspeciais(f: FiltrosEspeciais): number {
     (f.periodo ? 1 : 0) +
     (f.soDivergentes ? 1 : 0) +
     (f.dono ? 1 : 0) +
-    (f.fila ? 1 : 0)
+    (f.fila ? 1 : 0) +
+    (f.status !== 'todos' ? 1 : 0) +
+    (f.parecer !== 'todos' ? 1 : 0)
   );
 }
 
