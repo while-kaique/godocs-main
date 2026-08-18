@@ -26,7 +26,7 @@
  *    qualquer isolate, porque mora no banco.
  */
 import type { SheetColumn, SheetRow } from '@/lib/google/sheets';
-import { recortarResumo } from '@/lib/dashboard-resumo';
+import { recortarResumo, VERSAO_RECORTE_RESUMO } from '@/lib/dashboard-resumo';
 import {
   getEspelhoIndice,
   getEspelhoLinha,
@@ -51,13 +51,18 @@ export function chaveProjeto(id: string): string {
  * FNV-1a em duas variantes concatenadas (~64 bits). Não é criptográfico de propósito:
  * `crypto.subtle` é assíncrono e isto roda ~600× por corrida. Uma colisão significaria
  * "achamos que nada mudou" até a próxima edição daquela linha — risco aceito e declarado.
+ *
+ * ⚠️ A `VERSAO_RECORTE_RESUMO` entra no hash: o `linha_resumo` é DERIVADO do recorte, então
+ * coluna nova na listagem precisa de um re-espelhamento único — sem isso, linha que ninguém
+ * editou ficaria com o recorte antigo e a coluna nasceria vazia na tela para sempre.
  */
 export function hashLinha(row: Record<string, string>): string {
-  const canonico = JSON.stringify(
+  const canonico = JSON.stringify([
+    VERSAO_RECORTE_RESUMO,
     Object.keys(row)
       .sort()
       .map((k) => [k, row[k]]),
-  );
+  ]);
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (let i = 0; i < canonico.length; i++) {

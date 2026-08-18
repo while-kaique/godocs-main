@@ -10,11 +10,14 @@ import {
   TODAS_AS_AREAS,
   aplicarFiltros,
   areasDisponiveis,
+  casaEstrelas,
+  casaFiltrosExceto,
   casaParecer,
   casaPeriodo,
   contarFiltrosAtivos,
   contarPorPilula,
   pareceresDisponiveis,
+  rotuloFaixaEstrelas,
   totalSemStatus,
   type FiltrosDashboard,
 } from '@/lib/dashboard-filtros';
@@ -53,6 +56,7 @@ function proj(over: Partial<ProjetoDashboardResumo> = {}): ProjetoDashboardResum
     tipos: 'Saving',
     especial: false,
     aprovacaoLider: null,
+    estrelas: null,
     busca: 'projeto fulano',
     ...over,
   };
@@ -306,6 +310,8 @@ describe('peso do payload da listagem', () => {
         'dataSubmissao',
         'email',
         'especial',
+        // Número curto e DESENHADO (coluna "Estrelas" + filtro por faixa) — passa no canário.
+        'estrelas',
         'ganhoTotal',
         'id',
         'nome',
@@ -396,5 +402,134 @@ describe('filtro de pré-aprovação do líder', () => {
       'Pré-pendente',
       'Pré-aprovado',
     ]);
+  });
+});
+
+// ─── Faixa de estrelas (nota da triagem) ───────────────────────────────────────
+// A escala NÃO tem teto (17/08/2026), então o filtro é uma FAIXA com pontas abertas: um
+// `<select>` de opções fixas voltaria a inventar o teto que a ficha acabou de perder.
+describe('filtro por quantidade de estrelas', () => {
+  it('ponta aberta: só a mínima já é "1 estrela ou mais"', () => {
+    expect(casaEstrelas(proj({ estrelas: 1 }), 1, null)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 12 }), 1, null)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 0 }), 1, null)).toBe(false);
+    // Só a máxima = "até 2", incluindo quem não tem nota.
+    expect(casaEstrelas(proj({ estrelas: 2 }), null, 2)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 3 }), null, 2)).toBe(false);
+  });
+
+  it('faixa fechada é INCLUSIVA nas duas pontas', () => {
+    expect(casaEstrelas(proj({ estrelas: 3 }), 3, 5)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 5 }), 3, 5)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: 6 }), 3, 5)).toBe(false);
+  });
+
+  it('nota acima de 5 entra (não há teto na escala)', () => {
+    expect(casaEstrelas(proj({ estrelas: 10 }), 6, null)).toBe(true);
+  });
+
+  it('célula VAZIA conta como 0 — senão a fila do "ainda sem nota" seria inalcançável', () => {
+    expect(casaEstrelas(proj({ estrelas: null }), 0, 0)).toBe(true);
+    expect(casaEstrelas(proj({ estrelas: null }), 1, null)).toBe(false);
+  });
+
+  it('sem faixa não recorta nada', () => {
+    expect(casaEstrelas(proj({ estrelas: null }), null, null)).toBe(true);
+    expect(contarFiltrosAtivos(filtros())).toBe(0);
+  });
+
+  it('soma (AND) com as outras dimensões e conta como UM filtro ativo', () => {
+    const misto = [
+      proj({ id: 'A', estrelas: 5, statusChave: 'pendente' }),
+      proj({ id: 'B', estrelas: 1, statusChave: 'pendente' }),
+      proj({ id: 'C', estrelas: 8, statusChave: 'aprovado' }),
+    ];
+    const f = filtros({ estrelasMin: 4, status: 'pendente' });
+    expect(aplicarFiltros(misto, f).map((p) => p.id)).toEqual(['A']);
+    // Duas pontas preenchidas seguem sendo UMA dimensão no "Limpar filtros".
+    expect(contarFiltrosAtivos(filtros({ estrelasMin: 1, estrelasMax: 3 }))).toBe(1);
+    // E a contagem das pílulas respeita o recorte (senão "Pendente 3" abriria lista de 1).
+    expect(contarPorPilula(misto, filtros({ estrelasMin: 4 }))).toEqual({
+      pendente: 1,
+      aprovado: 1,
+    });
+    expect(totalSemStatus(misto, filtros({ estrelasMin: 4 }))).toBe(2);
+  });
+});
+
+// ─── Contagem do campo de PRÉ-STATUS (casamento com os outros filtros) ─────────
+// Bug relatado pelo Luis: o campo dizia "Pré-pendente (26)" e abria uma lista de 3 quando
+// havia outro filtro ligado — ele contava sobre a planilha INTEIRA, ao contrário das pílulas.
+describe('contagem do campo de pré-status', () => {
+  const base = [
+    proj({ id: 'A', aprovacaoLider: 'Pré-pendente', especial: true, statusChave: 'pendente' }),
+    proj({ id: 'B', aprovacaoLider: 'Pré-pendente', especial: false, statusChave: 'pendente' }),
+    proj({ id: 'C', aprovacaoLider: 'Pré-aprovado', especial: true, statusChave: 'aprovado' }),
+  ];
+
+  it('respeita os DEMAIS filtros (era o que dava contagem errada)', () => {
+    expect(pareceresDisponiveis(base, filtros())).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+    // Com "Especiais" ligado, "Pré-pendente" tem 1 — e não 2, como antes.
+    expect(pareceresDisponiveis(base, filtros({ especial: 'apenas' }))).toEqual([
+      { estado: 'pendente', total: 1 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+    // Some junto com o recorte de status/estrelas.
+    expect(pareceresDisponiveis(base, filtros({ status: 'aprovado' }))).toEqual([
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('IGNORA a própria dimensão — escolher um estado não apaga os outros do campo', () => {
+    expect(pareceresDisponiveis(base, filtros({ parecer: 'pendente' }))).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('o estado SELECIONADO nunca desaparece, mesmo com 0 no recorte', () => {
+    // Recorte sem nenhum "Pré-aprovado": o campo mantém a opção (com 0) para o select não
+    // renderizar em branco e a pessoa saber o que desfazer.
+    const r = pareceresDisponiveis(base, filtros({ parecer: 'aprovado', especial: 'sem' }));
+    expect(r).toEqual([
+      { estado: 'pendente', total: 1 },
+      { estado: 'aprovado', total: 0 },
+    ]);
+  });
+
+  it('a contagem do campo CONCORDA com o tamanho da lista filtrada', () => {
+    for (const estado of ['pendente', 'aprovado'] as const) {
+      const f = filtros({ parecer: estado, especial: 'apenas' });
+      const doCampo = pareceresDisponiveis(base, f).find((e) => e.estado === estado)!.total;
+      expect(aplicarFiltros(base, f).length).toBe(doCampo);
+    }
+  });
+
+  it('sem argumento de filtros, conta a listagem inteira (compatível com o call antigo)', () => {
+    expect(pareceresDisponiveis(base)).toEqual([
+      { estado: 'pendente', total: 2 },
+      { estado: 'aprovado', total: 1 },
+    ]);
+  });
+
+  it('casaFiltrosExceto é a fonte única do "ignora a própria dimensão"', () => {
+    const p = proj({ statusChave: 'pendente', especial: true, estrelas: 4 });
+    const f = filtros({ status: 'aprovado', especial: 'apenas', estrelasMin: 4 });
+    expect(casaFiltrosExceto(p, f, 'status')).toBe(true); // só o status desencaixava
+    expect(casaFiltrosExceto(p, f, 'estrelas')).toBe(false); // o status continua barrando
+  });
+});
+
+describe('rótulo da faixa de estrelas', () => {
+  it('diz a faixa em texto (o estado nunca é só cor na pílula)', () => {
+    expect(rotuloFaixaEstrelas(null, null)).toBe('Estrelas');
+    expect(rotuloFaixaEstrelas(0, 0)).toBe('Sem nota');
+    expect(rotuloFaixaEstrelas(3, null)).toBe('3+');
+    expect(rotuloFaixaEstrelas(null, 3)).toBe('até 3');
+    expect(rotuloFaixaEstrelas(2, 4)).toBe('2–4');
+    expect(rotuloFaixaEstrelas(3, 3)).toBe('3');
   });
 });

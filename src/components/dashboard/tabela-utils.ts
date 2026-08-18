@@ -7,7 +7,7 @@
  */
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
-export type Ordem = 'data' | 'nome' | 'autor' | 'ganho';
+export type Ordem = 'data' | 'nome' | 'autor' | 'ganho' | 'estrelas';
 export type Direcao = 'asc' | 'desc';
 
 /** Normaliza o termo com a MESMA regra do índice montado no servidor (`chaveBusca`). */
@@ -47,6 +47,10 @@ export function compararProjetos(
       // Sem valor fica abaixo de zero: um projeto sem ganho não pode competir com um
       // de R$ 0 registrado.
       return (a.ganhoTotal ?? -1) - (b.ganhoTotal ?? -1);
+    case 'estrelas':
+      // Célula vazia fica ABAIXO do zero explícito: "ainda não avaliei" não é o mesmo que
+      // "avaliei e não dei estrela" (é a mesma régua do ganho).
+      return (a.estrelas ?? -1) - (b.estrelas ?? -1);
     case 'data':
     default:
       return (a.dataOrdenacao ?? 0) - (b.dataOrdenacao ?? 0);

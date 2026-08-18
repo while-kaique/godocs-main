@@ -27,6 +27,7 @@ import {
   ArrowDown,
   AlertTriangle,
   Sparkles,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
@@ -42,6 +43,7 @@ import {
   type Direcao,
 } from '@/components/dashboard/tabela-utils';
 import { SeletorPeriodo } from '@/components/calendario/calendario';
+import { FiltroEstrelas } from '@/components/dashboard/filtro-estrelas';
 import {
   FILTROS_VAZIOS,
   TODAS_AS_AREAS,
@@ -65,6 +67,7 @@ import {
   agendarPrefetchDetalhe,
   cancelarPrefetchDetalhe,
   limparDetalhes,
+  prefetchDetalhe,
   semearLote,
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
@@ -190,7 +193,10 @@ function Dashboard() {
   const contagemPilula = useMemo(() => contarPorPilula(projetos, filtros), [projetos, filtros]);
   const totalDasPilulas = useMemo(() => totalSemStatus(projetos, filtros), [projetos, filtros]);
   const areas = useMemo(() => areasDisponiveis(projetos), [projetos]);
-  const pareceres = useMemo(() => pareceresDisponiveis(projetos), [projetos]);
+  // ⚠️ Depende dos FILTROS: a contagem de cada pré-status é a do recorte atual (menos a
+  // própria dimensão), igual à das pílulas. Contando sobre a planilha inteira, o campo dizia
+  // "Pré-pendente (26)" e abria uma lista de 3 com outro filtro ligado.
+  const pareceres = useMemo(() => pareceresDisponiveis(projetos, filtros), [projetos, filtros]);
   const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
@@ -362,6 +368,16 @@ function Dashboard() {
           maximo={hoje}
           onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
         />
+        {/* Faixa da nota da triagem (pedido do Luis, 17/08). Duas pontas abertas em vez de
+            uma lista fixa de opções, porque a escala NÃO tem teto: "de 1" já é "1 ou mais",
+            e "de 0 a 0" é a fila do que ninguém avaliou ainda. */}
+        <FiltroEstrelas
+          min={filtros.estrelasMin}
+          max={filtros.estrelasMax}
+          onChange={(estrelasMin, estrelasMax) =>
+            setFiltros((f) => ({ ...f, estrelasMin, estrelasMax }))
+          }
+        />
         <label className="sr-only" htmlFor="filtro-area">
           Filtrar por área
         </label>
@@ -502,6 +518,16 @@ function Dashboard() {
                 {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
                     ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
                 <Th className="hidden md:table-cell">Pré-status</Th>
+                {/* A nota na tabela é o que torna o filtro conferível — sem ela, "de 3 a 5"
+                    devolveria uma lista sem nada que a explique. */}
+                <Th
+                  className="hidden md:table-cell"
+                  onClick={() => alternarOrdem('estrelas')}
+                  ativa={ordem === 'estrelas'}
+                  direcao={direcao}
+                >
+                  Estrelas
+                </Th>
                 <Th className="hidden xl:table-cell">Complexidade</Th>
                 <Th
                   className="text-right"
@@ -527,7 +553,7 @@ function Dashboard() {
                 <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={10} className="p-10 text-center text-sm text-muted-foreground">
                     {projetos.length === 0
                       ? 'A planilha não devolveu nenhum projeto.'
                       : 'Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila.'}
@@ -554,6 +580,10 @@ function Dashboard() {
                     // ⚠️ Isto SÓ é aceitável porque a rota do detalhe lê o espelho (SQLite) e
                     // nunca o Sheets — ver o cabeçalho de `dashboard-detalhe-cache.ts`.
                     onMouseEnter={() => agendarPrefetchDetalhe(p.id)}
+                    // O apertar do botão vem ANTES do `click`: quem clica direto (sem
+                    // esperar os 150 ms do hover) já sai do zero, sem esperar o `onClick`
+                    // montar o overlay para só então pedir a ficha.
+                    onPointerDown={() => prefetchDetalhe(p.id)}
                     onMouseLeave={cancelarPrefetchDetalhe}
                     onFocus={() => agendarPrefetchDetalhe(p.id)}
                     onBlur={cancelarPrefetchDetalhe}
@@ -606,6 +636,26 @@ function Dashboard() {
                         // Projeto sem fila nenhuma (legado, isento): "—" quieto em vez de
                         // um chip "Sem parecer" repetido em centenas de linhas.
                         <span className="text-[12.5px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    {/* Nota como NÚMERO + uma estrela de rótulo: 12 estrelas desenhadas em
+                        600 linhas ninguém conta (e a escala não tem teto). Célula vazia é
+                        "—", diferente do 0 explícito. */}
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-[12.5px] md:table-cell">
+                      {p.estrelas == null || p.estrelas === 0 ? (
+                        // Vazio e 0 se PARECEM na tabela de propósito (a distinção mora na
+                        // ficha e na ordenação): aqui os dois querem dizer "não avaliado
+                        // ainda" para quem varre a lista, e um chip dourado com "0" gritaria.
+                        <span className="text-muted-foreground">{p.estrelas == null ? '—' : '0'}</span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11.5px] font-semibold tabular-nums"
+                          style={{ background: 'rgba(224,168,0,0.14)', color: '#8a6a00' }}
+                          title={`${p.estrelas} ${p.estrelas === 1 ? 'estrela' : 'estrelas'}`}
+                        >
+                          <Star className="h-3 w-3" style={{ color: '#e0a800' }} fill="#f5c518" aria-hidden />
+                          {p.estrelas}
+                        </span>
                       )}
                     </td>
                     <td className="hidden px-3 py-2.5 text-[12.5px] xl:table-cell">

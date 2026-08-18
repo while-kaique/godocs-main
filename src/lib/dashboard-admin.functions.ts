@@ -275,6 +275,13 @@ export async function getProjetosDashboardLote(
   return out;
 }
 
+/**
+ * Sanidade da célula "Estrelas" — NÃO é a escala da nota (a escala é aberta, ver o schema).
+ * Existe só para um clique repetido/`+` desgovernado não gravar um número absurdo numa
+ * coluna que gente usa para somar e ordenar na planilha.
+ */
+export const MAX_ESTRELAS_GRAVAVEL = 100;
+
 const statusSchema = z.object({
   projeto_id: z.string().min(1).max(120),
   status: z.enum(STATUS_GRAVAVEIS),
@@ -288,8 +295,12 @@ const statusSchema = z.object({
   motivo_reenvio: z.string().max(4000).optional(),
   motivo_reprovado: z.string().max(4000).optional(),
   // Nota da triagem (coluna manual "Estrelas"). `undefined` = não mexer na célula — é o
-  // que preserva as notas legadas fora da escala (7, 8, 10) de quem só veio mudar o status.
-  estrelas: z.number().int().min(0).max(5).optional(),
+  // que impede um "salvar status" de zerar a nota de outra pessoa.
+  // ⚠️ **Sem teto de 5** (pedido do Luis, 17/08/2026): a triagem dá N estrelas, e o teto
+  // antigo tratava as notas altas que JÁ existem na planilha (7, 8, 10) como legado a
+  // "substituir". O `MAX_ESTRELAS_GRAVAVEL` é só sanidade de célula (nota não é contador),
+  // não escala: quem define a escala é quem tria.
+  estrelas: z.number().int().min(0).max(MAX_ESTRELAS_GRAVAVEL).optional(),
 });
 
 /** Colunas que este módulo escreve — o teste garante que a lista não cresce por descuido. */

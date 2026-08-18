@@ -54,6 +54,13 @@ export type FiltrosDashboard = {
   parecer: FiltroParecer;
   /** Janela de "Data Submissão", inclusiva nas duas pontas. `null` = sem recorte. */
   periodo: Intervalo | null;
+  /**
+   * Faixa da nota da triagem (coluna "Estrelas"), inclusiva nas duas pontas. `null` em uma
+   * ponta = ponta aberta, então `min:1` sozinho já é "1 estrela ou mais" — o pedido do Luis
+   * de "filtrar de 1 a N". A escala não tem teto (ver `dashboard-resumo`).
+   */
+  estrelasMin: number | null;
+  estrelasMax: number | null;
 };
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
@@ -63,6 +70,8 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   area: TODAS_AS_AREAS,
   parecer: TODOS_OS_PARECERES,
   periodo: null,
+  estrelasMin: null,
+  estrelasMax: null,
 };
 
 /** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
@@ -108,8 +117,89 @@ export function casaParecer(p: ProjetoDashboardResumo, filtro: FiltroParecer): b
   return filtro === TODOS_OS_PARECERES || chaveDoEstado(p.aprovacaoLider) === filtro;
 }
 
+/**
+ * A nota cai na faixa? Célula VAZIA conta como **0**: quem filtra "1 ou mais" quer os
+ * avaliados, e quem filtra "0 a 0" quer justamente a fila do que ainda não recebeu nota —
+ * tratar vazio como "fora de qualquer faixa" deixaria essa fila inalcançável.
+ */
+export function casaEstrelas(
+  p: ProjetoDashboardResumo,
+  min: number | null,
+  max: number | null,
+): boolean {
+  if (min == null && max == null) return true;
+  const n = p.estrelas ?? 0;
+  if (min != null && n < min) return false;
+  if (max != null && n > max) return false;
+  return true;
+}
+
+/**
+ * Como a faixa de estrelas se LÊ no gatilho do filtro — fonte única do texto (a pílula, o
+ * `aria-label` e a descrição dentro do painel não podem chamar o mesmo recorte por nomes
+ * diferentes). Curto de propósito: mora numa pílula ao lado de outras cinco.
+ */
+export function rotuloFaixaEstrelas(min: number | null, max: number | null): string {
+  if (min == null && max == null) return "Estrelas";
+  if (min === 0 && max === 0) return "Sem nota";
+  if (min != null && max == null) return min === 0 ? "Qualquer nota" : `${min}+`;
+  if (min == null && max != null) return `até ${max}`;
+  if (min === max) return `${min}`;
+  return `${min}–${max}`;
+}
+
+/** A mesma faixa em frase — é o que o painel mostra sob a fileira de estrelas. */
+export function descreverFaixaEstrelas(min: number | null, max: number | null): string {
+  if (min == null && max == null) return "Qualquer nota, inclusive sem nota.";
+  if (min === 0 && max === 0) return "Só os que ainda não receberam nota.";
+  if (min != null && max == null) {
+    return min === 0
+      ? "Qualquer nota, inclusive sem nota."
+      : `${min} ${min === 1 ? "estrela" : "estrelas"} ou mais.`;
+  }
+  if (min == null && max != null) return `Até ${max} ${max === 1 ? "estrela" : "estrelas"}.`;
+  if (min === max) return `Exatamente ${min} ${min === 1 ? "estrela" : "estrelas"}.`;
+  return `De ${min} a ${max} estrelas.`;
+}
+
 export function casaStatus(p: ProjetoDashboardResumo, status: string): boolean {
   return status === "todos" || pilulaDe(p.statusChave) === status;
+}
+
+/**
+ * Dimensões do recorte — o vocabulário que `casaFiltrosExceto` entende.
+ */
+export type DimensaoFiltro =
+  | "status"
+  | "especial"
+  | "ganho"
+  | "area"
+  | "parecer"
+  | "periodo"
+  | "estrelas";
+
+/**
+ * O projeto passa por TODAS as dimensões, menos uma.
+ *
+ * É a régua de **quem conta o próprio campo**: a faixa de pílulas ignora `status` (senão
+ * escolher "Pendente" colapsaria a faixa em 1) e o campo de pré-status ignora `parecer`
+ * (senão escolher um estado apagaria os outros do campo). Fonte única para não haver duas
+ * listas de dimensões que precisem ser mantidas em sincronia à mão.
+ */
+export function casaFiltrosExceto(
+  p: ProjetoDashboardResumo,
+  f: FiltrosDashboard,
+  exceto: DimensaoFiltro,
+): boolean {
+  return (
+    (exceto === "status" || casaStatus(p, f.status)) &&
+    (exceto === "especial" || casaEspecial(p, f.especial)) &&
+    (exceto === "ganho" || casaGanho(p, f.ganho)) &&
+    (exceto === "area" || casaArea(p, f.area)) &&
+    (exceto === "parecer" || casaParecer(p, f.parecer)) &&
+    (exceto === "periodo" || casaPeriodo(p, f.periodo)) &&
+    (exceto === "estrelas" || casaEstrelas(p, f.estrelasMin, f.estrelasMax))
+  );
 }
 
 /** Composição AND de todas as dimensões — a fonte única de "o que a tela mostra". */
@@ -124,7 +214,8 @@ export function aplicarFiltros(
       casaGanho(p, f.ganho) &&
       casaArea(p, f.area) &&
       casaParecer(p, f.parecer) &&
-      casaPeriodo(p, f.periodo),
+      casaPeriodo(p, f.periodo) &&
+      casaEstrelas(p, f.estrelasMin, f.estrelasMax),
   );
 }
 
@@ -138,7 +229,9 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     (f.ganho !== "todos" ? 1 : 0) +
     (f.area !== TODAS_AS_AREAS ? 1 : 0) +
     (f.parecer !== TODOS_OS_PARECERES ? 1 : 0) +
-    (f.periodo ? 1 : 0)
+    (f.periodo ? 1 : 0) +
+    // A faixa de estrelas é UMA dimensão, mesmo com as duas pontas preenchidas.
+    (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0)
   );
 }
 
@@ -153,22 +246,34 @@ export function areasDisponiveis(projetos: ProjetoDashboardResumo[]): string[] {
 }
 
 /**
- * Estados de parecer PRESENTES na listagem, na ordem de leitura (`ORDEM_ESTADO_PARECER`) e
- * com a contagem de cada um — é a lista do `<select>` de pré-status. Mesma régua do filtro
- * de área: opção que não casa com projeto nenhum não entra no campo.
+ * Estados de parecer presentes **no recorte atual**, na ordem de leitura
+ * (`ORDEM_ESTADO_PARECER`) e com a contagem de cada um — é a lista do `<select>` de pré-status.
+ *
+ * ⚠️ **A contagem respeita os DEMAIS filtros** (natureza · ganho · área · período · estrelas ·
+ * fila de status), exatamente como a das pílulas: contando sobre a planilha inteira, o campo
+ * dizia "Pré-pendente (26)" e abria uma lista de 3 quando havia outro filtro ligado — a
+ * "contagem errada" relatada. A régua é `casaFiltrosExceto(..., 'parecer')`, e o "exceto" é o
+ * que impede o campo de se esvaziar ao escolher um estado (o mesmo motivo pelo qual a faixa de
+ * pílulas ignora a própria dimensão de status).
+ *
+ * ⚠️ O estado **selecionado nunca desaparece** do campo, mesmo com 0 no recorte: um `<select>`
+ * cujo `value` não existe entre as `<option>` renderiza em branco e a pessoa perde a noção do
+ * que está filtrando (e de como desfazer).
  */
 export function pareceresDisponiveis(
   projetos: ProjetoDashboardResumo[],
+  f: FiltrosDashboard = FILTROS_VAZIOS,
 ): { estado: EstadoParecer; total: number }[] {
   const contagem = new Map<EstadoParecer, number>();
   for (const p of projetos) {
+    if (!casaFiltrosExceto(p, f, "parecer")) continue;
     const k = chaveDoEstado(p.aprovacaoLider);
     contagem.set(k, (contagem.get(k) ?? 0) + 1);
   }
-  return ORDEM_ESTADO_PARECER.filter((e) => contagem.has(e)).map((e) => ({
-    estado: e,
-    total: contagem.get(e)!,
-  }));
+  const selecionado = f.parecer !== TODOS_OS_PARECERES ? f.parecer : null;
+  return ORDEM_ESTADO_PARECER.filter(
+    (e) => contagem.has(e) || e === selecionado,
+  ).map((e) => ({ estado: e, total: contagem.get(e) ?? 0 }));
 }
 
 /**
@@ -182,11 +287,9 @@ export function contarPorPilula(
 ): Record<string, number> {
   const out: Record<string, number> = {};
   for (const p of projetos) {
-    if (!casaEspecial(p, f.especial)) continue;
-    if (!casaGanho(p, f.ganho)) continue;
-    if (!casaArea(p, f.area)) continue;
-    if (!casaParecer(p, f.parecer)) continue;
-    if (!casaPeriodo(p, f.periodo)) continue;
+    // Ignora a PRÓPRIA dimensão de status (senão a faixa colapsaria na fila escolhida) —
+    // mesma régua do campo de pré-status, agora numa fonte única.
+    if (!casaFiltrosExceto(p, f, "status")) continue;
     const k = pilulaDe(p.statusChave);
     out[k] = (out[k] ?? 0) + 1;
   }

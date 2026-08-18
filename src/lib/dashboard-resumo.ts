@@ -122,6 +122,13 @@ export type ProjetoDashboardResumo = {
    * porque é um rótulo curto — a JUSTIFICATIVA (multi-linha) segue só no detalhe.
    */
   aprovacaoLider: string | null;
+  /**
+   * Nota da triagem (coluna manual "Estrelas") — número CRU da planilha, sem teto: a escala
+   * é aberta (pedido do Luis, 17/08/2026) e há notas 7/8/10 gravadas. `null` = célula vazia,
+   * que é diferente de `0` ("olhei e não dei estrela"). Cabe na listagem enxuta porque é um
+   * número: é ele que sustenta o filtro por faixa e a coluna da tabela.
+   */
+  estrelas: number | null;
   busca: string;
 };
 
@@ -151,8 +158,20 @@ export const COLUNAS_RESUMO: readonly string[] = [
   'Complexidade',
   'Tipos Projeto',
   'Especial?',
+  'Estrelas',
   COLUNA_ESTADO_LIDER,
 ];
+
+/**
+ * Versão do RECORTE. ⚠️ Entra na impressão digital da linha (`hashLinha`), então **bumpar
+ * aqui força um re-espelhamento único de todas as linhas** no próximo sync.
+ *
+ * Por que é necessário: o hash existe para não reescrever linha que não mudou, e o
+ * `linha_resumo` é derivado destas colunas. Acrescentar uma coluna sem bumpar deixaria as
+ * ~600 linhas que ninguém editou com o recorte ANTIGO — a coluna existiria no código e
+ * viria vazia na tela, para sempre.
+ */
+export const VERSAO_RECORTE_RESUMO = 2;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
@@ -209,6 +228,8 @@ export function mapResumo(row: SheetRow): ProjetoDashboardResumo | null {
     // (sem acento) e `row['Aprovação do Líder']` devolveria `undefined` — a coluna
     // nasceria vazia para todo projeto. Ver `coluna-chave.ts`.
     aprovacaoLider: texto(valorDaColuna(row as Record<string, string>, COLUNA_ESTADO_LIDER)),
+    // Nota crua, sem teto: "8" na planilha vale 8 (a escala é aberta desde 17/08/2026).
+    estrelas: numero(row['Estrelas']),
     // O que a busca alcança: nome do projeto, autor, e-mail, id, área e ferramenta.
     busca: chaveBusca(nome, autor, email, id, area, ferramenta),
   };

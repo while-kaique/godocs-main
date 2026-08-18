@@ -26,7 +26,7 @@ function Barra({ largura, className = '' }: { largura: string; className?: strin
   );
 }
 
-export function SkeletonLinhas({ linhas = 8, colunas = 9 }: { linhas?: number; colunas?: number }) {
+export function SkeletonLinhas({ linhas = 8, colunas = 10 }: { linhas?: number; colunas?: number }) {
   return (
     <>
       {Array.from({ length: linhas }, (_, i) => (
