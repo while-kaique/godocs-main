@@ -39,6 +39,15 @@ import {
   type ColunaEspeciais,
   type ReferenciaEspecial,
 } from '@/lib/especiais-view';
+import {
+  ROTULO_CONFIANCA,
+  definicaoDe,
+  deltaRecomendacao,
+  raridadeDe,
+  rotuloDelta,
+  tierDe,
+  type AvaliacaoEspecial,
+} from '@/lib/especiais-regua';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
 export const Route = createFileRoute('/_authenticated/especiais')({
@@ -49,6 +58,7 @@ export const Route = createFileRoute('/_authenticated/especiais')({
 type Listagem = {
   projetos: ProjetoDashboardResumo[];
   referencias: ReferenciaEspecial[];
+  avaliacoes: AvaliacaoEspecial[];
   lidoEm: string;
   espelhoVelho: boolean;
 };
@@ -80,6 +90,9 @@ function Especiais() {
   const [salvando, setSalvando] = useState<string | null>(null);
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [editandoRegua, setEditandoRegua] = useState<string | null>(null);
+  // "Só divergentes" é o modo de trabalho: com ~600 projetos, o que exige olho humano é onde a
+  // auditoria discorda da nota gravada.
+  const [soDivergentes, setSoDivergentes] = useState(false);
 
   const carregar = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
@@ -97,10 +110,18 @@ function Especiais() {
     void carregar();
   }, [carregar]);
 
-  const colunas = useMemo(
-    () => (dados ? agruparEspeciais(dados.projetos, dados.referencias) : []),
+  const avaliacaoPor = useMemo(
+    () => new Map((dados?.avaliacoes ?? []).map((a) => [a.projeto_id, a])),
     [dados],
   );
+
+  const colunas = useMemo(() => {
+    if (!dados) return [];
+    const visiveis = soDivergentes
+      ? dados.projetos.filter((p) => deltaRecomendacao(p.estrelas, avaliacaoPor.get(p.id)) != null)
+      : dados.projetos;
+    return agruparEspeciais(visiveis, dados.referencias);
+  }, [dados, soDivergentes, avaliacaoPor]);
   const referenciaPor = useMemo(
     () => new Map((dados?.referencias ?? []).map((r) => [r.projeto_id, r])),
     [dados],
@@ -178,6 +199,9 @@ function Especiais() {
 
   const niveisComRegua = colunas.filter((c) => c.ancoras.length > 0).length;
   const totalEspeciais = dados?.projetos.length ?? 0;
+  const divergentes = (dados?.projetos ?? []).filter(
+    (p) => deltaRecomendacao(p.estrelas, avaliacaoPor.get(p.id)) != null,
+  ).length;
 
   return (
     <div className="flex h-full flex-col">
@@ -192,6 +216,16 @@ function Especiais() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {divergentes > 0 && (
+              <Button
+                variant={soDivergentes ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={soDivergentes}
+                onClick={() => setSoDivergentes((v) => !v)}
+              >
+                {soDivergentes ? 'Vendo só divergentes' : `Só divergentes (${divergentes})`}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => void carregar(true)}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Atualizar
             </Button>
@@ -255,6 +289,7 @@ function Especiais() {
                 key={coluna.chave}
                 coluna={coluna}
                 referenciaPor={referenciaPor}
+                avaliacaoPor={avaliacaoPor}
                 selecionados={selecionados}
                 salvando={salvando}
                 editandoRegua={editandoRegua}
@@ -294,6 +329,7 @@ function fmtHora(iso: string) {
 function Coluna({
   coluna,
   referenciaPor,
+  avaliacaoPor,
   selecionados,
   salvando,
   editandoRegua,
@@ -305,6 +341,7 @@ function Coluna({
 }: {
   coluna: ColunaEspeciais;
   referenciaPor: Map<string, ReferenciaEspecial>;
+  avaliacaoPor: Map<string, AvaliacaoEspecial>;
   selecionados: string[];
   salvando: string | null;
   editandoRegua: string | null;
@@ -319,6 +356,7 @@ function Coluna({
       key={p.id}
       projeto={p}
       ancora={ehAncora ? referenciaPor.get(p.id) : undefined}
+      avaliacao={avaliacaoPor.get(p.id)}
       selecionado={selecionados.includes(p.id)}
       podeSelecionar={selecionados.length < MAX_COMPARAR || selecionados.includes(p.id)}
       salvando={salvando === p.id}
@@ -351,6 +389,29 @@ function Coluna({
         </h2>
         <span className="text-[12px] tabular-nums text-muted-foreground">{coluna.total}</span>
       </div>
+      {/* A régua da ESCALA (o que este nível significa e quão raro ele é na base) fica no
+          cabeçalho, acima da prateleira, porque vale para o nível inteiro — a frase da âncora,
+          logo abaixo, é o exemplo concreto dela. */}
+      {coluna.nota != null && (
+        <div className="mt-1.5 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {tierDe(coluna.nota) && (
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: 'rgba(224,168,0,0.14)', color: '#8a6a00' }}
+              >
+                {tierDe(coluna.nota)!.rotulo}
+              </span>
+            )}
+            {raridadeDe(coluna.nota) && (
+              <span className="text-[10.5px] text-muted-foreground">{raridadeDe(coluna.nota)}</span>
+            )}
+          </div>
+          {definicaoDe(coluna.nota) && (
+            <p className="text-[11px] leading-snug text-muted-foreground">{definicaoDe(coluna.nota)}</p>
+          )}
+        </div>
+      )}
 
       {/* A PRATELEIRA DA RÉGUA: fundo creme, sempre presente (nível sem referência não some,
           fica pedindo uma) — é ela que transforma a coluna numa comparação. */}
@@ -387,6 +448,7 @@ function Coluna({
 function Cartao({
   projeto,
   ancora,
+  avaliacao,
   selecionado,
   podeSelecionar,
   salvando,
@@ -400,6 +462,7 @@ function Cartao({
 }: {
   projeto: ProjetoDashboardResumo;
   ancora: ReferenciaEspecial | undefined;
+  avaliacao: AvaliacaoEspecial | undefined;
   selecionado: boolean;
   podeSelecionar: boolean;
   salvando: boolean;
@@ -445,6 +508,14 @@ function Cartao({
           <span className="text-[11px] text-muted-foreground">{fmtDataBR(projeto.dataSubmissao)}</span>
         )}
       </div>
+
+      {avaliacao && (
+        <RecomendacaoAuditoria
+          avaliacao={avaliacao}
+          atual={nota}
+          onAplicar={() => onNota(avaliacao.estrelas_recomendada)}
+        />
+      )}
 
       {/* Nota: passos de ±1 porque o gesto desta tela é REPOSICIONAR (o cartão muda de
           coluna), não pontuar do zero — a fileira de estrelas inteira vive na ficha. */}
@@ -499,6 +570,70 @@ function Cartao({
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * A recomendação da auditoria dentro do cartão.
+ *
+ * ⚠️ **Ela nunca vira a nota sozinha** — o "Aplicar" é o clique de gente que grava. A leitura
+ * fica junto porque a nota sem o porquê não é auditável: é o texto que diz por que a faixa, por
+ * que não sobe e o que faria subir.
+ *
+ * O selo de confiança e o "contestada" mudam o peso do que se lê: contestada quer dizer que o
+ * passe adversarial derrubou ou mexeu na nota — o oposto de "duvidosa", é a que passou pelo
+ * crivo mais duro.
+ */
+function RecomendacaoAuditoria({
+  avaliacao,
+  atual,
+  onAplicar,
+}: {
+  avaliacao: AvaliacaoEspecial;
+  atual: number | null;
+  onAplicar: () => void;
+}) {
+  const delta = deltaRecomendacao(atual, avaliacao);
+  const rotulo = rotuloDelta(delta);
+  return (
+    <div className="mt-2 rounded-md border px-2 py-1.5" style={{ borderColor: 'rgba(0,89,169,0.18)', background: 'rgba(0,89,169,0.04)' }}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>
+          Auditoria recomenda
+        </span>
+        <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold tabular-nums">
+          {avaliacao.estrelas_recomendada}
+          <Star className="h-3 w-3" style={{ color: OURO_BORDA }} fill={OURO} aria-hidden />
+        </span>
+        {rotulo && (
+          <span className="rounded px-1 py-0.5 text-[10.5px] font-semibold tabular-nums"
+            style={{ background: delta! > 0 ? 'rgba(23,113,79,0.12)' : 'rgba(179,38,30,0.10)', color: delta! > 0 ? '#17714f' : '#b3261e' }}>
+            {rotulo}
+          </span>
+        )}
+        <span className="text-[10.5px] text-muted-foreground">
+          {ROTULO_CONFIANCA[avaliacao.confianca]}
+        </span>
+        {avaliacao.contestada && (
+          <span className="text-[10.5px] text-muted-foreground" title="A nota passou pelo revisor adversarial">
+            · revista
+          </span>
+        )}
+      </div>
+      {avaliacao.leitura && (
+        <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">{avaliacao.leitura}</p>
+      )}
+      {delta != null && (
+        <button
+          type="button"
+          onClick={onAplicar}
+          className="mt-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2"
+          style={{ color: AZUL, ['--tw-ring-color' as string]: AZUL }}
+        >
+          Aplicar {avaliacao.estrelas_recomendada} {avaliacao.estrelas_recomendada === 1 ? 'estrela' : 'estrelas'}
+        </button>
+      )}
+    </div>
   );
 }
 
