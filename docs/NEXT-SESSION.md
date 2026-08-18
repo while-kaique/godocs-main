@@ -6,9 +6,15 @@
 
 ## Plano ativo — AGENTE CLASSIFICADOR DE ESPECIAIS (peça 4)
 
-**Estado:** a view `/especiais` está **codada, testada (1549 verdes) e commitada** na branch
-`feat/view-especiais-estrelas` (worktree `~/godocs-wt-especiais`). **Falta:** deploy no STAGING
-(regra 13) → validação visual do Luis → prod → PR. Fazer isso ANTES de começar o agente.
+**Estado (18/08, fim do dia):** a view `/especiais` **está na STAGING (version 170)** com a etapa (a)
+da fusão com o material do JV já dentro: régua 0–10 como FONTE ÚNICA (`especiais-regua.ts`), tabela
+`especial_avaliacao`, as **99 recomendações da força-tarefa como SEED idempotente** (o import por HTTP
+não serve: o `E2E_COOKIE` expira e o edge devolve login), recomendação no cartão com "Aplicar" e o
+filtro "Só divergentes". 1562 testes verdes. **Falta:** validação visual do Luis → prod → PR.
+⚠️ A staging roda o branch `deploy/staging-especiais` = feature + `origin/worktree-feat+investigador-aba-pre-aprovacao`
+(branch não-mergeada de outra pessoa) — refazer esse merge a cada deploy de staging enquanto ela não entrar no main.
+**Etapas b–d da fusão (pendentes):** modo FILA (filas derivadas de Status+Líder+Especial, espera, ações,
+dono/progresso) · ponte "posicionar" da fila para a régua · o AGENTE abaixo.
 
 ### O prompt da próxima sessão
 
