@@ -370,3 +370,24 @@ qualidade. **Barrar submissão está FORA em definitivo** — a reprovação é 
   da sidebar aponta para `/configuracoes`, rota inexistente). Hoje só via `ADMIN_EMAILS`.
 - ⬜ 🐞 `GET /api/admin/investigador/projetos` **quebrado em prod** (503 Cloudflare 1102): N+1 em
   `investigador.functions.ts:225-226` chama `getChatMessages` para todos os 605 projetos. Merece plano próprio.
+
+## Fase — Comparador de projetos ESPECIAIS por ÂNCORA (`/especiais`) 🟡
+
+**Por quê:** discussão GoBrands × PIAPP (18/08/2026) — o projeto saiu de 8 estrelas para "será
+que vale alguma?" numa conversa só, porque a coluna "Estrelas" é um número sem denominador
+(1/2/3 sem definição escrita, nenhuma justificativa gravada, comparar dois especiais exige abrir
+duas documentações).
+
+**Decisão:** a régua é **ÂNCORA, não rubrica absoluta** — cada nível tem no topo o projeto REAL
+que o define + a frase da régua. A pergunta vira "isto é maior ou menor que o PIAPP?".
+
+- [x] Módulo PURO `especiais-view.ts` + 14 testes (agrupamento, âncoras, alvos da comparação)
+- [x] Servidor `especiais.functions.ts` + tabela INTERNA `especial_referencia` + 4 rotas admin
+- [x] Tela `/especiais` (colunas por nível, prateleira da régua, ±1 estrela, comparar lado a lado)
+- [x] Spec (`SPEC_FEATURES_NOVAS.md`) + CLAUDE.md
+- [ ] Deploy STAGING (`edf400b4`) + validação visual do Luis
+- [ ] Prod (`674a3710`) + PR
+- [ ] **Peça 4 — agente classificador** (propõe a caixa comparando com as âncoras; NUNCA grava a
+      nota). Prompt pronto em `docs/NEXT-SESSION.md`.
+- [ ] **Em aberto (peça 1):** a estrela mede impacto para a empresa ou mérito do projeto? Foi a
+      ambiguidade exata do GoBrands.
