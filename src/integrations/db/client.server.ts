@@ -1542,6 +1542,39 @@ export function getAprovacoesDoProjeto(projetoId: string) {
 }
 
 /**
+ * TODAS as linhas pendentes de pré-aprovação (qualquer líder), para a aba
+ * "Pendentes de pré-aprovação" do Investigador — diagnóstico admin, não a fila
+ * de um líder específico (essa é a `getAprovacoesPendentesDe`). Uma linha por
+ * (projeto, líder); o chamador agrupa por `projeto_id` (D4: a decisão de UM
+ * líder resolve TODAS as linhas do projeto de uma vez, então "tem linha
+ * pendente" já significa "nenhum líder decidiu ainda"). Exclui rascunho (nunca
+ * abre fila), projeto descontinuado (não precisa mais de parecer) e os
+ * projetos de teste do harness E2E — mesmos filtros da `getPendenciasPorLider`.
+ */
+export function getTodasAprovacoesPendentes() {
+  return queryAll<
+    AprovacaoRow & {
+      projeto_nome: string | null;
+      autor_nome: string | null;
+      area: string | null;
+      ferramenta: string | null;
+      submitted_at: string | null;
+    }
+  >(
+    `SELECT a.*, p.nome AS projeto_nome, p.responsavel_nome AS autor_nome, p.area AS area,
+            p.ferramenta AS ferramenta, p.submitted_at AS submitted_at
+       FROM projeto_aprovacoes a
+       JOIN projetos p ON p.id = a.projeto_id
+      WHERE a.veredito = 'pendente'
+        AND p.status != 'rascunho'
+        AND COALESCE(p.descontinuado, 0) != 1
+        AND COALESCE(p.nome, '') NOT LIKE '[E2E-%'
+      ORDER BY a.criado_em ASC`,
+    [],
+  );
+}
+
+/**
  * Grava a decisão em TODAS as linhas do projeto (D4: o primeiro que decide resolve).
  * `decidido_por` guarda quem realmente decidiu, mesmo nas linhas dos outros líderes.
  *
