@@ -3183,6 +3183,27 @@ export function deveLimparContextoEspecialOrfao(
   return especial !== 1 && (contextoEspecial ?? '').trim().length > 0;
 }
 
+/**
+ * Aplica a limpeza do contexto especial órfão: zera no banco E no objeto em memória
+ * (é ele que o `syncSubmitToGoogle` serializa logo em seguida). Idempotente — só age
+ * quando há resíduo — e NUNCA lança: nenhuma escrita no Google pode cair por causa
+ * disto. Chamada no submit e no resync, os dois pontos que reescrevem a linha inteira.
+ */
+async function limparContextoEspecialOrfao(
+  projetoId: string,
+  projeto: { especial?: number | null; contexto_especial?: string | null },
+  origem: string,
+): Promise<void> {
+  if (!deveLimparContextoEspecialOrfao(projeto.especial, projeto.contexto_especial)) return;
+  try {
+    await updateProjeto(projetoId, { contexto_especial: null });
+    projeto.contexto_especial = null;
+    log(origem, `Projeto ${projetoId}: contexto especial órfão limpo (projeto não é mais especial).`);
+  } catch (limpezaErr) {
+    err(origem, "Falha ao limpar contexto especial órfão (não bloqueante):", limpezaErr);
+  }
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3580,23 +3601,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // ordem certa — aqui não depende de nada: se `especial` é 0 no momento do submit,
   // o contexto especial é resíduo, ponto. Zeramos no banco E no objeto em memória (é
   // ele que o `syncSubmitToGoogle` serializa logo abaixo). Idempotente e não bloqueia.
-  if (
-    deveLimparContextoEspecialOrfao(
-      projeto.especial as number | null,
-      projeto.contexto_especial as string | null,
-    )
-  ) {
-    try {
-      await updateProjeto(projeto_id, { contexto_especial: null });
-      (projeto as { contexto_especial?: string | null }).contexto_especial = null;
-      log(
-        "submeterParaValidacao",
-        `Projeto ${projeto_id}: contexto especial órfão limpo (projeto não é mais especial).`,
-      );
-    } catch (limpezaErr) {
-      err("submeterParaValidacao", "Falha ao limpar contexto especial órfão (não bloqueante):", limpezaErr);
-    }
-  }
+  await limparContextoEspecialOrfao(projeto_id, projeto, "submeterParaValidacao");
 
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──
   {
@@ -3689,6 +3694,12 @@ export async function resyncGoogle(rawData: unknown) {
 
   const projeto = await getProjetoById(projeto_id);
   if (!projeto) throw new Error("Projeto não encontrado.");
+
+  // Contexto especial órfão: o resync reescreve a linha INTEIRA a partir do banco, então
+  // sem esta limpeza ele REGRAVA o texto residual na coluna "Contexto do Projeto Especial"
+  // — é justamente o resync a ferramenta usada para consertar linhas antigas (casos "Farol
+  // de Ciência do Código de Conduta" e "GoStream - Checklist Proposta", 19/08/2026).
+  await limparContextoEspecialOrfao(projeto_id, projeto, "resyncGoogle");
 
   // Re-deriva R$ das horas (mesma rede de segurança do submit), incluindo o custo
   // evitado a partir dos itens persistidos.

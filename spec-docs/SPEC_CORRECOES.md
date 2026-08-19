@@ -51,8 +51,12 @@ quando a planilha e o banco **divergem** na flag — aqui os dois já dizem "nã
 (o novo caso reproduz a ORDEM REAL tipos→metadados e falha sem o fix).
 
 ⚠️ **Linhas já gravadas não se corrigem sozinhas** — a célula do Sheets só é reescrita na
-próxima IDA (reenvio/resync) do projeto. Os 2 casos acima precisam de correção manual da
-célula (ou de um resync depois deste deploy).
+próxima IDA (reenvio/resync) do projeto. **Complemento (mesmo dia):** o `resyncGoogle`
+reescreve a linha INTEIRA a partir do banco, então sem a mesma limpeza ele REGRAVARIA o
+resíduo — e é justamente o resync a ferramenta de conserto das linhas antigas. A limpeza
+virou o helper `limparContextoEspecialOrfao` (banco + objeto em memória, idempotente, nunca
+lança) e é chamada nos **dois** pontos que reescrevem a linha: `submeterParaValidacao` e
+`resyncGoogle` (`GET /api/admin/resync-google?projeto_id=…`).
 
 ---
 
