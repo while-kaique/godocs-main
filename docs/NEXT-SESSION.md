@@ -1,3 +1,19 @@
+# NEXT-SESSION
+
+## Plano ativo
+**nenhum plano formal** — a feature "Histórico de ações" foi implementada direto (pedido do Luis, sessão 19/08). Próximo é VALIDAR + promover, não planejar.
+
+## 19/08/2026 — Histórico de ações (drawer nas telas de aprovação)
+**Feito:** botão "Histórico" em `/dashboard`, `/especiais`, `/aprovacoes-pendentes` → drawer lateral (Sheet novo sobre o Radix Dialog) com feed GLOBAL de ações de admin (status, estrelas, dono de área, decisão de líder em `?como=`, reabrir fila), autor `@gocase` da borda + horário, paginado por cursor.
+- Tabela única `admin_activity_log` (append-only, interna) + `registrarAtividade` (nunca lança) + `GET /api/admin/atividades` (requireAdmin, keyset portátil). Estrelas ganharam `adminEmail`.
+- Arquivos: `src/lib/atividades.functions.ts`, `src/components/historico/*`, `src/components/ui/sheet.tsx`, schema/client.server, instrumentação em dashboard-admin/especiais/aprovacoes functions + worker. Spec: `spec-docs/SPEC_HISTORICO_ACOES.md`.
+- ✅ 1621 testes verdes (`tests/atividades.test.ts`), tsc limpo (5 erros pré-existentes do main), worker+SPA buildam. Commit `5d8e2d0` na branch `feat/historico-acoes-admin` (base main `2afd7d5`).
+- ✅ Deployado na STAGING `edf400b4`, runtime confirmado (worker no ar tem `/api/admin/atividades` + `admin_activity_log`).
+
+**PRÓXIMO PASSO:** validar o drawer no navegador na staging (https://godocs-staging.devgogroup.com/dashboard → botão "Histórico"; feed nasce vazio, popula ao mudar status/estrela) → com o ok do Luis, deploy em PROD `674a3710` → `/ggsd:ship` (PR pela conta writer `LuisEduardo100`). ⚠️ Revisão de código formal (GGSD) NÃO rodou — se for exigida, roda antes do ship.
+
+---
+
 # 🔜 Handoff — próxima sessão (GoDocs)
 
 > Deixa a próxima sessão pronta pra começar. **Atualizar SEMPRE ao fim de cada sessão.**
