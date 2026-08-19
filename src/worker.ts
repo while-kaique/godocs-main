@@ -107,6 +107,7 @@ import {
   decidirAprovacao,
   reabrirPreAprovacoes,
 } from "@/lib/aprovacoes.functions";
+import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -584,6 +585,21 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await definirStatusProjeto(body, adminEmail));
     }
 
+    // Feed unificado de ações do painel (drawer "Histórico"): quem aprovou/reprovou/pediu
+    // reenvio, deu estrelas, dividiu área, reabriu fila — mais recente primeiro, paginado
+    // por cursor opaco. Só admin (mesmo gate das 3 telas que abrem o drawer).
+    if (pathname === "/api/admin/atividades" && method === "GET") {
+      await requireAdmin(request);
+      return json(
+        await listarAtividades({
+          cursor: url.searchParams.get("cursor") ?? undefined,
+          limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+
     // ── Comparador de projetos ESPECIAIS (a régua por ÂNCORA) ───────────────
     // Ver src/lib/especiais.functions.ts: lê o MESMO espelho da triagem, só que agrupado por
     // NÍVEL, com a recomendação da auditoria por projeto. A nota segue na
@@ -593,9 +609,9 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await listarEspeciais());
     }
     if (pathname === "/api/admin/especiais/estrelas" && method === "POST") {
-      await requireAdmin(request);
+      const { email: adminEmail } = await requireAdmin(request);
       const body = await readBody(request);
-      return json(await definirEstrelasEspecial(body));
+      return json(await definirEstrelasEspecial(body, adminEmail));
     }
     // Divisão da validação: qual admin cuida de cada ÁREA. Interno, nunca vai à planilha.
     if (pathname === "/api/admin/especiais/dono" && method === "POST") {
@@ -733,8 +749,22 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // com ele, a fila; restaurar a aba recria o projeto, nunca a fila. Isto repõe.
     // ⚠️ `dry` é o DEFAULT: escrever exige `{"dry":false}` explícito no body.
     if (pathname === "/api/admin/aprovacoes/reabrir" && method === "POST") {
-      await requireAdmin(request);
-      return json(await reabrirPreAprovacoes(await readBody<unknown>(request)));
+      const { email: adminEmail } = await requireAdmin(request);
+      const resultado = await reabrirPreAprovacoes(await readBody<unknown>(request));
+      // Feed do painel: só as reaberturas que de fato aconteceram (nunca o dry-run).
+      if (!resultado.dry) {
+        for (const r of resultado.reabertos) {
+          await registrarAtividade({
+            ator_email: adminEmail,
+            acao: "reabrir_fila",
+            projeto_id: r.projeto_id,
+            projeto_nome: r.nome,
+            detalhe: "Fila de pré-aprovação reaberta",
+            meta: { aprovadores: r.aprovadores },
+          });
+        }
+      }
+      return json(resultado);
     }
 
     // ── Snapshot de pendências → Gomoon, sob demanda (admin) ──

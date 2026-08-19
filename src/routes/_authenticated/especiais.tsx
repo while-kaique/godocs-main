@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { apiFetch } from '@/lib/api-client';
@@ -319,6 +320,7 @@ function Especiais() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <HistoricoButton />
             <Button variant="outline" size="sm" onClick={() => setDivisaoAberta(true)}>
               <Users className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Divisão por pessoa
             </Button>

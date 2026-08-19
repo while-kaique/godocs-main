@@ -253,6 +253,28 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_projeto ON admin_status_log(projeto_id);
   CREATE INDEX IF NOT EXISTS idx_admin_status_log_criado ON admin_status_log(created_at);
 
+  -- Log UNIFICADO de ações do painel admin (feed do drawer "Histórico"). Onde o
+  -- admin_status_log responde "quem mexeu no STATUS deste projeto", esta tabela responde
+  -- "o que aconteceu no painel", em UMA linha por gesto: mudança de status, estrelas,
+  -- dono de área, pré-aprovação em modo admin, reabertura de fila. Toda escrita passa por
+  -- registrarAtividade() (não-bloqueante), então uma auditoria fora do ar NUNCA desfaz a
+  -- ação real. É DERIVADO/append-only: pode ser apagado sem perda de estado do app.
+  -- 'acao' é o discriminador. 'detalhe' é a frase legível. 'meta_json' guarda o extra
+  -- estruturado (status anterior/novo, nota, veredito) para o renderer, nunca em prompt.
+  CREATE TABLE IF NOT EXISTS admin_activity_log (
+    id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    ator_email    TEXT NOT NULL,                     -- e-mail @gocase da borda (quem fez)
+    acao          TEXT NOT NULL,                     -- 'status'|'estrelas'|'dono_area'|'lider_decisao'|'reabrir_fila'
+    projeto_id    TEXT,                              -- null em ações sem projeto (ex. divisão de área)
+    projeto_nome  TEXT,
+    detalhe       TEXT,                              -- frase pronta para exibir ("Reprovado", "10 estrelas"...)
+    meta_json     TEXT,                              -- JSON opcional com o extra estruturado
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_activity_criado ON admin_activity_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_admin_activity_projeto ON admin_activity_log(projeto_id);
+
   -- Pré-aprovação do LÍDER (integração TeamGuide). O liderado submete e o líder direto
   -- (derivado de /teams + membros) recebe uma DM no Chat e aprova/reprova DENTRO do
   -- GoDocs (a aprovação é estado do projeto, não do Chat). Uma linha por (projeto,
