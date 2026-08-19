@@ -21,6 +21,7 @@
 //    analista do time dele não é, e quem aprova é o coordenador — não o líder acima.
 
 import { z } from 'zod';
+import { registrarAtividade } from '@/lib/atividades.functions';
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
 import {
   AVISO_SAVING_INCOERENTE,
@@ -915,6 +916,24 @@ export async function decidirAprovacao(
     quemDecidiu,
     respostas,
   );
+
+  // Feed do painel (drawer "Histórico"): registra SÓ quando um admin decide em modo
+  // preview (`?como=`) — é uma ação DO PAINEL. A decisão de um líder na própria fila não
+  // é ação de admin e não entra no feed (fica em `projeto_aprovacoes`, como sempre).
+  // `linhasGravadas` truthy = o UPDATE de fato escreveu (não foi a perdedora da corrida).
+  if (opts?.atorReal && linhasGravadas) {
+    const proj = await getProjetoById(projeto_id).catch(() => null);
+    const rotulo =
+      veredito === 'aprovado' ? 'Pré-aprovado' : veredito === 'ajuste' ? 'Ajuste pedido' : 'Reprovado';
+    await registrarAtividade({
+      ator_email: quemDecidiu,
+      acao: 'lider_decisao',
+      projeto_id,
+      projeto_nome: proj?.nome ?? null,
+      detalhe: `${rotulo} (como ${alvo})`,
+      meta: { veredito, aprovador: alvo, comentario },
+    });
+  }
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);

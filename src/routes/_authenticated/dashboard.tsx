@@ -31,6 +31,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
@@ -313,6 +314,7 @@ function Dashboard() {
                   })}`}
             </span>
           )}
+          <HistoricoButton />
           <Button variant="outline" onClick={() => void atualizar()} disabled={atualizando}>
             {atualizando ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             {atualizando ? 'Sincronizando…' : 'Atualizar'}

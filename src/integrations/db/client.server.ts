@@ -1313,6 +1313,71 @@ export async function insertAdminStatusLog(data: {
   );
 }
 
+// ── Log unificado de ações do painel admin (feed do drawer "Histórico") ─────
+
+export type AdminActivityRow = {
+  id: string;
+  ator_email: string;
+  acao: string;
+  projeto_id: string | null;
+  projeto_nome: string | null;
+  detalhe: string | null;
+  meta_json: string | null;
+  created_at: string | null;
+};
+
+// Grava UMA linha no feed do painel. Chamada só por registrarAtividade (atividades.functions),
+// que engole erros — auditoria é registro paralelo e não pode derrubar a ação real.
+export async function insertAdminActivity(data: {
+  ator_email: string;
+  acao: string;
+  projeto_id?: string | null;
+  projeto_nome?: string | null;
+  detalhe?: string | null;
+  meta_json?: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO admin_activity_log
+       (id, ator_email, acao, projeto_id, projeto_nome, detalhe, meta_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [
+      generateId(),
+      data.ator_email,
+      data.acao,
+      data.projeto_id ?? null,
+      data.projeto_nome ?? null,
+      data.detalhe ?? null,
+      data.meta_json ?? null,
+    ],
+  );
+}
+
+// Página do feed por keyset (created_at, id) DESC — estável mesmo com escrita concorrente
+// (offset "escorregaria" quando chega linha nova). Cursor null = primeira página.
+// Pede `limit + 1` para saber se há próxima página sem uma segunda consulta.
+export async function queryAdminActivities(
+  cursor: { created_at: string; id: string } | null,
+  limit: number,
+): Promise<AdminActivityRow[]> {
+  if (cursor) {
+    // Forma PORTÁTIL do keyset (evita o row-value `(a,b) < (?,?)`, que nem todo motor
+    // aceita): "antes deste instante, OU no mesmo instante com id menor".
+    return queryAll<AdminActivityRow>(
+      `SELECT * FROM admin_activity_log
+        WHERE created_at < ? OR (created_at = ? AND id < ?)
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?`,
+      [cursor.created_at, cursor.created_at, cursor.id, limit],
+    );
+  }
+  return queryAll<AdminActivityRow>(
+    `SELECT * FROM admin_activity_log
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?`,
+    [limit],
+  );
+}
+
 // ── Pré-aprovação do líder (TeamGuide) ───────────────────────────────────────
 
 /** Número da versão mais recente do projeto (1 quando nunca versionou). */

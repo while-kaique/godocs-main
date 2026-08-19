@@ -12,7 +12,8 @@
  */
 import { z } from 'zod';
 import { updateRowByProjectId } from '@/lib/google/sheets';
-import { lerResumosEspelho, espelharEscrita, statusEspelho } from '@/lib/sheet-espelho';
+import { lerResumosEspelho, espelharEscrita, statusEspelho, lerLinhaEspelho } from '@/lib/sheet-espelho';
+import { registrarAtividade } from '@/lib/atividades.functions';
 import {
   mapResumo,
   ordenarPorDataDesc,
@@ -153,6 +154,12 @@ export async function definirDonoDeArea(raw: unknown, adminEmail: string) {
   const chave = chaveArea(area);
   if (!dono_email) {
     await deleteDonoDeArea(chave);
+    await registrarAtividade({
+      ator_email: adminEmail,
+      acao: 'dono_area',
+      detalhe: `Área ${chave}: dono removido`,
+      meta: { area: chave, dono_email: null },
+    });
     return { ok: true, area: chave, dono_email: null };
   }
   await upsertDonoDeArea({
@@ -160,6 +167,12 @@ export async function definirDonoDeArea(raw: unknown, adminEmail: string) {
     dono_email,
     dono_nome: dono_nome?.trim() || null,
     definido_por: adminEmail,
+  });
+  await registrarAtividade({
+    ator_email: adminEmail,
+    acao: 'dono_area',
+    detalhe: `Área ${chave}: ${dono_nome?.trim() || dono_email}`,
+    meta: { area: chave, dono_email, dono_nome: dono_nome?.trim() || null },
   });
   return { ok: true, area: chave, dono_email };
 }
@@ -216,11 +229,28 @@ const estrelasSchema = z.object({
  * transformaria a coluna em texto e quebraria a soma/ordenação de quem usa a planilha (mesma
  * razão documentada em `definirStatusProjeto`).
  */
-export async function definirEstrelasEspecial(raw: unknown) {
+export async function definirEstrelasEspecial(raw: unknown, adminEmail: string) {
   const { projeto_id, estrelas } = estrelasSchema.parse(raw);
+  const linha = await lerLinhaEspelho(projeto_id);
+  const estrelasAnterior = linha
+    ? Number(String((linha as Record<string, unknown>)['Estrelas'] ?? '') || 0) || 0
+    : null;
   const updates = { Estrelas: String(estrelas) };
   await updateRowByProjectId(projeto_id, updates);
   // Remendo do espelho com carimbo: um sync que COMEÇOU antes desta escrita não a desfaz.
   await espelharEscrita(projeto_id, updates);
+
+  // Feed do painel (drawer "Histórico"). Não bloqueia nem lança.
+  await registrarAtividade({
+    ator_email: adminEmail,
+    acao: 'estrelas',
+    projeto_id,
+    projeto_nome: linha
+      ? String((linha as Record<string, unknown>)['Projeto'] ?? '').trim() || null
+      : null,
+    detalhe: `${estrelas} ${estrelas === 1 ? 'estrela' : 'estrelas'}`,
+    meta: { estrelas, estrelas_anterior: estrelasAnterior },
+  });
+
   return { ok: true, projeto_id, estrelas };
 }

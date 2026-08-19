@@ -24,6 +24,7 @@
  */
 import { z } from "zod";
 import { updateRowByProjectId, type SheetRow } from "@/lib/google/sheets";
+import { registrarAtividade } from "@/lib/atividades.functions";
 import {
   insertAdminStatusLog,
   getAdminStatusLogs,
@@ -405,6 +406,20 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
     // Auditoria é registro paralelo — não pode desfazer uma escrita que já aconteceu.
     console.error("[dashboard-admin] falha ao registrar auditoria de status:", e);
   }
+
+  // Espelha no feed unificado do painel (drawer "Histórico"). registrarAtividade não lança.
+  await registrarAtividade({
+    ator_email: adminEmail,
+    acao: "status",
+    projeto_id,
+    projeto_nome: texto(linha["Projeto"]),
+    detalhe: status,
+    meta: {
+      status_anterior: statusAnterior,
+      status_novo: status,
+      motivo: observacoes?.trim() || motivo_reprovado?.trim() || motivo_reenvio?.trim() || null,
+    },
+  });
 
   return { ok: true, projeto_id, status, statusAnterior };
 }
