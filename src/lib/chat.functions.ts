@@ -2751,7 +2751,15 @@ export async function atualizarMetadados(rawData: unknown) {
   // num projeto hoje marcado especial, essa é a troca para saving/receita feita na
   // edição. Zera a flag aqui também (belt-and-suspenders com atualizarTipos, cobre a
   // ordem em que metadados chega antes da troca de tipos) e NÃO toma o ramo especial.
-  if (data.especial === false && ctxData?.especial === 1) {
+  // ⚠️ A condição NÃO pode ser só `ctxData?.especial === 1`: no fluxo real do formulário
+  // o `atualizarTipos` roda ANTES desta chamada (submeter.tsx) e já zerou a flag, então
+  // o guard não disparava — e o passo 1 acima acabava de REGRAVAR o `contexto_especial`
+  // que o form ainda carregava. Resultado: flag zerada, texto órfão no SQLite e na coluna
+  // "Contexto do Projeto Especial" (casos "Farol de Ciência do Código de Conduta" e
+  // "GoStream - Checklist Proposta", ago/2026). Por isso olhamos TAMBÉM o contexto: com
+  // `especial: false` explícito, contexto especial preenchido é sempre resíduo.
+  const temContextoResidual = (ctxData?.contexto_especial ?? '').trim().length > 0;
+  if (data.especial === false && (ctxData?.especial === 1 || temContextoResidual)) {
     // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
     // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
     await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
@@ -3160,6 +3168,21 @@ export async function reconciliarComplexidade(maxReanalises = 15) {
 
 // ─── Submeter para validação ─────────────────────────────────────────────────
 
+/**
+ * O `contexto_especial` guardado ainda descreve ESTE projeto?
+ *
+ * Decisor PURO (testável sem banco): só há contexto especial legítimo em projeto
+ * marcado como especial. Se a flag caiu (conversão especial → saving/receita) e o
+ * texto ficou, ele é resíduo — não pode ir para a coluna "Contexto do Projeto
+ * Especial" nem aparecer na tela do projeto. Texto vazio/só espaço não é resíduo.
+ */
+export function deveLimparContextoEspecialOrfao(
+  especial: number | null | undefined,
+  contextoEspecial: string | null | undefined,
+): boolean {
+  return especial !== 1 && (contextoEspecial ?? '').trim().length > 0;
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3546,6 +3569,33 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         nomeProjeto: projeto.nome,
       }).catch((e) => err("submeterParaValidacao", "Aviso ao líder falhou (não bloqueante):", e)),
     );
+  }
+
+  // ── Contexto especial órfão: rede final antes de qualquer escrita ────────────
+  // O projeto deixou de ser especial em algum ponto do fluxo (Etapa 2.5 → saving/
+  // receita), mas o texto do "porquê é especial" continuou no banco: ele não descreve
+  // mais este projeto e não pode ir para a coluna "Contexto do Projeto Especial" nem
+  // aparecer em /projeto/$id. As duas limpezas de origem (`atualizarTipos` e
+  // `atualizarMetadados`) são condicionais e dependem de o formulário chamá-las na
+  // ordem certa — aqui não depende de nada: se `especial` é 0 no momento do submit,
+  // o contexto especial é resíduo, ponto. Zeramos no banco E no objeto em memória (é
+  // ele que o `syncSubmitToGoogle` serializa logo abaixo). Idempotente e não bloqueia.
+  if (
+    deveLimparContextoEspecialOrfao(
+      projeto.especial as number | null,
+      projeto.contexto_especial as string | null,
+    )
+  ) {
+    try {
+      await updateProjeto(projeto_id, { contexto_especial: null });
+      (projeto as { contexto_especial?: string | null }).contexto_especial = null;
+      log(
+        "submeterParaValidacao",
+        `Projeto ${projeto_id}: contexto especial órfão limpo (projeto não é mais especial).`,
+      );
+    } catch (limpezaErr) {
+      err("submeterParaValidacao", "Falha ao limpar contexto especial órfão (não bloqueante):", limpezaErr);
+    }
   }
 
   // ── Sync Google (planilha + Drive + chat) — fire-and-forget ──

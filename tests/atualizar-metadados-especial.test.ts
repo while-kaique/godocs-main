@@ -13,7 +13,11 @@ import {
   getProjetoById,
   getDocumentacao,
 } from '@/integrations/db/client.server';
-import { atualizarMetadados, atualizarTipos } from '@/lib/chat.functions';
+import {
+  atualizarMetadados,
+  atualizarTipos,
+  deveLimparContextoEspecialOrfao,
+} from '@/lib/chat.functions';
 
 function asyncAdapter(db: BetterSqlite3.Database): GoDeployDB {
   return {
@@ -132,5 +136,48 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
     expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
     // reset:false = caminho normal (sem reconstrução da doc especial / sem return especial).
     expect((res as { reset: boolean }).reset).toBe(false);
+  });
+  // Regressão (casos "Farol de Ciência do Código de Conduta" e "GoStream - Checklist
+  // Proposta", ago/2026): na ORDEM REAL do formulário (submeter.tsx) o `atualizarTipos`
+  // roda ANTES do `atualizarMetadados`. O primeiro zerava a flag; quando o segundo
+  // chegava, o guard exigia `especial === 1` no banco, não disparava — e o passo de
+  // persistência REGRAVAVA o `contexto_especial` que o form ainda carregava. Resultado:
+  // flag zerada, texto órfão no SQLite e na coluna "Contexto do Projeto Especial".
+  it('ordem real do form (tipos → metadados) não deixa contexto especial órfão', async () => {
+    const projeto = await insertProjeto({
+      responsavel_nome: 'Izadora',
+      responsavel_email: 'izadora.gomes@gocase.com',
+      ferramenta: 'Outros: Antigravity',
+      nome: 'Farol de Ciência do Código de Conduta',
+      membros: [],
+      status: 'rascunho',
+      especial: true,
+      contexto_especial: 'O valor central do Farol é consolidar a cultura de integridade.',
+    });
+
+    // 1º: a troca de tipo (já zera especial + contexto).
+    await atualizarTipos({ projeto_id: projeto.id, tipos_projeto: ['saving'] });
+    // 2º: os metadados, ainda carregando o contexto especial no payload do form.
+    await atualizarMetadados({
+      projeto_id: projeto.id,
+      nome_projeto: 'Farol de Ciência do Código de Conduta',
+      contexto_especial: 'O valor central do Farol é consolidar a cultura de integridade.',
+      especial: false,
+    });
+
+    const depois = await getProjetoById(projeto.id);
+    expect(depois?.especial).toBe(0);
+    expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
+  });
+
+  // Rede final do submit: independe da ordem em que o formulário chamou as rotas.
+  it('deveLimparContextoEspecialOrfao: só limpa texto real de projeto não-especial', () => {
+    expect(deveLimparContextoEspecialOrfao(0, 'texto que sobrou')).toBe(true);
+    expect(deveLimparContextoEspecialOrfao(null, 'texto que sobrou')).toBe(true);
+    // Projeto especial de verdade: o contexto é legítimo, não se toca.
+    expect(deveLimparContextoEspecialOrfao(1, 'porque é especial')).toBe(false);
+    // Nada a limpar (idempotente — não gera UPDATE a cada reenvio).
+    expect(deveLimparContextoEspecialOrfao(0, null)).toBe(false);
+    expect(deveLimparContextoEspecialOrfao(0, '   ')).toBe(false);
   });
 });
