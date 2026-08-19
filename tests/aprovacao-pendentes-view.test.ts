@@ -19,7 +19,7 @@ import {
   FILTROS_PENDENTES_VAZIOS,
   rotuloAutor,
 } from '@/lib/aprovacao-pendentes-view';
-import type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+import { agruparAdjacentePorAutor, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 
 function projeto(over: Partial<ProjetoDashboardResumo> & { id: string }): ProjetoDashboardResumo {
   return {
@@ -173,5 +173,29 @@ describe('contarFiltrosPendentes', () => {
         soMultiplos: true,
       }),
     ).toBe(5);
+  });
+});
+
+
+describe('agruparAdjacentePorAutor', () => {
+  it('junta o mesmo autor mantendo a ordem de entrada e a ordem dos grupos', () => {
+    // Entrada já ordenada (ex.: por data): alzir espalhado no topo e no fim.
+    const lista = [
+      projeto({ id: 'alzir1', email: 'alzir@go.com' }),
+      projeto({ id: 'bia1', email: 'bia@go.com' }),
+      projeto({ id: 'caio1', email: 'caio@go.com' }),
+      projeto({ id: 'alzir2', email: 'alzir@go.com' }),
+    ];
+    const out = agruparAdjacentePorAutor(lista).map((p) => p.id);
+    // alzir aparece 1º (primeira aparição), com seus 2 juntos; depois bia, depois caio.
+    expect(out).toEqual(['alzir1', 'alzir2', 'bia1', 'caio1']);
+  });
+
+  it('é estável — lista sem repetição não muda', () => {
+    const lista = [
+      projeto({ id: 'a', email: 'a@go.com' }),
+      projeto({ id: 'b', email: 'b@go.com' }),
+    ];
+    expect(agruparAdjacentePorAutor(lista).map((p) => p.id)).toEqual(['a', 'b']);
   });
 });
