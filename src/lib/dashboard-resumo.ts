@@ -279,3 +279,24 @@ export function apenasAutoresComMultiplos(
   for (const p of projetos) conta.set(chaveAutor(p), (conta.get(chaveAutor(p)) ?? 0) + 1);
   return projetos.filter((p) => (conta.get(chaveAutor(p)) ?? 0) >= 2);
 }
+
+/**
+ * Reordena uma lista JÁ ORDENADA para que os projetos do mesmo autor fiquem CONTÍGUOS, sem
+ * bagunçar a ordenação escolhida: os grupos aparecem na ordem em que o primeiro projeto de
+ * cada autor apareceria (respeitando o sort de entrada), e dentro do grupo a ordem de entrada
+ * é preservada. É estável — usado quando o filtro "autores com 2+ projetos" está ligado, para
+ * o autor não sair espalhado no topo e no fim da lista.
+ */
+export function agruparAdjacentePorAutor(
+  ordenados: ProjetoDashboardResumo[],
+): ProjetoDashboardResumo[] {
+  const rank = new Map<string, number>();
+  for (const p of ordenados) {
+    const k = chaveAutor(p);
+    if (!rank.has(k)) rank.set(k, rank.size);
+  }
+  return ordenados
+    .map((p, i) => ({ p, i, r: rank.get(chaveAutor(p)) ?? 0 }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.p);
+}

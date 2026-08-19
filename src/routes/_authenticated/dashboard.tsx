@@ -75,7 +75,7 @@ import {
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 // Do módulo PURO (não do .functions server) para não puxar código de servidor ao bundle.
-import { apenasAutoresComMultiplos } from '@/lib/dashboard-resumo';
+import { apenasAutoresComMultiplos, agruparAdjacentePorAutor } from '@/lib/dashboard-resumo';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   head: () => ({ meta: [{ title: 'Triagem de projetos · GoDocs Admin' }] }),
@@ -223,7 +223,10 @@ function Dashboard() {
     // então quem tem vários respeita status/natureza/área/período/busca já aplicados.
     if (filtros.soMultiplos) buscados = apenasAutoresComMultiplos(buscados);
     const sinal = direcao === 'asc' ? 1 : -1;
-    return [...buscados].sort((a, b) => compararProjetos(a, b, ordem) * sinal);
+    const ordenado = [...buscados].sort((a, b) => compararProjetos(a, b, ordem) * sinal);
+    // Com o toggle ligado, mantém cada autor JUNTO na lista (sem espalhar topo/fim) — os
+    // grupos seguem a ordenação escolhida pela primeira linha de cada autor.
+    return filtros.soMultiplos ? agruparAdjacentePorAutor(ordenado) : ordenado;
   }, [projetos, filtros, buscaAplicada, ordem, direcao]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
