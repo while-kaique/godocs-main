@@ -48,6 +48,7 @@ import {
   definirDonoDeArea,
   importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
+import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
@@ -608,6 +609,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = await readBody(request);
       return json(await importarAvaliacoesEspeciais(body));
+    }
+
+    // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────
+    // Ver src/lib/aprovacao-pendentes.functions.ts: mesmo espelho da triagem, recortado aos
+    // pendentes/pré-aprovados do fluxo normal. Ações e divisão reusam os endpoints já acima
+    // (`/api/admin/dashboard/status` e `/api/admin/especiais/dono`) — aqui só a LEITURA.
+    if (pathname === "/api/admin/aprovacao-pendentes" && method === "GET") {
+      await requireAdmin(request);
+      return json(await listarAprovacaoPendentes());
     }
    if (pathname === "/api/admin/usuarios" && method === "GET") {
       await requireAdmin(request);

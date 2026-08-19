@@ -253,3 +253,29 @@ export function contarPorStatus(projetos: ProjetoDashboardResumo[]): Record<stri
   }
   return out;
 }
+
+// ─── Agrupamento por autor (compartilhado com a aba de aprovação de pendentes) ──
+
+/**
+ * Chave estável do autor: e-mail em minúsculas; sem e-mail, o nome; sem nada, `'sem-autor'`.
+ * É por e-mail para dois homônimos não caírem juntos e a mesma pessoa não se partir por acento.
+ * FONTE ÚNICA — usada pela aba `/aprovacoes-pendentes` e pelo filtro "2+ projetos" do dashboard.
+ */
+export function chaveAutor(p: ProjetoDashboardResumo): string {
+  const email = (p.email ?? '').trim().toLowerCase();
+  if (email) return email;
+  return (p.autor ?? '').trim().toLowerCase() || 'sem-autor';
+}
+
+/**
+ * Mantém só os projetos cujo AUTOR tem 2+ na lista dada. A contagem é sobre o conjunto que
+ * chega (já filtrado pelas outras dimensões), então "quem tem vários" respeita os demais
+ * filtros — o toggle revela quem tem mais de um projeto para validar tudo de uma vez.
+ */
+export function apenasAutoresComMultiplos(
+  projetos: ProjetoDashboardResumo[],
+): ProjetoDashboardResumo[] {
+  const conta = new Map<string, number>();
+  for (const p of projetos) conta.set(chaveAutor(p), (conta.get(chaveAutor(p)) ?? 0) + 1);
+  return projetos.filter((p) => (conta.get(chaveAutor(p)) ?? 0) >= 2);
+}

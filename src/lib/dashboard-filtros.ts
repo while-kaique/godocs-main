@@ -61,6 +61,13 @@ export type FiltrosDashboard = {
    */
   estrelasMin: number | null;
   estrelasMax: number | null;
+  /**
+   * Só projetos de autores com 2+ na visão atual — revela quem tem mais de um projeto para
+   * validar tudo de uma vez. ⚠️ É um filtro de CONJUNTO (conta autores sobre o resultado dos
+   * outros filtros), não um predicado por linha; por isso ele é aplicado por ÚLTIMO na tela
+   * (`apenasAutoresComMultiplos`), fora de `aplicarFiltros`. Some (AND) com os demais.
+   */
+  soMultiplos: boolean;
 };
 
 export const FILTROS_VAZIOS: FiltrosDashboard = {
@@ -72,6 +79,7 @@ export const FILTROS_VAZIOS: FiltrosDashboard = {
   periodo: null,
   estrelasMin: null,
   estrelasMax: null,
+  soMultiplos: false,
 };
 
 /** Um valor só conta como ganho quando é positivo (célula vazia e 0 não entram na fila). */
@@ -235,7 +243,8 @@ export function contarFiltrosAtivos(f: FiltrosDashboard): number {
     (f.parecer !== TODOS_OS_PARECERES ? 1 : 0) +
     (f.periodo ? 1 : 0) +
     // A faixa de estrelas é UMA dimensão, mesmo com as duas pontas preenchidas.
-    (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0)
+    (f.estrelasMin != null || f.estrelasMax != null ? 1 : 0) +
+    (f.soMultiplos ? 1 : 0)
   );
 }
 

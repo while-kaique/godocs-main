@@ -1516,3 +1516,22 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 **Fora de escopo por ora (peça seguinte).** O agente que pré-classifica o especial submetido comparando-o com o topo da base (PIAPP e as âncoras de 5, 6 e 7) e já propõe a caixa. Ele depende desta tela existir: as âncoras + as frases da régua são o material de comparação dele. Ver `docs/NEXT-SESSION.md`.
 
 **Peça 1 (rubrica de eixos) NÃO foi implementada** — decisão do Luis de 18/08/2026 foi trabalhar em volta das peças 2 e 3 (âncora + view). A pergunta que a rubrica dependia ("a estrela mede impacto para a empresa ou mérito do projeto?") segue em aberto.
+
+---
+
+## Aba TEMPORÁRIA — Aprovação de pendentes por autor (`/aprovacoes-pendentes`) + filtro "2+ projetos" no /dashboard (19/08/2026)
+
+**Pedido do Luis.** Uma aba admin temporária, cópia da `/especiais` mas **sem estrelas e sem agente**, para o time de RPA aprovar os projetos **pendentes e pré-aprovados** do fluxo normal — organizados numa **coluna por AUTOR** (para achar quem submeteu vários e validar tudo de uma vez), com divisão por área entre os admins (para editar).
+
+**Decisões (via pergunta ao Luis):**
+- **Colunas por AUTOR**, ordenadas por quem tem mais projetos (empate: nome). Chave por e-mail (`chaveAutor`), para homônimos não se juntarem e a mesma pessoa não se partir por acento/caixa.
+- **Escopo** (`ehDaFilaRpa`): só `!especial && !descontinuado && statusChave ∈ {'', 'pendente'}`. Fora: especial (aba própria), descontinuado, reenvio e já decididos (a bola não está com o RPA).
+- **Filtro** = toggle **"Só quem tem 2+ projetos"** (`apenasAutoresComMultiplos`): conta autores sobre o conjunto JÁ filtrado, soma (AND) com os demais (busca, validador, situação, período).
+
+**O mesmo filtro foi ao `/dashboard`** (pedido seguinte): toggle "Autores com 2+ projetos" (`filtros.soMultiplos`), aplicado por ÚLTIMO em `filtrados` (é filtro de CONJUNTO, não predicado por linha — não entra em `aplicarFiltros`, e as contagens das pílulas não o refletem de propósito).
+
+**Reuso / fonte única:** `chaveAutor` e `apenasAutoresComMultiplos` moram em `src/lib/dashboard-resumo.ts` (módulo PURO), consumidos pelas duas telas. A régua de fila/espera/divisão-por-área vem de `especiais-view.ts`. As ações de triagem reusam `especiais-acoes` + `POST /api/admin/dashboard/status`; a ficha reusa `ProjetoDetalheDialog`; a divisão reusa `POST /api/admin/especiais/dono`. Único endpoint novo: `GET /api/admin/aprovacao-pendentes` (`listarAprovacaoPendentes`, lê o espelho).
+
+**Arquivos:** `src/lib/aprovacao-pendentes-view.ts` (puro), `src/lib/aprovacao-pendentes.functions.ts` (servidor), `src/routes/_authenticated/aprovacoes-pendentes.tsx`, nav em `route.tsx` (selo "Temporária"), rota no `worker.ts`. Testes: `tests/aprovacao-pendentes-view.test.ts`.
+
+**Decisão em aberto:** o escopo inclui todos os `pendente` não-especiais (situação — fila do RPA / aguardando líder / aguardando autor — vira etiqueta + filtro). Se o Luis quiser só o que já é do RPA, é 1 linha em `ehDaFilaRpa`.
