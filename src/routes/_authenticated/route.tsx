@@ -13,6 +13,7 @@ import {
   Loader2,
   Mail,
   Star,
+  ClipboardList,
 } from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
@@ -179,6 +180,12 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/especiais" icon={<Star className="h-4 w-4" />}>
             Especiais
+          </NavItem>
+          <NavItem
+            to="/aprovacoes-pendentes"
+            icon={<ClipboardList className="h-4 w-4" />}
+          >
+            Aprovação de pendentes
           </NavItem>
           <NavItem to="/areas" icon={<Building2 className="h-4 w-4" />}>
             Áreas

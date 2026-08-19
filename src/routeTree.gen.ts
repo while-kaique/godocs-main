@@ -25,6 +25,7 @@ import { Route as AuthenticatedEspeciaisRouteImport } from './routes/_authentica
 import { Route as AuthenticatedEmailLegadosRouteImport } from './routes/_authenticated/email-legados'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAreasRouteImport } from './routes/_authenticated/areas'
+import { Route as AuthenticatedAprovacoesPendentesRouteImport } from './routes/_authenticated/aprovacoes-pendentes'
 import { Route as AuthenticatedTestesRouteRouteImport } from './routes/_authenticated/testes/route'
 import { Route as FaqCategoriaIndexRouteImport } from './routes/faq.$categoria.index'
 import { Route as AuthenticatedTestesIndexRouteImport } from './routes/_authenticated/testes/index'
@@ -113,6 +114,12 @@ const AuthenticatedAreasRoute = AuthenticatedAreasRouteImport.update({
   path: '/areas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAprovacoesPendentesRoute =
+  AuthenticatedAprovacoesPendentesRouteImport.update({
+    id: '/aprovacoes-pendentes',
+    path: '/aprovacoes-pendentes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTestesRouteRoute =
   AuthenticatedTestesRouteRouteImport.update({
     id: '/testes',
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/testes': typeof AuthenticatedTestesRouteRouteWithChildren
+  '/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/email-legados': typeof AuthenticatedEmailLegadosRoute
@@ -177,6 +185,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
+  '/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/areas': typeof AuthenticatedAreasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/email-legados': typeof AuthenticatedEmailLegadosRoute
@@ -202,6 +211,7 @@ export interface FileRoutesById {
   '/meus-projetos': typeof MeusProjetosRoute
   '/submeter': typeof SubmeterRoute
   '/_authenticated/testes': typeof AuthenticatedTestesRouteRouteWithChildren
+  '/_authenticated/aprovacoes-pendentes': typeof AuthenticatedAprovacoesPendentesRoute
   '/_authenticated/areas': typeof AuthenticatedAreasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/email-legados': typeof AuthenticatedEmailLegadosRoute
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/meus-projetos'
     | '/submeter'
     | '/testes'
+    | '/aprovacoes-pendentes'
     | '/areas'
     | '/dashboard'
     | '/email-legados'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/meus-projetos'
     | '/submeter'
+    | '/aprovacoes-pendentes'
     | '/areas'
     | '/dashboard'
     | '/email-legados'
@@ -272,6 +284,7 @@ export interface FileRouteTypes {
     | '/meus-projetos'
     | '/submeter'
     | '/_authenticated/testes'
+    | '/_authenticated/aprovacoes-pendentes'
     | '/_authenticated/areas'
     | '/_authenticated/dashboard'
     | '/_authenticated/email-legados'
@@ -414,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAreasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/aprovacoes-pendentes': {
+      id: '/_authenticated/aprovacoes-pendentes'
+      path: '/aprovacoes-pendentes'
+      fullPath: '/aprovacoes-pendentes'
+      preLoaderRoute: typeof AuthenticatedAprovacoesPendentesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/testes': {
       id: '/_authenticated/testes'
       path: '/testes'
@@ -479,6 +499,7 @@ const AuthenticatedTestesRouteRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedTestesRouteRoute: typeof AuthenticatedTestesRouteRouteWithChildren
+  AuthenticatedAprovacoesPendentesRoute: typeof AuthenticatedAprovacoesPendentesRoute
   AuthenticatedAreasRoute: typeof AuthenticatedAreasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEmailLegadosRoute: typeof AuthenticatedEmailLegadosRoute
@@ -489,6 +510,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTestesRouteRoute: AuthenticatedTestesRouteRouteWithChildren,
+  AuthenticatedAprovacoesPendentesRoute: AuthenticatedAprovacoesPendentesRoute,
   AuthenticatedAreasRoute: AuthenticatedAreasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEmailLegadosRoute: AuthenticatedEmailLegadosRoute,
