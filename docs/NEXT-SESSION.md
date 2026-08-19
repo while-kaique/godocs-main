@@ -4,10 +4,80 @@
 > Este doc é o **ponteiro enxuto** (ADR-026/034): o plano detalhado mora em `docs/plans/<slug>.md`; o índice
 > em `docs/plans/INDEX.md`. Ver também `ROADMAP.md`, `SPEC.md`, `CLAUDE.md` e `spec-docs/`.
 
-## Plano ativo
-**Nenhum plano ativo** — a sessão de 17/08 (noite) também foi código direto, a partir de um pedido de escopo
-fechado do Luis. Próximo é **o Luis validar as estrelas em prod** e, com o OK, **mergear o PR #263**
-(`/ggsd:ship` só se sobrar algo além do merge). Frente nova → `/ggsd:plan`.
+## Plano ativo — AGENTE CLASSIFICADOR DE ESPECIAIS (peça 4)
+
+**Estado (18/08, fim do dia) — EM PRODUÇÃO (`/especiais`):** régua 0–10 como FONTE ÚNICA
+(`especiais-regua.ts`, da rubrica do JV) com definição da faixa + raridade no cabeçalho da coluna ·
+as 99 recomendações da força-tarefa por SEED idempotente (`especiais-seed.ts`, curva 0:8 1:43 2:40
+3:6 4:2 travada em teste) mostradas no cartão com confiança, leitura e "Aplicar" · ±1 estrela
+gravando na planilha · as 3 decisões no cartão (Aprovar/Pedir reenvio/Reprovar, motivo obrigatório
+nas negativas, ação redundante escondida) pela MESMA rota do `/dashboard` · duplo clique abre o
+`ProjetoDetalheDialog` · divisão da validação por ÁREA (tabela interna `especial_area_dono`) com
+carga por pessoa · descontinuados fora · chip de espera 60d/30d só em quem aguarda decisão ·
+filtros de busca, status, validador, período e só-divergentes · 7+5 cartões por coluna.
+1582 testes verdes.
+
+⚠️ Saíram por decisão: a prateleira "Régua deste nível" (o agente ocupou o lugar), o filtro de
+**pré-status** e o de **fila** (especial não passa por líder — D27 —, então os dois listavam
+distinções que não existem nesta tela). `filaDe` continua no módulo, testada.
+
+⚠️ A staging e a prod rodam o branch `deploy/staging-especiais` = feature + `origin/worktree-feat+investigador-aba-pre-aprovacao`
+(branch não-mergeada de outra pessoa, que JÁ ESTAVA em prod) — refazer esse merge a cada deploy
+enquanto ela não entrar no `main`.
+
+## O QUE FALTA — fazer TUDO JUNTO na próxima sessão (decisão do Luis, 18/08)
+
+1. **O AGENTE classificador** (o grande item) — ver o prompt abaixo.
+2. **Ordenar as colunas por TEMPO DE ESPERA** (hoje é data desc, mais recente primeiro; no painel
+   do JV quem espera há mais tempo vem primeiro). É defeito, não escolha — o chip de espera já
+   está na tela.
+3. **Contador de progresso por pessoa** ("18 de 25 decididos") — hoje só a carga.
+4. **Filtro de dono com default no usuário logado** (hoje abre em "todos").
+5. **Escopo da tela — DECISÃO PENDENTE do Luis:** a `/especiais` cobre só os especiais (28 dos 99
+   do snapshot do JV). Os outros 71 (fila do RPA com líder pré-aprovado, aguardando líder, reenvios
+   não-especiais) não têm espera nem divisão por pessoa em lugar nenhum. Ou (a) estender esta tela
+   para todos os projetos, virando o painel do JV dentro do GoDocs — e aí os filtros de fila e
+   pré-status VOLTAM a fazer sentido —, ou (b) manter `/especiais` focada e levar espera+divisão
+   para o `/dashboard`.
+6. `fatores` e `alerta` do contrato de dados dele — só passam a importar com o agente, que é quem
+   os produz.
+
+### O prompt da próxima sessão
+
+> Implementar o **agente classificador de projetos especiais** (proxy, modelo **gpt-5.6-sol** no `LLM_MODEL`). Ele roda quando um projeto
+> **especial** é submetido e, ANTES da triagem humana, propõe em que caixa (nível de estrelas)
+> o projeto cai, **comparando-o com as ÂNCORAS da base** (PIAPP e as demais referências de 5, 6
+> e 7 estrelas) — as âncoras e as frases da régua já existem em `especial_referencia`, escritas
+> pela triagem na `/especiais`.
+
+**Contexto que a próxima sessão precisa ter em mãos:**
+- A régua desta feature é **ÂNCORA, não rubrica absoluta** (ver `SPEC_FEATURES_NOVAS.md`,
+  "Comparador de projetos ESPECIAIS por ÂNCORA"): gente é ruim em nota absoluta e boa em
+  comparação. O agente tem de herdar isso — a saída dele é *"fica entre a âncora de 2 e a de 3,
+  mais perto da de 2, porque X"*, não uma nota tirada do nada.
+- **O agente NUNCA grava a nota.** Ele PROPÕE, com justificativa e citando as âncoras que usou;
+  quem decide é a triagem, na `/especiais`. Este repo já queimou 3× com "prompt não segura"
+  (Gostream, ganho projetado, SmartOnline) — o determinístico é o agrupamento, não o juízo.
+- Os 3 papéis desenhados no brainstorm de 18/08, em ordem de valor: **(a)** ficha comparável de
+  ~5 linhas (o que faz · quem usa · o que quebra se sumir · abrangência · o ponteiro) — é o que
+  torna a coluna escaneável e é pré-requisito dos outros dois; **(b)** vizinhos mais próximos com
+  a diferença NOMEADA; **(c)** advogado do diabo ("por que este NÃO é N estrelas").
+- Material de entrada disponível: `Descrição`, `Contexto do Projeto Especial`, a documentação
+  compilada, `Área`, `Ferramenta` e as âncoras + frases da régua.
+- ⚠️ Especial **pula o analisador** hoje (`analisarProjetoFn`) — decidir se este agente entra
+  naquele caminho ou num próprio, e lembrar do D27 (especial não abre fila de líder).
+- ⚠️ **Decisão do Luis ainda em aberto** (peça 1 do brainstorm, não bloqueia a view mas
+  reaparece aqui): a estrela mede **impacto para a empresa** ou **mérito do projeto**? Foi a
+  ambiguidade exata do GoBrands (grande para Dados, pequeno em termos gerais).
+
+### Antes disso, o operacional da view
+1. `npm run test && npm run build && npm run build:worker` no worktree.
+2. Deploy **STAGING** (`edf400b4`) — `scripts/deploy-godeploy.sh` + `updateApp`. ⚠️ `git fetch` +
+   `getApp` ANTES de empacotar (o `updateApp` substitui a app INTEIRA e o Kaique sobe em paralelo).
+3. Validar `/especiais` no navegador: colunas, prateleira da régua, fixar/tirar régua, ±1 estrela
+   gravando na planilha, modo comparar trazendo a âncora junto.
+4. Prod (`674a3710`) → PR.
+
 
 ### 🆕 17/08 (noite) — estrelas SEM teto + filtro por faixa + ficha instantânea depois da busca (PR #263, **JÁ EM PROD**)
 

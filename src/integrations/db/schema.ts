@@ -378,6 +378,54 @@ const SCHEMA_SQL = `
   -- /glossario/especiais convivem.
   CREATE UNIQUE INDEX IF NOT EXISTS idx_faq_itens_slug ON faq_itens(categoria_id, slug);
   CREATE INDEX IF NOT EXISTS idx_faq_itens_categoria ON faq_itens(categoria_id);
+
+  -- Âncoras da régua dos projetos ESPECIAIS (comparador em /especiais). Cada linha diz
+  -- "este projeto REAL é o que define o nível N", com a frase da régua.
+  -- ⚠️ Tabela INTERNA: nenhuma coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync reverso
+  -- jamais a toca. A NOTA continua morando na planilha (coluna manual "Estrelas") -- aqui só
+  -- fica o papel de referência, que é decisão da triagem sobre a régua, não dado do projeto.
+  -- ⚠️ Um nível pode ter MAIS DE UMA âncora (o topo da base é PIAPP e companhia), por isso a
+  -- chave é o projeto e não a nota.
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  CREATE TABLE IF NOT EXISTS especial_referencia (
+    projeto_id   TEXT PRIMARY KEY,
+    nota         INTEGER NOT NULL,
+    motivo       TEXT,
+    definido_por TEXT,
+    definido_em  TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_especial_referencia_nota ON especial_referencia(nota);
+
+  -- Recomendação de estrelas por projeto (auditoria): o lote importado da força-tarefa e, na
+  -- fase seguinte, a saída do agente classificador.
+  -- ⚠️ Tabela INTERNA e ela NUNCA vira a nota: a coluna "Estrelas" da planilha só muda por
+  -- clique de gente. Aqui fica a SUGESTÃO + a leitura que a justifica.
+  -- ⚠️ A coluna modelo existe porque o llm.ts troca de modelo sozinho no fallback -- sem gravar qual
+  -- produziu a nota, "de quem é esta recomendação" vira pergunta sem resposta.
+  -- ⚠️ NUNCA use ponto-e-vírgula nos comentários deste arquivo (ver o aviso do FAQ acima).
+  -- Divisão da validação: qual admin cuida de cada ÁREA (a força-tarefa do JV, mas definida
+  -- à mão em vez de derivada por algoritmo -- quem valida o quê é decisão de quem coordena).
+  -- ⚠️ Tabela INTERNA: sem coluna no Sheets, fora de SAFE_UPDATE_FIELDS, o sync não a toca.
+  -- ⚠️ A chave é a ÁREA, não o projeto: contexto não se parte, e projeto novo da área já
+  -- nasce com dono sem ninguém ter de redistribuir nada.
+  CREATE TABLE IF NOT EXISTS especial_area_dono (
+    area         TEXT PRIMARY KEY,
+    dono_email   TEXT NOT NULL,
+    dono_nome    TEXT,
+    definido_por TEXT,
+    definido_em  TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS especial_avaliacao (
+    projeto_id            TEXT PRIMARY KEY,
+    estrelas_recomendada  REAL NOT NULL,
+    confianca             TEXT,
+    leitura               TEXT,
+    contestada            INTEGER NOT NULL DEFAULT 0,
+    origem                TEXT,
+    modelo                TEXT,
+    criado_em             TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
@@ -597,7 +645,6 @@ const SEED_ADMINS = [
   'joao.gabriel@gocase.com',
   'joaovictor.esteves@gocase.com',
   'kaique.breno@gocase.com',
-  'luciano.cavalcante@gocase.com',
   'luis.albuquerque@gocase.com',
 ];
 

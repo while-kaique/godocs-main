@@ -118,7 +118,8 @@ por fila, sem ver a linha inteira de um projeto num lugar organizado.
 | Busca | Instantânea (debounce 120 ms), tokens em AND, ignora acento/caixa. Atalho `/` foca; `Esc` limpa. |
 | Ordenação | Projeto · Autor · Ganho total · Enviado (clique no cabeçalho alterna a direção; `aria-sort`). |
 | Paginação | 25/50/100 por página, janela com elipses, contador "N–M de T". |
-| Detalhe | Overlay (`Dialog`) com a **linha inteira** agrupada: Descrição → Identificação → Saving e horas → Custos e receita → Análise → Memoriais (`<details>`) → **Outras colunas** → Histórico de triagem. |
+| Detalhe | Overlay (`Dialog`) com a **linha inteira** agrupada: Descrição → **Quem sentiria falta** → Identificação → Saving e horas → Custos e receita → Análise → Memoriais (`<details>`) → **Outras colunas** → Histórico de triagem. |
+| Quem sentiria falta | Seção que mostra o **contrafactual da Etapa 2** (`contrafactual_afetados` — pessoas OU times que o autor apontou). ⚠️ Esse campo **nunca virou coluna do Sheets**: vive só no SQLite, então a ficha o busca à parte, por PK (`getContrafactualAfetados`), fora do espelho. Ausente/erro → seção não aparece; não derruba a ficha. |
 | Decisão | No topo do overlay: `select` de status + campo de motivo → "Salvar na planilha". Botão desabilitado quando nada mudou. |
 
 **Régua de triagem (elemento de identidade):** cada linha tem 3 px de borda esquerda na cor do status, e
@@ -131,7 +132,9 @@ cor**: rótulo + ícone sempre presentes (`StatusBadge`).
 |---|---|
 | `src/lib/dashboard-admin.functions.ts` | **novo** — cache single-flight **+ stale-while-revalidate** (D9), `mapResumo`, `listarProjetosDashboard`, `getProjetoDashboard`, `definirStatusProjeto`, `STATUS_GRAVAVEIS`, parsers puros. |
 | `src/routes/_authenticated/dashboard.tsx` | **reescrito** — tabela densa, pílulas, busca, ordenação, paginação. |
-| `src/components/dashboard/projeto-detalhe-dialog.tsx` | **novo** — overlay da ficha + decisão de status. Grupos de colunas por NOME; coluna desconhecida cai em "Outras colunas". |
+| `src/components/dashboard/projeto-detalhe-dialog.tsx` | **novo** — overlay da ficha + decisão de status. Grupos de colunas por NOME; coluna desconhecida cai em "Outras colunas". +seção "Quem sentiria falta se a automação parasse" (contrafactual do SQLite). |
+| `src/integrations/db/client.server.ts` | +`getContrafactualAfetados(id)` — leitura por PK de `projetos.contrafactual_afetados` (o campo não está na planilha/espelho). |
+| `src/lib/dashboard-admin.functions.ts` | `getProjetoDashboard` faz 3 leituras em `Promise.all` (espelho + histórico + contrafactual); decodifica com `desserializarAfetados`; payload ganha o campo `contrafactual`. |
 | `src/components/dashboard/status-triagem.ts` | **novo** — vocabulário (rótulo/cor/ícone/ordem) e agregação de rótulos legados. |
 | `src/components/dashboard/tabela-utils.ts` | **novo** — busca/ordenação/janela de páginas puras (testáveis sem React). |
 | `src/components/status-badge.tsx` | +`reprovado` (vermelho + `XCircle`) e +`em validação`. Chaves existentes intactas. |

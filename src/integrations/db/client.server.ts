@@ -1682,6 +1682,38 @@ export function getAdminStatusLogs(projetoId: string, limit = 20) {
   );
 }
 
+// Contrafactual da Etapa 2 ("quem sentiria falta se a automação parasse") — vive SÓ no
+// SQLite (`projetos.contrafactual_afetados`), nunca virou coluna do Sheets. A ficha de
+// triagem do /dashboard lê a linha da planilha (espelho), então este campo precisa ser
+// buscado à parte, por PK. Serializado como "pessoa:a@x;b@y" | "time:Fiscal;CX".
+export function getContrafactualAfetados(projetoId: string) {
+  return queryOne<Pick<ProjetoRow, "contrafactual_afetados">>(
+    "SELECT contrafactual_afetados FROM projetos WHERE LOWER(id) = LOWER(?)",
+    [projetoId],
+  );
+}
+
+// Versão em LOTE do anterior — uma consulta por `IN` para o loader de fichas do dashboard
+// (`getProjetosDashboardLote`), no mesmo espírito de `getAdminStatusLogsPorIds`: round-trip
+// por projeto dentro de um laço é o erro que já derrubou o Investigador. Devolve o valor CRU
+// serializado ("pessoa:…"/"time:…") por id (minúsculo); a decodificação fica na camada de cima.
+export async function getContrafactualAfetadosPorIds(
+  projetoIds: string[],
+): Promise<Map<string, string | null>> {
+  const ids = [...new Set(projetoIds.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, string | null>();
+  if (ids.length === 0) return out;
+  const placeholders = ids.map(() => "?").join(", ");
+  const linhas = await queryAll<Pick<ProjetoRow, "id" | "contrafactual_afetados">>(
+    `SELECT id, contrafactual_afetados FROM projetos WHERE LOWER(id) IN (${placeholders})`,
+    ids,
+  );
+  for (const l of linhas) {
+    out.set(String(l.id ?? "").toLowerCase(), l.contrafactual_afetados ?? null);
+  }
+  return out;
+}
+
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
 // Escopado por SEGMENTO quando `audiencia` é informada — o selo de "reenvio" não deve
 // considerar um envio de "legado" para a mesma pessoa (são campanhas distintas). Sem
@@ -2348,3 +2380,143 @@ export type ApiLogRow = {
   response_body: string | null;
   created_at: string | null;
 };
+
+// ─── Âncoras da régua dos projetos ESPECIAIS (comparador em /especiais) ──────
+// Tabela INTERNA (ver o comentário do CREATE TABLE): a NOTA vive na planilha, aqui fica só
+// o papel de referência de um nível + a frase da régua.
+
+export type EspecialReferenciaRow = {
+  projeto_id: string;
+  nota: number;
+  motivo: string | null;
+  definido_por: string | null;
+  definido_em: string | null;
+};
+
+export async function getReferenciasEspeciais(): Promise<EspecialReferenciaRow[]> {
+  return queryAll<EspecialReferenciaRow>(
+    'SELECT projeto_id, nota, motivo, definido_por, definido_em FROM especial_referencia ORDER BY nota ASC',
+    [],
+  );
+}
+
+/**
+ * Marca (ou remarca) um projeto como âncora do seu nível. É UPSERT porque reescrever a frase
+ * da régua é o gesto comum — a triagem calibra o texto com o tempo, e um INSERT que falhasse
+ * na 2ª vez obrigaria a desmarcar antes de reescrever.
+ */
+export async function upsertReferenciaEspecial(dados: {
+  projeto_id: string;
+  nota: number;
+  motivo: string | null;
+  definido_por: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_referencia (projeto_id, nota, motivo, definido_por, definido_em)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       nota = excluded.nota,
+       motivo = excluded.motivo,
+       definido_por = excluded.definido_por,
+       definido_em = excluded.definido_em`,
+    [dados.projeto_id, dados.nota, dados.motivo, dados.definido_por],
+  );
+}
+
+export async function deleteReferenciaEspecial(projetoId: string): Promise<void> {
+  await exec('DELETE FROM especial_referencia WHERE projeto_id = ?', [projetoId]);
+}
+
+// ─── Recomendações de estrelas (auditoria / agente classificador) ────────────
+// Tabela INTERNA: a sugestão vive aqui, a NOTA vive na planilha. Ver o CREATE TABLE.
+
+export type EspecialAvaliacaoRow = {
+  projeto_id: string;
+  estrelas_recomendada: number;
+  confianca: string | null;
+  leitura: string | null;
+  contestada: number;
+  origem: string | null;
+  modelo: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesEspeciais(): Promise<EspecialAvaliacaoRow[]> {
+  return queryAll<EspecialAvaliacaoRow>('SELECT * FROM especial_avaliacao', []);
+}
+
+/**
+ * Grava (ou substitui) a recomendação de um projeto. UPSERT porque reavaliar é o caso normal:
+ * o agente roda de novo a cada reenvio, e uma recomendação nova sobre a mesma linha vale mais
+ * que a anterior. O histórico não é objetivo desta tabela — quem guarda decisão é a planilha.
+ */
+export async function upsertAvaliacaoEspecial(dados: {
+  projeto_id: string;
+  estrelas_recomendada: number;
+  confianca: string | null;
+  leitura: string | null;
+  contestada: boolean;
+  origem: string | null;
+  modelo: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_avaliacao
+       (projeto_id, estrelas_recomendada, confianca, leitura, contestada, origem, modelo, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       estrelas_recomendada = excluded.estrelas_recomendada,
+       confianca = excluded.confianca,
+       leitura = excluded.leitura,
+       contestada = excluded.contestada,
+       origem = excluded.origem,
+       modelo = excluded.modelo,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.estrelas_recomendada,
+      dados.confianca,
+      dados.leitura,
+      dados.contestada ? 1 : 0,
+      dados.origem,
+      dados.modelo,
+    ],
+  );
+}
+
+// ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────
+
+export type EspecialAreaDonoRow = {
+  area: string;
+  dono_email: string;
+  dono_nome: string | null;
+  definido_por: string | null;
+  definido_em: string | null;
+};
+
+export async function getDonosDeArea(): Promise<EspecialAreaDonoRow[]> {
+  return queryAll<EspecialAreaDonoRow>('SELECT * FROM especial_area_dono ORDER BY area', []);
+}
+
+/** Define (ou troca) o dono de uma área. UPSERT: redistribuir é o gesto normal. */
+export async function upsertDonoDeArea(dados: {
+  area: string;
+  dono_email: string;
+  dono_nome: string | null;
+  definido_por: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_area_dono (area, dono_email, dono_nome, definido_por, definido_em)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(area) DO UPDATE SET
+       dono_email = excluded.dono_email,
+       dono_nome = excluded.dono_nome,
+       definido_por = excluded.definido_por,
+       definido_em = excluded.definido_em`,
+    [dados.area, dados.dono_email, dados.dono_nome, dados.definido_por],
+  );
+}
+
+/** Tira o dono de uma área (volta para "sem dono"). */
+export async function deleteDonoDeArea(area: string): Promise<void> {
+  await exec('DELETE FROM especial_area_dono WHERE area = ?', [area]);
+}

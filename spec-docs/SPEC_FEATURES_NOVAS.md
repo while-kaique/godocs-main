@@ -1490,3 +1490,29 @@ parecer, Etapa 2 sem `type="date"`, piso de acessibilidade).
 mesmo número de antes — a régua de performance é a CONTAGEM de requisições). **`worker.js`
 não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 13 — staging
 `edf400b4` antes de prod).
+
+## Feature adicional — Comparador de projetos ESPECIAIS por ÂNCORA (`/especiais`, 18/08/2026)
+
+**Origem.** Discussão GoBrands × PIAPP: o GoBrands saiu de 8 estrelas para "será que vale alguma?" numa conversa só. A causa não é julgamento ruim — é a escala não existir. A coluna manual "Estrelas" é um número sem denominador: (1) 1/2/3 não têm definição escrita; (2) só o número é gravado, nenhuma justificativa, então nenhuma nota vira referência depois; (3) comparar dois especiais exige abrir duas documentações longas.
+
+**Decisão — a régua é ÂNCORA, não rubrica absoluta.** Gente é ruim em nota absoluta e boa em comparação. A tela agrupa os especiais por NÍVEL e fixa no topo de cada coluna o projeto REAL que o define (o "flagship"), com uma frase curta (≤280 chars) escrita pela triagem. A pergunta deixa de ser "quantas estrelas isto vale?" e passa a ser "isto é maior ou menor que o PIAPP?".
+
+**Onde aterrissou.**
+- `src/lib/especiais-view.ts` — módulo PURO: `agruparEspeciais`, `alvosDaComparacao`, `ancoraForaDoNivel`, `rotuloNota`, `NOTAS_BASE`, `MAX_COMPARAR`. Testes: `tests/especiais-view.test.ts` (14 casos).
+- `src/lib/especiais.functions.ts` — servidor: `listarEspeciais` (lê o MESMO espelho da triagem, filtra especial no servidor), `definirEstrelasEspecial`, `definirReferenciaEspecial`, `removerReferenciaEspecial`.
+- Tabela INTERNA `especial_referencia` (`schema.ts` + `client.server.ts`): `projeto_id` (PK), `nota`, `motivo`, `definido_por`, `definido_em`. Sem coluna no Sheets, fora de `SAFE_UPDATE_FIELDS`, o sync reverso não a toca.
+- Rotas `GET /api/admin/especiais` · `POST /api/admin/especiais/estrelas` · `POST /api/admin/especiais/referencia` · `POST /api/admin/especiais/referencia/remover` — todas `requireAdmin`.
+- Tela `src/routes/_authenticated/especiais.tsx` + item "Especiais" na sidebar.
+
+**Decisões fechadas (não "corrigir" por engano).**
+- **A âncora aparece na coluna da NOTA GRAVADA, nunca na `nota` declarada na referência.** Regravar a estrela de um projeto-âncora na ficha do `/dashboard` deixaria o cartão numa coluna e a régua em outra, e a tela afirmaria que o nível 3 é definido por um projeto que está no 2. A divergência vira **aviso no cartão**, não sumiço.
+- **Um nível pode ter MAIS DE UMA âncora** (o topo da base é PIAPP e companhia) — por isso a chave da tabela é o projeto, não a nota. A frase da régua do nível é a da 1ª âncora que tenha texto: âncora sem frase não apaga a que outra escreveu.
+- **`null` (sem nota) ≠ `0`.** São duas colunas: "ninguém olhou" e "olhei e não dei estrela".
+- **Níveis 0–5 aparecem mesmo vazios** (a régua tem de ser visível inteira: "não existe projeto de 4" ≠ "4 não existe"); notas acima ganham coluna quando há projeto ou âncora (escala ABERTA — há 7, 8 e 10 na planilha).
+- **A nota continua morando na planilha.** Esta tela é o 2º lugar do sistema que escreve "Estrelas" e escreve SÓ ela — nada de "Status", nada de "Atualizado Em" (carimbo do sistema que regulariza legado). Escrita numérica sem `ouTraco` (a coluna é somada/ordenada na planilha) + `espelharEscrita` com carimbo.
+- **O modo comparar reusa o LOTE da triagem** (`/api/admin/dashboard/projetos/lote`) — 1 requisição, porque cada uma custa ~750 ms de overhead fixo do edge — e **injeta a âncora do nível de cada selecionado** (`alvosDaComparacao`): sem isso a comparação seria "projeto novo × projeto novo", que é o que não resolve.
+- **Passos de ±1 na nota do cartão** (não a fileira de estrelas inteira): o gesto desta tela é REPOSICIONAR entre níveis; pontuar do zero é da ficha.
+
+**Fora de escopo por ora (peça seguinte).** O agente que pré-classifica o especial submetido comparando-o com o topo da base (PIAPP e as âncoras de 5, 6 e 7) e já propõe a caixa. Ele depende desta tela existir: as âncoras + as frases da régua são o material de comparação dele. Ver `docs/NEXT-SESSION.md`.
+
+**Peça 1 (rubrica de eixos) NÃO foi implementada** — decisão do Luis de 18/08/2026 foi trabalhar em volta das peças 2 e 3 (âncora + view). A pergunta que a rubrica dependia ("a estrela mede impacto para a empresa ou mérito do projeto?") segue em aberto.
