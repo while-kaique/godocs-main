@@ -18,13 +18,21 @@
  * Reusa a régua de fila, espera e divisão-por-área de `especiais-view.ts` (fonte única): o
  * que muda aqui é o EIXO da coluna (autor) e o recorte de escopo, não o vocabulário.
  */
-import type { ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
+import {
+  chaveAutor,
+  apenasAutoresComMultiplos,
+  type ProjetoDashboardResumo,
+} from '@/lib/dashboard-resumo';
 import {
   chaveArea,
   donoDoProjeto,
   ehDescontinuado,
   type DonoDeArea,
 } from '@/lib/especiais-view';
+
+// `chaveAutor`/`apenasAutoresComMultiplos` moram em `dashboard-resumo` (FONTE ÚNICA) porque o
+// filtro "2+ projetos" do /dashboard usa os MESMOS. Reexportados para o call site desta aba.
+export { chaveAutor, apenasAutoresComMultiplos };
 
 // Reexporta o que a tela também consome, para o call site importar de um lugar só.
 export {
@@ -67,18 +75,6 @@ export function apenasFilaRpa(projetos: ProjetoDashboardResumo[]): ProjetoDashbo
 }
 
 // ─── Chave e rótulo do autor ─────────────────────────────────────────────────
-
-/**
- * Chave da coluna do autor: o e-mail (identidade estável) em minúsculas; sem e-mail, o nome;
- * sem nada, `'sem-autor'`. É por e-mail e não por nome porque dois "Ana" diferentes não podem
- * cair na mesma coluna, e a mesma pessoa não pode se dividir em duas por causa de acento.
- */
-export function chaveAutor(p: ProjetoDashboardResumo): string {
-  const email = (p.email ?? '').trim().toLowerCase();
-  if (email) return email;
-  const nome = (p.autor ?? '').trim().toLowerCase();
-  return nome || 'sem-autor';
-}
 
 /** Nome legível do autor (nunca o e-mail cru quando há nome). */
 export function rotuloAutor(p: ProjetoDashboardResumo): string {
@@ -166,20 +162,6 @@ export function contarFiltrosPendentes(f: FiltrosPendentes): number {
     (f.periodo ? 1 : 0) +
     (f.soMultiplos ? 1 : 0)
   );
-}
-
-/**
- * Mantém só os projetos cujo AUTOR tem 2+ na lista dada. É o coração do toggle "só quem tem
- * mais de um projeto": conta por `chaveAutor` sobre o conjunto JÁ filtrado, então "quem tem
- * vários" respeita os outros filtros (uma pessoa com 3 projetos e um só na área filtrada
- * deixa de contar como múltipla ali).
- */
-export function apenasAutoresComMultiplos(
-  projetos: ProjetoDashboardResumo[],
-): ProjetoDashboardResumo[] {
-  const conta = new Map<string, number>();
-  for (const p of projetos) conta.set(chaveAutor(p), (conta.get(chaveAutor(p)) ?? 0) + 1);
-  return projetos.filter((p) => (conta.get(chaveAutor(p)) ?? 0) >= 2);
 }
 
 /** Quais filas aparecem na base, com contagem — alimenta o seletor de situação. */

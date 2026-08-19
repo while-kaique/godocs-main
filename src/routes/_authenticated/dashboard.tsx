@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Sparkles,
   Star,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/status-badge';
@@ -73,6 +74,8 @@ import {
 } from '@/lib/dashboard-detalhe-cache';
 import { fmtDataBR } from '@/lib/format-date';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
+// Do módulo PURO (não do .functions server) para não puxar código de servidor ao bundle.
+import { apenasAutoresComMultiplos } from '@/lib/dashboard-resumo';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   head: () => ({ meta: [{ title: 'Triagem de projetos · GoDocs Admin' }] }),
@@ -215,7 +218,10 @@ function Dashboard() {
   const ativos = contarFiltrosAtivos(filtros);
 
   const filtrados = useMemo(() => {
-    const buscados = filtrarPorTermo(aplicarFiltros(projetos, filtros), buscaAplicada);
+    let buscados = filtrarPorTermo(aplicarFiltros(projetos, filtros), buscaAplicada);
+    // "Só quem tem 2+" roda por ÚLTIMO: conta autores sobre o que os demais filtros deixaram,
+    // então quem tem vários respeita status/natureza/área/período/busca já aplicados.
+    if (filtros.soMultiplos) buscados = apenasAutoresComMultiplos(buscados);
     const sinal = direcao === 'asc' ? 1 : -1;
     return [...buscados].sort((a, b) => compararProjetos(a, b, ordem) * sinal);
   }, [projetos, filtros, buscaAplicada, ordem, direcao]);
@@ -415,6 +421,24 @@ function Dashboard() {
             </option>
           ))}
         </select>
+        {/* Só autores com 2+ projetos na visão atual (pedido do Luis): revela quem tem mais de
+            um projeto para validar tudo de uma vez. Soma (AND) com os demais; estado dito por
+            borda, fundo E aria-pressed, nunca só por cor. */}
+        <button
+          type="button"
+          aria-pressed={filtros.soMultiplos}
+          onClick={() => setFiltros((f) => ({ ...f, soMultiplos: !f.soMultiplos }))}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 motion-reduce:transition-none"
+          style={{
+            background: filtros.soMultiplos ? 'var(--go-blue)' : 'var(--card)',
+            color: filtros.soMultiplos ? '#fff' : 'var(--foreground)',
+            borderColor: filtros.soMultiplos ? 'var(--go-blue)' : 'var(--border)',
+            ['--tw-ring-color' as string]: 'var(--go-blue)',
+          }}
+        >
+          <Users className="h-3.5 w-3.5" aria-hidden />
+          Autores com 2+ projetos
+        </button>
         {/* Pré-aprovação do líder — a mesma coluna "Pré-status" da tabela, agora filtrável
             (pedido do Luis, 17/08). Os rótulos vêm de `ROTULO_ESTADO_PARECER`, a fonte única
             que o chip da linha usa: o filtro e a célula não podem chamar o mesmo estado por
