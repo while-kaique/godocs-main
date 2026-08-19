@@ -6,6 +6,56 @@
 
 ---
 
+## 2026-08-19 — Projeto que deixou de ser especial mantinha o "porquê é especial" na planilha e na tela
+
+**Status:** ✅ corrigido · **Branch:** `fix/contexto-especial-orfao`
+
+**Sintoma.** Projetos convertidos de **especial → saving/receita** aparecem no Sheets com
+`Especial? = "Não"`, `Tipos Projeto = saving` e a coluna **"Contexto do Projeto Especial"
+ainda com o texto inteiro do "porquê este projeto não tem ganho mensurável"** — que
+contradiz o memorial de saving da mesma linha. Dois casos reais confirmados em prod
+(19/08/2026): **"Farol de Ciência do Código de Conduta"** (`29899445b2da…`, Izadora Gomes)
+e **"GoStream - Checklist Proposta"**. O texto também continuava visível em `/projeto/$id`
+(bloco "Contexto (projeto especial)"), ou seja, o resíduo estava no **SQLite**, não só na
+planilha — provado pelo carimbo `Atualizado Em` de 13/08 no Farol: aquela reescrita monta a
+linha INTEIRA a partir do banco, e mesmo assim a célula saiu preenchida.
+
+**Causa-raiz — bug de ORDEM, não de regra faltando.** A limpeza existia em dois pontos e os
+dois eram condicionais:
+
+1. `atualizarTipos` zera `especial` **e** `contexto_especial` — mas só roda quando o form
+   detecta troca de tipos;
+2. `atualizarMetadados` zerava os dois **só quando o banco ainda estava `especial === 1`**.
+
+No fluxo real do formulário (`submeter.tsx`), o `atualizarTipos` é chamado **ANTES** do
+`atualizarMetadados` no mesmo clique. Quando o segundo chega, a flag já é 0 → o guard não
+dispara → e o passo de persistência dele (`campos.contexto_especial = data.contexto_especial`)
+**REGRAVA** o texto que o payload do form ainda carregava. A limpeza acontecia e era desfeita
+uma linha depois. O sync reverso também não conserta: o ramo que limpa o contexto só roda
+quando a planilha e o banco **divergem** na flag — aqui os dois já dizem "não especial".
+
+**Fix (2 camadas).**
+
+- **Causa-raiz:** o guard de `atualizarMetadados` deixou de exigir `especial === 1` no banco —
+  com `especial: false` EXPLÍCITO no request, contexto especial preenchido é sempre resíduo
+  (`temContextoResidual`). Roda DEPOIS da persistência dos campos, então o regravamento não
+  sobrevive.
+- **Rede final, independente de ordem e de qual rota o form chamou:** `submeterParaValidacao`
+  limpa o resíduo antes do sync, no banco **e** no objeto em memória (é ele que o
+  `syncSubmitToGoogle` serializa). Decisor PURO `deveLimparContextoEspecialOrfao(especial,
+  contexto)` — `especial !== 1 && contexto.trim() !== ''`. Idempotente (não gera UPDATE a cada
+  reenvio) e não bloqueia a submissão (try/catch).
+
+**Onde aterrissou.** `src/lib/chat.functions.ts` (guard de `atualizarMetadados`, decisor puro
++ rede em `submeterParaValidacao`); testes em `tests/atualizar-metadados-especial.test.ts`
+(o novo caso reproduz a ORDEM REAL tipos→metadados e falha sem o fix).
+
+⚠️ **Linhas já gravadas não se corrigem sozinhas** — a célula do Sheets só é reescrita na
+próxima IDA (reenvio/resync) do projeto. Os 2 casos acima precisam de correção manual da
+célula (ou de um resync depois deste deploy).
+
+---
+
 ## 2026-08-13 — abrir uma linha do `/dashboard` ainda esperava ~1 s DEPOIS do espelho
 
 **Status:** ✅ corrigido · **Branch:** `feat/espelho-e-perf-navegacao` (mesma do espelho, por
