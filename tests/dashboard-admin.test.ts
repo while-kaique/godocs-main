@@ -22,6 +22,10 @@ const espelhoFakeP = vi.hoisted(
 vi.mock('@/integrations/db/client.server', async () => ({
   insertAdminStatusLog: vi.fn(),
   getAdminStatusLogs: vi.fn(async () => []),
+  getAdminStatusLogsPorIds: vi.fn(async () => new Map()),
+  // Contrafactual mora só no SQLite; por padrão null (a maioria dos casos não o exercita).
+  getContrafactualAfetados: vi.fn(async () => null),
+  getContrafactualAfetadosPorIds: vi.fn(async () => new Map()),
   ...(await espelhoFakeP).api,
   // O `?refresh=1` dispara o sync reverso de verdade; aqui só o espelho interessa, então o
   // lado de `projetos` é stub (quem cobre aquele lado é `tests/sync-reverse.test.ts`).
@@ -44,7 +48,11 @@ vi.mock('@/integrations/db/client.server', async () => ({
 }));
 
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
-import { insertAdminStatusLog } from '@/integrations/db/client.server';
+import {
+  insertAdminStatusLog,
+  getContrafactualAfetados,
+  getContrafactualAfetadosPorIds,
+} from '@/integrations/db/client.server';
 import {
   mapResumo,
   chaveStatus,
@@ -54,6 +62,7 @@ import {
   ordenarPorDataDesc,
   listarProjetosDashboard,
   getProjetoDashboard,
+  getProjetosDashboardLote,
   definirStatusProjeto,
   STATUS_GRAVAVEIS,
   type ProjetoDashboardResumo,
@@ -287,6 +296,49 @@ describe('getProjetoDashboard', () => {
   it('404 quando o ID não está na planilha', async () => {
     await semearEspelho([linha()]);
     await expect(getProjetoDashboard('nao-existe')).rejects.toThrow(/não encontrado/i);
+  });
+
+  it('decodifica o contrafactual do SQLite (quem sentiria falta) no payload', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getContrafactualAfetados).mockResolvedValueOnce({
+      contrafactual_afetados: 'time:Fiscal;CX',
+    } as never);
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.contrafactual).toEqual({ tipo: 'time', lista: ['Fiscal', 'CX'] });
+  });
+
+  it('contrafactual é null quando o autor não respondeu', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getContrafactualAfetados).mockResolvedValueOnce(null as never);
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.contrafactual).toBeNull();
+  });
+
+  it('contrafactual é null (e não derruba a ficha) se a leitura do SQLite falhar', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getContrafactualAfetados).mockRejectedValueOnce(new Error('db down'));
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.contrafactual).toBeNull();
+    expect(d.campos['Projeto']).toBeDefined();
+  });
+
+  it('o lote também traz o contrafactual (via consulta em lote)', async () => {
+    await semearEspelho([linha({ 'ID Projeto': 'legado-148' })]);
+    vi.mocked(getContrafactualAfetadosPorIds).mockResolvedValueOnce(
+      new Map([['legado-148', 'pessoa:ana@x.com;bia@y.com']]) as never,
+    );
+    const lote = await getProjetosDashboardLote({ ids: ['legado-148'] });
+    expect(lote['legado-148'].contrafactual).toEqual({
+      tipo: 'pessoa',
+      lista: ['ana@x.com', 'bia@y.com'],
+    });
+  });
+
+  it('lote: contrafactual null quando não há resposta, sem derrubar o lote', async () => {
+    await semearEspelho([linha({ 'ID Projeto': 'legado-148' })]);
+    vi.mocked(getContrafactualAfetadosPorIds).mockResolvedValueOnce(new Map() as never);
+    const lote = await getProjetosDashboardLote({ ids: ['legado-148'] });
+    expect(lote['legado-148'].contrafactual).toBeNull();
   });
 });
 

@@ -1682,6 +1682,38 @@ export function getAdminStatusLogs(projetoId: string, limit = 20) {
   );
 }
 
+// Contrafactual da Etapa 2 ("quem sentiria falta se a automação parasse") — vive SÓ no
+// SQLite (`projetos.contrafactual_afetados`), nunca virou coluna do Sheets. A ficha de
+// triagem do /dashboard lê a linha da planilha (espelho), então este campo precisa ser
+// buscado à parte, por PK. Serializado como "pessoa:a@x;b@y" | "time:Fiscal;CX".
+export function getContrafactualAfetados(projetoId: string) {
+  return queryOne<Pick<ProjetoRow, "contrafactual_afetados">>(
+    "SELECT contrafactual_afetados FROM projetos WHERE LOWER(id) = LOWER(?)",
+    [projetoId],
+  );
+}
+
+// Versão em LOTE do anterior — uma consulta por `IN` para o loader de fichas do dashboard
+// (`getProjetosDashboardLote`), no mesmo espírito de `getAdminStatusLogsPorIds`: round-trip
+// por projeto dentro de um laço é o erro que já derrubou o Investigador. Devolve o valor CRU
+// serializado ("pessoa:…"/"time:…") por id (minúsculo); a decodificação fica na camada de cima.
+export async function getContrafactualAfetadosPorIds(
+  projetoIds: string[],
+): Promise<Map<string, string | null>> {
+  const ids = [...new Set(projetoIds.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, string | null>();
+  if (ids.length === 0) return out;
+  const placeholders = ids.map(() => "?").join(", ");
+  const linhas = await queryAll<Pick<ProjetoRow, "id" | "contrafactual_afetados">>(
+    `SELECT id, contrafactual_afetados FROM projetos WHERE LOWER(id) IN (${placeholders})`,
+    ids,
+  );
+  for (const l of linhas) {
+    out.set(String(l.id ?? "").toLowerCase(), l.contrafactual_afetados ?? null);
+  }
+  return out;
+}
+
 // Último disparo por e-mail (case-insensitive), para exibir "já enviado em…" na tela.
 // Escopado por SEGMENTO quando `audiencia` é informada — o selo de "reenvio" não deve
 // considerar um envio de "legado" para a mesma pessoa (são campanhas distintas). Sem

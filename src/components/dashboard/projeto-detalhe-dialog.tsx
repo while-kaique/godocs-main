@@ -51,6 +51,8 @@ type Detalhe = {
     admin_email: string;
     created_at: string | null;
   }[];
+  // Contrafactual da Etapa 2 ("quem sentiria falta"): vem do SQLite, não da planilha.
+  contrafactual: { tipo: 'pessoa' | 'time'; lista: string[] } | null;
 };
 
 type Grupo = { titulo: string; colunas: string[] };
@@ -559,6 +561,30 @@ export function ProjetoDetalheDialog({
                 <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
                   {campos[DESCRICAO]}
                 </p>
+              </Secao>
+            )}
+
+            {/* Contrafactual da Etapa 2 — "quem sentiria falta se a automação parasse".
+                Insumo do critério de projeto (o eixo contrafactual). Vive SÓ no SQLite,
+                nunca virou coluna do Sheets, então a triagem não o via até aqui. */}
+            {detalhe.contrafactual && detalhe.contrafactual.lista.length > 0 && (
+              <Secao titulo="Quem sentiria falta se a automação parasse">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {detalhe.contrafactual.tipo === 'time'
+                    ? 'Times/áreas apontados pelo autor'
+                    : 'Pessoas apontadas pelo autor'}
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {detalhe.contrafactual.lista.map((item) => (
+                    <li
+                      key={item}
+                      className="rounded-md border px-2.5 py-1 text-[13px]"
+                      style={{ borderColor: 'rgba(0,89,169,0.22)', background: 'rgba(0,89,169,0.04)' }}
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </Secao>
             )}
 

@@ -28,7 +28,13 @@ import {
   insertAdminStatusLog,
   getAdminStatusLogs,
   getAdminStatusLogsPorIds,
+  getContrafactualAfetados,
+  getContrafactualAfetadosPorIds,
 } from "@/integrations/db/client.server";
+import {
+  desserializarAfetados,
+  type AfetadoTipo,
+} from "@/lib/submeter/constants";
 import {
   lerResumosEspelho,
   lerLinhaEspelho,
@@ -103,6 +109,13 @@ export type DetalheDashboard = {
   id: string;
   /** Todas as células não-vazias da linha, chaveadas pelo nome real da coluna. */
   campos: Record<string, string>;
+  /**
+   * Contrafactual da Etapa 2 ("quem sentiria falta se a automação parasse"). Vem do
+   * SQLite (`projetos.contrafactual_afetados`), NÃO da planilha — esse campo nunca virou
+   * coluna do Sheets. `null` quando o autor não respondeu ou o projeto só existe na
+   * planilha (legado sem linha no SQLite).
+   */
+  contrafactual: { tipo: AfetadoTipo; lista: string[] } | null;
   /** Mudanças de status feitas por esta tela (a planilha não guarda autoria). */
   historico: {
     status_anterior: string | null;
@@ -173,14 +186,17 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
 export async function getProjetoDashboard(id: string): Promise<DetalheDashboard> {
   z.string().min(1).max(120).parse(id);
 
-  // As duas leituras são INDEPENDENTES e cada round-trip ao SQLite do Godeploy entra no tempo
+  // As três leituras são INDEPENDENTES e cada round-trip ao SQLite do Godeploy entra no tempo
   // de abrir a ficha — em série, o histórico só começava depois de a linha chegar.
   //
-  // ⚠️ O `catch` do histórico fica DENTRO do `Promise.all`, e não num `try` em volta: ele é
-  // acessório (auditoria fora do ar não pode impedir a triagem de abrir a ficha) e, no caminho
-  // do 404, quem lança é a checagem da linha — uma rejeição solta do log viraria "unhandled
+  // ⚠️ Os `catch` acessórios (histórico e contrafactual) ficam DENTRO do `Promise.all`, e
+  // não num `try` em volta: eles não podem impedir a triagem de abrir a ficha e, no caminho
+  // do 404, quem lança é a checagem da linha — uma rejeição solta viraria "unhandled
   // rejection" no worker, porque ninguém mais estaria esperando por ela.
-  const [alvo, historico] = await Promise.all([
+  //
+  // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
+  // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
+  const [alvo, historico, contrafactual] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
       .then((logs): DetalheDashboard["historico"] =>
@@ -196,6 +212,15 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
         console.error("[dashboard-admin] falha ao ler histórico de status:", e);
         return [];
       }),
+    getContrafactualAfetados(id)
+      .then((row): DetalheDashboard["contrafactual"] => {
+        const { tipo, lista } = desserializarAfetados(row?.contrafactual_afetados);
+        return lista.length > 0 ? { tipo, lista } : null;
+      })
+      .catch((e): DetalheDashboard["contrafactual"] => {
+        console.error("[dashboard-admin] falha ao ler contrafactual:", e);
+        return null;
+      }),
   ]);
 
   if (!alvo) {
@@ -207,7 +232,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
     if (val) campos[k] = val;
   }
 
-  return { id, campos, historico };
+  return { id, campos, historico, contrafactual };
 }
 
 /**
@@ -238,13 +263,19 @@ export async function getProjetosDashboardLote(
   const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
   if (alvos.length === 0) return {};
 
-  const [linhas, historicos] = await Promise.all([
+  const [linhas, historicos, contrafactuais] = await Promise.all([
     lerLinhasEspelho(alvos),
     // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
     // lote inteiro e devolver a tela ao caminho de 25 requisições.
     getAdminStatusLogsPorIds(alvos).catch((e) => {
       console.error("[dashboard-admin] falha ao ler histórico em lote:", e);
       return new Map<string, Awaited<ReturnType<typeof getAdminStatusLogs>>>();
+    }),
+    // Contrafactual ("quem sentiria falta") mora só no SQLite, então entra numa consulta por
+    // `IN` à parte (nunca uma por projeto). Falha aqui → seção só não aparece nas fichas do lote.
+    getContrafactualAfetadosPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler contrafactual em lote:", e);
+      return new Map<string, string | null>();
     }),
   ]);
 
@@ -260,6 +291,7 @@ export async function getProjetosDashboardLote(
       const val = texto(v as string | undefined);
       if (val) campos[k] = val;
     }
+    const afet = desserializarAfetados(contrafactuais.get(chave));
     out[id] = {
       id,
       campos,
@@ -270,6 +302,7 @@ export async function getProjetosDashboardLote(
         admin_email: l.admin_email,
         created_at: l.created_at,
       })),
+      contrafactual: afet.lista.length > 0 ? afet : null,
     };
   }
   return out;
