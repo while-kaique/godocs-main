@@ -1535,3 +1535,20 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 **Arquivos:** `src/lib/aprovacao-pendentes-view.ts` (puro), `src/lib/aprovacao-pendentes.functions.ts` (servidor), `src/routes/_authenticated/aprovacoes-pendentes.tsx`, nav em `route.tsx` (selo "Temporária"), rota no `worker.ts`. Testes: `tests/aprovacao-pendentes-view.test.ts`.
 
 **Decisão em aberto:** o escopo inclui todos os `pendente` não-especiais (situação — fila do RPA / aguardando líder / aguardando autor — vira etiqueta + filtro). Se o Luis quiser só o que já é do RPA, é 1 linha em `ehDaFilaRpa`.
+
+---
+
+## Alerta do Google Chat leva ao /dashboard (deep-link da ficha) — 20/08/2026
+
+**Motivo:** os avisos que caem no grupo do Google Chat (pré-aprovação do líder e projeto especial) terminavam com o *link da planilha de automações*. Mas quem lê esse grupo é **só admin**, e a triagem acontece no `/dashboard`, não na planilha. Pedido do Luis: trocar o link da planilha pelo link do dashboard, **já abrindo a ficha do projeto** com as informações gerais.
+
+**O que mudou:**
+- `src/lib/google/chat.ts`: removido o `SHEETS_URL`; novo helper PURO `linkDashboardProjeto(projetoId?)` que monta `<APP_BASE_URL>/dashboard?projeto=<id>` (origem extraída da env, `process.env` lido DENTRO da função — nunca no topo do módulo; fallback `https://godocs.devgogroup.com`; sem id → raiz do dashboard). As 2 mensagens (`buildSubmitMessage` e `buildEspecialMessage`) terminam agora em `🔎 Abrir a ficha no dashboard: <url>`. Campo `projetoId?` nos dois builders.
+- Chamadores passam o id: `notificacao-projeto.functions.ts` (`notificarChatPreAprovacao`) e `google/sync.ts` (`syncSubmitToGoogle`, via `p.projetoId`).
+- `src/routes/_authenticated/dashboard.tsx`: novo `validateSearch` para `?projeto=<id>`; um `useEffect` acha o resumo na lista COMPLETA (independe de filtro/página — o card é estado próprio) e abre a ficha (o MESMO `ProjetoDetalheDialog` do clique, herdando cache/prefetch). Um `useRef` guarda o id já aberto para não reabrir depois que a pessoa fecha; fechar a ficha limpa o param (`navigate` com `to:'/dashboard'`, `replace`).
+
+**Decisões fechadas:**
+- O link da planilha **saiu de vez** dessas mensagens (não é linha secundária) — decisão do Luis.
+- O deep-link abre o overlay de triagem (edita status), não a página read-only `/projeto/$id`. Como o grupo é só de admin, o gate `requireAdmin`/`_authenticated` do dashboard é adequado.
+
+**Testes:** `tests/chat-message-especial.test.ts` (link com id, encoding, raiz sem id, ausência do link da planilha nas 3 variantes de mensagem).
