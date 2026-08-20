@@ -129,6 +129,9 @@ function Especiais() {
   // Os filtros somam entre si (AND). "Só divergentes" mora aqui dentro porque é um filtro
   // como os outros — fora da barra, ele virava um modo escondido ao lado do botão Atualizar.
   const [filtros, setFiltros] = useState<FiltrosEspeciais>(FILTROS_ESPECIAIS_VAZIOS);
+  // "Mais antigos primeiro" (opção do "Período"): reordena os projetos DENTRO de cada coluna
+  // do mais antigo ao mais novo. Fora de `filtros` porque não filtra nada — só ordena.
+  const [maisAntigos, setMaisAntigos] = useState(false);
   // Quantos cartões cada coluna mostra. Chaveado pela coluna, e zerado a cada filtro novo.
   const [mostrando, setMostrando] = useState<Record<string, number>>({});
   const [divisaoAberta, setDivisaoAberta] = useState(false);
@@ -182,8 +185,8 @@ function Especiais() {
     if (filtros.status !== 'todos') visiveis = visiveis.filter((p) => casaStatus(p, filtros.status));
     if (filtros.periodo) visiveis = visiveis.filter((p) => casaPeriodo(p, filtros.periodo));
     if (filtros.termo.trim()) visiveis = filtrarPorTermo(visiveis, filtros.termo);
-    return agruparEspeciais(visiveis);
-  }, [dados, filtros, avaliacaoPor, donoPor]);
+    return agruparEspeciais(visiveis, maisAntigos);
+  }, [dados, filtros, avaliacaoPor, donoPor, maisAntigos]);
 
   // Filtro novo = lista nova: manter o "carregar mais" antigo mostraria 12 cartões numa coluna
   // que a pessoa acabou de reduzir a 3.
@@ -411,6 +414,8 @@ function Especiais() {
             valor={filtros.periodo}
             onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
             maximo={hojeIso()}
+            ordenarMaisAntigos={maisAntigos}
+            onOrdenarMaisAntigos={setMaisAntigos}
           />
 
           <button

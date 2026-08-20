@@ -122,6 +122,29 @@ describe('agruparPorAutor', () => {
     ]);
     expect(colunas[0].projetos.map((p) => p.id)).toEqual(['novo', 'velho']);
   });
+
+  it('maisAntigos=true inverte para o mais antigo primeiro dentro da coluna', () => {
+    const colunas = agruparPorAutor(
+      [
+        projeto({ id: 'velho', email: 'ana@go.com', dataOrdenacao: 100 }),
+        projeto({ id: 'novo', email: 'ana@go.com', dataOrdenacao: 200 }),
+      ],
+      true,
+    );
+    expect(colunas[0].projetos.map((p) => p.id)).toEqual(['velho', 'novo']);
+  });
+
+  it('maisAntigos=true mantém projeto SEM data no fim da coluna', () => {
+    const colunas = agruparPorAutor(
+      [
+        projeto({ id: 'sem-data', email: 'ana@go.com', dataOrdenacao: null }),
+        projeto({ id: 'velho', email: 'ana@go.com', dataOrdenacao: 100 }),
+        projeto({ id: 'novo', email: 'ana@go.com', dataOrdenacao: 200 }),
+      ],
+      true,
+    );
+    expect(colunas[0].projetos.map((p) => p.id)).toEqual(['velho', 'novo', 'sem-data']);
+  });
 });
 
 describe('apenasAutoresComMultiplos', () => {

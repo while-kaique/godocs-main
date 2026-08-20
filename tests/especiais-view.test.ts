@@ -104,6 +104,33 @@ describe('agruparEspeciais', () => {
     expect(colunas.find((c) => c.nota === 1)?.projetos.map((p) => p.id)).toEqual(['novo', 'velho']);
   });
 
+  it('maisAntigos=true inverte para o mais antigo primeiro DENTRO da coluna', () => {
+    const colunas = agruparEspeciais(
+      [
+        projeto({ id: 'velho', estrelas: 1, dataOrdenacao: 10 }),
+        projeto({ id: 'novo', estrelas: 1, dataOrdenacao: 99 }),
+      ],
+      true,
+    );
+    expect(colunas.find((c) => c.nota === 1)?.projetos.map((p) => p.id)).toEqual(['velho', 'novo']);
+  });
+
+  it('maisAntigos=true mantém projeto SEM data no fim (falta de data não é "mais antigo")', () => {
+    const colunas = agruparEspeciais(
+      [
+        projeto({ id: 'sem-data', estrelas: 1, dataOrdenacao: null }),
+        projeto({ id: 'velho', estrelas: 1, dataOrdenacao: 10 }),
+        projeto({ id: 'novo', estrelas: 1, dataOrdenacao: 99 }),
+      ],
+      true,
+    );
+    expect(colunas.find((c) => c.nota === 1)?.projetos.map((p) => p.id)).toEqual([
+      'velho',
+      'novo',
+      'sem-data',
+    ]);
+  });
+
   it('conta o total do nível', () => {
     const colunas = agruparEspeciais([
       projeto({ id: 'a', estrelas: 2 }),
