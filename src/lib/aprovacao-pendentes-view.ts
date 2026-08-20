@@ -90,21 +90,33 @@ export type ColunaAutor = {
   total: number;
 };
 
-/** Mais recente primeiro; sem data vai para o fim (mesma regra da listagem). */
-function porDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboardResumo): number {
+/**
+ * Comparador por data de submissão. `maisAntigos` inverte para mais ANTIGO primeiro; sem
+ * data vai SEMPRE para o fim (falta de data não é "mais antigo" — mesma regra da listagem).
+ */
+function porData(
+  a: ProjetoDashboardResumo,
+  b: ProjetoDashboardResumo,
+  maisAntigos: boolean,
+): number {
   if (a.dataOrdenacao == null && b.dataOrdenacao == null) {
     return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
   }
   if (a.dataOrdenacao == null) return 1;
   if (b.dataOrdenacao == null) return -1;
-  return b.dataOrdenacao - a.dataOrdenacao;
+  return maisAntigos ? a.dataOrdenacao - b.dataOrdenacao : b.dataOrdenacao - a.dataOrdenacao;
 }
 
 /**
  * Uma coluna por autor. Ordem: **quem tem mais projetos primeiro** (é o ponto da tela —
- * achar quem tem vários e validar em bloco), empate desfeito pelo nome.
+ * achar quem tem vários e validar em bloco), empate desfeito pelo nome. Dentro de cada
+ * coluna os projetos vêm do mais recente ao mais antigo, ou o inverso quando `maisAntigos`
+ * (filtro "mais antigos" do "Período" — validar a fila do começo).
  */
-export function agruparPorAutor(projetos: ProjetoDashboardResumo[]): ColunaAutor[] {
+export function agruparPorAutor(
+  projetos: ProjetoDashboardResumo[],
+  maisAntigos = false,
+): ColunaAutor[] {
   const grupos = new Map<string, ProjetoDashboardResumo[]>();
   for (const p of projetos) {
     const k = chaveAutor(p);
@@ -114,7 +126,7 @@ export function agruparPorAutor(projetos: ProjetoDashboardResumo[]): ColunaAutor
   }
   return [...grupos.entries()]
     .map(([chave, lista]) => {
-      const ordenados = [...lista].sort(porDataDesc);
+      const ordenados = [...lista].sort((a, b) => porData(a, b, maisAntigos));
       const ref = ordenados[0];
       return {
         chave,

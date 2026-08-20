@@ -416,6 +416,13 @@ function Dashboard() {
           valor={filtros.periodo}
           maximo={hoje}
           onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
+          // "Mais antigos" reaproveita a ordenação da tabela (coluna "Data"): ligado = data
+          // ascendente (mais antigo no topo); desligado = o padrão (mais recente primeiro).
+          ordenarMaisAntigos={ordem === 'data' && direcao === 'asc'}
+          onOrdenarMaisAntigos={(v) => {
+            setOrdem('data');
+            setDirecao(v ? 'asc' : 'desc');
+          }}
         />
         {/* Faixa da nota da triagem (pedido do Luis, 17/08). Duas pontas abertas em vez de
             uma lista fixa de opções, porque a escala NÃO tem teto: "de 1" já é "1 ou mais",

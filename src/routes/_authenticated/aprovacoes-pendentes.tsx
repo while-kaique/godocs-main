@@ -94,6 +94,9 @@ function AprovacaoPendentes() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosPendentes>(FILTROS_PENDENTES_VAZIOS);
+  // "Mais antigos primeiro" (opção do "Período"): reordena os projetos DENTRO de cada
+  // coluna do mais antigo ao mais novo. Fora de `filtros` porque não filtra nada — só ordena.
+  const [maisAntigos, setMaisAntigos] = useState(false);
   // Quantos cartões cada coluna mostra. Chaveado pela coluna, zerado a cada filtro novo.
   const [mostrando, setMostrando] = useState<Record<string, number>>({});
   const [divisaoAberta, setDivisaoAberta] = useState(false);
@@ -132,8 +135,8 @@ function AprovacaoPendentes() {
     // O toggle "só 2+" roda por ÚLTIMO, sobre o que sobrou: quem tem vários respeita os
     // outros filtros (ver `apenasAutoresComMultiplos`).
     if (filtros.soMultiplos) visiveis = apenasAutoresComMultiplos(visiveis);
-    return agruparPorAutor(visiveis);
-  }, [dados, filtros, donoPor]);
+    return agruparPorAutor(visiveis, maisAntigos);
+  }, [dados, filtros, donoPor, maisAntigos]);
 
   // Filtro novo = lista nova: zera o "carregar mais" para não mostrar 12 numa coluna que a
   // pessoa acabou de reduzir.
@@ -326,6 +329,8 @@ function AprovacaoPendentes() {
             valor={filtros.periodo}
             onChange={(periodo) => setFiltros((f) => ({ ...f, periodo }))}
             maximo={hojeIso()}
+            ordenarMaisAntigos={maisAntigos}
+            onOrdenarMaisAntigos={setMaisAntigos}
           />
 
           <button

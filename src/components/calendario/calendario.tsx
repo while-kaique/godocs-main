@@ -23,7 +23,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowDownUp, CalendarDays, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import {
   DIAS_SEMANA,
   PRESETS_PERIODO,
@@ -513,21 +513,34 @@ export function SeletorPeriodo({
   valor,
   onChange,
   maximo,
+  ordenarMaisAntigos,
+  onOrdenarMaisAntigos,
 }: {
   valor: Intervalo | null;
   onChange: (v: Intervalo | null) => void;
   maximo?: DiaIso;
+  /** Ordenar por data de envio, mais ANTIGOS primeiro. Só renderiza o controle quando
+   *  `onOrdenarMaisAntigos` é passado (o "Período" segue existindo sem ordenação). */
+  ordenarMaisAntigos?: boolean;
+  onOrdenarMaisAntigos?: (v: boolean) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const gatilho = useRef<HTMLButtonElement>(null);
+  const temOrdenacao = typeof onOrdenarMaisAntigos === 'function';
 
   function fechar() {
     setAberto(false);
     gatilho.current?.focus();
   }
 
-  const ativo = Boolean(valor);
-  const rotulo = valor ? rotuloIntervalo(valor) : 'Período';
+  // O pill fica ativo por QUALQUER dos dois (intervalo OU ordenação), e o "X" limpa ambos —
+  // senão a ordenação "mais antigos" ficaria ligada e invisível depois de limpar a data.
+  const ativo = Boolean(valor) || Boolean(ordenarMaisAntigos);
+  const rotulo = valor
+    ? rotuloIntervalo(valor)
+    : ordenarMaisAntigos
+      ? 'Mais antigos'
+      : 'Período';
 
   return (
     <>
@@ -553,7 +566,10 @@ export function SeletorPeriodo({
         {ativo && (
           <button
             type="button"
-            onClick={() => onChange(null)}
+            onClick={() => {
+              onChange(null);
+              onOrdenarMaisAntigos?.(false);
+            }}
             aria-label="Limpar período"
             className="absolute right-1.5 rounded-full p-1 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white motion-reduce:transition-none"
             style={{ color: '#fff' }}
@@ -564,6 +580,31 @@ export function SeletorPeriodo({
       </div>
       {aberto && (
         <Popover ancoraRef={gatilho} onFechar={fechar} rotulo="Escolher período">
+          {temOrdenacao && (
+            <div className="border-b px-3 py-2.5" style={{ borderColor: 'rgba(0,89,169,0.12)' }}>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(ordenarMaisAntigos)}
+                onClick={() => onOrdenarMaisAntigos?.(!ordenarMaisAntigos)}
+                className="flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 motion-reduce:transition-none"
+                style={{
+                  background: ordenarMaisAntigos ? AZUL : 'var(--go-white, #fff)',
+                  color: ordenarMaisAntigos ? '#fff' : 'var(--foreground)',
+                  borderColor: ordenarMaisAntigos ? AZUL : 'var(--border)',
+                  ['--tw-ring-color' as string]: AZUL,
+                }}
+              >
+                <ArrowDownUp className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="flex-1">Mais antigos primeiro</span>
+                {/* Estado nunca só por cor (a11y): o check aparece quando ligado. */}
+                {ordenarMaisAntigos && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+              </button>
+              <p className="mt-1.5 px-1 text-[11px] leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+                Ordena por data de envio — os mais antigos aparecem primeiro.
+              </p>
+            </div>
+          )}
           <Painel
             modo="intervalo"
             selecao={valor}

@@ -68,18 +68,32 @@ export function ehDescontinuado(p: ProjetoDashboardResumo): boolean {
   return (p.statusChave ?? '').trim().toLowerCase() === 'descontinuado';
 }
 
-/** Mais recente primeiro; sem data vai para o fim (mesma regra da listagem). */
-function porDataDesc(a: ProjetoDashboardResumo, b: ProjetoDashboardResumo): number {
+/**
+ * Comparador por data de submissão. `maisAntigos` inverte para mais ANTIGO primeiro; sem
+ * data vai SEMPRE para o fim (falta de data não é "mais antigo" — mesma regra da listagem).
+ */
+function porData(
+  a: ProjetoDashboardResumo,
+  b: ProjetoDashboardResumo,
+  maisAntigos: boolean,
+): number {
   if (a.dataOrdenacao == null && b.dataOrdenacao == null) {
     return (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR');
   }
   if (a.dataOrdenacao == null) return 1;
   if (b.dataOrdenacao == null) return -1;
-  return b.dataOrdenacao - a.dataOrdenacao;
+  return maisAntigos ? a.dataOrdenacao - b.dataOrdenacao : b.dataOrdenacao - a.dataOrdenacao;
 }
 
-/** Monta as colunas: uma por nível, com os projetos daquele nível. */
-export function agruparEspeciais(projetos: ProjetoDashboardResumo[]): ColunaEspeciais[] {
+/**
+ * Monta as colunas: uma por nível, com os projetos daquele nível. Dentro de cada coluna,
+ * do mais recente ao mais antigo — ou o inverso quando `maisAntigos` (filtro "mais antigos"
+ * do "Período").
+ */
+export function agruparEspeciais(
+  projetos: ProjetoDashboardResumo[],
+  maisAntigos = false,
+): ColunaEspeciais[] {
   const especiais = apenasEspeciais(projetos);
 
   const notas = new Set<number>(NOTAS_BASE);
@@ -90,7 +104,7 @@ export function agruparEspeciais(projetos: ProjetoDashboardResumo[]): ColunaEspe
   return chaves.map((nota) => {
     const doNivel = especiais
       .filter((p) => (nota == null ? p.estrelas == null : p.estrelas === nota))
-      .sort(porDataDesc);
+      .sort((a, b) => porData(a, b, maisAntigos));
     return {
       chave: nota == null ? SEM_NOTA : String(nota),
       nota,
