@@ -45,7 +45,29 @@ export async function sendChatNotification(
 // ─── Builders de mensagem ─────────────────────────────────────────────────
 
 const SEPARATOR = '──────────────────────';
-const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
+
+// Base do app em produção; fallback quando `APP_BASE_URL` não está setada.
+const APP_BASE_PADRAO = 'https://godocs.devgogroup.com';
+
+// Link para a FICHA do projeto no /dashboard (a esteira de triagem do admin). O grupo
+// do Chat é lido só por admin, então o alerta leva direto ao card em vez de à planilha:
+// `?projeto=<id>` abre o overlay da ficha (ver routes/_authenticated/dashboard.tsx).
+// Sem id → raiz do dashboard. ⚠️ `process.env` é lido DENTRO da função (nunca no topo
+// do módulo — derruba o worker no bootstrap do Godeploy; ver CLAUDE.md). `APP_BASE_URL`
+// pode carregar um caminho (o disparo de e-mails usa a URL inteira), então extraímos só
+// a origem — mesma armadilha tratada em `origemDe` de gomoon-lideres.functions.ts.
+export function linkDashboardProjeto(projetoId?: string | null): string {
+  const bruto = process.env.APP_BASE_URL ?? APP_BASE_PADRAO;
+  let origem: string;
+  try {
+    origem = new URL(bruto).origin;
+  } catch {
+    origem = APP_BASE_PADRAO;
+  }
+  return projetoId
+    ? `${origem}/dashboard?projeto=${encodeURIComponent(projetoId)}`
+    : `${origem}/dashboard`;
+}
 
 function formatBRL(value: number): string {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,6 +91,9 @@ function linhasNota(nota: string | null | undefined): string[] {
 }
 
 export function buildSubmitMessage(p: {
+  // ID do projeto — vira o link `/dashboard?projeto=<id>` que abre a ficha direto.
+  // Ausente → o link cai na raiz do dashboard (nunca deixa o alerta sem caminho).
+  projetoId?: string;
   projeto: string;
   area: string;
   ferramenta: string;
@@ -149,7 +174,7 @@ export function buildSubmitMessage(p: {
     '',
     `\u{1F4C5} *Data da submissão:* ${p.dataSubmissao}`,
     '',
-    `*Link da planilha de automações*: ${SHEETS_URL}`,
+    `\u{1F50E} *Abrir a ficha no dashboard*: ${linkDashboardProjeto(p.projetoId)}`,
     '',
     SEPARATOR,
   );
@@ -167,6 +192,7 @@ export function buildSubmitMessage(p: {
 // saíram Ferramenta, Participantes, Data da submissão e os separadores; descrição e
 // justificativa vão TRUNCADAS (o texto inteiro está na planilha e em /projeto/$id).
 function buildEspecialMessage(p: {
+  projetoId?: string;
   projeto: string;
   area: string;
   nomeCompleto: string;
@@ -194,7 +220,7 @@ function buildEspecialMessage(p: {
     `\u{1F4DD} *Descrição:* ${truncar(p.descricao ?? '')}`,
     `\u{2B50} *Por que é um projeto especial:* ${contexto}`,
     '',
-    `*Link da planilha de automações*: ${SHEETS_URL}`,
+    `\u{1F50E} *Abrir a ficha no dashboard*: ${linkDashboardProjeto(p.projetoId)}`,
   ].join('\n');
 }
 
