@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSubmitMessage } from '@/lib/google/chat';
+import { buildSubmitMessage, linkDashboardProjeto } from '@/lib/google/chat';
 
 // Base de parâmetros de um projeto NÃO-especial (com saving/receita) para reuso.
 const base = {
@@ -93,7 +93,9 @@ describe('buildSubmitMessage — o alerta do especial é ENXUTO', () => {
     expect(msg).toContain('Descrição do projeto.');
     expect(msg).toContain('Por que é um projeto especial:');
     expect(msg).toContain('Pesquisa exploratória sem ganho mensurável ainda.');
-    expect(msg).toContain('docs.google.com/spreadsheets');
+    // O link agora é o do DASHBOARD (o grupo é lido só por admin), não mais o da planilha.
+    expect(msg).toContain('/dashboard');
+    expect(msg).not.toContain('docs.google.com/spreadsheets');
   });
 
   it('NÃO traz mais Ferramenta, Participantes, Data da submissão nem separadores', () => {
@@ -161,6 +163,47 @@ describe('buildSubmitMessage — nota da pré-aprovação', () => {
     const semNota = buildSubmitMessage(base);
     expect(buildSubmitMessage({ ...base, notaPreAprovacao: '' })).toBe(semNota);
     expect(buildSubmitMessage({ ...base, notaPreAprovacao: null })).toBe(semNota);
+  });
+});
+
+// ─── Link do dashboard (substitui o link da planilha) ────────────────────────
+//
+// O grupo do Chat é lido só por admin, então o alerta leva à esteira de triagem
+// (/dashboard) e, com o id, abre a ficha do projeto direto (?projeto=<id>).
+describe('link do dashboard nas mensagens do Chat', () => {
+  it('linkDashboardProjeto monta /dashboard?projeto=<id> (encodado) e cai na raiz sem id', () => {
+    expect(linkDashboardProjeto('abc123')).toMatch(/\/dashboard\?projeto=abc123$/);
+    expect(linkDashboardProjeto('a b/c')).toContain('/dashboard?projeto=a%20b%2Fc');
+    expect(linkDashboardProjeto()).toMatch(/\/dashboard$/);
+    expect(linkDashboardProjeto(null)).toMatch(/\/dashboard$/);
+  });
+
+  it('a mensagem normal usa o link do dashboard com o id e não cita mais a planilha', () => {
+    const msg = buildSubmitMessage({ ...base, projetoId: 'proj-42' });
+    expect(msg).toContain('/dashboard?projeto=proj-42');
+    expect(msg).not.toContain('docs.google.com/spreadsheets');
+    expect(msg).not.toContain('Link da planilha');
+  });
+
+  it('a mensagem do especial também usa o link do dashboard com o id', () => {
+    const msg = buildSubmitMessage({
+      ...base,
+      projetoId: 'esp-7',
+      especial: true,
+      contextoEspecial: 'Pesquisa.',
+    });
+    expect(msg).toContain('/dashboard?projeto=esp-7');
+    expect(msg).not.toContain('docs.google.com/spreadsheets');
+  });
+
+  it('a mensagem de pré-aprovação leva o link do dashboard com o id', () => {
+    const msg = buildSubmitMessage({
+      ...base,
+      projetoId: 'pa-9',
+      preAprovacao: { por: 'Alguém', em: '20/08/2026 10:00' },
+    });
+    expect(msg).toContain('/dashboard?projeto=pa-9');
+    expect(msg).not.toContain('docs.google.com/spreadsheets');
   });
 });
 

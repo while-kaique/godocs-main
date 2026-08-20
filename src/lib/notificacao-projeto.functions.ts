@@ -73,6 +73,7 @@ export async function notificarChatPreAprovacao(
     const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
 
     const message = buildSubmitMessage({
+      projetoId,
       projeto: ouTraco(projeto.nome),
       area: ouTraco(projeto.area),
       ferramenta: ouTraco(projeto.ferramenta),

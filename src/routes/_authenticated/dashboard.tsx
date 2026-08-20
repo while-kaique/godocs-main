@@ -13,7 +13,7 @@
  * já manda um índice de busca normalizado por projeto. Filtrar em memória responde na
  * tecla; ir ao servidor a cada letra seria mais lento e não mais correto.
  */
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search,
@@ -80,6 +80,11 @@ import { apenasAutoresComMultiplos, agruparAdjacentePorAutor } from '@/lib/dashb
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   head: () => ({ meta: [{ title: 'Triagem de projetos · GoDocs Admin' }] }),
+  // ?projeto=<id> abre a ficha do projeto direto (deep-link do alerta no Google Chat,
+  // que só admin lê). Fechar a ficha limpa o param — ver o efeito abaixo.
+  validateSearch: (search: Record<string, unknown>): { projeto?: string } => ({
+    projeto: typeof search.projeto === 'string' ? search.projeto : undefined,
+  }),
   component: Dashboard,
 });
 
@@ -111,6 +116,8 @@ function fmtGanho(v: number | null) {
 
 function Dashboard() {
   const queryClient = useQueryClient();
+  const { projeto: projetoParam } = Route.useSearch();
+  const navigate = useNavigate();
   // React Query cacheia a listagem (mesmo padrão do /meus-projetos). staleTime de 60s:
   // sair do /dashboard e voltar dentro desse intervalo serve do CACHE — instantâneo, sem
   // nova leitura do espelho nem spinner. O prefetch do beforeLoad continua sendo consumido
@@ -155,6 +162,9 @@ function Dashboard() {
   const [aberto, setAberto] = useState<ProjetoDashboardResumo | null>(null);
 
   const inputBusca = useRef<HTMLInputElement>(null);
+  // Guarda o id de deep-link já aberto, para o efeito não reabrir a ficha depois que a
+  // pessoa fecha (e para não reabrir a cada recarga da listagem enquanto o param existe).
+  const deepLinkAbertoRef = useRef<string | null>(null);
 
   // Refresh EXPLÍCITO: sincroniza a planilha (?refresh=1), regrava o espelho e atualiza o
   // cache do React Query. Esquece as fichas guardadas (limparDetalhes) para o overlay não
@@ -206,6 +216,19 @@ function Dashboard() {
   // a cada tecla digitada em qualquer campo da tela.
   const projetos = useMemo(() => dados?.projetos ?? [], [dados]);
   const hoje = hojeIso();
+
+  // Deep-link ?projeto=<id>: quando a listagem chega, acha o resumo e abre a ficha direto.
+  // O card não depende de filtro/página (é estado próprio), então busco na lista COMPLETA.
+  // Só age uma vez por id (deepLinkAbertoRef), para não brigar com quem já fechou a ficha.
+  useEffect(() => {
+    if (!projetoParam || projetos.length === 0) return;
+    if (deepLinkAbertoRef.current === projetoParam) return;
+    const alvo = projetos.find((p) => p.id === projetoParam);
+    if (alvo) {
+      deepLinkAbertoRef.current = projetoParam;
+      setAberto(alvo);
+    }
+  }, [projetoParam, projetos]);
 
   // Contagem por pílula (agrega os rótulos legados no equivalente atual) — já RECORTADA
   // pelos demais filtros, senão "Pendente 40" abriria uma lista de 3 com "Especiais" ligado.
@@ -774,7 +797,19 @@ function Dashboard() {
 
       <ProjetoDetalheDialog
         projeto={aberto}
-        onFechar={() => setAberto(null)}
+        onFechar={() => {
+          setAberto(null);
+          // Se veio por deep-link (?projeto=<id>), tira o param para não reabrir sozinho
+          // e libera o ref, permitindo abrir de novo pelo mesmo link mais tarde.
+          if (projetoParam) {
+            deepLinkAbertoRef.current = null;
+            void navigate({
+              to: '/dashboard',
+              search: (prev: { projeto?: string }) => ({ ...prev, projeto: undefined }),
+              replace: true,
+            });
+          }
+        }}
         onStatusSalvo={aplicarStatusSalvo}
       />
     </div>

@@ -533,6 +533,7 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
         console.warn(`[google/sync] Projeto de teste E2E "${p.projeto.nome}" — notificação Google Chat suprimida.`);
       } else {
       const message = buildSubmitMessage({
+        projetoId: p.projetoId,
         projeto: ouTraco(p.projeto.nome),
         area: p.area,
         ferramenta: ouTraco(p.projeto.ferramenta),
