@@ -81,6 +81,27 @@ describe('normalizarClassificacao — projeto especial nunca reprova automático
   });
 });
 
+describe('normalizarClassificacao — fluxo direto de liderança nunca reprova automático', () => {
+  it('claro_nao + fluxoDireto → zona_cinzenta (validação humana), sem motivo', () => {
+    const r = normalizarClassificacao({
+      classificacao: 'claro_nao',
+      justificativa: 'Sem indicador objetivo.',
+      motivo: 'Não há indicador verificável.',
+      fluxoDireto: true,
+    });
+    expect(r.classificacao).toBe('zona_cinzenta');
+    expect(r.motivo).toBeNull();
+    expect(r.ajuste).toMatch(/liderança|direto/i);
+  });
+
+  it('liderança classificada como claro_sim passa intacta', () => {
+    expect(
+      normalizarClassificacao({ classificacao: 'claro_sim', justificativa: 'x', fluxoDireto: true })
+        .classificacao,
+    ).toBe('claro_sim');
+  });
+});
+
 describe('normalizarClassificacao — materialidade alta não reprova sozinha', () => {
   it('claro_nao com materialidade > R$ 5k/mês → zona_cinzenta (validação humana)', () => {
     const r = normalizarClassificacao({
@@ -176,6 +197,18 @@ describe('decidirStatusSubmissao', () => {
   it('AC6 — projeto especial nunca é reprovado (nem se a classificação vier claro_nao)', () => {
     expect(
       decidirStatusSubmissao({ ...base, classificacao: 'claro_nao', ehEspecial: true }),
+    ).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
+  });
+
+  it('fluxo direto de liderança nunca é reprovado (claro_nao → em_validacao/"Pendente")', () => {
+    expect(
+      decidirStatusSubmissao({ ...base, classificacao: 'claro_nao', fluxoDireto: true }),
+    ).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
+  });
+
+  it('fluxo direto de liderança vai sempre para validação humana (claro_sim → em_validacao)', () => {
+    expect(
+      decidirStatusSubmissao({ ...base, classificacao: 'claro_sim', fluxoDireto: true }),
     ).toEqual({ status: 'em_validacao', statusSheet: 'Pendente' });
   });
 

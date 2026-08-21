@@ -6,6 +6,7 @@
  */
 
 import { getCurrentUser, isAdmin } from "@/lib/auth.functions";
+import { ehLideranca } from "@/lib/areas/teamguide.server";
 import {
   iniciarSubmissao,
   enviarMensagem,
@@ -197,6 +198,24 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const user = await getCurrentUser(request);
       console.log("[worker] /api/auth/me resultado:", JSON.stringify(user));
       return json(user);
+    }
+
+    // ── Perfil de submissão: o usuário logado é liderança (cargo isento, coordenador+)?
+    // Decide se o formulário oferece o FLUXO DIRETO (pula o agente). Endpoint SEPARADO
+    // do /api/auth/me de propósito: só o formulário de submissão precisa disto, e a
+    // consulta à TeamGuide (cacheada por isolate) não deve entrar no caminho de todo
+    // /api/auth/me (dashboard/faq). Fail-to-false: erro/sem cargo → não oferece o atalho.
+    // É só o que PINTA — o servidor reconfere a permissão em iniciar-submissao/saving/receita.
+    if (pathname === "/api/submeter/perfil" && method === "GET") {
+      const email = getEmailFromRequest(request);
+      let lider = false;
+      try {
+        lider = !!email && (await ehLideranca(email));
+      } catch (e) {
+        console.error("[worker] /api/submeter/perfil ehLideranca falhou:", e);
+      }
+      const admin = email ? await isAdmin(email) : false;
+      return json({ ehLideranca: lider, isAdmin: admin });
     }
 
     // ── Config pública (rótulo do ambiente) — usado pela faixa de staging ──
@@ -419,13 +438,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         const tarefa = (async () => {
           try {
             let result: unknown;
+            const solicitante = getEmailFromRequest(request);
             if (pathname === "/api/chat/iniciar-submissao")
-              result = await iniciarSubmissao(body, { onDelta });
+              result = await iniciarSubmissao(body, solicitante, { onDelta });
             else if (pathname === "/api/chat/enviar-mensagem")
               result = await enviarMensagem(body, { onDelta });
             else if (pathname === "/api/chat/iniciar-saving")
-              result = await iniciarSaving(body, { onDelta });
-            else result = await iniciarReceita(body, { onDelta });
+              result = await iniciarSaving(body, solicitante, { onDelta });
+            else result = await iniciarReceita(body, solicitante, { onDelta });
 
             const resJson = JSON.stringify(result);
             responseSize = resJson.length;
@@ -487,10 +507,13 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
 
       try {
         let result: unknown;
-        if (pathname === "/api/chat/iniciar-submissao") result = await iniciarSubmissao(body);
+        if (pathname === "/api/chat/iniciar-submissao")
+          result = await iniciarSubmissao(body, getEmailFromRequest(request));
         else if (pathname === "/api/chat/enviar-mensagem") result = await enviarMensagem(body);
-        else if (pathname === "/api/chat/iniciar-saving") result = await iniciarSaving(body);
-        else if (pathname === "/api/chat/iniciar-receita") result = await iniciarReceita(body);
+        else if (pathname === "/api/chat/iniciar-saving")
+          result = await iniciarSaving(body, getEmailFromRequest(request));
+        else if (pathname === "/api/chat/iniciar-receita")
+          result = await iniciarReceita(body, getEmailFromRequest(request));
         else if (pathname === "/api/chat/atualizar-tipos") result = await atualizarTipos(body);
         else if (pathname === "/api/chat/atualizar-metadados")
           result = await atualizarMetadados(body);
