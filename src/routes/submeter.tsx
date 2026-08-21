@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Save, FolderClock, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch, ApiError, setDemoBackend } from "@/lib/api-client";
-import { criarDemoBackend, demoSeedForm, demoFile, type FluxoDemo } from "@/lib/fluxos/demo-backend";
+import { criarDemoBackend, demoSeedForm, demoFile, CHAVE_TESTE_LIDERANCA, type FluxoDemo } from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 import { CODIGOS_TRIAGEM_ESPECIAL } from "@/lib/mensagens-submissao";
@@ -1112,9 +1112,18 @@ export function SubmeterPageContent({
     return () => { cancelled = true; };
   }, []);
 
-  // Liderança EFETIVA: cargo isento OU override de admin (?lideranca=1) para testar.
-  // O fluxo DIRETO só vale para projeto padrão (o especial já pula o agente por conta própria).
-  const overrideLideranca = perfilAdmin && !!liderancaOverride;
+  // Liderança EFETIVA: cargo isento OU override de admin para testar. O override vem de
+  // duas fontes: `?lideranca=1` (funciona em navegação client-side) e a flag de
+  // sessionStorage setada pelo botão do /fluxos (robusta: o edge engole a query no OAuth,
+  // a flag não). Ambas SÓ valem para admin (o servidor reconfere de novo).
+  const liderancaFlag = useMemo(() => {
+    try {
+      return sessionStorage.getItem(CHAVE_TESTE_LIDERANCA) === "1";
+    } catch {
+      return false;
+    }
+  }, []);
+  const overrideLideranca = perfilAdmin && (!!liderancaOverride || liderancaFlag);
   const ehLiderancaEfetivo = perfilLideranca || overrideLideranca;
   // O fluxo DIRETO vale só para SUBMISSÃO NOVA e projeto padrão. Edição de liderança
   // segue a revisão guiada normal (evita o rehydrate/re-init do doc da edição); o

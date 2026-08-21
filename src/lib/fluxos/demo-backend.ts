@@ -13,6 +13,13 @@ import type { FormData } from '@/lib/submeter/constants'
 
 export type FluxoDemo = 'normal' | 'especial' | 'lideranca'
 
+// Flag (sessionStorage) que faz o formulário REAL de /submeter rodar como liderança
+// para ADMIN testar. Usada em vez de `?lideranca=1` porque o edge do Godeploy engole a
+// query string no redirect de OAuth (o param some da URL). O flag é setado no clique de
+// um botão do /fluxos (página já autenticada) e a navegação para /submeter é client-side,
+// então sobrevive; some ao fechar a aba. Lido em `submeter.tsx` (só admin reconfere).
+export const CHAVE_TESTE_LIDERANCA = 'godocs:teste-lideranca'
+
 /**
  * Preenche o formulário com dados de EXEMPLO para o sandbox — assim dá para avançar
  * pelas telas sem digitar. `tipoProjeto` fica vazio no especial (a natureza é definida
