@@ -29,6 +29,15 @@ atualizar CLAUDE.md (a nota "não há streaming / timeout=régua de tamanho" mud
 o `.md` do plano (§2 parte-2 e §9 mortas pelo Codex). ⚠️ Revisão de código formal (GGSD) NÃO rodou.
 Mensagem pro time do proxy sobre structured outputs já redigida (no chat da sessão).
 
+## Pergunta em aberto (21/08, fim da sessão) — contagem de isentos do AGENTE (fluxo direto de liderança)
+Luis perguntou: com a nova regra do fluxo direto, quantas pessoas ficam isentas de passar pelo agente, de quantas.
+Régua: `podeFluxoDireto = isAdmin(email) OU ehLideranca(cargo)`, onde `ehLideranca` = `ehCargoDeLideranca` (FONTE ÚNICA
+`src/lib/cargo-lideranca.ts` — casa por PALAVRA: coordenador/gerente/head/diretor/superintendente/presidente/socio/
+ceo/coo/cto/cfo/cpo/cmo/cro/vp/chief; MENOS exceções de ofício: diretor de arte, gerente/diretor de projeto, gerente/
+diretor de produto). Um subagente estava coletando o mapa cargo→count da Team Guide inteira (MCP `list_employees`,
+root, paginado) para aplicar a régua e dar isentos/total (cargos de liderança + admins à parte). RESPONDER quando o
+mapa chegar.
+
 ---
 
 ## Plano ativo ANTERIOR (histórico)
