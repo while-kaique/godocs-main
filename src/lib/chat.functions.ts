@@ -109,7 +109,8 @@ import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-ag
 import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
 import { extrairCamposDocumentacao } from "@/lib/agents/extractor";
 import { stripMarkdown } from "@/lib/strip-markdown";
-import { deriveAreaFromEmail } from "@/lib/areas/teamguide.server";
+import { deriveAreaFromEmail, ehLideranca } from "@/lib/areas/teamguide.server";
+import { memorialDiretoReceita, memorialDiretoSaving } from "@/lib/submeter-direto";
 import {
   abrirPreAprovacao,
   dispensarPreAprovacao,
@@ -548,6 +549,11 @@ const iniciarSubmissaoSchema = z.object({
   // Quando true, o fluxo pula a análise financeira e o analisador IA (validação humana).
   especial: z.boolean().optional(),
   contexto_especial: z.string().max(2000).optional(),
+  // Fluxo DIRETO de liderança: quando true (e o SOLICITANTE é liderança/admin, conferido
+  // no servidor), a doc é gerada por IA em UMA passada (extrator + compilador, sem
+  // conversa) e o fluxo NÃO inicia o chat — o frontend segue direto ao formulário
+  // determinístico de saving/receita. Ignorado para `especial` (que já pula tudo).
+  fluxo_direto: z.boolean().optional(),
   docs: z
     .array(z.object({ base64: z.string().min(1), filename: z.string().min(1) }))
     .min(1)
@@ -568,6 +574,10 @@ const enviarMensagemSchema = z.object({
 
 const iniciarSavingSchema = z.object({
   projeto_id: z.string().min(1),
+  // Fluxo DIRETO de liderança: pula o orquestrador e os gates — o memorial é montado
+  // DETERMINISTICAMENTE do formulário (sem R$; o R$ entra por enriquecerMemorial). Só
+  // vale se o solicitante for liderança/admin (conferido no servidor).
+  modo_direto: z.boolean().optional(),
   // 'trimestral'/'semestral': rotina a cada 3/6 meses — grava o ACUMULADO do
   // período pelo valor cheio (não mensaliza). A cadência fica no tipo_saving.
   tipo_saving: z.enum(["mensal", "pontual", "trimestral", "semestral"]),
@@ -620,6 +630,9 @@ const iniciarSavingSchema = z.object({
 
 const iniciarReceitaSchema = z.object({
   projeto_id: z.string().min(1),
+  // Fluxo DIRETO de liderança (idem iniciarSaving): pula o orquestrador/gates e monta
+  // o memorial de receita DETERMINISTICAMENTE. Conferido no servidor.
+  modo_direto: z.boolean().optional(),
   tipo_saving: z.enum(["mensal", "pontual", "trimestral", "semestral"]),
   // Valor de receita informado pela pessoa no formulário determinístico. O agente
   // recebe esse valor pré-preenchido e o DESAFIA (em vez de coletar do zero).
@@ -668,9 +681,24 @@ function buildDocEspecial(data: {
   };
 }
 
+// ─── Fluxo DIRETO de liderança ───────────────────────────────────────────────
+// Cargo isento de pré-aprovação (coordenador+, a MESMA régua de `ehLideranca`) pula
+// o agente conversacional e os gates: doc por IA numa passada + memorial
+// determinístico. ⚠️ É uma PORTA que pula os freios de qualidade, então a permissão
+// é conferida SEMPRE no SERVIDOR — o flag do cliente sozinho nunca libera (senão
+// qualquer submissor burlaria os gates mandando `fluxo_direto:true`). Admin também
+// entra (para poder testar o fluxo — ver override `?lideranca=1`). Fail-to-false: se
+// a TeamGuide não responder, `ehLideranca` devolve false e cai no fluxo normal.
+async function podeFluxoDireto(email: string | null | undefined): Promise<boolean> {
+  const alvo = (email ?? "").trim();
+  if (!alvo) return false;
+  if (await isAdmin(alvo)) return true;
+  return ehLideranca(alvo);
+}
+
 // ─── Iniciar submissão ───────────────────────────────────────────────────────
 
-export async function iniciarSubmissao(rawData: unknown) {
+export async function iniciarSubmissao(rawData: unknown, solicitanteEmail?: string | null) {
   const data = iniciarSubmissaoSchema.parse(rawData);
   log("iniciarSubmissao", `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
 
@@ -803,6 +831,44 @@ export async function iniciarSubmissao(rawData: unknown) {
       err("iniciarSubmissao", "Extrator falhou — continuando sem pré-preenchimento:", extractorErr);
       coletadoInicial = { ...documentacaoVazia(), nome_projeto: data.nome_projeto };
     }
+  }
+
+  // ── Fluxo DIRETO de liderança: compila a doc por IA numa ÚNICA passada (a partir
+  // do que o extrator pegou dos arquivos/descrição) e NÃO inicia o chat. O frontend
+  // segue direto ao formulário determinístico de saving/receita. A permissão é
+  // conferida no SERVIDOR (o flag do cliente sozinho não libera). Ver `podeFluxoDireto`.
+  if (data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail))) {
+    let doc: DocumentacaoGerada;
+    try {
+      doc = await compilarDocumentacao(ctx, coletadoInicial);
+    } catch (compileErr) {
+      // A liderança não tem chat para retentar — se a IA falhar, cai numa doc mínima
+      // determinística (título + descrição) para a submissão não travar. A validação
+      // de qualidade é humana (equipe RPA), igual ao caminho especial.
+      err(
+        "iniciarSubmissao",
+        "Compilação da doc falhou no fluxo direto — usando doc mínima:",
+        compileErr,
+      );
+      doc = buildDocEspecial({
+        nome_projeto: data.nome_projeto,
+        responsavel_nome: data.responsavel_nome,
+        responsavel_email: data.responsavel_email,
+        ferramenta: data.ferramenta,
+        membros: data.membros,
+        descricao_breve: data.descricao_breve,
+      });
+    }
+    const docComSinais = {
+      ...doc,
+      tem_ia_como_funcionalidade: coletadoInicial.tem_ia_como_funcionalidade ?? null,
+    };
+    await upsertDocumentacao(projeto.id, docComSinais);
+    log(
+      "iniciarSubmissao",
+      `Fluxo direto (liderança): doc compilada por IA — projeto ${projeto.id} pronto para o formulário.`,
+    );
+    return { projeto_id: projeto.id, fluxo_direto: true };
   }
 
   log("iniciarSubmissao", "Rodando orquestrador (fase doc)...");
@@ -2339,7 +2405,7 @@ export async function enviarMensagem(rawData: unknown) {
 
 // ─── Iniciar fase saving ─────────────────────────────────────────────────────
 
-export async function iniciarSaving(rawData: unknown) {
+export async function iniciarSaving(rawData: unknown, solicitanteEmail?: string | null) {
   const data = iniciarSavingSchema.parse(rawData);
   log("iniciarSaving", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
@@ -2455,6 +2521,71 @@ export async function iniciarSaving(rawData: unknown) {
     };
   }
 
+  // ── Fluxo DIRETO de liderança: memorial DETERMINÍSTICO, sem orquestrador nem gates.
+  // Conferido no servidor (`podeFluxoDireto`). O memorial visível ao usuário sai do
+  // formulário (sem R$); o R$ é injetado por enriquecerMemorial na submissão.
+  if (data.modo_direto && (await podeFluxoDireto(solicitanteEmail))) {
+    log("iniciarSaving", "Fluxo direto (liderança): memorial determinístico, sem gates.");
+    const memorial = memorialDiretoSaving(saving, ctx.descricao_breve);
+    saving.memorial_calculo = memorial;
+
+    const savingVoltouDireto = await hasFormEventTipo(data.projeto_id, "saving");
+    await gravarEvento(data.projeto_id, "saving", "saving", {
+      voltou: savingVoltouDireto,
+      fluxo_direto: true,
+      tipo_saving: data.tipo_saving,
+      alguem_fazia: data.alguem_fazia ?? null,
+      linhas: (data.linhas ?? []).map((l) => ({
+        cargo: l.cargo,
+        horas_antes: l.horas_antes,
+        horas_depois: l.horas_depois,
+      })),
+      custo_externo_mensal: data.custo_externo_mensal ?? null,
+      tem_custo_evitado: data.tem_custo_evitado ?? null,
+      custo_evitado_itens: itensEvitado,
+      tem_custo_projeto: data.tem_custo_projeto ?? null,
+      custo_projeto_itens: itensProjeto,
+      economia_horas_mes: saving.economia_horas_mes ?? null,
+      economia_reais_mes: saving.economia_reais_mes ?? null,
+      custo_evitado_mensal: custoEvitadoMensal > 0 ? custoEvitadoMensal : null,
+      custo_projeto_mensal: custoProjetoMensal > 0 ? custoProjetoMensal : null,
+    });
+
+    // Persiste doc.saving (R$ SEMPRE re-derivado das horas — fonte de verdade), igual
+    // ao ramo "completo" do fluxo normal, para a submissão ter o objeto financeiro.
+    const docRowDireto = await getDocumentacao(data.projeto_id);
+    if (docRowDireto) {
+      const doc = (parseJson<Record<string, unknown>>(docRowDireto.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const projetoCompleto = await getProjetoById(data.projeto_id);
+      const custoProjetoM = custoProjetoMensalFromItens(projetoCompleto?.custo_projeto_itens);
+      saving.custo_projeto_reais = custoProjetoM > 0 ? custoProjetoM : null;
+      doc.saving = recomputarSavingFinanceiro(saving, projetoCompleto?.custo_externo_mensal ?? 0);
+      avisarDivergenciaMemorialLinhas(doc.saving as SavingColetado, data.projeto_id);
+      await upsertDocumentacao(data.projeto_id, doc);
+    }
+
+    // Só saving → encerra aqui (chat_completo). Com receita a seguir, o frontend abre
+    // o formulário de receita, que marcará o chat_completo.
+    const soSaving =
+      tiposProjeto.includes("saving") && !tiposProjeto.includes("receita_incremental");
+    if (soSaving) await updateProjeto(data.projeto_id, { chat_completo: true });
+
+    return {
+      type: "complete" as const,
+      content: memorial,
+      options: null,
+      fase: soSaving ? "completo" : "saving",
+      isPreview: true,
+      isComplete: soSaving,
+      coletado: null,
+      saving,
+      receita: null,
+    };
+  }
+
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
@@ -2545,7 +2676,7 @@ export async function iniciarSaving(rawData: unknown) {
 
 // ─── Iniciar fase receita incremental ────────────────────────────────────────
 
-export async function iniciarReceita(rawData: unknown) {
+export async function iniciarReceita(rawData: unknown, solicitanteEmail?: string | null) {
   const data = iniciarReceitaSchema.parse(rawData);
   log("iniciarReceita", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
@@ -2560,6 +2691,46 @@ export async function iniciarReceita(rawData: unknown) {
   receita.tipo_saving = data.tipo_saving;
   receita.valor_ganho_mensal = data.valor_ganho_mensal ?? null;
   receita.racional = data.racional?.trim() || null;
+
+  // ── Fluxo DIRETO de liderança (idem iniciarSaving): memorial de receita
+  // DETERMINÍSTICO, sem orquestrador nem gates. Receita é a última fase → chat_completo.
+  if (data.modo_direto && (await podeFluxoDireto(solicitanteEmail))) {
+    log("iniciarReceita", "Fluxo direto (liderança): memorial determinístico, sem gates.");
+    const memorial = memorialDiretoReceita(receita, ctx.descricao_breve);
+    receita.memorial_calculo = memorial;
+
+    const receitaVoltouDireto = await hasFormEventTipo(data.projeto_id, "receita");
+    await gravarEvento(data.projeto_id, "receita", "receita", {
+      voltou: receitaVoltouDireto,
+      fluxo_direto: true,
+      tipo_saving: data.tipo_saving,
+      valor_ganho_mensal: data.valor_ganho_mensal ?? null,
+      racional: data.racional?.trim() || null,
+    });
+
+    const docRowDireto = await getDocumentacao(data.projeto_id);
+    if (docRowDireto) {
+      const doc = (parseJson<Record<string, unknown>>(docRowDireto.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      doc.receita = receita;
+      await upsertDocumentacao(data.projeto_id, doc);
+    }
+    await updateProjeto(data.projeto_id, { chat_completo: true });
+
+    return {
+      type: "complete" as const,
+      content: memorial,
+      options: null,
+      fase: "completo",
+      isPreview: true,
+      isComplete: true,
+      coletado: null,
+      saving: null,
+      receita,
+    };
+  }
 
   const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
 
@@ -2886,6 +3057,14 @@ export async function analisarProjetoFn(rawData: unknown) {
   // complexidade + parecer (observações), incl. o veredito de "é mesmo especial?".
   const projetoAtual = await getProjetoById(projeto_id);
   const ehEspecial = projetoAtual?.especial === 1;
+  // Fluxo DIRETO de liderança (cargo isento): como o especial, a decisão de status é
+  // humana — o analisador não reprova nem "valida" automático. Fail-to-false.
+  let ehLiderAnalise = false;
+  try {
+    ehLiderAnalise = await ehLideranca(projetoAtual?.responsavel_email ?? "");
+  } catch (e) {
+    console.error("[analisarProjeto] ehLideranca falhou (seguindo sem imunidade):", e);
+  }
 
   await insertAnalise({
     projeto_id,
@@ -2932,6 +3111,7 @@ export async function analisarProjetoFn(rawData: unknown) {
   const { status: statusFinal, statusSheet } = decidirStatusSubmissao({
     classificacao,
     ehEspecial,
+    fluxoDireto: ehLiderAnalise,
     materialidade: materialidadeProjeto,
     vereditoAprovado: resultado.resultado === "aprovado",
     tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
@@ -2959,8 +3139,9 @@ export async function analisarProjetoFn(rawData: unknown) {
     classificacao_avaliacao: resultado.classificacao_avaliacao ?? null,
     classificacao_justificativa: resultado.classificacao_justificativa ?? null,
     motivo_reprovacao: resultado.motivo_reprovacao ?? null,
-    // Especial não é "validado" pelo analisador — quem valida é o humano; não carimba validated_at.
-    ...(ehEspecial ? {} : { validated_at: new Date().toISOString() }),
+    // Especial e fluxo direto de liderança não são "validados" pelo analisador — quem
+    // valida é o humano; não carimba validated_at.
+    ...(ehEspecial || ehLiderAnalise ? {} : { validated_at: new Date().toISOString() }),
   });
 
   log(

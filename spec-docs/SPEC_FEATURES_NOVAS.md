@@ -1552,3 +1552,37 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 - O deep-link abre o overlay de triagem (edita status), não a página read-only `/projeto/$id`. Como o grupo é só de admin, o gate `requireAdmin`/`_authenticated` do dashboard é adequado.
 
 **Testes:** `tests/chat-message-especial.test.ts` (link com id, encoding, raiz sem id, ausência do link da planilha nas 3 variantes de mensagem).
+
+---
+
+## Fluxo direto de liderança (pula o agente) — 21/08/2026
+
+**Problema / pedido (Luis).** Cargos de liderança já isentos de pré-aprovação (coordenador para cima) não deveriam ter de conversar com o agente para submeter. Eles passam pela Etapa 1 e 2 e a documentação é gerada direto do que enviaram, indo para a submissão — só pelo fluxo determinístico.
+
+**Decisões fechadas (não "corrigir" por engano):**
+- **Quem entra:** exatamente a régua de isenção por cargo — `ehLideranca`/`cargo-lideranca.ts` (coordenador+, supervisor NÃO). Não duplicar a lista.
+- **Gates 100% desligados** para esses cargos (decisão do Luis): sem jornada/teto/≥44h/alocação/ganho-projetado/sobreposição. O memorial é montado do formulário.
+- **Doc gerada por IA numa passada** (não é a doc pobre do especial): extrator + `compilarDocumentacao`, sem conversa.
+- **Memorial sem R$** para o usuário (o R$ segue escondido; entra por `enriquecerMemorial` no `memorial_calculo`).
+- **Analisador não auto-reprova** projeto de liderança (imune como o especial → validação humana). Detectado por `ehLideranca(autor)`; sem coluna nova.
+- **Só submissão NOVA e projeto padrão.** Edição de líder segue a revisão guiada normal; especial já pula o agente sozinho.
+- **Permissão reconferida no SERVIDOR** em todo endpoint (o flag do cliente não burla gate).
+- **Override admin `?lideranca=1`** para admins testarem sem depender do cargo real (só admin; o servidor reconfere).
+
+**Onde aterrissou.** Backend: `src/lib/submeter-direto.ts` (memoriais puros), `iniciarSubmissao`/`iniciarSaving`/`iniciarReceita` (flags `fluxo_direto`/`modo_direto` + `podeFluxoDireto`), `analyzer.ts` (`fluxoDireto` em `normalizarClassificacao`/`decidirStatusSubmissao`), `worker.ts` (rota `GET /api/submeter/perfil` + e-mail threaded). Frontend: `submeter.tsx` (prop/estado de perfil, `modoDireto`, `handleContinuarDireto`, ramos diretos nos submits, botão da Etapa 2.5, background desligado). Testes: `tests/submeter-direto.test.ts` + `tests/criterios-classificacao.test.ts`.
+
+---
+
+## Sandbox de fluxos (`/fluxos`, admin) — 21/08/2026
+
+**Pedido (Luis).** Uma tela de admin para ver os fluxos de submissão (normal e especial — e liderança) sem passar pela submissão real: todas as telas, textos e loading de botão, com o frontend funcionando normal.
+
+**Abordagem escolhida (pelo Luis): sandbox do wizard REAL.** Rota admin `/fluxos` abre o formulário real de submissão em modo demonstração, com o backend mockado — nada é persistido. Vantagem: usa os componentes reais, então os textos nunca desincronizam do que vai para produção.
+
+**Decisões fechadas:**
+- Hook `setDemoBackend` em `api-client.ts`: quando definido, `apiFetch` delega a um handler mockado; quando `null` (produção), o caminho de rede fica idêntico (early-return).
+- `src/lib/fluxos/demo-backend.ts`: state machine que imita o SHAPE das respostas reais (para os componentes reais renderizarem) — textos são exemplos, não vêm do LLM.
+- `submeter.tsx` ganhou `demoFluxo`: instala o backend em `useLayoutEffect` (antes dos fetches passivos), pré-preenche o formulário e desliga seed/rascunho/background. `key={fluxo}` remonta limpo ao trocar.
+- Rota dentro de `_authenticated` (já gated a admin). É ferramenta de inspeção; não escreve nada.
+
+**Onde aterrissou.** `src/lib/api-client.ts`, `src/lib/fluxos/demo-backend.ts`, `src/routes/_authenticated/fluxos.tsx`, `src/routes/submeter.tsx`.

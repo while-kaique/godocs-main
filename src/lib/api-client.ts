@@ -16,8 +16,25 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Backend de DEMONSTRAÇÃO (sandbox admin `/fluxos`). Quando definido, TODA chamada de
+ * `apiFetch` é atendida por ele em vez da rede — sem tocar servidor, banco ou planilha.
+ * Serve para percorrer o formulário REAL de submissão (normal/especial/liderança) com
+ * loading de botão de verdade e nada persistido. É `null` em produção normal (o guard é
+ * um early-return; o caminho de rede fica idêntico). O handler pode lançar `ApiError`
+ * para simular um bloqueio de preenchimento. Ver `src/lib/fluxos/demo-backend.ts`.
+ */
+export type DemoBackend = (path: string, body: unknown, method: string) => Promise<unknown>
+let demoBackend: DemoBackend | null = null
+export function setDemoBackend(fn: DemoBackend | null): void {
+  demoBackend = fn
+}
+
 export async function apiFetch<T>(path: string, body?: unknown, method?: string): Promise<T> {
   const hasBody = body !== undefined
+  if (demoBackend) {
+    return (await demoBackend(path, body, method ?? (hasBody ? 'POST' : 'GET'))) as T
+  }
   const response = await fetch(path, {
     method: method ?? (hasBody ? 'POST' : 'GET'),
     headers: hasBody ? { 'Content-Type': 'application/json' } : undefined,

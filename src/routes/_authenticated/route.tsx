@@ -14,6 +14,7 @@ import {
   Mail,
   Star,
   ClipboardList,
+  Workflow,
 } from "lucide-react";
 
 // Cache do auth no cliente — evita fetch repetido a cada navegação dentro do admin.
@@ -201,6 +202,9 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/testes" icon={<FlaskConical className="h-4 w-4" />}>
             Testes
+          </NavItem>
+          <NavItem to="/fluxos" icon={<Workflow className="h-4 w-4" />}>
+            Fluxos
           </NavItem>
           <Link
             to="/"
