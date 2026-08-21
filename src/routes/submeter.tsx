@@ -57,15 +57,18 @@ export const Route = createFileRoute("/submeter")({
     ],
   }),
   // ?retomar=<id> reabre um rascunho específico (botão "Continuar" de Meus Projetos).
-  validateSearch: (search: Record<string, unknown>): { retomar?: string } => ({
+  // ?lideranca=1 FORÇA o fluxo direto de liderança (só vale para ADMIN — conferido no
+  // servidor) para o Luis/admins testarem sem depender do cargo real na TeamGuide.
+  validateSearch: (search: Record<string, unknown>): { retomar?: string; lideranca?: string } => ({
     retomar: typeof search.retomar === "string" ? search.retomar : undefined,
+    lideranca: typeof search.lideranca === "string" ? search.lideranca : undefined,
   }),
   component: SubmeterPage,
 });
 
 function SubmeterPage() {
-  const { retomar } = Route.useSearch();
-  return <SubmeterPageContent resumeDraftId={retomar} />;
+  const { retomar, lideranca } = Route.useSearch();
+  return <SubmeterPageContent resumeDraftId={retomar} liderancaOverride={lideranca === "1"} />;
 }
 
 /* ──────────────────────────────────────────────
@@ -447,7 +450,8 @@ function SalvarRascunhoModal({
 export function SubmeterPageContent({
   editProjetoId,
   resumeDraftId,
-}: { editProjetoId?: string; resumeDraftId?: string } = {}) {
+  liderancaOverride,
+}: { editProjetoId?: string; resumeDraftId?: string; liderancaOverride?: boolean } = {}) {
   const navigate = useNavigate();
   // Invalida o cache de "Meus Projetos" (staleTime 60s) após submeter/reenviar, para
   // a lista refletir o novo estado real (ex.: legado regularizado deixa de mostrar o
@@ -510,6 +514,8 @@ export function SubmeterPageContent({
   // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
   const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
   const [iniciandoChat, setIniciandoChat] = useState(false);
+  // Fluxo DIRETO de liderança: loading do botão "Enviar direto" (cria projeto + doc por IA).
+  const [iniciandoDireto, setIniciandoDireto] = useState(false);
   // F2 — processamento da doc em segundo plano (só submissão nova). Ao subir arquivos na
   // Etapa 2, disparamos iniciar-submissao em background para a Etapa 3 abrir sem espera.
   const [bgStatus, setBgStatus] = useState<"idle" | "processando" | "pronto" | "erro">("idle");
@@ -1046,6 +1052,39 @@ export function SubmeterPageContent({
     return () => { cancelled = true; };
   }, []);
 
+  // Perfil de submissão: o usuário logado é LIDERANÇA (cargo isento, coordenador+)? Se
+  // for, o formulário oferece o FLUXO DIRETO — pula o agente conversacional e os gates
+  // (doc por IA + memorial determinístico). Endpoint separado do /api/auth/me de
+  // propósito (só o form precisa; não pôr a consulta à TeamGuide no caminho de todo
+  // auth/me). ⚠️ É só o que PINTA: o servidor reconfere a permissão em
+  // iniciar-submissao/saving/receita, então o override abaixo nunca burla um gate.
+  const [perfilLideranca, setPerfilLideranca] = useState(false);
+  const [perfilAdmin, setPerfilAdmin] = useState(false);
+  // Até o perfil carregar, NÃO decidimos o fluxo — segura o disparo do background (que
+  // inicia o agente normal) para não pré-processar a doc de um líder pelo caminho errado.
+  const [perfilCarregado, setPerfilCarregado] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ ehLideranca?: boolean; isAdmin?: boolean } | null>("/api/submeter/perfil")
+      .then((p) => {
+        if (cancelled) return;
+        setPerfilLideranca(!!p?.ehLideranca);
+        setPerfilAdmin(!!p?.isAdmin);
+      })
+      .catch((e) => console.warn("[submeter] perfil de submissão indisponível:", e))
+      .finally(() => { if (!cancelled) setPerfilCarregado(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Liderança EFETIVA: cargo isento OU override de admin (?lideranca=1) para testar.
+  // O fluxo DIRETO só vale para projeto padrão (o especial já pula o agente por conta própria).
+  const overrideLideranca = perfilAdmin && !!liderancaOverride;
+  const ehLiderancaEfetivo = perfilLideranca || overrideLideranca;
+  // O fluxo DIRETO vale só para SUBMISSÃO NOVA e projeto padrão. Edição de liderança
+  // segue a revisão guiada normal (evita o rehydrate/re-init do doc da edição); o
+  // especial já pula o agente por conta própria.
+  const modoDireto = ehLiderancaEfetivo && !form.especial && !editProjetoId;
+
   // Etapa 2.5 (tipo de projeto): sub-tela entre a etapa 2 e o início do agente.
   // Só aparece na PRIMEIRA passagem (antes do agente iniciar). Em re-entradas
   // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
@@ -1298,6 +1337,10 @@ export function SubmeterPageContent({
   // Só submissão NOVA (!editProjetoId) e só enquanto o projeto não existe (cria 1 vez).
   useEffect(() => {
     if (editProjetoId || projetoId) return;
+    // Liderança usa o FLUXO DIRETO (doc por IA numa passada quando clica "Enviar
+    // direto") — não pré-processamos a doc pelo agente. Enquanto o perfil não carregou,
+    // seguramos o disparo para não iniciar o agente por engano num líder.
+    if (!perfilCarregado || ehLiderancaEfetivo) return;
     if (arquivos.length === 0) return;
     if (docExistenteInvalidado) return;
     if (!camposMinimosDocProntos(form)) return;
@@ -1309,7 +1352,7 @@ export function SubmeterPageContent({
     if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current);
     bgDebounceRef.current = setTimeout(() => { void dispararDocBackground(); }, 800);
     return () => { if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current); };
-  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground]);
+  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground, perfilCarregado, ehLiderancaEfetivo]);
 
   // Após o background criar o projeto, a Etapa 2.5 (não-especial) delega ao fluxo de
   // re-entrada num render com projetoId JÁ no estado (evita ler o valor stale).
@@ -1577,6 +1620,99 @@ export function SubmeterPageContent({
       toast.error(`Não foi possível iniciar o agente. ${msg}`, { duration: 12000 });
     } finally {
       setIniciandoChat(false);
+    }
+  }
+
+  /* ── Fluxo DIRETO de liderança: cria o projeto (doc por IA numa passada) e abre
+     direto o formulário determinístico de saving/receita, SEM passar pelo agente
+     conversacional. Só liderança/admin chega aqui (o botão só aparece p/ eles e o
+     servidor reconfere `fluxo_direto`). Espelha handleIniciarAgente na criação. ── */
+  async function handleContinuarDireto() {
+    if (!validateStep(2)) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    if (arquivos.length === 0) return;
+
+    const charsEstimados =
+      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
+    if (charsEstimados > TOKEN_BLOCK_CHARS) {
+      const tokens = Math.round(charsEstimados / 4);
+      toast.warning(
+        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
+        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
+        { duration: 10000 },
+      );
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+
+    setIniciandoDireto(true);
+    try {
+      const docs = await filesToDocs(arquivos);
+      const ferramentaEnviada = computeFerramenta();
+
+      const result = await apiFetch<{ projeto_id: string; fluxo_direto?: boolean }>(
+        "/api/chat/iniciar-submissao",
+        {
+          responsavel_nome: form.nome.trim(),
+          responsavel_email: form.email.trim(),
+          ferramenta: ferramentaEnviada,
+          escopo: form.escopo as "interno" | "externo",
+          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
+          membros: form.participantes,
+          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
+          nome_projeto: form.nomeProjeto.trim(),
+          data_criacao: form.dataCriacao,
+          tipos_projeto: form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
+          tipo_projeto: form.tipoProjeto[0] || undefined,
+          descricao_breve: form.descricaoBreve.trim() || undefined,
+          usa_ai_proxy: form.usaAiProxy || undefined,
+          contrafactual_afetados:
+            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
+            undefined,
+          // O backend gera a doc por IA numa passada e NÃO inicia o chat.
+          fluxo_direto: true,
+          docs,
+        },
+      );
+
+      setProjetoId(result.projeto_id);
+      setNomesExistentes(arquivos.map((f) => f.name));
+      setDocExistenteInvalidado(false);
+      setAgentTipos(form.tipoProjeto);
+      setAgentMeta(snapshotMeta());
+      setAgentArquivosSig(arquivosSig());
+
+      // Sem chat: vai direto ao formulário determinístico da fase financeira. Se há
+      // saving, começa por ele (o "ambos" segue para a receita depois); só receita
+      // abre o formulário de receita.
+      setChatMessages([]);
+      setChatComplete(false);
+      setFormDraft(emptyFormDraft());
+      setSavingSubmitted(null);
+      setReceitaSubmitted(null);
+      setApprovedSavingPreview(null);
+      setApprovedReceitaPreview(null);
+      if (form.tipoProjeto.includes("saving")) {
+        setChatFase("saving");
+        setShowReceitaForm(false);
+        setShowSavingForm(true);
+      } else {
+        setChatFase("receita");
+        setShowSavingForm(false);
+        setShowReceitaForm(true);
+      }
+      setCompletedSteps((prev) => new Set([...prev, 2, 3]));
+      goToStep(3, "forward");
+    } catch (err) {
+      console.error("[submeter] fluxo direto falhou:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Não foi possível preparar a submissão. ${msg}`, { duration: 12000 });
+    } finally {
+      setIniciandoDireto(false);
     }
   }
 
@@ -2327,6 +2463,8 @@ export function SubmeterPageContent({
           custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
           tem_custo_projeto: formData.temCustoProjeto || undefined,
           custo_projeto_itens: custoProjetoItens.length ? custoProjetoItens : undefined,
+          // Liderança: memorial determinístico, sem gates (o servidor reconfere).
+          modo_direto: modoDireto || undefined,
         },
       );
       setShowSavingForm(false);
@@ -2341,6 +2479,21 @@ export function SubmeterPageContent({
       setApprovedReceitaPreview(null);
       setShowReceitaForm(false);
       setChatComplete(false);
+      // Fluxo DIRETO de liderança: o backend já devolveu o memorial pronto (sem gates,
+      // sem chat). Aprova o preview e ou segue para a receita ("ambos") ou vai à revisão
+      // final. NÃO entra no chat (nenhuma mensagem de agente é exibida).
+      if (modoDireto) {
+        setApprovedSavingPreview(result.content ?? null);
+        setChatMessages([]);
+        if (form.tipoProjeto.includes("receita_incremental")) {
+          setChatFase("receita");
+          openReceitaForm();
+        } else {
+          setChatFase("completo");
+          setChatComplete(true);
+        }
+        return;
+      }
       const savingMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -2383,6 +2536,8 @@ export function SubmeterPageContent({
           tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
           valor_ganho_mensal: valorReceita,
           racional: formData.racionalReceita.trim() || undefined,
+          // Liderança: memorial determinístico, sem gates (o servidor reconfere).
+          modo_direto: modoDireto || undefined,
         },
       );
       setShowReceitaForm(false);
@@ -2390,6 +2545,15 @@ export function SubmeterPageContent({
       setReceitaSubmitted(formData);
       // Preview de receita aprovado anteriormente deixa de valer ao reiniciar a fase.
       setApprovedReceitaPreview(null);
+      // Fluxo DIRETO de liderança: receita é a última fase → aprova o preview e vai
+      // direto à revisão final, sem chat.
+      if (modoDireto) {
+        setApprovedReceitaPreview(result.content ?? null);
+        setChatMessages([]);
+        setChatFase("completo");
+        setChatComplete(true);
+        return;
+      }
       const receitaMsg: ChatMessage = {
         role: "assistant",
         content: result.content,
@@ -2972,8 +3136,30 @@ export function SubmeterPageContent({
                 </button>
               )}
 
+              {/* Etapa 2.5 (projeto padrão) — LIDERANÇA (cargo isento): pula o agente.
+                  Cria o projeto (doc por IA numa passada) e vai direto ao formulário
+                  determinístico de saving/receita. O servidor reconfere a permissão. */}
+              {step === 2 && showEtapa25 && respEspecial !== "sim" && modoDireto && (
+                <button
+                  type="button"
+                  onClick={handleContinuarDireto}
+                  disabled={iniciandoDireto}
+                  title="Como liderança, você segue direto para o preenchimento — sem conversar com o agente."
+                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
+                >
+                  {iniciandoDireto ? (
+                    <>
+                      <CyclingText steps={LOADING_STEPS_INICIAR} />
+                      <div className="go-spinner" />
+                    </>
+                  ) : (
+                    <span>Continuar &rarr;</span>
+                  )}
+                </button>
+              )}
+
               {/* Etapa 2.5 (projeto padrão): inicia o agente (1ª vez) ou retoma (re-entrada). */}
-              {step === 2 && showEtapa25 && respEspecial !== "sim" && (
+              {step === 2 && showEtapa25 && respEspecial !== "sim" && !modoDireto && (
                 projetoId ? (
                   <button
                     type="button"

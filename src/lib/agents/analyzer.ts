@@ -16,6 +16,7 @@ import type {
   SavingColetado,
 } from './types';
 import { detectarAiProxy } from './extractor';
+import { ehLideranca } from '@/lib/areas/teamguide.server';
 // Mesmas derivações que `submeterParaValidacao` aplica antes de gravar no Sheets — o
 // snapshot da documentação fica defasado no financeiro (ver comentário em buildUserMessage).
 import {
@@ -554,6 +555,9 @@ export function normalizarClassificacao(input: {
   justificativa?: string | null;
   motivo?: string | null;
   especial?: boolean | null;
+  // Fluxo DIRETO de liderança (cargo isento): como o especial, NUNCA reprova automático
+  // — a validação de qualidade é humana (equipe RPA). Rebaixa `claro_nao` → `zona_cinzenta`.
+  fluxoDireto?: boolean | null;
   materialidade?: number | null;
   tetoMaterialidade?: number;
 }): {
@@ -580,6 +584,10 @@ export function normalizarClassificacao(input: {
     } else if (input.especial) {
       classificacao = 'zona_cinzenta';
       ajuste = "projeto especial → 'zona_cinzenta' (especial nunca reprova automático)";
+    } else if (input.fluxoDireto) {
+      classificacao = 'zona_cinzenta';
+      ajuste =
+        "fluxo direto de liderança → 'zona_cinzenta' (validação humana; não reprova automático)";
     } else if ((input.materialidade ?? 0) > teto) {
       classificacao = 'zona_cinzenta';
       ajuste = `materialidade acima de R$ ${teto}/mês → 'zona_cinzenta' (decisão humana)`;
@@ -616,6 +624,9 @@ export type StatusSheet = 'Pendente' | 'Reprovado' | 'Reenvio Pendente';
 export function decidirStatusSubmissao(input: {
   classificacao?: ClassificacaoAvaliacao | string | null;
   ehEspecial: boolean;
+  // Fluxo DIRETO de liderança: nunca reprova automático e vai sempre para validação
+  // humana (em_validacao / "Pendente"), como o especial. Decisão do produto (21/08/2026).
+  fluxoDireto?: boolean;
   materialidade: number;
   vereditoAprovado: boolean;
   tetoMaterialidade?: number;
@@ -623,10 +634,11 @@ export function decidirStatusSubmissao(input: {
   const teto = input.tetoMaterialidade ?? TETO_MATERIALIDADE_CLASSIFICACAO;
   const classificacao = (input.classificacao ?? '').toString().trim().toLowerCase();
 
-  if (classificacao === 'claro_nao' && !input.ehEspecial) {
+  if (classificacao === 'claro_nao' && !input.ehEspecial && !input.fluxoDireto) {
     return { status: 'rejeitado', statusSheet: 'Reprovado' };
   }
   if (input.ehEspecial) return { status: 'em_validacao', statusSheet: 'Pendente' };
+  if (input.fluxoDireto) return { status: 'em_validacao', statusSheet: 'Pendente' };
   if (classificacao === 'zona_cinzenta') return { status: 'em_validacao', statusSheet: 'Pendente' };
   if (input.materialidade > teto) return { status: 'em_validacao', statusSheet: 'Pendente' };
   return input.vereditoAprovado
@@ -725,11 +737,20 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   const materialidade =
     ((savingConteudo?.economia_reais_mes as number) ?? 0) +
     ((receitaConteudo?.valor_ganho_mensal as number) ?? 0);
+  // Liderança (cargo isento) usa o fluxo direto → nunca reprova automático (validação
+  // humana). Fail-to-false: TeamGuide fora → segue a régua normal. Cacheado por isolate.
+  let ehLider = false;
+  try {
+    ehLider = await ehLideranca((projeto.responsavel_email as string | null) ?? '');
+  } catch (e) {
+    err('normalizarClassificacao: ehLideranca falhou (seguindo sem imunidade):', e);
+  }
   const classif = normalizarClassificacao({
     classificacao: resultado.classificacao_avaliacao,
     justificativa: resultado.classificacao_justificativa,
     motivo: resultado.motivo_reprovacao,
     especial: projeto.especial === 1,
+    fluxoDireto: ehLider,
     materialidade,
   });
   if (classif.ajuste) {
