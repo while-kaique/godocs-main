@@ -2577,7 +2577,11 @@ export function Step3Chat({
           );
         })}
 
-        {loading && (
+        {/* Loader (3 pontos / passos) só quando NÃO há bolha do assistente streamando: durante
+            o streaming a última mensagem já é do assistente e vai se preenchendo, então os
+            pontos sairiam sobrando embaixo dela. (Sem streaming, `loading` só é true enquanto a
+            última mensagem é a do usuário — a condição não muda o comportamento antigo.) */}
+        {loading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
             <div
               className="rounded-2xl rounded-tl-sm px-4 py-3"

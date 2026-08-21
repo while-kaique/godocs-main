@@ -5,7 +5,7 @@
 
 const log = (...args: unknown[]) => console.log("[orchestrator]", ...args);
 
-import { llmChat } from "@/lib/llm";
+import { llmChat, llmChatStream, extractPartialJsonStringField } from "@/lib/llm";
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -1444,6 +1444,12 @@ export async function runOrchestrator(
   resumoProjeto: string = "",
   tipos_projeto: ("saving" | "receita_incremental")[] = ["saving"],
   receita: ReceitaColetada = receitaVazia(),
+  // Streaming (SSE): quando `onDelta` está presente, a PROSA (o campo `content` do JSON) é
+  // emitida token a token à medida que chega — mas SÓ nos turnos que o modelo redige como
+  // `preview`/`complete` (as gerações longas). `question`/`options` são curtos e sujeitos a
+  // reescrita por gate → ficam bufferizados (§6 do plano). O retorno segue sendo o
+  // OrchestratorResult COMPLETO; os gates pós-orquestrador (em chat.functions) mandam.
+  streamOpts: { onDelta?: (chunk: string) => void } = {},
 ): Promise<OrchestratorResult> {
   let systemPrompt: string;
 
@@ -1551,12 +1557,51 @@ export async function runOrchestrator(
   const maxRetries = 2;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      raw = await llmChat(messages, {
-        jsonMode: true,
-        temperature,
-        maxTokens: 4096,
-        model: fastModel,
-      });
+      // Só a 1ª tentativa streama (e só se o chamador passou onDelta): assim uma reescrita
+      // por JSON inválido não re-emite prosa. A extração da prosa de dentro do JSON usa o
+      // parser incremental e é GATED pelo `type` — que chega no começo do stream, então
+      // decidimos "streamar ou não" sem adivinhar o futuro (§6 do plano).
+      if (attempt === 0 && streamOpts.onDelta) {
+        let rawAcc = "";
+        let streamedProse = "";
+        let streamAtivo: boolean | null = null; // null = ainda não sei o `type`
+        raw = await llmChatStream(messages, {
+          jsonMode: true,
+          temperature,
+          maxTokens: 4096,
+          model: fastModel,
+          onRawDelta: (piece) => {
+            rawAcc += piece;
+            if (streamAtivo === null) {
+              // ⚠️ Lê o `type` só quando ele FECHOU (aspas de fechamento presentes) — senão
+              // um `type` ainda parcial ("prev") seria comparado a "preview" e travaria
+              // streamAtivo em false para sempre. Como `type` é sempre um enum conhecido,
+              // exigir o valor completo + aspas resolve isso.
+              const tm = rawAcc.match(/"type"\s*:\s*"(preview|complete|question|options)"/);
+              if (!tm) return; // `type` ainda não fechou (ou é desconhecido) — espera/não streama
+              // ⚠️ NÃO streamar o `complete` da fase doc_preview (aprovação da doc): ele é uma
+              // frase curta seguida da compilação PESADA (compilarDocumentacao, ~88s, sem
+              // stream) — streamar a frase curta esconderia o loader de "compilando..." e a
+              // tela pareceria travada. Os AJUSTES da doc (type preview em doc_preview) seguem
+              // streamando normal.
+              streamAtivo = tm[1] === "preview" || (tm[1] === "complete" && fase !== "doc_preview");
+            }
+            if (!streamAtivo) return; // question/options: não streama a prosa
+            const content = extractPartialJsonStringField(rawAcc, "content");
+            if (content !== null && content.length > streamedProse.length && content.startsWith(streamedProse)) {
+              streamOpts.onDelta!(content.slice(streamedProse.length));
+              streamedProse = content;
+            }
+          },
+        });
+      } else {
+        raw = await llmChat(messages, {
+          jsonMode: true,
+          temperature,
+          maxTokens: 4096,
+          model: fastModel,
+        });
+      }
       log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? "..." : ""}`);
     } catch (llmErr) {
       const msg = llmErr instanceof Error ? llmErr.message : String(llmErr);
