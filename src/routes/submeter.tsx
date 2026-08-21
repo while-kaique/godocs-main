@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Save, FolderClock, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiFetch, ApiError } from "@/lib/api-client";
+import { apiFetch, ApiError, setDemoBackend } from "@/lib/api-client";
+import { criarDemoBackend, demoSeedForm, demoFile, type FluxoDemo } from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 import { CODIGOS_TRIAGEM_ESPECIAL } from "@/lib/mensagens-submissao";
@@ -451,7 +452,15 @@ export function SubmeterPageContent({
   editProjetoId,
   resumeDraftId,
   liderancaOverride,
-}: { editProjetoId?: string; resumeDraftId?: string; liderancaOverride?: boolean } = {}) {
+  demoFluxo,
+}: {
+  editProjetoId?: string;
+  resumeDraftId?: string;
+  liderancaOverride?: boolean;
+  // Sandbox admin `/fluxos`: renderiza o formulário REAL em modo demonstração (backend
+  // mockado, nada persistido). Ver src/lib/fluxos/demo-backend.ts.
+  demoFluxo?: FluxoDemo;
+} = {}) {
   const navigate = useNavigate();
   // Invalida o cache de "Meus Projetos" (staleTime 60s) após submeter/reenviar, para
   // a lista refletir o novo estado real (ex.: legado regularizado deixa de mostrar o
@@ -461,7 +470,7 @@ export function SubmeterPageContent({
   // Carrega tela de "preparando" enquanto seedamos: edição (servidor) OU
   // retomada de rascunho (localStorage ou ?retomar).
   const [seedLoading, setSeedLoading] = useState(
-    !!editProjetoId || !!resumeDraftId || hasLocalDraft(),
+    !demoFluxo && (!!editProjetoId || !!resumeDraftId || hasLocalDraft()),
   );
   // Apresentação do formulário (antes da Etapa 1). Decidida UMA vez, no mount, com
   // o mesmo trio de sinais do `seedLoading` acima — a intro só vale para submissão
@@ -469,11 +478,14 @@ export function SubmeterPageContent({
   // alguém abre /submeter do zero (inclusive depois de "Recomeçar" e de
   // "Submeter outro projeto", que recarregam a página sem rascunho).
   const [showIntro, setShowIntro] = useState(() =>
-    deveMostrarIntro({
-      editProjetoId,
-      resumeDraftId,
-      temRascunhoLocal: hasLocalDraft(),
-    }),
+    // No sandbox, sempre mostra a intro (é uma tela a inspecionar) e ignora rascunhos reais.
+    demoFluxo
+      ? true
+      : deveMostrarIntro({
+          editProjetoId,
+          resumeDraftId,
+          temRascunhoLocal: hasLocalDraft(),
+        }),
   );
   const [nomesExistentes, setNomesExistentes] = useState<string[]>([]);
   // O usuário removeu um arquivo já enviado (box "Arquivos enviados anteriormente").
@@ -876,6 +888,9 @@ export function SubmeterPageContent({
   // Mount: decide entre EDIÇÃO, RETOMADA de rascunho (local ou cross-device) ou
   // submissão nova (fresh). Roda uma única vez.
   useEffect(() => {
+    // Sandbox de demonstração (/fluxos): não seeda de rascunho/servidor — o formulário
+    // é pré-preenchido pelo efeito de demo. Sai cedo para não carregar nada real.
+    if (demoFluxo) return;
     // Sem guarda de "já seedou": sob StrictMode (dev) o efeito monta → desmonta →
     // remonta. Um ref persistente faria a 2ª montagem (a final) sair cedo, deixando
     // o seedLoading preso em true (o fetch da 1ª já vem com cancelled=true). O flag
@@ -1033,6 +1048,27 @@ export function SubmeterPageContent({
     especialGanhoOrganizacional: "",
   });
 
+  // ── Sandbox de demonstração (/fluxos) ──────────────────────────────────────
+  // Instala o backend MOCKADO e pré-preenche o formulário para percorrer o fluxo
+  // escolhido (normal/especial/liderança) sem tocar servidor/banco. O handler é
+  // memoizado (estado de conversa preservado entre renders) e instalado em
+  // useLayoutEffect — roda ANTES dos efeitos passivos (auth/me, perfil), então essas
+  // chamadas já caem no mock. Prefill roda uma vez.
+  const demoBk = useMemo(() => (demoFluxo ? criarDemoBackend(demoFluxo) : null), [demoFluxo]);
+  useLayoutEffect(() => {
+    if (!demoBk) return;
+    setDemoBackend(demoBk);
+    return () => setDemoBackend(null);
+  }, [demoBk]);
+  const demoSeedAplicado = useRef(false);
+  useEffect(() => {
+    if (!demoFluxo || demoSeedAplicado.current) return;
+    demoSeedAplicado.current = true;
+    setForm((prev) => ({ ...prev, ...demoSeedForm(demoFluxo, today) }));
+    setArquivos([demoFile()]);
+    setNomesExistentes(["exemplo-demonstracao.txt"]);
+  }, [demoFluxo, today]);
+
   // Identidade automática: nome + e-mail vêm da conta logada (Godeploy, via
   // /api/auth/me). O formulário não pergunta mais — preenchemos `form.nome`/
   // `form.email` UMA vez, e SÓ se estiverem vazios, para nunca sobrescrever o
@@ -1096,6 +1132,8 @@ export function SubmeterPageContent({
   // modo edição, depois que o rascunho existe no servidor (projetoId), e não
   // durante o seed inicial nem após submeter.
   useEffect(() => {
+    // Sandbox: nunca persiste rascunho (não polui o localStorage do admin).
+    if (demoFluxo) return;
     if (!projetoId || submitted || seedLoading) return;
     // Persiste tanto a submissão NOVA quanto a EDIÇÃO (esta sob chave por projeto).
     // Antes a edição não salvava nada → reload no meio da conversa perdia tudo.
@@ -1337,6 +1375,8 @@ export function SubmeterPageContent({
   // Só submissão NOVA (!editProjetoId) e só enquanto o projeto não existe (cria 1 vez).
   useEffect(() => {
     if (editProjetoId || projetoId) return;
+    // Sandbox: sem pré-processamento em background (cada fluxo cria o projeto no clique).
+    if (demoFluxo) return;
     // Liderança usa o FLUXO DIRETO (doc por IA numa passada quando clica "Enviar
     // direto") — não pré-processamos a doc pelo agente. Enquanto o perfil não carregou,
     // seguramos o disparo para não iniciar o agente por engano num líder.
@@ -1352,7 +1392,7 @@ export function SubmeterPageContent({
     if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current);
     bgDebounceRef.current = setTimeout(() => { void dispararDocBackground(); }, 800);
     return () => { if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current); };
-  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground, perfilCarregado, ehLiderancaEfetivo]);
+  }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground, perfilCarregado, ehLiderancaEfetivo, demoFluxo]);
 
   // Após o background criar o projeto, a Etapa 2.5 (não-especial) delega ao fluxo de
   // re-entrada num render com projetoId JÁ no estado (evita ler o valor stale).

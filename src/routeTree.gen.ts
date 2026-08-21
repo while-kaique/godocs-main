@@ -21,6 +21,7 @@ import { Route as ProjetoIdRouteImport } from './routes/projeto.$id'
 import { Route as EditarIdRouteImport } from './routes/editar.$id'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
 import { Route as AuthenticatedInvestigadorRouteImport } from './routes/_authenticated/investigador'
+import { Route as AuthenticatedFluxosRouteImport } from './routes/_authenticated/fluxos'
 import { Route as AuthenticatedEspeciaisRouteImport } from './routes/_authenticated/especiais'
 import { Route as AuthenticatedEmailLegadosRouteImport } from './routes/_authenticated/email-legados'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -93,6 +94,11 @@ const AuthenticatedInvestigadorRoute =
     path: '/investigador',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedFluxosRoute = AuthenticatedFluxosRouteImport.update({
+  id: '/fluxos',
+  path: '/fluxos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedEspeciaisRoute = AuthenticatedEspeciaisRouteImport.update({
   id: '/especiais',
   path: '/especiais',
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/especiais': typeof AuthenticatedEspeciaisRoute
+  '/fluxos': typeof AuthenticatedFluxosRoute
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/especiais': typeof AuthenticatedEspeciaisRoute
+  '/fluxos': typeof AuthenticatedFluxosRoute
   '/investigador': typeof AuthenticatedInvestigadorRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/email-legados': typeof AuthenticatedEmailLegadosRoute
   '/_authenticated/especiais': typeof AuthenticatedEspeciaisRoute
+  '/_authenticated/fluxos': typeof AuthenticatedFluxosRoute
   '/_authenticated/investigador': typeof AuthenticatedInvestigadorRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
   '/editar/$id': typeof EditarIdRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email-legados'
     | '/especiais'
+    | '/fluxos'
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
@@ -264,6 +274,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email-legados'
     | '/especiais'
+    | '/fluxos'
     | '/investigador'
     | '/usuarios'
     | '/editar/$id'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/email-legados'
     | '/_authenticated/especiais'
+    | '/_authenticated/fluxos'
     | '/_authenticated/investigador'
     | '/_authenticated/usuarios'
     | '/editar/$id'
@@ -399,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInvestigadorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/fluxos': {
+      id: '/_authenticated/fluxos'
+      path: '/fluxos'
+      fullPath: '/fluxos'
+      preLoaderRoute: typeof AuthenticatedFluxosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/especiais': {
       id: '/_authenticated/especiais'
       path: '/especiais'
@@ -504,6 +523,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEmailLegadosRoute: typeof AuthenticatedEmailLegadosRoute
   AuthenticatedEspeciaisRoute: typeof AuthenticatedEspeciaisRoute
+  AuthenticatedFluxosRoute: typeof AuthenticatedFluxosRoute
   AuthenticatedInvestigadorRoute: typeof AuthenticatedInvestigadorRoute
   AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
 }
@@ -515,6 +535,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEmailLegadosRoute: AuthenticatedEmailLegadosRoute,
   AuthenticatedEspeciaisRoute: AuthenticatedEspeciaisRoute,
+  AuthenticatedFluxosRoute: AuthenticatedFluxosRoute,
   AuthenticatedInvestigadorRoute: AuthenticatedInvestigadorRoute,
   AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
 }
