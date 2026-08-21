@@ -3496,3 +3496,9 @@ Nesta sessão `gh pr create`/`gh pr merge` **funcionaram** — o bloqueio local 
 **Plano ativo:** nenhum plano formal em `docs/plans/` — feature pequena/aprovada em conversa com o Luis. Spec em `spec-docs/SPEC_FEATURES_NOVAS.md` ("Fluxo direto de liderança" + "Sandbox de fluxos"). Memória: `fluxo-direto-lideranca.md`.
 
 **Próximo passo:** Luis validar no navegador na staging (`/submeter?lideranca=1` e `/fluxos`). Com o "ok" dele → deploy em prod (`674a3710`) + `git fetch`/incorporar origin/main + rebuild + PR (conta writer `LuisEduardo100`) + **merge no `main`** (regras 13/14). NÃO rodar `/ggsd:ship` antes da validação do Luis.
+
+### Ajuste 21/08 (mesma sessão) — acesso ao fluxo de líder + /fluxos
+- `?lideranca=1` NÃO funciona: o edge do Godeploy engole a query no OAuth (some da URL). Fix: botão "Abrir formulário real como líder" no /fluxos → flag `sessionStorage` (`CHAVE_TESTE_LIDERANCA`) + navegação client-side; `submeter.tsx` lê a flag (só admin). Redeployado na staging (entry index-JRIWYGX9.js).
+- Link "Fluxos (demo)" na sidebar admin (`_authenticated/route.tsx`).
+- Sandbox /fluxos: removida a aba "Especial" (o Padrão já oferece marcar especial na Etapa 2.5).
+- Commits: 2587746. Próximo passo inalterado: Luis validar → prod+PR+merge.
