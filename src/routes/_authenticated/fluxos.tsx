@@ -24,7 +24,7 @@ const FLUXOS: { id: FluxoDemo; rotulo: string; descricao: string }[] = [
   },
   {
     id: "lideranca",
-    rotulo: "Liderança (fluxo direto)",
+    rotulo: "Liderança",
     descricao:
       "Cargo isento: pula o agente conversacional. Doc por IA + formulário determinístico, sem gates.",
   },
@@ -117,7 +117,7 @@ function FluxosPage() {
               fontWeight: 600,
             }}
           >
-            ↺ Reiniciar / trocar fluxo
+            ↺ Reiniciar
           </button>
         )}
       </div>

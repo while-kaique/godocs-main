@@ -204,7 +204,7 @@ function AuthenticatedLayout() {
             Testes
           </NavItem>
           <NavItem to="/fluxos" icon={<Workflow className="h-4 w-4" />}>
-            Fluxos (demo)
+            Fluxos
           </NavItem>
           <Link
             to="/"
