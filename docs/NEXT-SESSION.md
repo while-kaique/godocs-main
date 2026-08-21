@@ -3486,3 +3486,13 @@ Nesta sessão `gh pr create`/`gh pr merge` **funcionaram** — o bloqueio local 
 
 ⚠️ **PR #214 (dashboard de triagem) foi MERGEADO** no `main` (`e878bc1`) nesta sessão; o worktree
 `dashboard-admin-sheets` e a branch local foram removidos.
+
+---
+
+## Sessão 21/08/2026 — Fluxo direto de liderança + sandbox /fluxos
+
+**O que a sessão fez.** Implementou o fluxo direto de submissão para cargos de liderança (isentos de pré-aprovação): pulam o agente conversacional — doc gerada por IA numa passada + formulário determinístico de saving/receita SEM gates; analisador não auto-reprova líder; override admin `?lideranca=1`. E o sandbox admin `/fluxos` (wizard real em modo demonstração, backend mockado). Branch `feat/submissao-direta-lideranca` (base origin/main 49f9f1d), 4 commits. 1641 testes ✓. Deploy em STAGING (`edf400b4`) validado no nível de build+boot.
+
+**Plano ativo:** nenhum plano formal em `docs/plans/` — feature pequena/aprovada em conversa com o Luis. Spec em `spec-docs/SPEC_FEATURES_NOVAS.md` ("Fluxo direto de liderança" + "Sandbox de fluxos"). Memória: `fluxo-direto-lideranca.md`.
+
+**Próximo passo:** Luis validar no navegador na staging (`/submeter?lideranca=1` e `/fluxos`). Com o "ok" dele → deploy em prod (`674a3710`) + `git fetch`/incorporar origin/main + rebuild + PR (conta writer `LuisEduardo100`) + **merge no `main`** (regras 13/14). NÃO rodar `/ggsd:ship` antes da validação do Luis.
