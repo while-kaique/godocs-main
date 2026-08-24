@@ -4047,7 +4047,14 @@ export async function resyncGoogle(rawData: unknown) {
   // então ele espelha o que a tabela INTERNA `projeto_aprovacoes` já diz — inclusive
   // um parecer JÁ DADO. Sem fila (isento/legado) manda `undefined`: a coluna fica como
   // está, em vez de virar "—" e apagar o estado que o submit gravou.
-  const filaLider = await getAprovacoesDoProjeto(projeto_id);
+  // ⚠️ A coluna "Aprovação do Líder" é do ESTÁGIO 1 — computa SÓ sobre essas linhas
+  // (mesmo predicado dos escritores primários: `dispensarPreAprovacao`,
+  // `decidirAprovacao`). Num projeto-feature com estágio 1 ISENTO (autor liderança), as
+  // únicas linhas em `projeto_aprovacoes` são do estágio 2; sem o filtro elas passavam
+  // o guard e gravavam o parecer do 2º líder na coluna do 1º.
+  const filaLider = (await getAprovacoesDoProjeto(projeto_id)).filter(
+    (l) => Number(l.estagio) === 1,
+  );
   const aprovacaoLider = filaLider.length ? rotuloAprovacaoSheet(filaLider) : undefined;
   const justificativaAprovacaoLider = filaLider.length
     ? justificativaAprovacaoSheet(filaLider)
@@ -4073,6 +4080,11 @@ export async function resyncGoogle(rawData: unknown) {
     ganhoTotalMensal,
     aprovacaoLider,
     justificativaAprovacaoLider,
+    // Vínculo de FEATURE → coluna "ID Pai" (linha do FILHO). Derivado do banco (fonte da
+    // verdade; não está em SAFE_UPDATE_FIELDS, então nada o restaura pelo sync reverso):
+    // o resync RESTAURA ativamente o vínculo. `?? null` grava "—" quando não há pai —
+    // nunca `undefined`, que aqui OMITE a coluna (guard em syncSubmitToGoogle).
+    idPai: projeto.projeto_pai_id ?? null,
     // Re-sync é REPARO administrativo (regravar a linha da planilha) — não avisa
     // ninguém. Antes disparava uma mensagem no grupo por projeto reparado.
     notificarChat: false,
