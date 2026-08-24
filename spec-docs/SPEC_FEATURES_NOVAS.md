@@ -1609,3 +1609,21 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 **Validação (staging, probe SSE, 24/08).** Prosa streama onde deve (memorial 931 deltas, TTFB 18s vs 66s de tela branca); silenciosa onde deve; submissão completou; logs = todas as `/api/chat/*` "ok", zero exceções; 1 fallback esperado no memorial. Veredito: seguro em prod.
 
 **Onde aterrissou.** `src/lib/llm.ts` (`llmChatStream`, stall-timeout, `extractPartialJsonStringField`), `src/lib/agents/orchestrator.ts` (`runOrchestrator` com `onDelta`), `src/lib/chat.functions.ts` (4 rotas threadam `onDelta`), `src/worker.ts` (SSE atrás de `LLM_STREAMING`), `src/lib/api-client.ts` (`apiStream`), `submeter.tsx`/`step3-chat.tsx` (bolha viva). Testes: `tests/llm-stream`, `tests/orchestrator-stream`, `tests/api-stream` (+24).
+
+## Bloqueio TEMPORÁRIO de novas submissões (janela determinística) — 24/08/2026
+
+**Status: EM PRODUÇÃO.** Feature temporária: pausar SUBMISSÕES NOVAS numa janela de tempo, sem tocar no que já foi enviado.
+
+**Problema.** Precisamos pausar o recebimento de projetos novos por uma semana (validação do formulário), mas SEM parar a triagem/aprovação do que já entrou e SEM impedir que quem já submeteu edite/reenvie.
+
+**Decisões fechadas (não regredir):**
+- **Janela DETERMINÍSTICA, sem cron.** Pura função do relógio: `estaBloqueado(now)` compara o instante contra dois marcos UTC fixos. Bloqueado quando `2026-08-26T02:59:00Z <= agora < 2026-09-01T03:00:00Z` (BRT: ter 25/08 23h59 → ter 01/09 00h00; fim exclusivo = instante de reabertura).
+- **FONTE ÚNICA PURA `src/lib/bloqueio-submissao.ts`** (client + server): janela + copy + `estaBloqueado`/`faseBloqueio`/`estadoBloqueio`/`deveRecusarSubmissao`/`janelaBloqueio`. Env de override (`SUBMISSAO_BLOQUEIO_INICIO`/`SUBMISSAO_BLOQUEIO_FIM`, ISO UTC) lida **LAZY** e guardada por `typeof process` (nunca `process.env` em escopo de módulo; no navegador cai nos defaults baked). Override inválido (`NaN`) volta ao default (nunca abre a janela por engano).
+- **Só SUBMISSÃO NOVA é barrada.** `deveRecusarSubmissao(ehReenvio, now)` = `!ehReenvio && estaBloqueado`. Reenvio/edição (`modo==='edicao'` ou `projeto.submitted_at` presente) nunca é recusado.
+- **Reforço de SERVIDOR + botão.** `submeterParaValidacao` (`chat.functions.ts`) lança `erroDeBloqueio(bloqueioSubmissaoPausada())` (novo `codigo:'submissao_pausada'` em `mensagens-submissao.ts`, que reusa a copy "durante" — titulo+resumo recompõem a frase). Cliente: home (`routes/index.tsx`) e intro (`submeter/intro.tsx`) mostram a faixa `AvisoBloqueioSubmissao` (`src/components/aviso-bloqueio-submissao.tsx`) e desabilitam o botão DURANTE; ANTES da janela mostram o aviso prévio sem bloquear.
+- **Copy (FONTE ÚNICA, sem "-"/"—"):** aviso prévio = "As novas submissões serão pausadas nesta terça, 25 de agosto, às 23h59. Se você já começou um projeto, conclua o envio antes desse horário. Voltamos a receber submissões na terça, 1º de setembro."; durante (= recusa do servidor) = "As submissões estão pausadas no momento e voltam na terça, 1º de setembro. Os projetos que você já enviou seguem em avaliação normalmente pelo time de RPA."
+- **a11y (regra 11):** estado nunca só por cor (ícone + rótulo textual "Aviso"/"Submissões pausadas"), `role="status"`, botão com `aria-disabled`/`title`, sem animação.
+
+**Reabrir / mover:** setar os secrets `SUBMISSAO_BLOQUEIO_INICIO`/`SUBMISSAO_BLOQUEIO_FIM` (sem redeploy de lógica). **Remover de vez:** apagar a chamada em `submeterParaValidacao`, a faixa nas 2 telas e os 2 blocos TEMPORÁRIO no `CLAUDE.md`.
+
+**Onde aterrissou.** `src/lib/bloqueio-submissao.ts` (novo), `src/components/aviso-bloqueio-submissao.tsx` (novo), `src/lib/mensagens-submissao.ts` (`bloqueioSubmissaoPausada` + codigo), `src/lib/chat.functions.ts` (guard em `submeterParaValidacao`), `src/routes/index.tsx`, `src/lib/submeter/intro.tsx`. Teste: `tests/bloqueio-submissao.test.ts`.

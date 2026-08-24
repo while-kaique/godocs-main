@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import {
+  AvisoBloqueioSubmissao,
+  useBloqueioSubmissao,
+} from "@/components/aviso-bloqueio-submissao";
+import {
   FilePlus2,
   LayoutList,
   ShieldCheck,
@@ -36,6 +40,8 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { acesso_negado } = useSearch({ from: "/" });
+  // Bloqueio temporário de novas submissões (janela determinística; ver bloqueio-submissao.ts).
+  const bloqueio = useBloqueioSubmissao();
   // Projetos legados pendentes de regularização (sem "Atualizado Em" no Sheets).
   // Busca silenciosa: se falhar, o selo simplesmente não aparece.
   const [pendentes, setPendentes] = useState<{ count: number; prazo: string } | null>(null);
@@ -359,15 +365,23 @@ function Home() {
             </Link>
           )}
 
+          {/* Aviso do bloqueio temporário de novas submissões (prévio ou pausado). */}
+          <AvisoBloqueioSubmissao fase={bloqueio.fase} mensagem={bloqueio.mensagem} className="mb-6" />
+
           {/* Action Cards */}
           <section className="grid grid-cols-1 gap-6 pb-12 md:grid-cols-2">
             <ActionCard
               to="/submeter"
               icon={<FilePlus2 className="h-6 w-6" />}
               title="Submeter projeto"
-              description="Cadastre um novo projeto com descrição, área, savings e documentação."
-              badge="Novo cadastro"
+              description={
+                bloqueio.bloqueado
+                  ? "As submissões estão pausadas no momento e voltam na terça, 1º de setembro."
+                  : "Cadastre um novo projeto com descrição, área, savings e documentação."
+              }
+              badge={bloqueio.bloqueado ? "Pausado" : "Novo cadastro"}
               accent
+              disabled={bloqueio.bloqueado}
             />
             <ActionCard
               to="/meus-projetos"

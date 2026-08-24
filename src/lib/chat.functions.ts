@@ -66,8 +66,10 @@ import {
   bloqueioReceitaIncompleta,
   bloqueioDocAusente,
   bloqueioDuplicata,
+  bloqueioSubmissaoPausada,
   erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
+import { deveRecusarSubmissao } from "@/lib/bloqueio-submissao";
 import {
   aplicaGateCustoEvitadoChat,
   detectarCustoEvitadoNoChat,
@@ -3524,6 +3526,16 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // ou quando o cliente passa modo:'edicao'. Reenvios nunca auto-aprovam — forçamos
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === "edicao" || !!projeto.submitted_at;
+
+  // ── Bloqueio TEMPORÁRIO de novas submissões (janela determinística) ──────────
+  // Reforço de SERVIDOR: recusa apenas SUBMISSÃO NOVA (não reenvio) enquanto a
+  // janela está aberta. Reenvio/edição de projeto já submetido segue normal — a
+  // triagem/aprovação do que já entrou não para. O cliente também desabilita o
+  // botão; isto cobre cliente desatualizado / chamada direta à API. Janela e copy
+  // vêm da fonte única `src/lib/bloqueio-submissao.ts`.
+  if (deveRecusarSubmissao(ehReenvio)) {
+    throw erroDeBloqueio(bloqueioSubmissaoPausada());
+  }
 
   // Gate de OWNERSHIP na edição: podem reenviar um projeto já existente o autor
   // (responsavel_email), um EDITOR DELEGADO (participante a quem o dono delegou o

@@ -1,6 +1,9 @@
 /**
  * MENSAGENS DE BLOQUEIO DA SUBMISSÃO — fonte única, PURA.
  *
+ * (A copy da submissão pausada mora em `bloqueio-submissao.ts`; aqui só a embrulhamos
+ *  no formato `BloqueioSubmissao`.)
+ *
  * Todo erro que impede o envio de um projeto tem de dizer TRÊS coisas: o que aconteceu, por
  * que (com os números reais do projeto) e **o que fazer para corrigir**. Sem a terceira, a
  * pessoa fica presa na tela — foi o que aconteceu no caso SmartOnline/DIFAL (10/08/2026):
@@ -37,6 +40,8 @@
  *    - marcar ESPECIAL → fim da **Etapa 2** (tela de tipo do projeto).
  */
 
+import { COPY_BLOQUEIO } from "@/lib/bloqueio-submissao";
+
 /** "324005.09" → "324.005,09". Formatação local (o mesmo helper existe em outros módulos). */
 export function moedaBR(n: number): string {
   const [inteiro, centavos] = (Number(n) || 0).toFixed(2).split(".");
@@ -71,7 +76,8 @@ export type CodigoBloqueio =
   | "doc_ausente"
   | "nome_duplicado"
   | "especial_dashboard"
-  | "especial_organizacional";
+  | "especial_organizacional"
+  | "submissao_pausada";
 
 /**
  * Os 2 bloqueios da TRIAGEM DO ESPECIAL. Eles são os únicos derivados de resposta de
@@ -263,6 +269,32 @@ export function bloqueioReceitaIncompleta(): BloqueioSubmissao {
 }
 
 /** Submissão sem documentação compilada. */
+/**
+ * Bloqueio de SUBMISSÃO PAUSADA (janela temporária). Reusa a copy "durante" (FONTE ÚNICA
+ * em `bloqueio-submissao.ts`): o titulo/resumo saem das duas frases dela (split na 1ª
+ * sentença, sem duplicar texto), e o caminho lembra que projeto já enviado segue normal.
+ * Só é lançado pelo servidor no caminho de submissão NOVA dentro da janela — o cliente já
+ * desabilita o botão, então na prática só um cliente desatualizado/chamada direta chega aqui.
+ */
+export function bloqueioSubmissaoPausada(): BloqueioSubmissao {
+  // titulo SEM ponto final: `formatarBloqueio` junta como "titulo. resumo", então
+  // titulo(sem ponto) + ". " + resumo recompõe EXATAMENTE a copy "durante".
+  const [primeiraFrase, ...resto] = COPY_BLOQUEIO.durante.split(". ");
+  return {
+    codigo: "submissao_pausada",
+    titulo: primeiraFrase,
+    resumo: resto.join(". "),
+    caminhos: [
+      {
+        rotulo: "Já tem um projeto enviado?",
+        detalhe:
+          `Ele segue em avaliação e pode ser editado em Meus Projetos. Novas submissões ` +
+          `voltam na terça, 1º de setembro.`,
+      },
+    ],
+  };
+}
+
 export function bloqueioDocAusente(): BloqueioSubmissao {
   return {
     codigo: "doc_ausente",
