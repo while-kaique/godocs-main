@@ -1,8 +1,14 @@
 # Plano — Eliminar a latência das respostas da IA (streaming ponta a ponta)
 
-> Status: **Fase 1 CODADA e DEPLOYADA na staging** (21/08/2026) — branch `feat/streaming-latencia-ia` (commit `a44fc8b` + merge `720ddf7`), staging `edf400b4` v196 com `LLM_STREAMING=1`. Aguardando validação no navegador → prod → merge no main.
-> ⚠️ **Correções ao plano após probes no proxy real (21/08):** o proxy é um **Codex subscription** — `response_format`/`json_schema` é SILENCIOSAMENTE IGNORADO, então a **parte 2 (Structured Outputs, §2/§4.2) está MORTA** (o loop de retry do orchestrator FICA como está) e **não existe gpt-4.x**, então o braço gpt-4.x + Predicted Outputs da **Fase 2 (§9) está morto**. A **parte 3 (prompt-cache, §4.7) foi DEFERIDA** (ganho não-mensurável no backend Codex + risco nos prompts calibrados; o streaming já levou o TTFB a ~3s). O que FOI entregue: só o streaming (parte 1).
+> Status: **Fase 1 EM PRODUÇÃO + MERGEADA no `main`** (24/08/2026) — prod `674a3710` v276 com `LLM_STREAMING=1`, PR #276 (`4424030`), staging `edf400b4` também no ar. `main` = prod = staging. A entrega foi **só o streaming (parte 1)**; as partes 2 e 3 caíram (ver ⚠️ abaixo).
+> ⚠️ **Correções ao plano após probes no proxy real (21/08):** o proxy é um **Codex subscription** — `response_format`/`json_schema` é SILENCIOSAMENTE IGNORADO, então a **parte 2 (Structured Outputs, §2/§4.2) está MORTA no proxy hoje** (o loop de retry/regex do orchestrator FICA como está) e **não existe gpt-4.x** (só gpt-5.6-{sol,terra,luna}/5.5/5.4/5.4-mini), então o braço gpt-4.x + Predicted Outputs da **Fase 2 (§9) está morto**. A **parte 3 (prompt-cache, §4.7) foi DEFERIDA** (ganho não-mensurável no backend Codex + risco nos prompts calibrados; o streaming já levou o TTFB a ~3s). O que FOI entregue: só o streaming (parte 1). Detalhe do que sobreviveu e o que caiu em cada seção está anotado inline abaixo (⛔/✅ por seção). **Trilha paralela viva:** o time do proxy (João Gabriel, 21/08) confirmou que o fix de Structured Outputs é VIÁVEL do lado deles (o gateway traduz Chat Completions → Responses API e descarta `response_format`; basta mapear para `text.format`) — quando isso subir, a gente liga o `response_format` de verdade e aposenta boa parte do loop de retry, mantendo o parser defensivo até provar em prod (ver §2).
 > Origem: diagnóstico do caso **RA Monitor / Luis Liveri** (`eef2ba7414d5ed3540b017063f804add`) — submissão de 20min22s, **6min47s só de espera de IA**, 3 picos >60s que estouraram o timeout do proxy e caíram no fallback (`gpt-5.4-mini`), sem erro.
+
+## 0. O que foi entregue (24/08/2026)
+
+Só a **parte 1 (streaming SSE)**. Onde aterrissou: `src/lib/llm.ts` (`llmChatStream` + stall-timeout preservando o fallback de dois relógios + `extractPartialJsonStringField`), `src/lib/agents/orchestrator.ts` (`runOrchestrator` com `onDelta`, streama prosa só em `type`∈{preview,complete}, nunca no `complete` de `doc_preview`), `src/lib/chat.functions.ts` (`enviarMensagem`/`iniciar{Submissao,Saving,Receita}` threadam `onDelta`; gate que assume NÃO streama), `src/worker.ts` (SSE `delta`/`envelope`/`error` nas 4 rotas de conversa, atrás da flag `LLM_STREAMING`, default OFF), `src/lib/api-client.ts` (`apiStream` transparente ao transporte), `submeter.tsx`/`step3-chat.tsx` (bolha viva por delta + reconciliação com o envelope canônico). Testes: `tests/llm-stream`, `tests/orchestrator-stream`, `tests/api-stream` (+24 casos).
+
+**Validação na staging (24/08, probe SSE com a sessão do Luis):** SSE confirmado nas 4 rotas; prosa streama token a token onde deve (doc preview 462 deltas, pergunta-saving 623, **memorial 931 deltas / TTFB 18s vs 66s de tela branca**, complete 32); silencioso por design onde deve (`doc_preview→complete` = ~64s de compilação pesada segue sem stream — a ÚNICA espera em branco que sobra). Logs: **todas as `/api/chat/*` = "ok", zero exceções**; 12 gerações no modelo real do proxy; **1 caiu no fallback gpt-5.4-mini** (memorial, 1ª tentativa) porque o modelo pesado do Codex "pensa" >25s (`STREAM_GAP_TIMEOUT_MS`) antes do 1º content e o gap-timer aborta — **NÃO é regressão** (o memorial já caía ~50% no fallback pelo timeout de 60s antigo). Item de melhoria futura: afrouxar o GAP pré-conteúdo, OU o fix de Structured Outputs do proxy.
 
 ## 1. Problema (com precisão)
 
@@ -18,11 +24,11 @@ O gargalo **não** é o proxy nem a rede. É que:
 
 Tudo roda em **gpt-5.x, sem trocar modelo**. Baixo risco. Ataca latência PERCEBIDA + fallback falso + retries desperdiçados. **Não** reduz o tempo bruto de geração (isso é Fase 2).
 
-1. **Streaming SSE ponta a ponta pelo Worker** + timeout por **stall** (primeiro-byte / gap entre chunks) no lugar do timeout por tempo total. — a espinha.
-2. **Structured Outputs** (`response_format: json_schema`, strict) — mata o loop de retry de JSON inválido/truncado do orchestrator (hoje até 3 regenerações inteiras de 60–88s).
-3. **Prompt caching automático** — reordenar os prompts para prefixo byte-estável → até ~80% menos TTFT (efeito só na entrada, não na geração).
+1. ✅ **ENTREGUE — Streaming SSE ponta a ponta pelo Worker** + timeout por **stall** (primeiro-byte / gap entre chunks) no lugar do timeout por tempo total. — a espinha.
+2. ⛔ **MORTA NO PROXY — Structured Outputs** (`response_format: json_schema`, strict) — mataria o loop de retry de JSON inválido/truncado do orchestrator. O proxy (Codex subscription) IGNORA `response_format` silenciosamente (probe 21/08), então o loop de retry/regex do orchestrator **FICA**. Fix viável do lado do time do proxy (ver §2 e §11); enquanto não subir, nada muda aqui.
+3. ⏸️ **DEFERIDA — Prompt caching automático** — reordenar os prompts para prefixo byte-estável. Benefício não-mensurável no backend Codex e o streaming já levou o TTFB a ~3s; risco alto de mexer nos prompts calibrados. Adiada.
 
-**Fora desta entrega, mas planejada (ver §9):** Fase 2 = experimento gpt-5.x vs gpt-4.x no pipeline novo, Predicted Outputs, split paralelo doc/memorial, roteamento por peso.
+**Fora desta entrega e AGORA MORTA (ver §9):** a Fase 2 dependia de gpt-4.x + Predicted Outputs, e **o proxy não expõe gpt-4.x** (só gpt-5.x). O que sobra de vivo da §9 (split paralelo doc/memorial, roteamento por peso) não depende de troca de modelo e pode ser revisitado sem experimento de modelo.
 
 ## 3. Decisão de arquitetura central — "prosa em stream + envelope JSON no fim"
 
@@ -54,11 +60,11 @@ Formato do turno (o modelo emite prosa primeiro, envelope estruturado como "rabo
 - ⚠️ `stream_options` pode não chegar se o stream for cancelado — **não pendurar estado no chunk de usage**.
 - ⚠️ Confirmar que o **gateway GoGroup encaminha** `stream:true` e `stream_options` (testar no proxy real).
 
-### 4.2 `src/lib/agents/orchestrator.ts` (`runOrchestrator`, parse ~L1551–1616)
-- Consumir o stream do `llmChat`: acumular a **prosa** e, no fim, parsear o **envelope** estruturado.
-- **Structured Outputs**: enviar `response_format: {type:"json_schema", json_schema:{...strict...}}` com o schema do `OrchestratorResult` — remove o loop de reparse (`maxRetries=2`) e a recuperação por regex. Manter um fallback de parse defensivo só como rede.
-- Traduzir `{type,content,coletado,saving,receita,options,fase}` para JSON Schema **strict**: todos os campos em `required`, `additionalProperties:false`, opcionais como união com `null`, tratar o campo `refusal`. (⚠️ validar `json_schema` no proxy; e testar a combinação com streaming.)
-- Definir como a prosa e o envelope convivem: opção A — o modelo escreve a prosa dentro do campo `content` do JSON e usamos partial-JSON (`partial-json`, o parser que a SDK da OpenAI usa) para extrair `content` incrementalmente enquanto streama; opção B — dois blocos (prosa em texto + linha final `\x1e{json}`). **Recomendado: A com `partial-json`** (menos mudança no contrato do modelo). Decidir na implementação medindo a estabilidade do parcial.
+### 4.2 `src/lib/agents/orchestrator.ts` (`runOrchestrator`, parse ~L1551–1616) — ✅ ENTREGUE (streaming) / ⛔ Structured Outputs MORTA no proxy
+- ✅ Consumir o stream do `llmChat`: acumular a **prosa** e, no fim, parsear o **envelope** estruturado. Feito via `onDelta` (9º arg posicional); streama prosa só quando `type`∈{preview,complete}. **O gate do type usa REGEX de valor completo** `/"type":"(...)"/` — ler type parcial ("prev") travava `streamAtivo=false` pra sempre (bug pego em teste). Retry/regex-recovery intactos.
+- ⛔ **Structured Outputs**: enviar `response_format: {type:"json_schema", json_schema:{...strict...}}` **NÃO funciona no proxy hoje** — ele é Codex subscription e IGNORA o campo (probe 21/08: 200 com texto livre). O loop de reparse (`maxRetries=2`) e a recuperação por regex **FICAM**. Extração incremental da prosa por parser hand-rolled `extractPartialJsonStringField` (sem dep `partial-json`, por causa do `node_modules` symlinkado + bundle do worker).
+- 🔜 **Fix VIÁVEL do lado do time do proxy (João Gabriel, 21/08):** o gateway não é passthrough — traduz Chat Completions → Responses API em `chatToResponses.ts` e o `response_format` cai num `[k]:unknown` e é descartado. Fix deles = mapear `response_format {type:json_schema,json_schema:{name,schema,strict}}` → `text:{format:{type:json_schema,name,schema,strict}}` (Responses API), garantia via constrained decoding do provider. **Passos combinados ANTES de a gente codar:** (1) um curl no `/responses` da assinatura Codex com `text.format` (com e sem stream) para confirmar que o backend honra; (2) mapear o campo no `chatToResponses.ts`; (3) **no MESMO PR deles, tratar `refusal` e geração INCOMPLETA no `responsesToChat.ts`** — senão JSON truncado (nossas gerações são longas) vira `finish_reason:stop` = sucesso quebrado, PIOR que hoje; (4) conferir `tools`+`text.format` juntos (o gateway sempre injeta tools upstream); plan B deles = validate-schema+retry dentro do gateway. **Do nosso lado, quando isso estiver em prod:** ligar `response_format` de verdade e aposentar boa parte do loop de retry — mantendo o parser defensivo até provar em prod.
+- ✅ Prosa × envelope: adotamos a **opção A** (prosa dentro do campo `content`, extração incremental), com parser próprio no lugar do `partial-json`.
 
 ### 4.3 `src/lib/chat.functions.ts` (`enviarMensagem` ~L1210–2337, `iniciarSubmissao`, `iniciarSaving`)
 - **Decidir streamable-vs-não ANTES de abrir o stream**: rodar a cadeia de gates de resposta (`reask`, L1334–1658) e a pré-empção (`devePreemptarPorProjecao`, L1669) primeiro. Se algum assume → devolver `json()` como hoje (sem stream).
@@ -110,17 +116,17 @@ Formato do turno (o modelo emite prosa primeiro, envelope estruturado como "rabo
 4. Só então **prod** `674a3710`; e (regra 14) **mergear no `main` na hora**.
 5. Medir em prod: TTFT p50/p90 e **% de turnos no fallback por tamanho** (meta: de ~58% → ~0).
 
-## 9. Fase 2 — EXPERIMENTO antes de decidir modelo (NÃO codar agora)
+## 9. Fase 2 — ⛔ O braço de modelo MORREU (proxy sem gpt-4.x); sobra o que não troca modelo
 
-Objetivo: com o pipeline novo (§2) já no ar, **medir tempo E qualidade** dos turnos pesados (doc, memorial) em:
-- **pipeline novo + gpt-5.x** (baseline pós-Fase-1),
-- **pipeline novo + gpt-4.x** (com **Predicted Outputs** — `prediction` com o esqueleto — onde aplicável).
+⚠️ **O experimento gpt-5.x vs gpt-4.x + Predicted Outputs está MORTO:** o proxy (Codex subscription) só expõe gpt-5.6-{sol,terra,luna}/5.5/5.4/5.4-mini — **não há gpt-4.1/4o** (gpt-4.1 dá 400/502), e Predicted Outputs é exclusivo de gpt-4.1/4o. Enquanto o produto rodar pelo proxy, não há caminho gpt-4.x para rotear os turnos pesados.
 
-Só **depois dos dados** decidir se roteia os turnos pesados pra gpt-4.1. Itens a incluir no experimento:
-- **Predicted Outputs**: ⚠️ só gpt-4.1/4o (NÃO gpt-5.x); armadilha de billing (tokens previstos rejeitados cobram como output — mandar só o esqueleto estável); incompatível com `tools`, `n>1`, `logprobs`, penalidades, `max_completion_tokens`; **confirmar `json_schema`+`prediction` no proxy**.
+O que continua VIVO da Fase 2 (não depende de trocar de modelo, revisitar sob dados, NÃO codar agora):
 - **Split paralelo**: gerar doc técnica e memorial financeiro em 2 chamadas concorrentes (~metade do wall).
 - **Roteamento por peso**: turnos leves seguem como estão (0% de fallback hoje); só os pesados vão pro caminho rápido.
+- **Afrouxar o GAP pré-conteúdo** (`STREAM_GAP_TIMEOUT_MS`, 25s): o modelo pesado do Codex "pensa" >25s antes do 1º content e cai no fallback gpt-5.4-mini (visto na validação de staging no memorial). Alternativa: o fix de Structured Outputs do proxy (§4.2), que encurtaria a geração.
 - Harness: comparar por cenário TTFT, wall total e um LLM-juiz de qualidade do memorial/doc (reaproveitar `scripts/e2e/validate-llm.mjs`).
+
+**~~Predicted Outputs~~ (morto no proxy):** só gpt-4.1/4o (NÃO gpt-5.x); registrado aqui só para não reabrir a ideia sem antes ter gpt-4.x disponível.
 
 ## 10. Riscos & gotchas
 
@@ -149,5 +155,5 @@ Só **depois dos dados** decidir se roteia os turnos pesados pra gpt-4.1. Itens 
 
 ## 12. Veículo & versões
 
-- **Recomendado:** OpenAI SDK cru com `stream:true` + `partial-json` (0.1.7) — preserva o fallback de dois relógios que já temos. **Não** adotar o Vercel AI SDK (seu `fallbackProvider` é só resolução de nome, não failover em runtime).
-- Workers: sem `process.env` em escopo de módulo — construir cliente dentro do handler a partir de `env`.
+- **Entregue:** `fetch` cru com `stream:true` + parser incremental **hand-rolled** (`extractPartialJsonStringField`) no lugar do `partial-json` — o `node_modules` symlinkado do worktree + o bundle do worker tornavam a dep frágil, e só precisávamos extrair UM campo string (`content`). Preserva o fallback de dois relógios que já tínhamos. **Não** adotamos o Vercel AI SDK (seu `fallbackProvider` é só resolução de nome, não failover em runtime).
+- Workers: sem `process.env` em escopo de módulo — a flag `LLM_STREAMING` é lida por `streamingLigado()`, lazy, dentro de função.

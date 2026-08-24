@@ -1586,3 +1586,26 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 - Rota dentro de `_authenticated` (já gated a admin). É ferramenta de inspeção; não escreve nada.
 
 **Onde aterrissou.** `src/lib/api-client.ts`, `src/lib/fluxos/demo-backend.ts`, `src/routes/_authenticated/fluxos.tsx`, `src/routes/submeter.tsx`.
+
+---
+
+## Streaming SSE das respostas do chat (flag `LLM_STREAMING`) — 24/08/2026
+
+**Status: EM PRODUÇÃO** (prod `674a3710` v276, PR #276 `4424030`, `main`=prod=staging). Plano completo em `docs/plans/streaming-latencia-ia.md` (§0 = o que foi entregue). Fase 1 do plano; partes 2 (Structured Outputs) e 3 (prompt-cache) caíram/deferidas — ver plano.
+
+**Problema.** As respostas do chat eram lidas INTEIRAS antes de pintar qualquer coisa (`await res.json()` no `llm.ts` → uma mensagem pronta na UI): tela em branco de 60–88s nos turnos pesados (doc, memorial). E o timeout do proxy era régua de TAMANHO, não de saúde — ~58% dos turnos pesados caíam no fallback gpt-5.4-mini só por serem longos (ver a correção "Fallback do LLM era a REGRA" em `SPEC_CORRECOES.md`). Origem: caso RA Monitor / Luis Liveri (`eef2ba7414d5ed3540b017063f804add`, 6min47s só de espera de IA).
+
+**Decisão central — "prosa em stream + envelope JSON no fim".** O contrato é um JSON único (`{type,content,coletado,saving,receita,options,fase}`) e gates determinísticos reescrevem esse objeto DEPOIS do LLM (um `preview` vira `question`). Então: a **prosa** (`content`) streama token a token; os **campos estruturais** resolvem no FIM, como evento `envelope`, depois dos gates pós-LLM. A UI pinta a prosa e reconcilia com o envelope canônico.
+
+**Decisões fechadas (não regredir):**
+- **Só as 4 rotas de conversa** (`iniciar-submissao`/`enviar-mensagem`/`iniciar-saving`/`iniciar-receita`) respondem `text/event-stream` (eventos `delta`/`envelope`/`error`). Erro vai DENTRO do stream (HTTP já é 200), com status/bloqueio, e o cliente reconstrói o `ApiError`.
+- **Streama a PROSA só em `type`∈{preview,complete}** (`llmChatStream`), **NUNCA no `complete` de `doc_preview`** — a compilação pesada da doc (~64s) segue silenciosa (é a única espera em branco que sobra). O gate do type usa REGEX de VALOR COMPLETO `/"type":"(...)"/` — ler o type parcial travava `streamAtivo` pra sempre (bug pego em teste).
+- **Timeout deixa de medir a resposta inteira e vira POR STALL:** TTFB 60s (proxy)/30s (fallback) + **GAP 25s** entre chunks (`STREAM_*_TIMEOUT_MS`). Geração longa saudável nunca corta (maior gap real ~1,7s). O **fallback de dois relógios é preservado**; e o modelo pesado do Codex que "pensa" >25s antes do 1º content ainda cai no fallback gpt-5.4-mini (NÃO é regressão — o memorial já caía ~50% pelo timeout de 60s antigo).
+- **Turno em que um gate assume (`reask !== null`) NÃO streama** — devolve `json()` imediato, como hoje (muitas vezes sem chamar o LLM). Estado e gates 100% inalterados.
+- **Cliente transparente ao transporte:** `apiStream` trata SSE E json → ligar/desligar é **só a env `LLM_STREAMING`**, sem redeploy do cliente. **Default OFF = idêntico ao json de sempre.** A flag é lida lazy por `streamingLigado()` (nunca `process.env` em escopo de módulo).
+- **Parser incremental hand-rolled** (`extractPartialJsonStringField`) no lugar da dep `partial-json` (node_modules symlinkado + bundle do worker; só precisávamos de um campo string).
+- ⛔ **Structured Outputs segue MORTA no proxy** (backend Codex ignora `response_format`) → o loop de retry/regex do orchestrator FICA. Fix viável do lado do time do proxy (ver plano §4.2).
+
+**Validação (staging, probe SSE, 24/08).** Prosa streama onde deve (memorial 931 deltas, TTFB 18s vs 66s de tela branca); silenciosa onde deve; submissão completou; logs = todas as `/api/chat/*` "ok", zero exceções; 1 fallback esperado no memorial. Veredito: seguro em prod.
+
+**Onde aterrissou.** `src/lib/llm.ts` (`llmChatStream`, stall-timeout, `extractPartialJsonStringField`), `src/lib/agents/orchestrator.ts` (`runOrchestrator` com `onDelta`), `src/lib/chat.functions.ts` (4 rotas threadam `onDelta`), `src/worker.ts` (SSE atrás de `LLM_STREAMING`), `src/lib/api-client.ts` (`apiStream`), `submeter.tsx`/`step3-chat.tsx` (bolha viva). Testes: `tests/llm-stream`, `tests/orchestrator-stream`, `tests/api-stream` (+24).

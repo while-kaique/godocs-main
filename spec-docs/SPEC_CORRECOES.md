@@ -2248,14 +2248,19 @@ fallback. O fallback fica curto de propósito: a `api.openai.com` direta é ráp
 é lento) e os memoriais dele fechavam dentro dos 25s; assim o pior caso não é esperar 60s duas
 vezes quando o proxy está realmente pendurado.
 
-**O que NÃO foi feito (decisão do Luis).** Streaming, que resolveria de raiz: o relógio passaria
-a medir o **primeiro byte**, o fallback voltaria a ser só plano B, a pessoa veria o texto
-aparecendo em ~2s em vez de encarar 40s de tela parada, e pararíamos de pagar DUAS gerações nos
-turnos que hoje abortam. O custo é o contrato: o orquestrador consome um JSON **completo**
-(`{type, content, saving…}`), então streamear até a tela exige buffer + parse incremental ou
-mudar o protocolo. Fica como projeto separado — e há um meio-caminho barato: usar transporte
-streaming só para medir o primeiro byte, bufferizando no servidor (corrige o timeout sem tocar
-frontend nem contrato).
+**O que NÃO foi feito na época (decisão do Luis) — ✅ ENTREGUE DEPOIS (24/08/2026).** Streaming,
+que resolveria de raiz: o relógio passaria a medir o **primeiro byte**, o fallback voltaria a ser
+só plano B, a pessoa veria o texto aparecendo em ~2s em vez de encarar 40s de tela parada, e
+pararíamos de pagar DUAS gerações nos turnos que hoje abortam. O custo era o contrato: o
+orquestrador consome um JSON **completo** (`{type, content, saving…}`), então streamear até a tela
+exige buffer + parse incremental ou mudar o protocolo. → **Feito como projeto separado** e hoje em
+produção atrás da flag `LLM_STREAMING` (default OFF): a prosa (`content`) streama token a token e o
+envelope estrutural resolve no fim, depois dos gates; o timeout virou **por stall** (primeiro-byte +
+gap entre chunks) no lugar de régua de tamanho. Ver **`SPEC_FEATURES_NOVAS.md` → "Streaming SSE das
+respostas do chat"** e `docs/plans/streaming-latencia-ia.md`. ⚠️ O caso de fallback do memorial não
+sumiu de todo: o modelo pesado do Codex às vezes "pensa" >25s antes do 1º content e o gap-timer o
+joga no gpt-5.4-mini — mas isso NÃO é a régua-de-tamanho de antes (que pegava a maioria dos turnos
+longos).
 
 **Onde aterrissou:** `src/lib/llm.ts` (2 constantes + comentários) ·
 `tests/llm-fallback.test.ts` (teste de regressão com fake timers: 25s NÃO derruba mais o proxy,
