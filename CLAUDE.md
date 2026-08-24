@@ -5,6 +5,9 @@ Hub interno do Gogroup para documentar projetos de automação (RPA & IA). Funci
 > ⚠️ **TEMPORÁRIO — Status sempre "Pendente" na planilha**
 > Enquanto validamos o formulário, o sync grava **"Pendente"** na coluna Status de **todos** os projetos no Sheets (inclusive auto-aprovados RPA e aprovados pelo analisador). O status interno (SQLite/dashboard) continua correto. Pontos marcados `// TEMPORÁRIO` em `chat.functions.ts` (`submeterParaValidacao`, `analisarProjeto`). **Reverter** para `status === 'aprovado' ? 'Aprovado' : ...` ao terminar a validação.
 
+> ⚠️ **TEMPORÁRIO — Bloqueio de novas submissões (janela determinística, 24/08/2026)**
+> Submissões **NOVAS** ficam pausadas na janela **25/08 23h59 BRT → 01/09 00h00 BRT** (UTC `2026-08-26T02:59:00Z` ≤ agora < `2026-09-01T03:00:00Z`). Reenvio/edição de projeto já submetido e a triagem/aprovação **não param**. FONTE ÚNICA (janela + copy + `estaBloqueado`/`estadoBloqueio`/`deveRecusarSubmissao`): módulo PURO **`src/lib/bloqueio-submissao.ts`** (client + server; env lida LAZY). Reforço de servidor em `submeterParaValidacao` (recusa só o caminho de submissão nova via `bloqueioSubmissaoPausada`, `mensagens-submissao.ts`); no cliente a home (`routes/index.tsx`) e a intro (`submeter/intro.tsx`) mostram a faixa `AvisoBloqueioSubmissao` e desabilitam o botão. **Reabrir / mover:** setar os secrets do Godeploy `SUBMISSAO_BLOQUEIO_INICIO`/`SUBMISSAO_BLOQUEIO_FIM` (ISO UTC) — sem redeploy de lógica; **remover de vez:** apagar a chamada em `submeterParaValidacao`, a faixa nas 2 telas e este bloco. Teste: `tests/bloqueio-submissao.test.ts`.
+
 ## Stack
 
 | Camada | Tecnologia |

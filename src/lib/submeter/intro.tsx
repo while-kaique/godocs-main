@@ -18,6 +18,10 @@ import React from "react";
 import { CircleCheck, CircleSlash2, ArrowRight } from "lucide-react";
 import { PageFrame, PageHeader, PageFooter, BrowserDots } from "./layout";
 import { STEPS } from "./constants";
+import {
+  AvisoBloqueioSubmissao,
+  useBloqueioSubmissao,
+} from "@/components/aviso-bloqueio-submissao";
 
 // A régua de "isto é projeto?", em forma de pergunta para a própria pessoa.
 //
@@ -68,6 +72,9 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
   React.useEffect(() => {
     inicioRef.current?.focus();
   }, []);
+  // Bloqueio temporário de novas submissões (a intro só aparece em submissão nova —
+  // exatamente o que a janela pausa). Ver src/lib/bloqueio-submissao.ts.
+  const bloqueio = useBloqueioSubmissao();
 
   return (
     <PageFrame>
@@ -289,11 +296,24 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
               aqui: o rascunho só nasce quando se sobem arquivos na Etapa 2
               (`dispararDocBackground` → `iniciar-submissao`), então na Etapa 1 a
               pessoa procuraria um botão que ainda não existe. */}
+          {/* Aviso do bloqueio temporário (prévio ou pausado). */}
+          <AvisoBloqueioSubmissao fase={bloqueio.fase} mensagem={bloqueio.mensagem} className="mt-6" />
+
           <div
             className="mt-7 flex items-center justify-end border-t pt-5"
             style={{ borderColor: "rgba(0,89,169,0.08)" }}
           >
-            <button type="button" className="go-btn-next" onClick={onProsseguir}>
+            <button
+              type="button"
+              className="go-btn-next"
+              onClick={onProsseguir}
+              disabled={bloqueio.bloqueado}
+              aria-disabled={bloqueio.bloqueado}
+              title={bloqueio.bloqueado ? "As submissões estão pausadas no momento." : undefined}
+              style={
+                bloqueio.bloqueado ? { opacity: 0.5, cursor: "not-allowed" } : undefined
+              }
+            >
               Ok, entendi
               <ArrowRight
                 size={15}
