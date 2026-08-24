@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-08-24 — Submissão quebrava com "Resposta inválida do servidor (HTTP 200)" com streaming ligado
+
+**Status:** ✅ corrigido · **Branch:** `fix/streaming-apistream-callsites` · **PR #282** · **Prod v281 com `LLM_STREAMING=0`**
+
+**Sintoma.** Com a flag `LLM_STREAMING` ligada, o chat da submissão (e as fases de saving/receita)
+falhava com o toast **"Resposta inválida do servidor (HTTP 200)"**: o servidor respondia
+`text/event-stream` (SSE), mas o cliente tentava fazer `response.json()` sobre o corpo de eventos
+e estourava no parse — status 200, mas payload que não é JSON.
+
+**Causa-raiz.** As **4 rotas de conversa** passaram a responder SSE quando `LLM_STREAMING` está ON
+(`iniciar-submissao`/`enviar-mensagem`/`iniciar-saving`/`iniciar-receita`), e o cliente ganhou o
+helper `apiStream` (trata SSE **e** json, transparente pela env). Mas em `submeter.tsx` **3 das 4**
+chamadas dessas rotas continuavam usando `apiFetch` (que faz `response.json()`), então só uma rota
+estava migrada. Com a flag OFF nada quebrava (json de sempre); ligar a flag expunha as 3 call-sites
+esquecidas.
+
+**Fix.** Migração dos **6 call-sites** de `apiFetch` → `apiStream` em `submeter.tsx` (as chamadas
+das rotas SSE), fechando a lacuna das 3 rotas restantes. **Somente cliente** — `worker.js`
+inalterado. Teste de guarda `tests/submeter-stream-callsites.test.ts` trava a regressão (garante
+que as chamadas às rotas SSE usam `apiStream`, não `apiFetch`).
+
+**Onde aterrissou.** `src/lib/submeter.tsx` (6 call-sites); `tests/submeter-stream-callsites.test.ts`
+(novo). Sem mudança de servidor.
+
+**Deploy.** Validado na **staging** (entry `index-CVJkZghc.js`, 1695 testes verdes) → **prod v281**
+(entry `index-CVJkZghc.js`, worker.js 1.104.352 bytes inalterado). ⚠️ **Prod subiu com
+`LLM_STREAMING=0`** (streaming DESLIGADO): esta subida é o deploy do cliente corrigido, com risco
+zero — o comportamento é idêntico ao json de sempre. **Religar `LLM_STREAMING` só depois da
+validação E2E** do fluxo com streaming.
+
+---
+
 ## 2026-08-19 — Projeto que deixou de ser especial mantinha o "porquê é especial" na planilha e na tela
 
 **Status:** ✅ corrigido · **Branch:** `fix/contexto-especial-orfao`
