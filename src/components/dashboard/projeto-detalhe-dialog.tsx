@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, ExternalLink, Save, History, FileText, Star } from 'lucide-react';
+import { Loader2, ExternalLink, Save, History, FileText, Star, RotateCcw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -41,16 +41,26 @@ const STATUS_OPCOES = [
   'Descontinuado',
 ] as const;
 
+type HistoricoEntrada =
+  | {
+      tipo: 'status';
+      status_anterior: string | null;
+      status_novo: string;
+      observacoes: string | null;
+      admin_email: string;
+      created_at: string | null;
+    }
+  | {
+      tipo: 'reenvio';
+      edicao: number;
+      submetido_por: string | null;
+      created_at: string | null;
+    };
+
 type Detalhe = {
   id: string;
   campos: Record<string, string>;
-  historico: {
-    status_anterior: string | null;
-    status_novo: string;
-    observacoes: string | null;
-    admin_email: string;
-    created_at: string | null;
-  }[];
+  historico: HistoricoEntrada[];
   // Contrafactual da Etapa 2 ("quem sentiria falta"): vem do SQLite, não da planilha.
   contrafactual: { tipo: 'pessoa' | 'time'; lista: string[] } | null;
 };
@@ -630,21 +640,34 @@ export function ProjetoDetalheDialog({
             {detalhe.historico.length > 0 && (
               <Secao titulo="Histórico de triagem">
                 <ul className="space-y-1.5">
-                  {detalhe.historico.map((h, i) => (
-                    <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
-                      <History className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-medium">
-                        {h.status_anterior ?? 'sem status'} → {h.status_novo}
-                      </span>
-                      <span className="text-muted-foreground">
-                        por {h.admin_email}
-                        {h.created_at ? ` em ${fmtDataBR(h.created_at)}` : ''}
-                      </span>
-                      {h.observacoes && (
-                        <span className="w-full text-muted-foreground">Motivo: {h.observacoes}</span>
-                      )}
-                    </li>
-                  ))}
+                  {detalhe.historico.map((h, i) =>
+                    h.tipo === 'reenvio' ? (
+                      <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
+                        <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                          Projeto reenviado (edição {h.edicao})
+                        </span>
+                        <span className="text-muted-foreground">
+                          {h.submetido_por ? `por ${h.submetido_por}` : ''}
+                          {h.created_at ? ` em ${fmtDataBR(h.created_at)}` : ''}
+                        </span>
+                      </li>
+                    ) : (
+                      <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
+                        <History className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">
+                          {h.status_anterior ?? 'sem status'} → {h.status_novo}
+                        </span>
+                        <span className="text-muted-foreground">
+                          por {h.admin_email}
+                          {h.created_at ? ` em ${fmtDataBR(h.created_at)}` : ''}
+                        </span>
+                        {h.observacoes && (
+                          <span className="w-full text-muted-foreground">Motivo: {h.observacoes}</span>
+                        )}
+                      </li>
+                    ),
+                  )}
                 </ul>
               </Secao>
             )}

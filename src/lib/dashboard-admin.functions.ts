@@ -31,6 +31,9 @@ import {
   getAdminStatusLogsPorIds,
   getContrafactualAfetados,
   getContrafactualAfetadosPorIds,
+  getReenviosDoProjeto,
+  getReenviosPorIds,
+  type ReenvioResumo,
 } from "@/integrations/db/client.server";
 import {
   desserializarAfetados,
@@ -117,15 +120,63 @@ export type DetalheDashboard = {
    * planilha (legado sem linha no SQLite).
    */
   contrafactual: { tipo: AfetadoTipo; lista: string[] } | null;
-  /** Mudanças de status feitas por esta tela (a planilha não guarda autoria). */
-  historico: {
+  /**
+   * Linha do tempo da triagem, mais recente primeiro. Duas naturezas de evento convivem:
+   * - `status`: mudança de status feita nesta tela (a planilha não guarda autoria) — de
+   *   `admin_status_log`.
+   * - `reenvio`: o dono/editor reenviou o projeto — de `projeto_versions` (`acao = 'reenvio'`).
+   * Sem essa segunda natureza, o reenvio só dava para inferir pelo status mudando.
+   */
+  historico: HistoricoEntrada[];
+};
+
+export type HistoricoEntrada =
+  | {
+      tipo: "status";
+      status_anterior: string | null;
+      status_novo: string;
+      observacoes: string | null;
+      admin_email: string;
+      created_at: string | null;
+    }
+  | {
+      tipo: "reenvio";
+      /** Nº da edição (1ª edição = 1). `versao_num = 1` é o submit inicial, não conta. */
+      edicao: number;
+      submetido_por: string | null;
+      created_at: string | null;
+    };
+
+/**
+ * Funde o log de status (admin) com os reenvios (dono/editor) numa linha do tempo única,
+ * mais recente primeiro — a MESMA ordem `created_at DESC` que o log de status já usava, para
+ * não reordenar silenciosamente a ficha dos outros projetos. Ambos os carimbos vêm do SQLite
+ * no formato `YYYY-MM-DD HH:MM:SS`, então a comparação por string ordena certo; carimbo
+ * ausente vai para o fim. PURA (testável sem banco).
+ */
+export function montarHistoricoTriagem(
+  statusLogs: {
     status_anterior: string | null;
     status_novo: string;
     observacoes: string | null;
     admin_email: string;
     created_at: string | null;
-  }[];
-};
+  }[],
+  reenvios: ReenvioResumo[],
+): HistoricoEntrada[] {
+  const entradas: HistoricoEntrada[] = [
+    ...statusLogs.map((l): HistoricoEntrada => ({ tipo: "status", ...l })),
+    ...reenvios.map(
+      (r): HistoricoEntrada => ({
+        tipo: "reenvio",
+        edicao: Math.max(1, r.versao_num - 1),
+        submetido_por: r.submetido_por,
+        created_at: r.created_at,
+      }),
+    ),
+  ];
+  return entradas.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+}
 
 // ─── Leitura do espelho ──────────────────────────────────────────────────────
 
@@ -197,10 +248,10 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   //
   // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
   // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
-  const [alvo, historico, contrafactual] = await Promise.all([
+  const [alvo, historicoStatus, reenvios, contrafactual] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
-      .then((logs): DetalheDashboard["historico"] =>
+      .then((logs) =>
         logs.map((l) => ({
           status_anterior: l.status_anterior,
           status_novo: l.status_novo,
@@ -209,10 +260,16 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
           created_at: l.created_at,
         })),
       )
-      .catch((e): DetalheDashboard["historico"] => {
+      .catch((e) => {
         console.error("[dashboard-admin] falha ao ler histórico de status:", e);
         return [];
       }),
+    // Reenvios (edições) do dono/editor — acessório: falha aqui só omite as linhas de reenvio,
+    // a ficha ainda abre com o log de status.
+    getReenviosDoProjeto(id).catch((e): ReenvioResumo[] => {
+      console.error("[dashboard-admin] falha ao ler reenvios:", e);
+      return [];
+    }),
     getContrafactualAfetados(id)
       .then((row): DetalheDashboard["contrafactual"] => {
         const { tipo, lista } = desserializarAfetados(row?.contrafactual_afetados);
@@ -233,7 +290,12 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
     if (val) campos[k] = val;
   }
 
-  return { id, campos, historico, contrafactual };
+  return {
+    id,
+    campos,
+    historico: montarHistoricoTriagem(historicoStatus, reenvios),
+    contrafactual,
+  };
 }
 
 /**
@@ -264,13 +326,19 @@ export async function getProjetosDashboardLote(
   const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
   if (alvos.length === 0) return {};
 
-  const [linhas, historicos, contrafactuais] = await Promise.all([
+  const [linhas, historicos, reenvios, contrafactuais] = await Promise.all([
     lerLinhasEspelho(alvos),
     // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
     // lote inteiro e devolver a tela ao caminho de 25 requisições.
     getAdminStatusLogsPorIds(alvos).catch((e) => {
       console.error("[dashboard-admin] falha ao ler histórico em lote:", e);
       return new Map<string, Awaited<ReturnType<typeof getAdminStatusLogs>>>();
+    }),
+    // Reenvios em lote (mesma consulta por `IN`, sem os blobs de snapshot). Falha aqui → as
+    // fichas do lote só ficam sem as linhas de reenvio.
+    getReenviosPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler reenvios em lote:", e);
+      return new Map<string, ReenvioResumo[]>();
     }),
     // Contrafactual ("quem sentiria falta") mora só no SQLite, então entra numa consulta por
     // `IN` à parte (nunca uma por projeto). Falha aqui → seção só não aparece nas fichas do lote.
@@ -296,13 +364,7 @@ export async function getProjetosDashboardLote(
     out[id] = {
       id,
       campos,
-      historico: (historicos.get(chave) ?? []).map((l) => ({
-        status_anterior: l.status_anterior,
-        status_novo: l.status_novo,
-        observacoes: l.observacoes,
-        admin_email: l.admin_email,
-        created_at: l.created_at,
-      })),
+      historico: montarHistoricoTriagem(historicos.get(chave) ?? [], reenvios.get(chave) ?? []),
       contrafactual: afet.lista.length > 0 ? afet : null,
     };
   }

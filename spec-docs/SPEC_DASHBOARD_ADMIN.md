@@ -109,6 +109,19 @@ por fila, sem ver a linha inteira de um projeto num lugar organizado.
   Plano: `docs/plans/sqlite-fonte-de-leitura.md`. Testes: `tests/dashboard-espelho.test.ts` (banco real),
   `tests/sheet-espelho.test.ts`, `tests/dashboard-admin.test.ts` (fake em memória).
 
+- **D12 — O reenvio do dono/editor vira LINHA no "Histórico de triagem" (24/08/2026).** Antes o log da ficha
+  era só `admin_status_log` (mudança de status feita por admin), então um reenvio só dava para inferir pelo
+  Status mudar de "Reenvio Pendente" de volta para "Pendente" — não havia registro de que o dono reenviou,
+  nem quando. Agora `getProjetoDashboard`/`getProjetosDashboardLote` fundem os reenvios já gravados em
+  **`projeto_versions`** (`acao = 'reenvio'`, com `submetido_por` e `created_at`) dentro do `historico`, que
+  passou a ser **união discriminada** `tipo: 'status' | 'reenvio'`, ordenada `created_at DESC` (a MESMA ordem
+  que o log de status já usava — não reordena a ficha dos outros projetos). Merge na função **PURA**
+  `montarHistoricoTriagem` (testável sem banco); "edição N" = `versao_num − 1` (a versão 1 é o submit
+  inicial). Leitores novos: `getReenviosDoProjeto` (individual) e `getReenviosPorIds` (lote), ambos **sem os
+  blobs de snapshot** — o teto de 32 MiB de RPC do Godeploy já derrubou o Investigador por trazê-los em
+  massa. É **acessório como o contrafactual**: falha de leitura só omite as linhas de reenvio, a ficha ainda
+  abre. Testes: `tests/dashboard-admin.test.ts`.
+
 ## 3. O que a tela faz
 
 | Recurso | Como |

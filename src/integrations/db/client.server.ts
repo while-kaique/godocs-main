@@ -707,6 +707,57 @@ export function getVersionsByProjeto(projeto_id: string) {
   );
 }
 
+/** Uma linha de reenvio na ficha de triagem (sem os blobs de snapshot). */
+export type ReenvioResumo = {
+  versao_num: number;
+  submetido_por: string | null;
+  created_at: string | null;
+};
+
+/**
+ * Reenvios (edições) de UM projeto para o "Histórico de triagem" da ficha do `/dashboard`.
+ * ⚠️ NUNCA seleciona os blobs de snapshot (`snapshot_projeto/_doc/_chat`) — só os 3 escalares
+ * que a linha do log precisa (o teto de 32 MiB de RPC do Godeploy já derrubou o Investigador
+ * por trazer esses blobs em massa). `versao_num = 1` é o submit inicial e fica de fora.
+ */
+export function getReenviosDoProjeto(projeto_id: string): Promise<ReenvioResumo[]> {
+  return queryAll<ReenvioResumo>(
+    `SELECT versao_num, submetido_por, created_at
+       FROM projeto_versions
+      WHERE projeto_id = ? AND acao = 'reenvio'
+      ORDER BY versao_num ASC`,
+    [projeto_id],
+  );
+}
+
+/**
+ * Versão em LOTE do anterior — uma consulta por `IN` para o loader de fichas do dashboard
+ * (`getProjetosDashboardLote`), no mesmo espírito de `getAdminStatusLogsPorIds`: round-trip por
+ * item dentro de um laço é o erro que já derrubou o Investigador. Map chaveado pelo id em minúsculas.
+ */
+export async function getReenviosPorIds(
+  projetoIds: string[],
+): Promise<Map<string, ReenvioResumo[]>> {
+  const ids = [...new Set(projetoIds.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, ReenvioResumo[]>();
+  if (ids.length === 0) return out;
+  const placeholders = ids.map(() => "?").join(", ");
+  const linhas = await queryAll<ReenvioResumo & { projeto_id: string }>(
+    `SELECT projeto_id, versao_num, submetido_por, created_at
+       FROM projeto_versions
+      WHERE acao = 'reenvio' AND LOWER(projeto_id) IN (${placeholders})
+      ORDER BY versao_num ASC`,
+    ids,
+  );
+  for (const l of linhas) {
+    const k = String(l.projeto_id ?? "").toLowerCase();
+    const atual = out.get(k);
+    if (atual) atual.push({ versao_num: l.versao_num, submetido_por: l.submetido_por, created_at: l.created_at });
+    else out.set(k, [{ versao_num: l.versao_num, submetido_por: l.submetido_por, created_at: l.created_at }]);
+  }
+  return out;
+}
+
 export function getLatestVersionByProjeto(projeto_id: string) {
   return queryOne<VersionRow>(
     "SELECT * FROM projeto_versions WHERE projeto_id = ? ORDER BY versao_num DESC LIMIT 1",
