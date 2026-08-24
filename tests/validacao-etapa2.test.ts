@@ -38,6 +38,10 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     contextoEspecial: '',
     especialDashboard: '',
     especialGanhoOrganizacional: '',
+    vinculo: 'novo',
+    paiId: '',
+    paiNome: '',
+    paiProdStatus: '',
     ...over,
   };
 }

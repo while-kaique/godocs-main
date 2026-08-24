@@ -1627,3 +1627,51 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 **Reabrir / mover:** setar os secrets `SUBMISSAO_BLOQUEIO_INICIO`/`SUBMISSAO_BLOQUEIO_FIM` (sem redeploy de lógica). **Remover de vez:** apagar a chamada em `submeterParaValidacao`, a faixa nas 2 telas e os 2 blocos TEMPORÁRIO no `CLAUDE.md`.
 
 **Onde aterrissou.** `src/lib/bloqueio-submissao.ts` (novo), `src/components/aviso-bloqueio-submissao.tsx` (novo), `src/lib/mensagens-submissao.ts` (`bloqueioSubmissaoPausada` + codigo), `src/lib/chat.functions.ts` (guard em `submeterParaValidacao`), `src/routes/index.tsx`, `src/lib/submeter/intro.tsx`. Teste: `tests/bloqueio-submissao.test.ts`.
+
+## Projeto como FEATURE de outro projeto (vínculo pai↔filho) (24/08/2026)
+
+**O quê.** Na Etapa 1, o submissor pode marcar o projeto como **feature de um projeto
+existente** em vez de projeto novo. Vale nos **3 fluxos** (padrão, especial, fluxo direto de
+liderança) e **só na submissão NOVA** (na edição o vínculo é read-only). Decisões FECHADAS do
+Luis — não redecidir.
+
+**Etapa 1 (UI, `step1.tsx`).** Bloco `blocoVinculo`: toggle "🆕 Projeto novo" × "🧩 Feature de
+um projeto existente". Marcando feature → "o projeto pai já está em produção?" (gate de porta,
+só frontend, como `prodStatus`) → **autocomplete do PAI** (`ProjetoPaiInput`, `form-components.tsx`,
+seleção única com navegação por teclado). Estado novo em `FormData`: `vinculo`/`paiId`/`paiNome`/
+`paiProdStatus`. `validarEtapa1`: feature exige `paiId` + pai em produção.
+
+**Autocomplete do pai.** Hook `useBuscaProjetos` (`submeter/projeto-pai-sugestoes.ts`, debounced)
+→ **`GET /api/projetos/buscar?q=`** (`projetos-busca.functions.ts`, autenticado). ⚠️ Fonte = o
+**espelho `sheet_espelho`** (`lerResumosEspelho`), **NUNCA** `readAllRows`/Sheets no request (cota
+compartilhada com prod). Filtro por nome sem acento (`filtrarProjetosPorNome`, PURA), devolve
+`{id, nome, autor}`, no máx. 20, `q` < 2 chars → [].
+
+**Persistência.** SQLite: `projetos.projeto_pai_id` (no FILHO, gravado por `iniciarSubmissao`) +
+`projeto_filhos_ids` (JSON, no PAI, acumulado por `vincularFilhoAoPai`). Sheets (por NOME, 2
+colunas novas em `SHEET_COLUMNS`): **"ID Pai"** na linha do filho (via `syncSubmitToGoogle`, campo
+`idPai`); **"ID Feature"** na linha do PAI — **cross-row** no `submeterParaValidacao`
+(`updateRowByProjectId` + `espelharEscrita`, lista acumulada sem duplicar via
+`serializarIdsFeatureSheet`; best-effort, nunca derruba a submissão). **Nome do filho** ganha o
+prefixo **`[feature de <NOME do pai>]`** (`prefixarNomeFeature`, IDEMPOTENTE no reenvio; usa o
+nome REAL do pai lido do SQLite/espelho, não texto do cliente). ⚠️ As 2 colunas precisam existir
+no cabeçalho de GoDocs/STAGING (senão ignoradas com aviso). Helpers PUROS: `src/lib/projeto-vinculo.ts`.
+
+**Aprovação sequencial de 2 líderes.** Ver `SPEC_APROVACAO_LIDER.md` §D32 (coluna `estagio` em
+`projeto_aprovacoes`; estágio 1 = líder do autor, estágio 2 = líder do dono do pai aberto só após
+o estágio 1 ser aprovado; copy própria do estágio 2 no Gomoon; parecer do estágio 2 na ficha do
+`/dashboard`). O `memorial`/ganho é da PRÓPRIA feature (não herda o do pai); o "vale menos" é 100%
+do lado do Gomoon (o GoDocs só disponibiliza o vínculo).
+
+**Onde aterrissou.** `src/lib/projeto-vinculo.ts` (novo), `src/lib/projetos-busca.functions.ts`
+(novo), `src/lib/submeter/projeto-pai-sugestoes.ts` (novo), `ProjetoPaiInput` em
+`form-components.tsx`, `step1.tsx`, `constants.ts` (FormData + `validarEtapa1`), `submeter.tsx`
+(estado + 4 payloads de `iniciar-submissao`), `worker.ts` (rota), `schema.ts` (2 colunas +
+`estagio`), `client.server.ts` (ProjetoRow/InsertProjeto/insertProjeto/`vincularFilhoAoPai` +
+`abrirAprovacoesPendentes`/`decidirAprovacoesDoProjeto` com estágio), `aprovacoes.functions.ts`
+(`abrirPreAprovacaoProjetoPai`, gatilho, filtros `estagio===1`, `parecerEstagio2ParaFicha`),
+`chat.functions.ts` (iniciarSubmissao + cross-row + gatilho isento), `google/sheets.ts` +
+`google/sync.ts` (2 colunas + `idPai`), `gomoon-mensagens.ts` + `gomoon-lideres.functions.ts`
+(copy + notify do estágio 2), `dashboard-admin.functions.ts` + `projeto-detalhe-dialog.tsx`
+(ficha mostra o parecer do estágio 2). Testes: `tests/projeto-vinculo.test.ts`,
+`tests/aprovacoes-sequencial.test.ts`.

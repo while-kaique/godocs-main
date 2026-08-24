@@ -33,12 +33,16 @@ import {
   getContrafactualAfetadosPorIds,
   getReenviosDoProjeto,
   getReenviosPorIds,
+  getAprovacoesDoProjeto,
+  getAprovacoesDeProjetos,
   type ReenvioResumo,
+  type AprovacaoRow,
 } from "@/integrations/db/client.server";
 import {
   desserializarAfetados,
   type AfetadoTipo,
 } from "@/lib/submeter/constants";
+import { parecerEstagio2ParaFicha, type ParecerEstagio2 } from "@/lib/aprovacoes.functions";
 import {
   lerResumosEspelho,
   lerLinhaEspelho,
@@ -120,6 +124,14 @@ export type DetalheDashboard = {
    * planilha (legado sem linha no SQLite).
    */
   contrafactual: { tipo: AfetadoTipo; lista: string[] } | null;
+  /**
+   * Parecer do ESTÁGIO 2 da pré-aprovação (líder do dono do projeto PAI) — só quando o
+   * projeto é uma FEATURE de outro (projeto vinculado). Vem do SQLite (`projeto_aprovacoes`,
+   * estágio 2), NÃO da planilha (o estágio 2 não tem coluna). A triagem vê os DOIS pareceres:
+   * o estágio 1 (líder do autor) na seção que lê a linha da planilha, e este ao lado.
+   * `null` = projeto não é feature, ou o estágio 2 ainda não abriu.
+   */
+  preAprovacaoPai: ParecerEstagio2 | null;
   /**
    * Linha do tempo da triagem, mais recente primeiro. Duas naturezas de evento convivem:
    * - `status`: mudança de status feita nesta tela (a planilha não guarda autoria) — de
@@ -248,7 +260,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   //
   // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
   // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
-  const [alvo, historicoStatus, reenvios, contrafactual] = await Promise.all([
+  const [alvo, historicoStatus, reenvios, contrafactual, preAprovacaoPai] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
       .then((logs) =>
@@ -279,6 +291,13 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
         console.error("[dashboard-admin] falha ao ler contrafactual:", e);
         return null;
       }),
+    // Parecer do estágio 2 (líder do dono do pai) — só SQLite; acessório, falha → null.
+    getAprovacoesDoProjeto(id)
+      .then((linhas) => parecerEstagio2ParaFicha(linhas))
+      .catch((e) => {
+        console.error("[dashboard-admin] falha ao ler pré-aprovação do pai:", e);
+        return null;
+      }),
   ]);
 
   if (!alvo) {
@@ -295,6 +314,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
     campos,
     historico: montarHistoricoTriagem(historicoStatus, reenvios),
     contrafactual,
+    preAprovacaoPai,
   };
 }
 
@@ -326,7 +346,7 @@ export async function getProjetosDashboardLote(
   const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
   if (alvos.length === 0) return {};
 
-  const [linhas, historicos, reenvios, contrafactuais] = await Promise.all([
+  const [linhas, historicos, reenvios, contrafactuais, aprovacoesPai] = await Promise.all([
     lerLinhasEspelho(alvos),
     // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
     // lote inteiro e devolver a tela ao caminho de 25 requisições.
@@ -346,6 +366,23 @@ export async function getProjetosDashboardLote(
       console.error("[dashboard-admin] falha ao ler contrafactual em lote:", e);
       return new Map<string, string | null>();
     }),
+    // Pré-aprovação do estágio 2 (líder do dono do pai) em lote — uma consulta por `IN`,
+    // agrupada por projeto_id. Acessório: falha → nenhuma ficha mostra o parecer do pai.
+    getAprovacoesDeProjetos(alvos)
+      .then((rows) => {
+        const porId = new Map<string, typeof rows>();
+        for (const r of rows) {
+          const k = r.projeto_id.trim().toLowerCase();
+          const lista = porId.get(k) ?? [];
+          lista.push(r);
+          porId.set(k, lista);
+        }
+        return porId;
+      })
+      .catch((e) => {
+        console.error("[dashboard-admin] falha ao ler pré-aprovação do pai em lote:", e);
+        return new Map<string, AprovacaoRow[]>();
+      }),
   ]);
 
   const out: Record<string, DetalheDashboard> = {};
@@ -366,6 +403,7 @@ export async function getProjetosDashboardLote(
       campos,
       historico: montarHistoricoTriagem(historicos.get(chave) ?? [], reenvios.get(chave) ?? []),
       contrafactual: afet.lista.length > 0 ? afet : null,
+      preAprovacaoPai: parecerEstagio2ParaFicha(aprovacoesPai.get(chave) ?? []),
     };
   }
   return out;

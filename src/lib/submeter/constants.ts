@@ -296,6 +296,14 @@ export function validarEtapa1(
   // Campos do projeto (escopo/status/ferramenta) só travam na submissão NOVA. Em
   // edição, um legado pode não tê-los preenchidos — não bloqueia (D2/RF-103).
   if (!modoEdicao) {
+    // Vínculo de FEATURE: se marcou "feature", precisa escolher o PAI e o pai tem de
+    // estar em produção (mesma régua do próprio projeto — só se documenta ganho já real).
+    if (form.vinculo === "feature") {
+      if (!form.paiId.trim())
+        errs.paiId = "Escolha o projeto do qual este é uma feature";
+      else if (form.paiProdStatus !== "sim")
+        errs.paiProdStatus = "O projeto pai precisa estar em produção";
+    }
     if (!form.escopo)
       errs.escopo = "Selecione se a solução é interna ou externa";
     if (!form.prodStatus)
@@ -506,6 +514,16 @@ export interface FormData {
   // (`especial`/`tipos_projeto`), que já é gravada.
   especialDashboard: "sim" | "nao" | "";
   especialGanhoOrganizacional: "sim" | "nao" | "";
+  // ─── Projeto como FEATURE de outro projeto (Etapa 1) ───
+  // "novo" = projeto normal; "feature" = feature de um projeto existente (escolhe o PAI).
+  // Vale nos 3 fluxos (padrão/especial/liderança). Só a submissão NOVA cria o vínculo
+  // (na edição o vínculo é read-only). `paiId`/`paiNome` vêm do autocomplete do pai.
+  vinculo: "novo" | "feature" | "";
+  paiId: string;
+  paiNome: string;
+  // Gate de porta (só frontend, como `prodStatus`): o pai precisa estar em produção.
+  // Não vai ao backend, a nenhum prompt nem ao Sheets.
+  paiProdStatus: "sim" | "dev" | "idle" | "";
 }
 
 // Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área

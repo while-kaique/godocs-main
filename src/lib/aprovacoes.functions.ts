@@ -39,6 +39,7 @@ import {
 } from '@/lib/agents/memorial-format';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { notificarChatPreAprovacao } from '@/lib/notificacao-projeto.functions';
+import { notificarLiderDoProjetoPai } from '@/lib/gomoon-lideres.functions';
 import { deveNotificarDecisao } from '@/lib/notificacao-chat';
 import { espelharEscrita } from '@/lib/sheet-espelho';
 import { runBackground } from '@/lib/background';
@@ -367,6 +368,96 @@ export async function abrirPreAprovacao(
   }
 }
 
+// ─── ESTÁGIO 2: líder do dono do PROJETO PAI (feature de outro projeto) ───────
+//
+// Quando um projeto é uma FEATURE de outro, além do líder do AUTOR (estágio 1) o líder
+// do DONO DO PROJETO PAI também precisa dar parecer — mas SÓ depois de o estágio 1 estar
+// resolvido (aprovado por clique, OU isento). Esta função abre a fila do estágio 2.
+//
+// Cada estágio tem isenção INDEPENDENTE (mesma régua de cargo): se o dono do pai é
+// liderança (D20) ou não tem líder (D6), o estágio 2 fica "satisfeito sem fila". A copy
+// do aviso ao líder do pai é PRÓPRIA (Gomoon, mesmo canal — D17).
+//
+// NUNCA lança (D3). Idempotente: não reabre se já há linhas do estágio 2 (o gatilho pode
+// disparar mais de uma vez).
+
+export type ResultadoAberturaPai = {
+  /** Criou linhas do estágio 2? */
+  aberto: boolean;
+  /** Estágio 2 satisfeito sem fila (dono do pai é liderança / sem líder / sem pai). */
+  isento: boolean;
+  motivo:
+    | 'sem_pai'
+    | 'pai_inexistente'
+    | 'sem_dono'
+    | 'lideranca'
+    | 'sem_lider'
+    | 'ja_aberto'
+    | 'teamguide_indisponivel'
+    | null;
+  aprovadores: { email: string; nome: string | null }[];
+};
+
+export async function abrirPreAprovacaoProjetoPai(
+  filhoId: string,
+): Promise<ResultadoAberturaPai> {
+  const semEstagio2 = (
+    motivo: ResultadoAberturaPai['motivo'],
+    isento: boolean,
+  ): ResultadoAberturaPai => ({ aberto: false, isento, motivo, aprovadores: [] });
+
+  try {
+    const filho = await getProjetoById(filhoId);
+    const paiId = (filho?.projeto_pai_id ?? '').trim();
+    if (!filho || !paiId) return semEstagio2('sem_pai', false);
+
+    // Idempotência: já existe fila do estágio 2 (o gatilho disparou antes) → não reabre.
+    const jaTem = (await getAprovacoesDoProjeto(filhoId)).some((l) => Number(l.estagio) === 2);
+    if (jaTem) return semEstagio2('ja_aberto', false);
+
+    const pai = await getProjetoById(paiId);
+    if (!pai) return semEstagio2('pai_inexistente', true);
+    const dono = (pai.responsavel_email ?? '').trim().toLowerCase();
+    if (!dono) return semEstagio2('sem_dono', true);
+
+    // Isenção por CARGO do dono do pai (independente do estágio 1).
+    if (await ehLideranca(dono)) {
+      console.log(`[aprovacoes] dono do pai ${dono} é liderança → estágio 2 isento (feature ${filhoId}).`);
+      return semEstagio2('lideranca', true);
+    }
+
+    const lideres = (await getLideresDe(dono)).filter((l) => !!l.email);
+    if (!lideres.length) return semEstagio2('sem_lider', true);
+
+    const aprovadores = lideres.map((l) => ({ email: l.email!.toLowerCase(), nome: l.nome || null }));
+    const versao = await getUltimaVersaoNum(filhoId);
+    await abrirAprovacoesPendentes(filhoId, versao, dono, aprovadores, {
+      estagio: 2,
+      limparAntes: true,
+    });
+
+    // Aviso ao líder do pai (Gomoon, copy própria) — fire-and-forget, nunca derruba nada.
+    runBackground(
+      notificarLiderDoProjetoPai(filhoId, aprovadores, {
+        autorNome: filho.responsavel_nome ?? '',
+        autorEmail: filho.responsavel_email ?? '',
+        projetoPaiNome: pai.nome ?? '',
+        featureNome: filho.nome ?? '',
+      }).catch((e) =>
+        console.error('[aprovacoes] aviso feature ao líder do pai falhou (não-fatal):', e),
+      ),
+    );
+
+    console.log(
+      `[aprovacoes] estágio 2 ABERTO para a feature ${filhoId} (pai ${paiId}, dono ${dono}, ${aprovadores.length} líder(es)).`,
+    );
+    return { aberto: true, isento: false, motivo: null, aprovadores };
+  } catch (e) {
+    console.error('[aprovacoes] falha ao abrir o estágio 2 (não-fatal):', e);
+    return semEstagio2('teamguide_indisponivel', false);
+  }
+}
+
 // ─── DISPENSA: o analisador reprovou, o líder não precisa mais opinar (D29) ──
 
 export type ResultadoDispensa = {
@@ -397,13 +488,18 @@ export async function dispensarPreAprovacao(projetoId: string): Promise<Resultad
     const linhas = await getAprovacoesDoProjeto(projetoId);
     if (!linhas.some((l) => l.veredito === 'pendente')) return { dispensou: false };
 
+    // Dispensa AMBOS os estágios pendentes (o projeto foi reprovado — Q6): o
+    // `dispensarAprovacoesPendentes` não filtra estágio, então fecha estágio 1 e 2.
     await dispensarAprovacoesPendentes(projetoId, MOTIVO_DISPENSA_CRITERIO);
     gravou = true;
 
     // ⚠️ A RE-LEITURA não é round-trip gratuito: é ela que faz o rótulo respeitar o
     // líder que tenha decidido ENTRE a leitura acima e o UPDATE (o `AND veredito =
     // 'pendente'` do SQL não toca a linha dele, e o rótulo tem de refletir isso).
-    const atualizadas = await getAprovacoesDoProjeto(projetoId);
+    // A coluna "Aprovação do Líder" é do estágio 1 → computa só sobre essas linhas.
+    const atualizadas = (await getAprovacoesDoProjeto(projetoId)).filter(
+      (l) => Number(l.estagio) === 1,
+    );
     console.log(`[aprovacoes] fila de ${projetoId} DISPENSADA (reprovado por critério).`);
     return {
       dispensou: true,
@@ -908,6 +1004,10 @@ export async function decidirAprovacao(
   // `decidido_por` guarda quem CLICOU. Na pré-visualização de admin (validação da tela)
   // o clique é do admin, não do líder — a auditoria registra o admin, nunca finge que o
   // líder decidiu.
+  // Feature de outro projeto: a decisão resolve SÓ as linhas do MESMO estágio do decisor
+  // (o estágio 1 é o líder do autor; o 2 é o líder do dono do pai). Sem isto, aprovar o
+  // estágio 2 fecharia a fila do estágio 1 (e vice-versa). Legado = estágio 1.
+  const estagioDecisor = Number(minha.estagio) || 1;
   const quemDecidiu = (opts?.atorReal ?? '').trim().toLowerCase() || alvo;
   const linhasGravadas = await decidirAprovacoesDoProjeto(
     projeto_id,
@@ -915,6 +1015,7 @@ export async function decidirAprovacao(
     comentario,
     quemDecidiu,
     respostas,
+    estagioDecisor,
   );
 
   // Feed do painel (drawer "Histórico"): registra SÓ quando um admin decide em modo
@@ -936,10 +1037,15 @@ export async function decidirAprovacao(
   }
 
   // Reflete na planilha (best-effort — a fonte de verdade é o SQLite).
+  // ⚠️ A coluna "Aprovação do Líder" é do ESTÁGIO 1 (líder do autor): computa SÓ sobre as
+  // linhas do estágio 1, para uma decisão do estágio 2 (líder do dono do pai) nunca
+  // sobrescrever esse estado. O estágio 2 não tem coluna no Sheets — aparece na ficha do
+  // /dashboard (lido do SQLite) e na tela/aviso do próprio líder do pai.
   const atualizadas = await getAprovacoesDoProjeto(projeto_id);
+  const estagio1 = atualizadas.filter((l) => Number(l.estagio) === 1);
   const colunasLiderDecidido = {
-    'Aprovação do Líder': rotuloAprovacaoSheet(atualizadas),
-    'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(atualizadas),
+    'Aprovação do Líder': rotuloAprovacaoSheet(estagio1),
+    'Justificativa Aprovação do Líder': justificativaAprovacaoSheet(estagio1),
   } as const;
   runBackground(
     updateRowByProjectId(projeto_id, colunasLiderDecidido)
@@ -974,25 +1080,38 @@ export async function decidirAprovacao(
   // Se o `env.DB` do Godeploy se comportar assim, o alerta do D30 morre para TODO projeto
   // não-isento. Não dá para detectar em código; dá para deixar rastro — e é a linha
   // abaixo que transforma "sumiu sem explicação" em "está no log desde o 1º deploy".
-  if (veredito === 'aprovado' && !deveNotificarDecisao(linhasGravadas)) {
+  // ⚠️ O alerta do grupo (D30) é do ESTÁGIO 1: sai UMA vez por projeto, quando o líder do
+  // autor pré-aprova. Uma aprovação do estágio 2 (líder do dono do pai) NÃO reavisa o
+  // grupo — seria uma 2ª mensagem para o mesmo projeto.
+  const avisaGrupo = veredito === 'aprovado' && estagioDecisor === 1;
+  if (avisaGrupo && !deveNotificarDecisao(linhasGravadas)) {
     console.warn(
       '[aprovacoes] UPDATE gravou 0 linhas — outro parecer chegou antes; grupo NÃO avisado',
       { projeto_id, quemDecidiu },
     );
   }
-  if (veredito === 'aprovado' && deveNotificarDecisao(linhasGravadas)) {
+  if (avisaGrupo && deveNotificarDecisao(linhasGravadas)) {
     // Nomeia o regime do adaptador no 1º deploy: `null` = o `env.DB` não reportou o
     // número e estamos notificando pelo default invertido, não por ter ganhado a corrida.
     if (linhasGravadas === null) {
       console.info('[aprovacoes] adaptador não reportou rowsWritten — avisando o grupo pelo default seguro');
     }
-    const parecer = assinaturaDoParecer(atualizadas, quemDecidiu);
+    const parecer = assinaturaDoParecer(estagio1, quemDecidiu);
     runBackground(
       Promise.resolve()
         .then(() => notificarChatPreAprovacao(projeto_id, parecer))
         .then(() => undefined)
         .catch((e) => console.error('[aprovacoes] falha ao avisar o Chat (não-fatal):', e)),
     );
+  }
+
+  // ── Gatilho do ESTÁGIO 2 (feature de outro projeto) ──
+  // Quando o líder do AUTOR (estágio 1) APROVA um projeto que é feature de outro, abre-se
+  // a fila do líder do dono do PAI. `ajuste`/`reprovado` NÃO chegam ao estágio 2 (o
+  // requisito: "se o 1º reprova, não chega ao 2º"). `abrirPreAprovacaoProjetoPai` confere
+  // internamente se há pai e se o estágio 2 já foi aberto (idempotente) e NUNCA lança.
+  if (veredito === 'aprovado' && estagioDecisor === 1 && deveNotificarDecisao(linhasGravadas)) {
+    await abrirPreAprovacaoProjetoPai(projeto_id);
   }
 
   return { ok: true, veredito };
@@ -1061,11 +1180,46 @@ export type ResumoAprovacao = {
   decidido_em: string | null;
 };
 
+/** Parecer do ESTÁGIO 2 (líder do dono do pai) pronto para a ficha de triagem. */
+export type ParecerEstagio2 = { estado: string; justificativa: string };
+
+/**
+ * Resume o parecer do ESTÁGIO 2 (feature de outro projeto) para a ficha do /dashboard, a
+ * partir de TODAS as linhas do projeto. Função PURA — reusa os mesmos redatores da coluna
+ * do estágio 1 (estado + justificativa), aplicados só às linhas do estágio 2. `null`
+ * quando não há estágio 2 (projeto não é feature, ou o estágio 2 ainda não abriu).
+ *
+ * ⚠️ O estágio 2 NÃO tem coluna no Sheets (Q3): a triagem o vê aqui, lido do SQLite, ao
+ * lado do parecer do estágio 1 (que vem da linha da planilha).
+ */
+export function parecerEstagio2ParaFicha(
+  linhas: Pick<
+    AprovacaoRow,
+    | 'estagio'
+    | 'veredito'
+    | 'aprovador_nome'
+    | 'aprovador_email'
+    | 'comentario'
+    | 'decidido_por'
+    | 'decidido_em'
+    | 'resp_move_kpi'
+    | 'resp_sente_falta'
+    | 'resp_saving_coerente'
+  >[],
+): ParecerEstagio2 | null {
+  const e2 = linhas.filter((l) => Number(l.estagio) === 2);
+  if (!e2.length) return null;
+  return { estado: rotuloAprovacaoSheet(e2), justificativa: justificativaAprovacaoSheet(e2) };
+}
+
 /** Resumo por projeto (1 entrada por id que tem fila). Não chama a TeamGuide. */
 export async function resumoAprovacaoPorProjeto(
   ids: string[],
 ): Promise<Record<string, ResumoAprovacao>> {
-  const rows = await getAprovacoesDeProjetos(ids);
+  // O card do AUTOR em "Meus Projetos" mostra o parecer do líder DELE (estágio 1). O
+  // estágio 2 (líder do dono do pai, feature de outro projeto) não é pendência do autor
+  // e não entra aqui — ele aparece na ficha de triagem do /dashboard.
+  const rows = (await getAprovacoesDeProjetos(ids)).filter((r) => Number(r.estagio) === 1);
   const out: Record<string, ResumoAprovacao> = {};
   for (const r of rows) {
     const atual = out[r.projeto_id];

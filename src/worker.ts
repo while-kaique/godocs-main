@@ -52,6 +52,7 @@ import {
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
+import { buscarProjetosPorNome } from "@/lib/projetos-busca.functions";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
 import { statusEspelho } from "@/lib/sheet-espelho";
 import {
@@ -233,6 +234,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ── Sugestões de participantes (autocomplete da etapa 1; lista da TeamGuide) ──
     if (pathname === "/api/participantes/sugestoes" && method === "GET") {
       return json(await getSugestoesParticipantes());
+    }
+
+    // ── Busca de projetos por nome (autocomplete do PAI — feature de outro projeto) ──
+    // Autenticado (edge OAuth + e-mail do header). Lê o ESPELHO, nunca o Sheets.
+    if (pathname === "/api/projetos/buscar" && method === "GET") {
+      if (!getEmailFromRequest(request)) return errorJson("Não autorizado.", 401);
+      const q = url.searchParams.get("q") ?? "";
+      return json(await buscarProjetosPorNome(q));
     }
 
     // ── Cron: sincroniza áreas da TeamGuide (chamado pela plataforma Godeploy) ──

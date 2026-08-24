@@ -32,7 +32,7 @@ import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
 import { getGodocsEnv } from '@/lib/env';
 import { ehProjetoTesteE2E } from '@/lib/google/chat';
-import { renderMensagemLider } from '@/lib/gomoon-mensagens';
+import { renderMensagemLider, renderMensagemLiderFeature } from '@/lib/gomoon-mensagens';
 
 const URL_PADRAO = 'https://gomoon.gogroupbr.com/api/godocs/lideres-pendentes';
 const APP_PADRAO = 'https://godocs.devgogroup.com';
@@ -442,6 +442,68 @@ export async function notificarLideresDoProjeto(
   }
 
   return enviarPayload(payload, base, `aviso imediato (${projetoId})`);
+}
+
+/**
+ * AVISO DO ESTÁGIO 2 — o líder do DONO DO PROJETO PAI, quando uma NOVA FEATURE (projeto
+ * vinculado) entra na fila dele. Mesmo canal do aviso imediato (Gomoon, D17), mas com
+ * COPY PRÓPRIA (`renderMensagemLiderFeature`): deixa claro que é uma feature nova no
+ * projeto DELE, não um projeto solto de um liderado.
+ *
+ * ⚠️ Guard `[E2E-…]` explícito (o nome do filho carrega a tag do harness). Idempotência
+ * por PROJETO-FEATURE (`chaveDeProjeto`). NUNCA lança (mesma régua do imediato).
+ */
+export async function notificarLiderDoProjetoPai(
+  filhoId: string,
+  aprovadores: { email: string; nome: string | null }[],
+  dados: { autorNome: string; autorEmail: string; projetoPaiNome: string; featureNome: string },
+  opts?: { dry?: boolean },
+): Promise<ResultadoNotificacao> {
+  const base = baseResultado(opts?.dry === true);
+
+  if (ehProjetoTesteE2E(dados.featureNome)) {
+    console.log(`[gomoon] feature ${filhoId} é teste E2E — aviso ao líder do pai suprimido.`);
+    return { ...base, ok: true };
+  }
+
+  const alvos = aprovadores
+    .map((a) => ({ email: (a.email ?? '').trim().toLowerCase(), nome: a.nome }))
+    .filter((a) => a.email);
+  if (!alvos.length) return { ...base, ok: true };
+
+  const appUrl = process.env.APP_BASE_URL ?? APP_PADRAO;
+  const url = `${origemDe(appUrl, APP_PADRAO)}/aprovacoes`;
+
+  const payload: PayloadLideresPendentes = {
+    origem: 'godocs',
+    ambiente: base.ambiente,
+    gerado_em: base.gerado_em,
+    lideres: alvos.map((a) => ({
+      email: a.email,
+      nome: a.nome,
+      url,
+      idempotency_key: chaveDeProjeto(a.email, filhoId),
+      // `liderados` nunca vazio (§3): a "liderada" aqui é a pessoa que implementou a
+      // feature. A CONTAGEM é 1 (esta feature). O texto real vai em `mensagem`.
+      liderados: [
+        {
+          nome: dados.autorNome || derivarNomeDeEmail(dados.autorEmail || a.email),
+          email: (dados.autorEmail ?? '').trim().toLowerCase(),
+          projetos_pendentes: 1,
+        },
+      ],
+      mensagem: {
+        texto: renderMensagemLiderFeature({
+          nome: a.nome,
+          autorNome: dados.autorNome,
+          projetoPaiNome: dados.projetoPaiNome,
+          featureNome: dados.featureNome,
+        }),
+      },
+    })),
+  };
+
+  return enviarPayload(payload, base, `aviso feature ao líder do pai (${filhoId})`);
 }
 
 /**

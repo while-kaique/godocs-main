@@ -163,6 +163,9 @@ export type SubmitSyncParams = {
   // sem líder / TeamGuide fora). Repassada ao `buildSubmitMessage`; só faz sentido
   // junto de `notificarChat: true`.
   notaPreAprovacao?: string | null;
+  // Vínculo de FEATURE → coluna "ID Pai" (linha do FILHO): id do projeto PAI, ou null →
+  // "—" (projeto novo). A coluna "ID Feature" (lista no PAI) é escrita à parte (cross-row).
+  idPai?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -442,6 +445,11 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     if (p.justificativaAprovacaoLider !== undefined || p.modo !== 'edicao') {
       row['Justificativa Aprovação do Líder'] = ouTraco(p.justificativaAprovacaoLider);
     }
+
+    // "ID Pai": vínculo de FEATURE — na linha do FILHO, o id do projeto PAI. Reflete o
+    // estado do SQLite (não é editável pela triagem), então grava sempre: valor → id do
+    // pai; null → "—". A coluna "ID Feature" (lista do PAI) é cross-row, escrita à parte.
+    row['ID Pai'] = ouTraco(p.idPai);
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em
     // submissão nova (ou edição sem anterior) grava "—" (regra: texto vazio → traço),

@@ -42,6 +42,8 @@ vem da **TeamGuide**.
 | **D27** | **Projeto ESPECIAL não abre fila de pré-aprovação** (decisão do Luis, 06/08/2026). `abrirPreAprovacao` devolve `isento` com motivo `'especial'` → coluna `Aprovação do Líder` = `—` e justificativa própria (*"Projeto especial — sem pré-aprovação do líder (vai direto à validação da RPA)"*). ⚠️ O guard roda **ANTES** da TeamGuide: é flag do próprio projeto (`especial = 1`), não depende de integração externa — trocar a ordem gastaria uma chamada externa para nada. | Projeto especial **não tem memorial financeiro**, então a 3ª pergunta do checklist ("o saving é coerente com o impacto?") não teria o que julgar, e o destino dele sempre foi a **validação humana da RPA** (é o que a flag significa). Estava só no código e no handoff — entrou aqui pela regra 12. Teste: *"projeto ESPECIAL não abre fila, nem consulta a TeamGuide (D27)"* em `tests/aprovacoes-lider.test.ts`. |
 | **D28** | **O líder convocado à fila LÊ o projeto em `/projeto/$id`** (correção de bug, 06/08/2026). O acesso de leitura passa a ter uma **3ª porta**: além de owner e participante, quem tem **linha em `projeto_aprovacoes`** para aquele projeto. A porta dá **só leitura** — `podeEditar` não muda (edição é do owner e dos `editores_delegados`, gotcha 8) — e o papel devolvido é **`'aprovador'`**, que a tela usa para o selo ("Aguarda seu parecer" / "Parecer registrado", rótulo + ícone) e para o link de volta apontar para `/aprovacoes`. Regras da porta: **(a)** linha **JÁ DECIDIDA também dá leitura** (o card segue oferecendo a doc depois do parecer — D15 —, e quem acabou de aprovar não pode levar 403 no que aprovou); **(b)** a checagem é **só SQLite, nunca a TeamGuide** — a liderança ao vivo é a régua de quem ENTRA na fila, não de quem já foi convocado, e uma reorganização de time não pode apagar o acesso a um projeto que a pessoa tem em mãos; **(c)** só é consultada quando owner/participante/admin falham (zero I/O extra para eles); **(d)** falha de leitura do banco → **sem acesso** (nunca "concede na dúvida"). Puro: `resolverAcessoAprovador(linhas, email)`; I/O: `acessoDeAprovador(projetoId, email)`. | **Bug em PRODUÇÃO**, achado pelo Estevão Vidal em 06/08/2026 (*"não to conseguindo abrir a página de 'Ler a documentação completa' no godocs pra aprovar um projeto"*, print com **"Acesso negado."**): o card da fila oferece o link, mas o gate era `ehOwner \|\| ehParticipante` e o líder **não é nenhum dos dois** → **403**. Era a **T3 do plano F1** e o **critério de aceitação nº 2**, que a spec afirmava cumprido; o `/ggsd:ship` barrou o merge do PR #235 exatamente nisso (`diverge-alta`, confiança 0,74). Custo real: 28 líderes foram convidados a `/aprovacoes` e quem clicava batia no erro. **Por que a linha da fila é prova suficiente:** é a MESMA régua do gate de `decidirAprovacao` (só grava se existir linha para (projeto, e-mail)) — quem pode **decidir** com base nela pode **ler** com base nela; o contrário (poder decidir sem poder ler a doc) é que era incoerente. Testes: bloco *"getMeuProjeto — o líder LÊ o projeto e NÃO edita"* + `resolverAcessoAprovador` em `tests/aprovacoes-lider.test.ts` (inclui: estranho segue levando 403, projeto sem fila não abre para ninguém, autor intocado). |
 | **D31** | **EDIÇÃO tem CARD PRÓPRIO: o que mudou na frente, o que não mudou colapsado** (pedido do Kaique, 17/08/2026). O card do D13/D15 passa a ser o card da **submissão nova**; quando o item da fila é um **reenvio** (`projeto_aprovacoes.versao > 1`), a tela monta o `CardEdicao`: cabeçalho dizendo qual versão está em julgamento e contra qual está comparando, **"O que mudou"** aberto (uma linha por campo, `antes → agora`, com **chip de variação** nos números), **texto longo colapsado** (memorial, descrição, documentação — abre em ANTES/AGORA empilhados) e **"Ver o que não mudou (N campos)"** fechado. A **zona do parecer é a MESMA** (checklist + bloqueio + caixa de texto, componente único `ZonaParecer`) — o card muda o que se LÊ, nunca o que se cobra. Quem escolhe o card é o **servidor** (`ItemAprovacao.edicao`), não o líder. Comparação PURA em **`src/lib/diff-versoes.ts`** (catálogo `CAMPOS_VERSAO`); rótulos/formatação em **`src/lib/projeto-rotulos.ts`** (fonte única com a tela). | O card de submissão mostra tudo com o mesmo peso — é o certo para quem lê o projeto pela 1ª vez e o **errado** no reenvio: o líder já leu, e reler a mesma parede de texto para achar de memória o que mudou é o caminho mais curto para o carimbo (o oposto do D13, "fácil, rápido e intuitivo"). Nos números o que decide o parecer não é o valor, é o **salto** entre versões: a 3ª pergunta do checklist ("o saving é coerente?") só tem resposta honesta se "R$ 5.400 → R$ 7.290" estiver escrito. **Decisões dentro da decisão:** **(1)** compara a versão da fila com a **imediatamente anterior**, não com "a última que este líder aprovou" — `abrirAprovacoesPendentes` **DELETA** as linhas anteriores a cada reenvio (D10), então o histórico de pareceres por versão não existe para consultar; **(2)** o **chip de variação é NEUTRO** (azul nas duas direções, com ícone ▲/▼ e `aria-label`) — na 1ª versão era verde/âmbar e estava errado duas vezes: **custo externo** subindo saía verde, e um saving que dobra é o que o líder tem de **duvidar**, não celebrar; **(3)** delta numérico só sai quando a **recorrência não mudou** ("120 h/mês → 120 h/trimestre" não é variação de zero, é outra unidade); **(4)** campo vazio nas duas versões **não aparece nem como "sem mudança"**; **(5)** sem snapshot da versão anterior (o `gravarVersaoProjeto` é não-bloqueante, e legado importado nunca teve v1) a tela **diz isso** e mostra o card completo — nunca um "antes" inventado; **(6)** a comparação **não cobre** participantes nem anexos (não estão no snapshot de versão) e o card **declara essa lacuna** por escrito, porque silêncio ali pareceria garantia. ⚠️ O catálogo é **separado do `CAMPOS_DIFF` do Investigador de propósito** (auditoria × parecer do gestor: lá `status` interno entra, aqui é ruído). Testes: `tests/diff-versoes.test.ts` (14 casos, incluindo os itens 1–5). |
+| **D32** | **Aprovação SEQUENCIAL de 2 líderes para PROJETO VINCULADO (feature de outro projeto)** (decisão do Luis, 24/08/2026). Um projeto marcado como **feature** de outro precisa de DOIS pareceres, em ordem: **estágio 1** = líder do AUTOR (o fluxo de sempre); **estágio 2** = líder do DONO DO PROJETO PAI, aberto **SÓ depois** de o estágio 1 ser APROVADO (`ajuste`/`reprovado` não chegam ao estágio 2). Se o estágio 1 for **isento** (liderança/sem líder/especial/TeamGuide fora), o estágio 2 abre já na submissão. Cada estágio tem **isenção por cargo INDEPENDENTE** (a mesma `ehLideranca`) e "o 1º líder decide por todos" (D4) DENTRO do estágio. Modelado pela coluna **`estagio`** (DEFAULT 1) em `projeto_aprovacoes`. | Uma feature vive DENTRO do projeto de outra pessoa: o líder do autor valida o ganho da feature (estágio 1) e o líder do DONO DO PAI precisa saber que puseram uma feature no projeto dele (estágio 2). Sequencial porque um estágio 2 sobre uma feature que o próprio líder do autor recusou seria ruído. ⚠️ **Invariantes que NÃO podem regredir:** o `estagio` DEFAULT 1 mantém TODO projeto e leitura legada como estágio 1 (zero mudança); `decidirAprovacoesDoProjeto` resolve **só o estágio do decisor** (`AND estagio = ?`), preservando a serialização do D30; a coluna Sheets **"Aprovação do Líder" é do estágio 1** e os 3 pontos de escrita filtram `estagio === 1` (uma decisão do estágio 2 nunca a sobrescreve); o **alerta do grupo (D30) é do estágio 1** (o estágio 2 não reavisa); o estágio 2 **não tem coluna no Sheets** — aparece na **ficha do `/dashboard`** (`preAprovacaoPai`, lido do SQLite); o aviso ao líder do pai é pelo **mesmo canal Gomoon (D17 — sem DM pelo GoDocs)** com copy própria. Fonte: `abrirPreAprovacaoProjetoPai` (`aprovacoes.functions.ts`), gatilho em `decidirAprovacao`; helpers de vínculo em `src/lib/projeto-vinculo.ts`. Testes: `tests/aprovacoes-sequencial.test.ts`, `tests/projeto-vinculo.test.ts`. Detalhe na §13. |
+
 ---
 
 ## 2. O que a API TeamGuide realmente entrega (verificado ao vivo, 03/08/2026)
@@ -635,3 +637,55 @@ o alerta sai quando o projeto está **liberado do lado do líder**.
 (`GOOGLE_CHAT_WEBHOOK_URL_AJUDA`) e o próprio `sendChatNotification`; as **DMs do Gomoon** ao líder
 (outro canal, outro contrato); `Status`, colunas do Sheets, `projeto_aprovacoes` e o fluxo de
 decisão do líder — só o **canal Chat** mudou.
+
+## 13. D32 — aprovação sequencial de 2 líderes (projeto vinculado / feature) (24/08/2026)
+
+Um projeto marcado como **FEATURE de outro** (Etapa 1, ver `SPEC_FEATURES_NOVAS.md`) precisa
+de DOIS pareceres, em ordem. A modelagem reusa `projeto_aprovacoes` com uma coluna nova
+**`estagio`** (INTEGER, DEFAULT 1) — todo projeto e leitura legada segue sendo estágio 1, sem
+mudança de comportamento.
+
+### Os dois estágios
+- **Estágio 1 — líder do AUTOR** (o fluxo de sempre): `abrirPreAprovacao` no
+  `submeterParaValidacao`. Coluna Sheets **"Aprovação do Líder"**, isenção por cargo (D20),
+  alerta do grupo (D30), tudo INALTERADO — os leitores da coluna passam a filtrar `estagio === 1`.
+- **Estágio 2 — líder do DONO DO PROJETO PAI**: `abrirPreAprovacaoProjetoPai(filhoId)`. Lê
+  `projeto_pai_id` do filho → dono do pai (`pai.responsavel_email`) → líderes do dono
+  (`getLideresDe`), com **isenção por cargo INDEPENDENTE** (`ehLideranca(dono)`). Insere linhas
+  `estagio = 2` (com `autor_email = dono do pai`, para a relação líder↔liderado do Gomoon).
+
+### Quando o estágio 2 abre
+- **Estágio 1 aprovado por clique:** gatilho em `decidirAprovacao` — `veredito === 'aprovado'`
+  **e** `estagio` do decisor `=== 1` **e** o `UPDATE` de fato gravou (`deveNotificarDecisao`,
+  para o vencedor da corrida abrir uma vez só). `ajuste`/`reprovado` NÃO abrem (o requisito:
+  "se o 1º reprova, não chega ao 2º").
+- **Estágio 1 isento** (autor é liderança/sem líder/especial/TeamGuide fora): não haverá clique,
+  então o estágio 2 abre já na submissão (`submeterParaValidacao`, logo após `abrirPreAprovacao`).
+  Vale para o **especial** também (D27 mantém o filho especial sem fila do próprio autor, mas o
+  dono do pai é avisado).
+
+### Invariantes que NÃO podem regredir
+1. **`estagio` DEFAULT 1** — legado e todo o resto do sistema é estágio 1.
+2. **`decidirAprovacoesDoProjeto` resolve só o estágio do decisor** (`AND estagio = ?`), preservando
+   a serialização do D30 (`AND veredito = 'pendente'`) e o retorno `number | null`.
+3. **A coluna Sheets "Aprovação do Líder" é do estágio 1** — `decidirAprovacao`, `dispensarPreAprovacao`
+   e `reabrirPreAprovacoes` computam o rótulo/justificativa só sobre `estagio === 1`. Uma decisão do
+   estágio 2 nunca a sobrescreve.
+4. **O alerta do grupo do Chat (D30) é do estágio 1** — o estágio 2 não reavisa (seria 2ª mensagem
+   do mesmo projeto).
+5. **O estágio 2 não tem coluna no Sheets** (decisão do Luis para a v1): aparece na **ficha do
+   `/dashboard`** (`DetalheDashboard.preAprovacaoPai`, de `parecerEstagio2ParaFicha`, lido do SQLite —
+   nunca da planilha), ao lado do parecer do estágio 1.
+6. **Dispensa (D29) fecha os DOIS estágios** — `dispensarAprovacoesPendentes` não filtra estágio.
+7. **Reenvio (D10) reseta a cadeia inteira** — `abrirAprovacoesPendentes` no estágio 1 faz o DELETE
+   de TODAS as linhas do projeto; o estágio 2, quando reaberto, limpa só as próprias linhas.
+8. **O card do AUTOR em "Meus Projetos" mostra só o estágio 1** (`resumoAprovacaoPorProjeto` filtra
+   `estagio === 1`) — o estágio 2 é do dono do pai, não do autor.
+9. **Aviso ao líder do pai pelo mesmo canal (Gomoon, D17)** — copy própria `renderMensagemLiderFeature`
+   (`gomoon-mensagens.ts`) + `notificarLiderDoProjetoPai` (`gomoon-lideres.functions.ts`); sem R$,
+   sem DM pelo GoDocs. `abrirPreAprovacaoProjetoPai` é **idempotente** (não reabre se já há estágio 2)
+   e **nunca lança** (D3).
+
+Testes: `tests/aprovacoes-sequencial.test.ts` (estágio 1 aprova → abre estágio 2; reprova/ajuste →
+não abre; isenção independente; decisão do estágio 2 não mexe no 1; idempotência; sem pai) e
+`tests/projeto-vinculo.test.ts` (helpers puros do vínculo).

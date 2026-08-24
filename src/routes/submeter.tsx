@@ -640,6 +640,13 @@ export function SubmeterPageContent({
           // passa pela triagem que não existia quando ele entrou).
           especialDashboard: "",
           especialGanhoOrganizacional: "",
+          // Vínculo de FEATURE é read-only na edição (só a submissão nova o cria). O
+          // prefixo "[feature de <pai>]" no nome já mostra o vínculo; aqui só semeamos o
+          // estado para o step1 exibir a referência.
+          vinculo: (data.projeto_pai_id as string | null) ? "feature" : "novo",
+          paiId: (data.projeto_pai_id as string | null) ?? "",
+          paiNome: (data.projeto_pai_nome as string | null) ?? "",
+          paiProdStatus: "",
         };
 
         setForm(newForm);
@@ -1046,6 +1053,10 @@ export function SubmeterPageContent({
     contextoEspecial: "",
     especialDashboard: "",
     especialGanhoOrganizacional: "",
+    vinculo: "novo",
+    paiId: "",
+    paiNome: "",
+    paiProdStatus: "",
   });
 
   // ── Sandbox de demonstração (/fluxos) ──────────────────────────────────────
@@ -1334,6 +1345,7 @@ export function SubmeterPageContent({
             membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
             nome_projeto: form.nomeProjeto.trim(),
             data_criacao: form.dataCriacao,
+            projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
             // SEM tipos/especial: a fase de doc não depende deles; a Etapa 2.5 os define
             // depois (handleContinuarAgente sincroniza; especial converte via metadados).
             descricao_breve: form.descricaoBreve.trim() || undefined,
@@ -1632,6 +1644,7 @@ export function SubmeterPageContent({
             undefined,
           especial: form.especial || undefined,
           contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
+          projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
           docs,
         },
       );
@@ -1724,6 +1737,7 @@ export function SubmeterPageContent({
             undefined,
           // O backend gera a doc por IA numa passada e NÃO inicia o chat.
           fluxo_direto: true,
+          projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
           docs,
         },
       );
@@ -1890,6 +1904,7 @@ export function SubmeterPageContent({
             undefined,
           especial: true,
           contexto_especial: form.contextoEspecial.trim(),
+          projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
           docs,
         },
       );

@@ -123,6 +123,14 @@ export const SHEET_COLUMNS = [
   // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
   // Pré-reprovado) — decisão do Luis, 03/08/2026.
   'Justificativa Aprovação do Líder',
+  // ─── Projeto como FEATURE de outro projeto (vínculo pai↔filho) ───────────────
+  // "ID Pai": na linha do FILHO, o id do projeto PAI (uma feature aponta 1 pai).
+  // "ID Feature": na linha do PAI, a LISTA acumulada dos ids das features (mesmo
+  // padrão das colunas de participantes — cross-row via updateRowByProjectId).
+  // ⚠️ As 2 colunas precisam existir no cabeçalho de GoDocs e STAGING (mapeamento por
+  // NOME — se faltar, a célula é ignorada com aviso e o resto do sync segue).
+  'ID Pai',
+  'ID Feature',
 ] as const;
 
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];

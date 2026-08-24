@@ -7,6 +7,7 @@
 // sobre um valor síncrono é no-op — então o mesmo código funciona em dev e em prod.
 
 import { initSchema } from "./schema";
+import { acumularIdFeature } from "@/lib/projeto-vinculo";
 import type { GoDeployDB } from "./db-adapter";
 
 export type { GoDeployDB } from "./db-adapter";
@@ -510,6 +511,8 @@ export type InsertProjeto = {
   usa_ai_proxy?: string | null;
   // Contrafactual (Etapa 2) — ver ProjetoRow/schema.ts.
   contrafactual_afetados?: string | null;
+  // Vínculo de FEATURE: id do projeto PAI (marcado na Etapa 1). Null = projeto novo.
+  projeto_pai_id?: string | null;
   status?: string;
 };
 
@@ -521,8 +524,8 @@ export async function insertProjeto(data: InsertProjeto) {
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
       escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
-      contrafactual_afetados, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      contrafactual_afetados, projeto_pai_id, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     [
       id,
@@ -545,6 +548,7 @@ export async function insertProjeto(data: InsertProjeto) {
       data.arquivos_nomes ? JSON.stringify(data.arquivos_nomes) : null,
       data.usa_ai_proxy ?? null,
       data.contrafactual_afetados ?? null,
+      data.projeto_pai_id ?? null,
       data.status ?? "rascunho",
       now,
       now,
@@ -569,6 +573,30 @@ export function updateProjeto(id: string, fields: Record<string, unknown>) {
     nowISO(),
     id,
   ]);
+}
+
+/**
+ * Vincula um FILHO ao PAI: acrescenta o id do filho a `projeto_filhos_ids` do pai (dedup,
+ * ordem estável). Devolve a lista atualizada (para o sync do Sheets espelhar a coluna
+ * "ID Feature" do pai) ou `null` se o pai não existir. Best-effort: o vínculo do lado do
+ * filho (`projeto_pai_id`) é a fonte primária — esta é a visão do pai.
+ */
+export async function vincularFilhoAoPai(
+  paiId: string,
+  filhoId: string,
+): Promise<string[] | null> {
+  const pai = await queryOne<{ projeto_filhos_ids: string | null }>(
+    "SELECT projeto_filhos_ids FROM projetos WHERE id = ?",
+    [paiId],
+  );
+  if (!pai) return null;
+  const lista = acumularIdFeature(pai.projeto_filhos_ids, filhoId);
+  await exec("UPDATE projetos SET projeto_filhos_ids = ?, updated_at = ? WHERE id = ?", [
+    JSON.stringify(lista),
+    nowISO(),
+    paiId,
+  ]);
+  return lista;
 }
 
 /** IDs de todos os projetos (usado pelo sync reverso Sheets→SQLite). */
@@ -1495,6 +1523,9 @@ export type AprovacaoRow = {
   resp_move_kpi: string | null;
   resp_sente_falta: string | null;
   resp_saving_coerente: string | null;
+  // Estágio da pré-aprovação (feature de outro projeto): 1 = líder do autor; 2 = líder do
+  // dono do projeto PAI. DEFAULT 1 no schema — linha/leitura legada é sempre estágio 1.
+  estagio: number;
 };
 
 /**
@@ -1508,15 +1539,34 @@ export async function abrirAprovacoesPendentes(
   versao: number,
   autorEmail: string | null,
   aprovadores: { email: string; nome: string | null }[],
+  // Estágio da fila (feature de outro projeto). 1 = líder do autor (limpa a rodada
+  // anterior, D10); 2 = líder do dono do PAI, aberto DEPOIS do estágio 1 — nesse caso
+  // NÃO se pode deletar as linhas do estágio 1 (ele já foi aprovado). `limparAntes`
+  // controla isso: default true (estágio 1); o estágio 2 passa false.
+  opts?: { estagio?: number; limparAntes?: boolean },
 ): Promise<void> {
-  await exec("DELETE FROM projeto_aprovacoes WHERE projeto_id = ?", [projetoId]);
+  const estagio = opts?.estagio ?? 1;
+  const limparAntes = opts?.limparAntes ?? true;
+  if (limparAntes) {
+    // Estágio 1 (submissão/reenvio) reseta a cadeia INTEIRA do projeto — D10 (reenviar
+    // invalida o veredito de TODA versão anterior, incluindo o estágio 2). O estágio 2,
+    // quando reaberto, limpa SÓ as próprias linhas — nunca o estágio 1 já aprovado.
+    if (estagio === 1) {
+      await exec("DELETE FROM projeto_aprovacoes WHERE projeto_id = ?", [projetoId]);
+    } else {
+      await exec("DELETE FROM projeto_aprovacoes WHERE projeto_id = ? AND estagio = ?", [
+        projetoId,
+        estagio,
+      ]);
+    }
+  }
   for (const a of aprovadores) {
     const email = (a.email ?? "").trim().toLowerCase();
     if (!email) continue;
     await exec(
       `INSERT INTO projeto_aprovacoes
-         (id, projeto_id, versao, autor_email, aprovador_email, aprovador_nome, veredito, criado_em)
-       VALUES (?, ?, ?, ?, ?, ?, 'pendente', datetime('now'))`,
+         (id, projeto_id, versao, autor_email, aprovador_email, aprovador_nome, veredito, estagio, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?, datetime('now'))`,
       [
         generateId(),
         projetoId,
@@ -1524,6 +1574,7 @@ export async function abrirAprovacoesPendentes(
         (autorEmail ?? "").trim().toLowerCase() || null,
         email,
         a.nome ?? null,
+        estagio,
       ],
     );
   }
@@ -1707,12 +1758,16 @@ export function decidirAprovacoesDoProjeto(
   comentario: string | null,
   decididoPor: string,
   respostas?: { move_kpi: string; sente_falta: string; saving_coerente: string } | null,
+  // Estágio do decisor (feature de outro projeto): resolve SÓ as linhas daquele estágio,
+  // para uma decisão do estágio 2 não fechar a fila do estágio 1 (e vice-versa). Default 1
+  // (fluxo de sempre). A serialização do D30 (`AND veredito = 'pendente'`) segue intacta.
+  estagio = 1,
 ): Promise<number | null> {
   return execContando(
     `UPDATE projeto_aprovacoes
         SET veredito = ?, comentario = ?, decidido_por = ?, decidido_em = datetime('now'),
             resp_move_kpi = ?, resp_sente_falta = ?, resp_saving_coerente = ?
-      WHERE projeto_id = ? AND veredito = 'pendente'`,
+      WHERE projeto_id = ? AND veredito = 'pendente' AND estagio = ?`,
     [
       veredito,
       comentario,
@@ -1721,6 +1776,7 @@ export function decidirAprovacoesDoProjeto(
       respostas?.sente_falta ?? null,
       respostas?.saving_coerente ?? null,
       projetoId,
+      estagio,
     ],
   );
 }
@@ -2388,6 +2444,11 @@ export type ProjetoRow = {
   // "Saving Horas Escalado". Null quando não se aplica (ninguém fazia / pontual).
   horas_carga_real: number | null;
   horas_escala: number | null;
+  // Vínculo de FEATURE (projeto como feature de outro). `projeto_pai_id` no FILHO aponta o
+  // PAI (marcado na Etapa 1, só na submissão nova); `projeto_filhos_ids` no PAI é o JSON
+  // array de ids dos filhos (acumulado). Colunas do Sheets: "ID Pai"/"ID Feature".
+  projeto_pai_id: string | null;
+  projeto_filhos_ids: string | null; // JSON array de ids dos projetos-feature (no PAI)
   created_at: string | null;
   updated_at: string | null;
 };

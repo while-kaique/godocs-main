@@ -593,6 +593,13 @@ const MIGRATIONS = [
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_move_kpi TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_sente_falta TEXT",
   "ALTER TABLE projeto_aprovacoes ADD COLUMN resp_saving_coerente TEXT",
+  // Estágio da pré-aprovação (feature de outro projeto). 1 = líder do AUTOR (fluxo de
+  // sempre); 2 = líder do DONO DO PROJETO PAI, aberto SÓ depois de o estágio 1 ser
+  // aprovado (ou já na submissão se o estágio 1 for isento). DEFAULT 1 -> toda linha e
+  // leitura existente segue sendo estágio 1, sem mudança de comportamento. A decisão de
+  // um estágio resolve só as linhas DAQUELE estágio (a coluna Sheets do estágio 1 nunca
+  // é sobrescrita por uma decisão do estágio 2).
+  "ALTER TABLE projeto_aprovacoes ADD COLUMN estagio INTEGER NOT NULL DEFAULT 1",
   // FAQ: a categoria virou UM documento (markdown leve) em vez de uma lista de tópicos
   // (SPEC_FAQ D13). Bancos que já tinham as categorias recebem a coluna aqui, e o seed
   // faz o BACKFILL do texto só quando o corpo está vazio — corpo escrito pelo admin
@@ -601,6 +608,15 @@ const MIGRATIONS = [
   // Botão "Voltar à versão anterior" do FAQ (D14): snapshot JSON de UM nível
   // (titulo/resumo/corpo + quando/quem). Restaurar consome o slot — não é histórico.
   'ALTER TABLE faq_categorias ADD COLUMN versao_anterior TEXT',
+  // Projeto como FEATURE de outro projeto (vínculo pai↔filho). O FILHO guarda o id do
+  // PAI em projeto_pai_id (marcado na Etapa 1, só na submissão NOVA); o PAI acumula os
+  // ids dos filhos em projeto_filhos_ids (JSON array de strings). Colunas do Sheets:
+  // projeto_pai_id -> "ID Pai" (linha do filho); projeto_filhos_ids -> "ID Feature"
+  // (linha do pai, lista acumulada). O nome do filho ganha o prefixo "[feature de
+  // <NOME do pai>]". INTERNO ao vínculo -- fora de SAFE_UPDATE_FIELDS (o valor mora no
+  // SQLite e nas 2 colunas dedicadas do Sheets, escritas por nome).
+  'ALTER TABLE projetos ADD COLUMN projeto_pai_id TEXT',
+  'ALTER TABLE projetos ADD COLUMN projeto_filhos_ids TEXT',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).
