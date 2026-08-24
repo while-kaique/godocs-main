@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toast } from "sonner";
 import { Loader2, Save, FolderClock, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiFetch, ApiError, setDemoBackend } from "@/lib/api-client";
+import { apiFetch, apiStream, ApiError, setDemoBackend } from "@/lib/api-client";
 import { criarDemoBackend, demoSeedForm, demoFile, CHAVE_TESTE_LIDERANCA, type FluxoDemo } from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
@@ -2309,10 +2309,32 @@ export function SubmeterPageContent({
       chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 50);
 
+    // Streaming: a prosa vai chegando token a token e preenchendo uma bolha "viva" do
+    // assistente. `streamingIniciado` marca que a bolha já foi criada por um delta. Se o
+    // streaming estiver DESLIGADO no servidor, nenhum delta chega, `streamingIniciado` fica
+    // false e o fluxo é idêntico ao de antes (a bolha nasce do envelope, no fim).
+    let streamingIniciado = false;
+    const onDelta = (chunk: string) => {
+      if (!streamingIniciado) {
+        streamingIniciado = true;
+        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: chatFase }]);
+      } else {
+        setChatMessages((prev) => {
+          const copy = prev.slice();
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return copy;
+        });
+      }
+    };
+
     try {
-      const result = await apiFetch<ReturnType<typeof Object.create>>(
+      const result = await apiStream<ReturnType<typeof Object.create>>(
         "/api/chat/enviar-mensagem",
         { projeto_id: projetoId, content, selected_option: selectedOption },
+        { onDelta },
       );
 
       const newFase: ChatFase = result.fase ?? chatFase;
@@ -2372,7 +2394,18 @@ export function SubmeterPageContent({
           setShowReceitaForm(true);
         }, 3000);
       } else {
-        setChatMessages((prev) => [...prev, assistantMsg]);
+        // Envelope canônico: se veio streaming, RECONCILIA a bolha viva (troca o texto
+        // provisório pelo `content` final + aplica type/isPreview/isComplete/options);
+        // senão, aparece a bolha nova de sempre.
+        if (streamingIniciado) {
+          setChatMessages((prev) => {
+            const copy = prev.slice();
+            copy[copy.length - 1] = assistantMsg;
+            return copy;
+          });
+        } else {
+          setChatMessages((prev) => [...prev, assistantMsg]);
+        }
         setChatFase(newFase);
       }
 
@@ -2396,7 +2429,9 @@ export function SubmeterPageContent({
         `Sua mensagem não foi enviada. ${msg} O restante da conversa está salvo — reenvie a última mensagem.`,
         { duration: 12000 },
       );
-      setChatMessages((prev) => prev.slice(0, -1));
+      // Remove a última mensagem do usuário — e a bolha do assistente que estava streamando,
+      // se houver (senão sobraria uma prosa provisória órfã).
+      setChatMessages((prev) => prev.slice(0, streamingIniciado ? -2 : -1));
     } finally {
       setChatLoading(false);
       setChatLoadingSteps(null);

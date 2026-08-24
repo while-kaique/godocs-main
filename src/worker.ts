@@ -143,6 +143,15 @@ function errorJson(message: string, status = 400, extra?: Record<string, unknown
   return json({ error: message, ...(extra ?? {}) }, status);
 }
 
+// Flag de streaming SSE das rotas de chat. Lida LAZY (nunca em escopo de módulo — no
+// Godeploy `process` não existe na avaliação do módulo). Desligada por padrão: só liga com
+// LLM_STREAMING ∈ {1,true,on}. Rollout: liga na staging, valida, depois na prod — sem tocar
+// no cliente (o apiStream trata json E event-stream).
+function streamingLigado(): boolean {
+  const v = (process.env.LLM_STREAMING ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "on";
+}
+
 function getEmailFromRequest(request: Request): string | null {
   const headerName = process.env.GODEPLOY_USER_HEADER ?? "x-godeploy-user-email";
   return (
@@ -403,6 +412,99 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       let statusCode = 200;
       let errorMsg: string | null = null;
       let responseSize = 0;
+
+      // ── STREAMING (SSE) ──────────────────────────────────────────────────────
+      // Só as 4 rotas de CONVERSA streamam, e só com a flag LLM_STREAMING ligada. Quando
+      // desligada, cai no caminho json() de sempre (comportamento idêntico ao de hoje) — e
+      // o cliente (apiStream) trata os dois transportes, então ligar/desligar é só a env,
+      // sem redeploy do cliente. A prosa vai como eventos `delta`; o OrchestratorResult
+      // COMPLETO (já passado pelos gates) vai como `envelope` no fim; erro vira `error`.
+      const rotasStream = new Set([
+        "/api/chat/iniciar-submissao",
+        "/api/chat/enviar-mensagem",
+        "/api/chat/iniciar-saving",
+        "/api/chat/iniciar-receita",
+      ]);
+      if (streamingLigado() && rotasStream.has(pathname)) {
+        const { readable, writable } = new TransformStream();
+        const writer = writable.getWriter();
+        const enc = new TextEncoder();
+        const send = (obj: unknown) =>
+          writer.write(enc.encode(`data: ${JSON.stringify(obj)}\n\n`)).catch(() => {});
+        const onDelta = (c: string) => {
+          void send({ t: "delta", c });
+        };
+
+        const tarefa = (async () => {
+          try {
+            let result: unknown;
+            const solicitante = getEmailFromRequest(request);
+            if (pathname === "/api/chat/iniciar-submissao")
+              result = await iniciarSubmissao(body, solicitante, { onDelta });
+            else if (pathname === "/api/chat/enviar-mensagem")
+              result = await enviarMensagem(body, { onDelta });
+            else if (pathname === "/api/chat/iniciar-saving")
+              result = await iniciarSaving(body, solicitante, { onDelta });
+            else result = await iniciarReceita(body, solicitante, { onDelta });
+
+            const resJson = JSON.stringify(result);
+            responseSize = resJson.length;
+            const logProjetoId =
+              projetoId ?? (result as { projeto_id?: string })?.projeto_id ?? null;
+            await insertApiLog({
+              projeto_id: logProjetoId,
+              endpoint: pathname,
+              method,
+              duration_ms: Date.now() - start,
+              status_code: statusCode,
+              request_size: requestSize,
+              response_size: responseSize,
+              request_body: reqJson,
+              response_body: resJson,
+            }).catch(() => {});
+            await send({ t: "envelope", r: result });
+          } catch (e) {
+            const err = e as Error & { status?: number; bloqueio?: unknown };
+            const amigavel = traduzirErroValidacao(e);
+            statusCode = amigavel?.status ?? err.status ?? 500;
+            errorMsg = err.message;
+            await insertApiLog({
+              projeto_id: projetoId,
+              endpoint: pathname,
+              method,
+              duration_ms: Date.now() - start,
+              status_code: statusCode,
+              error: errorMsg,
+              request_size: requestSize,
+              response_size: 0,
+              request_body: reqJson,
+              response_body: null,
+            }).catch(() => {});
+            // Erro vai DENTRO do stream (o HTTP já é 200): o cliente reconstrói o ApiError
+            // com o status/bloqueio para mostrar o mesmo painel de sempre.
+            await send({
+              t: "error",
+              m: amigavel?.mensagem ?? err.message,
+              status: statusCode,
+              ...(err.bloqueio ? { bloqueio: err.bloqueio } : {}),
+            });
+          } finally {
+            await writer.close().catch(() => {});
+          }
+        })();
+        if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(tarefa);
+
+        return new Response(readable, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            Connection: "keep-alive",
+          },
+        });
+      }
+
       try {
         let result: unknown;
         if (pathname === "/api/chat/iniciar-submissao")

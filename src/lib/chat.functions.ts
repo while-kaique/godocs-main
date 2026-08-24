@@ -698,7 +698,11 @@ async function podeFluxoDireto(email: string | null | undefined): Promise<boolea
 
 // ─── Iniciar submissão ───────────────────────────────────────────────────────
 
-export async function iniciarSubmissao(rawData: unknown, solicitanteEmail?: string | null) {
+export async function iniciarSubmissao(
+  rawData: unknown,
+  solicitanteEmail?: string | null,
+  opts: { onDelta?: (chunk: string) => void } = {},
+) {
   const data = iniciarSubmissaoSchema.parse(rawData);
   log("iniciarSubmissao", `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
 
@@ -872,7 +876,17 @@ export async function iniciarSubmissao(rawData: unknown, solicitanteEmail?: stri
   }
 
   log("iniciarSubmissao", "Rodando orquestrador (fase doc)...");
-  const resultado = await runOrchestrator(ctx, [], "doc", coletadoInicial, savingVazio());
+  const resultado = await runOrchestrator(
+    ctx,
+    [],
+    "doc",
+    coletadoInicial,
+    savingVazio(),
+    "",
+    ["saving"],
+    receitaVazia(),
+    { onDelta: opts.onDelta },
+  );
 
   await insertChatMessage({
     projeto_id: projeto.id,
@@ -1273,7 +1287,10 @@ function derivarJustificativaCargaEscala(
 
 // ─── Enviar mensagem ─────────────────────────────────────────────────────────
 
-export async function enviarMensagem(rawData: unknown) {
+export async function enviarMensagem(
+  rawData: unknown,
+  opts: { onDelta?: (chunk: string) => void } = {},
+) {
   // Mensagem longa demais → 400 com texto legível em vez do ZodError cru (que virava
   // 500 e travava o usuário no "tente novamente"). Trata antes do parse para a pessoa
   // saber exatamente o que fazer (resumir/dividir) em vez de ver um erro genérico.
@@ -1758,6 +1775,9 @@ export async function enviarMensagem(rawData: unknown) {
   // conduz a pergunta no chat (buildSavingPrompt) e a rede de segurança é aplicada na
   // gravação (resolverSplitCargaEscala em submeterParaValidacao) — ver SPEC_CORRECOES.
 
+  // Streaming: só passamos `onDelta` quando é o LLM que redige a resposta (reask === null).
+  // Quando um gate assume (reask !== null), runOrchestrator nem é chamado (short-circuit do
+  // `??`) e a resposta sai imediata, sem stream — como manda o §6 do plano.
   const resultado =
     reask ??
     (await runOrchestrator(
@@ -1769,6 +1789,7 @@ export async function enviarMensagem(rawData: unknown) {
       resumoProjeto,
       tiposProjeto,
       estado.receita,
+      { onDelta: opts.onDelta },
     ));
 
   // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui os campos de gate).
@@ -2405,7 +2426,11 @@ export async function enviarMensagem(rawData: unknown) {
 
 // ─── Iniciar fase saving ─────────────────────────────────────────────────────
 
-export async function iniciarSaving(rawData: unknown, solicitanteEmail?: string | null) {
+export async function iniciarSaving(
+  rawData: unknown,
+  solicitanteEmail?: string | null,
+  opts: { onDelta?: (chunk: string) => void } = {},
+) {
   const data = iniciarSavingSchema.parse(rawData);
   log("iniciarSaving", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
@@ -2599,6 +2624,8 @@ export async function iniciarSaving(rawData: unknown, solicitanteEmail?: string 
     saving,
     resumoProjeto,
     tiposProjeto,
+    receitaVazia(),
+    { onDelta: opts.onDelta },
   );
 
   // Backstop determinístico — CUSTO EVITADO PURO (alguem_fazia='externo'): o ganho é
@@ -2676,7 +2703,11 @@ export async function iniciarSaving(rawData: unknown, solicitanteEmail?: string 
 
 // ─── Iniciar fase receita incremental ────────────────────────────────────────
 
-export async function iniciarReceita(rawData: unknown, solicitanteEmail?: string | null) {
+export async function iniciarReceita(
+  rawData: unknown,
+  solicitanteEmail?: string | null,
+  opts: { onDelta?: (chunk: string) => void } = {},
+) {
   const data = iniciarReceitaSchema.parse(rawData);
   log("iniciarReceita", `projeto=${data.projeto_id}, tipo_saving=${data.tipo_saving}`);
 
@@ -2746,6 +2777,7 @@ export async function iniciarReceita(rawData: unknown, solicitanteEmail?: string
     resumoProjeto,
     tiposProjeto,
     receita,
+    { onDelta: opts.onDelta },
   );
 
   // Evento de timeline: valores do formulário de receita. `voltou` = reentrada.

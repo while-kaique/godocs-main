@@ -1,7 +1,47 @@
 # NEXT-SESSION
 
-## Plano ativo
-**nenhum plano formal** — a feature "Histórico de ações" foi implementada direto (pedido do Luis, sessão 19/08). Próximo é VALIDAR + promover, não planejar.
+## Plano ativo — STREAMING SSE das respostas da IA (Fase 1) → `docs/plans/streaming-latencia-ia.md`
+
+**Estado (21/08) — CODADO + DEPLOYADO NA STAGING, aguardando validação no navegador.**
+Elimina a tela em branco de 60–88s no chat de submissão (caso RA Monitor / Luis Liveri). A resposta
+agora flui token a token; o timeout virou régua de STALL (TTFB/gap), matando os ~58% de fallback "por
+geração longa". Branch `feat/streaming-latencia-ia` (worktree `~/godocs-wt-streaming`): commit da
+Fase 1 `a44fc8b` + merge de `origin/main` `720ddf7` (o main tinha avançado com liderança-direta #275 —
+deploy sem o merge REGREDIRIA staging; branch agora ⊇ origin/main).
+
+- **Arquivos:** `llm.ts` (`llmChatStream` + parser incremental de JSON, timeout por stall, fallback de
+  dois relógios preservado), `orchestrator.ts` (`onDelta`, streama só preview/complete, nunca o complete
+  de doc_preview), `chat.functions.ts` (threading do onDelta nas 4 rotas; gate que assume não streama),
+  `worker.ts` (resposta `text/event-stream` atrás da flag `LLM_STREAMING`, default OFF), `api-client.ts`
+  (`apiStream` transparente ao transporte + respeita o demoBackend do `/fluxos`), `submeter.tsx`/
+  `step3-chat.tsx` (bolha viva + reconciliação). Testes: `tests/{llm,orchestrator,api}-stream.test.ts`.
+- **Descobertas decisivas (probes no proxy real):** streaming FUNCIONA; `response_format`/json_schema é
+  IGNORADO (backend Codex subscription) → Structured Outputs (parte 2) MORTA, loop de retry FICA;
+  NÃO existe gpt-4.x → Fase 2 gpt-4.x morta. Prompt-cache reorder (parte 3) DEFERIDO (decisão do Luis).
+- ✅ 1665 testes verdes, tsc sem erros novos (os 5 são pré-existentes do main), worker+SPA buildam.
+  Deployado na STAGING `edf400b4` v196 com secret `LLM_STREAMING=1`; worker boota (crons 200, sem exceção).
+
+**PRÓXIMO PASSO:** Luis valida no navegador da staging (https://godocs-staging.devgogroup.com/ → submeter
+projeto de teste → ver o preview do memorial/doc preencher token a token em ~2-3s, não 60-88s de tela
+parada) → eu leio `getAppLogs(edf400b4)` e confirmo SSE + meço TTFB/fallback → com o ok, deploy PROD
+`674a3710` + `LLM_STREAMING=1` (regra 13) → regra 14 mergear no `main`. ⚠️ ANTES DO PR (regra 7/12):
+atualizar CLAUDE.md (a nota "não há streaming / timeout=régua de tamanho" muda) + specs + reescrever
+o `.md` do plano (§2 parte-2 e §9 mortas pelo Codex). ⚠️ Revisão de código formal (GGSD) NÃO rodou.
+Mensagem pro time do proxy sobre structured outputs já redigida (no chat da sessão).
+
+## Pergunta em aberto (21/08, fim da sessão) — contagem de isentos do AGENTE (fluxo direto de liderança)
+Luis perguntou: com a nova regra do fluxo direto, quantas pessoas ficam isentas de passar pelo agente, de quantas.
+Régua: `podeFluxoDireto = isAdmin(email) OU ehLideranca(cargo)`, onde `ehLideranca` = `ehCargoDeLideranca` (FONTE ÚNICA
+`src/lib/cargo-lideranca.ts` — casa por PALAVRA: coordenador/gerente/head/diretor/superintendente/presidente/socio/
+ceo/coo/cto/cfo/cpo/cmo/cro/vp/chief; MENOS exceções de ofício: diretor de arte, gerente/diretor de projeto, gerente/
+diretor de produto). Um subagente estava coletando o mapa cargo→count da Team Guide inteira (MCP `list_employees`,
+root, paginado) para aplicar a régua e dar isentos/total (cargos de liderança + admins à parte). RESPONDER quando o
+mapa chegar.
+
+---
+
+## Plano ativo ANTERIOR (histórico)
+**nenhum plano formal** — a feature "Histórico de ações" foi implementada direto (pedido do Luis, sessão 19/08).
 
 ## 19/08/2026 — Histórico de ações (drawer nas telas de aprovação)
 **Feito:** botão "Histórico" em `/dashboard`, `/especiais`, `/aprovacoes-pendentes` → drawer lateral (Sheet novo sobre o Radix Dialog) com feed GLOBAL de ações de admin (status, estrelas, dono de área, decisão de líder em `?como=`, reabrir fila), autor `@gocase` da borda + horário, paginado por cursor.

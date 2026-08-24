@@ -45,6 +45,23 @@ const LLM_TIMEOUT_FALLBACK_MS = 25_000;
 // (NÃO 5.5). Override opcional via env LLM_FALLBACK_MODEL (lido em runtime).
 const DEFAULT_FALLBACK_MODEL = "gpt-5.4-mini";
 
+// ── STREAMING (SSE) ──────────────────────────────────────────────────────────
+// Timeouts do caminho de streaming. ⚠️ Aqui o relógio NÃO é mais uma régua de
+// TAMANHO (como era no não-streaming): medimos o PRIMEIRO byte e o GAP entre chunks,
+// nunca o tempo total. Um stream de 88s tem centenas de chunks com gaps pequenos, então
+// jamais dispara — o que MATA a patologia dos 58% de fallback "por geração longa".
+//
+// Régua tirada de medição no proxy real (21/08/2026): num memorial de ~700 palavras
+// gerado pelo gpt-5.6-sol (o modelo pesado de prod), o TTFB foi ~2,2s e o MAIOR gap entre
+// chunks foi 2,2s (942 chunks, 26s no total). gpt-5.5 e gpt-5.4-mini foram ainda mais rápidos.
+//   - TTFB 60s: só pega um proxy REALMENTE pendurado; nunca uma geração longa saudável
+//     (mesmo que o modelo de raciocínio "pense" alguns segundos antes do 1º token).
+//   - GAP 25s: ~10× o pior gap medido — pega o proxy que morre NO MEIO sem cortar geração.
+// O fallback (OpenAI direto) tem TTFB mais curto (30s), no espírito dos "dois relógios".
+const STREAM_TTFB_TIMEOUT_MS = 60_000;
+const STREAM_GAP_TIMEOUT_MS = 25_000;
+const STREAM_TTFB_FALLBACK_MS = 30_000;
+
 export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Promise<string> {
   const provider = process.env.LLM_PROVIDER ?? "openai";
   const model = opts.model ?? process.env.LLM_MODEL ?? "gpt-4.1";
@@ -115,6 +132,81 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
       baseUrl: undefined, // direto na api.openai.com (sem proxy)
       timeoutMs: LLM_TIMEOUT_FALLBACK_MS,
       gatewayRetries: 2,
+    });
+  }
+}
+
+// Versão STREAMING de llmChat. Recebe um callback `onRawDelta` que é chamado com cada
+// pedaço de texto CRU do modelo (o `choices[0].delta.content` da SSE da OpenAI) à medida
+// que chega. Devolve o texto CRU COMPLETO no fim — mesmo tipo de retorno de llmChat, para
+// o chamador (orchestrator) parsear o JSON como sempre. A extração da "prosa" de dentro
+// do JSON (partial-JSON do campo `content`/`question`) é responsabilidade do chamador —
+// esta camada é agnóstica ao formato do OrchestratorResult.
+//
+// Preserva o FALLBACK de dois relógios (proxy → OpenAI direto). ⚠️ Regra anti-prosa-dupla:
+// uma vez que QUALQUER conteúdo tenha sido emitido via onRawDelta, NÃO cai mais no fallback
+// nem retenta — devolve o que veio (o chamador lida com JSON truncado pela rede de retry
+// dele). Só falha "limpa" (antes do 1º byte de conteúdo) aciona o fallback.
+export async function llmChatStream(
+  messages: LLMMessage[],
+  opts: LLMOptions & { onRawDelta?: (chunk: string) => void } = {},
+): Promise<string> {
+  const provider = process.env.LLM_PROVIDER ?? "openai";
+  const model = opts.model ?? process.env.LLM_MODEL ?? "gpt-4.1";
+  const baseUrl = process.env.LLM_BASE_URL?.trim() || undefined;
+  const proxyToken = process.env.API_PROXY_TOKEN?.trim() || undefined;
+  const usingProxy = !!(baseUrl && proxyToken);
+  const apiKey = usingProxy ? proxyToken! : process.env.LLM_API_KEY;
+
+  log(`[stream] provider=${provider}, model=${model}, base=${baseUrl ?? "(direto)"}, msgs=${messages.length}`);
+
+  if (!apiKey) {
+    throw new Error(
+      baseUrl
+        ? "API_PROXY_TOKEN não configurado (modo proxy via LLM_BASE_URL)"
+        : "LLM_API_KEY não configurada no .env",
+    );
+  }
+
+  // Anthropic ainda não streama de verdade nesta camada: gera tudo e emite de uma vez.
+  // (Prod usa OpenAI/proxy; este ramo é rede de segurança.)
+  if (provider === "anthropic") {
+    const full = await callAnthropic(messages, { ...opts, model, apiKey, baseUrl });
+    opts.onRawDelta?.(full);
+    return full;
+  }
+
+  if (provider !== "openai") {
+    throw new Error(`Provider desconhecido: ${provider}. Use "openai" ou "anthropic".`);
+  }
+
+  const fallbackKey = usingProxy ? process.env.LLM_FALLBACK?.trim() || undefined : undefined;
+
+  try {
+    return await callOpenAIStream(messages, {
+      ...opts,
+      model,
+      apiKey,
+      baseUrl,
+      ttfbMs: STREAM_TTFB_TIMEOUT_MS,
+      gapMs: STREAM_GAP_TIMEOUT_MS,
+      gatewayRetries: fallbackKey ? 0 : 2,
+      onRawDelta: opts.onRawDelta,
+    });
+  } catch (proxyErr) {
+    if (!fallbackKey) throw proxyErr;
+    const fallbackModel = process.env.LLM_FALLBACK_MODEL?.trim() || DEFAULT_FALLBACK_MODEL;
+    const reason = proxyErr instanceof Error ? proxyErr.message.slice(0, 100) : String(proxyErr);
+    errLog(`[stream] Proxy falhou/demorou (${reason}) — fallback p/ OpenAI direto, modelo=${fallbackModel}`);
+    return await callOpenAIStream(messages, {
+      ...opts,
+      model: fallbackModel,
+      apiKey: fallbackKey,
+      baseUrl: undefined,
+      ttfbMs: STREAM_TTFB_FALLBACK_MS,
+      gapMs: STREAM_GAP_TIMEOUT_MS,
+      gatewayRetries: 2,
+      onRawDelta: opts.onRawDelta,
     });
   }
 }
@@ -240,6 +332,255 @@ async function callOpenAI(
     log(`Erro de gateway (HTTP ${res.status}) — retry após 2s (${gatewayRetriesLeft} restantes)`);
     await new Promise((r) => setTimeout(r, 2000));
   }
+}
+
+// Versão STREAMING de callOpenAI. Mesma estrutura de retry/gateway/param-drop, mas em vez
+// de `await res.json()` consome a SSE da OpenAI e acumula `choices[0].delta.content`,
+// chamando onRawDelta a cada pedaço. Timeout por STALL (não por tempo total):
+//   - TTFB: aborta se o 1º byte não chegar em ttfbMs;
+//   - GAP:  aborta se passar gapMs SEM nenhum chunk depois do 1º byte.
+// ⚠️ Anti-prosa-dupla: uma vez emitido qualquer conteúdo, uma falha/stall NÃO propaga como
+// erro (não cairia no fallback) — resolvemos com o que já veio. Só falha ANTES do 1º
+// conteúdo (TTFB, gateway 5xx, rede) propaga → retry/fallback.
+async function callOpenAIStream(
+  messages: LLMMessage[],
+  opts: {
+    model: string;
+    apiKey: string;
+    temperature?: number;
+    maxTokens?: number;
+    baseUrl?: string;
+    ttfbMs: number;
+    gapMs: number;
+    gatewayRetries?: number;
+    onRawDelta?: (chunk: string) => void;
+  },
+): Promise<string> {
+  const endpoint = `${(opts.baseUrl ?? "https://api.openai.com/v1").replace(/\/+$/, "")}/chat/completions`;
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages,
+    temperature: opts.temperature ?? 0.7,
+    max_completion_tokens: opts.maxTokens ?? 2048,
+    stream: true,
+  };
+
+  const known = unsupportedByModel.get(opts.model);
+  if (known) for (const p of known) delete body[p];
+
+  const isGatewayError = (status: number) =>
+    status === 502 || status === 503 || status === 520 || status === 522 || status === 524;
+
+  let gatewayRetriesLeft = opts.gatewayRetries ?? 2;
+  let lastErr: Error | null = null;
+
+  while (true) {
+    // Estado do stall por tentativa. `emitted` marca que já mandamos conteúdo ao cliente.
+    let emitted = false;
+    let full = "";
+    const controller = new AbortController();
+    // stallKind distingue "TTFB" (nada chegou → erro/fallback) de "GAP" (chegou e travou
+    // → encerra com o parcial, sem re-streamar).
+    let stallKind: "ttfb" | "gap" | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const armTtfb = () => {
+      timer = setTimeout(() => {
+        stallKind = "ttfb";
+        controller.abort();
+      }, opts.ttfbMs);
+    };
+    const armGap = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        stallKind = "gap";
+        controller.abort();
+      }, opts.gapMs);
+    };
+    const disarm = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+
+    let res: Response;
+    try {
+      armTtfb();
+      res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (netErr) {
+      disarm();
+      const aborted = netErr instanceof Error && netErr.name === "AbortError";
+      lastErr = aborted
+        ? new Error(`timeout de primeiro byte após ${opts.ttfbMs}ms (proxy não respondeu)`)
+        : netErr instanceof Error
+          ? netErr
+          : new Error(String(netErr));
+      errLog(`[stream] Falha de ${aborted ? "TTFB" : "rede"}: ${lastErr.message.slice(0, 80)}`);
+      if (gatewayRetriesLeft <= 0) throw lastErr;
+      gatewayRetriesLeft--;
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+
+    if (!res.ok) {
+      disarm();
+      const errText = await res.text();
+      const dropped = res.status === 400 ? dropUnsupportedParam(body, errText) : null;
+      if (dropped) {
+        const set = unsupportedByModel.get(opts.model) ?? new Set<string>();
+        set.add(dropped);
+        unsupportedByModel.set(opts.model, set);
+        log(`[stream] Parâmetro '${dropped}' não suportado por ${opts.model} — removido`);
+        continue;
+      }
+      errLog(`[stream] OpenAI HTTP ${res.status}:`, errText.slice(0, 200));
+      const errSummary = errText.trimStart().startsWith("<")
+        ? `gateway indisponível (HTTP ${res.status}) — tente novamente em instantes`
+        : errText;
+      lastErr = new Error(`OpenAI error ${res.status}: ${errSummary}`);
+      if (!isGatewayError(res.status)) throw lastErr;
+      if (gatewayRetriesLeft <= 0) throw lastErr;
+      gatewayRetriesLeft--;
+      log(`[stream] Erro de gateway (HTTP ${res.status}) — retry após 2s (${gatewayRetriesLeft} restantes)`);
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+
+    if (!res.body) {
+      disarm();
+      lastErr = new Error("resposta de streaming sem corpo");
+      if (gatewayRetriesLeft <= 0) throw lastErr;
+      gatewayRetriesLeft--;
+      continue;
+    }
+
+    // Corpo OK: consome a SSE. A partir daqui, uma vez `emitted`, nunca propagamos erro.
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let sseBuffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!emitted) armGap(); // 1º byte chegou → troca TTFB por GAP
+        else armGap(); // reseta o relógio de gap a cada chunk
+        sseBuffer += decoder.decode(value, { stream: true });
+        const { events, rest } = splitSSE(sseBuffer);
+        sseBuffer = rest;
+        for (const ev of events) {
+          const piece = parseOpenAIDelta(ev);
+          if (piece) {
+            full += piece;
+            emitted = true;
+            try {
+              opts.onRawDelta?.(piece);
+            } catch (cbErr) {
+              errLog(`[stream] onRawDelta lançou (ignorado): ${(cbErr as Error).message?.slice(0, 60)}`);
+            }
+          }
+        }
+      }
+      disarm();
+      return full;
+    } catch (streamErr) {
+      disarm();
+      // Já emitimos algo? Então o stream estava vivo — encerra com o parcial (a rede de
+      // retry do orchestrator lida com JSON truncado). NÃO re-streama.
+      if (emitted) {
+        const why = stallKind === "gap" ? `gap > ${opts.gapMs}ms` : (streamErr as Error).message?.slice(0, 60);
+        errLog(`[stream] stream interrompido após emitir conteúdo (${why}) — devolvendo parcial`);
+        return full;
+      }
+      // Nada emitido: trata como falha limpa → retry/fallback.
+      const aborted = streamErr instanceof Error && streamErr.name === "AbortError";
+      lastErr = aborted
+        ? new Error(`stream estolou antes do 1º conteúdo (${stallKind ?? "abort"})`)
+        : streamErr instanceof Error
+          ? streamErr
+          : new Error(String(streamErr));
+      errLog(`[stream] Falha antes do 1º conteúdo: ${lastErr.message.slice(0, 80)}`);
+      if (gatewayRetriesLeft <= 0) throw lastErr;
+      gatewayRetriesLeft--;
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+  }
+}
+
+// Divide o buffer SSE acumulado em eventos completos (separados por "\n\n"), devolvendo o
+// resto ainda incompleto. Não perde bytes entre reads.
+export function splitSSE(buffer: string): { events: string[]; rest: string } {
+  const parts = buffer.split("\n\n");
+  const rest = parts.pop() ?? "";
+  return { events: parts, rest };
+}
+
+// De um evento SSE ("data: {...}" possivelmente multi-linha) extrai o texto do delta da
+// OpenAI (`choices[0].delta.content`). Ignora "[DONE]" e chunks sem conteúdo (ex: o chunk
+// de role, ou o de usage, que aliás o proxy nem manda). Devolve "" se não houver texto.
+export function parseOpenAIDelta(event: string): string {
+  let out = "";
+  for (const line of event.split("\n")) {
+    const trimmed = line.trimStart();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const j = JSON.parse(payload) as { choices?: { delta?: { content?: unknown } }[] };
+      const d = j.choices?.[0]?.delta?.content;
+      if (typeof d === "string") out += d;
+    } catch {
+      // chunk parcial/ruído — ignora (o buffer só entrega eventos completos, mas seja tolerante)
+    }
+  }
+  return out;
+}
+
+// Extrai INCREMENTALMENTE o valor DECODIFICADO de um campo string de TOPO de um JSON que
+// ainda está chegando. Ex.: de `{"type":"preview","content":"Olá\nmun` com field="content"
+// devolve `Olá\nmun`. Devolve null se o campo ainda não começou. Tolera truncamento no meio
+// da string ou de um escape. Não valida o JSON inteiro — é para uso em streaming.
+export function extractPartialJsonStringField(raw: string, field: string): string | null {
+  const keyPattern = new RegExp(`"${field}"\\s*:\\s*"`);
+  const m = keyPattern.exec(raw);
+  if (!m) return null;
+  let i = m.index + m[0].length; // 1º caractere DENTRO da string
+  let out = "";
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "\\") {
+      const next = raw[i + 1];
+      if (next === undefined) break; // truncado no meio do escape
+      if (next === "u") {
+        const hex = raw.slice(i + 2, i + 6);
+        if (hex.length < 4) break; // \uXXXX truncado
+        const code = parseInt(hex, 16);
+        if (!Number.isNaN(code)) out += String.fromCharCode(code);
+        i += 6;
+        continue;
+      }
+      const map: Record<string, string> = {
+        n: "\n",
+        t: "\t",
+        r: "\r",
+        b: "\b",
+        f: "\f",
+        "/": "/",
+        '"': '"',
+        "\\": "\\",
+      };
+      out += map[next] ?? next;
+      i += 2;
+      continue;
+    }
+    if (ch === '"') break; // fim da string
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 /**
