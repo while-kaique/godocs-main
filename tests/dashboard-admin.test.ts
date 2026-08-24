@@ -26,6 +26,9 @@ vi.mock('@/integrations/db/client.server', async () => ({
   // Contrafactual mora só no SQLite; por padrão null (a maioria dos casos não o exercita).
   getContrafactualAfetados: vi.fn(async () => null),
   getContrafactualAfetadosPorIds: vi.fn(async () => new Map()),
+  // Reenvios (edições) do dono/editor — por padrão vazio (a maioria dos casos não exercita).
+  getReenviosDoProjeto: vi.fn(async () => []),
+  getReenviosPorIds: vi.fn(async () => new Map()),
   ...(await espelhoFakeP).api,
   // O `?refresh=1` dispara o sync reverso de verdade; aqui só o espelho interessa, então o
   // lado de `projetos` é stub (quem cobre aquele lado é `tests/sync-reverse.test.ts`).
@@ -50,8 +53,11 @@ vi.mock('@/integrations/db/client.server', async () => ({
 import { readAllRows, updateRowByProjectId } from '@/lib/google/sheets';
 import {
   insertAdminStatusLog,
+  getAdminStatusLogs,
   getContrafactualAfetados,
   getContrafactualAfetadosPorIds,
+  getReenviosDoProjeto,
+  getReenviosPorIds,
 } from '@/integrations/db/client.server';
 import {
   mapResumo,
@@ -64,6 +70,7 @@ import {
   getProjetoDashboard,
   getProjetosDashboardLote,
   definirStatusProjeto,
+  montarHistoricoTriagem,
   STATUS_GRAVAVEIS,
   type ProjetoDashboardResumo,
 } from '@/lib/dashboard-admin.functions';
@@ -339,6 +346,94 @@ describe('getProjetoDashboard', () => {
     vi.mocked(getContrafactualAfetadosPorIds).mockResolvedValueOnce(new Map() as never);
     const lote = await getProjetosDashboardLote({ ids: ['legado-148'] });
     expect(lote['legado-148'].contrafactual).toBeNull();
+  });
+
+  it('o reenvio (projeto_versions) vira linha do histórico na ficha individual', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getReenviosDoProjeto).mockResolvedValueOnce([
+      { versao_num: 2, submetido_por: 'dono@x.com', created_at: '2026-08-21 20:04:13' },
+    ] as never);
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.historico).toEqual([
+      { tipo: 'reenvio', edicao: 1, submetido_por: 'dono@x.com', created_at: '2026-08-21 20:04:13' },
+    ]);
+  });
+
+  it('o lote também traz o reenvio (via consulta em lote)', async () => {
+    await semearEspelho([linha({ 'ID Projeto': 'legado-148' })]);
+    vi.mocked(getReenviosPorIds).mockResolvedValueOnce(
+      new Map([
+        ['legado-148', [{ versao_num: 3, submetido_por: 'dono@x.com', created_at: '2026-08-22 10:00:00' }]],
+      ]) as never,
+    );
+    const lote = await getProjetosDashboardLote({ ids: ['legado-148'] });
+    expect(lote['legado-148'].historico).toEqual([
+      { tipo: 'reenvio', edicao: 2, submetido_por: 'dono@x.com', created_at: '2026-08-22 10:00:00' },
+    ]);
+  });
+
+  it('reenvio que falhar não derruba a ficha (só omite as linhas de reenvio)', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getReenviosDoProjeto).mockRejectedValueOnce(new Error('db down'));
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.historico).toEqual([]);
+    expect(d.campos['Projeto']).toBeDefined();
+  });
+
+  it('status e reenvio convivem na linha do tempo, mais recente primeiro', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getAdminStatusLogs).mockResolvedValueOnce([
+      {
+        status_anterior: 'Pendente',
+        status_novo: 'Reenvio Pendente',
+        observacoes: 'ajustar ganhos',
+        admin_email: 'triagem@x.com',
+        created_at: '2026-08-18 17:22:11',
+      },
+    ] as never);
+    vi.mocked(getReenviosDoProjeto).mockResolvedValueOnce([
+      { versao_num: 2, submetido_por: 'dono@x.com', created_at: '2026-08-21 20:04:13' },
+    ] as never);
+    const d = await getProjetoDashboard('LEGADO-148');
+    // Reenvio (21/08) primeiro, depois o pedido de reenvio (18/08).
+    expect(d.historico.map((h) => h.tipo)).toEqual(['reenvio', 'status']);
+    expect(d.historico[0]).toMatchObject({ tipo: 'reenvio', edicao: 1 });
+    expect(d.historico[1]).toMatchObject({ tipo: 'status', status_novo: 'Reenvio Pendente' });
+  });
+});
+
+describe('montarHistoricoTriagem (puro)', () => {
+  it('ordena por created_at DESC, com carimbo ausente por último', () => {
+    const out = montarHistoricoTriagem(
+      [
+        {
+          status_anterior: null,
+          status_novo: 'Pendente',
+          observacoes: null,
+          admin_email: 'a@x.com',
+          created_at: '2026-08-10 09:00:00',
+        },
+      ],
+      [
+        { versao_num: 2, submetido_por: 'd@x.com', created_at: '2026-08-21 20:04:13' },
+        { versao_num: 3, submetido_por: 'd@x.com', created_at: null },
+      ],
+    );
+    expect(out.map((h) => h.created_at)).toEqual([
+      '2026-08-21 20:04:13',
+      '2026-08-10 09:00:00',
+      null,
+    ]);
+  });
+
+  it('edição = versao_num - 1 (o submit inicial é a versão 1)', () => {
+    const out = montarHistoricoTriagem(
+      [],
+      [{ versao_num: 4, submetido_por: null, created_at: '2026-08-01 00:00:00' }],
+    );
+    expect(out).toEqual([
+      { tipo: 'reenvio', edicao: 3, submetido_por: null, created_at: '2026-08-01 00:00:00' },
+    ]);
   });
 });
 
