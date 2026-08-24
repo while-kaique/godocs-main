@@ -1322,7 +1322,9 @@ export function SubmeterPageContent({
       try {
         const docs = await filesToDocs(arquivos);
         const ferramentaEnviada = computeFerramenta();
-        const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
+        // Rota SSE: `apiStream` trata tanto event-stream (flag ON) quanto JSON (flag OFF).
+        // A compilação da doc é SILENCIOSA (não streama prosa) — só aguardamos o envelope.
+        const result = await apiStream<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
           "/api/chat/iniciar-submissao",
           {
             responsavel_nome: form.nome.trim(),
@@ -1609,7 +1611,9 @@ export function SubmeterPageContent({
 
       const ferramentaEnviada = computeFerramenta();
 
-      const result = await apiFetch<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
+      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF). A fase de doc
+      // é SILENCIOSA (não streama prosa) — só aguardamos o envelope final.
+      const result = await apiStream<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
         "/api/chat/iniciar-submissao",
         {
           responsavel_nome: form.nome.trim(),
@@ -1703,7 +1707,9 @@ export function SubmeterPageContent({
       const docs = await filesToDocs(arquivos);
       const ferramentaEnviada = computeFerramenta();
 
-      const result = await apiFetch<{ projeto_id: string; fluxo_direto?: boolean }>(
+      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF). No fluxo
+      // direto a doc é gerada numa passada, SEM prosa streamada — só o envelope importa.
+      const result = await apiStream<{ projeto_id: string; fluxo_direto?: boolean }>(
         "/api/chat/iniciar-submissao",
         {
           responsavel_nome: form.nome.trim(),
@@ -1871,7 +1877,9 @@ export function SubmeterPageContent({
       const docs = await filesToDocs(arquivos);
 
       // 1) Cria o projeto (backend monta a doc sem IA e marca chat_completo).
-      const result = await apiFetch<{ projeto_id: string; especial?: boolean }>(
+      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF); a doc especial
+      // é montada sem IA (silenciosa) — só aguardamos o envelope.
+      const result = await apiStream<{ projeto_id: string; especial?: boolean }>(
         "/api/chat/iniciar-submissao",
         {
           responsavel_nome: form.nome.trim(),
@@ -2477,6 +2485,29 @@ export function SubmeterPageContent({
       return;
     }
     setSavingFormLoading(true);
+    // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial chega token a token e
+    // preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum delta
+    // chega, `streamingIniciado` fica false e o fluxo é idêntico ao JSON de antes.
+    // ⚠️ Durante esta chamada o FORMULÁRIO determinístico cobre o chat (com seu próprio
+    // loading) — o chat só renderiza com !showSavingForm && !showReceitaForm —, então a
+    // bolha viva fica invisível aqui; o conteúdo final aparece quando o form fecha, já
+    // reconciliado pelo envelope (`setChatMessages([savingMsg])` abaixo).
+    let streamingIniciado = false;
+    const onDelta = (chunk: string) => {
+      if (!streamingIniciado) {
+        streamingIniciado = true;
+        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "saving" }]);
+      } else {
+        setChatMessages((prev) => {
+          const copy = prev.slice();
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return copy;
+        });
+      }
+    };
     try {
       const custoMensal = formData.custoExterno
         ? formData.custoPeriodicidade === "anual"
@@ -2535,7 +2566,7 @@ export function SubmeterPageContent({
               }))
           : [];
 
-      const result = await apiFetch<ReturnType<typeof Object.create>>(
+      const result = await apiStream<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-saving",
         {
           projeto_id: projetoId,
@@ -2550,6 +2581,7 @@ export function SubmeterPageContent({
           // Liderança: memorial determinístico, sem gates (o servidor reconfere).
           modo_direto: modoDireto || undefined,
         },
+        { onDelta },
       );
       setShowSavingForm(false);
       // Registra o saving enviado (detecção de "nada mudou" e edição posterior).
@@ -2591,6 +2623,9 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao iniciar saving:", e);
       const msg = e instanceof Error ? e.message : String(e);
+      // Se o streaming criou a bolha viva antes do erro, remove-a: o formulário continua
+      // aberto para correção e não pode sobrar uma prosa provisória órfã no chat.
+      if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
       toast.error(
         `Não foi possível iniciar a análise de impacto. ${msg} Os dados que você preencheu continuam no formulário.`,
         { duration: 12000 },
@@ -2611,9 +2646,30 @@ export function SubmeterPageContent({
       return;
     }
     setReceitaFormLoading(true);
+    // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial de receita chega token a
+    // token e preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum
+    // delta chega e o fluxo é idêntico ao JSON de antes. ⚠️ Como no saving, o FORMULÁRIO
+    // cobre o chat durante esta chamada — a bolha só aparece quando o form fecha, já
+    // reconciliada pelo envelope (`setChatMessages([receitaMsg])` abaixo).
+    let streamingIniciado = false;
+    const onDelta = (chunk: string) => {
+      if (!streamingIniciado) {
+        streamingIniciado = true;
+        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "receita" }]);
+      } else {
+        setChatMessages((prev) => {
+          const copy = prev.slice();
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return copy;
+        });
+      }
+    };
     try {
       const valorReceita = formData.valorReceita ? parseFloat(formData.valorReceita) : undefined;
-      const result = await apiFetch<ReturnType<typeof Object.create>>(
+      const result = await apiStream<ReturnType<typeof Object.create>>(
         "/api/chat/iniciar-receita",
         {
           projeto_id: projetoId,
@@ -2623,6 +2679,7 @@ export function SubmeterPageContent({
           // Liderança: memorial determinístico, sem gates (o servidor reconfere).
           modo_direto: modoDireto || undefined,
         },
+        { onDelta },
       );
       setShowReceitaForm(false);
       // Registra a receita enviada (detecção de "nada mudou" e edição posterior).
@@ -2651,6 +2708,8 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao iniciar receita:", e);
       const msg = e instanceof Error ? e.message : String(e);
+      // Se o streaming criou a bolha viva antes do erro, remove-a (form segue aberto).
+      if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
       toast.error(
         `Não foi possível iniciar a análise de receita. ${msg} Os dados que você preencheu continuam no formulário.`,
         { duration: 12000 },
