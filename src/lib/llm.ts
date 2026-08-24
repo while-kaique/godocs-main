@@ -47,20 +47,57 @@ const DEFAULT_FALLBACK_MODEL = "gpt-5.4-mini";
 
 // ── STREAMING (SSE) ──────────────────────────────────────────────────────────
 // Timeouts do caminho de streaming. ⚠️ Aqui o relógio NÃO é mais uma régua de
-// TAMANHO (como era no não-streaming): medimos o PRIMEIRO byte e o GAP entre chunks,
-// nunca o tempo total. Um stream de 88s tem centenas de chunks com gaps pequenos, então
-// jamais dispara — o que MATA a patologia dos 58% de fallback "por geração longa".
+// TAMANHO (como era no não-streaming): medimos o tempo até o PRIMEIRO CONTEÚDO e o GAP
+// entre chunks, nunca o tempo total. Um stream de 88s tem centenas de chunks com gaps
+// pequenos, então jamais dispara — o que MATA a patologia dos 58% de fallback "por
+// geração longa".
 //
 // Régua tirada de medição no proxy real (21/08/2026): num memorial de ~700 palavras
 // gerado pelo gpt-5.6-sol (o modelo pesado de prod), o TTFB foi ~2,2s e o MAIOR gap entre
 // chunks foi 2,2s (942 chunks, 26s no total). gpt-5.5 e gpt-5.4-mini foram ainda mais rápidos.
-//   - TTFB 60s: só pega um proxy REALMENTE pendurado; nunca uma geração longa saudável
-//     (mesmo que o modelo de raciocínio "pense" alguns segundos antes do 1º token).
-//   - GAP 25s: ~10× o pior gap medido — pega o proxy que morre NO MEIO sem cortar geração.
-// O fallback (OpenAI direto) tem TTFB mais curto (30s), no espírito dos "dois relógios".
-const STREAM_TTFB_TIMEOUT_MS = 60_000;
-const STREAM_GAP_TIMEOUT_MS = 25_000;
-const STREAM_TTFB_FALLBACK_MS = 30_000;
+//
+// ⚠️ DUAS FASES DISTINTAS (24/08/2026): o modelo pesado do Codex "pensa" >25s ANTES do 1º
+// token de conteúdo — se o GAP de 25s valesse nessa fase, o gap-timer abortaria o modelo
+// bom e jogaria o memorial no fallback gpt-5.4-mini (visto na validação de staging). Então:
+//   - ATÉ o 1º delta de CONTEÚDO: vale só o relógio de PRIMEIRO CONTEÚDO (60s proxy / 30s
+//     fallback), que cobre headers + "raciocínio" do modelo. O GAP de 25s NÃO se aplica aqui.
+//     Chunks sem conteúdo (role/keepalive) não resetam esse relógio nem armam o GAP.
+//   - DEPOIS do 1º conteúdo: vale o GAP de 25s (~10× o pior gap medido), resetado a cada
+//     chunk — pega o proxy que morre NO MEIO sem cortar uma geração longa saudável.
+// O fallback (OpenAI direto) tem primeiro-conteúdo mais curto (30s), no espírito dos "dois
+// relógios". Os 3 valores são configuráveis por env (lidos LAZY em `streamTimeouts()` — nunca
+// em escopo de módulo, porque `process` não existe no bootstrap do Worker).
+const STREAM_FIRST_CONTENT_PROXY_DEFAULT_MS = 60_000;
+const STREAM_FIRST_CONTENT_FALLBACK_DEFAULT_MS = 30_000;
+const STREAM_GAP_DEFAULT_MS = 25_000;
+
+// Lê um inteiro positivo de ms de uma env; volta ao default se ausente/inválida. LAZY (dentro
+// de função) por causa do Worker — ver aviso acima e a regra do CLAUDE.md.
+function envPositiveMs(name: string, def: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return def;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : def;
+}
+
+// Timeouts do streaming resolvidos em runtime (proxy / fallback).
+function streamTimeouts(): {
+  firstContentProxyMs: number;
+  firstContentFallbackMs: number;
+  gapMs: number;
+} {
+  return {
+    firstContentProxyMs: envPositiveMs(
+      "STREAM_FIRST_CONTENT_TIMEOUT_MS",
+      STREAM_FIRST_CONTENT_PROXY_DEFAULT_MS,
+    ),
+    firstContentFallbackMs: envPositiveMs(
+      "STREAM_FIRST_CONTENT_FALLBACK_MS",
+      STREAM_FIRST_CONTENT_FALLBACK_DEFAULT_MS,
+    ),
+    gapMs: envPositiveMs("STREAM_GAP_TIMEOUT_MS", STREAM_GAP_DEFAULT_MS),
+  };
+}
 
 export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Promise<string> {
   const provider = process.env.LLM_PROVIDER ?? "openai";
@@ -181,6 +218,7 @@ export async function llmChatStream(
   }
 
   const fallbackKey = usingProxy ? process.env.LLM_FALLBACK?.trim() || undefined : undefined;
+  const t = streamTimeouts();
 
   try {
     return await callOpenAIStream(messages, {
@@ -188,8 +226,8 @@ export async function llmChatStream(
       model,
       apiKey,
       baseUrl,
-      ttfbMs: STREAM_TTFB_TIMEOUT_MS,
-      gapMs: STREAM_GAP_TIMEOUT_MS,
+      firstContentMs: t.firstContentProxyMs,
+      gapMs: t.gapMs,
       gatewayRetries: fallbackKey ? 0 : 2,
       onRawDelta: opts.onRawDelta,
     });
@@ -203,8 +241,8 @@ export async function llmChatStream(
       model: fallbackModel,
       apiKey: fallbackKey,
       baseUrl: undefined,
-      ttfbMs: STREAM_TTFB_FALLBACK_MS,
-      gapMs: STREAM_GAP_TIMEOUT_MS,
+      firstContentMs: t.firstContentFallbackMs,
+      gapMs: t.gapMs,
       gatewayRetries: 2,
       onRawDelta: opts.onRawDelta,
     });
@@ -336,12 +374,15 @@ async function callOpenAI(
 
 // Versão STREAMING de callOpenAI. Mesma estrutura de retry/gateway/param-drop, mas em vez
 // de `await res.json()` consome a SSE da OpenAI e acumula `choices[0].delta.content`,
-// chamando onRawDelta a cada pedaço. Timeout por STALL (não por tempo total):
-//   - TTFB: aborta se o 1º byte não chegar em ttfbMs;
-//   - GAP:  aborta se passar gapMs SEM nenhum chunk depois do 1º byte.
+// chamando onRawDelta a cada pedaço. Timeout por STALL, em DUAS FASES (não por tempo total):
+//   - PRIMEIRO CONTEÚDO: aborta se o 1º delta de CONTEÚDO não chegar em firstContentMs.
+//     Cobre headers + o "raciocínio" do modelo antes do 1º token. ⚠️ Chunks sem conteúdo
+//     (role/keepalive) NÃO resetam esse relógio nem armam o GAP — o modelo pesado do Codex
+//     pensa >25s antes do 1º token e não pode ser cortado por um gap de 25s.
+//   - GAP: só DEPOIS do 1º conteúdo — aborta se passar gapMs SEM chunk. Resetado a cada chunk.
 // ⚠️ Anti-prosa-dupla: uma vez emitido qualquer conteúdo, uma falha/stall NÃO propaga como
 // erro (não cairia no fallback) — resolvemos com o que já veio. Só falha ANTES do 1º
-// conteúdo (TTFB, gateway 5xx, rede) propaga → retry/fallback.
+// conteúdo (primeiro-conteúdo, gateway 5xx, rede) propaga → retry/fallback.
 async function callOpenAIStream(
   messages: LLMMessage[],
   opts: {
@@ -350,7 +391,7 @@ async function callOpenAIStream(
     temperature?: number;
     maxTokens?: number;
     baseUrl?: string;
-    ttfbMs: number;
+    firstContentMs: number;
     gapMs: number;
     gatewayRetries?: number;
     onRawDelta?: (chunk: string) => void;
@@ -379,15 +420,15 @@ async function callOpenAIStream(
     let emitted = false;
     let full = "";
     const controller = new AbortController();
-    // stallKind distingue "TTFB" (nada chegou → erro/fallback) de "GAP" (chegou e travou
-    // → encerra com o parcial, sem re-streamar).
-    let stallKind: "ttfb" | "gap" | null = null;
+    // stallKind distingue "first_content" (nada de conteúdo chegou → erro/fallback) de "gap"
+    // (conteúdo fluiu e travou → encerra com o parcial, sem re-streamar).
+    let stallKind: "first_content" | "gap" | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const armTtfb = () => {
+    const armFirstContent = () => {
       timer = setTimeout(() => {
-        stallKind = "ttfb";
+        stallKind = "first_content";
         controller.abort();
-      }, opts.ttfbMs);
+      }, opts.firstContentMs);
     };
     const armGap = () => {
       if (timer) clearTimeout(timer);
@@ -403,7 +444,7 @@ async function callOpenAIStream(
 
     let res: Response;
     try {
-      armTtfb();
+      armFirstContent();
       res = await fetch(endpoint, {
         method: "POST",
         headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
@@ -414,11 +455,11 @@ async function callOpenAIStream(
       disarm();
       const aborted = netErr instanceof Error && netErr.name === "AbortError";
       lastErr = aborted
-        ? new Error(`timeout de primeiro byte após ${opts.ttfbMs}ms (proxy não respondeu)`)
+        ? new Error(`timeout de ${opts.firstContentMs}ms sem primeiro conteúdo (proxy não respondeu)`)
         : netErr instanceof Error
           ? netErr
           : new Error(String(netErr));
-      errLog(`[stream] Falha de ${aborted ? "TTFB" : "rede"}: ${lastErr.message.slice(0, 80)}`);
+      errLog(`[stream] Falha de ${aborted ? "PRIMEIRO CONTEÚDO" : "rede"}: ${lastErr.message.slice(0, 80)}`);
       if (gatewayRetriesLeft <= 0) throw lastErr;
       gatewayRetriesLeft--;
       await new Promise((r) => setTimeout(r, 2000));
@@ -465,8 +506,6 @@ async function callOpenAIStream(
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        if (!emitted) armGap(); // 1º byte chegou → troca TTFB por GAP
-        else armGap(); // reseta o relógio de gap a cada chunk
         sseBuffer += decoder.decode(value, { stream: true });
         const { events, rest } = splitSSE(sseBuffer);
         sseBuffer = rest;
@@ -482,6 +521,11 @@ async function callOpenAIStream(
             }
           }
         }
+        // Relógios em DUAS fases: ATÉ o 1º conteúdo vale o relógio de PRIMEIRO CONTEÚDO
+        // (armado antes do fetch) — chunks sem conteúdo (role/keepalive) NÃO o resetam nem
+        // armam o GAP. DEPOIS do 1º conteúdo, qualquer chunk reseta o GAP (silêncio
+        // prolongado = estol real do proxy no meio da geração).
+        if (emitted) armGap();
       }
       disarm();
       return full;
@@ -494,7 +538,8 @@ async function callOpenAIStream(
         errLog(`[stream] stream interrompido após emitir conteúdo (${why}) — devolvendo parcial`);
         return full;
       }
-      // Nada emitido: trata como falha limpa → retry/fallback.
+      // Nada emitido: trata como falha limpa → retry/fallback. (A abort aqui é o relógio
+      // de PRIMEIRO CONTEÚDO estourando — o GAP nunca é armado antes do 1º conteúdo.)
       const aborted = streamErr instanceof Error && streamErr.name === "AbortError";
       lastErr = aborted
         ? new Error(`stream estolou antes do 1º conteúdo (${stallKind ?? "abort"})`)
