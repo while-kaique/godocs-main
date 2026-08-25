@@ -1,7 +1,7 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ [docs/plans/latencia-ia-roteamento-por-fase.md](plans/latencia-ia-roteamento-por-fase.md)** · Status: 🟡 em execução — CÓDIGO (T1–T4) FEITO + revisado 25/08; falta T5 staging + T6 docs + T7 prod
+**→ nenhum plano ativo.** O último (`latencia-ia-roteamento-por-fase.md`) foi **✅ ENTREGUE EM PROD (v286) + merge no `main` (PR #286), 25/08** — T1–T7 completos. Próximo trabalho: planejar o que vier com `/ggsd:plan`. _(Pendente só de VALIDAÇÃO humana: o Luis medir o TTFB da fase `doc` num chat real de prod — o roteamento por fase já está confirmado ativo por sinal de runtime nos logs.)_
 
 Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
 (`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador
