@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR,
   coautoresSelecionados, AFETADO_TIPOS,
+  CONTRIBUICAO_MIN, CONTRIBUICAO_MAX, contribuicoesFaltando,
 } from "./constants";
 import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
@@ -729,14 +730,22 @@ export function LegendaPapeis() {
 // obrigatório — o gate de avançar da Etapa 1 bloqueia enquanto faltar. O autor/
 // submissor NÃO entra aqui: ele é o dono, só o time adicionado ganha papel.
 export function ParticipantesPapeisInput({
-  participantes, papeis, onAdd, onRemove, onSetPapel, error, suggestions, loadingSuggestions,
+  participantes, papeis, contribuicoes, onAdd, onRemove, onSetPapel, onSetContribuicao,
+  error, errorContribuicao, suggestions, loadingSuggestions,
 }: {
   participantes: string[];
   papeis: Record<string, PapelParticipante | "">;
+  // O que cada pessoa FEZ (e-mail→texto curto). O papel diz o tamanho da participação;
+  // este texto diz o quê. Obrigatório antes de avançar (CONTRIBUICAO_MIN chars).
+  contribuicoes: Record<string, string>;
   onAdd: (email: string) => boolean;
   onRemove: (email: string) => void;
   onSetPapel: (email: string, papel: PapelParticipante) => void;
+  onSetContribuicao: (email: string, texto: string) => void;
   error?: string;
+  // Erro do campo de contribuição — separado do `error` (papel/coautor) de propósito:
+  // são cobranças diferentes e a mensagem de uma não explica a outra.
+  errorContribuicao?: string;
   suggestions?: SugestaoParticipante[];
   // A lista da TeamGuide ainda está chegando — mostra um "buscando…" sutil no
   // dropdown em vez de o campo parecer sem sugestões (ou soltar erro de validação).
@@ -841,6 +850,8 @@ export function ParticipantesPapeisInput({
   }
 
   const semPapel = participantes.filter((p) => !papeis[p]).length;
+  // Quantas pessoas ainda estão sem a descrição do que fizeram (ou com texto curto).
+  const semContribuicao = contribuicoesFaltando(participantes, contribuicoes).length;
 
   // Coautor é ÚNICO por projeto (1 autor + no máximo 1 coautor). Quando alguém já é
   // Coautor, a opção SAI da lista dos outros — nada de opção morta na tela. Quem já é o
@@ -1014,6 +1025,11 @@ export function ParticipantesPapeisInput({
           {participantes.map((email) => {
             const papel = papeis[email] || "";
             const faltando = !papel && !!error; // realça só depois de validar (avançar)
+            const chars = (contribuicoes[email] ?? "").trim().length;
+            // Realce vermelho do texto só DEPOIS de tentar avançar, como no papel — campo
+            // em branco recém-aberto não nasce em estado de erro.
+            const faltaTexto = chars < CONTRIBUICAO_MIN && !!errorContribuicao;
+            const faltam = CONTRIBUICAO_MIN - chars;
             return (
               <li
                 key={email}
@@ -1068,6 +1084,75 @@ export function ParticipantesPapeisInput({
                     &times;
                   </button>
                 </div>
+
+                {/* O que essa pessoa fez — LINHA PRÓPRIA (`basis-full`), nunca dividindo
+                    espaço com o e-mail e o seletor: na mesma linha o campo herda ~200px e
+                    um texto de 100 caracteres fica ilegível (é a barreira invisível que já
+                    cortou o nome do projeto nos cards de Meus Projetos). Duas linhas de
+                    altura para dizer "é curto" sem precisar de aviso. */}
+                <div className="basis-full">
+                  <label
+                    htmlFor={`contribuicao-${email}`}
+                    className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide"
+                    style={{ color: "var(--go-blue)" }}
+                  >
+                    O que essa pessoa fez
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      id={`contribuicao-${email}`}
+                      rows={2}
+                      maxLength={CONTRIBUICAO_MAX}
+                      value={contribuicoes[email] ?? ""}
+                      onChange={(e) => onSetContribuicao(email, e.target.value)}
+                      placeholder="Ex.: montou os fluxos no n8n e validou os testes com o time Fiscal"
+                      aria-describedby={`contribuicao-${email}-contador`}
+                      aria-invalid={faltaTexto || undefined}
+                      className="w-full resize-none rounded-lg px-3 pb-3.5 pt-2 text-[12.5px] leading-snug outline-none transition-colors focus:border-[#0059A9] motion-reduce:transition-none"
+                      style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        background: "var(--go-white)",
+                        border: `1px solid ${faltaTexto ? "#dc2626" : "rgba(0,89,169,0.18)"}`,
+                        color: "var(--go-text-primary)",
+                      }}
+                    />
+                    {/* Trilha lime que enche até o mínimo: o progresso do gate aparece sem
+                        número na frente do olho. Some quando o mínimo é atingido. */}
+                    {faltam > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute bottom-[7px] left-3 h-[3px] w-14 overflow-hidden rounded-full"
+                        style={{ background: "rgba(0,89,169,0.1)" }}
+                      >
+                        <span
+                          className="block h-full rounded-full transition-[width] duration-200 motion-reduce:transition-none"
+                          style={{
+                            width: `${Math.round((chars / CONTRIBUICAO_MIN) * 100)}%`,
+                            background: "var(--go-lime)",
+                          }}
+                        />
+                      </span>
+                    )}
+                  </div>
+                  {/* Contador + o que falta. Estado NUNCA só por cor: o texto diz quantos
+                      caracteres faltam, e ganha ícone depois de tentar avançar. */}
+                  <p
+                    id={`contribuicao-${email}-contador`}
+                    className="mt-0.5 flex items-center justify-between gap-2 text-[10.5px]"
+                    style={{ color: faltam > 0 ? "#8a7d00" : "#8b8b9a" }}
+                  >
+                    <span>
+                      {chars === 0
+                        ? `Conte em ${CONTRIBUICAO_MIN} caracteres ou mais`
+                        : faltam > 0
+                          ? `${faltaTexto ? "⚠️ " : ""}Faltam ${faltam} caractere${faltam > 1 ? "s" : ""}`
+                          : "Pronto"}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {chars}/{CONTRIBUICAO_MAX}
+                    </span>
+                  </p>
+                </div>
               </li>
             );
           })}
@@ -1079,6 +1164,17 @@ export function ParticipantesPapeisInput({
       {participantes.length > 0 && semPapel > 0 && !error && (
         <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
           {semPapel === 1 ? "1 participante sem papel" : `${semPapel} participantes sem papel`} — escolha o papel de cada pessoa.
+        </p>
+      )}
+
+      {/* Mesma direção para a descrição do que cada um fez. Só aparece quando o papel já
+          está resolvido — duas cobranças âmbar ao mesmo tempo viram ruído. */}
+      {participantes.length > 0 && semPapel === 0 && semContribuicao > 0 && !errorContribuicao && (
+        <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
+          {semContribuicao === 1
+            ? "1 participante sem a descrição do que fez"
+            : `${semContribuicao} participantes sem a descrição do que fizeram`}{" "}
+          — conte em uma frase o que cada pessoa fez.
         </p>
       )}
 
@@ -1096,6 +1192,7 @@ export function ParticipantesPapeisInput({
       )}
 
       <FieldError message={error} />
+      <FieldError message={errorContribuicao} />
     </>
   );
 }

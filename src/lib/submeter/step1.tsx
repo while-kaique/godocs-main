@@ -79,11 +79,24 @@ export function Step1({
     updateField("participantes", form.participantes.filter((p) => p !== email));
     const { [email]: _removido, ...resto } = form.participantesPapeis;
     updateField("participantesPapeis", resto);
+    // O texto de "o que essa pessoa fez" sai junto — deixar a chave órfã reapareceria
+    // como texto de outra pessoa se o mesmo e-mail fosse adicionado de novo.
+    const { [email]: _texto, ...restoContrib } = form.participantesContribuicoes;
+    updateField("participantesContribuicoes", restoContrib);
+    clearError("participantesContribuicoes");
   }
 
   function setPapelParticipant(email: string, papel: PapelParticipante) {
     updateField("participantesPapeis", { ...form.participantesPapeis, [email]: papel });
     clearError("participantes");
+  }
+
+  function setContribuicaoParticipant(email: string, texto: string) {
+    updateField("participantesContribuicoes", {
+      ...form.participantesContribuicoes,
+      [email]: texto,
+    });
+    clearError("participantesContribuicoes");
   }
 
   // Bloco de identidade (autor) — read-only, comum aos dois modos. A conta logada
@@ -261,15 +274,18 @@ export function Step1({
       {form.emEquipe === "sim" && (
         <div className="mt-2.5" style={{ animation: "go-slide-down 0.25s ease" }}>
           <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#8a7d00" }}>
-            👥 Participantes e seus papéis:
+            👥 Participantes, papéis e o que cada um fez:
           </label>
           <ParticipantesPapeisInput
             participantes={form.participantes}
             papeis={form.participantesPapeis}
+            contribuicoes={form.participantesContribuicoes}
             onAdd={addParticipant}
             onRemove={removeParticipant}
             onSetPapel={setPapelParticipant}
+            onSetContribuicao={setContribuicaoParticipant}
             error={errors.participantes}
+            errorContribuicao={errors.participantesContribuicoes}
             suggestions={sugestoesParticipantes}
             loadingSuggestions={sugestoesLoading}
           />

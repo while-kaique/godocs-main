@@ -28,6 +28,8 @@ import {
   interpretarParecerLider,
 } from '@/lib/aprovacoes-parecer';
 import { chaveColuna } from '@/lib/coluna-chave';
+import { rotuloColuna } from '@/lib/coluna-rotulo';
+import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
 // Os status graváveis são replicados aqui (não importados de `.functions.ts`) para o
@@ -250,7 +252,10 @@ function Campo({ nome, valor }: { nome: string; valor: string }) {
   return (
     <div className={longo ? 'sm:col-span-2' : undefined}>
       <dt className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-        {nome}
+        {/* Rótulo de exibição: as colunas de papel se chamam "Participantes"/"Participantes 2"
+            na planilha, mas quem submeteu escolheu "Coautor"/"Participante" — a ficha fala a
+            língua do formulário. A CHAVE da célula continua sendo o nome da coluna. */}
+        {rotuloColuna(nome)}
       </dt>
       <dd className="mt-0.5 text-[13px] leading-relaxed text-foreground">
         {ehUrl(valor) ? (
@@ -289,10 +294,18 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
 
 export function ProjetoDetalheDialog({
   projeto,
+  pessoas,
   onFechar,
   onStatusSalvo,
 }: {
   projeto: ProjetoDashboardResumo | null;
+  /**
+   * O que cada participante FEZ, do banco. OPCIONAL: só as abas que carregam o mapa
+   * (`/especiais`, `/aprovacoes-pendentes`) o passam — a ficha do `/dashboard` segue
+   * sem ele e nada muda ali. As colunas de papel da planilha dizem QUEM participou e em
+   * que papel; este bloco é o único lugar que diz o QUE cada pessoa fez.
+   */
+  pessoas?: ContribuicaoParticipante[];
   onFechar: () => void;
   onStatusSalvo: (id: string, status: string) => void;
 }) {
@@ -592,6 +605,33 @@ export function ProjetoDetalheDialog({
                       style={{ borderColor: 'rgba(0,89,169,0.22)', background: 'rgba(0,89,169,0.04)' }}
                     >
                       {item}
+                    </li>
+                  ))}
+                </ul>
+              </Secao>
+            )}
+
+            {/* Quem fez o quê — ABERTO aqui (ao contrário do cartão, que colapsa para a
+                coluna continuar escaneável): a ficha é onde se decide, e é para ler. */}
+            {pessoas != null && pessoas.length > 0 && (
+              <Secao titulo="Quem fez o quê">
+                <ul className="space-y-1.5">
+                  {pessoas.map((pes) => (
+                    <li key={pes.email} className="rounded-md bg-muted/60 px-2.5 py-2">
+                      <p className="flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted-foreground">
+                        <span className="font-medium text-foreground">{pes.email}</span>
+                        {pes.papel && (
+                          <span
+                            className="rounded px-1 py-px text-[10.5px] font-medium"
+                            style={{ background: 'rgba(0,89,169,0.1)', color: 'var(--go-blue)' }}
+                          >
+                            {pes.papel}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-[12.5px] leading-relaxed text-foreground">
+                        {pes.texto}
+                      </p>
                     </li>
                   ))}
                 </ul>

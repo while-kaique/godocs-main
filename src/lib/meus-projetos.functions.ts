@@ -118,6 +118,9 @@ export type MeuProjetoDetalhes = MeuProjetoItem & {
   membros: string[];
   // Mapa e-mail→papel dos participantes (seed do seletor de papéis na EDIÇÃO).
   membros_papeis: Record<string, string>;
+  // Mapa e-mail→"o que essa pessoa fez" (seed do campo de contribuição na EDIÇÃO).
+  // Sem devolver isto, o reenvio de uma edição apagaria o texto já escrito.
+  membros_contribuicoes: Record<string, string>;
   nome_projeto: string | null;
   data_criacao_projeto: string | null;
   descricao_breve: string | null;
@@ -625,6 +628,10 @@ export async function getMeuProjeto(
     // Mapa e-mail→papel para seedar o seletor de papéis na edição. {} = legado sem
     // papéis (o form default cada membro conhecido para "coexecutor").
     membros_papeis: parseJson<Record<string, string>>(data.membros_papeis) ?? {},
+    // O que cada participante fez. {} = legado/projeto anterior a esta feature — o form
+    // pede o texto na edição (a validação da Etapa 1 exige de todos).
+    membros_contribuicoes:
+      parseJson<Record<string, string>>(data.membros_contribuicoes) ?? {},
     nome_projeto: data.nome,
     data_criacao_projeto: data.data_criacao_projeto,
     descricao_breve: data.descricao_breve,

@@ -499,6 +499,9 @@ export type InsertProjeto = {
   // Papel de cada membro (e-mail→papel). Serializado em JSON. `membros` continua
   // sendo a lista plana de todos (base do ownership); este mapa só guarda o papel.
   membros_papeis?: Record<string, string> | null;
+  // O que cada participante fez (e-mail→texto curto). Serializado em JSON. Coluna
+  // INTERNA: nunca vai ao Sheets nem a prompt algum — ver a migração em `schema.ts`.
+  membros_contribuicoes?: Record<string, string> | null;
   nome?: string | null;
   data_criacao_projeto?: string | null;
   tipo_projeto?: string | null;
@@ -519,10 +522,11 @@ export async function insertProjeto(data: InsertProjeto) {
   await exec(
     `
     INSERT INTO projetos (id, responsavel_nome, responsavel_email, area_id, area, ferramenta,
-      escopo, servico_externo, membros, membros_papeis, nome, data_criacao_projeto, tipo_projeto, tipos_projeto,
+      escopo, servico_externo, membros, membros_papeis, membros_contribuicoes, nome,
+      data_criacao_projeto, tipo_projeto, tipos_projeto,
       descricao_breve, especial, contexto_especial, arquivos_nomes, usa_ai_proxy,
       contrafactual_afetados, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     [
       id,
@@ -535,6 +539,7 @@ export async function insertProjeto(data: InsertProjeto) {
       data.servico_externo ?? null,
       data.membros ? JSON.stringify(data.membros) : null,
       data.membros_papeis ? JSON.stringify(data.membros_papeis) : null,
+      data.membros_contribuicoes ? JSON.stringify(data.membros_contribuicoes) : null,
       data.nome ?? null,
       data.data_criacao_projeto ?? null,
       data.tipo_projeto ?? null,
@@ -2328,6 +2333,7 @@ export type ProjetoRow = {
   servico_externo: string | null;
   membros: string | null; // JSON string (lista plana de todos os participantes)
   membros_papeis: string | null; // JSON string (mapa e-mail→papel)
+  membros_contribuicoes: string | null; // JSON string (mapa e-mail→o que a pessoa fez)
   status: string | null;
   chat_completo: number | null;
   data_criacao_projeto: string | null;
@@ -2541,6 +2547,30 @@ export async function upsertReferenciaEspecial(dados: {
 
 export async function deleteReferenciaEspecial(projetoId: string): Promise<void> {
   await exec('DELETE FROM especial_referencia WHERE projeto_id = ?', [projetoId]);
+}
+
+/**
+ * "O que cada participante fez" de TODOS os projetos que têm o texto — as 4 colunas de
+ * participantes, cruas, para o mapper puro `montarContribuicoesPorProjeto`.
+ *
+ * Por que uma consulta própria: as abas do admin (`/especiais`, `/aprovacoes-pendentes`)
+ * listam do ESPELHO da planilha, e este campo é só do banco — sem esta query lateral não
+ * haveria como mostrar o texto ao lado do projeto. É barata e escalar: 4 colunas curtas,
+ * só das linhas que têm algo escrito (o `WHERE` corta legado e todo projeto anterior à
+ * feature), e nada de blobs — a lição do `getAllReenvios` (32 MiB de RPC) vale aqui.
+ */
+export async function getContribuicoesDeParticipantes() {
+  return queryAll<{
+    id: string;
+    membros: string | null;
+    membros_papeis: string | null;
+    membros_contribuicoes: string | null;
+  }>(
+    `SELECT id, membros, membros_papeis, membros_contribuicoes
+       FROM projetos
+      WHERE membros_contribuicoes IS NOT NULL AND membros_contribuicoes != ''`,
+    [],
+  );
 }
 
 // ─── Recomendações de estrelas (auditoria / agente classificador) ────────────
