@@ -9,15 +9,19 @@
  * como chave OpenAI direta, usada pelo fallback do `llm.ts`). Sem nenhuma das duas, a função
  * devolve `null` — o classificador degrada para recuperação sem vizinhos, nunca quebra.
  *
- * Modelo: `text-embedding-3-small` (1536 dims) por padrão — barato e suficiente para agrupar
- * projetos por semelhança de escopo. Override por `LLM_EMBEDDINGS_MODEL`.
+ * Modelo: `text-embedding-3-large` (3072 dims) por padrão — o `-small` (1536) diluía siblings de
+ * função em áreas diferentes (caso GoPrice × Agente precificador, 25/08/2026); o `-large` separa
+ * melhor o sinal distintivo. Override por `LLM_EMBEDDINGS_MODEL`. ⚠️ Trocar o modelo muda a
+ * dimensão — vetores de dims diferentes têm cosseno 0 (ver `cosseno`), então durante a transição
+ * os vetores antigos ficam invisíveis até o reembedding (o backfill `forcar` regrava tudo; e
+ * `garantirEmbeddings` já considera vetor de modelo diferente como "velho").
  *
  * ⚠️ Envs lidas LAZY (dentro de função). `process` não existe na avaliação do módulo no Godeploy
  * (regra do CLAUDE.md) — nada de `const X = process.env...` no topo.
  */
 
 const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
-const MODELO_PADRAO = 'text-embedding-3-small';
+const MODELO_PADRAO = 'text-embedding-3-large';
 
 export type EmbeddingConfig = {
   apiKey: string;

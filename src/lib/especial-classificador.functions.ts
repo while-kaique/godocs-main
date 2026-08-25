@@ -28,7 +28,12 @@ import { lerResumosEspelho } from '@/lib/sheet-espelho';
 import { apenasEspeciais } from '@/lib/especiais-view';
 import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
 import type { DocumentacaoGerada } from '@/lib/agents/types';
-import { gerarEmbeddingsLote, base64ParaVetor, vetorParaBase64 } from '@/lib/embeddings';
+import {
+  gerarEmbeddingsLote,
+  base64ParaVetor,
+  vetorParaBase64,
+  embeddingConfig,
+} from '@/lib/embeddings';
 import {
   textoParaEmbedding,
   hashTexto,
@@ -75,6 +80,14 @@ function resumoDocParaTexto(conteudoJson: string | null | undefined): string | n
   return txt || null;
 }
 
+/** Só o `o_que_faz` da doc — o campo mais discriminante, que lidera o texto do embedding. */
+function oQueFazDoc(conteudoJson: string | null | undefined): string | null {
+  if (!conteudoJson) return null;
+  const doc = parseJson<DocumentacaoGerada>(conteudoJson);
+  const t = doc?.o_que_faz?.trim();
+  return t || null;
+}
+
 /**
  * Monta a "impressão semântica" de um projeto. Prefere o banco (`projetos`); se o projeto só
  * existe no espelho (legado ainda não criado no SQLite), cai no resumo — embedding mais fraco,
@@ -87,6 +100,7 @@ async function montarEntradaSemantica(
   const ctx = await getProjetoContextoData(projetoId);
   const docRow = await getDocumentacaoConteudo(projetoId);
   const doc = resumoDocParaTexto(docRow?.conteudo);
+  const oQueFaz = oQueFazDoc(docRow?.conteudo);
 
   const nome = ctx?.nome ?? resumo?.nome ?? null;
   const area = ctx?.area_nome ?? ctx?.area ?? resumo?.area ?? null;
@@ -100,6 +114,7 @@ async function montarEntradaSemantica(
 
   const entrada: EntradaSemantica = {
     nome,
+    o_que_faz: oQueFaz,
     area,
     ferramenta,
     tipos: typeof tipos === 'string' ? tipos : null,
@@ -183,6 +198,9 @@ async function garantirEmbeddings(
   opts: { capGeracao?: number } = {},
 ): Promise<{ mapa: MapaEmbedding; gerados: number }> {
   const cap = opts.capGeracao ?? 40; // teto por corrida (custo + tempo do cron)
+  // Modelo-alvo: vetor gerado por OUTRO modelo é "velho" mesmo com o texto igual (troca de
+  // `-small`→`-large` muda a dimensão, e cosseno entre dims diferentes é 0 → o vizinho some).
+  const modeloAlvo = embeddingConfig()?.modelo;
   const pendentes: { id: string; texto: string; hash: string }[] = [];
 
   for (const id of ids) {
@@ -193,7 +211,9 @@ async function garantirEmbeddings(
     if (!texto) continue;
     const hash = hashTexto(texto);
     const atual = embeddings.get(id);
-    if (atual && atual.hash === hash) continue; // já fresco
+    const frescoTexto = atual != null && atual.hash === hash;
+    const frescoModelo = atual != null && (!modeloAlvo || atual.modelo === modeloAlvo);
+    if (frescoTexto && frescoModelo) continue; // já fresco (texto e modelo)
     pendentes.push({ id, texto, hash });
   }
 
@@ -394,8 +414,10 @@ export async function classificarEspeciaisPendentes(
     .filter((p) => p.estrelas != null || jaTemAvaliacao.has(p.id))
     .map((p) => p.id);
   const idsParaEmbeddar = Array.from(new Set([...candidatos.map((c) => c.id), ...rotulados]));
+  // `forcar` é a ferramenta da transição de modelo/texto — deixa o teto alto para reembeddar o
+  // corpus inteiro numa passada; no cron normal, teto baixo (custo + tempo por corrida).
   const ger = await garantirEmbeddings(idsParaEmbeddar, resumoPorId, embeddings, {
-    capGeracao: 60,
+    capGeracao: opts.forcar ? 200 : 60,
   });
   embeddings = ger.mapa;
 

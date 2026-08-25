@@ -91,25 +91,33 @@ export function selecionarVizinhos(
 /** Os campos de um projeto que compõem a "impressão semântica" para o embedding. */
 export type EntradaSemantica = {
   nome?: string | null;
-  area?: string | null;
-  ferramenta?: string | null;
-  tipos?: string | null;
+  /** O que o projeto FAZ (do `o_que_faz` da doc). É o sinal mais discriminante — lidera o texto. */
+  o_que_faz?: string | null;
   contexto_especial?: string | null;
   descricao?: string | null;
   memorial?: string | null;
   doc?: string | null;
+  // ⚠️ `area`/`ferramenta`/`tipos` NÃO entram no embedding de propósito (ver textoParaEmbedding).
+  area?: string | null;
+  ferramenta?: string | null;
+  tipos?: string | null;
 };
 
 /**
- * Monta o texto que representa o projeto para o embedding. Ordem = do mais discriminante (área,
- * escopo) para o mais volumoso (memorial/doc), porque o teto de caracteres corta o fim.
+ * Monta o texto que representa o projeto para o embedding. Ordem = do mais discriminante (o que o
+ * projeto FAZ) para o mais volumoso (memorial/doc), porque o teto de caracteres corta o fim.
+ *
+ * ⚠️ **Área, ferramenta e tipo ficam DE FORA de propósito** (25/08/2026). São boilerplate de baixa
+ * entropia (`automacao`, `Claude+GoDeploy`, dashboards de vários setores) que DILUI o sinal
+ * distintivo — e, pior, a ÁREA aproxima projetos por marca/setor e afasta IRMÃOS de função que
+ * moram em áreas diferentes: o «GoPrice» (Gocase) e o «Agente precificador» (Gobeaute) fazem quase
+ * a mesma coisa e não se reconheciam porque o texto era dominado por área+ferramenta. O embedding
+ * agora concentra no QUE o projeto faz (nome + o_que_faz + por que é especial + descrição + doc).
  */
 export function textoParaEmbedding(e: EntradaSemantica): string {
   const partes: string[] = [];
   if (e.nome) partes.push(`Projeto: ${e.nome}`);
-  if (e.area) partes.push(`Área: ${e.area}`);
-  if (e.ferramenta) partes.push(`Ferramenta: ${e.ferramenta}`);
-  if (e.tipos) partes.push(`Tipo: ${e.tipos}`);
+  if (e.o_que_faz) partes.push(`O que faz: ${e.o_que_faz}`);
   if (e.contexto_especial) partes.push(`Por que é especial: ${e.contexto_especial}`);
   if (e.descricao) partes.push(`Descrição: ${e.descricao}`);
   if (e.memorial) partes.push(`Memorial:\n${e.memorial}`);

@@ -98,6 +98,7 @@ DISCIPLINA:
 - "Uso esperado", "resultado projetado", "vai reduzir" NÃO é uso real — trata como POC até ter ponteiro medido.
 - O próprio entregável (o dashboard, o CSV, o documento que o projeto gera) NÃO é ponteiro de uso recorrente.
 - Admitir limite no memorial conta A FAVOR (honestidade), não contra.
+- ⚠️ Se um VIZINHO quase idêntico (alta similaridade) tem nota bem MAIOR, IGUALE a faixa dele OU justifique a diferença ESPECÍFICA e concreta entre os dois — não desça para POC/0–1 só porque o memorial DESTE projeto veio magro. Dois projetos que fazem a mesma coisa merecem faixas próximas.
 
 FORMATO DE RESPOSTA:
 Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JSON:
@@ -190,6 +191,42 @@ export function normalizarRecomendacao(bruto: unknown): RecomendacaoEspecial | n
   return { estrelas_recomendada: nota, confianca, leitura, contestada: alta };
 }
 
+// ─── Guard de divergência contra vizinho forte ─────────────────────────────────
+
+/** Similaridade a partir da qual um vizinho é "quase o mesmo projeto" para efeito do guard. */
+export const LIMIAR_SIM_VIZINHO_FORTE = 0.75;
+/** Nota do vizinho a partir da qual a divergência para baixo é suspeita (≥3 = top 4%). */
+export const NOTA_VIZINHO_FORTE = 3;
+/** Nota do alvo até a qual a recomendação conta como "caiu em POC" perto de um vizinho forte. */
+export const NOTA_ALVO_BAIXA = 1;
+
+/**
+ * Rede determinística: quando um vizinho de ALTA similaridade (≥0.75) vale ≥3★ mas o agente
+ * recomendou ≤1★, a diferença é grande demais para gravar calada — é o padrão do GoPrice (0–1)
+ * contra o «Agente precificador» (4★), em que o LLM desce para POC só porque o memorial do alvo
+ * veio magro. NÃO reescreve a nota (não inventamos número): rebaixa a confiança para `baixa`,
+ * marca `contestada` e prefixa a leitura com um aviso para a triagem conferir. Sem vizinho forte
+ * divergente, devolve a recomendação intacta.
+ */
+export function aplicarGuardVizinhoDivergente(
+  rec: RecomendacaoEspecial,
+  vizinhos: Vizinho[],
+): RecomendacaoEspecial {
+  if (rec.estrelas_recomendada > NOTA_ALVO_BAIXA) return rec;
+  const forte = vizinhos.find(
+    (v) => v.similaridade >= LIMIAR_SIM_VIZINHO_FORTE && v.estrela_efetiva >= NOTA_VIZINHO_FORTE,
+  );
+  if (!forte) return rec;
+  const nomeViz = forte.nome ?? forte.projeto_id;
+  const aviso = `⚠ Conferir na triagem: «${nomeViz}» (similaridade ${forte.similaridade.toFixed(2)}) é quase idêntico e vale ${forte.estrela_efetiva}★ — a nota ${rec.estrelas_recomendada}★ diverge muito; iguale a faixa ou justifique a diferença. `;
+  return {
+    ...rec,
+    confianca: 'baixa',
+    contestada: true,
+    leitura: aviso + rec.leitura,
+  };
+}
+
 /**
  * Roda o classificador: monta o prompt, chama o LLM (jsonMode) e devolve a recomendação
  * normalizada — ou `null` se o modelo não devolveu JSON utilizável. Nunca lança por conta do
@@ -208,5 +245,6 @@ export async function classificarEspecial(
     { jsonMode: true, temperature: 0.2, maxTokens: 900 },
   );
   const json = extrairJson(raw);
-  return normalizarRecomendacao(json);
+  const rec = normalizarRecomendacao(json);
+  return rec ? aplicarGuardVizinhoDivergente(rec, vizinhos) : null;
 }
