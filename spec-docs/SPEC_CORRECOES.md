@@ -2678,7 +2678,7 @@ não atropela requisição em voo · falha não vira entrada · lista vazia não
 `tests/calendario-ui.test.ts` (a tela não espera o auth · o redirect continua · o lote depende dos
 ids). Medição reproduzível: `scripts/dryrun-lider/peso-ficha.ts`.
 
-## Horas e contrato contados em dobro — o reconciliador não conseguia desfazer (25/08/2026)
+## Horas e contrato contados em dobro — o reconciliador não conseguia desfazer (25/08/2026, PR #283)
 
 **Sintoma.** "Portal de Reembolsos (Gobeaute)" (Naiarlisson Fernandes, CX) foi submetido com
 **271h/mês** de agentes de CX **E** o contrato da terceirizada (Scooto) que pagava justamente
