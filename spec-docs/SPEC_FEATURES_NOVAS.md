@@ -1698,3 +1698,59 @@ eventos), `meus-projetos.functions.ts` (seed), `investigador.functions.ts` +
 `routes/_authenticated/aprovacoes-pendentes.tsx`, `components/dashboard/projeto-detalhe-dialog.tsx`,
 `src/lib/participantes-contribuicoes.ts` (novo), `src/lib/coluna-rotulo.ts` (novo),
 `src/components/admin/quem-fez-o-que.tsx` (novo). Teste: `tests/participantes-contribuicoes.test.ts`.
+
+## Agente CLASSIFICADOR de projetos ESPECIAIS — a "peça 4" (RAG por embeddings) · 25/08/2026
+
+**Decisão (Luis, 25/08/2026):** o `/especiais` mostra a recomendação da auditoria (estrela 0–10),
+mas até aqui ela só vinha do **seed da força-tarefa do JV** (99 projetos, 18/08) e de importação em
+lote — todo especial submetido **depois** aparecia SEM recomendação. Faltava o agente que classifica
+na submissão. Ele **aprende com a própria memória** (os especiais já avaliados) e usa **RAG por
+embeddings** para "rápida e precisa avaliação". Escolhas: **embeddings vetoriais** (não recuperação
+lexical) + **1 passe com guard determinístico** (não passe adversarial).
+
+### O que o agente é (e o que NÃO é)
+- **PROPÕE** a estrela + a `leitura` que a justifica, gravada em `especial_avaliacao` (origem
+  `agente-classificador`, com o `modelo`). **NUNCA grava a coluna "Estrelas" da planilha** — a nota
+  só muda por clique de gente (mesma invariante do lote/seed). É um 2º par de olhos calibrado.
+- Roda **em background após a submissão** (só se `especial === 1`), no `worker.ts`, junto da análise
+  (`processarPosSubmissao` → `Promise.allSettled([analisar, classificar])` sob `ctx.waitUntil`).
+- **Backfill/cron** para os especiais que já existem sem recomendação (o buraco que o Luis viu):
+  `POST /api/admin/especiais/classificar-pendentes` (dry é o DEFAULT) + `POST /api/admin/especiais/classificar`
+  (um projeto, para teste) + cron `POST /api/cron/classificar-especiais` (dry:false, bounded a 10/corrida).
+
+### A memória e o "RAG"
+- **A memória são os especiais JÁ decididos.** O corpus de exemplares = especiais do espelho que têm
+  **nota humana** (coluna "Estrelas" = VERDADE) **ou** uma recomendação gravada. ⚠️ **O rótulo
+  preferido é a nota HUMANA, não a recomendação do próprio agente** — aprender das próprias saídas é
+  como o classificador deriva (feedback loop); a nota de gente é o chão (`rotuloExemplar`).
+- **Embeddings vão SEMPRE direto na OpenAI, NUNCA no proxy** — o gateway GoGroup é uma subscription
+  Codex e devolve **404 em `/embeddings`** (probe 25/08). Chave: `LLM_EMBEDDINGS_KEY` senão
+  `LLM_FALLBACK` (já nos secrets de prod). Modelo `text-embedding-3-small` (1536d, override
+  `LLM_EMBEDDINGS_MODEL`). Sem chave → degrada para recuperação sem vizinhos, nunca quebra
+  (`embeddings.ts`, envs LAZY).
+- **Vetor no SQLite como base64 de Float32Array** (o Worker não tem Buffer), tabela INTERNA/DERIVADA
+  `especial_embedding` (fora do Sheets e de `SAFE_UPDATE_FIELDS`; apagável — o backfill reconstrói).
+  `texto_hash` evita re-embeddar (custa) quando o texto do projeto não mudou.
+- **Recuperação PURA e testável** (`especial-corpus.ts`): cosseno em JS sobre o corpus (dezenas de
+  linhas), top-K acima do piso, exclui o próprio projeto e exemplares sem rótulo. Os vizinhos viram
+  bloco few-shot com nota + área + a `leitura` que ancora (é a leitura que ensina o "por que não sobe").
+
+### Prompt e guard (`agents/especial-classificador.ts`)
+- Prompt montado da `especiais-regua.ts` (FONTE ÚNICA: níveis, critérios, o que derruba, a CURVA_BASE
+  real) — não redigitar a régua aqui.
+- **Structured Outputs está MORTA no proxy** → `jsonMode: true` + parser defensivo por regex
+  (`extrairJson`: puro / cerca ```json / objeto embutido), mesmo padrão do `analyzer.ts`.
+- **Guard determinístico** (`normalizarRecomendacao`): clampa 0–10 e arredonda; confiança inválida →
+  `baixa`; **nota ≥3 (top 4% da base) força confiança ≤ média e marca `contestada`** (nota rara pede
+  olho humano) — e o agente **nunca grava a estrela** mesmo assim. Sem nota numérica → `null` (não grava).
+
+### Salvaguardas anti-inflação (a curva é dura de propósito)
+- ≥3★ é top 4%; ≥5★ é top 1%. A curva vai no prompt; o guard rebaixa confiança em nota alta; o corpus
+  prioriza a verdade humana. E a triagem humana continua sendo a rede final (o agente só sugere).
+
+### Arquivos
+- `src/lib/embeddings.ts` (novo) · `src/lib/especial-corpus.ts` (novo, PURO) ·
+  `src/lib/agents/especial-classificador.ts` (novo) · `src/lib/especial-classificador.functions.ts` (novo) ·
+  tabela `especial_embedding` + helpers em `client.server.ts`/`schema.ts` · rotas + disparo em `worker.ts`.
+- Testes: `tests/especial-classificador.test.ts` (round-trip base64, cosseno, recuperação, parse+guard).
+  Validado E2E contra OpenAI+proxy reais (25/08): painel de margem → 2★ ancorado no «Godash».

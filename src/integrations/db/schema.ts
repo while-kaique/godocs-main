@@ -448,6 +448,22 @@ const SCHEMA_SQL = `
     modelo                TEXT,
     criado_em             TEXT DEFAULT (datetime('now'))
   );
+
+  -- Memória VETORIAL do agente classificador de especiais: o embedding de cada projeto especial,
+  -- para recuperar os vizinhos semânticos ao classificar um novo (RAG).
+  -- ⚠️ Tabela INTERNA e DERIVADA: fora do Sheets e de SAFE_UPDATE_FIELDS, o sync não a toca.
+  -- Pode ser apagada -- o backfill/cron a reconstrói chamando a OpenAI de novo.
+  -- ⚠️ O vetor vive como base64 de Float32Array (o Worker não tem Buffer) -- ver embeddings.ts.
+  -- ⚠️ texto_hash existe para NÃO re-embeddar (custa dinheiro) quando o texto do projeto não mudou.
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS especial_embedding (
+    projeto_id  TEXT PRIMARY KEY,
+    modelo      TEXT NOT NULL,
+    dim         INTEGER NOT NULL,
+    vetor       TEXT NOT NULL,
+    texto_hash  TEXT,
+    criado_em   TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.

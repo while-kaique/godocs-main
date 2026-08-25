@@ -2629,6 +2629,58 @@ export async function upsertAvaliacaoEspecial(dados: {
   );
 }
 
+// ─── Memória vetorial dos especiais (embeddings do classificador) ────────────
+// Tabela INTERNA e DERIVADA: o vetor de cada especial, para a recuperação por similaridade.
+// Ver `especial-classificador.functions.ts` e `embeddings.ts`.
+
+export type EspecialEmbeddingRow = {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string; // base64 de Float32Array
+  texto_hash: string | null;
+  criado_em: string | null;
+};
+
+/** Todos os embeddings (vetor incluso). Usado pela recuperação — o corpus é pequeno (dezenas). */
+export async function getEmbeddingsEspeciais(): Promise<EspecialEmbeddingRow[]> {
+  return queryAll<EspecialEmbeddingRow>('SELECT * FROM especial_embedding', []);
+}
+
+/**
+ * Só id + texto_hash (sem o vetor) — para o backfill saber o que já está fresco e NÃO re-embeddar
+ * (o embedding custa). Não puxa a coluna `vetor` de propósito.
+ */
+export async function getHashesEmbeddingsEspeciais(): Promise<
+  { projeto_id: string; texto_hash: string | null }[]
+> {
+  return queryAll<{ projeto_id: string; texto_hash: string | null }>(
+    'SELECT projeto_id, texto_hash FROM especial_embedding',
+    [],
+  );
+}
+
+/** Grava (ou substitui) o embedding de um projeto. UPSERT: re-embeddar é o caso de edição. */
+export async function upsertEmbeddingEspecial(dados: {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string;
+  texto_hash: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO especial_embedding (projeto_id, modelo, dim, vetor, texto_hash, criado_em)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       modelo = excluded.modelo,
+       dim = excluded.dim,
+       vetor = excluded.vetor,
+       texto_hash = excluded.texto_hash,
+       criado_em = excluded.criado_em`,
+    [dados.projeto_id, dados.modelo, dados.dim, dados.vetor, dados.texto_hash],
+  );
+}
+
 // ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────
 
 export type EspecialAreaDonoRow = {
