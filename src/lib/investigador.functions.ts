@@ -82,6 +82,10 @@ export type ProjetoInvestigadorDetalhes = ProjetoInvestigador & {
     ferramenta: string
     area_nome: string | null
     membros: string[]
+    // Papel e "o que fez" de cada participante — mapas e-mail→valor. Só o banco os tem
+    // (nenhum dos dois vai ao Sheets), então é aqui que a auditoria os enxerga.
+    membros_papeis: Record<string, string>
+    membros_contribuicoes: Record<string, string>
     servico_externo: string | null
   }
   step2: {
@@ -365,6 +369,9 @@ export async function getProjetoInvestigadorDetalhes(id: string) {
       ferramenta: p.ferramenta,
       area_nome: p.area_nome ?? p.area,
       membros: parseJson<string[]>(p.membros) ?? [],
+      membros_papeis: parseJson<Record<string, string>>(p.membros_papeis) ?? {},
+      membros_contribuicoes:
+        parseJson<Record<string, string>>(p.membros_contribuicoes) ?? {},
       servico_externo: p.servico_externo ?? null,
     },
     step2: {

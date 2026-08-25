@@ -153,6 +153,10 @@ type ProjetoDetalhes = ProjetoInvestigador & {
     ferramenta: string
     area_nome: string | null
     membros: string[]
+    // Papel e "o que fez" de cada participante (mapas e-mail→valor). Existem SÓ no banco
+    // — nenhum dos dois tem coluna no Sheets —, e este painel é onde a auditoria os lê.
+    membros_papeis: Record<string, string>
+    membros_contribuicoes: Record<string, string>
     servico_externo: string | null
   }
   step2: {
@@ -1222,6 +1226,22 @@ function DetalheView({
               <KV label="Área" value={d.step1.area_nome} />
               <KV label="Serviço externo" value={d.step1.servico_externo} />
               <KV label="Membros" value={d.step1.membros.length > 0 ? d.step1.membros.join(', ') : null} />
+              {/* Papel + o que cada um fez: uma linha por pessoa, na ordem de `membros`.
+                  Estes dois mapas existem SÓ no banco (nenhum vai ao Sheets), então este
+                  painel é onde a auditoria os lê. Projeto anterior à feature não tem o
+                  texto — o KV mostra "—" e nada quebra. */}
+              {d.step1.membros.map((email) => {
+                const papelRaw = d.step1.membros_papeis[email] ?? ''
+                const papel = PAPEL_LABEL_INVESTIGADOR[papelRaw] ?? papelRaw
+                const feito = (d.step1.membros_contribuicoes[email] ?? '').trim()
+                return (
+                  <KV
+                    key={email}
+                    label={papel ? `${email} (${papel})` : email}
+                    value={feito || null}
+                  />
+                )
+              })}
             </div>
           </div>
           <div className="rounded-[var(--go-radius-sm)] border border-[var(--go-blue)]/8 bg-white p-4">
@@ -2052,6 +2072,23 @@ function formatarPapeisEvento(papeisRaw: unknown, membrosRaw: unknown): string |
     .join(', ')
 }
 
+/** Formata o mapa e-mail→"o que fez" como "email: texto · email2: texto". Mesma ordem
+ * estável do formatador de papéis (a lista `membros` primeiro, os demais depois). Retorna
+ * null quando o evento é anterior à feature ou o mapa está vazio — a linha simplesmente
+ * não aparece. Defensivo: aceita `unknown` e nunca lança. */
+function formatarContribuicoesEvento(contribRaw: unknown, membrosRaw: unknown): string | null {
+  if (!contribRaw || typeof contribRaw !== 'object' || Array.isArray(contribRaw)) return null
+  const contrib = contribRaw as Record<string, unknown>
+  const emails = Object.keys(contrib).filter((e) => String(contrib[e] ?? '').trim() !== '')
+  if (emails.length === 0) return null
+  const ordem = Array.isArray(membrosRaw) ? (membrosRaw as unknown[]).map(String) : []
+  const ordenados = [
+    ...ordem.filter((e) => emails.includes(e)),
+    ...emails.filter((e) => !ordem.includes(e)),
+  ]
+  return ordenados.map((email) => `${email}: ${String(contrib[email]).trim()}`).join(' · ')
+}
+
 /** Constrói os pares label→valor e os chips (cargo/custo) de um evento — função PURA,
  * usada tanto para o estado atual quanto para o anterior (a base do diff). */
 function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow[]; chips: EvChip[] } {
@@ -2074,6 +2111,10 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
     const papeisSub = formatarPapeisEvento(d.membros_papeis, d.membros)
     if (papeisSub) rows.push({ label: 'Participantes e papéis', value: papeisSub })
     else if (Array.isArray(d.membros) && d.membros.length > 0) rows.push({ label: 'Membros', value: (d.membros as string[]).join(', ') })
+    // O que cada participante fez — linha PRÓPRIA (não emenda no papel): é texto livre e
+    // juntar os dois numa linha só deixaria o papel ilegível no meio das frases.
+    const contribSub = formatarContribuicoesEvento(d.membros_contribuicoes, d.membros)
+    if (contribSub) rows.push({ label: 'O que cada um fez', value: contribSub })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Arquivos', value: (d.arquivos as string[]).join(', ') })
     if (d.especial === true) rows.push({ label: 'Especial', value: 'Sim' })
   } else if (tipo === 'saving') {
@@ -2114,6 +2155,8 @@ function linhasDoEvento(tipo: string, d: Record<string, unknown>): { rows: EvRow
     const papeisMeta = formatarPapeisEvento(campos.membros_papeis, campos.membros)
     if (papeisMeta) rows.push({ label: 'Participantes e papéis', value: papeisMeta })
     else if (Array.isArray(campos.membros) && (campos.membros as unknown[]).length > 0) rows.push({ label: 'Membros', value: (campos.membros as string[]).join(', ') })
+    const contribMeta = formatarContribuicoesEvento(campos.membros_contribuicoes, campos.membros)
+    if (contribMeta) rows.push({ label: 'O que cada um fez', value: contribMeta })
     if (Array.isArray(d.arquivos) && d.arquivos.length > 0) rows.push({ label: 'Novos arquivos', value: (d.arquivos as string[]).join(', ') })
   } else if (tipo === 'tipos') {
     if (Array.isArray(d.tipos_projeto)) rows.push({ label: 'Tipos', value: (d.tipos_projeto as string[]).join(', ') })

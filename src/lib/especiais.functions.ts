@@ -23,6 +23,7 @@ import {
   getAvaliacoesEspeciais,
   upsertAvaliacaoEspecial,
   getDonosDeArea,
+  getContribuicoesDeParticipantes,
   upsertDonoDeArea,
   deleteDonoDeArea,
   getAdmins,
@@ -34,6 +35,10 @@ import {
   type ValidadorEspeciais,
 } from '@/lib/especiais-view';
 import { NOTA_MAX, type AvaliacaoEspecial, type Confianca } from '@/lib/especiais-regua';
+import {
+  montarContribuicoesPorProjeto,
+  type ContribuicaoParticipante,
+} from '@/lib/participantes-contribuicoes';
 import { AVALIACOES_SEED, ORIGEM_SEED_FORCA_TAREFA } from '@/lib/especiais-seed';
 import { MAX_ESTRELAS_GRAVAVEL, ESPELHO_VELHO_MS } from '@/lib/dashboard-admin.functions';
 
@@ -41,6 +46,9 @@ export type ListagemEspeciais = {
   projetos: ProjetoDashboardResumo[];
   /** Recomendações da auditoria (lote importado hoje, agente classificador amanhã). */
   avaliacoes: AvaliacaoEspecial[];
+  /** `id do projeto → o que cada participante fez` (banco, nunca planilha). Projeto sem
+   *  texto não aparece no mapa; o cartão então não desenha o bloco. */
+  contribuicoes: Record<string, ContribuicaoParticipante[]>;
   /** Quem valida cada área (a divisão da força-tarefa, definida à mão). */
   donos: DonoDeArea[];
   /** Admins elegíveis a receber áreas — a lista do seletor da divisão. */
@@ -88,13 +96,15 @@ export async function semearAvaliacoesEspeciais(
 }
 
 export async function listarEspeciais(): Promise<ListagemEspeciais> {
-  const [{ linhas, lidoEmMs }, saude, avaliacoesIniciais, donos, admins] = await Promise.all([
-    lerResumosEspelho(),
-    statusEspelho(),
-    getAvaliacoesEspeciais(),
-    getDonosDeArea(),
-    getAdmins(),
-  ]);
+  const [{ linhas, lidoEmMs }, saude, avaliacoesIniciais, donos, admins, contribuicoes] =
+    await Promise.all([
+      lerResumosEspelho(),
+      statusEspelho(),
+      getAvaliacoesEspeciais(),
+      getDonosDeArea(),
+      getAdmins(),
+      getContribuicoesDeParticipantes(),
+    ]);
 
   // Seed: uma vez por isolate, e nunca bloqueia a tela se falhar (é dado de apoio, não estado).
   let avaliacoes = avaliacoesIniciais;
@@ -125,6 +135,7 @@ export async function listarEspeciais(): Promise<ListagemEspeciais> {
       modelo: a.modelo,
       criado_em: a.criado_em,
     })),
+    contribuicoes: montarContribuicoesPorProjeto(contribuicoes),
     donos: donos.map((d) => ({ area: d.area, dono_email: d.dono_email, dono_nome: d.dono_nome })),
     // A lista vem da tabela `admins`. Quem é admin só pela env `ADMIN_EMAILS` (bootstrap) não
     // aparece aqui — e isso é aceito: para RECEBER uma área é preciso estar cadastrado, o que

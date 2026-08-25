@@ -523,6 +523,14 @@ const membrosPapeisSchema = z
   .record(z.enum(["coexecutor", "planejador", "contribuidor", "idealizador", "referencia_tecnica"]))
   .optional();
 
+// O que cada participante FEZ (mapa e-mail→texto curto). Irmã do mapa de papéis.
+// ⚠️ Aqui o schema é DELIBERADAMENTE frouxo: limita o TETO (o banco não recebe texto
+// grande) e não exige o piso de 20 chars. Quem trava o mínimo é o formulário
+// (`contribuicoesFaltando`/`validarEtapa1`) — se o piso viesse para cá, uma aba com JS
+// em cache (version skew, que este repo já viu) levaria 400 no meio da submissão, sem
+// saída a não ser recarregar. Opcional: projeto individual/legado não manda o campo.
+const membrosContribuicoesSchema = z.record(z.string().max(200)).optional();
+
 const iniciarSubmissaoSchema = z.object({
   responsavel_nome: z.string().min(1).max(120),
   responsavel_email: z.string().email().max(255),
@@ -535,6 +543,7 @@ const iniciarSubmissaoSchema = z.object({
   servico_externo: z.string().max(200).optional(),
   membros: z.array(z.string()).default([]),
   membros_papeis: membrosPapeisSchema,
+  membros_contribuicoes: membrosContribuicoesSchema,
   nome_projeto: z.string().min(1).max(200),
   data_criacao: z.string(),
   tipo_projeto: z.enum(["saving", "receita_incremental"]).optional(),
@@ -720,6 +729,7 @@ export async function iniciarSubmissao(
       servico_externo: data.servico_externo ?? null,
       membros: data.membros,
       membros_papeis: data.membros_papeis ?? null,
+      membros_contribuicoes: data.membros_contribuicoes ?? null,
       nome: data.nome_projeto,
       data_criacao_projeto: data.data_criacao,
       // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
@@ -752,6 +762,9 @@ export async function iniciarSubmissao(
     // Investigador. Campo NOVO dentro do JSON `dados` (sem migração); eventos antigos
     // simplesmente não o têm e o Investigador cai na linha "Membros" simples.
     membros_papeis: data.membros_papeis ?? null,
+    // O que cada participante fez (mapa e-mail→texto) — mesma nota dos papéis: chave
+    // NOVA no JSON `dados`, sem migração; evento antigo simplesmente não a tem.
+    membros_contribuicoes: data.membros_contribuicoes ?? null,
     data_criacao: data.data_criacao,
     tipos_projeto: data.especial
       ? ["especial"]
@@ -2869,6 +2882,7 @@ const atualizarMetadadosSchema = z.object({
   servico_externo: z.string().max(200).optional(),
   membros: z.array(z.string()).optional(),
   membros_papeis: membrosPapeisSchema,
+  membros_contribuicoes: membrosContribuicoesSchema,
   data_criacao: z.string().optional(),
   descricao_breve: z.string().max(1000).optional(),
   // Governança: o projeto usa o AI Proxy interno (gateway de IA da empresa)?
@@ -2909,6 +2923,8 @@ export async function atualizarMetadados(rawData: unknown) {
   if (data.servico_externo !== undefined) campos.servico_externo = data.servico_externo;
   if (data.membros !== undefined) campos.membros = data.membros;
   if (data.membros_papeis !== undefined) campos.membros_papeis = data.membros_papeis;
+  if (data.membros_contribuicoes !== undefined)
+    campos.membros_contribuicoes = data.membros_contribuicoes;
   if (data.data_criacao !== undefined) campos.data_criacao_projeto = data.data_criacao;
   if (data.descricao_breve !== undefined) campos.descricao_breve = data.descricao_breve;
   if (data.usa_ai_proxy !== undefined) campos.usa_ai_proxy = data.usa_ai_proxy;
@@ -2934,6 +2950,8 @@ export async function atualizarMetadados(rawData: unknown) {
         membros: data.membros ?? null,
         // Papéis dos participantes (mapa e-mail→papel) — ver nota no evento "submissao".
         membros_papeis: data.membros_papeis ?? null,
+        // O que cada participante fez — ver nota no evento "submissao".
+        membros_contribuicoes: data.membros_contribuicoes ?? null,
         data_criacao: data.data_criacao ?? null,
         descricao_breve: data.descricao_breve ?? null,
         usa_ai_proxy: data.usa_ai_proxy ?? null,

@@ -247,6 +247,44 @@ export function montarMembrosPapeis(
   return out;
 }
 
+// ─── Contribuição de cada participante ("o que essa pessoa fez?") ───────────
+// Texto CURTO por participante, obrigatório no formulário. É a irmã de
+// `montarMembrosPapeis`: o papel diz de que tamanho foi a participação, este campo diz
+// o QUE a pessoa fez. Vai só para o banco (`projetos.membros_contribuicoes`) — nunca
+// para o Sheets, nunca para prompt de IA. O autor NÃO entra (como nos papéis).
+// ⚠️ Os limites moram AQUI e em lugar nenhum mais: o campo do formulário, a mensagem de
+// erro e o teste leem estas duas constantes. Não redigite 20/100 na tela.
+export const CONTRIBUICAO_MIN = 20;
+export const CONTRIBUICAO_MAX = 100;
+
+// Monta o mapa e-mail→contribuição para o payload `membros_contribuicoes`: só
+// participantes ATUAIS (quem saiu do time é podado), texto com trim e cortado no teto.
+// Descarta vazios, como `montarMembrosPapeis` descarta papel não escolhido.
+// Função pura — testável.
+export function montarMembrosContribuicoes(
+  participantes: string[],
+  contribuicoes: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const email of participantes) {
+    const texto = (contribuicoes[email] ?? "").trim().slice(0, CONTRIBUICAO_MAX);
+    if (texto) out[email] = texto;
+  }
+  return out;
+}
+
+// Participantes cuja contribuição ainda não serve (vazia ou curta demais). Devolve os
+// e-mails na ORDEM da lista de participantes — a tela usa para realçar cada campo e a
+// validação da Etapa 1 para bloquear o avanço. Função pura — testável.
+export function contribuicoesFaltando(
+  participantes: string[],
+  contribuicoes: Record<string, string>,
+): string[] {
+  return participantes.filter(
+    (email) => (contribuicoes[email] ?? "").trim().length < CONTRIBUICAO_MIN,
+  );
+}
+
 export const STEPS = [
   { id: 1, label: "Envio" },
   { id: 2, label: "Projeto" },
@@ -339,6 +377,20 @@ export function validarEtapa1(
     else if (coautoresSelecionados(form.participantes, form.participantesPapeis).length > 1)
       errs.participantes =
         "Só é possível ter 1 Coautor por projeto — deixe os demais como Participante ou Contribuidor";
+    // O que cada pessoa FEZ — obrigatório nos dois modos, como o papel. Erro em campo
+    // PRÓPRIO (`participantesContribuicoes`): quem esquece o texto de uma pessoa não
+    // pode ver a mensagem de papel/coautor, que fala de outra coisa.
+    else {
+      const faltando = contribuicoesFaltando(
+        form.participantes,
+        form.participantesContribuicoes,
+      );
+      if (faltando.length > 0)
+        errs.participantesContribuicoes =
+          faltando.length === 1
+            ? `Descreva o que ${faltando[0]} fez no projeto (mínimo ${CONTRIBUICAO_MIN} caracteres)`
+            : `Descreva o que cada participante fez no projeto — ${faltando.length} ainda sem descrição (mínimo ${CONTRIBUICAO_MIN} caracteres cada)`;
+    }
   }
 
   return errs;
@@ -475,6 +527,10 @@ export interface FormData {
   // `participantes`). "" = ainda não escolhido (obrigatório antes de avançar). O
   // autor NÃO entra aqui — só os e-mails do time adicionados pelo submissor.
   participantesPapeis: Record<string, PapelParticipante | "">;
+  // O que cada participante FEZ no projeto, chaveado pelo mesmo e-mail. Texto curto
+  // (CONTRIBUICAO_MIN..CONTRIBUICAO_MAX chars), obrigatório antes de avançar da Etapa 1.
+  // "" = ainda não escrito. Só o banco recebe (coluna interna) — não vai ao Sheets.
+  participantesContribuicoes: Record<string, string>;
   nomeProjeto: string;
   dataCriacao: string;
   tipoProjeto: ("saving" | "receita_incremental")[];
