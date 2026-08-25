@@ -26,6 +26,8 @@ vi.mock('@/integrations/db/client.server', async () => ({
   // Contrafactual mora só no SQLite; por padrão null (a maioria dos casos não o exercita).
   getContrafactualAfetados: vi.fn(async () => null),
   getContrafactualAfetadosPorIds: vi.fn(async () => new Map()),
+  // "O que cada participante fez" também só existe no SQLite; por padrão vazio.
+  getContribuicoesDeParticipantesPorIds: vi.fn(async () => new Map()),
   // Reenvios (edições) do dono/editor — por padrão vazio (a maioria dos casos não exercita).
   getReenviosDoProjeto: vi.fn(async () => []),
   getReenviosPorIds: vi.fn(async () => new Map()),
@@ -56,6 +58,7 @@ import {
   getAdminStatusLogs,
   getContrafactualAfetados,
   getContrafactualAfetadosPorIds,
+  getContribuicoesDeParticipantesPorIds,
   getReenviosDoProjeto,
   getReenviosPorIds,
 } from '@/integrations/db/client.server';
@@ -327,6 +330,68 @@ describe('getProjetoDashboard', () => {
     const d = await getProjetoDashboard('LEGADO-148');
     expect(d.contrafactual).toBeNull();
     expect(d.campos['Projeto']).toBeDefined();
+  });
+
+  // ── "O que cada participante fez" (`membros_contribuicoes`) ────────────────
+  // Mesma natureza do contrafactual: só existe no SQLite, nunca virou coluna do Sheets.
+  // A ficha é a FONTE ÚNICA das 3 abas (/dashboard, /especiais, /aprovacoes-pendentes) —
+  // por isso o payload precisa carregá-lo, e não a tela.
+
+  it('a ficha traz o que cada participante fez, com o papel legível', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getContribuicoesDeParticipantesPorIds).mockResolvedValueOnce(
+      new Map([
+        [
+          'legado-148',
+          {
+            id: 'LEGADO-148',
+            membros: JSON.stringify(['ana@x.com']),
+            membros_papeis: JSON.stringify({ 'ana@x.com': 'coexecutor' }),
+            membros_contribuicoes: JSON.stringify({ 'ana@x.com': 'Montou os fluxos no n8n' }),
+          },
+        ],
+      ]) as never,
+    );
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.pessoas).toEqual([
+      { email: 'ana@x.com', papel: 'Coautor', texto: 'Montou os fluxos no n8n' },
+    ]);
+  });
+
+  it('pessoas vem vazio (e a ficha abre) quando o projeto é anterior à feature', async () => {
+    await semearEspelho([linha()]);
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.pessoas).toEqual([]);
+    expect(d.campos['Projeto']).toBeDefined();
+  });
+
+  it('falha na leitura das contribuições não derruba a ficha', async () => {
+    await semearEspelho([linha()]);
+    vi.mocked(getContribuicoesDeParticipantesPorIds).mockRejectedValueOnce(new Error('db down'));
+    const d = await getProjetoDashboard('LEGADO-148');
+    expect(d.pessoas).toEqual([]);
+    expect(d.campos['Projeto']).toBeDefined();
+  });
+
+  it('o lote também traz o que cada participante fez', async () => {
+    await semearEspelho([linha({ 'ID Projeto': 'legado-148' })]);
+    vi.mocked(getContribuicoesDeParticipantesPorIds).mockResolvedValueOnce(
+      new Map([
+        [
+          'legado-148',
+          {
+            id: 'legado-148',
+            membros: JSON.stringify(['bia@y.com']),
+            membros_papeis: JSON.stringify({ 'bia@y.com': 'planejador' }),
+            membros_contribuicoes: JSON.stringify({ 'bia@y.com': 'Revisou as regras fiscais' }),
+          },
+        ],
+      ]) as never,
+    );
+    const lote = await getProjetosDashboardLote({ ids: ['legado-148'] });
+    expect(lote['legado-148'].pessoas).toEqual([
+      { email: 'bia@y.com', papel: 'Participante', texto: 'Revisou as regras fiscais' },
+    ]);
   });
 
   it('o lote também traz o contrafactual (via consulta em lote)', async () => {

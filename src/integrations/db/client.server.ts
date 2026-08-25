@@ -2559,18 +2559,44 @@ export async function deleteReferenciaEspecial(projetoId: string): Promise<void>
  * só das linhas que têm algo escrito (o `WHERE` corta legado e todo projeto anterior à
  * feature), e nada de blobs — a lição do `getAllReenvios` (32 MiB de RPC) vale aqui.
  */
+export type LinhaContribuicoesRow = {
+  id: string;
+  membros: string | null;
+  membros_papeis: string | null;
+  membros_contribuicoes: string | null;
+};
+
 export async function getContribuicoesDeParticipantes() {
-  return queryAll<{
-    id: string;
-    membros: string | null;
-    membros_papeis: string | null;
-    membros_contribuicoes: string | null;
-  }>(
+  return queryAll<LinhaContribuicoesRow>(
     `SELECT id, membros, membros_papeis, membros_contribuicoes
        FROM projetos
       WHERE membros_contribuicoes IS NOT NULL AND membros_contribuicoes != ''`,
     [],
   );
+}
+
+/**
+ * Versão em LOTE da anterior, por ids — o loader de fichas do `/dashboard`
+ * (`getProjetosDashboardLote`) precisa do texto de VÁRIOS projetos numa consulta só, e
+ * round-trip por projeto dentro de um laço é o erro que já derrubou o Investigador.
+ * Devolve as linhas CRUAS chaveadas pelo id em minúsculas; quem monta a lista exibida é o
+ * mapper puro `montarContribuicoesPorProjeto`.
+ */
+export async function getContribuicoesDeParticipantesPorIds(
+  projetoIds: string[],
+): Promise<Map<string, LinhaContribuicoesRow>> {
+  const ids = [...new Set(projetoIds.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, LinhaContribuicoesRow>();
+  if (ids.length === 0) return out;
+  const placeholders = ids.map(() => "?").join(", ");
+  const linhas = await queryAll<LinhaContribuicoesRow>(
+    `SELECT id, membros, membros_papeis, membros_contribuicoes
+       FROM projetos
+      WHERE LOWER(id) IN (${placeholders})`,
+    ids,
+  );
+  for (const l of linhas) out.set(String(l.id ?? "").toLowerCase(), l);
+  return out;
 }
 
 // ─── Recomendações de estrelas (auditoria / agente classificador) ────────────

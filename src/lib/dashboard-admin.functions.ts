@@ -31,6 +31,7 @@ import {
   getAdminStatusLogsPorIds,
   getContrafactualAfetados,
   getContrafactualAfetadosPorIds,
+  getContribuicoesDeParticipantesPorIds,
   getReenviosDoProjeto,
   getReenviosPorIds,
   type ReenvioResumo,
@@ -47,6 +48,10 @@ import {
   statusEspelho,
 } from "@/lib/sheet-espelho";
 import { syncSheetsToSqlite } from "@/lib/google/sync-reverse";
+import {
+  montarContribuicoesPorProjeto,
+  type ContribuicaoParticipante,
+} from "@/lib/participantes-contribuicoes";
 import {
   texto,
   ouTraco,
@@ -120,6 +125,14 @@ export type DetalheDashboard = {
    * planilha (legado sem linha no SQLite).
    */
   contrafactual: { tipo: AfetadoTipo; lista: string[] } | null;
+  /**
+   * "O que cada participante fez" (`projetos.membros_contribuicoes`). Mesma natureza do
+   * contrafactual acima: mora SÓ no SQLite, nunca virou coluna do Sheets — por isso vem
+   * numa leitura à parte e não sai da linha do espelho. Lista VAZIA quando o projeto é
+   * anterior à feature, é legado sem linha no SQLite, ou a leitura falhou (a ficha abre
+   * do mesmo jeito; a seção só não aparece).
+   */
+  pessoas: ContribuicaoParticipante[];
   /**
    * Linha do tempo da triagem, mais recente primeiro. Duas naturezas de evento convivem:
    * - `status`: mudança de status feita nesta tela (a planilha não guarda autoria) — de
@@ -248,7 +261,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   //
   // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
   // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
-  const [alvo, historicoStatus, reenvios, contrafactual] = await Promise.all([
+  const [alvo, historicoStatus, reenvios, contrafactual, pessoas] = await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
       .then((logs) =>
@@ -279,6 +292,17 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
         console.error("[dashboard-admin] falha ao ler contrafactual:", e);
         return null;
       }),
+    // "O que cada participante fez": mesma natureza do contrafactual (só SQLite), então
+    // mesma disciplina — leitura à parte, acessória, e falha aqui só omite a seção.
+    getContribuicoesDeParticipantesPorIds([id])
+      .then((mapa): ContribuicaoParticipante[] => {
+        const linha = mapa.get(id.trim().toLowerCase());
+        return linha ? (montarContribuicoesPorProjeto([linha])[linha.id] ?? []) : [];
+      })
+      .catch((e): ContribuicaoParticipante[] => {
+        console.error("[dashboard-admin] falha ao ler o que cada participante fez:", e);
+        return [];
+      }),
   ]);
 
   if (!alvo) {
@@ -295,6 +319,7 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
     campos,
     historico: montarHistoricoTriagem(historicoStatus, reenvios),
     contrafactual,
+    pessoas,
   };
 }
 
@@ -326,7 +351,7 @@ export async function getProjetosDashboardLote(
   const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
   if (alvos.length === 0) return {};
 
-  const [linhas, historicos, reenvios, contrafactuais] = await Promise.all([
+  const [linhas, historicos, reenvios, contrafactuais, contribuicoes] = await Promise.all([
     lerLinhasEspelho(alvos),
     // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
     // lote inteiro e devolver a tela ao caminho de 25 requisições.
@@ -346,6 +371,13 @@ export async function getProjetosDashboardLote(
       console.error("[dashboard-admin] falha ao ler contrafactual em lote:", e);
       return new Map<string, string | null>();
     }),
+    // "O que cada participante fez" — também só SQLite, também uma consulta por `IN`.
+    getContribuicoesDeParticipantesPorIds(alvos)
+      .then((mapa) => montarContribuicoesPorProjeto([...mapa.values()]))
+      .catch((e) => {
+        console.error("[dashboard-admin] falha ao ler contribuições em lote:", e);
+        return {} as Record<string, ContribuicaoParticipante[]>;
+      }),
   ]);
 
   const out: Record<string, DetalheDashboard> = {};
@@ -366,6 +398,9 @@ export async function getProjetosDashboardLote(
       campos,
       historico: montarHistoricoTriagem(historicos.get(chave) ?? [], reenvios.get(chave) ?? []),
       contrafactual: afet.lista.length > 0 ? afet : null,
+      // O mapper chaveia pelo id COMO ESTÁ no banco; o lote trabalha em minúsculas, então
+      // tenta os dois antes de desistir (id de legado vem em caixa alta na planilha).
+      pessoas: contribuicoes[id] ?? contribuicoes[chave] ?? [],
     };
   }
   return out;

@@ -1678,8 +1678,12 @@ vira fileira de "—").
   2 telas) vem **COLAPSADO**: 4 pessoas × 100 chars inflariam a coluna, que serve para escanear —
   é a lição do aviso de reprovação nos cards de "Meus Projetos", que aberto por padrão crescia
   ~200px.
-- Na **ficha** (`ProjetoDetalheDialog`, prop OPCIONAL `pessoas`) vem **ABERTO**: a ficha é onde se
-  decide, e é para ler. A prop é opcional porque a ficha do `/dashboard` não carrega o mapa.
+- Na **ficha** (`ProjetoDetalheDialog`) vem **ABERTO**: a ficha é onde se decide, e é para ler.
+  ⚠️ **A ficha é a FONTE ÚNICA das 3 abas** — inclusive o `/dashboard` (pedido de 25/08/2026).
+  O texto entra no PAYLOAD do detalhe (`DetalheDashboard.pessoas`), lido do SQLite por `IN` em
+  `getProjetoDashboard` e `getProjetosDashboardLote` com a MESMA disciplina do `contrafactual`:
+  leitura acessória dentro do `Promise.all`, `catch` próprio, falha só omite a seção e nunca
+  impede a ficha de abrir. Nada de prop vinda da tela — era duas fontes para o mesmo dado.
 
 **Rótulo das colunas de papel na ficha (mesmo PR).** A ficha mostrava os nomes crus da planilha:
 "PARTICIPANTES" e "PARTICIPANTES 2" — sendo que quem submeteu escolheu "Coautor" e
@@ -1754,3 +1758,18 @@ lexical) + **1 passe com guard determinístico** (não passe adversarial).
   tabela `especial_embedding` + helpers em `client.server.ts`/`schema.ts` · rotas + disparo em `worker.ts`.
 - Testes: `tests/especial-classificador.test.ts` (round-trip base64, cosseno, recuperação, parse+guard).
   Validado E2E contra OpenAI+proxy reais (25/08): painel de margem → 2★ ancorado no «Godash».
+
+## Latência da IA — roteamento de modelo + `reasoning_effort` POR FASE (25/08/2026)
+
+**Problema:** o modelo forte do proxy (`gpt-5.6-sol`) fica **mudo no fio durante o "pensar"** — TTFB medido ~19,6s no turno pesado antes do 1º token, e a metade pesada do produto (doc/memorial) sentia isso como tela branca. Sondas reais: `luna+low` no mesmo turno → TTFB ~3,2s (~6× mais rápido); `sol+low` → ~13,7s.
+
+**Decisão (Luis, 25/08 — Opção A conservadora):** rotear POR FASE, **não** o secret grosseiro tudo-ou-nada de antes. Só as fases **MECÂNICAS** (`doc`/`doc_preview`, que cobrem coleta da doc e `atualizar-metadados`) vão ao modelo leve com effort baixo; **saving/receita/memorial ficam 100% no `sol`**, porque numa fase só misturam perguntas mecânicas E a geração do MEMORIAL, e a `fase` (único sinal ANTES da chamada) não separa as duas — degradar o modelo do memorial é justo o risco a não correr (histórico Gostream/ganho projetado/SmartOnline: "prompt não segura").
+
+**Como funciona:**
+- `LLMOptions.reasoningEffort?` (`llm.ts`) injeta `reasoning_effort` no body de `callOpenAI`/`callOpenAIStream` **só quando presente** (opt-in). O proxy lê `req.reasoning_effort`; o fallback direto (OpenAI, gpt-5.x) também aceita.
+- Guard puro `sanitizeEffort(value?)` (`llm.ts`, allowlist `{low,medium,high,xhigh,max}`) → devolve `undefined` para `minimal`/vazio/desconhecido. ⚠️ **`minimal` faz o gateway responder 502 determinístico (6/6)** — pior que 400 (consome retries e cai no fallback), por isso o guard age ANTES de montar o body.
+- `runOrchestrator` (`orchestrator.ts:~1550`) calcula por fase, **em runtime** (nunca em escopo de módulo): `faseMecanica = fase==='doc' || fase==='doc_preview'`; `modeloTurno = faseMecanica ? (LLM_MODEL_FAST||undefined) : undefined`; `effortTurno = sanitizeEffort(faseMecanica ? LLM_REASONING_EFFORT_FAST : LLM_REASONING_EFFORT)`. Passa `model`/`reasoningEffort` aos DOIS call-sites (streaming e não-streaming).
+
+**Envs (secrets do Godeploy):** `LLM_MODEL_FAST=gpt-5.6-luna` + `LLM_REASONING_EFFORT_FAST=low` (setados em staging `edf400b4` e prod `674a3710`, 25/08). `LLM_REASONING_EFFORT` (effort das fases fortes) fica **unset** de propósito — ligá-lo é experimento futuro, não parte desta fatia.
+
+**Invariante crítico:** com **todas as envs de LLM ausentes**, o comportamento é **byte-idêntico ao de antes** (nenhum `reasoning_effort` no body; modelo = `LLM_MODEL` em todas as fases) — provado por teste. Testes: `tests/llm-reasoning-effort.test.ts`, `tests/llm-reasoning-routing.test.ts`. Plano completo: `docs/plans/latencia-ia-roteamento-por-fase.md`.

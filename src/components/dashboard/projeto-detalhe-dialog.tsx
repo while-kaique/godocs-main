@@ -65,6 +65,8 @@ type Detalhe = {
   historico: HistoricoEntrada[];
   // Contrafactual da Etapa 2 ("quem sentiria falta"): vem do SQLite, não da planilha.
   contrafactual: { tipo: 'pessoa' | 'time'; lista: string[] } | null;
+  /** O que cada participante fez — do SQLite, como o contrafactual (nunca da planilha). */
+  pessoas?: ContribuicaoParticipante[];
 };
 
 type Grupo = { titulo: string; colunas: string[] };
@@ -294,18 +296,10 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
 
 export function ProjetoDetalheDialog({
   projeto,
-  pessoas,
   onFechar,
   onStatusSalvo,
 }: {
   projeto: ProjetoDashboardResumo | null;
-  /**
-   * O que cada participante FEZ, do banco. OPCIONAL: só as abas que carregam o mapa
-   * (`/especiais`, `/aprovacoes-pendentes`) o passam — a ficha do `/dashboard` segue
-   * sem ele e nada muda ali. As colunas de papel da planilha dizem QUEM participou e em
-   * que papel; este bloco é o único lugar que diz o QUE cada pessoa fez.
-   */
-  pessoas?: ContribuicaoParticipante[];
   onFechar: () => void;
   onStatusSalvo: (id: string, status: string) => void;
 }) {
@@ -613,10 +607,14 @@ export function ProjetoDetalheDialog({
 
             {/* Quem fez o quê — ABERTO aqui (ao contrário do cartão, que colapsa para a
                 coluna continuar escaneável): a ficha é onde se decide, e é para ler. */}
-            {pessoas != null && pessoas.length > 0 && (
+            {/* O texto vem do PRÓPRIO detalhe da ficha — uma fonte só para as 3 abas
+                (/dashboard, /especiais e /aprovacoes-pendentes). Nos CARTÕES daquelas duas
+                ele chega pelo mapa da listagem, porque lá aparece sem abrir a ficha. As
+                colunas de papel dizem QUEM participou; só este bloco diz o QUE cada um fez. */}
+            {detalhe.pessoas != null && detalhe.pessoas.length > 0 && (
               <Secao titulo="Quem fez o quê">
                 <ul className="space-y-1.5">
-                  {pessoas.map((pes) => (
+                  {detalhe.pessoas.map((pes) => (
                     <li key={pes.email} className="rounded-md bg-muted/60 px-2.5 py-2">
                       <p className="flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted-foreground">
                         <span className="font-medium text-foreground">{pes.email}</span>
