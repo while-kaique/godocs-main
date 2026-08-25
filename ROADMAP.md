@@ -6,12 +6,15 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Plano ativo — Latência da IA: roteamento por FASE 🟡 (plano ✅ APROVADO em 2026-08-25, código não começou):**
+**Plano ativo — Latência da IA: roteamento por FASE 🟡 (CÓDIGO T1–T4 FEITO + revisado em 2026-08-25):**
 rotear turnos mecânicos (`doc`/`doc_preview`) para `gpt-5.6-luna` + `reasoning_effort=low`, mantendo
 memorial/doc-compile/analisador no `sol` (Opção A). Tudo env-gated, default = hoje. Base: investigação
-do proxy-ai (24–25/08, medições reais — `luna+low` TTFB 3,2s vs `sol/medium` 19,6s). Plano em
+do proxy-ai (24–25/08, medições reais — `luna+low` TTFB 3,2s vs `sol/medium` 19,6s). Código em `llm.ts`
+(`reasoningEffort?`/`sanitizeEffort`/injeção opt-in) + `orchestrator.ts` (cálculo por fase). Suíte 1711
+verde, worker rebuildado; revisão GGSD conformidade=`conforme`, qualidade=`sugestoes`. Plano em
 `docs/plans/latencia-ia-roteamento-por-fase.md`.
-**Próximo:** codar a fatia com `/ggsd:code` (sessão nova, contexto fresco) → medir na staging → prod → PR.
+**Próximo:** T5 — medir na staging (`edf400b4`, secrets `LLM_MODEL_FAST=gpt-5.6-luna`+`LLM_REASONING_EFFORT_FAST=low`)
+→ T6 docs (CLAUDE.md/SPEC) → T7 prod `674a3710` + merge no `main`.
 
 **Fase atual:** **nenhuma em aberto** — Fase 5 (**critério de projeto**) ✅ **CONCLUÍDA** em 2026-07-30:
 staging validada, prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). Fase 4 (loadings do

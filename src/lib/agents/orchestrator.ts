@@ -5,7 +5,7 @@
 
 const log = (...args: unknown[]) => console.log("[orchestrator]", ...args);
 
-import { llmChat, llmChatStream, extractPartialJsonStringField } from "@/lib/llm";
+import { llmChat, llmChatStream, extractPartialJsonStringField, sanitizeEffort } from "@/lib/llm";
 import type {
   ChatFase,
   ChatHistoryMessage,
@@ -1537,14 +1537,23 @@ export async function runOrchestrator(
   }
 
   const temperature = fase === "doc" || fase === "doc_preview" ? 0.2 : 0.4;
-  // Os turnos do orquestrador são conversa (perguntas/preview curtos) — diferente
-  // da compilação da doc (doc-compiler, modelo forte). Se LLM_MODEL_FAST estiver
-  // configurado, roteamos a conversa para um modelo mais rápido/barato; senão cai
-  // no LLM_MODEL padrão (sem mudança de comportamento). Reduz a latência percebida
-  // em respostas simples sem tocar na qualidade da compilação da doc.
-  const fastModel = process.env.LLM_MODEL_FAST || undefined;
+  // Roteamento POR FASE (não mais tudo-ou-nada). Só as fases MECÂNICAS (`doc`/
+  // `doc_preview` — coleta da doc e ajustes) vão para o modelo leve (LLM_MODEL_FAST)
+  // com reasoning_effort baixo; as fases de saving/receita ficam no LLM_MODEL forte
+  // (sol), porque elas MISTURAM perguntas mecânicas com a geração do MEMORIAL e a
+  // `fase` (único sinal disponível ANTES da chamada) não separa as duas — degradar o
+  // modelo do memorial é justo o risco a não correr (Gostream/ganho projetado/
+  // SmartOnline: "prompt não segura"). ⚠️ envs lidas EM RUNTIME (nunca em escopo de
+  // módulo: no Godeploy `process` não existe na avaliação do módulo). Tudo OPT-IN:
+  // envs ausentes → model `undefined` (cai no LLM_MODEL) + sem reasoning_effort =
+  // byte-idêntico ao comportamento de hoje. `sanitizeEffort` blinda o 502 do `minimal`.
+  const faseMecanica = fase === "doc" || fase === "doc_preview";
+  const modeloTurno = faseMecanica ? process.env.LLM_MODEL_FAST || undefined : undefined;
+  const effortTurno = faseMecanica
+    ? sanitizeEffort(process.env.LLM_REASONING_EFFORT_FAST)
+    : sanitizeEffort(process.env.LLM_REASONING_EFFORT);
   log(
-    `Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}${fastModel ? `, modelo rápido: ${fastModel}` : ""}`,
+    `Chamando LLM — fase: ${fase}, histórico: ${history.length} msgs, temperatura: ${temperature}${modeloTurno ? `, modelo rápido: ${modeloTurno}` : ""}${effortTurno ? `, reasoning_effort: ${effortTurno}` : ""}`,
   );
   // Re-tenta a chamada ao LLM tanto em resposta VAZIA quanto em JSON inválido. A
   // resposta do orquestrador carrega todo o estado (coletado/saving/receita) num
@@ -1569,7 +1578,8 @@ export async function runOrchestrator(
           jsonMode: true,
           temperature,
           maxTokens: 4096,
-          model: fastModel,
+          model: modeloTurno,
+          reasoningEffort: effortTurno,
           onRawDelta: (piece) => {
             rawAcc += piece;
             if (streamAtivo === null) {
@@ -1599,7 +1609,8 @@ export async function runOrchestrator(
           jsonMode: true,
           temperature,
           maxTokens: 4096,
-          model: fastModel,
+          model: modeloTurno,
+          reasoningEffort: effortTurno,
         });
       }
       log(`LLM respondeu: ${raw.slice(0, 200)}${raw.length > 200 ? "..." : ""}`);

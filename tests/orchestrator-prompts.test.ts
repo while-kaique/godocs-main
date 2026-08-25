@@ -6,18 +6,22 @@ import { documentacaoVazia, receitaVazia, savingVazio } from '@/lib/agents/types
 
 // Mock do LLM para capturar os prompts enviados
 let capturedMessages: { role: string; content: string }[] = [];
-vi.mock('@/lib/llm', () => ({
-  llmChat: vi.fn(async (messages: { role: string; content: string }[]) => {
-    capturedMessages = messages;
-    return JSON.stringify({
-      type: 'question',
-      content: 'mock response',
-      coletado: documentacaoVazia(),
-      saving: savingVazio(),
-      receita: receitaVazia(),
-    });
-  }),
-}));
+vi.mock('@/lib/llm', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/llm')>();
+  return {
+    ...real,
+    llmChat: vi.fn(async (messages: { role: string; content: string }[]) => {
+      capturedMessages = messages;
+      return JSON.stringify({
+        type: 'question',
+        content: 'mock response',
+        coletado: documentacaoVazia(),
+        saving: savingVazio(),
+        receita: receitaVazia(),
+      });
+    }),
+  };
+});
 
 const { runOrchestrator } = await import('@/lib/agents/orchestrator');
 

@@ -15,7 +15,28 @@ export type LLMOptions = {
   // Sobrescreve o modelo (LLM_MODEL) para esta chamada. Usado para rotear turnos
   // simples de conversa para um modelo mais rápido/barato (ver LLM_MODEL_FAST).
   model?: string;
+  // `reasoning_effort` do modelo (gpt-5.x). OPT-IN: só é injetado no body quando
+  // presente — ausente = comportamento de sempre (o backend/proxy usa o default).
+  // ⚠️ NUNCA passar `minimal` (o gateway devolve 502 determinístico) — quem seta
+  // deve filtrar por `sanitizeEffort` antes. Ver roteamento por fase no orchestrator.
+  reasoningEffort?: string;
 };
+
+// Guard puro anti-`minimal`: valida `reasoning_effort` contra a allowlist e devolve
+// `undefined` (= não enviar) para vazio/desconhecido/`minimal`. ⚠️ `minimal` faz o
+// gateway responder 502 (medido, 6/6) — pior que um 400 de parâmetro, porque consome
+// os retries de gateway e cai no fallback. Este guard blinda o body mesmo que um
+// secret venha errado. Loga 1× por valor rejeitado (não por chamada).
+const EFFORT_ALLOWLIST = new Set(["low", "medium", "high", "xhigh", "max"]);
+const effortRejeitadoLogado = new Set<string>();
+export function sanitizeEffort(value?: string): string | undefined {
+  if (value && EFFORT_ALLOWLIST.has(value)) return value;
+  if (value && !effortRejeitadoLogado.has(value)) {
+    effortRejeitadoLogado.add(value);
+    errLog(`reasoning_effort inválido ignorado: "${value}" (allowlist: ${[...EFFORT_ALLOWLIST].join(", ")})`);
+  }
+  return undefined;
+}
 
 // Timeout por tentativa de chamada ao LLM (AbortController). ⚠️ A chamada NÃO é streaming,
 // então este relógio mede o tempo de gerar a RESPOSTA INTEIRA — não o primeiro byte.
@@ -267,6 +288,7 @@ async function callOpenAI(
     // Quantas vezes retentar em erro de gateway/rede/timeout (com backoff de 2s).
     // 0 = falha rápido na 1ª (usado quando há fallback a jusante). Default 2.
     gatewayRetries?: number;
+    reasoningEffort?: string;
   },
 ): Promise<string> {
   // Endpoint: proxy (LLM_BASE_URL) ou OpenAI direto. Aceita base com ou sem barra final.
@@ -278,6 +300,12 @@ async function callOpenAI(
     temperature: opts.temperature ?? 0.7,
     max_completion_tokens: opts.maxTokens ?? 2048,
   };
+
+  // OPT-IN: só injeta `reasoning_effort` quando o chamador o passou. Ausente = body
+  // idêntico ao de sempre. Quem seta (orchestrator) já filtrou por `sanitizeEffort`.
+  if (opts.reasoningEffort) {
+    body.reasoning_effort = opts.reasoningEffort;
+  }
 
   if (opts.jsonMode) {
     body.response_format = { type: "json_object" };
@@ -395,6 +423,7 @@ async function callOpenAIStream(
     gapMs: number;
     gatewayRetries?: number;
     onRawDelta?: (chunk: string) => void;
+    reasoningEffort?: string;
   },
 ): Promise<string> {
   const endpoint = `${(opts.baseUrl ?? "https://api.openai.com/v1").replace(/\/+$/, "")}/chat/completions`;
@@ -405,6 +434,11 @@ async function callOpenAIStream(
     max_completion_tokens: opts.maxTokens ?? 2048,
     stream: true,
   };
+
+  // OPT-IN: idem ao caminho não-streaming (ver callOpenAI). Ausente = body de sempre.
+  if (opts.reasoningEffort) {
+    body.reasoning_effort = opts.reasoningEffort;
+  }
 
   const known = unsupportedByModel.get(opts.model);
   if (known) for (const p of known) delete body[p];

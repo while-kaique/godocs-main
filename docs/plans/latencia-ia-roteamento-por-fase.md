@@ -1,5 +1,21 @@
 # Plano — Latência da IA: roteamento de modelo + `reasoning_effort` POR FASE
-**Status:** ✅ aprovado (Luis, 2026-08-25)
+**Status:** 🟡 em execução (código T1–T4 feito 25/08; T5 staging + T6 docs + T7 prod pendentes)
+
+**Progresso (25/08, sessão /ggsd:code):** T1–T4 CODADOS e verdes. `src/lib/llm.ts` ganhou
+`reasoningEffort?` em `LLMOptions` + injeção opt-in de `reasoning_effort` no body de
+`callOpenAI`/`callOpenAIStream` + guard puro exportado `sanitizeEffort` (allowlist, rejeita
+`minimal`). `src/lib/agents/orchestrator.ts:~1545` trocou o `fastModel` grosseiro por cálculo POR
+FASE (lazy, runtime): `doc`/`doc_preview` → `LLM_MODEL_FAST`+`sanitizeEffort(LLM_REASONING_EFFORT_FAST)`;
+demais fases → model `undefined` (sol) + `sanitizeEffort(LLM_REASONING_EFFORT)`. Testes red autorados
+em contexto fresco (`tests/llm-reasoning-effort.test.ts`, `tests/llm-reasoning-routing.test.ts`, 16 casos)
+→ verdes; 2 mocks existentes migrados p/ `importOriginal` (o orchestrator passou a importar
+`sanitizeEffort`) — sem enfraquecer assert. Suíte 1711 verde, tsc só com os 5 erros pré-existentes,
+worker.js rebuildado. ⚠️ Revisão GGSD (§9.A conformidade + §9.B qualidade) DISPARADA mas ainda em voo
+no fim da sessão — marcadores `pendente`; `/ggsd:ship` vai barrar até rodarem. **Pendentes:** T5
+(staging: secrets `LLM_MODEL_FAST=gpt-5.6-luna`+`LLM_REASONING_EFFORT_FAST=low`, medir TTFB por fase),
+T6 (docs: CLAUDE.md seção LLM + SPEC_FEATURES_NOVAS.md), T7 (prod + merge no main).
+
+**Status original:** ✅ aprovado (Luis, 2026-08-25)
 
 **Objetivo:** cortar a latência percebida do chat de submissão roteando os turnos MECÂNICOS
 do orquestrador (fases `doc`/`doc_preview`) para um modelo leve (`gpt-5.6-luna`) com

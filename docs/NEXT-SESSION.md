@@ -1,14 +1,34 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ [docs/plans/latencia-ia-roteamento-por-fase.md](plans/latencia-ia-roteamento-por-fase.md)** · Status: ✅ aprovado (Luis, 25/08)
+**→ [docs/plans/latencia-ia-roteamento-por-fase.md](plans/latencia-ia-roteamento-por-fase.md)** · Status: 🟡 em execução — CÓDIGO (T1–T4) FEITO + revisado 25/08; falta T5 staging + T6 docs + T7 prod
 
 Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
 (`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador
 ficam no `sol` (decisão Opção A, Luis 25/08). Tudo env-gated, **default = comportamento de hoje**.
-Toca `src/lib/llm.ts` (novo `reasoningEffort?` em `LLMOptions`) + `orchestrator.ts:1539-1604`
-(troca o `fastModel` grosseiro por cálculo por fase). ⚠️ `minimal` dá 502 → guard. Base do
-diagnóstico: memórias `proxy-ai-arquitetura-gargalo` / `investigacao-proxy-ai-latencia-erros`.
+Base do diagnóstico: memórias `proxy-ai-arquitetura-gargalo` / `investigacao-proxy-ai-latencia-erros`.
+
+### ESTADO REAL (25/08, /ggsd:code — CÓDIGO COMPLETO E VERDE, commitado nesta sessão)
+- `src/lib/llm.ts`: `reasoningEffort?` em `LLMOptions`; injeção OPT-IN de `reasoning_effort` no body de
+  `callOpenAI`+`callOpenAIStream`; guard puro exportado `sanitizeEffort` (allowlist {low,medium,high,xhigh,max},
+  rejeita `minimal`→502/vazio/desconhecido, loga 1×).
+- `src/lib/agents/orchestrator.ts:~1545`: trocou o `fastModel` grosseiro (aplicado a TODAS as fases) por
+  cálculo POR FASE (lazy/runtime): `faseMecanica = doc||doc_preview` → `LLM_MODEL_FAST`+`sanitizeEffort(LLM_REASONING_EFFORT_FAST)`;
+  demais fases → model `undefined` (cai no `LLM_MODEL`=sol) + `sanitizeEffort(LLM_REASONING_EFFORT)`. Passado aos 2 call-sites.
+- Testes: `tests/llm-reasoning-effort.test.ts` + `tests/llm-reasoning-routing.test.ts` (16 casos, red→verde).
+  2 mocks existentes migrados p/ `importOriginal` (orchestrator passou a importar `sanitizeEffort`) — sem enfraquecer assert.
+- **Suíte 1711 verde**; tsc só com os 5 erros PRÉ-EXISTENTES do main (chat.functions.ts x2, submeter.tsx x3);
+  `worker.js` rebuildado. **Revisão GGSD:** §9.A conformidade=`conforme` (0.92), §9.B qualidade=`sugestoes` (0.85) — NÃO-BARRANTES.
+
+**Follow-ups baixos (dos revisores, opcionais):** (1) §9.B — aplicar `sanitizeEffort` TAMBÉM dentro de
+`callOpenAI`/`callOpenAIStream` (defense-in-depth do sink; nenhum chamador vivo viola hoje); (2) §9.A — teste e2e
+do orchestrator com `LLM_REASONING_EFFORT_FAST=minimal` provando body sem `reasoning_effort` ponta a ponta.
+
+**PRÓXIMO PASSO — T5 (staging, regra 13):** deploy no `edf400b4` → secrets `LLM_MODEL_FAST=gpt-5.6-luna`
++ `LLM_REASONING_EFFORT_FAST=low` (deixar `LLM_REASONING_EFFORT` unset) → sonda SSE medindo **TTFB por fase**
+vs baseline `sol/medium` → confirmar por `getAppLogs` que a fase `doc` cai, sem 502, e o memorial segue no `sol`.
+Depois T6 (docs: CLAUDE.md seção LLM + SPEC_FEATURES_NOVAS.md) e T7 (prod `674a3710` + secrets + merge no `main`
+pela conta `LuisEduardo100`). ⚠️ `/ggsd:ship` só após T5–T7.
 
 ---
 
