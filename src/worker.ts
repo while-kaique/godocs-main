@@ -84,6 +84,7 @@ import {
 } from "@/lib/meus-projetos.functions";
 import { assessDocsBackfill } from "@/lib/docs-backfill";
 import { reconciliarFinanceiroDoSheet } from "@/lib/reconciliar-financeiro";
+import { converterParaCustoEvitadoPuro } from "@/lib/converter-custo-evitado-puro";
 import {
   getPreviewDisparo,
   salvarTemplate,
@@ -865,6 +866,19 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const body = await readBody<{ projetoId?: string; dry?: boolean }>(request);
       if (!body?.projetoId) return errorJson("projetoId é obrigatório", 400);
       return json(await reconciliarFinanceiroDoSheet(body.projetoId, { dry: body.dry }));
+    }
+
+    // ── Converter para CUSTO EVITADO PURO (admin, correção de dupla contagem) ──
+    // Remove as `linhas` de horas do SQLite quando a submissão contou o mesmo
+    // trabalho duas vezes (horas + contrato que pagava justamente essas horas). O
+    // `reconciliar-financeiro` NÃO cobre isto: ele recalcula o total a partir das
+    // linhas, então com as horas ainda no banco devolve o número velho. Não escreve
+    // nada no Sheets. ⚠️ `dry` é o DEFAULT — gravar exige `{"dry":false}`.
+    if (pathname === "/api/admin/converter-custo-evitado-puro" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ projetoId?: string; dry?: boolean }>(request);
+      if (!body?.projetoId) return errorJson("projetoId é obrigatório", 400);
+      return json(await converterParaCustoEvitadoPuro(body.projetoId, { dry: body.dry }));
     }
 
     // ── Reabrir a fila do líder (admin, recuperação) ──
