@@ -1,6 +1,18 @@
 # NEXT-SESSION
 
-## Plano ativo — STREAMING SSE das respostas da IA (Fase 1) → `docs/plans/streaming-latencia-ia.md`
+## Plano ativo
+**→ [docs/plans/latencia-ia-roteamento-por-fase.md](plans/latencia-ia-roteamento-por-fase.md)** · Status: ✅ aprovado (Luis, 25/08)
+
+Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
+(`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador
+ficam no `sol` (decisão Opção A, Luis 25/08). Tudo env-gated, **default = comportamento de hoje**.
+Toca `src/lib/llm.ts` (novo `reasoningEffort?` em `LLMOptions`) + `orchestrator.ts:1539-1604`
+(troca o `fastModel` grosseiro por cálculo por fase). ⚠️ `minimal` dá 502 → guard. Base do
+diagnóstico: memórias `proxy-ai-arquitetura-gargalo` / `investigacao-proxy-ai-latencia-erros`.
+
+---
+
+## Plano ANTERIOR (histórico) — STREAMING SSE das respostas da IA (Fase 1) → `docs/plans/streaming-latencia-ia.md`
 
 **Estado (21/08) — CODADO + DEPLOYADO NA STAGING, aguardando validação no navegador.**
 Elimina a tela em branco de 60–88s no chat de submissão (caso RA Monitor / Luis Liveri). A resposta
