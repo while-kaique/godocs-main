@@ -31,6 +31,25 @@ quem está fora da TeamGuide). Quem está na TeamGuide passa a sair com nome + a
 
 ---
 
+## 2026-08-25 — Contribuição do participante era a DESCRIÇÃO do papel colada da legenda
+
+**Status:** ✅ corrigido · **Branch:** `fix/contribuicao-descricao-papel` (base `origin/main` 7f55aae, prod v287)
+
+**Sintoma.** Projeto especial **"Smart Replan"** (submetido 25/08/2026 13:45) veio com os **3 participantes** marcados como Contribuidor e o campo "O que essa pessoa fez" de todos os 3 com o **mesmo texto** — exatamente a descrição do papel Contribuidor da legenda: *"Auxiliou o time com planejamento, decisões técnicas ou ideias, sem atuar diretamente na execução."* O campo obrigatório perdeu o propósito (dizer o que CADA pessoa fez).
+
+**Causa-raiz.** **Não é bug de software** — nenhum caminho injeta esse texto (o `textarea` nasce vazio, `montarMembrosContribuicoes` descarta vazios, o servidor não tem cópia do texto, o seed da edição só devolve o gravado; `DESCRICAO_PAPEL` era display-only). É **falha de UX**: o campo é obrigatório (mín. 20 chars), a descrição do papel fica visível na legenda logo acima, e o submissor **copiou a legenda** para os 3 campos para passar do gate de tamanho. O texto tem 20+ chars, então o único gate existente (`contribuicoesFaltando`) o aceitava.
+
+**Fix.** Guard determinístico + orientação (pedido do Kaique: "1 e 3"):
+1. **Anti-cópia (determinístico):** `contribuicaoEhDescricaoDePapel`/`contribuicoesCopiadas` (`submeter/constants.ts`, PURAS) comparam o **núcleo** do texto (sem acento/caixa/pontuação/espaços) contra as **3** descrições de papel; casou → `validarEtapa1` bloqueia o avanço com mensagem própria ("… só repete o texto do papel — conte o que a pessoa fez de fato"), e o campo realça em vermelho após tentar avançar. Compara contra os 3 papéis, não só o escolhido (colar a legenda de outro papel também não vale).
+2. **Orientação (fix 3):** o estado vazio do campo agora diz "Conte o que a pessoa fez — sem copiar a descrição do papel"; ao detectar a cópia, avisa em âmbar na hora.
+3. **Fonte única:** `DESCRICAO_PAPEL` passou a derivar de `PAPEIS_PARTICIPANTE` (cada papel ganhou `descricao`), consumida pela legenda E pelo guard — o texto do papel mora num lugar só.
+
+⚠️ Guard é do **FRONT** (mesma régua de `contribuicoesFaltando`; o zod do backend só limita o teto — a contribuição nunca vai a Sheets/prompt). Reforço server-side fica como hardening futuro.
+
+**Onde aterrissou.** `src/lib/submeter/constants.ts`, `src/lib/submeter/form-components.tsx`, `tests/participantes-contribuicoes.test.ts`. `worker.js` rebuildado (`constants.ts` está no grafo do worker via `participantes-contribuicoes` → dashboard/investigador server). Rebaseado sobre `origin/main` 7f55aae (prod v287) para não reverter o classificador de especiais (#287). Testes verdes; `build` + `build:worker` OK.
+
+---
+
 ## 2026-08-24 — Submissão quebrava com "Resposta inválida do servidor (HTTP 200)" com streaming ligado
 
 **Status:** ✅ corrigido · **Branch:** `fix/streaming-apistream-callsites` · **PR #282** · **Prod v281 com `LLM_STREAMING=0`**

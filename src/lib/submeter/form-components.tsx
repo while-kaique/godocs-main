@@ -3,9 +3,9 @@ import { createPortal } from "react-dom";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR,
+  EMAIL_RE, ALLOWED_DOMAINS_RE, PAPEIS_PARTICIPANTE, PAPEL_COAUTOR, DESCRICAO_PAPEL,
   coautoresSelecionados, AFETADO_TIPOS,
-  CONTRIBUICAO_MIN, CONTRIBUICAO_MAX, contribuicoesFaltando,
+  CONTRIBUICAO_MIN, CONTRIBUICAO_MAX, contribuicoesFaltando, contribuicaoEhDescricaoDePapel,
 } from "./constants";
 import type { PapelParticipante, AfetadoTipo } from "./constants";
 import { filtrarSugestoes, type SugestaoParticipante } from "./participantes-sugestoes";
@@ -676,17 +676,6 @@ const COR_PAPEL: Record<PapelParticipante, string> = {
   contribuidor: "#8A7D00", // âmbar (família do lime do form) — "Contribuidor"
 };
 
-// Descrição de cada papel (chaveada pelo `value` interno) — exibida na legenda abaixo
-// do campo, para o submissor escolher o papel certo. Texto com acentuação (regra 4).
-const DESCRICAO_PAPEL: Record<PapelParticipante, string> = {
-  coexecutor:
-    "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal. Apenas 1 por projeto.",
-  planejador:
-    "Apoiou diretamente na construção do projeto, executando tarefas e entregas concretas dentro de um escopo definido.",
-  contribuidor:
-    "Auxiliou o time com planejamento, decisões técnicas ou ideias, sem atuar diretamente na execução.",
-};
-
 // Legenda dos papéis: uma linha por papel com o ponto colorido (MESMA cor do seletor —
 // reforça "cor = papel"), o rótulo em negrito e a descrição. a11y: o rótulo em texto é
 // o sinal primário; o ponto só reforça (aria-hidden). Ajuda contextual — renderizada
@@ -1030,6 +1019,11 @@ export function ParticipantesPapeisInput({
             // em branco recém-aberto não nasce em estado de erro.
             const faltaTexto = chars < CONTRIBUICAO_MIN && !!errorContribuicao;
             const faltam = CONTRIBUICAO_MIN - chars;
+            // Texto só repete a descrição do papel (colado da legenda). Some do olho
+            // assim que a pessoa começa a escrever algo próprio; o realce vermelho só
+            // aparece depois de tentar avançar (mesma régua do `faltaTexto`).
+            const ehCopia = contribuicaoEhDescricaoDePapel(contribuicoes[email] ?? "");
+            const copiaBloqueia = ehCopia && !!errorContribuicao;
             return (
               <li
                 key={email}
@@ -1107,12 +1101,12 @@ export function ParticipantesPapeisInput({
                       onChange={(e) => onSetContribuicao(email, e.target.value)}
                       placeholder="Ex.: montou os fluxos no n8n e validou os testes com o time Fiscal"
                       aria-describedby={`contribuicao-${email}-contador`}
-                      aria-invalid={faltaTexto || undefined}
+                      aria-invalid={faltaTexto || copiaBloqueia || undefined}
                       className="w-full resize-none rounded-lg px-3 pb-3.5 pt-2 text-[12.5px] leading-snug outline-none transition-colors focus:border-[#0059A9] motion-reduce:transition-none"
                       style={{
                         fontFamily: "'Poppins', sans-serif",
                         background: "var(--go-white)",
-                        border: `1px solid ${faltaTexto ? "#dc2626" : "rgba(0,89,169,0.18)"}`,
+                        border: `1px solid ${faltaTexto || copiaBloqueia ? "#dc2626" : "rgba(0,89,169,0.18)"}`,
                         color: "var(--go-text-primary)",
                       }}
                     />
@@ -1139,14 +1133,18 @@ export function ParticipantesPapeisInput({
                   <p
                     id={`contribuicao-${email}-contador`}
                     className="mt-0.5 flex items-center justify-between gap-2 text-[10.5px]"
-                    style={{ color: faltam > 0 ? "#8a7d00" : "#8b8b9a" }}
+                    style={{ color: faltam > 0 || ehCopia ? "#8a7d00" : "#8b8b9a" }}
                   >
                     <span>
+                      {/* Fix 3: o vazio já orienta a NÃO copiar a descrição do papel; a
+                          cópia detectada avisa o que fazer no lugar. */}
                       {chars === 0
-                        ? `Conte em ${CONTRIBUICAO_MIN} caracteres ou mais`
+                        ? `Conte o que a pessoa fez — sem copiar a descrição do papel (${CONTRIBUICAO_MIN}+ caracteres)`
                         : faltam > 0
                           ? `${faltaTexto ? "⚠️ " : ""}Faltam ${faltam} caractere${faltam > 1 ? "s" : ""}`
-                          : "Pronto"}
+                          : ehCopia
+                            ? "⚠️ Isso é o texto do papel — conte o que a pessoa fez de fato"
+                            : "Pronto"}
                     </span>
                     <span className="shrink-0 tabular-nums">
                       {chars}/{CONTRIBUICAO_MAX}
