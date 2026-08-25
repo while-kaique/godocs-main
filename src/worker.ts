@@ -49,6 +49,11 @@ import {
   definirDonoDeArea,
   importarAvaliacoesEspeciais,
 } from "@/lib/especiais.functions";
+import {
+  classificarEspecialProjeto,
+  classificarEspeciaisPendentes,
+  classificarEspecialEmBackground,
+} from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
@@ -188,6 +193,15 @@ function analisarEmBackground(projetoId: string): Promise<unknown> {
   );
 }
 
+// Análise + classificação de especiais, ambas em background. O classificador é NO-OP se o
+// projeto não for especial e nunca lança (ver classificarEspecialEmBackground).
+function processarPosSubmissao(projetoId: string): Promise<unknown> {
+  return Promise.allSettled([
+    analisarEmBackground(projetoId),
+    classificarEspecialEmBackground(projetoId),
+  ]);
+}
+
 async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Response> {
   const { pathname } = url;
   const method = request.method;
@@ -275,6 +289,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Cron: classificador de especiais pendentes (peça 4) ──────────────────
+    // Rede do disparo pós-submissão: um especial cujo background morreu (ou submetido
+    // antes da feature) recebe a recomendação aqui. Bounded por corrida (converge em
+    // várias), grava de verdade (dry:false), NUNCA toca a coluna "Estrelas".
+    if (pathname === "/api/cron/classificar-especiais" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await classificarEspeciaisPendentes({ dry: false, limite: 10 }));
     }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
@@ -533,7 +558,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         if (pathname === "/api/chat/submeter-validacao") {
           const pid = (body.projeto_id as string) ?? null;
           if (pid) {
-            const p = analisarEmBackground(pid);
+            const p = processarPosSubmissao(pid);
             if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(p);
           }
         }
@@ -750,6 +775,37 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = await readBody(request);
       return json(await importarAvaliacoesEspeciais(body));
+    }
+    // Agente classificador (peça 4) — recomenda a estrela de UM especial via RAG. `dry` não grava.
+    // NUNCA toca a coluna "Estrelas": a recomendação vive em `especial_avaliacao`.
+    if (pathname === "/api/admin/especiais/classificar" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        projetoId?: string;
+        dry?: boolean;
+        forcar?: boolean;
+      };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(
+        await classificarEspecialProjeto(body.projetoId, { dry: body.dry, forcar: body.forcar }),
+      );
+    }
+    // Backfill: classifica os especiais SEM recomendação. `dry` é o DEFAULT (gravar exige
+    // {"dry":false}); `forcar` reavalia todos; `limite` limita a corrida.
+    if (pathname === "/api/admin/especiais/classificar-pendentes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        dry?: boolean;
+        limite?: number;
+        forcar?: boolean;
+      };
+      return json(
+        await classificarEspeciaisPendentes({
+          dry: body.dry,
+          limite: body.limite,
+          forcar: body.forcar,
+        }),
+      );
     }
 
     // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────
