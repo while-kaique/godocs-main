@@ -1,4 +1,5 @@
 import { getAdminByEmail } from '@/integrations/db/client.server'
+import { getNomeDe } from '@/lib/areas/teamguide.server'
 
 export type CurrentUser = {
   email: string
@@ -56,12 +57,17 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
   }
   if (!email) return null
 
-  // Nome da conta logada: o gateway Godeploy pode injetar um header de nome
-  // (configurável via GODEPLOY_NAME_HEADER). Se ausente/vazio, derivamos do
-  // e-mail. process.env só lido aqui (lazy) — nunca em escopo de módulo.
+  // Nome da conta logada, em ordem de confiança:
+  //  1. header de nome do edge (`GODEPLOY_NAME_HEADER`) — hoje o Godeploy NÃO injeta,
+  //     fica como future-proofing;
+  //  2. nome REAL da TeamGuide (`getNomeDe`) — traz "João Victor Esteves" com espaços
+  //     e acentos, que a derivação do e-mail não consegue reconstruir;
+  //  3. derivação do local-part do e-mail (fallback: pessoa fora da TeamGuide / TG fora).
+  // process.env só lido aqui (lazy) — nunca em escopo de módulo.
   const nameHeader = process.env.GODEPLOY_NAME_HEADER ?? 'x-godeploy-user-name'
   const nameFromHeader = request.headers.get(nameHeader)?.trim()
-  const name = nameFromHeader || derivarNomeDeEmail(email)
+  const name =
+    nameFromHeader || (await getNomeDe(email)) || derivarNomeDeEmail(email)
 
   return { email, name, isAdmin: await isAdmin(email) }
 }

@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-08-25 — Nome do usuário na submissão saía errado (derivado do e-mail, não o nome real)
+
+**Status:** ✅ corrigido · **Branch:** `fix/nome-teamguide-identidade`
+
+**Sintoma.** Ao submeter, o nome do autor saía como **"Joaovictor Esteves"** para
+`joaovictor.esteves@gocase.com`, quando o nome real da conta/Google é **"João Victor Esteves"**.
+Local-part com um único token (`joaovictor`) não tem como virar dois nomes, e a acentuação some.
+
+**Causa-raiz.** O edge Godeploy injeta **apenas** o e-mail (`x-godeploy-user-email`), nunca um
+header de nome. Então `getCurrentUser` caía sempre em `derivarNomeDeEmail` (local-part → Title Case),
+que só troca `._-` por espaço e capitaliza — **não reconstrói** nomes colados nem acentos. O nome
+real existe na **TeamGuide** (`/employees/refs`, campo `name`), mas não era consultado.
+
+**Fix.** `getCurrentUser` (`auth.functions.ts`) agora resolve o nome em 3 fontes por ordem de
+confiança: (1) header de nome do edge (future-proofing); (2) **`getNomeDe(email)`** novo em
+`teamguide.server.ts` — busca o `name` real no mesmo cache de `getCargoDe`, **fail-safe** (qualquer
+erro da TeamGuide → `null`, o login nunca quebra por isto); (3) `derivarNomeDeEmail` (fallback pra
+quem está fora da TeamGuide). Quem está na TeamGuide passa a sair com nome + acento corretos.
+
+**Onde aterrissou.** `src/lib/auth.functions.ts` (ordem de resolução do nome);
+`src/lib/areas/teamguide.server.ts` (`getNomeDe`, exportada); `worker.js` rebuildado. `CLAUDE.md`
+(bullet "Identidade automática" atualizado).
+
+---
+
 ## 2026-08-24 — Submissão quebrava com "Resposta inválida do servidor (HTTP 200)" com streaming ligado
 
 **Status:** ✅ corrigido · **Branch:** `fix/streaming-apistream-callsites` · **PR #282** · **Prod v281 com `LLM_STREAMING=0`**
