@@ -1627,3 +1627,74 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 **Reabrir / mover:** setar os secrets `SUBMISSAO_BLOQUEIO_INICIO`/`SUBMISSAO_BLOQUEIO_FIM` (sem redeploy de lógica). **Remover de vez:** apagar a chamada em `submeterParaValidacao`, a faixa nas 2 telas e os 2 blocos TEMPORÁRIO no `CLAUDE.md`.
 
 **Onde aterrissou.** `src/lib/bloqueio-submissao.ts` (novo), `src/components/aviso-bloqueio-submissao.tsx` (novo), `src/lib/mensagens-submissao.ts` (`bloqueioSubmissaoPausada` + codigo), `src/lib/chat.functions.ts` (guard em `submeterParaValidacao`), `src/routes/index.tsx`, `src/lib/submeter/intro.tsx`. Teste: `tests/bloqueio-submissao.test.ts`.
+
+## Feature adicional — "O que essa pessoa fez?" por participante (25/08/2026)
+
+**Problema.** O formulário sabia QUEM participou e em que papel (`membros` + `membros_papeis`),
+mas não o QUE cada pessoa fez. Na triagem e nas duas abas temporárias do admin
+(`/especiais`, `/aprovacoes-pendentes`) o time de RPA via uma lista de e-mails e tinha de
+adivinhar a divisão de trabalho — ou perguntar ao autor.
+
+**O que foi feito.** Abaixo do seletor de papel de CADA participante (qualquer papel) entra um
+texto curto obrigatório: "O que essa pessoa fez". Vai só para o banco e aparece no Investigador
+e nos cartões/fichas das 2 abas do admin.
+
+**Decisões fechadas (não regredir):**
+- **20–100 caracteres, limites em FONTE ÚNICA** (`CONTRIBUICAO_MIN`/`CONTRIBUICAO_MAX`,
+  `submeter/constants.ts`). O campo tem 2 linhas de altura e contador `n/100` — a altura é o que
+  comunica "é curto" sem precisar de aviso.
+- **Coluna INTERNA `projetos.membros_contribuicoes`** (JSON, e-mail→texto). **NÃO existe no
+  Sheets** (decisão de produto: é dado de gestão, não de planilha), logo está fora de
+  `SAFE_UPDATE_FIELDS`, o sync reverso nunca a toca e ela sobrevive aos syncs — mesma classe de
+  `editores_delegados`. **Nunca entra em prompt de IA** (nem doc, nem memorial, nem analisador).
+- **O autor NÃO entra** (idêntico à régua dos papéis: o campo é dos participantes).
+- **A trava é do FRONT; o servidor tolera.** `validarEtapa1` bloqueia o avanço nos DOIS modos
+  (submissão nova e edição), em campo de erro PRÓPRIO (`participantesContribuicoes`) — a
+  mensagem de papel/coautor fala de outra coisa e não explicaria a falta do texto. O zod
+  (`membrosContribuicoesSchema`) limita só o TETO: com o piso no servidor, uma aba com JS em
+  cache (version skew — já aconteceu neste repo) levaria **400 no meio da submissão**, sem saída
+  além de recarregar. A consequência aceita: cliente adulterado pode gravar texto curto, e a
+  triagem vê o que veio.
+- **Uma cobrança por vez na tela:** enquanto falta PAPEL, o aviso âmbar é o do papel; o do texto
+  só aparece depois. Duas cobranças simultâneas viram ruído.
+- **Poda de quem sai do time:** `montarMembrosContribuicoes` só emite participantes atuais
+  (chave órfã nunca vai ao banco), faz trim e corta no teto.
+- **Entra no `AgentMeta`**, como os papéis: editar o texto no meio do chat dispara `metaChanged`
+  e persiste via `atualizar-metadados`. Sem isso a correção morria na tela.
+- **Timeline:** chave nova (`membros_contribuicoes`) no JSON `dados` dos eventos `submissao` e
+  `metadados` do `form_events` — sem migração; evento antigo não a tem e a linha não aparece.
+
+**Como as 2 abas do admin enxergam o texto (o ponto não óbvio).** `/especiais` e
+`/aprovacoes-pendentes` listam do **espelho da planilha** (`sheet_espelho`), e este campo não
+existe lá. Então ele chega por um **mapa lateral do banco**, chaveado pelo id do projeto —
+exatamente o que as `avaliacoes` da `/especiais` já faziam: `getContribuicoesDeParticipantes()`
+(SELECT das 4 colunas de participantes, só das linhas com texto, **sem blobs** — a lição dos
+32 MiB de RPC) → mapper PURO `montarContribuicoesPorProjeto` (`src/lib/participantes-contribuicoes.ts`),
+que ordena pela ordem de `membros`, traduz o papel (`rotuloPapelParticipante`, legados
+`idealizador`/`referencia_tecnica` → "Contribuidor") e **descarta projeto sem texto** (legado não
+vira fileira de "—").
+
+- No **cartão**, o bloco `QuemFezOQue` (`src/components/admin/quem-fez-o-que.tsx`, fonte única das
+  2 telas) vem **COLAPSADO**: 4 pessoas × 100 chars inflariam a coluna, que serve para escanear —
+  é a lição do aviso de reprovação nos cards de "Meus Projetos", que aberto por padrão crescia
+  ~200px.
+- Na **ficha** (`ProjetoDetalheDialog`, prop OPCIONAL `pessoas`) vem **ABERTO**: a ficha é onde se
+  decide, e é para ler. A prop é opcional porque a ficha do `/dashboard` não carrega o mapa.
+
+**Rótulo das colunas de papel na ficha (mesmo PR).** A ficha mostrava os nomes crus da planilha:
+"PARTICIPANTES" e "PARTICIPANTES 2" — sendo que quem submeteu escolheu "Coautor" e
+"Participante". `rotuloColuna` (`src/lib/coluna-rotulo.ts`, PURO, casamento tolerante via
+`chaveColuna`) traduz na EXIBIÇÃO. ⚠️ É só rótulo: a **chave** de leitura/escrita da célula
+continua sendo o nome da coluna (renomear a coluna quebraria o mapeamento por nome).
+
+**Onde aterrissou.** `src/integrations/db/schema.ts` (migração), `client.server.ts`
+(`InsertProjeto`/INSERT/`ProjetoRow` + `getContribuicoesDeParticipantes`),
+`src/lib/submeter/constants.ts` (2 puras + limites + `FormData` + `validarEtapa1`),
+`submeter/step1.tsx`, `submeter/form-components.tsx` (campo), `routes/submeter.tsx` (seed da
+edição, rehydrate, `AgentMeta`, 11 payloads), `chat.functions.ts` (schemas, insert, update, 2
+eventos), `meus-projetos.functions.ts` (seed), `investigador.functions.ts` +
+`routes/_authenticated/investigador.tsx` (timeline + painel), `especiais.functions.ts`,
+`aprovacao-pendentes.functions.ts`, `routes/_authenticated/especiais.tsx`,
+`routes/_authenticated/aprovacoes-pendentes.tsx`, `components/dashboard/projeto-detalhe-dialog.tsx`,
+`src/lib/participantes-contribuicoes.ts` (novo), `src/lib/coluna-rotulo.ts` (novo),
+`src/components/admin/quem-fez-o-que.tsx` (novo). Teste: `tests/participantes-contribuicoes.test.ts`.

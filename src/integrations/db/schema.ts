@@ -523,6 +523,15 @@ const MIGRATIONS = [
   // 'idealizador'/'referencia_tecnica' (feature anterior) caem em "Contribuidor" no sync.
   // NÃO se aplica ao autor (responsavel_email). Vazio/null = legado sem papéis (coexecutor).
   'ALTER TABLE projetos ADD COLUMN membros_papeis TEXT',
+  // O que CADA participante fez neste projeto (JSON, mapa e-mail→texto curto, 20–100
+  // chars). Irmã de `membros_papeis`: o papel diz o "de que tamanho" e este campo diz o
+  // "o quê". Coluna INTERNA — NÃO existe no Sheets (decisão de produto: é dado de gestão,
+  // não de planilha), logo fica fora de `SAFE_UPDATE_FIELDS` e o sync reverso nunca a
+  // toca (sobrevive aos syncs, como `editores_delegados`). NÃO se aplica ao autor
+  // (responsavel_email), e nunca entra em prompt nenhum. A trava dos 20–100 chars é do
+  // FORMULÁRIO (`validarEtapa1`); o zod do backend só limita o teto, para uma aba com JS
+  // em cache (version skew) não levar 400 na submissão.
+  'ALTER TABLE projetos ADD COLUMN membros_contribuicoes TEXT',
   // Governança de IA: o projeto usa o AI Proxy interno (ai-proxy.gogroupbr.com)?
   // 'sim'|'nao', resposta determinística do formulário (etapa 2). O agente de
   // documentação faz auto-detecção do uso na doc enviada e o analisador cruza

@@ -69,6 +69,8 @@ import {
   type AcaoTriagem,
 } from '@/lib/especiais-acoes';
 import { filtrarPorTermo } from '@/components/dashboard/tabela-utils';
+import { QuemFezOQue } from '@/components/admin/quem-fez-o-que';
+import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes';
 import { SeletorPeriodo } from '@/components/calendario/calendario';
 import { hojeIso } from '@/lib/calendario-datas';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
@@ -80,6 +82,7 @@ export const Route = createFileRoute('/_authenticated/aprovacoes-pendentes')({
 
 type Listagem = {
   projetos: ProjetoDashboardResumo[];
+  contribuicoes: Record<string, ContribuicaoParticipante[]>;
   donos: DonoDeArea[];
   validadores: ValidadorEspeciais[];
   lidoEm: string;
@@ -103,6 +106,10 @@ function AprovacaoPendentes() {
   const [fichaAberta, setFichaAberta] = useState<ProjetoDashboardResumo | null>(null);
   // "Agora" congelado: recalcular a cada render faria o chip de espera pular de faixa.
   const [agoraMs] = useState(() => Date.now());
+  // Mapa `id do projeto → o que cada participante fez`. Vem do BANCO, ao lado da
+  // listagem (a linha da planilha não tem este texto); `{}` enquanto carrega e para
+  // build antiga do servidor, que não manda a chave — o cartão só não desenha o bloco.
+  const contribuicoesPorProjeto = dados?.contribuicoes ?? {};
 
   const carregar = useCallback(async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
@@ -408,6 +415,7 @@ function AprovacaoPendentes() {
               <Coluna
                 key={coluna.chave}
                 coluna={coluna}
+                contribuicoes={contribuicoesPorProjeto}
                 rotuloDono={rotuloDono}
                 agoraMs={agoraMs}
                 onDecidir={decidir}
@@ -430,6 +438,7 @@ function AprovacaoPendentes() {
           lá reflete aqui na hora, sem recarregar a lista. */}
       <ProjetoDetalheDialog
         projeto={fichaAberta}
+        pessoas={fichaAberta ? (contribuicoesPorProjeto[fichaAberta.id] ?? []) : []}
         onFechar={() => setFichaAberta(null)}
         onStatusSalvo={(id, status) =>
           setDados((d) =>
@@ -530,6 +539,7 @@ function fmtHora(iso: string) {
 
 function Coluna({
   coluna,
+  contribuicoes,
   rotuloDono,
   agoraMs,
   salvando,
@@ -539,6 +549,8 @@ function Coluna({
   onAbrirFicha,
 }: {
   coluna: ColunaAutor;
+  /** O que cada participante fez (do banco — a linha da planilha não tem este texto). */
+  contribuicoes: Record<string, ContribuicaoParticipante[]>;
   rotuloDono: (p: ProjetoDashboardResumo) => string | null;
   agoraMs: number;
   salvando: string | null;
@@ -584,6 +596,7 @@ function Coluna({
           <Cartao
             key={p.id}
             projeto={p}
+            pessoas={contribuicoes[p.id] ?? []}
             dono={rotuloDono(p)}
             agoraMs={agoraMs}
             salvando={salvando === p.id}
@@ -612,6 +625,7 @@ function Coluna({
 
 function Cartao({
   projeto,
+  pessoas,
   dono,
   agoraMs,
   salvando,
@@ -619,6 +633,8 @@ function Cartao({
   onAbrirFicha,
 }: {
   projeto: ProjetoDashboardResumo;
+  /** O que cada participante fez (do banco — a linha da planilha não tem este texto). */
+  pessoas: ContribuicaoParticipante[];
   dono: string | null;
   agoraMs: number;
   salvando: boolean;
@@ -691,6 +707,8 @@ function Cartao({
           </span>
         )}
       </div>
+
+      <QuemFezOQue pessoas={pessoas} />
 
       <AcoesTriagem
         disponiveis={acoesDisponiveis(projeto.statusChave)}

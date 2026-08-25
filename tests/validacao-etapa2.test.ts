@@ -27,6 +27,7 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     emEquipe: 'nao',
     participantes: [],
     participantesPapeis: {},
+    participantesContribuicoes: {},
     nomeProjeto: 'Automação de Relatórios',
     dataCriacao: '2026-01-10',
     tipoProjeto: [],
