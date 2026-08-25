@@ -1678,8 +1678,12 @@ vira fileira de "—").
   2 telas) vem **COLAPSADO**: 4 pessoas × 100 chars inflariam a coluna, que serve para escanear —
   é a lição do aviso de reprovação nos cards de "Meus Projetos", que aberto por padrão crescia
   ~200px.
-- Na **ficha** (`ProjetoDetalheDialog`, prop OPCIONAL `pessoas`) vem **ABERTO**: a ficha é onde se
-  decide, e é para ler. A prop é opcional porque a ficha do `/dashboard` não carrega o mapa.
+- Na **ficha** (`ProjetoDetalheDialog`) vem **ABERTO**: a ficha é onde se decide, e é para ler.
+  ⚠️ **A ficha é a FONTE ÚNICA das 3 abas** — inclusive o `/dashboard` (pedido de 25/08/2026).
+  O texto entra no PAYLOAD do detalhe (`DetalheDashboard.pessoas`), lido do SQLite por `IN` em
+  `getProjetoDashboard` e `getProjetosDashboardLote` com a MESMA disciplina do `contrafactual`:
+  leitura acessória dentro do `Promise.all`, `catch` próprio, falha só omite a seção e nunca
+  impede a ficha de abrir. Nada de prop vinda da tela — era duas fontes para o mesmo dado.
 
 **Rótulo das colunas de papel na ficha (mesmo PR).** A ficha mostrava os nomes crus da planilha:
 "PARTICIPANTES" e "PARTICIPANTES 2" — sendo que quem submeteu escolheu "Coautor" e

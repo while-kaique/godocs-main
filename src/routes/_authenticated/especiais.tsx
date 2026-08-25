@@ -522,7 +522,6 @@ function Especiais() {
           salvo lá reflete aqui na hora, sem recarregar a lista. */}
       <ProjetoDetalheDialog
         projeto={fichaAberta}
-        pessoas={fichaAberta ? (contribuicoesPorProjeto[fichaAberta.id] ?? []) : []}
         onFechar={() => setFichaAberta(null)}
         onStatusSalvo={(id, status) =>
           setDados((d) =>
