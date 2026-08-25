@@ -477,6 +477,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
             responseSize = resJson.length;
             const logProjetoId =
               projetoId ?? (result as { projeto_id?: string })?.projeto_id ?? null;
+            // Envelope + FECHA o stream já: é o fechamento do stream (done) que faz o
+            // apiStream do cliente resolver e liberar o botão "Enviar para Triagem"
+            // (setChatComplete). O insertApiLog é observability (grava req+resp inteiros) e
+            // estava ANTES do send, segurando o botão à toa; mesmo depois do send ele seguraria,
+            // porque o cliente espera o `done`. Então fecha aqui e grava DEPOIS: o
+            // `ctx.waitUntil(tarefa)` mantém o isolate vivo até o log terminar, sem perdê-lo.
+            // (O finally fecha de novo no caminho de erro — writer.close() repetido é no-op.)
+            await send({ t: "envelope", r: result });
+            await writer.close().catch(() => {});
             await insertApiLog({
               projeto_id: logProjetoId,
               endpoint: pathname,
@@ -488,7 +497,6 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
               request_body: reqJson,
               response_body: resJson,
             }).catch(() => {});
-            await send({ t: "envelope", r: result });
           } catch (e) {
             const err = e as Error & { status?: number; bloqueio?: unknown };
             const amigavel = traduzirErroValidacao(e);
