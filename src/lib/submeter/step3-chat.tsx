@@ -2170,6 +2170,7 @@ export function Step3Chat({
   onSend,
   loading,
   loadingSteps,
+  finalizando,
   isComplete,
   onSubmit,
   submitting,
@@ -2209,6 +2210,10 @@ export function Step3Chat({
   // Passos nomeados para operações pesadas (compilar doc, ler arquivos, analisar
   // impacto). Quando presente e `loading` ativo, mostra o passo em vez dos 3 pontos.
   loadingSteps?: string[] | null;
+  // A prosa já terminou de streamar mas o turno ainda não fechou (a cauda estruturada do
+  // JSON segue sendo gerada). Mostra um indicador discreto sob a bolha do assistente para
+  // o intervalo não parecer travamento.
+  finalizando?: boolean;
   isComplete: boolean;
   onSubmit: () => void;
   submitting: boolean;
@@ -2581,6 +2586,41 @@ export function Step3Chat({
             o streaming a última mensagem já é do assistente e vai se preenchendo, então os
             pontos sairiam sobrando embaixo dela. (Sem streaming, `loading` só é true enquanto a
             última mensagem é a do usuário — a condição não muda o comportamento antigo.) */}
+        {/* "Finalizando…": a prosa terminou de streamar (a última bolha já é do assistente
+            e está completa) mas o turno ainda não fechou — o LLM gera a cauda estruturada
+            invisível. Sem isto a bolha fica parada e parece travada. Fala o mesmo idioma do
+            loader de operação pesada (rótulo + 3 pontos), com texto (estado não só por cor). */}
+        {finalizando && loading && messages[messages.length - 1]?.role === "assistant" && (
+          <div className="flex justify-start">
+            <div
+              className="rounded-2xl rounded-tl-sm px-4 py-3"
+              style={{ background: accentBgLight, border: `1px solid ${accentBorder}` }}
+            >
+              <div className="flex items-center gap-2.5 h-5">
+                <span
+                  className="text-[12.5px] font-medium"
+                  style={{ color: isSavingFase ? "#6b6e00" : "var(--go-blue)" }}
+                >
+                  {isFinancialFase ? "Finalizando memorial…" : "Finalizando…"}
+                </span>
+                <div className="flex gap-1.5 items-center">
+                  {[0, 0.2, 0.4].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{
+                        background: accentColor,
+                        opacity: 0.5,
+                        animation: `go-bounce 1.2s ease-in-out ${delay}s infinite`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
             <div

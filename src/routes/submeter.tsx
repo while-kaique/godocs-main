@@ -515,6 +515,13 @@ export function SubmeterPageContent({
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatComplete, setChatComplete] = useState(false);
+  // "Finalizando…": depois que a prosa termina de streamar, o LLM ainda gera a cauda
+  // estruturada (invisível) do JSON e só então o envelope libera o botão. Nesse intervalo
+  // a bolha do assistente fica parada e nenhum loader aparece (o dos 3 pontos só vale
+  // quando a última mensagem é do usuário) → sensação de travamento. Este estado liga um
+  // indicador discreto quando os deltas param por um tempo mas o turno ainda não fechou.
+  const [chatFinalizando, setChatFinalizando] = useState(false);
+  const finalizarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [chatFase, setChatFase] = useState<ChatFase>("doc");
   const [projetoId, setProjetoId] = useState<string | null>(null);
   // Tipo(s) com que o fluxo do agente está alinhado — usado para detectar troca
@@ -2366,6 +2373,8 @@ export function SubmeterPageContent({
     // A pessoa voltou a agir → o bloqueio da tentativa anterior deixa de descrever a tela.
     setBloqueio(null);
     setChatLoading(true);
+    setChatFinalizando(false);
+    if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
     // Aprovar a doc dispara a compilação (operação pesada) — mostra passos nomeados
     // em vez do loading genérico. Turnos simples de conversa ficam com os 3 pontos.
     setChatLoadingSteps(chatFase === "doc_preview" ? LOADING_STEPS_COMPILAR : null);
@@ -2380,6 +2389,12 @@ export function SubmeterPageContent({
     // false e o fluxo é idêntico ao de antes (a bolha nasce do envelope, no fim).
     let streamingIniciado = false;
     const onDelta = (chunk: string) => {
+      // Enquanto chega prosa, esconde o "Finalizando…" e reinicia o relógio. O indicador
+      // só liga se os deltas pararem por 2s (acima do maior gap saudável de geração, ~1,7s)
+      // sem o turno fechar — i.e., a cauda estruturada invisível ainda rodando.
+      setChatFinalizando(false);
+      if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
+      finalizarTimerRef.current = setTimeout(() => setChatFinalizando(true), 2000);
       if (!streamingIniciado) {
         streamingIniciado = true;
         setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: chatFase }]);
@@ -2500,6 +2515,8 @@ export function SubmeterPageContent({
     } finally {
       setChatLoading(false);
       setChatLoadingSteps(null);
+      setChatFinalizando(false);
+      if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
@@ -3192,6 +3209,7 @@ export function SubmeterPageContent({
                   onSend={handleSendMessage}
                   loading={chatLoading}
                   loadingSteps={chatLoadingSteps}
+                  finalizando={chatFinalizando}
                   isComplete={chatComplete}
                   onSubmit={handleSubmitProjeto}
                   submitting={submittingProject}
