@@ -1,5 +1,5 @@
 # Plano — Latência da IA: roteamento de modelo + `reasoning_effort` POR FASE
-**Status:** 🟡 em execução (código T1–T4 feito 25/08; T5 staging + T6 docs + T7 prod pendentes)
+**Status:** ✅ COMPLETO (25/08) — T1–T4 código + T5 staging (v207, secrets luna/low, logs limpos) + T6 docs (CLAUDE.md seção LLM + esta spec) + T7 PROD (v284, secrets luna/low, worker boot limpo) + merge no `main`. Validação de TTFB por fase em prod fica com o Luis (chat real na fase `doc`).
 
 **Progresso (25/08, sessão /ggsd:code):** T1–T4 CODADOS e verdes. `src/lib/llm.ts` ganhou
 `reasoningEffort?` em `LLMOptions` + injeção opt-in de `reasoning_effort` no body de
