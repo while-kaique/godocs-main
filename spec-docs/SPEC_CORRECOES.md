@@ -2677,3 +2677,45 @@ decidia o que pintar (é o que o cabeçalho de `auth-cache.ts` já dizia).
 não atropela requisição em voo · falha não vira entrada · lista vazia não dispara) e 3 em
 `tests/calendario-ui.test.ts` (a tela não espera o auth · o redirect continua · o lote depende dos
 ids). Medição reproduzível: `scripts/dryrun-lider/peso-ficha.ts`.
+
+## Horas e contrato contados em dobro — o reconciliador não conseguia desfazer (25/08/2026)
+
+**Sintoma.** "Portal de Reembolsos (Gobeaute)" (Naiarlisson Fernandes, CX) foi submetido com
+**271h/mês** de agentes de CX **E** o contrato da terceirizada (Scooto) que pagava justamente
+essas horas: R$ 3.777,74 + R$ 8.844 = **R$ 12.621,74** de ganho, o mesmo dinheiro contado dos
+dois lados. O correto era só o custo evitado: **R$ 8.844/mês**.
+
+**Causa.** É o ramo do "Alguém já fazia?" que o formulário mapeia para custo evitado PURO
+(`alguem_fazia='externo'`, `linhas=[]`), mas a submissão veio pelo ramo com horas. A triagem
+corrige na PLANILHA — e aí para: o sync reverso não cobre coluna financeira nenhuma, o SQLite
+segue com as `linhas`, e como o formulário de edição seeda do banco **o próximo reenvio reverte
+a correção**. `reconciliarFinanceiroDoSheet` (a rotina que existe justamente para isso) **não
+resolve este caso**: ela reconstrói o custo evitado da planilha mas recalcula o total a partir
+das `linhas` do banco — com as horas ainda lá, o dry-run em prod devolvia `saving_reais: 8844 →
+12621,74`, ou seja, ela *repunha* o número errado.
+
+**Fix.** `converterParaCustoEvitadoPuro` (`src/lib/converter-custo-evitado-puro.ts`) + rota
+`POST /api/admin/converter-custo-evitado-puro` (`requireAdmin`). Remove as `linhas`, zera o split
+carga real × escala (sem horas ele não tem referente) e recomputa o líquido pela MESMA
+`recomputarSavingFinanceiro` do fluxo normal — sem horas, o ganho é custo evitado − custo externo
+− custo do projeto. Regrava `documentacao.conteudo.saving`, `alguem_fazia='externo'`,
+`saving_horas`, `saving_reais`, `ganho_total_mensal` e `memorial_calculo`.
+
+⚠️ **NÃO escreve no Sheets** (mão única, igual ao reconciliador) — em especial não toca `Status`,
+`Aprovação do Líder` nem `Atualizado Em`. Foi decisão: o caminho alternativo (refazer a fase pelo
+`iniciar-saving` + `submeter-validacao`) reabriria a fila do líder e sobrescreveria o memorial já
+corrigido à mão, tudo por causa de uma correção de DADO.
+
+⚠️ **FAIL-CLOSED**: sem `custo_evitado_reais > 0` no estado do saving, converter zeraria o ganho
+do projeto → aborta. ⚠️ **`dry` é o DEFAULT**: gravar exige `{"dry":false}` explícito (mesma trava
+de `/api/admin/aprovacoes/reabrir`).
+
+**Onde aterrissou.** Planilha corrigida à mão na linha do projeto (`Alguém Fazia?` → `externo`,
+justificativa do custo evitado realinhada ao total de 8.844, memorial reescrito no perfil
+`custo_evitado`, `Ganho Total` 12.621,74 → 8.844, `Saving Horas Escalado/Real` → 0/0) e o banco
+alinhado pela rotina nova. Verificado nos dois sentidos depois: o `reconciliar-financeiro` passou
+a devolver `8844 → 8844` (antes, `→ 12621,74`) e reconverter é no-op (`linhas_removidas: 0`).
+
+**Testes.** `tests/converter-custo-evitado-puro.test.ts` — 6 casos sobre a função PURA
+`converterSavingParaCustoEvitado`, incluindo idempotência e **a regressão que motivou tudo**: com
+as `linhas` no lugar, o recálculo normal volta a somar horas + contrato (12.621,74).
