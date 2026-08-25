@@ -234,10 +234,15 @@ export type ResultadoClassificacao = {
 /**
  * Classifica UM especial. `dry` não grava — devolve a recomendação e os vizinhos usados
  * (é o que a rota manual/o cron em modo seco mostram).
+ *
+ * ⚠️ **Projeto que JÁ tem nota humana (coluna "Estrelas") NÃO é reclassificado** — a nota de
+ * gente é a verdade e a âncora; gerar uma recomendação competindo com ela (ex.: o agente sugerir
+ * 3 para o PIAPP, que é 10) é só ruído no cartão. Ele segue no corpus como EXEMPLAR, ensinando o
+ * agente. `forcar` reabre isso (uso manual explícito), nunca o caminho automático.
  */
 export async function classificarEspecialProjeto(
   projetoId: string,
-  opts: { dry?: boolean } = {},
+  opts: { dry?: boolean; forcar?: boolean } = {},
 ): Promise<ResultadoClassificacao> {
   const { linhas } = await lerResumosEspelho();
   const especiais = apenasEspeciais(
@@ -245,7 +250,17 @@ export async function classificarEspecialProjeto(
   );
   const resumoPorId = new Map(especiais.map((p) => [p.id, p]));
 
-  const montado = await montarEntradaSemantica(projetoId, resumoPorId.get(projetoId));
+  const resumoAlvo = resumoPorId.get(projetoId);
+  if (!opts.forcar && resumoAlvo?.estrelas != null) {
+    return {
+      ok: true,
+      projeto_id: projetoId,
+      motivo: `já tem nota humana (${resumoAlvo.estrelas}★) — vira âncora, não é reclassificado`,
+      gravado: false,
+    };
+  }
+
+  const montado = await montarEntradaSemantica(projetoId, resumoAlvo);
   if (!montado) {
     return { ok: false, projeto_id: projetoId, motivo: 'projeto sem contexto para classificar' };
   }
@@ -353,8 +368,11 @@ export async function classificarEspeciaisPendentes(
     ]),
   );
 
+  // ⚠️ Candidatos = especiais SEM recomendação **e SEM nota humana**. Quem a triagem já notou
+  // (coluna "Estrelas") é VERDADE e âncora — não se reclassifica (o PIAPP 10★ não vira "recomenda
+  // 3★" no cartão); ele segue no corpus como exemplar. `forcar` reabre tudo (reprocessamento manual).
   const candidatos = especiais
-    .filter((p) => opts.forcar || !jaTemAvaliacao.has(p.id))
+    .filter((p) => opts.forcar || (!jaTemAvaliacao.has(p.id) && p.estrelas == null))
     .slice(0, limite);
 
   if (candidatos.length === 0) {

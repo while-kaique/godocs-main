@@ -1727,6 +1727,10 @@ lexical) + **1 passe com guard determinístico** (não passe adversarial).
   **nota humana** (coluna "Estrelas" = VERDADE) **ou** uma recomendação gravada. ⚠️ **O rótulo
   preferido é a nota HUMANA, não a recomendação do próprio agente** — aprender das próprias saídas é
   como o classificador deriva (feedback loop); a nota de gente é o chão (`rotuloExemplar`).
+- ⚠️ **Quem já tem nota humana NÃO é reclassificado.** O backfill/single só pegam especiais **sem
+  recomendação E sem nota humana**; um flagship já notado (PIAPP = 10★) segue como ÂNCORA no corpus,
+  nunca ganha uma recomendação do agente competindo com a nota (seria ruído no cartão — "recomenda
+  3★ vs gravado 10★"). `forcar` reabre (reprocessamento manual explícito), nunca o caminho automático.
 - **Embeddings vão SEMPRE direto na OpenAI, NUNCA no proxy** — o gateway GoGroup é uma subscription
   Codex e devolve **404 em `/embeddings`** (probe 25/08). Chave: `LLM_EMBEDDINGS_KEY` senão
   `LLM_FALLBACK` (já nos secrets de prod). Modelo `text-embedding-3-small` (1536d, override

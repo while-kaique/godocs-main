@@ -780,9 +780,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // NUNCA toca a coluna "Estrelas": a recomendação vive em `especial_avaliacao`.
     if (pathname === "/api/admin/especiais/classificar" && method === "POST") {
       await requireAdmin(request);
-      const body = (await readBody(request)) as { projetoId?: string; dry?: boolean };
+      const body = (await readBody(request)) as {
+        projetoId?: string;
+        dry?: boolean;
+        forcar?: boolean;
+      };
       if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
-      return json(await classificarEspecialProjeto(body.projetoId, { dry: body.dry }));
+      return json(
+        await classificarEspecialProjeto(body.projetoId, { dry: body.dry, forcar: body.forcar }),
+      );
     }
     // Backfill: classifica os especiais SEM recomendação. `dry` é o DEFAULT (gravar exige
     // {"dry":false}); `forcar` reavalia todos; `limite` limita a corrida.
