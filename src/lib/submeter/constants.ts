@@ -193,13 +193,37 @@ export const ALLOWED_DOMAINS_RE = /^[^\s@]+@(gocase|gobeaute|gogroup)\.(com|com\
 // → "Contribuidor". Os papéis LEGADOS `idealizador`/`referencia_tecnica` (feature
 // anterior) não são mais oferecidos; no sync caem em "Contribuidor". Um papel por
 // pessoa (decisão de produto). A ordem abaixo é a ordem exibida no seletor.
+// ⚠️ `descricao` é a FONTE ÚNICA do texto de cada papel: a legenda "O que significa cada
+// papel" o EXIBE (`DESCRICAO_PAPEL`) e o guard anti-cópia o COMPARA contra a contribuição
+// digitada. Texto com acentuação (regra 4). Não redigite em outro lugar.
 export const PAPEIS_PARTICIPANTE = [
-  { value: "coexecutor", label: "Coautor" },
-  { value: "planejador", label: "Participante" },
-  { value: "contribuidor", label: "Contribuidor" },
+  {
+    value: "coexecutor",
+    label: "Coautor",
+    descricao:
+      "Executou e esteve à frente do projeto. Atuou como executor ou coexecutor principal. Apenas 1 por projeto.",
+  },
+  {
+    value: "planejador",
+    label: "Participante",
+    descricao:
+      "Apoiou diretamente na construção do projeto, executando tarefas e entregas concretas dentro de um escopo definido.",
+  },
+  {
+    value: "contribuidor",
+    label: "Contribuidor",
+    descricao:
+      "Auxiliou o time com planejamento, decisões técnicas ou ideias, sem atuar diretamente na execução.",
+  },
 ] as const;
 
 export type PapelParticipante = (typeof PAPEIS_PARTICIPANTE)[number]["value"];
+
+// Mapa `value`→descrição derivado de `PAPEIS_PARTICIPANTE` (não redigitar as descrições):
+// a legenda do formulário renderiza a partir daqui e o guard compara contra ela.
+export const DESCRICAO_PAPEL: Record<PapelParticipante, string> = Object.fromEntries(
+  PAPEIS_PARTICIPANTE.map((p) => [p.value, p.descricao]),
+) as Record<PapelParticipante, string>;
 
 // Papel "Coautor" — ÚNICO por projeto (decisão de produto 30/07/2026): cada projeto tem
 // 1 autor (o submissor/dono) e no máximo 1 Coautor. Os demais participantes ficam como
@@ -282,6 +306,44 @@ export function contribuicoesFaltando(
 ): string[] {
   return participantes.filter(
     (email) => (contribuicoes[email] ?? "").trim().length < CONTRIBUICAO_MIN,
+  );
+}
+
+// Núcleo comparável de um texto: sem acento, sem caixa, só letras/números separados por
+// espaço único (pontuação e espaços a mais colapsam). "Auxiliou o time…" com ou sem ponto
+// final, com espaço a mais ou em CAIXA vira a MESMA string. Pura.
+function nucleoComparavel(texto: string): string {
+  // Remove diacriticos combinantes (U+0300-U+036F) por CODIGO, sem depender de um literal
+  // de combining marks no source (fragil no editor). Depois: caixa baixa, so letras/numeros
+  // separados por espaco unico. Pura.
+  const semAcento = Array.from(texto.normalize("NFD"))
+    .filter((ch) => {
+      const c = ch.codePointAt(0) ?? 0;
+      return c < 0x300 || c > 0x36f;
+    })
+    .join("");
+  return semAcento.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// A contribuição digitada é só a DESCRIÇÃO de um papel copiada da legenda? É o modo de
+// falha real (Smart Replan, 25/08/2026): o submissor colou "Auxiliou o time…" nos 3
+// campos. Compara contra as 3 descrições — não só a do papel escolhido —, porque colar a
+// legenda de OUTRO papel também não diz o que a pessoa fez. Pura — testável.
+export function contribuicaoEhDescricaoDePapel(texto: string): boolean {
+  const nucleo = nucleoComparavel(texto);
+  if (!nucleo) return false;
+  return PAPEIS_PARTICIPANTE.some((p) => nucleoComparavel(p.descricao) === nucleo);
+}
+
+// Participantes cuja contribuição apenas REPETE a descrição do papel (texto já preenchido,
+// mas copiado da legenda). Ordem da lista. Separada de `contribuicoesFaltando` porque a
+// mensagem é outra: não é "faltou", é "isso não diz o que a pessoa fez". Pura — testável.
+export function contribuicoesCopiadas(
+  participantes: string[],
+  contribuicoes: Record<string, string>,
+): string[] {
+  return participantes.filter((email) =>
+    contribuicaoEhDescricaoDePapel(contribuicoes[email] ?? ""),
   );
 }
 
@@ -390,6 +452,20 @@ export function validarEtapa1(
           faltando.length === 1
             ? `Descreva o que ${faltando[0]} fez no projeto (mínimo ${CONTRIBUICAO_MIN} caracteres)`
             : `Descreva o que cada participante fez no projeto — ${faltando.length} ainda sem descrição (mínimo ${CONTRIBUICAO_MIN} caracteres cada)`;
+      // Nada faltou, mas o texto pode ser só a DESCRIÇÃO do papel colada da legenda
+      // (caso Smart Replan): tem 20+ caracteres e passaria pelo gate de tamanho, mas não
+      // diz o que a pessoa fez. Bloqueia com mensagem própria.
+      else {
+        const copiadas = contribuicoesCopiadas(
+          form.participantes,
+          form.participantesContribuicoes,
+        );
+        if (copiadas.length > 0)
+          errs.participantesContribuicoes =
+            copiadas.length === 1
+              ? `A descrição de ${copiadas[0]} só repete o texto do papel — conte o que essa pessoa fez de fato no projeto`
+              : `${copiadas.length} descrições só repetem o texto do papel — conte o que cada pessoa fez de fato no projeto`;
+      }
     }
   }
 

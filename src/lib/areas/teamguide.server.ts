@@ -574,6 +574,30 @@ export async function getCargoDe(email: string): Promise<string | null> {
 }
 
 /**
+ * Nome REAL cadastrado na TeamGuide (`name`, ex. "João Victor Esteves"), ou `null`.
+ * É a fonte confiável do nome de exibição: o edge Godeploy só injeta o e-mail, então
+ * sem isto o nome vira o local-part do e-mail em Title Case (`joaovictor.esteves`
+ * → "Joaovictor Esteves"), perdendo espaços e acentos.
+ *
+ * ⚠️ FAIL-SAFE: roda no `/api/auth/me` (caminho crítico); qualquer falha da TeamGuide
+ * (token ausente, 403, timeout) devolve `null` para o chamador cair no fallback — o
+ * login NUNCA pode quebrar por causa desta consulta. Usa o mesmo cache do `getCargoDe`.
+ */
+export async function getNomeDe(email: string): Promise<string | null> {
+  const alvo = (email ?? '').trim().toLowerCase();
+  if (!alvo) return null;
+  try {
+    const token = getToken();
+    expirarCachesVencidos();
+    const refs = await carregarRefs(token);
+    const achado = refs.find((r) => (r.contactEmail ?? '').trim().toLowerCase() === alvo);
+    return (achado?.name ?? '').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A pessoa é ISENTA de pré-aprovação? A régua é o **CARGO** — coordenador para cima
  * (D20, `ehCargoDeLideranca`, fonte única em `@/lib/cargo-lideranca`).
  *
