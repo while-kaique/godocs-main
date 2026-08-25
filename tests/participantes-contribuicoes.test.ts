@@ -11,8 +11,11 @@ import { describe, it, expect } from 'vitest';
 import {
   CONTRIBUICAO_MIN,
   CONTRIBUICAO_MAX,
+  DESCRICAO_PAPEL,
   montarMembrosContribuicoes,
   contribuicoesFaltando,
+  contribuicaoEhDescricaoDePapel,
+  contribuicoesCopiadas,
   validarEtapa1,
   type FormData,
 } from '@/lib/submeter/constants';
@@ -143,6 +146,70 @@ describe('validarEtapa1 — a descrição do que cada um fez é obrigatória', (
         participantes: [],
         participantesPapeis: {},
         participantesContribuicoes: {},
+      }),
+      { modoEdicao: false },
+    );
+    expect(errs.participantesContribuicoes).toBeUndefined();
+  });
+});
+
+// Guard anti-cópia (caso Smart Replan, 25/08/2026): o submissor colou a DESCRIÇÃO do
+// papel da legenda nos 3 campos "o que essa pessoa fez". Tem 20+ chars, então passava
+// pelo gate de tamanho — mas não diz nada.
+describe('contribuicaoEhDescricaoDePapel', () => {
+  it('pega a descrição de cada papel colada verbatim', () => {
+    expect(contribuicaoEhDescricaoDePapel(DESCRICAO_PAPEL.contribuidor)).toBe(true);
+    expect(contribuicaoEhDescricaoDePapel(DESCRICAO_PAPEL.coexecutor)).toBe(true);
+    expect(contribuicaoEhDescricaoDePapel(DESCRICAO_PAPEL.planejador)).toBe(true);
+  });
+
+  it('ignora ponto final, caixa e espaço a mais (o núcleo comparável colapsa isso)', () => {
+    const t = '  AUXILIOU O TIME COM PLANEJAMENTO, DECISÕES TÉCNICAS OU IDEIAS, SEM ATUAR DIRETAMENTE NA EXECUÇÃO  ';
+    expect(contribuicaoEhDescricaoDePapel(t)).toBe(true);
+  });
+
+  it('texto real do que a pessoa fez NÃO é bloqueado', () => {
+    expect(contribuicaoEhDescricaoDePapel(TEXTO_OK)).toBe(false);
+    expect(contribuicaoEhDescricaoDePapel('montou os fluxos e revisou os testes')).toBe(false);
+  });
+
+  it('vazio não arma', () => {
+    expect(contribuicaoEhDescricaoDePapel('')).toBe(false);
+    expect(contribuicaoEhDescricaoDePapel('   ')).toBe(false);
+  });
+});
+
+describe('contribuicoesCopiadas', () => {
+  it('lista quem colou a descrição, na ordem dos participantes', () => {
+    const copiadas = contribuicoesCopiadas(
+      ['ana@gocase.com', 'bru@gocase.com', 'caio@gocase.com'],
+      {
+        'ana@gocase.com': TEXTO_OK,
+        'bru@gocase.com': DESCRICAO_PAPEL.contribuidor,
+        'caio@gocase.com': DESCRICAO_PAPEL.planejador, // colou a legenda de OUTRO papel — também não vale
+      },
+    );
+    expect(copiadas).toEqual(['bru@gocase.com', 'caio@gocase.com']);
+  });
+});
+
+describe('validarEtapa1 — cópia da descrição do papel é barrada', () => {
+  it('bloqueia quando o texto só repete o papel (mesmo com 20+ chars)', () => {
+    const errs = validarEtapa1(
+      baseForm({
+        participantes: ['ana@gocase.com'],
+        participantesPapeis: { 'ana@gocase.com': 'contribuidor' },
+        participantesContribuicoes: { 'ana@gocase.com': DESCRICAO_PAPEL.contribuidor },
+      }),
+      { modoEdicao: false },
+    );
+    expect(errs.participantesContribuicoes).toContain('repete o texto do papel');
+  });
+
+  it('não bloqueia um texto real do que a pessoa fez', () => {
+    const errs = validarEtapa1(
+      baseForm({
+        participantesContribuicoes: { 'ana@gocase.com': TEXTO_OK },
       }),
       { modoEdicao: false },
     );
