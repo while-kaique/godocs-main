@@ -66,19 +66,19 @@ describe("faseBloqueio / estadoBloqueio", () => {
 });
 
 describe("deveRecusarSubmissao — recusa do servidor", () => {
-  it("submissão NOVA dentro da janela → recusa", () => {
-    expect(deveRecusarSubmissao(false, MEIO)).toBe(true);
-    expect(deveRecusarSubmissao(false, INICIO)).toBe(true);
+  it("dentro da janela → recusa (submissão nova E reenvio/edição)", () => {
+    expect(deveRecusarSubmissao(MEIO)).toBe(true);
+    expect(deveRecusarSubmissao(INICIO)).toBe(true);
   });
-  it("submissão NOVA fora da janela → passa", () => {
-    expect(deveRecusarSubmissao(false, ANTES)).toBe(false);
-    expect(deveRecusarSubmissao(false, FIM)).toBe(false);
-    expect(deveRecusarSubmissao(false, DEPOIS)).toBe(false);
+  it("fora da janela → passa", () => {
+    expect(deveRecusarSubmissao(ANTES)).toBe(false);
+    expect(deveRecusarSubmissao(FIM)).toBe(false);
+    expect(deveRecusarSubmissao(DEPOIS)).toBe(false);
   });
-  it("REENVIO nunca é recusado, nem dentro da janela", () => {
-    expect(deveRecusarSubmissao(true, MEIO)).toBe(false);
-    expect(deveRecusarSubmissao(true, INICIO)).toBe(false);
-    expect(deveRecusarSubmissao(true, ANTES)).toBe(false);
+  it("a decisão agora é só o relógio — bate com estaBloqueado (reenvio incluído)", () => {
+    for (const t of [ANTES, INICIO, MEIO, FIM, DEPOIS]) {
+      expect(deveRecusarSubmissao(t)).toBe(estaBloqueado(t));
+    }
   });
 });
 
