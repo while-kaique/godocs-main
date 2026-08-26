@@ -116,13 +116,17 @@ export function estadoBloqueio(
 }
 
 /**
- * Decisão do SERVIDOR: recusar este envio? Só recusa SUBMISSÃO NOVA (não reenvio)
- * dentro da janela. Reenvio/edição de projeto já submetido nunca é barrado.
+ * Decisão do SERVIDOR: recusar este envio? Dentro da janela, recusa TODA submissão
+ * do usuário — submissão NOVA *e* reenvio/edição de projeto já submetido (reenvio é
+ * uma submissão). Fora da janela nunca recusa. O que NÃO para nessa janela é a
+ * triagem/aprovação do admin, que não passa por aqui.
+ *
+ * A decisão depende só do relógio: `estaBloqueado(now, janela)`. Não recebe mais o
+ * antigo `ehReenvio` — a distinção nova × reenvio deixou de existir para o gate.
  */
 export function deveRecusarSubmissao(
-  ehReenvio: boolean,
   now: Date | number = Date.now(),
   janela: JanelaBloqueio = janelaBloqueio(),
 ): boolean {
-  return !ehReenvio && estaBloqueado(now, janela);
+  return estaBloqueado(now, janela);
 }
