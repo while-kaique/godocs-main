@@ -130,8 +130,42 @@ vivo e o fallback não foi exercitado nesta medição.
   Criativo» (0★) são irmãos de função, e é comparando os dois que a lente aprende onde está a
   diferença. ⚠️ **Corolário para o T3/T4: agrupar por função NÃO reduz a variância da nota** — não
   contar com isso para o calibrador.
-- **T3 — Avaliadores por lente.** N prompts derivados dos `CRITERIOS` da régua — **não redigitar a régua**,
-  importar de `especiais-regua.ts`. Saída estruturada (nota + justificativa + o que a sustenta).
+- **T3 — Avaliadores por lente.** ✅ **FEITO** (`src/lib/agents/especiais-lentes.ts`, 26 testes puros).
+  **4 lentes declaradas**, cada uma com os `CRITERIOS` do seu eixo importados da régua e a lista
+  explícita do que ela **NÃO** julga: `recorrencia_rastro` (recorrência + rastreabilidade +
+  contrafactual) · `complexidade_autonomia` · `alcance_reuso` · `risco_evitado`. Os 2 critérios que
+  não são eixo de valor (`Qualidade de execução`, `Especiais`) viram `CRITERIOS_GLOBAIS` e vão em
+  TODAS as lentes — numa lente só, as outras três julgariam um especial como se fosse financeiro.
+  ⚠️ **Teste de cobertura**: lentes ∪ globais tem de cobrir a régua inteira, então critério novo em
+  `especiais-regua.ts` esquecido aqui **falha o teste** em vez de desaparecer do painel calado.
+
+  Três decisões que os achados do T1 impuseram (não relitigar sem medir de novo):
+
+  1. ⚠️ **Cada lente devolve um TETO do seu eixo, não um voto — e a consolidação NÃO usa média.**
+     Média de N lentes **fabrica** a compressão para o meio que o T1 mediu (lente 0 + lente 4 = 2,
+     e é exatamente o defeito: viés agregado −0,06 escondendo 0★ → +1,94 e 7★ → −7). `consolidarLentes`
+     é PURA: `nota = min(teto, max(gate, maior lente de valor))` — **disjuntiva para cima** (a régua
+     diz 4★ = "reuso multi-área **OU** risco material **OU** ganho estrutural": um eixo forte basta)
+     e **conjuntiva no gate**.
+  2. ⚠️ **A lente estrutural é GATE (teto), não mais uma opinião.** A `DERRUBA` inteira fala do eixo
+     estrutural (peça única, POC, sem ponteiro nem contrafactual → 0–1) e o topo da régua é
+     conjuntivo. Então complexidade técnica **não compra nota** sem recorrência com ponteiro
+     nomeado. `MARGEM_ACIMA_DO_GATE = 1`, e o gate só empresta essa margem quando a prova dele é
+     **`nomeada`**. Isso ataca o achado 3 do T1 de frente — **12 dos 17 zeros humanos** foram
+     promovidos pelo agente único.
+  3. ⚠️ **Prova é campo próprio (`evidencia: nomeada|vaga|ausente`), separada da confiança.**
+     Confiança é o quanto o modelo acredita; evidência é o que dá para ir conferir. Dois guards
+     determinísticos: `evidencia: 'ausente'` limita a própria lente a **1★** (`TETO_SEM_EVIDENCIA`
+     — senão "provavelmente roda todo mês" compra 3★), e **`nomeada` sem o trecho copiado vira
+     `vaga`** (alegar fonte é grátis, copiar o trecho não é — a mesma régua do `[1.4]`: substantivo
+     de fonte, não verbo de verificação).
+
+  Mais duas propriedades que o T6/T7 dependem: **lente que falha ≠ lente que deu 0** (falha vira
+  `falhas` + `Consolidado.faltando`, para o T7 distinguir "julgou baixo" de "não julgou"), e
+  **`opts.lentes` escolhe quais rodar** — é como a medição responde "2, 3 ou 4 lentes valem o
+  custo" sem tocar no código. A função do T2 entra no prompt como CONTEXTO ("o que este grupo
+  faz") com o aviso explícito de que grupo não prevê nota (dentro de uma função as notas humanas
+  vão de 0 a 10).
 - **T4 — Calibrador.** Reescala a rodada contra `CURVA_BASE`. Parte PURA (a reescala) separada da parte
   LLM (a redação da leitura). (guarda: rodada artificialmente inflada volta para a curva)
 - **T5 — Revisor adversarial + convergência.** Refuta toda nota ≥3; teto de 3 voltas absorvente; sem
