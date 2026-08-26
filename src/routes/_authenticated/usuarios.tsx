@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/usuarios")({
 });
 
 function UsuariosPage() {
+  useTituloPagina(SECAO.usuarios);
   const { user } = Route.useRouteContext();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);

@@ -5,11 +5,12 @@ import { apiFetch } from "@/lib/api-client";
 import { SubmeterPageContent } from "./submeter";
 
 export const Route = createFileRoute("/editar/$id")({
+  // O título ("Editando · <nome do projeto>") sai de `useTituloPagina` dentro do
+  // `SubmeterPageContent`, que é quem tem o nome seedado. ⚠️ NÃO chamar o hook aqui
+  // também: numa montagem o efeito do filho roda antes do efeito do pai, e este
+  // sobrescreveria o do filho.
   head: () => ({
-    meta: [
-      { title: "Editar Projeto · GoGroup" },
-      { name: "description", content: "Edite ou reenvie seu projeto de automação." },
-    ],
+    meta: [{ name: "description", content: "Edite ou reenvie seu projeto de automação." }],
   }),
   component: EditarPage,
 });

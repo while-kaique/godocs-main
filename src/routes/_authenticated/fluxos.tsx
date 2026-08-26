@@ -4,11 +4,10 @@ import { FlaskConical, UserCog } from "lucide-react";
 import { SubmeterPageContent } from "@/routes/submeter";
 import { CHAVE_TESTE_LIDERANCA } from "@/lib/fluxos/demo-backend";
 import type { FluxoDemo } from "@/lib/fluxos/demo-backend";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 
 export const Route = createFileRoute("/_authenticated/fluxos")({
-  head: () => ({
-    meta: [{ title: "Fluxos de submissão (demonstração) | RPA & IA" }],
-  }),
   component: FluxosPage,
 });
 
@@ -34,6 +33,10 @@ function FluxosPage() {
   // `null` = tela de escolha; um fluxo = wizard real em modo demonstração.
   const [fluxo, setFluxo] = useState<FluxoDemo | null>(null);
   const navigate = useNavigate();
+
+  // Título só na tela de ESCOLHA: com um fluxo rodando, quem manda no título é o
+  // `SubmeterPageContent` embutido (ele sabe a etapa e o nome do projeto de mentira).
+  useTituloPagina(SECAO.fluxos, "Escolher fluxo", fluxo === null);
 
   // Abre o formulário REAL (/submeter) rodando como liderança — cria projeto de teste
   // de verdade na staging. Usa flag em sessionStorage (o `?lideranca=1` some no OAuth do

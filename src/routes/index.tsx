@@ -2,6 +2,8 @@ import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import {
   AvisoBloqueioSubmissao,
   useBloqueioSubmissao,
@@ -19,9 +21,10 @@ export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
     acesso_negado: search.acesso_negado === true || search.acesso_negado === "true" ? true : undefined,
   }),
+  // Sem `title` aqui: o título da aba sai de `useTituloPagina` no componente (fonte
+  // única, `src/lib/titulo-pagina.ts`). O `og:title` continua sendo do documento.
   head: () => ({
     meta: [
-      { title: "Triagem de Fluxos · GoGroup" },
       {
         name: "description",
         content:
@@ -39,6 +42,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  useTituloPagina(SECAO.inicio);
   const { acesso_negado } = useSearch({ from: "/" });
   // Bloqueio temporário de novas submissões (janela determinística; ver bloqueio-submissao.ts).
   const bloqueio = useBloqueioSubmissao();
