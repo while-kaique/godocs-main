@@ -22,6 +22,7 @@ import {
   retroativoCustosPontuais,
 } from "@/lib/chat.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
+import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import {
   getAreas,
   createArea,
@@ -1055,6 +1056,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = await readBody<{ max?: number }>(request).catch(() => ({}) as { max?: number });
       return json(await reconciliarSnapshots(body?.max));
+    }
+
+    // ── Backfill do ROLLUP histórico de saving/receita (admin) ──
+    // Recomputa INTEIRAMENTE a tabela durável `rollup_saving_receita` (grão mensal, por
+    // mês de submitted_at × área × tipo_saving) a partir dos projetos aprovados. Fonte da
+    // API histórica do squad Intelli. Idempotente/convergente — rodar de novo dá o mesmo
+    // resultado. Existe para o backfill inicial e para validar na staging.
+    if (pathname === "/api/admin/rollup-backfill" && method === "POST") {
+      await requireAdmin(request);
+      return json(await recalcularRollupBackfill());
     }
 
     // ── Disparo de e-mails por segmento (admin) ──

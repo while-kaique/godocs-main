@@ -664,6 +664,74 @@ export function getProjetosParaSnapshot() {
   );
 }
 
+// --- Rollup histórico de saving/receita (API para o squad Intelli / João Gabriel) ---
+
+/**
+ * Linhas dos projetos APROVADOS para o agregador do rollup histórico. Saving = `saving_reais`
+ * (líquido); receita = `documentacao.conteudo.receita.valor_ganho_mensal`, CRUS e SEPARADOS
+ * (ver `rollup-financeiro.ts` para as regras). Aprovado = `status IN ('aprovado','validado')`
+ * excluindo descontinuados.
+ *
+ * ⚠️ A receita vem por SUBCONSULTA correlacionada com `LIMIT 1` (não JOIN): um projeto com
+ * mais de uma linha em `documentacao` (legado) duplicaria a linha do projeto num JOIN e
+ * inflaria a contagem. `json_valid` dentro de um CASE (nunca num AND) porque `conteudo` nem
+ * sempre é JSON válido e `json_extract` sobre texto solto lança.
+ */
+export function getProjetosAprovadosParaRollup() {
+  return queryAll<{
+    submitted_at: string | null;
+    area: string | null;
+    tipo_saving: string | null;
+    saving_reais: number | null;
+    receita_reais: number | null;
+  }>(
+    `SELECT p.submitted_at, p.area, p.tipo_saving, p.saving_reais,
+            COALESCE(
+              (SELECT CASE WHEN json_valid(d.conteudo)
+                           THEN json_extract(d.conteudo, '$.receita.valor_ganho_mensal') END
+                 FROM documentacao d
+                WHERE d.projeto_id = p.id
+                LIMIT 1),
+              0
+            ) AS receita_reais
+       FROM projetos p
+      WHERE p.status IN ('aprovado', 'validado')
+        AND (p.descontinuado IS NULL OR p.descontinuado != 1)`,
+    [],
+  );
+}
+
+/**
+ * Substitui INTEIRAMENTE o rollup mensal pelas células recalculadas (DELETE-all + INSERT).
+ * O backfill recomputa o conjunto todo, então a substituição total é o que garante
+ * idempotência E remove células que deixaram de existir (projeto desaprovado/descontinuado).
+ */
+export async function substituirRollupMensal(
+  celulas: import("@/lib/rollup-financeiro").CelulaRollup[],
+): Promise<void> {
+  await exec("DELETE FROM rollup_saving_receita WHERE grao = 'mensal'", []);
+  for (const c of celulas) {
+    await exec(
+      `INSERT INTO rollup_saving_receita
+         (grao, periodo, area, tipo_saving, saving_reais, receita_reais, num_projetos, atualizado_em)
+       VALUES ('mensal', ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [c.periodo, c.area, c.tipo_saving, c.saving_reais, c.receita_reais, c.num_projetos],
+    );
+  }
+}
+
+/** Lê o rollup mensal persistido, ordenado por (período, área, tipo_saving). */
+export function lerRollupMensal() {
+  return queryAll<import("@/lib/rollup-financeiro").CelulaRollup>(
+    `SELECT 'mensal' AS grao, periodo, area, tipo_saving,
+            saving_reais, receita_reais, num_projetos
+       FROM rollup_saving_receita
+      WHERE grao = 'mensal'
+      ORDER BY periodo, area, tipo_saving`,
+    [],
+  );
+}
+
 /**
  * Projeção escalar do ÚLTIMO snapshot de cada projeto (via `json_extract`, SEM blobs) —
  * para o cron detectar divergência entre o estado atual e a última versão. Uma consulta.
