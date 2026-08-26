@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
+
+**Status:** ✅ corrigido (staging validada) · **Branch:** `fix/snapshots-integridade`
+
+**Sintoma.** O histórico de auditoria de submissões/edições tinha buracos: muitos projetos submetidos **sem nenhuma linha em `projeto_versions`** — na staging, **578 submetidos e praticamente nenhum com versão**. Sem "visão panorâmica completa" confiável de submissões e edições (necessária para a API histórica de saving/receita do João Gabriel e para a futura tela de histórico no godocs).
+
+**Causa-raiz.** A versão só é gravada dentro de `submeterParaValidacao`, num `try/catch` **NÃO-BLOQUEANTE** (um erro ali não pode derrubar a submissão do usuário — correto). Consequência: submissões cujo snapshot falhou ficam sem versão, e **legados** importados do Sheets nunca passaram por esse caminho (nasceram sem versão). Nada reconciliava depois.
+
+**Fix.** Rede de reconciliação (mesmo espírito de `reconciliarComplexidade`: caminho quente segue não-bloqueante, o cron é a rede). `reconciliarSnapshots` (novo) varre os submetidos e (1) cria a **v1 faltante** e (2) grava um **reenvio** quando o estado EDITÁVEL divergiu do último snapshot — tudo marcado **`projeto_versions.origem='reconciliado'`** (nunca sobrescreve/apaga um `'real'`; NULL legado = `'real'`). Idempotente/convergente, **bounded a `max=200`/passada** (acima disso o fetch de doc por projeto estoura o timeout de request — medido: `max:2000` deu timeout, 200 passa). Formato do snapshot virou **FONTE ÚNICA** `montarSnapshotProjeto` (reusada pelo submit); `snapshotDiverge` exclui `status`/validação humana de propósito (não é edição do dono). Cron `POST /api/cron/reconciliar-snapshots` + admin `POST /api/admin/reconciliar-snapshots {max?}`. Backfill inicial = rodar a rota admin em passadas de 200 até `v1_criadas+reenvios=0` (staging: convergiu, 578 `ja_ok`, 0 falhas, 2ª passada 0 escritas).
+
+**Onde aterrissou.** `src/lib/snapshot-projeto.ts` (novo, puro), `src/lib/reconciliar-snapshots.ts` (novo), `src/integrations/db/schema.ts` (migração `origem`), `src/integrations/db/client.server.ts` (`gravarVersaoProjeto` +param, `getProjetosParaSnapshot`, `getUltimosSnapshotsResumo`, `VersionRow.origem`), `src/lib/chat.functions.ts` (submit reusa o builder), `src/worker.ts` (2 rotas), `worker.js` rebuildado. Testes `tests/snapshot-projeto.test.ts` + `tests/reconciliar-snapshots.test.ts`. `CLAUDE.md` (seção Investigador). Falta: deploy prod + registrar cron + backfill prod + PR.
+
+---
+
 ## 2026-08-25 — Nome do usuário na submissão saía errado (derivado do e-mail, não o nome real)
 
 **Status:** ✅ corrigido · **Branch:** `fix/nome-teamguide-identidade`
