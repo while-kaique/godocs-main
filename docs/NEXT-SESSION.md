@@ -1,7 +1,9 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ [docs/plans/latencia-ia-roteamento-por-fase.md](plans/latencia-ia-roteamento-por-fase.md)** · Status: 🟡 em execução — CÓDIGO (T1–T4) FEITO + revisado 25/08; falta T5 staging + T6 docs + T7 prod
+**→ [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md)** · Status: **rascunho** (confiança BAIXA — exploração profunda adiada por contexto esgotado; a próxima sessão de `/ggsd:plan` ou `/ggsd:code` deve varrer o código antes de implementar). Secret `PINECONE_API_KEY` já setado em prod/staging/.env.local.
+
+_(Anterior: `latencia-ia-roteamento-por-fase.md` **✅ ENTREGUE EM PROD (v286) + PR #286, 25/08** — T1–T7 completos.)_
 
 Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
 (`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador
