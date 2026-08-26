@@ -305,10 +305,23 @@ export type ResultadoUpsert = {
   ok: boolean;
   enviados: number;
   namespace: string;
+  /** Vetores DESCARTADOS por dimensão incompatível com o índice (ver o filtro abaixo). */
+  descartados_dim?: number;
   motivo?: string;
 };
 
-/** Envia vetores em lotes de `CHUNK_UPSERT`. Nunca lança; para no primeiro lote que falhar. */
+/**
+ * Envia vetores em lotes de `CHUNK_UPSERT`. Nunca lança; para no primeiro lote que falhar.
+ *
+ * ⚠️ **Vetor de dimensão diferente da do índice é DESCARTADO, não enviado.** O SQLite guarda o
+ * histórico de todos os modelos já usados, e um único vetor velho (1536d do
+ * `text-embedding-3-small`) faz o Pinecone devolver **400 no lote inteiro** — `"Vector dimension
+ * 1536 does not match the dimension of the index 3072"` — derrubando o backfill de TODOS os
+ * outros. Aconteceu de verdade no primeiro backfill da staging (26/08/2026): 49 vetores, 0
+ * upsertados. O descarte é silencioso no protocolo mas CONTADO em `descartados_dim`, para a rota
+ * dizer quantos ficaram de fora em vez de mentir "tudo certo" — quem os repõe é o reembedding
+ * (`classificar-pendentes` com `forcar`, que já trata vetor de outro modelo como velho).
+ */
 export async function upsertVetores(
   vetores: VetorParaUpsert[],
   opts: { namespace?: string } = {},
@@ -321,9 +334,27 @@ export async function upsertVetores(
     return { ok: false, enviados: 0, namespace, motivo: 'Pinecone indisponível (sem chave ou sem índice)' };
   }
 
+  const compativeis = vetores.filter((v) => v.vetor.length === descricao.dimensao);
+  const descartados_dim = vetores.length - compativeis.length;
+  if (descartados_dim > 0) {
+    console.warn(
+      `[pinecone] ${descartados_dim} vetor(es) descartado(s) por dimensão != ${descricao.dimensao} ` +
+        '— reembedde com {"forcar":true} para repô-los',
+    );
+  }
+  if (compativeis.length === 0) {
+    return {
+      ok: true,
+      enviados: 0,
+      namespace,
+      descartados_dim,
+      motivo: `todos os ${descartados_dim} vetores são de outro modelo (dimensão != ${descricao.dimensao})`,
+    };
+  }
+
   let enviados = 0;
-  for (let i = 0; i < vetores.length; i += CHUNK_UPSERT) {
-    const lote = vetores.slice(i, i + CHUNK_UPSERT);
+  for (let i = 0; i < compativeis.length; i += CHUNK_UPSERT) {
+    const lote = compativeis.slice(i, i + CHUNK_UPSERT);
     try {
       const resp = await fetch(`https://${descricao.host}/vectors/upsert`, {
         method: 'POST',
@@ -342,6 +373,7 @@ export async function upsertVetores(
           ok: false,
           enviados,
           namespace,
+          descartados_dim,
           motivo: `upsert HTTP ${resp.status}: ${(await resp.text()).slice(0, 300)}`,
         };
       }
@@ -351,11 +383,12 @@ export async function upsertVetores(
         ok: false,
         enviados,
         namespace,
+        descartados_dim,
         motivo: e instanceof Error ? e.message : 'erro no upsert',
       };
     }
   }
-  return { ok: true, enviados, namespace };
+  return { ok: true, enviados, namespace, descartados_dim };
 }
 
 /** Um vizinho como o Pinecone devolve: id + score + metadata. */

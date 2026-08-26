@@ -104,7 +104,8 @@ describe('pinecone.ts', () => {
     const r = await upsertVetores([
       {
         id: 'P1',
-        vetor: [1, 2, 3],
+        // Dimensão do índice de verdade: vetor menor seria DESCARTADO pelo guard de dimensão.
+        vetor: Array.from({ length: INDICE.dimension }, () => 0.1),
         metadata: {
           projeto_id: 'P1',
           tem_nota_humana: false,
@@ -124,6 +125,38 @@ describe('pinecone.ts', () => {
     expect(meta.estrela_recomendada).toBe(2);
     expect('estrela_humana' in meta).toBe(false); // null não vai — o Pinecone não aceita
     expect('area' in meta).toBe(false);
+  });
+
+  // ⚠️ Bug REAL pego no 1º backfill da staging (26/08/2026): 49 vetores, 0 upsertados. O SQLite
+  // guardava vetores 1536d do `text-embedding-3-small` e o Pinecone devolve 400 no LOTE INTEIRO
+  // ("Vector dimension 1536 does not match the dimension of the index 3072"), derrubando os
+  // compatíveis junto. Descartar o velho e CONTAR o descarte é o que impede um vetor de outro
+  // modelo de travar a migração toda.
+  it('descarta vetor de outra dimensão em vez de deixá-lo derrubar o lote', async () => {
+    fetchMock.mockResolvedValueOnce(respostaOk({ ...INDICE, dimension: 3 })).mockResolvedValueOnce(respostaOk({}));
+    const { upsertVetores } = await import('@/lib/pinecone');
+    const meta = { projeto_id: 'x', tem_nota_humana: true };
+    const r = await upsertVetores([
+      { id: 'velho', vetor: [1, 2], metadata: { ...meta, projeto_id: 'velho' } },
+      { id: 'novo', vetor: [1, 2, 3], metadata: { ...meta, projeto_id: 'novo' } },
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.enviados).toBe(1);
+    expect(r.descartados_dim).toBe(1);
+    const corpo = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(corpo.vectors.map((v: { id: string }) => v.id)).toEqual(['novo']);
+  });
+
+  it('lote 100% de outro modelo não vira erro de rede — reporta e não chama o upsert', async () => {
+    fetchMock.mockResolvedValueOnce(respostaOk({ ...INDICE, dimension: 3 }));
+    const { upsertVetores } = await import('@/lib/pinecone');
+    const r = await upsertVetores([
+      { id: 'velho', vetor: [1, 2], metadata: { projeto_id: 'velho', tem_nota_humana: true } },
+    ]);
+    expect(r.enviados).toBe(0);
+    expect(r.descartados_dim).toBe(1);
+    expect(r.motivo).toContain('outro modelo');
+    expect(fetchMock).toHaveBeenCalledTimes(1); // só o describe
   });
 
   it('upsert sem índice não lança — só reporta', async () => {

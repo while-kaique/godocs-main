@@ -57,7 +57,33 @@ O cosseno-em-JS **funciona hoje** e não é o que causou o erro de classificaç�
 
 - **A re-auditoria não tem `dry`** — a decisão 7 dizia "dry-default", mas **não existe caminho de escrita** para secar: escrever a nota é da triagem (só clique humano), e gravar uma "segunda opinião" ao lado da nota de gente em `especial_avaliacao` competiria com ela no cartão — exatamente o que o classificador já evita ao **não** reclassificar quem tem nota humana. A rota é read-only e o teste prova que nenhum writer é chamado.
 - **A re-auditoria EXIGE o Pinecone** (sem fallback). O que faz a comparação valer é o filtro `tem_nota_humana` resolvido no servidor; comparar a nota de gente contra a mediana das recomendações do próprio agente é o feedback loop puro. Sem índice ela responde `ok:false` com o motivo — melhor que um relatório que parece certo.
+- **`upsertVetores` DESCARTA vetor de outra dimensão** (achado da execução, não do plano): o SQLite
+  guarda o histórico de todos os modelos, e um único vetor 1536d velho fazia o Pinecone devolver 400
+  no LOTE INTEIRO — o 1º backfill da staging deu **49 vetores → 0 upsertados**. Agora descarta e
+  CONTA (`descartados_dim`). ⚠️ **Reembedding (`classificar-pendentes` com `forcar`) vem ANTES do
+  backfill depois de qualquer troca de modelo.**
 - **Dois helpers novos no banco** (`getEmbeddingEspecial`, `getEmbeddingsEspeciaisPagina`): sem eles, o caminho quente e o backfill continuariam puxando a tabela inteira e o teto de RPC só teria mudado de lugar.
+
+## Execução — o que a staging mostrou (26/08/2026)
+
+Índice `godocs-especiais` criado (serverless, 3072, cosine, host `…aped-4627-b74a`), namespace
+`staging`. Sequência que funcionou: **reembeddar → backfill → re-auditar**.
+
+- **Recuperação via Pinecone confirmada ponta a ponta:** `classificar-pendentes` devolveu
+  `origem_vizinhos: "pinecone"` com **6 vizinhos**; 49 embeddings regerados em 3072d.
+- **Backfill:** 49/49 upsertados, `sem_vetor: 0`.
+- **Re-auditoria:** 48 analisados → **29 coerentes · 11 infladas · 8 defladas · 0 sem_base**.
+
+⚠️ **A régua acusa as âncoras.** O achado nº 1 foi o **PIAPP** (flagship 10★ conhecida) contra
+referência **0**. A recuperação estava certa — os 6 vizinhos eram plataformas de IA (Gobeaute
+Prompt Studio, Prisma, Hitmaker, Argos, Tropa, CTR Machine), similaridade 0,68–0,72, notas
+0/5/0/0/2/0. Uma flagship é por definição distante dos pares; separar "é a âncora" de "está
+inflada" é trabalho humano, e é por isso que cada linha carrega os `vizinhos`. Calibrar a régua
+exige medir concordância contra as **644 notas humanas** — exercício próprio, fora desta fatia.
+
+⚠️ Nota lateral: com `text-embedding-3-large` **nada** ficou abaixo do `PISO_SIMILARIDADE` de 0,2
+(o mínimo observado foi **0,653**). O piso virou letra morta na prática — mexer nele altera também
+o CLASSIFICADOR (constante compartilhada), então fica registrado, não alterado.
 
 ## Critérios de aceitação
 

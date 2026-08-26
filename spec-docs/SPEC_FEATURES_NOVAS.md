@@ -1824,6 +1824,32 @@ resolve é estrutural:
    Chave com valor nulo é OMITIDA — o Pinecone não aceita `null`.
 7. **Upsert é best-effort** — o SQLite já gravou; falhar no índice não derruba a classificação.
 8. **A coluna "Estrelas" continua só de clique humano.**
+9. **Vetor de dimensão diferente da do índice é DESCARTADO no `upsertVetores`, nunca enviado.**
+   ⚠️ Bug REAL do 1º backfill da staging (26/08/2026): **49 vetores, 0 upsertados**. O SQLite
+   guarda o histórico de todos os modelos já usados, e **um** vetor 1536d do
+   `text-embedding-3-small` faz o Pinecone devolver **400 no LOTE INTEIRO** (`Vector dimension
+   1536 does not match the dimension of the index 3072`), derrubando os compatíveis junto. O
+   descarte é CONTADO em `descartados_dim` — a rota diz quantos ficaram de fora em vez de mentir
+   "tudo certo". Quem os repõe é o reembedding (`classificar-pendentes` com `{"forcar":true}`,
+   que já trata vetor de outro modelo como velho). ⚠️ **Depois de trocar o modelo de embedding,
+   o reembedding vem ANTES do backfill.**
+
+### Limitação conhecida da re-auditoria: ela ACUSA AS ÂNCORAS
+
+Medido na staging em 26/08/2026 — 48 analisados: **29 coerentes, 11 "infladas", 8 "defladas"**. O
+achado **nº 1 foi o PIAPP**, a flagship 10★ conhecida, contra referência **0** (delta 10).
+
+Não é defeito de recuperação: os 6 vizinhos do PIAPP eram plataformas de IA corretas (Gobeaute
+Prompt Studio, Prisma, Hitmaker, Argos - CDP inteligente, Tropa Gogroup, CTR Machine), com
+similaridades 0,68–0,72 e notas 0/5/0/0/2/0. **Uma flagship é por definição distante dos pares** —
+é isso que a torna flagship. A métrica responde "esta nota discorda dos vizinhos", que é verdade;
+separar *"é a âncora"* de *"está inflada"* é trabalho HUMANO.
+
+É por isso que cada linha do relatório devolve os `vizinhos` com nome, nota e similaridade: sem
+eles o relatório seria um número sem defesa. ⚠️ **Não "consertar" isso rebaixando nota alta
+automaticamente** — a rota é read-only, e um falso positivo custa uma olhada da triagem, não um
+usuário travado (≠ o loop do `[1.4]`, ≠ o ganho projetado). Calibrar a régua de verdade exige
+medir concordância contra as **644 notas humanas** da planilha, que é exercício próprio.
 
 ### Re-auditoria (`POST /api/admin/especiais/reauditar`)
 
