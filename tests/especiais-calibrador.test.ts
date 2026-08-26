@@ -22,6 +22,7 @@ import {
   aplicarPisosDeProva,
   calibrarRodada,
   compararForca,
+  CURVA_ESPECIAIS_AUDITADOS,
   curvaDeNotas,
   entradaDeConsolidado,
   explicarCalibragem,
@@ -93,16 +94,11 @@ describe("cota por faixa (por rodada)", () => {
     expect(cota3.depois).toBeLessThanOrEqual(cota3.permitido);
     expect(cota5.depois).toBeLessThanOrEqual(cota5.permitido);
     expect(resumo.rebaixados_por_cota).toBeGreaterThan(0);
-    // a permissão sai da curva declarada, não de um número na mão
-    expect(cota3.referencia_pct).toBeCloseTo(
-      Math.round(percentilAcimaDe(NOTA_EXIGE_PROVA_NOMEADA) * 10) / 10,
-      1,
-    );
+    // a permissão sai da curva declarada (a dos ESPECIAIS, por default), não de um número na mão
+    const pct3 = percentilDaCurva(CURVA_ESPECIAIS_AUDITADOS, NOTA_EXIGE_PROVA_NOMEADA);
+    expect(cota3.referencia_pct).toBeCloseTo(Math.round(pct3 * 10) / 10, 1);
     expect(cota3.permitido).toBe(
-      Math.max(
-        MIN_POR_FAIXA,
-        Math.ceil((20 * percentilAcimaDe(NOTA_EXIGE_PROVA_NOMEADA) * FATOR_TOLERANCIA) / 100),
-      ),
+      Math.max(MIN_POR_FAIXA, Math.ceil((20 * pct3 * FATOR_TOLERANCIA) / 100)),
     );
     // e ninguém subiu
     for (const l of linhas) expect(l.nota_depois).toBeLessThanOrEqual(l.nota_antes);
@@ -178,17 +174,38 @@ describe("as DUAS tarefas juntas (achado 3 do T1)", () => {
 });
 
 describe("curva de referência é parâmetro", () => {
-  it("curva mais generosa permite mais prata, e o resumo diz QUAL curva foi usada", () => {
+  it("a `CURVA_BASE` é MUITO mais dura que a dos especiais — e o default é a dos especiais", () => {
     const entradas = Array.from({ length: 20 }, (_, i) => ent(`p${i}`, 3, { valor: [3, 3] }));
-    const generosa = curvaDeNotas([0, 1, 2, 3, 3, 3, 4, 5, 7, 10]); // 50% ≥3
-    const base = calibrarRodada(entradas).resumo;
-    const solta = calibrarRodada(entradas, { curva: generosa, rotuloCurva: "especiais" }).resumo;
+    const padrao = calibrarRodada(entradas).resumo;
+    const comBase = calibrarRodada(entradas, { curva: CURVA_BASE }).resumo;
 
-    const cotaBase = base.cotas.find((c) => c.limiar === 3)!;
-    const cotaSolta = solta.cotas.find((c) => c.limiar === 3)!;
-    expect(cotaSolta.permitido).toBeGreaterThan(cotaBase.permitido);
-    expect(base.curva_referencia).toBe("CURVA_BASE");
-    expect(solta.curva_referencia).toBe("especiais");
+    const cotaPadrao = padrao.cotas.find((c) => c.limiar === 3)!;
+    const cotaBase = comBase.cotas.find((c) => c.limiar === 3)!;
+    // medido 26/08/2026: 41,7% dos especiais auditados são ≥3, contra 5,4% da base inteira
+    expect(cotaPadrao.referencia_pct).toBeGreaterThan(cotaBase.referencia_pct * 5);
+    expect(cotaPadrao.permitido).toBeGreaterThan(cotaBase.permitido);
+    expect(padrao.curva_referencia).toBe("CURVA_ESPECIAIS_AUDITADOS");
+    expect(comBase.curva_referencia).toContain("base inteira");
+  });
+
+  it("curva declarada de fora é respeitada, com o rótulo que o chamador der", () => {
+    const entradas = Array.from({ length: 20 }, (_, i) => ent(`p${i}`, 3, { valor: [3, 3] }));
+    const generosa = curvaDeNotas([0, 3, 3, 3, 4, 5, 7, 10, 10, 10]); // 80% ≥3
+    const solta = calibrarRodada(entradas, {
+      curva: generosa,
+      rotuloCurva: "força-tarefa",
+    }).resumo;
+    expect(solta.cotas.find((c) => c.limiar === 3)!.permitido).toBeGreaterThan(
+      calibrarRodada(entradas).resumo.cotas.find((c) => c.limiar === 3)!.permitido,
+    );
+    expect(solta.curva_referencia).toBe("força-tarefa");
+  });
+
+  it("a curva dos especiais AUDITADOS é a medição de 26/08/2026 (48 com nota humana)", () => {
+    const total = Object.values(CURVA_ESPECIAIS_AUDITADOS).reduce((s, v) => s + v, 0);
+    expect(total).toBe(48);
+    expect(percentilDaCurva(CURVA_ESPECIAIS_AUDITADOS, 3)).toBeCloseTo(41.7, 1);
+    expect(percentilDaCurva(CURVA_ESPECIAIS_AUDITADOS, 5)).toBeCloseTo(12.5, 1);
   });
 
   it("`percentilDaCurva` ignora a chave `vazio` e casa com a régua na CURVA_BASE", () => {

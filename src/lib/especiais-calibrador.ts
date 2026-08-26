@@ -18,15 +18,13 @@
  *    rodada inteira sai generosa. Só DESCE, começa pelos mais fracos e **preserva a ordem**.
  *
  * ## ⚠️ Duas armadilhas da curva de referência
- * - **A `CURVA_BASE` é a curva da BASE INTEIRA** (644 linhas, financeiros incluídos, 426 zeros) e
- *   **especiais AUDITADOS não se distribuem como ela** — no T2, só em `conteudo_criativo` as notas
- *   humanas foram `[0,0,0,1,2,2,3,3,3,4,5,5,7,10]` (6 de 14 são ≥3). Aplicar a curva da base como
- *   cota DURA sobre uma rodada de especiais rebaixaria prata correta. Daí `FATOR_TOLERANCIA` e
- *   `MIN_POR_FAIXA`, e daí a curva ser PARÂMETRO.
- * - **Usar as notas HUMANAS do test set como referência é VAZAMENTO** (calibrar contra o gabarito
- *   melhora o MAE do T7 e não generaliza para especial nenhum ainda não auditado). A referência
- *   tem de ser DECLARADA a priori. `curvaDeNotas` existe para declarar uma curva de outra
- *   população — nunca a do conjunto sob medição.
+ * - **A `CURVA_BASE` NÃO serve de referência para especiais** — ela é a curva da base INTEIRA
+ *   (financeiros incluídos, 426 zeros): ≥3 = 5,4%, contra **41,7% dos especiais auditados** na
+ *   mesma medição. São 7× de diferença, e aplicá-la como cota rebaixaria prata CORRETA. O default
+ *   é a `CURVA_ESPECIAIS_AUDITADOS` (medida, ver abaixo).
+ * - **Usar as notas HUMANAS do conjunto SOB MEDIÇÃO como referência é VAZAMENTO** (calibrar contra
+ *   o gabarito melhora o MAE do T7 e não generaliza). Como os 48 auditados são test set E
+ *   população, no T7 a corrida principal roda com `aplicarCota: false` — mede e RELATA.
  *
  * ⚠️ Não escreve nada, não chama LLM (a redação da leitura é `agents/especiais-calibrador.ts`) e
  * **nunca PROMOVE**: rodada dura demais é problema do T3 (é lá que a média foi proibida), não se
@@ -36,7 +34,7 @@
  * e aquele módulo puxa o `llmChat` — então este arquivo é **server-side**: se um dia uma TELA
  * precisar da reescala, o que se move é a constante para um módulo sem LLM, não uma segunda cópia.
  */
-import { CURVA_BASE, NOTA_MAX, percentilAcimaDe } from "@/lib/especiais-regua";
+import { CURVA_BASE, NOTA_MAX } from "@/lib/especiais-regua";
 import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
 import {
   LENTE_GATE,
@@ -126,16 +124,50 @@ export function aplicarPisosDeProva(e: EntradaCalibragem): {
 // ─── Mecanismo 2: cota por faixa (por rodada) ──────────────────────────────────
 
 /**
- * Quantas vezes a rodada pode passar do percentual da curva antes de a cota morder. ⚠️ Não é
- * frouxidão: a curva de referência é da base INTEIRA e uma página de 12 especiais auditados
- * legitimamente tem mais prata que ela (ver o cabeçalho).
+ * **A curva dos especiais AUDITADOS — MEDIDA, não estimada** (staging, espelho real da planilha,
+ * 26/08/2026: `GET /api/admin/especiais`, 51 especiais, 48 com nota humana, sem LLM):
+ *
+ * `0:17 · 1:3 · 2:8 · 3:11 · 4:3 · 5:3 · 7:1 · 8:1 · 10:1` → **≥3 = 41,7% · ≥5 = 12,5%**
+ *
+ * ⚠️ **É esta, e não a `CURVA_BASE`, a referência de uma rodada de especiais.** Na mesma medição a
+ * base inteira deu ≥3 = 5,4% e ≥5 = 1,1% (bate com a `CURVA_BASE`, então o espelho é fiel) — as
+ * duas populações são **7× diferentes** no corte da prata. Usar a curva da base aqui rebaixaria
+ * prata CORRETA: numa página de 12, ela permitiria 2 e a triagem humana dá 5.
+ *
+ * ⚠️ **Corolário que corrige a leitura do T1:** o agente único deu ≥3 em 33,3% e ≥5 em 6,3% —
+ * **abaixo** dos 41,7%/12,5% humanos. Ele **não estava inflado**, estava CONSERVADOR no topo, o que
+ * casa com a compressão medida (7★ → −7, 8★ → −4, 10★ → −6). O "INFLADA" do T1 era artefato de
+ * comparar com a população errada.
+ *
+ * ⚠️ Isto **não é mexer na régua** (`CURVA_BASE` fica intacta, e a fronteira do plano proíbe
+ * ajustá-la para o painel passar): é declarar a curva da população que o painel julga.
+ * ⚠️ Como as 48 notas são também o gabarito do T7, usar esta curva como cota **na medição** é
+ * vazamento — no T7 a corrida principal roda com `aplicarCota: false` (mede e RELATA).
  */
-export const FATOR_TOLERANCIA = 2;
+export const CURVA_ESPECIAIS_AUDITADOS: Record<string, number> = {
+  "0": 17,
+  "1": 3,
+  "2": 8,
+  "3": 11,
+  "4": 3,
+  "5": 3,
+  "7": 1,
+  "8": 1,
+  "10": 1,
+};
 
 /**
- * Piso absoluto por faixa. Sem ele, uma página de 12 **nunca** poderia ter uma prata
- * (12 × 5,7% × 2 = 1,37 → 2, ok; mas ≥7★ daria 0,13 → 1 só por causa deste piso) — e cota que
- * proíbe a nota alta de existir é fraude na direção oposta à inflação.
+ * Quantas vezes a rodada pode passar do percentual da curva antes de a cota morder. Com a curva da
+ * PRÓPRIA população (o default), a folga é pequena — ela cobre variação de amostra numa página de
+ * 12, não diferença de população. ⚠️ Passando a `CURVA_BASE` como referência, este fator não
+ * conserta a distância de 7× entre as duas curvas: aí o certo é a curva certa, não mais tolerância.
+ */
+export const FATOR_TOLERANCIA = 1.25;
+
+/**
+ * Piso absoluto por faixa. Sem ele, uma página de 12 **nunca** poderia ter um diamante
+ * (12 × 4,2% × 1,25 = 0,63 → 1 só por causa deste piso) — e cota que proíbe a nota alta de existir
+ * é fraude na direção oposta à inflação.
  */
 export const MIN_POR_FAIXA = 1;
 
@@ -220,7 +252,10 @@ export type ResultadoCalibragem = {
 };
 
 export type OpcoesCalibragem = {
-  /** Curva de referência DECLARADA. Default: `CURVA_BASE` (a base inteira). */
+  /**
+   * Curva de referência DECLARADA. Default: `CURVA_ESPECIAIS_AUDITADOS` (a população que o painel
+   * julga). ⚠️ Passar a `CURVA_BASE` aqui é comparar com a base INTEIRA e rebaixa prata correta.
+   */
   curva?: Record<string, number>;
   rotuloCurva?: string;
   /** `false` mede a rodada contra a curva e RELATA, sem rebaixar por cota. Default `true`. */
@@ -243,11 +278,16 @@ export function calibrarRodada(
   entradas: EntradaCalibragem[],
   opts: OpcoesCalibragem = {},
 ): ResultadoCalibragem {
-  const curva = opts.curva ?? CURVA_BASE;
-  const rotuloCurva = opts.rotuloCurva ?? (opts.curva ? "curva declarada" : "CURVA_BASE");
+  const curva = opts.curva ?? CURVA_ESPECIAIS_AUDITADOS;
+  const rotuloCurva =
+    opts.rotuloCurva ??
+    (opts.curva
+      ? curva === CURVA_BASE
+        ? "CURVA_BASE (base inteira)"
+        : "curva declarada"
+      : "CURVA_ESPECIAIS_AUDITADOS");
   const aplicarCota = opts.aplicarCota !== false;
   const fator = opts.fatorTolerancia ?? FATOR_TOLERANCIA;
-  const usaBase = curva === CURVA_BASE;
 
   // 1. pisos de prova, por projeto.
   const nota = new Map<string, number>();
@@ -270,7 +310,7 @@ export function calibrarRodada(
   let rebaixados_por_cota = 0;
 
   for (const limiar of limiares) {
-    const referencia_pct = usaBase ? percentilAcimaDe(limiar) : percentilDaCurva(curva, limiar);
+    const referencia_pct = percentilDaCurva(curva, limiar);
     const permitido = Math.max(MIN_POR_FAIXA, Math.ceil((total * referencia_pct * fator) / 100));
     const acima = () => ordenadas.filter((e) => (nota.get(e.projeto_id) ?? 0) >= limiar);
     const antes = acima().length;

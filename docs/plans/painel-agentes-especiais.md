@@ -40,7 +40,7 @@ adversarial sobre toda nota ≥3*. Resultado em 99 projetos: **0★:8 · 1★:43
 |---|---|---|
 | 1 | Roteamento por quê? | **FUNÇÃO**, nunca área (lição 2). A função sai de uma **taxonomia DECLARADA** (`TAXONOMIA_FUNCAO`, fonte única, no espírito da `TAXONOMIA_DESTINO_GANHO`) + os vizinhos do Pinecone como evidência. ⚠️ Taxonomia declarada, não inventada pelo LLM a cada corrida: função que muda de nome entre corridas destrói a comparabilidade. |
 | 2 | Avaliadores idênticos ou com lentes distintas? | **Lentes DISTINTAS.** N cópias do mesmo prompt concordam por construção e a "convergência" vira teatro. As lentes saem dos `CRITERIOS` que já existem na régua: **recorrência+rastreabilidade · complexidade/autonomia · alcance/reuso · risco evitado**. |
-| 3 | Calibrador | **OBRIGATÓRIO e determinístico onde der.** Reescala a distribuição da RODADA contra `CURVA_BASE`. Rodada mais generosa que a curva = defeito do juiz, não da base (a própria régua diz isso). |
+| 3 | Calibrador | **OBRIGATÓRIO e determinístico onde der.** Reescala a distribuição da RODADA contra uma curva de referência DECLARADA. ⚠️ **Corrigido pela medição de 26/08/2026 (achado 4 do T1): a referência é a `CURVA_ESPECIAIS_AUDITADOS` (≥3 = 41,7%), NÃO a `CURVA_BASE` (≥3 = 5,4%)** — são populações diferentes, e usar a da base rebaixaria prata correta. |
 | 4 | Revisor adversarial | Sobre **toda nota ≥3** (é o que a força-tarefa fez, e 3★ já é top 4%). Prompt de REFUTAR, não de confirmar; empate mantém a nota MENOR. |
 | 5 | Teto de voltas | **3**, absorvente. Não convergiu → grava a nota do calibrador + **`contestada: true`** (campo que já existe) e segue. ⚠️ Loop sem teto absorvente é o erro que este repo já cometeu 3× (gate `[1.4]`, carga×escala, ganho projetado). |
 | 6 | Onde roda | **BATCH, jamais pós-submissão.** ~4 lentes × 3 voltas + roteador + calibrador + revisor ≈ **30–36 chamadas/projeto** contra 1 hoje. Rota admin + cron, paginada e retomável (mesmo padrão do backfill do Pinecone: `proximo_offset`). |
@@ -67,10 +67,10 @@ planilha real, então o test set é o de verdade). **Este é o número que o T7 
 | dentro de ±1 | **58,3%** |
 | nota exata | **29,2%** |
 | viés agregado | **−0,06** ⚠️ engana, ver abaixo |
-| ≥3★ na rodada × na base | **33,3% × 5,7%** → INFLADA |
-| ≥5★ na rodada × na base | **6,3% × 1,1%** → INFLADA |
+| ≥3★ na rodada × nos especiais auditados | **33,3% × 41,7%** → CONSERVADOR (ver achado 4) |
+| ≥5★ na rodada × nos especiais auditados | **6,3% × 12,5%** → CONSERVADOR |
 
-**Três achados que mudam o T2/T3 (não redescobrir na marra):**
+**Quatro achados que mudam o T2/T3 (não redescobrir na marra):**
 
 1. ⚠️ **O test set são ~48 especiais, não 644.** A `CURVA_BASE` conta LINHAS da aba (financeiros
    incluídos, 100 sem nota); auditado **e** especial é um subconjunto pequeno. A comparação do T7 é
@@ -83,9 +83,21 @@ planilha real, então o test set é o de verdade). **Este é o número que o T7 
    devolveria um número que aprova um juiz ruim.
 3. ⚠️ **A matriz diz onde dói:** dos 17 zeros humanos, **12 saem do zero** (6→bronze, 5→prata, 1→
    diamante); dos 14 pratas humanos, **10 caem para bronze**. Ou seja, o calibrador da decisão 3 tem
-   **duas** tarefas, não uma — segurar o topo (a inflação que a curva já denuncia) **e** parar de
-   promover o lixo. Um calibrador que só reescala a distribuição arruma o histograma sem arrumar o
-   PAR (pode empurrar zeros para cima e notas altas para baixo e ainda "bater a curva").
+   **duas** tarefas, não uma — segurar o topo **e** parar de promover o lixo. Um calibrador que só
+   reescala a distribuição arruma o histograma sem arrumar o PAR (pode empurrar zeros para cima e
+   notas altas para baixo e ainda "bater a curva").
+4. ⚠️ **CORREÇÃO (26/08/2026): a rodada NÃO estava inflada — a comparação era com a população
+   errada.** A 1ª leitura do T1 usou a `CURVA_BASE` (base INTEIRA) e cravou "INFLADA" nos 2 cortes.
+   Medido depois na staging, sem LLM (`GET /api/admin/especiais` + `/api/admin/dashboard/projetos`,
+   espelho real): a curva humana dos **48 especiais auditados** é
+   `0:17 · 1:3 · 2:8 · 3:11 · 4:3 · 5:3 · 7:1 · 8:1 · 10:1` → **≥3 = 41,7% · ≥5 = 12,5%**, enquanto a
+   base inteira (535 auditados) deu **≥3 = 5,4% · ≥5 = 1,1%** (bate com a `CURVA_BASE`, então o
+   espelho é fiel). São **7× de diferença** no corte da prata. Ou seja: o agente único é **menos**
+   generoso que a triagem nos dois cortes (33,3% × 41,7% e 6,3% × 12,5%) — e isso **casa** com o
+   achado 2 (compressão: 7★ → −7, 8★ → −4, 10★ → −6). ⚠️ **Consequência prática:** cota contra a
+   `CURVA_BASE` rebaixaria prata CORRETA (numa página de 12 ela permitiria 2 e a triagem dá 5), e o
+   critério de aceitação 2 foi reescrito. A constante medida vive em `CURVA_ESPECIAIS_AUDITADOS`
+   (`especiais-calibrador.ts`), com teste que prende os 48 e os 2 percentuais. Nada na régua mudou.
 
 **Custo medido:** ~13 s de overhead fixo por corrida (espelho + embeddings + Pinecone) + **~10 s por
 projeto**, 1 chamada de LLM cada. Os 48 do baseline levaram ~7 min em 4 requisições. ⚠️ Uma corrida
@@ -188,20 +200,17 @@ vivo e o fallback não foi exercitado nesta medição.
 
   ⚠️ **Duas armadilhas da curva de referência, e as duas mudam o T7:**
 
-  - **A `CURVA_BASE` é a curva da BASE INTEIRA** (644 linhas, financeiros incluídos, 426 zeros) e
-    **especiais AUDITADOS não se distribuem como ela.** Evidência que já está neste plano: no T2, só
-    dentro de `conteudo_criativo` as notas humanas foram `[0,0,0,1,2,2,3,3,3,4,5,5,7,10]` — **6 de
-    14 são ≥3**, contra 5,7% na base. O T1 também registra "14 pratas humanas" em 48 especiais
-    (~29%). Ou seja: o "≥3 na rodada × na base: 33,3% × 5,7% → INFLADA" **compara populações
-    diferentes** — parte do que parece inflação pode ser o test set sendo, de fato, mais generoso.
-    Por isso a curva é **PARÂMETRO** (`opts.curva`/`rotuloCurva`, e o resumo declara qual usou) e a
-    cota é deliberadamente TOLERANTE (`FATOR_TOLERANCIA = 2` + `MIN_POR_FAIXA = 1`). **Medir a curva
-    humana dos especiais auditados é pré-requisito do T7** e sai barato: `POST
-    /api/admin/especiais/funcoes` já devolve `estrelas` por projeto **sem LLM**.
-  - **Usar as notas humanas do TEST SET como referência é VAZAMENTO** — calibrar contra o gabarito
-    melhora o MAE do T7 e não generaliza para especial ainda não auditado. `curvaDeNotas(notas)`
-    existe para DECLARAR a curva de outra população (a força-tarefa, um período anterior), nunca a
-    do conjunto sob medição.
+  - **A `CURVA_BASE` NÃO é a referência de uma rodada de especiais** — MEDIDO no mesmo dia (achado 4
+    do T1): ≥3 = **41,7%** nos especiais auditados contra **5,4%** na base inteira, 7× de diferença.
+    O default virou a **`CURVA_ESPECIAIS_AUDITADOS`** (constante medida, com teste prendendo os 48 e
+    os 2 percentuais); a curva segue **PARÂMETRO** (`opts.curva`/`rotuloCurva`, e o resumo declara
+    qual usou), e `FATOR_TOLERANCIA` caiu de 2 para **1,25** — com a curva da própria população, a
+    folga cobre variação de amostra numa página de 12, não diferença de população.
+  - **Usar as notas humanas do conjunto SOB MEDIÇÃO como referência é VAZAMENTO** — e aqui os 48
+    auditados são, ao mesmo tempo, a população e o gabarito. Por isso a corrida principal do T7 roda
+    com **`aplicarCota: false`** (mede e RELATA); a cota com a curva dos especiais vale para a
+    PRODUÇÃO, sobre os especiais ainda não auditados. `curvaDeNotas(notas)` existe para declarar a
+    curva de outra população (a força-tarefa, um período anterior).
 
   A parte LLM só **redige** (nota + motivo já decididos entram prontos no prompt, que **proíbe**
   propor outra nota) e **nunca fica sem texto**: falha, vazio ou texto gigante caem no
@@ -227,15 +236,25 @@ vivo e o fallback não foi exercitado nesta medição.
 - **T7 — Medir o PAINEL no mesmo harness do T1 e comparar.** ⚠️ **É a trava de subida.** O juiz é
   PARÂMETRO de `medirConcordanciaAgente` (`opts.juiz`/`rotuloJuiz`) e `compararConcordancia` já aplica
   o critério 1 — o T7 é fiação, não código novo. Alvo a bater: **MAE < 1,69 E ±1 > 58,3%**, sem piorar
-  o `erro_por_nota` das pontas.
+  o `erro_por_nota` das pontas. ⚠️ Depois do achado 4, o ganho tem de vir das **PONTAS** (parar de
+  promover os 17 zeros e parar de esmagar 7★/8★/10★), não de "ficar mais duro" — o juiz já é
+  conservador no topo. ⚠️ A corrida principal roda com **`aplicarCota: false`** (a curva de
+  referência é a da mesma população que dá o gabarito; usá-la como cota na medição é vazamento). A
+  corrida com cota entra como número secundário, para saber quanto a cota mexeria em produção.
+  ⚠️ E o `erro_por_nota` do harness compara contra a curva da base: ao ler o relatório, a régua de
+  generosidade é a `CURVA_ESPECIAIS_AUDITADOS`.
 - **T8 — Staging → validar → prod (regra 13) + PR (regra 7).**
 
 ## Critérios de aceitação
 
-1. O painel **bate o baseline do agente único** no test set das 644 notas (MAE menor **e** % dentro de ±1
-   maior). Não bateu → não vira padrão; entra como ferramenta de auditoria e o T7 registra o número.
-2. A distribuição das recomendações **não fica mais generosa que `CURVA_BASE`** — é o sintoma nº 1 de
-   inflação, e a régua diz explicitamente que aí o defeito é do juiz.
+1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
+   menor E % dentro de ±1 maior**, sem piorar o `erro_por_nota` das pontas. Não bateu → não vira
+   padrão; entra como ferramenta de auditoria e o T7 registra o número.
+2. A distribuição das recomendações é comparada com a **`CURVA_ESPECIAIS_AUDITADOS`** (≥3 = 41,7%,
+   ≥5 = 12,5% — medida 26/08/2026), **NÃO** com a `CURVA_BASE`. ⚠️ Reescrito depois da medição: o
+   critério antigo ("não ficar mais generosa que a `CURVA_BASE`") empurraria o painel a ser ainda
+   mais duro que um juiz que já é conservador no topo — seria otimizar na direção errada. O que
+   reprova aqui é **distância** da curva da população, para qualquer um dos dois lados.
 3. Nenhuma escrita na coluna "Estrelas"; tudo em `especial_avaliacao` com `origem: 'painel-agentes'`.
 4. Roda em lote, retomável, com teto de custo; **nada** entra no caminho pós-submissão.
 5. Loop com teto absorvente provado por teste de simulação que NÃO converge.
