@@ -1,7 +1,15 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ nenhum plano ativo.** O último (`latencia-ia-roteamento-por-fase.md`) foi **✅ ENTREGUE EM PROD (v286) + merge no `main` (PR #286), 25/08** — T1–T7 completos. Próximo trabalho: planejar o que vier com `/ggsd:plan`. _(Pendente só de VALIDAÇÃO humana: o Luis medir o TTFB da fase `doc` num chat real de prod — o roteamento por fase já está confirmado ativo por sinal de runtime nos logs.)_
+**→ API histórica de saving/receita p/ João Gabriel (squad Intelli) — FASE 3 NÚCLEO.** Plano em `~/.claude/plans/flickering-fluttering-rabin.md` + memória `api-historica-saving-receita-jg` (fonte da verdade dos detalhes/decisões).
+
+**Esta sessão (26/08):** implementei o núcleo da Fase 3 até o VERDE e commitei no worktree `~/godocs-wt-rollup-jg` (branch `feat/rollup-historico-jg`, commit `ecd3c0e`, base RED `2881707`). 5 arquivos: PURO `src/lib/rollup-financeiro.ts` (`periodoMensal`/`agregarRollupMensal`/`derivarTotaisPorArea` + sentinelas `AREA_NAO_IDENTIFICADA`/`TIPO_SAVING_INDEFINIDO`), orquestração `src/lib/rollup-backfill.ts` (`recalcularRollupBackfill`, DELETE-all+INSERT idempotente), helpers em `client.server.ts` (`getProjetosAprovadosParaRollup` — só `aprovado`/`validado`, exclui descontinuados, receita via subconsulta `json_valid`+`json_extract` `LIMIT 1`; `substituirRollupMensal`; `lerRollupMensal`), tabela `rollup_saving_receita` no `SCHEMA_SQL`, rota `POST /api/admin/rollup-backfill` (`requireAdmin`) + `worker.js` rebuildado. Suíte **1824 verde** (1808+16); tsc = os 5 erros PRÉ-EXISTENTES (nenhum toca os arquivos novos). Regras travadas: saving e receita CRUS/SEPARADOS, nunca somados, nunca ÷10; 1 projeto = 1 célula; sem total geral.
+
+⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou nesta sessão.** O commit passou (sessão limpa, suíte verde), mas os revisores de conformidade/qualidade/reuso não foram executados. **O `/ggsd:ship` vai barrar até a revisão rodar** (marcador `.review-status` ausente = pendente). Destravar: rodar os revisores sobre o diff antes de enviar.
+
+**Próximo passo:** rodar os revisores GGSD (§9) sobre o diff `ecd3c0e`; passando, ir pra STAGING (`edf400b4`) — deploy → `POST /api/admin/rollup-backfill` → conferir `lerRollupMensal` bate com o /dashboard → prod (`674a3710`) → PR via `LuisEduardo100`. Deploy é outward-facing: confirmar com o Luis antes de staging/prod. Depois (sessões seguintes): snapshot semanal (cron) + push outbound (dry-run até `JG_INGEST_URL`; `JG_INGEST_TOKEN` já setado).
+
+_(Anterior: `latencia-ia-roteamento-por-fase.md` **✅ ENTREGUE EM PROD (v286) + PR #286, 25/08** — T1–T7 completos.)_
 
 Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
 (`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador
