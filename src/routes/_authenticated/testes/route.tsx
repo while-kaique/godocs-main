@@ -1,10 +1,10 @@
 import { createFileRoute, Outlet, Link } from '@tanstack/react-router';
 import { FlaskConical, Play, LayoutGrid, Brain } from 'lucide-react';
 
+// O título da aba é de cada FILHA (Visão geral · Cenários · Prompts), não deste layout:
+// numa montagem, o efeito do filho roda antes do efeito do pai, e um título no layout
+// sobrescreveria o da tela que acabou de abrir.
 export const Route = createFileRoute('/_authenticated/testes')({
-  head: () => ({
-    meta: [{ title: 'Testes · GoDocs Admin' }],
-  }),
   component: TestesLayout,
 });
 

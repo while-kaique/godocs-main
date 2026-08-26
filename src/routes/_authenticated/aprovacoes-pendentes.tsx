@@ -74,9 +74,12 @@ import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes
 import { SeletorPeriodo } from '@/components/calendario/calendario';
 import { hojeIso } from '@/lib/calendario-datas';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import { SECAO } from '@/lib/titulo-pagina';
 
+// Título da aba: montado no componente (`useTituloPagina`) para levar o nome do projeto
+// com a ficha aberta. Ver `src/lib/titulo-pagina.ts`.
 export const Route = createFileRoute('/_authenticated/aprovacoes-pendentes')({
-  head: () => ({ meta: [{ title: 'Aprovação de pendentes · GoDocs Admin' }] }),
   component: AprovacaoPendentes,
 });
 
@@ -106,6 +109,11 @@ function AprovacaoPendentes() {
   const [fichaAberta, setFichaAberta] = useState<ProjetoDashboardResumo | null>(null);
   // "Agora" congelado: recalcular a cada render faria o chip de espera pular de faixa.
   const [agoraMs] = useState(() => Date.now());
+  // Título da aba: com a ficha aberta vale o nome do projeto que está sendo aprovado.
+  useTituloPagina(
+    SECAO.aprovacoesPendentes,
+    fichaAberta ? (fichaAberta.nome ?? fichaAberta.id) : null,
+  );
   // Mapa `id do projeto → o que cada participante fez`. Vem do BANCO, ao lado da
   // listagem (a linha da planilha não tem este texto); `{}` enquanto carrega e para
   // build antiga do servidor, que não manda a chave — o cartão só não desenha o bloco.

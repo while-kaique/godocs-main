@@ -7,11 +7,10 @@ import { ScenarioLauncher } from '@/lib/testes/scenario-launcher';
 import { ChatSimulation } from '@/lib/testes/chat-simulation';
 import { StateInspector } from '@/lib/testes/state-inspector';
 import { ApiInspector } from '@/lib/testes/api-inspector';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import { SECAO } from '@/lib/titulo-pagina';
 
 export const Route = createFileRoute('/_authenticated/testes/cenarios')({
-  head: () => ({
-    meta: [{ title: 'Cenários de Teste · GoDocs Admin' }],
-  }),
   component: CenariosPage,
 });
 
@@ -171,6 +170,7 @@ function ResizableCenter() {
 // ─── Page Shell ─────────────────────────────────────────────────────────────
 
 function CenariosPage() {
+  useTituloPagina(SECAO.cenarios);
   return (
     <TestesProvider>
       <div

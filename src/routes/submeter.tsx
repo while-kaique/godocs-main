@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toast } from "sonner";
 import { Loader2, Save, FolderClock, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import { apiFetch, apiStream, ApiError, setDemoBackend } from "@/lib/api-client";
 import { criarDemoBackend, demoSeedForm, demoFile, CHAVE_TESTE_LIDERANCA, type FluxoDemo } from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
@@ -1079,6 +1081,14 @@ export function SubmeterPageContent({
     especialDashboard: "",
     especialGanhoOrganizacional: "",
   });
+
+  // Título da aba. Esta tela é a MESMA em dois modos (nova submissão × edição), e é
+  // comum ter as duas abertas — o rótulo separa uma da outra. Enquanto o projeto não
+  // tem nome, a etapa é o detalhe útil ("Nova submissão · Etapa 2").
+  useTituloPagina(
+    demoFluxo ? SECAO.fluxos : editProjetoId ? SECAO.editar : SECAO.submeter,
+    form.nomeProjeto.trim() || `Etapa ${step}`,
+  );
 
   // ── Sandbox de demonstração (/fluxos) ──────────────────────────────────────
   // Instala o backend MOCKADO e pré-preenche o formulário para percorrer o fluxo

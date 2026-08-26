@@ -7,6 +7,8 @@ import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import {
   Loader2,
   FileText,
@@ -26,12 +28,11 @@ const TRANSFERIR_AUTORIA =
 const APROVADOR_ORIGEM = { to: "/aprovacoes", label: "← Pré-aprovações" } as const;
 const MEUS_PROJETOS_ORIGEM = { to: "/meus-projetos", label: "← Meus Projetos" } as const;
 
+// O título da aba leva o NOME do projeto e mora no componente (`useTituloPagina`) — o
+// `head:` da rota só conhece o `$id`, que não diz nada a quem olha a aba.
 export const Route = createFileRoute("/projeto/$id")({
   head: () => ({
-    meta: [
-      { title: "Projeto · GoGroup" },
-      { name: "description", content: "Detalhes do projeto de automação." },
-    ],
+    meta: [{ name: "description", content: "Detalhes do projeto de automação." }],
   }),
   component: ProjetoReadOnlyPage,
 });
@@ -100,6 +101,10 @@ function ProjetoReadOnlyPage() {
       .catch((e) => setErro(e instanceof Error ? e.message : "Erro ao carregar o projeto."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Projeto ESPECIAL ganha rótulo próprio na aba: ele não tem memorial financeiro e
+  // segue outro caminho na triagem, então saber disso pelo título poupa abrir a ficha.
+  useTituloPagina(p?.especial ? SECAO.especial : SECAO.projeto, p?.nome ?? null);
 
   // Quem chega como aprovador volta para a fila; todo mundo mais, para "Meus Projetos".
   // Enquanto carrega, o padrão é "Meus Projetos" (não há papel ainda para decidir).

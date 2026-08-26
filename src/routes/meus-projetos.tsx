@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -57,11 +59,9 @@ const TRANSFERIR_AUTORIA =
   "Só o autor pode editar este projeto. Para transferir a autoria, acione a equipe RPA.";
 
 export const Route = createFileRoute("/meus-projetos")({
+  // Título da aba: `useTituloPagina` no componente (leva o filtro ativo junto).
   head: () => ({
-    meta: [
-      { title: "Meus Projetos · GoGroup" },
-      { name: "description", content: "Seus projetos de automação submetidos." },
-    ],
+    meta: [{ name: "description", content: "Seus projetos de automação submetidos." }],
   }),
   component: MeusProjetosPage,
 });
@@ -107,6 +107,14 @@ type Projeto = {
 };
 
 type Filtro = "todos" | "meus" | "participo" | "rascunhos";
+
+/** Rótulo de cada filtro — fonte única das pílulas da tela e do título da aba. */
+const ROTULO_FILTRO: Record<Filtro, string> = {
+  todos: "Todos",
+  meus: "Meus",
+  participo: "Participo",
+  rascunhos: "Rascunhos",
+};
 
 // Aceita ISO (app) e pt-BR dd/mm/yyyy (planilha/legados) — ver @/lib/format-date.
 const fmtDate = fmtDataBR;
@@ -456,6 +464,12 @@ function MeusProjetosPage() {
   // Abre em "Todos" (tudo que você submeteu ou participa). "Meus", "Participo" e
   // "Rascunhos" recortam essa lista por papel/estado.
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  // O filtro vai para a aba porque "Rascunhos" é a razão mais comum de deixar esta tela
+  // aberta num canto — em "Todos" (o padrão) não vale a pena poluir o título.
+  useTituloPagina(
+    SECAO.meusProjetos,
+    filtro === "todos" ? null : ROTULO_FILTRO[filtro],
+  );
   const [excluindo, setExcluindo] = useState<string | null>(null);
   // Id do projeto cuja ação de descontinuar/reativar está em andamento (spinner no botão).
   const [descontinuando, setDescontinuando] = useState<string | null>(null);
@@ -550,12 +564,9 @@ function MeusProjetosPage() {
     });
   }
 
-  const FILTROS: { key: Filtro; label: string }[] = [
-    { key: "todos", label: "Todos" },
-    { key: "meus", label: "Meus" },
-    { key: "participo", label: "Participo" },
-    { key: "rascunhos", label: "Rascunhos" },
-  ];
+  const FILTROS: { key: Filtro; label: string }[] = (
+    ["todos", "meus", "participo", "rascunhos"] as Filtro[]
+  ).map((key) => ({ key, label: ROTULO_FILTRO[key] }));
 
   return (
     <div
