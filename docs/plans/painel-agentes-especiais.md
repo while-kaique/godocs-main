@@ -166,8 +166,46 @@ vivo e o fallback não foi exercitado nesta medição.
   custo" sem tocar no código. A função do T2 entra no prompt como CONTEXTO ("o que este grupo
   faz") com o aviso explícito de que grupo não prevê nota (dentro de uma função as notas humanas
   vão de 0 a 10).
-- **T4 — Calibrador.** Reescala a rodada contra `CURVA_BASE`. Parte PURA (a reescala) separada da parte
-  LLM (a redação da leitura). (guarda: rodada artificialmente inflada volta para a curva)
+- **T4 — Calibrador.** ✅ **FEITO** — parte PURA em `src/lib/especiais-calibrador.ts` (17 testes) e
+  a redação da leitura em `src/lib/agents/especiais-calibrador.ts`.
+
+  **DOIS mecanismos, porque o achado 3 do T1 diz que a tarefa é dupla** (segurar o topo **e** parar
+  de promover o lixo — um calibrador só-histograma arruma a distribuição sem arrumar o PAR):
+
+  1. **Piso de PROVA (por projeto, SEM curva).** `≥3` exige prova **nomeada** no eixo estrutural;
+     `≥5` exige **2** eixos de valor sustentando ≥3 (o 5★ da régua é conjuntivo; um eixo forte
+     sozinho é o 4★ "Prata alta"). Não depende da composição do lote, então não é fraudável por
+     sorte de amostra — é o mecanismo que ataca os **12 dos 17 zeros** promovidos pelo agente único.
+  2. **Cota por faixa (por rodada, contra uma curva de referência).** Nos 2 cortes que a régua
+     NOMEIA (`LIMIARES_GENEROSIDADE`, ≥3 e ≥5), do corte mais alto para o mais baixo, rebaixando
+     **do mais fraco para o mais forte** — `compararForca` põe a NOTA na frente da prova, e é isso
+     que garante que a cota **nunca inverta a ordem** da rodada.
+
+  Invariantes provados por teste: **nunca promove** (`depois ≤ antes` em qualquer entrada) · **não
+  inverte a ordem** · rodada inflada volta para a curva · página pequena com **uma** prata legítima
+  não é rebaixada (`MIN_POR_FAIXA`) · `aplicarCota:false` mede e RELATA sem mexer na nota (é como se
+  comparam os 2 regimes no T7) · rodada vazia não lança.
+
+  ⚠️ **Duas armadilhas da curva de referência, e as duas mudam o T7:**
+
+  - **A `CURVA_BASE` é a curva da BASE INTEIRA** (644 linhas, financeiros incluídos, 426 zeros) e
+    **especiais AUDITADOS não se distribuem como ela.** Evidência que já está neste plano: no T2, só
+    dentro de `conteudo_criativo` as notas humanas foram `[0,0,0,1,2,2,3,3,3,4,5,5,7,10]` — **6 de
+    14 são ≥3**, contra 5,7% na base. O T1 também registra "14 pratas humanas" em 48 especiais
+    (~29%). Ou seja: o "≥3 na rodada × na base: 33,3% × 5,7% → INFLADA" **compara populações
+    diferentes** — parte do que parece inflação pode ser o test set sendo, de fato, mais generoso.
+    Por isso a curva é **PARÂMETRO** (`opts.curva`/`rotuloCurva`, e o resumo declara qual usou) e a
+    cota é deliberadamente TOLERANTE (`FATOR_TOLERANCIA = 2` + `MIN_POR_FAIXA = 1`). **Medir a curva
+    humana dos especiais auditados é pré-requisito do T7** e sai barato: `POST
+    /api/admin/especiais/funcoes` já devolve `estrelas` por projeto **sem LLM**.
+  - **Usar as notas humanas do TEST SET como referência é VAZAMENTO** — calibrar contra o gabarito
+    melhora o MAE do T7 e não generaliza para especial ainda não auditado. `curvaDeNotas(notas)`
+    existe para DECLARAR a curva de outra população (a força-tarefa, um período anterior), nunca a
+    do conjunto sob medição.
+
+  A parte LLM só **redige** (nota + motivo já decididos entram prontos no prompt, que **proíbe**
+  propor outra nota) e **nunca fica sem texto**: falha, vazio ou texto gigante caem no
+  determinístico `explicarCalibragem`, com a nota idêntica.
 - **T5 — Revisor adversarial + convergência.** Refuta toda nota ≥3; teto de 3 voltas absorvente; sem
   consenso → `contestada`. (guarda: simulação de N turnos que NÃO converge termina — o teste que pegou o
   loop do gate de sobreposição)
