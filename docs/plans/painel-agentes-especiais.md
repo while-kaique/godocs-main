@@ -50,13 +50,55 @@ adversarial sobre toda nota ≥3*. Resultado em 99 projetos: **0★:8 · 1★:43
 ## Decisões que só a MEDIÇÃO fecha (T1 antes de T2)
 
 - **Quantas lentes** (3 ou 4) e **quantas voltas** valem o custo. Se 2 lentes já batem o baseline, 4 é
-  dinheiro fora.
+  dinheiro fora. ⚠️ Com ~10 s por chamada de LLM (medido no T1), cada lente a mais é ~8 min a mais
+  numa corrida de 48.
 - **Se o painel ganha do agente único.** ⚠️ É possível que não ganhe. O T7 é uma trava real: sem ganho
   medido, o painel **não vira o padrão** — vira ferramenta de auditoria em lote e o classificador segue.
 
+## T1 MEDIDO — o baseline do agente único (26/08/2026, staging, 48/48 especiais)
+
+Rodado em 4 páginas de 12 pelo `POST /api/admin/especiais/concordancia` (o espelho da staging traz a
+planilha real, então o test set é o de verdade). **Este é o número que o T7 tem de bater.**
+
+| Métrica | Agente único (baseline) |
+|---|---|
+| pares medidos | **48** (não 644 — ver abaixo) |
+| MAE | **1,69** |
+| dentro de ±1 | **58,3%** |
+| nota exata | **29,2%** |
+| viés agregado | **−0,06** ⚠️ engana, ver abaixo |
+| ≥3★ na rodada × na base | **33,3% × 5,7%** → INFLADA |
+| ≥5★ na rodada × na base | **6,3% × 1,1%** → INFLADA |
+
+**Três achados que mudam o T2/T3 (não redescobrir na marra):**
+
+1. ⚠️ **O test set são ~48 especiais, não 644.** A `CURVA_BASE` conta LINHAS da aba (financeiros
+   incluídos, 100 sem nota); auditado **e** especial é um subconjunto pequeno. A comparação do T7 é
+   **pareada** (mesmo conjunto, dois juízes), então 48 serve — mas não dá para cravar 2ª casa decimal,
+   e "MAE 1,69 → 1,62" não é ganho, é ruído.
+2. ⚠️ **O viés agregado MENTE, e por pouco: −0,06 leria como juiz calibrado.** Aberto por faixa do
+   gabarito: **0★ → +1,94** · 3★ → −0,91 · 4★ → −1,67 · 5★ → −2,33 · **7★ → −7** · 8★ → −4 ·
+   10★ → −6. O defeito não é generosidade nem dureza: é **COMPRESSÃO PARA O MEIO** (tudo vira 1–3), e
+   os dois lados se cancelam na média. Daí o campo `erro_por_nota` no módulo puro — o harness sem ele
+   devolveria um número que aprova um juiz ruim.
+3. ⚠️ **A matriz diz onde dói:** dos 17 zeros humanos, **12 saem do zero** (6→bronze, 5→prata, 1→
+   diamante); dos 14 pratas humanos, **10 caem para bronze**. Ou seja, o calibrador da decisão 3 tem
+   **duas** tarefas, não uma — segurar o topo (a inflação que a curva já denuncia) **e** parar de
+   promover o lixo. Um calibrador que só reescala a distribuição arruma o histograma sem arrumar o
+   PAR (pode empurrar zeros para cima e notas altas para baixo e ainda "bater a curva").
+
+**Custo medido:** ~13 s de overhead fixo por corrida (espelho + embeddings + Pinecone) + **~10 s por
+projeto**, 1 chamada de LLM cada. Os 48 do baseline levaram ~7 min em 4 requisições. ⚠️ Uma corrida
+do PAINEL nos mesmos 48, a 30–36 chamadas/projeto, é **~1.500 chamadas** — o T6 precisa do teto de
+custo e da retomada por página desde o primeiro commit, não como polimento.
+
+**Vizinhança:** 48/48 vieram do **Pinecone** (`vizinhos_de.sqlite = 0`), 0 falhas — o índice está
+vivo e o fallback não foi exercitado nesta medição.
+
 ## Tarefas
 
-- **T1 — Harness de concordância (FAZER PRIMEIRO).** As **644 notas humanas** da coluna "Estrelas" são
+- **T1 — Harness de concordância (FAZER PRIMEIRO).** ✅ **FEITO** (`especiais-concordancia.ts` +
+  `medirConcordanciaAgente` + `POST /api/admin/especiais/concordancia`), baseline medido acima. As **644 notas humanas** da coluna "Estrelas" são
   test set pronto. Medir o **agente ATUAL** contra elas: **MAE**, **% dentro de ±1**, matriz por faixa e
   a distribuição contra `CURVA_BASE`. Módulo PURO para as métricas + rota admin read-only. ⚠️ Sem este
   número não existe "melhorou" — existe opinião. (guarda: teste puro das métricas com casos fixos)
@@ -72,7 +114,10 @@ adversarial sobre toda nota ≥3*. Resultado em 99 projetos: **0★:8 · 1★:43
   loop do gate de sobreposição)
 - **T6 — Orquestração + rota admin + cron.** `dry` default, paginado, retomável, nunca lança, teto de
   custo por corrida. (guarda: `dry` não grava nada)
-- **T7 — Medir o PAINEL no mesmo harness do T1 e comparar.** ⚠️ **É a trava de subida.**
+- **T7 — Medir o PAINEL no mesmo harness do T1 e comparar.** ⚠️ **É a trava de subida.** O juiz é
+  PARÂMETRO de `medirConcordanciaAgente` (`opts.juiz`/`rotuloJuiz`) e `compararConcordancia` já aplica
+  o critério 1 — o T7 é fiação, não código novo. Alvo a bater: **MAE < 1,69 E ±1 > 58,3%**, sem piorar
+  o `erro_por_nota` das pontas.
 - **T8 — Staging → validar → prod (regra 13) + PR (regra 7).**
 
 ## Critérios de aceitação

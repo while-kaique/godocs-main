@@ -8,7 +8,7 @@
  * contra o gabarito humano. ⚠️ **Sem este número não existe "melhorou" — existe opinião**, e é
  * por isso que o T1 vem antes de qualquer avaliador novo do painel.
  *
- * ## Por que estas quatro métricas, e não uma
+ * ## Por que estas cinco métricas, e não uma
  * - **MAE** (erro absoluto médio): a distância típica da nota. É o primeiro corte da comparação
  *   baseline × painel.
  * - **% dentro de ±1**: numa escala de 11 pontos julgada por gente, ±1 é desacordo de gosto. Só
@@ -18,6 +18,14 @@
  *   base — e um juiz que erra +1 em tudo tem MAE idêntico ao que erra −1 em tudo.
  * - **Matriz por FAIXA**: onde o erro mora. Confundir 0 com 1 é ruído; confundir 1 com 4 troca o
  *   tier da pessoa (a estrela é o único pagamento do especial).
+ * - **Erro por nota humana** (`erro_por_nota`): o viés ABERTO por faixa do gabarito. ⚠️ É o que
+ *   impede a leitura mais enganosa deste harness — ver o comentário do campo.
+
+ * ## O test set real são ~48 especiais, não 644
+ * A `CURVA_BASE` conta 644 LINHAS da aba (financeiros incluídos, 100 sem nota). Auditado **e**
+ * especial é um subconjunto pequeno: a 1ª corrida achou **48** com nota humana. É pouco para
+ * cravar a 2ª casa decimal, e é por isso que o T7 compara os DOIS juízes no MESMO conjunto — a
+ * comparação é pareada, então o tamanho da amostra não a invalida.
  *
  * ⚠️ As faixas saem dos `TIERS` da régua (**fonte única**) + a faixa do zero, que não é tier
  * nenhum. Não redigitar bronze/prata/ouro/diamante aqui.
@@ -100,6 +108,15 @@ export type LinhaDistribuicao = {
   base_pct: number;
 };
 
+export type ErroPorNota = {
+  /** A nota HUMANA (o gabarito) desta linha. */
+  humana: number;
+  n: number;
+  mae: number;
+  /** Viés dentro da faixa: positivo = o juiz inflou os projetos que a triagem deu esta nota. */
+  vies: number;
+};
+
 export type MetricasConcordancia = {
   pares: number;
   /** `null` sem pares — 0 leria como "acertou tudo". */
@@ -110,6 +127,13 @@ export type MetricasConcordancia = {
   dentro_de_1_pct: number | null;
   /** `matriz[faixaHumana][faixaRecomendada] = quantos`. Todas as faixas presentes, inclusive 0. */
   matriz: Record<string, Record<string, number>>;
+  /**
+   * O viés ABERTO por nota humana. ⚠️ **Sem isto o viés agregado mente**: na primeira corrida
+   * real (48 especiais, 26/08/2026) o agregado deu −0,06 — leitura de juiz calibrado — enquanto
+   * por faixa era **+1,94 nos zeros e −7 no 7★**. O juiz não estava calibrado: ele COMPRIME tudo
+   * para o meio (1–3), e os dois erros se cancelam na média.
+   */
+  erro_por_nota: ErroPorNota[];
   distribuicao: LinhaDistribuicao[];
   generosidade: ComparacaoLimiar[];
   /** Atalho: a rodada estourou a curva em ALGUM dos cortes nomeados pela régua. */
@@ -133,6 +157,7 @@ export function medirConcordancia(pares: ParNota[]): MetricasConcordancia {
   const n = pares.length;
   const matriz = matrizVazia();
   const porNota = new Map<number, number>();
+  const porHumana = new Map<number, { n: number; abs: number; sinal: number }>();
   let somaAbs = 0;
   let somaSinal = 0;
   let exatas = 0;
@@ -146,7 +171,18 @@ export function medirConcordancia(pares: ParNota[]): MetricasConcordancia {
     if (Math.abs(d) <= 1) dentro++;
     matriz[faixaDe(p.humana)][faixaDe(p.recomendada)]++;
     porNota.set(p.recomendada, (porNota.get(p.recomendada) ?? 0) + 1);
+    const acc = porHumana.get(p.humana) ?? { n: 0, abs: 0, sinal: 0 };
+    porHumana.set(p.humana, { n: acc.n + 1, abs: acc.abs + Math.abs(d), sinal: acc.sinal + d });
   }
+
+  const erro_por_nota: ErroPorNota[] = [...porHumana.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([humana, v]) => ({
+      humana,
+      n: v.n,
+      mae: arred(v.abs / v.n),
+      vies: arred(v.sinal / v.n),
+    }));
 
   const notas = new Set<number>([...porNota.keys()]);
   for (const k of Object.keys(CURVA_BASE)) {
@@ -176,6 +212,7 @@ export function medirConcordancia(pares: ParNota[]): MetricasConcordancia {
     exatas_pct: n === 0 ? null : pct(exatas, n),
     dentro_de_1_pct: n === 0 ? null : pct(dentro, n),
     matriz,
+    erro_por_nota,
     distribuicao,
     generosidade,
     mais_generosa: generosidade.some((g) => g.mais_generosa),

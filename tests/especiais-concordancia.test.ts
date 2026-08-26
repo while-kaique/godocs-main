@@ -78,6 +78,18 @@ describe('medirConcordancia', () => {
     expect(m.vies).toBe(0.75); // (0 +1 -1 +3) / 4
   });
 
+  it('o viés POR NOTA expõe a compressão que o agregado cancela', () => {
+    // o defeito medido na 1ª corrida real: infla o zero, esmaga a nota alta, agregado ~0
+    const m = medirConcordancia([par(0, 2, 1), par(0, 2, 2), par(8, 4, 3)]);
+    expect(m.vies).toBe(0); // (+2 +2 -4) / 3 — leria como juiz calibrado
+    const zero = m.erro_por_nota.find((e) => e.humana === 0)!;
+    const oito = m.erro_por_nota.find((e) => e.humana === 8)!;
+    expect(zero.vies).toBe(2);
+    expect(zero.n).toBe(2);
+    expect(oito.vies).toBe(-4);
+    expect(m.erro_por_nota.map((e) => e.humana)).toEqual([0, 8]); // ordenado pelo gabarito
+  });
+
   it('o viés separa o juiz generoso do duro — o MAE sozinho não', () => {
     const generoso = medirConcordancia([par(0, 1, 1), par(1, 2, 2), par(2, 3, 3)]);
     const duro = medirConcordancia([par(1, 0, 1), par(2, 1, 2), par(3, 2, 3)]);
