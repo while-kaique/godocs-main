@@ -10,6 +10,7 @@
 // área de UMA pessoa pelo email (deriveAreaFromEmail).
 
 import { ehCargoDeLideranca } from '@/lib/cargo-lideranca';
+import { filtrarLideresOverride } from '@/lib/lideranca-override';
 
 const BASE = 'https://api.teamguide.app';
 
@@ -509,7 +510,11 @@ function construirIndiceLideranca(teamsRaw: TGTeam[], membros: TGMember[]): Indi
   for (const membro of membros) {
     const email = emailDe(membro);
     if (!email) continue;
-    const lideres = lideresDoMembro(membro);
+    // Remendo declarado para cadastro torto na TeamGuide (fonte única em
+    // `@/lib/lideranca-override`). Aplicado AQUI, no único ponto que constrói o
+    // índice, para os DOIS lados ficarem coerentes: quem some da lista de líderes
+    // dele também não recebe ele como liderado.
+    const lideres = filtrarLideresOverride(email, lideresDoMembro(membro));
     lideresPorEmail.set(email, lideres);
     for (const lider of lideres) {
       if (!lider.email) continue;
