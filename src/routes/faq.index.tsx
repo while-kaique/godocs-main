@@ -14,11 +14,12 @@ import {
 import { FaqCard, FaqShell, FaqVazio } from "@/components/faq/faq-ui";
 import { titulosDoDocumento } from "@/lib/faq/markdown";
 import { filtrarAssuntosFaq } from "@/lib/faq/formato";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 
 export const Route = createFileRoute("/faq/")({
   head: () => ({
     meta: [
-      { title: "Perguntas frequentes · GoGroup" },
       {
         name: "description",
         content:
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/faq/")({
 });
 
 function FaqIndex() {
+  useTituloPagina(SECAO.faq, "Perguntas frequentes");
   const { categorias, ehAdmin, podeEditar, verComoUsuario, carregando, erro, recarregar } = useFaq();
   const [busca, setBusca] = useState("");
 

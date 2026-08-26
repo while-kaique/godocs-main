@@ -621,6 +621,9 @@ export async function gravarVersaoProjeto(
   // conversa ORIGINAL de cada versão (os chat_messages são apagados ao voltar
   // etapas). Opcional/forward-only: versões antigas ficam com NULL.
   snapshotChat?: unknown[] | null,
+  // 'real' = caminho normal de submissão/reenvio; 'reconciliado' = reconstruído do
+  // estado atual pelo cron (fecha furos). Ver `src/lib/snapshot-projeto.ts`.
+  origem: "real" | "reconciliado" = "real",
 ): Promise<void> {
   const row = await queryOne<{ proxima: number }>(
     "SELECT COALESCE(MAX(versao_num), 0) + 1 AS proxima FROM projeto_versions WHERE projeto_id = ?",
@@ -628,8 +631,8 @@ export async function gravarVersaoProjeto(
   );
   const versao_num = row?.proxima ?? 1;
   await exec(
-    `INSERT INTO projeto_versions (id, projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, snapshot_chat, submetido_por, created_at)
-     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT INTO projeto_versions (id, projeto_id, versao_num, acao, snapshot_projeto, snapshot_doc, snapshot_chat, submetido_por, origem, created_at)
+     VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       projeto_id,
       versao_num,
@@ -638,8 +641,59 @@ export async function gravarVersaoProjeto(
       snapshotDoc ? JSON.stringify(snapshotDoc) : null,
       snapshotChat && snapshotChat.length > 0 ? JSON.stringify(snapshotChat) : null,
       submetidoPor,
+      origem,
     ],
   );
+}
+
+/**
+ * Projetos SUBMETIDOS com os campos escalares necessários para (re)montar o snapshot
+ * de auditoria. UMA consulta, SEM os blobs de conversa (`snapshot_chat`) — alimenta o
+ * cron `reconciliarSnapshots`. Inclui `memorial_calculo`/`custo_evitado_itens` (texto,
+ * não os blobs de 32 MiB) porque entram no snapshot.
+ */
+export function getProjetosParaSnapshot() {
+  return queryAll<Record<string, unknown> & { id: string; responsavel_email: string }>(
+    `SELECT id, nome, descricao_breve, ferramenta, tipos_projeto, especial, area,
+            saving_horas, saving_reais, horas_carga_real, horas_escala, tipo_saving,
+            memorial_calculo, ganho_total_mensal, custo_externo_mensal, alguem_fazia,
+            custo_evitado, custo_evitado_justificativa, custo_evitado_itens,
+            status, responsavel_email
+       FROM projetos
+      WHERE status != 'rascunho' AND submitted_at IS NOT NULL`,
+  );
+}
+
+/**
+ * Projeção escalar do ÚLTIMO snapshot de cada projeto (via `json_extract`, SEM blobs) —
+ * para o cron detectar divergência entre o estado atual e a última versão. Uma consulta.
+ * Chaves batem com `CHAVES_*` de `snapshot-projeto.ts`.
+ */
+export async function getUltimosSnapshotsResumo(): Promise<
+  Map<string, Record<string, unknown>>
+> {
+  const rows = await queryAll<Record<string, unknown> & { projeto_id: string }>(`
+    SELECT v.projeto_id,
+           json_extract(v.snapshot_projeto, '$.saving_reais')          AS saving_reais,
+           json_extract(v.snapshot_projeto, '$.ganho_total_mensal')    AS ganho_total_mensal,
+           json_extract(v.snapshot_projeto, '$.saving_horas')          AS saving_horas,
+           json_extract(v.snapshot_projeto, '$.custo_externo_mensal')  AS custo_externo_mensal,
+           json_extract(v.snapshot_projeto, '$.tipo_saving')           AS tipo_saving,
+           json_extract(v.snapshot_projeto, '$.nome')                  AS nome,
+           json_extract(v.snapshot_projeto, '$.area')                  AS area,
+           json_extract(v.snapshot_projeto, '$.especial')              AS especial,
+           json_extract(v.snapshot_projeto, '$.alguem_fazia')          AS alguem_fazia,
+           json_extract(v.snapshot_projeto, '$.custo_evitado')         AS custo_evitado,
+           json_extract(v.snapshot_projeto, '$.descricao_breve')       AS descricao_breve,
+           json_extract(v.snapshot_projeto, '$.ferramenta')            AS ferramenta
+      FROM projeto_versions v
+     WHERE v.versao_num = (
+       SELECT MAX(v2.versao_num) FROM projeto_versions v2 WHERE v2.projeto_id = v.projeto_id
+     )
+  `);
+  const map = new Map<string, Record<string, unknown>>();
+  for (const r of rows) map.set(String(r.projeto_id), r);
+  return map;
 }
 
 /** Contagem de reenvios (edições) por projeto — usado na listagem do Investigador. */
@@ -2426,6 +2480,7 @@ export type VersionRow = {
   snapshot_doc: string | null; // JSON
   snapshot_chat: string | null; // JSON (array de chat_messages); NULL em versões antigas
   submetido_por: string | null;
+  origem: string | null; // 'real' | 'reconciliado'; NULL (legado) = tratado como 'real'
   created_at: string | null;
 };
 

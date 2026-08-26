@@ -30,6 +30,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import { fmtDataBR } from "@/lib/format-date";
@@ -169,6 +171,8 @@ function fmtDate(iso: string | null): string {
   return iso ? fmtDataBR(iso) : "—";
 }
 
+// Título da aba: o projeto ATUAL do slider (`useTituloPagina` no componente) — a fila
+// troca de projeto sem trocar de rota, então `head:` não serviria.
 export const Route = createFileRoute("/aprovacoes")({
   component: AprovacoesPage,
 });
@@ -215,6 +219,11 @@ function AprovacoesPage() {
 
   const total = fila.length;
   const atual = fila[indice] ?? null;
+
+  // Título da aba = o projeto que está na tela agora. Fila vazia (ou ainda carregando)
+  // fica em "Aprovações · GoDocs".
+  useTituloPagina(SECAO.aprovacoes, atual?.projeto_nome ?? null);
+
   const pendentes = fila.filter((i) => !decididos[i.projeto_id]).length;
   const erro = error ? (error instanceof Error ? error.message : "Erro ao carregar a fila.") : null;
 

@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,7 +123,6 @@ function variaveisDe(a: Audiencia) {
 }
 
 export const Route = createFileRoute("/_authenticated/email-legados")({
-  head: () => ({ meta: [{ title: "Disparo de e-mails · Hub Admin" }] }),
   component: EmailLegadosPage,
 });
 
@@ -153,6 +154,9 @@ function selecaoPadrao(aud: Audiencia, recipients: Recipient[]): Set<string> {
 
 function EmailLegadosPage() {
   const [audiencia, setAudiencia] = useState<Audiencia>("legado");
+  // O segmento vai para a aba: os 3 têm lista, template e histórico próprios, e disparar
+  // no segmento errado é justamente o erro que dói aqui.
+  useTituloPagina(SECAO.emails, segMeta(audiencia).curto);
   // Estado por segmento (preserva edições de template e seleção ao trocar de aba).
   const [previews, setPreviews] = useState<Partial<Record<Audiencia, Preview>>>({});
   const [drafts, setDrafts] = useState<Partial<Record<Audiencia, { assunto: string; corpo: string }>>>({});

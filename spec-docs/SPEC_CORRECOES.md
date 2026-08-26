@@ -6,6 +6,55 @@
 
 ---
 
+## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
+
+**Status:** ✅ corrigido (staging validada) · **Branch:** `fix/snapshots-integridade`
+
+**Sintoma.** O histórico de auditoria de submissões/edições tinha buracos: muitos projetos submetidos **sem nenhuma linha em `projeto_versions`** — na staging, **578 submetidos e praticamente nenhum com versão**. Sem "visão panorâmica completa" confiável de submissões e edições (necessária para a API histórica de saving/receita do João Gabriel e para a futura tela de histórico no godocs).
+
+**Causa-raiz.** A versão só é gravada dentro de `submeterParaValidacao`, num `try/catch` **NÃO-BLOQUEANTE** (um erro ali não pode derrubar a submissão do usuário — correto). Consequência: submissões cujo snapshot falhou ficam sem versão, e **legados** importados do Sheets nunca passaram por esse caminho (nasceram sem versão). Nada reconciliava depois.
+
+**Fix.** Rede de reconciliação (mesmo espírito de `reconciliarComplexidade`: caminho quente segue não-bloqueante, o cron é a rede). `reconciliarSnapshots` (novo) varre os submetidos e (1) cria a **v1 faltante** e (2) grava um **reenvio** quando o estado EDITÁVEL divergiu do último snapshot — tudo marcado **`projeto_versions.origem='reconciliado'`** (nunca sobrescreve/apaga um `'real'`; NULL legado = `'real'`). Idempotente/convergente, **bounded a `max=200`/passada** (acima disso o fetch de doc por projeto estoura o timeout de request — medido: `max:2000` deu timeout, 200 passa). Formato do snapshot virou **FONTE ÚNICA** `montarSnapshotProjeto` (reusada pelo submit); `snapshotDiverge` exclui `status`/validação humana de propósito (não é edição do dono). Cron `POST /api/cron/reconciliar-snapshots` + admin `POST /api/admin/reconciliar-snapshots {max?}`. Backfill inicial = rodar a rota admin em passadas de 200 até `v1_criadas+reenvios=0` (staging: convergiu, 578 `ja_ok`, 0 falhas, 2ª passada 0 escritas).
+
+**Onde aterrissou.** `src/lib/snapshot-projeto.ts` (novo, puro), `src/lib/reconciliar-snapshots.ts` (novo), `src/integrations/db/schema.ts` (migração `origem`), `src/integrations/db/client.server.ts` (`gravarVersaoProjeto` +param, `getProjetosParaSnapshot`, `getUltimosSnapshotsResumo`, `VersionRow.origem`), `src/lib/chat.functions.ts` (submit reusa o builder), `src/worker.ts` (2 rotas), `worker.js` rebuildado. Testes `tests/snapshot-projeto.test.ts` + `tests/reconciliar-snapshots.test.ts`. `CLAUDE.md` (seção Investigador). Falta: deploy prod + registrar cron + backfill prod + PR.
+---
+
+## 2026-08-26 — Aba de aprovação de pendentes só atualizava por clique + item "Configurações" morto na sidebar
+
+**Status:** ✅ corrigido · **Branch:** `fix/auto-atualizar-aprovacoes-pendentes`
+
+**Sintoma.** (a) `/aprovacoes-pendentes` é tela de PLANTÃO — o time de RPA a deixa aberta enquanto
+valida —, mas a lista só mudava com um clique em **"Atualizar"**. Quem esquecia decidia sobre fila
+velha: projeto que outro admin já resolveu, projeto novo que não aparecia, parecer de líder que
+acabou de chegar. (b) O item **"Configurações"** da sidebar do admin não abria nada.
+
+**Causa-raiz.** (a) A tela nunca teve poll: uma única carga no mount (`useEffect`) e o resto por
+clique. O `carregar(silencioso)` já existia (usado depois de definir dono de área), só não havia
+relógio chamando. (b) O `NavItem` apontava para **`/configuracoes`, rota que nunca existiu** — não
+há `src/routes/_authenticated/configuracoes.tsx` nem entrada no `routeTree.gen.ts`, então o clique
+caía no SPA fallback. (A tabela `configuracoes` e a rota `GET /api/admin/configuracoes` existem e
+alimentam os critérios do validador — o que não existe é a TELA.)
+
+**Fix.** (a) Poll de **15 s** por `useAutoAtualizar` (`src/lib/auto-atualizar.ts`, hook + predicado
+PURO `motivoParaPular`), com as 4 travas descritas no `CLAUDE.md`: não empilha requisição, não
+atualiza por baixo de quem está decidindo (ficha/painel/gravação), não gasta chamada com a aba em
+segundo plano (e atualiza NA HORA ao voltar para ela) e **falha do ciclo automático não abre o
+painel vermelho de erro** — vira aviso discreto (ícone + texto) ao lado do carimbo de sincronização,
+com a lista velha preservada. O botão "Atualizar" fica (forçar agora) e o cabeçalho declara
+"Atualiza sozinho a cada 15 s". O `agoraMs` da tela passa a ser repontado a cada atualização (aba
+aberta a noite inteira mantinha "3 dias de espera"). ⚠️ **Barato porque a rota lê o espelho no
+SQLite, não o Sheets** — medido em prod: ~1,3 s e ~24 KB por chamada, 4 chamadas/min por aba, e
+**zero** consumo da cota de 60 leituras/min compartilhada com produção; se a rota voltar a ler a
+planilha, o poll sai no MESMO commit. (b) Removidos o `NavItem` e o ícone `Settings` de `route.tsx`
+— só isso, nada de banco nem de API.
+
+**Onde aterrissou.** `src/lib/auto-atualizar.ts` (novo), `src/routes/_authenticated/aprovacoes-pendentes.tsx`,
+`src/routes/_authenticated/route.tsx`, `tests/auto-atualizar.test.ts` (novo). `CLAUDE.md`
+(bullet em "Convenções rápidas") e `SPEC_FEATURES_NOVAS.md` (seção da aba). **Sem** mudança
+server-side → `worker.js` intocado.
+
+---
+
 ## 2026-08-25 — Nome do usuário na submissão saía errado (derivado do e-mail, não o nome real)
 
 **Status:** ✅ corrigido · **Branch:** `fix/nome-teamguide-identidade`

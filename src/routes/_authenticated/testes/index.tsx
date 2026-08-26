@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Play, FlaskConical, Brain } from 'lucide-react';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import { SECAO } from '@/lib/titulo-pagina';
 
 export const Route = createFileRoute('/_authenticated/testes/')({
   component: TestesIndex,
 });
 
 function TestesIndex() {
+  useTituloPagina(SECAO.testes);
   return (
     <div className="flex h-full items-center justify-center p-8">
       <div className="w-full max-w-2xl space-y-6">

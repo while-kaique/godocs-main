@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { apiFetch } from '@/lib/api-client'
+import { useTituloPagina } from '@/lib/use-titulo-pagina'
+import { SECAO } from '@/lib/titulo-pagina'
 import {
   Search,
   AlertTriangle,
@@ -38,8 +40,9 @@ import {
   UserCheck,
 } from 'lucide-react'
 
+// O título da aba é dinâmico (nome do projeto aberto), então mora no componente via
+// `useTituloPagina` — `head:` não enxerga estado da página. Ver `src/lib/titulo-pagina.ts`.
 export const Route = createFileRoute('/_authenticated/investigador')({
-  head: () => ({ meta: [{ title: 'Investigador · GoDocs Admin' }] }),
   component: Investigador,
 })
 
@@ -406,6 +409,18 @@ function isAbandonado(p: ProjetoInvestigador): boolean {
 
 type AbaInvestigador = 'submetidos' | 'edicoes' | 'abandonados' | 'pendentes_aprovacao'
 
+/**
+ * Rótulo de cada aba no título da janela. Separado do `ABAS` lá embaixo (que carrega
+ * as contagens e é montado depois do early return do detalhe) só porque o hook do
+ * título precisa rodar ANTES desse early return.
+ */
+const ABAS_TITULO: Record<AbaInvestigador, string> = {
+  submetidos: 'Submetidos',
+  edicoes: 'Edições',
+  abandonados: 'Abandonados',
+  pendentes_aprovacao: 'Pré-aprovação',
+}
+
 /** Carimbo → epoch ms (aceita ISO com Z/offset ou datetime SQLite). NaN se inválido. */
 function tsToEpoch(iso: string | null | undefined): number {
   if (!iso) return NaN
@@ -604,6 +619,15 @@ function Investigador() {
   // Valores dinâmicos para filtros (extraídos dos projetos carregados)
   const areasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.area_nome).filter(Boolean))].sort() as string[], [projetos])
   const ferramentasUnicas = useMemo(() => [...new Set(projetos.map((p) => p.ferramenta).filter(Boolean))].sort() as string[], [projetos])
+
+  // Título da aba: com um projeto aberto vale o NOME dele (é o que distingue duas abas
+  // de investigador); na lista, vale a aba atual. Fica ANTES do early return abaixo por
+  // causa das regras de hooks.
+  const rotuloAba = ABAS_TITULO[aba]
+  useTituloPagina(
+    SECAO.investigador,
+    selectedId ? (detalhes?.nome ?? null) : rotuloAba,
+  )
 
   if (selectedId) {
     return (

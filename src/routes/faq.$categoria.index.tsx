@@ -16,11 +16,12 @@ import { FaqDocumento } from "@/components/faq/faq-documento";
 import { CopiarLink, FaqShell, FaqVazio } from "@/components/faq/faq-ui";
 import { resolverCategoria } from "@/lib/faq/conteudo";
 import { linhaAtualizacaoFaq } from "@/lib/faq/formato";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 
+// Título da aba: o ASSUNTO aberto (`useTituloPagina`) — este é o link que circula em
+// Google Chat e e-mail, e a aba dizer só "Ajuda" não ajudaria ninguém a achar de volta.
 export const Route = createFileRoute("/faq/$categoria/")({
-  head: () => ({
-    meta: [{ title: "Perguntas frequentes · GoGroup" }],
-  }),
   component: FaqCategoriaPage,
 });
 
@@ -29,6 +30,7 @@ function FaqCategoriaPage() {
   const { categorias, ehAdmin, podeEditar, verComoUsuario, carregando, erro, recarregar } =
     useFaq();
   const categoria = resolverCategoria(categorias, slug);
+  useTituloPagina(SECAO.faq, categoria?.titulo ?? null);
 
   if (carregando) {
     return (

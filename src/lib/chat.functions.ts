@@ -70,6 +70,7 @@ import {
   erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
 import { deveRecusarSubmissao } from "@/lib/bloqueio-submissao";
+import { montarSnapshotProjeto } from "@/lib/snapshot-projeto";
 import {
   aplicaGateCustoEvitadoChat,
   detectarCustoEvitadoNoChat,
@@ -3545,13 +3546,13 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === "edicao" || !!projeto.submitted_at;
 
-  // ── Bloqueio TEMPORÁRIO de novas submissões (janela determinística) ──────────
-  // Reforço de SERVIDOR: recusa apenas SUBMISSÃO NOVA (não reenvio) enquanto a
-  // janela está aberta. Reenvio/edição de projeto já submetido segue normal — a
-  // triagem/aprovação do que já entrou não para. O cliente também desabilita o
-  // botão; isto cobre cliente desatualizado / chamada direta à API. Janela e copy
-  // vêm da fonte única `src/lib/bloqueio-submissao.ts`.
-  if (deveRecusarSubmissao(ehReenvio)) {
+  // ── Bloqueio TEMPORÁRIO de submissões (janela determinística) ────────────────
+  // Reforço de SERVIDOR: enquanto a janela está aberta, recusa TODA submissão do
+  // usuário — submissão NOVA *e* reenvio/edição de projeto já submetido (reenvio é
+  // uma submissão). A triagem/aprovação do admin não passa por aqui e não para. O
+  // cliente também desabilita o botão; isto cobre cliente desatualizado / chamada
+  // direta à API. Janela e copy vêm da fonte única `src/lib/bloqueio-submissao.ts`.
+  if (deveRecusarSubmissao()) {
     throw erroDeBloqueio(bloqueioSubmissaoPausada());
   }
 
@@ -3732,27 +3733,10 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   try {
     const projetoAtualizado = await getProjetoById(projeto_id);
     if (projetoAtualizado) {
-      const snapshotProjeto: Record<string, unknown> = {
-        nome: projetoAtualizado.nome,
-        descricao_breve: projetoAtualizado.descricao_breve,
-        ferramenta: projetoAtualizado.ferramenta,
-        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
-        especial: projetoAtualizado.especial,
-        area: projetoAtualizado.area,
-        saving_horas: projetoAtualizado.saving_horas,
-        saving_reais: projetoAtualizado.saving_reais,
-        horas_carga_real: projetoAtualizado.horas_carga_real,
-        horas_escala: projetoAtualizado.horas_escala,
-        tipo_saving: projetoAtualizado.tipo_saving,
-        memorial_calculo: projetoAtualizado.memorial_calculo,
-        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
-        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
-        alguem_fazia: projetoAtualizado.alguem_fazia,
-        custo_evitado: projetoAtualizado.custo_evitado,
-        custo_evitado_justificativa: projetoAtualizado.custo_evitado_justificativa,
-        custo_evitado_itens: projetoAtualizado.custo_evitado_itens,
-        status: projetoAtualizado.status,
-      };
+      // FONTE ÚNICA do formato do snapshot (reusada pelo cron reconciliarSnapshots).
+      const snapshotProjeto = montarSnapshotProjeto(
+        projetoAtualizado as unknown as Record<string, unknown>,
+      );
       // Snapshot da conversa ATUAL — congela os agentes originais desta versão para
       // o Investigador (os chat_messages são apagados ao voltar etapas/reeditar).
       const chatSnapshot = await getChatMessages(projeto_id);

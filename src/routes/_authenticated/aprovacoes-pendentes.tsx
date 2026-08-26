@@ -14,7 +14,7 @@
  * Ver `src/lib/aprovacao-pendentes-view.ts` (puro) e `src/lib/aprovacao-pendentes.functions.ts`.
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Ban,
@@ -74,9 +74,16 @@ import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes
 import { SeletorPeriodo } from '@/components/calendario/calendario';
 import { hojeIso } from '@/lib/calendario-datas';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import {
+  INTERVALO_AUTO_ATUALIZAR_MS,
+  useAutoAtualizar,
+} from '@/lib/auto-atualizar';
+import { SECAO } from '@/lib/titulo-pagina';
 
+// Título da aba: montado no componente (`useTituloPagina`) para levar o nome do projeto
+// com a ficha aberta. Ver `src/lib/titulo-pagina.ts`.
 export const Route = createFileRoute('/_authenticated/aprovacoes-pendentes')({
-  head: () => ({ meta: [{ title: 'Aprovação de pendentes · GoDocs Admin' }] }),
   component: AprovacaoPendentes,
 });
 
@@ -104,21 +111,46 @@ function AprovacaoPendentes() {
   const [mostrando, setMostrando] = useState<Record<string, number>>({});
   const [divisaoAberta, setDivisaoAberta] = useState(false);
   const [fichaAberta, setFichaAberta] = useState<ProjetoDashboardResumo | null>(null);
-  // "Agora" congelado: recalcular a cada render faria o chip de espera pular de faixa.
-  const [agoraMs] = useState(() => Date.now());
+  // "Agora" congelado ENTRE atualizações: recalcular a cada render faria o chip de espera
+  // pular de faixa. Reponto a cada atualização bem-sucedida — com a tela atualizando
+  // sozinha ela fica aberta por horas, e um "agora" preso na montagem manteria "3 dias de
+  // espera" numa aba que virou a noite.
+  const [agoraMs, setAgoraMs] = useState(() => Date.now());
+  // A atualização automática falhou (rede/edge). NÃO vira o painel vermelho de erro: um
+  // soluço de rede a cada 15 s encheria a tela de alarme sobre uma lista que continua
+  // válida. Vira um aviso discreto ao lado do carimbo de sincronização.
+  const [falhaAuto, setFalhaAuto] = useState(false);
+  // Guard de requisição em voo: a rodada leva ~1,3 s, mas pode passar dos 15 s. Sem isto as
+  // chamadas se empilham sobre um endpoint já lento (foi o que derrubou o /investigador).
+  const emVooRef = useRef(false);
+  // Título da aba: com a ficha aberta vale o nome do projeto que está sendo aprovado.
+  useTituloPagina(
+    SECAO.aprovacoesPendentes,
+    fichaAberta ? (fichaAberta.nome ?? fichaAberta.id) : null,
+  );
   // Mapa `id do projeto → o que cada participante fez`. Vem do BANCO, ao lado da
   // listagem (a linha da planilha não tem este texto); `{}` enquanto carrega e para
   // build antiga do servidor, que não manda a chave — o cartão só não desenha o bloco.
   const contribuicoesPorProjeto = dados?.contribuicoes ?? {};
 
-  const carregar = useCallback(async (silencioso = false) => {
+  /**
+   * `silencioso` = sem o spinner de tela cheia (a lista velha fica à vista enquanto recarrega).
+   * `auto` = tique do relógio: além de silencioso, uma falha NÃO abre o painel de erro
+   * (ver `falhaAuto`) e não apaga a lista que está na tela.
+   */
+  const carregar = useCallback(async (silencioso = false, auto = false) => {
     if (!silencioso) setCarregando(true);
+    emVooRef.current = true;
     try {
       setDados(await apiFetch<Listagem>('/api/admin/aprovacao-pendentes'));
-      setErro(null);
+      setAgoraMs(Date.now());
+      setFalhaAuto(false);
+      if (!auto) setErro(null);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não foi possível carregar os projetos.');
+      if (auto) setFalhaAuto(true);
+      else setErro(e instanceof Error ? e.message : 'Não foi possível carregar os projetos.');
     } finally {
+      emVooRef.current = false;
       setCarregando(false);
     }
   }, []);
@@ -126,6 +158,23 @@ function AprovacaoPendentes() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /**
+   * Atualiza sozinha a cada 15 s — a tela é de PLANTÃO (fica aberta enquanto o time valida) e
+   * a fila muda por baixo: submissão nova, parecer de líder, outro admin decidindo. O botão
+   * "Atualizar" continua ali para quem quer forçar agora.
+   *
+   * Barato porque o endpoint lê o ESPELHO da planilha no SQLite, não o Sheets: não consome a
+   * cota de leituras (medido em prod: ~1,3 s e ~24 KB por chamada). As travas ficam em
+   * `@/lib/auto-atualizar` — não empilha requisição, não atualiza por baixo de quem está
+   * decidindo (ficha/painel/gravação) e não gasta chamada com a aba em segundo plano; voltar
+   * para a aba atualiza na hora, que é quando a lista velha mais engana.
+   */
+  useAutoAtualizar(() => carregar(true, true), {
+    emVoo: emVooRef.current,
+    carregandoPrimeiraVez: dados == null,
+    interagindo: fichaAberta != null || divisaoAberta || salvando != null,
+  });
 
   const donoPor = useMemo(
     () => new Map((dados?.donos ?? []).map((d) => [chaveArea(d.area), d])),
@@ -270,7 +319,12 @@ function AprovacaoPendentes() {
             aoClicar={() => setFiltros((f) => ({ ...f, soMultiplos: !f.soMultiplos }))}
             ativo={filtros.soMultiplos}
           />
-          <div className="ml-auto flex items-end pb-1 text-[11.5px] text-muted-foreground">
+          {/* Carimbo da planilha + o contrato da tela: ela se atualiza sozinha. Sem essa
+              linha ninguém sabe que a lista é viva, e o botão "Atualizar" continua parecendo
+              obrigatório. A falha do ciclo automático aparece AQUI (ícone + texto, nunca só
+              cor), não no painel vermelho de erro: soluço de rede a cada 15 s viraria alarme
+              sobre uma lista que continua válida. */}
+          <div className="ml-auto flex flex-col items-end pb-1 text-[11.5px] text-muted-foreground">
             {dados && (
               <span className="inline-flex items-center gap-1.5">
                 {dados.espelhoVelho && (
@@ -278,6 +332,16 @@ function AprovacaoPendentes() {
                 )}
                 Planilha sincronizada às {fmtHora(dados.lidoEm)}
                 {dados.espelhoVelho && ' (há mais de 20 min)'}
+              </span>
+            )}
+            {falhaAuto ? (
+              <span className="inline-flex items-center gap-1.5 text-amber-700">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                Não consegui atualizar sozinho — use “Atualizar”
+              </span>
+            ) : (
+              <span>
+                Atualiza sozinho a cada {Math.round(INTERVALO_AUTO_ATUALIZAR_MS / 1000)} s
               </span>
             )}
           </div>

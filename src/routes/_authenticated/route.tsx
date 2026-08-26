@@ -6,7 +6,6 @@ import { iniciarPrefetchDashboard } from "@/lib/dashboard-prefetch";
 import {
   LayoutDashboard,
   Building2,
-  Settings,
   ExternalLink,
   FlaskConical,
   Search,
@@ -190,9 +189,6 @@ function AuthenticatedLayout() {
           </NavItem>
           <NavItem to="/areas" icon={<Building2 className="h-4 w-4" />}>
             Áreas
-          </NavItem>
-          <NavItem to="/configuracoes" icon={<Settings className="h-4 w-4" />}>
-            Configurações
           </NavItem>
           <NavItem to="/investigador" icon={<Search className="h-4 w-4" />}>
             Investigador

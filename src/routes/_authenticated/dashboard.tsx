@@ -36,7 +36,9 @@ import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
-import { STATUS_TRIAGEM, corDaRegua } from '@/components/dashboard/status-triagem';
+import { STATUS_TRIAGEM, corDaRegua, metaStatus } from '@/components/dashboard/status-triagem';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import { SECAO } from '@/lib/titulo-pagina';
 import {
   filtrarPorTermo,
   compararProjetos,
@@ -78,8 +80,9 @@ import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 // Do módulo PURO (não do .functions server) para não puxar código de servidor ao bundle.
 import { apenasAutoresComMultiplos, agruparAdjacentePorAutor } from '@/lib/dashboard-resumo';
 
+// Título da aba: dinâmico (projeto aberto na ficha / fila filtrada), montado no
+// componente com `useTituloPagina` — ver `src/lib/titulo-pagina.ts`.
 export const Route = createFileRoute('/_authenticated/dashboard')({
-  head: () => ({ meta: [{ title: 'Triagem de projetos · GoDocs Admin' }] }),
   // ?projeto=<id> abre a ficha do projeto direto (deep-link do alerta no Google Chat,
   // que só admin lê). Fechar a ficha limpa o param — ver o efeito abaixo.
   validateSearch: (search: Record<string, unknown>): { projeto?: string } => ({
@@ -160,6 +163,14 @@ function Dashboard() {
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState<number>(25);
   const [aberto, setAberto] = useState<ProjetoDashboardResumo | null>(null);
+
+  // Título da aba. Com a ficha aberta vale o NOME do projeto (é o que diferencia duas
+  // abas de triagem); fechada, vale a fila filtrada ("Dash · Reenvio pendente"), e em
+  // "todos" fica só "Dash · GoDocs".
+  useTituloPagina(
+    SECAO.dashboard,
+    aberto ? (aberto.nome ?? aberto.id) : (metaStatus(filtro)?.label ?? null),
+  );
 
   const inputBusca = useRef<HTMLInputElement>(null);
   // Guarda o id de deep-link já aberto, para o efeito não reabrir a ficha depois que a

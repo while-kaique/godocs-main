@@ -21,6 +21,7 @@ import {
   reconciliarComplexidade,
   retroativoCustosPontuais,
 } from "@/lib/chat.functions";
+import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import {
   getAreas,
   createArea,
@@ -294,6 +295,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await reconciliarComplexidade());
     }
 
+    // ── Cron: reconcilia SNAPSHOTS de auditoria (projeto_versions) ──
+    // A versão é gravada de forma não-bloqueante no submit; submissões cujo snapshot
+    // falhou (e legados) ficam sem versão. Este cron fecha os furos reconstruindo a
+    // versão a partir do estado atual (marcada origem='reconciliado'). Idempotente.
+    if (pathname === "/api/cron/reconciliar-snapshots" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await reconciliarSnapshots());
+    }
+
     // ── Cron: classificador de especiais pendentes (peça 4) ──────────────────
     // Rede do disparo pós-submissão: um especial cujo background morreu (ou submetido
     // antes da feature) recebe a recomendação aqui. Bounded por corrida (converge em
@@ -480,6 +492,15 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
             responseSize = resJson.length;
             const logProjetoId =
               projetoId ?? (result as { projeto_id?: string })?.projeto_id ?? null;
+            // Envelope + FECHA o stream já: é o fechamento do stream (done) que faz o
+            // apiStream do cliente resolver e liberar o botão "Enviar para Triagem"
+            // (setChatComplete). O insertApiLog é observability (grava req+resp inteiros) e
+            // estava ANTES do send, segurando o botão à toa; mesmo depois do send ele seguraria,
+            // porque o cliente espera o `done`. Então fecha aqui e grava DEPOIS: o
+            // `ctx.waitUntil(tarefa)` mantém o isolate vivo até o log terminar, sem perdê-lo.
+            // (O finally fecha de novo no caminho de erro — writer.close() repetido é no-op.)
+            await send({ t: "envelope", r: result });
+            await writer.close().catch(() => {});
             await insertApiLog({
               projeto_id: logProjetoId,
               endpoint: pathname,
@@ -491,7 +512,6 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
               request_body: reqJson,
               response_body: resJson,
             }).catch(() => {});
-            await send({ t: "envelope", r: result });
           } catch (e) {
             const err = e as Error & { status?: number; bloqueio?: unknown };
             const amigavel = traduzirErroValidacao(e);
@@ -1062,6 +1082,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/reanalisar-pendentes" && method === "POST") {
       await requireAdmin(request);
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Reconciliação de SNAPSHOTS sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/reconciliar-snapshots, sem o header de cron:
+    // fecha os furos do histórico de versões (reconstrói versões faltantes marcadas
+    // origem='reconciliado'). Existe para o backfill inicial e para validar na staging
+    // (o cron não dispara lá). Aceita {max} opcional. Idempotente.
+    if (pathname === "/api/admin/reconciliar-snapshots" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ max?: number }>(request).catch(() => ({}) as { max?: number });
+      return json(await reconciliarSnapshots(body?.max));
     }
 
     // ── Disparo de e-mails por segmento (admin) ──

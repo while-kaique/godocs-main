@@ -87,9 +87,12 @@ import {
   type AvaliacaoEspecial,
 } from '@/lib/especiais-regua';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
+import { useTituloPagina } from '@/lib/use-titulo-pagina';
+import { SECAO } from '@/lib/titulo-pagina';
 
+// Título da aba: montado no componente (`useTituloPagina`) para levar o nome do projeto
+// com a ficha aberta. Ver `src/lib/titulo-pagina.ts`.
 export const Route = createFileRoute('/_authenticated/especiais')({
-  head: () => ({ meta: [{ title: 'Comparador de especiais · GoDocs Admin' }] }),
   component: Especiais,
 });
 
@@ -143,6 +146,16 @@ function Especiais() {
   // "Agora" congelado no carregamento: recalcular a cada render faria o chip de espera mudar
   // de faixa no meio de um clique.
   const [agoraMs] = useState(() => Date.now());
+  // Título da aba: com a ficha aberta vale o nome do projeto; fechada, quantos estão
+  // selecionados para comparar (é o estado que se perde de vista ao trocar de aba).
+  useTituloPagina(
+    SECAO.especiais,
+    fichaAberta
+      ? (fichaAberta.nome ?? fichaAberta.id)
+      : selecionados.length > 0
+        ? `${selecionados.length} selecionado${selecionados.length > 1 ? 's' : ''}`
+        : null,
+  );
   // Mapa `id do projeto → o que cada participante fez`. Vem do BANCO, ao lado da
   // listagem (a linha da planilha não tem este texto); `{}` enquanto carrega e para
   // build antiga do servidor, que não manda a chave — o cartão só não desenha o bloco.

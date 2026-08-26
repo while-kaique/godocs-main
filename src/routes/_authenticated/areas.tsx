@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { useTituloPagina } from "@/lib/use-titulo-pagina";
+import { SECAO } from "@/lib/titulo-pagina";
 
 type Area = { id: string; nome: string };
 
 export const Route = createFileRoute("/_authenticated/areas")({
-  head: () => ({ meta: [{ title: "Áreas · Hub Admin" }] }),
   component: AreasPage,
 });
 
 function AreasPage() {
+  useTituloPagina(SECAO.areas);
   const [areas, setAreas] = useState<Area[] | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [loading, setLoading] = useState(false);

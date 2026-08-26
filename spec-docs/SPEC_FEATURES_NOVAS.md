@@ -1534,6 +1534,15 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 
 **Arquivos:** `src/lib/aprovacao-pendentes-view.ts` (puro), `src/lib/aprovacao-pendentes.functions.ts` (servidor), `src/routes/_authenticated/aprovacoes-pendentes.tsx`, nav em `route.tsx` (selo "Temporária"), rota no `worker.ts`. Testes: `tests/aprovacao-pendentes-view.test.ts`.
 
+**Atualiza sozinha a cada 15 s (26/08/2026, pedido do Kaique — "o botão Atualizar tem de ser quase desnecessário"):** a tela é de PLANTÃO (fica aberta enquanto o time valida) e a fila muda por baixo — submissão nova, parecer de líder, outro admin decidindo. O poll é `useAutoAtualizar` (**`src/lib/auto-atualizar.ts`**, hook + o predicado PURO `motivoParaPular`); o botão "Atualizar" **fica** (forçar agora) e o cabeçalho passa a dizer "Atualiza sozinho a cada 15 s".
+
+- **Por que 15 s é barato AQUI:** `GET /api/admin/aprovacao-pendentes` lê o **espelho da planilha no SQLite**, nunca o Sheets em request — **não consome a cota de 60 leituras/min compartilhada com prod**. Medido em prod: ~1,3 s e ~24 KB por chamada (4 chamadas/min por aba aberta). ⚠️ **Se algum dia essa rota voltar a ler o Google Sheets, o poll sai no MESMO commit** (é a mesma armadilha do `preload={false}` do link "Dashboard").
+- **As 4 travas** (cada uma é um jeito conhecido de "atualizar sozinho" quebrar a tela): **(1)** não empilha requisição (`emVoo`) — a rodada pode passar dos 15 s, e o empilhamento foi o que derrubou o `/investigador` (polling de 8 s); **(2)** não atualiza por baixo de quem está DECIDINDO — ficha aberta, painel de divisão aberto ou gravação em curso (`interagindo`) congelam a lista, e o tique seguinte ao fechar já traz o dado novo; **(3)** aba em segundo plano não gasta chamada, e **voltar para a aba atualiza NA HORA** (mesmo padrão do `AtualizacaoBanner`) — é quando a lista velha mais engana; **(4)** falha do ciclo automático **NÃO abre o painel vermelho de erro** (soluço de rede a cada 15 s viraria alarme sobre uma lista que continua válida): vira aviso discreto com ícone + texto ao lado do carimbo de sincronização (`falhaAuto`), e a lista velha permanece na tela. O botão manual segue mostrando o erro real.
+- **`agoraMs` deixou de ser congelado para sempre** — ele é repontado a cada atualização bem-sucedida. Continua congelado ENTRE atualizações (o chip de espera não pode pular de faixa a cada render), mas com a tela se atualizando sozinha ela fica aberta por horas e um "agora" preso na montagem manteria "3 dias de espera" numa aba que virou a noite.
+- **Escopo:** só esta aba. `/especiais` e `/dashboard` seguem no botão manual (o hook é reusável quando/se for pedido).
+
+Teste: `tests/auto-atualizar.test.ts` (a regra pura, incluindo a precedência "aba escondida vence" e a cadência de 15 s como decisão de produto).
+
 **Decisão em aberto:** o escopo inclui todos os `pendente` não-especiais (situação — fila do RPA / aguardando líder / aguardando autor — vira etiqueta + filtro). Se o Luis quiser só o que já é do RPA, é 1 linha em `ehDaFilaRpa`.
 
 ---
@@ -1858,3 +1867,27 @@ similaridade das notas humanas dos vizinhos e devolve `inflada` · `deflada` · 
 **Envs (secrets do Godeploy):** `LLM_MODEL_FAST=gpt-5.6-luna` + `LLM_REASONING_EFFORT_FAST=low` (setados em staging `edf400b4` e prod `674a3710`, 25/08). `LLM_REASONING_EFFORT` (effort das fases fortes) fica **unset** de propósito — ligá-lo é experimento futuro, não parte desta fatia.
 
 **Invariante crítico:** com **todas as envs de LLM ausentes**, o comportamento é **byte-idêntico ao de antes** (nenhum `reasoning_effort` no body; modelo = `LLM_MODEL` em todas as fases) — provado por teste. Testes: `tests/llm-reasoning-effort.test.ts`, `tests/llm-reasoning-routing.test.ts`. Plano completo: `docs/plans/latencia-ia-roteamento-por-fase.md`.
+
+## Título da aba por página (26/08/2026)
+
+**Problema (relato do Kaique):** *"ao entrar em páginas dentro do sistema, o nome nunca muda, é sempre Hub de Projetos - Godocs"*. Com triagem, investigador e a ficha de um projeto abertos ao mesmo tempo — o normal em dia de validação — as abas ficavam indistinguíveis; achar de volta era clicar uma a uma.
+
+**Causa:** o `<HeadContent />` do TanStack Router **nunca foi renderizado** no `__root.tsx`. As rotas até declaravam `head: () => ({ meta: [{ title }] })` (11 delas), mas nada consumia esse `head` — era código morto, e o `<title>` do `index.html` valia para sempre. ⚠️ Diagnóstico enganoso: os títulos ESTAVAM escritos no código.
+
+**Decisão — hook, não `HeadContent`:** metade dos títulos úteis depende de estado da **PÁGINA**, não da rota (o projeto aberto no overlay da triagem, o card do investigador, o projeto atual do slider de pré-aprovação, a aba/filtro selecionado). `head:` de rota não enxerga nada disso, e manter as duas fontes deixaria o `HeadContent` sobrescrevendo o título dinâmico a cada re-render do router. Então: **uma** fonte só — `useTituloPagina`.
+
+**Como funciona:**
+- **`src/lib/titulo-pagina.ts`** (módulo **PURO**, FONTE ÚNICA): `montarTitulo(secao, detalhe?)`, `encurtarDetalhe` e o mapa `SECAO` de rótulos.
+- **`src/lib/use-titulo-pagina.ts`**: `useTituloPagina(secao, detalhe?, ativo?)` escreve `document.title` num `useEffect`.
+- **Formato `Seção · detalhe`**, e `Seção · GoDocs` quando não há detalhe. ⚠️ O detalhe **ocupa o lugar da marca** de propósito: com os três ("Investigador · Bot de Faturamento · GoDocs") a aba corta antes de chegar ao nome do projeto, que é justamente o que faltava. Detalhe cortado em **60 chars** (`LIMITE_DETALHE`), preferindo fronteira de palavra.
+
+**Cobertura (16 rotas):** `Início` · `Meus Projetos · <filtro>` (só fora de "Todos") · `Nova submissão · <nome do projeto ou Etapa N>` · `Editando · <nome>` · `Projeto · <nome>` (**`Especial · <nome>`** quando `especial`) · `Aprovações · <projeto atual do slider>` · `Dash · <projeto da ficha | fila filtrada>` · `Investigador · <projeto aberto | aba>` · `Aprovados · <projeto da ficha>` (`/aprovacoes-pendentes`) · `Especiais · <projeto | N selecionados>` · `Ajuda · <assunto>` (FAQ) · `E-mails · <segmento>` · `Áreas` · `Usuários` · `Testes`/`Cenários`/`Prompts da IA` · `Demonstração · Escolher fluxo` (`/fluxos`).
+
+**Gotchas que não podem regredir:**
+1. ⚠️ **Não chamar o hook num layout/pai que renderiza um filho com título próprio.** Na montagem o efeito do **filho roda ANTES** do efeito do pai, então o pai apagaria o título do filho. É o caso de `/testes` (o título é de cada filha), de `/editar/$id` (quem titula é o `SubmeterPageContent`, que tem o nome seedado) e de `/fluxos` — este último resolve com o 3º parâmetro **`ativo`** (`false` = cede o título), nunca com um `if` em volta do hook.
+2. ⚠️ **O hook NÃO restaura o título anterior ao desmontar**, de propósito: quem entra na tela seguinte escreve o dela no mesmo tick, e restaurar criaria um piscar "Investigador → Hub de Projetos → Dash".
+3. ⚠️ **Rota nova = chamar `useTituloPagina`.** Voltar a escrever `title` no `head:` NÃO funciona enquanto o `<HeadContent />` não existir — e ressuscitá-lo criaria duas fontes brigando.
+4. ⚠️ A fila do líder é **`Aprovações`**, nunca "Aprovados" (nomenclatura de pré-aprovação, CLAUDE.md) — "Aprovados" é o painel admin `/aprovacoes-pendentes`. Há teste explícito.
+5. Os `head:` das rotas seguem existindo só para **`description`/`og:`** (que também não são aplicados hoje, mas são do documento, não da navegação).
+
+**Teste:** `tests/titulo-pagina.test.ts` (11 casos — formato, corte, normalização de espaço/quebra de linha do nome vindo da planilha, seção sempre primeiro, e a trava de nomenclatura).
