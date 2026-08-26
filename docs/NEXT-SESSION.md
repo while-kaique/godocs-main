@@ -1,7 +1,17 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ nenhum plano ativo.** O último (`latencia-ia-roteamento-por-fase.md`) foi **✅ ENTREGUE EM PROD (v286) + merge no `main` (PR #286), 25/08** — T1–T7 completos. Próximo trabalho: planejar o que vier com `/ggsd:plan`. _(Pendente só de VALIDAÇÃO humana: o Luis medir o TTFB da fase `doc` num chat real de prod — o roteamento por fase já está confirmado ativo por sinal de runtime nos logs.)_
+**→ API histórica de saving/receita p/ João Gabriel (squad Intelli) — FASE 3 NÚCLEO.** Plano em `~/.claude/plans/flickering-fluttering-rabin.md` + memória `api-historica-saving-receita-jg` (fonte da verdade dos detalhes/decisões).
+
+**Esta sessão (26/08, cont.):** Luis decidiu **"aprovado" = o que a TRIAGEM aprovou na PLANILHA** (Status="Aprovado" no espelho), não `projetos.status`. Reescrevi o rollup pra sair **INTEIRO do espelho** (mesma fonte do /dashboard): saving/receita/área/cadência/mês todos das colunas "Saving Reais"/"Receita Mensal"/"Área"/"Tipo de Saving"/"Data Submissão"; removi o join com `projetos`/`documentacao` (ler receita de `documentacao` dava ~0 — receita de legado mora na PLANILHA). "Tipo de Saving" entrou em `COLUNAS_RESUMO` (fora do payload da listagem) + bump `VERSAO_RECORTE_RESUMO` 2→3 (re-espelha no próximo sync). Deployado staging (v226) + prod (v297, prod==main). **Bate EXATO com o dashboard:** prod saving **R$1.353.716,12**, receita **R$1.384.843,40** (= dashboard). Suíte **1823 verde**. Commits: `71c8b84`, `add2025` (+ `df495f2`/`8247e1f` da 1ª versão via projetos, superada). Rota leitura: `GET /api/admin/rollup-mensal` (admin). Fluxo de deploy do rollup: deploy → `POST /api/admin/sync-sheets-now` → `POST /api/admin/rollup-backfill` → `GET /api/admin/rollup-mensal`.
+
+**Entrega = PUSH (Luis decidiu):** o godocs EMPURRA pro app do Gabriel (modelo Gomoon), token `gdk_ingest_…` já combinado com ele. Construído: `src/lib/rollup-push.functions.ts` (`enviarRollupParaJG`/`montarPayloadRollup`), rota admin `POST /api/admin/rollup-push` (dry default) + **cron `POST /api/cron/rollup-push`** (id `2aysp914qg9r`, diário 07:00 UTC) que recomputa do espelho e empurra. Contrato: `origem`/`ambiente`/`gerado_em`/`grao:mensal`/`celulas`/`totais_area`, saving+receita separados, sem total geral, token no header. **Validado em staging (v227) + prod (v298):** dry-run monta (prod 177 células), envio real responde `JG_INGEST_URL não configurada` (inerte, esperado). CLAUDE.md + SPEC_FEATURES_NOVAS atualizados. Suíte **1826 verde**.
+
+⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou.**
+
+**Próximo passo:** (1) **Luis seta o secret `JG_INGEST_URL`** (endpoint do Gabriel) em prod `674a3710` — aí o cron passa a entregar sozinho, sem redeploy; testar com `POST /api/admin/rollup-push {"dry":false}`. (2) **PR do que está em prod pra main** via `LuisEduardo100` (regra 14; branch `feat/rollup-historico-jg`) — EM ANDAMENTO nesta sessão.
+
+_(Anterior: `latencia-ia-roteamento-por-fase.md` **✅ ENTREGUE EM PROD (v286) + PR #286, 25/08** — T1–T7 completos.)_
 
 Latência da IA: roteamento de modelo + `reasoning_effort` **por FASE**. Turnos mecânicos
 (`doc`/`doc_preview`) → `gpt-5.6-luna` + `reasoning_effort=low`; memorial/doc-compile/analisador

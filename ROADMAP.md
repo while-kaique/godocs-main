@@ -6,7 +6,15 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Plano ativo — Latência da IA: roteamento por FASE 🟡 (CÓDIGO T1–T4 FEITO + revisado em 2026-08-25):**
+**Plano ativo — API histórica de saving/receita p/ João Gabriel (squad Intelli), FASE 3 NÚCLEO 🟡 (código pronto+verde em 2026-08-26, NÃO deployado):**
+agregador puro (`rollup-financeiro.ts`) + tabela durável `rollup_saving_receita` + backfill mensal (`rollup-backfill.ts`) + rota admin
+`POST /api/admin/rollup-backfill`. Grão (mês de `submitted_at`, área, `tipo_saving`); saving e receita CRUS/SEPARADOS, nunca somados,
+nunca ÷10; só aprovados; sem total geral. Branch `feat/rollup-historico-jg` (`ecd3c0e`, base RED `2881707`), suíte **1824 verde**.
+⚠️ Revisão GGSD (§9) NÃO rodou — `/ggsd:ship` barra até rodar. **Próximo:** revisores §9 → staging `edf400b4` (`rollup-backfill` + conferir
+`lerRollupMensal` × /dashboard) → prod `674a3710` → PR via `LuisEduardo100`. Depois: snapshot semanal + push outbound (dry-run até `JG_INGEST_URL`).
+Detalhes na memória `api-historica-saving-receita-jg` + `~/.claude/plans/flickering-fluttering-rabin.md`.
+
+**Plano anterior — Latência da IA: roteamento por FASE 🟡 (CÓDIGO T1–T4 FEITO + revisado em 2026-08-25):**
 rotear turnos mecânicos (`doc`/`doc_preview`) para `gpt-5.6-luna` + `reasoning_effort=low`, mantendo
 memorial/doc-compile/analisador no `sol` (Opção A). Tudo env-gated, default = hoje. Base: investigação
 do proxy-ai (24–25/08, medições reais — `luna+low` TTFB 3,2s vs `sol/medium` 19,6s). Código em `llm.ts`
