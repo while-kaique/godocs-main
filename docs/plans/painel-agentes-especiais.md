@@ -272,6 +272,22 @@ vivo e o fallback não foi exercitado nesta medição.
   corrida com cota entra como número secundário, para saber quanto a cota mexeria em produção.
   ⚠️ E o `erro_por_nota` do harness compara contra a curva da base: ao ler o relatório, a régua de
   generosidade é a `CURVA_ESPECIAIS_AUDITADOS`.
+
+  **Fiação FEITA** (`medirConcordanciaPainel` + `POST /api/admin/especiais/concordancia`
+  `{"juiz":"painel"}`, 2 testes): o painel entra como `opts.juiz` do harness do T1, que já monta o
+  alvo, recupera a vizinhança **excluindo o próprio projeto** e calcula MAE / ±1 / matriz /
+  `erro_por_nota`. Duas coisas que a fiação obrigou a arrumar:
+
+  - ⚠️ **`JuizConcordancia` ganhou um 3º parâmetro** (`extra.funcao`, aditivo — o agente único
+    ignora): a FUNÇÃO tem de sair do **mesmo texto** no harness e no lote, senão as duas corridas
+    roteariam diferente e deixariam de ser comparáveis. O recipe (título = nome + "o que faz";
+    corpo = o texto do embedding) virou **`funcaoDoMontado`**, fonte única — estava digitado 3×.
+  - ⚠️ **Página de 5, não 15** (`PAGINA_CONCORDANCIA_PAINEL`): ~7 chamadas e até ~40 s por projeto
+    (lentes em paralelo + até 3 voltas de revisor SEQUENCIAIS) — 12 numa requisição passariam de 8
+    minutos. São ~10 requisições para varrer os 48.
+
+  **Falta a MEDIÇÃO**, e ela só roda com o código na staging (o `/funcoes` do T2 respondeu 404 lá,
+  então a staging está num build anterior a esta branch) → é o T8.
 - **T8 — Staging → validar → prod (regra 13) + PR (regra 7).**
 
 ## Critérios de aceitação

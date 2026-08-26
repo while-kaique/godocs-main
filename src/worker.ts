@@ -63,6 +63,7 @@ import {
   medirConcordanciaAgente,
   rotearEspeciaisPorFuncao,
   julgarEspeciaisComPainel,
+  medirConcordanciaPainel,
 } from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -888,9 +889,26 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     // ⚠️ SOMENTE LEITURA — não existe `dry` porque não existe caminho de escrita: a nota humana
     // aqui é GABARITO, e nada é gravado em `especial_avaliacao` nem na coluna "Estrelas".
     // Paginado: `proximo_offset` diz onde continuar (é ~1 chamada de LLM por projeto).
+    // ⚠️ `juiz: "painel"` mede o PAINEL de agentes (T7) no MESMO harness — é a trava de subida do
+    // plano. Continua SEM caminho de escrita, e a página é menor de propósito (~7 chamadas e até
+    // ~40 s por projeto, contra ~10 s do agente único).
     if (pathname === "/api/admin/especiais/concordancia" && method === "POST") {
       await requireAdmin(request);
-      const body = (await readBody(request)) as { limite?: number; offset?: number };
+      const body = (await readBody(request)) as {
+        limite?: number;
+        offset?: number;
+        juiz?: string;
+        lentes?: string[];
+      };
+      if (body.juiz === "painel") {
+        return json(
+          await medirConcordanciaPainel({
+            limite: body.limite,
+            offset: body.offset,
+            lentes: body.lentes,
+          }),
+        );
+      }
       return json(await medirConcordanciaAgente({ limite: body.limite, offset: body.offset }));
     }
 

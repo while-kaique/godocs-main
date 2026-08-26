@@ -325,3 +325,49 @@ describe("painel em lote (T6)", () => {
     expect(r.linhas[0].voltas).toBeGreaterThan(0);
   });
 });
+
+describe("T7 — fiação do painel no harness de concordância", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    avaliarComLentes.mockImplementation(async () => {
+      const avals = TODAS(2);
+      return { avaliacoes: avals, falhas: [], consolidado: consolidarLentes(avals) };
+    });
+    revisarAdversarial.mockResolvedValue({
+      refutada: false,
+      nota_sugerida: null,
+      motivo: "sustentou",
+    });
+  });
+
+  it("mede SÓ os especiais com nota humana e NÃO grava nada", async () => {
+    const mod = await import("@/lib/especial-classificador.functions");
+    const espelho = await import("@/lib/sheet-espelho");
+    const resumoMod = await import("@/lib/dashboard-resumo");
+    // p1 e p3 auditados; p2 sem nota → fica fora do test set
+    vi.spyOn(resumoMod, "mapResumo").mockImplementation((l: { id: string }) =>
+      resumo(l.id, l.id === "p2" ? null : 3),
+    );
+    expect(espelho.lerResumosEspelho).toBeDefined();
+
+    const r = await mod.medirConcordanciaPainel({ limite: 5 });
+    expect(r.somente_leitura).toBe(true);
+    expect(r.juiz).toBe(mod.JUIZ_PAINEL);
+    expect(r.total_com_nota).toBe(2);
+    expect(r.pares.map((p) => p.projeto_id).sort()).toEqual(["p1", "p3"]);
+    expect(upsertAvaliacao).not.toHaveBeenCalled();
+    // o gabarito é a nota humana; a recomendada é a do painel
+    for (const par of r.pares) expect(par.humana).toBe(3);
+    expect(r.metricas.pares).toBe(2);
+  });
+
+  it("o juiz do painel recebe a FUNÇÃO derivada pelo harness (mesmo recipe do lote)", async () => {
+    const mod = await import("@/lib/especial-classificador.functions");
+    const resumoMod = await import("@/lib/dashboard-resumo");
+    vi.spyOn(resumoMod, "mapResumo").mockImplementation((l: { id: string }) => resumo(l.id, 2));
+    await mod.medirConcordanciaPainel({ limite: 1 });
+    expect(avaliarComLentes).toHaveBeenCalled();
+    const opts = avaliarComLentes.mock.calls[0][2] as { funcao?: string | null };
+    expect(opts).toHaveProperty("funcao");
+  });
+});

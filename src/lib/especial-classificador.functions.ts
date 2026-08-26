@@ -920,6 +920,17 @@ export async function reauditarEspeciais(
   };
 }
 
+/**
+ * A FUNÇÃO (T2) de um projeto já montado. ⚠️ **FONTE ÚNICA do recipe**: título = o que o AUTOR diz
+ * que o projeto é (nome + "o que faz"), corpo = o mesmo texto que vira embedding. O peso do título
+ * é o que desempata sem chute (`PESO_TITULO`), e digitar este recipe duas vezes faria o roteador da
+ * medição divergir do roteador do lote — matando a comparabilidade que o T2 existe para garantir.
+ */
+function funcaoDoMontado(entrada: EntradaSemantica, evidencias: EvidenciaVizinho[] = []) {
+  const titulo = [entrada.nome, entrada.o_que_faz].filter(Boolean).join(" — ");
+  return classificarFuncao({ titulo, corpo: textoParaEmbedding(entrada) }, evidencias);
+}
+
 // ─── T1 do painel — harness de concordância contra as notas HUMANAS ────────────
 
 /**
@@ -929,6 +940,12 @@ export async function reauditarEspeciais(
 export type JuizConcordancia = (
   alvo: AlvoClassificacao,
   vizinhos: Vizinho[],
+  /**
+   * Contexto DERIVADO que o harness já tem em mãos. Aditivo de propósito: o `classificarEspecial`
+   * (agente único) ignora, e o painel usa a FUNÇÃO — que precisa sair do MESMO texto do lote, senão
+   * a corrida de medição e a de produção roteariam diferente e deixariam de ser comparáveis.
+   */
+  extra?: { funcao?: string | null },
 ) => Promise<{ estrelas_recomendada: number } | null>;
 
 export type ResultadoConcordancia = {
@@ -1050,7 +1067,10 @@ export async function medirConcordanciaAgente(
           })
         : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
       vizinhos_de[recuperado.origem]++;
-      const rec = await juiz(montado.alvo, recuperado.vizinhos);
+      const det = funcaoDoMontado(montado.entrada);
+      const rec = await juiz(montado.alvo, recuperado.vizinhos, {
+        funcao: det.funcao === FUNCAO_INDEFINIDA ? null : det.funcao,
+      });
       if (!rec) {
         falhas.push({ projeto_id: alvoResumo.id, motivo: "juiz sem recomendação" });
         continue;
@@ -1166,10 +1186,6 @@ export async function rotearEspeciaisPorFuncao(
         falhas.push({ projeto_id: p.id, motivo: "sem contexto" });
         continue;
       }
-      // Título = o que o AUTOR diz que o projeto é (nome + "o que faz"); corpo = o resto do texto
-      // semântico. O peso do título é o que desempata sem chute (ver PESO_TITULO).
-      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(" — ");
-      const corpo = textoParaEmbedding(montado.entrada);
       // Evidência dos vizinhos: o que o índice permite saber deles é nome + leitura.
       const vetor = mapaVetores.get(p.id)?.vetor;
       let evidencias: EvidenciaVizinho[] = [];
@@ -1183,7 +1199,7 @@ export async function rotearEspeciaisPorFuncao(
           similaridade: v.similaridade,
         }));
       }
-      const det = classificarFuncao({ titulo, corpo }, evidencias);
+      const det = funcaoDoMontado(montado.entrada, evidencias);
       saida.push({
         projeto_id: p.id,
         nome: p.nome,
@@ -1540,8 +1556,7 @@ export async function julgarEspeciaisComPainel(
       vizinhos_de[recuperado.origem]++;
 
       // Função (T2): determinística, sem LLM — entra no prompt das lentes como CONTEXTO.
-      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(" — ");
-      const det = classificarFuncao({ titulo, corpo: textoParaEmbedding(montado.entrada) });
+      const det = funcaoDoMontado(montado.entrada);
 
       const j = await julgarUmEspecialComPainel(montado.alvo, recuperado.vizinhos, {
         lentes: opts.lentes,
@@ -1656,4 +1671,46 @@ export async function julgarEspeciaisComPainel(
     linhas,
     proximo_offset: proximo < universo.length ? proximo : null,
   };
+}
+
+// ─── T7 do painel — medir o PAINEL no MESMO harness do T1 ──────────────────────
+
+/** Rótulo do juiz-painel no relatório de concordância (o do agente único é `ORIGEM_AGENTE`). */
+export const JUIZ_PAINEL = "painel-agentes";
+
+/**
+ * Página padrão da medição do painel. ⚠️ Menor que a do agente único (15) porque aqui cada projeto
+ * custa ~7 chamadas e **até ~40 s de relógio** (lentes em paralelo + até 3 voltas de revisor
+ * SEQUENCIAIS): 12 projetos numa requisição passariam de 8 minutos.
+ */
+export const PAGINA_CONCORDANCIA_PAINEL = 5;
+
+/**
+ * Mede o PAINEL contra as notas HUMANAS, no MESMO harness do T1 — é a trava de subida do plano.
+ *
+ * ⚠️ **É fiação, não juiz novo:** o painel entra como `opts.juiz` de `medirConcordanciaAgente`, que
+ * já monta o alvo, recupera a vizinhança (excluindo o próprio projeto), deriva a FUNÇÃO pelo mesmo
+ * recipe do lote e calcula MAE / ±1 / matriz / `erro_por_nota`. Nada é gravado — o harness não tem
+ * caminho de escrita.
+ *
+ * ⚠️ **A cota da rodada NÃO se aplica aqui, e isso é decisão, não esquecimento:** a curva de
+ * referência dos especiais é a distribuição das MESMAS 48 notas que servem de gabarito, então usá-la
+ * para rebaixar notas na medição seria calibrar contra o gabarito (vazamento). O que roda por
+ * projeto são os **pisos de prova** (que não olham a rodada) e o **revisor**.
+ */
+export async function medirConcordanciaPainel(
+  opts: { limite?: number; offset?: number; lentes?: string[] } = {},
+): Promise<ResultadoConcordancia> {
+  const juiz: JuizConcordancia = (alvo, vizinhos, extra) =>
+    julgarUmEspecialComPainel(alvo, vizinhos, {
+      lentes: opts.lentes,
+      funcao: extra?.funcao,
+    }).then((j) => ({ estrelas_recomendada: j.nota }));
+
+  return medirConcordanciaAgente({
+    limite: Math.min(opts.limite ?? PAGINA_CONCORDANCIA_PAINEL, PAGINA_PAINEL_MAX),
+    offset: opts.offset,
+    juiz,
+    rotuloJuiz: JUIZ_PAINEL,
+  });
 }
