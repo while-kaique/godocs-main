@@ -1534,6 +1534,15 @@ não precisa de rebuild** (mudança 100% frontend). **Deploy pendente** (regra 1
 
 **Arquivos:** `src/lib/aprovacao-pendentes-view.ts` (puro), `src/lib/aprovacao-pendentes.functions.ts` (servidor), `src/routes/_authenticated/aprovacoes-pendentes.tsx`, nav em `route.tsx` (selo "Temporária"), rota no `worker.ts`. Testes: `tests/aprovacao-pendentes-view.test.ts`.
 
+**Atualiza sozinha a cada 15 s (26/08/2026, pedido do Kaique — "o botão Atualizar tem de ser quase desnecessário"):** a tela é de PLANTÃO (fica aberta enquanto o time valida) e a fila muda por baixo — submissão nova, parecer de líder, outro admin decidindo. O poll é `useAutoAtualizar` (**`src/lib/auto-atualizar.ts`**, hook + o predicado PURO `motivoParaPular`); o botão "Atualizar" **fica** (forçar agora) e o cabeçalho passa a dizer "Atualiza sozinho a cada 15 s".
+
+- **Por que 15 s é barato AQUI:** `GET /api/admin/aprovacao-pendentes` lê o **espelho da planilha no SQLite**, nunca o Sheets em request — **não consome a cota de 60 leituras/min compartilhada com prod**. Medido em prod: ~1,3 s e ~24 KB por chamada (4 chamadas/min por aba aberta). ⚠️ **Se algum dia essa rota voltar a ler o Google Sheets, o poll sai no MESMO commit** (é a mesma armadilha do `preload={false}` do link "Dashboard").
+- **As 4 travas** (cada uma é um jeito conhecido de "atualizar sozinho" quebrar a tela): **(1)** não empilha requisição (`emVoo`) — a rodada pode passar dos 15 s, e o empilhamento foi o que derrubou o `/investigador` (polling de 8 s); **(2)** não atualiza por baixo de quem está DECIDINDO — ficha aberta, painel de divisão aberto ou gravação em curso (`interagindo`) congelam a lista, e o tique seguinte ao fechar já traz o dado novo; **(3)** aba em segundo plano não gasta chamada, e **voltar para a aba atualiza NA HORA** (mesmo padrão do `AtualizacaoBanner`) — é quando a lista velha mais engana; **(4)** falha do ciclo automático **NÃO abre o painel vermelho de erro** (soluço de rede a cada 15 s viraria alarme sobre uma lista que continua válida): vira aviso discreto com ícone + texto ao lado do carimbo de sincronização (`falhaAuto`), e a lista velha permanece na tela. O botão manual segue mostrando o erro real.
+- **`agoraMs` deixou de ser congelado para sempre** — ele é repontado a cada atualização bem-sucedida. Continua congelado ENTRE atualizações (o chip de espera não pode pular de faixa a cada render), mas com a tela se atualizando sozinha ela fica aberta por horas e um "agora" preso na montagem manteria "3 dias de espera" numa aba que virou a noite.
+- **Escopo:** só esta aba. `/especiais` e `/dashboard` seguem no botão manual (o hook é reusável quando/se for pedido).
+
+Teste: `tests/auto-atualizar.test.ts` (a regra pura, incluindo a precedência "aba escondida vence" e a cadência de 15 s como decisão de produto).
+
 **Decisão em aberto:** o escopo inclui todos os `pendente` não-especiais (situação — fila do RPA / aguardando líder / aguardando autor — vira etiqueta + filtro). Se o Luis quiser só o que já é do RPA, é 1 linha em `ehDaFilaRpa`.
 
 ---
