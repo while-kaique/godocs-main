@@ -91,25 +91,33 @@ export function selecionarVizinhos(
 /** Os campos de um projeto que compõem a "impressão semântica" para o embedding. */
 export type EntradaSemantica = {
   nome?: string | null;
-  area?: string | null;
-  ferramenta?: string | null;
-  tipos?: string | null;
+  /** O que o projeto FAZ (do `o_que_faz` da doc). É o sinal mais discriminante — lidera o texto. */
+  o_que_faz?: string | null;
   contexto_especial?: string | null;
   descricao?: string | null;
   memorial?: string | null;
   doc?: string | null;
+  // ⚠️ `area`/`ferramenta`/`tipos` NÃO entram no embedding de propósito (ver textoParaEmbedding).
+  area?: string | null;
+  ferramenta?: string | null;
+  tipos?: string | null;
 };
 
 /**
- * Monta o texto que representa o projeto para o embedding. Ordem = do mais discriminante (área,
- * escopo) para o mais volumoso (memorial/doc), porque o teto de caracteres corta o fim.
+ * Monta o texto que representa o projeto para o embedding. Ordem = do mais discriminante (o que o
+ * projeto FAZ) para o mais volumoso (memorial/doc), porque o teto de caracteres corta o fim.
+ *
+ * ⚠️ **Área, ferramenta e tipo ficam DE FORA de propósito** (25/08/2026). São boilerplate de baixa
+ * entropia (`automacao`, `Claude+GoDeploy`, dashboards de vários setores) que DILUI o sinal
+ * distintivo — e, pior, a ÁREA aproxima projetos por marca/setor e afasta IRMÃOS de função que
+ * moram em áreas diferentes: o «GoPrice» (Gocase) e o «Agente precificador» (Gobeaute) fazem quase
+ * a mesma coisa e não se reconheciam porque o texto era dominado por área+ferramenta. O embedding
+ * agora concentra no QUE o projeto faz (nome + o_que_faz + por que é especial + descrição + doc).
  */
 export function textoParaEmbedding(e: EntradaSemantica): string {
   const partes: string[] = [];
   if (e.nome) partes.push(`Projeto: ${e.nome}`);
-  if (e.area) partes.push(`Área: ${e.area}`);
-  if (e.ferramenta) partes.push(`Ferramenta: ${e.ferramenta}`);
-  if (e.tipos) partes.push(`Tipo: ${e.tipos}`);
+  if (e.o_que_faz) partes.push(`O que faz: ${e.o_que_faz}`);
   if (e.contexto_especial) partes.push(`Por que é especial: ${e.contexto_especial}`);
   if (e.descricao) partes.push(`Descrição: ${e.descricao}`);
   if (e.memorial) partes.push(`Memorial:\n${e.memorial}`);
@@ -148,4 +156,58 @@ export function montarBlocoFewShot(vizinhos: Vizinho[]): string {
     return `• «${v.nome ?? v.projeto_id}»${area} → ${nota} (${proc})${leitura}`;
   });
   return linhas.join('\n');
+}
+
+// ─── Recuperação vinda de um índice externo (Pinecone) ─────────────────────────
+
+/** O que um índice vetorial devolve: identidade + proximidade. Sem o vetor e sem a leitura. */
+export type MatchVetorial = {
+  id: string;
+  /** Proximidade 0..1. No Pinecone com métrica `cosine` é o MESMO número do `cosseno` daqui. */
+  score: number;
+};
+
+/** Um exemplar sem o vetor — o que se hidrata da fonte da verdade depois da busca. */
+export type ExemplarSemVetor = Omit<ExemplarEspecial, 'vetor'>;
+
+/**
+ * Converte os `matches` de um índice externo em `Vizinho[]`, hidratando nome/área/leitura/notas
+ * do corpus local (a fonte da verdade continua sendo o SQLite + o espelho — decisão 6).
+ *
+ * ⚠️ **As regras são as MESMAS de `selecionarVizinhos`** — piso de similaridade, `k`, exclusão do
+ * próprio projeto e `rotuloExemplar` (nota humana vence a recomendada). É de propósito: trocar a
+ * ORIGEM dos vizinhos não pode mudar QUAIS vizinhos entram no prompt, senão a migração para o
+ * Pinecone viraria uma mudança de nota disfarçada de mudança de infraestrutura.
+ *
+ * Match sem correspondente no corpus local é DESCARTADO (vetor órfão de projeto já excluído —
+ * o índice pode ficar à frente da limpeza). Puro: testável sem rede.
+ */
+export function vizinhosDeMatches(
+  matches: MatchVetorial[],
+  exemplarPorId: Map<string, ExemplarSemVetor>,
+  opts: { k?: number; piso?: number; excluirId?: string } = {},
+): Vizinho[] {
+  const k = opts.k ?? K_VIZINHOS;
+  const piso = opts.piso ?? PISO_SIMILARIDADE;
+  const vizinhos: Vizinho[] = [];
+  const vistos = new Set<string>();
+  for (const m of matches) {
+    if (opts.excluirId && m.id === opts.excluirId) continue;
+    if (vistos.has(m.id)) continue;
+    if (!(m.score >= piso)) continue; // NaN cai fora junto
+    const ex = exemplarPorId.get(m.id);
+    if (!ex) continue;
+    const rotulo = rotuloExemplar({ ...ex, vetor: [] });
+    if (!rotulo) continue;
+    vistos.add(m.id);
+    vizinhos.push({
+      ...ex,
+      vetor: [],
+      similaridade: m.score,
+      estrela_efetiva: rotulo.estrela,
+      fonte_rotulo: rotulo.fonte,
+    });
+  }
+  vizinhos.sort((a, b) => b.similaridade - a.similaridade);
+  return vizinhos.slice(0, k);
 }

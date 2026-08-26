@@ -19,7 +19,10 @@ import {
   extrairJson,
   normalizarRecomendacao,
   buildSystemPromptEspecial,
+  aplicarGuardVizinhoDivergente,
+  type RecomendacaoEspecial,
 } from '@/lib/agents/especial-classificador';
+import type { Vizinho } from '@/lib/especial-corpus';
 
 // ─── embeddings.ts ───────────────────────────────────────────────────────────
 
@@ -137,15 +140,29 @@ describe('corpus — selecionarVizinhos', () => {
 });
 
 describe('corpus — textoParaEmbedding e hashTexto', () => {
-  it('coloca área/escopo antes do memorial (o fim é o que o teto corta)', () => {
+  it('lidera com o que o projeto FAZ, antes do memorial (o fim é o que o teto corta)', () => {
     const t = textoParaEmbedding({
       nome: 'Bot X',
-      area: 'Fiscal',
+      o_que_faz: 'precifica SKUs por margem',
       contexto_especial: 'controla risco',
       memorial: 'memorial longo',
     });
-    expect(t.indexOf('Área: Fiscal')).toBeLessThan(t.indexOf('Memorial:'));
-    expect(t.indexOf('Projeto: Bot X')).toBeLessThan(t.indexOf('Área: Fiscal'));
+    expect(t.indexOf('Projeto: Bot X')).toBeLessThan(t.indexOf('O que faz:'));
+    expect(t.indexOf('O que faz:')).toBeLessThan(t.indexOf('Memorial:'));
+  });
+  it('NÃO inclui área/ferramenta/tipo (boilerplate que dilui e aproxima por setor, não por função)', () => {
+    const t = textoParaEmbedding({
+      nome: 'GoPrice',
+      o_que_faz: 'calcula preço',
+      area: 'Gocase',
+      ferramenta: 'Claude + GoDeploy',
+      tipos: 'especial',
+    });
+    expect(t).not.toContain('Gocase');
+    expect(t).not.toContain('Claude + GoDeploy');
+    expect(t).not.toContain('especial');
+    expect(t).toContain('GoPrice');
+    expect(t).toContain('calcula preço');
   });
   it('usa memorial OU doc, não os dois', () => {
     const t = textoParaEmbedding({ memorial: 'MEM', doc: 'DOC' });
@@ -234,5 +251,70 @@ describe('agente — prompt de sistema (fonte única da régua)', () => {
     expect(p).toContain('Recorrência real'); // critério da régua
     expect(p).toContain('JSON'); // formato forçado
     expect(p).toMatch(/0 a 10/); // escala
+  });
+  it('instrui a igualar a faixa de um vizinho quase idêntico com nota maior', () => {
+    expect(buildSystemPromptEspecial()).toMatch(/vizinho quase idêntico/i);
+  });
+});
+
+// ─── Fix B: guard de divergência contra vizinho forte ─────────────────────────
+
+function viz(over: Partial<Vizinho>): Vizinho {
+  return {
+    projeto_id: 'v',
+    nome: 'Vizinho',
+    area: 'CX',
+    estrela_humana: null,
+    estrela_recomendada: null,
+    leitura: null,
+    vetor: [1, 0, 0],
+    similaridade: 0.8,
+    estrela_efetiva: 3,
+    fonte_rotulo: 'humana',
+    ...over,
+  };
+}
+
+function rec(over: Partial<RecomendacaoEspecial>): RecomendacaoEspecial {
+  return {
+    estrelas_recomendada: 0,
+    confianca: 'baixa',
+    leitura: 'memorial magro, parece POC',
+    contestada: false,
+    ...over,
+  };
+}
+
+describe('agente — aplicarGuardVizinhoDivergente', () => {
+  it('nota ≤1 com vizinho forte (sim≥0.75, ≥3★) → confiança baixa, contestada e aviso na leitura', () => {
+    const r = aplicarGuardVizinhoDivergente(rec({ estrelas_recomendada: 0, confianca: 'media' }), [
+      viz({ nome: 'Agente precificador', similaridade: 0.82, estrela_efetiva: 4 }),
+    ]);
+    expect(r.confianca).toBe('baixa');
+    expect(r.contestada).toBe(true);
+    expect(r.leitura).toMatch(/Conferir na triagem/);
+    expect(r.leitura).toContain('Agente precificador');
+    expect(r.leitura).toContain('memorial magro'); // preserva a leitura original
+  });
+  it('não dispara quando a similaridade do vizinho é baixa', () => {
+    const original = rec({ estrelas_recomendada: 1 });
+    const r = aplicarGuardVizinhoDivergente(original, [viz({ similaridade: 0.5, estrela_efetiva: 4 })]);
+    expect(r).toEqual(original);
+  });
+  it('não dispara quando o vizinho forte também é baixo (<3★)', () => {
+    const original = rec({ estrelas_recomendada: 1 });
+    const r = aplicarGuardVizinhoDivergente(original, [viz({ similaridade: 0.9, estrela_efetiva: 2 })]);
+    expect(r).toEqual(original);
+  });
+  it('não dispara quando a nota do alvo já é ≥2 (não caiu em POC)', () => {
+    const original = rec({ estrelas_recomendada: 2, confianca: 'media' });
+    const r = aplicarGuardVizinhoDivergente(original, [viz({ similaridade: 0.9, estrela_efetiva: 4 })]);
+    expect(r).toEqual(original);
+  });
+  it('NÃO reescreve a nota — só rebaixa confiança e sinaliza', () => {
+    const r = aplicarGuardVizinhoDivergente(rec({ estrelas_recomendada: 1 }), [
+      viz({ similaridade: 0.8, estrela_efetiva: 5 }),
+    ]);
+    expect(r.estrelas_recomendada).toBe(1);
   });
 });

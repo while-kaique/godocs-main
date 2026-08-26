@@ -2762,6 +2762,37 @@ export async function getEmbeddingsEspeciais(): Promise<EspecialEmbeddingRow[]> 
 }
 
 /**
+ * O embedding de UM projeto. É o que a re-auditoria e a recuperação por índice externo usam:
+ * elas precisam do vetor do ALVO, não do corpus inteiro. Puxar a tabela toda para pegar uma
+ * linha é o caminho que encosta no teto de 32 MiB de RPC do Godeploy (o mesmo que derrubou o
+ * `/edicoes`) — com 3072 dims cada vetor pesa ~16 KB.
+ */
+export async function getEmbeddingEspecial(
+  projetoId: string,
+): Promise<EspecialEmbeddingRow | null> {
+  const rows = await queryAll<EspecialEmbeddingRow>(
+    'SELECT * FROM especial_embedding WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Uma PÁGINA de embeddings, ordenada por `projeto_id` (ordem estável entre corridas). O backfill
+ * do índice externo varre o corpus por aqui em vez de `getEmbeddingsEspeciais()`: a leitura
+ * inteira cabe hoje (dezenas de especiais) e deixa de caber sem aviso lá pelos ~1.900.
+ */
+export async function getEmbeddingsEspeciaisPagina(
+  offset: number,
+  limite: number,
+): Promise<EspecialEmbeddingRow[]> {
+  return queryAll<EspecialEmbeddingRow>(
+    'SELECT * FROM especial_embedding ORDER BY projeto_id LIMIT ? OFFSET ?',
+    [limite, offset],
+  );
+}
+
+/**
  * Só id + texto_hash (sem o vetor) — para o backfill saber o que já está fresco e NÃO re-embeddar
  * (o embedding custa). Não puxa a coluna `vetor` de propósito.
  */

@@ -57,6 +57,9 @@ import {
   classificarEspecialProjeto,
   classificarEspeciaisPendentes,
   classificarEspecialEmBackground,
+  prepararIndicePinecone,
+  sincronizarPineconeEspeciais,
+  reauditarEspeciais,
 } from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -830,6 +833,41 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           forcar: body.forcar,
         }),
       );
+    }
+
+    // ── Índice vetorial dos especiais no Pinecone (plataforma oficial) ───────
+    // Setup (T1): descreve o índice. Só CRIA com {"criar":true} — criar índice é ato de
+    // infraestrutura, não efeito colateral de uma leitura. A dimensão (3072) é IMUTÁVEL:
+    // se o índice existente tiver outra, a resposta reprova em vez de usar.
+    if (pathname === "/api/admin/especiais/pinecone/indice" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { criar?: boolean };
+      return json(await prepararIndicePinecone({ criar: body.criar }));
+    }
+    // Backfill (T5): sobe para o índice os vetores que já existem no SQLite. `dry` é o
+    // DEFAULT; varre em páginas (`proximo_offset` diz onde continuar).
+    if (pathname === "/api/admin/especiais/pinecone/backfill" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        dry?: boolean;
+        limite?: number;
+        offset?: number;
+      };
+      return json(
+        await sincronizarPineconeEspeciais({
+          dry: body.dry,
+          limite: body.limite,
+          offset: body.offset,
+        }),
+      );
+    }
+    // Re-auditoria (T6): compara cada nota HUMANA com a mediana dos vizinhos de nota humana
+    // e reporta inflação/deflação. ⚠️ SÓ RELATÓRIO — não existe caminho de escrita, e por
+    // isso não há `dry`. A coluna "Estrelas" continua sendo só de clique humano.
+    if (pathname === "/api/admin/especiais/reauditar" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { limite?: number; offset?: number };
+      return json(await reauditarEspeciais({ limite: body.limite, offset: body.offset }));
     }
 
     // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────

@@ -1,6 +1,19 @@
 # NEXT-SESSION
 
 ## Plano ativo
+**→ DOIS trabalhos vivos nesta data. Regra 7: os dois lados valem — não escolher um.**
+
+### 1. RAG dos especiais no Pinecone — ✅ **ENTREGUE EM PROD (26/08, ~20:14 UTC)**
+
+[docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md) · PR **#298**.
+T1–T7 completos: `a1fe406` deployado SOZINHO primeiro (crava o modelo de embedding — a dimensão do índice é imutável), depois o Pinecone. Índice `godocs-especiais` (serverless, 3072, cosine) com namespaces `prod`/`staging`; backfill **49/49 staging** e **64/64 prod**; classificação confirmada devolvendo `origem_vizinhos: "pinecone"`. Re-auditoria em prod: **50 analisados → 40 coerentes · 7 infladas · 3 defladas**.
+
+⚠️ **Leia o relatório sabendo que a régua acusa as ÂNCORAS** — o achado nº 1 é o PIAPP (10★ contra referência 4). A recuperação está certa; uma flagship é por definição distante dos pares. Separar "é a âncora" de "está inflada" é trabalho humano.
+
+⚠️ **Depois de trocar o modelo de embedding, o reembedding (`classificar-pendentes` com `forcar`) vem ANTES do backfill** — um vetor de outra dimensão fazia o Pinecone recusar o lote inteiro (49 → 0 no 1º backfill da staging). Hoje o `upsertVetores` descarta e conta.
+
+### 2. API histórica de saving/receita (squad Intelli) — do colega, PR #297
+
 **→ API histórica de saving/receita p/ João Gabriel (squad Intelli) — FASE 3 NÚCLEO.** Plano em `~/.claude/plans/flickering-fluttering-rabin.md` + memória `api-historica-saving-receita-jg` (fonte da verdade dos detalhes/decisões).
 
 **Esta sessão (26/08, cont.):** Luis decidiu **"aprovado" = o que a TRIAGEM aprovou na PLANILHA** (Status="Aprovado" no espelho), não `projetos.status`. Reescrevi o rollup pra sair **INTEIRO do espelho** (mesma fonte do /dashboard): saving/receita/área/cadência/mês todos das colunas "Saving Reais"/"Receita Mensal"/"Área"/"Tipo de Saving"/"Data Submissão"; removi o join com `projetos`/`documentacao` (ler receita de `documentacao` dava ~0 — receita de legado mora na PLANILHA). "Tipo de Saving" entrou em `COLUNAS_RESUMO` (fora do payload da listagem) + bump `VERSAO_RECORTE_RESUMO` 2→3 (re-espelha no próximo sync). Deployado staging (v226) + prod (v297, prod==main). **Bate EXATO com o dashboard:** prod saving **R$1.353.716,12**, receita **R$1.384.843,40** (= dashboard). Suíte **1823 verde**. Commits: `71c8b84`, `add2025` (+ `df495f2`/`8247e1f` da 1ª versão via projetos, superada). Rota leitura: `GET /api/admin/rollup-mensal` (admin). Fluxo de deploy do rollup: deploy → `POST /api/admin/sync-sheets-now` → `POST /api/admin/rollup-backfill` → `GET /api/admin/rollup-mensal`.
@@ -10,6 +23,8 @@
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou.**
 
 **Próximo passo:** (1) **Luis seta o secret `JG_INGEST_URL`** (endpoint do Gabriel) em prod `674a3710` — aí o cron passa a entregar sozinho, sem redeploy; testar com `POST /api/admin/rollup-push {"dry":false}`. (2) **PR do que está em prod pra main** via `LuisEduardo100` (regra 14; branch `feat/rollup-historico-jg`) — EM ANDAMENTO nesta sessão.
+
+⚠️ **Cruzamento dos dois (26/08):** o deploy do Pinecone às 20:14 UTC substituiu a v296, que tinha o rollup e **ainda não estava no git** — o PR #297 entrou no `main` 15 min antes e a branch foi reincorporada e **redeployada**, então prod tem as duas features. A tabela `rollup_saving_receita` vive no `env.DB` e nunca foi afetada (o `env.DB` sobrevive ao `updateApp`).
 
 _(Anterior: `latencia-ia-roteamento-por-fase.md` **✅ ENTREGUE EM PROD (v286) + PR #286, 25/08** — T1–T7 completos.)_
 

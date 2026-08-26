@@ -1772,6 +1772,113 @@ lexical) + **1 passe com guard determinístico** (não passe adversarial).
 - Testes: `tests/especial-classificador.test.ts` (round-trip base64, cosseno, recuperação, parse+guard).
   Validado E2E contra OpenAI+proxy reais (25/08): painel de margem → 2★ ancorado no «Godash».
 
+## Índice vetorial no PINECONE + re-auditoria das estrelas · 26/08/2026
+
+**Decisão (Kaique, 26/08/2026): o Pinecone é a plataforma oficial de busca vetorial deste
+pipeline.** Está tomada — não se relitiga a cada sessão. Plano e as 7 decisões fechadas em
+[`docs/plans/rag-especiais-pinecone-reauditoria.md`](../docs/plans/rag-especiais-pinecone-reauditoria.md).
+
+### Por que sair do cosseno-em-JS (o motivo NÃO é precisão)
+
+O cosseno-em-JS funciona e **não** foi ele que errou a classificação em prod — quem errou foi o
+TEXTO do embedding (área e ferramenta dominavam o sinal e separavam irmãos de função: «GoPrice»
+0–1★ contra «Agente precificador» 4★; corrigido no `a1fe406`, em PR próprio). O que o índice
+resolve é estrutural:
+
+1. **Teto de RPC do Godeploy.** `getEmbeddingsEspeciais()` carregava a tabela INTEIRA por
+   classificação. Com `text-embedding-3-large` (3072d) são ~16 KB por vetor em base64 → o limite
+   de **32 MiB** de serialização bate em **~1.900 especiais**. É o mesmo teto que já derrubou o
+   `/edicoes` do Investigador. Cache no isolate seria remendo; sair da tabela é conserto.
+2. **Padronização.** Vetor em base64 numa coluna TEXT + cosseno escrito à mão é artesanal.
+3. **Filtro por metadata NO SERVIDOR** (só vizinhos com nota HUMANA) — trivial em JS só enquanto
+   o corpus couber na memória, e é o que a re-auditoria exige.
+
+### Como ficou
+
+- **`src/lib/pinecone.ts`** — cliente REST puro (describe/create/upsert/query/delete), envs LAZY,
+  só `fetch` (roda no Worker), host do índice cacheado por isolate, **nada lança**.
+- **`recuperarVizinhos`** (`especial-classificador.functions.ts`) — Pinecone primeiro, cosseno-em-JS
+  do SQLite como fallback. O corpus do fallback é um **thunk preguiçoso**: com o índice no ar a
+  tabela de vetores **não é lida** (é o ponto da migração).
+- **Backfill** `POST /api/admin/especiais/pinecone/backfill` (dry-default), varrendo em **páginas**.
+- **Setup** `POST /api/admin/especiais/pinecone/indice` — só cria com `{"criar":true}`.
+
+### Invariantes que não podem regredir
+
+1. **SQLite é a FONTE DA VERDADE**; Pinecone é índice de LEITURA. Fora do ar → degrada, nunca
+   quebra a submissão. ⚠️ Fallback que nunca roda apodrece calado — o teste exercita o caminho
+   degradado de propósito.
+2. **`null` (indisponível) ≠ `[]` (índice vazio).** Só `null` cai no SQLite; tratar `[]` como falha
+   mascararia justamente o backfill que falta rodar.
+3. **Namespace vem do `GODOCS_ENV`** (`prod` × `staging`), sem env própria — uma env a mais é uma
+   chance a mais de staging escrever em prod.
+4. **A dimensão do índice é IMUTÁVEL (3072).** A rota de setup **reprova** índice de outra dimensão
+   em vez de usá-lo — consultar 3072 num índice de 1536 devolve 400, e silenciar isso daria "sem
+   vizinhos" para sempre. Corolário: o modelo de embedding tem de estar cravado ANTES do índice
+   nascer, e é por isso que o `a1fe406` vai em PR separado e PRIMEIRO.
+5. **As regras de seleção são as MESMAS nos dois caminhos** (`vizinhosDeMatches` repete piso, `k`,
+   exclusão do próprio projeto e "nota humana vence a recomendada") — senão trocar a ORIGEM dos
+   vizinhos viraria mudança de nota disfarçada de mudança de infraestrutura.
+6. **Metadata:** `projeto_id`, `tem_nota_humana`, `estrela_humana`, `estrela_recomendada`, `area`,
+   `texto_hash`, `modelo`. A `leitura` NÃO vai (é longa, muda a cada reavaliação, mora no SQLite).
+   Chave com valor nulo é OMITIDA — o Pinecone não aceita `null`.
+7. **Upsert é best-effort** — o SQLite já gravou; falhar no índice não derruba a classificação.
+8. **A coluna "Estrelas" continua só de clique humano.**
+9. **Vetor de dimensão diferente da do índice é DESCARTADO no `upsertVetores`, nunca enviado.**
+   ⚠️ Bug REAL do 1º backfill da staging (26/08/2026): **49 vetores, 0 upsertados**. O SQLite
+   guarda o histórico de todos os modelos já usados, e **um** vetor 1536d do
+   `text-embedding-3-small` faz o Pinecone devolver **400 no LOTE INTEIRO** (`Vector dimension
+   1536 does not match the dimension of the index 3072`), derrubando os compatíveis junto. O
+   descarte é CONTADO em `descartados_dim` — a rota diz quantos ficaram de fora em vez de mentir
+   "tudo certo". Quem os repõe é o reembedding (`classificar-pendentes` com `{"forcar":true}`,
+   que já trata vetor de outro modelo como velho). ⚠️ **Depois de trocar o modelo de embedding,
+   o reembedding vem ANTES do backfill.**
+
+### Limitação conhecida da re-auditoria: ela ACUSA AS ÂNCORAS
+
+Medido na staging em 26/08/2026 — 48 analisados: **29 coerentes, 11 "infladas", 8 "defladas"**. O
+achado **nº 1 foi o PIAPP**, a flagship 10★ conhecida, contra referência **0** (delta 10).
+
+Não é defeito de recuperação: os 6 vizinhos do PIAPP eram plataformas de IA corretas (Gobeaute
+Prompt Studio, Prisma, Hitmaker, Argos - CDP inteligente, Tropa Gogroup, CTR Machine), com
+similaridades 0,68–0,72 e notas 0/5/0/0/2/0. **Uma flagship é por definição distante dos pares** —
+é isso que a torna flagship. A métrica responde "esta nota discorda dos vizinhos", que é verdade;
+separar *"é a âncora"* de *"está inflada"* é trabalho HUMANO.
+
+É por isso que cada linha do relatório devolve os `vizinhos` com nome, nota e similaridade: sem
+eles o relatório seria um número sem defesa. ⚠️ **Não "consertar" isso rebaixando nota alta
+automaticamente** — a rota é read-only, e um falso positivo custa uma olhada da triagem, não um
+usuário travado (≠ o loop do `[1.4]`, ≠ o ganho projetado). Calibrar a régua de verdade exige
+medir concordância contra as **644 notas humanas** da planilha, que é exercício próprio.
+
+### Re-auditoria (`POST /api/admin/especiais/reauditar`)
+
+`src/lib/especiais-reauditoria.ts` (PURO) compara cada nota HUMANA com a **mediana ponderada** pela
+similaridade das notas humanas dos vizinhos e devolve `inflada` · `deflada` · `coerente` ·
+`sem_base`. `LIMIAR_DELTA = 2` (numa curva em que **3★ já é o top 4% de 644 projetos**, 2 estrelas
+é outra faixa, não desacordo de gosto) e `MIN_VIZINHOS_COMPARAVEIS = 3`.
+
+- ⚠️ **É SÓ RELATÓRIO — não existe caminho de escrita, e por isso a rota não tem `dry`.** O plano
+  dizia "dry-default", mas não há o que secar: escrever a nota é da triagem, e gravar uma segunda
+  opinião ao lado da nota de gente competiria com ela no cartão — exatamente o que o classificador
+  já evita ao **não** reclassificar quem tem nota humana.
+- ⚠️ **Exige o Pinecone, sem fallback.** O que faz a comparação valer é o filtro `tem_nota_humana`
+  resolvido no servidor; comparar a nota de gente contra a mediana das recomendações do próprio
+  agente é o feedback loop puro. Sem índice responde `ok:false` com o motivo — melhor que um
+  relatório que parece certo.
+- ⚠️ **Mediana e não média:** uma âncora 10★ puxaria a média e tornaria toda a vizinhança dela
+  "deflada". ⚠️ **`sem_base` nunca vira "coerente" por omissão** — diria que a nota foi conferida
+  quando não foi.
+
+### Arquivos
+- `src/lib/pinecone.ts` (novo) · `src/lib/especiais-reauditoria.ts` (novo, PURO) ·
+  `vizinhosDeMatches` em `especial-corpus.ts` · `recuperarVizinhos`/`sincronizarPineconeEspeciais`/
+  `reauditarEspeciais` em `especial-classificador.functions.ts` · `getEmbeddingEspecial` e
+  `getEmbeddingsEspeciaisPagina` em `client.server.ts` · 3 rotas admin em `worker.ts`.
+- Testes: `tests/pinecone-cliente.test.ts` (cliente REST, fetch mockado — arquivo PRÓPRIO porque o
+  outro mocka `@/lib/pinecone` inteiro e `vi.mock` vale para o arquivo todo) e
+  `tests/pinecone-especiais.test.ts` (recuperação com fallback, backfill, re-auditoria).
+
 ## Latência da IA — roteamento de modelo + `reasoning_effort` POR FASE (25/08/2026)
 
 **Problema:** o modelo forte do proxy (`gpt-5.6-sol`) fica **mudo no fio durante o "pensar"** — TTFB medido ~19,6s no turno pesado antes do 1º token, e a metade pesada do produto (doc/memorial) sentia isso como tela branca. Sondas reais: `luna+low` no mesmo turno → TTFB ~3,2s (~6× mais rápido); `sol+low` → ~13,7s.
