@@ -23,6 +23,7 @@ import {
 } from "@/lib/chat.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
+import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
 import {
   getAreas,
   createArea,
@@ -79,6 +80,7 @@ import {
   excluirProjetoCascade,
   getProjetoById,
   getAprovacoesDoProjeto,
+  lerRollupMensal,
 } from "@/integrations/db/client.server";
 import {
   listarMeusProjetos,
@@ -1066,6 +1068,24 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/rollup-backfill" && method === "POST") {
       await requireAdmin(request);
       return json(await recalcularRollupBackfill());
+    }
+    // Leitura do rollup durável (admin): células brutas + totais por área.
+    // O campo `verificacao` (soma global) NÃO faz parte do contrato do squad Intelli — a
+    // regra "sem total geral" vale para o PAYLOAD de saída; aqui é só apoio para bater os
+    // números com o /dashboard antes do push.
+    if (pathname === "/api/admin/rollup-mensal" && method === "GET") {
+      await requireAdmin(request);
+      const celulas = await lerRollupMensal();
+      const totaisArea = derivarTotaisPorArea(celulas);
+      const verificacao = celulas.reduce(
+        (acc, c) => ({
+          saving_reais: Math.round((acc.saving_reais + c.saving_reais) * 100) / 100,
+          receita_reais: Math.round((acc.receita_reais + c.receita_reais) * 100) / 100,
+          num_projetos: acc.num_projetos + c.num_projetos,
+        }),
+        { saving_reais: 0, receita_reais: 0, num_projetos: 0 },
+      );
+      return json({ celulas, totais_area: totaisArea, verificacao });
     }
 
     // ── Disparo de e-mails por segmento (admin) ──
