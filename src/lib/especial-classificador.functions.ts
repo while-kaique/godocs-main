@@ -25,17 +25,17 @@ import {
   upsertEmbeddingEspecial,
   parseJson,
   type EspecialEmbeddingRow,
-} from '@/integrations/db/client.server';
-import { lerResumosEspelho } from '@/lib/sheet-espelho';
-import { apenasEspeciais } from '@/lib/especiais-view';
-import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
-import type { DocumentacaoGerada } from '@/lib/agents/types';
+} from "@/integrations/db/client.server";
+import { lerResumosEspelho } from "@/lib/sheet-espelho";
+import { apenasEspeciais } from "@/lib/especiais-view";
+import { mapResumo, type ProjetoDashboardResumo } from "@/lib/dashboard-resumo";
+import type { DocumentacaoGerada } from "@/lib/agents/types";
 import {
   gerarEmbeddingsLote,
   base64ParaVetor,
   vetorParaBase64,
   embeddingConfig,
-} from '@/lib/embeddings';
+} from "@/lib/embeddings";
 import {
   textoParaEmbedding,
   hashTexto,
@@ -46,7 +46,7 @@ import {
   type ExemplarEspecial,
   type ExemplarSemVetor,
   type Vizinho,
-} from '@/lib/especial-corpus';
+} from "@/lib/especial-corpus";
 import {
   consultarVizinhos,
   upsertVetores,
@@ -54,35 +54,58 @@ import {
   descreverIndice,
   garantirIndice,
   type VetorParaUpsert,
-} from '@/lib/pinecone';
+} from "@/lib/pinecone";
 import {
   avaliarDesvio,
   ordenarPorGravidade,
   resumirReauditoria,
   type LinhaReauditoria,
   type ResumoReauditoria,
-} from '@/lib/especiais-reauditoria';
+} from "@/lib/especiais-reauditoria";
 import {
   classificarEspecial,
   type AlvoClassificacao,
   type RecomendacaoEspecial,
-} from '@/lib/agents/especial-classificador';
+} from "@/lib/agents/especial-classificador";
 import {
   medirConcordancia,
   type MetricasConcordancia,
   type ParNota,
-} from '@/lib/especiais-concordancia';
+} from "@/lib/especiais-concordancia";
 import {
   classificarFuncao,
   medirCobertura,
   rotuloFuncao,
+  FUNCAO_INDEFINIDA,
   type CoberturaFuncao,
   type EvidenciaVizinho,
   type FuncaoDetectada,
-} from '@/lib/especiais-funcao';
+} from "@/lib/especiais-funcao";
+import type { Confianca } from "@/lib/especiais-regua";
+import { avaliarComLentes, LENTES, type AvaliacaoLente } from "@/lib/agents/especiais-lentes";
+import {
+  calibrarRodada,
+  entradaDeConsolidado,
+  explicarCalibragem,
+  type EntradaCalibragem,
+  type LinhaCalibrada,
+  type MotivoRebaixa,
+  type ResumoCalibragem,
+} from "@/lib/especiais-calibrador";
+import { redigirLeituraCalibrada } from "@/lib/agents/especiais-calibrador";
+import {
+  aplicarRevisao,
+  explicarConvergencia,
+  iniciarConvergencia,
+  podeRevisarDeNovo,
+  TETO_VOLTAS,
+  type EstadoConvergencia,
+} from "@/lib/especiais-convergencia";
+import { revisarAdversarial } from "@/lib/agents/especiais-revisor";
+import { confiancaDoPainel, leituraDoPainel, ORIGEM_PAINEL } from "@/lib/especiais-painel";
 
 /** Carimbo de origem gravado em cada recomendação do agente (distingue do seed da força-tarefa). */
-export const ORIGEM_AGENTE = 'agente-classificador';
+export const ORIGEM_AGENTE = "agente-classificador";
 
 /** Modelo de chat configurado — gravado junto da recomendação para saber de quem é a nota. */
 function modeloChatConfigurado(): string {
@@ -91,7 +114,7 @@ function modeloChatConfigurado(): string {
   // ⚠️ O fallback do llm.ts pode trocar o modelo por baixo (proxy >60s → gpt-5.4-mini). Como o
   // `llmChat` só devolve texto, gravamos o modelo CONFIGURADO — a imprecisão aqui é cosmética
   // (a nota é sugestão, nunca vai à planilha sozinha), diferente de um número errado no Sheets.
-  return env?.LLM_MODEL || 'desconhecido';
+  return env?.LLM_MODEL || "desconhecido";
 }
 
 // ─── Texto semântico do projeto ────────────────────────────────────────────────
@@ -105,12 +128,12 @@ function resumoDocParaTexto(conteudoJson: string | null | undefined): string | n
   if (doc.o_que_faz) partes.push(doc.o_que_faz);
   if (doc.execucao) partes.push(doc.execucao);
   if (Array.isArray(doc.fluxo) && doc.fluxo.length) {
-    partes.push(doc.fluxo.map((f) => `${f.etapa}: ${f.descricao}`).join('\n'));
+    partes.push(doc.fluxo.map((f) => `${f.etapa}: ${f.descricao}`).join("\n"));
   }
   if (Array.isArray(doc.atencao) && doc.atencao.length) {
-    partes.push(doc.atencao.map((a) => `${a.titulo}: ${a.descricao}`).join('\n'));
+    partes.push(doc.atencao.map((a) => `${a.titulo}: ${a.descricao}`).join("\n"));
   }
-  const txt = partes.join('\n').trim();
+  const txt = partes.join("\n").trim();
   return txt || null;
 }
 
@@ -139,7 +162,7 @@ async function montarEntradaSemantica(
   const nome = ctx?.nome ?? resumo?.nome ?? null;
   const area = ctx?.area_nome ?? ctx?.area ?? resumo?.area ?? null;
   const ferramenta = ctx?.ferramenta ?? resumo?.tipos ?? null;
-  const tipos = resumo?.tipos ?? (ctx?.tipos_projeto ?? null);
+  const tipos = resumo?.tipos ?? ctx?.tipos_projeto ?? null;
   const contexto_especial = ctx?.contexto_especial ?? null;
   const descricao = ctx?.descricao_breve ?? null;
   const memorial = ctx?.memorial_calculo ?? null;
@@ -151,7 +174,7 @@ async function montarEntradaSemantica(
     o_que_faz: oQueFaz,
     area,
     ferramenta,
-    tipos: typeof tipos === 'string' ? tipos : null,
+    tipos: typeof tipos === "string" ? tipos : null,
     contexto_especial,
     descricao,
     memorial,
@@ -161,8 +184,8 @@ async function montarEntradaSemantica(
     projeto_id: projetoId,
     nome,
     area,
-    ferramenta: typeof ferramenta === 'string' ? ferramenta : null,
-    tipos: typeof tipos === 'string' ? tipos : null,
+    ferramenta: typeof ferramenta === "string" ? ferramenta : null,
+    tipos: typeof tipos === "string" ? tipos : null,
     contexto_especial,
     descricao,
     memorial,
@@ -174,7 +197,10 @@ async function montarEntradaSemantica(
 
 // ─── Corpus (memória) ──────────────────────────────────────────────────────────
 
-type MapaEmbedding = Map<string, { vetor: number[]; modelo: string; dim: number; hash: string | null }>;
+type MapaEmbedding = Map<
+  string,
+  { vetor: number[]; modelo: string; dim: number; hash: string | null }
+>;
 
 function decodificarEmbeddings(rows: EspecialEmbeddingRow[]): MapaEmbedding {
   const mapa: MapaEmbedding = new Map();
@@ -246,7 +272,7 @@ function mapaExemplares(
 }
 
 /** De onde vieram os vizinhos desta corrida — vai no resultado para a operação enxergar o fallback. */
-export type OrigemVizinhos = 'pinecone' | 'sqlite';
+export type OrigemVizinhos = "pinecone" | "sqlite";
 
 /**
  * Recupera os vizinhos do alvo: **Pinecone primeiro, cosseno-em-JS do SQLite como fallback**
@@ -281,13 +307,13 @@ async function recuperarVizinhos(
   if (matches != null) {
     return {
       vizinhos: vizinhosDeMatches(matches, args.exemplarPorId, { k, excluirId: args.excluirId }),
-      origem: 'pinecone',
+      origem: "pinecone",
     };
   }
   const corpus = await args.corpusFallback();
   return {
     vizinhos: selecionarVizinhos(alvoVetor, corpus, { k, excluirId: args.excluirId }),
-    origem: 'sqlite',
+    origem: "sqlite",
   };
 }
 
@@ -436,7 +462,7 @@ export async function classificarEspecialProjeto(
 
   const montado = await montarEntradaSemantica(projetoId, resumoAlvo);
   if (!montado) {
-    return { ok: false, projeto_id: projetoId, motivo: 'projeto sem contexto para classificar' };
+    return { ok: false, projeto_id: projetoId, motivo: "projeto sem contexto para classificar" };
   }
 
   // Embedding do ALVO — 1 linha, não a tabela inteira. Ler todos os vetores por classificação é
@@ -469,14 +495,18 @@ export async function classificarEspecialProjeto(
         excluirId: projetoId,
         exemplarPorId: mapaExemplares(especiais, avaliacoes),
         corpusFallback: async () =>
-          montarCorpus(especiais, avaliacoes, decodificarEmbeddings(await getEmbeddingsEspeciais())),
+          montarCorpus(
+            especiais,
+            avaliacoes,
+            decodificarEmbeddings(await getEmbeddingsEspeciais()),
+          ),
       })
-    : { vizinhos: [] as Vizinho[], origem: 'sqlite' as OrigemVizinhos };
+    : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
   const vizinhos = recuperado.vizinhos;
 
   const recomendacao = await classificarEspecial(montado.alvo, vizinhos);
   if (!recomendacao) {
-    return { ok: false, projeto_id: projetoId, motivo: 'LLM não devolveu recomendação utilizável' };
+    return { ok: false, projeto_id: projetoId, motivo: "LLM não devolveu recomendação utilizável" };
   }
 
   let gravado = false;
@@ -519,7 +549,7 @@ export async function classificarEspecialEmBackground(projetoId: string): Promis
     if (!p || p.especial !== 1) return; // só especiais
     await classificarEspecialProjeto(projetoId);
   } catch (e) {
-    console.error('[especial-classificador] falha em background:', e);
+    console.error("[especial-classificador] falha em background:", e);
   }
 }
 
@@ -576,7 +606,7 @@ export async function classificarEspeciaisPendentes(
       embeddings_gerados: 0,
       classificados: 0,
       resultados: [],
-      motivo: 'nenhum especial pendente de classificação',
+      motivo: "nenhum especial pendente de classificação",
     };
   }
 
@@ -608,7 +638,7 @@ export async function classificarEspeciaisPendentes(
     try {
       const montado = await montarEntradaSemantica(cand.id, cand);
       if (!montado) {
-        resultados.push({ ok: false, projeto_id: cand.id, motivo: 'sem contexto' });
+        resultados.push({ ok: false, projeto_id: cand.id, motivo: "sem contexto" });
         continue;
       }
       const alvoEmb = embeddings.get(cand.id);
@@ -618,11 +648,11 @@ export async function classificarEspeciaisPendentes(
             exemplarPorId,
             corpusFallback,
           })
-        : { vizinhos: [] as Vizinho[], origem: 'sqlite' as OrigemVizinhos };
+        : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
       const vizinhos = recuperado.vizinhos;
       const rec = await classificarEspecial(montado.alvo, vizinhos);
       if (!rec) {
-        resultados.push({ ok: false, projeto_id: cand.id, motivo: 'LLM sem recomendação' });
+        resultados.push({ ok: false, projeto_id: cand.id, motivo: "LLM sem recomendação" });
         continue;
       }
       if (!dry) {
@@ -653,7 +683,7 @@ export async function classificarEspeciaisPendentes(
       resultados.push({
         ok: false,
         projeto_id: cand.id,
-        motivo: e instanceof Error ? e.message : 'erro',
+        motivo: e instanceof Error ? e.message : "erro",
       });
     }
   }
@@ -822,8 +852,8 @@ export async function reauditarEspeciais(
       linhas: [],
       proximo_offset: null,
       motivo:
-        'a re-auditoria exige o índice do Pinecone (o filtro de nota humana roda no servidor) — ' +
-        'rode o setup e o backfill antes',
+        "a re-auditoria exige o índice do Pinecone (o filtro de nota humana roda no servidor) — " +
+        "rode o setup e o backfill antes",
     };
   }
 
@@ -855,7 +885,7 @@ export async function reauditarEspeciais(
         nome: p.nome,
         area: p.area,
         estrela_humana: p.estrelas as number,
-        desvio: { veredito: 'sem_base', referencia: null, delta: null, base: 0 },
+        desvio: { veredito: "sem_base", referencia: null, delta: null, base: 0 },
         vizinhos: [],
       });
       continue;
@@ -981,8 +1011,8 @@ export async function medirConcordanciaAgente(
       proximo_offset: null,
       motivo:
         comNota.length === 0
-          ? 'nenhum especial tem nota humana — sem gabarito não há o que medir'
-          : 'offset além do fim do test set',
+          ? "nenhum especial tem nota humana — sem gabarito não há o que medir"
+          : "offset além do fim do test set",
     };
   }
 
@@ -1008,7 +1038,7 @@ export async function medirConcordanciaAgente(
     try {
       const montado = await montarEntradaSemantica(alvoResumo.id, alvoResumo);
       if (!montado) {
-        falhas.push({ projeto_id: alvoResumo.id, motivo: 'sem contexto' });
+        falhas.push({ projeto_id: alvoResumo.id, motivo: "sem contexto" });
         continue;
       }
       const emb = embeddings.get(alvoResumo.id);
@@ -1018,11 +1048,11 @@ export async function medirConcordanciaAgente(
             exemplarPorId,
             corpusFallback,
           })
-        : { vizinhos: [] as Vizinho[], origem: 'sqlite' as OrigemVizinhos };
+        : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
       vizinhos_de[recuperado.origem]++;
       const rec = await juiz(montado.alvo, recuperado.vizinhos);
       if (!rec) {
-        falhas.push({ projeto_id: alvoResumo.id, motivo: 'juiz sem recomendação' });
+        falhas.push({ projeto_id: alvoResumo.id, motivo: "juiz sem recomendação" });
         continue;
       }
       pares.push({
@@ -1035,7 +1065,7 @@ export async function medirConcordanciaAgente(
     } catch (e) {
       falhas.push({
         projeto_id: alvoResumo.id,
-        motivo: e instanceof Error ? e.message : 'erro',
+        motivo: e instanceof Error ? e.message : "erro",
       });
     }
   }
@@ -1065,7 +1095,7 @@ export type LinhaFuncao = {
   estrelas: number | null;
   funcao: string;
   rotulo: string;
-  origem: FuncaoDetectada['origem'];
+  origem: FuncaoDetectada["origem"];
   termos: string[];
   empate: boolean;
 };
@@ -1133,12 +1163,12 @@ export async function rotearEspeciaisPorFuncao(
     try {
       const montado = await montarEntradaSemantica(p.id, p);
       if (!montado) {
-        falhas.push({ projeto_id: p.id, motivo: 'sem contexto' });
+        falhas.push({ projeto_id: p.id, motivo: "sem contexto" });
         continue;
       }
       // Título = o que o AUTOR diz que o projeto é (nome + "o que faz"); corpo = o resto do texto
       // semântico. O peso do título é o que desempata sem chute (ver PESO_TITULO).
-      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(' — ');
+      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(" — ");
       const corpo = textoParaEmbedding(montado.entrada);
       // Evidência dos vizinhos: o que o índice permite saber deles é nome + leitura.
       const vetor = mapaVetores.get(p.id)?.vetor;
@@ -1149,7 +1179,7 @@ export async function rotearEspeciaisPorFuncao(
           ? vizinhosDeMatches(matches, exemplarPorId, { excluirId: p.id })
           : [];
         evidencias = vizinhos.map((v) => ({
-          texto: [v.nome, v.leitura].filter(Boolean).join(' '),
+          texto: [v.nome, v.leitura].filter(Boolean).join(" "),
           similaridade: v.similaridade,
         }));
       }
@@ -1166,7 +1196,7 @@ export async function rotearEspeciaisPorFuncao(
         empate: det.empate,
       });
     } catch (e) {
-      falhas.push({ projeto_id: p.id, motivo: e instanceof Error ? e.message : 'erro' });
+      falhas.push({ projeto_id: p.id, motivo: e instanceof Error ? e.message : "erro" });
     }
   }
 
@@ -1203,5 +1233,427 @@ export async function rotearEspeciaisPorFuncao(
       .sort((a, b) => b.areas.length - a.areas.length),
     linhas: saida,
     proximo_offset: offset + limite < especiais.length ? offset + limite : null,
+  };
+}
+
+// ─── T6 do painel — orquestração (lentes → calibrador → revisor → gravação) ────
+
+/**
+ * Teto de chamadas de LLM por CORRIDA. ⚠️ Não é polimento: o T1 mediu ~10 s por chamada, e uma
+ * passada do painel nos 48 especiais a ~8 chamadas cada é ~380 chamadas / ~1 h. O teto + o
+ * `proximo_offset` é o que faz a corrida caber numa requisição e retomar de onde parou.
+ */
+export const TETO_CHAMADAS_PAINEL = 120;
+
+/**
+ * Página padrão. Menor que a do classificador de 1 agente de propósito: aqui cada projeto custa
+ * `lentes (em paralelo) + até 3 voltas de revisor + 1 redação`, ou seja **~30–50 s de relógio**,
+ * não ~10 s.
+ */
+export const PAGINA_PAINEL = 5;
+export const PAGINA_PAINEL_MAX = 12;
+
+export type JulgamentoPainel = {
+  projeto_id: string;
+  nome: string | null;
+  funcao: string;
+  /** A nota preliminar das lentes, antes de qualquer piso ou revisão. */
+  nota_lentes: number;
+  /** Depois dos pisos de prova (por projeto) e do revisor — ainda ANTES da cota da rodada. */
+  nota: number;
+  contestada: boolean;
+  confianca: Confianca;
+  avaliacoes: AvaliacaoLente[];
+  falhas_lentes: { lente: string; motivo: string }[];
+  convergencia: EstadoConvergencia;
+  entrada: EntradaCalibragem;
+  linha: LinhaCalibrada;
+  origem_vizinhos: OrigemVizinhos;
+  chamadas: number;
+};
+
+export type OpcoesPainelProjeto = {
+  lentes?: string[];
+  funcao?: string | null;
+  /** `false` (default) não gasta chamada de LLM para redigir — a leitura sai determinística. */
+  redigirLeitura?: boolean;
+};
+
+/**
+ * Julga UM especial pelo painel: lentes em paralelo → pisos de prova → revisor adversarial com
+ * teto absorvente. **Não aplica a cota da rodada** (ela é cross-projeto) e **não grava nada**.
+ *
+ * ⚠️ **Uma volta re-roda o REVISOR, não as lentes.** O material do projeto não muda entre voltas —
+ * o que muda é o desafio, e quem tem de produzir argumento novo é o desafiante (ele recebe os
+ * argumentos já usados e é proibido de repetir). Re-rodar as 4 lentes por volta triplicaria o custo
+ * (de ~8 para ~15 chamadas/projeto) sem nova evidência; se o T7 mostrar que faz falta, isso volta
+ * como opção medida, não como default silencioso.
+ *
+ * É esta função que o T7 passa como `juiz` do harness de concordância.
+ */
+export async function julgarUmEspecialComPainel(
+  alvo: AlvoClassificacao,
+  vizinhos: Vizinho[],
+  opts: OpcoesPainelProjeto = {},
+): Promise<JulgamentoPainel> {
+  let chamadas = 0;
+
+  const r = await avaliarComLentes(alvo, vizinhos, {
+    funcao: opts.funcao,
+    lentes: opts.lentes,
+  });
+  chamadas += opts.lentes?.length ?? LENTES.length;
+
+  const entrada = entradaDeConsolidado(alvo.projeto_id, r.avaliacoes, r.consolidado);
+  // Pisos de prova ANTES do revisor: não se gasta chamada defendendo nota que a prova já derrubou.
+  const soPisos = calibrarRodada([entrada], { aplicarCota: false });
+  let linha = soPisos.linhas[0];
+
+  let estado = iniciarConvergencia(linha.nota_depois);
+  const argumentos: string[] = [];
+  while (podeRevisarDeNovo(estado)) {
+    const veredicto = await revisarAdversarial({
+      alvo,
+      nota: estado.nota,
+      avaliacoes: r.avaliacoes,
+      vizinhos,
+      comoSaiu: explicarCalibragem(linha),
+      refutacoesAnteriores: argumentos,
+    });
+    chamadas++;
+    if (veredicto.refutada) argumentos.push(veredicto.motivo);
+    estado = aplicarRevisao(estado, veredicto);
+  }
+
+  if (estado.nota !== linha.nota_depois) {
+    linha = { ...linha, nota_depois: estado.nota };
+  }
+
+  return {
+    projeto_id: alvo.projeto_id,
+    nome: alvo.nome,
+    funcao: opts.funcao ?? FUNCAO_INDEFINIDA,
+    nota_lentes: r.consolidado.nota_preliminar,
+    nota: estado.nota,
+    contestada: estado.contestada,
+    confianca: confiancaDoPainel(r.avaliacoes, r.consolidado, estado, estado.nota),
+    avaliacoes: r.avaliacoes,
+    falhas_lentes: r.falhas,
+    convergencia: estado,
+    entrada: { ...entrada, nota_preliminar: estado.nota },
+    linha,
+    origem_vizinhos: "pinecone",
+    chamadas,
+  };
+}
+
+export type LinhaPainel = {
+  projeto_id: string;
+  nome: string | null;
+  area: string | null;
+  /** A nota humana, quando existe — só para o relatório (o painel nunca a escreve). */
+  estrelas_humana: number | null;
+  funcao: string;
+  nota_lentes: number;
+  nota_pos_prova: number;
+  /** A nota FINAL: pisos de prova + revisor + cota da rodada. */
+  nota: number;
+  contestada: boolean;
+  confianca: Confianca;
+  motivos: MotivoRebaixa[];
+  voltas: number;
+  encerramento: string;
+  leitura: string;
+  gravado: boolean;
+  /** Havia recomendação de OUTRA origem neste projeto (só acontece com `forcar`). */
+  sobrescreveu: boolean;
+  eixos: { lente: string; nota: number; evidencia: string }[];
+  falhas_lentes: { lente: string; motivo: string }[];
+  chamadas: number;
+};
+
+export type ResultadoPainel = {
+  ok: boolean;
+  dry: boolean;
+  origem: string;
+  modelo: string;
+  total_especiais: number;
+  candidatos: number;
+  julgados: number;
+  gravados: number;
+  sobrescritos: number;
+  chamadas_llm: number;
+  teto_chamadas: number;
+  /** `true` quando a corrida parou no teto de custo (e não por fim da página). */
+  parou_no_teto: boolean;
+  vizinhos_de: { pinecone: number; sqlite: number };
+  falhas: { projeto_id: string; motivo: string }[];
+  calibragem: ResumoCalibragem;
+  linhas: LinhaPainel[];
+  proximo_offset: number | null;
+  motivo?: string;
+};
+
+export type OpcoesPainelLote = {
+  /** Seco é o PADRÃO — gravar exige `{dry:false}` explícito. */
+  dry?: boolean;
+  limite?: number;
+  offset?: number;
+  /** Reavalia quem já tem recomendação/nota humana (é o único caminho que SOBRESCREVE). */
+  forcar?: boolean;
+  /** Julga só os especiais COM nota humana — o test set do T7. */
+  soComNotaHumana?: boolean;
+  lentes?: string[];
+  /** `false` mede a rodada contra a curva e RELATA sem rebaixar (o regime do T7). */
+  aplicarCota?: boolean;
+  curva?: Record<string, number>;
+  rotuloCurva?: string;
+  tetoChamadas?: number;
+  redigirLeitura?: boolean;
+};
+
+/**
+ * O painel em LOTE (T6). Três fases, nesta ordem:
+ * 1. **por projeto**: lentes → pisos de prova → revisor (`julgarUmEspecialComPainel`);
+ * 2. **por rodada**: `calibrarRodada` sobre as notas que saíram do revisor — a cota é cross-projeto
+ *    e só faz sentido com a página inteira em mãos;
+ * 3. **gravação**: `especial_avaliacao` com `origem: 'painel-agentes'`, se `dry` for `false`.
+ *
+ * ⚠️ **BATCH, jamais pós-submissão** (decisão 6 do plano): 30–50 s por projeto não cabe num
+ * request de usuário. ⚠️ **`dry` é o default** e nada é gravado sem `{dry:false}`. ⚠️ **Nunca
+ * lança** — falha de projeto vira linha em `falhas` e a corrida segue. ⚠️ **Nunca escreve a coluna
+ * "Estrelas"** nem toca o Sheets.
+ *
+ * Paginado por `offset`/`limite` (ordem estável por id) e limitado por `tetoChamadas`: batendo o
+ * teto, para e devolve `proximo_offset` no projeto em que parou — a corrida seguinte continua dali.
+ */
+export async function julgarEspeciaisComPainel(
+  opts: OpcoesPainelLote = {},
+): Promise<ResultadoPainel> {
+  const dry = opts.dry ?? true;
+  const limite = Math.max(1, Math.min(opts.limite ?? PAGINA_PAINEL, PAGINA_PAINEL_MAX));
+  const offset = Math.max(0, opts.offset ?? 0);
+  const teto = Math.max(8, opts.tetoChamadas ?? TETO_CHAMADAS_PAINEL);
+  const modelo = modeloChatConfigurado();
+
+  const { linhas: linhasSheet } = await lerResumosEspelho();
+  const especiais = apenasEspeciais(
+    linhasSheet.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
+  ).sort((a, b) => a.id.localeCompare(b.id));
+  const resumoPorId = new Map(especiais.map((p) => [p.id, p]));
+
+  const avaliacoesRows = await getAvaliacoesEspeciais();
+  const origemPorId = new Map(avaliacoesRows.map((a) => [a.projeto_id, a.origem]));
+  const avaliacoes = new Map(
+    avaliacoesRows.map((a) => [
+      a.projeto_id,
+      { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura },
+    ]),
+  );
+  const exemplarPorId = mapaExemplares(especiais, avaliacoes);
+
+  // Quem entra: por padrão os especiais SEM recomendação e SEM nota humana (a mesma régua do
+  // classificador — nota de gente é verdade e âncora). `soComNotaHumana` inverte para o test set do
+  // T7; `forcar` abre tudo (e é o único caminho que sobrescreve recomendação de outra origem).
+  const universo = opts.soComNotaHumana
+    ? especiais.filter((p) => p.estrelas != null)
+    : especiais.filter((p) => opts.forcar || (!origemPorId.has(p.id) && p.estrelas == null));
+  const fatia = universo.slice(offset, offset + limite);
+
+  const vazio: ResumoCalibragem = calibrarRodada([], {
+    curva: opts.curva,
+    rotuloCurva: opts.rotuloCurva,
+    aplicarCota: opts.aplicarCota,
+  }).resumo;
+
+  if (fatia.length === 0) {
+    return {
+      ok: true,
+      dry,
+      origem: ORIGEM_PAINEL,
+      modelo,
+      total_especiais: especiais.length,
+      candidatos: universo.length,
+      julgados: 0,
+      gravados: 0,
+      sobrescritos: 0,
+      chamadas_llm: 0,
+      teto_chamadas: teto,
+      parou_no_teto: false,
+      vizinhos_de: { pinecone: 0, sqlite: 0 },
+      falhas: [],
+      calibragem: vazio,
+      linhas: [],
+      proximo_offset: null,
+      motivo:
+        universo.length === 0
+          ? "nenhum especial elegível para o painel"
+          : "offset além do fim da lista",
+    };
+  }
+
+  // Memória: embeddings dos alvos + dos exemplares rotulados, para a vizinhança ter contra o que
+  // comparar. Mesmo caminho do classificador (o corpus do fallback é um thunk preguiçoso).
+  let embeddings = decodificarEmbeddings(await getEmbeddingsEspeciais());
+  const rotulados = especiais
+    .filter((p) => p.estrelas != null || origemPorId.has(p.id))
+    .map((p) => p.id);
+  const idsParaEmbeddar = Array.from(new Set([...fatia.map((c) => c.id), ...rotulados]));
+  const ger = await garantirEmbeddings(idsParaEmbeddar, resumoPorId, embeddings, {
+    capGeracao: 60,
+  });
+  embeddings = ger.mapa;
+  const corpus = montarCorpus(especiais, avaliacoes, embeddings);
+  const corpusFallback = async () => corpus;
+
+  const falhas: { projeto_id: string; motivo: string }[] = [];
+  const vizinhos_de = { pinecone: 0, sqlite: 0 };
+  const julgamentos: JulgamentoPainel[] = [];
+  let chamadas = 0;
+  let parou_no_teto = false;
+  let consumidos = 0;
+
+  // Custo máximo de UM projeto: as lentes + o teto de voltas do revisor + a redação (se ligada).
+  const custoPorProjeto =
+    (opts.lentes?.length ?? LENTES.length) + TETO_VOLTAS + (opts.redigirLeitura ? 1 : 0);
+
+  for (const cand of fatia) {
+    if (chamadas + custoPorProjeto > teto) {
+      parou_no_teto = true;
+      break;
+    }
+    consumidos++;
+    try {
+      const montado = await montarEntradaSemantica(cand.id, cand);
+      if (!montado) {
+        falhas.push({ projeto_id: cand.id, motivo: "sem contexto" });
+        continue;
+      }
+      const emb = embeddings.get(cand.id);
+      const recuperado = emb
+        ? await recuperarVizinhos(emb.vetor, {
+            excluirId: cand.id,
+            exemplarPorId,
+            corpusFallback,
+          })
+        : { vizinhos: [] as Vizinho[], origem: "sqlite" as OrigemVizinhos };
+      vizinhos_de[recuperado.origem]++;
+
+      // Função (T2): determinística, sem LLM — entra no prompt das lentes como CONTEXTO.
+      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(" — ");
+      const det = classificarFuncao({ titulo, corpo: textoParaEmbedding(montado.entrada) });
+
+      const j = await julgarUmEspecialComPainel(montado.alvo, recuperado.vizinhos, {
+        lentes: opts.lentes,
+        funcao: det.funcao === FUNCAO_INDEFINIDA ? null : det.funcao,
+        redigirLeitura: opts.redigirLeitura,
+      });
+      chamadas += j.chamadas;
+      julgamentos.push({ ...j, origem_vizinhos: recuperado.origem });
+    } catch (e) {
+      falhas.push({ projeto_id: cand.id, motivo: e instanceof Error ? e.message : "erro" });
+    }
+  }
+
+  // Fase 2 — a cota da RODADA, sobre as notas que saíram do revisor.
+  const calibrada = calibrarRodada(
+    julgamentos.map((j) => j.entrada),
+    { curva: opts.curva, rotuloCurva: opts.rotuloCurva, aplicarCota: opts.aplicarCota },
+  );
+  const porId = new Map(calibrada.linhas.map((l) => [l.projeto_id, l]));
+
+  // Fase 3 — leitura e gravação.
+  const linhas: LinhaPainel[] = [];
+  let gravados = 0;
+  let sobrescritos = 0;
+
+  for (const j of julgamentos) {
+    const linhaFinal = porId.get(j.projeto_id) ?? j.linha;
+    const refutacao = [...j.convergencia.historico].reverse().find((h) => h.refutada)?.motivo;
+    let leitura = leituraDoPainel({
+      linha: linhaFinal,
+      avaliacoes: j.avaliacoes,
+      estado: j.convergencia,
+      refutacao,
+    });
+    if (opts.redigirLeitura && chamadas + 1 <= teto) {
+      leitura = await redigirLeituraCalibrada({
+        nome: j.nome,
+        linha: linhaFinal,
+        avaliacoes: j.avaliacoes,
+        resumo: {
+          total: calibrada.resumo.total,
+          curva_referencia: calibrada.resumo.curva_referencia,
+          mais_generosa: calibrada.resumo.mais_generosa,
+        },
+      });
+      chamadas++;
+    }
+
+    const origemAnterior = origemPorId.get(j.projeto_id);
+    const sobrescreveu = origemAnterior != null && origemAnterior !== ORIGEM_PAINEL;
+    if (!dry) {
+      await upsertAvaliacaoEspecial({
+        projeto_id: j.projeto_id,
+        estrelas_recomendada: linhaFinal.nota_depois,
+        confianca: j.confianca,
+        leitura,
+        contestada: j.contestada,
+        origem: ORIGEM_PAINEL,
+        modelo,
+      });
+      gravados++;
+      if (sobrescreveu) sobrescritos++;
+    }
+
+    const resumo = resumoPorId.get(j.projeto_id);
+    linhas.push({
+      projeto_id: j.projeto_id,
+      nome: j.nome,
+      area: resumo?.area ?? null,
+      estrelas_humana: resumo?.estrelas ?? null,
+      funcao: j.funcao,
+      nota_lentes: j.nota_lentes,
+      nota_pos_prova: j.linha.nota_depois,
+      nota: linhaFinal.nota_depois,
+      contestada: j.contestada,
+      confianca: j.confianca,
+      motivos: linhaFinal.motivos,
+      voltas: j.convergencia.volta,
+      encerramento: explicarConvergencia(j.convergencia),
+      leitura,
+      gravado: !dry,
+      sobrescreveu,
+      eixos: j.avaliacoes.map((a) => ({
+        lente: a.lente,
+        nota: a.nota,
+        evidencia: a.evidencia,
+      })),
+      falhas_lentes: j.falhas_lentes,
+      chamadas: j.chamadas,
+    });
+  }
+
+  // Onde a próxima corrida começa: no projeto em que esta parou (teto) ou depois da página.
+  const proximo = offset + consumidos;
+
+  return {
+    ok: true,
+    dry,
+    origem: ORIGEM_PAINEL,
+    modelo,
+    total_especiais: especiais.length,
+    candidatos: universo.length,
+    julgados: julgamentos.length,
+    gravados,
+    sobrescritos,
+    chamadas_llm: chamadas,
+    teto_chamadas: teto,
+    parou_no_teto,
+    vizinhos_de,
+    falhas,
+    calibragem: calibrada.resumo,
+    linhas,
+    proximo_offset: proximo < universo.length ? proximo : null,
   };
 }

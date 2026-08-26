@@ -43,7 +43,7 @@ adversarial sobre toda nota ≥3*. Resultado em 99 projetos: **0★:8 · 1★:43
 | 3 | Calibrador | **OBRIGATÓRIO e determinístico onde der.** Reescala a distribuição da RODADA contra uma curva de referência DECLARADA. ⚠️ **Corrigido pela medição de 26/08/2026 (achado 4 do T1): a referência é a `CURVA_ESPECIAIS_AUDITADOS` (≥3 = 41,7%), NÃO a `CURVA_BASE` (≥3 = 5,4%)** — são populações diferentes, e usar a da base rebaixaria prata correta. |
 | 4 | Revisor adversarial | Sobre **toda nota ≥3** (é o que a força-tarefa fez, e 3★ já é top 4%). Prompt de REFUTAR, não de confirmar; empate mantém a nota MENOR. |
 | 5 | Teto de voltas | **3**, absorvente. Não convergiu → grava a nota do calibrador + **`contestada: true`** (campo que já existe) e segue. ⚠️ Loop sem teto absorvente é o erro que este repo já cometeu 3× (gate `[1.4]`, carga×escala, ganho projetado). |
-| 6 | Onde roda | **BATCH, jamais pós-submissão.** ~4 lentes × 3 voltas + roteador + calibrador + revisor ≈ **30–36 chamadas/projeto** contra 1 hoje. Rota admin + cron, paginada e retomável (mesmo padrão do backfill do Pinecone: `proximo_offset`). |
+| 6 | Onde roda | **BATCH, jamais pós-submissão.** Estimativa original: ~4 lentes × 3 voltas + roteador + calibrador + revisor ≈ 30–36 chamadas/projeto. ⚠️ **MEDIDO no T6: ~8 chamadas/projeto** — a volta re-roda o REVISOR, não as lentes (o material não muda entre voltas), o roteador é determinístico e o calibrador é puro. Rota admin + cron, paginada e retomável (`proximo_offset`) + teto de custo por corrida. |
 | 7 | Convive com o classificador de hoje? | **Sim.** O painel grava em `especial_avaliacao` com `origem` PRÓPRIA (`painel-agentes`); o classificador de 1 agente continua sendo o caminho pós-submissão e o fallback. Trocar o padrão só depois do T7. |
 | 8 | Escreve nota? | **NUNCA.** Coluna "Estrelas" só por clique humano — invariante do projeto inteiro, não desta fatia. |
 
@@ -231,8 +231,37 @@ vivo e o fallback não foi exercitado nesta medição.
   não entender a resposta carimbaria nota rara por acidente; o custo é limitado pelo teto). Nota que
   cai abaixo do corte durante a revisão encerra **sem** `contestada` — não há mais nota rara a
   defender, e contestar ali só sujaria o cartão da triagem.
-- **T6 — Orquestração + rota admin + cron.** `dry` default, paginado, retomável, nunca lança, teto de
-  custo por corrida. (guarda: `dry` não grava nada)
+- **T6 — Orquestração + rota admin + cron.** ✅ **FEITO** — `julgarEspeciaisComPainel` +
+  `julgarUmEspecialComPainel` (`especial-classificador.functions.ts`, ao lado do T1/T2), montagem
+  final PURA em `src/lib/especiais-painel.ts`, rota **`POST /api/admin/especiais/painel`** e cron
+  **`POST /api/cron/painel-especiais`** (14 testes; `worker.js` rebuildado).
+
+  **Três fases por corrida:** (1) por projeto — lentes em paralelo → pisos de prova → revisor;
+  (2) por rodada — `calibrarRodada` sobre as notas que saíram do revisor (a cota é cross-projeto e
+  só faz sentido com a página em mãos); (3) leitura + gravação em `especial_avaliacao` com
+  `origem: 'painel-agentes'`.
+
+  Decisões que o custo impôs (e que o T7 pode revisar COM número):
+
+  1. ⚠️ **Uma volta re-roda o REVISOR, não as lentes.** O material do projeto não muda entre voltas —
+     o que muda é o desafio, e quem tem de produzir argumento novo é o desafiante (ele recebe os
+     argumentos já usados e é proibido de repetir). Re-rodar as 4 lentes por volta levaria de ~8 para
+     ~15 chamadas/projeto sem nova evidência. Isso derruba a estimativa da decisão 6: **~8
+     chamadas/projeto**, não 30–36 — os 48 do test set custam ~380 chamadas, não ~1.500.
+  2. ⚠️ **Os pisos de prova rodam ANTES do revisor** — não se gasta chamada defendendo nota que a
+     prova já derrubou.
+  3. ⚠️ **A redação da leitura é OPT-IN** (`redigirLeitura`): sem ela a leitura sai determinística
+     (`leituraDoPainel`, que nomeia a PROVA de cada eixo, não só a nota) e a corrida economiza 1
+     chamada por projeto. Ligada, ela ainda respeita o teto.
+
+  Travas: **`dry` é o DEFAULT** (gravar exige `{"dry":false}`, com teste) · **teto de custo por
+  corrida** (`tetoChamadas`, default 120) que PARA a corrida e devolve `proximo_offset` do projeto em
+  que parou · **nunca lança** (projeto que explode vira linha em `falhas` e a corrida segue) ·
+  **nunca toca a coluna "Estrelas"** nem o Sheets · candidatos padrão são os especiais **sem
+  recomendação e sem nota humana**, então o painel **não sobrescreve** o agente único (a tabela tem
+  UMA linha por projeto — sobrescrever exige `forcar`, e o resultado conta `sobrescritos`).
+  ⚠️ O cron existe mas **NÃO está agendado no Godeploy**: até o T7 passar, o painel roda pela rota
+  admin. `soComNotaHumana: true` julga exatamente o test set do T7.
 - **T7 — Medir o PAINEL no mesmo harness do T1 e comparar.** ⚠️ **É a trava de subida.** O juiz é
   PARÂMETRO de `medirConcordanciaAgente` (`opts.juiz`/`rotuloJuiz`) e `compararConcordancia` já aplica
   o critério 1 — o T7 é fiação, não código novo. Alvo a bater: **MAE < 1,69 E ±1 > 58,3%**, sem piorar

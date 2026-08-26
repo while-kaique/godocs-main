@@ -62,6 +62,7 @@ import {
   reauditarEspeciais,
   medirConcordanciaAgente,
   rotearEspeciaisPorFuncao,
+  julgarEspeciaisComPainel,
 } from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -141,11 +142,7 @@ interface Env {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function json(
-  data: unknown,
-  status = 200,
-  extraHeaders?: Record<string, string>,
-): Response {
+function json(data: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json", ...(extraHeaders ?? {}) },
@@ -321,6 +318,19 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await classificarEspeciaisPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron: PAINEL de agentes sobre os especiais sem recomendação (T6) ──────
+    // ⚠️ Página pequena e teto de custo BAIXO de propósito: são ~8 chamadas de LLM por projeto
+    // (contra 1 do classificador), e o cron existe para CONVERGIR em várias corridas, não para
+    // varrer a base numa. Ele pega só quem não tem recomendação nenhuma nem nota humana — não
+    // atropela o classificador nem a nota de gente (decisão 7 do plano).
+    // ⚠️ NÃO está agendado no Godeploy: até o T7 passar, o painel roda pela rota admin.
+    if (pathname === "/api/cron/painel-especiais" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await julgarEspeciaisComPainel({ dry: false, limite: 3, tetoChamadas: 30 }));
     }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
@@ -894,6 +904,41 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await rotearEspeciaisPorFuncao({ limite: body.limite, offset: body.offset }));
     }
 
+    // PAINEL DE AGENTES (T6): lentes distintas → calibrador → revisor adversarial, em LOTE.
+    // ⚠️ `dry` é o DEFAULT — gravar exige {"dry":false} explícito (mesma trava do
+    // `converter-custo-evitado-puro`). Grava só em `especial_avaliacao` com origem
+    // `painel-agentes`; NUNCA a coluna "Estrelas" e nunca o Sheets.
+    // ⚠️ Paginado E limitado por CUSTO: ~8 chamadas de LLM por projeto, ~30–50 s de relógio cada,
+    // então a corrida para no `tetoChamadas` e devolve `proximo_offset` de onde continuar.
+    // `soComNotaHumana:true` julga exatamente o test set do T7.
+    if (pathname === "/api/admin/especiais/painel" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as {
+        dry?: boolean;
+        limite?: number;
+        offset?: number;
+        forcar?: boolean;
+        soComNotaHumana?: boolean;
+        lentes?: string[];
+        aplicarCota?: boolean;
+        tetoChamadas?: number;
+        redigirLeitura?: boolean;
+      };
+      return json(
+        await julgarEspeciaisComPainel({
+          dry: body.dry,
+          limite: body.limite,
+          offset: body.offset,
+          forcar: body.forcar,
+          soComNotaHumana: body.soComNotaHumana,
+          lentes: body.lentes,
+          aplicarCota: body.aplicarCota,
+          tetoChamadas: body.tetoChamadas,
+          redigirLeitura: body.redigirLeitura,
+        }),
+      );
+    }
+
     // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────
     // Ver src/lib/aprovacao-pendentes.functions.ts: mesmo espelho da triagem, recortado aos
     // pendentes/pré-aprovados do fluxo normal. Ações e divisão reusam os endpoints já acima
@@ -902,7 +947,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       return json(await listarAprovacaoPendentes());
     }
-   if (pathname === "/api/admin/usuarios" && method === "GET") {
+    if (pathname === "/api/admin/usuarios" && method === "GET") {
       await requireAdmin(request);
       return json(await getUsuarios());
     }
