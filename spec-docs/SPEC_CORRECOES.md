@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-08-26 — Aba de aprovação de pendentes só atualizava por clique + item "Configurações" morto na sidebar
+
+**Status:** ✅ corrigido · **Branch:** `fix/auto-atualizar-aprovacoes-pendentes`
+
+**Sintoma.** (a) `/aprovacoes-pendentes` é tela de PLANTÃO — o time de RPA a deixa aberta enquanto
+valida —, mas a lista só mudava com um clique em **"Atualizar"**. Quem esquecia decidia sobre fila
+velha: projeto que outro admin já resolveu, projeto novo que não aparecia, parecer de líder que
+acabou de chegar. (b) O item **"Configurações"** da sidebar do admin não abria nada.
+
+**Causa-raiz.** (a) A tela nunca teve poll: uma única carga no mount (`useEffect`) e o resto por
+clique. O `carregar(silencioso)` já existia (usado depois de definir dono de área), só não havia
+relógio chamando. (b) O `NavItem` apontava para **`/configuracoes`, rota que nunca existiu** — não
+há `src/routes/_authenticated/configuracoes.tsx` nem entrada no `routeTree.gen.ts`, então o clique
+caía no SPA fallback. (A tabela `configuracoes` e a rota `GET /api/admin/configuracoes` existem e
+alimentam os critérios do validador — o que não existe é a TELA.)
+
+**Fix.** (a) Poll de **15 s** por `useAutoAtualizar` (`src/lib/auto-atualizar.ts`, hook + predicado
+PURO `motivoParaPular`), com as 4 travas descritas no `CLAUDE.md`: não empilha requisição, não
+atualiza por baixo de quem está decidindo (ficha/painel/gravação), não gasta chamada com a aba em
+segundo plano (e atualiza NA HORA ao voltar para ela) e **falha do ciclo automático não abre o
+painel vermelho de erro** — vira aviso discreto (ícone + texto) ao lado do carimbo de sincronização,
+com a lista velha preservada. O botão "Atualizar" fica (forçar agora) e o cabeçalho declara
+"Atualiza sozinho a cada 15 s". O `agoraMs` da tela passa a ser repontado a cada atualização (aba
+aberta a noite inteira mantinha "3 dias de espera"). ⚠️ **Barato porque a rota lê o espelho no
+SQLite, não o Sheets** — medido em prod: ~1,3 s e ~24 KB por chamada, 4 chamadas/min por aba, e
+**zero** consumo da cota de 60 leituras/min compartilhada com produção; se a rota voltar a ler a
+planilha, o poll sai no MESMO commit. (b) Removidos o `NavItem` e o ícone `Settings` de `route.tsx`
+— só isso, nada de banco nem de API.
+
+**Onde aterrissou.** `src/lib/auto-atualizar.ts` (novo), `src/routes/_authenticated/aprovacoes-pendentes.tsx`,
+`src/routes/_authenticated/route.tsx`, `tests/auto-atualizar.test.ts` (novo). `CLAUDE.md`
+(bullet em "Convenções rápidas") e `SPEC_FEATURES_NOVAS.md` (seção da aba). **Sem** mudança
+server-side → `worker.js` intocado.
+
+---
+
 ## 2026-08-25 — Nome do usuário na submissão saía errado (derivado do e-mail, não o nome real)
 
 **Status:** ✅ corrigido · **Branch:** `fix/nome-teamguide-identidade`
