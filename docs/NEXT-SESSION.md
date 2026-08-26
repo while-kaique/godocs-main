@@ -3,6 +3,28 @@
 ## Plano ativo
 **→ DOIS trabalhos vivos nesta data. Regra 7: os dois lados valem — não escolher um.**
 
+### 0. ⭐ COMEÇAR AQUI — Painel de agentes para julgar ESPECIAIS (o fluxograma)
+
+**→ [docs/plans/painel-agentes-especiais.md](plans/painel-agentes-especiais.md)** · branch
+**`feat/painel-agentes-especiais`** (worktree `.claude/worktrees/painel-agentes`, criada em 26/08 a
+partir do `main` `f2e6788`). Status: **plano fechado, ZERO código escrito.**
+
+**Decisão do Kaique (26/08):** construir na branch e **só subir quando tudo estiver testado** — a
+trava de subida é a **T7** (o painel BATER o baseline no test set), não "ficou pronto".
+
+**A primeira tarefa é MEDIR, não codar o painel.** T1 = rodar o **agente atual** contra as **644 notas
+humanas** da coluna "Estrelas" (MAE, % dentro de ±1, distribuição contra a `CURVA_BASE`). Sem esse
+número não existe "melhorou" — existe opinião. O mesmo harness mede o painel no T7.
+
+⚠️ **Duas lições que NÃO podem ser redescobertas na marra** (a topologia já rodou fora do app, na
+força-tarefa do JV que gerou o `especiais-seed.ts`): **(1) o nó CALIBRADOR não pode faltar** — sem
+reescalar na `CURVA_BASE`, cada agente extra no loop empurra a nota para cima e 3 voltas viram
+inflação; **(2) rotear por ÁREA é o eixo errado e isso está MEDIDO** — o `a1fe406` cortou área do
+embedding porque ela separa irmãos de função (bug GoPrice × «Agente precificador»). O eixo é **função**.
+
+⚠️ **BATCH, nunca pós-submissão:** ~30–36 chamadas de LLM por projeto contra 1 hoje.
+
+
 ### 1. RAG dos especiais no Pinecone — ✅ **ENTREGUE EM PROD (26/08, ~20:14 UTC)**
 
 [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md) · PR **#298**.
