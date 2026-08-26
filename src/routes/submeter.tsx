@@ -1846,7 +1846,15 @@ export function SubmeterPageContent({
       setTimeout(() => setShaking(false), 350);
       return;
     }
-    if (!editProjetoId && arquivos.length === 0) return;
+    // Doc obrigatória — mas só barra quando NÃO há arquivo novo E NÃO há doc já enviada.
+    // Os File[] (`arquivos`) NÃO sobrevivem a um reload/rehydrate, mas a doc já subiu ao
+    // background e persiste como `nomesExistentes` (+ `projetoId`). Nesse estado a submissão
+    // especial segue pelo ramo `existenteId` com `reset_doc:true`, que remonta a doc da
+    // descrição+contexto SEM os arquivos locais — então `arquivos` vazio com doc existente
+    // DEVE prosseguir, nunca abortar em silêncio (o botão "morto" que a pessoa via após
+    // recarregar a página; workaround era excluir e re-anexar). `validarEtapa2` já mostra o
+    // erro visível quando não há doc alguma.
+    if (!editProjetoId && arquivos.length === 0 && nomesExistentes.length === 0) return;
 
     setBloqueio(null);
     setEnviandoEspecial(true);
