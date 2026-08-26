@@ -3545,13 +3545,13 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // sempre em_validacao para que a re-análise automática recomece do zero.
   const ehReenvio = modo === "edicao" || !!projeto.submitted_at;
 
-  // ── Bloqueio TEMPORÁRIO de novas submissões (janela determinística) ──────────
-  // Reforço de SERVIDOR: recusa apenas SUBMISSÃO NOVA (não reenvio) enquanto a
-  // janela está aberta. Reenvio/edição de projeto já submetido segue normal — a
-  // triagem/aprovação do que já entrou não para. O cliente também desabilita o
-  // botão; isto cobre cliente desatualizado / chamada direta à API. Janela e copy
-  // vêm da fonte única `src/lib/bloqueio-submissao.ts`.
-  if (deveRecusarSubmissao(ehReenvio)) {
+  // ── Bloqueio TEMPORÁRIO de submissões (janela determinística) ────────────────
+  // Reforço de SERVIDOR: enquanto a janela está aberta, recusa TODA submissão do
+  // usuário — submissão NOVA *e* reenvio/edição de projeto já submetido (reenvio é
+  // uma submissão). A triagem/aprovação do admin não passa por aqui e não para. O
+  // cliente também desabilita o botão; isto cobre cliente desatualizado / chamada
+  // direta à API. Janela e copy vêm da fonte única `src/lib/bloqueio-submissao.ts`.
+  if (deveRecusarSubmissao()) {
     throw erroDeBloqueio(bloqueioSubmissaoPausada());
   }
 

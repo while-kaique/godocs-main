@@ -10,6 +10,7 @@ import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
+import { useBloqueioSubmissao } from "@/components/aviso-bloqueio-submissao";
 import type { Veredito } from "@/lib/aprovacoes.functions";
 import {
   FileText,
@@ -32,6 +33,10 @@ import {
 
 // Itens por página em cada filtro de "Meus Projetos".
 const PER_PAGE = 10;
+
+// Tooltip do botão "Editar" desabilitado durante a janela de bloqueio de submissões.
+// (Não é copy de aviso da fonte única; é só o title/aria do botão desabilitado.)
+const EDICAO_PAUSADA_TITULO = "Edição pausada até 1º de setembro.";
 
 // Prazo para regularizar legados (editar/salvar até deixar de constar como legado).
 const PRAZO_LEGADO = "30/06/2026";
@@ -471,6 +476,10 @@ function MeusProjetosPage() {
     filtro === "todos" ? null : ROTULO_FILTRO[filtro],
   );
   const [excluindo, setExcluindo] = useState<string | null>(null);
+  // Bloqueio TEMPORÁRIO de submissões (janela determinística): durante a janela o
+  // reenvio/edição também para. Desabilita o botão "Editar" (reavalia a cada 60s).
+  // Descontinuar/Reativar e Visualizar NÃO são edição e seguem funcionando.
+  const { bloqueado } = useBloqueioSubmissao();
   // Id do projeto cuja ação de descontinuar/reativar está em andamento (spinner no botão).
   const [descontinuando, setDescontinuando] = useState<string | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -985,7 +994,25 @@ function MeusProjetosPage() {
                                       Descontinuar
                                     </button>
                                   ))}
-                                {podeEditar ? (
+                                {podeEditar && bloqueado ? (
+                                  // Edição pausada na janela de bloqueio: botão desabilitado
+                                  // (mesma estética de disabled do projeto), sem navegar.
+                                  <span
+                                    aria-disabled="true"
+                                    title={EDICAO_PAUSADA_TITULO}
+                                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold"
+                                    style={{
+                                      background: "var(--go-blue)",
+                                      color: "var(--go-white)",
+                                      opacity: 0.5,
+                                      cursor: "not-allowed",
+                                      pointerEvents: "none",
+                                    }}
+                                  >
+                                    <PencilLine className="h-3.5 w-3.5" />
+                                    Editar
+                                  </span>
+                                ) : podeEditar ? (
                                   <Link
                                     to="/editar/$id"
                                     params={{ id: p.id }}

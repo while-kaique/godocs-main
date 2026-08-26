@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { estaBloqueado } from "@/lib/bloqueio-submissao";
 import { SubmeterPageContent } from "./submeter";
 
 export const Route = createFileRoute("/editar/$id")({
@@ -25,6 +26,14 @@ function EditarPage() {
 
   useEffect(() => {
     let ativo = true;
+    // Bloqueio TEMPORÁRIO de submissões (janela determinística): durante a janela o
+    // reenvio/edição também para. URL direta para o editor volta à listagem — o gate
+    // DURO continua sendo o servidor (`deveRecusarSubmissao`), isto é só a porta do
+    // cliente. Fonte única do relógio em `src/lib/bloqueio-submissao.ts`.
+    if (estaBloqueado()) {
+      navigate({ to: "/meus-projetos", replace: true });
+      return;
+    }
     apiFetch<{ podeEditar: boolean }>(`/api/meus-projetos/${id}`)
       .then((p) => {
         if (!ativo) return;

@@ -5,6 +5,7 @@ import { fmtDataBR } from "@/lib/format-date";
 import { StatusBadge } from "@/components/status-badge";
 import { InfoTooltip } from "@/components/info-tooltip";
 import { AvisoPendencia } from "@/components/aviso-pendencia";
+import { useBloqueioSubmissao } from "@/components/aviso-bloqueio-submissao";
 import { SimpleMarkdown } from "@/lib/submeter/step3-chat";
 import { normalizarMarcadoresMemorial } from "@/lib/agents/memorial-format";
 import { useTituloPagina } from "@/lib/use-titulo-pagina";
@@ -94,6 +95,9 @@ function ProjetoReadOnlyPage() {
   const [p, setP] = useState<Detalhes | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  // Durante a janela de bloqueio, editar/reenviar também para: o botão "Editar"
+  // fica desabilitado (reavalia a cada 60s). Só a edição — a visualização segue.
+  const { bloqueado } = useBloqueioSubmissao();
 
   useEffect(() => {
     apiFetch<Detalhes>(`/api/meus-projetos/${id}`)
@@ -243,17 +247,35 @@ function ProjetoReadOnlyPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <StatusBadge status={p.status} />
-                  {p.podeEditar && (
-                    <Link
-                      to="/editar/$id"
-                      params={{ id: p.id }}
-                      className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
-                      style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
-                    >
-                      <PencilLine className="h-3.5 w-3.5" />
-                      Editar
-                    </Link>
-                  )}
+                  {p.podeEditar &&
+                    (bloqueado ? (
+                      // Edição pausada na janela de bloqueio: botão desabilitado, sem navegar.
+                      <span
+                        aria-disabled="true"
+                        title="Edição pausada até 1º de setembro."
+                        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold"
+                        style={{
+                          background: "var(--go-blue)",
+                          color: "var(--go-white)",
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <PencilLine className="h-3.5 w-3.5" />
+                        Editar
+                      </span>
+                    ) : (
+                      <Link
+                        to="/editar/$id"
+                        params={{ id: p.id }}
+                        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold transition-all"
+                        style={{ background: "var(--go-blue)", color: "var(--go-white)" }}
+                      >
+                        <PencilLine className="h-3.5 w-3.5" />
+                        Editar
+                      </Link>
+                    ))}
                 </div>
               </div>
 
