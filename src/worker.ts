@@ -22,6 +22,9 @@ import {
   retroativoCustosPontuais,
 } from "@/lib/chat.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
+import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
+import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
+import { enviarRollupParaJG } from "@/lib/rollup-push.functions";
 import {
   getAreas,
   createArea,
@@ -81,6 +84,7 @@ import {
   excluirProjetoCascade,
   getProjetoById,
   getAprovacoesDoProjeto,
+  lerRollupMensal,
 } from "@/integrations/db/client.server";
 import {
   listarMeusProjetos,
@@ -1093,6 +1097,49 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = await readBody<{ max?: number }>(request).catch(() => ({}) as { max?: number });
       return json(await reconciliarSnapshots(body?.max));
+    }
+
+    // ── Backfill do ROLLUP histórico de saving/receita (admin) ──
+    // Recomputa INTEIRAMENTE a tabela durável `rollup_saving_receita` (grão mensal, por
+    // mês de submitted_at × área × tipo_saving) a partir dos projetos aprovados. Fonte da
+    // API histórica do squad Intelli. Idempotente/convergente — rodar de novo dá o mesmo
+    // resultado. Existe para o backfill inicial e para validar na staging.
+    if (pathname === "/api/admin/rollup-backfill" && method === "POST") {
+      await requireAdmin(request);
+      return json(await recalcularRollupBackfill());
+    }
+    // Leitura do rollup durável (admin): células brutas + totais por área.
+    // O campo `verificacao` (soma global) NÃO faz parte do contrato do squad Intelli — a
+    // regra "sem total geral" vale para o PAYLOAD de saída; aqui é só apoio para bater os
+    // números com o /dashboard antes do push.
+    if (pathname === "/api/admin/rollup-mensal" && method === "GET") {
+      await requireAdmin(request);
+      const celulas = await lerRollupMensal();
+      const totaisArea = derivarTotaisPorArea(celulas);
+      const verificacao = celulas.reduce(
+        (acc, c) => ({
+          saving_reais: Math.round((acc.saving_reais + c.saving_reais) * 100) / 100,
+          receita_reais: Math.round((acc.receita_reais + c.receita_reais) * 100) / 100,
+          num_projetos: acc.num_projetos + c.num_projetos,
+        }),
+        { saving_reais: 0, receita_reais: 0, num_projetos: 0 },
+      );
+      return json({ celulas, totais_area: totaisArea, verificacao });
+    }
+    // Push do rollup para o app do squad Intelli (João Gabriel), modelo Gomoon. `dry` é o
+    // DEFAULT (monta e devolve o payload sem enviar); enviar exige {"dry":false}. Sem
+    // JG_INGEST_URL fica inerte (aguardando o endpoint do Gabriel).
+    if (pathname === "/api/admin/rollup-push" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ dry?: boolean }>(request);
+      return json(await enviarRollupParaJG({ dry: body.dry !== false }));
+    }
+    // Cron: recomputa o rollup do espelho e empurra para o Gabriel (não-dry).
+    if (pathname === "/api/cron/rollup-push" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await enviarRollupParaJG({ dry: false }));
     }
 
     // ── Disparo de e-mails por segmento (admin) ──

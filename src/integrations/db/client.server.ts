@@ -664,6 +664,39 @@ export function getProjetosParaSnapshot() {
   );
 }
 
+// --- Rollup histórico de saving/receita (API para o squad Intelli / João Gabriel) ---
+
+/**
+ * Substitui INTEIRAMENTE o rollup mensal pelas células recalculadas (DELETE-all + INSERT).
+ * O backfill recomputa o conjunto todo, então a substituição total é o que garante
+ * idempotência E remove células que deixaram de existir (projeto desaprovado/descontinuado).
+ */
+export async function substituirRollupMensal(
+  celulas: import("@/lib/rollup-financeiro").CelulaRollup[],
+): Promise<void> {
+  await exec("DELETE FROM rollup_saving_receita WHERE grao = 'mensal'", []);
+  for (const c of celulas) {
+    await exec(
+      `INSERT INTO rollup_saving_receita
+         (grao, periodo, area, tipo_saving, saving_reais, receita_reais, num_projetos, atualizado_em)
+       VALUES ('mensal', ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [c.periodo, c.area, c.tipo_saving, c.saving_reais, c.receita_reais, c.num_projetos],
+    );
+  }
+}
+
+/** Lê o rollup mensal persistido, ordenado por (período, área, tipo_saving). */
+export function lerRollupMensal() {
+  return queryAll<import("@/lib/rollup-financeiro").CelulaRollup>(
+    `SELECT 'mensal' AS grao, periodo, area, tipo_saving,
+            saving_reais, receita_reais, num_projetos
+       FROM rollup_saving_receita
+      WHERE grao = 'mensal'
+      ORDER BY periodo, area, tipo_saving`,
+    [],
+  );
+}
+
 /**
  * Projeção escalar do ÚLTIMO snapshot de cada projeto (via `json_extract`, SEM blobs) —
  * para o cron detectar divergência entre o estado atual e a última versão. Uma consulta.

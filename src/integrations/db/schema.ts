@@ -464,6 +464,23 @@ const SCHEMA_SQL = `
     texto_hash  TEXT,
     criado_em   TEXT DEFAULT (datetime('now'))
   );
+
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  -- Rollup histórico de saving/receita por (grão, período, área, tipo_saving) — fonte durável
+  -- da API histórica consumida pelo squad Intelli (João Gabriel). Tabela DERIVADA e INTERNA
+  -- (fora de SAFE_UPDATE_FIELDS, o sync reverso não a toca) reconstruída pelo backfill a
+  -- partir dos projetos aprovados. saving_reais e receita_reais são CRUS e SEPARADOS.
+  CREATE TABLE IF NOT EXISTS rollup_saving_receita (
+    grao          TEXT NOT NULL,
+    periodo       TEXT NOT NULL,
+    area          TEXT NOT NULL,
+    tipo_saving   TEXT NOT NULL,
+    saving_reais  REAL NOT NULL DEFAULT 0,
+    receita_reais REAL NOT NULL DEFAULT 0,
+    num_projetos  INTEGER NOT NULL DEFAULT 0,
+    atualizado_em TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (grao, periodo, area, tipo_saving)
+  );
 `;
 
 // Migrações seguras — ALTER TABLE com tratamento de "duplicate column" para bancos existentes.
