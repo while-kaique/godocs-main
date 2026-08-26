@@ -61,6 +61,7 @@ import {
   sincronizarPineconeEspeciais,
   reauditarEspeciais,
   medirConcordanciaAgente,
+  rotearEspeciaisPorFuncao,
 } from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -881,6 +882,16 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = (await readBody(request)) as { limite?: number; offset?: number };
       return json(await medirConcordanciaAgente({ limite: body.limite, offset: body.offset }));
+    }
+
+    // Roteamento por FUNÇÃO (T2 do painel): classifica cada especial numa função DECLARADA
+    // (`TAXONOMIA_FUNCAO`) e mede a cobertura da taxonomia contra a base. Determinístico —
+    // vocabulário, não LLM —, então mesmo texto devolve sempre a mesma função (é o que faz duas
+    // corridas serem comparáveis). ⚠️ SOMENTE LEITURA e sem `dry`: função é ROTA, não nota.
+    if (pathname === "/api/admin/especiais/funcoes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { limite?: number; offset?: number };
+      return json(await rotearEspeciaisPorFuncao({ limite: body.limite, offset: body.offset }));
     }
 
     // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────

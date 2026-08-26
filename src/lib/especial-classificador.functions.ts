@@ -72,6 +72,14 @@ import {
   type MetricasConcordancia,
   type ParNota,
 } from '@/lib/especiais-concordancia';
+import {
+  classificarFuncao,
+  medirCobertura,
+  rotuloFuncao,
+  type CoberturaFuncao,
+  type EvidenciaVizinho,
+  type FuncaoDetectada,
+} from '@/lib/especiais-funcao';
 
 /** Carimbo de origem gravado em cada recomendação do agente (distingue do seed da força-tarefa). */
 export const ORIGEM_AGENTE = 'agente-classificador';
@@ -1044,5 +1052,156 @@ export async function medirConcordanciaAgente(
     metricas: medirConcordancia(pares),
     pares,
     proximo_offset: offset + limite < comNota.length ? offset + limite : null,
+  };
+}
+
+// ─── T2 do painel — roteamento por FUNÇÃO (sem LLM, sem escrita) ───────────────
+
+export type LinhaFuncao = {
+  projeto_id: string;
+  nome: string | null;
+  /** Só para o relatório: é ela que a taxonomia NÃO usa (lição 2), e ver as duas lado a lado prova. */
+  area: string | null;
+  estrelas: number | null;
+  funcao: string;
+  rotulo: string;
+  origem: FuncaoDetectada['origem'];
+  termos: string[];
+  empate: boolean;
+};
+
+export type ResultadoFuncoes = {
+  ok: boolean;
+  /** Este roteador é determinístico e read-only: sem LLM, sem `dry`, sem caminho de escrita. */
+  somente_leitura: true;
+  total_especiais: number;
+  analisados: number;
+  falhas: { projeto_id: string; motivo: string }[];
+  cobertura: CoberturaFuncao;
+  /** Cruzamento função × área — a evidência de que a função ATRAVESSA áreas (lição 2). */
+  funcao_por_area: { funcao: string; rotulo: string; areas: string[] }[];
+  linhas: LinhaFuncao[];
+  proximo_offset: number | null;
+};
+
+/**
+ * Roteia os especiais por FUNÇÃO e mede a cobertura da `TAXONOMIA_FUNCAO` contra a base real (T2).
+ *
+ * Sem LLM: o roteador é casamento de vocabulário sobre o MESMO texto que vira embedding
+ * (`textoParaEmbedding`) — mesma entrada que o classificador vê, então a rota do painel e a
+ * vizinhança do RAG falam do mesmo projeto. Os vizinhos do índice entram só como DESEMPATE, e a
+ * evidência que se tem deles é `nome + leitura` (o índice não guarda o texto inteiro).
+ *
+ * ⚠️ **Faz leitura por projeto** (contexto + doc), o que este repo evita em listagem — aqui é
+ * aceitável porque a página é LIMITADA (`limite`, teto 60), a rota é de admin e não há LLM no meio;
+ * o que não pode é isso virar caminho de request de usuário.
+ *
+ * ⚠️ Não escreve nada e não dá nota: função é ROTA, não juízo.
+ */
+export async function rotearEspeciaisPorFuncao(
+  opts: { limite?: number; offset?: number } = {},
+): Promise<ResultadoFuncoes> {
+  const limite = Math.max(1, Math.min(opts.limite ?? 25, 60));
+  const offset = Math.max(0, opts.offset ?? 0);
+
+  const { linhas: linhasSheet } = await lerResumosEspelho();
+  const especiais = apenasEspeciais(
+    linhasSheet.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
+  ).sort((a, b) => a.id.localeCompare(b.id));
+
+  const avaliacoesRows = await getAvaliacoesEspeciais();
+  const avaliacoes = new Map(
+    avaliacoesRows.map((a) => [
+      a.projeto_id,
+      { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura },
+    ]),
+  );
+  const exemplarPorId = mapaExemplares(especiais, avaliacoes);
+  const fatia = especiais.slice(offset, offset + limite);
+
+  // Vetores só dos alvos desta página — nada de carregar a tabela inteira (teto de 32 MiB).
+  const mapaVetores = decodificarEmbeddings(
+    (await Promise.all(fatia.map((p) => getEmbeddingEspecial(p.id)))).filter(
+      (r): r is EspecialEmbeddingRow => r != null,
+    ),
+  );
+
+  const saida: LinhaFuncao[] = [];
+  const falhas: { projeto_id: string; motivo: string }[] = [];
+
+  for (const p of fatia) {
+    try {
+      const montado = await montarEntradaSemantica(p.id, p);
+      if (!montado) {
+        falhas.push({ projeto_id: p.id, motivo: 'sem contexto' });
+        continue;
+      }
+      // Título = o que o AUTOR diz que o projeto é (nome + "o que faz"); corpo = o resto do texto
+      // semântico. O peso do título é o que desempata sem chute (ver PESO_TITULO).
+      const titulo = [montado.entrada.nome, montado.entrada.o_que_faz].filter(Boolean).join(' — ');
+      const corpo = textoParaEmbedding(montado.entrada);
+      // Evidência dos vizinhos: o que o índice permite saber deles é nome + leitura.
+      const vetor = mapaVetores.get(p.id)?.vetor;
+      let evidencias: EvidenciaVizinho[] = [];
+      if (vetor) {
+        const matches = await consultarVizinhos(vetor, { topK: Math.max(K_VIZINHOS * 3, 12) });
+        const vizinhos = matches
+          ? vizinhosDeMatches(matches, exemplarPorId, { excluirId: p.id })
+          : [];
+        evidencias = vizinhos.map((v) => ({
+          texto: [v.nome, v.leitura].filter(Boolean).join(' '),
+          similaridade: v.similaridade,
+        }));
+      }
+      const det = classificarFuncao({ titulo, corpo }, evidencias);
+      saida.push({
+        projeto_id: p.id,
+        nome: p.nome,
+        area: p.area,
+        estrelas: p.estrelas,
+        funcao: det.funcao,
+        rotulo: det.rotulo,
+        origem: det.origem,
+        termos: det.termos,
+        empate: det.empate,
+      });
+    } catch (e) {
+      falhas.push({ projeto_id: p.id, motivo: e instanceof Error ? e.message : 'erro' });
+    }
+  }
+
+  const porFuncaoArea = new Map<string, Set<string>>();
+  for (const l of saida) {
+    if (!l.area) continue;
+    const set = porFuncaoArea.get(l.funcao) ?? new Set<string>();
+    set.add(l.area);
+    porFuncaoArea.set(l.funcao, set);
+  }
+
+  return {
+    ok: true,
+    somente_leitura: true,
+    total_especiais: especiais.length,
+    analisados: saida.length,
+    falhas,
+    cobertura: medirCobertura(
+      saida.map((l) => ({
+        funcao: l.funcao,
+        rotulo: l.rotulo,
+        origem: l.origem,
+        termos: l.termos,
+        placar: [],
+        empate: l.empate,
+      })),
+    ),
+    funcao_por_area: [...porFuncaoArea.entries()]
+      .map(([funcao, areas]) => ({
+        funcao,
+        rotulo: rotuloFuncao(funcao),
+        areas: [...areas].sort(),
+      }))
+      .sort((a, b) => b.areas.length - a.areas.length),
+    linhas: saida,
+    proximo_offset: offset + limite < especiais.length ? offset + limite : null,
   };
 }

@@ -102,9 +102,34 @@ vivo e o fallback não foi exercitado nesta medição.
   test set pronto. Medir o **agente ATUAL** contra elas: **MAE**, **% dentro de ±1**, matriz por faixa e
   a distribuição contra `CURVA_BASE`. Módulo PURO para as métricas + rota admin read-only. ⚠️ Sem este
   número não existe "melhorou" — existe opinião. (guarda: teste puro das métricas com casos fixos)
-- **T2 — `TAXONOMIA_FUNCAO` + roteador.** Constante declarada (fonte única) + classificação da função do
-  projeto usando os vizinhos do Pinecone como evidência. (guarda: teste puro; função estável entre
-  corridas para o mesmo texto)
+- **T2 — `TAXONOMIA_FUNCAO` + roteador.** ✅ **FEITO** (`especiais-funcao.ts` +
+  `rotearEspeciaisPorFuncao` + `POST /api/admin/especiais/funcoes`), validado nos **51 especiais**.
+
+  **12 funções declaradas, tiradas da base real** — nenhuma vazia, **0 indefinidas em 51**, e a
+  função ATRAVESSA área (preço aparece em Growth e em Gobeaute; documento/fiscal em 3 áreas), que
+  era a lição 2. Distribuição: criativo 14 · preço 6 · doc/fiscal 5 · atendimento 5 · gente 4 ·
+  integração/alerta/painel/logística 3 cada · qualidade/plataforma-IA 2 · coleta 1.
+
+  **O roteador é DETERMINÍSTICO (vocabulário, sem LLM)** — é o que garante "mesmo texto → mesma
+  função" e, com isso, a comparabilidade entre corridas. Duas decisões que a MEDIÇÃO impôs:
+
+  1. ⚠️ **Termo no NOME/"o que faz" vale 3× termo no corpo** (`PESO_TITULO`). Sem isso, **14 de 51
+     (27%) empatavam em 1 termo × 1 termo** e o desempate errava: «Gobeaute Prompt Studio» virava
+     *integração* por um "integrar" perdido na doc; «[VERSTA] Robo orçamento» virava *criativo* por
+     um "ads"; «Hub Criativo» virava *gente e processo* por um "checklist"; «Ferramenta de comentar
+     nos posts» virava *criativo* por "vídeo". Com o peso, os 4 acertam e os empates caíram a 8.
+  2. ⚠️ **Vizinho do Pinecone NÃO desempata — só fala quando NADA casou.** Desempatando, ele decidiu
+     13 de 51 e **errou ao menos 3** (é o que provocou os 2 primeiros erros acima). A evidência que
+     se tem dele é `nome + leitura`, texto curtíssimo; evidência fina não pode vencer régua
+     declarada. Depois da mudança ele decidiu **1** caso em 51 — vira rede, como deve ser.
+
+  **Função ≠ nota (a prova que o roteamento não embute juízo):** dentro de `conteudo_criativo` as
+  notas humanas vão de **0 a 10** (`[0,0,0,1,2,2,3,3,3,4,5,5,7,10]`), e em `preco_margem` de 0 a 8.
+  Se a função predissesse a nota, o roteador estaria julgando em vez de rotear — e o T3 herdaria o
+  viés. É justamente esse espalhamento que dá contraste ao avaliador: o PIAPP (10★) e o «Hub
+  Criativo» (0★) são irmãos de função, e é comparando os dois que a lente aprende onde está a
+  diferença. ⚠️ **Corolário para o T3/T4: agrupar por função NÃO reduz a variância da nota** — não
+  contar com isso para o calibrador.
 - **T3 — Avaliadores por lente.** N prompts derivados dos `CRITERIOS` da régua — **não redigitar a régua**,
   importar de `especiais-regua.ts`. Saída estruturada (nota + justificativa + o que a sustenta).
 - **T4 — Calibrador.** Reescala a rodada contra `CURVA_BASE`. Parte PURA (a reescala) separada da parte
