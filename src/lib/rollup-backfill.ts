@@ -10,10 +10,12 @@
 // submissão de cada projeto aprovado).
 
 import {
-  getProjetosAprovadosParaRollup,
+  getProjetosParaRollupPorIds,
   substituirRollupMensal,
 } from "@/integrations/db/client.server";
 import { agregarRollupMensal } from "@/lib/rollup-financeiro";
+import { lerResumosEspelho } from "@/lib/sheet-espelho";
+import { mapResumo } from "@/lib/dashboard-resumo";
 
 const log = (...a: unknown[]) => console.log("[rollupBackfill]", ...a);
 
@@ -25,7 +27,17 @@ export type RollupBackfillResultado = {
 };
 
 export async function recalcularRollupBackfill(): Promise<RollupBackfillResultado> {
-  const projetos = await getProjetosAprovadosParaRollup();
+  // "Aprovado" = o que a TRIAGEM aprovou na PLANILHA (coluna "Status"="Aprovado" no espelho),
+  // não `projetos.status` (que só reflete auto-aprovação/validação in-app; a decisão da triagem
+  // nunca volta pelo sync reverso). Reusamos o `mapResumo`/`chaveStatus` do dashboard — o mesmo
+  // caminho tolerante que a listagem usa — em vez de um `json_extract('$.Status')` frágil.
+  const { linhas } = await lerResumosEspelho();
+  const idsAprovados = linhas
+    .map(mapResumo)
+    .filter((r): r is NonNullable<typeof r> => !!r && r.statusChave === "aprovado")
+    .map((r) => r.id);
+
+  const projetos = await getProjetosParaRollupPorIds(idsAprovados);
   const celulas = agregarRollupMensal(projetos);
   await substituirRollupMensal(celulas);
 

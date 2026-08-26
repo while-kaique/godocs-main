@@ -667,38 +667,68 @@ export function getProjetosParaSnapshot() {
 // --- Rollup histórico de saving/receita (API para o squad Intelli / João Gabriel) ---
 
 /**
- * Linhas dos projetos APROVADOS para o agregador do rollup histórico. Saving = `saving_reais`
- * (líquido); receita = `documentacao.conteudo.receita.valor_ganho_mensal`, CRUS e SEPARADOS
- * (ver `rollup-financeiro.ts` para as regras). Aprovado = `status IN ('aprovado','validado')`
- * excluindo descontinuados.
+ * Linhas dos projetos APROVADOS para o agregador do rollup histórico, POR LISTA DE IDS.
+ * Saving = `saving_reais` (líquido); receita = `documentacao.conteudo.receita.valor_ganho_mensal`,
+ * CRUS e SEPARADOS (ver `rollup-financeiro.ts` para as regras).
  *
- * ⚠️ A receita vem por SUBCONSULTA correlacionada com `LIMIT 1` (não JOIN): um projeto com
- * mais de uma linha em `documentacao` (legado) duplicaria a linha do projeto num JOIN e
- * inflaria a contagem. `json_valid` dentro de um CASE (nunca num AND) porque `conteudo` nem
- * sempre é JSON válido e `json_extract` sobre texto solto lança.
+ * ⚠️ **"Aprovado" = o que a TRIAGEM aprovou na PLANILHA** (coluna "Status"="Aprovado" no espelho),
+ * NÃO `projetos.status` — decisão do Luis (26/08/2026). O sync reverso EXCLUI `status`, então a
+ * aprovação da triagem nunca volta para `projetos.status` (que só reflete auto-aprovação do
+ * analisador + validação in-app): usar o status interno subcontava o saving em ~7×. Quem resolve
+ * o conjunto aprovado é o ORQUESTRADOR (`rollup-backfill.ts`), lendo o espelho; aqui só puxamos
+ * os dados financeiros AUTORITATIVOS de `projetos` para os ids já filtrados. Descontinuados são
+ * excluídos de novo por segurança (o espelho de um descontinuado diz "Descontinuado", mas guarda).
+ *
+ * ⚠️ A receita vem por SUBCONSULTA correlacionada com `LIMIT 1` (não JOIN): um projeto com mais de
+ * uma linha em `documentacao` (legado) duplicaria a linha do projeto num JOIN e inflaria a
+ * contagem. `json_valid` dentro de um CASE (nunca num AND) porque `conteudo` nem sempre é JSON
+ * válido e `json_extract` sobre texto solto lança. Ids em LOTES de 500 (limite de `?` do SQLite).
  */
-export function getProjetosAprovadosParaRollup() {
-  return queryAll<{
+export async function getProjetosParaRollupPorIds(ids: string[]): Promise<
+  Array<{
     submitted_at: string | null;
     area: string | null;
     tipo_saving: string | null;
     saving_reais: number | null;
     receita_reais: number | null;
-  }>(
-    `SELECT p.submitted_at, p.area, p.tipo_saving, p.saving_reais,
-            COALESCE(
-              (SELECT CASE WHEN json_valid(d.conteudo)
-                           THEN json_extract(d.conteudo, '$.receita.valor_ganho_mensal') END
-                 FROM documentacao d
-                WHERE d.projeto_id = p.id
-                LIMIT 1),
-              0
-            ) AS receita_reais
-       FROM projetos p
-      WHERE p.status IN ('aprovado', 'validado')
-        AND (p.descontinuado IS NULL OR p.descontinuado != 1)`,
-    [],
-  );
+  }>
+> {
+  const norm = Array.from(new Set(ids.map((s) => s.trim().toLowerCase()).filter(Boolean)));
+  if (norm.length === 0) return [];
+  const out: Array<{
+    submitted_at: string | null;
+    area: string | null;
+    tipo_saving: string | null;
+    saving_reais: number | null;
+    receita_reais: number | null;
+  }> = [];
+  for (let i = 0; i < norm.length; i += 500) {
+    const lote = norm.slice(i, i + 500);
+    const marcadores = lote.map(() => "?").join(",");
+    const linhas = await queryAll<{
+      submitted_at: string | null;
+      area: string | null;
+      tipo_saving: string | null;
+      saving_reais: number | null;
+      receita_reais: number | null;
+    }>(
+      `SELECT p.submitted_at, p.area, p.tipo_saving, p.saving_reais,
+              COALESCE(
+                (SELECT CASE WHEN json_valid(d.conteudo)
+                             THEN json_extract(d.conteudo, '$.receita.valor_ganho_mensal') END
+                   FROM documentacao d
+                  WHERE d.projeto_id = p.id
+                  LIMIT 1),
+                0
+              ) AS receita_reais
+         FROM projetos p
+        WHERE lower(p.id) IN (${marcadores})
+          AND (p.descontinuado IS NULL OR p.descontinuado != 1)`,
+      lote,
+    );
+    out.push(...linhas);
+  }
+  return out;
 }
 
 /**
