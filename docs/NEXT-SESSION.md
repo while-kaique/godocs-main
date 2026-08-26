@@ -1,7 +1,7 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ API histórica de saving/receita p/ João Gabriel (squad Intelli) — FASE 3 NÚCLEO.** Plano em `~/.claude/plans/flickering-fluttering-rabin.md` + memória `api-historica-saving-receita-jg` (fonte da verdade dos detalhes/decisões).
+**Nenhum plano ativo** — a **API histórica de saving/receita p/ o João Gabriel** fechou (🚀 EM PROD v298 + PR #297 MERGED, 26/08). Único pendente é **externo**: o Luis setar o secret `JG_INGEST_URL` quando o Gabriel entregar o endpoint (o cron `rollup-push` entrega sozinho a partir daí). Próxima tarefa nova = planejar com `/ggsd:plan`. Detalhes: memória `api-historica-saving-receita-jg` + CLAUDE.md ("Rollup histórico…").
 
 **Esta sessão (26/08, cont.):** Luis decidiu **"aprovado" = o que a TRIAGEM aprovou na PLANILHA** (Status="Aprovado" no espelho), não `projetos.status`. Reescrevi o rollup pra sair **INTEIRO do espelho** (mesma fonte do /dashboard): saving/receita/área/cadência/mês todos das colunas "Saving Reais"/"Receita Mensal"/"Área"/"Tipo de Saving"/"Data Submissão"; removi o join com `projetos`/`documentacao` (ler receita de `documentacao` dava ~0 — receita de legado mora na PLANILHA). "Tipo de Saving" entrou em `COLUNAS_RESUMO` (fora do payload da listagem) + bump `VERSAO_RECORTE_RESUMO` 2→3 (re-espelha no próximo sync). Deployado staging (v226) + prod (v297, prod==main). **Bate EXATO com o dashboard:** prod saving **R$1.353.716,12**, receita **R$1.384.843,40** (= dashboard). Suíte **1823 verde**. Commits: `71c8b84`, `add2025` (+ `df495f2`/`8247e1f` da 1ª versão via projetos, superada). Rota leitura: `GET /api/admin/rollup-mensal` (admin). Fluxo de deploy do rollup: deploy → `POST /api/admin/sync-sheets-now` → `POST /api/admin/rollup-backfill` → `GET /api/admin/rollup-mensal`.
 
