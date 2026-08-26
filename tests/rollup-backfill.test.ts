@@ -1,29 +1,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { criarDbMemoria } from "./helpers/db-memoria";
-import {
-  insertProjetoRaw,
-  upsertDocumentacao,
-  upsertEspelhoLinha,
-  getProjetosParaRollupPorIds,
-  lerRollupMensal,
-} from "@/integrations/db/client.server";
+import { upsertEspelhoLinha, lerRollupMensal } from "@/integrations/db/client.server";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 
-const base = (over: Record<string, unknown>) => ({
-  responsavel_nome: "Fulano",
-  responsavel_email: "fulano@gocase.com",
-  ferramenta: "Python",
-  submitted_at: "2026-06-15T12:00:00.000Z",
-  area: "Fiscal",
-  tipo_saving: "mensal",
-  saving_reais: 0,
-  ...over,
-});
-
-// Semeia a linha do espelho com o "Status" que a TRIAGEM daria na planilha — é ele, e não
-// `projetos.status`, que decide "aprovado" (decisão do Luis, 26/08/2026).
-async function seedEspelho(id: string, status: string) {
-  const linha = JSON.stringify({ "ID Projeto": id, Status: status });
+// O rollup sai INTEIRO do espelho da planilha (o mesmo que o /dashboard lê): status, saving,
+// receita, área, cadência e data. Por isso o teste NÃO semeia `projetos` — só o espelho.
+type Celula = Record<string, string>;
+async function seedEspelho(id: string, cols: Celula) {
+  const linha = JSON.stringify({ "ID Projeto": id, ...cols });
   await upsertEspelhoLinha({
     projeto_id: id.toLowerCase(),
     linha,
@@ -35,50 +19,45 @@ async function seedEspelho(id: string, status: string) {
   });
 }
 
-describe("rollup histórico — backfill (integração)", () => {
+describe("rollup histórico — backfill do ESPELHO (integração)", () => {
   beforeAll(async () => {
     await criarDbMemoria();
 
-    // ── Entram (espelho = "Aprovado") ──
-    await insertProjetoRaw(base({ id: "ap1", status: "em_validacao", area: "Fiscal", saving_reais: 100 }));
-    await insertProjetoRaw(base({ id: "ap2", status: "em_validacao", area: "Fiscal", saving_reais: 200 }));
-    await insertProjetoRaw(base({ id: "ap3", status: "aprovado", area: "Contábil", saving_reais: 50 }));
-    await upsertDocumentacao("ap3", { receita: { valor_ganho_mensal: 500 } });
-    // `promovido`: interno em_validacao, mas a triagem aprovou na planilha → DEVE entrar
-    // (prova que o espelho vence o status interno — o cerne da mudança).
-    await insertProjetoRaw(base({ id: "promovido", status: "em_validacao", area: "Logística", saving_reais: 70 }));
-    await seedEspelho("ap1", "Aprovado");
-    await seedEspelho("ap2", "Aprovado");
-    await seedEspelho("ap3", "Aprovado");
-    await seedEspelho("promovido", "Aprovado");
+    // ── Entram: Status = "Aprovado" ──
+    await seedEspelho("ap1", {
+      Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "15/06/2026",
+      "Tipo de Saving": "mensal", "Saving Reais": "100",
+    });
+    await seedEspelho("ap2", {
+      Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "20/06/2026",
+      "Tipo de Saving": "mensal", "Saving Reais": "200",
+    });
+    // ap3 tem RECEITA na PLANILHA (coluna "Receita Mensal"), sem documentação nenhuma —
+    // prova que a receita vem do espelho, não de `documentacao.conteudo.receita`.
+    await seedEspelho("ap3", {
+      Status: "Aprovado", "Área": "Contábil", "Data Submissão": "10/06/2026",
+      "Tipo de Saving": "mensal", "Saving Reais": "50", "Receita Mensal": "500",
+    });
+    // aprovado SEM data → conta no total, mas não posiciona no tempo (fica fora das células).
+    await seedEspelho("semdata", {
+      Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "",
+      "Tipo de Saving": "mensal", "Saving Reais": "70",
+    });
 
-    // ── Ficam de fora ──
-    // `pend`: interno "aprovado", mas planilha "Pendente" → NÃO entra (espelho manda).
-    await insertProjetoRaw(base({ id: "pend", status: "aprovado", saving_reais: 999 }));
-    await seedEspelho("pend", "Pendente");
-    // `desc`: planilha "Aprovado", mas descontinuado → excluído por segurança.
-    await insertProjetoRaw(base({ id: "desc", status: "aprovado", descontinuado: 1, saving_reais: 999 }));
-    await seedEspelho("desc", "Aprovado");
-    // `semesp`: interno "aprovado", mas sem linha no espelho → NÃO entra.
-    await insertProjetoRaw(base({ id: "semesp", status: "aprovado", saving_reais: 999 }));
+    // ── Ficam de fora: status ≠ "Aprovado" ──
+    await seedEspelho("pend", {
+      Status: "Pendente", "Área": "Fiscal", "Data Submissão": "15/06/2026",
+      "Tipo de Saving": "mensal", "Saving Reais": "999",
+    });
+    await seedEspelho("desc", {
+      Status: "Descontinuado", "Área": "Fiscal", "Data Submissão": "15/06/2026",
+      "Tipo de Saving": "mensal", "Saving Reais": "999",
+    });
   });
 
-  it("getProjetosParaRollupPorIds traz só os ids pedidos, exclui descontinuados e ausentes", async () => {
-    const linhas = await getProjetosParaRollupPorIds(["ap1", "ap3", "desc", "inexistente"]);
-    const savings = linhas.map((p) => p.saving_reais).sort((a, b) => (a ?? 0) - (b ?? 0));
-    // ap1 (100) + ap3 (50); desc é descontinuado e "inexistente" não existe → fora.
-    expect(savings).toEqual([50, 100]);
-    // a receita de ap3 vem da documentação
-    const contabil = linhas.find((p) => p.area === "Contábil");
-    expect(contabil?.receita_reais).toBe(500);
-    // id vazio / lista vazia não quebra
-    expect(await getProjetosParaRollupPorIds([])).toEqual([]);
-  });
-
-  it("recalcularRollupBackfill usa o STATUS DO ESPELHO, não projetos.status", async () => {
+  it("agrega só os APROVADOS do espelho, com saving e receita da planilha", async () => {
     const resumo = await recalcularRollupBackfill();
-    expect(resumo.projetos).toBe(4); // ap1, ap2, ap3, promovido
-    expect(resumo.celulas).toBeGreaterThan(0);
+    expect(resumo.projetos).toBe(4); // ap1, ap2, ap3, semdata (todos "Aprovado")
 
     const celulas = await lerRollupMensal();
 
@@ -89,19 +68,17 @@ describe("rollup histórico — backfill (integração)", () => {
     expect(fiscal?.saving_reais).toBe(300);
     expect(fiscal?.num_projetos).toBe(2);
 
-    // Contábil traz a receita da documentação
+    // Contábil traz a RECEITA da planilha (500), sem documentação
     const contabil = celulas.find(
       (c) => c.periodo === "2026-06" && c.area === "Contábil" && c.tipo_saving === "mensal",
     );
     expect(contabil?.saving_reais).toBe(50);
     expect(contabil?.receita_reais).toBe(500);
 
-    // `promovido` (interno em_validacao, planilha Aprovado) ENTROU — espelho vence.
-    const log = celulas.find((c) => c.area === "Logística");
-    expect(log?.saving_reais).toBe(70);
-
-    // os de fora (saving 999: pend/desc/semesp) nunca viram célula
+    // `pend`/`desc` (999) nunca viram célula; `semdata` (sem data) não posiciona no tempo →
+    // a soma das células é 100+200+50 = 350 (o 70 do semdata fica de fora).
     expect(celulas.every((c) => c.saving_reais !== 999)).toBe(true);
+    expect(celulas.reduce((a, c) => a + c.saving_reais, 0)).toBe(350);
   });
 
   it("é idempotente: rodar duas vezes não duplica linhas", async () => {

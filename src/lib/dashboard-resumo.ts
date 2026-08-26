@@ -155,6 +155,11 @@ export const COLUNAS_RESUMO: readonly string[] = [
   'Ganho Total',
   'Saving Reais',
   'Receita Mensal',
+  // Lida pelo rollup histórico (`rollup-backfill.ts`), NÃO pelo `mapResumo` — é a cadência
+  // (mensal/pontual/tri/semestral) que o grão do rollup usa e que o Gabriel normaliza. Fica
+  // aqui, como `Ferramenta`, para existir no `linha_resumo` do espelho sem virar campo do
+  // payload da listagem (não entra em `ProjetoDashboardResumo`).
+  'Tipo de Saving',
   'Complexidade',
   'Tipos Projeto',
   'Especial?',
@@ -171,7 +176,7 @@ export const COLUNAS_RESUMO: readonly string[] = [
  * ~600 linhas que ninguém editou com o recorte ANTIGO — a coluna existiria no código e
  * viria vazia na tela, para sempre.
  */
-export const VERSAO_RECORTE_RESUMO = 2;
+export const VERSAO_RECORTE_RESUMO = 3;
 
 /**
  * Recorta de uma linha da planilha só as `COLUNAS_RESUMO`.
