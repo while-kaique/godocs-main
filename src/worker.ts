@@ -60,6 +60,7 @@ import {
   prepararIndicePinecone,
   sincronizarPineconeEspeciais,
   reauditarEspeciais,
+  medirConcordanciaAgente,
 } from "@/lib/especial-classificador.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
@@ -868,6 +869,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       await requireAdmin(request);
       const body = (await readBody(request)) as { limite?: number; offset?: number };
       return json(await reauditarEspeciais({ limite: body.limite, offset: body.offset }));
+    }
+
+    // Concordância (T1 do painel de agentes): roda o classificador de HOJE nos especiais que já
+    // têm nota humana e compara — MAE, % dentro de ±1, viés, matriz por faixa e a distribuição
+    // contra a CURVA_BASE. É o BASELINE que o painel tem de bater (trava de subida do T7).
+    // ⚠️ SOMENTE LEITURA — não existe `dry` porque não existe caminho de escrita: a nota humana
+    // aqui é GABARITO, e nada é gravado em `especial_avaliacao` nem na coluna "Estrelas".
+    // Paginado: `proximo_offset` diz onde continuar (é ~1 chamada de LLM por projeto).
+    if (pathname === "/api/admin/especiais/concordancia" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { limite?: number; offset?: number };
+      return json(await medirConcordanciaAgente({ limite: body.limite, offset: body.offset }));
     }
 
     // ── Aba TEMPORÁRIA: aprovação de pendentes/pré-aprovados, por AUTOR ──────

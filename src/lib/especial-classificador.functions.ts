@@ -67,6 +67,11 @@ import {
   type AlvoClassificacao,
   type RecomendacaoEspecial,
 } from '@/lib/agents/especial-classificador';
+import {
+  medirConcordancia,
+  type MetricasConcordancia,
+  type ParNota,
+} from '@/lib/especiais-concordancia';
 
 /** Carimbo de origem gravado em cada recomendação do agente (distingue do seed da força-tarefa). */
 export const ORIGEM_AGENTE = 'agente-classificador';
@@ -873,6 +878,171 @@ export async function reauditarEspeciais(
     namespace,
     resumo: resumirReauditoria(ordenadas),
     linhas: ordenadas,
+    proximo_offset: offset + limite < comNota.length ? offset + limite : null,
+  };
+}
+
+// ─── T1 do painel — harness de concordância contra as notas HUMANAS ────────────
+
+/**
+ * O juiz sob medição. O T1 mede o agente ÚNICO de hoje (o baseline a bater); o T7 passa o painel
+ * aqui e compara no MESMO harness. É por isso que o juiz é parâmetro e não literal.
+ */
+export type JuizConcordancia = (
+  alvo: AlvoClassificacao,
+  vizinhos: Vizinho[],
+) => Promise<{ estrelas_recomendada: number } | null>;
+
+export type ResultadoConcordancia = {
+  ok: boolean;
+  /** Declarado no payload: este harness NÃO tem caminho de escrita — não existe `dry:false`. */
+  somente_leitura: true;
+  /** Quem foi medido (`agente-classificador` no T1). */
+  juiz: string;
+  modelo: string;
+  /** Quantos especiais têm nota humana no total — o tamanho do test set. */
+  total_com_nota: number;
+  avaliados: number;
+  falhas: { projeto_id: string; motivo: string }[];
+  /** De onde vieram os vizinhos desta fatia — vizinho ruim é a 1ª suspeita de MAE alto. */
+  vizinhos_de: { pinecone: number; sqlite: number };
+  metricas: MetricasConcordancia;
+  pares: ParNota[];
+  proximo_offset: number | null;
+  motivo?: string;
+};
+
+/**
+ * Mede o juiz contra o gabarito: roda a classificação nos especiais que JÁ têm nota humana e
+ * compara. É o T1 do painel de agentes e a régua de qualquer "melhorou" daqui para a frente.
+ *
+ * ⚠️ **Nada é gravado em `especial_avaliacao`.** O classificador de produção pula de propósito
+ * quem tem nota humana (segunda opinião ao lado da nota de gente é ruído no cartão da triagem) —
+ * aqui a mesma nota é o GABARITO, e a recomendação vive só no payload da resposta. O único efeito
+ * colateral é o cache de embedding (`especial_embedding`), que é o mesmo texto que a produção já
+ * embeddaria; nenhuma nota, nenhuma linha do Sheets.
+ *
+ * ⚠️ **O projeto medido é excluído da própria vizinhança** (`excluirId`), senão ele apareceria
+ * como exemplo few-shot da própria nota e o harness mediria a memória, não o julgamento.
+ *
+ * Paginado e retomável pelo `proximo_offset` (ordem estável por id), porque são ~1 chamada de LLM
+ * por projeto e a fatia inteira não cabe numa corrida.
+ */
+export async function medirConcordanciaAgente(
+  opts: { limite?: number; offset?: number; juiz?: JuizConcordancia; rotuloJuiz?: string } = {},
+): Promise<ResultadoConcordancia> {
+  const limite = Math.max(1, Math.min(opts.limite ?? 15, 40));
+  const offset = Math.max(0, opts.offset ?? 0);
+  const juiz: JuizConcordancia = opts.juiz ?? classificarEspecial;
+  const rotuloJuiz = opts.rotuloJuiz ?? ORIGEM_AGENTE;
+
+  const { linhas } = await lerResumosEspelho();
+  const especiais = apenasEspeciais(
+    linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null),
+  );
+  const resumoPorId = new Map(especiais.map((p) => [p.id, p]));
+
+  const avaliacoesRows = await getAvaliacoesEspeciais();
+  const avaliacoes = new Map(
+    avaliacoesRows.map((a) => [
+      a.projeto_id,
+      { estrelas_recomendada: a.estrelas_recomendada, leitura: a.leitura },
+    ]),
+  );
+  const exemplarPorId = mapaExemplares(especiais, avaliacoes);
+
+  // Ordem estável por id: a paginação precisa devolver a MESMA fatia entre corridas.
+  const comNota = especiais
+    .filter((p) => p.estrelas != null)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const fatia = comNota.slice(offset, offset + limite);
+
+  const vazio = medirConcordancia([]);
+  if (fatia.length === 0) {
+    return {
+      ok: true,
+      somente_leitura: true,
+      juiz: rotuloJuiz,
+      modelo: modeloChatConfigurado(),
+      total_com_nota: comNota.length,
+      avaliados: 0,
+      falhas: [],
+      vizinhos_de: { pinecone: 0, sqlite: 0 },
+      metricas: vazio,
+      pares: [],
+      proximo_offset: null,
+      motivo:
+        comNota.length === 0
+          ? 'nenhum especial tem nota humana — sem gabarito não há o que medir'
+          : 'offset além do fim do test set',
+    };
+  }
+
+  // Os exemplares rotulados são as âncoras few-shot; sem vetor deles a vizinhança fica pobre e o
+  // harness mediria um agente pior do que o de produção.
+  let embeddings = decodificarEmbeddings(await getEmbeddingsEspeciais());
+  const rotulados = especiais
+    .filter((p) => p.estrelas != null || avaliacoes.has(p.id))
+    .map((p) => p.id);
+  const idsParaEmbeddar = Array.from(new Set([...fatia.map((c) => c.id), ...rotulados]));
+  const ger = await garantirEmbeddings(idsParaEmbeddar, resumoPorId, embeddings, {
+    capGeracao: 60,
+  });
+  embeddings = ger.mapa;
+  const corpus = montarCorpus(especiais, avaliacoes, embeddings);
+  const corpusFallback = async () => corpus;
+
+  const pares: ParNota[] = [];
+  const falhas: { projeto_id: string; motivo: string }[] = [];
+  const vizinhos_de = { pinecone: 0, sqlite: 0 };
+
+  for (const alvoResumo of fatia) {
+    try {
+      const montado = await montarEntradaSemantica(alvoResumo.id, alvoResumo);
+      if (!montado) {
+        falhas.push({ projeto_id: alvoResumo.id, motivo: 'sem contexto' });
+        continue;
+      }
+      const emb = embeddings.get(alvoResumo.id);
+      const recuperado = emb
+        ? await recuperarVizinhos(emb.vetor, {
+            excluirId: alvoResumo.id,
+            exemplarPorId,
+            corpusFallback,
+          })
+        : { vizinhos: [] as Vizinho[], origem: 'sqlite' as OrigemVizinhos };
+      vizinhos_de[recuperado.origem]++;
+      const rec = await juiz(montado.alvo, recuperado.vizinhos);
+      if (!rec) {
+        falhas.push({ projeto_id: alvoResumo.id, motivo: 'juiz sem recomendação' });
+        continue;
+      }
+      pares.push({
+        projeto_id: alvoResumo.id,
+        nome: alvoResumo.nome,
+        area: alvoResumo.area,
+        humana: alvoResumo.estrelas as number,
+        recomendada: rec.estrelas_recomendada,
+      });
+    } catch (e) {
+      falhas.push({
+        projeto_id: alvoResumo.id,
+        motivo: e instanceof Error ? e.message : 'erro',
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    somente_leitura: true,
+    juiz: rotuloJuiz,
+    modelo: modeloChatConfigurado(),
+    total_com_nota: comNota.length,
+    avaliados: pares.length,
+    falhas,
+    vizinhos_de,
+    metricas: medirConcordancia(pares),
+    pares,
     proximo_offset: offset + limite < comNota.length ? offset + limite : null,
   };
 }
