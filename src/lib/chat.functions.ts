@@ -70,6 +70,7 @@ import {
   erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
 import { deveRecusarSubmissao } from "@/lib/bloqueio-submissao";
+import { montarSnapshotProjeto } from "@/lib/snapshot-projeto";
 import {
   aplicaGateCustoEvitadoChat,
   detectarCustoEvitadoNoChat,
@@ -3732,27 +3733,10 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   try {
     const projetoAtualizado = await getProjetoById(projeto_id);
     if (projetoAtualizado) {
-      const snapshotProjeto: Record<string, unknown> = {
-        nome: projetoAtualizado.nome,
-        descricao_breve: projetoAtualizado.descricao_breve,
-        ferramenta: projetoAtualizado.ferramenta,
-        tipos_projeto: parseJson(projetoAtualizado.tipos_projeto) ?? [],
-        especial: projetoAtualizado.especial,
-        area: projetoAtualizado.area,
-        saving_horas: projetoAtualizado.saving_horas,
-        saving_reais: projetoAtualizado.saving_reais,
-        horas_carga_real: projetoAtualizado.horas_carga_real,
-        horas_escala: projetoAtualizado.horas_escala,
-        tipo_saving: projetoAtualizado.tipo_saving,
-        memorial_calculo: projetoAtualizado.memorial_calculo,
-        ganho_total_mensal: projetoAtualizado.ganho_total_mensal,
-        custo_externo_mensal: projetoAtualizado.custo_externo_mensal,
-        alguem_fazia: projetoAtualizado.alguem_fazia,
-        custo_evitado: projetoAtualizado.custo_evitado,
-        custo_evitado_justificativa: projetoAtualizado.custo_evitado_justificativa,
-        custo_evitado_itens: projetoAtualizado.custo_evitado_itens,
-        status: projetoAtualizado.status,
-      };
+      // FONTE ÚNICA do formato do snapshot (reusada pelo cron reconciliarSnapshots).
+      const snapshotProjeto = montarSnapshotProjeto(
+        projetoAtualizado as unknown as Record<string, unknown>,
+      );
       // Snapshot da conversa ATUAL — congela os agentes originais desta versão para
       // o Investigador (os chat_messages são apagados ao voltar etapas/reeditar).
       const chatSnapshot = await getChatMessages(projeto_id);

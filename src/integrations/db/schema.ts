@@ -519,6 +519,11 @@ const MIGRATIONS = [
   // Submetidos × Edições). Forward-only: versões antigas (anteriores a esta coluna)
   // ficam com snapshot_chat NULL e caem no fallback do chat atual.
   'ALTER TABLE projeto_versions ADD COLUMN snapshot_chat TEXT',
+  // Procedência do snapshot: 'real' = gravado no caminho de submissão/reenvio;
+  // 'reconciliado' = reconstruído do estado atual pelo cron reconciliarSnapshots
+  // (fecha furos de submissões cujo snapshot falhou e de legados sem versão).
+  // NULL = linha anterior a esta coluna, tratada como 'real' pelos leitores.
+  'ALTER TABLE projeto_versions ADD COLUMN origem TEXT',
   // Espelho do "Atualizado Em" do Sheets (carimbo da última escrita do sistema na
   // planilha). NULL = o app nunca sincronizou este projeto p/ o Sheets = legado
   // pendente de regularização. Persistir no SQLite deixa a contagem de pendentes

@@ -21,6 +21,7 @@ import {
   reconciliarComplexidade,
   retroativoCustosPontuais,
 } from "@/lib/chat.functions";
+import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import {
   getAreas,
   createArea,
@@ -289,6 +290,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Cron: reconcilia SNAPSHOTS de auditoria (projeto_versions) ──
+    // A versão é gravada de forma não-bloqueante no submit; submissões cujo snapshot
+    // falhou (e legados) ficam sem versão. Este cron fecha os furos reconstruindo a
+    // versão a partir do estado atual (marcada origem='reconciliado'). Idempotente.
+    if (pathname === "/api/cron/reconciliar-snapshots" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await reconciliarSnapshots());
     }
 
     // ── Cron: classificador de especiais pendentes (peça 4) ──────────────────
@@ -1032,6 +1044,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/reanalisar-pendentes" && method === "POST") {
       await requireAdmin(request);
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Reconciliação de SNAPSHOTS sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/reconciliar-snapshots, sem o header de cron:
+    // fecha os furos do histórico de versões (reconstrói versões faltantes marcadas
+    // origem='reconciliado'). Existe para o backfill inicial e para validar na staging
+    // (o cron não dispara lá). Aceita {max} opcional. Idempotente.
+    if (pathname === "/api/admin/reconciliar-snapshots" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ max?: number }>(request).catch(() => ({}) as { max?: number });
+      return json(await reconciliarSnapshots(body?.max));
     }
 
     // ── Disparo de e-mails por segmento (admin) ──
