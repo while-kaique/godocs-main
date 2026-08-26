@@ -157,3 +157,57 @@ export function montarBlocoFewShot(vizinhos: Vizinho[]): string {
   });
   return linhas.join('\n');
 }
+
+// ─── Recuperação vinda de um índice externo (Pinecone) ─────────────────────────
+
+/** O que um índice vetorial devolve: identidade + proximidade. Sem o vetor e sem a leitura. */
+export type MatchVetorial = {
+  id: string;
+  /** Proximidade 0..1. No Pinecone com métrica `cosine` é o MESMO número do `cosseno` daqui. */
+  score: number;
+};
+
+/** Um exemplar sem o vetor — o que se hidrata da fonte da verdade depois da busca. */
+export type ExemplarSemVetor = Omit<ExemplarEspecial, 'vetor'>;
+
+/**
+ * Converte os `matches` de um índice externo em `Vizinho[]`, hidratando nome/área/leitura/notas
+ * do corpus local (a fonte da verdade continua sendo o SQLite + o espelho — decisão 6).
+ *
+ * ⚠️ **As regras são as MESMAS de `selecionarVizinhos`** — piso de similaridade, `k`, exclusão do
+ * próprio projeto e `rotuloExemplar` (nota humana vence a recomendada). É de propósito: trocar a
+ * ORIGEM dos vizinhos não pode mudar QUAIS vizinhos entram no prompt, senão a migração para o
+ * Pinecone viraria uma mudança de nota disfarçada de mudança de infraestrutura.
+ *
+ * Match sem correspondente no corpus local é DESCARTADO (vetor órfão de projeto já excluído —
+ * o índice pode ficar à frente da limpeza). Puro: testável sem rede.
+ */
+export function vizinhosDeMatches(
+  matches: MatchVetorial[],
+  exemplarPorId: Map<string, ExemplarSemVetor>,
+  opts: { k?: number; piso?: number; excluirId?: string } = {},
+): Vizinho[] {
+  const k = opts.k ?? K_VIZINHOS;
+  const piso = opts.piso ?? PISO_SIMILARIDADE;
+  const vizinhos: Vizinho[] = [];
+  const vistos = new Set<string>();
+  for (const m of matches) {
+    if (opts.excluirId && m.id === opts.excluirId) continue;
+    if (vistos.has(m.id)) continue;
+    if (!(m.score >= piso)) continue; // NaN cai fora junto
+    const ex = exemplarPorId.get(m.id);
+    if (!ex) continue;
+    const rotulo = rotuloExemplar({ ...ex, vetor: [] });
+    if (!rotulo) continue;
+    vistos.add(m.id);
+    vizinhos.push({
+      ...ex,
+      vetor: [],
+      similaridade: m.score,
+      estrela_efetiva: rotulo.estrela,
+      fonte_rotulo: rotulo.fonte,
+    });
+  }
+  vizinhos.sort((a, b) => b.similaridade - a.similaridade);
+  return vizinhos.slice(0, k);
+}

@@ -1,7 +1,9 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md)** · Status: **APROVADO** — as 7 decisões foram fechadas em 26/08/2026 (confiança **ALTA**, código varrido). **Pinecone é a plataforma oficial de busca vetorial deste pipeline — decisão tomada, não relitigar.** Secret `PINECONE_API_KEY` já setado em prod/staging/.env.local.
+**→ [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md)** · Status: 🟡 **CÓDIGO FEITO (T2–T6)** na branch `feat/pinecone-especiais` (26/08) — cliente REST, recuperação com fallback, backfill paginado e re-auditoria; **1833 testes verdes** (+46), `worker.js` rebuildado. **Pinecone é a plataforma oficial de busca vetorial deste pipeline — decisão tomada, não relitigar.** Secret `PINECONE_API_KEY` já setado em prod/staging/.env.local.
+
+**⛔ O que falta, na ordem:** **(1)** deployar o `a1fe406` sozinho (ver abaixo); **(2)** criar o índice em cada app — `POST /api/admin/especiais/pinecone/indice` com `{"criar":true}`; **(3)** encher o índice — `POST /api/admin/especiais/pinecone/backfill`, `{"dry":true}` primeiro e depois `{"dry":false}` seguindo o `proximo_offset`; **(4)** ler o relatório de `POST /api/admin/especiais/reauditar`; **(5)** staging → prod (regra 13) + PR (regra 7). ⚠️ Rota `POST` de `/api/*` não abre pela barra de endereços — dispare por `fetch` numa aba logada.
 
 ⚠️ **Ordem obrigatória (não juntar num PR só):** **(1)** deployar o `a1fe406` (`feat/rag-especial-qualidade`) sozinho — corrige bug MEDIDO em prod (GoPrice 0–1★ × «Agente precificador» 4★) e **crava o modelo de embedding**, porque a dimensão do índice Pinecone é IMUTÁVEL; **(2)** Pinecone (T1–T5); **(3)** re-auditoria (T6). Se (1) e (2) forem no mesmo PR e a nota mudar, ninguém sabe qual dos dois mexeu.
 

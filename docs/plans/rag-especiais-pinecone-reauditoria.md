@@ -1,6 +1,6 @@
 # Plano — RAG de especiais no Pinecone + re-auditoria de estrelas
 
-**Status:** **APROVADO** — as 7 decisões foram fechadas em 26/08/2026 (confiança **ALTA**). **Pinecone é a plataforma oficial de busca vetorial deste pipeline**; a decisão está tomada e não deve ser relitigada a cada sessão.
+**Status:** **CÓDIGO FEITO (T2–T6)** na branch `feat/pinecone-especiais`, 26/08/2026 — 1833 testes verdes (+46), `worker.js` rebuildado. **Falta rodar T1 no ambiente** (criar o índice pela rota de setup, com a `PINECONE_API_KEY` que já está nos secrets de prod e staging), o backfill e a validação em staging → prod (regra 13). As 7 decisões foram fechadas em 26/08/2026 (confiança **ALTA**). **Pinecone é a plataforma oficial de busca vetorial deste pipeline**; a decisão está tomada e não deve ser relitigada a cada sessão.
 
 **Objetivo:** Migrar a recuperação vetorial do agente classificador de especiais (peça 4) do cosseno-em-JS/SQLite para o **Pinecone (REST)**, vetorizando **nome + o que faz + por que é especial + descrição + documentação**, e usar o índice para (a) recomendar estrela de especiais **novos** e (b) **re-auditar** os já submetidos (com nota humana) detectando inflação/deflação.
 
@@ -45,13 +45,19 @@ O cosseno-em-JS **funciona hoje** e não é o que causou o erro de classificaç�
 
 ### Tarefas
 
-- **T1 —** Criar o índice no Pinecone (serverless, **3072**, namespaces `prod`/`staging`). Doc de setup. (guarda: `query` de smoke retorna vazio sem erro)
-- **T2 —** Cliente Pinecone REST puro em `src/lib/` (upsert/query/delete), envs LAZY, `fetch` (roda no Worker). (guarda: teste com fetch mockado)
-- **T3 —** Composição do texto + embedding — **reaproveitar o `textoParaEmbedding` do `a1fe406`**, não reescrever. (guarda: teste puro do texto montado)
-- **T4 —** Recuperação: a origem do `corpus` de `selecionarVizinhos` passa a ser o Pinecone (topK + filtro `tem_nota_humana`), mantendo o SQLite como fallback. (guarda: teste com Pinecone mockado **e** teste do caminho degradado)
-- **T5 —** Backfill: upsert de TODOS os especiais no Pinecone (rota admin dry-default). (guarda: contagem upsertada == nº de especiais)
-- **T6 —** Re-auditoria (decisão 7). (guarda: dry mode não muta nada)
-- **T7 —** Staging → validar → prod (regra 13) + PR (regra 7).
+- **T1 — ⛔ falta rodar no ambiente.** O código do setup existe (`garantirIndice`, rota `POST /api/admin/especiais/pinecone/indice`); criar o índice é uma chamada com `{"criar":true}` em cada app. Serverless, **3072**, `cosine`, namespaces `prod`/`staging` derivados do `GODOCS_ENV`. ⚠️ Índice com outra dimensão é **reprovado** pela rota em vez de usado (consultar 3072 num índice de 1536 devolve 400, e silenciar isso daria "sem vizinhos" para sempre).
+- **T2 — ✅ `src/lib/pinecone.ts`** — cliente REST puro (describe/create/upsert/query/delete), envs LAZY, só `fetch`, host do índice cacheado por isolate, nada lança. (guarda: `tests/pinecone-cliente.test.ts`, fetch mockado)
+- **T3 — ✅ reaproveitado.** O `textoParaEmbedding` do `a1fe406` não foi tocado; o embedding continua saindo de `embeddings.ts` direto na OpenAI.
+- **T4 — ✅ `recuperarVizinhos`** (`especial-classificador.functions.ts`): Pinecone primeiro, cosseno-em-JS do SQLite como fallback. O corpus do fallback é um **thunk preguiçoso** — com o índice no ar a tabela de vetores **não é lida**, que é o ponto da migração. (guarda: `tests/pinecone-especiais.test.ts`, com o caminho degradado exercitado)
+- **T5 — ✅ `sincronizarPineconeEspeciais`** + `POST /api/admin/especiais/pinecone/backfill` (dry-default). Varre em **páginas** (`getEmbeddingsEspeciaisPagina`) — ler `especial_embedding` inteira aqui seria o mesmo teto de 32 MiB que motivou o índice.
+- **T6 — ✅ `especiais-reauditoria.ts`** (puro: mediana ponderada, `LIMIAR_DELTA=2`, `MIN_VIZINHOS_COMPARAVEIS=3`) + `reauditarEspeciais` + `POST /api/admin/especiais/reauditar`.
+- **T7 — ⛔ aberta.** Staging → validar → prod (regra 13) + PR (regra 7).
+
+### O que ficou diferente do plano (e por quê)
+
+- **A re-auditoria não tem `dry`** — a decisão 7 dizia "dry-default", mas **não existe caminho de escrita** para secar: escrever a nota é da triagem (só clique humano), e gravar uma "segunda opinião" ao lado da nota de gente em `especial_avaliacao` competiria com ela no cartão — exatamente o que o classificador já evita ao **não** reclassificar quem tem nota humana. A rota é read-only e o teste prova que nenhum writer é chamado.
+- **A re-auditoria EXIGE o Pinecone** (sem fallback). O que faz a comparação valer é o filtro `tem_nota_humana` resolvido no servidor; comparar a nota de gente contra a mediana das recomendações do próprio agente é o feedback loop puro. Sem índice ela responde `ok:false` com o motivo — melhor que um relatório que parece certo.
+- **Dois helpers novos no banco** (`getEmbeddingEspecial`, `getEmbeddingsEspeciaisPagina`): sem eles, o caminho quente e o backfill continuariam puxando a tabela inteira e o teto de RPC só teria mudado de lugar.
 
 ## Critérios de aceitação
 
