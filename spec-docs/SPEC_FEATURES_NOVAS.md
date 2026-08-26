@@ -1810,3 +1810,18 @@ lexical) + **1 passe com guard determinístico** (não passe adversarial).
 5. Os `head:` das rotas seguem existindo só para **`description`/`og:`** (que também não são aplicados hoje, mas são do documento, não da navegação).
 
 **Teste:** `tests/titulo-pagina.test.ts` (11 casos — formato, corte, normalização de espaço/quebra de linha do nome vindo da planilha, seção sempre primeiro, e a trava de nomenclatura).
+
+---
+
+## Rollup histórico de saving/receita → app do squad Intelli (João Gabriel) (26/08/2026)
+
+**Pedido (Luis):** expor a série histórica de **saving operacional + receita incremental** por **ÁREA**, mensal, dos projetos **aprovados**, para o app do João Gabriel montar gráficos de evolução. Modelo de entrega **PUSH** (godocs empurra, como o Gomoon) — o Gabriel lê no app dele; token de ingest já combinado.
+
+**Decisões fechadas (não "corrigir" por engano):**
+1. **"Aprovado" = coluna "Status"="Aprovado" no ESPELHO da planilha** (o que a triagem aprovou), NÃO `projetos.status`. Motivo: o sync reverso exclui `status`, então a aprovação da triagem nunca volta pro estado interno — usar o interno subcontava o saving ~7× (286 proj/R$196k vs 643/R$1,35M em prod).
+2. **Tudo sai do espelho** (mesma fonte do `/dashboard`): saving, receita, área, cadência ("Tipo de Saving"), mês ("Data Submissão"). Ler receita de `documentacao.conteudo.receita` dava ~0 (receita de legado mora na planilha) → o rollup bate byte a byte com o dashboard.
+3. **Saving e receita CRUS e SEPARADOS** (nunca somados, nunca ÷10 do `ganho_total_mensal`); **`tipo_saving` cru** (o Gabriel normaliza); **SEM total geral** da empresa (só por área). 1 projeto = 1 célula.
+
+**Onde:** agregador PURO `src/lib/rollup-financeiro.ts`; orquestração `src/lib/rollup-backfill.ts` (`recalcularRollupBackfill`, idempotente); tabela durável `rollup_saving_receita`; push `src/lib/rollup-push.functions.ts` (`enviarRollupParaJG`, `montarPayloadRollup`); rotas `POST /api/admin/rollup-backfill`, `GET /api/admin/rollup-mensal`, `POST /api/admin/rollup-push` (dry default), cron `POST /api/cron/rollup-push` (diário 07:00 UTC). "Tipo de Saving" em `COLUNAS_RESUMO` + bump `VERSAO_RECORTE_RESUMO` → 3 (re-espelha no sync).
+
+**Pendente:** `JG_INGEST_URL` (endpoint do Gabriel) — até setar, o push é inerte e diz por quê. Detalhe operacional no CLAUDE.md ("Rollup histórico…"). Testes: `tests/rollup-financeiro.test.ts`, `tests/rollup-backfill.test.ts`, `tests/rollup-push.test.ts`.
