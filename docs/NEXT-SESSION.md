@@ -1,7 +1,9 @@
 # NEXT-SESSION
 
 ## Plano ativo
-**→ [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md)** · Status: **rascunho** (confiança BAIXA — exploração profunda adiada por contexto esgotado; a próxima sessão de `/ggsd:plan` ou `/ggsd:code` deve varrer o código antes de implementar). Secret `PINECONE_API_KEY` já setado em prod/staging/.env.local.
+**→ [docs/plans/rag-especiais-pinecone-reauditoria.md](plans/rag-especiais-pinecone-reauditoria.md)** · Status: **APROVADO** — as 7 decisões foram fechadas em 26/08/2026 (confiança **ALTA**, código varrido). **Pinecone é a plataforma oficial de busca vetorial deste pipeline — decisão tomada, não relitigar.** Secret `PINECONE_API_KEY` já setado em prod/staging/.env.local.
+
+⚠️ **Ordem obrigatória (não juntar num PR só):** **(1)** deployar o `a1fe406` (`feat/rag-especial-qualidade`) sozinho — corrige bug MEDIDO em prod (GoPrice 0–1★ × «Agente precificador» 4★) e **crava o modelo de embedding**, porque a dimensão do índice Pinecone é IMUTÁVEL; **(2)** Pinecone (T1–T5); **(3)** re-auditoria (T6). Se (1) e (2) forem no mesmo PR e a nota mudar, ninguém sabe qual dos dois mexeu.
 
 _(Anterior: `latencia-ia-roteamento-por-fase.md` **✅ ENTREGUE EM PROD (v286) + PR #286, 25/08** — T1–T7 completos.)_
 
