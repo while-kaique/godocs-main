@@ -206,9 +206,22 @@ vivo e o fallback não foi exercitado nesta medição.
   A parte LLM só **redige** (nota + motivo já decididos entram prontos no prompt, que **proíbe**
   propor outra nota) e **nunca fica sem texto**: falha, vazio ou texto gigante caem no
   determinístico `explicarCalibragem`, com a nota idêntica.
-- **T5 — Revisor adversarial + convergência.** Refuta toda nota ≥3; teto de 3 voltas absorvente; sem
-  consenso → `contestada`. (guarda: simulação de N turnos que NÃO converge termina — o teste que pegou o
-  loop do gate de sobreposição)
+- **T5 — Revisor adversarial + convergência.** ✅ **FEITO** — máquina PURA em
+  `src/lib/especiais-convergencia.ts` + agente em `src/lib/agents/especiais-revisor.ts` (18 testes).
+
+  As **4 travas anti-loop** deste repo, aplicadas a voltas de agente em vez de turnos de chat:
+  **(1)** teto **absorvente** `TETO_VOLTAS = 3`; **(2)** máquina **estritamente monotônica** —
+  `volta` só cresce e a nota **só desce** (empate ou sugestão para CIMA mantém a atual, decisão 4);
+  **(3)** **terminal é NO-OP** — `aplicarRevisao` sobre estado encerrado devolve o MESMO objeto, o
+  que torna impossível reabrir a discussão na fiação do T6; **(4)** o laço consulta o predicado
+  `podeRevisarDeNovo`, nunca um `while (true)`. Guarda pedida pelo plano: **20 revisões que nunca
+  aceitam TERMINAM** — e um laço INGÊNUO (sem o predicado) também para, porque o terminal é no-op.
+
+  Duas decisões que valem registro: **nota abaixo do corte já nasce encerrada** (`sem_revisao` —
+  refutar 1★ é gastar chamada) e **veredicto ILEGÍVEL vira REFUTAÇÃO, nunca aceitação** (aceitar por
+  não entender a resposta carimbaria nota rara por acidente; o custo é limitado pelo teto). Nota que
+  cai abaixo do corte durante a revisão encerra **sem** `contestada` — não há mais nota rara a
+  defender, e contestar ali só sujaria o cartão da triagem.
 - **T6 — Orquestração + rota admin + cron.** `dry` default, paginado, retomável, nunca lança, teto de
   custo por corrida. (guarda: `dry` não grava nada)
 - **T7 — Medir o PAINEL no mesmo harness do T1 e comparar.** ⚠️ **É a trava de subida.** O juiz é
