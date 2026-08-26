@@ -24,6 +24,7 @@ import {
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
+import { enviarRollupParaJG } from "@/lib/rollup-push.functions";
 import {
   getAreas,
   createArea,
@@ -1086,6 +1087,21 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         { saving_reais: 0, receita_reais: 0, num_projetos: 0 },
       );
       return json({ celulas, totais_area: totaisArea, verificacao });
+    }
+    // Push do rollup para o app do squad Intelli (João Gabriel), modelo Gomoon. `dry` é o
+    // DEFAULT (monta e devolve o payload sem enviar); enviar exige {"dry":false}. Sem
+    // JG_INGEST_URL fica inerte (aguardando o endpoint do Gabriel).
+    if (pathname === "/api/admin/rollup-push" && method === "POST") {
+      await requireAdmin(request);
+      const body = await readBody<{ dry?: boolean }>(request);
+      return json(await enviarRollupParaJG({ dry: body.dry !== false }));
+    }
+    // Cron: recomputa o rollup do espelho e empurra para o Gabriel (não-dry).
+    if (pathname === "/api/cron/rollup-push" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await enviarRollupParaJG({ dry: false }));
     }
 
     // ── Disparo de e-mails por segmento (admin) ──
