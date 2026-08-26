@@ -682,7 +682,8 @@ export function getProjetosParaSnapshot() {
  * ⚠️ A receita vem por SUBCONSULTA correlacionada com `LIMIT 1` (não JOIN): um projeto com mais de
  * uma linha em `documentacao` (legado) duplicaria a linha do projeto num JOIN e inflaria a
  * contagem. `json_valid` dentro de um CASE (nunca num AND) porque `conteudo` nem sempre é JSON
- * válido e `json_extract` sobre texto solto lança. Ids em LOTES de 500 (limite de `?` do SQLite).
+ * válido e `json_extract` sobre texto solto lança. Ids em LOTES de 90 — o SQLite do Godeploy
+ * (env.DB) limita os `?` de um statement bem abaixo dos 999 padrão ("too many SQL variables").
  */
 export async function getProjetosParaRollupPorIds(ids: string[]): Promise<
   Array<{
@@ -702,8 +703,8 @@ export async function getProjetosParaRollupPorIds(ids: string[]): Promise<
     saving_reais: number | null;
     receita_reais: number | null;
   }> = [];
-  for (let i = 0; i < norm.length; i += 500) {
-    const lote = norm.slice(i, i + 500);
+  for (let i = 0; i < norm.length; i += 90) {
+    const lote = norm.slice(i, i + 90);
     const marcadores = lote.map(() => "?").join(",");
     const linhas = await queryAll<{
       submitted_at: string | null;

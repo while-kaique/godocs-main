@@ -791,7 +791,7 @@ Esse saving considera apenas o tempo direto de compila\xE7\xE3o e prepara\xE7\xE
             custo_evitado, custo_evitado_justificativa, custo_evitado_itens,
             status, responsavel_email
        FROM projetos
-      WHERE status != 'rascunho' AND submitted_at IS NOT NULL`)}async function Bp(e){let t=Array.from(new Set(e.map(o=>o.trim().toLowerCase()).filter(Boolean)));if(t.length===0)return[];let a=[];for(let o=0;o<t.length;o+=500){let r=t.slice(o,o+500),n=r.map(()=>"?").join(","),i=await Te(`SELECT p.submitted_at, p.area, p.tipo_saving, p.saving_reais,
+      WHERE status != 'rascunho' AND submitted_at IS NOT NULL`)}async function Bp(e){let t=Array.from(new Set(e.map(o=>o.trim().toLowerCase()).filter(Boolean)));if(t.length===0)return[];let a=[];for(let o=0;o<t.length;o+=90){let r=t.slice(o,o+90),n=r.map(()=>"?").join(","),i=await Te(`SELECT p.submitted_at, p.area, p.tipo_saving, p.saving_reais,
               COALESCE(
                 (SELECT CASE WHEN json_valid(d.conteudo)
                              THEN json_extract(d.conteudo, '$.receita.valor_ganho_mensal') END
