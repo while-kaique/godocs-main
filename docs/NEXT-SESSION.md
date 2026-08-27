@@ -39,12 +39,19 @@ Entregue:
 - **Worker**: crons `POST /api/cron/deliberar-avaliacoes` + `/api/cron/avaliacao-retroativa` + rotas admin
   `/api/admin/deliberar-avaliacoes` + `/api/admin/avaliacao-retroativa` (dry default). NO-OP se flag OFF.
 
-⚠️ **§9 revisores NÃO fecharam** (estavam rodando quando o contexto encheu → commit de WIP): marcadores
-`.review-status`/`.quality-status` = **`pendente`** (conservador) → o `/ggsd:ship` BARRA até rodar/gravar os
-vereditos. **RETOMAR:** re-rodar §9.A conformidade + §9.B qualidade + §9.C reuso (pacote: plano `docs/plans/
-agentes-avaliacao-autonomos.md §9` + diff `77403f9` + suíte 1999 + faixa profunda). Achado esperado da qualidade
-(follow-up herdado da B): `getEmbeddingsProjetos()` lê a tabela inteira (risco 32 MiB RPC, só background/cron,
-~4,6 MB hoje) → paginar quando urgir. **PRÓXIMO PASSO após §9:** staging `edf400b4` com `AVALIACAO_NORMAIS=sombra`
+✅ **§9 revisores LIBERARAM (contexto fresco):** **conformidade=`conforme`** (0.9 — modo sombra real, nenhum
+arquivo de status/analyzer tocado, NO-OP OFF antes de I/O em todos os entrypoints, especial/liderança isentos,
+cético nunca endossa, tabelas separadas, sem blob em lote, não extrapola escopo); **qualidade=`sugestoes`** (0.8,
+0 crítico/alto → NÃO barra); **reuso=`possivel-duplicacao`** (só-sugestão) — **1 achado JÁ CORRIGIDO** (commit
+`24ea845`): o cético agora importa `FATOR_FTE_PADRAO`/`MIN_VIZINHOS_APOIO`/`PISO_APOIO_RAG` canônicos em vez de
+redeclarar literais (anti-drift). Marcadores `.review-status=conforme`/`.quality-status=sugestoes` → `/ggsd:ship`
+NÃO barra por §9. **Follow-ups NÃO-bloqueantes (deferidos):** (1) `getEmbeddingsProjetos()` lê a tabela inteira
+com o blob `vetor` (risco 32 MiB RPC — a pegadinha que migrou os especiais ao Pinecone; só background/cron, flag
+OFF, ~4,6 MB hoje) → paginar/Pinecone ANTES de o corpus aprovado passar de ~1.500 linhas; (2) `lerResumosEspelho`
+lido 2× por corrida de cron (SQLite, background — barato) → passar os resumos já lidos a `carregarContextoPainel`;
+(3) `deliberacao_avaliacao.historico` grava só a rodada corrente (sobrescreve, lado seguro) — comentário do schema
+diz "cada rodada" → acumular com teto OU ajustar o comentário; (4) sem teste de integração do NO-OP/sombra dos
+orquestradores (só os 40 puros; C4/C5 não exigem). **PRÓXIMO PASSO:** staging `edf400b4` com `AVALIACAO_NORMAIS=sombra`
 → rodar as rotas admin dry:false → conferir `deliberacao_avaliacao`/`avaliacao_retroativa` gravando SEM mudar
 Status → Luis valida → só então (fase futura) plugar no status. NÃO deploy/merge/PR sem OK do Luis.
 
