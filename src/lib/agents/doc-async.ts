@@ -45,11 +45,31 @@ export function coletadoDePendente(
   return null;
 }
 
+// Chaves que a doc COMPILADA (output do LLM) NUNCA pode contribuir ao blob: o financeiro
+// (`saving`/`receita`) é autoritativo (turno `completo` + `recomputarSavingFinanceiro`) e as
+// flags de controle são nossas. Um `saving`/`receita` alucinado pelo LLM não pode contaminar
+// o financeiro real — no fluxo assíncrono a doc pode aterrissar DEPOIS do `completo`, sem
+// self-heal, então blindar na fonte é a defesa. Ver §9.B.
+const CHAVES_PROTEGIDAS_DOC = [
+  "saving",
+  "receita",
+  "compilacao_pendente",
+  "coletado_pendente",
+] as const;
+
+/** Remove da doc compilada as chaves protegidas (financeiro/controle) — nunca vão ao blob por essa via. */
+export function soCamposDaDoc(docCompilada: Record<string, unknown>): Record<string, unknown> {
+  const limpo: Record<string, unknown> = { ...docCompilada };
+  for (const k of CHAVES_PROTEGIDAS_DOC) delete limpo[k];
+  return limpo;
+}
+
 /**
  * Funde a doc compilada no conteúdo atual PRESERVANDO o financeiro (`saving`/`receita`) e
  * removendo as chaves de pendência. Os campos compilados vencem os antigos. O sinal
  * `tem_ia_como_funcionalidade` vem do `coletado` (se presente), senão do `atual`, senão null.
- * Aceita `atual` null/undefined (funde sobre {}).
+ * ⚠️ A doc compilada é filtrada por `soCamposDaDoc` — um `saving`/`receita` alucinado pelo LLM
+ * NÃO sobrescreve o financeiro real. Aceita `atual` null/undefined (funde sobre {}).
  */
 export function mergeDocCompilada(
   atual: Record<string, unknown> | null | undefined,
@@ -62,7 +82,7 @@ export function mergeDocCompilada(
 
   return {
     ...resto, // preserva saving/receita e o que houver
-    ...docCompilada, // campos compilados vencem (a doc compilada não traz saving/receita)
+    ...soCamposDaDoc(docCompilada), // campos compilados vencem, MENOS o financeiro/controle
     tem_ia_como_funcionalidade:
       coletado.tem_ia_como_funcionalidade ??
       (resto as { tem_ia_como_funcionalidade?: unknown }).tem_ia_como_funcionalidade ??

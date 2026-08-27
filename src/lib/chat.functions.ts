@@ -110,6 +110,7 @@ import {
   precisaCompilarDoc,
   coletadoDePendente,
   mergeDocCompilada,
+  soCamposDaDoc,
 } from "@/lib/agents/doc-async";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
@@ -3503,7 +3504,9 @@ function patchDaDocCompilada(
   coletado: DocumentacaoColetada,
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {
-    ...doc,
+    // ⚠️ soCamposDaDoc: NUNCA deixa um `saving`/`receita` alucinado pelo LLM na doc compilada
+    // vazar para o blob (o json_patch faria merge recursivo no financeiro autoritativo). Ver §9.B.
+    ...soCamposDaDoc(doc as Record<string, unknown>),
     compilacao_pendente: null,
     coletado_pendente: null,
   };
@@ -3517,7 +3520,7 @@ function patchDaDocCompilada(
 // sem tocar em saving/receita — não há mais janela de lost-update do blob. FAIL-SAFE: se a
 // compilação lançar, deixa o placeholder pendente — `submeterParaValidacao` reconcilia antes
 // do envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
-async function compilarEPersistirDoc(
+export async function compilarEPersistirDoc(
   projetoId: string,
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
@@ -3541,6 +3544,51 @@ async function compilarEPersistirDoc(
   }
 }
 
+// Reconcilia a doc quando a compilação foi para SEGUNDO PLANO (flag DOC_COMPILE_ASYNC) e o
+// conteúdo ainda é o PLACEHOLDER (background não terminou / o isolate morreu / a compilação
+// falhou). O Drive (renderResumoDocumentacao) e o analisador exigem a doc compilada, então
+// GARANTIMOS aqui: recompila síncrono a partir do coletado snapshotado (single-flight reusa a
+// compilação do background se estiver em voo no mesmo isolate) e grava os campos da doc via
+// json_patch ATÔMICO — preservando saving/receita mesmo com o background concorrente. Se a
+// compilação falhar, LANÇA bloqueio: NUNCA submete doc incompleta. Idempotente: com a flag OFF
+// ou a doc já compilada, precisaCompilarDoc é false e devolve o conteúdo sem tocar em nada.
+export async function reconciliarDocSePendente(
+  projetoId: string,
+  conteudo: Record<string, unknown>,
+  projeto: NonNullable<Awaited<ReturnType<typeof getProjetoById>>>,
+): Promise<Record<string, unknown>> {
+  if (!precisaCompilarDoc(conteudo)) return conteudo;
+
+  log("reconciliarDocSePendente", `Doc ainda pendente — compilando agora antes de submeter (projeto ${projetoId}).`);
+  const coletadoPendente =
+    coletadoDePendente(conteudo) ?? { ...documentacaoVazia(), nome_projeto: projeto.nome ?? null };
+  const ctxRecompile: ProjetoContexto = {
+    responsavel_nome: projeto.responsavel_nome ?? "",
+    responsavel_email: projeto.responsavel_email ?? "",
+    area: projeto.area ?? null,
+    ferramenta: projeto.ferramenta ?? "",
+    membros: parseJson<string[]>(projeto.membros) ?? [],
+    nome_projeto: projeto.nome ?? coletadoPendente.nome_projeto ?? "",
+    data_criacao: projeto.data_criacao_projeto ?? null,
+    doc_texto: null,
+    descricao_breve: projeto.descricao_breve ?? null,
+  };
+  try {
+    const doc = await compilarDocSingleFlight(projetoId, ctxRecompile, coletadoPendente);
+    await patchDocumentacaoConteudo(projetoId, patchDaDocCompilada(doc, coletadoPendente));
+    log("reconciliarDocSePendente", `Doc compilada e reconciliada no submit (projeto ${projetoId}).`);
+    // `conteudo` em memória fundido p/ o downstream (Drive/analisador) usar a doc completa.
+    return mergeDocCompilada(conteudo, doc, coletadoPendente);
+  } catch (compileErr) {
+    err(
+      "reconciliarDocSePendente",
+      `Compilação da doc falhou no submit (projeto ${projetoId}) — não submetendo doc incompleta:`,
+      compileErr,
+    );
+    throw erroDeBloqueio(bloqueioDocAusente());
+  }
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3558,43 +3606,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   if (!projeto) throw new Error("Projeto não encontrado.");
 
-  // ── Reconciliação da doc ASSÍNCRONA (flag DOC_COMPILE_ASYNC) ────────────────
-  // Quando a compilação da doc foi para background na aprovação, o conteúdo pode ainda ser
-  // o PLACEHOLDER (background não terminou / o isolate morreu / a compilação falhou). O
-  // Drive (renderResumoDocumentacao) e o analisador exigem a doc compilada, então garantimos
-  // AQUI: recompilamos síncrono a partir do coletado snapshotado, preservando saving/receita.
-  // Se a compilação falhar de novo, NÃO submetemos doc incompleta (bloqueia). Idempotente:
-  // com a flag OFF ou a doc já compilada, precisaCompilarDoc é false e nada roda.
-  if (precisaCompilarDoc(conteudo)) {
-    log("submeterParaValidacao", "Doc ainda pendente de compilação — compilando agora antes de submeter.");
-    const coletadoPendente =
-      coletadoDePendente(conteudo) ?? { ...documentacaoVazia(), nome_projeto: projeto.nome ?? null };
-    const ctxRecompile: ProjetoContexto = {
-      responsavel_nome: projeto.responsavel_nome ?? "",
-      responsavel_email: projeto.responsavel_email ?? "",
-      area: projeto.area ?? null,
-      ferramenta: projeto.ferramenta ?? "",
-      membros: parseJson<string[]>(projeto.membros) ?? [],
-      nome_projeto: projeto.nome ?? coletadoPendente.nome_projeto ?? "",
-      data_criacao: projeto.data_criacao_projeto ?? null,
-      doc_texto: null,
-      descricao_breve: projeto.descricao_breve ?? null,
-    };
-    try {
-      // Single-flight: se o background ainda está compilando este projeto no MESMO isolate,
-      // reusa a promise em vez de disparar uma 2ª compilação.
-      const doc = await compilarDocSingleFlight(projeto_id, ctxRecompile, coletadoPendente);
-      // Escrita ATÔMICA dos campos da doc (json_patch) — preserva saving/receita mesmo se o
-      // background gravar concorrentemente. `conteudo` em memória é fundido para o downstream
-      // (Drive/analisador) usar a doc completa neste request.
-      await patchDocumentacaoConteudo(projeto_id, patchDaDocCompilada(doc, coletadoPendente));
-      conteudo = mergeDocCompilada(conteudo, doc, coletadoPendente);
-      log("submeterParaValidacao", "Doc compilada e reconciliada no submit.");
-    } catch (compileErr) {
-      err("submeterParaValidacao", "Compilação da doc falhou no submit — não submetendo doc incompleta:", compileErr);
-      throw erroDeBloqueio(bloqueioDocAusente());
-    }
-  }
+  // Reconciliação da doc ASSÍNCRONA: garante a doc compilada ANTES do Drive/analisador,
+  // preservando saving/receita; bloqueia se a compilação falhar. Ver reconciliarDocSePendente.
+  conteudo = await reconciliarDocSePendente(projeto_id, conteudo, projeto);
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado

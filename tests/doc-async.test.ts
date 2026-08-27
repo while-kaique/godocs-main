@@ -6,6 +6,7 @@ import {
   mergeDocCompilada,
   placeholderDocPendente,
   precisaCompilarDoc,
+  soCamposDaDoc,
 } from '@/lib/agents/doc-async';
 
 // Coletado mínimo reusável nos casos.
@@ -171,5 +172,33 @@ describe('mergeDocCompilada — funde a doc compilada preservando o financeiro',
     const coletado = coletadoMinimo();
     expect(mergeDocCompilada(null, docCompilada, coletado).o_que_faz).toBe('faz');
     expect(mergeDocCompilada(undefined, docCompilada, coletado).o_que_faz).toBe('faz');
+  });
+
+  it('NÃO deixa um saving/receita alucinado na doc compilada sobrescrever o financeiro (§9.B)', () => {
+    const atual = { saving: { horas: 10 }, receita: { valor: 5 } };
+    // O LLM "alucinou" saving/receita no JSON da doc compilada.
+    const docCompilada = {
+      o_que_faz: 'faz',
+      saving: { horas: 999 },
+      receita: { valor: 999 },
+    };
+    const res = mergeDocCompilada(atual, docCompilada, coletadoMinimo());
+    expect(res.o_que_faz).toBe('faz');
+    expect(res.saving).toEqual({ horas: 10 }); // financeiro autoritativo preservado
+    expect(res.receita).toEqual({ valor: 5 });
+  });
+});
+
+describe('soCamposDaDoc — remove as chaves protegidas (financeiro/controle)', () => {
+  it('tira saving/receita/compilacao_pendente/coletado_pendente e mantém os campos da doc', () => {
+    const limpo = soCamposDaDoc({
+      o_que_faz: 'faz',
+      fluxo: 'f',
+      saving: { horas: 1 },
+      receita: { valor: 2 },
+      compilacao_pendente: true,
+      coletado_pendente: { nome_projeto: 'X' },
+    });
+    expect(limpo).toEqual({ o_que_faz: 'faz', fluxo: 'f' });
   });
 });
