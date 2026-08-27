@@ -9,7 +9,7 @@
 // salvamos uma doc "de segunda categoria" que não passou pelo agente.
 
 import { llmChat } from '@/lib/llm';
-import { docMecanicoLLMOpts } from './doc-modelo';
+import { docCompiladorLLMOpts } from './doc-modelo';
 import type { DocumentacaoColetada, DocumentacaoGerada, ProjetoContexto } from './types';
 
 const log = (...args: unknown[]) => console.log('[doc-compiler]', ...args);
@@ -127,8 +127,9 @@ export async function compilarDocumentacao(
       jsonMode: true,
       temperature: 0.3,
       maxTokens: MAX_OUTPUT_TOKENS,
-      // Trabalho mecânico: roteia p/ modelo leve quando configurado (opt-in, default = hoje).
-      ...docMecanicoLLMOpts(),
+      // Modelo leve opt-in + (no modo async) SEMPRE o modelo escolhido, sem o mini escondido:
+      // timeout folgado p/ lentidão + retries do mesmo modelo em erro. Default OFF = hoje.
+      ...docCompiladorLLMOpts(),
     });
 
     const doc = parseDocJson(ultimaResposta);

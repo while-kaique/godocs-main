@@ -10,6 +10,8 @@
 // ⚠️ NUNCA ler `process.env` em escopo de módulo — só dentro da função (Godeploy).
 
 import { sanitizeEffort } from "@/lib/llm";
+import type { LLMOptions } from "@/lib/llm";
+import { docCompilacaoAssincronaAtiva } from "@/lib/agents/doc-async";
 
 /**
  * Options de LLM para as chamadas mecânicas da doc. Vazio quando nada foi configurado
@@ -26,4 +28,36 @@ export function docMecanicoLLMOpts(): { model?: string; reasoningEffort?: string
   if (effort) opts.reasoningEffort = effort;
 
   return opts;
+}
+
+// Inteiro positivo de env (lazy) com default; ignora vazio/NaN/≤0.
+function envIntPositivo(nome: string, padrao: number): number {
+  const bruto = process.env[nome];
+  const n = bruto ? Number(bruto) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : padrao;
+}
+
+/**
+ * Opções de LLM para a COMPILAÇÃO da doc (a doc GRANDE, onde o fallback silencioso para o
+ * `gpt-5.4-mini` mais degrada). Estende `docMecanicoLLMOpts` garantindo que a doc seja sempre
+ * compilada pelo modelo escolhido:
+ * - `semFallbackModelo`: em erro/timeout do proxy, retenta o MESMO modelo (nunca o mini);
+ * - `timeoutMs` FOLGADO (`DOC_COMPILE_TIMEOUT_MS`, default 180s): lentidão do luna NÃO é cortada;
+ * - `retriesModelo` (`DOC_COMPILE_RETRIES`, default 3): retries do luna antes de desistir.
+ *
+ * ⚠️ Só liga no MODO ASSÍNCRONO (`DOC_COMPILE_ASYNC`): aí a compilação é background/submit e o
+ * cliente NÃO bloqueia, então o timeout folgado é seguro. Com a flag OFF (default de hoje) devolve
+ * exatamente `docMecanicoLLMOpts()` — byte-idêntico, o fallback de sempre segue disponível. O
+ * kill-switch `DOC_COMPILE_PRESERVAR_MODELO=0` restaura o comportamento antigo mesmo no async.
+ */
+export function docCompiladorLLMOpts(): LLMOptions {
+  const base = docMecanicoLLMOpts();
+  const preservar = (process.env.DOC_COMPILE_PRESERVAR_MODELO ?? "").trim() !== "0";
+  if (!docCompilacaoAssincronaAtiva() || !preservar) return base;
+  return {
+    ...base,
+    semFallbackModelo: true,
+    timeoutMs: envIntPositivo("DOC_COMPILE_TIMEOUT_MS", 180_000),
+    retriesModelo: envIntPositivo("DOC_COMPILE_RETRIES", 3),
+  };
 }

@@ -1072,6 +1072,20 @@ export function getDocumentacao(projetoId: string) {
 }
 
 /**
+ * IDs das docs marcadas como PENDENTES de compilação (`compilacao_pendente:true` no conteúdo).
+ * Alimenta o cron `recompilarDocsPendentes`, que re-tenta a compilação no modelo escolhido
+ * (luna). `json_valid` guarda contra conteúdo não-JSON legado. Bounded por `max`.
+ */
+export function getDocsPendentesCompilacao(max = 20) {
+  return queryAll<{ projeto_id: string }>(
+    `SELECT projeto_id FROM documentacao
+      WHERE json_valid(conteudo) AND json_extract(conteudo, '$.compilacao_pendente') = 1
+      LIMIT ?`,
+    [max],
+  );
+}
+
+/**
  * Merge ATÔMICO de `patch` no `documentacao.conteudo` via `json_patch` (RFC 7386), num
  * ÚNICO UPDATE — sem read-modify-write. As chaves NÃO citadas no patch (ex.: `saving`,
  * `receita`) ficam INTACTAS; chave com valor `null` no patch é REMOVIDA (usado p/ limpar

@@ -20,6 +20,18 @@ export type LLMOptions = {
   // ⚠️ NUNCA passar `minimal` (o gateway devolve 502 determinístico) — quem seta
   // deve filtrar por `sanitizeEffort` antes. Ver roteamento por fase no orchestrator.
   reasoningEffort?: string;
+  // Timeout por tentativa (AbortController) OVERRIDE. Ausente = o default do modo
+  // (LLM_TIMEOUT_PROXY_MS). Usado pelo COMPILADOR da doc, que quer um relógio FOLGADO:
+  // geração longa (doc grande) não pode ser cortada como se fosse erro.
+  timeoutMs?: number;
+  // Compilador da doc: NÃO cair no modelo leve escondido (LLM_FALLBACK/gpt-5.4-mini).
+  // Com `true`, em erro/timeout do proxy o MESMO modelo é retentado no proxio (backoff),
+  // e se esgotar LANÇA — o chamador defere a recompilação; a doc nunca sai no mini.
+  // ⚠️ Só afeta quem SETA (compilador). Chat/saving/memorial não passam → fallback intacto.
+  semFallbackModelo?: boolean;
+  // Quantas vezes retentar o MESMO modelo em erro de gateway/rede/timeout quando
+  // `semFallbackModelo` (mapeia para o gatewayRetries do callOpenAI, backoff de 2s). Default 2.
+  retriesModelo?: number;
 };
 
 // Guard puro anti-`minimal`: valida `reasoning_effort` contra a allowlist e devolve
@@ -165,6 +177,22 @@ export async function llmChat(messages: LLMMessage[], opts: LLMOptions = {}): Pr
   // (LLM_FALLBACK_MODEL). Se os logs voltarem a mostrar fallback na maioria dos turnos, o
   // problema é o timeout do proxy estar curto para o tamanho da geração — não "instabilidade".
   const fallbackKey = usingProxy ? process.env.LLM_FALLBACK?.trim() || undefined : undefined;
+
+  // COMPILADOR da doc (semFallbackModelo): garante a doc SEMPRE no modelo escolhido (luna),
+  // sem o mini escondido. Distingue LENTIDÃO de ERRO — o timeout FOLGADO (opts.timeoutMs) deixa
+  // a geração longa terminar; erro real (502/rede/timeout) retenta o MESMO modelo no proxy
+  // (gatewayRetries, backoff 2s) e, esgotado, LANÇA (o chamador defere). NUNCA vai ao mini/OpenAI
+  // direto. Fica ANTES do try/catch do fallback — quem não seta a flag mantém o fallback de sempre.
+  if (opts.semFallbackModelo) {
+    return await callOpenAI(messages, {
+      ...opts,
+      model,
+      apiKey,
+      baseUrl,
+      timeoutMs: opts.timeoutMs ?? LLM_TIMEOUT_PROXY_MS,
+      gatewayRetries: opts.retriesModelo ?? 2,
+    });
+  }
 
   // `model` resolvido (opts.model ?? env) tem de VENCER o spread de opts — senão um
   // opts.model undefined (ex: LLM_MODEL_FAST não configurado) sobrescreveria o modelo

@@ -19,6 +19,7 @@ import {
   upsertDocumentacao,
   patchDocumentacaoConteudo,
   getDocumentacao,
+  getDocsPendentesCompilacao,
   getProjetoById,
   getProjetosSubmetidos,
   getProjetosNaoRascunho,
@@ -3580,6 +3581,18 @@ export async function reconciliarDocSePendente(
     // `conteudo` em memória fundido p/ o downstream (Drive/analisador) usar a doc completa.
     return mergeDocCompilada(conteudo, doc, coletadoPendente);
   } catch (compileErr) {
+    // No MODO ASSÍNCRONO o cliente NÃO pode travar: ele já seguiu com o `coletado`. Se o luna
+    // não entregou nem aqui (com o timeout folgado), DEFERIMOS — a doc fica PENDENTE e é
+    // recompilada no luna pelo cron (`recompilarDocsPendentes`); nunca publicamos doc de mini.
+    // No modo síncrono (default de hoje) mantém o bloqueio: sem async não há rede que recomponha.
+    if (docCompilacaoAssincronaAtiva()) {
+      err(
+        "reconciliarDocSePendente",
+        `Compilação falhou no submit (projeto ${projetoId}) — DEFERIDA p/ recompilação no luna (doc fica pendente):`,
+        compileErr,
+      );
+      return conteudo; // permanece com compilacao_pendente:true → cron recompila depois
+    }
     err(
       "reconciliarDocSePendente",
       `Compilação da doc falhou no submit (projeto ${projetoId}) — não submetendo doc incompleta:`,
@@ -3587,6 +3600,43 @@ export async function reconciliarDocSePendente(
     );
     throw erroDeBloqueio(bloqueioDocAusente());
   }
+}
+
+// Cron/admin: recompila as docs que ficaram PENDENTES (background morreu / submit deferiu por
+// erro do proxy). Re-tenta cada uma no modelo escolhido (luna, via reconciliarDocSePendente →
+// compilarDocumentacao com as opts do compilador) e faz o patch atômico. NÃO lança (rede): doc
+// que falhar de novo continua pendente p/ a próxima corrida. Bounded por `max`. Idempotente.
+export async function recompilarDocsPendentes(
+  max = 20,
+): Promise<{ verificados: number; recompilados: number; pendentes: number }> {
+  const pend = await getDocsPendentesCompilacao(max);
+  let recompilados = 0;
+  let pendentes = 0;
+  for (const { projeto_id } of pend) {
+    try {
+      const docRow = await getDocumentacao(projeto_id);
+      if (!docRow) continue;
+      const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      if (!precisaCompilarDoc(conteudo)) continue; // já resolvido entre a query e agora
+      const projeto = await getProjetoById(projeto_id);
+      if (!projeto) continue;
+      const reconc = await reconciliarDocSePendente(projeto_id, conteudo, projeto);
+      if (precisaCompilarDoc(reconc)) pendentes++;
+      else recompilados++;
+    } catch (e) {
+      // reconciliarDocSePendente pode lançar no modo síncrono; aqui a corrida nunca cai.
+      pendentes++;
+      err("recompilarDocsPendentes", `Falha ao recompilar ${projeto_id} (segue pendente):`, e);
+    }
+  }
+  log(
+    "recompilarDocsPendentes",
+    `verificados=${pend.length} recompilados=${recompilados} pendentes=${pendentes}`,
+  );
+  return { verificados: pend.length, recompilados, pendentes };
 }
 
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {

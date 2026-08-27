@@ -1,6 +1,9 @@
 # Plano — Frente 1: tirar a documentação do caminho crítico da submissão
 
-**Status:** executado (código) — 27/08/2026 · A+B implementados, suíte 1954 verde, gates §9 liberam (quality=limpo, review=diverge-baixa), race de lost-update corrigida. Branch `feat/submissao-doc-async`. FALTA: staging (`DOC_COMPILE_ASYNC=1`) + validação/prod pelo Luis. _(aprovado por Luis em 27/08/2026)_
+**Status:** aprovado ✅ (Luis, 27/08/2026) — REABERTO para a fatia C (decisão do Luis, 27/08): _o compilador da doc deve rodar SEMPRE no modelo escolhido (luna), sem o `gpt-5.4-mini` escondido do fallback, mas sem nunca deixar o cliente/doc sem resposta._ (A+B já executados: suíte 1954 verde, gates §9 liberam, race de lost-update corrigida; falta staging/prod pelo Luis.)
+>
+> **Fatia C — compilador sempre no modelo escolhido (sem mini escondido):** (1) distinguir LENTIDÃO de ERRO — lentidão do luna não corta nem troca modelo (timeout FOLGADO, background); (2) ERRO real (502/exceção) → retenta o LUNA com backoff, nunca o mini; (3) esgotado → defere p/ recompilação em background/cron (doc fica pendente, re-tentada no luna), nunca publica doc de mini; (4) cliente nunca trava — segue com o `coletado`; a doc é garantida no submit/depois sem travar. Env-gated; NÃO mexer no fallback das outras chamadas (chat/saving/memorial) — só no compilador.
+>
 > Origem: reclamações recorrentes de que "submeter projeto está lento/chato". Objetivo do dono do produto (Luis, 27/08/2026): o cliente que submete **não pode sentir gargalo nenhum**. Esta é a **prioridade #1**, independente da Frente 2 (time de agentes).
 > Metodologia: GGSD (plano aprovado → código em worktree → staging → prod). Regras do projeto 1/2/8/10/13/14.
 

@@ -20,6 +20,7 @@ import {
   resyncGoogle,
   reconciliarComplexidade,
   retroativoCustosPontuais,
+  recompilarDocsPendentes,
 } from "@/lib/chat.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
@@ -308,6 +309,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await reconciliarSnapshots());
+    }
+
+    // ── Cron: recompila docs PENDENTES (compilação assíncrona) ──
+    // A compilação da doc roda em background/submit no modelo escolhido (luna) e NUNCA cai no
+    // mini. Se o luna não entregou (proxy fora), a doc fica pendente e o cliente segue sem
+    // travar; este cron a recompila no luna depois. Idempotente, bounded.
+    if (pathname === "/api/cron/recompilar-docs-pendentes" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await recompilarDocsPendentes());
     }
 
     // ── Cron: classificador de especiais pendentes (peça 4) ──────────────────
@@ -1086,6 +1098,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/reanalisar-pendentes" && method === "POST") {
       await requireAdmin(request);
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Recompilação de docs pendentes sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/recompilar-docs-pendentes, sem o header de cron —
+    // para backfill/validação na staging (onde o cron não dispara). Idempotente.
+    if (pathname === "/api/admin/recompilar-docs-pendentes" && method === "POST") {
+      await requireAdmin(request);
+      return json(await recompilarDocsPendentes());
     }
 
     // ── Reconciliação de SNAPSHOTS sob demanda (admin) ──

@@ -88,3 +88,26 @@ describe('patchDocumentacaoConteudo — merge atômico sem lost-update (fix da r
     expect(linhas).toBe(0);
   });
 });
+
+describe('getDocsPendentesCompilacao / recompilarDocsPendentes — rede da doc pendente', () => {
+  it('lista SÓ as docs com compilacao_pendente=true', async () => {
+    const { upsertDocumentacao, getDocsPendentesCompilacao } = await import(
+      '@/integrations/db/client.server'
+    );
+    await upsertDocumentacao('pend1', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' } });
+    await upsertDocumentacao('pronto1', { o_que_faz: 'já compilado' });
+    const ids = (await getDocsPendentesCompilacao(50)).map((r) => r.projeto_id);
+    expect(ids).toContain('pend1');
+    expect(ids).not.toContain('pronto1');
+  });
+
+  it('recompilarDocsPendentes conta os pendentes e não trava sem projeto (pula, não compila)', async () => {
+    const { upsertDocumentacao } = await import('@/integrations/db/client.server');
+    const { recompilarDocsPendentes } = await import('@/lib/chat.functions');
+    // Doc pendente SEM projeto correspondente → getProjetoById devolve undefined → pula.
+    await upsertDocumentacao('semproj', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' } });
+    const r = await recompilarDocsPendentes(50);
+    expect(r.verificados).toBeGreaterThanOrEqual(1);
+    expect(r.recompilados).toBe(0); // sem projeto, nada recompila; NÃO lança (rede)
+  });
+});

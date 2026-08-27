@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type BetterSqlite3 from 'better-sqlite3';
 import { criarDbMemoria } from './helpers/db-memoria';
 
@@ -52,6 +52,11 @@ beforeEach(async () => {
   db.pragma('foreign_keys = OFF');
   const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
   vi.mocked(compilarDocumentacao).mockReset();
+  delete process.env.DOC_COMPILE_ASYNC;
+});
+
+afterEach(() => {
+  delete process.env.DOC_COMPILE_ASYNC;
 });
 
 describe('reconciliarDocSePendente — submit garante a doc, preserva financeiro, bloqueia em falha', () => {
@@ -100,6 +105,21 @@ describe('reconciliarDocSePendente — submit garante a doc, preserva financeiro
     const conteudo = await lerDoc('r3');
 
     await expect(reconciliarDocSePendente('r3', conteudo, projetoFake)).rejects.toThrow();
+  });
+
+  it('modo ASYNC + compilação falha → DEFERE (não trava o cliente): NÃO lança, doc fica pendente', async () => {
+    process.env.DOC_COMPILE_ASYNC = '1';
+    const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
+    vi.mocked(compilarDocumentacao).mockRejectedValueOnce(new Error('proxy fora'));
+    const { reconciliarDocSePendente } = await import('@/lib/chat.functions');
+
+    await seedDoc('r4', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' }, saving: { horas: 3 } });
+    const conteudo = await lerDoc('r4');
+
+    // Cliente nunca trava: retorna (sem throw) e a doc segue PENDENTE p/ o cron recompilar.
+    const reconc = await reconciliarDocSePendente('r4', conteudo, projetoFake);
+    expect(reconc.compilacao_pendente).toBe(true);
+    expect(reconc.saving).toEqual({ horas: 3 }); // financeiro preservado
   });
 });
 
