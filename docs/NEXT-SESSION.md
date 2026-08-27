@@ -31,7 +31,40 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
 
-### Estado da sessão /ggsd:code (27/08 — Frente 1) — ✅ CÓDIGO VERDE, RACE §9 CORRIGIDA, GATES LIBERAM (HEAD `0219c23`)
+### Estado da sessão /ggsd:code (27/08 — Frente 1) — ✅ A+B+C EM CÓDIGO VERDE (HEAD `82bbc4e`)
+
+> **ATUALIZAÇÃO 2 — fatia C (compilador SEMPRE no modelo escolhido, sem mini escondido):** decisão do
+> Luis. Hoje o fallback do `llm.ts` trocava o modelo por `gpt-5.4-mini` em timeout/erro — degradando a
+> compilação da doc grande em silêncio. Fatia C garante que a doc seja compilada sempre no modelo
+> escolhido (luna) SEM nunca travar o cliente:
+> - `llm.ts`: nova opção `semFallbackModelo` (+ `timeoutMs`/`retriesModelo`) — no proxy, erro/timeout
+>   retenta o MESMO modelo (backoff 2s) e LANÇA se esgotar; NUNCA cai no mini/OpenAI-direto. **Só afeta
+>   quem seta a flag** → chat/saving/memorial intactos.
+> - `doc-modelo.ts`: `docCompiladorLLMOpts()` liga a flag + timeout FOLGADO (`DOC_COMPILE_TIMEOUT_MS`
+>   180s) + retries (`DOC_COMPILE_RETRIES` 3) **SÓ no modo async** (`DOC_COMPILE_ASYNC`), onde a
+>   compilação é background/submit e o cliente não bloqueia. Default OFF = byte-idêntico a hoje;
+>   kill-switch `DOC_COMPILE_PRESERVAR_MODELO=0`. Distingue LENTIDÃO (timeout folgado, não corta) de ERRO
+>   (retenta luna).
+> - `doc-compiler.ts` usa `docCompiladorLLMOpts()`.
+> - Submit (`reconciliarDocSePendente`): no async, se a compilação falhar, **DEFERE** (doc fica pendente,
+>   cliente não trava) em vez de bloquear; síncrono mantém o bloqueio de hoje.
+> - Cron/admin **`recompilar-docs-pendentes`** (`getDocsPendentesCompilacao` + `recompilarDocsPendentes`):
+>   re-tenta as docs pendentes no luna; nunca publica doc de mini; idempotente, bounded, não lança.
+> - Testes: `tests/llm-sem-fallback-modelo.test.ts` (nunca cai no mini, retenta luna, guarda de
+>   regressão do fallback antigo), `tests/doc-compilador-opts.test.ts` (flag/kill-switch/defaults),
+>   defer no `tests/doc-async-submit.test.ts`, query+cron em `tests/doc-async-race.test.ts`. **Suíte 1965
+>   verde** (+11); tsc só os 5 pré-existentes; `worker.js` rebuildado. Commit `82bbc4e`.
+> - ⚠️ **Revisão §9 NÃO re-rodou** para o diff da fatia C — os marcadores foram postos em `pendente`
+>   (o diff mudou desde a revisão de `0219c23`); `/ggsd:ship` **barra** até rodar `ggsd:revisor-qualidade`
+>   (foco: mudança no fallback/timeout — caminho sensível) + `ggsd:verificador-conformidade` sobre `82bbc4e`.
+>
+> **PRÓXIMO PASSO (fatia C):** (1) rodar os revisores §9 (conformidade + qualidade) sobre `82bbc4e` e
+> gravar os marcadores; (2) staging (`edf400b4`) com `DOC_COMPILE_ASYNC=1` (+ `DOC_MECANICO_MODEL=luna` p/
+> exercitar a preservação; opcionais `DOC_COMPILE_TIMEOUT_MS`/`DOC_COMPILE_RETRIES`) e **registrar o cron
+> `POST /api/cron/recompilar-docs-pendentes`** no Godeploy; validar que a doc grande sai no luna (logs sem
+> `fallback … gpt-5.4-mini` na compilação) e que o cliente nunca trava; (3) prod + merge no main pelo Luis.
+>
+> _(Abaixo: estado da fatia A+B corrigida — race §9 — mantido como referência.)_
 
 > **ATUALIZAÇÃO (2ª rodada /ggsd:code):** A+B **IMPLEMENTADOS até o VERDE**. Suíte **1942 passando**
 > (baseline era 1905; +37), `tsc` só com os **5 erros PRÉ-EXISTENTES** do main (nenhum novo), `worker.js`
