@@ -41,15 +41,18 @@ branch `feat/agentes-avaliacao-fte`:
   implausível & status seria `aprovado` → força `em_validacao`/"Pendente".
 - **Teste** `tests/plausibilidade-fte.test.ts` (15 casos, autorado pelo `ggsd:test-writer` isolado) — verde.
 
-**PENDÊNCIA (destravar antes do `/ggsd:ship`):** os **revisores §9 de contexto fresco** (conformidade RF-37 +
-qualidade RF-27) foram **DESPACHADOS mas os vereditos não foram integrados** (fim de janela de contexto) — os
-marcadores `.claude/.review-status` e `.claude/.quality-status` seguem **`pendente`**, então o `/ggsd:ship`
-vai **BARRAR o envio** até rodá-los. Retomar: rodar `/ggsd:code` §9 (invocar `ggsd:verificador-conformidade`
-e `ggsd:revisor-qualidade` sobre `git diff origin/main -- src/lib/agents/analyzer.ts src/lib/chat.functions.ts
-tests/plausibilidade-fte.test.ts`, ignorar `worker.js`) e gravar os vereditos nos marcadores.
+**§9 revisores de contexto fresco — COMPLETO, ambos LIBERAM o envio:** qualidade `limpo` (zero achados),
+conformidade `diverge-baixa` (cumpre T1+T2, não extrapola B/C). Marcadores `.claude/.quality-status=limpo` e
+`.claude/.review-status=diverge-baixa` → o `/ggsd:ship` **NÃO barra** por esses gates.
 
-**Depois disso:** staging (`edf400b4`) → validar com projeto absurdo (ex.: 500h/1 pessoa vai p/ "Pendente") →
-prod (`674a3710`) + merge `main` (regra 14) + atualizar CLAUDE.md/spec. Fatias B/C ficam para depois.
+**Follow-up NÃO-bloqueante (sugestão do conformidade, deferida pelo plano a T4 smoke/T5 staging):** o *flip* de
+status nos call sites (`aprovado→em_validacao` no implausível; `claro_sim→zona_cinzenta` em `analisarProjeto`)
+só é coberto pela função pura, sem teste automatizado dos 2 call sites. Antes de confiar em prod, vale um teste
+de call site: assertar o flip num implausível e a NÃO-alteração em `claro_nao`/especial/liderança.
+
+**PRÓXIMO PASSO (Luis):** staging (`edf400b4`) → validar com projeto absurdo (ex.: 500h/1 pessoa → "Pendente")
+→ prod (`674a3710`) + merge `main` (regra 14) + atualizar CLAUDE.md/spec. Fatias B/C ficam para depois.
+Fator opcional: secret `FTE_FATOR_IMPLAUSIVEL` (ausente → 1.5 ativo; `off`/≤0 → desliga o gate).
 
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
