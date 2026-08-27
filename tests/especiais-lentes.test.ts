@@ -22,6 +22,8 @@ import {
   LENTES,
   LENTE_GATE,
   MARGEM_ACIMA_DO_GATE,
+  MARGEM_VALOR_NOMEADO,
+  NOTA_VALOR_EMPRESTA,
   MIN_SUSTENTACAO,
   TETO_SEM_EVIDENCIA,
   aplicarTetoSemEvidencia,
@@ -214,8 +216,40 @@ describe("consolidação — sem média, gate como teto", () => {
     expect(c.explicacao).toContain("teto");
   });
 
-  it("gate com prova VAGA não empresta margem nenhuma", () => {
+  // ⚠️ Decisão do Kaique, 27/08/2026, com a medição do T7 na mesa: gate com prova `vaga` PASSOU a
+  // receber margem quando um eixo de VALOR sustenta ≥3 COM prova nomeada. Antes a margem era 0 e
+  // NENHUM dos 48 especiais passava de 2★, contra 41,7% de ≥3★ da triagem humana.
+  it("gate VAGO recebe a margem emprestada de um eixo de valor com prova NOMEADA", () => {
     const c = consolidarLentes([av(GATE, 2, "vaga"), av(VALOR[0], 6)]);
+    expect(c.valor_nomeado_max).toBe(6);
+    expect(c.teto).toBe(2 + MARGEM_VALOR_NOMEADO);
+    expect(c.nota_preliminar).toBe(3);
+  });
+
+  // ⚠️ O empréstimo é de ESPAÇO, não da nota do eixo: com `teto = valor_nomeado_max` direto, o caso
+  // real «Acompanhamento de Mudanças de Preço» (humana 2, gate 2/vaga, alcance 4/nomeada) iria a 4★
+  // — trocaria um erro de −1 por um de +2. Este teste é o que impede essa "melhoria".
+  it("o empréstimo é UMA nota, não a nota cheia do eixo de valor", () => {
+    const c = consolidarLentes([av(GATE, 2, "vaga"), av(VALOR[0], 4)]);
+    expect(c.nota_preliminar).toBe(3);
+    expect(c.nota_preliminar).toBeLessThan(4);
+  });
+
+  it("eixo de valor sem prova nomeada NÃO empresta nada ao gate vago", () => {
+    const c = consolidarLentes([av(GATE, 2, "vaga"), av(VALOR[0], 6, "vaga")]);
+    expect(c.valor_nomeado_max).toBe(0);
+    expect(c.teto).toBe(2);
+    expect(c.nota_preliminar).toBe(2);
+  });
+
+  it("eixo de valor nomeado ABAIXO de 3 não empresta (o limiar é declarado)", () => {
+    const c = consolidarLentes([av(GATE, 1, "vaga"), av(VALOR[0], NOTA_VALOR_EMPRESTA - 1)]);
+    expect(c.teto).toBe(1);
+    expect(c.nota_preliminar).toBe(1);
+  });
+
+  it("gate com prova AUSENTE não recebe empréstimo nenhum (ponteiro vago ≠ inexistente)", () => {
+    const c = consolidarLentes([av(GATE, 2, "ausente"), av(VALOR[0], 6)]);
     expect(c.teto).toBe(2);
     expect(c.nota_preliminar).toBe(2);
   });

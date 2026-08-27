@@ -35,7 +35,12 @@ import { LENTE_GATE, consolidarLentes, type AvaliacaoLente } from "@/lib/agents/
 function ent(
   id: string,
   nota: number,
-  opts: { gate?: number; prova?: "nomeada" | "vaga" | "ausente"; valor?: number[] } = {},
+  opts: {
+    gate?: number;
+    prova?: "nomeada" | "vaga" | "ausente";
+    valor?: number[];
+    valorNomeado?: number;
+  } = {},
 ): EntradaCalibragem {
   return {
     projeto_id: id,
@@ -43,12 +48,32 @@ function ent(
     gate: opts.gate ?? nota,
     gate_evidencia: opts.prova ?? "nomeada",
     notas_valor: opts.valor ?? [nota, nota],
+    valor_nomeado_max: opts.valorNomeado ?? 0,
   };
 }
 
 describe("piso de prova (por projeto, sem curva)", () => {
   it("≥3 sem prova nomeada no eixo estrutural não passa da faixa de baixo", () => {
     const r = aplicarPisosDeProva(ent("a", 4, { prova: "vaga" }));
+    expect(r.nota).toBe(NOTA_EXIGE_PROVA_NOMEADA - 1);
+    expect(r.motivos).toContain("prova_nao_nomeada");
+  });
+
+  // ⚠️ Decisão do Kaique, 27/08/2026 (T7 medido): a prova nomeada não precisa mais ser a DO GATE —
+  // vale a de qualquer eixo que sustente ≥3. Exigindo-a só do gate, os 48 especiais ficaram TODOS em
+  // 2★ contra 41,7% de ≥3★ da triagem humana. O piso continua sendo sobre PROVA, não sobre o eixo.
+  it("≥3 com gate vago PASSA quando um eixo de valor traz prova nomeada sustentando ≥3", () => {
+    const r = aplicarPisosDeProva(
+      ent("a", 3, { prova: "vaga", valorNomeado: NOTA_EXIGE_PROVA_NOMEADA }),
+    );
+    expect(r.nota).toBe(3);
+    expect(r.motivos).not.toContain("prova_nao_nomeada");
+  });
+
+  it("≥3 com gate vago e prova nomeada ABAIXO de 3 segue rebaixado", () => {
+    const r = aplicarPisosDeProva(
+      ent("a", 4, { prova: "vaga", valorNomeado: NOTA_EXIGE_PROVA_NOMEADA - 1 }),
+    );
     expect(r.nota).toBe(NOTA_EXIGE_PROVA_NOMEADA - 1);
     expect(r.motivos).toContain("prova_nao_nomeada");
   });

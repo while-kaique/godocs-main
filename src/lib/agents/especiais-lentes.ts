@@ -34,6 +34,7 @@ import {
   TOTAL_AUDITADO,
   type Confianca,
 } from "@/lib/especiais-regua";
+import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
 import { montarBlocoFewShot, type Vizinho } from "@/lib/especial-corpus";
 import { definicaoFuncao, rotuloFuncao } from "@/lib/especiais-funcao";
 import { extrairJson, type AlvoClassificacao } from "@/lib/agents/especial-classificador";
@@ -290,6 +291,27 @@ export function aplicarTetoSemEvidencia(av: AvaliacaoLente): AvaliacaoLente {
  */
 export const MARGEM_ACIMA_DO_GATE = 1;
 
+/**
+ * Quanto um eixo de VALOR com prova **NOMEADA** empresta ao teto quando o gate tem prova só `vaga`.
+ *
+ * ⚠️ **Decisão do Kaique, 27/08/2026, com a medição do T7 na mesa** — afrouxa o gate conjuntivo da
+ * decisão fechada nº 2 do plano ("nada sobe sem recorrência com ponteiro"), e afrouxa DE PROPÓSITO:
+ * com margem 0 para prova `vaga`, **nenhum** dos 48 especiais passou de 2★ numa população onde a
+ * triagem humana dá ≥3★ a 41,7%. Era o caso «Integrações multi-plataforma de CRM» (humana 3): gate
+ * `1/vaga` + alcance `3/nomeada` → teto 1 → nota **1**, com o eixo forte jogado fora.
+ *
+ * ⚠️ **É 1, não a nota cheia do eixo de valor.** Prova nomeada em outro eixo compra ESPAÇO, não a
+ * nota: com `teto = valor_nomeado_max` direto, «Acompanhamento de Mudanças de Preço» (humana 2, gate
+ * `2/vaga`, alcance `4/nomeada`) saltaria para 4★ — trocar um erro de −1 por um de +2. Com 1, os
+ * dois casos caem dentro de ±1, que é o critério que o T7 mede.
+ * ⚠️ Gate com prova **`ausente`** não recebe empréstimo nenhum (segue `aplicarTetoSemEvidencia`):
+ * o que se aceita é ponteiro vago, não ponteiro inexistente.
+ */
+export const MARGEM_VALOR_NOMEADO = 1;
+
+/** Nota que um eixo de valor precisa sustentar para o empréstimo acima valer (fonte única: ≥3). */
+export const NOTA_VALOR_EMPRESTA = LIMIARES_GENEROSIDADE[0];
+
 export type Consolidado = {
   nota_preliminar: number;
   /** A nota da lente estrutural (`null` se ela falhou — aí não há teto). */
@@ -299,6 +321,8 @@ export type Consolidado = {
   teto: number | null;
   /** A maior nota entre as lentes de VALOR (não-gate). */
   valor_max: number;
+  /** A maior nota entre as lentes de VALOR que trouxeram prova NOMEADA (0 se nenhuma). */
+  valor_nomeado_max: number;
   /** Lentes declaradas que não responderam nesta rodada. */
   faltando: string[];
   /** Como a nota saiu, em uma linha — vai para a leitura e para o revisor do T5. */
@@ -326,6 +350,8 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
   const gateAv = porChave.get(LENTE_GATE) ?? null;
   const valor = avaliacoes.filter((a) => a.lente !== LENTE_GATE);
   const valor_max = valor.length ? Math.max(...valor.map((a) => a.nota)) : 0;
+  const nomeadas = valor.filter((a) => a.evidencia === "nomeada");
+  const valor_nomeado_max = nomeadas.length ? Math.max(...nomeadas.map((a) => a.nota)) : 0;
 
   if (!gateAv) {
     const nota = avaliacoes.length ? Math.max(...avaliacoes.map((a) => a.nota)) : 0;
@@ -335,6 +361,7 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
       gate_evidencia: null,
       teto: null,
       valor_max,
+      valor_nomeado_max,
       faltando,
       explicacao: avaliacoes.length
         ? `lente estrutural não respondeu — sem teto; nota = maior lente (${nota})`
@@ -342,7 +369,14 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
     };
   }
 
-  const margem = gateAv.evidencia === "nomeada" ? MARGEM_ACIMA_DO_GATE : 0;
+  // Margem: o gate com prova nomeada empresta 1 (como sempre); com prova só `vaga`, um eixo de
+  // VALOR que sustenta ≥3 COM prova nomeada empresta 1 no lugar dele (ver `MARGEM_VALOR_NOMEADO`).
+  const margem =
+    gateAv.evidencia === "nomeada"
+      ? MARGEM_ACIMA_DO_GATE
+      : gateAv.evidencia === "vaga" && valor_nomeado_max >= NOTA_VALOR_EMPRESTA
+        ? MARGEM_VALOR_NOMEADO
+        : 0;
   const teto = Math.min(NOTA_MAX, gateAv.nota + margem);
   const bruta = Math.max(gateAv.nota, valor_max);
   const nota_preliminar = Math.min(teto, bruta);
@@ -358,6 +392,7 @@ export function consolidarLentes(avaliacoes: AvaliacaoLente[]): Consolidado {
     gate_evidencia: gateAv.evidencia,
     teto,
     valor_max,
+    valor_nomeado_max,
     faltando,
     explicacao,
   };

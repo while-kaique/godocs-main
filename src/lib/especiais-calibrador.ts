@@ -54,6 +54,14 @@ export type EntradaCalibragem = {
   gate_evidencia: Evidencia | null;
   /** Notas das lentes de VALOR (não-gate) que responderam. */
   notas_valor: number[];
+  /**
+   * A maior nota entre os eixos de VALOR com prova **NOMEADA** (0 se nenhum).
+   *
+   * ⚠️ Existe porque o piso de ≥3 passou a aceitar prova nomeada em QUALQUER eixo (decisão do
+   * Kaique, 27/08/2026) — antes só a do gate contava, e isso segurava 100% dos 48 especiais em 2★.
+   * Opcional para não quebrar chamador antigo: ausente = 0 = comportamento de antes.
+   */
+  valor_nomeado_max?: number;
 };
 
 /** Ponte do T3 para cá — evita que o chamador remonte a entrada à mão e erre o `gate`. */
@@ -68,6 +76,7 @@ export function entradaDeConsolidado(
     gate: consolidado.gate,
     gate_evidencia: consolidado.gate_evidencia,
     notas_valor: avaliacoes.filter((a) => a.lente !== LENTE_GATE).map((a) => a.nota),
+    valor_nomeado_max: consolidado.valor_nomeado_max,
   };
 }
 
@@ -105,7 +114,13 @@ export function aplicarPisosDeProva(e: EntradaCalibragem): {
     motivos.push("fora_da_escala");
   }
 
-  if (nota >= NOTA_EXIGE_PROVA_NOMEADA && e.gate_evidencia !== "nomeada") {
+  // ⚠️ A prova nomeada pode vir do gate OU de um eixo de VALOR que sustente ≥3 (decisão do Kaique,
+  // 27/08/2026, medida no T7): exigindo-a só do gate, os 48 especiais ficaram TODOS em 2★, contra
+  // 41,7% de ≥3★ da triagem humana. O que segue proibido é nota alta sem prova nomeada em lugar
+  // nenhum — o piso continua sendo sobre PROVA, não sobre qual eixo a trouxe.
+  const provaNomeada =
+    e.gate_evidencia === "nomeada" || (e.valor_nomeado_max ?? 0) >= NOTA_EXIGE_PROVA_NOMEADA;
+  if (nota >= NOTA_EXIGE_PROVA_NOMEADA && !provaNomeada) {
     nota = NOTA_EXIGE_PROVA_NOMEADA - 1;
     motivos.push("prova_nao_nomeada");
   }
