@@ -46,6 +46,7 @@ import {
   hashTexto,
   selecionarVizinhos,
   type EntradaSemantica,
+  type ExemplarEspecial,
 } from '@/lib/especial-corpus';
 import { avaliarPlausibilidadeFTE, fatorFtePlausibilidade } from '@/lib/agents/analyzer';
 import { avaliarFinanceiro } from '@/lib/agents/avaliacao-financeira';
@@ -214,7 +215,8 @@ export type ResultadoAvaliacaoNormal = {
 type ContextoAvaliacao = {
   dry: boolean;
   resumoPorId: Map<string, ProjetoDashboardResumo>;
-  corpusEmb: Map<string, number[]>;
+  /** Corpus de aprovados JÁ montado — construído UMA vez pelo chamador (não por candidato). */
+  corpus: ExemplarEspecial[];
   embeddings: MapaEmbedding;
 };
 
@@ -282,12 +284,10 @@ async function avaliarComContexto(
     materialidade,
   });
 
-  // ── Voto RAG (vizinhos aprovados) ──
+  // ── Voto RAG (vizinhos aprovados) — corpus JÁ montado no contexto (fora do laço) ──
   const alvo = ctx.embeddings.get(projetoId);
   const vizinhos = alvo
-    ? selecionarVizinhos(alvo.vetor, montarCorpusNormais(vizinhosAprovados(ctx), ctx.corpusEmb), {
-        excluirId: projetoId,
-      })
+    ? selecionarVizinhos(alvo.vetor, ctx.corpus, { excluirId: projetoId })
     : [];
   const rag = avaliarSinalRag(vizinhos);
 
@@ -337,11 +337,6 @@ async function avaliarComContexto(
   };
 }
 
-/** Os resumos de aprovados normais do contexto (para o corpus do RAG). */
-function vizinhosAprovados(ctx: ContextoAvaliacao): ProjetoDashboardResumo[] {
-  return selecionarAprovadosNormais([...ctx.resumoPorId.values()]);
-}
-
 // ─── Um projeto (rota manual / disparo) ────────────────────────────────────────
 
 /**
@@ -368,10 +363,11 @@ export async function avaliarProjetoNormal(
   }
   const ger = await garantirEmbeddings([projetoId], resumoPorId, embeddings, { capGeracao: 1 });
 
+  const corpus = montarCorpusNormais(selecionarAprovadosNormais(resumos), embMapDe(ger.mapa));
   return avaliarComContexto(projetoId, {
     dry: opts.dry ?? false,
     resumoPorId,
-    corpusEmb: embMapDe(ger.mapa),
+    corpus,
     embeddings: ger.mapa,
   });
 }
@@ -458,9 +454,10 @@ export async function avaliarProjetosNormaisPendentes(
   const idsEmbeddar = Array.from(new Set([...candidatos.map((c) => c.id), ...aprovados.map((a) => a.id)]));
   const ger = await garantirEmbeddings(idsEmbeddar, resumoPorId, embeddings, { capGeracao: 60 });
   embeddings = ger.mapa;
-  const corpusEmb = embMapDe(embeddings);
+  // Corpus montado UMA vez (fora do laço de candidatos) — o corpus não depende do candidato.
+  const corpus = montarCorpusNormais(aprovados, embMapDe(embeddings));
 
-  const ctx: ContextoAvaliacao = { dry, resumoPorId, corpusEmb, embeddings };
+  const ctx: ContextoAvaliacao = { dry, resumoPorId, corpus, embeddings };
   const resultados: ResultadoAvaliacaoNormal[] = [];
   let avaliados = 0;
   for (const cand of candidatos) {
