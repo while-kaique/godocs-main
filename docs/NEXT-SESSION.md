@@ -14,6 +14,15 @@
 ⚠️ Revisão GGSD (§9) NÃO rodou nesta sessão.
 
 ## Plano ativo
+
+**→ Canonicalizar a dimensão `area` do rollup pro Gabriel (27/08).** Plano aprovado:
+[docs/plans/rollup-areas-canonicas.md](plans/rollup-areas-canonicas.md) — dedup caixa/acento +
+renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
+(~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
+
+---
+
+### Histórico (planos anteriores desta data)
 **→ DOIS trabalhos vivos nesta data. Regra 7: os dois lados valem — não escolher um.**
 
 ### 1. RAG dos especiais no Pinecone — ✅ **ENTREGUE EM PROD (26/08, ~20:14 UTC)**
