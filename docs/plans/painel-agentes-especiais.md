@@ -360,6 +360,36 @@ recorrência com ponteiro") — é decisão de produto, não calibragem. As opç
 de VALOR com prova nomeada mesmo com gate `vaga`; rever a régua da lente-gate (que dá 1–2 em tudo);
 ou aceitar o critério 1 na 2ª frase (painel = ferramenta de auditoria, classificador segue padrão).
 
+### Tentativa 2 (27/08/2026) — prova nomeada em eixo de VALOR: destravou o teto, NÃO destravou o 3★
+
+Decisão do Kaique com a medição na mesa (afrouxar o gate conjuntivo da decisão fechada nº 2):
+`MARGEM_VALOR_NOMEADO` em `consolidarLentes` + o piso de ≥3 aceitando prova nomeada em QUALQUER eixo
+(`aplicarPisosDeProva`). Commit `d4ad1e3`, 2028 testes.
+
+| | baseline | painel original | +curva (revertida) | +margem emprestada |
+|---|---|---|---|---|
+| MAE | 1,69 | 1,65 | 1,79 | **1,75** |
+| dentro de ±1 | 58,3% | 58,3% | 54,2% | **52,1%** |
+| ≥3★ | 33,3% | 0% | 0% | **0%** |
+| viés | −0,06 | −0,98 | −0,92 | **−0,83** |
+
+**Mexeu no topo** — PIAPP 1★→2★, CTR machine 1★→2★, 4★ passou de −3,67 para −3,33 — mas **nenhum
+projeto chegou a 3★**, e o ±1 caiu. O teto deixou de ser a trava e algo DEPOIS dele segura.
+
+**Suspeito nº 1 para a tentativa 3: o revisor adversarial (decisão fechada nº 4).** Ele revisa **toda
+nota ≥3** com prompt de REFUTAR e, no empate, **mantém a nota MENOR** — se a consolidação libera 3 e o
+revisor derruba, o efeito medido é exatamente este: 0% de ≥3★ com o teto já aberto. ⚠️ **Confirmar
+ANTES de mexer**, com `POST /api/admin/especiais/painel {dry:true, soComNotaHumana:true,
+aplicarCota:false, limite:2..3}` e lendo `nota_lentes` → `nota_pos_prova` → `nota` + `voltas` +
+`encerramento`: se `nota_lentes ≥ 3` e `nota` = 2, é o revisor; se `nota_lentes` continua 1–2, o
+problema é a régua da lente-gate. ⚠️ `limite:6` estourou o tempo da requisição (`Failed to fetch`) —
+usar 2 ou 3.
+
+⚠️ **O diagnóstico ficou pendente por falta de janela na staging:** às **20:13** outra sessão
+deployou a "Frente 1 (doc assíncrona)" no `edf400b4` (version 245) e a rota do painel passou a dar
+**404** — rota commitada ≠ rota no ar. A medição acima já tinha fechado, então os números valem; o
+follow-up precisa de um novo deploy da branch (combinar com quem estiver medindo).
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
