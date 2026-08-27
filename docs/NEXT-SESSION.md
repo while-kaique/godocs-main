@@ -15,7 +15,40 @@
 
 ## Plano ativo
 
-**→ Frente 2 (fatia B): TIME de avaliação — RAG por corpus + Financeiro + Agregador com confiança.**
+**✅ Fatia C CÓDIGO VERDE (27/08, /ggsd:code — commit `77403f9` na branch `feat/agentes-avaliacao-teamc`).**
+Suíte **1999 verde** (1959 baseline + 40 novos), tsc só os 5 erros PRÉ-EXISTENTES, `worker.js` rebuildado. TUDO
+env-gated pelo MASTER `AVALIACAO_NORMAIS` DEFAULT OFF (modo sombra — NADA muda status/veredito de prod; os 5
+entrypoints têm NO-OP antes de qualquer I/O; `analyzer.ts`/`chat.functions.ts`/`decidirStatusSubmissao` INTOCADOS).
+Entregue:
+- **Cético PURO** `src/lib/agents/cetico-avaliacao.ts` (`avaliarCetico`): só REFUTA uma aprovação (anti-bajulação —
+  `em_validacao`/`isento` ficam neutros), 1 sinal por condição-limite (FTE raspando teto·financeiro sem evidência·
+  RAG marginal), `confianca`=lastro (min(1, sinais×0,3)). Teste `tests/cetico-avaliacao.test.ts`.
+- **Deliberação PURA** `src/lib/deliberacao.ts`: `grauConfianca(n)`→alta|media|baixa (peça 3, confiança formalizada,
+  reusa `Confianca` de especiais-regua), `conciliarComCetico` (cético refuta aprovar→rebaixa em_validacao, NUNCA vira
+  aprovar), `avancarDeliberacao` (máquina `deliberando→consenso|nao_consenso|isento`, reducer PURO, idempotente em
+  terminal, bounded `MAX_RODADAS_DELIBERACAO=2`). Teste `tests/deliberacao.test.ts`.
+- **Retroativo PURO** `src/lib/avaliacao-retroativa.ts`: `compararComHumano` (aprovar×aprovado=acerto·em_validacao×
+  aprovado=conservador·**aprovar×reprovado=erro_grave** [as 500h]·resto=sem_base) + `agregarAcuracia` (taxas sobre
+  comparáveis). Teste `tests/avaliacao-retroativa.test.ts`.
+- **Orquestração modo sombra**: `avaliacao-normais.functions.ts` — fiou o cético no painel (`computarVotos` extraído,
+  grava `conciliado` em `projeto_avaliacao` + abre deliberação), extraiu `carregarContextoPainel`/`computarVotosDoProjeto`
+  reusados; `avancarDeliberacoesPendentes` (cron da deliberação). `avaliacao-retroativa.functions.ts`
+  (`avaliarRetroativo`, reusa o painel, grava em `avaliacao_retroativa`, NUNCA toca `projeto_avaliacao`/status).
+- **Schema+DB**: tabelas `deliberacao_avaliacao` + `avaliacao_retroativa` (SEPARADAS, comentários sem `;`,
+  `getDeliberacoesAbertas` só colunas de controle — sem blob); rows+get/upsert em `client.server.ts`.
+- **Worker**: crons `POST /api/cron/deliberar-avaliacoes` + `/api/cron/avaliacao-retroativa` + rotas admin
+  `/api/admin/deliberar-avaliacoes` + `/api/admin/avaliacao-retroativa` (dry default). NO-OP se flag OFF.
+
+⚠️ **§9 revisores NÃO fecharam** (estavam rodando quando o contexto encheu → commit de WIP): marcadores
+`.review-status`/`.quality-status` = **`pendente`** (conservador) → o `/ggsd:ship` BARRA até rodar/gravar os
+vereditos. **RETOMAR:** re-rodar §9.A conformidade + §9.B qualidade + §9.C reuso (pacote: plano `docs/plans/
+agentes-avaliacao-autonomos.md §9` + diff `77403f9` + suíte 1999 + faixa profunda). Achado esperado da qualidade
+(follow-up herdado da B): `getEmbeddingsProjetos()` lê a tabela inteira (risco 32 MiB RPC, só background/cron,
+~4,6 MB hoje) → paginar quando urgir. **PRÓXIMO PASSO após §9:** staging `edf400b4` com `AVALIACAO_NORMAIS=sombra`
+→ rodar as rotas admin dry:false → conferir `deliberacao_avaliacao`/`avaliacao_retroativa` gravando SEM mudar
+Status → Luis valida → só então (fase futura) plugar no status. NÃO deploy/merge/PR sem OK do Luis.
+
+**→ (histórico) Frente 2 fatia B — RAG + Financeiro + Agregador.** (plano `docs/plans/agentes-avaliacao-autonomos.md` Status ✅ aprovado — fatia C.)
 Plano APROVADO (Luis, 27/08): [docs/plans/agentes-avaliacao-autonomos.md](plans/agentes-avaliacao-autonomos.md)
 — fatia B, EM CIMA da fatia A (o `avaliarPlausibilidadeFTE` vira o especialista "Plausibilidade"). Construir:
 (1) RAG p/ projetos NORMAIS — tabela `projeto_embedding` (SEPARADA de `especial_embedding`), reusar o código
