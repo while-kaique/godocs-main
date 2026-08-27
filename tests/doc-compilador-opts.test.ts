@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { docMecanicoLLMOpts, docCompiladorLLMOpts } from '@/lib/agents/doc-modelo';
+import {
+  docMecanicoLLMOpts,
+  docCompiladorLLMOpts,
+  docCompiladorSubmitLLMOpts,
+} from '@/lib/agents/doc-modelo';
 
 // Fatia C — o COMPILADOR da doc deve rodar sempre no modelo escolhido, sem o mini escondido.
 // docCompiladorLLMOpts estende docMecanicoLLMOpts com `semFallbackModelo` + timeout FOLGADO +
@@ -54,5 +58,41 @@ describe('docCompiladorLLMOpts — preserva o modelo na compilação (só no mod
     const opts = docCompiladorLLMOpts();
     expect(opts.model).toBe('luna');
     expect(opts.semFallbackModelo).toBe(true);
+  });
+});
+
+describe('docCompiladorSubmitLLMOpts — perfil FAIL-FAST do submit (não pendura o clique)', () => {
+  afterEach(() => {
+    delete process.env.DOC_COMPILE_ASYNC;
+    delete process.env.DOC_COMPILE_PRESERVAR_MODELO;
+    delete process.env.DOC_COMPILE_SUBMIT_TIMEOUT_MS;
+    delete process.env.DOC_MECANICO_MODEL;
+  });
+
+  it('DOC_COMPILE_ASYNC off → idêntico a docMecanicoLLMOpts (comportamento de hoje)', () => {
+    expect(docCompiladorSubmitLLMOpts()).toEqual(docMecanicoLLMOpts());
+  });
+
+  it('DOC_COMPILE_ASYNC=1 → semFallbackModelo + retriesModelo=0 (SEM retries) + timeout 120s', () => {
+    process.env.DOC_COMPILE_ASYNC = '1';
+    const opts = docCompiladorSubmitLLMOpts();
+    expect(opts.semFallbackModelo).toBe(true);
+    expect(opts.retriesModelo).toBe(0); // fail-fast: 1 tentativa só, sem multiplicar o timeout
+    expect(opts.timeoutMs).toBe(120000);
+  });
+
+  it('nunca herda os retries do perfil folgado (submit ≠ background)', () => {
+    process.env.DOC_COMPILE_ASYNC = '1';
+    process.env.DOC_COMPILE_RETRIES = '3';
+    expect(docCompiladorSubmitLLMOpts().retriesModelo).toBe(0);
+    expect(docCompiladorLLMOpts().retriesModelo).toBe(3);
+  });
+
+  it('respeita DOC_COMPILE_SUBMIT_TIMEOUT_MS e o kill-switch', () => {
+    process.env.DOC_COMPILE_ASYNC = '1';
+    process.env.DOC_COMPILE_SUBMIT_TIMEOUT_MS = '45000';
+    expect(docCompiladorSubmitLLMOpts().timeoutMs).toBe(45000);
+    process.env.DOC_COMPILE_PRESERVAR_MODELO = '0';
+    expect('semFallbackModelo' in docCompiladorSubmitLLMOpts()).toBe(false);
   });
 });

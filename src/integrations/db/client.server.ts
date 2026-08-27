@@ -1077,9 +1077,13 @@ export function getDocumentacao(projetoId: string) {
  * (luna). `json_valid` guarda contra conteúdo não-JSON legado. Bounded por `max`.
  */
 export function getDocsPendentesCompilacao(max = 20) {
+  // ORDER BY updated_at DESC: prioriza as docs pendentes MAIS RECENTES. Uma doc "poison" que
+  // falha sempre não tem o updated_at bumpado no defer, então cai para o fim e NÃO inaniza as
+  // pendentes novas ocupando as vagas do LIMIT (o gotcha de starvation da revisão §9).
   return queryAll<{ projeto_id: string }>(
     `SELECT projeto_id FROM documentacao
       WHERE json_valid(conteudo) AND json_extract(conteudo, '$.compilacao_pendente') = 1
+      ORDER BY updated_at DESC
       LIMIT ?`,
     [max],
   );

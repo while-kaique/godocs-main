@@ -113,6 +113,8 @@ import {
   mergeDocCompilada,
   soCamposDaDoc,
 } from "@/lib/agents/doc-async";
+import { docCompiladorLLMOpts, docCompiladorSubmitLLMOpts } from "@/lib/agents/doc-modelo";
+import type { LLMOptions } from "@/lib/llm";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
   analisarProjeto as analisarProjetoAgent,
@@ -3485,10 +3487,11 @@ function compilarDocSingleFlight(
   projetoId: string,
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
+  llmOpts?: LLMOptions,
 ): Promise<DocumentacaoGerada> {
   const emVoo = compilacoesEmVoo.get(projetoId);
   if (emVoo) return emVoo;
-  const p = compilarDocumentacao(ctx, coletado).finally(() => {
+  const p = compilarDocumentacao(ctx, coletado, llmOpts).finally(() => {
     if (compilacoesEmVoo.get(projetoId) === p) compilacoesEmVoo.delete(projetoId);
   });
   compilacoesEmVoo.set(projetoId, p);
@@ -3557,6 +3560,10 @@ export async function reconciliarDocSePendente(
   projetoId: string,
   conteudo: Record<string, unknown>,
   projeto: NonNullable<Awaited<ReturnType<typeof getProjetoById>>>,
+  // Perfil de LLM da compilação. O SUBMIT passa o FAIL-FAST (docCompiladorSubmitLLMOpts, 0 retries)
+  // p/ o clique não pendurar; o CRON passa o FOLGADO (docCompiladorLLMOpts, retries) por rodar em
+  // background. Ausente → folgado (default seguro).
+  llmOpts?: LLMOptions,
 ): Promise<Record<string, unknown>> {
   if (!precisaCompilarDoc(conteudo)) return conteudo;
 
@@ -3575,7 +3582,7 @@ export async function reconciliarDocSePendente(
     descricao_breve: projeto.descricao_breve ?? null,
   };
   try {
-    const doc = await compilarDocSingleFlight(projetoId, ctxRecompile, coletadoPendente);
+    const doc = await compilarDocSingleFlight(projetoId, ctxRecompile, coletadoPendente, llmOpts);
     await patchDocumentacaoConteudo(projetoId, patchDaDocCompilada(doc, coletadoPendente));
     log("reconciliarDocSePendente", `Doc compilada e reconciliada no submit (projeto ${projetoId}).`);
     // `conteudo` em memória fundido p/ o downstream (Drive/analisador) usar a doc completa.
@@ -3623,7 +3630,13 @@ export async function recompilarDocsPendentes(
       if (!precisaCompilarDoc(conteudo)) continue; // já resolvido entre a query e agora
       const projeto = await getProjetoById(projeto_id);
       if (!projeto) continue;
-      const reconc = await reconciliarDocSePendente(projeto_id, conteudo, projeto);
+      // Cron roda em background → perfil FOLGADO (retries + timeout longo): aqui pode esperar.
+      const reconc = await reconciliarDocSePendente(
+        projeto_id,
+        conteudo,
+        projeto,
+        docCompiladorLLMOpts(),
+      );
       if (precisaCompilarDoc(reconc)) pendentes++;
       else recompilados++;
     } catch (e) {
@@ -3658,7 +3671,14 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   // Reconciliação da doc ASSÍNCRONA: garante a doc compilada ANTES do Drive/analisador,
   // preservando saving/receita; bloqueia se a compilação falhar. Ver reconciliarDocSePendente.
-  conteudo = await reconciliarDocSePendente(projeto_id, conteudo, projeto);
+  // Submit é AWAITED no clique "Enviar" → perfil FAIL-FAST (0 retries, timeout limitado): sob
+  // proxy degradado defere rápido em vez de pendurar a requisição; o cron recompila no folgado.
+  conteudo = await reconciliarDocSePendente(
+    projeto_id,
+    conteudo,
+    projeto,
+    docCompiladorSubmitLLMOpts(),
+  );
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado

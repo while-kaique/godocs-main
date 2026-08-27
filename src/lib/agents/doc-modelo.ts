@@ -61,3 +61,24 @@ export function docCompiladorLLMOpts(): LLMOptions {
     retriesModelo: envIntPositivo("DOC_COMPILE_RETRIES", 3),
   };
 }
+
+/**
+ * Perfil FAIL-FAST para a reconciliação no SUBMIT — o `reconciliarDocSePendente` é AWAITED na
+ * requisição do clique "Enviar para Triagem", então NÃO pode herdar o orçamento folgado do
+ * background (`retriesModelo:3` × `timeoutMs:180s` = ~726s de bloqueio sob proxy degradado — o
+ * achado ALTA da revisão §9). Aqui: **1 tentativa (retriesModelo:0)** e timeout limitado
+ * (`DOC_COMPILE_SUBMIT_TIMEOUT_MS`, default 120s — ainda cabe uma compilação saudável ~88s, mas
+ * sem multiplicar). Se falhar/estourar, o submit DEFERE e o cron recompila com o orçamento folgado.
+ * Continua `semFallbackModelo` (nunca publica doc de mini). Mesmo gating do compilador (só async).
+ */
+export function docCompiladorSubmitLLMOpts(): LLMOptions {
+  const base = docMecanicoLLMOpts();
+  const preservar = (process.env.DOC_COMPILE_PRESERVAR_MODELO ?? "").trim() !== "0";
+  if (!docCompilacaoAssincronaAtiva() || !preservar) return base;
+  return {
+    ...base,
+    semFallbackModelo: true,
+    timeoutMs: envIntPositivo("DOC_COMPILE_SUBMIT_TIMEOUT_MS", 120_000),
+    retriesModelo: 0,
+  };
+}

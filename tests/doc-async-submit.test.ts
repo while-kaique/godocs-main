@@ -107,6 +107,21 @@ describe('reconciliarDocSePendente — submit garante a doc, preserva financeiro
     await expect(reconciliarDocSePendente('r3', conteudo, projetoFake)).rejects.toThrow();
   });
 
+  it('repassa o perfil de LLM (fail-fast do submit) ao compilador', async () => {
+    const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
+    vi.mocked(compilarDocumentacao).mockResolvedValueOnce(DOC_COMPILADA as never);
+    const { reconciliarDocSePendente } = await import('@/lib/chat.functions');
+
+    await seedDoc('r5', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' } });
+    const conteudo = await lerDoc('r5');
+    const opts = { semFallbackModelo: true, retriesModelo: 0, timeoutMs: 120000 };
+    await reconciliarDocSePendente('r5', conteudo, projetoFake, opts);
+
+    // 3º argumento de compilarDocumentacao é o override de opts (0 retries = fail-fast).
+    const args = vi.mocked(compilarDocumentacao).mock.calls[0];
+    expect(args[2]).toMatchObject({ retriesModelo: 0, semFallbackModelo: true });
+  });
+
   it('modo ASYNC + compilação falha → DEFERE (não trava o cliente): NÃO lança, doc fica pendente', async () => {
     process.env.DOC_COMPILE_ASYNC = '1';
     const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
