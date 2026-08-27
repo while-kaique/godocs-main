@@ -322,6 +322,44 @@ de n=2 registrado em 26/08.
 margem ser recalibrada e a corrida repetida — a corrida custa 5 min e 0 intervenção, então medir de
 novo é barato.
 
+### Tentativa 1 (27/08/2026) — RESULTADO NEGATIVO: a curva no prompt da lente NÃO é o lever
+
+Diagnóstico primeiro (`POST /api/admin/especiais/painel` `{dry, soComNotaHumana, aplicarCota:false,
+limite:6}`), que mostrou o mecanismo e derrubou a suspeita registrada em 26/08 (a `MARGEM_ACIMA_DO_GATE`):
+
+- **`nomeada` FUNCIONA** — a maioria das lentes devolve prova nomeada; não é o guard do trecho copiado.
+- **Os pisos de prova nem mordem** — `motivos` volta **vazio** em todos os 6. Quem corta é o **teto da
+  consolidação** (`teto = nota do gate + margem`), antes de o calibrador falar.
+- **A lente-gate dá 1–2 em quase tudo**, e é ela o teto. Exemplo: «Integrações multi-plataforma de CRM»
+  (humana 3) saiu gate `1/vaga` + alcance `3/nomeada` → teto 1 → **nota 1**: o eixo forte é descartado.
+
+A hipótese testada foi que o **prompt** da lente mostrava a `CURVA_BASE` ("≥3★ é top 4% da base … na
+dúvida fique na MENOR") — a população errada, o mesmo erro que o achado 4 corrigiu no calibrador em
+26/08. Trocada pela `CURVA_ESPECIAIS_AUDITADOS` (com a constante movida para `especiais-regua.ts`,
+porque o calibrador importa as lentes e o inverso seria ciclo) e **medida nos mesmos 48 pares**:
+
+| | painel (curva da base) | painel (curva dos especiais) |
+|---|---|---|
+| MAE | 1,65 | **1,79** |
+| dentro de ±1 | 58,3% | **54,2%** |
+| ≥3★ | 0% | **0%** |
+| zeros (viés) | +0,88 | **+1,18** |
+
+**Revertido** (`b7f9266` reverte `e59d959`). Mexeu — os zeros se moveram, então o build estava no ar —
+mas na direção errada, e o teto de 2★ não cedeu. ⚠️ **Não retentar esta hipótese**: a moldura de
+população no prompt não é o que segura o painel.
+
+**O que sobra como trava, para a próxima tentativa** — são DUAS, em série, e qualquer uma sozinha já
+impede o 3★:
+1. `consolidarLentes` (`agents/especiais-lentes.ts:345`): `teto = gate + (nomeada ? 1 : 0)`. Com gate
+   1–2, teto 1–3. Um eixo de valor 4 com prova nomeada não sobe nada.
+2. `aplicarPisosDeProva` (`especiais-calibrador.ts:110`): **≥3 exige prova `nomeada` no eixo
+   ESTRUTURAL**. Mesmo com margem, gate `vaga` volta para 2.
+⚠️ Mexer nisso é mexer na semântica da **decisão fechada nº 2** (gate conjuntivo: "nada sobe sem
+recorrência com ponteiro") — é decisão de produto, não calibragem. As opções são: dar margem ao eixo
+de VALOR com prova nomeada mesmo com gate `vaga`; rever a régua da lente-gate (que dá 1–2 em tudo);
+ou aceitar o critério 1 na 2ª frase (painel = ferramenta de auditoria, classificador segue padrão).
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
