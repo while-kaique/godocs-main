@@ -2,24 +2,28 @@
 // Gabriel) — mesmo modelo do Gomoon (`gomoon-lideres.functions.ts`): POST não-bloqueante que
 // NUNCA lança (quem chama é cron/rota admin).
 //
-// ⚠️ CONTRATO REAL do endpoint do Gabriel (`POST /api/ingest/godocs-metrics`), levantado por
-// sondagem em 27/08/2026 — NÃO é o contrato que a gente tinha codado antes (`grao`/`celulas`):
-//   • DOIS headers, camadas distintas e AMBOS obrigatórios:
-//       - `Authorization: Bearer <gdk_…>`  → fura o OAuth do EDGE do GoDeploy (chave de
-//         PLATAFORMA; sem ela o app dele responde 302 pro login). Secret `JG_INGEST_PLATFORM_TOKEN`.
-//       - `X-Godocs-Token: <godocs_…>`     → autoriza o INGEST dentro do app dele (sem ela, 401).
-//         Secret `JG_INGEST_TOKEN`.
-//   • Corpo: `{ granularity: "month", rollups: [ { period_key, period_start, area, … } ] }`.
-//       - `granularity` ∈ {"month","week"} (só temos mensal).
-//       - por item, VALIDADOS: `period_key` ("2026-07"), `period_start` (ISO "2026-07-01"),
-//         `area`. Os campos de VALOR NÃO são validados (coerção silenciosa lá) — mantemos os
-//         nomes que combinamos (`saving_reais`/`receita_reais`/`num_projetos`/`tipo_saving`).
-//       - `source: "godocs"` é derivado do TOKEN no lado dele — não mandamos no corpo.
-//   • saving e receita CRUS e SEPARADOS (nunca somados), `tipo_saving` cru (o Gabriel normaliza),
-//     SEM total geral da empresa.
+// ⚠️ O que o Gabriel quer é a VISÃO HISTÓRICA CUMULATIVA por ÁREA (27/08): um saving mensal
+// de R$2.000 que começou no mês 5 já rendeu R$6.000 até o 3º mês. Então NÃO mandamos o
+// snapshot "quanto entrou de novo naquele mês" — mandamos, por (mês, área), o ACUMULADO
+// realizado até aquele mês (`montarSerieCumulativa`). Regras de acúmulo por cadência:
+//   • mensal      → valor × (nº de meses desde o início, inclusive)
+//   • pontual     → valor uma vez (fica plano)
+//   • trimestral  → valor × (nº de trimestres decorridos)
+//   • semestral   → valor × (nº de semestres decorridos)
+//   • desconhecido→ uma vez (conservador — nunca infla)
+//   • receita     → mensal recorrente (valor_ganho_mensal acumula todo mês)
+// O mês de INÍCIO é aproximado pelo mês de `submitted_at` (mesma aproximação já documentada).
 //
-// ⚠️ Envs lidas em RUNTIME (nunca no topo do módulo — o Godeploy não tem `process` na avaliação
-// do módulo). Sem `JG_INGEST_URL` (ou sem um dos 2 tokens) o push fica INERTE e diz por quê.
+// ⚠️ CONTRATO REAL do endpoint do Gabriel (`POST /api/ingest/godocs-metrics`, sondado 27/08):
+//   • DOIS headers, ambos obrigatórios:
+//       - `Authorization: Bearer <gdk_…>`  → fura o OAuth do EDGE do GoDeploy. Secret `JG_INGEST_PLATFORM_TOKEN`.
+//       - `X-Godocs-Token: <godocs_…>`     → autoriza o INGEST no app dele. Secret `JG_INGEST_TOKEN`.
+//   • Corpo: `{ granularity: "month", rollups: [ { period_key, period_start(ISO), area, … } ] }`.
+//     Por item, VALIDADOS: `period_key` ("2026-07"), `period_start` (ISO), `area`. Os valores
+//     NÃO são validados (coerção silenciosa lá) — mandamos `saving_reais`/`receita_reais`
+//     (ACUMULADOS) + `num_projetos` (ativos até o mês). `source:"godocs"` ele deriva do token.
+//
+// ⚠️ Envs lidas em RUNTIME. Sem `JG_INGEST_URL` (ou sem um dos 2 tokens) o push fica INERTE.
 
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { lerRollupMensal } from "@/integrations/db/client.server";
@@ -28,30 +32,38 @@ import { getGodocsEnv } from "@/lib/env";
 const TIMEOUT_MS = 20_000;
 const log = (...a: unknown[]) => console.log("[rollupPush]", ...a);
 
-/** Uma linha do rollup no formato que o app do Gabriel valida/persiste. */
+/** Célula bruta do rollup mensal (o que `lerRollupMensal` devolve). `periodo` = mês de início. */
+export type CelulaRollup = {
+  periodo: string; // "YYYY-MM" (mês de submissão ≈ início do ganho)
+  area: string;
+  tipo_saving: string;
+  saving_reais: number;
+  receita_reais: number;
+  num_projetos: number;
+};
+
+/** Linha da série CUMULATIVA por (mês, área) — o acumulado realizado até aquele mês. */
+export type LinhaCumulativa = {
+  periodo: string; // "YYYY-MM"
+  area: string;
+  saving_reais: number; // ACUMULADO até este mês
+  receita_reais: number; // ACUMULADO até este mês
+  num_projetos: number; // projetos ativos até este mês
+};
+
+/** Uma linha no formato que o app do Gabriel valida/persiste. */
 export type RollupItem = {
   period_key: string; // "2026-07"
   period_start: string; // "2026-07-01" (ISO, VALIDADO no lado dele)
   area: string;
-  tipo_saving: string; // cru — o Gabriel normaliza
-  saving_reais: number;
-  receita_reais: number;
+  saving_reais: number; // acumulado
+  receita_reais: number; // acumulado
   num_projetos: number;
 };
 
 export type PayloadRollup = {
   granularity: "month";
   rollups: RollupItem[];
-};
-
-/** Célula bruta do rollup mensal (o que `lerRollupMensal` devolve). */
-export type CelulaRollup = {
-  periodo: string; // "YYYY-MM"
-  area: string;
-  tipo_saving: string;
-  saving_reais: number;
-  receita_reais: number;
-  num_projetos: number;
 };
 
 export type ResultadoPush = {
@@ -66,41 +78,110 @@ export type ResultadoPush = {
   payload?: PayloadRollup;
 };
 
-/** "2026-07" → "2026-07-01" (primeiro dia do mês, ISO). Idempotente se já vier com dia. */
+/** "2026-07" → índice absoluto de mês (ano*12 + mês0). */
+function indiceMes(periodo: string): number {
+  const [y, m] = periodo.split("-").map(Number);
+  return y * 12 + (m - 1);
+}
+/** índice → "YYYY-MM". */
+function mesDeIndice(i: number): string {
+  const y = Math.floor(i / 12);
+  const m = (i % 12) + 1;
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+/** "2026-07" → "2026-07-01" (primeiro dia do mês, ISO). Idempotente. */
 export function inicioDoMesIso(periodo: string): string {
   const m = /^(\d{4})-(\d{2})/.exec(periodo);
   return m ? `${m[1]}-${m[2]}-01` : periodo;
 }
+const arred2 = (x: number) => Math.round(x * 100) / 100;
 
-/** Monta o contrato do endpoint do Gabriel a partir das células (PURA — sem I/O, sem token). */
-export function montarPayloadRollup(celulas: CelulaRollup[]): PayloadRollup {
+/** Quantas vezes o valor de uma cadência já foi realizado após `dm` meses desde o início. */
+function fatorAcumulo(tipoSaving: string, dm: number): number {
+  switch (tipoSaving) {
+    case "mensal":
+      return dm + 1;
+    case "trimestral":
+      return Math.floor(dm / 3) + 1;
+    case "semestral":
+      return Math.floor(dm / 6) + 1;
+    case "pontual":
+      return 1;
+    default:
+      return 1; // cadência desconhecida → conta uma vez, nunca infla
+  }
+}
+
+/**
+ * Expande as células do rollup na série CUMULATIVA por (mês, área): para cada mês do início da
+ * área até `mesCorrente`, soma o ganho realizado até ali. PURA — sem I/O. Meses sem projeto
+ * ainda ativo (acúmulo zero e sem projeto) são omitidos.
+ */
+export function montarSerieCumulativa(
+  celulas: CelulaRollup[],
+  mesCorrente: string,
+): LinhaCumulativa[] {
+  if (celulas.length === 0) return [];
+  const fim = indiceMes(mesCorrente);
+  const areas = [...new Set(celulas.map((c) => c.area))];
+  const linhas: LinhaCumulativa[] = [];
+  for (const area of areas) {
+    const daArea = celulas.filter((c) => c.area === area);
+    const inicio = Math.min(...daArea.map((c) => indiceMes(c.periodo)));
+    for (let mi = inicio; mi <= fim; mi++) {
+      let saving = 0;
+      let receita = 0;
+      let projetos = 0;
+      for (const c of daArea) {
+        const si = indiceMes(c.periodo);
+        if (si > mi) continue;
+        const dm = mi - si;
+        saving += c.saving_reais * fatorAcumulo(c.tipo_saving, dm);
+        receita += c.receita_reais * (dm + 1); // receita é mensal recorrente
+        projetos += c.num_projetos;
+      }
+      if (projetos === 0 && saving === 0 && receita === 0) continue;
+      linhas.push({
+        periodo: mesDeIndice(mi),
+        area,
+        saving_reais: arred2(saving),
+        receita_reais: arred2(receita),
+        num_projetos: projetos,
+      });
+    }
+  }
+  return linhas;
+}
+
+/** Monta o contrato do endpoint do Gabriel a partir da série cumulativa (PURA). */
+export function montarPayloadRollup(linhas: LinhaCumulativa[]): PayloadRollup {
   return {
     granularity: "month",
-    rollups: celulas.map((c) => ({
-      period_key: c.periodo,
-      period_start: inicioDoMesIso(c.periodo),
-      area: c.area,
-      tipo_saving: c.tipo_saving,
-      saving_reais: c.saving_reais,
-      receita_reais: c.receita_reais,
-      num_projetos: c.num_projetos,
+    rollups: linhas.map((l) => ({
+      period_key: l.periodo,
+      period_start: inicioDoMesIso(l.periodo),
+      area: l.area,
+      saving_reais: l.saving_reais,
+      receita_reais: l.receita_reais,
+      num_projetos: l.num_projetos,
     })),
   };
 }
 
 /**
- * Recomputa o rollup (do espelho, para mandar dado FRESCO) e empurra para o Gabriel.
- * `dry:true` monta e devolve o payload SEM enviar. Nunca lança.
+ * Recomputa o rollup (do espelho, dado FRESCO), expande na série cumulativa até o mês corrente
+ * e empurra para o Gabriel. `dry:true` monta e devolve o payload SEM enviar. Nunca lança.
  */
 export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<ResultadoPush> {
   const ambiente = getGodocsEnv() === "staging" ? "staging" : "producao";
-  const geradoEm = new Date().toISOString();
+  const agora = new Date();
+  const geradoEm = agora.toISOString();
+  const mesCorrente = `${agora.getUTCFullYear()}-${String(agora.getUTCMonth() + 1).padStart(2, "0")}`;
 
   // Dado fresco: recomputa do espelho antes de enviar (idempotente).
   try {
     await recalcularRollupBackfill();
   } catch (e) {
-    // Se o recompute falhar, ainda enviamos o que estiver persistido (não trava o push).
     log("recompute falhou, seguindo com o rollup persistido:", e instanceof Error ? e.message : e);
   }
 
@@ -113,14 +194,15 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
     receita_reais: c.receita_reais,
     num_projetos: c.num_projetos,
   }));
-  const payload = montarPayloadRollup(celulas);
-  const areas = new Set(celulas.map((c) => c.area)).size;
+  const serie = montarSerieCumulativa(celulas, mesCorrente);
+  const payload = montarPayloadRollup(serie);
+  const areas = new Set(serie.map((l) => l.area)).size;
   const base: ResultadoPush = {
     ok: false,
     dry: opts.dry,
     ambiente,
     gerado_em: geradoEm,
-    celulas: celulas.length,
+    celulas: serie.length,
     areas,
   };
 
@@ -130,7 +212,6 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
   const platformToken = (process.env.JG_INGEST_PLATFORM_TOKEN || "").trim(); // gdk_… (Authorization)
   const ingestToken = (process.env.JG_INGEST_TOKEN || "").trim(); // godocs_… (X-Godocs-Token)
   if (!url) {
-    // Estado ESPERADO até o Gabriel entregar a URL — inerte, não é erro de execução.
     log("JG_INGEST_URL não configurada — payload NÃO enviado (aguardando o endpoint do Gabriel).");
     return { ...base, erro: "JG_INGEST_URL não configurada." };
   }
@@ -145,9 +226,7 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
 
   const resp = await postJG(url, platformToken, ingestToken, payload);
   if (resp.erro) return { ...base, status: resp.status, erro: resp.erro };
-  log(
-    `enviado (${ambiente}): ${celulas.length} célula(s), ${areas} área(s) — HTTP ${resp.status}`,
-  );
+  log(`enviado (${ambiente}): ${serie.length} linha(s), ${areas} área(s) — HTTP ${resp.status}`);
   return { ...base, ok: true, status: resp.status };
 }
 
