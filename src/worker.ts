@@ -61,6 +61,11 @@ import {
   sincronizarPineconeEspeciais,
   reauditarEspeciais,
 } from "@/lib/especial-classificador.functions";
+import {
+  avaliarProjetoNormalEmBackground,
+  avaliarProjetoNormal,
+  avaliarProjetosNormaisPendentes,
+} from "@/lib/avaliacao-normais.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
@@ -201,12 +206,16 @@ function analisarEmBackground(projetoId: string): Promise<unknown> {
   );
 }
 
-// Análise + classificação de especiais, ambas em background. O classificador é NO-OP se o
-// projeto não for especial e nunca lança (ver classificarEspecialEmBackground).
+// Análise + classificação de especiais + time autônomo de avaliação de normais, TODAS em
+// paralelo (Promise.allSettled). O classificador de especiais é NO-OP se o projeto não for
+// especial; a avaliação de normais (3ª promise) é NO-OP se a flag AVALIACAO_NORMAIS está OFF
+// (default) ou se o projeto é especial — e em MODO SOMBRA só grava a recomendação, nunca muda o
+// status. Nenhuma das três lança (cada uma engole os próprios erros).
 function processarPosSubmissao(projetoId: string): Promise<unknown> {
   return Promise.allSettled([
     analisarEmBackground(projetoId),
     classificarEspecialEmBackground(projetoId),
+    avaliarProjetoNormalEmBackground(projetoId),
   ]);
 }
 
@@ -319,6 +328,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await classificarEspeciaisPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron irmão: time autônomo de avaliação de NORMAIS (fatia B, MODO SOMBRA) ──
+    // Rede do disparo pós-submissão + mantém os embeddings do corpus de aprovados em dia.
+    // NO-OP se AVALIACAO_NORMAIS está OFF (default). Grava a recomendação em `projeto_avaliacao`,
+    // NUNCA muda o status. Bounded por corrida (idempotente, converge em várias).
+    if (pathname === "/api/cron/avaliar-normais" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avaliarProjetosNormaisPendentes({ dry: false, limite: 10 }));
     }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
@@ -832,6 +852,25 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           limite: body.limite,
           forcar: body.forcar,
         }),
+      );
+    }
+
+    // ── Time autônomo de avaliação de NORMAIS (fatia B, MODO SOMBRA) — rotas manuais ──
+    // Avalia UM projeto normal (RAG + FTE + Financeiro → Agregador). `dry` não grava. NO-OP se
+    // AVALIACAO_NORMAIS OFF ou se o projeto é especial. NUNCA muda o status (só grava recomendação).
+    if (pathname === "/api/admin/avaliar-normais" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoId?: string; dry?: boolean };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(await avaliarProjetoNormal(body.projetoId, { dry: body.dry }));
+    }
+    // Backfill: avalia os normais SEM recomendação + mantém os embeddings do corpus. `dry` é o
+    // DEFAULT (gravar exige {"dry":false}); `limite` limita a corrida.
+    if (pathname === "/api/admin/avaliar-normais-pendentes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(
+        await avaliarProjetosNormaisPendentes({ dry: body.dry, limite: body.limite }),
       );
     }
 

@@ -47,29 +47,33 @@ sombra) — não muda prod até validar. Worktree `~/godocs-wt-agentes-teamB`, b
 - **Testes RED→verde** (test-writer isolado): `tests/avaliacao-financeira.test.ts` (9 casos) +
   `tests/agregador-avaliacao.test.ts` (avaliarSinalRag a–d + agregarVotos e–m).
 
-**PRÓXIMO PASSO — Fatia B PARTE 2 (a próxima sessão de código):**
-1. **Orquestrador** `src/lib/avaliacao-normais.functions.ts` (irmão de `especial-classificador.functions.ts`):
-   env-gate LAZY `AVALIACAO_NORMAIS` (default OFF → NO-OP total); `avaliarProjetoNormalEmBackground(id)`
-   (NO-OP se OFF ou `especial===1`) + `avaliarProjetosNormaisPendentes({dry,limite})` (backfill/cron).
-   Fluxo: embed do ALVO (reusar `gerarEmbeddingsLote`/`textoParaEmbedding`/`hashTexto`/`recortarTexto`
-   de `embeddings.ts`+`especial-corpus.ts`) → corpus de APROVADOS normais (do espelho: `!especial &&
-   statusChave==='aprovado' && !descontinuado`, via `lerResumosEspelho`+`mapResumo`; label
-   `estrela_humana=1` como marcador positivo p/ reusar `selecionarVizinhos`) → `avaliarSinalRag` →
-   `avaliarPlausibilidadeFTE`+`avaliarFinanceiro` → `agregarVotos` → `upsertAvaliacaoNormal` (SOMBRA:
-   grava, NÃO muda status). Dados do projeto: `getProjetoById`+`getDocumentacao`(conteudo saving/receita)
-   +`getProjetoContextoData`+`getDocumentacaoConteudo`. FTE/financeiro inputs = mesmos de `analisarProjetoFn`
-   (membros.length+1 pessoas; horas de `saving.economia_horas_mes`/linhas; `custo_evitado_itens`).
-2. **Worker** (`src/worker.ts`): 3ª promise no `Promise.allSettled` de `processarPosSubmissao`
-   (`avaliarProjetoNormalEmBackground`); cron `POST /api/cron/avaliar-normais` (header `x-godeploy-cron`,
-   `{dry:false,limite:10}`); admin `POST /api/admin/avaliar-normais` (1 projeto) + `/api/admin/avaliar-normais-pendentes`
-   (dry default) — padrão das rotas `especiais/classificar*`. Import do orquestrador no topo.
-3. `npm run build:worker` + commitar `worker.js` (regra 1 — só depois do worker.ts alterado).
-4. **§9 revisores** (conformidade + qualidade) sobre o diff COMPLETO da fatia B — **PENDENTE**, ver ressalva abaixo.
-5. Staging (`edf400b4`) com `AVALIACAO_NORMAIS` ligado em sombra → validar `projeto_avaliacao` gravando
-   sem mudar status → Luis valida → só então (fase futura) plugar no status.
+**✅ Fatia B — PARTE 2 CÓDIGO VERDE (27/08, cont. da sessão /ggsd:code — commits na branch):** suíte
+**1959 verde** (1944 + 15 novos), `build:worker` ok, tsc só os 5 erros PRÉ-EXISTENTES. Entrou:
+- **Corpus/config PURO** `src/lib/avaliacao-corpus.ts`: `avaliacaoNormaisAtiva(raw)` (**DEFAULT OFF** —
+  invariante testado), `selecionarAprovadosNormais` (`!especial && statusChave==='aprovado'` = veredito
+  HUMANO), `montarCorpusNormais` (marca `estrela_humana=ROTULO_APROVADO=1` p/ reusar `selecionarVizinhos`).
+  Teste RED→verde `tests/avaliacao-corpus.test.ts` (15 casos, test-writer isolado).
+- **Orquestrador** `src/lib/avaliacao-normais.functions.ts` (modo SOMBRA, env-gate LAZY
+  `avaliacaoNormaisLigada`): `avaliarProjetoNormal(id,{dry})` + `avaliarProjetoNormalEmBackground(id)`
+  (NO-OP se OFF ou especial) + `avaliarProjetosNormaisPendentes({dry,limite})` (backfill idempotente,
+  bounded). RAG ao vivo: gera embeddings via `embeddings.ts` (direto OpenAI), popula `projeto_embedding`,
+  `selecionarVizinhos` dos aprovados → `avaliarSinalRag`; + FTE + Financeiro → `agregarVotos` →
+  `upsertAvaliacaoNormal` (grava recomendação/confiança; **NUNCA muda status**). Origem `agregador-normais`.
+- **Worker** (`src/worker.ts`): 3ª promise no `processarPosSubmissao` (`avaliarProjetoNormalEmBackground`,
+  paralelo a análise+especial, NO-OP p/ especiais); cron `POST /api/cron/avaliar-normais` (header cron);
+  admin `POST /api/admin/avaliar-normais` (1 projeto) + `/api/admin/avaliar-normais-pendentes` (dry default).
+  `worker.js` rebuildado + commitado.
 
-⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` = `pendente`): o
-`/ggsd:ship` vai **barrar** até a revisão de contexto fresco rodar sobre o diff completo da fatia B.
+**⚠️ §9 revisores FALHARAM por RATE-LIMIT (429), NÃO por código** — os 3 (conformidade/qualidade/reuso)
+foram disparados mas morreram no limite de sessão (resetou 19:40 BRT); os marcadores seguem `pendente`.
+O código está VERDE e type-clean. **PRÓXIMO PASSO: re-rodar os 3 revisores §9 sobre o diff completo da
+fatia B** (`git diff f93af11^` ou o range do commit atual) → gravar `.review-status`/`.quality-status` →
+o `/ggsd:ship` só passa depois. Depois: **staging** (`edf400b4`) com `AVALIACAO_NORMAIS` ligado em sombra
+→ validar `projeto_avaliacao` gravando sem mudar status → Luis valida. **Fatia C** (cético + deliberação
+multi-turno + retroativo) fica para depois, com o Kaique.
+
+⚠️ **RESSALVA — revisão GGSD (§9) NÃO concluiu** (rate-limit; `.review-status`/`.quality-status` =
+`pendente`): o `/ggsd:ship` vai **barrar** até re-rodar os revisores sobre o diff da fatia B.
 Rodar na PARTE 2, com o orquestrador+worker prontos.
 
 **Contexto multi-frente (27/08):** rodada de 2 frentes independentes via Herdr. Esta = **Frente 2**. A
