@@ -1,5 +1,16 @@
 # NEXT-SESSION
 
+## Próximo passo (27/08 — correção do push do rollup pro Gabriel)
+**Deployar o fix `fix/rollup-push-contrato-jg` na STAGING (`edf400b4`) com os 3 secrets e validar o envio real → depois prod + PR.** Branch `fix/rollup-push-contrato-jg` (commit `62d579b`), suíte **1890 verde**, worker buildado, NÃO deployado.
+
+**O que foi corrigido:** o push (`rollup-push.functions.ts`) mandava o contrato ERRADO — o endpoint real do Gabriel (`POST https://squad-intelligence.devgogroup.com/api/ingest/godocs-metrics`, sondado ao vivo) espera `{granularity:"month", rollups:[{period_key, period_start(ISO), area, tipo_saving, saving_reais, receita_reais, num_projetos}]}` e **DOIS headers obrigatórios**: `Authorization: Bearer <gdk_…>` (fura o edge do GoDeploy) + `X-Godocs-Token: <godocs_…>` (autoriza o ingest). Antes: só `Authorization` + corpo `grao/celulas` → 400/401. Smoke real com o formato novo: `recebidos:3, gravados:3`.
+
+**Secrets (staging E prod, mudaram):** `JG_INGEST_URL` = a URL acima · `JG_INGEST_PLATFORM_TOKEN` = `gdk_AAVW17DAT2KX58Z9MZD4MX` (NOVO) · `JG_INGEST_TOKEN` = `godocs_d0B2CDdhuCE5tY-kGseyVjlEy-Y761DEDwAY-j8Z-okwndK2` (SUBSTITUI o `gdk_ingest_e85f…` obsoleto).
+
+**Confirmar com o Gabriel (2, não dá pra adivinhar):** (1) os valores caíram nas colunas certas (smoke `SMOKE-GODOCS saving_reais 7777.77` — não zerou?) — o endpoint NÃO valida campos de valor, coerção calada; (2) o ingest é **upsert** por `(period_key,area,tipo_saving)` e não **append** — o cron manda o rollup INTEIRO todo dia, append duplicaria. Limpar do banco dele as áreas de teste: `TESTE`, `T`, `AUTHTEST`, `ECHOTEST`, `TESTE-INTEGRACAO`, `SMOKE-GODOCS`, `SMOKE-CX`.
+
+⚠️ Revisão GGSD (§9) NÃO rodou nesta sessão.
+
 ## Plano ativo
 **→ DOIS trabalhos vivos nesta data. Regra 7: os dois lados valem — não escolher um.**
 
