@@ -54,15 +54,22 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 >   regressão do fallback antigo), `tests/doc-compilador-opts.test.ts` (flag/kill-switch/defaults),
 >   defer no `tests/doc-async-submit.test.ts`, query+cron em `tests/doc-async-race.test.ts`. **Suíte 1965
 >   verde** (+11); tsc só os 5 pré-existentes; `worker.js` rebuildado. Commit `82bbc4e`.
-> - ⚠️ **Revisão §9 NÃO re-rodou** para o diff da fatia C — os marcadores foram postos em `pendente`
->   (o diff mudou desde a revisão de `0219c23`); `/ggsd:ship` **barra** até rodar `ggsd:revisor-qualidade`
->   (foco: mudança no fallback/timeout — caminho sensível) + `ggsd:verificador-conformidade` sobre `82bbc4e`.
+> - ✅ **Revisão §9 FECHADA (HEAD `380c438`):** conformidade `conforme` (0.95) · qualidade `sugestoes`
+>   (0.92, saiu de `bloqueio`). O bloqueio ALTA (timeout folgado 180s×3 vazava p/ o submit → ~726s de
+>   hang) foi corrigido: o submit usa `docCompiladorSubmitLLMOpts` (**fail-fast: retriesModelo=0 + timeout
+>   120s**) e defere; background/cron seguem no folgado (`docCompiladorLLMOpts`). Achado baixa mitigado
+>   (`ORDER BY updated_at DESC` em `getDocsPendentesCompilacao`). `.review-status=conforme`,
+>   `.quality-status=sugestoes` → **gates não barram o ship**. Commits: `82bbc4e` (fatia C) + `380c438` (fix §9).
+> - ⚠️ **Sugestão baixa em aberto (opcional, não barra):** o param `llmOpts?` de `reconciliarDocSePendente`/
+>   `compilarDocumentacao` defaulta ao perfil FOLGADO — um futuro chamador awaited que esqueça o param
+>   reintroduziria o hang. Defensivo: inverter o default para fail-fast e o background/cron optar pelo folgado.
 >
-> **PRÓXIMO PASSO (fatia C):** (1) rodar os revisores §9 (conformidade + qualidade) sobre `82bbc4e` e
-> gravar os marcadores; (2) staging (`edf400b4`) com `DOC_COMPILE_ASYNC=1` (+ `DOC_MECANICO_MODEL=luna` p/
-> exercitar a preservação; opcionais `DOC_COMPILE_TIMEOUT_MS`/`DOC_COMPILE_RETRIES`) e **registrar o cron
-> `POST /api/cron/recompilar-docs-pendentes`** no Godeploy; validar que a doc grande sai no luna (logs sem
-> `fallback … gpt-5.4-mini` na compilação) e que o cliente nunca trava; (3) prod + merge no main pelo Luis.
+> **PRÓXIMO PASSO (fatia C):** (1) staging (`edf400b4`) com `DOC_COMPILE_ASYNC=1` (+ `DOC_MECANICO_MODEL=luna`
+> p/ exercitar a preservação; opcionais `DOC_COMPILE_TIMEOUT_MS`/`DOC_COMPILE_RETRIES`/`DOC_COMPILE_SUBMIT_TIMEOUT_MS`/
+> `DOC_COMPILE_PRESERVAR_MODELO`) e **registrar o cron `POST /api/cron/recompilar-docs-pendentes`** no Godeploy;
+> validar que a doc grande sai no luna (logs sem `fallback … gpt-5.4-mini` na compilação), que o clique "Enviar"
+> não pendura sob proxy lento, e que a doc é garantida (background/cron); (2) prod + merge no main pelo Luis.
+> (Opcional: aplicar a sugestão baixa do default fail-fast.)
 >
 > _(Abaixo: estado da fatia A+B corrigida — race §9 — mantido como referência.)_
 
