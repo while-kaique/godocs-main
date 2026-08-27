@@ -20,6 +20,23 @@
 renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
 (~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
 
+**STATUS (27/08): CÓDIGO PRONTO, NÃO DEPLOYADO.** Branch `fix/rollup-areas-canonicas` (off
+`origin/main` @1834db6), worktree `~/godocs-wt-areas-rollup`, commit `9352e34`. Suíte **1899 verde**,
+build + worker OK. **Validado contra o payload REAL de prod (dry-run)**: 41 → **30 áreas**, saving e
+receita totais idênticos ao centavo (nada descartado). Luis já aprovou as decisões de mapeamento
+(Produto/Operações/Finanças genéricos; 4 pequenos e os 2 não-área mantidos; renomes AZ→AZ Buy,
+CSC→Projetos/CSC, JURIDICO→Jurídico/Compliance, FP&A→FP&A e Tesouraria).
+
+**PRÓXIMO PASSO:** aguardando **OK do Luis** na lista final de 30 áreas (mostrada no chat). Com o OK:
+deploy STAGING `edf400b4` → `sync-sheets-now` → `rollup-backfill` → dry-run `rollup-push` (conferir ~30
+áreas + totais) → prod `674a3710` → PR via `LuisEduardo100` (regra 14). ⚠️ O cron diário de prod
+(`2aysp914qg9r`) passa a empurrar a lista limpa pro app do Gabriel assim que prod subir.
+
+⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
+`/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
+
+---
+
 ---
 
 ### Histórico (planos anteriores desta data)
