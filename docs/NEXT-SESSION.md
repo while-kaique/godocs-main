@@ -29,31 +29,27 @@ OUTRO worktree (`~/godocs-wt-doc-async`) — não colidir. Os worktrees do JG ro
 (`~/godocs-wt-classificador`, `~/godocs-wt-rag-especial`) seguem em paralelo — NÃO tocar. Fatias B/C do
 plano ficam para depois. Staging antes de prod (regra 13); parar na staging para o Luis validar.
 
-**🚧 WIP mid-TDD (27/08, sessão /ggsd:code — RED confirmado, implementação PENDENTE):** a fatia A ficou
-**no vermelho de propósito** (fim de janela de contexto). O que já está na branch `feat/agentes-avaliacao-fte`:
-- **Interface + stub** de `avaliarPlausibilidadeFTE` em `src/lib/agents/analyzer.ts` (irmã de
-  `normalizarClassificacao`/`decidirStatusSubmissao`, logo antes dela) + constantes exportadas
-  `FATOR_FTE_PADRAO = 1.5` e `HORAS_BASE_FTE = 220`. O stub retorna sempre `{implausivel:false, fte:0, pessoas:0, motivo:null}`.
-- **Teste RED** `tests/plausibilidade-fte.test.ts` (autorado pelo `ggsd:test-writer` isolado, cego à
-  implementação): **5 falham / 10 passam** — as 5 que falham exigem o comportamento novo (caso 500h enfileira;
-  FTE ≈ 2,27; kill-switch por fator; `pessoasDeclaradas` 0/ausente → assume ≥1). Documentação da interface e
-  dos invariantes está no docstring da função.
-- Ajuste de docs: o `Status:` do plano foi normalizado para `**Status:** aprovado …` (o hook `plan-gate.sh`
-  não lia o formato antigo `> Status: **✅ aprovado**` — a aprovação do Luis segue intacta).
+**✅ Fatia A CÓDIGO VERDE (27/08, sessão /ggsd:code — commits `b06e07e` RED + `71ccbb0` green):** o detector
+determinístico de FTE está implementado e fiado, suíte **1920 verde**, `worker.js` rebuildado (regra 1). Na
+branch `feat/agentes-avaliacao-fte`:
+- **`avaliarPlausibilidadeFTE`** (PURA) + `fatorFtePlausibilidade()` (env LAZY `FTE_FATOR_IMPLAUSIVEL`;
+  ausente→1.5 ativo, `off`/≤0→desligado) + constantes `FATOR_FTE_PADRAO=1.5`/`HORAS_BASE_FTE=220` em
+  `src/lib/agents/analyzer.ts`. Regras: fte=`horas/220`, implausível se `fte>pessoas*fator`; especial/
+  fluxoDireto/temMultiplo/sem-horas isentos; motivo legível PT-BR sempre que dispara.
+- **Consumido em `analisarProjeto`**: implausível & !`claro_nao` → rebaixa `claro_sim`→`zona_cinzenta` +
+  enriquece a justificativa com o motivo. **Gate em `analisarProjetoFn`** (ao lado do de materialidade):
+  implausível & status seria `aprovado` → força `em_validacao`/"Pendente".
+- **Teste** `tests/plausibilidade-fte.test.ts` (15 casos, autorado pelo `ggsd:test-writer` isolado) — verde.
 
-**PRÓXIMO PASSO (retomar aqui):** (1) implementar a lógica real de `avaliarPlausibilidadeFTE` até o **verde**
-dos 15 casos (NÃO enfraquecer o teste); regras no docstring: fte=`horasTotais/horasBase`, implausível se
-`fte > pessoas*fator`; especial/fluxoDireto/temMultiplo/sem-horas → nunca implausível; fator≤0 ou não-finito →
-kill-switch; pessoas≤0 → 1; motivo legível PT-BR sempre que dispara. (2) **Consumir** em `analisarProjeto`
-(`analyzer.ts:~735`, ao lado de `normalizarClassificacao` — computar `horasTotais` de `conteudo.saving`
-(`economia_horas_mes`), `pessoasDeclaradas` = `membros.length + 1` (autor), `temMultiplo` de
-`saving.teto_pessoa==='multiplo'`, `especial`/`ehLider` já disponíveis; implausível & !isento → rebaixar
-`classificacao_avaliacao` `claro_sim`→`zona_cinzenta` e enriquecer a justificativa com o motivo). (3) **Gate**
-em `analisarProjetoFn` (`chat.functions.ts:~3164`, ao lado do de materialidade — recomputar e, se implausível
-& !especial & !lider & status seria `aprovado`, forçar `em_validacao`/"Pendente"). ⚠️ Ler o **fator do env LAZY
-dentro de função** (nunca em escopo de módulo). (4) `npm run test` verde + `npm run build:worker` + commitar
-`worker.js` (regra 1). (5) §8.1 medir faixa + §9 revisores (marcadores `.review-status`/`.quality-status`
-seguem **`pendente`** — o `/ggsd:ship` vai BARRAR o envio até a revisão de contexto fresco rodar).
+**PENDÊNCIA (destravar antes do `/ggsd:ship`):** os **revisores §9 de contexto fresco** (conformidade RF-37 +
+qualidade RF-27) foram **DESPACHADOS mas os vereditos não foram integrados** (fim de janela de contexto) — os
+marcadores `.claude/.review-status` e `.claude/.quality-status` seguem **`pendente`**, então o `/ggsd:ship`
+vai **BARRAR o envio** até rodá-los. Retomar: rodar `/ggsd:code` §9 (invocar `ggsd:verificador-conformidade`
+e `ggsd:revisor-qualidade` sobre `git diff origin/main -- src/lib/agents/analyzer.ts src/lib/chat.functions.ts
+tests/plausibilidade-fte.test.ts`, ignorar `worker.js`) e gravar os vereditos nos marcadores.
+
+**Depois disso:** staging (`edf400b4`) → validar com projeto absurdo (ex.: 500h/1 pessoa vai p/ "Pendente") →
+prod (`674a3710`) + merge `main` (regra 14) + atualizar CLAUDE.md/spec. Fatias B/C ficam para depois.
 
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
