@@ -1,44 +1,57 @@
 // Push OUTBOUND do rollup histórico de saving/receita para o app do squad Intelli (João
-// Gabriel) — mesmo modelo do Gomoon (`gomoon-lideres.functions.ts`): POST com o token no
-// header `Authorization: Bearer`, NUNCA lança (quem chama é cron/rota admin), `ambiente`
-// derivado do `GODOCS_ENV` (fonte única) para o lado deles rotear staging × produção.
+// Gabriel) — mesmo modelo do Gomoon (`gomoon-lideres.functions.ts`): POST não-bloqueante que
+// NUNCA lança (quem chama é cron/rota admin).
 //
-// ⚠️ Contrato (decisões do Luis): série MENSAL, POR ÁREA, saving e receita CRUS e SEPARADOS
-// (nunca somados num "ganho total"), `tipo_saving` cru (o Gabriel normaliza), SEM total geral
-// da empresa. O token vai no HEADER, jamais no corpo.
+// ⚠️ CONTRATO REAL do endpoint do Gabriel (`POST /api/ingest/godocs-metrics`), levantado por
+// sondagem em 27/08/2026 — NÃO é o contrato que a gente tinha codado antes (`grao`/`celulas`):
+//   • DOIS headers, camadas distintas e AMBOS obrigatórios:
+//       - `Authorization: Bearer <gdk_…>`  → fura o OAuth do EDGE do GoDeploy (chave de
+//         PLATAFORMA; sem ela o app dele responde 302 pro login). Secret `JG_INGEST_PLATFORM_TOKEN`.
+//       - `X-Godocs-Token: <godocs_…>`     → autoriza o INGEST dentro do app dele (sem ela, 401).
+//         Secret `JG_INGEST_TOKEN`.
+//   • Corpo: `{ granularity: "month", rollups: [ { period_key, period_start, area, … } ] }`.
+//       - `granularity` ∈ {"month","week"} (só temos mensal).
+//       - por item, VALIDADOS: `period_key` ("2026-07"), `period_start` (ISO "2026-07-01"),
+//         `area`. Os campos de VALOR NÃO são validados (coerção silenciosa lá) — mantemos os
+//         nomes que combinamos (`saving_reais`/`receita_reais`/`num_projetos`/`tipo_saving`).
+//       - `source: "godocs"` é derivado do TOKEN no lado dele — não mandamos no corpo.
+//   • saving e receita CRUS e SEPARADOS (nunca somados), `tipo_saving` cru (o Gabriel normaliza),
+//     SEM total geral da empresa.
 //
-// ⚠️ Envs lidas em RUNTIME (nunca no topo do módulo — o Godeploy não tem `process` na
-// avaliação do módulo). Sem `JG_INGEST_URL` o push fica INERTE (dry de fato) e diz por quê —
-// é o estado esperado até o Gabriel preparar o endpoint dele e passar a URL.
+// ⚠️ Envs lidas em RUNTIME (nunca no topo do módulo — o Godeploy não tem `process` na avaliação
+// do módulo). Sem `JG_INGEST_URL` (ou sem um dos 2 tokens) o push fica INERTE e diz por quê.
 
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { lerRollupMensal } from "@/integrations/db/client.server";
-import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
 import { getGodocsEnv } from "@/lib/env";
 
 const TIMEOUT_MS = 20_000;
 const log = (...a: unknown[]) => console.log("[rollupPush]", ...a);
 
+/** Uma linha do rollup no formato que o app do Gabriel valida/persiste. */
+export type RollupItem = {
+  period_key: string; // "2026-07"
+  period_start: string; // "2026-07-01" (ISO, VALIDADO no lado dele)
+  area: string;
+  tipo_saving: string; // cru — o Gabriel normaliza
+  saving_reais: number;
+  receita_reais: number;
+  num_projetos: number;
+};
+
 export type PayloadRollup = {
-  origem: "godocs";
-  ambiente: "producao" | "staging";
-  gerado_em: string;
-  grao: "mensal";
-  celulas: Array<{
-    periodo: string;
-    area: string;
-    tipo_saving: string;
-    saving_reais: number;
-    receita_reais: number;
-    num_projetos: number;
-  }>;
-  totais_area: Array<{
-    periodo: string;
-    area: string;
-    saving_reais: number;
-    receita_reais: number;
-    num_projetos: number;
-  }>;
+  granularity: "month";
+  rollups: RollupItem[];
+};
+
+/** Célula bruta do rollup mensal (o que `lerRollupMensal` devolve). */
+export type CelulaRollup = {
+  periodo: string; // "YYYY-MM"
+  area: string;
+  tipo_saving: string;
+  saving_reais: number;
+  receita_reais: number;
+  num_projetos: number;
 };
 
 export type ResultadoPush = {
@@ -53,28 +66,25 @@ export type ResultadoPush = {
   payload?: PayloadRollup;
 };
 
-/** Monta o contrato a partir das células do rollup (PURA — sem I/O, sem token). */
-export function montarPayloadRollup(
-  celulas: PayloadRollup["celulas"],
-  ambiente: "producao" | "staging",
-  geradoEm: string,
-): PayloadRollup {
-  const totais = derivarTotaisPorArea(
-    celulas.map((c) => ({ ...c, grao: "mensal" as const })),
-  ).map(({ periodo, area, saving_reais, receita_reais, num_projetos }) => ({
-    periodo,
-    area,
-    saving_reais,
-    receita_reais,
-    num_projetos,
-  }));
+/** "2026-07" → "2026-07-01" (primeiro dia do mês, ISO). Idempotente se já vier com dia. */
+export function inicioDoMesIso(periodo: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(periodo);
+  return m ? `${m[1]}-${m[2]}-01` : periodo;
+}
+
+/** Monta o contrato do endpoint do Gabriel a partir das células (PURA — sem I/O, sem token). */
+export function montarPayloadRollup(celulas: CelulaRollup[]): PayloadRollup {
   return {
-    origem: "godocs",
-    ambiente,
-    gerado_em: geradoEm,
-    grao: "mensal",
-    celulas,
-    totais_area: totais,
+    granularity: "month",
+    rollups: celulas.map((c) => ({
+      period_key: c.periodo,
+      period_start: inicioDoMesIso(c.periodo),
+      area: c.area,
+      tipo_saving: c.tipo_saving,
+      saving_reais: c.saving_reais,
+      receita_reais: c.receita_reais,
+      num_projetos: c.num_projetos,
+    })),
   };
 }
 
@@ -95,7 +105,7 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
   }
 
   const celulasRaw = await lerRollupMensal();
-  const celulas = celulasRaw.map((c) => ({
+  const celulas: CelulaRollup[] = celulasRaw.map((c) => ({
     periodo: c.periodo,
     area: c.area,
     tipo_saving: c.tipo_saving,
@@ -103,7 +113,7 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
     receita_reais: c.receita_reais,
     num_projetos: c.num_projetos,
   }));
-  const payload = montarPayloadRollup(celulas, ambiente, geradoEm);
+  const payload = montarPayloadRollup(celulas);
   const areas = new Set(celulas.map((c) => c.area)).size;
   const base: ResultadoPush = {
     ok: false,
@@ -117,18 +127,23 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
   if (opts.dry) return { ...base, ok: true, payload };
 
   const url = (process.env.JG_INGEST_URL || "").trim();
-  const token = (process.env.JG_INGEST_TOKEN || "").trim();
+  const platformToken = (process.env.JG_INGEST_PLATFORM_TOKEN || "").trim(); // gdk_… (Authorization)
+  const ingestToken = (process.env.JG_INGEST_TOKEN || "").trim(); // godocs_… (X-Godocs-Token)
   if (!url) {
     // Estado ESPERADO até o Gabriel entregar a URL — inerte, não é erro de execução.
     log("JG_INGEST_URL não configurada — payload NÃO enviado (aguardando o endpoint do Gabriel).");
     return { ...base, erro: "JG_INGEST_URL não configurada." };
   }
-  if (!token) {
-    log("JG_INGEST_TOKEN não configurado — payload NÃO enviado.");
+  if (!platformToken) {
+    log("JG_INGEST_PLATFORM_TOKEN (gdk_) não configurado — payload NÃO enviado.");
+    return { ...base, erro: "JG_INGEST_PLATFORM_TOKEN não configurado." };
+  }
+  if (!ingestToken) {
+    log("JG_INGEST_TOKEN (godocs_) não configurado — payload NÃO enviado.");
     return { ...base, erro: "JG_INGEST_TOKEN não configurado." };
   }
 
-  const resp = await postJG(url, token, payload);
+  const resp = await postJG(url, platformToken, ingestToken, payload);
   if (resp.erro) return { ...base, status: resp.status, erro: resp.erro };
   log(
     `enviado (${ambiente}): ${celulas.length} célula(s), ${areas} área(s) — HTTP ${resp.status}`,
@@ -136,10 +151,11 @@ export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<Result
   return { ...base, ok: true, status: resp.status };
 }
 
-/** POST ao endpoint do Gabriel — NUNCA lança (devolve o erro no campo `erro`). */
+/** POST ao endpoint do Gabriel (2 headers) — NUNCA lança (devolve o erro no campo `erro`). */
 async function postJG(
   url: string,
-  token: string,
+  platformToken: string,
+  ingestToken: string,
   payload: PayloadRollup,
 ): Promise<{ status?: number; erro?: string }> {
   const controller = new AbortController();
@@ -147,7 +163,11 @@ async function postJG(
   try {
     const resp = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${platformToken}`,
+        "X-Godocs-Token": ingestToken,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

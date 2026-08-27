@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { montarPayloadRollup } from "@/lib/rollup-push.functions";
+import {
+  montarPayloadRollup,
+  inicioDoMesIso,
+  type CelulaRollup,
+} from "@/lib/rollup-push.functions";
 
-const cel = (over: Partial<Record<string, unknown>>) => ({
+const cel = (over: Partial<CelulaRollup>): CelulaRollup => ({
   periodo: "2026-06",
   area: "Fiscal",
   tipo_saving: "mensal",
@@ -9,50 +13,51 @@ const cel = (over: Partial<Record<string, unknown>>) => ({
   receita_reais: 0,
   num_projetos: 1,
   ...over,
-}) as {
-  periodo: string;
-  area: string;
-  tipo_saving: string;
-  saving_reais: number;
-  receita_reais: number;
-  num_projetos: number;
-};
+});
 
-describe("push do rollup — montarPayloadRollup (contrato do squad Intelli)", () => {
+describe("push do rollup — montarPayloadRollup (contrato REAL do squad Intelli)", () => {
   const celulas = [
     cel({ area: "Fiscal", tipo_saving: "mensal", saving_reais: 100 }),
     cel({ area: "Fiscal", tipo_saving: "pontual", saving_reais: 50 }),
     cel({ area: "CX", tipo_saving: "mensal", saving_reais: 200, receita_reais: 500 }),
   ];
 
-  it("carimba origem/ambiente/gerado_em e mantém a cadência crua", () => {
-    const p = montarPayloadRollup(celulas, "staging", "2026-06-26T00:00:00.000Z");
-    expect(p.origem).toBe("godocs");
-    expect(p.ambiente).toBe("staging");
-    expect(p.gerado_em).toBe("2026-06-26T00:00:00.000Z");
-    expect(p.grao).toBe("mensal");
-    expect(p.celulas).toHaveLength(3);
-    // tipo_saving cru preservado (o Gabriel normaliza)
-    expect(new Set(p.celulas.map((c) => c.tipo_saving))).toEqual(new Set(["mensal", "pontual"]));
+  it("emite envelope granularity:month + rollups[] (não grao/celulas)", () => {
+    const p = montarPayloadRollup(celulas);
+    expect(p.granularity).toBe("month");
+    expect(p.rollups).toHaveLength(3);
+    // o contrato antigo NÃO deve mais existir
+    expect((p as Record<string, unknown>).grao).toBeUndefined();
+    expect((p as Record<string, unknown>).celulas).toBeUndefined();
+    expect((p as Record<string, unknown>).totais_area).toBeUndefined();
+    // source é derivado do token no lado dele — não vai no corpo
+    expect((p as Record<string, unknown>).origem).toBeUndefined();
+    expect((p as Record<string, unknown>).source).toBeUndefined();
   });
 
-  it("deriva totais POR ÁREA, com saving e receita SEPARADOS", () => {
-    const p = montarPayloadRollup(celulas, "producao", "2026-06-26T00:00:00.000Z");
-    const fiscal = p.totais_area.find((t) => t.area === "Fiscal" && t.periodo === "2026-06");
-    const cx = p.totais_area.find((t) => t.area === "CX" && t.periodo === "2026-06");
-    expect(fiscal).toEqual({
-      periodo: "2026-06", area: "Fiscal", saving_reais: 150, receita_reais: 0, num_projetos: 2,
-    });
-    expect(cx).toEqual({
-      periodo: "2026-06", area: "CX", saving_reais: 200, receita_reais: 500, num_projetos: 1,
-    });
+  it("cada item traz period_key, period_start ISO e tipo_saving cru", () => {
+    const p = montarPayloadRollup(celulas);
+    const item = p.rollups[0];
+    expect(item.period_key).toBe("2026-06");
+    expect(item.period_start).toBe("2026-06-01");
+    expect(item.area).toBe("Fiscal");
+    // cadência crua preservada (o Gabriel normaliza)
+    expect(new Set(p.rollups.map((r) => r.tipo_saving))).toEqual(new Set(["mensal", "pontual"]));
+    // saving e receita seguem SEPARADOS por item
+    const cx = p.rollups.find((r) => r.area === "CX")!;
+    expect(cx.saving_reais).toBe(200);
+    expect(cx.receita_reais).toBe(500);
   });
 
-  it("NÃO emite total geral da empresa (todo total tem área)", () => {
-    const p = montarPayloadRollup(celulas, "producao", "2026-06-26T00:00:00.000Z");
-    expect(p.totais_area.every((t) => typeof t.area === "string" && t.area.length > 0)).toBe(true);
-    // não há chave de topo que some saving+receita nem que agregue entre áreas
+  it("NÃO soma saving+receita nem emite total geral", () => {
+    const p = montarPayloadRollup(celulas);
     expect((p as Record<string, unknown>).total_geral).toBeUndefined();
     expect((p as Record<string, unknown>).ganho_total).toBeUndefined();
+    expect(p.rollups.every((r) => typeof r.area === "string" && r.area.length > 0)).toBe(true);
+  });
+
+  it("inicioDoMesIso deriva o primeiro dia e é idempotente", () => {
+    expect(inicioDoMesIso("2026-07")).toBe("2026-07-01");
+    expect(inicioDoMesIso("2026-12-01")).toBe("2026-12-01");
   });
 });
