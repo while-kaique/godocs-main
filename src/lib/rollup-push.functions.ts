@@ -29,7 +29,11 @@ import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { lerRollupMensal } from "@/integrations/db/client.server";
 import { getGodocsEnv } from "@/lib/env";
 
-const TIMEOUT_MS = 20_000;
+// O endpoint de ingest do Gabriel processa o lote inteiro na resposta (upsert por
+// (period_key,area,tipo_saving)) e leva ~30s para ~150 linhas (medido 27/08: 147 linhas → 29,5s,
+// `gravados:147`). Com 20s o push (e o cron diário) abortava SEMPRE por timeout embora o lado dele
+// gravasse. 60s dá margem sem prender o isolate indefinidamente.
+const TIMEOUT_MS = 60_000;
 const log = (...a: unknown[]) => console.log("[rollupPush]", ...a);
 
 /** Célula bruta do rollup mensal (o que `lerRollupMensal` devolve). `periodo` = mês de início. */
