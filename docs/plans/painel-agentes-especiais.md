@@ -290,6 +290,38 @@ vivo e o fallback não foi exercitado nesta medição.
   então a staging está num build anterior a esta branch) → é o T8.
 - **T8 — Staging → validar → prod (regra 13) + PR (regra 7).**
 
+## T7 MEDIDO — o painel NÃO bateu o baseline (27/08/2026, staging, 48/48 pares, 0 falhas)
+
+Rodado em 16 páginas de 3 com 4 em paralelo pelo `POST /api/admin/especiais/concordancia
+{"juiz":"painel"}` (5 min de relógio; modelo `gpt-5.6-sol`). **O critério 1 não passou.**
+
+| Métrica | Agente único (baseline) | Painel (T7) | Veredito |
+|---|---|---|---|
+| MAE | 1,69 | **1,65** | empate (−0,04 é o ruído que o achado 1 declara) |
+| dentro de ±1 | 58,3% | **58,3%** | ❌ o critério exige MAIOR, deu IGUAL |
+| nota exata | 29,2% | 31,3% | ganho pequeno |
+| viés agregado | −0,06 | **−0,98** | o painel é DURO, e agora o agregado não engana |
+| ≥3★ na rodada (população 41,7%) | 33,3% | **0%** | ❌ critério 2 estourado |
+| ≥5★ na rodada (população 12,5%) | 6,3% | **0%** | ❌ |
+
+**O painel nunca passa de 2★.** Nenhum dos 48 recebeu 3 ou mais. Erro por faixa do gabarito:
+0★ **+0,88** (melhorou muito contra o +1,94 do agente único) · 1★ −0,33 · 2★ −0,13 · 3★ −1,55 ·
+4★ −3,67 · 5★ −4 · 7★ −5 · 8★ −6 · **10★ −9** (PIAPP, humana 10 → painel 1). Ou seja: o painel
+ACERTOU o fundo da distribuição e perdeu o topo inteiro — o oposto do agente único, que inflava
+zeros e comprimia as pontas.
+
+**Causa (uma linha, não a régua):** `agents/especiais-lentes.ts:345` —
+`const margem = gateAv.evidencia === "nomeada" ? MARGEM_ACIMA_DO_GATE : 0`. Como `nomeada` só
+sobrevive com trecho copiado (`MIN_SUSTENTACAO`, linha 254), a maioria dos projetos cai em `vaga`,
+a margem vira **0** e o teto do painel = a nota do gate. O eixo de alcance não tem para onde subir.
+⚠️ O que se mexe é o **teto/margem quando a prova é `vaga`** — **não** a régua, não a `CURVA_BASE`,
+não a exigência de trecho copiado (é ela que consertou os zeros). Confirma em n=48 o sinal precoce
+de n=2 registrado em 26/08.
+
+**Situação:** nada sobe. O painel fica como ferramenta de auditoria (critério 1, 2ª frase) até a
+margem ser recalibrada e a corrida repetida — a corrida custa 5 min e 0 intervenção, então medir de
+novo é barato.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
