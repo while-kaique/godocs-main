@@ -602,6 +602,62 @@ export function normalizarClassificacao(input: {
   return { classificacao, justificativa, motivo, ajuste };
 }
 
+// ─── Plausibilidade de FTE (detector determinístico de saving implausível) ───
+
+/**
+ * Fator PADRÃO: quantas vezes o FTE (horas/220) pode exceder as pessoas declaradas
+ * antes de o saving ser considerado implausível e ENFILEIRADO para a triagem humana.
+ * Env-tunável no call site (nunca lido em escopo de módulo — regra do worker).
+ */
+export const FATOR_FTE_PADRAO = 1.5;
+
+/** Base CLT de horas úteis por pessoa/mês (22 dias úteis ≈ 220h) = 1 FTE. */
+export const HORAS_BASE_FTE = 220;
+
+export type ResultadoPlausibilidadeFTE = {
+  /** true → saving implausível: enfileira para revisão humana (NUNCA reprova). */
+  implausivel: boolean;
+  /** FTE calculado = horasTotais / horasBase (0 quando não há horas a julgar). */
+  fte: number;
+  /** Pessoas declaradas efetivas usadas na conta (≥ 1 quando há horas). */
+  pessoas: number;
+  /** Motivo LEGÍVEL ao humano — sempre presente quando implausivel; null caso contrário. */
+  motivo: string | null;
+};
+
+/**
+ * Detecta saving IMPLAUSÍVEL por FTE. PURA e determinística (irmã de
+ * normalizarClassificacao/decidirStatusSubmissao). Calcula `fte = horasTotais/220` e
+ * confronta com as pessoas realmente declaradas; se o FTE excede as pessoas por um
+ * FATOR configurável, o número é implausível para aprovação automática e deve ir à
+ * triagem humana.
+ *
+ * Invariantes:
+ *   1. ESPECIAL ou FLUXO DIRETO de liderança → NUNCA implausível (herda a isenção da
+ *      régua de elegibilidade — a validação desses é 100% humana);
+ *   2. Linha confirmada como VÁRIAS pessoas/unidades no chat (teto_pessoa='multiplo')
+ *      → NUNCA implausível (a multiplicação já foi justificada pelo usuário);
+ *   3. Sem horas a julgar (null/≤0/NaN) → NUNCA implausível (não enfileira sem base);
+ *   4. Fator ausente/inválido → FATOR_FTE_PADRAO; fator ≤ 0 ou não-finito → gate
+ *      DESLIGADO (kill switch — nunca implausível);
+ *   5. Pessoas ausentes/≤0 → assume 1 (há sempre ao menos o autor);
+ *   6. Este detector NUNCA reprova, só ENFILEIRA — e SEMPRE com motivo legível quando
+ *      dispara (nunca enfileira em silêncio).
+ */
+export function avaliarPlausibilidadeFTE(input: {
+  horasTotais?: number | null;
+  pessoasDeclaradas?: number | null;
+  temMultiplo?: boolean | null;
+  especial?: boolean | null;
+  fluxoDireto?: boolean | null;
+  fator?: number | null;
+  horasBase?: number | null;
+}): ResultadoPlausibilidadeFTE {
+  // STUB — implementação real na próxima etapa (TDD red-green).
+  void input;
+  return { implausivel: false, fte: 0, pessoas: 0, motivo: null };
+}
+
 // ─── Precedência de status (interno × coluna Status do Sheets) ───────────────
 
 export type StatusSheet = 'Pendente' | 'Reprovado' | 'Reenvio Pendente';

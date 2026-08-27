@@ -15,22 +15,45 @@
 
 ## Plano ativo
 
-**→ Canonicalizar a dimensão `area` do rollup pro Gabriel (27/08).** Plano aprovado:
-[docs/plans/rollup-areas-canonicas.md](plans/rollup-areas-canonicas.md) — dedup caixa/acento +
-renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
-(~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
+**→ Frente 2 (fatia A): detector determinístico de saving implausível / FTE.** Plano APROVADO (Luis,
+27/08): [docs/plans/agentes-avaliacao-autonomos.md](plans/agentes-avaliacao-autonomos.md) — **só a fatia
+A por ora**: função PURA `avaliarPlausibilidadeFTE` em `analyzer.ts` (irmã de `normalizarClassificacao`),
+consumida em `analisarProjeto` e como gate em `analisarProjetoFn` → projeto absurdo (ex.: 500h/mês = ~12
+FTE vs. pessoas declaradas) vai para `em_validacao` (fila RPA), NUNCA aprova automático. Especial/liderança
+ISENTOS (herdam `analyzer.ts:584-590`). Nunca reprova sem motivo legível. Worktree
+`~/godocs-wt-agentes-avaliacao`, branch `feat/agentes-avaliacao-fte` (off `origin/main` @bc09004).
 
-**STATUS (27/08): CÓDIGO PRONTO, NÃO DEPLOYADO.** Branch `fix/rollup-areas-canonicas` (off
-`origin/main` @1834db6), worktree `~/godocs-wt-areas-rollup`, commit `9352e34`. Suíte **1899 verde**,
-build + worker OK. **Validado contra o payload REAL de prod (dry-run)**: 41 → **30 áreas**, saving e
-receita totais idênticos ao centavo (nada descartado). Luis já aprovou as decisões de mapeamento
-(Produto/Operações/Finanças genéricos; 4 pequenos e os 2 não-área mantidos; renomes AZ→AZ Buy,
-CSC→Projetos/CSC, JURIDICO→Jurídico/Compliance, FP&A→FP&A e Tesouraria).
+**Contexto multi-frente (27/08):** rodada de 2 frentes independentes via Herdr. Esta = **Frente 2**. A
+Frente 1 (doc fora do caminho crítico — `docs/plans/submissao-doc-fora-do-caminho-critico.md`) roda em
+OUTRO worktree (`~/godocs-wt-doc-async`) — não colidir. Os worktrees do JG rollup e do Kaique
+(`~/godocs-wt-classificador`, `~/godocs-wt-rag-especial`) seguem em paralelo — NÃO tocar. Fatias B/C do
+plano ficam para depois. Staging antes de prod (regra 13); parar na staging para o Luis validar.
 
-**PRÓXIMO PASSO:** aguardando **OK do Luis** na lista final de 30 áreas (mostrada no chat). Com o OK:
-deploy STAGING `edf400b4` → `sync-sheets-now` → `rollup-backfill` → dry-run `rollup-push` (conferir ~30
-áreas + totais) → prod `674a3710` → PR via `LuisEduardo100` (regra 14). ⚠️ O cron diário de prod
-(`2aysp914qg9r`) passa a empurrar a lista limpa pro app do Gabriel assim que prod subir.
+**🚧 WIP mid-TDD (27/08, sessão /ggsd:code — RED confirmado, implementação PENDENTE):** a fatia A ficou
+**no vermelho de propósito** (fim de janela de contexto). O que já está na branch `feat/agentes-avaliacao-fte`:
+- **Interface + stub** de `avaliarPlausibilidadeFTE` em `src/lib/agents/analyzer.ts` (irmã de
+  `normalizarClassificacao`/`decidirStatusSubmissao`, logo antes dela) + constantes exportadas
+  `FATOR_FTE_PADRAO = 1.5` e `HORAS_BASE_FTE = 220`. O stub retorna sempre `{implausivel:false, fte:0, pessoas:0, motivo:null}`.
+- **Teste RED** `tests/plausibilidade-fte.test.ts` (autorado pelo `ggsd:test-writer` isolado, cego à
+  implementação): **5 falham / 10 passam** — as 5 que falham exigem o comportamento novo (caso 500h enfileira;
+  FTE ≈ 2,27; kill-switch por fator; `pessoasDeclaradas` 0/ausente → assume ≥1). Documentação da interface e
+  dos invariantes está no docstring da função.
+- Ajuste de docs: o `Status:` do plano foi normalizado para `**Status:** aprovado …` (o hook `plan-gate.sh`
+  não lia o formato antigo `> Status: **✅ aprovado**` — a aprovação do Luis segue intacta).
+
+**PRÓXIMO PASSO (retomar aqui):** (1) implementar a lógica real de `avaliarPlausibilidadeFTE` até o **verde**
+dos 15 casos (NÃO enfraquecer o teste); regras no docstring: fte=`horasTotais/horasBase`, implausível se
+`fte > pessoas*fator`; especial/fluxoDireto/temMultiplo/sem-horas → nunca implausível; fator≤0 ou não-finito →
+kill-switch; pessoas≤0 → 1; motivo legível PT-BR sempre que dispara. (2) **Consumir** em `analisarProjeto`
+(`analyzer.ts:~735`, ao lado de `normalizarClassificacao` — computar `horasTotais` de `conteudo.saving`
+(`economia_horas_mes`), `pessoasDeclaradas` = `membros.length + 1` (autor), `temMultiplo` de
+`saving.teto_pessoa==='multiplo'`, `especial`/`ehLider` já disponíveis; implausível & !isento → rebaixar
+`classificacao_avaliacao` `claro_sim`→`zona_cinzenta` e enriquecer a justificativa com o motivo). (3) **Gate**
+em `analisarProjetoFn` (`chat.functions.ts:~3164`, ao lado do de materialidade — recomputar e, se implausível
+& !especial & !lider & status seria `aprovado`, forçar `em_validacao`/"Pendente"). ⚠️ Ler o **fator do env LAZY
+dentro de função** (nunca em escopo de módulo). (4) `npm run test` verde + `npm run build:worker` + commitar
+`worker.js` (regra 1). (5) §8.1 medir faixa + §9 revisores (marcadores `.review-status`/`.quality-status`
+seguem **`pendente`** — o `/ggsd:ship` vai BARRAR o envio até a revisão de contexto fresco rodar).
 
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
