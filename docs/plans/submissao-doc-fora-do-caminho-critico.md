@@ -1,6 +1,6 @@
 # Plano — Frente 1: tirar a documentação do caminho crítico da submissão
 
-**Status:** aprovado ✅ (Luis, 27/08/2026)
+**Status:** executado (código) — 27/08/2026 · A+B implementados, suíte 1954 verde, gates §9 liberam (quality=limpo, review=diverge-baixa), race de lost-update corrigida. Branch `feat/submissao-doc-async`. FALTA: staging (`DOC_COMPILE_ASYNC=1`) + validação/prod pelo Luis. _(aprovado por Luis em 27/08/2026)_
 > Origem: reclamações recorrentes de que "submeter projeto está lento/chato". Objetivo do dono do produto (Luis, 27/08/2026): o cliente que submete **não pode sentir gargalo nenhum**. Esta é a **prioridade #1**, independente da Frente 2 (time de agentes).
 > Metodologia: GGSD (plano aprovado → código em worktree → staging → prod). Regras do projeto 1/2/8/10/13/14.
 
