@@ -107,6 +107,8 @@ import { validarDocumentacao } from "@/lib/agents/validator";
 import {
   analisarProjeto as analisarProjetoAgent,
   decidirStatusSubmissao,
+  avaliarPlausibilidadeFTE,
+  fatorFtePlausibilidade,
 } from "@/lib/agents/analyzer";
 import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-agent";
 import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
@@ -3161,7 +3163,7 @@ export async function analisarProjetoFn(rawData: unknown) {
   // motivo, especial nunca reprova, materialidade alta → humana) já foram aplicadas por
   // normalizarClassificacao dentro do analisador.
   const classificacao = resultado.classificacao_avaliacao ?? null;
-  const { status: statusFinal, statusSheet } = decidirStatusSubmissao({
+  let { status: statusFinal, statusSheet } = decidirStatusSubmissao({
     classificacao,
     ehEspecial,
     fluxoDireto: ehLiderAnalise,
@@ -3169,6 +3171,39 @@ export async function analisarProjetoFn(rawData: unknown) {
     vereditoAprovado: resultado.resultado === "aprovado",
     tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
   });
+
+  // Gate determinístico de FTE (defesa em profundidade, ao lado do de materialidade): um
+  // saving implausível para as pessoas declaradas (ex.: 500h/mês ≈ 2,3 FTE p/ 1 pessoa)
+  // NUNCA pode ser auto-aprovado — vai para a triagem humana (em_validacao/"Pendente").
+  // O analisador (analisarProjeto) já rebaixa a classificação p/ 'zona_cinzenta' nesses
+  // casos; este gate cobre o caminho em que o status ainda sairia 'aprovado'. Especial e
+  // liderança são isentos DENTRO de avaliarPlausibilidadeFTE. Fator lido do env (LAZY).
+  const savingFte = conteudo.saving as Record<string, unknown> | undefined;
+  const membrosFte = parseJson<string[]>(projetoAtual?.membros ?? null) ?? [];
+  const linhasFte = (savingFte?.linhas as
+    | Array<{ economia_horas_mes?: number | null }>
+    | undefined) ?? [];
+  const horasFte =
+    typeof savingFte?.economia_horas_mes === "number"
+      ? (savingFte.economia_horas_mes as number)
+      : linhasFte.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
+  const plausFte = avaliarPlausibilidadeFTE({
+    horasTotais: horasFte,
+    pessoasDeclaradas: membrosFte.length + 1, // + o autor (não entra em `membros`)
+    temMultiplo: savingFte?.teto_pessoa === "multiplo",
+    especial: ehEspecial,
+    fluxoDireto: ehLiderAnalise,
+    fator: fatorFtePlausibilidade(),
+  });
+  if (plausFte.implausivel && statusFinal === "aprovado") {
+    log(
+      "analisarProjeto",
+      `FTE implausível (~${plausFte.fte.toFixed(2)} FTE p/ ${plausFte.pessoas} pessoa(s)) → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`,
+    );
+    statusFinal = "em_validacao";
+    statusSheet = "Pendente";
+  }
+
   const reprovadoPorCriterio = statusSheet === "Reprovado";
   if (reprovadoPorCriterio) {
     log(

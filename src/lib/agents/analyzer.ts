@@ -653,9 +653,63 @@ export function avaliarPlausibilidadeFTE(input: {
   fator?: number | null;
   horasBase?: number | null;
 }): ResultadoPlausibilidadeFTE {
-  // STUB — implementação real na próxima etapa (TDD red-green).
-  void input;
-  return { implausivel: false, fte: 0, pessoas: 0, motivo: null };
+  // Base de horas por FTE (220h/mês por padrão); só aceita override positivo e finito.
+  const horasBase =
+    typeof input.horasBase === 'number' && isFinite(input.horasBase) && input.horasBase > 0
+      ? input.horasBase
+      : HORAS_BASE_FTE;
+
+  // Horas a julgar: sem número válido/positivo não há base (invariante 3).
+  const horas =
+    typeof input.horasTotais === 'number' && isFinite(input.horasTotais) && input.horasTotais > 0
+      ? input.horasTotais
+      : 0;
+
+  // Pessoas efetivas ≥ 1 — há sempre ao menos o autor (invariante 5).
+  const pessoasBruto =
+    typeof input.pessoasDeclaradas === 'number' && isFinite(input.pessoasDeclaradas)
+      ? input.pessoasDeclaradas
+      : 0;
+  const pessoas = pessoasBruto >= 1 ? pessoasBruto : 1;
+
+  // Fator: ausente/não-número → padrão (ativo). Presente mas ≤ 0 ou não-finito
+  // (Infinity/NaN) → gate DESLIGADO (kill switch, invariante 4).
+  const fator = typeof input.fator === 'number' ? input.fator : FATOR_FTE_PADRAO;
+  const gateAtivo = isFinite(fator) && fator > 0;
+
+  // Especial, fluxo direto de liderança e "múltiplo já confirmado no chat" → nunca
+  // implausível (invariantes 1 e 2).
+  const isento = input.especial === true || input.fluxoDireto === true || input.temMultiplo === true;
+
+  const fte = horas > 0 ? horas / horasBase : 0;
+
+  const implausivel = !isento && gateAtivo && horas > 0 && fte > pessoas * fator;
+
+  // NUNCA enfileira em silêncio: motivo legível sempre que dispara (invariante 6).
+  const fteTexto = fte.toFixed(1).replace('.', ',');
+  const horasTexto = String(Math.round(horas));
+  const pessoasTexto = String(Math.round(pessoas));
+  const rotuloPessoas = Math.round(pessoas) === 1 ? 'pessoa' : 'pessoas';
+  const motivo = implausivel
+    ? `Saving de ${horasTexto}h/mês equivale a ~${fteTexto} pessoas em tempo integral (FTE), mas o projeto declara apenas ${pessoasTexto} ${rotuloPessoas} — número implausível para aprovação automática; enviado para a triagem humana conferir.`
+    : null;
+
+  return { implausivel, fte, pessoas, motivo };
+}
+
+/**
+ * Lê o fator do gate de FTE do ambiente — LAZY (dentro da função; NUNCA em escopo de
+ * módulo, senão o worker quebra no bootstrap). Ausente → FATOR_FTE_PADRAO (gate ATIVO).
+ * Valor ≤ 0, `off`/`desligado` → Infinity (kill switch: avaliarPlausibilidadeFTE trata
+ * como gate desligado). Valor não-numérico desconhecido → padrão.
+ */
+export function fatorFtePlausibilidade(): number {
+  const raw = (process.env.FTE_FATOR_IMPLAUSIVEL ?? '').trim().toLowerCase();
+  if (!raw) return FATOR_FTE_PADRAO;
+  if (raw === 'off' || raw === 'desligado') return Infinity;
+  const n = Number(raw);
+  if (isFinite(n)) return n > 0 ? n : Infinity; // ≤ 0 → desliga o gate
+  return FATOR_FTE_PADRAO;
 }
 
 // ─── Precedência de status (interno × coluna Status do Sheets) ───────────────
@@ -817,6 +871,43 @@ export async function analisarProjeto(projetoId: string): Promise<ResultadoAnali
   resultado.classificacao_avaliacao = classif.classificacao;
   resultado.classificacao_justificativa = classif.justificativa;
   resultado.motivo_reprovacao = classif.motivo;
+
+  // Detector determinístico de saving IMPLAUSÍVEL por FTE (irmão da régua de critério):
+  // horas/220 = FTE confrontado com as pessoas declaradas (autor + membros). Implausível
+  // → ENFILEIRA para a triagem humana (claro_sim → zona_cinzenta), NUNCA reprova. Especial
+  // e liderança são isentos DENTRO de avaliarPlausibilidadeFTE. O fator vem do env (LAZY).
+  const membrosProjeto = parseJson<string[]>((projeto.membros as string | null) ?? null) ?? [];
+  const linhasSaving = (savingConteudo?.linhas as
+    | Array<{ economia_horas_mes?: number | null }>
+    | undefined) ?? [];
+  const horasTotaisSaving =
+    typeof savingConteudo?.economia_horas_mes === 'number'
+      ? (savingConteudo.economia_horas_mes as number)
+      : linhasSaving.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
+  const plausFte = avaliarPlausibilidadeFTE({
+    horasTotais: horasTotaisSaving,
+    pessoasDeclaradas: membrosProjeto.length + 1, // + o autor (não entra em `membros`)
+    temMultiplo: savingConteudo?.teto_pessoa === 'multiplo',
+    especial: projeto.especial === 1,
+    fluxoDireto: ehLider,
+    fator: fatorFtePlausibilidade(),
+  });
+  if (plausFte.implausivel && resultado.classificacao_avaliacao !== 'claro_nao') {
+    if (resultado.classificacao_avaliacao !== 'zona_cinzenta') {
+      log(
+        `FTE implausível (~${plausFte.fte.toFixed(2)} FTE p/ ${plausFte.pessoas} pessoa(s)): '${resultado.classificacao_avaliacao}' → 'zona_cinzenta' (enfileira p/ triagem humana)`,
+      );
+      resultado.classificacao_avaliacao = 'zona_cinzenta';
+    }
+    // Surface o motivo na justificativa (é o que o humano lê no dashboard). Idempotente.
+    const jaTemMotivo =
+      plausFte.motivo != null &&
+      (resultado.classificacao_justificativa ?? '').includes(plausFte.motivo);
+    if (plausFte.motivo && !jaTemMotivo) {
+      resultado.classificacao_justificativa =
+        `${(resultado.classificacao_justificativa ?? '').trim()} ${plausFte.motivo}`.trim();
+    }
+  }
 
   // O LLM avalia todos os critérios internamente mas retorna só os mais relevantes.
   // Usamos pontuacao_total e pontuacao_maxima calculados pelo LLM (que viu todos).
