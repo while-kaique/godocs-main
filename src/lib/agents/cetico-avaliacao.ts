@@ -14,6 +14,9 @@
  * Irmão puro de `avaliarPlausibilidadeFTE`/`avaliarFinanceiro`/`agregarVotos`: testável, sem LLM.
  */
 
+import { FATOR_FTE_PADRAO } from './analyzer';
+import { MIN_VIZINHOS_APOIO, PISO_APOIO_RAG } from './agregador-avaliacao';
+
 export type ResultadoCetico = {
   /** Vota para DERRUBAR a aprovação (só true quando o preliminar é `aprovar` e há condição-limite). */
   refuta: boolean;
@@ -25,15 +28,17 @@ export type ResultadoCetico = {
   sinais: string[];
 };
 
-/** Teto de FTE por pessoa (mesma régua do detector de plausibilidade). */
-const FATOR_PADRAO = 1.5;
-/** Fração do teto de FTE a partir da qual já é "raspando" (suspeito, mesmo sem estourar). */
+// ⚠️ A régua base do cético é a MESMA do RAG/FTE — importa as constantes CANÔNICAS (não redeclarar
+// literais, senão o limiar adversarial diverge silenciosamente quando a fonte mudar).
+/** Teto de FTE por pessoa (fonte única: `analyzer.ts`). */
+const FATOR_PADRAO = FATOR_FTE_PADRAO;
+/** Vizinhos mínimos para o apoio do RAG não ser marginal (fonte única: `agregador-avaliacao.ts`). */
+const MIN_VIZINHOS_PADRAO = MIN_VIZINHOS_APOIO;
+/** Similaridade mínima do apoio do RAG (fonte única: `agregador-avaliacao.ts`). */
+const PISO_APOIO_PADRAO = PISO_APOIO_RAG;
+/** Fração do teto de FTE a partir da qual já é "raspando" (suspeito, mesmo sem estourar) — próprio do cético. */
 const FRACAO_RASPANDO = 0.8;
-/** Vizinhos mínimos para o apoio do RAG não ser marginal. */
-const MIN_VIZINHOS_PADRAO = 2;
-/** Similaridade mínima do apoio do RAG. */
-const PISO_APOIO_PADRAO = 0.5;
-/** Margem acima do piso abaixo da qual a similaridade ainda é "raspando". */
+/** Margem acima do piso abaixo da qual a similaridade ainda é "raspando" — próprio do cético. */
 const MARGEM_SIM = 0.1;
 
 function num(v: number | null | undefined, fallback: number): number {
