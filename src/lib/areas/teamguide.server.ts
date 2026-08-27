@@ -461,8 +461,17 @@ export async function deriveAreaFromEmail(email: string): Promise<string | null>
 // Quem chega ao topo sem líder fica com lista vazia (D6 — o CEO).
 
 type IndiceLideranca = {
-  /** e-mail (minúsculo) → líderes diretos */
+  /** e-mail (minúsculo) → líderes diretos (JÁ com os overrides de `lideranca-override`) */
   lideresPorEmail: Map<string, PessoaLideranca[]>;
+  /**
+   * e-mail (minúsculo) → líderes diretos **CRUS**, exatamente como a árvore devolveu.
+   *
+   * Existe porque o override pode ter exceção POR PROJETO (`exceto_projetos`) e o índice
+   * não é de projeto nenhum: guardar o cru é o que permite ao `getLideresDe(email,
+   * {projetoId})` reaplicar o filtro sabendo de qual projeto se trata. Ninguém deve ler
+   * este mapa direto — quem quer a relação "oficial" lê `lideresPorEmail`.
+   */
+  lideresBrutosPorEmail: Map<string, PessoaLideranca[]>;
   /** e-mail do líder (minúsculo) → liderados */
   lideradosPorEmail: Map<string, { nome: string; email: string }[]>;
   /**
@@ -505,6 +514,7 @@ function construirIndiceLideranca(teamsRaw: TGTeam[], membros: TGMember[]): Indi
   };
 
   const lideresPorEmail = new Map<string, PessoaLideranca[]>();
+  const lideresBrutosPorEmail = new Map<string, PessoaLideranca[]>();
   const lideradosPorEmail = new Map<string, { nome: string; email: string }[]>();
 
   for (const membro of membros) {
@@ -514,7 +524,9 @@ function construirIndiceLideranca(teamsRaw: TGTeam[], membros: TGMember[]): Indi
     // `@/lib/lideranca-override`). Aplicado AQUI, no único ponto que constrói o
     // índice, para os DOIS lados ficarem coerentes: quem some da lista de líderes
     // dele também não recebe ele como liderado.
-    const lideres = filtrarLideresOverride(email, lideresDoMembro(membro));
+    const brutos = lideresDoMembro(membro);
+    const lideres = filtrarLideresOverride(email, brutos);
+    lideresBrutosPorEmail.set(email, brutos);
     lideresPorEmail.set(email, lideres);
     for (const lider of lideres) {
       if (!lider.email) continue;
@@ -536,7 +548,7 @@ function construirIndiceLideranca(teamsRaw: TGTeam[], membros: TGMember[]): Indi
     if (email) liderancasPorEmail.add(email);
   }
 
-  return { lideresPorEmail, lideradosPorEmail, liderancasPorEmail };
+  return { lideresPorEmail, lideresBrutosPorEmail, lideradosPorEmail, liderancasPorEmail };
 }
 
 let cacheLideranca: IndiceLideranca | null = null;
@@ -551,12 +563,25 @@ export async function buildLiderancaIndex(): Promise<IndiceLideranca> {
   return cacheLideranca;
 }
 
-/** Líderes diretos de um e-mail. Lista vazia quando não há (CEO, D6) ou é desconhecido. */
-export async function getLideresDe(email: string): Promise<PessoaLideranca[]> {
+/**
+ * Líderes diretos de um e-mail. Lista vazia quando não há (CEO, D6) ou é desconhecido.
+ *
+ * `opts.projetoId` diz DE QUAL projeto se trata, e só serve para as exceções por projeto
+ * dos overrides (`exceto_projetos` em `@/lib/lideranca-override`): sem ele o resultado é
+ * o mesmo do índice geral. Quem abre fila (`abrirPreAprovacao`) sempre passa — é lá que a
+ * ressalva "neste projeto o líder é outro" precisa valer.
+ */
+export async function getLideresDe(
+  email: string,
+  opts?: { projetoId?: string | null },
+): Promise<PessoaLideranca[]> {
   const alvo = (email ?? '').trim().toLowerCase();
   if (!alvo) return [];
-  const { lideresPorEmail } = await buildLiderancaIndex();
-  return lideresPorEmail.get(alvo) ?? [];
+  const { lideresBrutosPorEmail } = await buildLiderancaIndex();
+  // Filtra a partir do CRU (e não do já filtrado) para que a exceção por projeto possa
+  // devolver o líder que o override geral tinha tirado. Sem `projetoId` o resultado é
+  // idêntico ao `lideresPorEmail`.
+  return filtrarLideresOverride(alvo, lideresBrutosPorEmail.get(alvo) ?? [], opts?.projetoId);
 }
 
 /** O outro lado da mesma relação: quem responde a este e-mail. */

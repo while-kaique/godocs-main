@@ -118,6 +118,16 @@ describe('pré-aprovação do líder', () => {
     mockSheet.mockResolvedValue(true);
   });
 
+  it('pergunta os líderes JÁ dizendo de qual projeto se trata (exceção por projeto, D32)', async () => {
+    // Sem o `projetoId`, um override de liderança valeria também no projeto em que a
+    // pessoa responde a outro líder — a ressalva `exceto_projetos` ficaria inerte.
+    const id = await criarProjeto();
+
+    await abrirPreAprovacao(id);
+
+    expect(mockLideres).toHaveBeenCalledWith('luis.albuquerque@gocase.com', { projetoId: id });
+  });
+
   it('abre a fila com o líder DIRETO', async () => {
     const id = await criarProjeto();
 

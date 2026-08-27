@@ -332,7 +332,10 @@ export async function abrirPreAprovacao(
     }
 
     // Só líderes COM e-mail cadastrado podem receber a fila (sem e-mail não há login).
-    const lideres = (await getLideresDe(autor)).filter((l) => !!l.email);
+    // ⚠️ O `projetoId` vai junto porque um override de liderança pode ter exceção POR
+    // PROJETO (`exceto_projetos`, D32): sem ele, o remendo geral valeria também no
+    // projeto em que a pessoa responde a outro líder.
+    const lideres = (await getLideresDe(autor, { projetoId })).filter((l) => !!l.email);
     if (!lideres.length) {
       console.log(`[aprovacoes] ${autor} sem líder na TeamGuide → sem fila de aprovação (D6).`);
       return semFila('sem_lider');
@@ -522,7 +525,7 @@ export async function reabrirPreAprovacoes(body: unknown): Promise<ResultadoReab
       } else if (await ehLideranca(autor)) {
         out.isentos.push({ projeto_id: id, nome, motivo: 'lideranca' });
       } else {
-        const lideres = (await getLideresDe(autor)).filter((l) => !!l.email);
+        const lideres = (await getLideresDe(autor, { projetoId: id })).filter((l) => !!l.email);
         if (!lideres.length) out.isentos.push({ projeto_id: id, nome, motivo: 'sem_lider' });
         else
           out.reabertos.push({
