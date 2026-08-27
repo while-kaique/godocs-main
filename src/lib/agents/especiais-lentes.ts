@@ -30,9 +30,8 @@ import {
   CRITERIOS,
   DERRUBA,
   NOTA_MAX,
-  CURVA_ESPECIAIS_AUDITADOS,
-  TOTAL_ESPECIAIS_AUDITADOS,
-  percentilEspeciaisAcimaDe,
+  CURVA_BASE,
+  TOTAL_AUDITADO,
   type Confianca,
 } from "@/lib/especiais-regua";
 import { montarBlocoFewShot, type Vizinho } from "@/lib/especial-corpus";
@@ -132,24 +131,11 @@ function descreverNiveis(): string {
   return NIVEIS.map((n) => `${n.nota} — ${n.titulo}: ${n.definicao}`).join("\n");
 }
 
-/**
- * A curva que a lente vê é a dos **ESPECIAIS AUDITADOS**, não a da base inteira.
- *
- * ⚠️ **Era a `CURVA_BASE` aqui, e isso ERA a trava do painel** (medido no T7, 27/08/2026): a base
- * conta a aba toda (~426 financeiros de nota 0), então ela diz "≥3★ é top 4%" — e a lente, mandada
- * ficar na faixa MENOR na dúvida, devolvia 1–2 em quase tudo. Como o teto da consolidação é a nota
- * do gate, **0 dos 48** especiais passou de 2★ numa população onde a triagem humana dá ≥3 a 41,7%.
- * O calibrador já tinha sido corrigido em 26/08 (`CURVA_ESPECIAIS_AUDITADOS`) e o prompt ficou para
- * trás. ⚠️ Não voltar para a `CURVA_BASE`: ela está certa para o que é (a base toda) e errada para
- * quem só julga especiais.
- */
 function descreverCurva(): string {
-  return Object.entries(CURVA_ESPECIAIS_AUDITADOS)
+  return Object.entries(CURVA_BASE)
+    .filter(([k]) => k !== "vazio")
     .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(
-      ([nota, qtd]) =>
-        `${nota}★: ${qtd} (${((qtd / TOTAL_ESPECIAIS_AUDITADOS) * 100).toFixed(1)}%)`,
-    )
+    .map(([nota, qtd]) => `${nota}★: ${qtd} (${((qtd / TOTAL_AUDITADO) * 100).toFixed(1)}%)`)
     .join(" · ");
 }
 
@@ -179,9 +165,9 @@ ${descreverNiveis()}
 O QUE DERRUBA para 0–1, por melhor que o memorial esteja:
 ${DERRUBA.map((d) => `- ${d}`).join("\n")}
 
-A CURVA REAL DOS PROJETOS ESPECIAIS JÁ AUDITADOS PELA TRIAGEM (${TOTAL_ESPECIAIS_AUDITADOS} projetos com nota humana) — é ESTA a sua régua, porque é a população deste projeto:
+A CURVA REAL DA BASE (644 projetos) — sua régua contra inflação:
 ${descreverCurva()}
-Entre os ESPECIAIS, ${percentilEspeciaisAcimaDe(3).toFixed(1)}% valem ≥3★ e ${percentilEspeciaisAcimaDe(5).toFixed(1)}% valem ≥5★ — especial é um recorte pequeno e já selecionado da base, então 3★ aqui NÃO é raridade extrema. Na dúvida entre duas faixas, fique na MENOR — mas não confunda "ficar na menor" com nunca passar de 2: se o seu eixo sustenta 3 ou 4 com prova, diga 3 ou 4.
+≥3★ é top 4% da base; ≥5★ é top 1%. Na dúvida entre duas faixas, fique na MENOR.
 
 DISCIPLINA:
 - Notas INTEIRAS.

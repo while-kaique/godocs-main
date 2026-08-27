@@ -92,48 +92,6 @@ export const TOTAL_AUDITADO = Object.entries(CURVA_BASE)
   .filter(([k]) => k !== 'vazio')
   .reduce((s, [, v]) => s + v, 0);
 
-/**
- * **A curva dos especiais AUDITADOS — MEDIDA, não estimada** (staging, espelho real da planilha,
- * 26/08/2026): `0:17 · 1:3 · 2:8 · 3:11 · 4:3 · 5:3 · 7:1 · 8:1 · 10:1` → **≥3 = 41,7% · ≥5 = 12,5%**.
- *
- * ⚠️ **É esta, e não a `CURVA_BASE`, a referência de qualquer juiz de ESPECIAIS** — as duas
- * populações são **7× diferentes** no corte da prata (a base inteira dá ≥3 = 5,4%), porque a
- * `CURVA_BASE` conta a aba toda, com os ~426 financeiros de nota 0.
- *
- * ⚠️ **Mora AQUI, na régua, e não no calibrador (que a reexporta), porque o PROMPT DAS LENTES
- * também precisa dela** e `especiais-calibrador.ts` importa `agents/especiais-lentes.ts` — a lente
- * importar o calibrador de volta seria ciclo. _(Origem: no T7 de 27/08/2026 o calibrador já usava a
- * curva certa e o prompt das lentes seguia mostrando a da base, com o texto "≥3★ é top 4% da base
- * … na dúvida fique na MENOR". Resultado medido: as lentes davam 1–2 em quase tudo, o teto da
- * consolidação é a nota do gate, e **0 dos 48** especiais passou de 2★ numa população onde 41,7%
- * valem ≥3. A curva errada no prompt era a trava.)_
- */
-export const CURVA_ESPECIAIS_AUDITADOS: Record<string, number> = {
-  '0': 17,
-  '1': 3,
-  '2': 8,
-  '3': 11,
-  '4': 3,
-  '5': 3,
-  '7': 1,
-  '8': 1,
-  '10': 1,
-};
-
-/** Total de especiais com nota humana — denominador dos percentuais da curva acima. */
-export const TOTAL_ESPECIAIS_AUDITADOS = Object.values(CURVA_ESPECIAIS_AUDITADOS).reduce(
-  (s, v) => s + v,
-  0,
-);
-
-/** Quantos por cento dos ESPECIAIS auditados estão em `nota` ou acima. */
-export function percentilEspeciaisAcimaDe(nota: number): number {
-  const acima = Object.entries(CURVA_ESPECIAIS_AUDITADOS)
-    .filter(([k]) => Number(k) >= nota)
-    .reduce((s, [, v]) => s + v, 0);
-  return (acima / TOTAL_ESPECIAIS_AUDITADOS) * 100;
-}
-
 /** Quantos por cento da base estão em `nota` ou acima. É o "top X%" que a tela mostra. */
 export function percentilAcimaDe(nota: number): number {
   const acima = Object.entries(CURVA_BASE)

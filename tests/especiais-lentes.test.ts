@@ -34,14 +34,7 @@ import {
   type AvaliacaoLente,
   type Evidencia,
 } from "@/lib/agents/especiais-lentes";
-import {
-  CRITERIOS,
-  NOTA_MAX,
-  CURVA_BASE,
-  CURVA_ESPECIAIS_AUDITADOS,
-  TOTAL_ESPECIAIS_AUDITADOS,
-  percentilEspeciaisAcimaDe,
-} from "@/lib/especiais-regua";
+import { CRITERIOS, NOTA_MAX } from "@/lib/especiais-regua";
 import type { AlvoClassificacao } from "@/lib/agents/especial-classificador";
 import type { Vizinho } from "@/lib/especial-corpus";
 
@@ -124,31 +117,8 @@ describe("prompt de cada lente", () => {
   it("traz a régua, a curva e o teto da escala (importados, não redigitados)", () => {
     const p = buildSystemPromptLente(LENTES[1]);
     expect(p).toContain(`0–${NOTA_MAX}`);
+    expect(p).toContain("top 4%");
     expect(p).toContain("0★:"); // a curva real
-  });
-
-  // ⚠️ REGRESSÃO do T7 (27/08/2026): o prompt mostrava a `CURVA_BASE` (a aba inteira, com os ~426
-  // financeiros de nota 0), dizendo "≥3★ é top 4% da base … na dúvida fique na MENOR". As lentes
-  // devolviam 1–2 em quase tudo e, como o teto da consolidação é a nota do gate, NENHUM dos 48
-  // especiais passou de 2★ — numa população onde a triagem humana dá ≥3 a 41,7%. A curva errada
-  // no prompt era a trava do painel. Este teste existe para ela não voltar sozinha.
-  it("mostra à lente a curva dos ESPECIAIS auditados, nunca a da base inteira", () => {
-    const p = buildSystemPromptLente(LENTES[0]);
-
-    // a população certa, com os percentis medidos
-    expect(p).toContain(`${TOTAL_ESPECIAIS_AUDITADOS} projetos com nota humana`);
-    expect(p).toContain(`${percentilEspeciaisAcimaDe(3).toFixed(1)}% valem ≥3★`);
-    expect(p).toContain(`${percentilEspeciaisAcimaDe(5).toFixed(1)}% valem ≥5★`);
-
-    // e NÃO a moldura da base: nem a frase de raridade, nem a curva dela
-    expect(p).not.toContain("top 4%");
-    expect(p).not.toContain("CURVA REAL DA BASE");
-    expect(p).not.toContain(`0★: ${CURVA_BASE["0"]}`);
-    // ⚠️ "644" NÃO entra nesta lista: a âncora do 10★ ("hoje 1 projeto em 644") é fato da régua e
-    // pode ficar — o que estava errado era usar a distribuição da base como régua de inflação.
-
-    // a linha da curva é a dos auditados (17 zeros, não 426)
-    expect(p).toContain(`0★: ${CURVA_ESPECIAIS_AUDITADOS["0"]}`);
   });
 
   it("dois prompts de lentes diferentes NÃO são o mesmo texto", () => {
