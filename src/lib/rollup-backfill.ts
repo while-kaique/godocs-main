@@ -16,6 +16,7 @@
 
 import { substituirRollupMensal } from "@/integrations/db/client.server";
 import { agregarRollupMensal, type ProjetoRollupInput } from "@/lib/rollup-financeiro";
+import { canonicalizarArea } from "@/lib/area-canonico";
 import { lerResumosEspelho } from "@/lib/sheet-espelho";
 import { chaveStatus, texto, numero } from "@/lib/dashboard-resumo";
 import { parseDataFlexivel } from "@/lib/format-date";
@@ -40,7 +41,10 @@ export async function recalcularRollupBackfill(): Promise<RollupBackfillResultad
       // ISO derivado da data da planilha — `periodoMensal` fatia o `YYYY-MM` dela. Projeto
       // sem data cai como `null` e o agregador o exclui do tempo (não dá para posicioná-lo).
       submitted_at: data ? data.toISOString() : null,
-      area: texto(row["Área"]),
+      // Canonicaliza o nome da área ANTES de agregar (dedup caixa/acento + renomes que fundem +
+      // grafia das 23 do Gabriel). Como o agregador agrupa por (periodo, area, tipo), variantes que
+      // viram o mesmo nome SOMAM — total preservado, nada descartado. Ver `area-canonico.ts`.
+      area: canonicalizarArea(texto(row["Área"])),
       tipo_saving: texto(row["Tipo de Saving"]),
       saving_reais: numero(row["Saving Reais"]),
       receita_reais: numero(row["Receita Mensal"]),
