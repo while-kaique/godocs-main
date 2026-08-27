@@ -103,6 +103,13 @@ import {
   type EstadoGanhoReal,
 } from "@/lib/agents/ganho-projetado";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
+import {
+  docCompilacaoAssincronaAtiva,
+  placeholderDocPendente,
+  precisaCompilarDoc,
+  coletadoDePendente,
+  mergeDocCompilada,
+} from "@/lib/agents/doc-async";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
   analisarProjeto as analisarProjetoAgent,
@@ -2348,18 +2355,44 @@ export async function enviarMensagem(
     (resultado.fase === "saving" || resultado.fase === "receita") &&
     estado.fase === "doc_preview"
   ) {
-    log("enviarMensagem", "Doc aprovada — compilando documentação...");
-    const doc = await compilarDocumentacao(ctx, resultado.coletado);
-    // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
-    // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
-    // aqui, o gate determinístico de IA do analisador nunca o enxerga (ficava sempre null)
-    // e a resposta explícita do usuário perdia a precedência. Ver SPEC_COMPLEXIDADE_NIVEIS (G0).
-    const docComSinais = {
-      ...doc,
-      tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
-    };
-    await upsertDocumentacao(data.projeto_id, docComSinais);
-    log("enviarMensagem", "Documentação compilada e salva.");
+    if (docCompilacaoAssincronaAtiva()) {
+      // ⚡ Compilação ASSÍNCRONA (flag DOC_COMPILE_ASYNC): a fase saving/receita usa só o
+      // `coletado` (buildDetalhesAprovados), então NÃO esperamos os ~88s da compilação para
+      // liberar o próximo passo. Gravamos um PLACEHOLDER (com o snapshot do coletado para o
+      // submit reconciliar) e disparamos a compilação em segundo plano. `submeterParaValidacao`
+      // garante a doc pronta antes de submeter (compila síncrono se o background não terminou).
+      log("enviarMensagem", "Doc aprovada — compilando em segundo plano (não bloqueia o próximo passo).");
+      // Preserva o conteúdo existente (edição: um saving/receita já compilado não pode ser
+      // apagado pelo placeholder; upsertDocumentacao SUBSTITUI o conteúdo inteiro). Em
+      // submissão nova não há doc ainda → fica só o placeholder.
+      const docRowAtual = await getDocumentacao(data.projeto_id);
+      const conteudoAtual = docRowAtual
+        ? parseJson<Record<string, unknown>>(docRowAtual.conteudo)
+        : null;
+      await upsertDocumentacao(data.projeto_id, {
+        ...(conteudoAtual ?? {}),
+        ...placeholderDocPendente(resultado.coletado),
+      });
+      runBackground(compilarEPersistirDoc(data.projeto_id, ctx, resultado.coletado));
+    } else {
+      // Caminho SÍNCRONO de hoje: a compilação da doc é o CERNE do produto e é feita pelo
+      // agente — NÃO há fallback. Compilamos e salvamos ANTES de confirmar a transição. Se a
+      // IA não devolver uma doc válida (mesmo após os retries internos), compilarDocumentacao
+      // lança: abortamos o turno SEM persistir nada, e o usuário continua no preview podendo
+      // aprovar de novo (o frontend faz rollback da mensagem e exibe o erro).
+      log("enviarMensagem", "Doc aprovada — compilando documentação...");
+      const doc = await compilarDocumentacao(ctx, resultado.coletado);
+      // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
+      // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
+      // aqui, o gate determinístico de IA do analisador nunca o enxerga (ficava sempre null)
+      // e a resposta explícita do usuário perdia a precedência. Ver SPEC_COMPLEXIDADE_NIVEIS (G0).
+      const docComSinais = {
+        ...doc,
+        tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
+      };
+      await upsertDocumentacao(data.projeto_id, docComSinais);
+      log("enviarMensagem", "Documentação compilada e salva.");
+    }
   }
 
   // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
@@ -3438,6 +3471,30 @@ async function limparContextoEspecialOrfao(
   }
 }
 
+// Compila a doc em SEGUNDO PLANO e persiste, fundindo sobre o conteúdo atual (preserva
+// saving/receita e limpa a flag de pendência). FAIL-SAFE: se a compilação lançar, deixa o
+// placeholder pendente — `submeterParaValidacao` reconcilia (compila síncrono) antes do
+// envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
+async function compilarEPersistirDoc(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+): Promise<void> {
+  try {
+    const doc = await compilarDocumentacao(ctx, coletado);
+    const row = await getDocumentacao(projetoId);
+    const atual = row ? parseJson<Record<string, unknown>>(row.conteudo) : null;
+    await upsertDocumentacao(projetoId, mergeDocCompilada(atual, doc, coletado));
+    log("compilarEPersistirDoc", `Doc compilada em segundo plano e salva (projeto ${projetoId}).`);
+  } catch (compileErr) {
+    err(
+      "compilarEPersistirDoc",
+      `Compilação em segundo plano falhou (projeto ${projetoId}) — fica pendente p/ o submit reconciliar:`,
+      compileErr,
+    );
+  }
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3446,7 +3503,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   if (!docRow) throw erroDeBloqueio(bloqueioDocAusente());
 
-  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+  let conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
     string,
     unknown
   >;
@@ -3454,6 +3511,39 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const projeto = await getProjetoById(projeto_id);
 
   if (!projeto) throw new Error("Projeto não encontrado.");
+
+  // ── Reconciliação da doc ASSÍNCRONA (flag DOC_COMPILE_ASYNC) ────────────────
+  // Quando a compilação da doc foi para background na aprovação, o conteúdo pode ainda ser
+  // o PLACEHOLDER (background não terminou / o isolate morreu / a compilação falhou). O
+  // Drive (renderResumoDocumentacao) e o analisador exigem a doc compilada, então garantimos
+  // AQUI: recompilamos síncrono a partir do coletado snapshotado, preservando saving/receita.
+  // Se a compilação falhar de novo, NÃO submetemos doc incompleta (bloqueia). Idempotente:
+  // com a flag OFF ou a doc já compilada, precisaCompilarDoc é false e nada roda.
+  if (precisaCompilarDoc(conteudo)) {
+    log("submeterParaValidacao", "Doc ainda pendente de compilação — compilando agora antes de submeter.");
+    const coletadoPendente =
+      coletadoDePendente(conteudo) ?? { ...documentacaoVazia(), nome_projeto: projeto.nome ?? null };
+    const ctxRecompile: ProjetoContexto = {
+      responsavel_nome: projeto.responsavel_nome ?? "",
+      responsavel_email: projeto.responsavel_email ?? "",
+      area: projeto.area ?? null,
+      ferramenta: projeto.ferramenta ?? "",
+      membros: parseJson<string[]>(projeto.membros) ?? [],
+      nome_projeto: projeto.nome ?? coletadoPendente.nome_projeto ?? "",
+      data_criacao: projeto.data_criacao_projeto ?? null,
+      doc_texto: null,
+      descricao_breve: projeto.descricao_breve ?? null,
+    };
+    try {
+      const doc = await compilarDocumentacao(ctxRecompile, coletadoPendente);
+      conteudo = mergeDocCompilada(conteudo, doc, coletadoPendente);
+      await upsertDocumentacao(projeto_id, conteudo);
+      log("submeterParaValidacao", "Doc compilada e reconciliada no submit.");
+    } catch (compileErr) {
+      err("submeterParaValidacao", "Compilação da doc falhou no submit — não submetendo doc incompleta:", compileErr);
+      throw erroDeBloqueio(bloqueioDocAusente());
+    }
+  }
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
