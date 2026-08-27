@@ -31,7 +31,36 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
 
-### Estado da sessão /ggsd:code (27/08 — Frente 1, doc fora do caminho crítico) — DESIGN PRONTO, CÓDIGO 0%
+### Estado da sessão /ggsd:code (27/08 — Frente 1) — ✅ CÓDIGO VERDE E COMMITADO (commit `9399f49`)
+
+> **ATUALIZAÇÃO (2ª rodada /ggsd:code):** A+B **IMPLEMENTADOS até o VERDE**. Suíte **1942 passando**
+> (baseline era 1905; +37), `tsc` só com os **5 erros PRÉ-EXISTENTES** do main (nenhum novo), `worker.js`
+> rebuildado. Novos módulos `src/lib/agents/doc-modelo.ts` (B, `docMecanicoLLMOpts`) e
+> `src/lib/agents/doc-async.ts` (A, puras + flag). Wiring em `chat.functions.ts`: turno de aprovação
+> (placeholder **preservando conteúdo existente** na edição + `runBackground(compilarEPersistirDoc)`) e
+> reconciliação fail-safe no `submeterParaValidacao` (compila síncrono se pendente, preserva
+> saving/receita; se compilar falhar → bloqueia, não submete doc incompleta). B: `...docMecanicoLLMOpts()`
+> nos `llmChat` de `doc-compiler.ts`/`extractor.ts`. Testes: `doc-modelo.test.ts`+`doc-async.test.ts` (35
+> casos, red→verde via test-writer) + passthrough B em `doc-compiler.test.ts` (mock migrado p/
+> `importOriginal` para não perder `sanitizeEffort`). Commits: `e21e373` (docs) + `9399f49` (código).
+>
+> **Revisores §9 (faixa medida = profunda):** **reuso (§9.C) = `sem-duplicacao`** (reusa `sanitizeEffort`,
+> `runBackground`, `LLMOptions`; o paralelo com o roteamento por fase do orchestrator é bifurcação
+> intencional com rationale no cabeçalho de `doc-modelo.ts`). ⚠️ **conformidade (§9.A) e qualidade (§9.B)
+> foram DESPACHADOS mas os vereditos NÃO foram lidos** (sessão fechou por contexto) — `.review-status` e
+> `.quality-status` seguem **`pendente`** → `/ggsd:ship` **barra** até ler/tratar.
+>
+> **PRÓXIMO PASSO (retomar aqui):** (1) ler os vereditos de conformidade (§9.A) e qualidade (§9.B) —
+> reexecutar os revisores `ggsd:verificador-conformidade` e `ggsd:revisor-qualidade` com o diff de
+> `9399f49` (atenção que a qualidade foi pedida para olhar a RACE background×completo/submit no
+> `documentacao.conteudo`, já mitigada por read-merge + backstop do submit + preservação do conteúdo na
+> edição); (2) tratar achados crítica/alta (default seguro ou waiver/ADR) e gravar os marcadores; (3) se
+> mudar código, `npm run test` verde + `npm run build:worker`; (4) PARAR — staging (`edf400b4`, setar
+> `DOC_COMPILE_ASYNC=1` + opcionalmente `DOC_MECANICO_MODEL`/`DOC_MECANICO_EFFORT`) e validação (medir TTFT
+> do turno de aprovação e do submit antes/depois; conferir doc final íntegra no Drive/analisador) são do
+> Luis. NÃO deploy prod, NÃO merge main, NÃO PR.
+>
+> _(O bloco abaixo é o design original da 1ª rodada — mantido como referência; o código acima já o executa.)_
 
 Sessão fechada cedo por contexto cheio (stop hook). **Baseline verde: 1905 testes.** Nada de produção
 foi escrito ainda; o design está 100% travado (arquivo:linha), e o `ggsd:test-writer` foi disparado para
