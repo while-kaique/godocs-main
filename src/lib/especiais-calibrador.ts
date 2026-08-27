@@ -34,7 +34,7 @@
  * e aquele módulo puxa o `llmChat` — então este arquivo é **server-side**: se um dia uma TELA
  * precisar da reescala, o que se move é a constante para um módulo sem LLM, não uma segunda cópia.
  */
-import { CURVA_BASE, NOTA_MAX } from "@/lib/especiais-regua";
+import { CURVA_BASE, CURVA_ESPECIAIS_AUDITADOS, NOTA_MAX } from "@/lib/especiais-regua";
 import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
 import {
   LENTE_GATE,
@@ -143,18 +143,11 @@ export function aplicarPisosDeProva(e: EntradaCalibragem): {
  * ajustá-la para o painel passar): é declarar a curva da população que o painel julga.
  * ⚠️ Como as 48 notas são também o gabarito do T7, usar esta curva como cota **na medição** é
  * vazamento — no T7 a corrida principal roda com `aplicarCota: false` (mede e RELATA).
+ * ⚠️ **A constante MORA na régua** (`especiais-regua.ts`) e aqui é só reexportada: o prompt das
+ * lentes precisa da mesma curva, e este módulo importa `agents/especiais-lentes` — importar de
+ * volta seria ciclo. Alterar a curva = alterar na régua, nunca duplicar aqui.
  */
-export const CURVA_ESPECIAIS_AUDITADOS: Record<string, number> = {
-  "0": 17,
-  "1": 3,
-  "2": 8,
-  "3": 11,
-  "4": 3,
-  "5": 3,
-  "7": 1,
-  "8": 1,
-  "10": 1,
-};
+export { CURVA_ESPECIAIS_AUDITADOS } from "@/lib/especiais-regua";
 
 /**
  * Quantas vezes a rodada pode passar do percentual da curva antes de a cota morder. Com a curva da
