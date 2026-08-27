@@ -17,6 +17,7 @@ import {
   getDocumentacaoConteudo,
   getDocMessage,
   upsertDocumentacao,
+  patchDocumentacaoConteudo,
   getDocumentacao,
   getProjetoById,
   getProjetosSubmetidos,
@@ -3471,20 +3472,65 @@ async function limparContextoEspecialOrfao(
   }
 }
 
-// Compila a doc em SEGUNDO PLANO e persiste, fundindo sobre o conteúdo atual (preserva
-// saving/receita e limpa a flag de pendência). FAIL-SAFE: se a compilação lançar, deixa o
-// placeholder pendente — `submeterParaValidacao` reconcilia (compila síncrono) antes do
-// envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
+// ── Compilação da doc: single-flight + escrita ATÔMICA (sem race) ──────────────
+// Dois caminhos podem querer compilar a doc do mesmo projeto: o background (disparado na
+// aprovação) e a reconciliação do submit. SINGLE-FLIGHT por projeto (neste isolate) dedupe
+// a compilação — um 2º pedido enquanto há um em voo reusa a MESMA promise (sem duas
+// compilações concorrentes no mesmo isolate; entre isolates diferentes o pior caso é uma
+// recompilação redundante, nunca corrupção — ver patchDaDocCompilada).
+const compilacoesEmVoo = new Map<string, Promise<DocumentacaoGerada>>();
+function compilarDocSingleFlight(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+): Promise<DocumentacaoGerada> {
+  const emVoo = compilacoesEmVoo.get(projetoId);
+  if (emVoo) return emVoo;
+  const p = compilarDocumentacao(ctx, coletado).finally(() => {
+    if (compilacoesEmVoo.get(projetoId) === p) compilacoesEmVoo.delete(projetoId);
+  });
+  compilacoesEmVoo.set(projetoId, p);
+  return p;
+}
+
+// Patch (RFC 7386) com os campos da doc COMPILADA + limpeza das chaves de pendência.
+// ⚠️ NÃO inclui `saving`/`receita`: aplicado via json_patch, um patch sem essas chaves as
+// deixa INTACTAS — é isso que impede o background de apagar o financeiro (o lost-update que
+// o §9 pegou). `null` remove a chave (compilacao_pendente/coletado_pendente). `tem_ia` só
+// entra quando não-nulo (senão o `null` do patch removeria o sinal já gravado no placeholder).
+function patchDaDocCompilada(
+  doc: DocumentacaoGerada,
+  coletado: DocumentacaoColetada,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    ...doc,
+    compilacao_pendente: null,
+    coletado_pendente: null,
+  };
+  if (coletado.tem_ia_como_funcionalidade != null) {
+    patch.tem_ia_como_funcionalidade = coletado.tem_ia_como_funcionalidade;
+  }
+  return patch;
+}
+
+// Compila a doc em SEGUNDO PLANO e persiste os CAMPOS DA DOC via merge ATÔMICO (json_patch),
+// sem tocar em saving/receita — não há mais janela de lost-update do blob. FAIL-SAFE: se a
+// compilação lançar, deixa o placeholder pendente — `submeterParaValidacao` reconcilia antes
+// do envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
 async function compilarEPersistirDoc(
   projetoId: string,
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
 ): Promise<void> {
   try {
-    const doc = await compilarDocumentacao(ctx, coletado);
-    const row = await getDocumentacao(projetoId);
-    const atual = row ? parseJson<Record<string, unknown>>(row.conteudo) : null;
-    await upsertDocumentacao(projetoId, mergeDocCompilada(atual, doc, coletado));
+    const doc = await compilarDocSingleFlight(projetoId, ctx, coletado);
+    const linhas = await patchDocumentacaoConteudo(projetoId, patchDaDocCompilada(doc, coletado));
+    // linhas === 0 → não havia row (o placeholder não persistiu): cria via upsert. `null`
+    // (adaptador não informa) NÃO cria — o placeholder quase sempre existe e criar às cegas
+    // poderia sobrescrever um financeiro recém-gravado.
+    if (linhas === 0) {
+      await upsertDocumentacao(projetoId, mergeDocCompilada(null, doc, coletado));
+    }
     log("compilarEPersistirDoc", `Doc compilada em segundo plano e salva (projeto ${projetoId}).`);
   } catch (compileErr) {
     err(
@@ -3535,9 +3581,14 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
       descricao_breve: projeto.descricao_breve ?? null,
     };
     try {
-      const doc = await compilarDocumentacao(ctxRecompile, coletadoPendente);
+      // Single-flight: se o background ainda está compilando este projeto no MESMO isolate,
+      // reusa a promise em vez de disparar uma 2ª compilação.
+      const doc = await compilarDocSingleFlight(projeto_id, ctxRecompile, coletadoPendente);
+      // Escrita ATÔMICA dos campos da doc (json_patch) — preserva saving/receita mesmo se o
+      // background gravar concorrentemente. `conteudo` em memória é fundido para o downstream
+      // (Drive/analisador) usar a doc completa neste request.
+      await patchDocumentacaoConteudo(projeto_id, patchDaDocCompilada(doc, coletadoPendente));
       conteudo = mergeDocCompilada(conteudo, doc, coletadoPendente);
-      await upsertDocumentacao(projeto_id, conteudo);
       log("submeterParaValidacao", "Doc compilada e reconciliada no submit.");
     } catch (compileErr) {
       err("submeterParaValidacao", "Compilação da doc falhou no submit — não submetendo doc incompleta:", compileErr);
