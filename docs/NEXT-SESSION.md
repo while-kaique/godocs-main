@@ -15,25 +15,76 @@
 
 ## Plano ativo
 
-**→ Canonicalizar a dimensão `area` do rollup pro Gabriel (27/08).** Plano aprovado:
-[docs/plans/rollup-areas-canonicas.md](plans/rollup-areas-canonicas.md) — dedup caixa/acento +
-renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
-(~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
+**→ Frente 1: tirar a documentação do caminho crítico da submissão.** Plano APROVADO (Luis, 27/08):
+[docs/plans/submissao-doc-fora-do-caminho-critico.md](plans/submissao-doc-fora-do-caminho-critico.md).
+Abordagem **A+B**: compilar a doc (~88s) em `runBackground` liberando o próximo passo na hora + garantir
+a doc no submit; extrator/compilador no modelo leve (env-gated). Achado-chave: a fase de saving só usa
+`coletado`, NÃO a doc compilada (`orchestrator.ts:180-197`). Worktree `~/godocs-wt-doc-async`, branch
+`feat/submissao-doc-async` (off `origin/main` @bc09004). **Prioridade #1** (gargalo do cliente).
 
-**STATUS (27/08): CÓDIGO PRONTO, NÃO DEPLOYADO.** Branch `fix/rollup-areas-canonicas` (off
-`origin/main` @1834db6), worktree `~/godocs-wt-areas-rollup`, commit `9352e34`. Suíte **1899 verde**,
-build + worker OK. **Validado contra o payload REAL de prod (dry-run)**: 41 → **30 áreas**, saving e
-receita totais idênticos ao centavo (nada descartado). Luis já aprovou as decisões de mapeamento
-(Produto/Operações/Finanças genéricos; 4 pequenos e os 2 não-área mantidos; renomes AZ→AZ Buy,
-CSC→Projetos/CSC, JURIDICO→Jurídico/Compliance, FP&A→FP&A e Tesouraria).
-
-**PRÓXIMO PASSO:** aguardando **OK do Luis** na lista final de 30 áreas (mostrada no chat). Com o OK:
-deploy STAGING `edf400b4` → `sync-sheets-now` → `rollup-backfill` → dry-run `rollup-push` (conferir ~30
-áreas + totais) → prod `674a3710` → PR via `LuisEduardo100` (regra 14). ⚠️ O cron diário de prod
-(`2aysp914qg9r`) passa a empurrar a lista limpa pro app do Gabriel assim que prod subir.
+**Contexto multi-frente (27/08):** rodada de 2 frentes independentes via Herdr. Esta = **Frente 1**. A
+Frente 2 (time autônomo de avaliação / detector de absurdos — `docs/plans/agentes-avaliacao-autonomos.md`)
+roda em OUTRO worktree — não colidir. Os worktrees do JG rollup (`~/godocs-wt-areas-rollup`,
+`~/godocs-wt-rollup-jg`) e do Kaique (`~/godocs-wt-classificador`, `~/godocs-wt-rag-especial`) seguem em
+paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para o Luis validar.
 
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
+
+### Estado da sessão /ggsd:code (27/08 — Frente 1, doc fora do caminho crítico) — DESIGN PRONTO, CÓDIGO 0%
+
+Sessão fechada cedo por contexto cheio (stop hook). **Baseline verde: 1905 testes.** Nada de produção
+foi escrito ainda; o design está 100% travado (arquivo:linha), e o `ggsd:test-writer` foi disparado para
+autorar o red das funções puras novas (os arquivos de teste podem chegar ao worktree como WIP não-commitado).
+
+**Achado-chave confirmado (destrava tudo):** a fase saving/receita consome só `buildDetalhesAprovados`
+(`orchestrator.ts:180-197`), que usa APENAS o `coletado` — NÃO a doc compilada. Logo a compilação (~88s)
+pode sair do caminho crítico; `documentacao.conteudo` só é preciso no submit (Drive `chat.functions.ts:3765`
+`renderResumoDocumentacao(projeto,conteudo,…)`) e no analisador (pós-submit).
+
+**Plano de implementação (A+B), tudo ENV-GATED com default = comportamento de hoje:**
+
+- **B — modelo leve opt-in** (novo módulo `src/lib/agents/doc-modelo.ts`):
+  `docMecanicoLLMOpts(): {model?,reasoningEffort?}` lê `DOC_MECANICO_MODEL` + `DOC_MECANICO_EFFORT`
+  LAZY (nunca em escopo de módulo), filtra effort por `sanitizeEffort` (de `@/lib/llm`, allowlist
+  low/medium/high/xhigh/max — `minimal`→omitido). Envs ausentes → `{}` = idêntico a hoje. ⚠️ NÃO reusar
+  `LLM_MODEL_FAST` (já setado em prod p/ o roteamento por fase → quebraria "default=hoje"); envs dedicadas.
+  Espalhar `...docMecanicoLLMOpts()` nas chamadas `llmChat` de `doc-compiler.ts:125` (`compilarDocumentacao`)
+  e `extractor.ts:227` (`chamarEParsear`).
+- **A — compilação em background + reconciliação no submit** (novo módulo `src/lib/agents/doc-async.ts`,
+  funções PURAS + flag): `docCompilacaoAssincronaAtiva()` lê `DOC_COMPILE_ASYNC` LAZY (só "1"/"true"→on;
+  default OFF=síncrono de hoje); `placeholderDocPendente(coletado)`→`{compilacao_pendente:true,
+  coletado_pendente:coletado, tem_ia_como_funcionalidade}`; `precisaCompilarDoc(conteudo)`→
+  `conteudo?.compilacao_pendente===true`; `coletadoDePendente(conteudo)`→snapshot|null;
+  `mergeDocCompilada(atual,doc,coletado)`→ funde doc sobre atual PRESERVANDO `saving`/`receita`, remove
+  `compilacao_pendente`/`coletado_pendente`, seta `tem_ia_como_funcionalidade` (coletado ?? atual ?? null).
+  - Wiring em `chat.functions.ts`:
+    - **Turno de aprovação da doc** (`~2347-2363`): se `docCompilacaoAssincronaAtiva()` → grava placeholder
+      via `upsertDocumentacao` + `runBackground(compilarEPersistirDoc(projeto_id, ctx, resultado.coletado))`
+      e retorna o turno NA HORA; senão mantém o caminho síncrono de hoje. `compilarEPersistirDoc` (novo
+      wrapper IO, fail-safe): compila → lê conteudo atual → `mergeDocCompilada` → upsert; se lançar, deixa o
+      placeholder pendente (submit recompila). `runBackground`/`parseJson` já importados.
+    - **`submeterParaValidacao`** (após `getProjetoById` ~3456, ANTES do bloco de saving em 3461 e do Drive
+      em 3765): se `precisaCompilarDoc(conteudo)` → reconstrói `ctx` do `projeto` (responsavel_nome/email,
+      area, ferramenta, membros=parseJson, nome, data_criacao_projeto, descricao_breve), `coletado` de
+      `coletadoDePendente(conteudo)`, `compilarDocumentacao` SÍNCRONO, `conteudo = mergeDocCompilada(...)`
+      (trocar `const conteudo`→`let`), `upsertDocumentacao`. Se compilar falhar aqui → `erroDeBloqueio`
+      (não submeter doc incompleta). Preserva `conteudo.saving`/`receita` (o bloco 3461 depende deles).
+  - Turno `completo` (2387-2415) e a race: NÃO precisa mudar — ele faz read-merge e preserva o que leu;
+    a reconciliação do submit é o backstop (auto-cura qualquer race do background vs. completo).
+
+**Invariantes a não regredir:** doc compilada segue fonte de `documentacao.conteudo` (Drive/analisador);
+NÃO tocar gates de saving nem o contrato do envelope de streaming (deixar `orchestrator.ts:1592-1597`
+como está — só o COMENTÁRIO fica levemente stale, opcional atualizar); PT-BR com acentos; NUNCA
+`process.env` em escopo de módulo; rebuildar `worker.js` (regra 1).
+
+**PRÓXIMO PASSO (retomar aqui):** (1) conferir/finalizar o red do `ggsd:test-writer` (`tests/doc-modelo.test.ts`
++ `tests/doc-async.test.ts`; se não chegou, reautora); (2) implementar os 2 módulos + wiring acima +
+estender `tests/doc-compiler.test.ts`/`tests/extractor.test.ts` p/ provar B (model/effort chegam ao
+`llmChat` quando env setada); (3) `npm run test` verde + `npm run build:worker` (commitar `worker.js`);
+(4) revisão §9 (conformidade + qualidade — caminho quente); (5) PARAR — staging (`edf400b4`, setar
+`DOC_COMPILE_ASYNC`/`DOC_MECANICO_*`) e validação são do Luis (medir TTFT do turno de aprovação e do submit
+antes/depois). ⚠️ revisão §9 pendente → `/ggsd:ship` barra até rodar.
 
 ---
 
