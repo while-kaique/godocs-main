@@ -12,8 +12,8 @@ nunca decide negativo; especial/liderança isentos). Tudo env-gated, DEFAULT OFF
 PARTE 1: schema (`projeto_embedding`+`projeto_avaliacao`, separadas das `especial_*`), DB layer, `avaliarFinanceiro` +
 `avaliarSinalRag`/`agregarVotos` (puros). PARTE 2: corpus `avaliacao-corpus.ts` + orquestrador `avaliacao-normais.functions.ts`
 (RAG ao vivo via `embeddings.ts`→`projeto_embedding`→`selecionarVizinhos`; FTE+Financeiro→`agregarVotos`→`upsertAvaliacaoNormal`) +
-3ª promise no `processarPosSubmissao` + cron `/api/cron/avaliar-normais` + admin routes + `worker.js`. Suíte **1959 verde**.
-Branch `feat/agentes-avaliacao-teamB`. **Próximo:** §9 revisores sobre o diff completo (liberar os gates) → staging `edf400b4` com
+3ª promise no `processarPosSubmissao` + cron `/api/cron/avaliar-normais` + admin routes + `worker.js`. Suíte **1959 verde**. §9 liberou (conformidade `conforme`, qualidade `sugestoes`).
+Branch `feat/agentes-avaliacao-teamB`. **Próximo:** staging `edf400b4` com
 `AVALIACAO_NORMAIS` ligado em sombra → validação do Luis. **Fatia C** (cético + deliberação + retroativo) DEPOIS. Detalhe no
 `## Plano ativo` do `docs/NEXT-SESSION.md` e em `docs/plans/agentes-avaliacao-autonomos.md`.
 

@@ -64,16 +64,25 @@ sombra) — não muda prod até validar. Worktree `~/godocs-wt-agentes-teamB`, b
   admin `POST /api/admin/avaliar-normais` (1 projeto) + `/api/admin/avaliar-normais-pendentes` (dry default).
   `worker.js` rebuildado + commitado.
 
-**⚠️ §9 revisores FALHARAM por RATE-LIMIT (429), NÃO por código** — os 3 (conformidade/qualidade/reuso)
-foram disparados mas morreram no limite de sessão (resetou 19:40 BRT); os marcadores seguem `pendente`.
-O código está VERDE e type-clean. **PRÓXIMO PASSO: re-rodar os 3 revisores §9 sobre o diff completo da
-fatia B** (`git diff f93af11^` ou o range do commit atual) → gravar `.review-status`/`.quality-status` →
-o `/ggsd:ship` só passa depois. Depois: **staging** (`edf400b4`) com `AVALIACAO_NORMAIS` ligado em sombra
-→ validar `projeto_avaliacao` gravando sem mudar status → Luis valida. **Fatia C** (cético + deliberação
-multi-turno + retroativo) fica para depois, com o Kaique.
+**✅ §9 revisores LIBERARAM os gates** (contexto fresco, 2ª tentativa — a 1ª morreu por rate-limit):
+- **Conformidade `conforme`** (0.92): modo sombra real (nada muda status; `decidirStatusSubmissao`/
+  `analisarProjetoFn` intocados), DEFAULT OFF com NO-OP antes de qualquer I/O, NO-OP p/ especiais,
+  tabelas separadas, agregador nunca devolve negativo, especial/liderança isentos, não extrapola p/ fatia C.
+- **Qualidade `sugestoes`** (0.85, não-barrante): 0 achado crítico/alto. **1 sugestão MÉDIA (follow-up):**
+  `getEmbeddingsProjetos()` (`client.server.ts` → `SELECT * FROM projeto_embedding` com a coluna `vetor`) é
+  lido INTEIRO a cada avaliação (`avaliacao-normais.functions.ts`) — a pegadinha dos **32 MiB de RPC** do
+  Godeploy que levou o classificador de especiais ao **Pinecone + thunk preguiçoso + backfill paginado**.
+  Hoje ~4,6 MB (~7× de folga) e roda **em background/cron/admin** (nunca na resposta da submissão), por isso
+  não bloqueia; mas a tabela cresce com TODOS os normais avaliados. **Default seguro quando urgir:** paginar
+  (`getEmbeddingsProjetosPagina`, como o especial) ou migrar o corpus p/ Pinecone com SQLite de fallback.
+  1 achado BAIXO **já corrigido** (commit `fdb7cf1`): corpus montado 1× fora do laço de candidatos.
+- Marcadores: `.review-status=conforme`, `.quality-status=sugestoes` → o `/ggsd:ship` **NÃO barra** por §9.
 
-⚠️ **RESSALVA — revisão GGSD (§9) NÃO concluiu** (rate-limit; `.review-status`/`.quality-status` =
-`pendente`): o `/ggsd:ship` vai **barrar** até re-rodar os revisores sobre o diff da fatia B.
+**PRÓXIMO PASSO:** **staging** (`edf400b4`) com o secret `AVALIACAO_NORMAIS` ligado em sombra (ex.: `sombra`)
+→ rodar `POST /api/admin/avaliar-normais-pendentes {"dry":false}` (ou aguardar o cron) → conferir a tabela
+`projeto_avaliacao` gravando veredito/confiança **sem mudar o Status** → Luis valida a qualidade das
+recomendações → só então (fase futura) plugar no status. **Fatia C** (agente cético + deliberação
+multi-turno persistida + retroativo dos já-submetidos) fica para depois, com o Kaique.
 Rodar na PARTE 2, com o orquestrador+worker prontos.
 
 **Contexto multi-frente (27/08):** rodada de 2 frentes independentes via Herdr. Esta = **Frente 2**. A
