@@ -1,6 +1,6 @@
 # Plano — Canonicalizar a dimensão `area` do rollup pro Gabriel
 
-Status: aprovado
+Status: executado (2026-08-27) — EM PROD + MAIN via PR #302
 
 ## Problema
 O push do rollup histórico pro app do squad Intelli (João Gabriel) manda hoje **~41 áreas**,

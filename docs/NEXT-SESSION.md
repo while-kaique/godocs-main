@@ -20,20 +20,23 @@
 renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
 (~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
 
-**STATUS (27/08): CÓDIGO PRONTO, NÃO DEPLOYADO.** Branch `fix/rollup-areas-canonicas` (off
-`origin/main` @1834db6), worktree `~/godocs-wt-areas-rollup`, commit `9352e34`. Suíte **1899 verde**,
-build + worker OK. **Validado contra o payload REAL de prod (dry-run)**: 41 → **30 áreas**, saving e
-receita totais idênticos ao centavo (nada descartado). Luis já aprovou as decisões de mapeamento
-(Produto/Operações/Finanças genéricos; 4 pequenos e os 2 não-área mantidos; renomes AZ→AZ Buy,
-CSC→Projetos/CSC, JURIDICO→Jurídico/Compliance, FP&A→FP&A e Tesouraria).
+**STATUS (27/08): 🚀 EM PROD + MAIN — PR #302 MERGED** (mergeCommit `bc09004`). Staging `edf400b4` +
+prod `674a3710` deployados; main==prod==staging. Suíte **1905 verde**. Worktree `~/godocs-wt-areas-rollup`.
 
-**PRÓXIMO PASSO:** aguardando **OK do Luis** na lista final de 30 áreas (mostrada no chat). Com o OK:
-deploy STAGING `edf400b4` → `sync-sheets-now` → `rollup-backfill` → dry-run `rollup-push` (conferir ~30
-áreas + totais) → prod `674a3710` → PR via `LuisEduardo100` (regra 14). ⚠️ O cron diário de prod
-(`2aysp914qg9r`) passa a empurrar a lista limpa pro app do Gabriel assim que prod subir.
+**Confirmado em prod:** backfill dá **30 áreas** (era 41); push real do worker `ok:true` HTTP 200;
+endpoint do Gabriel `recebidos:147, gravados:147, rejeitados:[]`. **2º fix na mesma sessão:** TIMEOUT_MS
+do push 20s→60s (ingest do Gabriel leva ~30s; o push e o cron `2aysp914qg9r` abortavam antes).
 
-⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
-`/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
+**Integridade auditada (27/08, pergunta do Luis):** rollup manda SÓ `Status="Aprovado"` do espelho;
+0 contaminação de teste/E2E; total bate ao centavo com a soma crua dos aprovados do dashboard
+(saving **R$696.306,89** / receita **R$1.384.843,40**). Os valores grandes do payload = série CUMULATIVA
+(design do Gabriel). ⚠️ O saving caiu de R$1,35M (memória 26/08) p/ R$696k — movimento de dado na
+triagem, NÃO bug (receita idêntica; rollup espelha o dashboard).
+
+**PRÓXIMO PASSO:** dívida — rodar a **revisão GGSD (§9)** sobre o diff (não rodou: `.review-status`/
+`.quality-status` ausentes). Feature entregue; se surgir ajuste da revisão, nova branch + PR.
+Confirmar com o Gabriel: (1) ele trata saving/receita como ACUMULADO (não re-soma); (2) valores caíram
+não-zero do lado dele.
 
 ---
 
