@@ -44,21 +44,33 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 > casos, red→verde via test-writer) + passthrough B em `doc-compiler.test.ts` (mock migrado p/
 > `importOriginal` para não perder `sanitizeEffort`). Commits: `e21e373` (docs) + `9399f49` (código).
 >
-> **Revisores §9 (faixa medida = profunda):** **reuso (§9.C) = `sem-duplicacao`** (reusa `sanitizeEffort`,
-> `runBackground`, `LLMOptions`; o paralelo com o roteamento por fase do orchestrator é bifurcação
-> intencional com rationale no cabeçalho de `doc-modelo.ts`). ⚠️ **conformidade (§9.A) e qualidade (§9.B)
-> foram DESPACHADOS mas os vereditos NÃO foram lidos** (sessão fechou por contexto) — `.review-status` e
-> `.quality-status` seguem **`pendente`** → `/ggsd:ship` **barra** até ler/tratar.
+> **Revisores §9 (faixa medida = profunda) — vereditos LIDOS:**
+> - **reuso (§9.C) = `sem-duplicacao`** (reusa `sanitizeEffort`, `runBackground`, `LLMOptions`; o paralelo
+>   com o roteamento por fase do orchestrator é bifurcação intencional com rationale no cabeçalho de
+>   `doc-modelo.ts`). Só-sugestão, sem marcador.
+> - **conformidade (§9.A) = `diverge-baixa`** (libera). Único achado: o passthrough B do EXTRATOR não tinha
+>   teste — **JÁ TRATADO** no commit `03654c2` (`tests/extractor.test.ts`). `.review-status=diverge-baixa`.
+> - ⚠️ **qualidade (§9.B) = `bloqueio`** (alta, `.quality-status=bloqueio`) — **NÃO TRATADO, é o que falta.**
+>   RACE de lost-update no `documentacao.conteudo`: a compilação em background faz read-modify-write no
+>   MESMO blob que o turno `completo` sobrescreve inteiro (`upsertDocumentacao` full-replace, sem
+>   transação/CAS). Janela: bg lê `atual` (sem saving), `completo` grava `{...,saving}`, bg grava
+>   `mergeDocCompilada(staleSemSaving,doc)` → **saving/receita PERDIDOS**, sem self-heal (a rede do submit
+>   exige `conteudo.saving` existente; a reconciliação só roda com `compilacao_pendente` presente). Janela
+>   curta (bg ~88s termina antes do `completo` no caso comum) e **atrás de flag OFF por padrão** (prod
+>   seguro), mas é perda silenciosa de dado financeiro em caminho quente → o `quality-gate` **barra o
+>   envio** (correto). Não foi corrigido nesta sessão por ser refactor que não cabia no contexto restante.
 >
-> **PRÓXIMO PASSO (retomar aqui):** (1) ler os vereditos de conformidade (§9.A) e qualidade (§9.B) —
-> reexecutar os revisores `ggsd:verificador-conformidade` e `ggsd:revisor-qualidade` com o diff de
-> `9399f49` (atenção que a qualidade foi pedida para olhar a RACE background×completo/submit no
-> `documentacao.conteudo`, já mitigada por read-merge + backstop do submit + preservação do conteúdo na
-> edição); (2) tratar achados crítica/alta (default seguro ou waiver/ADR) e gravar os marcadores; (3) se
-> mudar código, `npm run test` verde + `npm run build:worker`; (4) PARAR — staging (`edf400b4`, setar
-> `DOC_COMPILE_ASYNC=1` + opcionalmente `DOC_MECANICO_MODEL`/`DOC_MECANICO_EFFORT`) e validação (medir TTFT
-> do turno de aprovação e do submit antes/depois; conferir doc final íntegra no Drive/analisador) são do
-> Luis. NÃO deploy prod, NÃO merge main, NÃO PR.
+> **PRÓXIMO PASSO (retomar aqui) — é o FIX DA RACE (§9.B), obrigatório antes de qualquer envio:**
+> (1) escolher e aplicar um default seguro race-free (recomendado: **(b)** guardar a doc compilada em
+> campo SEPARADO de `saving`/`receita` — os leitores são o analisador, o Drive `renderResumoDocumentacao`
+> e a reconciliação do submit; OU **(a)** o background só pré-aquece e NÃO persiste, deixando o submit
+> sempre reconciliar — race-free mas perde o overlap, o 88s volta ao submit; OU merge atômico no DB se
+> houver). Opções (c) write condicional / (d) reler-e-abortar apenas ENCURTAM a janela, não fecham — não
+> bastam para `alta`. (2) `npm run test` verde + `npm run build:worker` (commitar `worker.js`) + re-rodar
+> `ggsd:revisor-qualidade` sobre o novo diff e regravar `.quality-status`. (3) PARAR — staging
+> (`edf400b4`, setar `DOC_COMPILE_ASYNC=1` + opcionalmente `DOC_MECANICO_MODEL`/`DOC_MECANICO_EFFORT`) e
+> validação (medir TTFT do turno de aprovação e do submit antes/depois; conferir doc final íntegra no
+> Drive/analisador) são do Luis. NÃO deploy prod, NÃO merge main, NÃO PR.
 >
 > _(O bloco abaixo é o design original da 1ª rodada — mantido como referência; o código acima já o executa.)_
 
