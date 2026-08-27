@@ -65,7 +65,9 @@ import {
   avaliarProjetoNormalEmBackground,
   avaliarProjetoNormal,
   avaliarProjetosNormaisPendentes,
+  avancarDeliberacoesPendentes,
 } from "@/lib/avaliacao-normais.functions";
+import { avaliarRetroativo } from "@/lib/avaliacao-retroativa.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
@@ -339,6 +341,26 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         return errorJson("Rota exclusiva de cron.", 403);
       }
       return json(await avaliarProjetosNormaisPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron: avança a DELIBERAÇÃO das mesas ABERTAS (fatia C, MODO SOMBRA) ──
+    // Máquina de estados persistida: cada corrida roda +1 rodada dos `deliberando`, bounded,
+    // até consenso ou nao_consenso. NO-OP se AVALIACAO_NORMAIS OFF. NUNCA muda o status.
+    if (pathname === "/api/cron/deliberar-avaliacoes" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avancarDeliberacoesPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron: RETROATIVO — mede a mesa contra o veredito humano (fatia C, MODO SOMBRA) ──
+    // Roda a mesa nos projetos já decididos pelo humano (aprovado/reprovado no espelho) e grava
+    // acerto/erro em `avaliacao_retroativa`. NO-OP se OFF. SEM tocar status. Bounded/idempotente.
+    if (pathname === "/api/cron/avaliacao-retroativa" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avaliarRetroativo({ dry: false, limite: 20 }));
     }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
@@ -872,6 +894,18 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(
         await avaliarProjetosNormaisPendentes({ dry: body.dry, limite: body.limite }),
       );
+    }
+    // Deliberação: avança as mesas abertas. `dry` DEFAULT (gravar exige {"dry":false}). NO-OP se OFF.
+    if (pathname === "/api/admin/deliberar-avaliacoes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(await avancarDeliberacoesPendentes({ dry: body.dry, limite: body.limite }));
+    }
+    // Retroativo: mede a mesa contra o veredito humano. `dry` DEFAULT (gravar exige {"dry":false}).
+    if (pathname === "/api/admin/avaliacao-retroativa" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(await avaliarRetroativo({ dry: body.dry, limite: body.limite }));
     }
 
     // ── Índice vetorial dos especiais no Pinecone (plataforma oficial) ───────

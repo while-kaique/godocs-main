@@ -2954,6 +2954,159 @@ export async function upsertAvaliacaoNormal(dados: {
   );
 }
 
+// ─── Deliberação multi-turno do time autônomo de avaliação (fatia C, MODO SOMBRA) ──
+
+export type DeliberacaoAvaliacaoRow = {
+  projeto_id: string;
+  estado: string;
+  rodada: number;
+  veredito: string | null;
+  confianca: number | null;
+  grau: string | null;
+  encerrada: number;
+  motivo: string | null;
+  historico: string | null;
+  origem: string | null;
+  atualizado_em: string | null;
+};
+
+export async function getDeliberacao(
+  projetoId: string,
+): Promise<DeliberacaoAvaliacaoRow | null> {
+  const rows = await queryAll<DeliberacaoAvaliacaoRow>(
+    'SELECT * FROM deliberacao_avaliacao WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Deliberações ABERTAS (estado='deliberando') para o cron avançar. Só as colunas de controle —
+ *  NUNCA o `historico` em lote (mantém a leitura pequena; irmão do teto de 32 MiB de RPC). */
+export async function getDeliberacoesAbertas(
+  limite: number,
+): Promise<{ projeto_id: string; estado: string; rodada: number }[]> {
+  return queryAll<{ projeto_id: string; estado: string; rodada: number }>(
+    "SELECT projeto_id, estado, rodada FROM deliberacao_avaliacao WHERE estado = 'deliberando' ORDER BY atualizado_em ASC LIMIT ?",
+    [limite],
+  );
+}
+
+/** ids com deliberação registrada (qualquer estado) — para o cron saber quem já está na mesa. */
+export async function getIdsDeliberacoes(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM deliberacao_avaliacao',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou avança) a deliberação. UPSERT: cada rodada do cron substitui o estado. */
+export async function upsertDeliberacao(dados: {
+  projeto_id: string;
+  estado: string;
+  rodada: number;
+  veredito: string | null;
+  confianca: number | null;
+  grau: string | null;
+  encerrada: boolean;
+  motivo: string | null;
+  historico: string | null;
+  origem: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO deliberacao_avaliacao
+       (projeto_id, estado, rodada, veredito, confianca, grau, encerrada, motivo, historico, origem, atualizado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       estado = excluded.estado,
+       rodada = excluded.rodada,
+       veredito = excluded.veredito,
+       confianca = excluded.confianca,
+       grau = excluded.grau,
+       encerrada = excluded.encerrada,
+       motivo = excluded.motivo,
+       historico = excluded.historico,
+       origem = excluded.origem,
+       atualizado_em = excluded.atualizado_em`,
+    [
+      dados.projeto_id,
+      dados.estado,
+      dados.rodada,
+      dados.veredito,
+      dados.confianca,
+      dados.grau,
+      dados.encerrada ? 1 : 0,
+      dados.motivo,
+      dados.historico,
+      dados.origem,
+    ],
+  );
+}
+
+// ─── Retroativo do time de avaliação (fatia C, MODO SOMBRA) ──────────────────
+
+export type AvaliacaoRetroativaRow = {
+  projeto_id: string;
+  veredito_agregado: string | null;
+  veredito_humano: string | null;
+  resultado: string;
+  confianca: number | null;
+  grau: string | null;
+  motivo: string | null;
+  origem: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesRetroativas(): Promise<AvaliacaoRetroativaRow[]> {
+  return queryAll<AvaliacaoRetroativaRow>('SELECT * FROM avaliacao_retroativa', []);
+}
+
+/** ids já medidos pelo retroativo — para o cron não re-rodar o que já mediu (idempotência). */
+export async function getIdsRetroativos(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM avaliacao_retroativa',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou substitui) a medição retroativa de um projeto. UPSERT: re-medir é reavaliar. */
+export async function upsertAvaliacaoRetroativa(dados: {
+  projeto_id: string;
+  veredito_agregado: string | null;
+  veredito_humano: string | null;
+  resultado: string;
+  confianca: number | null;
+  grau: string | null;
+  motivo: string | null;
+  origem: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO avaliacao_retroativa
+       (projeto_id, veredito_agregado, veredito_humano, resultado, confianca, grau, motivo, origem, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       veredito_agregado = excluded.veredito_agregado,
+       veredito_humano = excluded.veredito_humano,
+       resultado = excluded.resultado,
+       confianca = excluded.confianca,
+       grau = excluded.grau,
+       motivo = excluded.motivo,
+       origem = excluded.origem,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.veredito_agregado,
+      dados.veredito_humano,
+      dados.resultado,
+      dados.confianca,
+      dados.grau,
+      dados.motivo,
+      dados.origem,
+    ],
+  );
+}
+
 // ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────
 
 export type EspecialAreaDonoRow = {

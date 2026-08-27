@@ -501,6 +501,46 @@ const SCHEMA_SQL = `
     criado_em   TEXT DEFAULT (datetime('now'))
   );
 
+  -- Estado da DELIBERAÇÃO multi-turno do time autônomo de avaliação (fatia C, MODO SOMBRA):
+  -- quando os especialistas divergem, a confiança agregada é baixa OU o cético refuta, a mesa
+  -- abre +1 rodada. Máquina de estados PERSISTIDA (deliberando → consenso | nao_consenso |
+  -- isento), avançada pelo CRON idempotente e bounded (uma rodada não cabe indefinidamente num
+  -- request de 60s). ⚠️ SOMBRA -- grava a recomendação e o estado, NADA aqui muda o status do
+  -- projeto. ⚠️ Tabela INTERNA e DERIVADA (fora do Sheets e de SAFE_UPDATE_FIELDS).
+  -- ⚠️ historico é JSON PEQUENO (resumo de cada rodada), nunca blob de snapshot (teto 32 MiB RPC).
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS deliberacao_avaliacao (
+    projeto_id    TEXT PRIMARY KEY,
+    estado        TEXT NOT NULL,
+    rodada        INTEGER NOT NULL DEFAULT 0,
+    veredito      TEXT,
+    confianca     REAL,
+    grau          TEXT,
+    encerrada     INTEGER NOT NULL DEFAULT 0,
+    motivo        TEXT,
+    historico     TEXT,
+    origem        TEXT,
+    atualizado_em TEXT DEFAULT (datetime('now'))
+  );
+
+  -- RETROATIVO (fatia C, MODO SOMBRA): roda a MESA nos projetos com veredito HUMANO assentado
+  -- (aprovado/reprovado no espelho) e compara a recomendação da mesa com o que o humano decidiu,
+  -- medindo acerto/erro (acerto | conservador | erro_grave | sem_base) — mede a qualidade da mesa
+  -- SEM tocar em status nenhum. ⚠️ Tabela INTERNA e DERIVADA (fora do Sheets e de
+  -- SAFE_UPDATE_FIELDS). Pode ser apagada -- o cron retroativo a reconstrói.
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS avaliacao_retroativa (
+    projeto_id       TEXT PRIMARY KEY,
+    veredito_agregado TEXT,
+    veredito_humano  TEXT,
+    resultado        TEXT NOT NULL,
+    confianca        REAL,
+    grau             TEXT,
+    motivo           TEXT,
+    origem           TEXT,
+    criado_em        TEXT DEFAULT (datetime('now'))
+  );
+
   -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
   -- Rollup histórico de saving/receita por (grão, período, área, tipo_saving) — fonte durável
   -- da API histórica consumida pelo squad Intelli (João Gabriel). Tabela DERIVADA e INTERNA

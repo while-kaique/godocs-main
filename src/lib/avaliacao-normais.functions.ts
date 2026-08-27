@@ -28,8 +28,11 @@ import {
   upsertEmbeddingProjeto,
   getIdsAvaliacoesNormais,
   upsertAvaliacaoNormal,
+  upsertDeliberacao,
+  getDeliberacoesAbertas,
   parseJson,
   type ProjetoEmbeddingRow,
+  type ProjetoRow,
 } from '@/integrations/db/client.server';
 import { lerResumosEspelho } from '@/lib/sheet-espelho';
 import { mapResumo, type ProjetoDashboardResumo } from '@/lib/dashboard-resumo';
@@ -55,6 +58,8 @@ import {
   avaliarSinalRag,
   type VeredictoAgregado,
 } from '@/lib/agents/agregador-avaliacao';
+import { avaliarCetico } from '@/lib/agents/cetico-avaliacao';
+import { conciliarComCetico, avancarDeliberacao } from '@/lib/deliberacao';
 import {
   avaliacaoNormaisAtiva,
   selecionarAprovadosNormais,
@@ -220,16 +225,25 @@ type ContextoAvaliacao = {
   embeddings: MapaEmbedding;
 };
 
-/** Núcleo: avalia com o corpus/embeddings JÁ carregados (evita reler a cada candidato no backfill). */
-async function avaliarComContexto(
-  projetoId: string,
-  ctx: ContextoAvaliacao,
-): Promise<ResultadoAvaliacaoNormal> {
-  const projeto = await getProjetoById(projetoId);
-  if (!projeto) return { ok: false, projeto_id: projetoId, motivo: 'projeto não encontrado' };
-  if (projeto.especial === 1) {
-    return { ok: true, projeto_id: projetoId, motivo: 'especial — NO-OP', gravado: false };
-  }
+/** Votos crus dos especialistas + juiz + cético (SEM I/O de escrita). Reusado pelo painel, pela
+ *  deliberação e pelo retroativo — computar uma vez, gravar onde cada caminho precisa. */
+export type VotosPainel = {
+  fte: ReturnType<typeof avaliarPlausibilidadeFTE>;
+  financeiro: ReturnType<typeof avaliarFinanceiro>;
+  rag: ReturnType<typeof avaliarSinalRag>;
+  cetico: ReturnType<typeof avaliarCetico>;
+  agregado: ReturnType<typeof agregarVotos>;
+  conciliado: ReturnType<typeof conciliarComCetico>;
+  vizinhos: number;
+  ehLider: boolean;
+};
+
+/**
+ * Roda a MESA completa sobre um projeto JÁ carregado (não especial): FTE + Financeiro + RAG →
+ * Agregador → Cético → conciliação. PURO de efeito colateral (só LÊ doc/TeamGuide); NÃO grava.
+ */
+async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promise<VotosPainel> {
+  const projetoId = projeto.id;
 
   // Fluxo direto de liderança → isento (fail-to-false: TeamGuide fora → segue a régua normal).
   let ehLider = false;
@@ -286,13 +300,13 @@ async function avaliarComContexto(
 
   // ── Voto RAG (vizinhos aprovados) — corpus JÁ montado no contexto (fora do laço) ──
   const alvo = ctx.embeddings.get(projetoId);
-  const vizinhos = alvo
+  const vizinhosArr = alvo
     ? selecionarVizinhos(alvo.vetor, ctx.corpus, { excluirId: projetoId })
     : [];
-  const rag = avaliarSinalRag(vizinhos);
+  const rag = avaliarSinalRag(vizinhosArr);
 
-  // ── Juiz ──
-  const resultado = agregarVotos({
+  // ── Juiz preliminar ──
+  const agregado = agregarVotos({
     fte,
     financeiro,
     rag,
@@ -300,27 +314,92 @@ async function avaliarComContexto(
     fluxoDireto: ehLider,
   });
 
+  // ── Cético (adversarial) + conciliação — a rede anti-bajulação da fatia C ──
+  const cetico = avaliarCetico({
+    agregadoVeredito: agregado.veredito,
+    fte: { implausivel: fte.implausivel, fte: fte.fte, pessoas: fte.pessoas },
+    financeiro: { veredito: financeiro.veredito, confianca: financeiro.confianca },
+    rag: {
+      apoio: rag.apoio,
+      confianca: rag.confianca,
+      vizinhos: rag.vizinhos,
+      topSimilaridade: rag.topSimilaridade,
+    },
+    fator: fatorFtePlausibilidade(),
+  });
+  const conciliado = conciliarComCetico(agregado, cetico);
+
+  return { fte, financeiro, rag, cetico, agregado, conciliado, vizinhos: vizinhosArr.length, ehLider };
+}
+
+/** Serializa os votos para a coluna de auditoria `votos` (sem R$ cru — só veredito/confiança). */
+function serializarVotos(v: VotosPainel): string {
+  return JSON.stringify({
+    fte: v.fte,
+    financeiro: { veredito: v.financeiro.veredito, confianca: v.financeiro.confianca },
+    rag: {
+      apoio: v.rag.apoio,
+      confianca: v.rag.confianca,
+      vizinhos: v.rag.vizinhos,
+      topSimilaridade: Number(v.rag.topSimilaridade.toFixed(3)),
+    },
+    cetico: { refuta: v.cetico.refuta, confianca: v.cetico.confianca, sinais: v.cetico.sinais },
+    grau: v.conciliado.grau,
+    ceticoRefutou: v.conciliado.ceticoRefutou,
+  });
+}
+
+/** Núcleo: avalia com o corpus/embeddings JÁ carregados (evita reler a cada candidato no backfill). */
+async function avaliarComContexto(
+  projetoId: string,
+  ctx: ContextoAvaliacao,
+): Promise<ResultadoAvaliacaoNormal> {
+  const projeto = await getProjetoById(projetoId);
+  if (!projeto) return { ok: false, projeto_id: projetoId, motivo: 'projeto não encontrado' };
+  if (projeto.especial === 1) {
+    return { ok: true, projeto_id: projetoId, motivo: 'especial — NO-OP', gravado: false };
+  }
+
+  const votos = await computarVotos(projeto, ctx);
+  const { conciliado, cetico } = votos;
+
   let gravado = false;
   if (!ctx.dry) {
+    const modelo = embeddingConfig()?.modelo ?? 'deterministico';
     await upsertAvaliacaoNormal({
       projeto_id: projetoId,
-      veredito: resultado.veredito,
-      confianca: resultado.confianca,
-      aplicar: resultado.aplicarEmValidacao,
-      divergencia: resultado.divergencia,
-      motivo: resultado.motivos.join(' '),
-      votos: JSON.stringify({
-        fte,
-        financeiro: { veredito: financeiro.veredito, confianca: financeiro.confianca },
-        rag: {
-          apoio: rag.apoio,
-          confianca: rag.confianca,
-          vizinhos: rag.vizinhos,
-          topSimilaridade: Number(rag.topSimilaridade.toFixed(3)),
-        },
-      }),
+      veredito: conciliado.veredito,
+      confianca: conciliado.confianca,
+      aplicar: conciliado.aplicarEmValidacao,
+      divergencia: conciliado.divergencia,
+      motivo: conciliado.motivos.join(' '),
+      votos: serializarVotos(votos),
       origem: ORIGEM_AGREGADOR,
-      modelo: embeddingConfig()?.modelo ?? 'deterministico',
+      modelo,
+    });
+
+    // Abre a DELIBERAÇÃO a partir dos votos deste turno (rodada 1). Consenso encerra na hora;
+    // divergência/confiança baixa/refuta do cético deixa `deliberando` para o cron avançar.
+    const delib = avancarDeliberacao(
+      { estado: null, rodada: 0 },
+      {
+        agregadoVeredito: conciliado.veredito,
+        divergencia: conciliado.divergencia,
+        confianca: conciliado.confianca,
+        ceticoRefuta: cetico.refuta,
+      },
+    );
+    await upsertDeliberacao({
+      projeto_id: projetoId,
+      estado: delib.estado,
+      rodada: delib.rodada,
+      veredito: delib.veredito,
+      confianca: delib.confianca,
+      grau: delib.grau,
+      encerrada: delib.encerrada,
+      motivo: delib.motivo,
+      historico: JSON.stringify([{ rodada: delib.rodada, estado: delib.estado, motivo: delib.motivo }]),
+      origem: ORIGEM_AGREGADOR,
     });
     gravado = true;
   }
@@ -328,11 +407,11 @@ async function avaliarComContexto(
   return {
     ok: true,
     projeto_id: projetoId,
-    veredito: resultado.veredito,
-    confianca: resultado.confianca,
-    aplicar: resultado.aplicarEmValidacao,
-    divergencia: resultado.divergencia,
-    vizinhos: vizinhos.length,
+    veredito: conciliado.veredito,
+    confianca: conciliado.confianca,
+    aplicar: conciliado.aplicarEmValidacao,
+    divergencia: conciliado.divergencia,
+    vizinhos: votos.vizinhos,
     gravado,
   };
 }
@@ -389,6 +468,59 @@ export async function avaliarProjetoNormalEmBackground(projetoId: string): Promi
   }
 }
 
+// ─── Loader de contexto compartilhado (espelho + embeddings + corpus) ──────────
+
+type ContextoCarregado = {
+  ctx: ContextoAvaliacao;
+  resumos: ProjetoDashboardResumo[];
+  aprovados: ReturnType<typeof selecionarAprovadosNormais>;
+  gerados: number;
+};
+
+/**
+ * Lê o espelho, garante os embeddings do corpus (aprovados) + dos `idsAlvo`, e monta o contexto
+ * da mesa UMA vez. Reusado pelo backfill, pela deliberação e pelo retroativo (não reler a cada
+ * candidato). Bounded por `capGeracao`.
+ */
+export async function carregarContextoPainel(
+  idsAlvo: string[],
+  opts: { dry: boolean; capGeracao?: number },
+): Promise<ContextoCarregado> {
+  const { linhas } = await lerResumosEspelho();
+  const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
+  const resumoPorId = new Map(resumos.map((p) => [p.id, p]));
+  const aprovados = selecionarAprovadosNormais(resumos);
+
+  let embeddings = decodificarEmbeddings(await getEmbeddingsProjetos());
+  const idsEmbeddar = Array.from(new Set([...idsAlvo, ...aprovados.map((a) => a.id)]));
+  const ger = await garantirEmbeddings(idsEmbeddar, resumoPorId, embeddings, {
+    capGeracao: opts.capGeracao ?? 60,
+  });
+  embeddings = ger.mapa;
+  const corpus = montarCorpusNormais(aprovados, embMapDe(embeddings));
+
+  return {
+    ctx: { dry: opts.dry, resumoPorId, corpus, embeddings },
+    resumos,
+    aprovados,
+    gerados: ger.gerados,
+  };
+}
+
+/**
+ * Roda a mesa sobre UM projeto (já carregado ou por id) com o contexto dado, SEM gravar. Usado
+ * pelo retroativo (compara a recomendação com o humano) e pela deliberação (fresca a cada rodada).
+ * Devolve os votos conciliados ou null (projeto ausente/especial).
+ */
+export async function computarVotosDoProjeto(
+  projetoId: string,
+  ctx: ContextoAvaliacao,
+): Promise<VotosPainel | null> {
+  const projeto = await getProjetoById(projetoId);
+  if (!projeto || projeto.especial === 1) return null;
+  return computarVotos(projeto, ctx);
+}
+
 // ─── Backfill / cron irmão (idempotente, bounded) ──────────────────────────────
 
 export type ResultadoBackfillNormais = {
@@ -425,11 +557,9 @@ export async function avaliarProjetosNormaisPendentes(
   const dry = opts.dry ?? true;
   const limite = opts.limite ?? 15;
 
+  // Uma leitura do espelho só para selecionar os candidatos (sem gerar embedding ainda).
   const { linhas } = await lerResumosEspelho();
   const resumos = linhas.map(mapResumo).filter((p): p is ProjetoDashboardResumo => p != null);
-  const resumoPorId = new Map(resumos.map((p) => [p.id, p]));
-  const aprovados = selecionarAprovadosNormais(resumos);
-
   const jaAvaliados = new Set(await getIdsAvaliacoesNormais());
   // Candidatos = normais NÃO especiais, já submetidos (têm status na planilha) e sem avaliação.
   const candidatos = resumos
@@ -449,15 +579,11 @@ export async function avaliarProjetosNormaisPendentes(
     };
   }
 
-  // Garante embeddings do corpus (aprovados) + dos candidatos, bounded.
-  let embeddings = decodificarEmbeddings(await getEmbeddingsProjetos());
-  const idsEmbeddar = Array.from(new Set([...candidatos.map((c) => c.id), ...aprovados.map((a) => a.id)]));
-  const ger = await garantirEmbeddings(idsEmbeddar, resumoPorId, embeddings, { capGeracao: 60 });
-  embeddings = ger.mapa;
-  // Corpus montado UMA vez (fora do laço de candidatos) — o corpus não depende do candidato.
-  const corpus = montarCorpusNormais(aprovados, embMapDe(embeddings));
+  const { ctx, gerados } = await carregarContextoPainel(candidatos.map((c) => c.id), {
+    dry,
+    capGeracao: 60,
+  });
 
-  const ctx: ContextoAvaliacao = { dry, resumoPorId, corpus, embeddings };
   const resultados: ResultadoAvaliacaoNormal[] = [];
   let avaliados = 0;
   for (const cand of candidatos) {
@@ -479,8 +605,126 @@ export async function avaliarProjetosNormaisPendentes(
     ligado: true,
     dry,
     candidatos: candidatos.length,
-    embeddings_gerados: ger.gerados,
+    embeddings_gerados: gerados,
     avaliados,
     resultados,
   };
+}
+
+// ─── Deliberação: cron que avança as mesas ABERTAS (fatia C, MODO SOMBRA) ───────
+
+export type ResultadoDeliberacaoBackfill = {
+  ok: boolean;
+  ligado: boolean;
+  dry: boolean;
+  abertas: number;
+  avancadas: number;
+  encerradas: number;
+  resultados: { projeto_id: string; estado: string; rodada: number; encerrada: boolean }[];
+  motivo?: string;
+};
+
+/**
+ * Avança UMA rodada de cada deliberação ABERTA (`estado='deliberando'`). Idempotente e bounded por
+ * `limite`. Re-roda a mesa (fresca — o corpus de aprovados pode ter crescido) e aplica o reducer
+ * `avancarDeliberacao`. Consenso/nao_consenso encerram. NUNCA muda o status do projeto (sombra).
+ */
+export async function avancarDeliberacoesPendentes(
+  opts: { dry?: boolean; limite?: number } = {},
+): Promise<ResultadoDeliberacaoBackfill> {
+  if (!avaliacaoNormaisLigada()) {
+    return {
+      ok: true,
+      ligado: false,
+      dry: true,
+      abertas: 0,
+      avancadas: 0,
+      encerradas: 0,
+      resultados: [],
+      motivo: 'AVALIACAO_NORMAIS desligado (modo sombra OFF)',
+    };
+  }
+  const dry = opts.dry ?? true;
+  const limite = opts.limite ?? 10;
+
+  const abertas = await getDeliberacoesAbertas(limite);
+  if (abertas.length === 0) {
+    return {
+      ok: true,
+      ligado: true,
+      dry,
+      abertas: 0,
+      avancadas: 0,
+      encerradas: 0,
+      resultados: [],
+      motivo: 'nenhuma deliberação aberta',
+    };
+  }
+
+  // Contexto com os alvos abertos + o corpus de aprovados.
+  const { ctx } = await carregarContextoPainel(
+    abertas.map((a) => a.projeto_id),
+    { dry, capGeracao: 40 },
+  );
+
+  const resultados: ResultadoDeliberacaoBackfill['resultados'] = [];
+  let avancadas = 0;
+  let encerradas = 0;
+  for (const aberta of abertas) {
+    try {
+      const votos = await computarVotosDoProjeto(aberta.projeto_id, ctx);
+      // Sinais da rodada: se o projeto sumiu/virou especial, encerra por falta de base.
+      const sinais = votos
+        ? {
+            agregadoVeredito: votos.conciliado.veredito,
+            divergencia: votos.conciliado.divergencia,
+            confianca: votos.conciliado.confianca,
+            ceticoRefuta: votos.cetico.refuta,
+          }
+        : {
+            agregadoVeredito: 'em_validacao' as const,
+            divergencia: false,
+            confianca: 0,
+            ceticoRefuta: false,
+          };
+      const delib = avancarDeliberacao(
+        { estado: 'deliberando', rodada: aberta.rodada },
+        sinais,
+      );
+      if (!dry) {
+        await upsertDeliberacao({
+          projeto_id: aberta.projeto_id,
+          estado: delib.estado,
+          rodada: delib.rodada,
+          veredito: delib.veredito,
+          confianca: delib.confianca,
+          grau: delib.grau,
+          encerrada: delib.encerrada,
+          motivo: delib.motivo,
+          historico: JSON.stringify([
+            { rodada: delib.rodada, estado: delib.estado, motivo: delib.motivo },
+          ]),
+          origem: ORIGEM_AGREGADOR,
+        });
+      }
+      avancadas++;
+      if (delib.encerrada) encerradas++;
+      resultados.push({
+        projeto_id: aberta.projeto_id,
+        estado: delib.estado,
+        rodada: delib.rodada,
+        encerrada: delib.encerrada,
+      });
+    } catch (e) {
+      resultados.push({
+        projeto_id: aberta.projeto_id,
+        estado: 'erro',
+        rodada: aberta.rodada,
+        encerrada: false,
+      });
+      console.error('[avaliacao-normais] deliberação falhou:', e);
+    }
+  }
+
+  return { ok: true, ligado: true, dry, abertas: abertas.length, avancadas, encerradas, resultados };
 }

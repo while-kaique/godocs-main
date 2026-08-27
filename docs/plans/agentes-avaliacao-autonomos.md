@@ -1,6 +1,6 @@
 # Plano — Frente 2: time autônomo de avaliação (juiz melhor que o humano)
 
-**Status:** ✅ aprovado — fatia B (RAG por corpus de aprovados + especialista Financeiro + Agregador/Juiz com confiança) (Luis, 27/08/2026)
+**Status:** ✅ aprovado — fatia C (cético/adversarial + deliberação persistida por cron + confiança formalizada + retroativo modo sombra) (Luis, 27/08/2026). Fatias A+B já prontas e verdes.
 > Origem: o GoDocs deveria julgar sozinho (aprovado/reprovado/em avaliação) e mandar à fila humana do RPA só a **minoria** dos casos-limite. Caso concreto de falha: **saving de 500h/mês (=12 FTE) foi APROVADO** — implausível, deveria ter sido enfileirado. Objetivo do dono (Luis, 27/08/2026).
 > **Independente da Frente 1** (latência). Metodologia GGSD.
 
@@ -72,4 +72,45 @@ Worktree próprio `~/godocs-wt-agentes-avaliacao` (fora da raiz). Env-gated onde
 - ✅ **Fatia A** (detector FTE) — EM CIMA dela a fatia B foi construída (o FTE virou o especialista "Plausibilidade").
 - 🟡 **Fatia B — PARTE 1 (27/08, checkpoint verde, NÃO fechada):** schema (`projeto_embedding` + `projeto_avaliacao`, tabelas SEPARADAS das `especial_*`), DB layer, especialista **Financeiro** PURO (`avaliarFinanceiro`) e **Agregador/juiz** PURO (`avaliarSinalRag` + `agregarVotos` — confiança baixa/divergência → `em_validacao`, nunca decide negativo, especial/liderança isentos). Testes red→verde (24 casos), suíte **1944 verde**. Detalhe e PRÓXIMO PASSO no ponteiro `## Plano ativo` do `docs/NEXT-SESSION.md`.
 - ✅ **Fatia B — PARTE 2 (27/08, código VERDE):** corpus/config PURO `avaliacao-corpus.ts` (`avaliacaoNormaisAtiva` DEFAULT OFF, `selecionarAprovadosNormais`, `montarCorpusNormais`) + orquestrador `avaliacao-normais.functions.ts` (modo SOMBRA, env-gate LAZY; RAG ao vivo via `embeddings.ts`→`projeto_embedding`→`selecionarVizinhos` + FTE + Financeiro → `agregarVotos` → `upsertAvaliacaoNormal`, NUNCA muda status) + 3ª promise no `processarPosSubmissao` + cron `/api/cron/avaliar-normais` + admin routes + `build:worker`. Suíte **1959 verde**. ✅ §9 LIBEROU (conformidade `conforme` 0.92, qualidade `sugestoes` não-barrante). Follow-up médio: `getEmbeddingsProjetos()` lê a tabela inteira (risco 32 MiB RPC, em background / ~7× de folga) → paginar/Pinecone quando urgir. 1 achado baixo corrigido (corpus fora do laço, `fdb7cf1`).
-- ⬜ **Fatia C** (cético + deliberação multi-turno + retroativo) — DEPOIS, com o Kaique.
+## 9. Fatia C — cético + deliberação + confiança + retroativo (APROVADA, modo sombra)
+
+Fecha o TIME. **Tudo env-gated pelo MASTER `AVALIACAO_NORMAIS`** (o mesmo da fatia B): OFF (default) → NO-OP
+total, nada roda. Nada muda status/veredito de prod — só GRAVA recomendações em tabelas internas, até o Luis
+validar a sombra. Invariantes herdados: especial/liderança ISENTOS; nunca reprova sem motivo legível; triagem
+humana sempre sobrepõe; embeddings SEMPRE direto na OpenAI; envs LAZY; comentário no SCHEMA_SQL sem `;`; NUNCA
+selecionar blobs em massa (teto 32 MiB RPC).
+
+**(1) Especialista CÉTICO/adversarial** (`src/lib/agents/cetico-avaliacao.ts`, PURO). Recebe o veredito
+preliminar do agregador + os votos e **tenta REFUTAR uma aprovação** (vota para derrubar; nunca empurra para
+aprovar — anti-bajulação). Devolve `{refuta, confianca, motivo, sinais}`, onde `confianca` é o LASTRO da
+refutação (quão seguro ele está de que aquilo NÃO devia ser auto-aprovado). Refuta em condições-limite: FTE
+perto do teto sem estourar, financeiro `inconclusivo` sendo aprovado sem evidência, apoio do RAG marginal
+(exatamente o mínimo de vizinhos / similaridade raspando o piso), materialidade logo abaixo do teto. Só
+desafia `aprovar`; `em_validacao`/`isento` → não refuta.
+
+**(2) DELIBERAÇÃO persistida por CRON** (`src/lib/deliberacao.ts` PURO + tabela `deliberacao_avaliacao`).
+Quando os especialistas DIVERGEM, a confiança agregada é BAIXA, ou o cético REFUTA → abre +1 rodada. Estado
+PERSISTIDO no banco (`deliberando`→`consenso`|`nao_consenso`|`isento`), avançado por CRON idempotente (não
+cabe num request de 60s), **bounded** por `MAX_RODADAS_DELIBERACAO`. Reducer PURO `avancarDeliberacao(estado,
+sinaisDaRodada)`. `nao_consenso` (esgotou as rodadas sem acordo) → recomenda `em_validacao` (humano). Reusa o
+protocolo de confiança/estado do agregador.
+
+**(3) CONFIANÇA formalizada** (`grauConfianca(n)` PURO → `alta|media|baixa`, tipo `Confianca` reusado de
+`especiais-regua.ts`): todo desfecho (agregador, cético, deliberação, retroativo) carrega grau + é registrado
+para auditoria (coluna `grau`/`votos`).
+
+**(4) RETROATIVO modo SOMBRA** (`src/lib/avaliacao-retroativa.ts` PURO + `*.functions.ts` + tabela
+`avaliacao_retroativa`). Cron roda a MESA nos projetos com **veredito HUMANO** (pendentes e já-decididos no
+espelho), compara a recomendação com o Status humano e mede acerto/confiança: `acerto` (concordam) ·
+`conservador` (mesa mandaria ao humano, humano aprovou) · `erro_grave` (mesa auto-aprovaria o que o humano
+REPROVOU — o caso das 500h) · `sem_base`. GRAVA o resultado; **SEM mudar status**. Comparação PURA
+`compararComHumano(veredito, statusHumano)` + agregação de acurácia.
+
+### Tasks fatia C
+- **C1** — pure `avaliarCetico` + testes (red isolado). **C2** — pure `deliberacao.ts` (`grauConfianca`,
+  `conciliarComCetico`, `avancarDeliberacao`) + testes. **C3** — pure `avaliacao-retroativa.ts`
+  (`compararComHumano`, `agregarAcuracia`) + testes. **C4** — schema (2 tabelas) + DB layer + fiar o cético
+  no painel (`avaliarComContexto`) e persistir grau/deliberação. **C5** — orquestradores de deliberação e
+  retroativo + crons + admin routes. **C6** — build:worker, suíte verde, §9.
+
+- ✅ **Fatia C** (esta sessão) — cético/deliberação/confiança/retroativo em modo sombra.
