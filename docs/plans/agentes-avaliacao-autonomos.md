@@ -1,6 +1,6 @@
 # Plano — Frente 2: time autônomo de avaliação (juiz melhor que o humano)
 
-**Status:** ✅ aprovado — fatia A (Luis, 27/08/2026)
+**Status:** ✅ aprovado — fatia B (RAG por corpus de aprovados + especialista Financeiro + Agregador/Juiz com confiança) (Luis, 27/08/2026)
 > Origem: o GoDocs deveria julgar sozinho (aprovado/reprovado/em avaliação) e mandar à fila humana do RPA só a **minoria** dos casos-limite. Caso concreto de falha: **saving de 500h/mês (=12 FTE) foi APROVADO** — implausível, deveria ter sido enfileirado. Objetivo do dono (Luis, 27/08/2026).
 > **Independente da Frente 1** (latência). Metodologia GGSD.
 
@@ -66,3 +66,10 @@ Debate como máquina de estados persistida; cron pega a próxima rodada até con
 ## 7. Rollout / gates
 
 Worktree próprio `~/godocs-wt-agentes-avaliacao` (fora da raiz). Env-gated onde der (fator do FTE, ligar/desligar RAG). **Staging antes de prod**; validar com projeto absurdo antes de confiar. Não colidir com o worktree do Kaique nem com o `~/godocs-wt-rollup-jg` ativo.
+
+## 8. Progresso — fatia B
+
+- ✅ **Fatia A** (detector FTE) — EM CIMA dela a fatia B foi construída (o FTE virou o especialista "Plausibilidade").
+- 🟡 **Fatia B — PARTE 1 (27/08, checkpoint verde, NÃO fechada):** schema (`projeto_embedding` + `projeto_avaliacao`, tabelas SEPARADAS das `especial_*`), DB layer, especialista **Financeiro** PURO (`avaliarFinanceiro`) e **Agregador/juiz** PURO (`avaliarSinalRag` + `agregarVotos` — confiança baixa/divergência → `em_validacao`, nunca decide negativo, especial/liderança isentos). Testes red→verde (24 casos), suíte **1944 verde**. Detalhe e PRÓXIMO PASSO no ponteiro `## Plano ativo` do `docs/NEXT-SESSION.md`.
+- ⬜ **Fatia B — PARTE 2:** orquestrador `avaliacao-normais.functions.ts` (env-gate `AVALIACAO_NORMAIS` default OFF, modo SOMBRA) + 3ª promise no `processarPosSubmissao` + cron/admin routes + `build:worker`. Depois: §9 revisores sobre o diff completo → staging → validação do Luis.
+- ⬜ **Fatia C** (cético + deliberação multi-turno + retroativo) — DEPOIS, com o Kaique.

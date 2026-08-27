@@ -15,13 +15,62 @@
 
 ## Plano ativo
 
-**→ Frente 2 (fatia A): detector determinístico de saving implausível / FTE.** Plano APROVADO (Luis,
-27/08): [docs/plans/agentes-avaliacao-autonomos.md](plans/agentes-avaliacao-autonomos.md) — **só a fatia
-A por ora**: função PURA `avaliarPlausibilidadeFTE` em `analyzer.ts` (irmã de `normalizarClassificacao`),
-consumida em `analisarProjeto` e como gate em `analisarProjetoFn` → projeto absurdo (ex.: 500h/mês = ~12
-FTE vs. pessoas declaradas) vai para `em_validacao` (fila RPA), NUNCA aprova automático. Especial/liderança
-ISENTOS (herdam `analyzer.ts:584-590`). Nunca reprova sem motivo legível. Worktree
-`~/godocs-wt-agentes-avaliacao`, branch `feat/agentes-avaliacao-fte` (off `origin/main` @bc09004).
+**→ Frente 2 (fatia B): TIME de avaliação — RAG por corpus + Financeiro + Agregador com confiança.**
+Plano APROVADO (Luis, 27/08): [docs/plans/agentes-avaliacao-autonomos.md](plans/agentes-avaliacao-autonomos.md)
+— fatia B, EM CIMA da fatia A (o `avaliarPlausibilidadeFTE` vira o especialista "Plausibilidade"). Construir:
+(1) RAG p/ projetos NORMAIS — tabela `projeto_embedding` (SEPARADA de `especial_embedding`), reusar o código
+PURO (`embeddings.ts`, `especial-corpus.ts`: selecionarVizinhos/textoParaEmbedding/hashTexto), aprender do
+veredito HUMANO (aprovado no `sheet_espelho`/`analises`), cron irmão; (2) especialista FINANCEIRO (coerência
+saving/receita × memorial, dupla contagem, materialidade); (3) AGREGADOR/Juiz PURO que concilia votos +
+CONFIANÇA (baixa confiança/divergência → `em_validacao`, nunca decide sozinho). Especialistas em PARALELO
+(`Promise.allSettled` no `processarPosSubmissao`), NO-OP p/ especiais. Tudo env-gated, DEFAULT OFF (modo
+sombra) — não muda prod até validar. Worktree `~/godocs-wt-agentes-teamB`, branch
+`feat/agentes-avaliacao-teamB` (off `feat/agentes-avaliacao-fte`). Fatia C (cético + deliberação + retroativo) DEPOIS.
+
+**🟡 Fatia B — PARTE 1 VERDE (27/08, sessão /ggsd:code — checkpoint tested, NÃO fechada):** suíte
+**1944 verde** (1920 baseline + 24 novos). Feito, na branch `feat/agentes-avaliacao-teamB`:
+- **Schema** (`src/integrations/db/schema.ts`): 2 tabelas NOVAS, SEPARADAS das `especial_*` —
+  `projeto_embedding` (memória vetorial dos normais, espelha `especial_embedding`) e
+  `projeto_avaliacao` (recomendação do agregador em MODO SOMBRA: veredito/confianca/aplicar/
+  divergencia/motivo/votos/origem/modelo). Comentários SEM `;` (regra do initSchema).
+- **DB layer** (`src/integrations/db/client.server.ts`): `ProjetoEmbeddingRow` + `get/getAll/upsert`;
+  `ProjetoAvaliacaoRow` + `getAvaliacoesNormais`/`getAvaliacaoNormal`/`getIdsAvaliacoesNormais`/
+  `upsertAvaliacaoNormal`. Espelham as funções da peça do Kaique.
+- **Especialista FINANCEIRO** (PURO) `src/lib/agents/avaliacao-financeira.ts` — `avaliarFinanceiro`
+  + `TETO_MATERIALIDADE_FINANCEIRO=5000`. Checa materialidade alta, saving/receita sem ganho,
+  DUPLA CONTAGEM custo evitado ≈ receita (tolerância 1% — buraco do Sucesso.AI). Devolve
+  `{veredito:'ok'|'atencao'|'inconclusivo', confianca 0-1, motivo, sinais}`.
+- **AGREGADOR/juiz** (PURO) `src/lib/agents/agregador-avaliacao.ts` — `avaliarSinalRag` (sinal do RAG:
+  vizinhos aprovados próximos → apoio; `PISO_APOIO_RAG=0.5`, `MIN_VIZINHOS_APOIO=2`) +
+  `agregarVotos` (concilia FTE+Financeiro+RAG; **confiança baixa OU divergência → `em_validacao`**;
+  **NUNCA** devolve veredito negativo; especial/liderança → `isento`; `LIMIAR_CONFIANCA_AGREGADOR=0.6`).
+- **Testes RED→verde** (test-writer isolado): `tests/avaliacao-financeira.test.ts` (9 casos) +
+  `tests/agregador-avaliacao.test.ts` (avaliarSinalRag a–d + agregarVotos e–m).
+
+**PRÓXIMO PASSO — Fatia B PARTE 2 (a próxima sessão de código):**
+1. **Orquestrador** `src/lib/avaliacao-normais.functions.ts` (irmão de `especial-classificador.functions.ts`):
+   env-gate LAZY `AVALIACAO_NORMAIS` (default OFF → NO-OP total); `avaliarProjetoNormalEmBackground(id)`
+   (NO-OP se OFF ou `especial===1`) + `avaliarProjetosNormaisPendentes({dry,limite})` (backfill/cron).
+   Fluxo: embed do ALVO (reusar `gerarEmbeddingsLote`/`textoParaEmbedding`/`hashTexto`/`recortarTexto`
+   de `embeddings.ts`+`especial-corpus.ts`) → corpus de APROVADOS normais (do espelho: `!especial &&
+   statusChave==='aprovado' && !descontinuado`, via `lerResumosEspelho`+`mapResumo`; label
+   `estrela_humana=1` como marcador positivo p/ reusar `selecionarVizinhos`) → `avaliarSinalRag` →
+   `avaliarPlausibilidadeFTE`+`avaliarFinanceiro` → `agregarVotos` → `upsertAvaliacaoNormal` (SOMBRA:
+   grava, NÃO muda status). Dados do projeto: `getProjetoById`+`getDocumentacao`(conteudo saving/receita)
+   +`getProjetoContextoData`+`getDocumentacaoConteudo`. FTE/financeiro inputs = mesmos de `analisarProjetoFn`
+   (membros.length+1 pessoas; horas de `saving.economia_horas_mes`/linhas; `custo_evitado_itens`).
+2. **Worker** (`src/worker.ts`): 3ª promise no `Promise.allSettled` de `processarPosSubmissao`
+   (`avaliarProjetoNormalEmBackground`); cron `POST /api/cron/avaliar-normais` (header `x-godeploy-cron`,
+   `{dry:false,limite:10}`); admin `POST /api/admin/avaliar-normais` (1 projeto) + `/api/admin/avaliar-normais-pendentes`
+   (dry default) — padrão das rotas `especiais/classificar*`. Import do orquestrador no topo.
+3. `npm run build:worker` + commitar `worker.js` (regra 1 — só depois do worker.ts alterado).
+4. **§9 revisores** (conformidade + qualidade) sobre o diff COMPLETO da fatia B — **PENDENTE**, ver ressalva abaixo.
+5. Staging (`edf400b4`) com `AVALIACAO_NORMAIS` ligado em sombra → validar `projeto_avaliacao` gravando
+   sem mudar status → Luis valida → só então (fase futura) plugar no status.
+
+⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` = `pendente`): o
+`/ggsd:ship` vai **barrar** até a revisão de contexto fresco rodar sobre o diff completo da fatia B.
+Rodar na PARTE 2, com o orquestrador+worker prontos.
 
 **Contexto multi-frente (27/08):** rodada de 2 frentes independentes via Herdr. Esta = **Frente 2**. A
 Frente 1 (doc fora do caminho crítico — `docs/plans/submissao-doc-fora-do-caminho-critico.md`) roda em

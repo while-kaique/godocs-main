@@ -465,6 +465,42 @@ const SCHEMA_SQL = `
     criado_em   TEXT DEFAULT (datetime('now'))
   );
 
+  -- Memória VETORIAL dos projetos NORMAIS (time autônomo de avaliação, fatia B). Espelha
+  -- especial_embedding mas é uma tabela SEPARADA de propósito: normais têm memorial financeiro,
+  -- especiais são qualitativos, e os corpora não se misturam (não atropelar a peça do Kaique).
+  -- ⚠️ Tabela INTERNA e DERIVADA: fora do Sheets e de SAFE_UPDATE_FIELDS, o sync não a toca.
+  -- Pode ser apagada -- o cron de backfill a reconstrói chamando a OpenAI de novo.
+  -- ⚠️ O vetor vive como base64 de Float32Array (o Worker não tem Buffer) -- ver embeddings.ts.
+  -- ⚠️ texto_hash existe para NÃO re-embeddar (custa dinheiro) quando o texto do projeto não mudou.
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS projeto_embedding (
+    projeto_id  TEXT PRIMARY KEY,
+    modelo      TEXT NOT NULL,
+    dim         INTEGER NOT NULL,
+    vetor       TEXT NOT NULL,
+    texto_hash  TEXT,
+    criado_em   TEXT DEFAULT (datetime('now'))
+  );
+
+  -- Recomendação do AGREGADOR/juiz do time autônomo de avaliação (fatia B, MODO SOMBRA):
+  -- o veredito conciliado (Plausibilidade/FTE + Financeiro + sinal do RAG) + confiança + os
+  -- votos individuais (auditoria). ⚠️ SOMBRA -- esta tabela GRAVA a recomendação mas NADA nela
+  -- muda o status do projeto (a decisão segue sendo a de decidirStatusSubmissao) até o Luis
+  -- validar. ⚠️ Tabela INTERNA: a decisão vive no projeto/planilha, a sugestão vive aqui.
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS projeto_avaliacao (
+    projeto_id  TEXT PRIMARY KEY,
+    veredito    TEXT NOT NULL,
+    confianca   REAL NOT NULL,
+    aplicar     INTEGER NOT NULL DEFAULT 0,
+    divergencia INTEGER NOT NULL DEFAULT 0,
+    motivo      TEXT,
+    votos       TEXT,
+    origem      TEXT,
+    modelo      TEXT,
+    criado_em   TEXT DEFAULT (datetime('now'))
+  );
+
   -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
   -- Rollup histórico de saving/receita por (grão, período, área, tipo_saving) — fonte durável
   -- da API histórica consumida pelo squad Intelli (João Gabriel). Tabela DERIVADA e INTERNA

@@ -2826,6 +2826,134 @@ export async function upsertEmbeddingEspecial(dados: {
   );
 }
 
+// ─── Time autônomo de avaliação de projetos NORMAIS (fatia B) ────────────────
+// Tabelas SEPARADAS das especial_* de propósito (corpora distintos; não atropelar a peça do
+// Kaique). `projeto_embedding` é a memória vetorial dos normais; `projeto_avaliacao` guarda a
+// recomendação do agregador em MODO SOMBRA (grava, não muda status). Ver
+// `avaliacao-normais.functions.ts` e `agents/agregador-avaliacao.ts`.
+
+export type ProjetoEmbeddingRow = {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string; // base64 de Float32Array
+  texto_hash: string | null;
+  criado_em: string | null;
+};
+
+/** Todos os embeddings de normais (vetor incluso). Corpus por cosseno-em-JS na fatia B. */
+export async function getEmbeddingsProjetos(): Promise<ProjetoEmbeddingRow[]> {
+  return queryAll<ProjetoEmbeddingRow>('SELECT * FROM projeto_embedding', []);
+}
+
+/** O embedding de UM projeto normal — o vetor do ALVO, sem puxar a tabela toda. */
+export async function getEmbeddingProjeto(
+  projetoId: string,
+): Promise<ProjetoEmbeddingRow | null> {
+  const rows = await queryAll<ProjetoEmbeddingRow>(
+    'SELECT * FROM projeto_embedding WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Grava (ou substitui) o embedding de um projeto normal. UPSERT: re-embeddar é o caso de edição. */
+export async function upsertEmbeddingProjeto(dados: {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string;
+  texto_hash: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO projeto_embedding (projeto_id, modelo, dim, vetor, texto_hash, criado_em)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       modelo = excluded.modelo,
+       dim = excluded.dim,
+       vetor = excluded.vetor,
+       texto_hash = excluded.texto_hash,
+       criado_em = excluded.criado_em`,
+    [dados.projeto_id, dados.modelo, dados.dim, dados.vetor, dados.texto_hash],
+  );
+}
+
+export type ProjetoAvaliacaoRow = {
+  projeto_id: string;
+  veredito: string;
+  confianca: number;
+  aplicar: number;
+  divergencia: number;
+  motivo: string | null;
+  votos: string | null;
+  origem: string | null;
+  modelo: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesNormais(): Promise<ProjetoAvaliacaoRow[]> {
+  return queryAll<ProjetoAvaliacaoRow>('SELECT * FROM projeto_avaliacao', []);
+}
+
+export async function getAvaliacaoNormal(
+  projetoId: string,
+): Promise<ProjetoAvaliacaoRow | null> {
+  const rows = await queryAll<ProjetoAvaliacaoRow>(
+    'SELECT * FROM projeto_avaliacao WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** id + veredito (sem votos) — para o backfill saber quem já foi avaliado sem puxar os blobs. */
+export async function getIdsAvaliacoesNormais(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM projeto_avaliacao',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou substitui) a recomendação do agregador. UPSERT: reavaliar é o caso do reenvio. */
+export async function upsertAvaliacaoNormal(dados: {
+  projeto_id: string;
+  veredito: string;
+  confianca: number;
+  aplicar: boolean;
+  divergencia: boolean;
+  motivo: string | null;
+  votos: string | null;
+  origem: string | null;
+  modelo: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO projeto_avaliacao
+       (projeto_id, veredito, confianca, aplicar, divergencia, motivo, votos, origem, modelo, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       veredito = excluded.veredito,
+       confianca = excluded.confianca,
+       aplicar = excluded.aplicar,
+       divergencia = excluded.divergencia,
+       motivo = excluded.motivo,
+       votos = excluded.votos,
+       origem = excluded.origem,
+       modelo = excluded.modelo,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.veredito,
+      dados.confianca,
+      dados.aplicar ? 1 : 0,
+      dados.divergencia ? 1 : 0,
+      dados.motivo,
+      dados.votos,
+      dados.origem,
+      dados.modelo,
+    ],
+  );
+}
+
 // ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────
 
 export type EspecialAreaDonoRow = {

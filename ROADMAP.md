@@ -6,6 +6,15 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
+**Plano ativo — Frente 2: time autônomo de avaliação, FATIA B 🟡 (PARTE 1 verde em 2026-08-27, NÃO fechada):**
+RAG por corpus de aprovados + especialista Financeiro + Agregador/juiz com confiança (confiança baixa/divergência → `em_validacao`,
+nunca decide negativo; especial/liderança isentos). Tudo env-gated, DEFAULT OFF (modo SOMBRA). PARTE 1 pronta: schema
+(`projeto_embedding`+`projeto_avaliacao`, separadas das `especial_*`), DB layer, `avaliarFinanceiro` + `avaliarSinalRag`/`agregarVotos`
+(puros, 24 testes), suíte **1944 verde**. Branch `feat/agentes-avaliacao-teamB`. ⚠️ §9 revisores NÃO rodaram (`/ggsd:ship` barra).
+**Próximo:** PARTE 2 — orquestrador `avaliacao-normais.functions.ts` (env-gate `AVALIACAO_NORMAIS`, modo sombra) + 3ª promise no
+`processarPosSubmissao` + cron/admin routes + `build:worker` → §9 → staging. Detalhe no `## Plano ativo` do `docs/NEXT-SESSION.md` e em
+`docs/plans/agentes-avaliacao-autonomos.md`.
+
 **Plano ativo — API histórica de saving/receita p/ João Gabriel (squad Intelli), FASE 3 NÚCLEO 🟡 (código pronto+verde em 2026-08-26, NÃO deployado):**
 agregador puro (`rollup-financeiro.ts`) + tabela durável `rollup_saving_receita` + backfill mensal (`rollup-backfill.ts`) + rota admin
 `POST /api/admin/rollup-backfill`. Grão (mês de `submitted_at`, área, `tipo_saving`); saving e receita CRUS/SEPARADOS, nunca somados,
