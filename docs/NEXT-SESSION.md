@@ -31,7 +31,7 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 ⚠️ **RESSALVA — revisão GGSD (§9) NÃO rodou** (`.review-status`/`.quality-status` ausentes): o
 `/ggsd:ship` vai **barrar** até rodar `/ggsd:code` review ou a revisão de diff. Destravar antes do PR.
 
-### Estado da sessão /ggsd:code (27/08 — Frente 1) — ✅ CÓDIGO VERDE E COMMITADO (commit `9399f49`)
+### Estado da sessão /ggsd:code (27/08 — Frente 1) — ✅ CÓDIGO VERDE, RACE §9 CORRIGIDA, GATES LIBERAM (HEAD `0219c23`)
 
 > **ATUALIZAÇÃO (2ª rodada /ggsd:code):** A+B **IMPLEMENTADOS até o VERDE**. Suíte **1942 passando**
 > (baseline era 1905; +37), `tsc` só com os **5 erros PRÉ-EXISTENTES** do main (nenhum novo), `worker.js`
@@ -44,33 +44,32 @@ paralelo — NÃO tocar. Staging antes de prod (regra 13); parar na staging para
 > casos, red→verde via test-writer) + passthrough B em `doc-compiler.test.ts` (mock migrado p/
 > `importOriginal` para não perder `sanitizeEffort`). Commits: `e21e373` (docs) + `9399f49` (código).
 >
-> **Revisores §9 (faixa medida = profunda) — vereditos LIDOS:**
-> - **reuso (§9.C) = `sem-duplicacao`** (reusa `sanitizeEffort`, `runBackground`, `LLMOptions`; o paralelo
->   com o roteamento por fase do orchestrator é bifurcação intencional com rationale no cabeçalho de
->   `doc-modelo.ts`). Só-sugestão, sem marcador.
-> - **conformidade (§9.A) = `diverge-baixa`** (libera). Único achado: o passthrough B do EXTRATOR não tinha
->   teste — **JÁ TRATADO** no commit `03654c2` (`tests/extractor.test.ts`). `.review-status=diverge-baixa`.
-> - ⚠️ **qualidade (§9.B) = `bloqueio`** (alta, `.quality-status=bloqueio`) — **NÃO TRATADO, é o que falta.**
->   RACE de lost-update no `documentacao.conteudo`: a compilação em background faz read-modify-write no
->   MESMO blob que o turno `completo` sobrescreve inteiro (`upsertDocumentacao` full-replace, sem
->   transação/CAS). Janela: bg lê `atual` (sem saving), `completo` grava `{...,saving}`, bg grava
->   `mergeDocCompilada(staleSemSaving,doc)` → **saving/receita PERDIDOS**, sem self-heal (a rede do submit
->   exige `conteudo.saving` existente; a reconciliação só roda com `compilacao_pendente` presente). Janela
->   curta (bg ~88s termina antes do `completo` no caso comum) e **atrás de flag OFF por padrão** (prod
->   seguro), mas é perda silenciosa de dado financeiro em caminho quente → o `quality-gate` **barra o
->   envio** (correto). Não foi corrigido nesta sessão por ser refactor que não cabia no contexto restante.
+> **Revisores §9 (faixa profunda) — TODOS OS GATES LIBERAM (race CORRIGIDA):**
+> - **reuso (§9.C) = `sem-duplicacao`** (reusa `sanitizeEffort`, `runBackground`, `LLMOptions`, `json_patch`).
+> - **conformidade (§9.A) = `diverge-baixa`** (libera). `.review-status=diverge-baixa`. Só achados baixa:
+>   T4 (cliente `submeter.tsx`) não implementado — refinamento, o EARS "liberar o próximo passo" já é
+>   cumprido pelo backend retornar o turno rápido; e um comentário cita "§9.B" (âncora cosmética, plano vai
+>   até §6). Nenhum bloqueia.
+> - **qualidade (§9.B) = `limpo`** (era `bloqueio`). `.quality-status=limpo`. A RACE de lost-update FOI
+>   CORRIGIDA (commits `ae1bd8c` + `0219c23`): os escritores de doc concorrentes (background
+>   `compilarEPersistirDoc` + reconciliação `reconciliarDocSePendente`) gravam SÓ os campos da doc,
+>   ATOMICAMENTE, via `json_patch` (novo `patchDocumentacaoConteudo`, `client.server.ts`) — as chaves
+>   `saving`/`receita` ficam intactas, nunca há RMW do blob inteiro. O turno `completo` segue o único
+>   escritor do financeiro (sequencial antes do submit). `soCamposDaDoc` blinda contra um `saving`/`receita`
+>   ALUCINADO pelo LLM na doc compilada (não vaza para o blob). `compilarDocSingleFlight` evita duas
+>   compilações no mesmo isolate. Testes de DB real: `tests/doc-async-race.test.ts` (o json_patch preserva o
+>   financeiro) + `tests/doc-async-submit.test.ts` (submit compila-se-pendente/preserva/BLOQUEIA em falha;
+>   background fail-safe). Suíte **1954 verde**.
 >
-> **PRÓXIMO PASSO (retomar aqui) — é o FIX DA RACE (§9.B), obrigatório antes de qualquer envio:**
-> (1) escolher e aplicar um default seguro race-free (recomendado: **(b)** guardar a doc compilada em
-> campo SEPARADO de `saving`/`receita` — os leitores são o analisador, o Drive `renderResumoDocumentacao`
-> e a reconciliação do submit; OU **(a)** o background só pré-aquece e NÃO persiste, deixando o submit
-> sempre reconciliar — race-free mas perde o overlap, o 88s volta ao submit; OU merge atômico no DB se
-> houver). Opções (c) write condicional / (d) reler-e-abortar apenas ENCURTAM a janela, não fecham — não
-> bastam para `alta`. (2) `npm run test` verde + `npm run build:worker` (commitar `worker.js`) + re-rodar
-> `ggsd:revisor-qualidade` sobre o novo diff e regravar `.quality-status`. (3) PARAR — staging
-> (`edf400b4`, setar `DOC_COMPILE_ASYNC=1` + opcionalmente `DOC_MECANICO_MODEL`/`DOC_MECANICO_EFFORT`) e
-> validação (medir TTFT do turno de aprovação e do submit antes/depois; conferir doc final íntegra no
-> Drive/analisador) são do Luis. NÃO deploy prod, NÃO merge main, NÃO PR.
+> **PRÓXIMO PASSO (retomar aqui) — STAGING + validação (é do Luis):** (1) deploy no STAGING (`edf400b4`,
+> regra 13) setando `DOC_COMPILE_ASYNC=1` (e opcionalmente `DOC_MECANICO_MODEL`/`DOC_MECANICO_EFFORT` p/ o
+> modelo leve — medir qualidade da doc com LLM-juiz antes de fixar); (2) validar no navegador: medir TTFT do
+> turno de aprovação da doc e do submit antes/depois, e conferir a doc final íntegra no Drive/analisador +
+> saving/receita corretos (a race era exatamente aqui); (3) só então prod (`674a3710`) + merge no `main`
+> (regra 14) + atualizar CLAUDE.md/specs. Opcional trivial: (a) implementar T4 no `submeter.tsx`; (b)
+> trocar os comentários "§9.B"/"Ver §9" por referência ao plano/§6. Commits desta feature: `e21e373`,
+> `9399f49`, `03654c2`, `39f6fba`, `2b7b19c`, `ae1bd8c`, `0219c23` (branch `feat/submissao-doc-async`).
+> ⚠️ Ainda **NÃO** houve deploy/merge/PR — staging e validação são do Luis.
 >
 > _(O bloco abaixo é o design original da 1ª rodada — mantido como referência; o código acima já o executa.)_
 
