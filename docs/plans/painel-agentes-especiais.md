@@ -495,6 +495,57 @@ Três coisas que este número diz:
 (MAE 1,69 · ±1 58,3% · ≥3★ 33,3%) e com a `CURVA_ESPECIAIS_AUDITADOS` (critério 2). São ~16 páginas
 e ~220 chamadas de LLM.
 
+### Tentativa 3 — MEDIDA (28/08/2026): as lentes destravaram, a NOTA não. O gargalo mudou de lugar
+
+Staging redeployada com o HEAD `d6e246c` (version 247) e rodado o MESMO harness: diagnóstico
+`{dry:true, soComNotaHumana:true, aplicarCota:false, limite:3}` + T7 completo
+(`POST /api/admin/especiais/concordancia {"juiz":"painel", limite:3}`, 16 páginas com 4 em
+paralelo, **48/48 pares, 0 falhas, 294 s**).
+
+**1) As âncoras por eixo FUNCIONARAM — no nível da lente.** Os mesmos 3 projetos do diagnóstico
+de 28/08, antes × depois:
+
+| projeto | humana | eixos ANTES (régua global) | eixos DEPOIS (âncoras por eixo) | lentes | final |
+|---|---|---|---|---|---|
+| Integrações multi-plataforma de CRM | 3 | 1/vaga · 2 · 2 · 1 | **1/vaga · 2 · 4 · 1** | 2 (era 1) | 2 |
+| BB Indústria QC | 0 | 2 · 2 · 1 · 2 | **3 · 2 · 4 · 2** | 4 (era 2) | 2 (revisor cortou, 1 volta) |
+| Hub Criativo | 0 | 1/vaga · 2 · 2 · 1 | **2 · 2 · 2 · 1** | 2 (era 1) | 2 |
+
+Lentes que nunca passavam de 2 agora chegam a 3 e 4, e o **revisor adversarial passou a rodar**
+(BB Indústria: `voltas: 1`, nota 4 → 2). A hipótese do diagnóstico estava certa: a régua global
+era o que travava as lentes.
+
+**2) E mesmo assim o T7 PIOROU.** Nenhum dos 48 passou de 2★ — distribuição da rodada
+`0:8 · 1:7 · 2:33`.
+
+| Métrica | Agente único (T1) | Painel (T7) | Painel + âncoras (T3) |
+|---|---|---|---|
+| MAE | 1,69 | 1,65 | **1,73** ❌ |
+| dentro de ±1 | 58,3% | 58,3% | **52,1%** ❌ |
+| nota exata | 29,2% | 31,3% | 22,9% |
+| viés | −0,06 | −0,98 | −0,65 |
+| ≥3★ (população 41,7%) | 33,3% | 0% | **0%** ❌ |
+
+Erro por faixa do gabarito: 0★ **+1,41** (piorou contra o +0,88 do T7) · 1★ +0,33 · 2★ −0,13 ·
+3★ −1,36 · 4★ −3 · 5★ −3,67 · 7★ −6 · 8★ −6 · 10★ −8. As âncoras subiram o fundo (mais 2★
+onde a humana é 0) sem alcançar o topo — piorou dos dois lados.
+
+**3) O gargalo agora é a CONSOLIDAÇÃO, e é uma linha:** `consolidarLentes`
+(`agents/especiais-lentes.ts:454`) faz `teto = gate + margem`, `margem ≤ 1`. A nota do painel
+**nunca pode passar da lente estrutural + 1**, por mais alto que qualquer eixo de valor esteja.
+No CRM os eixos deram 1/2/**4**/1 e o teto do gate (1/vaga + 1) enterrou o 4 num 2 — a lente que
+enxergou o projeto certo não tem peso nenhum. É a decisão nº 2 do plano (max com teto) encostando
+no limite dela: destravar as lentes só expõe que a consolidação as descarta.
+
+**Situação: nada sobe** (3ª medição seguida abaixo do baseline). O painel segue ferramenta de
+auditoria. As âncoras por eixo FICAM (corrigiram um defeito real e medido das lentes), mas
+sozinhas não pagam o critério 1.
+
+**A próxima decisão é de PRODUTO, não de calibragem:** ou a consolidação deixa de ser "gate + 1"
+(ex.: gate vira piso de elegibilidade e a nota sai do eixo de valor mais alto COM prova nomeada),
+ou o painel é arquivado como auditor e a estrela continua no agente único. ⚠️ Mexer na
+consolidação é mexer na decisão nº 2 — precisa ser decidido, não ajustado.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
