@@ -30,8 +30,13 @@ export function especialistasMesaLlmLigados(): boolean {
 }
 
 /**
- * Roda UM especialista. Chama o LLM leve em `jsonMode`, parseia por `extrairJson` (Structured
- * Outputs está morta no proxy) e normaliza fail-closed. Qualquer falha → `fallbackDeterministico`.
+ * Roda UM especialista. Chama o LLM em `jsonMode`, parseia por `extrairJson` (Structured Outputs
+ * está morta no proxy) e normaliza fail-closed. Qualquer falha → `fallbackDeterministico`.
+ *
+ * ⚠️ Sem `model` explícito → cai no `LLM_MODEL` (o `sol`, forte). É de propósito: o parecer é
+ * trabalho de RACIOCÍNIO crítico (o cético precisa refutar de verdade), não turno mecânico como a
+ * `doc`. O roteamento por fase/modelo desta mesa é decisão do T5 (orquestração) — aqui a chamada é
+ * neutra e não afirma "leve".
  */
 export async function julgarComEspecialista(
   entrada: EntradaEspecialista,

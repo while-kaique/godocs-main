@@ -201,6 +201,11 @@ export function normalizarJulgamento(
   const o = bruto as Record<string, unknown>;
   const argumento = typeof o.argumento === "string" ? o.argumento.trim() : "";
   if (!argumento) return fallbackDeterministico(entrada);
+  // ⚠️ FAIL-CLOSED na direção SEGURA: `preocupa` malformado (ex.: string "true") NÃO vira `false`
+  // por coerção — isso apagaria um sinal de preocupação num sistema cujo fim é justamente
+  // sinalizá-la à triagem. Objeto parcial cai no fallback (herda `voto.preocupa`). Espelha o
+  // `typeof o.refutada !== "boolean" → semResposta` de `especiais-revisor.normalizarVeredicto`.
+  if (typeof o.preocupa !== "boolean") return fallbackDeterministico(entrada);
 
   const sinais = Array.isArray(o.sinais)
     ? o.sinais.filter((s): s is string => typeof s === "string")
@@ -208,7 +213,7 @@ export function normalizarJulgamento(
 
   return {
     dimensao: entrada.dimensao,
-    preocupa: o.preocupa === true,
+    preocupa: o.preocupa,
     argumento,
     confianca: confiancaClampada(o.confianca, entrada.voto.confianca),
     sinais,
