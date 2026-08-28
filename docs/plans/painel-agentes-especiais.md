@@ -546,6 +546,55 @@ sozinhas não pagam o critério 1.
 ou o painel é arquivado como auditor e a estrela continua no agente único. ⚠️ Mexer na
 consolidação é mexer na decisão nº 2 — precisa ser decidido, não ajustado.
 
+#### Corolário MEDIDO (28/08/2026, 2ª corrida independente do MESMO HEAD): soltar o teto NÃO resolve
+
+A leitura acima ("o gargalo é a consolidação") está certa no mecanismo e **incompleta na conclusão**.
+Uma 2ª corrida do mesmo `d6e246c` (T7 completo, 48/48, 0 falhas, + o `dry` dos 48 para abrir o
+pipeline por projeto) mostra que a saída proposta ali já foi simulada sobre os dados reais e **reprova
+o critério 1**.
+
+**(a) A altura que as lentes alcançam, aberta:** `nota_lentes` = `0:8 · 1:5 · 2:17 · **3:14 · 4:3 ·
+5:1**` — **18 dos 48 (37,5%) chegam a ≥3**, contra os 41,7% humanos. As âncoras não subiram "um
+pouco": elas praticamente acertaram a distribuição no nível da lente.
+
+**(b) Os 18 caem para EXATAMENTE 2 — os 18, sempre no mesmo passo.** `nota_pos_prova` = 2 em 18/18,
+**inclusive num caso com `voltas: 0`** (Bot de Faturamento), ou seja sem revisor nenhum. Corte
+uniforme para o mesmo número não é julgamento, é piso/teto determinístico — e ele age **antes** do
+revisor, que nos outros 17 apenas confirma o que já foi cortado.
+
+**(c) A saída proposta, simulada nos dados reais** (gate `> 0` como piso de elegibilidade; nota = o
+maior eixo de VALOR com prova **nomeada**; sem teto):
+
+| | baseline | painel+âncoras (como está) | com a consolidação solta |
+|---|---|---|---|
+| MAE | **1,69** | 1,73 | **1,79** ❌ |
+| dentro de ±1 | **58,3%** | 47,9% | **56,2%** ❌ |
+| viés | −0,06 | −0,73 | **+0,12** ✅ |
+| ≥3★ (humana 41,7%) | 33,3% | 0% | **47,9%** ✅ |
+
+Ela conserta a **distribuição** (≥3★ e viés voltam ao lugar) e **não conserta o PAR**: MAE e ±1
+continuam abaixo do baseline, que é justamente o critério 1 ("MAE menor **E** ±1 maior").
+
+**(d) Por que — e este é o achado que muda o próximo passo:** dos **18** projetos que as lentes
+levam a ≥3, **sete têm nota humana 0** (Argos, Painel de S&OE, BB Indústria QC, CTR Machine, Bot de
+Faturamento, Farol de Coleta, Mix Produtos), lado a lado com um **8★** (VERSTA) e dois **5★**
+(CX Ticket Creator, Robô de vídeos). **As lentes alcançam o topo, mas não separam 0 de 3.** Soltar o
+teto troca "nunca promove" por "promove errado" — é o mesmo achado 3 do T1 (12 dos 17 zeros humanos
+promovidos pelo agente único) reaparecendo por outra porta, e é ele que o gate conjuntivo da decisão
+nº 2 estava segurando. ⚠️ **Portanto: mexer na consolidação sem antes ensinar as lentes a rejeitar o
+zero é trocar um erro medido por outro erro medido.**
+
+⚠️ **Nota de método — o ruído deste harness é de ~4 pontos.** As duas corridas do MESMO HEAD deram
+MAE 1,73 nas duas, mas ±1 **52,1%** e **47,9%**, e distribuições `0:8 · 1:7 · 2:33` × `0:8 · 1:11 ·
+2:29`. O juiz é um LLM sem semente. **Diferença menor que ~5 pontos percentuais entre duas rodadas
+não é sinal** — vale para qualquer comparação futura aqui, e reforça o que o T1 já dizia sobre a 2ª
+casa decimal com n=48.
+
+**Onde o esforço tem chance, em ordem:** (1) fazer a lente-gate **rejeitar** (o que hoje ela não faz:
+dá 3/nomeada a projeto que a triagem zerou) — é o eixo que a `DERRUBA` já descreve e o único cuja
+melhora conserta MAE e distribuição ao mesmo tempo; (2) só então rever a consolidação; (3) aceitar o
+critério 1 na 2ª frase (painel = auditoria, classificador segue padrão).
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
