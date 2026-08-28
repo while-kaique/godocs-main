@@ -459,13 +459,41 @@ Testes (5 novos, 2033 no total): as âncoras cobrem 0..5 em ordem e sem repetir 
 âncoras da lente e **não** as das outras · **nenhuma definição global de 3★ para cima aparece no
 prompt** (é o gargalo, preso por teste) · a escala global aparece só em títulos.
 
-**Pendente: medir.** `POST /api/admin/especiais/painel {dry:true, soComNotaHumana:true,
+**Medição (FEITA — resultado abaixo).** `POST /api/admin/especiais/painel {dry:true, soComNotaHumana:true,
 aplicarCota:false, limite:3}` na staging, comparando `nota_lentes` com a tabela do diagnóstico (os
 mesmos 3 projetos: CRM 1/vaga, BB Indústria 2, Hub Criativo 1/vaga) — se as lentes continuarem em 1–2,
 a hipótese das âncoras cai junto com as outras três. Passando disso, rodar o T7 nos 48 pares.
 ⚠️ A staging está com o build de OUTRA branch (Frente 1, doc assíncrona): **redeployar `edf400b4` com
 esta branch antes de medir**, senão a rota do painel dá 404 (aconteceu em 27/08). ⚠️ `limite:6` estoura
 o tempo da requisição — usar 2 ou 3.
+
+**MEDIDO (28/08/2026, staging com o HEAD `d6e246c`, mesma chamada e MESMOS 3 projetos do
+diagnóstico): o gargalo cedeu — as lentes passaram de 2.** 13 chamadas, 0 falhas.
+
+| projeto (humana) | eixos ANTES | lentes | final | eixos DEPOIS | lentes | final |
+|---|---|---|---|---|---|---|
+| CRM (3) | 1/vaga · 2 · 2 · 1 | 1 | 1 | 1/vaga · 2 · **4/nomeada** · 1/nomeada | **2** | **2** |
+| BB Indústria QC (0) | 2 · 2 · 1 · 2 | 2 | 2 | **3/nomeada** · 2 · 2 · 2 | **3** | 2 |
+| Hub Criativo (0) | 1/vaga · 2 · 2 · 1 | 1 | 1 | 1/vaga · 2 · 2 · **2/nomeada** | 1 | 1 |
+
+Três coisas que este número diz:
+
+1. **A hipótese estava certa.** `nota_lentes` chegou a **3** pela primeira vez, e um eixo isolado deu
+   **4** (alcance do CRM) — antes NENHUMA lente passava de 2 em projeto nenhum. As âncoras por eixo
+   eram mesmo a trava, e as tentativas 1 e 2 mexiam a jusante dela.
+2. **O resto do pipeline acordou junto.** No BB o **revisor adversarial RODOU** (`voltas: 1`,
+   encerramento *"a revisão baixou a nota para fora do corte"*) e derrubou 3★→2★ — exatamente o que
+   ele existe para fazer, e **certo** aqui (nota humana **0**). Teto, piso e revisor deixaram de ser
+   suspeitos inertes: agora há nota alta o bastante para eles julgarem.
+3. **Os 3 erros diminuíram**: |2−3|, |2−0|, |1−0| contra |1−3|, |2−0|, |1−0| — MAE de 1,67 → 1,33
+   nesta amostra. ⚠️ **3 projetos não são medição** (o T1 já avisa que nem 48 dão 2ª casa decimal):
+   isto é o diagnóstico repetido, não o T7.
+
+**Próximo passo: o T7 nos 48 pares.** Rodar o painel gravando (`dry:false`, paginado por
+`proximo_offset` em passos de 3 — `limite:6` estoura o tempo da requisição) e depois
+`/api/admin/especiais/concordancia` sobre a origem `painel-agentes`, comparando com o baseline
+(MAE 1,69 · ±1 58,3% · ≥3★ 33,3%) e com a `CURVA_ESPECIAIS_AUDITADOS` (critério 2). São ~16 páginas
+e ~220 chamadas de LLM.
 
 ## Critérios de aceitação
 
