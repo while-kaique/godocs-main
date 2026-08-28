@@ -35,6 +35,20 @@ import {
   getReenviosDoProjeto,
   getReenviosPorIds,
   type ReenvioResumo,
+  getAvaliacoesNormaisPorIds,
+  getAvaliacaoNormal,
+  getDeliberacao,
+  getDeliberacoesPorIds,
+  getAvaliacaoRetroativa,
+  getAvaliacoesRetroativasPorIds,
+  getFeedbacksPorIds,
+  getAvaliacaoFeedback,
+  upsertAvaliacaoFeedback,
+  deleteAvaliacaoFeedback,
+  type ProjetoAvaliacaoRow,
+  type DeliberacaoResumoRow,
+  type AvaliacaoRetroativaRow,
+  type AvaliacaoFeedbackRow,
 } from "@/integrations/db/client.server";
 import {
   desserializarAfetados,
@@ -100,10 +114,30 @@ export const STATUS_GRAVAVEIS = [
 ] as const;
 export type StatusGravavel = (typeof STATUS_GRAVAVEIS)[number];
 
+/**
+ * O que a coluna "Sombra" da tabela mostra por projeto — o veredito do AGREGADOR do time de
+ * avaliação (fatia B) e sua confiança. Enxuto de propósito: a tabela só destaca veredito +
+ * confiança; o detalhe (deliberação, retroativo, motivos) vive na ficha. NADA aqui muda status.
+ */
+export type AvaliacaoSombraResumo = {
+  veredito: string;
+  confianca: number | null;
+  divergencia: boolean;
+  aplicar: boolean;
+};
+
 export type ListagemDashboard = {
   projetos: ProjetoDashboardResumo[];
   contagem: Record<string, number>; // statusChave → total ('sem_status' quando vazio)
   total: number;
+  /**
+   * Recomendação em SOMBRA do agregador por projeto (coluna "Sombra"), chaveada por id. Vem
+   * de tabelas INTERNAS (não do espelho da planilha), por isso num mapa lateral — mesmo padrão
+   * das `avaliacoes` da `/especiais`. Falha de leitura → mapa vazio (a coluna mostra "—").
+   */
+  avaliacoes: Record<string, AvaliacaoSombraResumo>;
+  /** Voto 👍/👎 já dado pelo admin, por id (indicador na coluna; o voto acontece na ficha). */
+  feedbacks: Record<string, "like" | "dislike">;
   /** ISO — quando a planilha foi lida pela última vez (a idade do ESPELHO, não do request). */
   lidoEm: string;
   /** O espelho passou de `ESPELHO_VELHO_MS` sem sincronizar → a tela avisa. */
@@ -141,6 +175,39 @@ export type DetalheDashboard = {
    * Sem essa segunda natureza, o reenvio só dava para inferir pelo status mudando.
    */
   historico: HistoricoEntrada[];
+  /**
+   * A avaliação em SOMBRA do time de agentes (fatia B/C) — o que o agente recomendaria, ao
+   * lado da decisão humana, para o TESTE SOMBRA. Vem de tabelas INTERNAS (não da planilha,
+   * não do espelho). ⚠️ NADA disto muda o status do projeto. `null` quando o agente ainda não
+   * avaliou este projeto (ou a leitura falhou — a seção só não aparece).
+   */
+  avaliacaoSombra: {
+    /** Recomendação do agregador (fatia B). */
+    mesa: {
+      veredito: string;
+      confianca: number | null;
+      divergencia: boolean;
+      aplicar: boolean;
+      motivo: string | null;
+    } | null;
+    /** Estado da deliberação multi-turno (fatia C). */
+    deliberacao: {
+      estado: string;
+      grau: string | null;
+      rodada: number;
+      motivo: string | null;
+    } | null;
+    /** Medição retroativa contra o humano (fatia C). */
+    retroativo: {
+      resultado: string;
+      veredito_agregado: string | null;
+      veredito_humano: string | null;
+      grau: string | null;
+      motivo: string | null;
+    } | null;
+  } | null;
+  /** Voto do admin sobre a recomendação em sombra (👍/👎), ou `null` se ainda não votou. */
+  feedback: "like" | "dislike" | null;
 };
 
 export type HistoricoEntrada =
@@ -201,6 +268,102 @@ export function montarHistoricoTriagem(
  */
 export const ESPELHO_VELHO_MS = 20 * 60 * 1000;
 
+// ─── Superfície SOMBRA (teste sombra do time de avaliação) ───────────────────
+
+/** Normaliza o voto cru da tabela para o par exibível (ignora valor desconhecido). */
+function normalizarVoto(v: string | null | undefined): "like" | "dislike" | null {
+  return v === "like" || v === "dislike" ? v : null;
+}
+
+/**
+ * Recomendação do agregador + voto do admin da PÁGINA inteira, em duas consultas por `IN`.
+ * ⚠️ NUNCA lança — o teste sombra é acessório e não pode derrubar a triagem. Falha → mapas
+ * vazios (a coluna "Sombra" mostra "—").
+ */
+async function carregarSombraDaListagem(ids: string[]): Promise<{
+  avaliacoes: Record<string, AvaliacaoSombraResumo>;
+  feedbacks: Record<string, "like" | "dislike">;
+}> {
+  const avaliacoes: Record<string, AvaliacaoSombraResumo> = {};
+  const feedbacks: Record<string, "like" | "dislike"> = {};
+  if (ids.length === 0) return { avaliacoes, feedbacks };
+  try {
+    const [mesas, votos] = await Promise.all([
+      getAvaliacoesNormaisPorIds(ids),
+      getFeedbacksPorIds(ids),
+    ]);
+    for (const id of ids) {
+      const chave = id.trim().toLowerCase();
+      const m = mesas.get(chave);
+      if (m) {
+        avaliacoes[id] = {
+          veredito: m.veredito,
+          confianca: m.confianca,
+          divergencia: m.divergencia === 1,
+          aplicar: m.aplicar === 1,
+        };
+      }
+      const voto = normalizarVoto(votos.get(chave)?.voto);
+      if (voto) feedbacks[id] = voto;
+    }
+  } catch (e) {
+    console.error("[dashboard-admin] falha ao ler avaliação em sombra da listagem:", e);
+  }
+  return { avaliacoes, feedbacks };
+}
+
+/**
+ * Monta o bloco `avaliacaoSombra` da ficha a partir das três linhas (agregador, deliberação,
+ * retroativo). PURA. `null` quando nenhuma das três existe (o agente ainda não avaliou).
+ */
+export function montarAvaliacaoSombra(
+  mesa: {
+    veredito: string;
+    confianca: number | null;
+    divergencia: number;
+    aplicar: number;
+    motivo: string | null;
+  } | null,
+  delib: {
+    estado: string;
+    rodada: number;
+    grau: string | null;
+    motivo: string | null;
+  } | null,
+  retro: {
+    resultado: string;
+    veredito_agregado: string | null;
+    veredito_humano: string | null;
+    grau: string | null;
+    motivo: string | null;
+  } | null,
+): DetalheDashboard["avaliacaoSombra"] {
+  if (!mesa && !delib && !retro) return null;
+  return {
+    mesa: mesa
+      ? {
+          veredito: mesa.veredito,
+          confianca: mesa.confianca,
+          divergencia: mesa.divergencia === 1,
+          aplicar: mesa.aplicar === 1,
+          motivo: mesa.motivo,
+        }
+      : null,
+    deliberacao: delib
+      ? { estado: delib.estado, grau: delib.grau, rodada: delib.rodada, motivo: delib.motivo }
+      : null,
+    retroativo: retro
+      ? {
+          resultado: retro.resultado,
+          veredito_agregado: retro.veredito_agregado,
+          veredito_humano: retro.veredito_humano,
+          grau: retro.grau,
+          motivo: retro.motivo,
+        }
+      : null,
+  };
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -228,6 +391,11 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     .filter((p): p is ProjetoDashboardResumo => p != null)
     .sort(ordenarPorDataDesc);
 
+  // Superfície SOMBRA: a recomendação do agregador e o voto do admin vêm de tabelas INTERNAS
+  // (não do espelho), num mapa lateral chaveado por id — mesmo padrão da `/especiais`. Falha
+  // aqui NÃO derruba a listagem (o teste sombra é acessório): a coluna só mostra "—".
+  const { avaliacoes, feedbacks } = await carregarSombraDaListagem(projetos.map((p) => p.id));
+
   // A idade é do dado: preferimos o carimbo da última corrida OK e caímos no `lido_em` das
   // linhas (o espelho pode ter linhas de antes de `sync_runs` existir).
   const idadeRef = saude.ultimoSyncOkMs ?? lidoEmMs;
@@ -235,6 +403,8 @@ export async function listarProjetosDashboard(refresh = false): Promise<Listagem
     projetos,
     contagem: contarPorStatus(projetos),
     total: projetos.length,
+    avaliacoes,
+    feedbacks,
     lidoEm: new Date(idadeRef ?? Date.now()).toISOString(),
     espelhoVelho: idadeRef != null && Date.now() - idadeRef > ESPELHO_VELHO_MS,
     syncFalhou: saude.ultimaFalhou,
@@ -261,7 +431,8 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
   //
   // O contrafactual ("quem sentiria falta") mora SÓ no SQLite (`projetos.contrafactual_afetados`),
   // nunca na planilha — por isso a leitura à parte, por PK. Falha dele → seção só não aparece.
-  const [alvo, historicoStatus, reenvios, contrafactual, pessoas] = await Promise.all([
+  const [alvo, historicoStatus, reenvios, contrafactual, pessoas, sombra, feedback] =
+    await Promise.all([
     lerLinhaEspelho(id),
     getAdminStatusLogs(id)
       .then((logs) =>
@@ -303,6 +474,19 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
         console.error("[dashboard-admin] falha ao ler o que cada participante fez:", e);
         return [];
       }),
+    // Avaliação em SOMBRA (teste sombra) — tabelas INTERNAS, acessório: falha só omite a seção.
+    Promise.all([getAvaliacaoNormal(id), getDeliberacao(id), getAvaliacaoRetroativa(id)])
+      .then(([mesa, delib, retro]) => montarAvaliacaoSombra(mesa, delib, retro))
+      .catch((e): DetalheDashboard["avaliacaoSombra"] => {
+        console.error("[dashboard-admin] falha ao ler avaliação em sombra:", e);
+        return null;
+      }),
+    getAvaliacaoFeedback(id)
+      .then((row): DetalheDashboard["feedback"] => normalizarVoto(row?.voto))
+      .catch((e): DetalheDashboard["feedback"] => {
+        console.error("[dashboard-admin] falha ao ler feedback da sombra:", e);
+        return null;
+      }),
   ]);
 
   if (!alvo) {
@@ -320,6 +504,8 @@ export async function getProjetoDashboard(id: string): Promise<DetalheDashboard>
     historico: montarHistoricoTriagem(historicoStatus, reenvios),
     contrafactual,
     pessoas,
+    avaliacaoSombra: sombra,
+    feedback,
   };
 }
 
@@ -351,7 +537,8 @@ export async function getProjetosDashboardLote(
   const alvos = [...new Set(ids.map((i) => i.trim()).filter(Boolean))].slice(0, LOTE_MAX_FICHAS);
   if (alvos.length === 0) return {};
 
-  const [linhas, historicos, reenvios, contrafactuais, contribuicoes] = await Promise.all([
+  const [linhas, historicos, reenvios, contrafactuais, contribuicoes, mesas, delibs, retros, votos] =
+    await Promise.all([
     lerLinhasEspelho(alvos),
     // Histórico é acessório: sem ele a ficha ainda abre. Uma falha aqui não pode custar o
     // lote inteiro e devolver a tela ao caminho de 25 requisições.
@@ -378,6 +565,24 @@ export async function getProjetosDashboardLote(
         console.error("[dashboard-admin] falha ao ler contribuições em lote:", e);
         return {} as Record<string, ContribuicaoParticipante[]>;
       }),
+    // Avaliação em SOMBRA em lote — 3 consultas por `IN` (agregador, deliberação, retroativo)
+    // + os votos. Cada uma acessória: falha só omite a seção sombra das fichas do lote.
+    getAvaliacoesNormaisPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler avaliação (sombra) em lote:", e);
+      return new Map<string, ProjetoAvaliacaoRow>();
+    }),
+    getDeliberacoesPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler deliberação (sombra) em lote:", e);
+      return new Map<string, DeliberacaoResumoRow>();
+    }),
+    getAvaliacoesRetroativasPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler retroativo (sombra) em lote:", e);
+      return new Map<string, AvaliacaoRetroativaRow>();
+    }),
+    getFeedbacksPorIds(alvos).catch((e) => {
+      console.error("[dashboard-admin] falha ao ler feedback (sombra) em lote:", e);
+      return new Map<string, AvaliacaoFeedbackRow>();
+    }),
   ]);
 
   const out: Record<string, DetalheDashboard> = {};
@@ -401,6 +606,12 @@ export async function getProjetosDashboardLote(
       // O mapper chaveia pelo id COMO ESTÁ no banco; o lote trabalha em minúsculas, então
       // tenta os dois antes de desistir (id de legado vem em caixa alta na planilha).
       pessoas: contribuicoes[id] ?? contribuicoes[chave] ?? [],
+      avaliacaoSombra: montarAvaliacaoSombra(
+        mesas.get(chave) ?? null,
+        delibs.get(chave) ?? null,
+        retros.get(chave) ?? null,
+      ),
+      feedback: normalizarVoto(votos.get(chave)?.voto),
     };
   }
   return out;
@@ -519,4 +730,42 @@ export async function definirStatusProjeto(raw: unknown, adminEmail: string) {
   });
 
   return { ok: true, projeto_id, status, statusAnterior };
+}
+
+// ─── Feedback do admin sobre a recomendação em SOMBRA (teste sombra) ──────────
+
+const feedbackSchema = z.object({
+  projetoId: z.string().min(1).max(120),
+  // `null` = limpar o voto (o admin clicou de novo no botão que já estava marcado).
+  voto: z.enum(["like", "dislike"]).nullable(),
+});
+
+/**
+ * Registra o voto 👍/👎 do admin sobre a recomendação em SOMBRA — SINAL DE TREINAMENTO.
+ * ⚠️ NÃO muda o status do projeto (segue humano): só grava/apaga a linha em `avaliacao_feedback`.
+ * Guarda junto o veredito do agente a que o voto se refere (contexto para análise depois).
+ */
+export async function registrarFeedbackSombra(raw: unknown, adminEmail: string) {
+  const { projetoId, voto } = feedbackSchema.parse(raw);
+
+  if (voto === null) {
+    await deleteAvaliacaoFeedback(projetoId);
+    return { ok: true as const, voto: null };
+  }
+
+  // O veredito a que o voto se refere — best-effort (o agente pode não ter avaliado ainda).
+  let veredito: string | null = null;
+  try {
+    veredito = (await getAvaliacaoNormal(projetoId))?.veredito ?? null;
+  } catch (e) {
+    console.error("[dashboard-admin] falha ao ler veredito da sombra para o feedback:", e);
+  }
+
+  await upsertAvaliacaoFeedback({
+    projeto_id: projetoId,
+    voto,
+    veredito_referente: veredito,
+    admin_email: adminEmail,
+  });
+  return { ok: true as const, voto };
 }

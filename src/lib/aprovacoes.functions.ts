@@ -32,6 +32,10 @@ import {
   type ChaveChecklist,
 } from '@/lib/aprovacoes-checklist';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
+import {
+  preAprovacaoCongelada,
+  COPY_CONGELAMENTO_PREAPROVACAO,
+} from '@/lib/congelamento-preaprovacao';
 import { compararVersoes, type CampoComparado, type SnapshotVersao } from '@/lib/diff-versoes';
 import {
   extrairResumoMemorial,
@@ -756,7 +760,7 @@ function lerSnapshotVersao(v: VersaoParaComparacao | null | undefined): Snapshot
 
 export async function listarAprovacoesPendentes(
   email: string,
-): Promise<{ lidera: boolean; itens: ItemAprovacao[] }> {
+): Promise<{ lidera: boolean; itens: ItemAprovacao[]; congelada: boolean }> {
   const alvo = (email ?? '').trim().toLowerCase();
   const rows = await getAprovacoesPendentesDe(alvo);
 
@@ -817,7 +821,7 @@ export async function listarAprovacoesPendentes(
   } catch (e) {
     console.error('[aprovacoes] TeamGuide indisponível ao checar liderança:', e);
   }
-  return { lidera, itens };
+  return { lidera, itens, congelada: preAprovacaoCongelada() };
 }
 
 // ─── Decisão ─────────────────────────────────────────────────────────────────
@@ -851,6 +855,13 @@ export async function decidirAprovacao(
   body: unknown,
   opts?: { atorReal?: string | null },
 ): Promise<{ ok: true; veredito: Veredito }> {
+  // Congelamento MANUAL da pré-aprovação (kill-switch por env, default OFF). Enquanto
+  // ligado, NENHUM parecer de líder é registrado — nem no modo `?como=` de admin. É a
+  // trava DURA; a tela também esconde os botões, isto cobre cliente desatualizado e
+  // chamada direta à API. Fonte única em `congelamento-preaprovacao.ts`.
+  if (preAprovacaoCongelada()) {
+    throw Object.assign(new Error(COPY_CONGELAMENTO_PREAPROVACAO), { status: 423 });
+  }
   const alvo = (email ?? '').trim().toLowerCase();
   const parsed = decidirSchema.safeParse(body);
   if (!parsed.success) {

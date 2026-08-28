@@ -2942,6 +2942,27 @@ export async function getAvaliacaoNormal(
   return rows[0] ?? null;
 }
 
+/**
+ * Recomendações do agregador de VÁRIOS projetos numa consulta só — a superfície SOMBRA do
+ * `/dashboard` (coluna "Sombra" + fichas em lote) precisa do veredito de uma página inteira,
+ * e round-trip por projeto dentro de um laço é o erro que já derrubou o Investigador. Chaveado
+ * pelo id em minúsculas. `votos` vem junto (é pequeno) mas a listagem não o usa.
+ */
+export async function getAvaliacoesNormaisPorIds(
+  ids: string[],
+): Promise<Map<string, ProjetoAvaliacaoRow>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, ProjetoAvaliacaoRow>();
+  if (chaves.length === 0) return out;
+  const placeholders = chaves.map(() => "?").join(", ");
+  const linhas = await queryAll<ProjetoAvaliacaoRow>(
+    `SELECT * FROM projeto_avaliacao WHERE LOWER(projeto_id) IN (${placeholders})`,
+    chaves,
+  );
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
+  return out;
+}
+
 /** id + veredito (sem votos) — para o backfill saber quem já foi avaliado sem puxar os blobs. */
 export async function getIdsAvaliacoesNormais(): Promise<string[]> {
   const rows = await queryAll<{ projeto_id: string }>(
@@ -3015,6 +3036,33 @@ export async function getDeliberacao(
     [projetoId],
   );
   return rows[0] ?? null;
+}
+
+/** Linha de deliberação SEM o `historico` — o que a superfície SOMBRA precisa por lote. */
+export type DeliberacaoResumoRow = Pick<
+  DeliberacaoAvaliacaoRow,
+  "projeto_id" | "estado" | "rodada" | "veredito" | "confianca" | "grau" | "motivo"
+>;
+
+/**
+ * Deliberações de VÁRIOS projetos numa consulta só, para a ficha em lote do `/dashboard`.
+ * ⚠️ NUNCA seleciona `historico` (mesmo teto de 32 MiB de RPC do resto): só as colunas de
+ * controle que a ficha mostra. Chaveado pelo id em minúsculas.
+ */
+export async function getDeliberacoesPorIds(
+  ids: string[],
+): Promise<Map<string, DeliberacaoResumoRow>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, DeliberacaoResumoRow>();
+  if (chaves.length === 0) return out;
+  const placeholders = chaves.map(() => "?").join(", ");
+  const linhas = await queryAll<DeliberacaoResumoRow>(
+    `SELECT projeto_id, estado, rodada, veredito, confianca, grau, motivo
+       FROM deliberacao_avaliacao WHERE LOWER(projeto_id) IN (${placeholders})`,
+    chaves,
+  );
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
+  return out;
 }
 
 /** Deliberações ABERTAS (estado='deliberando') para o cron avançar. Só as colunas de controle —
@@ -3098,6 +3146,36 @@ export async function getAvaliacoesRetroativas(): Promise<AvaliacaoRetroativaRow
   return queryAll<AvaliacaoRetroativaRow>('SELECT * FROM avaliacao_retroativa', []);
 }
 
+/** A medição retroativa de UM projeto — a ficha SOMBRA mostra "confere com o humano?". */
+export async function getAvaliacaoRetroativa(
+  projetoId: string,
+): Promise<AvaliacaoRetroativaRow | null> {
+  const rows = await queryAll<AvaliacaoRetroativaRow>(
+    "SELECT * FROM avaliacao_retroativa WHERE projeto_id = ?",
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Medições retroativas de VÁRIOS projetos numa consulta só (ficha em lote do `/dashboard`).
+ * Chaveado pelo id em minúsculas — round-trip por projeto num laço é o erro conhecido.
+ */
+export async function getAvaliacoesRetroativasPorIds(
+  ids: string[],
+): Promise<Map<string, AvaliacaoRetroativaRow>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, AvaliacaoRetroativaRow>();
+  if (chaves.length === 0) return out;
+  const placeholders = chaves.map(() => "?").join(", ");
+  const linhas = await queryAll<AvaliacaoRetroativaRow>(
+    `SELECT * FROM avaliacao_retroativa WHERE LOWER(projeto_id) IN (${placeholders})`,
+    chaves,
+  );
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
+  return out;
+}
+
 /** ids já medidos pelo retroativo — para o cron não re-rodar o que já mediu (idempotência). */
 export async function getIdsRetroativos(): Promise<string[]> {
   const rows = await queryAll<{ projeto_id: string }>(
@@ -3142,6 +3220,68 @@ export async function upsertAvaliacaoRetroativa(dados: {
       dados.origem,
     ],
   );
+}
+
+// ─── Feedback do admin sobre a recomendação em SOMBRA (teste sombra) ─────────
+// Tabela INTERNA: o voto 👍/👎 é sinal de treinamento, a DECISÃO segue humana. Ver o CREATE.
+
+export type AvaliacaoFeedbackRow = {
+  projeto_id: string;
+  voto: string; // 'like' | 'dislike'
+  veredito_referente: string | null;
+  admin_email: string | null;
+  criado_em: string | null;
+};
+
+/** O voto de UM projeto (para a ficha refletir o botão marcado). */
+export async function getAvaliacaoFeedback(
+  projetoId: string,
+): Promise<AvaliacaoFeedbackRow | null> {
+  const rows = await queryAll<AvaliacaoFeedbackRow>(
+    "SELECT * FROM avaliacao_feedback WHERE projeto_id = ?",
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Votos de VÁRIOS projetos (a listagem mostra o 👍/👎 já dado). Chaveado em minúsculas. */
+export async function getFeedbacksPorIds(
+  ids: string[],
+): Promise<Map<string, AvaliacaoFeedbackRow>> {
+  const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
+  const out = new Map<string, AvaliacaoFeedbackRow>();
+  if (chaves.length === 0) return out;
+  const placeholders = chaves.map(() => "?").join(", ");
+  const linhas = await queryAll<AvaliacaoFeedbackRow>(
+    `SELECT * FROM avaliacao_feedback WHERE LOWER(projeto_id) IN (${placeholders})`,
+    chaves,
+  );
+  for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
+  return out;
+}
+
+/** Grava (ou substitui) o voto do admin. UPSERT: revotar é o caso normal (o último vale). */
+export async function upsertAvaliacaoFeedback(dados: {
+  projeto_id: string;
+  voto: string;
+  veredito_referente: string | null;
+  admin_email: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO avaliacao_feedback (projeto_id, voto, veredito_referente, admin_email, criado_em)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       voto = excluded.voto,
+       veredito_referente = excluded.veredito_referente,
+       admin_email = excluded.admin_email,
+       criado_em = excluded.criado_em`,
+    [dados.projeto_id, dados.voto, dados.veredito_referente, dados.admin_email],
+  );
+}
+
+/** Apaga o voto de um projeto (o admin clicou de novo para limpar). */
+export async function deleteAvaliacaoFeedback(projetoId: string): Promise<void> {
+  await exec("DELETE FROM avaliacao_feedback WHERE projeto_id = ?", [projetoId]);
 }
 
 // ─── Divisão da validação por ÁREA (força-tarefa dos especiais) ──────────────

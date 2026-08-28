@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { HistoricoButton } from '@/components/historico/historico-button';
 import { StatusBadge } from '@/components/status-badge';
 import { ChipEstadoParecer } from '@/components/dashboard/parecer-lider';
+import { ChipSombra, type SombraChipDados } from '@/components/dashboard/chip-sombra';
 import { ProjetoDetalheDialog } from '@/components/dashboard/projeto-detalhe-dialog';
 import { SkeletonLinhas } from '@/components/dashboard/skeleton-linhas';
 import { STATUS_TRIAGEM, corDaRegua, metaStatus } from '@/components/dashboard/status-triagem';
@@ -95,6 +96,10 @@ type Listagem = {
   projetos: ProjetoDashboardResumo[];
   contagem: Record<string, number>;
   total: number;
+  /** Recomendação em SOMBRA do agente por id (coluna "Sombra" do teste sombra). */
+  avaliacoes: Record<string, SombraChipDados>;
+  /** Voto 👍/👎 já dado pelo admin, por id. */
+  feedbacks: Record<string, 'like' | 'dislike'>;
   /** ISO da última sincronização com a planilha (a idade do espelho). */
   lidoEm: string;
   /** Passou de 20 min sem sincronizar = 4 corridas de cron perdidas → avisa. */
@@ -599,6 +604,10 @@ function Dashboard() {
                   Autor
                 </Th>
                 <Th className="hidden lg:table-cell">Área</Th>
+                {/* Teste sombra: a recomendação do AGENTE ao lado da decisão humana. A ordem
+                    de leitura é Sombra · Status · Pré-status — os 3 vereditos lado a lado.
+                    Sempre visível (é o ponto desta tela). */}
+                <Th title="Recomendação do agente em modo sombra (não muda o status)">Sombra</Th>
                 <Th>Status</Th>
                 {/* Pré-aprovação do líder ao lado do Status, para a triagem já chegar
                     ciente do parecer sem abrir a ficha (pedido do Luis, 05/08/2026). */}
@@ -638,7 +647,7 @@ function Dashboard() {
                 <SkeletonLinhas />
               ) : visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="p-10 text-center text-sm text-muted-foreground">
                     {projetos.length === 0
                       ? 'A planilha não devolveu nenhum projeto.'
                       : 'Nenhum projeto casa com esse filtro. Limpe a busca ou escolha outra fila.'}
@@ -710,6 +719,12 @@ function Dashboard() {
                     </td>
                     <td className="hidden px-3 py-2.5 text-[12.5px] lg:table-cell">
                       <span className="block max-w-[160px] truncate">{p.area ?? '—'}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <ChipSombra
+                        dados={dados?.avaliacoes?.[p.id] ?? dados?.avaliacoes?.[p.id.toLowerCase()] ?? null}
+                        voto={dados?.feedbacks?.[p.id] ?? dados?.feedbacks?.[p.id.toLowerCase()] ?? null}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <StatusBadge status={p.statusChave} />
@@ -936,15 +951,17 @@ function Th({
   onClick,
   ativa,
   direcao,
+  title,
 }: {
   children?: React.ReactNode;
   className?: string;
   onClick?: () => void;
   ativa?: boolean;
   direcao?: Direcao;
+  title?: string;
 }) {
   const base = `px-3 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground ${className}`;
-  if (!onClick) return <th className={base}>{children}</th>;
+  if (!onClick) return <th className={base} title={title}>{children}</th>;
   return (
     <th
       className={base}

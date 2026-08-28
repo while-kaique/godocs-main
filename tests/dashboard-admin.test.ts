@@ -31,6 +31,17 @@ vi.mock('@/integrations/db/client.server', async () => ({
   // Reenvios (edições) do dono/editor — por padrão vazio (a maioria dos casos não exercita).
   getReenviosDoProjeto: vi.fn(async () => []),
   getReenviosPorIds: vi.fn(async () => new Map()),
+  // Avaliação em SOMBRA (teste sombra) — tabelas INTERNAS; por padrão sem recomendação/voto.
+  getAvaliacoesNormaisPorIds: vi.fn(async () => new Map()),
+  getAvaliacaoNormal: vi.fn(async () => null),
+  getDeliberacao: vi.fn(async () => null),
+  getDeliberacoesPorIds: vi.fn(async () => new Map()),
+  getAvaliacaoRetroativa: vi.fn(async () => null),
+  getAvaliacoesRetroativasPorIds: vi.fn(async () => new Map()),
+  getFeedbacksPorIds: vi.fn(async () => new Map()),
+  getAvaliacaoFeedback: vi.fn(async () => null),
+  upsertAvaliacaoFeedback: vi.fn(async () => undefined),
+  deleteAvaliacaoFeedback: vi.fn(async () => undefined),
   ...(await espelhoFakeP).api,
   // O `?refresh=1` dispara o sync reverso de verdade; aqui só o espelho interessa, então o
   // lado de `projetos` é stub (quem cobre aquele lado é `tests/sync-reverse.test.ts`).

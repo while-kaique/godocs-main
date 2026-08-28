@@ -47,6 +47,7 @@ import {
   type ChaveChecklist,
   type RespostaChecklist,
 } from "@/lib/aprovacoes-checklist";
+import { COPY_CONGELAMENTO_PREAPROVACAO } from "@/lib/congelamento-preaprovacao";
 import { TIPOS_PROJETO_LABEL, TIPO_SAVING_LABEL, fmtHoras, fmtReais } from "@/lib/projeto-rotulos";
 import type { CampoComparado } from "@/lib/diff-versoes";
 import {
@@ -62,6 +63,7 @@ import {
   Eye,
   FileText,
   Loader2,
+  Lock,
   CircleX,
   MessageSquareWarning,
   Minus,
@@ -119,6 +121,8 @@ type Fila = {
   itens: ItemAprovacao[];
   /** E-mail da fila que estou vendo, quando um admin abre com `?como=` (validação). */
   visualizando_como?: string | null;
+  /** Pré-aprovação congelada (kill-switch do servidor): a tela vira leitura. */
+  congelada?: boolean;
 };
 
 type Respostas = Partial<Record<ChaveChecklist, RespostaChecklist>>;
@@ -153,6 +157,8 @@ type ParecerProps = {
   onReprovar: () => void;
   /** Salta para o próximo projeto sem parecer (null quando não há mais nenhum). */
   proximoPendente: (() => void) | null;
+  /** Pré-aprovação congelada: some o checklist e os botões, entra o aviso de pausa. */
+  congelada?: boolean;
 };
 
 /** Pé do card: sair deste projeto sem decidir. Igual nos dois cards. */
@@ -226,6 +232,9 @@ function AprovacoesPage() {
 
   const pendentes = fila.filter((i) => !decididos[i.projeto_id]).length;
   const erro = error ? (error instanceof Error ? error.message : "Erro ao carregar a fila.") : null;
+  // Congelamento vem do servidor (o cliente não enxerga o secret). Enquanto ligado,
+  // a tela vira leitura: banner no topo + parecer desabilitado. O gate DURO é o servidor.
+  const congelada = data?.congelada ?? false;
 
   const irPara = useCallback(
     (destino: number) => {
@@ -275,6 +284,12 @@ function AprovacoesPage() {
   }
 
   async function decidir(projetoId: string, veredito: Veredito, texto?: string) {
+    // Congelada: nem tenta (o servidor recusaria com 423). Belt-and-suspenders com o
+    // gate duro — a tela já esconde os botões, isto cobre um clique de atalho de teclado.
+    if (congelada) {
+      toast.info(COPY_CONGELAMENTO_PREAPROVACAO);
+      return;
+    }
     setEnviando(projetoId);
     try {
       await apiFetch(
@@ -315,6 +330,7 @@ function AprovacoesPage() {
   function parecerDoAtual(item: ItemAprovacao): ParecerProps {
     return {
       projetoId: item.projeto_id,
+      congelada,
       decidido: decididos[item.projeto_id] ?? null,
       respostas: respostas[item.projeto_id] ?? {},
       onResponder: (chave, valor) => marcar(item.projeto_id, chave, valor),
@@ -435,6 +451,23 @@ function AprovacoesPage() {
 
           {!isLoading && !erro && (
             <>
+              {congelada && (
+                <div
+                  className="mb-3 flex items-start gap-2.5 rounded-xl px-4 py-3"
+                  style={{
+                    background: "rgba(0,89,169,0.06)",
+                    border: "1px solid rgba(0,89,169,0.2)",
+                  }}
+                >
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--go-blue)" }} />
+                  <p
+                    className="text-[13px] leading-relaxed"
+                    style={{ color: "var(--go-text-heading)" }}
+                  >
+                    {COPY_CONGELAMENTO_PREAPROVACAO}
+                  </p>
+                </div>
+              )}
               {total === 0 && (
                 <div
                   className="rounded-xl p-10 text-center"
@@ -1629,7 +1662,29 @@ function ZonaParecer({
   onPedirAjuste,
   onReprovar,
   proximoPendente,
+  congelada,
 }: ParecerProps) {
+  // Pré-aprovação congelada: em vez do checklist + botões, o líder vê só o aviso de
+  // pausa. Parecer JÁ dado (não deveria existir enquanto congelado, mas por garantia)
+  // continua caindo no fluxo normal abaixo, só de leitura.
+  if (congelada && !decidido) {
+    return (
+      <div
+        className="px-5 py-4"
+        style={{ background: "rgba(0,89,169,0.03)", borderTop: "1px solid rgba(0,89,169,0.08)" }}
+      >
+        <div
+          className="flex items-start gap-2.5 rounded-lg px-3.5 py-3"
+          style={{ background: "rgba(0,89,169,0.06)", border: "1px solid rgba(0,89,169,0.18)" }}
+        >
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--go-blue)" }} />
+          <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--go-text-heading)" }}>
+            {COPY_CONGELAMENTO_PREAPROVACAO}
+          </p>
+        </div>
+      </div>
+    );
+  }
   const completo = checklistCompleto(respostas);
   const faltam = CHECKLIST_APROVACAO.filter((p) => !respostas[p.chave]).length;
   // Saving incoerente é PRÉ-REQUISITO, não algo a justificar: some o "Pré-aprovar".

@@ -541,6 +541,20 @@ const SCHEMA_SQL = `
     criado_em        TEXT DEFAULT (datetime('now'))
   );
 
+  -- FEEDBACK do admin sobre a recomendação em SOMBRA (teste sombra do time de avaliação): o
+  -- admin marca 👍/👎 na ficha do projeto dizendo se concorda com o veredito do agente. É
+  -- SINAL DE TREINAMENTO -- nada aqui muda o status do projeto (que segue humano). Tabela
+  -- INTERNA e DERIVADA (fora do Sheets e de SAFE_UPDATE_FIELDS). Um voto por projeto (o voto
+  -- mais recente vale) -- guardamos o veredito a que o voto se refere para dar contexto depois.
+  -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
+  CREATE TABLE IF NOT EXISTS avaliacao_feedback (
+    projeto_id         TEXT PRIMARY KEY,
+    voto               TEXT NOT NULL,
+    veredito_referente TEXT,
+    admin_email        TEXT,
+    criado_em          TEXT DEFAULT (datetime('now'))
+  );
+
   -- ⚠️ NUNCA use ponto e vírgula nos comentários deste arquivo (o initSchema quebra o SQL nele).
   -- Rollup histórico de saving/receita por (grão, período, área, tipo_saving) — fonte durável
   -- da API histórica consumida pelo squad Intelli (João Gabriel). Tabela DERIVADA e INTERNA
