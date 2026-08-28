@@ -670,6 +670,45 @@ it7 e it8 mediram).
 especial NÃO é ≥3"* — melhor que o agente único, que inflava os zeros —, e não responde *"este é 4"*.
 A estrela continua no agente único até as lentes aprenderam a ler o topo.
 
+### ⚠️ VIÉS DO INSTRUMENTO (28/08/2026) — medir o painel na STAGING subestima: falta 57% do material
+
+Descoberto ao auditar POR QUE o painel não vê a flagship. O painel julga o que
+`montarEntradaSemantica` monta: `descricao_breve` + `contexto_especial` + `memorial_calculo` +
+**`doc`** (a documentação compilada, de `documentacao.conteudo`). Medindo os 48 especiais:
+
+| | staging | produção |
+|---|---|---|
+| têm documentação | **0 de 48 (0%)** | **48 de 48 (100%)** |
+| material total, mediana | **1.079 chars** | **2.612 chars** |
+
+**A documentação é 57% do material, na mediana — e na staging ela não existe.** Motivo: os projetos
+da staging **nascem do sync reverso da planilha** (`syncSheetsToSqlite` cria a linha em `projetos`),
+e **a planilha não tem coluna de documentação** — então `documentacao` fica vazia para tudo que não
+foi submetido pelo app NAQUELE ambiente. Não é bug: é o que o espelho é. Confirmado com controle
+(3 projetos NÃO-especiais da staging, com memorial de 2–3 mil chars, também sem documentação) e por
+leitura direta de prod (PIAPP: `doc` 1.479 chars em prod, 0 na staging).
+
+**O que isso invalida:** todas as 8 configurações do T7/tentativa 4 foram medidas com **menos da
+metade** do material que o painel tem em produção. A conclusão "as lentes não *veem* o projeto
+excepcional" fica **suspensa**: o PIAPP tem em prod 308 de descrição + 692 de contexto + **1.479 de
+documentação**, e na staging as lentes leram os 1.000 primeiros e nada da documentação.
+
+**O que NÃO invalida:** a comparação painel × baseline **é pareada** — o agente único do T1 leu o
+MESMO material empobrecido. Então "o painel melhorou o erro na faixa 0★ de +1,94 para ~+0,6"
+continua valendo. O que não se pode mais afirmar é a MAGNITUDE do erro nas faixas altas, nem que ele
+seja um limite de leitura.
+
+⚠️ **Regra nova para qualquer medição futura de qualidade de agente:** [[staging-tem-espelho-real-para-medir]]
+vale para as COLUNAS DA PLANILHA. **Não vale para o que mora só no SQLite** — `documentacao`,
+`chat_messages`, `form_events`, `projeto_versions`. Antes de medir, confira o campo que o agente lê:
+`GET /api/meus-projetos/:id` devolve `documentacao` (e é read-only nos dois ambientes).
+
+**Como medir com material honesto sem escrever em lugar nenhum:** ler o material de prod pelo
+endpoint acima (48 GETs) e executar as lentes com o **prompt REAL** (dumpado de
+`buildSystemPromptLente`) sobre esse material. Não reproduz o painel inteiro (falta a vizinhança do
+Pinecone e o rótulo de função), mas responde a pergunta que importa — *o sinal está no material?* —
+sem tocar em nada.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
