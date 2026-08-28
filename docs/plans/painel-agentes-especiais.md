@@ -390,6 +390,43 @@ deployou a "Frente 1 (doc assíncrona)" no `edf400b4` (version 245) e a rota do 
 **404** — rota commitada ≠ rota no ar. A medição acima já tinha fechado, então os números valem; o
 follow-up precisa de um novo deploy da branch (combinar com quem estiver medindo).
 
+### DIAGNÓSTICO DEFINITIVO (28/08/2026) — o gargalo são AS LENTES; teto, piso e revisor nunca entram
+
+`POST /api/admin/especiais/painel {dry:true, soComNotaHumana:true, aplicarCota:false, limite:3}`,
+staging com o HEAD `eedb853`, 12 chamadas, 0 falhas:
+
+| projeto | humana | eixos (nota/prova) | lentes | pós-prova | final | voltas |
+|---|---|---|---|---|---|---|
+| Integrações multi-plataforma de CRM | 3 | recorrência **1/vaga** · complexidade 2 · alcance 2 · risco 1 | 1 | 1 | 1 | 0 |
+| BB Indústria QC | 0 | 2 · 2 · 1 · 2 (todas nomeadas) | 2 | 2 | 2 | 0 |
+| Hub Criativo | 0 | **1/vaga** · 2 · 2 · 1 | 1 | 1 | 1 | 0 |
+
+`encerramento` das três: **"nota abaixo do corte de revisão — não passou pelo revisor adversarial"**,
+`motivos: []`. Isto **elimina** os três suspeitos anteriores de uma vez:
+
+- **não é o revisor** (decisão nº 4): a nota nunca alcança o corte de ≥3, então ele nem roda;
+- **não é o piso de prova** (`motivos` vazio nas três);
+- **não é o teto da consolidação**: `nota_lentes` já é 1–2 — o teto não tem o que cortar.
+
+**É a RÉGUA que cada lente recebe.** O prompt entrega a régua **global** (`NIVEIS`) e pergunta "a nota
+mais alta que o SEU eixo sustenta". Mas as âncoras de 3★ para cima descrevem o **projeto inteiro**
+(plataforma/produto interno, várias áreas usando, autonomia, ponteiro auditável) — propriedades que um
+eixo ISOLADO quase nunca pode alegar sozinho. Cada lente responde 1–2 corretamente **dentro da
+pergunta que recebeu**, e a soma das partes nunca chega ao todo. ⚠️ **Consequência para as tentativas
+1 e 2: as duas mexeram a jusante do gargalo** — daí não terem movido o ≥3★ (a 2 mexeu no topo porque
+mudou o teto de quem já tinha 2, nada mais).
+
+**As duas saídas reais (decisão de produto, não calibragem):**
+1. **Âncoras POR EIXO** — cada lente recebe o que 0/1/2/3/4/5 significam **no eixo dela** (ex.: alcance
+   3 = "2+ áreas usam", 4 = "área inteira depende", 5 = "virou plataforma de terceiros"), em vez da
+   régua global. É a correção mais fiel à decisão nº 2 (lentes distintas, sem média) e a que a
+   evidência aponta. Custo: escrever 4 réguas curtas na fonte única (`CRITERIOS`/`NIVEIS` da régua).
+2. **Consolidação que compõe** em vez de tomar o máximo com teto — mexe na decisão nº 2 e reintroduz o
+   risco de média/compressão que o T1 mediu (viés −0,06 escondendo +1,94 nos zeros). **Não recomendada.**
+
+⚠️ **O que NÃO tentar de novo:** curva no prompt (tentativa 1, medida e revertida) · teto/piso/margem
+(tentativa 2, medida: mexe no topo mas não cria 3★) · revisor adversarial (este diagnóstico: nem roda).
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
