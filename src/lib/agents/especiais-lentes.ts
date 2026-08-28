@@ -55,6 +55,22 @@ export type Lente = {
   pergunta: string;
   /** Títulos de `CRITERIOS` (régua) que esta lente julga. */
   criterios: string[];
+  /**
+   * O que cada nota da escala 0–`NOTA_MAX` significa **NO EIXO DESTA LENTE**.
+   *
+   * ⚠️ Existe porque a régua GLOBAL (`NIVEIS`) descreve o **projeto inteiro** — 3★ é
+   * "inteligência **+** recorrência **+** evidência **+** adoção", 5★ é "plataforma, várias áreas,
+   * autonomia, ponteiro auditável". Um eixo ISOLADO nunca pode alegar isso sozinho, então toda
+   * lente respondia 1–2 **corretamente dentro da pergunta que recebia**, e o painel nunca produzia
+   * um ≥3★ (medido: 0% em 48 especiais, contra 41,7% da triagem humana — ver
+   * `docs/plans/painel-agentes-especiais.md`, diagnóstico de 28/08/2026).
+   *
+   * A escala é a MESMA (a nota consolidada é comparável com a humana); o que muda é a leitura:
+   * cada lente lê o número no seu eixo. ⚠️ **A régua global segue sendo fonte única do que uma
+   * ESTRELA é** (`especiais-regua.ts`) — estas âncoras a traduzem por eixo, não a substituem, e
+   * nenhuma delas afrouxa a `DERRUBA` (que continua entrando no prompt inteira).
+   */
+  ancoras: { nota: number; definicao: string }[];
 };
 
 /** A lente estrutural: teto das outras (ver o cabeçalho e `consolidarLentes`). */
@@ -67,6 +83,15 @@ export const LENTES: Lente[] = [
     pergunta:
       "Isto roda de novo sozinho, existe um lugar NOMEADO onde conferir o ponteiro, e alguém nomeado sente falta se desligar?",
     criterios: ["Recorrência real", "Rastreabilidade", "Contrafactual"],
+    ancoras: [
+      { nota: 0, definicao: "Rodou uma vez, ou é teste/POC. Nada volta a rodar." },
+      { nota: 1, definicao: "Roda de vez em quando, disparado à mão, sem lugar nomeado onde conferir. Se desligar, só o autor sente." },
+      { nota: 2, definicao: "Roda sozinho (cron, gatilho) ou em uso contínuo, E existe UM lugar nomeado onde conferir o resultado. Um time sente falta." },
+      { nota: 3, definicao: "Roda sozinho, o ponteiro tem nome próprio, e gente de FORA do autor depende da saída na rotina dela." },
+      { nota: 4, definicao: "A rotina é obrigação recorrente de um processo com prazo (fiscal, financeiro, atendimento) e o rastro é conferível por quem não participou." },
+      { nota: 5, definicao: "Outras áreas dependem, e o rastro é sistema/base própria consultada por terceiros — auditável sem pedir nada ao autor." },
+      { nota: 7, definicao: "Parar é incidente operacional do grupo: há dono formal, monitoramento e gente avisada quando falha." },
+    ],
   },
   {
     chave: "complexidade_autonomia",
@@ -74,6 +99,15 @@ export const LENTES: Lente[] = [
     pergunta:
       "O quanto o sistema DECIDE? Onde ele cai na escada automação < inteligência (IA no fluxo) < autonomia (decide e age sozinho)?",
     criterios: ["Complexidade técnica"],
+    ancoras: [
+      { nota: 0, definicao: "Não há sistema: o trabalho é manual, o entregável é o documento ou a planilha." },
+      { nota: 1, definicao: "Automação de passos fixos — script, macro, mover ou formatar dados sempre do mesmo jeito." },
+      { nota: 2, definicao: "Automação com regras condicionais ou integração entre sistemas: trata casos diferentes, mas não decide nada de novo." },
+      { nota: 3, definicao: "Inteligência DENTRO do fluxo — IA, modelo ou heurística classifica, extrai ou redige, e esse resultado entra no processo." },
+      { nota: 4, definicao: "Decide e age sozinho em parte do fluxo; o humano só revisa exceção." },
+      { nota: 5, definicao: "Autonomia de ponta a ponta, com tratamento do próprio erro — é serviço/plataforma que outros chamam." },
+      { nota: 7, definicao: "Orquestra vários serviços ou agentes, se corrige, e outros projetos são construídos em cima dele." },
+    ],
   },
   {
     chave: "alcance_reuso",
@@ -81,6 +115,15 @@ export const LENTES: Lente[] = [
     pergunta:
       "Quantas pessoas de fora do autor usam isto de fato, e o quanto ele foi reusado em outro time, área, marca ou no grupo?",
     criterios: ["Alcance e reuso"],
+    ancoras: [
+      { nota: 0, definicao: "Ninguém usa além da execução que produziu o entregável." },
+      { nota: 1, definicao: "Só o autor usa." },
+      { nota: 2, definicao: "O time do autor usa — time nomeado, não \"a equipe\"." },
+      { nota: 3, definicao: "Pessoas de fora do time do autor usam de fato, e dá para nomear quem." },
+      { nota: 4, definicao: "Duas ou mais áreas usam, ou o mesmo projeto foi reusado em outra marca, unidade ou empresa do grupo." },
+      { nota: 5, definicao: "A área inteira depende, ou virou serviço em que outros times se acoplam." },
+      { nota: 7, definicao: "Escala de grupo: usuários reais fora do time, em várias marcas ou empresas." },
+    ],
   },
   {
     chave: "risco_evitado",
@@ -88,6 +131,15 @@ export const LENTES: Lente[] = [
     pergunta:
       "Que risco fiscal, jurídico, financeiro ou de segurança deixou de existir, e o quanto ele era material?",
     criterios: ["Risco evitado"],
+    ancoras: [
+      { nota: 0, definicao: "Não há risco a evitar. É resposta CORRETA e comum — a maioria dos projetos não evita risco nenhum." },
+      { nota: 1, definicao: "Erro operacional pequeno, percebido e refeito sem custo." },
+      { nota: 2, definicao: "Retrabalho recorrente ou erro que custa dinheiro pequeno, nomeado no material." },
+      { nota: 3, definicao: "Risco material nomeado — multa, juros, quebra de prazo contratual, perda de dado — com valor ou ocorrência citada." },
+      { nota: 4, definicao: "Risco fiscal, jurídico ou de segurança com exposição relevante E prova de que era real: autuação, incidente passado, apontamento de auditoria." },
+      { nota: 5, definicao: "Exposição estrutural do grupo (compliance, LGPD, fraude) endereçada de forma contínua e auditável." },
+      { nota: 7, definicao: "Risco que ameaçava a operação inteira; o controle virou padrão do grupo." },
+    ],
   },
 ];
 
@@ -128,8 +180,26 @@ function textoDosCriterios(titulos: readonly string[]): string {
     .join("\n");
 }
 
-function descreverNiveis(): string {
-  return NIVEIS.map((n) => `${n.nota} — ${n.titulo}: ${n.definicao}`).join("\n");
+/**
+ * As âncoras DO EIXO da lente — o que substituiu a régua global no prompt (ver `Lente.ancoras`).
+ */
+function descreverAncoras(lente: Lente): string {
+  return lente.ancoras
+    .slice()
+    .sort((a, b) => a.nota - b.nota)
+    .map((a) => `${a.nota} — ${a.definicao}`)
+    .join("\n");
+}
+
+/**
+ * A escala global em UMA linha, só os TÍTULOS. Entra no prompt por um motivo estreito: as notas
+ * dos projetos vizinhos (few-shot) são GLOBAIS, e sem nenhuma referência a lente não sabe ler
+ * "este vizinho vale 4". ⚠️ Só os títulos, **nunca as definições**: são as definições globais de
+ * 3★ para cima ("plataforma, várias áreas, autonomia, ponteiro auditável") que um eixo isolado
+ * não consegue alegar sozinho e que travavam TODA lente em 1–2.
+ */
+function descreverEscalaGlobalCurta(): string {
+  return NIVEIS.map((n) => `${n.nota} ${n.titulo}`).join(" · ");
 }
 
 function descreverCurva(): string {
@@ -160,8 +230,12 @@ ${outrosEixos(lente.chave)
 O QUE VOCÊ DEVOLVE:
 A nota MAIS ALTA da régua 0–${NOTA_MAX} que o SEU eixo sustenta — um TETO vindo do seu eixo, não um voto médio. Se o seu eixo sustenta 2, diga 2 mesmo que o projeto pareça impressionante por outro motivo: o outro motivo não é seu.
 
-A RÉGUA (âncoras de cada nível):
-${descreverNiveis()}
+A RÉGUA DO SEU EIXO — a escala é a MESMA 0–${NOTA_MAX} da base, mas aqui está o que cada nota significa NO SEU EIXO. É contra ESTAS frases que você responde, e não contra a descrição de um projeto inteiro:
+${descreverAncoras(lente)}
+Nota não listada fica entre a de baixo e a de cima. De 8 a 10 é o topo absoluto da base (3 projetos em 644): só se o SEU eixo, sozinho, já for o melhor exemplo que existe.
+
+A ESCALA GLOBAL (só para LER a nota dos projetos vizinhos — não responda por ela):
+${descreverEscalaGlobalCurta()}
 
 O QUE DERRUBA para 0–1, por melhor que o memorial esteja:
 ${DERRUBA.map((d) => `- ${d}`).join("\n")}

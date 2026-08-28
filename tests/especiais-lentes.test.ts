@@ -36,7 +36,7 @@ import {
   type AvaliacaoLente,
   type Evidencia,
 } from "@/lib/agents/especiais-lentes";
-import { CRITERIOS, NOTA_MAX } from "@/lib/especiais-regua";
+import { CRITERIOS, NIVEIS, NOTA_MAX, definicaoDe } from "@/lib/especiais-regua";
 import type { AlvoClassificacao } from "@/lib/agents/especial-classificador";
 import type { Vizinho } from "@/lib/especial-corpus";
 
@@ -102,6 +102,28 @@ describe("as lentes são declaradas e distintas", () => {
   });
 });
 
+describe("âncoras por eixo", () => {
+  it("cobrem 0..5 no mínimo, em ordem, sem repetir nota e dentro da escala", () => {
+    for (const l of LENTES) {
+      const notas = l.ancoras.map((a) => a.nota);
+      expect(notas).toEqual([...notas].sort((a, b) => a - b));
+      expect(new Set(notas).size).toBe(notas.length);
+      for (const n of notas) expect(n).toBeGreaterThanOrEqual(0);
+      for (const n of notas) expect(n).toBeLessThanOrEqual(NOTA_MAX);
+      for (let n = 0; n <= 5; n++) expect(notas).toContain(n);
+    }
+  });
+
+  it("a âncora de cada nota é DIFERENTE entre as lentes — senão o eixo não é um eixo", () => {
+    for (let n = 0; n <= 5; n++) {
+      const defs = LENTES.map((l) => l.ancoras.find((a) => a.nota === n)?.definicao).filter(
+        (d): d is string => !!d,
+      );
+      expect(new Set(defs).size).toBe(defs.length);
+    }
+  });
+});
+
 describe("prompt de cada lente", () => {
   it("traz só os critérios da lente + os globais, e diz o que ela NÃO julga", () => {
     const gate = lentePorChave(GATE)!;
@@ -121,6 +143,35 @@ describe("prompt de cada lente", () => {
     expect(p).toContain(`0–${NOTA_MAX}`);
     expect(p).toContain("top 4%");
     expect(p).toContain("0★:"); // a curva real
+  });
+
+  it("traz as âncoras DO EIXO da lente, e não as de outra lente", () => {
+    for (const l of LENTES) {
+      const p = buildSystemPromptLente(l);
+      for (const a of l.ancoras) expect(p).toContain(a.definicao);
+      // as âncoras das OUTRAS lentes não vazam para cá (senão a lente volta a julgar o projeto
+      // inteiro — é exatamente a trava que estas âncoras existem para desfazer)
+      for (const outra of LENTES.filter((o) => o.chave !== l.chave))
+        for (const a of outra.ancoras) expect(p).not.toContain(a.definicao);
+    }
+  });
+
+  it("NÃO traz as definições GLOBAIS de 3★ para cima — era o gargalo medido do T7", () => {
+    // A régua global descreve o PROJETO INTEIRO ("plataforma, várias áreas, autonomia"): um eixo
+    // isolado não pode alegar isso, e toda lente respondia 1–2 corretamente. Ver o diagnóstico de
+    // 28/08/2026 em docs/plans/painel-agentes-especiais.md.
+    for (const l of LENTES) {
+      const p = buildSystemPromptLente(l);
+      for (let nota = 3; nota <= NOTA_MAX; nota++) {
+        const global = definicaoDe(nota)!;
+        expect(p).not.toContain(global);
+      }
+    }
+  });
+
+  it("traz a escala global só em TÍTULOS, para ler a nota dos vizinhos", () => {
+    const p = buildSystemPromptLente(LENTES[0]);
+    for (const n of NIVEIS) expect(p).toContain(`${n.nota} ${n.titulo}`);
   });
 
   it("dois prompts de lentes diferentes NÃO são o mesmo texto", () => {

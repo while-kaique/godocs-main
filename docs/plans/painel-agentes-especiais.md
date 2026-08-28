@@ -427,6 +427,46 @@ mudou o teto de quem já tinha 2, nada mais).
 ⚠️ **O que NÃO tentar de novo:** curva no prompt (tentativa 1, medida e revertida) · teto/piso/margem
 (tentativa 2, medida: mexe no topo mas não cria 3★) · revisor adversarial (este diagnóstico: nem roda).
 
+### Tentativa 3 (28/08/2026) — ÂNCORAS POR EIXO (a saída nº 1 do diagnóstico) — implementada, A MEDIR
+
+Cada lente deixou de receber a régua **global** (`NIVEIS`, que descreve o projeto INTEIRO) e passou a
+receber **as âncoras do eixo dela**: `Lente.ancoras` em `agents/especiais-lentes.ts`, 7 níveis (0–5 e
+7) por lente, renderizadas por `descreverAncoras(lente)` no lugar de `descreverNiveis()`.
+
+O que cada 3★ virou, por eixo — é aqui que o gargalo se desfaz:
+
+| eixo | 3 no eixo (antes: "inteligência + recorrência + evidência + adoção", que é o projeto todo) |
+|---|---|
+| recorrência/rastro (gate) | roda sozinho, ponteiro com nome próprio, gente de FORA do autor depende |
+| complexidade | inteligência DENTRO do fluxo (IA/modelo/heurística decide algo que entra no processo) |
+| alcance | pessoas de fora do time do autor usam de fato, e dá para nomear quem |
+| risco | risco material nomeado (multa, juros, prazo contratual, perda de dado) com valor ou ocorrência |
+
+⚠️ **A régua global NÃO saiu do prompt inteira** — sairia junto a leitura dos vizinhos do few-shot,
+que carregam nota **global**. Entrou `descreverEscalaGlobalCurta()`: só os **TÍTULOS** (`0 Não pontua ·
+1 Útil e local · … · 5 Ouro …`), explicitamente "só para LER a nota dos vizinhos, não responda por
+ela". São as **definições** de 3★+ que travavam, não os rótulos. `DERRUBA`, curva da base e "na dúvida
+fique na MENOR" ficam **intactos** — os freios contra inflação são os mesmos da medição anterior, para
+que a diferença medida seja das âncoras e de mais nada.
+
+⚠️ **Nada mudou na régua** (`especiais-regua.ts` segue fonte única do que uma ESTRELA é) nem na
+consolidação, no piso de prova ou no revisor — as âncoras traduzem a mesma escala por eixo, e a nota
+consolidada continua comparável com a humana. É a fronteira do plano ("não mexer na régua para fazer o
+painel passar") respeitada de propósito.
+
+Testes (5 novos, 2033 no total): as âncoras cobrem 0..5 em ordem e sem repetir · a âncora de cada nota
+é **diferente** entre as lentes (se duas lentes dizem o mesmo, o eixo não é um eixo) · o prompt traz as
+âncoras da lente e **não** as das outras · **nenhuma definição global de 3★ para cima aparece no
+prompt** (é o gargalo, preso por teste) · a escala global aparece só em títulos.
+
+**Pendente: medir.** `POST /api/admin/especiais/painel {dry:true, soComNotaHumana:true,
+aplicarCota:false, limite:3}` na staging, comparando `nota_lentes` com a tabela do diagnóstico (os
+mesmos 3 projetos: CRM 1/vaga, BB Indústria 2, Hub Criativo 1/vaga) — se as lentes continuarem em 1–2,
+a hipótese das âncoras cai junto com as outras três. Passando disso, rodar o T7 nos 48 pares.
+⚠️ A staging está com o build de OUTRA branch (Frente 1, doc assíncrona): **redeployar `edf400b4` com
+esta branch antes de medir**, senão a rota do painel dá 404 (aconteceu em 27/08). ⚠️ `limite:6` estoura
+o tempo da requisição — usar 2 ou 3.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
