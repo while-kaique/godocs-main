@@ -10,6 +10,7 @@
 const log = (...args: unknown[]) => console.log('[extractor]', ...args);
 
 import { llmChat } from '@/lib/llm';
+import { docMecanicoLLMOpts } from './doc-modelo';
 import type { DocumentacaoColetada, ProjetoContexto } from './types';
 import { documentacaoVazia } from './types';
 
@@ -229,7 +230,8 @@ async function chamarEParsear(
         { role: 'system', content: system },
         { role: 'user', content: userContent },
       ],
-      { jsonMode: true, temperature: 0, maxTokens },
+      // Trabalho mecânico: roteia p/ modelo leve quando configurado (opt-in, default = hoje).
+      { jsonMode: true, temperature: 0, maxTokens, ...docMecanicoLLMOpts() },
     );
     log(`LLM respondeu: ${raw.slice(0, 200)}`);
   } catch (e) {

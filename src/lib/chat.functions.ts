@@ -17,7 +17,9 @@ import {
   getDocumentacaoConteudo,
   getDocMessage,
   upsertDocumentacao,
+  patchDocumentacaoConteudo,
   getDocumentacao,
+  getDocsPendentesCompilacao,
   getProjetoById,
   getProjetosSubmetidos,
   getProjetosNaoRascunho,
@@ -103,10 +105,22 @@ import {
   type EstadoGanhoReal,
 } from "@/lib/agents/ganho-projetado";
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
+import {
+  docCompilacaoAssincronaAtiva,
+  placeholderDocPendente,
+  precisaCompilarDoc,
+  coletadoDePendente,
+  mergeDocCompilada,
+  soCamposDaDoc,
+} from "@/lib/agents/doc-async";
+import { docCompiladorLLMOpts, docCompiladorSubmitLLMOpts } from "@/lib/agents/doc-modelo";
+import type { LLMOptions } from "@/lib/llm";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
   analisarProjeto as analisarProjetoAgent,
   decidirStatusSubmissao,
+  avaliarPlausibilidadeFTE,
+  fatorFtePlausibilidade,
 } from "@/lib/agents/analyzer";
 import { enviarEmailAprovacao, enviarEmailRejeicao } from "@/lib/agents/email-agent";
 import { extractTextFromMultipleFiles } from "@/lib/extract-text.server";
@@ -2348,18 +2362,44 @@ export async function enviarMensagem(
     (resultado.fase === "saving" || resultado.fase === "receita") &&
     estado.fase === "doc_preview"
   ) {
-    log("enviarMensagem", "Doc aprovada — compilando documentação...");
-    const doc = await compilarDocumentacao(ctx, resultado.coletado);
-    // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
-    // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
-    // aqui, o gate determinístico de IA do analisador nunca o enxerga (ficava sempre null)
-    // e a resposta explícita do usuário perdia a precedência. Ver SPEC_COMPLEXIDADE_NIVEIS (G0).
-    const docComSinais = {
-      ...doc,
-      tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
-    };
-    await upsertDocumentacao(data.projeto_id, docComSinais);
-    log("enviarMensagem", "Documentação compilada e salva.");
+    if (docCompilacaoAssincronaAtiva()) {
+      // ⚡ Compilação ASSÍNCRONA (flag DOC_COMPILE_ASYNC): a fase saving/receita usa só o
+      // `coletado` (buildDetalhesAprovados), então NÃO esperamos os ~88s da compilação para
+      // liberar o próximo passo. Gravamos um PLACEHOLDER (com o snapshot do coletado para o
+      // submit reconciliar) e disparamos a compilação em segundo plano. `submeterParaValidacao`
+      // garante a doc pronta antes de submeter (compila síncrono se o background não terminou).
+      log("enviarMensagem", "Doc aprovada — compilando em segundo plano (não bloqueia o próximo passo).");
+      // Preserva o conteúdo existente (edição: um saving/receita já compilado não pode ser
+      // apagado pelo placeholder; upsertDocumentacao SUBSTITUI o conteúdo inteiro). Em
+      // submissão nova não há doc ainda → fica só o placeholder.
+      const docRowAtual = await getDocumentacao(data.projeto_id);
+      const conteudoAtual = docRowAtual
+        ? parseJson<Record<string, unknown>>(docRowAtual.conteudo)
+        : null;
+      await upsertDocumentacao(data.projeto_id, {
+        ...(conteudoAtual ?? {}),
+        ...placeholderDocPendente(resultado.coletado),
+      });
+      runBackground(compilarEPersistirDoc(data.projeto_id, ctx, resultado.coletado));
+    } else {
+      // Caminho SÍNCRONO de hoje: a compilação da doc é o CERNE do produto e é feita pelo
+      // agente — NÃO há fallback. Compilamos e salvamos ANTES de confirmar a transição. Se a
+      // IA não devolver uma doc válida (mesmo após os retries internos), compilarDocumentacao
+      // lança: abortamos o turno SEM persistir nada, e o usuário continua no preview podendo
+      // aprovar de novo (o frontend faz rollback da mensagem e exibe o erro).
+      log("enviarMensagem", "Doc aprovada — compilando documentação...");
+      const doc = await compilarDocumentacao(ctx, resultado.coletado);
+      // O analisador lê documentacao.conteudo, mas a doc compilada (DocumentacaoGerada)
+      // NÃO inclui o sinal tem_ia_como_funcionalidade coletado na fase doc. Sem carregá-lo
+      // aqui, o gate determinístico de IA do analisador nunca o enxerga (ficava sempre null)
+      // e a resposta explícita do usuário perdia a precedência. Ver SPEC_COMPLEXIDADE_NIVEIS (G0).
+      const docComSinais = {
+        ...doc,
+        tem_ia_como_funcionalidade: resultado.coletado.tem_ia_como_funcionalidade ?? null,
+      };
+      await upsertDocumentacao(data.projeto_id, docComSinais);
+      log("enviarMensagem", "Documentação compilada e salva.");
+    }
   }
 
   // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
@@ -3161,7 +3201,7 @@ export async function analisarProjetoFn(rawData: unknown) {
   // motivo, especial nunca reprova, materialidade alta → humana) já foram aplicadas por
   // normalizarClassificacao dentro do analisador.
   const classificacao = resultado.classificacao_avaliacao ?? null;
-  const { status: statusFinal, statusSheet } = decidirStatusSubmissao({
+  let { status: statusFinal, statusSheet } = decidirStatusSubmissao({
     classificacao,
     ehEspecial,
     fluxoDireto: ehLiderAnalise,
@@ -3169,6 +3209,39 @@ export async function analisarProjetoFn(rawData: unknown) {
     vereditoAprovado: resultado.resultado === "aprovado",
     tetoMaterialidade: TETO_MATERIALIDADE_ANALISE,
   });
+
+  // Gate determinístico de FTE (defesa em profundidade, ao lado do de materialidade): um
+  // saving implausível para as pessoas declaradas (ex.: 500h/mês ≈ 2,3 FTE p/ 1 pessoa)
+  // NUNCA pode ser auto-aprovado — vai para a triagem humana (em_validacao/"Pendente").
+  // O analisador (analisarProjeto) já rebaixa a classificação p/ 'zona_cinzenta' nesses
+  // casos; este gate cobre o caminho em que o status ainda sairia 'aprovado'. Especial e
+  // liderança são isentos DENTRO de avaliarPlausibilidadeFTE. Fator lido do env (LAZY).
+  const savingFte = conteudo.saving as Record<string, unknown> | undefined;
+  const membrosFte = parseJson<string[]>(projetoAtual?.membros ?? null) ?? [];
+  const linhasFte = (savingFte?.linhas as
+    | Array<{ economia_horas_mes?: number | null }>
+    | undefined) ?? [];
+  const horasFte =
+    typeof savingFte?.economia_horas_mes === "number"
+      ? (savingFte.economia_horas_mes as number)
+      : linhasFte.reduce((s, l) => s + (Number(l?.economia_horas_mes) || 0), 0);
+  const plausFte = avaliarPlausibilidadeFTE({
+    horasTotais: horasFte,
+    pessoasDeclaradas: membrosFte.length + 1, // + o autor (não entra em `membros`)
+    temMultiplo: savingFte?.teto_pessoa === "multiplo",
+    especial: ehEspecial,
+    fluxoDireto: ehLiderAnalise,
+    fator: fatorFtePlausibilidade(),
+  });
+  if (plausFte.implausivel && statusFinal === "aprovado") {
+    log(
+      "analisarProjeto",
+      `FTE implausível (~${plausFte.fte.toFixed(2)} FTE p/ ${plausFte.pessoas} pessoa(s)) → status forçado para em_validacao (analisador havia retornado '${statusVeredito}')`,
+    );
+    statusFinal = "em_validacao";
+    statusSheet = "Pendente";
+  }
+
   const reprovadoPorCriterio = statusSheet === "Reprovado";
   if (reprovadoPorCriterio) {
     log(
@@ -3438,6 +3511,182 @@ async function limparContextoEspecialOrfao(
   }
 }
 
+// ── Compilação da doc: single-flight + escrita ATÔMICA (sem race) ──────────────
+// Dois caminhos podem querer compilar a doc do mesmo projeto: o background (disparado na
+// aprovação) e a reconciliação do submit. SINGLE-FLIGHT por projeto (neste isolate) dedupe
+// a compilação — um 2º pedido enquanto há um em voo reusa a MESMA promise (sem duas
+// compilações concorrentes no mesmo isolate; entre isolates diferentes o pior caso é uma
+// recompilação redundante, nunca corrupção — ver patchDaDocCompilada).
+const compilacoesEmVoo = new Map<string, Promise<DocumentacaoGerada>>();
+function compilarDocSingleFlight(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+  llmOpts?: LLMOptions,
+): Promise<DocumentacaoGerada> {
+  const emVoo = compilacoesEmVoo.get(projetoId);
+  if (emVoo) return emVoo;
+  const p = compilarDocumentacao(ctx, coletado, llmOpts).finally(() => {
+    if (compilacoesEmVoo.get(projetoId) === p) compilacoesEmVoo.delete(projetoId);
+  });
+  compilacoesEmVoo.set(projetoId, p);
+  return p;
+}
+
+// Patch (RFC 7386) com os campos da doc COMPILADA + limpeza das chaves de pendência.
+// ⚠️ NÃO inclui `saving`/`receita`: aplicado via json_patch, um patch sem essas chaves as
+// deixa INTACTAS — é isso que impede o background de apagar o financeiro (o lost-update que
+// o §9 pegou). `null` remove a chave (compilacao_pendente/coletado_pendente). `tem_ia` só
+// entra quando não-nulo (senão o `null` do patch removeria o sinal já gravado no placeholder).
+function patchDaDocCompilada(
+  doc: DocumentacaoGerada,
+  coletado: DocumentacaoColetada,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    // ⚠️ soCamposDaDoc: NUNCA deixa um `saving`/`receita` alucinado pelo LLM na doc compilada
+    // vazar para o blob (o json_patch faria merge recursivo no financeiro autoritativo). Ver §9.B.
+    ...soCamposDaDoc(doc as Record<string, unknown>),
+    compilacao_pendente: null,
+    coletado_pendente: null,
+  };
+  if (coletado.tem_ia_como_funcionalidade != null) {
+    patch.tem_ia_como_funcionalidade = coletado.tem_ia_como_funcionalidade;
+  }
+  return patch;
+}
+
+// Compila a doc em SEGUNDO PLANO e persiste os CAMPOS DA DOC via merge ATÔMICO (json_patch),
+// sem tocar em saving/receita — não há mais janela de lost-update do blob. FAIL-SAFE: se a
+// compilação lançar, deixa o placeholder pendente — `submeterParaValidacao` reconcilia antes
+// do envio, então uma falha aqui nunca submete doc incompleta. Disparada via runBackground.
+export async function compilarEPersistirDoc(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  coletado: DocumentacaoColetada,
+): Promise<void> {
+  try {
+    const doc = await compilarDocSingleFlight(projetoId, ctx, coletado);
+    const linhas = await patchDocumentacaoConteudo(projetoId, patchDaDocCompilada(doc, coletado));
+    // linhas === 0 → não havia row (o placeholder não persistiu): cria via upsert. `null`
+    // (adaptador não informa) NÃO cria — o placeholder quase sempre existe e criar às cegas
+    // poderia sobrescrever um financeiro recém-gravado.
+    if (linhas === 0) {
+      await upsertDocumentacao(projetoId, mergeDocCompilada(null, doc, coletado));
+    }
+    log("compilarEPersistirDoc", `Doc compilada em segundo plano e salva (projeto ${projetoId}).`);
+  } catch (compileErr) {
+    err(
+      "compilarEPersistirDoc",
+      `Compilação em segundo plano falhou (projeto ${projetoId}) — fica pendente p/ o submit reconciliar:`,
+      compileErr,
+    );
+  }
+}
+
+// Reconcilia a doc quando a compilação foi para SEGUNDO PLANO (flag DOC_COMPILE_ASYNC) e o
+// conteúdo ainda é o PLACEHOLDER (background não terminou / o isolate morreu / a compilação
+// falhou). O Drive (renderResumoDocumentacao) e o analisador exigem a doc compilada, então
+// GARANTIMOS aqui: recompila síncrono a partir do coletado snapshotado (single-flight reusa a
+// compilação do background se estiver em voo no mesmo isolate) e grava os campos da doc via
+// json_patch ATÔMICO — preservando saving/receita mesmo com o background concorrente. Se a
+// compilação falhar, LANÇA bloqueio: NUNCA submete doc incompleta. Idempotente: com a flag OFF
+// ou a doc já compilada, precisaCompilarDoc é false e devolve o conteúdo sem tocar em nada.
+export async function reconciliarDocSePendente(
+  projetoId: string,
+  conteudo: Record<string, unknown>,
+  projeto: NonNullable<Awaited<ReturnType<typeof getProjetoById>>>,
+  // Perfil de LLM da compilação. O SUBMIT passa o FAIL-FAST (docCompiladorSubmitLLMOpts, 0 retries)
+  // p/ o clique não pendurar; o CRON passa o FOLGADO (docCompiladorLLMOpts, retries) por rodar em
+  // background. Ausente → folgado (default seguro).
+  llmOpts?: LLMOptions,
+): Promise<Record<string, unknown>> {
+  if (!precisaCompilarDoc(conteudo)) return conteudo;
+
+  log("reconciliarDocSePendente", `Doc ainda pendente — compilando agora antes de submeter (projeto ${projetoId}).`);
+  const coletadoPendente =
+    coletadoDePendente(conteudo) ?? { ...documentacaoVazia(), nome_projeto: projeto.nome ?? null };
+  const ctxRecompile: ProjetoContexto = {
+    responsavel_nome: projeto.responsavel_nome ?? "",
+    responsavel_email: projeto.responsavel_email ?? "",
+    area: projeto.area ?? null,
+    ferramenta: projeto.ferramenta ?? "",
+    membros: parseJson<string[]>(projeto.membros) ?? [],
+    nome_projeto: projeto.nome ?? coletadoPendente.nome_projeto ?? "",
+    data_criacao: projeto.data_criacao_projeto ?? null,
+    doc_texto: null,
+    descricao_breve: projeto.descricao_breve ?? null,
+  };
+  try {
+    const doc = await compilarDocSingleFlight(projetoId, ctxRecompile, coletadoPendente, llmOpts);
+    await patchDocumentacaoConteudo(projetoId, patchDaDocCompilada(doc, coletadoPendente));
+    log("reconciliarDocSePendente", `Doc compilada e reconciliada no submit (projeto ${projetoId}).`);
+    // `conteudo` em memória fundido p/ o downstream (Drive/analisador) usar a doc completa.
+    return mergeDocCompilada(conteudo, doc, coletadoPendente);
+  } catch (compileErr) {
+    // No MODO ASSÍNCRONO o cliente NÃO pode travar: ele já seguiu com o `coletado`. Se o luna
+    // não entregou nem aqui (com o timeout folgado), DEFERIMOS — a doc fica PENDENTE e é
+    // recompilada no luna pelo cron (`recompilarDocsPendentes`); nunca publicamos doc de mini.
+    // No modo síncrono (default de hoje) mantém o bloqueio: sem async não há rede que recomponha.
+    if (docCompilacaoAssincronaAtiva()) {
+      err(
+        "reconciliarDocSePendente",
+        `Compilação falhou no submit (projeto ${projetoId}) — DEFERIDA p/ recompilação no luna (doc fica pendente):`,
+        compileErr,
+      );
+      return conteudo; // permanece com compilacao_pendente:true → cron recompila depois
+    }
+    err(
+      "reconciliarDocSePendente",
+      `Compilação da doc falhou no submit (projeto ${projetoId}) — não submetendo doc incompleta:`,
+      compileErr,
+    );
+    throw erroDeBloqueio(bloqueioDocAusente());
+  }
+}
+
+// Cron/admin: recompila as docs que ficaram PENDENTES (background morreu / submit deferiu por
+// erro do proxy). Re-tenta cada uma no modelo escolhido (luna, via reconciliarDocSePendente →
+// compilarDocumentacao com as opts do compilador) e faz o patch atômico. NÃO lança (rede): doc
+// que falhar de novo continua pendente p/ a próxima corrida. Bounded por `max`. Idempotente.
+export async function recompilarDocsPendentes(
+  max = 20,
+): Promise<{ verificados: number; recompilados: number; pendentes: number }> {
+  const pend = await getDocsPendentesCompilacao(max);
+  let recompilados = 0;
+  let pendentes = 0;
+  for (const { projeto_id } of pend) {
+    try {
+      const docRow = await getDocumentacao(projeto_id);
+      if (!docRow) continue;
+      const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      if (!precisaCompilarDoc(conteudo)) continue; // já resolvido entre a query e agora
+      const projeto = await getProjetoById(projeto_id);
+      if (!projeto) continue;
+      // Cron roda em background → perfil FOLGADO (retries + timeout longo): aqui pode esperar.
+      const reconc = await reconciliarDocSePendente(
+        projeto_id,
+        conteudo,
+        projeto,
+        docCompiladorLLMOpts(),
+      );
+      if (precisaCompilarDoc(reconc)) pendentes++;
+      else recompilados++;
+    } catch (e) {
+      // reconciliarDocSePendente pode lançar no modo síncrono; aqui a corrida nunca cai.
+      pendentes++;
+      err("recompilarDocsPendentes", `Falha ao recompilar ${projeto_id} (segue pendente):`, e);
+    }
+  }
+  log(
+    "recompilarDocsPendentes",
+    `verificados=${pend.length} recompilados=${recompilados} pendentes=${pendentes}`,
+  );
+  return { verificados: pend.length, recompilados, pendentes };
+}
+
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
   const { projeto_id, modo } = submeterValidacaoSchema.parse(rawData);
   log("submeterParaValidacao", `projeto=${projeto_id}`);
@@ -3446,7 +3695,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   if (!docRow) throw erroDeBloqueio(bloqueioDocAusente());
 
-  const conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
+  let conteudo = (parseJson<Record<string, unknown>>(docRow.conteudo) ?? {}) as Record<
     string,
     unknown
   >;
@@ -3454,6 +3703,17 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const projeto = await getProjetoById(projeto_id);
 
   if (!projeto) throw new Error("Projeto não encontrado.");
+
+  // Reconciliação da doc ASSÍNCRONA: garante a doc compilada ANTES do Drive/analisador,
+  // preservando saving/receita; bloqueia se a compilação falhar. Ver reconciliarDocSePendente.
+  // Submit é AWAITED no clique "Enviar" → perfil FAIL-FAST (0 retries, timeout limitado): sob
+  // proxy degradado defere rápido em vez de pendurar a requisição; o cron recompila no folgado.
+  conteudo = await reconciliarDocSePendente(
+    projeto_id,
+    conteudo,
+    projeto,
+    docCompiladorSubmitLLMOpts(),
+  );
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado

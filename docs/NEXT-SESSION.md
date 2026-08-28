@@ -1,31 +1,23 @@
 # NEXT-SESSION
 
-## Próximo passo (27/08 — correção do push do rollup pro Gabriel)
-**Deployar o fix `fix/rollup-push-contrato-jg` na STAGING (`edf400b4`) com os 3 secrets e validar o envio real → depois prod + PR.** Branch `fix/rollup-push-contrato-jg` (commit `62d579b`), suíte **1890 verde**, worker buildado, NÃO deployado.
-
-**Também nesta sessão (commit `6bdd9a0`):** o Gabriel quer VISÃO CUMULATIVA por área (saving R$2.000 do mês 5 → R$6.000 no mês 7). `montarSerieCumulativa` (pura, sem leitura nova) expande o rollup em (mês, área) → acumulado até o mês por cadência (mensal acumula todo mês; pontual/desconhecido 1×; tri/semestral por período; receita mensal recorrente). Smoke real cumulativo: `gravados:3`. ⚠️ Confirmar com o Gabriel: (a) `saving_reais`/`receita_reais` agora são ACUMULADO (não incremental do mês) e SAIU o `tipo_saving` da linha — ele não pode re-somar; (b) mês de início = mês de submissão. **Token pro Gabriel: NENHUM — os 2 tokens do curl são dele, só setamos como secret.**
-
-**O que foi corrigido antes:** o push (`rollup-push.functions.ts`) mandava o contrato ERRADO — o endpoint real do Gabriel (`POST https://squad-intelligence.devgogroup.com/api/ingest/godocs-metrics`, sondado ao vivo) espera `{granularity:"month", rollups:[{period_key, period_start(ISO), area, tipo_saving, saving_reais, receita_reais, num_projetos}]}` e **DOIS headers obrigatórios**: `Authorization: Bearer <gdk_…>` (fura o edge do GoDeploy) + `X-Godocs-Token: <godocs_…>` (autoriza o ingest). Antes: só `Authorization` + corpo `grao/celulas` → 400/401. Smoke real com o formato novo: `recebidos:3, gravados:3`.
-
-**Secrets (staging E prod, mudaram):** `JG_INGEST_URL` = a URL acima · `JG_INGEST_PLATFORM_TOKEN` = `gdk_AAVW17DAT2KX58Z9MZD4MX` (NOVO) · `JG_INGEST_TOKEN` = `godocs_d0B2CDdhuCE5tY-kGseyVjlEy-Y761DEDwAY-j8Z-okwndK2` (SUBSTITUI o `gdk_ingest_e85f…` obsoleto).
-
-**Confirmar com o Gabriel (2, não dá pra adivinhar):** (1) os valores caíram nas colunas certas (smoke `SMOKE-GODOCS saving_reais 7777.77` — não zerou?) — o endpoint NÃO valida campos de valor, coerção calada; (2) o ingest é **upsert** por `(period_key,area,tipo_saving)` e não **append** — o cron manda o rollup INTEIRO todo dia, append duplicaria. Limpar do banco dele as áreas de teste: `TESTE`, `T`, `AUTHTEST`, `ECHOTEST`, `TESTE-INTEGRACAO`, `SMOKE-GODOCS`, `SMOKE-CX`.
-
-⚠️ Revisão GGSD (§9) NÃO rodou nesta sessão.
-
 ## Plano ativo
+`docs/plans/agentes-avaliacao-autonomos.md` (fatia A executada) + `docs/plans/submissao-doc-fora-do-caminho-critico.md` (Frente 1 executada). **Nenhum plano novo aberto** — o próximo passo é CÓDIGO de UI, não planejar.
 
-**→ Canonicalizar a dimensão `area` do rollup pro Gabriel (27/08).** Plano aprovado:
-[docs/plans/rollup-areas-canonicas.md](plans/rollup-areas-canonicas.md) — dedup caixa/acento +
-renomes que fundem + alinhar grafia às 23 do Gabriel, SEM mudar total nem descartar nada
-(~41 → ~30 áreas). Ponto único: `rollup-backfill.ts` + novo `src/lib/area-canonico.ts`.
+## O que esta sessão fez (28/08/2026)
+Deploy do **time de agentes em prod, modo SOMBRA VISÍVEL** (decisão do Luis: medir+ver, NÃO autônomo) + **Frente 1 (doc async)** junto.
+- Integrei `feat/agentes-avaliacao-teamc` (A+B+C) + `feat/submissao-doc-async` sobre `origin/main` (bc09004) nesta branch `integ/agentes-avaliacao-prod` (@99d2ef9). O teamc já continha o rollup/áreas do JG — nada perdido.
+- **2078 testes verdes**, `worker.js` + `dist` rebuildados e commitados. CLAUDE.md sem conflito.
+- Verificado no código: veredito do agregador = `aprovar | em_validacao | isento` (NUNCA auto-reprova; "mandar pra RPA" = `em_validacao`). B/C só gravam `projeto_avaliacao` (sombra). Fatia A/FTE muda status conservador, ligada por default.
 
-**STATUS (27/08): CÓDIGO PRONTO, NÃO DEPLOYADO.** Branch `fix/rollup-areas-canonicas` (off
-`origin/main` @1834db6), worktree `~/godocs-wt-areas-rollup`, commit `9352e34`. Suíte **1899 verde**,
-build + worker OK. **Validado contra o payload REAL de prod (dry-run)**: 41 → **30 áreas**, saving e
-receita totais idênticos ao centavo (nada descartado). Luis já aprovou as decisões de mapeamento
-(Produto/Operações/Finanças genéricos; 4 pequenos e os 2 não-área mantidos; renomes AZ→AZ Buy,
-CSC→Projetos/CSC, JURIDICO→Jurídico/Compliance, FP&A→FP&A e Tesouraria).
+## Próximo passo
+**Construir a superfície de visualização "Agente" no `/dashboard`** (coluna na tabela + bloco na ficha, lendo `projeto_avaliacao` via mapa lateral por id — padrão `/especiais`). Pontos de injeção exatos (file:line) na memória `deploy-time-agentes-sombra-visivel.md`. Depois: setar flags (`AVALIACAO_NORMAIS=1`, `AVALIACAO_REDATOR=1`, `DOC_COMPILE_ASYNC=1`, `DOC_MECANICO_MODEL=gpt-5.6-luna`, `DOC_MECANICO_EFFORT=low`) → criar crons (`avaliar-normais`, `deliberar-avaliacoes`, `avaliacao-retroativa`) → **STAGING `edf400b4` PRIMEIRO** (regra 13) → prod `674a3710` → merge main (regra 14).
+
+## Pendências / ressalvas
+- Superfície `/dashboard` ainda NÃO codada — é a fatia em aberto.
+- Deploy ainda não tocou staging nem prod. Cookie da staging em `~/godocs-main/.env` (`E2E_COOKIE`).
+- ⚠️ worker STALE morde no Godeploy — exigir sinal de RUNTIME nos logs após deploy.
+
+---
 
 **PRÓXIMO PASSO:** aguardando **OK do Luis** na lista final de 30 áreas (mostrada no chat). Com o OK:
 deploy STAGING `edf400b4` → `sync-sheets-now` → `rollup-backfill` → dry-run `rollup-push` (conferir ~30

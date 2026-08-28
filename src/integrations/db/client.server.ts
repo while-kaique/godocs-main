@@ -1071,6 +1071,43 @@ export function getDocumentacao(projetoId: string) {
   return queryOne<DocumentacaoRow>("SELECT * FROM documentacao WHERE projeto_id = ?", [projetoId]);
 }
 
+/**
+ * IDs das docs marcadas como PENDENTES de compilação (`compilacao_pendente:true` no conteúdo).
+ * Alimenta o cron `recompilarDocsPendentes`, que re-tenta a compilação no modelo escolhido
+ * (luna). `json_valid` guarda contra conteúdo não-JSON legado. Bounded por `max`.
+ */
+export function getDocsPendentesCompilacao(max = 20) {
+  // ORDER BY updated_at DESC: prioriza as docs pendentes MAIS RECENTES. Uma doc "poison" que
+  // falha sempre não tem o updated_at bumpado no defer, então cai para o fim e NÃO inaniza as
+  // pendentes novas ocupando as vagas do LIMIT (o gotcha de starvation da revisão §9).
+  return queryAll<{ projeto_id: string }>(
+    `SELECT projeto_id FROM documentacao
+      WHERE json_valid(conteudo) AND json_extract(conteudo, '$.compilacao_pendente') = 1
+      ORDER BY updated_at DESC
+      LIMIT ?`,
+    [max],
+  );
+}
+
+/**
+ * Merge ATÔMICO de `patch` no `documentacao.conteudo` via `json_patch` (RFC 7386), num
+ * ÚNICO UPDATE — sem read-modify-write. As chaves NÃO citadas no patch (ex.: `saving`,
+ * `receita`) ficam INTACTAS; chave com valor `null` no patch é REMOVIDA (usado p/ limpar
+ * `compilacao_pendente`/`coletado_pendente`). É o que torna a compilação da doc em segundo
+ * plano segura: ela grava só os campos da doc e NUNCA pode apagar o financeiro que outro
+ * caminho (turno `completo`) escreveu — não há mais janela de lost-update do blob.
+ * Devolve quantas linhas mudaram (0 = ainda não há row; `null` = adaptador não informou).
+ */
+export async function patchDocumentacaoConteudo(
+  projetoId: string,
+  patch: Record<string, unknown>,
+): Promise<number | null> {
+  return execContando(
+    "UPDATE documentacao SET conteudo = json_patch(conteudo, ?), updated_at = ? WHERE projeto_id = ?",
+    [JSON.stringify(patch), nowISO(), projetoId],
+  );
+}
+
 export async function upsertDocumentacao(projetoId: string, conteudo: unknown) {
   const existing = await queryOne<{ id: string }>(
     "SELECT id FROM documentacao WHERE projeto_id = ?",
@@ -2823,6 +2860,287 @@ export async function upsertEmbeddingEspecial(dados: {
        texto_hash = excluded.texto_hash,
        criado_em = excluded.criado_em`,
     [dados.projeto_id, dados.modelo, dados.dim, dados.vetor, dados.texto_hash],
+  );
+}
+
+// ─── Time autônomo de avaliação de projetos NORMAIS (fatia B) ────────────────
+// Tabelas SEPARADAS das especial_* de propósito (corpora distintos; não atropelar a peça do
+// Kaique). `projeto_embedding` é a memória vetorial dos normais; `projeto_avaliacao` guarda a
+// recomendação do agregador em MODO SOMBRA (grava, não muda status). Ver
+// `avaliacao-normais.functions.ts` e `agents/agregador-avaliacao.ts`.
+
+export type ProjetoEmbeddingRow = {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string; // base64 de Float32Array
+  texto_hash: string | null;
+  criado_em: string | null;
+};
+
+/** Todos os embeddings de normais (vetor incluso). Corpus por cosseno-em-JS na fatia B. */
+export async function getEmbeddingsProjetos(): Promise<ProjetoEmbeddingRow[]> {
+  return queryAll<ProjetoEmbeddingRow>('SELECT * FROM projeto_embedding', []);
+}
+
+/** O embedding de UM projeto normal — o vetor do ALVO, sem puxar a tabela toda. */
+export async function getEmbeddingProjeto(
+  projetoId: string,
+): Promise<ProjetoEmbeddingRow | null> {
+  const rows = await queryAll<ProjetoEmbeddingRow>(
+    'SELECT * FROM projeto_embedding WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Grava (ou substitui) o embedding de um projeto normal. UPSERT: re-embeddar é o caso de edição. */
+export async function upsertEmbeddingProjeto(dados: {
+  projeto_id: string;
+  modelo: string;
+  dim: number;
+  vetor: string;
+  texto_hash: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO projeto_embedding (projeto_id, modelo, dim, vetor, texto_hash, criado_em)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       modelo = excluded.modelo,
+       dim = excluded.dim,
+       vetor = excluded.vetor,
+       texto_hash = excluded.texto_hash,
+       criado_em = excluded.criado_em`,
+    [dados.projeto_id, dados.modelo, dados.dim, dados.vetor, dados.texto_hash],
+  );
+}
+
+export type ProjetoAvaliacaoRow = {
+  projeto_id: string;
+  veredito: string;
+  confianca: number;
+  aplicar: number;
+  divergencia: number;
+  motivo: string | null;
+  votos: string | null;
+  origem: string | null;
+  modelo: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesNormais(): Promise<ProjetoAvaliacaoRow[]> {
+  return queryAll<ProjetoAvaliacaoRow>('SELECT * FROM projeto_avaliacao', []);
+}
+
+export async function getAvaliacaoNormal(
+  projetoId: string,
+): Promise<ProjetoAvaliacaoRow | null> {
+  const rows = await queryAll<ProjetoAvaliacaoRow>(
+    'SELECT * FROM projeto_avaliacao WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** id + veredito (sem votos) — para o backfill saber quem já foi avaliado sem puxar os blobs. */
+export async function getIdsAvaliacoesNormais(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM projeto_avaliacao',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou substitui) a recomendação do agregador. UPSERT: reavaliar é o caso do reenvio. */
+export async function upsertAvaliacaoNormal(dados: {
+  projeto_id: string;
+  veredito: string;
+  confianca: number;
+  aplicar: boolean;
+  divergencia: boolean;
+  motivo: string | null;
+  votos: string | null;
+  origem: string | null;
+  modelo: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO projeto_avaliacao
+       (projeto_id, veredito, confianca, aplicar, divergencia, motivo, votos, origem, modelo, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       veredito = excluded.veredito,
+       confianca = excluded.confianca,
+       aplicar = excluded.aplicar,
+       divergencia = excluded.divergencia,
+       motivo = excluded.motivo,
+       votos = excluded.votos,
+       origem = excluded.origem,
+       modelo = excluded.modelo,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.veredito,
+      dados.confianca,
+      dados.aplicar ? 1 : 0,
+      dados.divergencia ? 1 : 0,
+      dados.motivo,
+      dados.votos,
+      dados.origem,
+      dados.modelo,
+    ],
+  );
+}
+
+// ─── Deliberação multi-turno do time autônomo de avaliação (fatia C, MODO SOMBRA) ──
+
+export type DeliberacaoAvaliacaoRow = {
+  projeto_id: string;
+  estado: string;
+  rodada: number;
+  veredito: string | null;
+  confianca: number | null;
+  grau: string | null;
+  encerrada: number;
+  motivo: string | null;
+  historico: string | null;
+  origem: string | null;
+  atualizado_em: string | null;
+};
+
+export async function getDeliberacao(
+  projetoId: string,
+): Promise<DeliberacaoAvaliacaoRow | null> {
+  const rows = await queryAll<DeliberacaoAvaliacaoRow>(
+    'SELECT * FROM deliberacao_avaliacao WHERE projeto_id = ?',
+    [projetoId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Deliberações ABERTAS (estado='deliberando') para o cron avançar. Só as colunas de controle —
+ *  NUNCA o `historico` em lote (mantém a leitura pequena; irmão do teto de 32 MiB de RPC). */
+export async function getDeliberacoesAbertas(
+  limite: number,
+): Promise<{ projeto_id: string; estado: string; rodada: number }[]> {
+  return queryAll<{ projeto_id: string; estado: string; rodada: number }>(
+    "SELECT projeto_id, estado, rodada FROM deliberacao_avaliacao WHERE estado = 'deliberando' ORDER BY atualizado_em ASC LIMIT ?",
+    [limite],
+  );
+}
+
+/** ids com deliberação registrada (qualquer estado) — para o cron saber quem já está na mesa. */
+export async function getIdsDeliberacoes(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM deliberacao_avaliacao',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou avança) a deliberação. UPSERT: cada rodada do cron substitui o estado. */
+export async function upsertDeliberacao(dados: {
+  projeto_id: string;
+  estado: string;
+  rodada: number;
+  veredito: string | null;
+  confianca: number | null;
+  grau: string | null;
+  encerrada: boolean;
+  motivo: string | null;
+  historico: string | null;
+  origem: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO deliberacao_avaliacao
+       (projeto_id, estado, rodada, veredito, confianca, grau, encerrada, motivo, historico, origem, atualizado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       estado = excluded.estado,
+       rodada = excluded.rodada,
+       veredito = excluded.veredito,
+       confianca = excluded.confianca,
+       grau = excluded.grau,
+       encerrada = excluded.encerrada,
+       motivo = excluded.motivo,
+       historico = excluded.historico,
+       origem = excluded.origem,
+       atualizado_em = excluded.atualizado_em`,
+    [
+      dados.projeto_id,
+      dados.estado,
+      dados.rodada,
+      dados.veredito,
+      dados.confianca,
+      dados.grau,
+      dados.encerrada ? 1 : 0,
+      dados.motivo,
+      dados.historico,
+      dados.origem,
+    ],
+  );
+}
+
+// ─── Retroativo do time de avaliação (fatia C, MODO SOMBRA) ──────────────────
+
+export type AvaliacaoRetroativaRow = {
+  projeto_id: string;
+  veredito_agregado: string | null;
+  veredito_humano: string | null;
+  resultado: string;
+  confianca: number | null;
+  grau: string | null;
+  motivo: string | null;
+  origem: string | null;
+  criado_em: string | null;
+};
+
+export async function getAvaliacoesRetroativas(): Promise<AvaliacaoRetroativaRow[]> {
+  return queryAll<AvaliacaoRetroativaRow>('SELECT * FROM avaliacao_retroativa', []);
+}
+
+/** ids já medidos pelo retroativo — para o cron não re-rodar o que já mediu (idempotência). */
+export async function getIdsRetroativos(): Promise<string[]> {
+  const rows = await queryAll<{ projeto_id: string }>(
+    'SELECT projeto_id FROM avaliacao_retroativa',
+    [],
+  );
+  return rows.map((r) => r.projeto_id);
+}
+
+/** Grava (ou substitui) a medição retroativa de um projeto. UPSERT: re-medir é reavaliar. */
+export async function upsertAvaliacaoRetroativa(dados: {
+  projeto_id: string;
+  veredito_agregado: string | null;
+  veredito_humano: string | null;
+  resultado: string;
+  confianca: number | null;
+  grau: string | null;
+  motivo: string | null;
+  origem: string | null;
+}): Promise<void> {
+  await exec(
+    `INSERT INTO avaliacao_retroativa
+       (projeto_id, veredito_agregado, veredito_humano, resultado, confianca, grau, motivo, origem, criado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(projeto_id) DO UPDATE SET
+       veredito_agregado = excluded.veredito_agregado,
+       veredito_humano = excluded.veredito_humano,
+       resultado = excluded.resultado,
+       confianca = excluded.confianca,
+       grau = excluded.grau,
+       motivo = excluded.motivo,
+       origem = excluded.origem,
+       criado_em = excluded.criado_em`,
+    [
+      dados.projeto_id,
+      dados.veredito_agregado,
+      dados.veredito_humano,
+      dados.resultado,
+      dados.confianca,
+      dados.grau,
+      dados.motivo,
+      dados.origem,
+    ],
   );
 }
 

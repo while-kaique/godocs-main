@@ -1,6 +1,20 @@
 // Testes: helpers puros do extractor (normalização e divisão em lotes)
-import { describe, it, expect } from 'vitest';
-import { norm, dividirEmLotes, parseFlexivel, detectarAiProxy } from '@/lib/agents/extractor';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  norm,
+  dividirEmLotes,
+  parseFlexivel,
+  detectarAiProxy,
+  extrairCamposDocumentacao,
+} from '@/lib/agents/extractor';
+import { llmChat } from '@/lib/llm';
+import type { ProjetoContexto } from '@/lib/agents/types';
+
+// Mocka SÓ o llmChat (mantém `sanitizeEffort` real via importOriginal — o doc-modelo o usa).
+vi.mock('@/lib/llm', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/llm')>();
+  return { ...real, llmChat: vi.fn().mockResolvedValue('{"nome_projeto":"X"}') };
+});
 
 describe('detectarAiProxy — auto-detecção do gateway interno de IA', () => {
   it('detecta o host ai-proxy.gogroupbr.com no material enviado', () => {
@@ -17,6 +31,46 @@ describe('detectarAiProxy — auto-detecção do gateway interno de IA', () => {
     expect(detectarAiProxy('')).toBe(false);
     expect(detectarAiProxy(null)).toBe(false);
     expect(detectarAiProxy(undefined)).toBe(false);
+  });
+});
+
+describe('extrairCamposDocumentacao — roteamento opt-in do modelo mecânico (B)', () => {
+  const llmChatMock = vi.mocked(llmChat);
+  const ctx: ProjetoContexto = {
+    responsavel_nome: 'Luis',
+    responsavel_email: 'luis@x.com',
+    area: null,
+    ferramenta: 'Python',
+    membros: [],
+    nome_projeto: 'X',
+    data_criacao: null,
+    doc_texto: 'algum código aqui com conteúdo suficiente',
+    descricao_breve: null,
+  };
+
+  afterEach(() => {
+    delete process.env.DOC_MECANICO_MODEL;
+    delete process.env.DOC_MECANICO_EFFORT;
+    llmChatMock.mockClear();
+  });
+
+  it('sem DOC_MECANICO_* → NÃO passa model/reasoningEffort (idêntico a hoje)', async () => {
+    delete process.env.DOC_MECANICO_MODEL;
+    delete process.env.DOC_MECANICO_EFFORT;
+    await extrairCamposDocumentacao(ctx, 'algum código aqui com conteúdo suficiente');
+    const opts = llmChatMock.mock.calls[0][1] ?? {};
+    expect('model' in opts).toBe(false);
+    expect('reasoningEffort' in opts).toBe(false);
+  });
+
+  it('com DOC_MECANICO_MODEL/EFFORT → repassa model e reasoningEffort ao llmChat', async () => {
+    process.env.DOC_MECANICO_MODEL = 'gpt-5.6-luna';
+    process.env.DOC_MECANICO_EFFORT = 'low';
+    await extrairCamposDocumentacao(ctx, 'algum código aqui com conteúdo suficiente');
+    expect(llmChatMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ model: 'gpt-5.6-luna', reasoningEffort: 'low' }),
+    );
   });
 });
 

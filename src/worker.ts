@@ -20,6 +20,7 @@ import {
   resyncGoogle,
   reconciliarComplexidade,
   retroativoCustosPontuais,
+  recompilarDocsPendentes,
 } from "@/lib/chat.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
@@ -65,6 +66,13 @@ import {
   julgarEspeciaisComPainel,
   medirConcordanciaPainel,
 } from "@/lib/especial-classificador.functions";
+import {
+  avaliarProjetoNormalEmBackground,
+  avaliarProjetoNormal,
+  avaliarProjetosNormaisPendentes,
+  avancarDeliberacoesPendentes,
+} from "@/lib/avaliacao-normais.functions";
+import { avaliarRetroativo } from "@/lib/avaliacao-retroativa.functions";
 import { listarAprovacaoPendentes } from "@/lib/aprovacao-pendentes.functions";
 import { getAreasPublicas, sincronizarAreas } from "@/lib/areas.functions";
 import { getSugestoesParticipantes } from "@/lib/participantes.functions";
@@ -201,12 +209,16 @@ function analisarEmBackground(projetoId: string): Promise<unknown> {
   );
 }
 
-// Análise + classificação de especiais, ambas em background. O classificador é NO-OP se o
-// projeto não for especial e nunca lança (ver classificarEspecialEmBackground).
+// Análise + classificação de especiais + time autônomo de avaliação de normais, TODAS em
+// paralelo (Promise.allSettled). O classificador de especiais é NO-OP se o projeto não for
+// especial; a avaliação de normais (3ª promise) é NO-OP se a flag AVALIACAO_NORMAIS está OFF
+// (default) ou se o projeto é especial — e em MODO SOMBRA só grava a recomendação, nunca muda o
+// status. Nenhuma das três lança (cada uma engole os próprios erros).
 function processarPosSubmissao(projetoId: string): Promise<unknown> {
   return Promise.allSettled([
     analisarEmBackground(projetoId),
     classificarEspecialEmBackground(projetoId),
+    avaliarProjetoNormalEmBackground(projetoId),
   ]);
 }
 
@@ -310,6 +322,17 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       return json(await reconciliarSnapshots());
     }
 
+    // ── Cron: recompila docs PENDENTES (compilação assíncrona) ──
+    // A compilação da doc roda em background/submit no modelo escolhido (luna) e NUNCA cai no
+    // mini. Se o luna não entregou (proxy fora), a doc fica pendente e o cliente segue sem
+    // travar; este cron a recompila no luna depois. Idempotente, bounded.
+    if (pathname === "/api/cron/recompilar-docs-pendentes" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await recompilarDocsPendentes());
+    }
+
     // ── Cron: classificador de especiais pendentes (peça 4) ──────────────────
     // Rede do disparo pós-submissão: um especial cujo background morreu (ou submetido
     // antes da feature) recebe a recomendação aqui. Bounded por corrida (converge em
@@ -333,6 +356,36 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       }
       return json(await julgarEspeciaisComPainel({ dry: false, limite: 3, tetoChamadas: 30 }));
     }
+
+    // ── Cron irmão: time autônomo de avaliação de NORMAIS (fatia B, MODO SOMBRA) ──
+    // Rede do disparo pós-submissão + mantém os embeddings do corpus de aprovados em dia.
+    // NO-OP se AVALIACAO_NORMAIS está OFF (default). Grava a recomendação em `projeto_avaliacao`,
+    // NUNCA muda o status. Bounded por corrida (idempotente, converge em várias).
+    if (pathname === "/api/cron/avaliar-normais" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avaliarProjetosNormaisPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron: avança a DELIBERAÇÃO das mesas ABERTAS (fatia C, MODO SOMBRA) ──
+    // Máquina de estados persistida: cada corrida roda +1 rodada dos `deliberando`, bounded,
+    // até consenso ou nao_consenso. NO-OP se AVALIACAO_NORMAIS OFF. NUNCA muda o status.
+    if (pathname === "/api/cron/deliberar-avaliacoes" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avancarDeliberacoesPendentes({ dry: false, limite: 10 }));
+    }
+
+    // ── Cron: RETROATIVO — mede a mesa contra o veredito humano (fatia C, MODO SOMBRA) ──
+    // Roda a mesa nos projetos já decididos pelo humano (aprovado/reprovado no espelho) e grava
+    // acerto/erro em `avaliacao_retroativa`. NO-OP se OFF. SEM tocar status. Bounded/idempotente.
+    if (pathname === "/api/cron/avaliacao-retroativa" && method === "POST") {
+      if (!request.headers.get("x-godeploy-cron")) {
+        return errorJson("Rota exclusiva de cron.", 403);
+      }
+      return json(await avaliarRetroativo({ dry: false, limite: 20 }));    }
 
     // ── Cron: snapshot diário das pendências de pré-aprovação → Gomoon (D17) ──
     // 1×/dia às 09h BRT (`0 12 * * 1-5` — o cron do Godeploy é UTC). O Gomoon
@@ -848,6 +901,37 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       );
     }
 
+    // ── Time autônomo de avaliação de NORMAIS (fatia B, MODO SOMBRA) — rotas manuais ──
+    // Avalia UM projeto normal (RAG + FTE + Financeiro → Agregador). `dry` não grava. NO-OP se
+    // AVALIACAO_NORMAIS OFF ou se o projeto é especial. NUNCA muda o status (só grava recomendação).
+    if (pathname === "/api/admin/avaliar-normais" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { projetoId?: string; dry?: boolean };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório.", 400);
+      return json(await avaliarProjetoNormal(body.projetoId, { dry: body.dry }));
+    }
+    // Backfill: avalia os normais SEM recomendação + mantém os embeddings do corpus. `dry` é o
+    // DEFAULT (gravar exige {"dry":false}); `limite` limita a corrida.
+    if (pathname === "/api/admin/avaliar-normais-pendentes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(
+        await avaliarProjetosNormaisPendentes({ dry: body.dry, limite: body.limite }),
+      );
+    }
+    // Deliberação: avança as mesas abertas. `dry` DEFAULT (gravar exige {"dry":false}). NO-OP se OFF.
+    if (pathname === "/api/admin/deliberar-avaliacoes" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(await avancarDeliberacoesPendentes({ dry: body.dry, limite: body.limite }));
+    }
+    // Retroativo: mede a mesa contra o veredito humano. `dry` DEFAULT (gravar exige {"dry":false}).
+    if (pathname === "/api/admin/avaliacao-retroativa" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await readBody(request)) as { dry?: boolean; limite?: number };
+      return json(await avaliarRetroativo({ dry: body.dry, limite: body.limite }));
+    }
+
     // ── Índice vetorial dos especiais no Pinecone (plataforma oficial) ───────
     // Setup (T1): descreve o índice. Só CRIA com {"criar":true} — criar índice é ato de
     // infraestrutura, não efeito colateral de uma leitura. A dimensão (3072) é IMUTÁVEL:
@@ -1173,6 +1257,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
     if (pathname === "/api/admin/reanalisar-pendentes" && method === "POST") {
       await requireAdmin(request);
       return json(await reconciliarComplexidade());
+    }
+
+    // ── Recompilação de docs pendentes sob demanda (admin) ──
+    // MESMO trabalho do cron /api/cron/recompilar-docs-pendentes, sem o header de cron —
+    // para backfill/validação na staging (onde o cron não dispara). Idempotente.
+    if (pathname === "/api/admin/recompilar-docs-pendentes" && method === "POST") {
+      await requireAdmin(request);
+      return json(await recompilarDocsPendentes());
     }
 
     // ── Reconciliação de SNAPSHOTS sob demanda (admin) ──
