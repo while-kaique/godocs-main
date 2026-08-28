@@ -8,7 +8,18 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, ExternalLink, Save, History, FileText, Star, RotateCcw } from 'lucide-react';
+import {
+  Loader2,
+  ExternalLink,
+  Save,
+  History,
+  FileText,
+  Star,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  Bot,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +40,15 @@ import {
 } from '@/lib/aprovacoes-parecer';
 import { chaveColuna } from '@/lib/coluna-chave';
 import { rotuloColuna } from '@/lib/coluna-rotulo';
+import {
+  rotuloVeredito,
+  rotuloEstadoDeliberacao,
+  rotuloResultadoRetroativo,
+  rotuloGrau,
+  pctConfianca,
+  grauConfianca,
+  aparenciaConfianca,
+} from '@/lib/avaliacao-sombra-rotulos';
 import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
@@ -59,6 +79,24 @@ type HistoricoEntrada =
       created_at: string | null;
     };
 
+type AvaliacaoSombra = {
+  mesa: {
+    veredito: string;
+    confianca: number | null;
+    divergencia: boolean;
+    aplicar: boolean;
+    motivo: string | null;
+  } | null;
+  deliberacao: { estado: string; grau: string | null; rodada: number; motivo: string | null } | null;
+  retroativo: {
+    resultado: string;
+    veredito_agregado: string | null;
+    veredito_humano: string | null;
+    grau: string | null;
+    motivo: string | null;
+  } | null;
+};
+
 type Detalhe = {
   id: string;
   campos: Record<string, string>;
@@ -67,6 +105,10 @@ type Detalhe = {
   contrafactual: { tipo: 'pessoa' | 'time'; lista: string[] } | null;
   /** O que cada participante fez — do SQLite, como o contrafactual (nunca da planilha). */
   pessoas?: ContribuicaoParticipante[];
+  /** Avaliação em SOMBRA do time de agentes (teste sombra). NADA disto muda o status. */
+  avaliacaoSombra?: AvaliacaoSombra | null;
+  /** Voto do admin sobre a recomendação em sombra. */
+  feedback?: 'like' | 'dislike' | null;
 };
 
 type Grupo = { titulo: string; colunas: string[] };
@@ -294,6 +336,161 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
+/** Confiança em destaque: o número grande, colorido pelo grau, com o rótulo do grau ao lado. */
+function ConfiancaDestaque({ conf }: { conf: number | null }) {
+  const a = aparenciaConfianca(conf);
+  const grau = typeof conf === 'number' ? grauConfianca(conf) : null;
+  return (
+    <span
+      className="inline-flex items-baseline gap-1.5 rounded-lg px-2.5 py-1"
+      style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
+    >
+      <span className="text-[20px] font-bold leading-none tabular-nums">{pctConfianca(conf)}</span>
+      <span className="text-[11px] font-semibold">{rotuloGrau(grau)}</span>
+    </span>
+  );
+}
+
+function LinhaSombra({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+        {rotulo}
+      </span>
+      <span className="text-[13px]">{children}</span>
+    </div>
+  );
+}
+
+function AvaliacaoSombraPainel({
+  sombra,
+  feedback,
+  votando,
+  onVotar,
+}: {
+  sombra: AvaliacaoSombra;
+  feedback: 'like' | 'dislike' | null;
+  votando: boolean;
+  onVotar: (v: 'like' | 'dislike') => void;
+}) {
+  const { mesa, deliberacao, retroativo } = sombra;
+  return (
+    <div
+      className="rounded-xl border p-4"
+      style={{ borderColor: 'rgba(71,85,105,0.28)', background: 'rgba(71,85,105,0.04)' }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.06em]"
+          style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}
+        >
+          <Bot className="h-3 w-3" aria-hidden /> Sombra
+        </span>
+        <span className="text-[12px] text-muted-foreground">
+          Recomendação do agente — <strong className="font-semibold">não muda o status</strong> do
+          projeto (a decisão segue sendo da triagem).
+        </span>
+      </div>
+
+      {mesa ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div>
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+              Veredito do agente
+            </span>
+            <p className="text-[15px] font-semibold">{rotuloVeredito(mesa.veredito)}</p>
+          </div>
+          <ConfiancaDestaque conf={mesa.confianca} />
+          {mesa.divergencia && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              style={{ background: 'rgba(138,90,0,0.12)', border: '1px solid rgba(138,90,0,0.4)', color: '#8a5a00' }}
+            >
+              Especialistas divergiram
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 text-[13px] text-muted-foreground">
+          O agregador ainda não emitiu recomendação para este projeto.
+        </p>
+      )}
+
+      {mesa?.motivo && (
+        <p className="mt-2 whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5 text-[12.5px] leading-relaxed">
+          {mesa.motivo}
+        </p>
+      )}
+
+      {deliberacao && (
+        <div className="mt-3 space-y-1">
+          <LinhaSombra rotulo="Deliberação">
+            {rotuloEstadoDeliberacao(deliberacao.estado)}
+            {deliberacao.grau ? ` · confiança ${deliberacao.grau}` : ''}
+            {` · rodada ${deliberacao.rodada}`}
+          </LinhaSombra>
+          {deliberacao.motivo && (
+            <p className="whitespace-pre-wrap text-[12.5px] text-muted-foreground">
+              {deliberacao.motivo}
+            </p>
+          )}
+        </div>
+      )}
+
+      {retroativo && (
+        <div className="mt-3 space-y-1">
+          <LinhaSombra rotulo="Confere com o humano?">
+            {rotuloResultadoRetroativo(retroativo.resultado)}
+          </LinhaSombra>
+          <LinhaSombra rotulo="Agente × humano">
+            {rotuloVeredito(retroativo.veredito_agregado)} × {rotuloVeredito(retroativo.veredito_humano)}
+          </LinhaSombra>
+          {retroativo.motivo && (
+            <p className="whitespace-pre-wrap text-[12.5px] text-muted-foreground">
+              {retroativo.motivo}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Sinal de treinamento: o admin diz se concorda com o agente. Estado nunca só por cor —
+          o botão marcado leva rótulo, ícone preenchido e aria-pressed. */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
+        <span className="text-[12px] font-medium text-muted-foreground">
+          A recomendação está certa?
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant={feedback === 'like' ? 'default' : 'outline'}
+          aria-pressed={feedback === 'like'}
+          disabled={votando}
+          onClick={() => onVotar('like')}
+        >
+          <ThumbsUp className="h-4 w-4" fill={feedback === 'like' ? 'currentColor' : 'none'} />
+          Concordo
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={feedback === 'dislike' ? 'destructive' : 'outline'}
+          aria-pressed={feedback === 'dislike'}
+          disabled={votando}
+          onClick={() => onVotar('dislike')}
+        >
+          <ThumbsDown className="h-4 w-4" fill={feedback === 'dislike' ? 'currentColor' : 'none'} />
+          Discordo
+        </Button>
+        {feedback && (
+          <span className="text-[12px] text-muted-foreground">
+            {feedback === 'like' ? 'Você concordou.' : 'Você discordou.'} Clique de novo para desmarcar.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ProjetoDetalheDialog({
   projeto,
   onFechar,
@@ -318,6 +515,10 @@ export function ProjetoDetalheDialog({
   const [estrelas, setEstrelas] = useState(0);
   const estrelasOriginal = useRef(0);
   const [salvando, setSalvando] = useState(false);
+  // Voto 👍/👎 do admin sobre a recomendação em sombra (teste sombra). Espelha o estado do
+  // servidor e é otimista: clicar reflete na hora e desfaz se o POST falhar.
+  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+  const [votando, setVotando] = useState(false);
   // Guarda o texto original da coluna "Observações": só mandamos a coluna quando o
   // validador realmente mexeu nela (evitar reescrever a célula com o mesmo conteúdo).
   const obsOriginal = useRef('');
@@ -356,6 +557,7 @@ export function ProjetoDetalheDialog({
         // porque recortá-la aqui faz o "salvar" REBAIXAR a nota de outra pessoa.
         setEstrelas(nota);
         setStatusEscolhido(d.campos['Status'] ?? '');
+        setFeedback(d.feedback ?? null);
       })
       .catch((e: Error) => vivo && setErro(e.message))
       .finally(() => vivo && setCarregando(false));
@@ -394,6 +596,25 @@ export function ProjetoDetalheDialog({
       toast.error(e instanceof Error ? e.message : 'Não foi possível salvar o status.');
     } finally {
       setSalvando(false);
+    }
+  }
+
+  // Vota (ou desmarca, clicando de novo no voto atual) na recomendação em sombra.
+  // ⚠️ Não toca no status do projeto — é só sinal de treinamento. Otimista, com rollback.
+  async function votarSombra(voto: 'like' | 'dislike') {
+    if (!projeto || votando) return;
+    const novo = feedback === voto ? null : voto;
+    const anterior = feedback;
+    setFeedback(novo);
+    setVotando(true);
+    try {
+      await apiFetch('/api/admin/avaliacao/feedback', { projetoId: projeto.id, voto: novo });
+      invalidarDetalhe(projeto.id);
+    } catch (e) {
+      setFeedback(anterior);
+      toast.error(e instanceof Error ? e.message : 'Não foi possível registrar o voto.');
+    } finally {
+      setVotando(false);
     }
   }
 
@@ -570,6 +791,19 @@ export function ProjetoDetalheDialog({
             {!parecerLider.vazio && (
               <Secao titulo="Pré-aprovação do líder">
                 <ParecerLiderPainel parecer={parecerLider} />
+              </Secao>
+            )}
+
+            {/* Teste sombra: o que o time de AGENTES recomendaria, ao lado da decisão
+                humana. NADA aqui muda o status — é para calibrar os agentes. */}
+            {detalhe.avaliacaoSombra && (
+              <Secao titulo="Avaliação em sombra (agente)">
+                <AvaliacaoSombraPainel
+                  sombra={detalhe.avaliacaoSombra}
+                  feedback={feedback}
+                  votando={votando}
+                  onVotar={votarSombra}
+                />
               </Secao>
             )}
 

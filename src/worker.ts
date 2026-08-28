@@ -47,6 +47,7 @@ import {
   getProjetoDashboard,
   getProjetosDashboardLote,
   definirStatusProjeto,
+  registrarFeedbackSombra,
 } from "@/lib/dashboard-admin.functions";
 import {
   listarEspeciais,
@@ -814,6 +815,14 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       const { email: adminEmail } = await requireAdmin(request);
       const body = await readBody(request);
       return json(await definirStatusProjeto(body, adminEmail));
+    }
+    // Feedback 👍/👎 do admin sobre a recomendação em SOMBRA (teste sombra do time de
+    // avaliação) — SINAL DE TREINAMENTO. Não muda status: grava/apaga a linha em
+    // `avaliacao_feedback`. Só admin (mesmo gate da triagem).
+    if (pathname === "/api/admin/avaliacao/feedback" && method === "POST") {
+      const { email: adminEmail } = await requireAdmin(request);
+      const body = await readBody(request);
+      return json(await registrarFeedbackSombra(body, adminEmail));
     }
 
     // Feed unificado de ações do painel (drawer "Histórico"): quem aprovou/reprovou/pediu
