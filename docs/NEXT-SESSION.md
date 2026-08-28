@@ -1,7 +1,27 @@
 # NEXT-SESSION
 
 ## Plano ativo
-`docs/plans/agentes-avaliacao-autonomos.md` (fatia A executada) + `docs/plans/submissao-doc-fora-do-caminho-critico.md` (Frente 1 executada). **Nenhum plano novo aberto** — o próximo passo é CÓDIGO de UI, não planejar.
+**→ [docs/plans/mesa-avaliacao-parecer-raciocinado.md](plans/mesa-avaliacao-parecer-raciocinado.md)** · Status: **✅ APROVADO (Luis, 28/08)** — escopo **B (time LLM completo)**: transformar a mesa de avaliação em sombra (hoje 100% determinística, "ecoa o gate") num **time de agentes LLM críticos** que raciocinam sobre o **ganho total** (÷10, não receita crua 51k), com confiança = concordância real, deliberação até 5 rodadas e histórico de rodadas na ficha. Tudo em **SOMBRA** (`AVALIACAO_NORMAIS`, nada muda status).
+
+### 🚧 /ggsd:code EM ANDAMENTO — Fatia 1 = T1 (28/08, WIP, contexto estourou no meio)
+**Worktree `~/godocs-wt-mesa-parecer`** (branch **`feat/mesa-parecer-raciocinado`**, base `origin/main` @ `7d49ec2`, com PR #306). ⚠️ **O código da mesa vive no `origin/main`** (PRs #303/#305), NÃO na branch docs — por isso o worktree parte do main. `npm ci` feito, **baseline verde 2232**.
+
+**T1 = os 4 agentes especialistas LLM** (2 arquivos NOVOS, ainda NÃO criados): espelham o padrão de `src/lib/agents/especiais-revisor.ts` (`buildPrompt*` puro → `normalizar*` fail-closed → `.functions` que chama `llmChat({jsonMode:true})` e NUNCA lança; `extrairJson` reusado de `agents/especial-classificador.ts`).
+- **`src/lib/agents/especialista-avaliacao.ts` (PURO):** tipos `DimensaoAvaliacao='fte'|'financeiro'|'rag'|'cetico'`, `TextoProjeto`, `VotoDeterministico`, `EntradaEspecialista`, `JulgamentoEspecialista{dimensao,preocupa,argumento,confianca(0..1 clampado),sinais,origem:'llm'|'deterministico'}`; `fallbackDeterministico(entrada)`, `buildPromptEspecialista(entrada):LLMMessage[]` (persona por dimensão; cético = ADVERSARIAL/derrubar, não conferir — 4ª peça só desafia `aprovar`), `normalizarJulgamento(bruto,entrada)` (inutilizável → fallback).
+- **`src/lib/agents/especialista-avaliacao.functions.ts` (LLM):** `especialistasMesaLlmLigados()` (env `AVALIACAO_MESA_LLM` LAZY, default OFF — SEPARADA da `AVALIACAO_NORMAIS`, igual ao redator ter `AVALIACAO_REDATOR`), `julgarComEspecialista(entrada)` (llmChat jsonMode → normaliza → catch → fallbackDeterministico).
+
+**ESTADO EXATO ao estourar o contexto:** `printf pendente` nos 2 marcadores `.claude/.review-status`/`.quality-status` (armados conservador, §7). **RED CONFIRMADO** (`ggsd:test-writer`, confiança 0.95): `tests/especialista-avaliacao.test.ts` COMMITADO, encoda os 8 critérios; a suíte cai na resolução do import (`Cannot find package '@/lib/agents/especialista-avaliacao'`) porque os 2 módulos ainda não existem. `LLMMessage = {role:'system'|'user'|'assistant', content:string}` (`src/lib/llm.ts`).
+
+**PRÓXIMO (retomar direto no verde):** (1) **implementar os 2 arquivos T1 até verde** — `npx vitest run tests/especialista-avaliacao.test.ts` (mockar `llmChat`, sem enfraquecer o teste); (3) §8 suíte + §8.1 `verify-tier.sh` (mede faixa — nada de prod tocado ainda, provavelmente `padrao`) + §9.A/B revisores → gravar marcadores; (4) **seguir T2→T7** (agregador com confiança=concordância real; deliberação 2→5 rodadas + histórico APPEND no `deliberacao_avaliacao.historico` sem `SELECT historico` em lote; materialidade `saving+receita/10` em `computarVotos:290-307` — **NÃO** tocar `analyzer.ts:847`; UI rodadas em `montarAvaliacaoSombra` que hoje DESCARTA histórico; retroativo = rede). **Fronteiras:** não tocar gate real do analyzer, não deletar o determinístico (vira VOTO/input), nada sai da sombra. Detalhe completo no arquivo do plano + memória `mesa-avaliacao-qualidade-parecer`.
+
+**Diagnóstico já verificado no código (não re-derivar):** materialidade da mesa hoje = `economia_reais_mes + valor_ganho_mensal` (receita CRUA, `avaliacao-normais.functions.ts:298`); confiança RAG = degrau `0.85` (`agregador-avaliacao.ts:58`); agregado = `Math.min` dos votos; `MAX_RODADAS_DELIBERACAO=2` (`deliberacao.ts:24`); `upsertDeliberacao` SOBRESCREVE historico com só a rodada corrente e o mapper `montarAvaliacaoSombra` o DESCARTA.
+
+_(Plano ANTERIOR pausado abaixo; ignore — o ativo é a mesa-parecer.)_
+
+---
+
+_(histórico anterior:)_
+`docs/plans/agentes-avaliacao-autonomos.md` (fatia A executada) + `docs/plans/submissao-doc-fora-do-caminho-critico.md` (Frente 1 executada).
 
 ## O que esta sessão fez (28/08/2026)
 Deploy do **time de agentes em prod, modo SOMBRA VISÍVEL** (decisão do Luis: medir+ver, NÃO autônomo) + **Frente 1 (doc async)** junto.
