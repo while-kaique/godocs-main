@@ -1071,6 +1071,43 @@ export function getDocumentacao(projetoId: string) {
   return queryOne<DocumentacaoRow>("SELECT * FROM documentacao WHERE projeto_id = ?", [projetoId]);
 }
 
+/**
+ * IDs das docs marcadas como PENDENTES de compilação (`compilacao_pendente:true` no conteúdo).
+ * Alimenta o cron `recompilarDocsPendentes`, que re-tenta a compilação no modelo escolhido
+ * (luna). `json_valid` guarda contra conteúdo não-JSON legado. Bounded por `max`.
+ */
+export function getDocsPendentesCompilacao(max = 20) {
+  // ORDER BY updated_at DESC: prioriza as docs pendentes MAIS RECENTES. Uma doc "poison" que
+  // falha sempre não tem o updated_at bumpado no defer, então cai para o fim e NÃO inaniza as
+  // pendentes novas ocupando as vagas do LIMIT (o gotcha de starvation da revisão §9).
+  return queryAll<{ projeto_id: string }>(
+    `SELECT projeto_id FROM documentacao
+      WHERE json_valid(conteudo) AND json_extract(conteudo, '$.compilacao_pendente') = 1
+      ORDER BY updated_at DESC
+      LIMIT ?`,
+    [max],
+  );
+}
+
+/**
+ * Merge ATÔMICO de `patch` no `documentacao.conteudo` via `json_patch` (RFC 7386), num
+ * ÚNICO UPDATE — sem read-modify-write. As chaves NÃO citadas no patch (ex.: `saving`,
+ * `receita`) ficam INTACTAS; chave com valor `null` no patch é REMOVIDA (usado p/ limpar
+ * `compilacao_pendente`/`coletado_pendente`). É o que torna a compilação da doc em segundo
+ * plano segura: ela grava só os campos da doc e NUNCA pode apagar o financeiro que outro
+ * caminho (turno `completo`) escreveu — não há mais janela de lost-update do blob.
+ * Devolve quantas linhas mudaram (0 = ainda não há row; `null` = adaptador não informou).
+ */
+export async function patchDocumentacaoConteudo(
+  projetoId: string,
+  patch: Record<string, unknown>,
+): Promise<number | null> {
+  return execContando(
+    "UPDATE documentacao SET conteudo = json_patch(conteudo, ?), updated_at = ? WHERE projeto_id = ?",
+    [JSON.stringify(patch), nowISO(), projetoId],
+  );
+}
+
 export async function upsertDocumentacao(projetoId: string, conteudo: unknown) {
   const existing = await queryOne<{ id: string }>(
     "SELECT id FROM documentacao WHERE projeto_id = ?",
