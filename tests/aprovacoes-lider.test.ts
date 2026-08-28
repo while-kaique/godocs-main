@@ -531,7 +531,7 @@ describe('pré-aprovação do líder', () => {
   it('quem não lidera ninguém não vê a fila', async () => {
     const r = await listarAprovacoesPendentes('luis.albuquerque@gocase.com');
 
-    expect(r).toEqual({ lidera: false, itens: [] });
+    expect(r).toEqual({ lidera: false, itens: [], congelada: false });
   });
 });
 
