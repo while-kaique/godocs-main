@@ -9,6 +9,8 @@
 // salvamos uma doc "de segunda categoria" que não passou pelo agente.
 
 import { llmChat } from '@/lib/llm';
+import type { LLMOptions } from '@/lib/llm';
+import { docCompiladorLLMOpts } from './doc-modelo';
 import type { DocumentacaoColetada, DocumentacaoGerada, ProjetoContexto } from './types';
 
 const log = (...args: unknown[]) => console.log('[doc-compiler]', ...args);
@@ -101,6 +103,10 @@ export function parseDocJson(raw: string): DocumentacaoGerada | null {
 export async function compilarDocumentacao(
   ctx: ProjetoContexto,
   coletado: DocumentacaoColetada,
+  // Override das opções de LLM. Ausente → docCompiladorLLMOpts() (perfil FOLGADO de
+  // background/cron). O SUBMIT passa um perfil FAIL-FAST (0 retries, timeout limitado) para o
+  // clique "Enviar" não pendurar sob proxy degradado — ver docCompiladorSubmitLLMOpts.
+  llmOptsOverride?: LLMOptions,
 ): Promise<DocumentacaoGerada> {
   const baseMessages = [
     { role: 'system' as const, content: SYSTEM_PROMPT },
@@ -126,6 +132,10 @@ export async function compilarDocumentacao(
       jsonMode: true,
       temperature: 0.3,
       maxTokens: MAX_OUTPUT_TOKENS,
+      // Modelo leve opt-in + (no modo async) SEMPRE o modelo escolhido, sem o mini escondido:
+      // timeout folgado p/ lentidão + retries do mesmo modelo em erro. Default OFF = hoje.
+      // O submit passa um override FAIL-FAST (0 retries) p/ não pendurar o clique.
+      ...(llmOptsOverride ?? docCompiladorLLMOpts()),
     });
 
     const doc = parseDocJson(ultimaResposta);

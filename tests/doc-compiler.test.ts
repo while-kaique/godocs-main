@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock da camada LLM — não queremos rede nos testes. Controlamos o que o "agente"
 // devolve a cada chamada para exercitar o parse, o retry e o lançamento sem fallback.
-vi.mock('@/lib/llm', () => ({ llmChat: vi.fn() }));
+// ⚠️ importOriginal: mockamos SÓ o llmChat e mantemos o resto REAL (o doc-modelo, via
+// doc-compiler, importa `sanitizeEffort` deste módulo — um mock total o deixaria undefined).
+vi.mock('@/lib/llm', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/llm')>();
+  return { ...real, llmChat: vi.fn() };
+});
 
 import { llmChat } from '@/lib/llm';
 import { parseDocJson, compilarDocumentacao } from '@/lib/agents/doc-compiler';
@@ -96,5 +101,33 @@ describe('compilarDocumentacao', () => {
     );
     // Tentou MAX_ATTEMPTS (3) vezes antes de desistir.
     expect(llmChatMock).toHaveBeenCalledTimes(3);
+  });
+
+  // Frente 1 (B) — roteamento opt-in do modelo mecânico.
+  it('sem DOC_MECANICO_* → NÃO passa model/reasoningEffort (idêntico a hoje)', async () => {
+    delete process.env.DOC_MECANICO_MODEL;
+    delete process.env.DOC_MECANICO_EFFORT;
+    llmChatMock.mockResolvedValueOnce(DOC_VALIDA);
+
+    await compilarDocumentacao(ctx, coletado);
+
+    const opts = llmChatMock.mock.calls[0][1] ?? {};
+    expect('model' in opts).toBe(false);
+    expect('reasoningEffort' in opts).toBe(false);
+  });
+
+  it('com DOC_MECANICO_MODEL/EFFORT → repassa model e reasoningEffort ao llmChat', async () => {
+    process.env.DOC_MECANICO_MODEL = 'gpt-5.6-luna';
+    process.env.DOC_MECANICO_EFFORT = 'low';
+    llmChatMock.mockResolvedValueOnce(DOC_VALIDA);
+
+    await compilarDocumentacao(ctx, coletado);
+
+    expect(llmChatMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ model: 'gpt-5.6-luna', reasoningEffort: 'low' }),
+    );
+    delete process.env.DOC_MECANICO_MODEL;
+    delete process.env.DOC_MECANICO_EFFORT;
   });
 });
