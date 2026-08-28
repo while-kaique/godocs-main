@@ -80,6 +80,12 @@ export type VeredictoRevisor = {
   refutada: boolean;
   nota_sugerida: number | null;
   motivo: string;
+  /**
+   * A refutação é um caso da lista **`DERRUBA`** da régua — "isto não é projeto" — e não apenas
+   * "isto não é 4★"? Só o `true` explícito conta, e ele **ignora o piso estrutural** (`estado.piso`):
+   * é a única forma de o revisor zerar um projeto cujo eixo estrutural trouxe prova nomeada.
+   */
+  derruba?: boolean;
 };
 
 export type MotivoEncerramento = "sem_revisao" | "aceita" | "abaixo_do_corte" | "teto_de_voltas";
@@ -96,6 +102,25 @@ export type EstadoConvergencia = {
   /** Quantas revisões já foram aplicadas (0 = nenhuma ainda). Só cresce. */
   volta: number;
   nota: number;
+  /**
+   * PISO ESTRUTURAL: a nota do eixo estrutural quando ele trouxe prova **NOMEADA** (0 quando não
+   * trouxe). O revisor não desce abaixo dele — salvo `derruba`.
+   *
+   * ⚠️ Existe por um caso real e absurdo: «[VERSTA] Robô orçamento» (nota humana **8★**) teve
+   * eixos 3/2/4/1 — estrutural **3 com prova nomeada** — e **UMA volta do revisor fechou em 0★**
+   * (medido 28/08/2026). O revisor refutou a ALTURA (o alcance de 4 não se sustentava) e a queda
+   * livre transformou isso em "este projeto não vale nada".
+   *
+   * A régua: o revisor julga **quão alto** o projeto chega, não **se ele existe**. Se o eixo
+   * estrutural provou, com nome, que a coisa roda de novo e tem onde conferir, refutar o alcance
+   * não apaga a recorrência provada. Quem pode apagá-la é a `DERRUBA` — e para isso existe o
+   * `derruba` do veredicto, que ignora este piso.
+   *
+   * ⚠️ Isto **não** é o `MAX_QUEDA_POR_VOLTA` (limite por volta, medido e descartado): lá o teto era
+   * cego e impedia zerar o lixo; aqui o piso é o que a PROVA do estrutural sustenta, e o lixo — que
+   * não tem prova nomeada no estrutural — segue caindo até 0.
+   */
+  piso: number;
   encerrado: boolean;
   contestada: boolean;
   motivo: MotivoEncerramento | null;
@@ -111,12 +136,13 @@ function clamp(n: number): number {
  * Estado inicial. Nota abaixo do corte já nasce **encerrada** (`sem_revisao`) — o T6 não deve
  * gastar chamada de revisor com ela.
  */
-export function iniciarConvergencia(nota: number): EstadoConvergencia {
+export function iniciarConvergencia(nota: number, pisoEstrutural = 0): EstadoConvergencia {
   const n = clamp(nota);
   const revisar = deveRevisar(n);
   return {
     volta: 0,
     nota: n,
+    piso: Math.min(clamp(pisoEstrutural), n),
     encerrado: !revisar,
     contestada: false,
     motivo: revisar ? null : "sem_revisao",
@@ -143,11 +169,12 @@ export function aplicarRevisao(
 
   const volta = estado.volta + 1;
   const sugerida = veredicto.nota_sugerida == null ? null : clamp(veredicto.nota_sugerida);
-  // Só desce (decisão 4: empate ou sugestão maior mantém a atual) e **no máximo 1 por volta**
-  // (`MAX_QUEDA_POR_VOLTA` — ver lá o caso do 8★ que virava 0★).
-  // Só desce: empate ou sugestão maior mantém a nota atual (decisão 4).
-  // ⚠️ Sem limite de queda por volta — o limite foi MEDIDO e descartado (ver `MAX_QUEDA_POR_VOLTA`).
-  const nota = sugerida != null && sugerida < estado.nota ? sugerida : estado.nota;
+  // Só desce: empate ou sugestão maior mantém a nota atual (decisão 4). Sem limite de queda por
+  // volta (o `MAX_QUEDA_POR_VOLTA` foi medido e descartado) — mas com **PISO ESTRUTURAL**: refutar a
+  // ALTURA não apaga o que o eixo estrutural provou. `derruba` ignora o piso (ver `estado.piso`).
+  const piso = veredicto.derruba === true ? 0 : estado.piso;
+  const nota =
+    sugerida != null && sugerida < estado.nota ? Math.max(piso, sugerida) : estado.nota;
 
   const passo: PassoConvergencia = {
     volta,
@@ -159,12 +186,13 @@ export function aplicarRevisao(
   const historico = [...estado.historico, passo];
 
   if (!passo.refutada) {
-    return { volta, nota, encerrado: true, contestada: false, motivo: "aceita", historico };
+    return { volta, nota, piso: estado.piso, encerrado: true, contestada: false, motivo: "aceita", historico };
   }
   if (!deveRevisar(nota)) {
     return {
       volta,
       nota,
+      piso: estado.piso,
       encerrado: true,
       contestada: false,
       motivo: "abaixo_do_corte",
@@ -175,13 +203,14 @@ export function aplicarRevisao(
     return {
       volta,
       nota,
+      piso: estado.piso,
       encerrado: true,
       contestada: true,
       motivo: "teto_de_voltas",
       historico,
     };
   }
-  return { volta, nota, encerrado: false, contestada: false, motivo: null, historico };
+  return { volta, nota, piso: estado.piso, encerrado: false, contestada: false, motivo: null, historico };
 }
 
 /** Ainda cabe uma revisão? É o predicado que o laço do T6 consulta — nunca um `while (true)`. */

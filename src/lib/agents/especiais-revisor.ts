@@ -77,13 +77,15 @@ REGRAS DO SEU VEREDICTO:
 - Se você tentou e a nota se sustenta, diga isso (refutada: false). Aceitar quando não há o que atacar é resposta correta.
 - Não repita um argumento já usado numa volta anterior: se ele não derrubou, procure outro ou aceite.
 
-DUAS REFUTAÇÕES DIFERENTES, e a diferença está na NOTA que você sugere:
-- **ALTURA** ("isto não é 4★, mas é um projeto") → sugira a faixa de baixo.
-- **DERRUBA** ("isto não é projeto") → sugira 0 ou 1, e SÓ quando cai num dos casos listados acima (peça única, POC abandonada, sem ponteiro E sem contrafactual, tarefa de baixa frequência do próprio autor, duplicata).
+DUAS REFUTAÇÕES DIFERENTES — e é o campo "derruba" que as separa:
+- **ALTURA** ("isto não é 4★, mas é um projeto") → "derruba": false. Sugira a faixa que o eixo sustenta. O sistema NÃO deixa a nota cair abaixo do que o eixo estrutural já provou com nome próprio: refutar o alcance não apaga a recorrência provada.
+- **DERRUBA** ("isto não é projeto") → "derruba": true, e SÓ quando cai num dos casos listados acima (peça única, POC abandonada, sem ponteiro E sem contrafactual, tarefa de baixa frequência do próprio autor, duplicata). Aí a sua nota_sugerida vale integralmente, inclusive 0 — é a única forma de zerar um projeto cujo eixo estrutural trouxe prova nomeada.
+⚠️ "derruba": true não é para dizer que o projeto é fraco. É para dizer que ele não é um projeto.
 
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
   "refutada": true | false,
+  "derruba": true | false,
   "nota_sugerida": <inteiro 0 a ${NOTA_MAX}, ou null se você não propõe outra nota>,
   "motivo": "<1 a 3 frases: o ataque concreto, ou por que a nota se sustentou>"
 }`;
@@ -168,6 +170,8 @@ export function normalizarVeredicto(bruto: unknown): VeredictoRevisor {
     refutada: true,
     nota_sugerida: null,
     motivo: "revisor não devolveu veredicto utilizável — nota mantida e marcada para revisão",
+    // ⚠️ resposta ilegível NUNCA vira `derruba`: ela ignoraria o piso estrutural.
+    derruba: false,
   };
   if (!bruto || typeof bruto !== "object") return semResposta;
 
@@ -182,6 +186,8 @@ export function normalizarVeredicto(bruto: unknown): VeredictoRevisor {
     refutada: o.refutada,
     nota_sugerida,
     motivo: motivo || (o.refutada ? "refutada sem motivo declarado" : "nota sustentada"),
+    // ⚠️ só o `true` explícito conta — qualquer outra coisa respeita o piso estrutural.
+    derruba: o.derruba === true,
   };
 }
 

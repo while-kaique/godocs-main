@@ -709,6 +709,91 @@ endpoint acima (48 GETs) e executar as lentes com o **prompt REAL** (dumpado de
 Pinecone e o rótulo de função), mas responde a pergunta que importa — *o sinal está no material?* —
 sem tocar em nada.
 
+### A pergunta do formulário (28/08/2026) — MEDIDO: 3 perguntas são a PRÉ-CONDIÇÃO, não um extra
+
+Pergunta de produto: *"o formulário pode ganhar no máximo 3 perguntas para especiais. Isso já
+resolve, ou a IA precisa ler melhor?"* Respondida com evidência, por dois caminhos independentes, e
+**sem escrever nada** (leituras `GET /api/meus-projetos/:id` nos dois ambientes + agentes lendo o
+material em arquivo).
+
+**1) O que o material de fato traz** (48 especiais, produção):
+
+| campo da documentação | preenchido |
+|---|---|
+| execução (como roda) · fluxo · dependências · configurar antes · pontos de atenção | **2 de 48 (4%)** |
+| `o_que_faz` é CÓPIA da descrição ou do contexto | **46 de 48 (96%)** |
+
+Texto genuinamente NOVO na documentação: **mediana de 306 caracteres**. Ou seja: o especial chega com
+**dois parágrafos**, escritos uma vez e repetidos, e as 5 listas estruturadas vazias. ⚠️ Isso modera a
+correção do bloco anterior: a documentação são 57% dos CARACTERES, mas quase tudo é duplicata — o
+material pobre da staging não era metade do sinal, era ~300 caracteres a menos.
+
+**2) O que as lentes dizem que falta** — rodando as 4 lentes com o **prompt REAL** sobre o material
+COMPLETO de produção (84 avaliações, 21 projetos). No PIAPP (10★ humano), com tudo em mão:
+
+| eixo | nota | o que a própria lente diz que a travou |
+|---|---|---|
+| recorrência/rastro | **2** (vaga) | *"o teto para em 2 porque o rastro não tem nome: não se cita um único relatório, painel, base"* |
+| complexidade | **4** (nomeada) | *"para em 4 porque nada mostra o sistema decidindo e agindo sozinho de ponta a ponta"* |
+| alcance | **4** (nomeada) | *"não chega ao 5/7 porque nenhum time é nomeado — o '+10 times' é auto-declarado"* |
+| risco | 0 | não se aplica (correto) |
+
+**Cada trava é um fato que não existe em campo nenhum do formulário.** Consolidado: gate 2/vaga +
+eixo de valor nomeado ≥3 → teto 3 → **nota 3** (contra 2 na staging).
+
+**3) As 3 perguntas** — um painel de 25 agentes (diagnóstico + contraprova cética por projeto +
+síntese) chegou às MESMAS três travas, por conta própria, e mediu a cobertura:
+
+| # | pergunta (como o autor leria) | eixo | destrava |
+|---|---|---|---|
+| 1 | *"**Fora do que este projeto entrega**, em qual sistema, painel, base ou relatório (diga o nome) alguém confere o resultado dele hoje, com que frequência, e quem de fora do seu time abriu esse lugar na última semana (nome e cargo)? Se esse lugar não existe, escreva «não existe»."* | recorrência/rastro (o que **trava a nota final**) | **10 de 12** |
+| 2 | *"Quais marcas, áreas ou empresas do grupo já rodam com isto **HOJE** (liste os nomes) e quantas pessoas de fora do seu time usaram no último mês? Se for só o seu time, escreva «só o meu time»."* | alcance | **9 de 12** |
+| 3 | *"O que este projeto decide e executa sem ninguém confirmar? E quando algo falha (a API recusa, o arquivo não chega), ele tenta de novo sozinho ou uma pessoa refaz à mão — quantas vezes alguém precisou entrar no meio no último mês?"* | complexidade | **6 de 12** |
+
+⚠️ As três pedem **NOME, LUGAR ou NÚMERO conferível** e trazem a saída honesta explícita ("não
+existe", "só o meu time") — é o que impede a resposta inflada de ser mais fácil que a verdadeira. E
+nenhuma repete o que o formulário já pergunta (descrição · por que é especial · ferramenta · quem
+sentiria falta).
+
+**4) O que as perguntas NÃO resolvem:** elas tiram os projetos de 0–1 para 2–3 e o PIAPP de 3 para
+~5–6. **Não entregam o 10.** Sobram dois defeitos que são nossos: **(a)** 5 dos 12 têm a prova da nota
+alta ESCRITA e a lente não usou (*"aprende sozinha e se regula"* → 1★ no Prisma; app com banco e
+métricas → "script" no Gocreators; *"execução durável, 94% sem intervenção humana"* → eixo carimbado
+sem abrir o material no CX Ticket); **(b)** o fechamento — ver a tentativa 5 abaixo.
+
+⚠️ **E antes de somar pergunta nova: os campos que o formulário JÁ pede chegam em branco** (execução,
+fluxo, dependências, atenção: 4% de preenchimento). Pergunta nova que nasce vazia não mede nada.
+
+### Tentativa 5 (28/08/2026) — PISO ESTRUTURAL: conserta o absurdo, custa precisão
+
+O caso: «[VERSTA] Robô orçamento», **8★ humano**, eixos 3/2/**4**/1 (estrutural 3 **com prova
+nomeada**) — e **UMA volta do revisor fechou em 0★**. Ele refutou a ALTURA (o alcance de 4 não se
+sustentava) e a queda livre virou *"este projeto não vale nada"*.
+
+Régua nova, em `EstadoConvergencia.piso`: **o revisor julga quão ALTO o projeto chega, não SE ele
+existe.** Prova nomeada no eixo estrutural passa a ser piso; só `derruba: true` (caso da `DERRUBA`) o
+ignora. É diferente do `MAX_QUEDA_POR_VOLTA` medido antes: aquele era um teto cego por volta, este é
+o que a PROVA sustenta — lixo sem prova nomeada segue caindo a 0.
+
+| | baseline | it2 (sem piso) | it9 (com piso) |
+|---|---|---|---|
+| MAE | 1,69 | **1,56** | 1,83 |
+| ±1 | 58,3% | **62,5%** | 50,0% |
+| ≥3★ | 33,3% | 0% | **14,6%** |
+| erro na faixa 0★ | +1,94 | **+0,76** | +1,76 |
+
+**É o MESMO trade-off, pela 5ª vez** — e agora sabemos por quê: toda configuração que deixa o 3★
+existir promove os zeros junto, porque **o material não distingue um 0 de um 3**. As duas medições
+convergem: as lentes citam `execucao: "—"`, `fluxo: []` e "nenhum lugar nomeado" **para a flagship e
+para o lixo igualmente**.
+
+⚠️ **Corolário para o próximo esforço: calibrar mais é trocar um erro medido por outro.** A ordem
+certa é (1) as 3 perguntas + os campos que já existem deixarem de chegar vazios, (2) só então
+re-medir e recalibrar. **O piso FICA** apesar do custo em MAE: um auditor que recomenda 0★ para o
+projeto de 8★ da casa queima a confiança na primeira vez que um humano olha, e o custo dele é
+inteiramente explicado pela lacuna de material que está prestes a ser fechada. Reavaliar junto com a
+re-medição.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE

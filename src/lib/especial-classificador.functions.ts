@@ -82,7 +82,12 @@ import {
   type FuncaoDetectada,
 } from "@/lib/especiais-funcao";
 import type { Confianca } from "@/lib/especiais-regua";
-import { avaliarComLentes, LENTES, type AvaliacaoLente } from "@/lib/agents/especiais-lentes";
+import {
+  avaliarComLentes,
+  LENTES,
+  LENTE_GATE,
+  type AvaliacaoLente,
+} from "@/lib/agents/especiais-lentes";
 import {
   calibrarRodada,
   entradaDeConsolidado,
@@ -1325,7 +1330,11 @@ export async function julgarUmEspecialComPainel(
   const soPisos = calibrarRodada([entrada], { aplicarCota: false });
   let linha = soPisos.linhas[0];
 
-  let estado = iniciarConvergencia(linha.nota_depois);
+  // PISO ESTRUTURAL do revisor: o que o eixo estrutural provou COM NOME não é apagado por uma
+  // refutação de altura (ver `EstadoConvergencia.piso` — o caso VERSTA, 8★ humano, fechado em 0★).
+  const gateAv = r.avaliacoes.find((a) => a.lente === LENTE_GATE) ?? null;
+  const pisoEstrutural = gateAv && gateAv.evidencia === "nomeada" ? gateAv.nota : 0;
+  let estado = iniciarConvergencia(linha.nota_depois, pisoEstrutural);
   const argumentos: string[] = [];
   while (podeRevisarDeNovo(estado)) {
     const veredicto = await revisarAdversarial({

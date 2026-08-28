@@ -315,6 +315,9 @@ describe("painel em lote (T6)", () => {
     });
     revisarAdversarial.mockResolvedValue({
       refutada: true,
+      // caso da `DERRUBA` (o ponteiro citado é o próprio entregável) → ignora o piso estrutural.
+      // Sem a flag, o piso do gate `TODAS(5)` (5, prova nomeada) manteria a nota em 5.
+      derruba: true,
       nota_sugerida: 2,
       motivo: "o relatório citado é o próprio entregável",
     });
@@ -322,6 +325,27 @@ describe("painel em lote (T6)", () => {
     const r = await julgarEspeciaisComPainel({ limite: 1 });
     expect(r.linhas[0].nota).toBe(2);
     expect(r.linhas[0].nota_lentes).toBeGreaterThan(2);
+    expect(r.linhas[0].voltas).toBeGreaterThan(0);
+  });
+
+  it("refutação de ALTURA não zera projeto cujo eixo estrutural provou — o caso VERSTA", async () => {
+    // Real, medido em 28/08/2026: «[VERSTA] Robô orçamento» (nota humana 8★) teve eixos 3/2/4/1 —
+    // estrutural 3 com prova NOMEADA — e UMA volta do revisor fechou em 0★. O revisor refutou a
+    // altura do alcance e a queda livre virou "este projeto não vale nada".
+    avaliarComLentes.mockImplementation(async () => {
+      const avals = TODAS(4);
+      return { avaliacoes: avals, falhas: [], consolidado: consolidarLentes(avals) };
+    });
+    revisarAdversarial.mockResolvedValue({
+      refutada: true,
+      derruba: false, // altura, não DERRUBA
+      nota_sugerida: 0,
+      motivo: "o alcance declarado não se confirma",
+    });
+    const { julgarEspeciaisComPainel } = await import("@/lib/especial-classificador.functions");
+    const r = await julgarEspeciaisComPainel({ limite: 1 });
+    // o piso é a nota do gate (4, prova nomeada) — a nota não desce abaixo do que ele provou
+    expect(r.linhas[0].nota).toBe(4);
     expect(r.linhas[0].voltas).toBeGreaterThan(0);
   });
 });
