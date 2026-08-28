@@ -23,8 +23,52 @@ import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
 /** Voltas no máximo. Absorvente: no teto encerra, não recomeça. */
 export const TETO_VOLTAS = 3;
 
-/** Nota a partir da qual a revisão adversarial acontece (≥3 = top 4% da base). */
+/**
+ * Nota a partir da qual a revisão adversarial acontece.
+ *
+ * ⚠️ **Era `LIMIARES_GENEROSIDADE[0]` (3), e o "3" vinha de "3★ = top 4% da base" — a população
+ * ERRADA.** Entre os especiais auditados, ≥3★ é **41,7%** e ≥4★ é **18,8%**: revisar a partir de 3
+ * jogava o revisor adversarial em cima de QUASE METADE da população, e como ele refuta o que
+ * examina, o corte virou absorvente — 17 de 17 notas ≥3 viraram 2★ e o painel devolveu **0% de
+ * ≥3★** contra 41,7% da triagem (medido 28/08/2026).
+ *
+ * O papel do revisor é "última trava antes da triagem" para nota **RARA**. Na população certa, a
+ * raridade equivalente ao que se pretendia começa em **4** — que é também onde a régua deixa de
+ * descrever um projeto sólido e passa a descrever reuso multi-área / risco material.
+ *
+ * ⚠️ **A hipótese "então revise só a partir de 4" foi MEDIDA E DESCARTADA (28/08/2026).** Ela faz
+ * exatamente o que promete — o 3★ passa a existir (≥3★ saiu de 0% para 23–31% da rodada) — e o preço
+ * é o par: nada mais filtra o falso 3★, o erro na faixa 0★ sobe de +0,76 para +1,41/+1,65 e as duas
+ * métricas do critério 1 pioram (com queda livre: MAE 1,69 e ±1 56,2%; com queda limitada: MAE 1,71
+ * e ±1 52,1% — contra MAE 1,56 e ±1 62,5% revisando a partir de 3). **Não retentar sozinha**: ela só
+ * fará sentido quando as lentes souberem separar o 0 do 3, que é o gargalo aberto.
+ *
+ * Fica em 3 — o valor da decisão fechada nº 4 —, e o que se corrigiu no revisor foi a POPULAÇÃO que
+ * ele lê (ver `especiais-revisor.ts`), não o corte.
+ */
 export const NOTA_REVISAO_ADVERSARIAL = LIMIARES_GENEROSIDADE[0];
+
+/**
+ * Quanto UMA refutação PODERIA derrubar a nota, se o limite estivesse ligado. ⚠️ **NÃO está** — a
+ * constante fica aqui como registro de uma hipótese MEDIDA E DESCARTADA (28/08/2026), para não ser
+ * retentada: limitar a queda a 1 ponto protegia o topo (o 8★ que virava 0★) mas impedia o revisor de
+ * zerar o lixo, e o erro na faixa 0★ subiu de +0,76 para +1,65 — MAE 1,56 → 1,77 e ±1 62,5% → 50%.
+ * Com o campo `derruba` para liberar a queda no caso da `DERRUBA`, ainda ficou pior que sem limite
+ * (MAE 1,67 · ±1 52,1%). Ver `docs/plans/painel-agentes-especiais.md`.
+ *
+ * Registro da hipótese, não parâmetro em uso. **1 ponto por volta.**
+ *
+ * ⚠️ Não é frouxidão — é o que separa "revisar" de "zerar". A decisão 4 diz que a nota **só desce**
+ * e que empate mantém a MENOR; ela nunca disse que uma refutação vale queda livre. Sem este limite,
+ * o revisor que refuta a condição de 3★ devolvia `nota_sugerida: 0` e o painel gravava **0★ num
+ * projeto que a triagem deu 8★** (VERSTA, medido 28/08/2026; CX Ticket Creator 5★→0★ e Robô de
+ * vídeos 5★→0★ no mesmo lote). A refutação diz "este eixo não sustenta ESTA altura" — a conclusão
+ * é a faixa de baixo, não o chão da escala.
+ *
+ * O teto de voltas segue sendo a trava de custo: com `TETO_VOLTAS = 3`, a queda máxima de uma
+ * rodada é 3 pontos, e ela exige o revisor refutar 3 vezes com argumentos DIFERENTES.
+ */
+export const MAX_QUEDA_POR_VOLTA = 1;
 
 /** Nota abaixo do corte não precisa de revisor: refutar 1★ é gastar chamada para nada. */
 export function deveRevisar(nota: number): boolean {
@@ -99,7 +143,10 @@ export function aplicarRevisao(
 
   const volta = estado.volta + 1;
   const sugerida = veredicto.nota_sugerida == null ? null : clamp(veredicto.nota_sugerida);
+  // Só desce (decisão 4: empate ou sugestão maior mantém a atual) e **no máximo 1 por volta**
+  // (`MAX_QUEDA_POR_VOLTA` — ver lá o caso do 8★ que virava 0★).
   // Só desce: empate ou sugestão maior mantém a nota atual (decisão 4).
+  // ⚠️ Sem limite de queda por volta — o limite foi MEDIDO e descartado (ver `MAX_QUEDA_POR_VOLTA`).
   const nota = sugerida != null && sugerida < estado.nota ? sugerida : estado.nota;
 
   const passo: PassoConvergencia = {

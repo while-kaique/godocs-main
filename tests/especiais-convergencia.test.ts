@@ -13,6 +13,8 @@
  * - o prompt do revisor é de DERRUBAR e proíbe sugerir nota maior.
  */
 import { describe, it, expect } from "vitest";
+import { percentilNaCurva } from "@/lib/especiais-regua";
+import { CURVA_ESPECIAIS_AUDITADOS } from "@/lib/especiais-calibrador";
 import {
   NOTA_REVISAO_ADVERSARIAL,
   TETO_VOLTAS,
@@ -27,8 +29,10 @@ import {
 import {
   buildSystemPromptRevisor,
   buildUserMessageRevisor,
+  eixoQueSustenta,
   normalizarVeredicto,
 } from "@/lib/agents/especiais-revisor";
+import { lentePorChave, type AvaliacaoLente } from "@/lib/agents/especiais-lentes";
 import { NOTA_MAX } from "@/lib/especiais-regua";
 import type { AlvoClassificacao } from "@/lib/agents/especial-classificador";
 
@@ -122,7 +126,7 @@ describe("monotonicidade", () => {
   });
 
   it("nota que cai abaixo do corte encerra sem contestação (não há mais nota rara a defender)", () => {
-    let e = iniciarConvergencia(4);
+    let e = iniciarConvergencia(NOTA_REVISAO_ADVERSARIAL);
     e = aplicarRevisao(e, {
       refutada: true,
       nota_sugerida: NOTA_REVISAO_ADVERSARIAL - 1,
@@ -205,7 +209,78 @@ describe("prompt do revisor", () => {
     const p = buildSystemPromptRevisor();
     expect(p).toContain("DERRUBAR");
     expect(p).toContain("IGUAL ou MENOR");
-    expect(p).toContain("REFUTE");
+    // refutar exige NOMEAR a condição que falha — ver o teste da população abaixo
+    expect(p).toContain("NOMEAR a condição da régua");
+  });
+
+  it("declara a população dos ESPECIAIS, não a base inteira — era o que o fazia refutar tudo", () => {
+    // O revisor recebia `raridadeDe` (CURVA_BASE): "3+ = top 4% da base". Nos especiais auditados
+    // ≥3★ é 42%, e com a moldura errada ele refutou 17 de 17 notas ≥3 (medido 28/08/2026), tornando
+    // o corte de ≥3 absorvente: TODA nota alta virava 2★. Ver docs/plans/painel-agentes-especiais.md.
+    const p = buildSystemPromptRevisor();
+    const pct = Math.round(percentilNaCurva(CURVA_ESPECIAIS_AUDITADOS, NOTA_REVISAO_ADVERSARIAL));
+    expect(pct).toBeGreaterThan(10); // sanidade: é a curva dos especiais (≥4 = 19%), não a da base (≥3 = 4%)
+    expect(p).toContain(`${pct}%`);
+    expect(p).toContain("ESPECIAIS");
+    expect(p).not.toContain("top 4% da base");
+    // e a dúvida deixou de ser refutação (era "Na dúvida, REFUTE")
+    expect(p).toContain("Dúvida não é refutação");
+  });
+
+  it("nomeia o EIXO que sustenta a nota, com a âncora daquele eixo", () => {
+    // O revisor recebia só a definição GLOBAL da faixa, que é conjuntiva ("inteligência no fluxo +
+    // recorrência + evidência + adoção"): bastava faltar uma parte para refutar, e a nota do painel
+    // é DISJUNTIVA (vem de UM eixo). Refutou 17 de 17 notas ≥3 (28/08/2026) → painel em 0% de ≥3★.
+    const alcance = lentePorChave("alcance_reuso")!;
+    const av: AvaliacaoLente[] = [
+      {
+        lente: "recorrencia_rastro",
+        nota: 2,
+        evidencia: "nomeada",
+        confianca: "alta",
+        justificativa: "roda por cron e há painel nomeado",
+        sustentacao: "painel Metabase de pedidos",
+      },
+      {
+        lente: "alcance_reuso",
+        nota: 4,
+        evidencia: "nomeada",
+        confianca: "alta",
+        justificativa: "duas áreas usam",
+        sustentacao: "Fiscal e Compras usam o robô",
+      },
+    ];
+    expect(eixoQueSustenta(av, 4)).toContain(alcance.rotulo);
+    expect(eixoQueSustenta(av, 4)).toContain(alcance.ancoras.find((a) => a.nota === 4)!.definicao);
+
+    const m = buildUserMessageRevisor({
+      alvo,
+      nota: 4,
+      avaliacoes: av,
+      vizinhos: [],
+      comoSaiu: "alcance 4 com teto 4",
+    });
+    expect(m).toContain("O EIXO QUE SUSTENTA ESTA NOTA");
+    // a definição global continua no prompt, mas rotulada como referência, não como requisito
+    expect(m).toContain("NÃO é uma lista de requisitos");
+  });
+
+  it("o prompt PROÍBE refutar cobrando a condição de outro eixo", () => {
+    const p = buildSystemPromptRevisor();
+    expect(p).toContain("cobrar a condição de OUTRO eixo não é refutação");
+    expect(p).toContain("DISJUNTIVA");
+  });
+
+  it("a raridade da mensagem sai da curva dos ESPECIAIS", () => {
+    const m = buildUserMessageRevisor({
+      alvo,
+      nota: 3,
+      avaliacoes: [],
+      vizinhos: [],
+      comoSaiu: "estrutural 3",
+    });
+    expect(m).toContain("dos especiais auditados");
+    expect(m).not.toContain("da base");
   });
 
   it("a mensagem leva a nota, como ela saiu e os argumentos já usados", () => {

@@ -595,6 +595,81 @@ dá 3/nomeada a projeto que a triagem zerou) — é o eixo que a `DERRUBA` já d
 melhora conserta MAE e distribuição ao mesmo tempo; (2) só então rever a consolidação; (3) aceitar o
 critério 1 na 2ª frase (painel = auditoria, classificador segue padrão).
 
+### Tentativa 4 (28/08/2026) — 8 configurações medidas: o painel virou um bom DETECTOR de zero, e o ≥3★ continua morto
+
+Ciclo fazer → medir → corrigir com o `dry` dos 48 (staging redeployada a cada passo). **Tudo
+read-only** (`dry:true` no painel, `somente_leitura:true` no harness) — nada gravado em
+`especial_avaliacao` nem na coluna "Estrelas".
+
+| # | o que mudou | MAE | ±1 | exata | ≥3★ | erro 0★ |
+|---|---|---|---|---|---|---|
+| — | **baseline agente único** | **1,69** | **58,3%** | **29,2%** | **33,3%** | **+1,94** |
+| it0 | âncoras por eixo (tentativa 3) | 1,65 | 54,2% | 27,1% | 0% | +1,41 |
+| it1 | revisor lê a curva dos ESPECIAIS | 1,62 | 58,3% | 29,2% | 0% | +1,06 |
+| **it2** | **revisor ataca o EIXO que sustenta** | **1,56** | **62,5%** | **37,5%** | 0% | **+0,76** |
+| it4 | + `derruba` × altura (queda ≤1) | 1,67 | 52,1% | 25,0% | 8,3% | +1,41 |
+| it5 | + revisor só a partir de 4 | 1,71 | 52,1% | 27,1% | **31,2%** | +1,65 |
+| it6 | + rejeição por eixo (dura) | 1,85 | 52,1% | 14,6% | 8,3% | +1,24 |
+| it7 | rejeição conjuntiva (`DERRUBA` inteira) | 1,79 | 47,9% | 22,9% | 20,8% | +1,59 |
+| it8 | revisor a partir de 4, queda LIVRE | 1,69 | 56,2% | 29,2% | 22,9% | +1,41 |
+
+**Os 3 consertos que FICARAM** (e ficaram por MECANISMO, não por número — cada um corrigia uma
+afirmação falsa que o código fazia):
+
+1. **âncoras por eixo** (`Lente.ancoras`) — a lente respondia sobre o projeto inteiro;
+2. **o revisor lê a curva dos ESPECIAIS, não a da base** (`raridadeNaCurva` +
+   `CURVA_ESPECIAIS_AUDITADOS`): ele recebia *"3★ = top 4% da base"* quando, na população que julga,
+   ≥3★ é **41,7%**. Com a moldura errada refutou **17 de 17**;
+3. **o revisor ataca o EIXO QUE SUSTENTA a nota** (`eixoQueSustenta`): ele recebia só a
+   `definicaoDe(nota)` GLOBAL, que é **conjuntiva** ("inteligência no fluxo **+** recorrência **+**
+   evidência **+** adoção"), e a nota do painel é **disjuntiva** (vem de UM eixo). Bastava faltar uma
+   parte — e sempre falta —, então ele refutava dizendo *"a faixa 3 exige inteligência no fluxo"* de
+   um projeto cuja nota vinha do ALCANCE. Era incoerência entre o T3 e o T5, não rigor.
+
+**As 4 hipóteses MEDIDAS E DESCARTADAS** (não retentar; cada uma está registrada no código, ao lado
+da constante que a implementaria):
+
+- **queda máxima de 1 ponto por volta** (`MAX_QUEDA_POR_VOLTA`, mantida como registro, DESLIGADA):
+  protege o topo (sem ela o revisor levava o VERSTA, 8★ humano, a 0★) mas impede zerar o lixo — erro
+  0★ +0,76 → +1,65, MAE 1,56 → 1,77;
+- **campo `derruba` liberando a queda no caso da `DERRUBA`** (removido): melhorou o cap, ainda pior
+  que sem limite (MAE 1,67 · ±1 52,1%);
+- **revisor só a partir de 4** (`NOTA_REVISAO_ADVERSARIAL`, de volta a 3): faz o que promete — ≥3★
+  sai de 0% para 23–31% — e o preço é o par, porque **nada mais filtra o falso 3★**;
+- **rejeição por eixo** (`Lente.rejeicao`, removida): a `DERRUBA` traduzida para o eixo. Na versão
+  dura levou 27 dos 48 para 1★ (exata 14,6%); na versão conjuntiva ("entregável é o ponteiro **E**
+  não há consumo recorrente") ainda deu MAE 1,79.
+
+**O resultado, confirmado em 2 corridas do harness oficial** (`{"juiz":"painel"}`, 48/48, 0 falhas):
+
+| | MAE | ±1 | exata | erro 0★ | ≥3★ |
+|---|---|---|---|---|---|
+| baseline | 1,69 | 58,3% | 29,2% | +1,94 | 33,3% |
+| painel, corrida 1 | 1,67 | 56,2% | 35,4% | +0,65 | 0% |
+| painel, corrida 2 | 1,58 | 62,5% | 39,6% | +0,53 | 0% |
+
+**O que é ganho REAL** (aparece nas duas, acima do ruído do instrumento): **nota exata 35–40% contra
+29,2%** e, sobretudo, **o erro na faixa 0★ caiu de +1,94 para ~+0,6**. Isso é o **achado 3 do T1**
+resolvido — *"dos 17 zeros humanos, 12 saíram do zero"* era o defeito nº 1 do agente único, e o painel
+praticamente parou de promover o que a triagem zerou.
+
+**O que NÃO se pode afirmar:** que o painel bate o critério 1. MAE ficou melhor nas duas corridas e
+±1 empata, mas a amplitude entre duas corridas do MESMO código é **MAE 0,08 · ±1 6,2pp · exata 4,2pp**
+— a diferença perseguida está DENTRO do ruído. ⚠️ **Com n=48 e um juiz LLM sem semente, qualquer
+comparação futura aqui precisa de 2 corridas e de uma diferença acima dessa amplitude.**
+
+**O que continua quebrado, e onde o próximo esforço tem de ir:** o painel **nunca recomenda ≥3★**, e o
+erro nas faixas altas é IMÓVEL nas 8 configurações (4★ ≈ −3 · 5★ −3/−5 · 7★ −4/−5 · 8★ −5/−8 ·
+10★ −8). O **PIAPP (10★, a flagship conhecida) sai com `nota_lentes` 2 em TODAS as rodadas** — ou
+seja: as lentes não *veem* o projeto excepcional lendo o material dele. Isso é limite de SINAL na
+leitura, não de consolidação, teto, piso nem revisor — os quatro já foram mexidos e medidos. Enquanto
+isso não mudar, **abrir espaço para ≥3★ só promove os projetos médios e os zeros** (foi o que it5,
+it7 e it8 mediram).
+
+**Situação: o painel entra como AUDITOR, não como recomendador de prata.** Ele responde bem *"este
+especial NÃO é ≥3"* — melhor que o agente único, que inflava os zeros —, e não responde *"este é 4"*.
+A estrela continua no agente único até as lentes aprenderam a ler o topo.
+
 ## Critérios de aceitação
 
 1. O painel **bate o baseline do agente único** no test set (48 especiais com nota humana): **MAE
