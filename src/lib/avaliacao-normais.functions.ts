@@ -51,8 +51,16 @@ import {
   type EntradaSemantica,
   type ExemplarEspecial,
 } from '@/lib/especial-corpus';
-import { avaliarPlausibilidadeFTE, fatorFtePlausibilidade } from '@/lib/agents/analyzer';
-import { avaliarFinanceiro } from '@/lib/agents/avaliacao-financeira';
+import { avaliarPlausibilidadeFTE, fatorFtePlausibilidade, HORAS_BASE_FTE } from '@/lib/agents/analyzer';
+import {
+  avaliarFinanceiro,
+  TETO_MATERIALIDADE_FINANCEIRO,
+} from '@/lib/agents/avaliacao-financeira';
+import {
+  redigirJustificativa,
+  redatorJustificativaLigado,
+} from '@/lib/agents/redator-justificativa.functions';
+import type { FatosJustificativa } from '@/lib/agents/redator-justificativa';
 import {
   agregarVotos,
   avaliarSinalRag,
@@ -349,6 +357,38 @@ function serializarVotos(v: VotosPainel): string {
   });
 }
 
+/**
+ * Traduz os votos da mesa em FATOS DETERMINÍSTICOS para o REDATOR (Frente 2). Só passa números que
+ * a mesa realmente computou; os motivos concretos (com R$) vão nos `apontamentos` — o redator é
+ * proibido de inventar qualquer outro valor. Sem materialidade crua aqui (ela vive no motivo do
+ * financeiro), então não a repassamos como número solto.
+ */
+function montarFatosJustificativa(v: VotosPainel): FatosJustificativa {
+  const apontamentos: FatosJustificativa['apontamentos'] = [];
+  if (v.fte.implausivel && v.fte.motivo) {
+    apontamentos.push({ especialista: 'Plausibilidade (FTE)', motivo: v.fte.motivo });
+  }
+  if (v.financeiro.veredito !== 'ok' && v.financeiro.motivo) {
+    apontamentos.push({ especialista: 'Financeiro', motivo: v.financeiro.motivo });
+  }
+  if (!v.rag.apoio && v.rag.motivo) {
+    apontamentos.push({ especialista: 'Semelhança com aprovados', motivo: v.rag.motivo });
+  }
+  if (v.cetico.refuta && v.cetico.motivo) {
+    apontamentos.push({ especialista: 'Revisor cético', motivo: v.cetico.motivo });
+  }
+  if (apontamentos.length === 0 && v.conciliado.divergencia) {
+    apontamentos.push({ especialista: 'Mesa', motivo: 'Sinais divergentes entre os especialistas.' });
+  }
+  return {
+    fte: v.fte.fte > 0 ? v.fte.fte : null,
+    horasTotais: v.fte.fte > 0 ? Math.round(v.fte.fte * HORAS_BASE_FTE) : null,
+    pessoasDeclaradas: v.fte.pessoas,
+    tetoMaterialidade: v.financeiro.veredito !== 'ok' ? TETO_MATERIALIDADE_FINANCEIRO : null,
+    apontamentos,
+  };
+}
+
 /** Núcleo: avalia com o corpus/embeddings JÁ carregados (evita reler a cada candidato no backfill). */
 async function avaliarComContexto(
   projetoId: string,
@@ -363,6 +403,14 @@ async function avaliarComContexto(
   const votos = await computarVotos(projeto, ctx);
   const { conciliado, cetico } = votos;
 
+  // Motivo determinístico de sempre (comportamento padrão). Só quando a Frente 2 (redator) está
+  // LIGADA e a mesa manda para conferência humana, humaniza a mensagem com o LLM leve — fail-safe
+  // interno cai neste mesmo motivo. DEFAULT OFF = byte-idêntico ao de hoje.
+  let motivoFinal = conciliado.motivos.join(' ');
+  if (conciliado.aplicarEmValidacao && redatorJustificativaLigado()) {
+    motivoFinal = await redigirJustificativa(montarFatosJustificativa(votos));
+  }
+
   let gravado = false;
   if (!ctx.dry) {
     const modelo = embeddingConfig()?.modelo ?? 'deterministico';
@@ -372,7 +420,7 @@ async function avaliarComContexto(
       confianca: conciliado.confianca,
       aplicar: conciliado.aplicarEmValidacao,
       divergencia: conciliado.divergencia,
-      motivo: conciliado.motivos.join(' '),
+      motivo: motivoFinal,
       votos: serializarVotos(votos),
       origem: ORIGEM_AGREGADOR,
       modelo,
@@ -412,6 +460,7 @@ async function avaliarComContexto(
     aplicar: conciliado.aplicarEmValidacao,
     divergencia: conciliado.divergencia,
     vizinhos: votos.vizinhos,
+    motivo: motivoFinal,
     gravado,
   };
 }
