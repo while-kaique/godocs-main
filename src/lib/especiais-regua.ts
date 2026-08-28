@@ -100,6 +100,34 @@ export function percentilAcimaDe(nota: number): number {
   return (acima / TOTAL_AUDITADO) * 100;
 }
 
+/**
+ * Percentual de uma curva QUALQUER em `nota` ou acima — a versão genérica de `percentilAcimaDe`.
+ *
+ * ⚠️ Existe porque **a população muda a leitura da mesma nota**: na base inteira ≥3★ é top 4%, e
+ * entre os especiais AUDITADOS é **41,7%** (`CURVA_ESPECIAIS_AUDITADOS`, `especiais-calibrador.ts`).
+ * Dizer "top 4%" a quem julga só especiais faz 3★ soar absurdo — foi o que travou o revisor
+ * adversarial em refutar 17 de 17 (medido 28/08/2026, ver `docs/plans/painel-agentes-especiais.md`).
+ */
+export function percentilNaCurva(curva: Record<string, number>, nota: number): number {
+  const pares = Object.entries(curva).filter(([k]) => k !== 'vazio');
+  const total = pares.reduce((s, [, v]) => s + v, 0);
+  if (!total) return 0;
+  const acima = pares.filter(([k]) => Number(k) >= nota).reduce((s, [, v]) => s + v, 0);
+  return (acima / total) * 100;
+}
+
+/** `raridadeDe` para uma curva/população declarada. `rotulo` nomeia a população na frase. */
+export function raridadeNaCurva(
+  curva: Record<string, number>,
+  nota: number,
+  rotulo: string,
+): string | null {
+  if (nota <= 1) return null;
+  const pct = percentilNaCurva(curva, nota);
+  if (pct >= 50) return null;
+  return `${nota}+ = top ${pct < 1 ? pct.toFixed(1) : Math.round(pct)}% ${rotulo}`;
+}
+
 /** Frase curta de raridade para o cabeçalho da coluna ("top 4% da base"). */
 export function raridadeDe(nota: number): string | null {
   if (nota <= 1) return null;

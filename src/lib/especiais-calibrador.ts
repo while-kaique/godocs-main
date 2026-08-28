@@ -1,0 +1,403 @@
+/**
+ * CALIBRADOR do painel de agentes (T4) — módulo **PURO**: a reescala da rodada.
+ *
+ * ## Por que ele é obrigatório
+ * Cada agente a mais num loop empurra a nota para CIMA. Na força-tarefa do JV foi o calibrador que
+ * fez 99 projetos não passarem de 4★ (`especiais-seed.ts`); sem ele, três voltas viram inflação.
+ *
+ * ## As DUAS tarefas dele (a lição que o T1 mediu)
+ * Um calibrador que só reescala a DISTRIBUIÇÃO arruma o histograma sem arrumar o PAR: ele pode
+ * empurrar zeros para cima e notas altas para baixo e ainda "bater a curva". A matriz do T1 diz
+ * onde dói: dos **17 zeros humanos, 12 saíram do zero**; dos **14 pratas, 10 caíram para bronze**.
+ * Então aqui há dois mecanismos, e a ordem importa:
+ *
+ * 1. **PISO DE PROVA (por projeto, sem curva nenhuma)** — nota alta exige prova. É o que impede
+ *    promover o lixo, não depende da composição do lote e não pode ser fraudado por sorte de
+ *    amostra. Roda primeiro.
+ * 2. **COTA POR FAIXA (por rodada, contra uma curva de referência)** — segura o topo quando a
+ *    rodada inteira sai generosa. Só DESCE, começa pelos mais fracos e **preserva a ordem**.
+ *
+ * ## ⚠️ Duas armadilhas da curva de referência
+ * - **A `CURVA_BASE` NÃO serve de referência para especiais** — ela é a curva da base INTEIRA
+ *   (financeiros incluídos, 426 zeros): ≥3 = 5,4%, contra **41,7% dos especiais auditados** na
+ *   mesma medição. São 7× de diferença, e aplicá-la como cota rebaixaria prata CORRETA. O default
+ *   é a `CURVA_ESPECIAIS_AUDITADOS` (medida, ver abaixo).
+ * - **Usar as notas HUMANAS do conjunto SOB MEDIÇÃO como referência é VAZAMENTO** (calibrar contra
+ *   o gabarito melhora o MAE do T7 e não generaliza). Como os 48 auditados são test set E
+ *   população, no T7 a corrida principal roda com `aplicarCota: false` — mede e RELATA.
+ *
+ * ⚠️ Não escreve nada, não chama LLM (a redação da leitura é `agents/especiais-calibrador.ts`) e
+ * **nunca PROMOVE**: rodada dura demais é problema do T3 (é lá que a média foi proibida), não se
+ * conserta inflando aqui.
+ *
+ * ⚠️ Ele importa `LENTE_GATE` do módulo das lentes (fonte única da chave, em vez de redigitá-la),
+ * e aquele módulo puxa o `llmChat` — então este arquivo é **server-side**: se um dia uma TELA
+ * precisar da reescala, o que se move é a constante para um módulo sem LLM, não uma segunda cópia.
+ */
+import { CURVA_BASE, NOTA_MAX } from "@/lib/especiais-regua";
+import { LIMIARES_GENEROSIDADE } from "@/lib/especiais-concordancia";
+import {
+  LENTE_GATE,
+  type AvaliacaoLente,
+  type Consolidado,
+  type Evidencia,
+} from "@/lib/agents/especiais-lentes";
+
+// ─── Entrada ───────────────────────────────────────────────────────────────────
+
+export type EntradaCalibragem = {
+  projeto_id: string;
+  /** A nota que saiu de `consolidarLentes`. */
+  nota_preliminar: number;
+  /** Nota da lente estrutural (`null` = ela falhou). */
+  gate: number | null;
+  gate_evidencia: Evidencia | null;
+  /** Notas das lentes de VALOR (não-gate) que responderam. */
+  notas_valor: number[];
+  /**
+   * A maior nota entre os eixos de VALOR com prova **NOMEADA** (0 se nenhum).
+   *
+   * ⚠️ Existe porque o piso de ≥3 passou a aceitar prova nomeada em QUALQUER eixo (decisão do
+   * Kaique, 27/08/2026) — antes só a do gate contava, e isso segurava 100% dos 48 especiais em 2★.
+   * Opcional para não quebrar chamador antigo: ausente = 0 = comportamento de antes.
+   */
+  valor_nomeado_max?: number;
+};
+
+/** Ponte do T3 para cá — evita que o chamador remonte a entrada à mão e erre o `gate`. */
+export function entradaDeConsolidado(
+  projeto_id: string,
+  avaliacoes: AvaliacaoLente[],
+  consolidado: Consolidado,
+): EntradaCalibragem {
+  return {
+    projeto_id,
+    nota_preliminar: consolidado.nota_preliminar,
+    gate: consolidado.gate,
+    gate_evidencia: consolidado.gate_evidencia,
+    notas_valor: avaliacoes.filter((a) => a.lente !== LENTE_GATE).map((a) => a.nota),
+    valor_nomeado_max: consolidado.valor_nomeado_max,
+  };
+}
+
+// ─── Mecanismo 1: piso de PROVA (por projeto) ──────────────────────────────────
+
+/** Nota a partir da qual a prova do eixo estrutural tem de ser NOMEADA (≥3 = top 4% da base). */
+export const NOTA_EXIGE_PROVA_NOMEADA = LIMIARES_GENEROSIDADE[0];
+/** Nota a partir da qual um eixo forte sozinho não basta (≥5 = top 1%). */
+export const NOTA_EXIGE_DOIS_EIXOS = LIMIARES_GENEROSIDADE[1];
+/** Quantos eixos de VALOR precisam sustentar ≥`NOTA_EXIGE_PROVA_NOMEADA` para a nota passar de 4. */
+export const EIXOS_VALOR_PARA_OURO = 2;
+
+export type MotivoRebaixa = "prova_nao_nomeada" | "um_eixo_so" | "cota_da_faixa" | "fora_da_escala";
+
+/**
+ * Aplica os pisos de prova de UM projeto. Só desce.
+ *
+ * - **≥3 exige prova NOMEADA no eixo estrutural** — a régua põe evidência entre as condições do 3★,
+ *   e o T3 deixa passar `gate 3 + prova vaga` (a margem do gate é 0 nesse caso, mas a própria nota
+ *   do gate ainda vale 3). Sem prova nomeada o teto é `NOTA_EXIGE_PROVA_NOMEADA − 1`.
+ * - **≥5 exige `EIXOS_VALOR_PARA_OURO` eixos de valor sustentando ≥3** — o 5★ da régua é
+ *   conjuntivo ("plataforma **ou** produto interno, autonomia, várias áreas usando, ponteiro
+ *   auditável"); um eixo forte sozinho é 4★, que é exatamente o que a faixa "Prata alta" descreve.
+ */
+export function aplicarPisosDeProva(e: EntradaCalibragem): {
+  nota: number;
+  motivos: MotivoRebaixa[];
+} {
+  const motivos: MotivoRebaixa[] = [];
+  let nota = e.nota_preliminar;
+
+  if (!Number.isFinite(nota)) return { nota: 0, motivos: ["fora_da_escala"] };
+  if (nota < 0 || nota > NOTA_MAX) {
+    nota = Math.max(0, Math.min(NOTA_MAX, Math.round(nota)));
+    motivos.push("fora_da_escala");
+  }
+
+  // ⚠️ A prova nomeada pode vir do gate OU de um eixo de VALOR que sustente ≥3 (decisão do Kaique,
+  // 27/08/2026, medida no T7): exigindo-a só do gate, os 48 especiais ficaram TODOS em 2★, contra
+  // 41,7% de ≥3★ da triagem humana. O que segue proibido é nota alta sem prova nomeada em lugar
+  // nenhum — o piso continua sendo sobre PROVA, não sobre qual eixo a trouxe.
+  const provaNomeada =
+    e.gate_evidencia === "nomeada" || (e.valor_nomeado_max ?? 0) >= NOTA_EXIGE_PROVA_NOMEADA;
+  if (nota >= NOTA_EXIGE_PROVA_NOMEADA && !provaNomeada) {
+    nota = NOTA_EXIGE_PROVA_NOMEADA - 1;
+    motivos.push("prova_nao_nomeada");
+  }
+
+  if (nota >= NOTA_EXIGE_DOIS_EIXOS) {
+    const fortes = e.notas_valor.filter((n) => n >= NOTA_EXIGE_PROVA_NOMEADA).length;
+    if (fortes < EIXOS_VALOR_PARA_OURO) {
+      nota = NOTA_EXIGE_DOIS_EIXOS - 1;
+      motivos.push("um_eixo_so");
+    }
+  }
+
+  return { nota, motivos };
+}
+
+// ─── Mecanismo 2: cota por faixa (por rodada) ──────────────────────────────────
+
+/**
+ * **A curva dos especiais AUDITADOS — MEDIDA, não estimada** (staging, espelho real da planilha,
+ * 26/08/2026: `GET /api/admin/especiais`, 51 especiais, 48 com nota humana, sem LLM):
+ *
+ * `0:17 · 1:3 · 2:8 · 3:11 · 4:3 · 5:3 · 7:1 · 8:1 · 10:1` → **≥3 = 41,7% · ≥5 = 12,5%**
+ *
+ * ⚠️ **É esta, e não a `CURVA_BASE`, a referência de uma rodada de especiais.** Na mesma medição a
+ * base inteira deu ≥3 = 5,4% e ≥5 = 1,1% (bate com a `CURVA_BASE`, então o espelho é fiel) — as
+ * duas populações são **7× diferentes** no corte da prata. Usar a curva da base aqui rebaixaria
+ * prata CORRETA: numa página de 12, ela permitiria 2 e a triagem humana dá 5.
+ *
+ * ⚠️ **Corolário que corrige a leitura do T1:** o agente único deu ≥3 em 33,3% e ≥5 em 6,3% —
+ * **abaixo** dos 41,7%/12,5% humanos. Ele **não estava inflado**, estava CONSERVADOR no topo, o que
+ * casa com a compressão medida (7★ → −7, 8★ → −4, 10★ → −6). O "INFLADA" do T1 era artefato de
+ * comparar com a população errada.
+ *
+ * ⚠️ Isto **não é mexer na régua** (`CURVA_BASE` fica intacta, e a fronteira do plano proíbe
+ * ajustá-la para o painel passar): é declarar a curva da população que o painel julga.
+ * ⚠️ Como as 48 notas são também o gabarito do T7, usar esta curva como cota **na medição** é
+ * vazamento — no T7 a corrida principal roda com `aplicarCota: false` (mede e RELATA).
+ */
+export const CURVA_ESPECIAIS_AUDITADOS: Record<string, number> = {
+  "0": 17,
+  "1": 3,
+  "2": 8,
+  "3": 11,
+  "4": 3,
+  "5": 3,
+  "7": 1,
+  "8": 1,
+  "10": 1,
+};
+
+/**
+ * Quantas vezes a rodada pode passar do percentual da curva antes de a cota morder. Com a curva da
+ * PRÓPRIA população (o default), a folga é pequena — ela cobre variação de amostra numa página de
+ * 12, não diferença de população. ⚠️ Passando a `CURVA_BASE` como referência, este fator não
+ * conserta a distância de 7× entre as duas curvas: aí o certo é a curva certa, não mais tolerância.
+ */
+export const FATOR_TOLERANCIA = 1.25;
+
+/**
+ * Piso absoluto por faixa. Sem ele, uma página de 12 **nunca** poderia ter um diamante
+ * (12 × 4,2% × 1,25 = 0,63 → 1 só por causa deste piso) — e cota que proíbe a nota alta de existir
+ * é fraude na direção oposta à inflação.
+ */
+export const MIN_POR_FAIXA = 1;
+
+export type Cota = {
+  limiar: number;
+  /** % da curva de referência em `limiar` ou acima. */
+  referencia_pct: number;
+  permitido: number;
+  antes: number;
+  depois: number;
+};
+
+/** Percentual de uma curva declarada (`{'0': 426, vazio: 100, …}`) em `nota` ou acima. */
+export function percentilDaCurva(curva: Record<string, number>, nota: number): number {
+  const total = Object.entries(curva)
+    .filter(([k]) => k !== "vazio")
+    .reduce((s, [, v]) => s + v, 0);
+  if (total === 0) return 0;
+  const acima = Object.entries(curva)
+    .filter(([k]) => k !== "vazio" && Number(k) >= nota)
+    .reduce((s, [, v]) => s + v, 0);
+  return (acima / total) * 100;
+}
+
+/**
+ * Monta uma curva de referência a partir de notas observadas. ⚠️ **Nunca** passe aqui as notas
+ * humanas do conjunto que está sendo medido (vazamento — ver o cabeçalho); serve para DECLARAR a
+ * curva de outra população (a força-tarefa, um período anterior, uma amostra separada).
+ */
+export function curvaDeNotas(notas: number[]): Record<string, number> {
+  const curva: Record<string, number> = {};
+  for (const n of notas) {
+    const k = String(Math.max(0, Math.min(NOTA_MAX, Math.round(n))));
+    curva[k] = (curva[k] ?? 0) + 1;
+  }
+  return curva;
+}
+
+/**
+ * Quem sobrevive à cota, do mais FORTE para o mais fraco. A 1ª chave é a **nota**, de propósito:
+ * assim a cota **nunca inverte a ordem** da rodada (quem estava acima continua acima). Prova e
+ * eixos entram só como desempate, e o id fecha para a corrida ser reproduzível.
+ */
+export function compararForca(a: EntradaCalibragem, b: EntradaCalibragem): number {
+  if (a.nota_preliminar !== b.nota_preliminar) return b.nota_preliminar - a.nota_preliminar;
+  const na = a.gate_evidencia === "nomeada" ? 1 : 0;
+  const nb = b.gate_evidencia === "nomeada" ? 1 : 0;
+  if (na !== nb) return nb - na;
+  if ((a.gate ?? 0) !== (b.gate ?? 0)) return (b.gate ?? 0) - (a.gate ?? 0);
+  const fa = a.notas_valor.filter((n) => n >= NOTA_EXIGE_PROVA_NOMEADA).length;
+  const fb = b.notas_valor.filter((n) => n >= NOTA_EXIGE_PROVA_NOMEADA).length;
+  if (fa !== fb) return fb - fa;
+  return a.projeto_id.localeCompare(b.projeto_id);
+}
+
+// ─── Resultado ─────────────────────────────────────────────────────────────────
+
+export type LinhaCalibrada = {
+  projeto_id: string;
+  nota_antes: number;
+  nota_depois: number;
+  motivos: MotivoRebaixa[];
+};
+
+export type ResumoCalibragem = {
+  total: number;
+  /** Rótulo da curva usada — o relatório não pode ficar ambíguo sobre CONTRA O QUE calibrou. */
+  curva_referencia: string;
+  cota_aplicada: boolean;
+  distribuicao_antes: Record<string, number>;
+  distribuicao_depois: Record<string, number>;
+  cotas: Cota[];
+  rebaixados_por_prova: number;
+  rebaixados_por_cota: number;
+  /** A rodada CALIBRADA ainda é mais generosa que a referência em algum corte da régua. */
+  mais_generosa: boolean;
+};
+
+export type ResultadoCalibragem = {
+  linhas: LinhaCalibrada[];
+  resumo: ResumoCalibragem;
+};
+
+export type OpcoesCalibragem = {
+  /**
+   * Curva de referência DECLARADA. Default: `CURVA_ESPECIAIS_AUDITADOS` (a população que o painel
+   * julga). ⚠️ Passar a `CURVA_BASE` aqui é comparar com a base INTEIRA e rebaixa prata correta.
+   */
+  curva?: Record<string, number>;
+  rotuloCurva?: string;
+  /** `false` mede a rodada contra a curva e RELATA, sem rebaixar por cota. Default `true`. */
+  aplicarCota?: boolean;
+  fatorTolerancia?: number;
+};
+
+function distribuicao(notas: number[]): Record<string, number> {
+  const d: Record<string, number> = {};
+  for (const n of notas) d[String(n)] = (d[String(n)] ?? 0) + 1;
+  return d;
+}
+
+/**
+ * Calibra a rodada: pisos de prova por projeto, depois a cota por faixa. **Nunca promove** e
+ * **nunca inverte a ordem** (ver `compararForca`). Rodada vazia devolve resumo zerado — nunca
+ * lança, porque isto roda em lote de background.
+ */
+export function calibrarRodada(
+  entradas: EntradaCalibragem[],
+  opts: OpcoesCalibragem = {},
+): ResultadoCalibragem {
+  const curva = opts.curva ?? CURVA_ESPECIAIS_AUDITADOS;
+  const rotuloCurva =
+    opts.rotuloCurva ??
+    (opts.curva
+      ? curva === CURVA_BASE
+        ? "CURVA_BASE (base inteira)"
+        : "curva declarada"
+      : "CURVA_ESPECIAIS_AUDITADOS");
+  const aplicarCota = opts.aplicarCota !== false;
+  const fator = opts.fatorTolerancia ?? FATOR_TOLERANCIA;
+
+  // 1. pisos de prova, por projeto.
+  const nota = new Map<string, number>();
+  const motivos = new Map<string, MotivoRebaixa[]>();
+  for (const e of entradas) {
+    const r = aplicarPisosDeProva(e);
+    nota.set(e.projeto_id, r.nota);
+    motivos.set(e.projeto_id, r.motivos);
+  }
+  const rebaixados_por_prova = entradas.filter((e) =>
+    (motivos.get(e.projeto_id) ?? []).some((m) => m !== "fora_da_escala"),
+  ).length;
+
+  // 2. cota por faixa, do corte MAIS ALTO para o mais baixo (rebaixar o topo muda as contagens
+  //    dos cortes de baixo, e recontar depois é o que faz as duas cotas conviverem).
+  const total = entradas.length;
+  const ordenadas = [...entradas].sort(compararForca);
+  const limiares = [...LIMIARES_GENEROSIDADE].sort((a, b) => b - a);
+  const cotas: Cota[] = [];
+  let rebaixados_por_cota = 0;
+
+  for (const limiar of limiares) {
+    const referencia_pct = percentilDaCurva(curva, limiar);
+    const permitido = Math.max(MIN_POR_FAIXA, Math.ceil((total * referencia_pct * fator) / 100));
+    const acima = () => ordenadas.filter((e) => (nota.get(e.projeto_id) ?? 0) >= limiar);
+    const antes = acima().length;
+
+    if (aplicarCota) {
+      // Do mais FRACO para o mais forte: a ordem da rodada fica preservada.
+      const fracosPrimeiro = acima().reverse();
+      let excedente = antes - permitido;
+      for (const e of fracosPrimeiro) {
+        if (excedente <= 0) break;
+        nota.set(e.projeto_id, limiar - 1);
+        motivos.set(e.projeto_id, [...(motivos.get(e.projeto_id) ?? []), "cota_da_faixa"]);
+        rebaixados_por_cota++;
+        excedente--;
+      }
+    }
+
+    cotas.push({
+      limiar,
+      referencia_pct: Math.round(referencia_pct * 10) / 10,
+      permitido,
+      antes,
+      depois: acima().length,
+    });
+  }
+  cotas.sort((a, b) => a.limiar - b.limiar);
+
+  const linhas: LinhaCalibrada[] = entradas.map((e) => ({
+    projeto_id: e.projeto_id,
+    nota_antes: e.nota_preliminar,
+    nota_depois: nota.get(e.projeto_id) ?? 0,
+    motivos: motivos.get(e.projeto_id) ?? [],
+  }));
+
+  const mais_generosa = cotas.some((c) => total > 0 && (c.depois / total) * 100 > c.referencia_pct);
+
+  return {
+    linhas,
+    resumo: {
+      total,
+      curva_referencia: rotuloCurva,
+      cota_aplicada: aplicarCota,
+      distribuicao_antes: distribuicao(linhas.map((l) => l.nota_antes)),
+      distribuicao_depois: distribuicao(linhas.map((l) => l.nota_depois)),
+      cotas,
+      rebaixados_por_prova,
+      rebaixados_por_cota,
+      mais_generosa,
+    },
+  };
+}
+
+// ─── Texto determinístico do rebaixamento ──────────────────────────────────────
+
+const TEXTO_MOTIVO: Record<MotivoRebaixa, string> = {
+  prova_nao_nomeada:
+    "a nota exigia um lugar NOMEADO onde conferir o ponteiro, e o material não nomeou nenhum",
+  um_eixo_so: `a faixa exigia ${EIXOS_VALOR_PARA_OURO} eixos de valor sustentando a nota, e só um sustentou`,
+  cota_da_faixa:
+    "a rodada inteira ficou mais generosa que a curva de referência neste corte, e esta foi a nota mais fraca acima dele",
+  fora_da_escala: "a nota veio fora da escala e foi trazida para dentro dela",
+};
+
+/**
+ * A frase do rebaixamento, montada dos motivos — o que o painel grava quando o LLM da redação
+ * falha (ou quando ninguém quer gastar chamada). Sem motivo, diz que a nota passou intacta.
+ */
+export function explicarCalibragem(linha: LinhaCalibrada): string {
+  const reais = linha.motivos.filter((m) => m !== "fora_da_escala");
+  if (reais.length === 0) {
+    return `Calibragem não mexeu na nota (${linha.nota_depois}★): ela já cabia na curva e na prova apresentada.`;
+  }
+  const porques = reais.map((m) => TEXTO_MOTIVO[m]).join("; ");
+  return `Calibrada de ${linha.nota_antes}★ para ${linha.nota_depois}★ — ${porques}.`;
+}
