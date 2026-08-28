@@ -2943,10 +2943,38 @@ export async function getAvaliacaoNormal(
 }
 
 /**
+ * O datasource do Godeploy limita as variáveis por statement em **100** (bem abaixo do SQLite
+ * padrão) — medido em prod: um `IN` com 101 placeholders estoura com "too many SQL variables at
+ * offset 361". As superfícies SOMBRA recebem a listagem INTEIRA do `/dashboard` (~700 ids), então
+ * os getters PorIds quebram o `IN` em lotes DESTE tamanho. Folga de 10 sob o teto para nunca
+ * raspar (e caber um eventual bind extra além do `IN`).
+ */
+const MAX_VARS_IN = 90;
+
+/**
+ * Roda um `SELECT ... WHERE col IN (...)` em lotes de até `MAX_VARS_IN` ids e concatena as linhas.
+ * Os lotes são LEITURAS independentes → `Promise.all` para não empilhar latência (uma página do
+ * dashboard vira ~8 consultas em paralelo, não em fila). `montarSql` recebe os placeholders do lote.
+ */
+async function queryEmLotesPorIds<T>(
+  montarSql: (placeholders: string) => string,
+  chaves: string[],
+): Promise<T[]> {
+  const lotes: string[][] = [];
+  for (let i = 0; i < chaves.length; i += MAX_VARS_IN) lotes.push(chaves.slice(i, i + MAX_VARS_IN));
+  const resultados = await Promise.all(
+    lotes.map((lote) => queryAll<T>(montarSql(lote.map(() => "?").join(", ")), lote)),
+  );
+  return resultados.flat();
+}
+
+/**
  * Recomendações do agregador de VÁRIOS projetos numa consulta só — a superfície SOMBRA do
  * `/dashboard` (coluna "Sombra" + fichas em lote) precisa do veredito de uma página inteira,
  * e round-trip por projeto dentro de um laço é o erro que já derrubou o Investigador. Chaveado
- * pelo id em minúsculas. `votos` vem junto (é pequeno) mas a listagem não o usa.
+ * pelo id em minúsculas. `votos` vem junto (é pequeno) mas a listagem não o usa. ⚠️ Quebra o `IN`
+ * em lotes (`queryEmLotesPorIds`): a listagem manda a base INTEIRA e um `IN` de 700 estourava o
+ * teto de 100 variáveis do Godeploy — a coluna "Sombra" da página toda caía em "—".
  */
 export async function getAvaliacoesNormaisPorIds(
   ids: string[],
@@ -2954,9 +2982,8 @@ export async function getAvaliacoesNormaisPorIds(
   const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
   const out = new Map<string, ProjetoAvaliacaoRow>();
   if (chaves.length === 0) return out;
-  const placeholders = chaves.map(() => "?").join(", ");
-  const linhas = await queryAll<ProjetoAvaliacaoRow>(
-    `SELECT * FROM projeto_avaliacao WHERE LOWER(projeto_id) IN (${placeholders})`,
+  const linhas = await queryEmLotesPorIds<ProjetoAvaliacaoRow>(
+    (ph) => `SELECT * FROM projeto_avaliacao WHERE LOWER(projeto_id) IN (${ph})`,
     chaves,
   );
   for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
@@ -3251,9 +3278,8 @@ export async function getFeedbacksPorIds(
   const chaves = [...new Set(ids.map((i) => i.trim().toLowerCase()).filter(Boolean))];
   const out = new Map<string, AvaliacaoFeedbackRow>();
   if (chaves.length === 0) return out;
-  const placeholders = chaves.map(() => "?").join(", ");
-  const linhas = await queryAll<AvaliacaoFeedbackRow>(
-    `SELECT * FROM avaliacao_feedback WHERE LOWER(projeto_id) IN (${placeholders})`,
+  const linhas = await queryEmLotesPorIds<AvaliacaoFeedbackRow>(
+    (ph) => `SELECT * FROM avaliacao_feedback WHERE LOWER(projeto_id) IN (${ph})`,
     chaves,
   );
   for (const l of linhas) out.set(String(l.projeto_id ?? "").toLowerCase(), l);
