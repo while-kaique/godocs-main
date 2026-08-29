@@ -446,7 +446,10 @@ async function avaliarComContexto(
       grau: delib.grau,
       encerrada: delib.encerrada,
       motivo: delib.motivo,
-      historico: JSON.stringify([{ rodada: delib.rodada, estado: delib.estado, motivo: delib.motivo }]),
+      // Rodada 1 ABRE a deliberação: substitui (sem append). Cada entrada carrega a confiança da rodada.
+      historico: JSON.stringify([
+        { rodada: delib.rodada, estado: delib.estado, confianca: delib.confianca, motivo: delib.motivo },
+      ]),
       origem: ORIGEM_AGREGADOR,
     });
     gravado = true;
@@ -750,10 +753,12 @@ export async function avancarDeliberacoesPendentes(
           grau: delib.grau,
           encerrada: delib.encerrada,
           motivo: delib.motivo,
+          // Cada rodada do cron ANEXA sua entrada ao histórico (preserva as anteriores).
           historico: JSON.stringify([
-            { rodada: delib.rodada, estado: delib.estado, motivo: delib.motivo },
+            { rodada: delib.rodada, estado: delib.estado, confianca: delib.confianca, motivo: delib.motivo },
           ]),
           origem: ORIGEM_AGREGADOR,
+          apendarHistorico: true,
         });
       }
       avancadas++;

@@ -3112,7 +3112,16 @@ export async function getIdsDeliberacoes(): Promise<string[]> {
   return rows.map((r) => r.projeto_id);
 }
 
-/** Grava (ou avança) a deliberação. UPSERT: cada rodada do cron substitui o estado. */
+/**
+ * Grava (ou avança) a deliberação. UPSERT por projeto.
+ *
+ * ⚠️ `apendarHistorico`: por padrão (rodada 1 / abertura) o `historico` é SUBSTITUÍDO
+ * (comportamento de sempre). Com `apendarHistorico:true` (rodadas do cron) a entrada nova é
+ * ANEXADA ao histórico já gravado, preservando as rodadas anteriores — e sem `SELECT historico`
+ * (o append é feito no próprio SQL via JSON1, respeitando o teto de 32 MiB de RPC). Espera-se que
+ * `dados.historico` seja um array JSON de UMA entrada (a rodada corrente); só o elemento `[0]`
+ * dele é anexado.
+ */
 export async function upsertDeliberacao(dados: {
   projeto_id: string;
   estado: string;
@@ -3124,7 +3133,11 @@ export async function upsertDeliberacao(dados: {
   motivo: string | null;
   historico: string | null;
   origem: string | null;
+  apendarHistorico?: boolean;
 }): Promise<void> {
+  const historicoSet = dados.apendarHistorico
+    ? "historico = json_insert(COALESCE(historico, json_array()), '$[#]', json(json_extract(excluded.historico, '$[0]')))"
+    : "historico = excluded.historico";
   await exec(
     `INSERT INTO deliberacao_avaliacao
        (projeto_id, estado, rodada, veredito, confianca, grau, encerrada, motivo, historico, origem, atualizado_em)
@@ -3137,7 +3150,7 @@ export async function upsertDeliberacao(dados: {
        grau = excluded.grau,
        encerrada = excluded.encerrada,
        motivo = excluded.motivo,
-       historico = excluded.historico,
+       ${historicoSet},
        origem = excluded.origem,
        atualizado_em = excluded.atualizado_em`,
     [

@@ -12,7 +12,7 @@ describe('constantes', () => {
   it('valores fixos', () => {
     expect(LIMIAR_GRAU_ALTA).toBe(0.8);
     expect(LIMIAR_GRAU_MEDIA).toBe(0.6);
-    expect(MAX_RODADAS_DELIBERACAO).toBe(2);
+    expect(MAX_RODADAS_DELIBERACAO).toBe(5);
   });
 });
 
@@ -155,38 +155,39 @@ describe('avancarDeliberacao', () => {
     expect(r.motivo.length).toBeGreaterThan(0);
   });
 
-  it('divergência → deliberando na r1, nao_consenso na r2', () => {
-    const r1 = avancarDeliberacao(
-      { estado: null, rodada: 0 },
-      { agregadoVeredito: 'aprovar', divergencia: true, confianca: 0.9, ceticoRefuta: false },
-    );
-    expect(r1.estado).toBe('deliberando');
-    expect(r1.veredito).toBe('em_validacao');
-    expect(r1.rodada).toBe(1);
-    expect(r1.encerrada).toBe(false);
-
-    const r2 = avancarDeliberacao(
-      { estado: r1.estado, rodada: r1.rodada },
-      { agregadoVeredito: 'aprovar', divergencia: true, confianca: 0.9, ceticoRefuta: false },
-    );
-    expect(r2.estado).toBe('nao_consenso');
-    expect(r2.veredito).toBe('em_validacao');
-    expect(r2.rodada).toBe(2);
-    expect(r2.encerrada).toBe(true);
+  it('divergência → deliberando nas r1..r4, nao_consenso na r5', () => {
+    const sinais = { agregadoVeredito: 'aprovar' as const, divergencia: true, confianca: 0.9, ceticoRefuta: false };
+    let atual: { estado?: string | null; rodada?: number | null } = { estado: null, rodada: 0 };
+    const rs = [] as ReturnType<typeof avancarDeliberacao>[];
+    for (let i = 0; i < 5; i++) {
+      const r = avancarDeliberacao(atual as never, sinais);
+      rs.push(r);
+      atual = { estado: r.estado, rodada: r.rodada };
+    }
+    for (let i = 0; i < 4; i++) {
+      expect(rs[i].estado).toBe('deliberando');
+      expect(rs[i].veredito).toBe('em_validacao');
+      expect(rs[i].rodada).toBe(i + 1);
+      expect(rs[i].encerrada).toBe(false);
+    }
+    expect(rs[4].estado).toBe('nao_consenso');
+    expect(rs[4].veredito).toBe('em_validacao');
+    expect(rs[4].rodada).toBe(5);
+    expect(rs[4].encerrada).toBe(true);
   });
 
-  it('confiança baixa bloqueia consenso → deliberando depois nao_consenso', () => {
-    const r1 = avancarDeliberacao(
-      { estado: null, rodada: 0 },
-      { agregadoVeredito: 'aprovar', divergencia: false, confianca: 0.3, ceticoRefuta: false },
-    );
-    expect(r1.estado).toBe('deliberando');
-    const r2 = avancarDeliberacao(
-      { estado: r1.estado, rodada: r1.rodada },
-      { agregadoVeredito: 'aprovar', divergencia: false, confianca: 0.3, ceticoRefuta: false },
-    );
-    expect(r2.estado).toBe('nao_consenso');
-    expect(r2.rodada).toBe(2);
+  it('confiança baixa bloqueia consenso → deliberando até a r4, nao_consenso na r5', () => {
+    const sinais = { agregadoVeredito: 'aprovar' as const, divergencia: false, confianca: 0.3, ceticoRefuta: false };
+    let atual: { estado?: string | null; rodada?: number | null } = { estado: null, rodada: 0 };
+    const rs = [] as ReturnType<typeof avancarDeliberacao>[];
+    for (let i = 0; i < 5; i++) {
+      const r = avancarDeliberacao(atual as never, sinais);
+      rs.push(r);
+      atual = { estado: r.estado, rodada: r.rodada };
+    }
+    for (let i = 0; i < 4; i++) expect(rs[i].estado).toBe('deliberando');
+    expect(rs[4].estado).toBe('nao_consenso');
+    expect(rs[4].rodada).toBe(5);
   });
 
   it('cético refuta bloqueia consenso na r1', () => {

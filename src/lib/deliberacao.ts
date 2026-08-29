@@ -20,8 +20,10 @@ import type { Confianca } from '@/lib/especiais-regua';
 export const LIMIAR_GRAU_ALTA = 0.8;
 /** Piso do grau MÉDIA (abaixo dele → baixa). */
 export const LIMIAR_GRAU_MEDIA = 0.6;
-/** Rodadas máximas da deliberação antes de declarar `nao_consenso` (→ humano). Bounded. */
-export const MAX_RODADAS_DELIBERACAO = 2;
+/** Rodadas máximas da deliberação antes de declarar `nao_consenso` (→ humano). Bounded.
+ *  Sobe de 2 para 5 (escopo B do time LLM): cada rodada do cron injeta argumento novo, então
+ *  mais rodadas buscam consenso de qualidade em vez de convergir cedo ao mesmo interino. */
+export const MAX_RODADAS_DELIBERACAO = 5;
 
 /** Limiar de confiança agregada abaixo do qual não há consenso (mesma régua do agregador). */
 const LIMIAR_CONFIANCA_PADRAO = 0.6;

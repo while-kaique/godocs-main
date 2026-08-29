@@ -3,22 +3,18 @@
 ## Plano ativo
 `docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1+T2 concluídos; **T3 em andamento (RED em voo).**
 
-## O que esta sessão fez (28/08)
-- Abriu a sessão de código do **T3 — deliberação multi-rodada + histórico APPEND**. Baseline **verde (2267)** confirmada no worktree `~/godocs-wt-mesa-parecer` (branch `feat/mesa-parecer-raciocinado`).
-- **§5 blast-radius (contido):** `MAX_RODADAS_DELIBERACAO` (default) só é lido pelos 2 call-sites de `avancarDeliberacao` (opener rodada 1 em `avaliacao-normais.functions.ts:431` e cron advancer `:739`); `upsertDeliberacao` (`client.server.ts:3116`) só tem esses 2 callers. Descoberta-chave: o "sem `SELECT historico` em lote (32 MiB RPC)" vale só para leituras em LOTE — `getDeliberacao(projetoId)` single já traz historico, mas o APPEND será feito **no SQL** (JSON1) para não reler nada.
-- **Distinção reset×append (o plano implica, não soletra):** o **opener (rodada 1) mantém RESET** (overwrite atual); só o **cron advancer** faz APPEND. Solução: flag opcional `apendarHistorico?` em `upsertDeliberacao` (default = comportamento de hoje, byte-idêntico).
-- **RED delegado ao test-writer (§7.1, contexto fresco)** — 2 arquivos NOVOS: `tests/deliberacao-multi-rodada.test.ts` (MAX=5; sem consenso segue `deliberando` até r4, `nao_consenso` só na r5) + `tests/deliberacao-historico-append.test.ts` (DB em memória: rodada 1 sem append + rodadas 2/3 com `apendarHistorico:true` → 3 entradas com `confianca`, rodada 1 preservada). **Handoff feito ANTES do veredito chegar** (janela de contexto a 92%).
+## O que esta sessão fez (28/08) — T3 IMPLEMENTADO E VERDE
+- **T3 — deliberação multi-rodada (2→5) + histórico APPEND: CÓDIGO COMPLETO, suíte 2270 verde** (era 2267 + 3 testes novos), tsc só com os 7 erros PRÉ-EXISTENTES do main (nenhum nos arquivos tocados). `worker.js` rebuildado. As 4 mudanças do handoff anterior aplicadas exatamente:
+  - `src/lib/deliberacao.ts`: `MAX_RODADAS_DELIBERACAO` 2→**5**.
+  - `src/integrations/db/client.server.ts` `upsertDeliberacao`: flag opcional **`apendarHistorico?: boolean`**. `true` → SET do ON CONFLICT vira `historico = json_insert(COALESCE(historico, json_array()), '$[#]', json(json_extract(excluded.historico, '$[0]')))` (append 1 entrada/rodada, **SEM SELECT**, JSON1 — confirmado que Godeploy suporta: `json_extract`/`json_valid`/`json_each` já rodam em prod). `false`/ausente → `historico = excluded.historico` (reset **byte-idêntico** ao de hoje).
+  - `src/lib/avaliacao-normais.functions.ts`: opener (rodada 1, `:446`) mantém reset + entrada agora com `confianca`; cron advancer (`:753`) passa `apendarHistorico:true` + `confianca` na entrada.
+  - `tests/deliberacao.test.ts`: 3 asserts do comportamento ANTIGO atualizados (MAX `toBe(2)`→`toBe(5)`; os 2 testes "r2 nao_consenso" caminham até r5). RED (test-writer) commitado junto: `tests/deliberacao-multi-rodada.test.ts` + `tests/deliberacao-historico-append.test.ts`.
+- **§8.1 faixa medida = `profunda`** (tocou `client.server.ts`/dados). **§9 revisores FECHADOS, NENHUM bloqueia:** conformidade=`conforme` (0.95, zero achados — 4 mudanças exatas, nada de T4/T5 vazou, `analyzer.ts:847` intacto) · qualidade=`limpo` (0.9, zero achados — append JSON1 atômico no UPDATE sem SELECT/sem race, SQL só de literais fixos sem injeção, histórico bounded em 5, try/catch por projeto no cron). Sem §9.C (não criei componente novo). Marcadores gravados `conforme`/`limpo`.
 
 ## Próximo passo
-**Retomar o T3 (via /ggsd:code):** (1) **RED JÁ CONFIRMADO** (test-writer, confiança 0.95) — os 2 arquivos estão **untracked** no worktree; 3 asserts vermelhos: `MAX` 2≠5, encerra na rodada 2 em vez de seguir `deliberando` até r5, `historico` length 1 (substitui) em vez de 3 (append) sem `confianca`. **NÃO re-delegar o RED** — ir direto implementar até verde as **4 mudanças**:
-- `src/lib/deliberacao.ts`: `MAX_RODADAS_DELIBERACAO` 2→**5**.
-- `src/integrations/db/client.server.ts` `upsertDeliberacao`: flag opcional `apendarHistorico?: boolean`. `true` → ON CONFLICT usa `historico = json_insert(COALESCE(historico, json_array()), '$[#]', json(json_extract(excluded.historico,'$[0]')))` (append 1 entrada/rodada, sem SELECT). `false`/ausente → `historico = excluded.historico` (reset atual).
-- `src/lib/avaliacao-normais.functions.ts`: opener (`:449`) mantém reset + enriquece a entrada com `confianca`; cron advancer (`:753`) passa `apendarHistorico:true` + `confianca` na entrada.
-- `tests/deliberacao.test.ts`: atualizar os 3 asserts do comportamento ANTIGO (linha 15 `toBe(2)`→`toBe(5)`; os 2 testes "r2 nao_consenso" das linhas ~158/178 para caminhar até r5). **Não é enfraquecer — a regra mudou.**
-- Depois: §8.1 medir faixa + §9 revisores; `npm run build:worker`; então T4→T7.
+**T4 — materialidade da mesa = `saving + receita/10`** em `avaliacao-normais.functions.ts:290-307` (NÃO tocar `analyzer.ts:847`, gate real; reconferir fonte do ÷10 `ganhoTotalMensal` `chat.functions.ts:3919`). RED→verde por peça, via `/ggsd:code`.
 
 ## Pendências / avisos
-- Revisão §9 do **T2 já passou** (conforme 0.9 / sugestoes 0.86) — os marcadores `.review-status=conforme`/`.quality-status=sugestoes` são de T2, não barram. Esta sessão **não gravou código de produção** (só doc de handoff) → nada novo a revisar.
-- **Alerta T4:** materialidade da mesa = `saving + receita/10` (NÃO tocar `analyzer.ts:847`, gate real). Reconferir a fonte do ÷10 (`ganhoTotalMensal`, `chat.functions.ts:3919`).
+- T3 **completo e revisado** (§9 verde) — pronto p/ T4 na próxima sessão. `/ggsd:ship` só depois de T4→T7 + staging/prod.
 - **Alerta T5:** `voto.motivo` no prompt não pode carregar tarifa valor/hora oculta; sem R$ cru no payload.
-- Ordem restante: **T3 (em curso)** → T4 → T5 (fiar agentes LLM) → T6 (UI rodadas: parar `montarAvaliacaoSombra` de descartar historico) → T7 (retroativo = rede) → build:worker/staging/prod/PR (`LuisEduardo100`).
+- Ordem restante: **T3 (§9 a fechar)** → T4 (materialidade ÷10) → T5 (fiar agentes LLM) → T6 (UI rodadas: parar `montarAvaliacaoSombra` de descartar historico) → T7 (retroativo = rede) → staging (`edf400b4`)/prod (`674a3710`)/PR (`LuisEduardo100`).
