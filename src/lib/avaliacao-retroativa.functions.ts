@@ -9,7 +9,10 @@
  * ⚠️ **SEM tocar status nenhum.** Não grava em `projeto_avaliacao` nem abre deliberação — só mede e
  * grava em `avaliacao_retroativa`. Respeita a flag master `AVALIACAO_NORMAIS` (OFF → NO-OP total).
  * ⚠️ Reusa o painel da fatia B/C (`computarVotosDoProjeto` + `carregarContextoPainel`) — a régua da
- * mesa é EXATAMENTE a mesma do fluxo ao vivo, senão a medição não valeria.
+ * mesa é EXATAMENTE a mesma do fluxo ao vivo, senão a medição não valeria. Isso vale também para a
+ * mesa LLM (T5): com `AVALIACAO_MESA_LLM` ligado, `computarVotosDoProjeto` roda os especialistas
+ * raciocinados e devolve o `conciliado` deles — então este retroativo é a REDE que mede o `erro_grave`
+ * da MESA NOVA (agentes LLM) contra o veredito humano, o gate de confiança antes de sair da sombra.
  */
 import {
   getIdsRetroativos,

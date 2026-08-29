@@ -87,7 +87,19 @@ type AvaliacaoSombra = {
     aplicar: boolean;
     motivo: string | null;
   } | null;
-  deliberacao: { estado: string; grau: string | null; rodada: number; motivo: string | null } | null;
+  deliberacao: {
+    estado: string;
+    grau: string | null;
+    rodada: number;
+    motivo: string | null;
+    /** Rodadas da deliberação (parecer + confiança de cada uma). `[]` quando veio pelo lote. */
+    historico?: {
+      rodada: number;
+      estado: string | null;
+      confianca: number | null;
+      motivo: string | null;
+    }[];
+  } | null;
   retroativo: {
     resultado: string;
     veredito_agregado: string | null;
@@ -433,6 +445,32 @@ function AvaliacaoSombraPainel({
             <p className="whitespace-pre-wrap text-[12.5px] text-muted-foreground">
               {deliberacao.motivo}
             </p>
+          )}
+          {(deliberacao.historico?.length ?? 0) > 1 && (
+            <div className="mt-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
+                Rodadas da mesa
+              </span>
+              <ol
+                className="mt-1 space-y-2 border-l-2 pl-3"
+                style={{ borderColor: 'rgba(71,85,105,0.22)' }}
+              >
+                {deliberacao.historico!.map((r, i) => (
+                  <li key={`${r.rodada}-${i}`} className="text-[12px]">
+                    <span className="font-semibold" style={{ color: '#475569' }}>
+                      Rodada {r.rodada}
+                      {r.estado ? ` · ${rotuloEstadoDeliberacao(r.estado)}` : ''}
+                      {typeof r.confianca === 'number' ? ` · confiança ${pctConfianca(r.confianca)}` : ''}
+                    </span>
+                    {r.motivo && (
+                      <p className="mt-0.5 whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                        {r.motivo}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
         </div>
       )}
