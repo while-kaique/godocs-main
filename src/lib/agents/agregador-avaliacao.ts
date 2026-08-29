@@ -15,6 +15,7 @@
  */
 import type { ResultadoPlausibilidadeFTE } from './analyzer';
 import type { ResultadoFinanceiro } from './avaliacao-financeira';
+import type { JulgamentoEspecialista } from './especialista-avaliacao';
 
 // ─── Sinal do RAG (vizinhos aprovados) ──────────────────────────────────────
 
@@ -155,6 +156,113 @@ export function agregarVotos(input: {
   return {
     veredito,
     confianca: clamp01(confianca),
+    aplicarEmValidacao,
+    divergencia,
+    isento: false,
+    motivos,
+  };
+}
+
+// ─── Chair sobre os JULGAMENTOS LLM (T2) ─────────────────────────────────────
+
+/**
+ * Concilia os pareceres RACIOCINADOS dos especialistas LLM da mesa (`agregarVotos` acima faz o
+ * mesmo com os votos DETERMINÍSTICOS crus; este é o irmão que julga a saída dos agentes).
+ *
+ * ## O que muda em relação a `agregarVotos`
+ * A confiança **deixa de ser o degrau fixo** (0.85 do RAG / `Math.min` dos votos) e passa a medir
+ * **concordância real** entre os agentes: quanto do painel está do mesmo lado (dispersão) × quão
+ * seguros os agentes estão (confiança média). Assim:
+ *   - painel unânime e seguro → confiança alta;
+ *   - painel dividido (uns preocupam, outros não) → confiança baixa + `divergencia`;
+ *   - painel que CONCORDA mas está inseguro (todos tranquilos, confiança baixa) → confiança baixa,
+ *     e mesmo sem divergência a mesa manda para o humano (o limiar passa a ter efeito real).
+ *
+ * ## Invariantes (os mesmos de `agregarVotos`)
+ * - **Nunca** um veredito negativo automático: só `aprovar`, `em_validacao` ou `isento`.
+ * - Qualquer especialista que `preocupa` → `em_validacao` (a mesa não sobrepõe uma preocupação).
+ * - **Especial/liderança são ISENTOS** (validação 100% humana).
+ * - MODO SOMBRA: só PRODUZ a recomendação; nada aqui muda status.
+ *
+ * Os `motivos` vêm do ARGUMENTO raciocinado dos especialistas que preocuparam (não do cálculo cru)
+ * — é o parecer que a ficha mostra. Sem preocupação e com consenso, um resumo tranquilizador.
+ */
+export function agregarJulgamentos(input: {
+  julgamentos: JulgamentoEspecialista[];
+  especial?: boolean | null;
+  fluxoDireto?: boolean | null;
+  limiarConfianca?: number | null;
+}): ResultadoAgregado {
+  // Especial e liderança: a decisão é 100% humana (herda a isenção da régua de elegibilidade).
+  if (input.especial === true || input.fluxoDireto === true) {
+    return {
+      veredito: 'isento',
+      confianca: 1,
+      aplicarEmValidacao: false,
+      divergencia: false,
+      isento: true,
+      motivos: [
+        'Projeto especial ou de liderança — avaliação automática não se aplica (validação humana).',
+      ],
+    };
+  }
+
+  const limiar =
+    typeof input.limiarConfianca === 'number' &&
+    isFinite(input.limiarConfianca) &&
+    input.limiarConfianca > 0
+      ? input.limiarConfianca
+      : LIMIAR_CONFIANCA_AGREGADOR;
+
+  const julgamentos = input.julgamentos ?? [];
+  const n = julgamentos.length;
+
+  // Sem pareceres: dúvida máxima → humano decide (fail-safe; nunca aprova no vazio).
+  if (n === 0) {
+    return {
+      veredito: 'em_validacao',
+      confianca: 0,
+      aplicarEmValidacao: true,
+      divergencia: false,
+      isento: false,
+      motivos: ['Sem pareceres dos especialistas — recomendo conferência humana.'],
+    };
+  }
+
+  const preocupados = julgamentos.filter((j) => j.preocupa);
+  const tranquilos = julgamentos.filter((j) => !j.preocupa);
+  const algumPreocupa = preocupados.length > 0;
+  const divergencia = preocupados.length > 0 && tranquilos.length > 0;
+
+  // Confiança = concordância DIRECIONAL (fração do painel no lado majoritário, ∈ [0.5, 1])
+  // × confiança MÉDIA dos agentes (quão seguros estão). Consenso inseguro derruba a confiança;
+  // divisão derruba a direcional. Substitui o degrau 0.85.
+  const concordanciaDirecional = Math.max(preocupados.length, tranquilos.length) / n;
+  const confiancaMedia = julgamentos.reduce((s, j) => s + clamp01(j.confianca), 0) / n;
+  const confianca = clamp01(concordanciaDirecional * confiancaMedia);
+
+  const aplicarEmValidacao = algumPreocupa || confianca < limiar;
+  const veredito: VeredictoAgregado = aplicarEmValidacao ? 'em_validacao' : 'aprovar';
+
+  const motivos: string[] = [];
+  // O parecer que a ficha mostra é o ARGUMENTO raciocinado de quem preocupou.
+  for (const j of preocupados) {
+    if (j.argumento && j.argumento.trim()) motivos.push(j.argumento.trim());
+  }
+  if (divergencia) {
+    motivos.push('Sinais divergentes entre os especialistas — enviado à triagem humana.');
+  }
+  if (motivos.length === 0) {
+    motivos.push(
+      confianca < limiar
+        ? 'Os especialistas concordam que não há problema, mas sem segurança suficiente — recomendo conferência humana.'
+        : 'Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.',
+    );
+  }
+
+  return {
+    veredito,
+    confianca,
     aplicarEmValidacao,
     divergencia,
     isento: false,
