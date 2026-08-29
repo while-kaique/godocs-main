@@ -247,6 +247,21 @@ export type VotosPainel = {
 };
 
 /**
+ * Materialidade da MESA (sombra): ganho total mensal = saving líquido + receita ÷ 10.
+ * Espelha `ganhoTotalMensal` (`chat.functions.ts`): o saving entra CHEIO (`economia_reais_mes`
+ * já é líquido — inclui custo evitado e abate custo externo) e a receita bruta
+ * (`valor_ganho_mensal`) aplica o ÷10 (fator de equivalência). É a magnitude que o Financeiro
+ * pondera contra o teto — ⚠️ SÓ na mesa/sombra: NÃO é o gate REAL do analyzer
+ * (`analyzer.ts` / `calcularMaterialidade`), que segue com a receita crua (Decisão 3).
+ */
+export function materialidadeMesa(
+  economiaReaisMes: number | null,
+  valorReceita: number | null,
+): number {
+  return (economiaReaisMes ?? 0) + (valorReceita ?? 0) / 10;
+}
+
+/**
  * Roda a MESA completa sobre um projeto JÁ carregado (não especial): FTE + Financeiro + RAG →
  * Agregador → Cético → conciliação. PURO de efeito colateral (só LÊ doc/TeamGuide); NÃO grava.
  */
@@ -295,7 +310,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     typeof receita?.valor_ganho_mensal === 'number'
       ? (receita.valor_ganho_mensal as number)
       : null;
-  const materialidade = (economiaReaisMes ?? 0) + (valorReceita ?? 0);
+  const materialidade = materialidadeMesa(economiaReaisMes, valorReceita);
   const financeiro = avaliarFinanceiro({
     temSaving: !!saving,
     temReceita: !!receita,
