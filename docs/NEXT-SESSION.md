@@ -1,20 +1,24 @@
 # NEXT-SESSION
 
 ## Plano ativo
-`docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1+T2 concluídos; **T3 em andamento (RED em voo).**
+`docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1–T4 concluídos e commitados (`da9dda1`); **T5 em andamento (ponte pura pronta, fiação pendente).**
 
-## O que esta sessão fez (28/08) — T3 IMPLEMENTADO E VERDE
-- **T3 — deliberação multi-rodada (2→5) + histórico APPEND: CÓDIGO COMPLETO, suíte 2270 verde** (era 2267 + 3 testes novos), tsc só com os 7 erros PRÉ-EXISTENTES do main (nenhum nos arquivos tocados). `worker.js` rebuildado. As 4 mudanças do handoff anterior aplicadas exatamente:
-  - `src/lib/deliberacao.ts`: `MAX_RODADAS_DELIBERACAO` 2→**5**.
-  - `src/integrations/db/client.server.ts` `upsertDeliberacao`: flag opcional **`apendarHistorico?: boolean`**. `true` → SET do ON CONFLICT vira `historico = json_insert(COALESCE(historico, json_array()), '$[#]', json(json_extract(excluded.historico, '$[0]')))` (append 1 entrada/rodada, **SEM SELECT**, JSON1 — confirmado que Godeploy suporta: `json_extract`/`json_valid`/`json_each` já rodam em prod). `false`/ausente → `historico = excluded.historico` (reset **byte-idêntico** ao de hoje).
-  - `src/lib/avaliacao-normais.functions.ts`: opener (rodada 1, `:446`) mantém reset + entrada agora com `confianca`; cron advancer (`:753`) passa `apendarHistorico:true` + `confianca` na entrada.
-  - `tests/deliberacao.test.ts`: 3 asserts do comportamento ANTIGO atualizados (MAX `toBe(2)`→`toBe(5)`; os 2 testes "r2 nao_consenso" caminham até r5). RED (test-writer) commitado junto: `tests/deliberacao-multi-rodada.test.ts` + `tests/deliberacao-historico-append.test.ts`.
-- **§8.1 faixa medida = `profunda`** (tocou `client.server.ts`/dados). **§9 revisores FECHADOS, NENHUM bloqueia:** conformidade=`conforme` (0.95, zero achados — 4 mudanças exatas, nada de T4/T5 vazou, `analyzer.ts:847` intacto) · qualidade=`limpo` (0.9, zero achados — append JSON1 atômico no UPDATE sem SELECT/sem race, SQL só de literais fixos sem injeção, histórico bounded em 5, try/catch por projeto no cron). Sem §9.C (não criei componente novo). Marcadores gravados `conforme`/`limpo`.
+## O que esta sessão fez (29/08) — T5 começou: ponte pura verde
+- **Peça PURA nova `src/lib/agents/mesa-especialistas.ts` + `tests/mesa-especialistas.test.ts` (9/9 verde), suíte cheia 2284 verde** (2275 + 9):
+  - `montarEntradasEspecialistas(votos, texto, vizinhosTexto)` — transforma os 4 votos determinísticos (fte/financeiro/rag/cetico) em `EntradaEspecialista[]`: cada especialista recebe o próprio voto como INPUT + os outros 3 em `outrosVotos`. `confiancaFte = implausivel?0.2:0.9` (espelha `agregarVotos`).
+  - `conciliarJulgamentos(julgamentos, {especial,fluxoDireto,limiar?})` — delega a `agregarJulgamentos` (T2) + `grau`=`grauConfianca` + `ceticoRefutou`=cético `.preocupa` → `ResultadoConciliado`.
+- **Ainda NÃO fiado** no orquestrador — a ponte existe mas não é chamada por ninguém em produção.
 
 ## Próximo passo
-**T4 — materialidade da mesa = `saving + receita/10`** em `avaliacao-normais.functions.ts:290-307` (NÃO tocar `analyzer.ts:847`, gate real; reconferir fonte do ÷10 `ganhoTotalMensal` `chat.functions.ts:3919`). RED→verde por peça, via `/ggsd:code`.
+**T5 (fiação) — chamar a ponte no `src/lib/avaliacao-normais.functions.ts`**, gated por `especialistasMesaLlmLigados()` (OFF → byte-idêntico à sombra determinística de hoje, que roda em prod). Design detalhado no memory `mesa-avaliacao-qualidade-parecer.md` (seção "T5 EM ANDAMENTO"), resumo:
+1. `computarVotos`: se `especialistasMesaLlmLigados()` → montar `TextoProjeto` (via `montarEntradaSemanticaNormal`, `?? ''`) + `vizinhosTexto` (`v.nome — v.area`) → `julgamentos = await Promise.all(entradas.map(julgarComEspecialista))` (nunca lança) → `conciliadoEfetivo = conciliarJulgamentos(...)`. OFF → determinístico intacto.
+2. `VotosPainel` += `julgamentos?` + `ceticoRefuta` (efetivo). `serializarVotos` += julgamentos enxuto (sem `argumento`/R$).
+3. `avaliarComContexto`: redator só quando `!especialistasMesaLlmLigados()`; deliberação sinal + historico motivo = parecer LLM quando ligado.
+4. `avancarDeliberacoesPendentes`: idem (sinal `ceticoRefuta`, historico = parecer da rodada).
+5. RED→verde (mockar LLM), suíte cheia, §8.1(faixa) + §9 revisores, `build:worker`.
 
 ## Pendências / avisos
-- T3 **completo e revisado** (§9 verde) — pronto p/ T4 na próxima sessão. `/ggsd:ship` só depois de T4→T7 + staging/prod.
+- **Revisão §9 do incremento desta sessão NÃO rodou** (a ponte pura é auto-contida e não fiada, então não muda comportamento em prod) — mas ela roda junto com a fiação do T5, que é mudança de comportamento. `/ggsd:ship` **vai barrar** até §9 do T5 fechar.
+- **Byte-idêntico obrigatório com `AVALIACAO_MESA_LLM` OFF** — prod roda `AVALIACAO_NORMAIS` ON em sombra determinística; a fiação não pode alterar isso.
 - **Alerta T5:** `voto.motivo` no prompt não pode carregar tarifa valor/hora oculta; sem R$ cru no payload.
-- Ordem restante: **T3 (§9 a fechar)** → T4 (materialidade ÷10) → T5 (fiar agentes LLM) → T6 (UI rodadas: parar `montarAvaliacaoSombra` de descartar historico) → T7 (retroativo = rede) → staging (`edf400b4`)/prod (`674a3710`)/PR (`LuisEduardo100`).
+- Ordem restante: **T5 (fiação, §9)** → T6 (UI rodadas: parar `montarAvaliacaoSombra` de descartar historico) → T7 (retroativo = rede) → staging (`edf400b4`)/prod (`674a3710`)/PR (`LuisEduardo100`).
