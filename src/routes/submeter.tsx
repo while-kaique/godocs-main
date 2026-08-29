@@ -2969,7 +2969,7 @@ export function SubmeterPageContent({
   // tela de carregamento que tem de ganhar — a intro na frente de um seed em voo
   // esconderia um projeto sendo restaurado.
   if (showIntro) {
-    return <IntroSubmissao onProsseguir={() => setShowIntro(false)} />;
+    return <IntroSubmissao onProsseguir={() => setShowIntro(false)} demo={!!demoFluxo} />;
   }
 
   /* ── Success Screen ── */
