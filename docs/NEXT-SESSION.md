@@ -12,8 +12,14 @@
 - **T7 (retroativo = rede)**: confirmado POR CONSTRUÇÃO — `avaliacao-retroativa.functions.ts` já roda `computarVotosDoProjeto` → mede a MESA NOVA (LLM) contra o veredito humano. Só o comentário-cabeçalho foi tornado explícito.
 - Testes novos: `tests/mesa-fiada-serializacao.test.ts` (4) + `tests/mesa-historico-rodadas.test.ts` (5). **Suíte cheia 2293 verde**; `tsc` só os 7 erros pré-existentes (chat.functions/submeter/especiais-painel). `worker.js` rebuildado (regra 1).
 
+## Estado: ✅ FEATURE ENTREGUE (29/08) — PROD + MAIN
+- **§9 limpa** (conformidade `conforme` 0.92 · qualidade `limpo` 0.86; 1 obs BAIXA não-bloqueante deixada como está).
+- **Deploy**: staging (`edf400b4`) + prod (`674a3710`) — worker novo (1.244.804) boota 200 sem exceção pós-deploy.
+- **Merge**: PR #307 no `main` (merge commit `0487664`). Invariante `main = prod = staging` confirmado.
+- `AVALIACAO_MESA_LLM` **NÃO setado** em nenhum ambiente → mesa em sombra byte-idêntica (feature inerte até ligar).
+
 ## Próximo passo
-**§9 FECHADA E LIMPA** (conformidade=`conforme` 0.92 · qualidade=`limpo` 0.86; 1 observação BAIXA não-bloqueante: render das rodadas só com ≥2 — decisão de UX consciente, deixada como está). Próximo é o **deploy**: **staging (`edf400b4`) → validar num projeto de receita real + um absurdo (500h) com `AVALIACAO_MESA_LLM` ligado SÓ na staging → prod (`674a3710`) → PR (`LuisEduardo100`)** + atualizar CLAUDE.md/spec. `/ggsd:ship` está liberado pela §9.
+**Nada pendente nesta feature.** Item OPCIONAL, quando o Luis quiser: setar `AVALIACAO_MESA_LLM=1` **só na staging** (`edf400b4`) e validar o raciocínio dos especialistas num projeto de receita real + um absurdo (500h) na ficha do /dashboard, antes de considerar ligar em prod. Próxima sessão de código começa de um worktree novo do `main`.
 
 ## Pendências / avisos
 - **§9 do T5–T7 — QUALIDADE=`limpo` (0.86, zero achados), CONFORMIDADE ainda em background** ao fechar a sessão. Colher o veredito de conformidade antes do ship (o `/ggsd:ship` barra até `.review-status` fechar).
