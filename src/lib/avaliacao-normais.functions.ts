@@ -73,6 +73,19 @@ import {
   selecionarAprovadosNormais,
   montarCorpusNormais,
 } from '@/lib/avaliacao-corpus';
+import {
+  julgarComEspecialista,
+  especialistasMesaLlmLigados,
+} from '@/lib/agents/especialista-avaliacao.functions';
+import {
+  montarEntradasEspecialistas,
+  conciliarJulgamentos,
+  type VotosDeterministicos,
+} from '@/lib/agents/mesa-especialistas';
+import type {
+  JulgamentoEspecialista,
+  TextoProjeto,
+} from '@/lib/agents/especialista-avaliacao';
 
 /** Carimbo de origem gravado em cada recomendação (distingue do que possa vir depois). */
 export const ORIGEM_AGREGADOR = 'agregador-normais';
@@ -241,9 +254,17 @@ export type VotosPainel = {
   rag: ReturnType<typeof avaliarSinalRag>;
   cetico: ReturnType<typeof avaliarCetico>;
   agregado: ReturnType<typeof agregarVotos>;
+  /** Conciliação EFETIVA: LLM (`conciliarJulgamentos`) quando `AVALIACAO_MESA_LLM` ligado, senão o
+   *  determinístico (`conciliarComCetico`). As duas formas são o mesmo `ResultadoConciliado`. */
   conciliado: ReturnType<typeof conciliarComCetico>;
   vizinhos: number;
   ehLider: boolean;
+  /** Pareceres RACIOCINADOS dos especialistas LLM — só quando `AVALIACAO_MESA_LLM` ligado (senão
+   *  `undefined`, e a mesa é byte-idêntica à determinística de hoje). */
+  julgamentos?: JulgamentoEspecialista[];
+  /** O cético EFETIVO refuta? Julgamento LLM do cético (`.preocupa`) quando ligado; senão o voto
+   *  determinístico (`cetico.refuta`). É o sinal que a deliberação consome. */
+  ceticoRefuta: boolean;
 };
 
 /**
@@ -350,13 +371,66 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
     },
     fator: fatorFtePlausibilidade(),
   });
-  const conciliado = conciliarComCetico(agregado, cetico);
+  const conciliadoDet = conciliarComCetico(agregado, cetico);
 
-  return { fte, financeiro, rag, cetico, agregado, conciliado, vizinhos: vizinhosArr.length, ehLider };
+  // ── Especialistas LLM (opt-in `AVALIACAO_MESA_LLM`) — cada voto determinístico vira a ENTRADA de
+  // um agente que o ARGUMENTA/contesta com o texto real do projeto (Decisão 2: sinal, não piso). O
+  // resultado é conciliado na MESMA forma (`ResultadoConciliado`). ⚠️ DEFAULT OFF → byte-idêntico à
+  // sombra determinística que roda em prod hoje (`AVALIACAO_NORMAIS` ligado, mesa LLM desligada).
+  let conciliado = conciliadoDet;
+  let ceticoRefuta = cetico.refuta;
+  let julgamentos: JulgamentoEspecialista[] | undefined;
+  if (especialistasMesaLlmLigados()) {
+    const entrada = await montarEntradaSemanticaNormal(projetoId, ctx.resumoPorId.get(projetoId));
+    // Texto SEM R$ escondido do usuário (o `motivo` do voto é o único que pode citar valor, e ele já
+    // fala do ganho TOTAL, não de valor/hora por cargo — ver `serializarVotos`/`montarEntradas`).
+    const texto: TextoProjeto = {
+      nome: entrada?.nome ?? '',
+      area: entrada?.area ?? '',
+      descricao: entrada?.descricao ?? '',
+      o_que_faz: entrada?.o_que_faz ?? '',
+      memorial: entrada?.memorial ?? '',
+      doc: entrada?.doc ?? '',
+    };
+    const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(' — '));
+    const votosDet: VotosDeterministicos = { fte, financeiro, rag, cetico };
+    const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto);
+    // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
+    // um agente que falhe não derruba a mesa nem o lote de background.
+    julgamentos = await Promise.all(entradas.map(julgarComEspecialista));
+    conciliado = conciliarJulgamentos(julgamentos, {
+      especial: projeto.especial === 1,
+      fluxoDireto: ehLider,
+    });
+    // Cético EFETIVO = o parecer do agente cético (preocupou?); sem ele (não deveria faltar), o
+    // determinístico. É o sinal `ceticoRefuta` que a deliberação lê.
+    ceticoRefuta = julgamentos.find((j) => j.dimensao === 'cetico')?.preocupa ?? cetico.refuta;
+  }
+
+  return {
+    fte,
+    financeiro,
+    rag,
+    cetico,
+    agregado,
+    conciliado,
+    vizinhos: vizinhosArr.length,
+    ehLider,
+    julgamentos,
+    ceticoRefuta,
+  };
 }
 
-/** Serializa os votos para a coluna de auditoria `votos` (sem R$ cru — só veredito/confiança). */
-function serializarVotos(v: VotosPainel): string {
+/**
+ * Serializa os votos para a coluna de auditoria `votos` (sem R$ cru — só veredito/confiança).
+ *
+ * ⚠️ **Byte-idêntico com a mesa LLM OFF**: `julgamentos` só entra quando os especialistas LLM
+ * rodaram (`v.julgamentos?.length`); sem eles a chave nem aparece — a auditoria de hoje segue igual.
+ * ⚠️ O parecer LLM entra ENXUTO (`dimensao`/`preocupa`/`confianca`/`origem`): o `argumento` já vive
+ * no `motivo` da avaliação (que a ficha mostra), e repeti-lo aqui só arriscaria vazar texto; nenhum
+ * R$ cru é serializado.
+ */
+export function serializarVotos(v: VotosPainel): string {
   return JSON.stringify({
     fte: v.fte,
     financeiro: { veredito: v.financeiro.veredito, confianca: v.financeiro.confianca },
@@ -369,6 +443,16 @@ function serializarVotos(v: VotosPainel): string {
     cetico: { refuta: v.cetico.refuta, confianca: v.cetico.confianca, sinais: v.cetico.sinais },
     grau: v.conciliado.grau,
     ceticoRefutou: v.conciliado.ceticoRefutou,
+    ...(v.julgamentos?.length
+      ? {
+          julgamentos: v.julgamentos.map((j) => ({
+            dimensao: j.dimensao,
+            preocupa: j.preocupa,
+            confianca: j.confianca,
+            origem: j.origem,
+          })),
+        }
+      : {}),
   });
 }
 
@@ -416,13 +500,18 @@ async function avaliarComContexto(
   }
 
   const votos = await computarVotos(projeto, ctx);
-  const { conciliado, cetico } = votos;
+  const { conciliado } = votos;
+  // Modo mesa-LLM: os especialistas raciocinaram este turno. `conciliado.motivos` JÁ é o parecer
+  // argumentado dos agentes (via `conciliarJulgamentos`), então NÃO passa pelo redator (que
+  // reescreveria os FATOS determinísticos por cima do raciocínio). OFF → `undefined` → caminho de
+  // sempre.
+  const modoLlm = !!votos.julgamentos?.length;
 
   // Motivo determinístico de sempre (comportamento padrão). Só quando a Frente 2 (redator) está
-  // LIGADA e a mesa manda para conferência humana, humaniza a mensagem com o LLM leve — fail-safe
-  // interno cai neste mesmo motivo. DEFAULT OFF = byte-idêntico ao de hoje.
+  // LIGADA, a mesa LLM está DESLIGADA e a mesa manda para conferência humana, humaniza a mensagem
+  // com o LLM leve — fail-safe interno cai neste mesmo motivo. DEFAULT OFF = byte-idêntico ao de hoje.
   let motivoFinal = conciliado.motivos.join(' ');
-  if (conciliado.aplicarEmValidacao && redatorJustificativaLigado()) {
+  if (conciliado.aplicarEmValidacao && redatorJustificativaLigado() && !modoLlm) {
     motivoFinal = await redigirJustificativa(montarFatosJustificativa(votos));
   }
 
@@ -449,7 +538,7 @@ async function avaliarComContexto(
         agregadoVeredito: conciliado.veredito,
         divergencia: conciliado.divergencia,
         confianca: conciliado.confianca,
-        ceticoRefuta: cetico.refuta,
+        ceticoRefuta: votos.ceticoRefuta,
       },
     );
     await upsertDeliberacao({
@@ -461,9 +550,16 @@ async function avaliarComContexto(
       grau: delib.grau,
       encerrada: delib.encerrada,
       motivo: delib.motivo,
-      // Rodada 1 ABRE a deliberação: substitui (sem append). Cada entrada carrega a confiança da rodada.
+      // Rodada 1 ABRE a deliberação: substitui (sem append). Cada entrada carrega a confiança da
+      // rodada. Com a mesa LLM ligada, o histórico guarda o PARECER argumentado (`motivoFinal`); sem
+      // ela, o motivo determinístico da rodada — como sempre.
       historico: JSON.stringify([
-        { rodada: delib.rodada, estado: delib.estado, confianca: delib.confianca, motivo: delib.motivo },
+        {
+          rodada: delib.rodada,
+          estado: delib.estado,
+          confianca: delib.confianca,
+          motivo: modoLlm ? motivoFinal : delib.motivo,
+        },
       ]),
       origem: ORIGEM_AGREGADOR,
     });
@@ -746,7 +842,7 @@ export async function avancarDeliberacoesPendentes(
             agregadoVeredito: votos.conciliado.veredito,
             divergencia: votos.conciliado.divergencia,
             confianca: votos.conciliado.confianca,
-            ceticoRefuta: votos.cetico.refuta,
+            ceticoRefuta: votos.ceticoRefuta,
           }
         : {
             agregadoVeredito: 'em_validacao' as const,
@@ -768,9 +864,16 @@ export async function avancarDeliberacoesPendentes(
           grau: delib.grau,
           encerrada: delib.encerrada,
           motivo: delib.motivo,
-          // Cada rodada do cron ANEXA sua entrada ao histórico (preserva as anteriores).
+          // Cada rodada do cron ANEXA sua entrada ao histórico (preserva as anteriores). Com a mesa
+          // LLM ligada, a entrada guarda o PARECER argumentado desta rodada (os agentes re-raciocinam
+          // a cada corrida); sem ela, o motivo determinístico — como sempre.
           historico: JSON.stringify([
-            { rodada: delib.rodada, estado: delib.estado, confianca: delib.confianca, motivo: delib.motivo },
+            {
+              rodada: delib.rodada,
+              estado: delib.estado,
+              confianca: delib.confianca,
+              motivo: votos?.julgamentos?.length ? votos.conciliado.motivos.join(' ') : delib.motivo,
+            },
           ]),
           origem: ORIGEM_AGREGADOR,
           apendarHistorico: true,

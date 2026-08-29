@@ -1,6 +1,6 @@
 # Plano — Mesa de avaliação: de eco-de-gate a auditor raciocinado
 
-**Status:** ✅ aprovado (Luis, 28/08/2026) — escopo **B (time LLM completo)**; gates determinísticos viram **voto** (não piso), retroativo é a rede; materialidade **só na sombra**.
+**Status:** 🟡 EM EXECUÇÃO (/ggsd:code) — aprovado (Luis, 28/08/2026), escopo **B (time LLM completo)**; gates determinísticos viram **voto** (não piso), retroativo é a rede; materialidade **só na sombra**. **T1–T7 CONCLUÍDOS no código (29/08)** — falta a revisão §9 fechar (2 revisores em background) + staging/prod/PR/CLAUDE.md. Suíte 2293 verde; `AVALIACAO_MESA_LLM` DEFAULT OFF (byte-idêntico à sombra determinística em prod).
 
 **Objetivo:** transformar a "mesa de avaliação em sombra" (hoje 100% determinística, que só ecoa os gates) num **auditor que raciocina sobre os dados reais do projeto** — parecer argumentado sobre o **ganho total** (não a receita crua), confiança = qualidade real da concordância, loop de até 5 rodadas buscando consenso, e histórico de rodadas exposto na ficha. Tudo **em SOMBRA** (`AVALIACAO_NORMAIS`, nunca muda status).
 

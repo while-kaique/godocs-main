@@ -196,6 +196,13 @@ export type DetalheDashboard = {
       grau: string | null;
       rodada: number;
       motivo: string | null;
+      /**
+       * Histórico das rodadas (o parecer + confiança de cada uma) — a "conversa" da mesa. Só é
+       * preenchido na FICHA individual (`getProjetoDashboard`), que lê a linha inteira; no lote da
+       * listagem fica `[]` de propósito (o `historico` NÃO é selecionado em lote — teto de 32 MiB
+       * de RPC). Vazio quando não há deliberação ou quando veio pelo lote.
+       */
+      historico: { rodada: number; estado: string | null; confianca: number | null; motivo: string | null }[];
     } | null;
     /** Medição retroativa contra o humano (fatia C). */
     retroativo: {
@@ -313,8 +320,37 @@ async function carregarSombraDaListagem(ids: string[]): Promise<{
 }
 
 /**
+ * Interpreta o `historico` da deliberação (JSON gravado por `upsertDeliberacao`) num array tipado
+ * de rodadas. FAIL-SOFT: entrada ausente/ilegível → `[]` (a seção só não mostra as rodadas).
+ * Só campos escalares conhecidos entram (nada de blob).
+ */
+export function parseHistoricoDeliberacao(
+  raw: string | null | undefined,
+): { rodada: number; estado: string | null; confianca: number | null; motivo: string | null }[] {
+  if (!raw) return [];
+  let arr: unknown;
+  try {
+    arr = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => ({
+      rodada: typeof e.rodada === "number" ? e.rodada : 0,
+      estado: typeof e.estado === "string" ? e.estado : null,
+      confianca: typeof e.confianca === "number" ? e.confianca : null,
+      motivo: typeof e.motivo === "string" ? e.motivo : null,
+    }));
+}
+
+/**
  * Monta o bloco `avaliacaoSombra` da ficha a partir das três linhas (agregador, deliberação,
  * retroativo). PURA. `null` quando nenhuma das três existe (o agente ainda não avaliou).
+ *
+ * ⚠️ O `historico` da deliberação só chega quando o chamador leu a linha INTEIRA (ficha individual);
+ * o lote não o seleciona (32 MiB de RPC) e passa `undefined` → `[]`.
  */
 export function montarAvaliacaoSombra(
   mesa: {
@@ -329,6 +365,7 @@ export function montarAvaliacaoSombra(
     rodada: number;
     grau: string | null;
     motivo: string | null;
+    historico?: string | null;
   } | null,
   retro: {
     resultado: string;
@@ -350,7 +387,13 @@ export function montarAvaliacaoSombra(
         }
       : null,
     deliberacao: delib
-      ? { estado: delib.estado, grau: delib.grau, rodada: delib.rodada, motivo: delib.motivo }
+      ? {
+          estado: delib.estado,
+          grau: delib.grau,
+          rodada: delib.rodada,
+          motivo: delib.motivo,
+          historico: parseHistoricoDeliberacao(delib.historico),
+        }
       : null,
     retroativo: retro
       ? {
