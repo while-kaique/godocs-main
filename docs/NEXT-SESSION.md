@@ -10,7 +10,7 @@
 - **RED delegado ao test-writer (§7.1, contexto fresco)** — 2 arquivos NOVOS: `tests/deliberacao-multi-rodada.test.ts` (MAX=5; sem consenso segue `deliberando` até r4, `nao_consenso` só na r5) + `tests/deliberacao-historico-append.test.ts` (DB em memória: rodada 1 sem append + rodadas 2/3 com `apendarHistorico:true` → 3 entradas com `confianca`, rodada 1 preservada). **Handoff feito ANTES do veredito chegar** (janela de contexto a 92%).
 
 ## Próximo passo
-**Retomar o T3 (via /ggsd:code):** (1) confirmar o veredito RED do test-writer (arquivos podem já estar untracked no worktree); (2) implementar até verde as **4 mudanças**:
+**Retomar o T3 (via /ggsd:code):** (1) **RED JÁ CONFIRMADO** (test-writer, confiança 0.95) — os 2 arquivos estão **untracked** no worktree; 3 asserts vermelhos: `MAX` 2≠5, encerra na rodada 2 em vez de seguir `deliberando` até r5, `historico` length 1 (substitui) em vez de 3 (append) sem `confianca`. **NÃO re-delegar o RED** — ir direto implementar até verde as **4 mudanças**:
 - `src/lib/deliberacao.ts`: `MAX_RODADAS_DELIBERACAO` 2→**5**.
 - `src/integrations/db/client.server.ts` `upsertDeliberacao`: flag opcional `apendarHistorico?: boolean`. `true` → ON CONFLICT usa `historico = json_insert(COALESCE(historico, json_array()), '$[#]', json(json_extract(excluded.historico,'$[0]')))` (append 1 entrada/rodada, sem SELECT). `false`/ausente → `historico = excluded.historico` (reset atual).
 - `src/lib/avaliacao-normais.functions.ts`: opener (`:449`) mantém reset + enriquece a entrada com `confianca`; cron advancer (`:753`) passa `apendarHistorico:true` + `confianca` na entrada.
