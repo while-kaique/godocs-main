@@ -13,7 +13,7 @@
 - Testes novos: `tests/mesa-fiada-serializacao.test.ts` (4) + `tests/mesa-historico-rodadas.test.ts` (5). **Suíte cheia 2293 verde**; `tsc` só os 7 erros pré-existentes (chat.functions/submeter/especiais-painel). `worker.js` rebuildado (regra 1).
 
 ## Próximo passo
-**Colher os vereditos dos 2 revisores §9 (conformidade + qualidade) que ficaram rodando em BACKGROUND** — a revisão está **PENDENTE** e o **`/ggsd:ship` vai barrar até ela fechar** (pré-condição A). Se ambos limpos/sugestões: **staging (`edf400b4`) → validar num projeto de receita real + um absurdo (500h) com `AVALIACAO_MESA_LLM` ligado só na staging → prod (`674a3710`) → PR (`LuisEduardo100`)** + atualizar CLAUDE.md/spec. Se algum bloquear: aplicar/waiver antes de seguir.
+**§9 FECHADA E LIMPA** (conformidade=`conforme` 0.92 · qualidade=`limpo` 0.86; 1 observação BAIXA não-bloqueante: render das rodadas só com ≥2 — decisão de UX consciente, deixada como está). Próximo é o **deploy**: **staging (`edf400b4`) → validar num projeto de receita real + um absurdo (500h) com `AVALIACAO_MESA_LLM` ligado SÓ na staging → prod (`674a3710`) → PR (`LuisEduardo100`)** + atualizar CLAUDE.md/spec. `/ggsd:ship` está liberado pela §9.
 
 ## Pendências / avisos
 - **§9 do T5–T7 — QUALIDADE=`limpo` (0.86, zero achados), CONFORMIDADE ainda em background** ao fechar a sessão. Colher o veredito de conformidade antes do ship (o `/ggsd:ship` barra até `.review-status` fechar).
