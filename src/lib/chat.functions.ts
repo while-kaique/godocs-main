@@ -71,7 +71,7 @@ import {
   bloqueioSubmissaoPausada,
   erroDeBloqueio,
 } from "@/lib/mensagens-submissao";
-import { deveRecusarSubmissao } from "@/lib/bloqueio-submissao";
+import { deveRecusarSubmissao, emailIsentoBloqueio } from "@/lib/bloqueio-submissao";
 import { montarSnapshotProjeto } from "@/lib/snapshot-projeto";
 import {
   aplicaGateCustoEvitadoChat,
@@ -3936,7 +3936,9 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // uma submissão). A triagem/aprovação do admin não passa por aqui e não para. O
   // cliente também desabilita o botão; isto cobre cliente desatualizado / chamada
   // direta à API. Janela e copy vêm da fonte única `src/lib/bloqueio-submissao.ts`.
-  if (deveRecusarSubmissao()) {
+  // Isenção por e-mail (allowlist env) — libera um testador específico durante a janela sem
+  // reabri-la para todos. Default (sem secret) → ninguém isento = comportamento de hoje.
+  if (deveRecusarSubmissao() && !emailIsentoBloqueio(solicitanteEmail)) {
     throw erroDeBloqueio(bloqueioSubmissaoPausada());
   }
 

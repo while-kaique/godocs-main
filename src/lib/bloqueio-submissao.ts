@@ -79,6 +79,26 @@ function paraMs(now: Date | number): number {
 }
 
 /**
+ * Isenção por e-mail do bloqueio temporário — allowlist via env
+ * `SUBMISSAO_BLOQUEIO_EXCECAO_EMAILS` (lista separada por vírgula, case-insensitive). É
+ * SERVER-side (lê env; no navegador `process` não existe → sempre `false`, e o cliente recebe a
+ * isenção pronta pelo `/api/auth/me`). Default (env ausente/vazia) → `false` = ninguém isento =
+ * comportamento de hoje. Reversível: apagar o secret re-bloqueia. Usada para liberar submissão a
+ * um testador específico durante a janela (ex.: validar um fluxo novo na staging).
+ */
+export function emailIsentoBloqueio(email: string | null | undefined): boolean {
+  const alvo = (email ?? "").trim().toLowerCase();
+  if (!alvo) return false;
+  const lista = lerEnvUtc("SUBMISSAO_BLOQUEIO_EXCECAO_EMAILS");
+  if (!lista) return false;
+  return lista
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(alvo);
+}
+
+/**
  * TRUE quando o instante cai DENTRO da janela de bloqueio (início inclusivo, fim
  * exclusivo = a submissão volta exatamente no instante de reabertura).
  */

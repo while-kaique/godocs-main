@@ -20,10 +20,25 @@ import { estadoBloqueio, type FaseBloqueio } from "@/lib/bloqueio-submissao";
 /** Reavalia o estado no mount e a cada minuto (cobre a página aberta cruzando a virada). */
 export function useBloqueioSubmissao() {
   const [estado, setEstado] = useState(() => estadoBloqueio());
+  // Isenção por e-mail (allowlist env, decidida no SERVIDOR e entregue pelo /api/auth/me): um
+  // testador liberado durante a janela não tem o botão desabilitado. Falha/ausência → mantém o
+  // bloqueio (fail-closed). Default (sem secret) → ninguém isento = comportamento de hoje.
+  const [isento, setIsento] = useState(false);
   useEffect(() => {
     const id = setInterval(() => setEstado(estadoBloqueio()), 60_000);
-    return () => clearInterval(id);
+    let vivo = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => {
+        if (vivo && u && u.bloqueioIsento === true) setIsento(true);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+      clearInterval(id);
+    };
   }, []);
+  if (isento) return { fase: "livre" as FaseBloqueio, bloqueado: false, mensagem: null };
   return estado;
 }
 

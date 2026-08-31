@@ -1,10 +1,14 @@
 import { getAdminByEmail } from '@/integrations/db/client.server'
 import { getNomeDe } from '@/lib/areas/teamguide.server'
+import { emailIsentoBloqueio } from '@/lib/bloqueio-submissao'
 
 export type CurrentUser = {
   email: string
   name: string
   isAdmin: boolean
+  // Isento do bloqueio temporário de submissões (allowlist env). O cliente usa isto para não
+  // desabilitar o botão de submeter deste usuário durante a janela. Default: false.
+  bloqueioIsento: boolean
 }
 
 /**
@@ -69,5 +73,5 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
   const name =
     nameFromHeader || (await getNomeDe(email)) || derivarNomeDeEmail(email)
 
-  return { email, name, isAdmin: await isAdmin(email) }
+  return { email, name, isAdmin: await isAdmin(email), bloqueioIsento: emailIsentoBloqueio(email) }
 }
