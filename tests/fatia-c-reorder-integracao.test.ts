@@ -82,15 +82,18 @@ describe('fatia C — wiring de integração do fluxo reordenado', () => {
       docs: DOC_MINIMO,
     })) as { projeto_id: string; reorder_doc_final?: boolean; response?: unknown };
 
-    // NÃO abriu a fase doc: sem `response`, só o sinal de reordenação.
+    // NÃO abriu a fase doc E retorna NA HORA (extrator + compilação vão para background): sem
+    // `response`, só o sinal de reordenação.
     expect(res.reorder_doc_final).toBe(true);
     expect(res.response).toBeUndefined();
 
-    // O blob nasceu pendente E com o coletado_inicial durável (para o preview financeiro reler).
+    // O extrator+compilação rodam em background (extrairCompilarPersistir). Deixa o pipeline
+    // terminar (mocks instantâneos) e confere que o coletado_inicial DURÁVEL sobreviveu ao merge
+    // da compilação — é o que o preview financeiro relê para o memorial não sair em branco.
+    await new Promise((r) => setTimeout(r, 50));
     const docRow = await getDocumentacao(res.projeto_id);
     expect(docRow).toBeTruthy();
     const conteudo = JSON.parse((docRow as { conteudo: string }).conteudo);
-    expect(conteudo.compilacao_pendente).toBe(true);
     expect(conteudo.coletado_inicial?.o_que_faz).toBe('automatiza o faturamento');
   });
 
