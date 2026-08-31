@@ -3520,12 +3520,16 @@ export function SubmeterPageContent({
                   <button
                     type="button"
                     onClick={handleContinuarAgente}
-                    disabled={continuando}
+                    disabled={continuando || pendingContinuar}
                     className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
                   >
-                    {continuando ? (
+                    {continuando || pendingContinuar ? (
                       <>
-                        <CyclingText steps={LOADING_STEPS_REPROCESSAR} />
+                        {/* Reorder: entre o fim do bg-compile e a navegação (pendingContinuar), o
+                            loading fica CONTÍNUO — sem o botão virar estático e piscar de rótulo.
+                            `continuando` (reprocesso na edição) usa os passos de reprocesso; a
+                            entrada nova (pendingContinuar) reusa os passos da 1ª fase (continuidade). */}
+                        <CyclingText steps={continuando ? LOADING_STEPS_REPROCESSAR : LOADING_STEPS_INICIAR} />
                         <div className="go-spinner" />
                       </>
                     ) : (
