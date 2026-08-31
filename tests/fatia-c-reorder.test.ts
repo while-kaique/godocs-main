@@ -18,6 +18,7 @@ import {
   resolverColetadoFinanceiro,
 } from '@/lib/agents/doc-async';
 import { proximaFase } from '@/lib/agents/orchestrator';
+import { deveIrParaRefinoDoc, previewFinanceiroEhReceita } from '@/lib/submeter/constants';
 
 const comSubstancia = (extra: Partial<DocumentacaoColetada> = {}): DocumentacaoColetada => ({
   ...documentacaoVazia(),
@@ -237,5 +238,73 @@ describe('coletadoIgual() — igualdade campo a campo (independe da ordem das ch
     const b = { ...comSubstancia() };
     delete (b as Record<string, unknown>).atencao;
     expect(coletadoIgual(a, b as DocumentacaoColetada)).toBe(true);
+  });
+});
+
+// ─── deveIrParaRefinoDoc() — guarda ATÔMICA da transição financeiro→refino (bug G) ───
+// No fluxo reordenado, QUALQUER turno que retorna novaFase="doc" vindo de uma fase não-doc
+// é a transição para o refino final: as mensagens do chat DEVEM ser limpas antes de o
+// cabeçalho virar para "Documentação Técnica" (senão ele aparece sobre o memorial financeiro
+// ainda visível). O servidor deriva a fase do estado PERSISTIDO, que pode DIVERGIR do chatFase
+// do cliente — por isso a guarda cobre também "saving"/"receita" crus, não só os *_preview.
+describe('deveIrParaRefinoDoc()', () => {
+  const fasesFinanceirasECompleto: ChatFase[] = [
+    'saving',
+    'saving_preview',
+    'receita',
+    'receita_preview',
+    'completo',
+  ];
+
+  it('true quando reorderAtivo, novaFase=doc e a fase atual NÃO é de doc', () => {
+    for (const faseAtual of fasesFinanceirasECompleto) {
+      expect(deveIrParaRefinoDoc(true, faseAtual, 'doc')).toBe(true);
+    }
+  });
+
+  it('cerne do bug: fase atual "saving"/"receita" (estado persistido divergente) também dispara', () => {
+    expect(deveIrParaRefinoDoc(true, 'saving', 'doc')).toBe(true);
+    expect(deveIrParaRefinoDoc(true, 'receita', 'doc')).toBe(true);
+  });
+
+  it('false quando reorderAtivo=false, para qualquer combinação (flag OFF = byte-idêntico)', () => {
+    expect(deveIrParaRefinoDoc(false, 'saving_preview', 'doc')).toBe(false);
+    expect(deveIrParaRefinoDoc(false, 'saving', 'doc')).toBe(false);
+    expect(deveIrParaRefinoDoc(false, 'receita', 'doc')).toBe(false);
+    expect(deveIrParaRefinoDoc(false, 'completo', 'doc')).toBe(false);
+    expect(deveIrParaRefinoDoc(false, 'doc', 'doc')).toBe(false);
+  });
+
+  it('false quando novaFase !== doc, mesmo com reorderAtivo=true', () => {
+    const outrasNovasFases: ChatFase[] = [
+      'saving',
+      'receita',
+      'saving_preview',
+      'receita_preview',
+      'completo',
+    ];
+    for (const novaFase of outrasNovasFases) {
+      expect(deveIrParaRefinoDoc(true, 'saving_preview', novaFase)).toBe(false);
+    }
+  });
+
+  it('false quando a fase atual JÁ é de doc (não re-limpa turnos dentro do refino)', () => {
+    expect(deveIrParaRefinoDoc(true, 'doc', 'doc')).toBe(false);
+    expect(deveIrParaRefinoDoc(true, 'doc_preview', 'doc')).toBe(false);
+  });
+});
+
+// ─── previewFinanceiroEhReceita() — captura o preview certo (saving × receita) ───
+describe('previewFinanceiroEhReceita()', () => {
+  it('true para as fases de receita', () => {
+    expect(previewFinanceiroEhReceita('receita')).toBe(true);
+    expect(previewFinanceiroEhReceita('receita_preview')).toBe(true);
+  });
+
+  it('false para todas as demais fases', () => {
+    const naoReceita: ChatFase[] = ['doc', 'doc_preview', 'saving', 'saving_preview', 'completo'];
+    for (const fase of naoReceita) {
+      expect(previewFinanceiroEhReceita(fase)).toBe(false);
+    }
   });
 });

@@ -20,6 +20,7 @@ import {
   limitarCoautorUnico, deveMostrarIntro,
   validarEtapa25Especial, motivoBloqueioEspecial,
   serializarFerramentas, desserializarFerramentas,
+  deveIrParaRefinoDoc, previewFinanceiroEhReceita,
 } from "@/lib/submeter/constants";
 import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
@@ -204,6 +205,7 @@ function GanhoComparison({
 const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
 const LOADING_STEPS_SAVING = ["Calculando a economia de horas…", "Montando o memorial de economia…"];
+const LOADING_STEPS_RECEITA = ["Calculando o ganho de receita…", "Montando o memorial de receita…"];
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 // Edição reprocessa o documento e REGERA a documentação via IA antes de reenviar —
@@ -2466,12 +2468,11 @@ export function SubmeterPageContent({
       const newFase: ChatFase = result.fase ?? chatFase;
       const transitionToSaving = chatFase !== "saving" && newFase === "saving";
       const transitionToReceita = chatFase !== "receita" && newFase === "receita";
-      // Reorder: o financeiro aprovado transita para o REFINO da doc (última etapa). Só quando
-      // vem de saving_preview/receita_preview — a doc já compilou em background.
-      const transitionToDocRefino =
-        reorderAtivo &&
-        newFase === "doc" &&
-        (chatFase === "saving_preview" || chatFase === "receita_preview");
+      // Reorder: o financeiro aprovado transita para o REFINO da doc (última etapa). QUALQUER
+      // fase não-doc de origem conta — o servidor deriva a fase do estado PERSISTIDO, que pode
+      // divergir do chatFase do cliente (o preview pode chegar ainda como saving/receita crus).
+      // A limpeza + virada de fase acontece atomicamente aqui (bug G); a doc já compilou em bg.
+      const transitionToDocRefino = deveIrParaRefinoDoc(reorderAtivo, chatFase, newFase);
 
       const assistantMsg: ChatMessage = {
         role: "assistant",
@@ -2532,7 +2533,7 @@ export function SubmeterPageContent({
         // pergunta. Reusa o chatLoading; a prosa da doc streama numa bolha viva.
         const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
         if (lastPreviewMsg) {
-          if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
+          if (previewFinanceiroEhReceita(chatFase)) setApprovedReceitaPreview(lastPreviewMsg.content);
           else setApprovedSavingPreview(lastPreviewMsg.content);
         }
         setChatMessages([]);
@@ -2840,15 +2841,25 @@ export function SubmeterPageContent({
       return;
     }
     setReceitaFormLoading(true);
+    // Fluxo REORDENADO: fecha o formulário JÁ e mostra o PROGRESSO no chat com um rótulo de
+    // memorial ("Montando o memorial de receita…") em vez dos 3 pontinhos genéricos — espelha
+    // o `handleSavingFormSubmit`. Sem isso, o form cobria o chat e o usuário via só o botão
+    // parado. No fluxo normal (flag OFF), mantém o de hoje.
+    if (reorderAtivo) {
+      setShowReceitaForm(false);
+      setChatLoading(true);
+      setChatLoadingSteps(LOADING_STEPS_RECEITA);
+    }
     // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial de receita chega token a
     // token e preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum
-    // delta chega e o fluxo é idêntico ao JSON de antes. ⚠️ Como no saving, o FORMULÁRIO
-    // cobre o chat durante esta chamada — a bolha só aparece quando o form fecha, já
-    // reconciliada pelo envelope (`setChatMessages([receitaMsg])` abaixo).
+    // delta chega e o fluxo é idêntico ao JSON de antes.
     let streamingIniciado = false;
     const onDelta = (chunk: string) => {
       if (!streamingIniciado) {
         streamingIniciado = true;
+        // A bolha viva assume o progresso → esconde os passos nomeados (reorder).
+        setChatLoading(false);
+        setChatLoadingSteps(null);
         setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "receita" }]);
       } else {
         setChatMessages((prev) => {
@@ -2902,14 +2913,21 @@ export function SubmeterPageContent({
     } catch (e) {
       console.error("[submeter] falha ao iniciar receita:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      // Se o streaming criou a bolha viva antes do erro, remove-a (form segue aberto).
+      // Se o streaming criou a bolha viva antes do erro, remove-a.
       if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
+      // Reorder fechou o formulário para mostrar o progresso — em caso de erro, reabre para o
+      // usuário corrigir (os dados seguem no formulário), espelhando o saving.
+      if (reorderAtivo) setShowReceitaForm(true);
       toast.error(
         `Não foi possível iniciar a análise de receita. ${msg} Os dados que você preencheu continuam no formulário.`,
         { duration: 12000 },
       );
     } finally {
       setReceitaFormLoading(false);
+      // Reorder liga o loader nomeado no submit — desliga aqui (o streaming, quando há, já o
+      // escondeu no 1º delta; com a flag OFF o loader ficaria preso sobre o memorial sem isto).
+      setChatLoading(false);
+      setChatLoadingSteps(null);
     }
   }
 

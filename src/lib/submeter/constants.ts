@@ -680,6 +680,40 @@ export interface FieldErrors {
 
 export type ChatFase = "doc" | "doc_preview" | "saving" | "saving_preview" | "receita" | "receita_preview" | "completo";
 
+/**
+ * Fluxo REORDENADO (fatia C): decide se um turno que retorna `novaFase === "doc"` é a
+ * transição do FINANCEIRO para o REFINO da doc (a última etapa). Quando é, as mensagens do
+ * chat DEVEM ser limpas atomicamente ANTES de o cabeçalho virar para "Documentação Técnica"
+ * — senão ele aparece sobre o memorial de saving/receita ainda visível (bug G).
+ *
+ * A guarda cobre QUALQUER fase não-doc de origem (não só `saving_preview`/`receita_preview`):
+ * o servidor deriva a fase do estado PERSISTIDO, que pode DIVERGIR do `chatFase` do cliente,
+ * então o preview do memorial pode chegar ao cliente ainda como `saving`/`receita` crus. O
+ * único sinal confiável é o servidor mandar ir para `"doc"` vindo de fora do refino.
+ *
+ * `reorderAtivo` é o 1º termo → com a flag OFF retorna sempre `false` (byte-idêntico ao de hoje).
+ */
+export function deveIrParaRefinoDoc(
+  reorderAtivo: boolean,
+  chatFaseAtual: ChatFase,
+  novaFase: ChatFase,
+): boolean {
+  return (
+    reorderAtivo &&
+    novaFase === "doc" &&
+    chatFaseAtual !== "doc" &&
+    chatFaseAtual !== "doc_preview"
+  );
+}
+
+/**
+ * Na transição financeiro→refino, decide se o preview aprovado a capturar é o de RECEITA
+ * (senão é o de saving). Chaveia pela fase de origem — `receita`/`receita_preview` → receita.
+ */
+export function previewFinanceiroEhReceita(chatFaseAtual: ChatFase): boolean {
+  return chatFaseAtual === "receita" || chatFaseAtual === "receita_preview";
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
