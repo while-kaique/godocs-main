@@ -1,5 +1,5 @@
 # Plano — Fatia C: destravar prod (bug G + veredito F + rótulo B)
-**Status:** ✅ aprovado (Luis, 2026-08-31)
+**Status:** 🟡 executado parcial (código G+B, 2026-08-31) — commit `4905faa` na branch `feat/fatia-c-reorder-wizard` (worktree `~/godocs-wt-fatia-c`). **G + B codados e testados** (suíte 2353 verde, build OK, frontend-only). **Falta (não é código):** F (veredito `reasoning_effort=low`, medição na staging — T-F1) · T-D1 (deploy staging + Luis valida G/B no navegador + smoke do loader de receita com streaming OFF) · T-D2 (prod + merge + docs + 3 revisores sobre o diff da branch + apagar `SUBMISSAO_BLOQUEIO_EXCECAO_EMAILS` pós-01/09). Revisão §9.A conformidade = `diverge-baixa` (não-bloqueante).
 
 **Objetivo:** corrigir o bug visual que bloqueia a ida da reordenação do wizard (fatia C) para produção — o cabeçalho "Documentação Técnica" aparecendo sobre o memorial de saving —, decidir o veredito do `reasoning_effort=low` (manter ou apagar o secret) e rotular o loading do chat ("gerando o memorial…"), para então subir a reordenação à prod com segurança.
 
