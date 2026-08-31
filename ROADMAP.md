@@ -20,6 +20,8 @@ analyzer). Plano em `docs/plans/mesa-avaliacao-parecer-raciocinado.md`. ⚠️ C
 
 _(Anterior — Latência da IA: roteamento por FASE ✅ EM PROD (v286) + PR #286, 25/08.)_
 
+_(Frente de latência — **Fatia C (reordenar o wizard, doc paralela + refino no fim)** 🟡 **CÓDIGO COMPLETO 31/08**, atrás da flag `REORDER_DOC_FINAL` (default OFF). Suíte 2346 verde; worktree `~/godocs-wt-fatia-c`. **Próximo:** T7 staging (`edf400b4` + secrets) → T8 prod + merge. Ponteiro em `docs/NEXT-SESSION.md`.)_
+
 **Fase atual:** **nenhuma em aberto** — Fase 5 (**critério de projeto**) ✅ **CONCLUÍDA** em 2026-07-30:
 staging validada, prod `674a3710` deployado e **PR #216 mergeado** (`main` `39deaf9`). Fase 4 (loadings do
 `/dashboard`) ✅ (PR #215); Fase 3 (dashboard = triagem) ✅ (PR #214); `aceitar-zip-submissao` ✅ (PR #213).
