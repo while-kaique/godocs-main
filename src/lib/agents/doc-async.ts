@@ -19,6 +19,96 @@ export function docCompilacaoAssincronaAtiva(): boolean {
 }
 
 /**
+ * Flag opt-in da REORDENAÇÃO do wizard (fatia C): a doc compila em background desde o anexo,
+ * o usuário responde saving/receita PRIMEIRO (com todos os gates) e o refino conversacional da
+ * doc acontece por ÚLTIMO. Só liga com "1"/"true" (case-insensitive); ausente/outro → false =
+ * ordem de hoje (doc → financeiro), byte-idêntico. ⚠️ Lida LAZY (nunca em escopo de módulo).
+ * ⚠️ Reorder EXIGE `docCompilacaoAssincronaAtiva` ligado (o financeiro roda antes da doc existir).
+ */
+export function reorderDocFinal(): boolean {
+  const v = (process.env.REORDER_DOC_FINAL ?? "").trim().toLowerCase();
+  return v === "1" || v === "true";
+}
+
+// Campos de SUBSTÂNCIA da doc (os que a fase `doc`/refino coleta). `nome_projeto` fica de fora:
+// vem sempre do formulário, então não sinaliza "a fase doc rodou".
+const CAMPOS_SUBSTANCIA_DOC = [
+  "o_que_faz",
+  "execucao",
+  "dependencias",
+  "fluxo",
+  "configurar_antes",
+  "atencao",
+] as const;
+
+/**
+ * true quando o `coletado` não tem NENHUM campo de substância preenchido — i.e., a fase `doc`
+ * ainda não rodou (só o `nome_projeto` do formulário, que é ignorado). É o gatilho do fallback
+ * que relê o `coletado_inicial` do blob quando `extrairEstado` volta vazio (fluxo reordenado).
+ */
+export function coletadoVazio(c: DocumentacaoColetada): boolean {
+  return CAMPOS_SUBSTANCIA_DOC.every((k) => {
+    const v = c[k];
+    return v == null || (typeof v === "string" && v.trim() === "");
+  });
+}
+
+/**
+ * Recupera o `coletado_inicial` durável do blob da doc — a saída do extrator gravada em
+ * `iniciarSubmissao` no fluxo reordenado. Diferente de `coletado_pendente`, este SOBREVIVE ao
+ * `mergeDocCompilada` (não está na lista de deleção), então segue legível depois que o bg-compile
+ * aterrissa. null quando ausente/inválido.
+ */
+export function coletadoInicialDoBlob(
+  conteudo: Record<string, unknown> | null | undefined,
+): DocumentacaoColetada | null {
+  return lerColetadoDoBlob(conteudo, "coletado_inicial");
+}
+
+// Campos do `coletado` que a fase doc/refino coleta e que a compilação consome. Ordem fixa: a
+// comparação abaixo é campo a campo, então NÃO depende da ordem de inserção das chaves.
+const CAMPOS_COLETADO_DOC = [
+  "nome_projeto",
+  "o_que_faz",
+  "execucao",
+  "dependencias",
+  "fluxo",
+  "configurar_antes",
+  "atencao",
+  "tem_ia_como_funcionalidade",
+] as const;
+
+/**
+ * Decide qual `coletado` alimenta o preview financeiro (saving/receita): o do CHAT quando tem
+ * substância (fluxo normal, a fase doc rodou), senão o `coletado_inicial` do BLOB (fluxo
+ * reordenado, a fase doc só roda no fim). Sem nenhum dos dois com substância, devolve o do chat
+ * (não piora). PURO — a leitura do blob fica no chamador. Impede o memorial financeiro em branco.
+ */
+export function resolverColetadoFinanceiro(
+  coletadoDoChat: DocumentacaoColetada,
+  coletadoDoBlob: DocumentacaoColetada | null,
+): DocumentacaoColetada {
+  if (!coletadoVazio(coletadoDoChat)) return coletadoDoChat;
+  if (coletadoDoBlob && !coletadoVazio(coletadoDoBlob)) return coletadoDoBlob;
+  return coletadoDoChat;
+}
+
+/**
+ * Igualdade de `coletado` para a doc — campo a campo (estável, independente da ordem das chaves).
+ * Usada para decidir se o REFINO mudou algo e a doc precisa recompilar. ⚠️ `JSON.stringify` NÃO
+ * serve: `coletadoAntes` (do blob) e `coletadoAgora` (echo do LLM) nascem de caminhos diferentes e
+ * podem serializar com chaves em ordem distinta → falso "mudou" → recompilação de ~64s à toa.
+ * `null`/`undefined`: só iguais se AMBOS ausentes (um só ausente = mudou → recompila, direção segura).
+ */
+export function coletadoIgual(
+  a: DocumentacaoColetada | null | undefined,
+  b: DocumentacaoColetada | null | undefined,
+): boolean {
+  if (!a || !b) return a == null && b == null;
+  return CAMPOS_COLETADO_DOC.every((k) => (a[k] ?? null) === (b[k] ?? null));
+}
+
+/**
  * Conteúdo PLACEHOLDER gravado na aprovação da doc quando a compilação vai para background.
  * Carrega a flag de pendência, um snapshot do `coletado` (para o submit recompilar sem o
  * estado do chat) e o sinal `tem_ia_como_funcionalidade` (o analisador o lê pós-submit).
@@ -36,13 +126,21 @@ export function precisaCompilarDoc(conteudo: Record<string, unknown> | null | un
   return conteudo?.compilacao_pendente === true;
 }
 
+/** Leitor único de um `coletado` gravado no blob da doc, por CHAVE. null quando ausente/inválido. */
+function lerColetadoDoBlob(
+  conteudo: Record<string, unknown> | null | undefined,
+  chave: string,
+): DocumentacaoColetada | null {
+  const c = conteudo?.[chave];
+  if (c && typeof c === "object") return c as DocumentacaoColetada;
+  return null;
+}
+
 /** Recupera o `coletado` snapshotado no placeholder; null quando ausente/inválido. */
 export function coletadoDePendente(
   conteudo: Record<string, unknown> | null | undefined,
 ): DocumentacaoColetada | null {
-  const c = conteudo?.coletado_pendente;
-  if (c && typeof c === "object") return c as DocumentacaoColetada;
-  return null;
+  return lerColetadoDoBlob(conteudo, "coletado_pendente");
 }
 
 // Chaves que a doc COMPILADA (output do LLM) NUNCA pode contribuir ao blob: o financeiro

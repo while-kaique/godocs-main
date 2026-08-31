@@ -1433,6 +1433,49 @@ Se precisa de clarificação:
 {"type":"question","content":"pergunta","saving":{...campos atuais}}`;
 }
 
+// ─── Transição de fase (FONTE ÚNICA) ────────────────────────────────────────
+// Antes, o mapa de transição vivia digitado em DOIS blocos idênticos (o caminho
+// principal e o fallback de JSON truncado). Unificado aqui: dado (fase atual, type
+// do LLM, hasSaving/hasReceita e a flag de reordenação), devolve a PRÓXIMA fase.
+//
+// `reorderDocFinal=false` (padrão) = ordem de hoje: doc → financeiro → completo.
+// `reorderDocFinal=true` (fatia C) = ordem invertida: financeiro → doc(refino) → completo.
+// Qualquer `type` que não seja preview/complete NÃO transita (question/options ficam na fase).
+export function proximaFase(
+  faseAtual: ChatFase,
+  type: string,
+  opts: { hasSaving: boolean; hasReceita: boolean; reorderDocFinal: boolean },
+): ChatFase {
+  const { hasSaving, hasReceita, reorderDocFinal } = opts;
+
+  if (type === "preview") {
+    if (faseAtual === "doc") return "doc_preview";
+    if (faseAtual === "saving") return "saving_preview";
+    if (faseAtual === "receita") return "receita_preview";
+    return faseAtual;
+  }
+
+  if (type === "complete") {
+    if (reorderDocFinal) {
+      // Ordem invertida: o financeiro vem primeiro, o refino da doc por ÚLTIMO.
+      if (faseAtual === "saving_preview") return hasReceita ? "receita" : "doc";
+      if (faseAtual === "receita_preview") return "doc";
+      if (faseAtual === "doc_preview") return "completo"; // refino é a última fase
+      return faseAtual;
+    }
+    // Ordem de hoje: doc primeiro, financeiro depois.
+    if (faseAtual === "doc_preview") {
+      // Sem saving nem receita (projeto especial) → encerra após a doc.
+      return hasSaving ? "saving" : hasReceita ? "receita" : "completo";
+    }
+    if (faseAtual === "saving_preview") return hasReceita ? "receita" : "completo";
+    if (faseAtual === "receita_preview") return "completo";
+    return faseAtual;
+  }
+
+  return faseAtual;
+}
+
 // ─── Runner principal ───────────────────────────────────────────────────────
 
 export async function runOrchestrator(
@@ -1449,8 +1492,12 @@ export async function runOrchestrator(
   // `preview`/`complete` (as gerações longas). `question`/`options` são curtos e sujeitos a
   // reescrita por gate → ficam bufferizados (§6 do plano). O retorno segue sendo o
   // OrchestratorResult COMPLETO; os gates pós-orquestrador (em chat.functions) mandam.
-  streamOpts: { onDelta?: (chunk: string) => void } = {},
+  streamOpts: { onDelta?: (chunk: string) => void; reorderDocFinal?: boolean } = {},
 ): Promise<OrchestratorResult> {
+  // Reordenação do wizard (fatia C): o CALLER lê a env `REORDER_DOC_FINAL` e passa o booleano
+  // aqui (o orquestrador não lê env). Muda SÓ o mapa de transição (proximaFase); default false
+  // = ordem de hoje, byte-idêntico.
+  const reorderDoc = streamOpts.reorderDocFinal ?? false;
   let systemPrompt: string;
 
   switch (fase) {
@@ -1684,20 +1731,11 @@ export async function runOrchestrator(
       receita,
     } as OrchestratorResult;
 
-    if (recoveredType === "preview") {
-      if (fase === "doc") fallbackResult.fase = "doc_preview";
-      else if (fase === "saving") fallbackResult.fase = "saving_preview";
-      else if (fase === "receita") fallbackResult.fase = "receita_preview";
-    } else if (recoveredType === "complete") {
-      if (fase === "doc_preview") {
-        // Sem saving nem receita (projeto especial) → encerra após a doc.
-        fallbackResult.fase = hasSaving ? "saving" : hasReceita ? "receita" : "completo";
-      } else if (fase === "saving_preview") {
-        fallbackResult.fase = hasReceita ? "receita" : "completo";
-      } else if (fase === "receita_preview") {
-        fallbackResult.fase = "completo";
-      }
-    }
+    fallbackResult.fase = proximaFase(fase, recoveredType, {
+      hasSaving,
+      hasReceita,
+      reorderDocFinal: reorderDoc,
+    });
 
     return fallbackResult;
   }
@@ -1734,23 +1772,12 @@ export async function runOrchestrator(
       : { content }),
   } as OrchestratorResult;
 
-  // Transição de fase automática
-  if (type === "preview") {
-    if (fase === "doc") result.fase = "doc_preview";
-    else if (fase === "saving") result.fase = "saving_preview";
-    else if (fase === "receita") result.fase = "receita_preview";
-  }
-
-  if (type === "complete") {
-    if (fase === "doc_preview") {
-      // Sem saving nem receita (projeto especial) → encerra após a doc.
-      result.fase = hasSaving ? "saving" : hasReceita ? "receita" : "completo";
-    } else if (fase === "saving_preview") {
-      result.fase = hasReceita ? "receita" : "completo";
-    } else if (fase === "receita_preview") {
-      result.fase = "completo";
-    }
-  }
+  // Transição de fase automática (FONTE ÚNICA — proximaFase)
+  result.fase = proximaFase(fase, type, {
+    hasSaving,
+    hasReceita,
+    reorderDocFinal: reorderDoc,
+  });
 
   log(`Resultado: type="${result.type}", fase="${result.fase}"`);
   return result;

@@ -12,6 +12,7 @@ import {
   enviarMensagem,
   iniciarSaving,
   iniciarReceita,
+  iniciarRefinoDoc,
   atualizarTipos,
   atualizarMetadados,
   analisarProjetoFn,
@@ -536,6 +537,7 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         "/api/chat/enviar-mensagem",
         "/api/chat/iniciar-saving",
         "/api/chat/iniciar-receita",
+        "/api/chat/iniciar-refino-doc",
       ]);
       if (streamingLigado() && rotasStream.has(pathname)) {
         const { readable, writable } = new TransformStream();
@@ -557,6 +559,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
               result = await enviarMensagem(body, { onDelta });
             else if (pathname === "/api/chat/iniciar-saving")
               result = await iniciarSaving(body, solicitante, { onDelta });
+            else if (pathname === "/api/chat/iniciar-refino-doc")
+              result = await iniciarRefinoDoc(body, solicitante, { onDelta });
             else result = await iniciarReceita(body, solicitante, { onDelta });
 
             const resJson = JSON.stringify(result);
@@ -634,6 +638,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           result = await iniciarSaving(body, getEmailFromRequest(request));
         else if (pathname === "/api/chat/iniciar-receita")
           result = await iniciarReceita(body, getEmailFromRequest(request));
+        else if (pathname === "/api/chat/iniciar-refino-doc")
+          result = await iniciarRefinoDoc(body, getEmailFromRequest(request));
         else if (pathname === "/api/chat/atualizar-tipos") result = await atualizarTipos(body);
         else if (pathname === "/api/chat/atualizar-metadados")
           result = await atualizarMetadados(body);

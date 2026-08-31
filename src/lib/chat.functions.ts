@@ -107,6 +107,11 @@ import {
 import { compilarDocumentacao } from "@/lib/agents/doc-compiler";
 import {
   docCompilacaoAssincronaAtiva,
+  reorderDocFinal,
+  coletadoVazio,
+  coletadoInicialDoBlob,
+  coletadoIgual,
+  resolverColetadoFinanceiro,
   placeholderDocPendente,
   precisaCompilarDoc,
   coletadoDePendente,
@@ -903,6 +908,23 @@ export async function iniciarSubmissao(
       `Fluxo direto (liderança): doc compilada por IA — projeto ${projeto.id} pronto para o formulário.`,
     );
     return { projeto_id: projeto.id, fluxo_direto: true };
+  }
+
+  // ── Fluxo REORDENADO (fatia C, flag REORDER_DOC_FINAL): tira a doc do caminho crítico.
+  // Em vez de abrir o chat na fase `doc` (com os ~44s de espera do preview), disparamos a
+  // compilação da doc em BACKGROUND desde o anexo e devolvemos já sinalizando a fase `saving`.
+  // O `coletado` do extrator vai DURÁVEL no blob (`coletado_inicial`) — o preview financeiro o
+  // relê por `coletadoParaFinanceiro` (a fase `doc` não roda antes). O refino da doc acontece por
+  // ÚLTIMO (transição saving/receita_preview→doc, sob a mesma flag). Requer o bg-compile ligado.
+  if (reorderDocFinal() && !data.especial) {
+    log("iniciarSubmissao", "Fluxo reordenado — compilando doc em segundo plano; abrindo em saving.");
+    await upsertDocumentacao(projeto.id, {
+      ...placeholderDocPendente(coletadoInicial),
+      // Durável: sobrevive ao mergeDocCompilada (≠ coletado_pendente, que é apagado no merge).
+      coletado_inicial: coletadoInicial,
+    });
+    runBackground(compilarEPersistirDoc(projeto.id, ctx, coletadoInicial));
+    return { projeto_id: projeto.id, reorder_doc_final: true };
   }
 
   log("iniciarSubmissao", "Rodando orquestrador (fase doc)...");
@@ -1819,7 +1841,7 @@ export async function enviarMensagem(
       resumoProjeto,
       tiposProjeto,
       estado.receita,
-      { onDelta: opts.onDelta },
+      { onDelta: opts.onDelta, reorderDocFinal: reorderDocFinal() },
     ));
 
   // O orquestrador adota o `saving` ecoado pelo LLM (que NÃO inclui os campos de gate).
@@ -2402,6 +2424,29 @@ export async function enviarMensagem(
     }
   }
 
+  // Fluxo REORDENADO (fatia C): refino da doc APROVADO (doc_preview → completo). A doc foi
+  // compilada em background no anexo; recompilamos SÓ se o refino mudou o `coletado` (a pessoa
+  // conversou e alterou algum campo) — senão a doc do background já vale e não gastamos os ~64s.
+  // Marca pendente + bg recompile; o `completo` block abaixo grava o financeiro por cima (o
+  // mergeDocCompilada preserva saving/receita) e o submit reconcilia se o bg não terminou.
+  if (reorderDocFinal() && resultado.fase === "completo" && estado.fase === "doc_preview") {
+    const docRow0 = await getDocumentacao(data.projeto_id);
+    const conteudo0 = docRow0 ? parseJson<Record<string, unknown>>(docRow0.conteudo) : null;
+    const coletadoAntes = coletadoInicialDoBlob(conteudo0);
+    const coletadoAgora = resultado.coletado;
+    // Campo a campo (independe da ordem das chaves) — JSON.stringify daria falso "mudou".
+    const mudou = !coletadoIgual(coletadoAntes, coletadoAgora);
+    if (mudou) {
+      log("enviarMensagem", "Refino mudou a doc — recompilando em segundo plano.");
+      await upsertDocumentacao(data.projeto_id, {
+        ...(conteudo0 ?? {}),
+        ...placeholderDocPendente(coletadoAgora),
+        coletado_inicial: coletadoAgora,
+      });
+      runBackground(compilarEPersistirDoc(data.projeto_id, ctx, coletadoAgora));
+    }
+  }
+
   // Turno concluído com sucesso — agora sim persiste a mensagem do usuário e a resposta.
   await insertChatMessage({
     projeto_id: data.projeto_id,
@@ -2481,6 +2526,28 @@ export async function enviarMensagem(
 }
 
 // ─── Iniciar fase saving ─────────────────────────────────────────────────────
+
+/**
+ * Resolve o `coletado` que alimenta o preview financeiro (saving/receita). No fluxo normal a
+ * fase `doc` já rodou e o `coletado` veio do chat (`coletadoDoChat`). No fluxo REORDENADO a fase
+ * `doc` só roda no fim (refino), então o chat vem vazio (`coletadoVazio`) e releio o
+ * `coletado_inicial` que `iniciarSubmissao` gravou no blob da doc. Sem esse fallback o memorial
+ * financeiro sairia com Nome/O-que-faz/Fluxo em branco. Falha de leitura → mantém o do chat.
+ */
+async function coletadoParaFinanceiro(
+  projeto_id: string,
+  coletadoDoChat: DocumentacaoColetada,
+): Promise<DocumentacaoColetada> {
+  if (!coletadoVazio(coletadoDoChat)) return coletadoDoChat;
+  try {
+    const docRow = await getDocumentacao(projeto_id);
+    const conteudo = docRow ? parseJson<Record<string, unknown>>(docRow.conteudo) : null;
+    return resolverColetadoFinanceiro(coletadoDoChat, coletadoInicialDoBlob(conteudo));
+  } catch (e) {
+    err("coletadoParaFinanceiro", "falha ao reler coletado_inicial do blob:", e);
+    return coletadoDoChat;
+  }
+}
 
 export async function iniciarSaving(
   rawData: unknown,
@@ -2671,17 +2738,22 @@ export async function iniciarSaving(
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
+  // Fluxo REORDENADO (fatia C): a fase `doc` não roda antes do saving, então `extrairEstado`
+  // volta vazio. O `coletado` do extrator foi gravado no blob da doc (`coletado_inicial`, durável
+  // ao bg-compile) por `iniciarSubmissao` — releio dele para o preview de saving não sair com
+  // Nome/O-que-faz/Fluxo em branco. Flux normal (flag OFF): estado.coletado tem substância → no-op.
+  const coletadoSaving = await coletadoParaFinanceiro(data.projeto_id, estado.coletado);
 
   const resultado = await runOrchestrator(
     ctx,
     [],
     "saving",
-    estado.coletado,
+    coletadoSaving,
     saving,
     resumoProjeto,
     tiposProjeto,
     receitaVazia(),
-    { onDelta: opts.onDelta },
+    { onDelta: opts.onDelta, reorderDocFinal: reorderDocFinal() },
   );
 
   // Backstop determinístico — CUSTO EVITADO PURO (alguem_fazia='externo'): o ganho é
@@ -2757,6 +2829,55 @@ export async function iniciarSaving(
   return formatResponse(resultado);
 }
 
+// ─── Iniciar REFINO da doc (fluxo REORDENADO, fatia C) ───────────────────────
+
+/**
+ * Primeiro turno da fase de REFINO da doc, no fluxo reordenado (chamado pelo frontend DEPOIS de
+ * saving/receita). A doc já foi compilada em background desde o anexo; aqui rodamos a fase `doc`
+ * com o `coletado` do blob (`coletado_inicial`) e history=[] para DISPARAR o seed: 7 campos
+ * preenchidos → PREVIEW DIRETO (a pessoa só aprova/pede ajuste); senão o agente pergunta o que
+ * falta — exatamente a fase doc de hoje, só reposicionada. Carrega saving/receita do estado para
+ * o memorial financeiro sobreviver até o `completo` final. Espelha a estrutura de iniciarSaving.
+ */
+export async function iniciarRefinoDoc(
+  rawData: unknown,
+  _solicitanteEmail?: string | null,
+  opts: { onDelta?: (chunk: string) => void } = {},
+) {
+  const data = z.object({ projeto_id: z.string() }).parse(rawData);
+  log("iniciarRefinoDoc", `projeto=${data.projeto_id}`);
+
+  const ctx = await getProjetoContexto(data.projeto_id);
+  const tiposProjeto = getTiposProjeto(ctx);
+
+  const msgs = await getChatMessagesExcludeRole(data.projeto_id, "doc");
+  const resumoProjeto = extrairResumoProjeto(msgs ?? []);
+  const estado = extrairEstado(msgs ?? []);
+  // A fase `doc` não rodou antes no reorder → o `coletado` vem do blob (coletado_inicial durável).
+  const coletado = await coletadoParaFinanceiro(data.projeto_id, estado.coletado);
+
+  const resultado = await runOrchestrator(
+    ctx,
+    [],
+    "doc",
+    coletado,
+    estado.saving,
+    resumoProjeto,
+    tiposProjeto,
+    estado.receita,
+    { onDelta: opts.onDelta, reorderDocFinal: reorderDocFinal() },
+  );
+
+  await insertChatMessage({
+    projeto_id: data.projeto_id,
+    role: "assistant",
+    content: JSON.stringify(resultado),
+    options: resultado.type === "options" ? resultado.options : null,
+  });
+
+  return formatResponse(resultado);
+}
+
 // ─── Iniciar fase receita incremental ────────────────────────────────────────
 
 export async function iniciarReceita(
@@ -2823,17 +2944,20 @@ export async function iniciarReceita(
 
   const resumoProjeto = extrairResumoProjeto(msgs ?? []);
   const estado = extrairEstado(msgs ?? []);
+  // Fluxo REORDENADO: idem iniciarSaving — a fase `doc` não rodou, relê o `coletado_inicial`
+  // do blob. Flag OFF: no-op (o chat já tem o coletado).
+  const coletadoReceita = await coletadoParaFinanceiro(data.projeto_id, estado.coletado);
 
   const resultado = await runOrchestrator(
     ctx,
     [],
     "receita",
-    estado.coletado,
+    coletadoReceita,
     estado.saving,
     resumoProjeto,
     tiposProjeto,
     receita,
-    { onDelta: opts.onDelta },
+    { onDelta: opts.onDelta, reorderDocFinal: reorderDocFinal() },
   );
 
   // Evento de timeline: valores do formulário de receita. `voltou` = reentrada.

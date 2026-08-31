@@ -525,6 +525,10 @@ export function SubmeterPageContent({
   const [chatFinalizando, setChatFinalizando] = useState(false);
   const finalizarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [chatFase, setChatFase] = useState<ChatFase>("doc");
+  // Fluxo REORDENADO (fatia C, backend com REORDER_DOC_FINAL ON): quando `iniciar-submissao`
+  // devolve `reorder_doc_final`, a doc compila em background e o wizard abre já em saving; o
+  // refino da doc vem por ÚLTIMO. O frontend descobre pelo retorno do backend (não lê env).
+  const [reorderAtivo, setReorderAtivo] = useState(false);
   const [projetoId, setProjetoId] = useState<string | null>(null);
   // Tipo(s) com que o fluxo do agente está alinhado — usado para detectar troca
   // de tipo (saving ↔ receita) quando o usuário volta à etapa 2 no meio do fluxo.
@@ -1370,7 +1374,7 @@ export function SubmeterPageContent({
         const ferramentaEnviada = computeFerramenta();
         // Rota SSE: `apiStream` trata tanto event-stream (flag ON) quanto JSON (flag OFF).
         // A compilação da doc é SILENCIOSA (não streama prosa) — só aguardamos o envelope.
-        const result = await apiStream<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
+        const result = await apiStream<{ projeto_id: string; response?: ReturnType<typeof Object.create>; reorder_doc_final?: boolean }>(
           "/api/chat/iniciar-submissao",
           {
             responsavel_nome: form.nome.trim(),
@@ -1401,16 +1405,27 @@ export function SubmeterPageContent({
         setAgentTipos([]);
         setAgentMeta(snapshotMeta());
         setAgentArquivosSig(arquivosSig());
+        // Fluxo REORDENADO: o backend NÃO abriu a fase doc (nenhum `response`) — a doc compila em
+        // background e o chat começa em `saving`. Nenhuma bolha de agente é criada aqui; a Etapa
+        // 2.5 (handleContinuarAgente) abre o formulário de saving direto.
+        if (result.reorder_doc_final) {
+          setReorderAtivo(true);
+          setChatMessages([]);
+          setChatFase("saving");
+          setDocExistenteInvalidado(false);
+          setBgStatus("pronto");
+          return result.projeto_id;
+        }
         setChatMessages([{
           role: "assistant",
-          content: result.response.content,
-          options: result.response.options ?? undefined,
-          isComplete: result.response.isComplete,
-          isPreview: result.response.isPreview,
-          fase: result.response.fase,
+          content: result.response!.content,
+          options: result.response!.options ?? undefined,
+          isComplete: result.response!.isComplete,
+          isPreview: result.response!.isPreview,
+          fase: result.response!.fase,
         }]);
-        setChatFase(result.response.fase ?? "doc");
-        if (result.response.isComplete) setChatComplete(true);
+        setChatFase(result.response!.fase ?? "doc");
+        if (result.response!.isComplete) setChatComplete(true);
         setDocExistenteInvalidado(false);
         setBgStatus("pronto");
         return result.projeto_id;
@@ -2378,6 +2393,18 @@ export function SubmeterPageContent({
       }
     }
 
+    // Fluxo REORDENADO (submissão NOVA, padrão): a doc já compila em background — abre o
+    // formulário de saving/receita DIRETO (sem passar pela fase doc). O refino da doc vem no fim
+    // (transição saving/receita_preview → doc, que dispara iniciar-refino-doc). Espelha o ramo de
+    // edição acima, mas para submissão nova.
+    if (reorderAtivo && !editProjetoId && !form.especial && !showSavingForm && !showReceitaForm) {
+      const querSaving = form.tipoProjeto.includes("saving");
+      setChatComplete(false);
+      setChatMessages([]);
+      if (querSaving) openSavingForm();
+      else openReceitaForm();
+    }
+
     goToStep(3, "forward");
   }
 
@@ -2438,6 +2465,12 @@ export function SubmeterPageContent({
       const newFase: ChatFase = result.fase ?? chatFase;
       const transitionToSaving = chatFase !== "saving" && newFase === "saving";
       const transitionToReceita = chatFase !== "receita" && newFase === "receita";
+      // Reorder: o financeiro aprovado transita para o REFINO da doc (última etapa). Só quando
+      // vem de saving_preview/receita_preview — a doc já compilou em background.
+      const transitionToDocRefino =
+        reorderAtivo &&
+        newFase === "doc" &&
+        (chatFase === "saving_preview" || chatFase === "receita_preview");
 
       const assistantMsg: ChatMessage = {
         role: "assistant",
@@ -2491,6 +2524,61 @@ export function SubmeterPageContent({
           }
           setShowReceitaForm(true);
         }, 3000);
+      } else if (transitionToDocRefino) {
+        // Reorder: financeiro aprovado → refino da doc (última etapa). Captura o preview financeiro
+        // aprovado e dispara o 1º turno do refino (iniciar-refino-doc). A doc já compilou em
+        // background: completa → PREVIEW DIRETO (aprovar/pedir ajuste); incompleta → o agente
+        // pergunta. Reusa o chatLoading; a prosa da doc streama numa bolha viva.
+        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
+        if (lastPreviewMsg) {
+          if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
+          else setApprovedSavingPreview(lastPreviewMsg.content);
+        }
+        setChatMessages([]);
+        setChatFase("doc");
+        let refinoStreamIniciado = false;
+        const refino = await apiStream<ReturnType<typeof Object.create>>(
+          "/api/chat/iniciar-refino-doc",
+          { projeto_id: projetoId },
+          {
+            onDelta: (chunk) => {
+              setChatFinalizando(false);
+              if (!refinoStreamIniciado) {
+                refinoStreamIniciado = true;
+                setChatMessages([{ role: "assistant", content: chunk, fase: "doc" }]);
+              } else {
+                setChatMessages((prev) => {
+                  const copy = prev.slice();
+                  const last = copy[copy.length - 1];
+                  if (last && last.role === "assistant") {
+                    copy[copy.length - 1] = { ...last, content: last.content + chunk };
+                  }
+                  return copy;
+                });
+              }
+            },
+          },
+        );
+        const refinoMsg: ChatMessage = {
+          role: "assistant",
+          content: refino.content,
+          options: refino.options ?? undefined,
+          isComplete: refino.isComplete,
+          isPreview: refino.isPreview,
+          fase: refino.fase ?? "doc",
+        };
+        if (refinoStreamIniciado) {
+          setChatMessages((prev) => {
+            const copy = prev.slice();
+            copy[copy.length - 1] = refinoMsg;
+            return copy;
+          });
+        } else {
+          setChatMessages([refinoMsg]);
+        }
+        setChatFase(refino.fase ?? "doc");
+        // O refino NÃO encerra aqui (fase doc/doc_preview) — só o doc_preview→completo, depois de
+        // a pessoa aprovar/ajustar, marca chatComplete (via o bloco isComplete de sempre).
       } else {
         // Envelope canônico: se veio streaming, RECONCILIA a bolha viva (troca o texto
         // provisório pelo `content` final + aplica type/isPreview/isComplete/options);
