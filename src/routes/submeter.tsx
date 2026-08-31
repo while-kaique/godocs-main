@@ -203,6 +203,7 @@ function GanhoComparison({
 // Passos nomeados estimados por operação pesada (item: loading com etapa explícita).
 const LOADING_STEPS_INICIAR = ["Lendo os arquivos…", "Analisando o código…", "Montando a documentação…"];
 const LOADING_STEPS_COMPILAR = ["Compilando a documentação…", "Preparando a análise de impacto…"];
+const LOADING_STEPS_SAVING = ["Calculando a economia de horas…", "Montando o memorial de economia…"];
 const LOADING_STEPS_REPROCESSAR = ["Relendo os arquivos…", "Reanalisando o projeto…", "Atualizando a documentação…"];
 const LOADING_STEPS_ENVIAR_ESPECIAL = ["Registrando o projeto…", "Enviando para validação…"];
 // Edição reprocessa o documento e REGERA a documentação via IA antes de reenviar —
@@ -2665,17 +2666,25 @@ export function SubmeterPageContent({
       return;
     }
     setSavingFormLoading(true);
+    // Fluxo REORDENADO (meta 2-3s/etapa, sem tela congelada): fecha o formulário JÁ e mostra o
+    // PROGRESSO no chat — os passos nomeados ("Calculando a economia…") e, com streaming ligado, a
+    // prosa do memorial chegando token a token. Sem isso, o form cobria o chat e o usuário via só o
+    // botão "Analisando…" parado (a bolha viva ficava invisível). No fluxo normal, mantém o de hoje.
+    if (reorderAtivo) {
+      setShowSavingForm(false);
+      setChatLoading(true);
+      setChatLoadingSteps(LOADING_STEPS_SAVING);
+    }
     // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial chega token a token e
     // preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum delta
     // chega, `streamingIniciado` fica false e o fluxo é idêntico ao JSON de antes.
-    // ⚠️ Durante esta chamada o FORMULÁRIO determinístico cobre o chat (com seu próprio
-    // loading) — o chat só renderiza com !showSavingForm && !showReceitaForm —, então a
-    // bolha viva fica invisível aqui; o conteúdo final aparece quando o form fecha, já
-    // reconciliado pelo envelope (`setChatMessages([savingMsg])` abaixo).
     let streamingIniciado = false;
     const onDelta = (chunk: string) => {
       if (!streamingIniciado) {
         streamingIniciado = true;
+        // A bolha viva assume o progresso → esconde os passos nomeados (reorder).
+        setChatLoading(false);
+        setChatLoadingSteps(null);
         setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "saving" }]);
       } else {
         setChatMessages((prev) => {
@@ -2806,12 +2815,17 @@ export function SubmeterPageContent({
       // Se o streaming criou a bolha viva antes do erro, remove-a: o formulário continua
       // aberto para correção e não pode sobrar uma prosa provisória órfã no chat.
       if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
+      // Reorder fechou o formulário para mostrar o progresso — em caso de erro, reabre para o
+      // usuário corrigir (os dados seguem no formulário).
+      if (reorderAtivo) setShowSavingForm(true);
       toast.error(
         `Não foi possível iniciar a análise de impacto. ${msg} Os dados que você preencheu continuam no formulário.`,
         { duration: 12000 },
       );
     } finally {
       setSavingFormLoading(false);
+      setChatLoading(false);
+      setChatLoadingSteps(null);
     }
   }
 

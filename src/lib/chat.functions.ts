@@ -855,12 +855,20 @@ export async function iniciarSubmissao(
     escopo: data.escopo ?? null,
   };
 
+  // Decide o CAMINHO antes do extrator. O fluxo direto (liderança) e o normal NÃO-reordenado
+  // precisam do `coletado` síncrono aqui; o fluxo REORDENADO roda o extrator (chamada de IA) em
+  // BACKGROUND — o clique de avançar NÃO pode esperar IA (meta: 2-3s por etapa). `podeFluxoDireto`
+  // é async, então resolvemos UMA vez e reusamos no ramo abaixo.
+  const ehFluxoDireto =
+    !!data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail));
+  const usaReorder = reorderDocFinal() && !data.especial && !ehFluxoDireto;
+
   let coletadoInicial: DocumentacaoColetada = {
     ...documentacaoVazia(),
     nome_projeto: data.nome_projeto,
   };
 
-  if (docTexto || data.descricao_breve) {
+  if ((docTexto || data.descricao_breve) && !usaReorder) {
     try {
       log("iniciarSubmissao", "Rodando extrator automático...");
       coletadoInicial = await extrairCamposDocumentacao(ctx, docTexto || "");
@@ -876,7 +884,7 @@ export async function iniciarSubmissao(
   // do que o extrator pegou dos arquivos/descrição) e NÃO inicia o chat. O frontend
   // segue direto ao formulário determinístico de saving/receita. A permissão é
   // conferida no SERVIDOR (o flag do cliente sozinho não libera). Ver `podeFluxoDireto`.
-  if (data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail))) {
+  if (ehFluxoDireto) {
     let doc: DocumentacaoGerada;
     try {
       doc = await compilarDocumentacao(ctx, coletadoInicial);
@@ -911,19 +919,13 @@ export async function iniciarSubmissao(
   }
 
   // ── Fluxo REORDENADO (fatia C, flag REORDER_DOC_FINAL): tira a doc do caminho crítico.
-  // Em vez de abrir o chat na fase `doc` (com os ~44s de espera do preview), disparamos a
-  // compilação da doc em BACKGROUND desde o anexo e devolvemos já sinalizando a fase `saving`.
-  // O `coletado` do extrator vai DURÁVEL no blob (`coletado_inicial`) — o preview financeiro o
-  // relê por `coletadoParaFinanceiro` (a fase `doc` não roda antes). O refino da doc acontece por
-  // ÚLTIMO (transição saving/receita_preview→doc, sob a mesma flag). Requer o bg-compile ligado.
-  if (reorderDocFinal() && !data.especial) {
-    log("iniciarSubmissao", "Fluxo reordenado — compilando doc em segundo plano; abrindo em saving.");
-    await upsertDocumentacao(projeto.id, {
-      ...placeholderDocPendente(coletadoInicial),
-      // Durável: sobrevive ao mergeDocCompilada (≠ coletado_pendente, que é apagado no merge).
-      coletado_inicial: coletadoInicial,
-    });
-    runBackground(compilarEPersistirDoc(projeto.id, ctx, coletadoInicial));
+  // Retorna NA HORA (sem esperar IA) sinalizando a fase `saving`; o EXTRATOR e a COMPILAÇÃO da doc
+  // rodam 100% em BACKGROUND (`extrairCompilarPersistir`). O `coletado` vai DURÁVEL no blob
+  // (`coletado_inicial`) — o preview financeiro o relê por `coletadoParaFinanceiro`. O refino da doc
+  // acontece por ÚLTIMO (transição saving/receita_preview→doc). Requer o bg-compile ligado.
+  if (usaReorder) {
+    log("iniciarSubmissao", "Fluxo reordenado — extrator+doc em segundo plano; abrindo em saving.");
+    runBackground(extrairCompilarPersistir(projeto.id, ctx, docTexto || ""));
     return { projeto_id: projeto.id, reorder_doc_final: true };
   }
 
@@ -3677,6 +3679,42 @@ function patchDaDocCompilada(
     patch.tem_ia_como_funcionalidade = coletado.tem_ia_como_funcionalidade;
   }
   return patch;
+}
+
+/**
+ * Fluxo REORDENADO — pipeline COMPLETO da doc em SEGUNDO PLANO (extrator → compilação), disparado
+ * por `runBackground` no `iniciarSubmissao`. O clique de avançar NÃO espera IA (meta 2-3s/etapa).
+ * Grava um PLACEHOLDER na hora (com o `coletado` base) para o submit ter o que reconciliar mesmo se
+ * a IA demorar; roda o extrator; regrava o `coletado_inicial` refinado; compila. FAIL-SAFE: erro
+ * do extrator → segue com o base; erro da compilação → placeholder pendente (o submit reconcilia).
+ */
+export async function extrairCompilarPersistir(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  docTexto: string,
+): Promise<void> {
+  const base: DocumentacaoColetada = {
+    ...documentacaoVazia(),
+    nome_projeto: ctx.nome_projeto ?? null,
+  };
+  // Placeholder imediato: o submit e o preview financeiro já têm um blob válido para reconciliar/reler.
+  await upsertDocumentacao(projetoId, {
+    ...placeholderDocPendente(base),
+    coletado_inicial: base,
+  });
+  let coletado = base;
+  try {
+    coletado = await extrairCamposDocumentacao(ctx, docTexto);
+  } catch (extractorErr) {
+    err("extrairCompilarPersistir", "Extrator falhou em background — seguindo sem pré-preenchimento:", extractorErr);
+    coletado = base;
+  }
+  // Regrava o coletado_inicial refinado (durável, sobrevive ao mergeDocCompilada).
+  await upsertDocumentacao(projetoId, {
+    ...placeholderDocPendente(coletado),
+    coletado_inicial: coletado,
+  });
+  await compilarEPersistirDoc(projetoId, ctx, coletado);
 }
 
 // Compila a doc em SEGUNDO PLANO e persiste os CAMPOS DA DOC via merge ATÔMICO (json_patch),
