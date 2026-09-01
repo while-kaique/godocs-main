@@ -2414,7 +2414,19 @@ export function SubmeterPageContent({
     // formulário de saving/receita DIRETO (sem passar pela fase doc). O refino da doc vem no fim
     // (transição saving/receita_preview → doc, que dispara iniciar-refino-doc). Espelha o ramo de
     // edição acima, mas para submissão nova.
-    if (reorderAtivo && !editProjetoId && !form.especial && !showSavingForm && !showReceitaForm) {
+    // ⚠️ Só na PRIMEIRA entrada (sem conversa nem saving submetido). Sem `chatMessages.length===0
+    // && !savingSubmitted`, VOLTAR ao formulário e RETORNAR ao agente com uma conversa em andamento
+    // resetava o chat (`setChatMessages([])`) e reabria o form — a pessoa perdia o fluxo atual. O
+    // ramo de EDIÇÃO acima já guarda por `chatMessages.length===0`; aqui faltava.
+    if (
+      reorderAtivo &&
+      !editProjetoId &&
+      !form.especial &&
+      !showSavingForm &&
+      !showReceitaForm &&
+      chatMessages.length === 0 &&
+      !savingSubmitted
+    ) {
       const querSaving = form.tipoProjeto.includes("saving");
       setChatComplete(false);
       setChatMessages([]);

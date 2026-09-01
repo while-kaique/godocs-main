@@ -1030,6 +1030,14 @@ export function buildSavingPrompt(
   const todasZeroTotal =
     temLinhas && linhas.every((l) => l.horas_antes === 0 && l.horas_depois === 0);
   const temCustoMonitoramento = linhas.some((l) => l.horas_antes === 0 && l.horas_depois > 0);
+  // Custo evitado: a resposta JÁ veio do FORMULÁRIO determinístico (sim → itens com valor; não →
+  // custo_evitado_reais null). O agente NÃO pode reperguntar. Quando a pessoa respondeu "Não
+  // deixou de pagar", é PROIBIDO levantar o assunto — era a redundância que o Luis pegou (o agente
+  // perguntava "algum contrato/licença/serviço deixou de ser pago?" com o formulário já dizendo NÃO).
+  const temCustoEvitadoForm = (saving.custo_evitado_reais ?? 0) > 0;
+  const custoEvitadoFormBloco = temCustoEvitadoForm
+    ? `- O usuário JÁ cadastrou no formulário um gasto que a empresa deixou de pagar por causa desta automação${saving.custo_evitado_descricao ? `: "${saving.custo_evitado_descricao}"` : " (detalhe nos itens do formulário)"}. APENAS RECONHEÇA e descreva-o QUALITATIVAMENTE no memorial (o que era, periodicidade), SEM citar R$. NÃO pergunte de novo nem peça o valor.`
+    : `- ⛔ O usuário JÁ RESPONDEU no formulário que a empresa NÃO deixou de pagar NENHUM gasto por causa desta automação. É PROIBIDO perguntar se algum contrato, licença, serviço de terceiro, taxa, multa, juros ou retrabalho pago deixou de ser pago — a resposta já é NÃO. Não existe custo evitado neste projeto; não crie a Seção 3 nem levante o assunto.`;
   const algumaParcialZero = temHorasAntes && linhas.some((l) => l.horas_antes === 0);
 
   // Gate de ECONOMIA ALTA (só saving MENSAL — pontual é trabalho único, não muda
@@ -1330,9 +1338,8 @@ SINCRONIA OBRIGATÓRIA — AS LINHAS SÃO A FONTE DE VERDADE:
 - MULTIPLICADORES (por loja, por colaborador, por unidade, por cliente): quando o ganho se repete por várias unidades (ex: "são 90h POR LOJA e existem 3 lojas"), embuta a multiplicação DENTRO das \`linhas\` — multiplique horas_antes/horas_depois de cada cargo pelo nº de unidades OU crie uma linha por unidade. NUNCA multiplique apenas no texto. Ex: 18h→6h por loja × 3 lojas = 54h→18h na linha daquele cargo. Vale também quando VÁRIAS PESSOAS do mesmo cargo executam a tarefa (ex.: 3 gerentes): embuta o × N pessoas na linha E deixe o nº de pessoas explícito no memorial ("N pessoas × ~Xh cada") — um total que só é crível para um time NÃO pode aparecer no memorial como se fosse de uma pessoa.
 - ANTES de emitir preview/complete, confira: a soma de (horas_antes − horas_depois) das linhas é igual ao "Economia total: Xh" que aparece no memorial? Se não, ajuste as \`linhas\` até bater.
 
-CUSTO EVITADO (SEÇÃO 3):
-- Além do tempo economizado, MUITOS projetos fazem a empresa DEIXAR DE PAGAR um gasto — e o rótulo dele NÃO importa: contrato, licença cancelada, serviço de terceiro que deixou de ser contratado, taxa, multa, juros, retrabalho pago, cobrança pontual de implementação que não foi mais necessária. A régua é uma só: a empresa pagava e parou de pagar por causa desta automação.
-- O custo evitado AGORA é coletado no FORMULÁRIO (antes do chat), não por você. Se os campos \`custo_evitado_reais\`/\`custo_evitado_descricao\` JÁ vierem preenchidos no estado, NÃO pergunte de novo — apenas RECONHEÇA e descreva-o qualitativamente no memorial (o que foi evitado e a periodicidade), SEM citar R$.
+CUSTO EVITADO (SEÇÃO 3) — A RESPOSTA JÁ VEIO DO FORMULÁRIO, NÃO REPERGUNTE:
+${custoEvitadoFormBloco}
 - NÃO altere \`custo_evitado_reais\`, \`custo_evitado_tipo\` nem \`custo_evitado_descricao\`: PRESERVE-os exatamente como vieram (são a fonte de verdade do formulário). O sistema soma o custo evitado ao saving automaticamente.
 - Isso é DIFERENTE de receita incremental (dinheiro novo entrando) e DIFERENTE de custo externo incorrido (gasto que a automação PASSOU a ter).
 - No memorial visível (content/memorial_calculo), descreva o custo evitado de forma QUALITATIVA (o que era pago, periodicidade). O valor em R$ NUNCA aparece no texto visível.${blocoDistincao}
