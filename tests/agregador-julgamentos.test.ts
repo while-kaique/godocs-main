@@ -34,8 +34,16 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.confianca).toBe(1);
   });
 
-  it("fluxoDireto:true → isento, veredito 'isento'", () => {
+  // ⚠️ MUDOU (01/09/2026): 145 dos 649 normais (22%) saíam `isento` só por serem de liderança —
+  // exatamente a faixa que passa pelo fluxo DIRETO, sem agente e sem gates. Agora são julgados.
+  it("fluxoDireto:true → NÃO isenta mais: julga e pode aprovar", () => {
     const r = agregarJulgamentos({ julgamentos: TODOS_TRANQUILOS_ALTA, fluxoDireto: true });
+    expect(r.isento).toBe(false);
+    expect(r.veredito).toBe("aprovar");
+  });
+
+  it("especial:true → segue isento (só o especial isenta)", () => {
+    const r = agregarJulgamentos({ julgamentos: TODOS_TRANQUILOS_ALTA, especial: true });
     expect(r.isento).toBe(true);
     expect(r.veredito).toBe("isento");
   });

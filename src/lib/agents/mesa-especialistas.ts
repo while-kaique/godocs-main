@@ -129,6 +129,8 @@ export function montarEntradasEspecialistas(
  */
 export function conciliarJulgamentos(
   julgamentos: JulgamentoEspecialista[],
+  // ⚠️ `fluxoDireto` continua no contrato (os chamadores o passam e o analisador REAL ainda o usa),
+  // mas desde 01/09/2026 ele NÃO isenta na mesa — só `especial` isenta. Ver `agregarJulgamentos`.
   opts: { especial?: boolean | null; fluxoDireto?: boolean | null; limiarConfianca?: number | null },
 ): ResultadoConciliado {
   const agregado = agregarJulgamentos({ julgamentos, ...opts });

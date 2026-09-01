@@ -6,6 +6,103 @@
 
 ---
 
+## 2026-09-01 — Mesa de avaliação em SOMBRA nunca aprovava nada (o cético adversarial tinha VETO)
+
+**Sintoma.** Com o time LLM crítico ligado em prod (`AVALIACAO_MESA_LLM=1`, desde 29/08), a mesa de
+sombra dos projetos NORMAIS mandava **100% dos projetos para a triagem humana**. Re-avaliação medida
+em PROD (01/09/2026, 20 normais escolhidos em amostra estratificada, fan-out 6, 80s): **20/20**
+voltaram `em_validacao` com `divergencia: true` — **zero aprovações**, inclusive os 12 que o
+agregador determinístico antigo tinha marcado como `aprovar 0.85`. Acurácia contra o gabarito humano
+(comparador puro de `avaliacao-retroativa.ts`): **0 acerto · 18 conservador · 0 erro_grave** →
+`taxa_acerto = 0%`. Um agente que nunca aprova tem `erro_grave = 0` trivialmente: é o mesmo 0% de
+quem escreve "conferir" em toda linha. Como a mesa não reduzia trabalho nenhum, ela não podia ser
+cogitada para substituir a validação do time de RPA — que era a pergunta do Luis.
+
+**Causa-raiz.** `aplicarEmValidacao = algumPreocupa || confianca < limiar` (`agregarJulgamentos`,
+`src/lib/agents/agregador-avaliacao.ts`) dava **poder de veto a qualquer 1 dos 4 especialistas** —
+e um deles é o **CÉTICO ADVERSARIAL**, cuja persona manda literalmente *"Sua tarefa é TENTAR DERRUBAR
+uma aprovação"* (`especialista-avaliacao.ts`). Logo `aprovar` exigia **unanimidade de "sem
+preocupação"** num painel que tem um membro cuja função é achar problema: inalcançável por
+construção. **Um sinal que está SEMPRE aceso não é sinal.**
+- ⚠️ **O limiar de confiança NÃO era o gargalo** — foi a hipótese natural e está errada:
+  `LIMIAR_CONFIANCA_AGREGADOR = 0.6` e a confiança medida deu **0,70**. Baixar o limiar não teria
+  mudado nada.
+- A confiança em si **já estava correta e real** (18 valores distintos em 20, de 0,4525 a 0,7219):
+  `concordância direcional × confiança média`, entregue pelo T2. Os degraus fixos que apareciam na
+  tela (413× exatamente `0.85`, 145× `1`, 49× `0.5`, 38× `0.3`) **não eram mock** — eram vereditos do
+  agregador DETERMINÍSTICO velho, gravados no backfill de 28/08, que nunca foram recomputados porque
+  `avaliarProjetosNormaisPendentes` **pula quem já tem linha** em `projeto_avaliacao` (`jaAvaliados`).
+- **A mesma trava estava DUPLICADA na deliberação:** `avancarDeliberacao` exigia
+  `agregadoVeredito === 'aprovar' && !divergencia && !ceticoRefuta && conf >= limiar`. Com um único
+  objetor o consenso era impossível, e como `avancarDeliberacoesPendentes` grava **só**
+  `deliberacao_avaliacao` (nunca `projeto_avaliacao.veredito`), as rodadas 2–5 moíam até
+  `nao_consenso` **sem nunca mudar a recomendação exibida** — as 5 rodadas eram decorativas.
+
+**Fix.**
+- **`QUORUM_PREOCUPACAO = 2`** (novo, exportado): barra por **quórum**, não por qualquer objeção. A
+  objeção **solitária** não veta, mas (a) fica **REGISTRADA** nos `motivos` — a ficha mostra a
+  ressalva ao lado da recomendação, com a frase *"Objeção isolada, sem quórum para barrar…"* — e
+  (b) **continua derrubando a confiança** pela concordância direcional. Duas ou mais barram como
+  antes. **Simétrico:** nenhuma dimensão é privilegiada (não é "o cético perdeu o voto", é "um voto
+  isolado não barra"), o que evita ter de justificar por que UMA persona vale menos.
+- **`MIN_JULGAMENTOS_PARA_APROVAR = 2`**: fecha o achado deixado em aberto na revisão do T2 — painel
+  de um só tem concordância direcional `1.0` **por construção** e inflaria a confiança.
+- `motivos` deixou de prometer *"enviado à triagem humana"* quando a mesa está recomendando aprovar.
+- `avancarDeliberacao`: consenso passa a ser só `aprovar && conf >= limiar` — não reexige
+  `!divergencia`/`!ceticoRefuta`, que eram a mesma trava contada duas vezes.
+- ⚠️ **`agregarVotos` (o agregador DETERMINÍSTICO) ficou BYTE-IDÊNTICO** — verificado por extração e
+  comparação das duas versões da função (2290 chars), mantendo a disciplina do T2 de não mutá-lo.
+  Uma primeira tentativa de fix alterou-o **por acidente** (o bloco dos `motivos` é textualmente
+  idêntico nas duas funções e um replace global pegou as duas, quebrando 2 testes de `agregarVotos`);
+  a edição foi refeita **escopada** ao corpo de `agregarJulgamentos`. ⚠️ Ao editar este arquivo por
+  script, **escope pela assinatura da função** — os dois agregadores compartilham trechos literais.
+- **Segue 100% SOMBRA:** nada aqui muda status de projeto.
+
+**Onde aterrissou.** `src/lib/agents/agregador-avaliacao.ts` (`QUORUM_PREOCUPACAO`,
+`MIN_JULGAMENTOS_PARA_APROVAR`, `agregarJulgamentos`, invariante do JSDoc reescrito) ·
+`src/lib/deliberacao.ts` (`avancarDeliberacao`). Testes: `tests/agregador-julgamentos.test.ts`
+(objeção solitária → `aprovar` com ressalva; quórum de 2 → `em_validacao`; painel de 1 nunca aprova),
+`tests/deliberacao.test.ts` (cético não bloqueia mais; objeção solitária fecha consenso na r1;
+confiança baixa ainda bloqueia), `tests/mesa-especialistas.test.ts`. Suíte **2298 verde**; `tsc` só os
+7 erros pré-existentes.
+
+### Correção 2 (mesma sessão) — 22% da base saía `isento` só por ser de liderança
+
+**Sintoma.** **145 dos 649 normais (22%)** apareciam `isento` na coluna Sombra, e a medição mostrou
+que **100% deles eram por LIDERANÇA** (`especial = 0`): "Fluxo de Caixa FIP Gobeauty", "Triagem
+Automática de Comunicação de Fornecedores", "Radar Pix", "Painel Stock Flow", "RPA - Detecção de
+Obrigações Acessórias"… Decisão do Luis ao ver o resultado: *"não quero isento nunca"*.
+
+**Causa-raiz.** O gate `if (input.especial === true || input.fluxoDireto === true) return isento` no
+topo dos DOIS agregadores da mesa. A isenção fazia sentido no ANALISADOR (onde mexe em status), e foi
+herdada aqui por simetria — mas na mesa ela silenciava justamente a faixa que **mais** merece olhar:
+quem é coordenador+ submete pelo **fluxo DIRETO**, sem agente conversacional e **sem nenhum dos
+gates** (jornada, teto 220h, ≥44h, alocação, ganho projetado, sobreposição). E o desperdício era
+duplo: os 4 especialistas LLM **já rodavam** nesses projetos (não há curto-circuito antes do
+`Promise.all` — `ehLider` só alimentava este gate) e o parecer era **descartado**.
+
+**Fix.** O gate passa a olhar **só `especial`**, nos dois agregadores. `fluxoDireto` permanece no
+contrato (os chamadores o passam; `conciliarJulgamentos` também) com comentário explícito de que
+**não isenta** — para ninguém "consertar" de volta.
+- ⚠️ **A imunidade do ANALISADOR REAL segue INTOCADA** (`normalizarClassificacao` e
+  `decidirStatusSubmissao`, `analyzer.ts`): lá `fluxoDireto` decide **status de produção** ("não
+  auto-reprovar líder", decisão de 21/08/2026); aqui é só a recomendação em sombra. **NÃO unificar as
+  duas réguas** — são coisas diferentes com o mesmo nome de flag.
+- **Especial continua isento.** E como `avaliarComContexto` já retorna **antes de gravar** para
+  especiais (`'especial — NO-OP'`, `gravado: false` → célula **"—"**, nunca "isento"; confirmado nos
+  dados: 72 especiais, **0** linhas em `projeto_avaliacao`), o efeito prático é que **`isento`
+  desaparece da coluna Sombra**. Especiais seguem com o agente CLASSIFICADOR de estrelas, que é
+  outro fluxo.
+
+**Onde aterrissou.** `src/lib/agents/agregador-avaliacao.ts` (os 2 gates + 2 JSDoc),
+`src/lib/agents/mesa-especialistas.ts` (comentário no contrato). Testes atualizados nos 3 arquivos
+(`fluxoDireto` NÃO isenta / `especial` isenta): `tests/agregador-avaliacao.test.ts`,
+`tests/agregador-julgamentos.test.ts`, `tests/mesa-especialistas.test.ts`. Suíte **2300 verde**.
+
+**Status.** Branch `fix/mesa-veto-cetico` (as duas correções). ⚠️ **O que ainda falta para a mesa ser
+cogitável como substituta do RPA não é regra, é MEDIÇÃO:** rodar o backfill da base com as duas
+correções e recalcular a acurácia contra os 591 projetos com veredito humano assentado.
+
 ## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
 
 **Status:** ✅ corrigido (staging validada) · **Branch:** `fix/snapshots-integridade`

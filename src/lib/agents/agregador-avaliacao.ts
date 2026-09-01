@@ -8,7 +8,7 @@
  * Regra de ouro (o pedido do dono): **confiança baixa OU divergência → `em_validacao`** (fila
  * humana). O agregador **NUNCA decide sozinho** um desfecho negativo — só há dois caminhos,
  * `aprovar` (todos os votos confiantes e concordes) ou `em_validacao` (qualquer dúvida) — e
- * **especial/liderança são ISENTOS** (herdam a validação 100% humana).
+ * **especial é ISENTO** (liderança NÃO isenta mais — 01/09/2026; ver o gate).
  *
  * ⚠️ MODO SOMBRA (fatia B): esta função só PRODUZ a recomendação. Nada aqui muda o status do
  * projeto — quem registra é `avaliacao-normais.functions.ts`, na tabela `projeto_avaliacao`.
@@ -130,8 +130,16 @@ export function agregarVotos(input: {
   fluxoDireto?: boolean | null;
   limiarConfianca?: number | null;
 }): ResultadoAgregado {
-  // Especial e liderança: a decisão é 100% humana (herda a isenção da régua de elegibilidade).
-  if (input.especial === true || input.fluxoDireto === true) {
+  // ⚠️ LIDERANÇA NÃO ISENTA MAIS (decisão do Luis, 01/09/2026). Só o ESPECIAL isenta.
+  // Antes, `fluxoDireto` (autor coordenador+) devolvia `isento` e isso silenciava **145 dos 649
+  // normais (22% da base)** — "Fluxo de Caixa FIP Gobeauty", "Triagem Automática de Comunicação de
+  // Fornecedores" e cia. saíam sem nenhuma recomendação, justamente a faixa que passa pelo fluxo
+  // DIRETO (sem agente, sem gates) e por isso mais merece um olhar. Pior: os 4 especialistas LLM
+  // JÁ rodavam nesses projetos e o resultado era DESCARTADO pelo curto-circuito.
+  // ⚠️ Isto é só a MESA (sombra). A imunidade do ANALISADOR real (`normalizarClassificacao` e
+  // `decidirStatusSubmissao`, em `analyzer.ts`) continua intacta — lá `fluxoDireto` mexe em STATUS
+  // de produção, aqui não muda nada além da recomendação exibida. NÃO unificar as duas réguas.
+  if (input.especial === true) {
     return {
       veredito: 'isento',
       confianca: 1,
@@ -209,7 +217,8 @@ export function agregarVotos(input: {
  *   não barra (o cético adversarial sempre acha uma), mas fica registrada nos `motivos` e derruba a
  *   confiança pela concordância direcional. ⚠️ SUBSTITUI o invariante antigo "qualquer especialista
  *   que preocupa → em_validacao", que tornava `aprovar` inalcançável — ver `QUORUM_PREOCUPACAO`.
- * - **Especial/liderança são ISENTOS** (validação 100% humana).
+ * - **Especial é ISENTO**; **liderança NÃO** (mudou em 01/09/2026 — a mesa julga quem entra
+ *   pelo fluxo direto como julga todo mundo). Ver o comentário do gate.
  * - MODO SOMBRA: só PRODUZ a recomendação; nada aqui muda status.
  *
  * Os `motivos` vêm do ARGUMENTO raciocinado dos especialistas que preocuparam (não do cálculo cru)
@@ -221,8 +230,16 @@ export function agregarJulgamentos(input: {
   fluxoDireto?: boolean | null;
   limiarConfianca?: number | null;
 }): ResultadoAgregado {
-  // Especial e liderança: a decisão é 100% humana (herda a isenção da régua de elegibilidade).
-  if (input.especial === true || input.fluxoDireto === true) {
+  // ⚠️ LIDERANÇA NÃO ISENTA MAIS (decisão do Luis, 01/09/2026). Só o ESPECIAL isenta.
+  // Antes, `fluxoDireto` (autor coordenador+) devolvia `isento` e isso silenciava **145 dos 649
+  // normais (22% da base)** — "Fluxo de Caixa FIP Gobeauty", "Triagem Automática de Comunicação de
+  // Fornecedores" e cia. saíam sem nenhuma recomendação, justamente a faixa que passa pelo fluxo
+  // DIRETO (sem agente, sem gates) e por isso mais merece um olhar. Pior: os 4 especialistas LLM
+  // JÁ rodavam nesses projetos e o resultado era DESCARTADO pelo curto-circuito.
+  // ⚠️ Isto é só a MESA (sombra). A imunidade do ANALISADOR real (`normalizarClassificacao` e
+  // `decidirStatusSubmissao`, em `analyzer.ts`) continua intacta — lá `fluxoDireto` mexe em STATUS
+  // de produção, aqui não muda nada além da recomendação exibida. NÃO unificar as duas réguas.
+  if (input.especial === true) {
     return {
       veredito: 'isento',
       confianca: 1,
