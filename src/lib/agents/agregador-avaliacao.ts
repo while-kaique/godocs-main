@@ -16,6 +16,7 @@
 import type { ResultadoPlausibilidadeFTE } from './analyzer';
 import type { ResultadoFinanceiro } from './avaliacao-financeira';
 import type { JulgamentoEspecialista } from './especialista-avaliacao';
+import { ROTULO_CURTO_DIMENSAO } from '@/lib/mesa-parecer';
 
 // ─── Sinal do RAG (vizinhos aprovados) ──────────────────────────────────────
 
@@ -180,7 +181,7 @@ export function agregarVotos(input: {
   if (!finOk && input.financeiro.motivo) motivos.push(input.financeiro.motivo);
   if (!ragOk && input.rag.motivo) motivos.push(input.rag.motivo);
   if (divergencia) {
-    motivos.push('Sinais divergentes entre os especialistas — enviado à triagem humana.');
+    motivos.push('Os especialistas divergiram — vai para a triagem.');
   }
   if (motivos.length === 0) {
     motivos.push('Saving plausível, financeiro coerente e semelhante a projetos já aprovados.');
@@ -294,18 +295,23 @@ export function agregarJulgamentos(input: {
 
   const motivos: string[] = [];
   // O parecer que a ficha mostra é o ARGUMENTO raciocinado de quem preocupou.
+  // Cada frase vai MARCADA com o especialista que a escreveu. Sem isso os argumentos viravam um
+  // parágrafo corrido e, quando dois especialistas levantavam a MESMA dúvida, o texto parecia
+  // repetido/embaralhado — era o defeito relatado pelo Luis em 01/09/2026. Marcado, o leitor vê
+  // duas vozes concordando, que é o que de fato aconteceu.
   for (const j of preocupados) {
-    if (j.argumento && j.argumento.trim()) motivos.push(j.argumento.trim());
+    const arg = j.argumento?.trim();
+    if (arg) motivos.push(`${ROTULO_CURTO_DIMENSAO[j.dimensao]}: ${arg}`);
   }
   // Só promete triagem humana quando a mesa REALMENTE está mandando para lá.
   if (divergencia && aplicarEmValidacao) {
-    motivos.push('Sinais divergentes entre os especialistas — enviado à triagem humana.');
+    motivos.push('Os especialistas divergiram — vai para a triagem.');
   }
   // Objeção SOLITÁRIA (sem quórum): a mesa recomenda aprovar, mas o argumento de quem objetou já
   // foi empilhado acima e NUNCA some — a ficha mostra a ressalva ao lado da recomendação.
   if (!aplicarEmValidacao && preocupados.length > 0) {
     motivos.push(
-      'Objeção isolada, sem quórum para barrar: a mesa recomenda aprovar, mas a ressalva acima fica registrada para a triagem.',
+      'Só um especialista objetou — não é o bastante para barrar, mas a ressalva fica registrada.',
     );
   }
   if (motivos.length === 0) {

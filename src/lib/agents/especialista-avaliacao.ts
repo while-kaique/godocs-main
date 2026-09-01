@@ -148,10 +148,22 @@ Você recebe: o texto do projeto, o CÁLCULO determinístico do seu eixo (um SIN
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
   "preocupa": true | false,
-  "argumento": "<1 a 3 frases: por que este eixo preocupa (ou não), com base no texto do projeto>",
+  "argumento": "<1 ou 2 frases CURTAS, em português simples — ver as regras abaixo>",
   "confianca": <número 0 a 1: quão seguro você está do seu parecer>,
   "sinais": ["<pista curta>", "..."]
-}`;
+}
+
+COMO ESCREVER O "argumento" — quem lê é a pessoa da TRIAGEM, com a fila cheia, não um analista:
+- No MÁXIMO 2 frases curtas. Se não couber, corte o detalhe — não escreva um laudo.
+- Português SIMPLES, do dia a dia. NÃO use estas palavras: "contrafactual", "coorte",
+  "atribuição incremental", "materialidade", "material", "premissa", "implausivelmente",
+  "incompatibilidade". Diga a mesma coisa com palavras comuns: em vez de "contrafactual", "a
+  comparação com o que teria acontecido sem a automação"; em vez de "coorte de 8.378 sessões",
+  "um grupo de 8.378 acessos"; em vez de "atribuição incremental de 40,3%", "atribuir 40,3% do
+  ganho à automação"; em vez de "valor material", "valor alto".
+- Diga O QUE preocupa e O QUE resolveria a dúvida ("falta o registro de X", "precisa conferir Y").
+- Cite no MÁXIMO 2 números — os que sustentam a dúvida. Não repita o mesmo número duas vezes.
+- Se NÃO preocupa, uma frase basta.`;
 
   const user = `PROJETO:
 - Nome: ${texto.nome}
