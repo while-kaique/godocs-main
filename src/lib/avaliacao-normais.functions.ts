@@ -392,7 +392,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       memorial: entrada?.memorial ?? '',
       doc: entrada?.doc ?? '',
     };
-    const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(' — '));
+    const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
     const votosDet: VotosDeterministicos = { fte, financeiro, rag, cetico };
     const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto);
     // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
@@ -496,7 +496,7 @@ async function avaliarComContexto(
   const projeto = await getProjetoById(projetoId);
   if (!projeto) return { ok: false, projeto_id: projetoId, motivo: 'projeto não encontrado' };
   if (projeto.especial === 1) {
-    return { ok: true, projeto_id: projetoId, motivo: 'especial — NO-OP', gravado: false };
+    return { ok: true, projeto_id: projetoId, motivo: 'especial, NO-OP', gravado: false };
   }
 
   const votos = await computarVotos(projeto, ctx);
@@ -510,7 +510,9 @@ async function avaliarComContexto(
   // Motivo determinístico de sempre (comportamento padrão). Só quando a Frente 2 (redator) está
   // LIGADA, a mesa LLM está DESLIGADA e a mesa manda para conferência humana, humaniza a mensagem
   // com o LLM leve — fail-safe interno cai neste mesmo motivo. DEFAULT OFF = byte-idêntico ao de hoje.
-  let motivoFinal = conciliado.motivos.join(' ');
+  // Uma linha por especialista (o agregador já marcou cada frase com o autor) — a ficha renderiza
+  // como bullets. Parágrafo corrido fazia dois pareceres sobre a MESMA dúvida parecerem repetição.
+  let motivoFinal = conciliado.motivos.join('\n');
   if (conciliado.aplicarEmValidacao && redatorJustificativaLigado() && !modoLlm) {
     motivoFinal = await redigirJustificativa(montarFatosJustificativa(votos));
   }
@@ -872,7 +874,7 @@ export async function avancarDeliberacoesPendentes(
               rodada: delib.rodada,
               estado: delib.estado,
               confianca: delib.confianca,
-              motivo: votos?.julgamentos?.length ? votos.conciliado.motivos.join(' ') : delib.motivo,
+              motivo: votos?.julgamentos?.length ? votos.conciliado.motivos.join('\n') : delib.motivo,
             },
           ]),
           origem: ORIGEM_AGREGADOR,

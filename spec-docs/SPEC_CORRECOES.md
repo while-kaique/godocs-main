@@ -6,6 +6,166 @@
 
 ---
 
+## 2026-09-01 — Mesa de avaliação em SOMBRA nunca aprovava nada (o cético adversarial tinha VETO)
+
+**Sintoma.** Com o time LLM crítico ligado em prod (`AVALIACAO_MESA_LLM=1`, desde 29/08), a mesa de
+sombra dos projetos NORMAIS mandava **100% dos projetos para a triagem humana**. Re-avaliação medida
+em PROD (01/09/2026, 20 normais escolhidos em amostra estratificada, fan-out 6, 80s): **20/20**
+voltaram `em_validacao` com `divergencia: true` — **zero aprovações**, inclusive os 12 que o
+agregador determinístico antigo tinha marcado como `aprovar 0.85`. Acurácia contra o gabarito humano
+(comparador puro de `avaliacao-retroativa.ts`): **0 acerto · 18 conservador · 0 erro_grave** →
+`taxa_acerto = 0%`. Um agente que nunca aprova tem `erro_grave = 0` trivialmente: é o mesmo 0% de
+quem escreve "conferir" em toda linha. Como a mesa não reduzia trabalho nenhum, ela não podia ser
+cogitada para substituir a validação do time de RPA — que era a pergunta do Luis.
+
+**Causa-raiz.** `aplicarEmValidacao = algumPreocupa || confianca < limiar` (`agregarJulgamentos`,
+`src/lib/agents/agregador-avaliacao.ts`) dava **poder de veto a qualquer 1 dos 4 especialistas** —
+e um deles é o **CÉTICO ADVERSARIAL**, cuja persona manda literalmente *"Sua tarefa é TENTAR DERRUBAR
+uma aprovação"* (`especialista-avaliacao.ts`). Logo `aprovar` exigia **unanimidade de "sem
+preocupação"** num painel que tem um membro cuja função é achar problema: inalcançável por
+construção. **Um sinal que está SEMPRE aceso não é sinal.**
+- ⚠️ **O limiar de confiança NÃO era o gargalo** — foi a hipótese natural e está errada:
+  `LIMIAR_CONFIANCA_AGREGADOR = 0.6` e a confiança medida deu **0,70**. Baixar o limiar não teria
+  mudado nada.
+- A confiança em si **já estava correta e real** (18 valores distintos em 20, de 0,4525 a 0,7219):
+  `concordância direcional × confiança média`, entregue pelo T2. Os degraus fixos que apareciam na
+  tela (413× exatamente `0.85`, 145× `1`, 49× `0.5`, 38× `0.3`) **não eram mock** — eram vereditos do
+  agregador DETERMINÍSTICO velho, gravados no backfill de 28/08, que nunca foram recomputados porque
+  `avaliarProjetosNormaisPendentes` **pula quem já tem linha** em `projeto_avaliacao` (`jaAvaliados`).
+- **A mesma trava estava DUPLICADA na deliberação:** `avancarDeliberacao` exigia
+  `agregadoVeredito === 'aprovar' && !divergencia && !ceticoRefuta && conf >= limiar`. Com um único
+  objetor o consenso era impossível, e como `avancarDeliberacoesPendentes` grava **só**
+  `deliberacao_avaliacao` (nunca `projeto_avaliacao.veredito`), as rodadas 2–5 moíam até
+  `nao_consenso` **sem nunca mudar a recomendação exibida** — as 5 rodadas eram decorativas.
+
+**Fix.**
+- **`QUORUM_PREOCUPACAO = 2`** (novo, exportado): barra por **quórum**, não por qualquer objeção. A
+  objeção **solitária** não veta, mas (a) fica **REGISTRADA** nos `motivos` — a ficha mostra a
+  ressalva ao lado da recomendação, com a frase *"Objeção isolada, sem quórum para barrar…"* — e
+  (b) **continua derrubando a confiança** pela concordância direcional. Duas ou mais barram como
+  antes. **Simétrico:** nenhuma dimensão é privilegiada (não é "o cético perdeu o voto", é "um voto
+  isolado não barra"), o que evita ter de justificar por que UMA persona vale menos.
+- **`MIN_JULGAMENTOS_PARA_APROVAR = 2`**: fecha o achado deixado em aberto na revisão do T2 — painel
+  de um só tem concordância direcional `1.0` **por construção** e inflaria a confiança.
+- `motivos` deixou de prometer *"enviado à triagem humana"* quando a mesa está recomendando aprovar.
+- `avancarDeliberacao`: consenso passa a ser só `aprovar && conf >= limiar` — não reexige
+  `!divergencia`/`!ceticoRefuta`, que eram a mesma trava contada duas vezes.
+- ⚠️ **`agregarVotos` (o agregador DETERMINÍSTICO) ficou BYTE-IDÊNTICO** — verificado por extração e
+  comparação das duas versões da função (2290 chars), mantendo a disciplina do T2 de não mutá-lo.
+  Uma primeira tentativa de fix alterou-o **por acidente** (o bloco dos `motivos` é textualmente
+  idêntico nas duas funções e um replace global pegou as duas, quebrando 2 testes de `agregarVotos`);
+  a edição foi refeita **escopada** ao corpo de `agregarJulgamentos`. ⚠️ Ao editar este arquivo por
+  script, **escope pela assinatura da função** — os dois agregadores compartilham trechos literais.
+- **Segue 100% SOMBRA:** nada aqui muda status de projeto.
+
+**Onde aterrissou.** `src/lib/agents/agregador-avaliacao.ts` (`QUORUM_PREOCUPACAO`,
+`MIN_JULGAMENTOS_PARA_APROVAR`, `agregarJulgamentos`, invariante do JSDoc reescrito) ·
+`src/lib/deliberacao.ts` (`avancarDeliberacao`). Testes: `tests/agregador-julgamentos.test.ts`
+(objeção solitária → `aprovar` com ressalva; quórum de 2 → `em_validacao`; painel de 1 nunca aprova),
+`tests/deliberacao.test.ts` (cético não bloqueia mais; objeção solitária fecha consenso na r1;
+confiança baixa ainda bloqueia), `tests/mesa-especialistas.test.ts`. Suíte **2298 verde**; `tsc` só os
+7 erros pré-existentes.
+
+### Correção 2 (mesma sessão) — 22% da base saía `isento` só por ser de liderança
+
+**Sintoma.** **145 dos 649 normais (22%)** apareciam `isento` na coluna Sombra, e a medição mostrou
+que **100% deles eram por LIDERANÇA** (`especial = 0`): "Fluxo de Caixa FIP Gobeauty", "Triagem
+Automática de Comunicação de Fornecedores", "Radar Pix", "Painel Stock Flow", "RPA - Detecção de
+Obrigações Acessórias"… Decisão do Luis ao ver o resultado: *"não quero isento nunca"*.
+
+**Causa-raiz.** O gate `if (input.especial === true || input.fluxoDireto === true) return isento` no
+topo dos DOIS agregadores da mesa. A isenção fazia sentido no ANALISADOR (onde mexe em status), e foi
+herdada aqui por simetria — mas na mesa ela silenciava justamente a faixa que **mais** merece olhar:
+quem é coordenador+ submete pelo **fluxo DIRETO**, sem agente conversacional e **sem nenhum dos
+gates** (jornada, teto 220h, ≥44h, alocação, ganho projetado, sobreposição). E o desperdício era
+duplo: os 4 especialistas LLM **já rodavam** nesses projetos (não há curto-circuito antes do
+`Promise.all` — `ehLider` só alimentava este gate) e o parecer era **descartado**.
+
+**Fix.** O gate passa a olhar **só `especial`**, nos dois agregadores. `fluxoDireto` permanece no
+contrato (os chamadores o passam; `conciliarJulgamentos` também) com comentário explícito de que
+**não isenta** — para ninguém "consertar" de volta.
+- ⚠️ **A imunidade do ANALISADOR REAL segue INTOCADA** (`normalizarClassificacao` e
+  `decidirStatusSubmissao`, `analyzer.ts`): lá `fluxoDireto` decide **status de produção** ("não
+  auto-reprovar líder", decisão de 21/08/2026); aqui é só a recomendação em sombra. **NÃO unificar as
+  duas réguas** — são coisas diferentes com o mesmo nome de flag.
+- **Especial continua isento.** E como `avaliarComContexto` já retorna **antes de gravar** para
+  especiais (`'especial — NO-OP'`, `gravado: false` → célula **"—"**, nunca "isento"; confirmado nos
+  dados: 72 especiais, **0** linhas em `projeto_avaliacao`), o efeito prático é que **`isento`
+  desaparece da coluna Sombra**. Especiais seguem com o agente CLASSIFICADOR de estrelas, que é
+  outro fluxo.
+
+**Onde aterrissou.** `src/lib/agents/agregador-avaliacao.ts` (os 2 gates + 2 JSDoc),
+`src/lib/agents/mesa-especialistas.ts` (comentário no contrato). Testes atualizados nos 3 arquivos
+(`fluxoDireto` NÃO isenta / `especial` isenta): `tests/agregador-avaliacao.test.ts`,
+`tests/agregador-julgamentos.test.ts`, `tests/mesa-especialistas.test.ts`. Suíte **2300 verde**.
+
+### Correção 3 (mesma sessão) — parecer com jargão, repetido e com traços; e a caixa dominava a ficha
+
+**Sintoma.** O Luis leu um parecer real de 47% e disse: *"está usando muitos termos difíceis e
+embaralhado demais"*; depois: *"não quero que nas linguagens usadas pelos agentes tenha hífens,
+traços"*. O texto tinha 900 caracteres, dizia "contrafactual", "coorte", "atribuição incremental",
+"materialidade", **repetia a mesma base de cálculo duas vezes** (344 compras sobre ~12 mil acessos
+vs. 576 numa coorte de 8.378 sessões) e ocupava o topo da ficha, empurrando a decisão humana para
+fora da vista.
+
+**Causa-raiz.** Três coisas independentes:
+1. **Jargão e tamanho:** o prompt pedia "1 a 3 frases" e não dizia nada sobre registro. Modelo
+   entregou laudo de analista.
+2. **A repetição NÃO era do modelo, era do agregador:** `motivos` empilhava o argumento de cada
+   preocupado e o `motivo` gravado era `motivos.join(' ')`. Quando dois especialistas levantavam a
+   MESMA dúvida, o parágrafo corrido lia como texto embaralhado, sem deixar ver que eram **duas
+   vozes concordando**.
+3. **Traços:** travessão em todos os textos da mesa e, principalmente, **no próprio prompt** (as
+   personas e as instruções eram cheias de `—`) — o modelo imita a pontuação que lê.
+
+**Fix.**
+- **Prompt** (`especialista-avaliacao.ts`): no MÁXIMO 2 frases curtas, português do dia a dia, com
+  **lista PROIBIDA explícita** e a tradução de cada termo, no máximo 2 números e sem repetir número;
+  diz o que preocupa **e o que resolveria**; proíbe travessão/hífen solto. Os travessões saíram
+  também das personas e do formato.
+- **Atribuição** (`agregarJulgamentos`): cada frase vai marcada com quem a escreveu
+  (`"Financeiro: ..."`) e o `motivo` junta as linhas com `\n`.
+- **Módulo PURO novo `src/lib/mesa-parecer.ts`** (fonte única, importável pelo CLIENTE — fica fora de
+  `agents/` porque importar o arquivo do especialista arrastaria os PROMPTS para o bundle):
+  `ROTULO_CURTO_DIMENSAO` (Horas · Financeiro · Precedente · Cético), `partirParecerMesa` e
+  **`semTravessao`**. ⚠️ `partirParecerMesa` é **tolerante ao formato ANTIGO** (parágrafo corrido sem
+  prefixo volta como uma linha sem autor) — nenhum backfill é necessário para a tela funcionar.
+  ⚠️ `semTravessao` **mantém o hífen DENTRO da palavra** (`e-mail`, `pré-aprovação`): ali é
+  ortografia, não pontuação. É a **TRAVA determinística**, aplicada em `normalizarJulgamento` (o
+  funil por onde TODO texto de LLM entra na mesa) — porque neste repo "prompt não segura" já custou
+  caro 3 vezes.
+- **UI** (`projeto-detalhe-dialog.tsx`): o painel Sombra nasce **COLAPSADO**. A tira mostra chip +
+  veredito + **confiança como número dominante** + "Divergiram"; parecer em bullets por especialista,
+  deliberação, rodadas (clampadas em 2 linhas, com `title`), retroativo e 👍/👎 abrem no dropdown. A
+  tira INTEIRA é o `<button aria-expanded>` (idioma do `AvisoPendencia`: alvo generoso, um stop de
+  teclado); foco visível, `motion-reduce`, estado nunca só por cor (chevron **+** a palavra
+  "Detalhes"/"Ocultar"). `ConfiancaDestaque` ganhou modo `compacta` em vez de um segundo componente.
+- ⚠️ Corrigidos de passagem os textos que ainda diziam **"Projeto especial ou de liderança"** —
+  mentira depois da Correção 2.
+- ⚠️ Este prompt **não está no `prompt-registry`** (a regra 3 cobre os prompts do chat de submissão,
+  não os da mesa de sombra).
+
+**Antes × depois (medido na staging).**
+- Antes: *"O ganho de R$ 51 mil/mês é material e depende de um contrafactual cuja base não está
+  claramente alinhada: as 344 compras esperadas… Sinais divergentes entre os especialistas — enviado
+  à triagem humana."* (900 chars, jargão, base repetida)
+- Depois: *"**Cético** · A economia usa 486 XMLs por mês, mas não há registro que comprove esse volume
+  nem o tempo manual. Também precisa conferir nos logs se falhas e retrabalho permitem mesmo
+  considerar zero hora depois."* + *"Só um especialista objetou. Não é o bastante para barrar, mas a
+  ressalva fica registrada."*
+
+**Onde aterrissou.** `src/lib/mesa-parecer.ts` (novo) · `src/lib/agents/especialista-avaliacao.ts` ·
+`src/lib/agents/agregador-avaliacao.ts` · `src/lib/deliberacao.ts` ·
+`src/lib/avaliacao-normais.functions.ts` · `src/components/dashboard/projeto-detalhe-dialog.tsx`.
+Testes: `tests/mesa-parecer.test.ts` (15 casos: atribuição, legado, dois-pontos no meio da frase,
+hífen ortográfico preservado). Suíte **2314 verde**.
+
+**Status.** Branch `fix/mesa-veto-cetico` (as três correções). ⚠️ **O que ainda falta para a mesa ser
+cogitável como substituta do RPA não é regra, é MEDIÇÃO:** rodar o backfill da base com as correções
+e recalcular a acurácia contra os 591 projetos com veredito humano assentado. ⚠️ **Ordem importa:** o
+backfill tem de vir DEPOIS destas correções de texto, senão os ~628 pareceres nascem na linguagem
+velha e a base precisaria ser reprocessada (outras ~2.500 chamadas de LLM).
+
 ## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
 
 **Status:** ✅ corrigido (staging validada) · **Branch:** `fix/snapshots-integridade`

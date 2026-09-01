@@ -34,8 +34,16 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.confianca).toBe(1);
   });
 
-  it("fluxoDireto:true → isento, veredito 'isento'", () => {
+  // ⚠️ MUDOU (01/09/2026): 145 dos 649 normais (22%) saíam `isento` só por serem de liderança —
+  // exatamente a faixa que passa pelo fluxo DIRETO, sem agente e sem gates. Agora são julgados.
+  it("fluxoDireto:true → NÃO isenta mais: julga e pode aprovar", () => {
     const r = agregarJulgamentos({ julgamentos: TODOS_TRANQUILOS_ALTA, fluxoDireto: true });
+    expect(r.isento).toBe(false);
+    expect(r.veredito).toBe("aprovar");
+  });
+
+  it("especial:true → segue isento (só o especial isenta)", () => {
+    const r = agregarJulgamentos({ julgamentos: TODOS_TRANQUILOS_ALTA, especial: true });
     expect(r.isento).toBe(true);
     expect(r.veredito).toBe("isento");
   });
@@ -89,7 +97,10 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.confianca).toBeLessThan(0.5);
   });
 
-  it("um único especialista preocupa entre tranquilos → em_validacao, divergência true, motivos inclui o ARGUMENTO do preocupado", () => {
+  // ⚠️ REGRA MUDOU (01/09/2026): objeção SOLITÁRIA não barra mais — ver `QUORUM_PREOCUPACAO`.
+  // O cético adversarial objeta por ofício, e com veto de 1 a mesa nunca aprovava nada (20/20
+  // medidos em prod). A ressalva continua no parecer e a confiança continua caindo.
+  it("um único especialista preocupa entre tranquilos → APROVAR (sem quórum), com a ressalva REGISTRADA nos motivos", () => {
     const argCetico = "número fechou na conversa sem rastro de medição — refuto a aprovação";
     const r = agregarJulgamentos({
       julgamentos: [
@@ -99,9 +110,37 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
         jul("cetico", true, 0.9, argCetico),
       ],
     });
-    expect(r.veredito).toBe("em_validacao");
+    expect(r.veredito).toBe("aprovar");
+    expect(r.aplicarEmValidacao).toBe(false);
+    // a divergência CONTINUA registrada (e derruba a confiança), só não veta
     expect(r.divergencia).toBe(true);
-    expect(r.motivos).toContain(argCetico);
+    expect(r.confianca).toBeCloseTo(0.75 * 0.9, 5);
+    // o argumento de quem objetou NUNCA some do parecer
+    // marcado com o autor da frase (o parecer da ficha vira bullets por especialista)
+    expect(r.motivos).toContain(`Cético: ${argCetico}`);
+    expect(r.motivos.join(" ")).toMatch(/não é o bastante para barrar/i);
+    // e NÃO promete triagem humana quando está recomendando aprovar
+    expect(r.motivos.join(" ")).not.toMatch(/vai para a triagem/i);
+  });
+
+  it("DOIS preocupados (quórum) → em_validacao, mesmo com dois tranquilos", () => {
+    const r = agregarJulgamentos({
+      julgamentos: [
+        jul("fte", false, 0.9),
+        jul("financeiro", true, 0.9, "materialidade acima do teto"),
+        jul("rag", false, 0.9),
+        jul("cetico", true, 0.9, "impacto projetado vendido como realizado"),
+      ],
+    });
+    expect(r.veredito).toBe("em_validacao");
+    expect(r.aplicarEmValidacao).toBe(true);
+    expect(r.motivos).toContain("Financeiro: materialidade acima do teto");
+  });
+
+  it("painel de UM só, tranquilo e confiante → NUNCA aprovar (piso de quórum do painel)", () => {
+    const r = agregarJulgamentos({ julgamentos: [jul("fte", false, 1)] });
+    expect(r.veredito).toBe("em_validacao");
+    expect(r.aplicarEmValidacao).toBe(true);
   });
 
   it("todos preocupam e confiantes → em_validacao, SEM divergência (só um lado), confiança alta, motivos com os argumentos", () => {
@@ -116,7 +155,7 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.veredito).toBe("em_validacao");
     expect(r.divergencia).toBe(false);
     expect(r.confianca).toBeGreaterThan(0.85);
-    expect(r.motivos).toContain("materialidade acima do teto");
+    expect(r.motivos).toContain("Financeiro: materialidade acima do teto");
   });
 
   it("limiarConfianca custom (0.95): todos tranquilos conf 0.9 (confiança ≈0.9 < 0.95) → em_validacao", () => {

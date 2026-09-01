@@ -127,7 +127,8 @@ function veredictoDeEstadoTerminal(estado: EstadoDeliberacao): VeredictoMesa {
  * - `isento` (o preliminar isentou) → terminal `isento`, sem consumir rodada.
  * - estado já terminal → devolve o mesmo (não incrementa rodada).
  * - senão roda: `rodada = (atual.rodada ?? 0) + 1`.
- *   • CONSENSO quando `aprovar` E sem divergência E sem refuta E confiança ≥ limiar → terminal.
+ *   • CONSENSO quando `aprovar` E confiança ≥ limiar → terminal (o `aprovar` do agregador já
+ *     embute o quórum de preocupação — não reexigir `!divergencia`/`!ceticoRefuta` aqui).
  *   • rodada < maxRodadas → `deliberando` (interino conservador `em_validacao`).
  *   • esgotou as rodadas sem consenso → terminal `nao_consenso` (→ humano).
  */
@@ -159,7 +160,7 @@ export function avancarDeliberacao(
       veredito: 'isento',
       confianca: 1,
       grau: 'alta',
-      motivo: 'Projeto especial ou de liderança — deliberação não se aplica (validação humana).',
+      motivo: 'Projeto especial. A deliberação não se aplica (validação humana).',
       encerrada: true,
     };
   }
@@ -173,7 +174,7 @@ export function avancarDeliberacao(
       veredito,
       confianca: sinais.confianca,
       grau: grauConfianca(sinais.confianca),
-      motivo: 'Deliberação já encerrada — estado preservado.',
+      motivo: 'Deliberação já encerrada, estado preservado.',
       encerrada: true,
     };
   }
@@ -181,11 +182,13 @@ export function avancarDeliberacao(
   const rodada = rodadaAnterior + 1;
   const grau = grauConfianca(sinais.confianca);
 
-  const consenso =
-    sinais.agregadoVeredito === 'aprovar' &&
-    !sinais.divergencia &&
-    !sinais.ceticoRefuta &&
-    sinais.confianca >= limiar;
+  // ⚠️ `aprovar` do agregador JÁ significa "nenhuma preocupação com QUÓRUM" (ver
+  // `QUORUM_PREOCUPACAO` em `agregador-avaliacao.ts`). Exigir aqui DE NOVO ausência de divergência e
+  // de objeção do cético era a MESMA trava duplicada: com um único objetor — e o cético adversarial
+  // objeta por ofício — o consenso ficava inalcançável e toda deliberação moía até `nao_consenso`,
+  // enquanto a recomendação gravada dizia outra coisa. A divergência segue no registro (e na
+  // confiança); ela só não veta mais duas vezes.
+  const consenso = sinais.agregadoVeredito === 'aprovar' && sinais.confianca >= limiar;
 
   if (consenso) {
     return {
@@ -206,7 +209,7 @@ export function avancarDeliberacao(
       veredito: 'em_validacao',
       confianca: sinais.confianca,
       grau,
-      motivo: 'Sem consenso ainda (divergência, confiança baixa ou objeção do cético) — nova rodada.',
+      motivo: 'Sem consenso ainda (divergência, confiança baixa ou objeção do cético). Nova rodada.',
       encerrada: false,
     };
   }
@@ -217,7 +220,7 @@ export function avancarDeliberacao(
     veredito: 'em_validacao',
     confianca: sinais.confianca,
     grau,
-    motivo: 'Sem consenso após as rodadas previstas — enviado à triagem humana.',
+    motivo: 'Sem consenso após as rodadas previstas. Enviado à triagem humana.',
     encerrada: true,
   };
 }
