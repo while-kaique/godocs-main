@@ -83,12 +83,25 @@ describe("agregarVotos — juiz agregador puro com confiança", () => {
     expect(r.confianca).toBe(1);
   });
 
-  it("fluxoDireto:true → isento, veredito 'isento'", () => {
+  // ⚠️ MUDOU (01/09/2026): liderança NÃO isenta mais a MESA — só `especial`. A imunidade do
+  // ANALISADOR real (analyzer.ts) segue existindo e é outra régua.
+  it("fluxoDireto:true → NÃO isenta mais: a mesa julga normalmente", () => {
     const r = agregarVotos({
       fte: fteOk,
       financeiro: financeiroOk,
       rag: ragApoio,
       fluxoDireto: true,
+    });
+    expect(r.isento).toBe(false);
+    expect(r.veredito).not.toBe("isento");
+  });
+
+  it("especial:true → segue isento (a régua do especial não mudou)", () => {
+    const r = agregarVotos({
+      fte: fteOk,
+      financeiro: financeiroOk,
+      rag: ragApoio,
+      especial: true,
     });
     expect(r.isento).toBe(true);
     expect(r.veredito).toBe("isento");

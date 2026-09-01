@@ -143,10 +143,10 @@ describe('conciliarJulgamentos', () => {
     expect(r.ceticoRefutou).toBe(true);
   });
 
-  it('especial/liderança → isento (nunca avalia)', () => {
+  it('especial → isento; liderança NÃO isenta mais (01/09/2026)', () => {
     const js = [julg('fte', true, 0.9)];
     expect(conciliarJulgamentos(js, { especial: true }).veredito).toBe('isento');
-    expect(conciliarJulgamentos(js, { fluxoDireto: true }).veredito).toBe('isento');
+    expect(conciliarJulgamentos(js, { fluxoDireto: true }).veredito).not.toBe('isento');
   });
 
   it('sem pareceres → em_validacao, confiança 0, cético não refutou (fail-safe)', () => {
