@@ -19,6 +19,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Bot,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Dialog,
@@ -49,6 +50,7 @@ import {
   grauConfianca,
   aparenciaConfianca,
 } from '@/lib/avaliacao-sombra-rotulos';
+import { partirParecerMesa } from '@/lib/mesa-parecer';
 import type { ContribuicaoParticipante } from '@/lib/participantes-contribuicoes';
 import type { ProjetoDashboardResumo } from '@/lib/dashboard-admin.functions';
 
@@ -348,17 +350,27 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-/** Confiança em destaque: o número grande, colorido pelo grau, com o rótulo do grau ao lado. */
-function ConfiancaDestaque({ conf }: { conf: number | null }) {
+/**
+ * Confiança em destaque: o número, colorido pelo grau, com o rótulo do grau ao lado.
+ * `compacta` é a versão da linha colapsada — mesmo componente para a tela não ter duas réguas de
+ * cor/arredondamento para o mesmo número.
+ */
+function ConfiancaDestaque({ conf, compacta }: { conf: number | null; compacta?: boolean }) {
   const a = aparenciaConfianca(conf);
   const grau = typeof conf === 'number' ? grauConfianca(conf) : null;
   return (
     <span
-      className="inline-flex items-baseline gap-1.5 rounded-lg px-2.5 py-1"
+      className={`inline-flex items-baseline rounded-lg ${compacta ? 'gap-1 px-2 py-0.5' : 'gap-1.5 px-2.5 py-1'}`}
       style={{ background: a.fundo, border: `1px solid ${a.borda}`, color: a.cor }}
     >
-      <span className="text-[20px] font-bold leading-none tabular-nums">{pctConfianca(conf)}</span>
-      <span className="text-[11px] font-semibold">{rotuloGrau(grau)}</span>
+      <span
+        className={`font-bold leading-none tabular-nums ${compacta ? 'text-[15px]' : 'text-[20px]'}`}
+      >
+        {pctConfianca(conf)}
+      </span>
+      <span className={`font-semibold ${compacta ? 'text-[10.5px]' : 'text-[11px]'}`}>
+        {rotuloGrau(grau)}
+      </span>
     </span>
   );
 }
@@ -374,6 +386,17 @@ function LinhaSombra({ rotulo, children }: { rotulo: string; children: React.Rea
   );
 }
 
+/**
+ * Painel da avaliação em SOMBRA — **colapsado por padrão** (pedido do Luis, 01/09/2026).
+ *
+ * A tira visível responde as duas perguntas que a triagem faz de relance: **o que o agente
+ * recomendou** e **quão seguro ele está**. O resto (parecer, deliberação, rodadas, retroativo,
+ * voto) vive atrás do dropdown, porque o parecer chegava como um parágrafo de 900 caracteres em
+ * cima da ficha e empurrava a decisão humana para fora da vista.
+ *
+ * A tira INTEIRA é o `<button aria-expanded>` — mesmo idioma do `AvisoPendencia`: alvo generoso e
+ * um único stop de teclado. Estado nunca só por cor: chevron + a palavra "Detalhes"/"Ocultar".
+ */
 function AvaliacaoSombraPainel({
   sombra,
   feedback,
@@ -386,145 +409,173 @@ function AvaliacaoSombraPainel({
   onVotar: (v: 'like' | 'dislike') => void;
 }) {
   const { mesa, deliberacao, retroativo } = sombra;
+  const [aberto, setAberto] = useState(false);
+  // O parecer vem com uma linha por especialista ("Financeiro: ..."); parecer LEGADO (parágrafo
+  // corrido, sem prefixo) volta como uma única linha sem autor e é exibido como sempre.
+  const linhas = partirParecerMesa(mesa?.motivo);
+  const borda = 'rgba(71,85,105,0.28)';
   return (
-    <div
-      className="rounded-xl border p-4"
-      style={{ borderColor: 'rgba(71,85,105,0.28)', background: 'rgba(71,85,105,0.04)' }}
-    >
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rounded-xl border" style={{ borderColor: borda, background: 'rgba(71,85,105,0.04)' }}>
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        aria-controls="sombra-detalhes"
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0059A9] focus-visible:ring-offset-1"
+      >
         <span
           className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.06em]"
           style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}
         >
           <Bot className="h-3 w-3" aria-hidden /> Sombra
         </span>
-        <span className="text-[12px] text-muted-foreground">
-          Recomendação do agente — <strong className="font-semibold">não muda o status</strong> do
-          projeto (a decisão segue sendo da triagem).
-        </span>
-      </div>
-
-      {mesa ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div>
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-              Veredito do agente
-            </span>
-            <p className="text-[15px] font-semibold">{rotuloVeredito(mesa.veredito)}</p>
-          </div>
-          <ConfiancaDestaque conf={mesa.confianca} />
-          {mesa.divergencia && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-              style={{ background: 'rgba(138,90,0,0.12)', border: '1px solid rgba(138,90,0,0.4)', color: '#8a5a00' }}
-            >
-              Especialistas divergiram
-            </span>
-          )}
-        </div>
-      ) : (
-        <p className="mt-3 text-[13px] text-muted-foreground">
-          O agregador ainda não emitiu recomendação para este projeto.
-        </p>
-      )}
-
-      {mesa?.motivo && (
-        <p className="mt-2 whitespace-pre-wrap rounded-lg bg-muted/50 p-2.5 text-[12.5px] leading-relaxed">
-          {mesa.motivo}
-        </p>
-      )}
-
-      {deliberacao && (
-        <div className="mt-3 space-y-1">
-          <LinhaSombra rotulo="Deliberação">
-            {rotuloEstadoDeliberacao(deliberacao.estado)}
-            {deliberacao.grau ? ` · confiança ${deliberacao.grau}` : ''}
-            {` · rodada ${deliberacao.rodada}`}
-          </LinhaSombra>
-          {deliberacao.motivo && (
-            <p className="whitespace-pre-wrap text-[12.5px] text-muted-foreground">
-              {deliberacao.motivo}
-            </p>
-          )}
-          {(deliberacao.historico?.length ?? 0) > 1 && (
-            <div className="mt-2">
-              <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-                Rodadas da mesa
-              </span>
-              <ol
-                className="mt-1 space-y-2 border-l-2 pl-3"
-                style={{ borderColor: 'rgba(71,85,105,0.22)' }}
+        {mesa ? (
+          <>
+            <span className="text-[13.5px] font-semibold">{rotuloVeredito(mesa.veredito)}</span>
+            <ConfiancaDestaque conf={mesa.confianca} compacta />
+            {mesa.divergencia && (
+              <span
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                style={{
+                  background: 'rgba(138,90,0,0.12)',
+                  border: '1px solid rgba(138,90,0,0.4)',
+                  color: '#8a5a00',
+                }}
               >
-                {deliberacao.historico!.map((r, i) => (
-                  <li key={`${r.rodada}-${i}`} className="text-[12px]">
-                    <span className="font-semibold" style={{ color: '#475569' }}>
-                      Rodada {r.rodada}
-                      {r.estado ? ` · ${rotuloEstadoDeliberacao(r.estado)}` : ''}
-                      {typeof r.confianca === 'number' ? ` · confiança ${pctConfianca(r.confianca)}` : ''}
-                    </span>
-                    {r.motivo && (
-                      <p className="mt-0.5 whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                        {r.motivo}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
+                Divergiram
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-[12.5px] text-muted-foreground">Sem recomendação ainda</span>
+        )}
+        <span
+          className="ml-auto inline-flex items-center gap-1 text-[11.5px] font-semibold"
+          style={{ color: '#475569' }}
+        >
+          {aberto ? 'Ocultar' : 'Detalhes'}
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform motion-reduce:transition-none ${aberto ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </span>
+      </button>
+
+      {aberto && (
+        <div
+          id="sombra-detalhes"
+          className="space-y-3 border-t px-3.5 pb-3.5 pt-3"
+          style={{ borderColor: 'rgba(71,85,105,0.18)' }}
+        >
+          <p className="text-[11.5px] text-muted-foreground">
+            Recomendação do agente — <strong className="font-semibold">não muda o status</strong>. A
+            decisão segue sendo da triagem.
+          </p>
+
+          {linhas.length > 0 && (
+            <ul className="space-y-1.5">
+              {linhas.map((l, i) => (
+                <li key={i} className="text-[12.5px] leading-relaxed">
+                  {l.autor ? (
+                    <>
+                      <span className="font-semibold" style={{ color: '#475569' }}>
+                        {l.autor}
+                      </span>
+                      <span className="text-muted-foreground"> · </span>
+                      {l.texto}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">{l.texto}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {deliberacao && (
+            <div className="space-y-1">
+              <LinhaSombra rotulo="Deliberação">
+                {rotuloEstadoDeliberacao(deliberacao.estado)}
+                {deliberacao.grau ? ` · confiança ${deliberacao.grau}` : ''}
+                {` · rodada ${deliberacao.rodada}`}
+              </LinhaSombra>
+              {(deliberacao.historico?.length ?? 0) > 1 && (
+                <ol
+                  className="mt-1.5 space-y-1.5 border-l-2 pl-3"
+                  style={{ borderColor: 'rgba(71,85,105,0.22)' }}
+                >
+                  {deliberacao.historico!.map((r, i) => (
+                    <li key={`${r.rodada}-${i}`} className="text-[12px]">
+                      <span className="font-semibold" style={{ color: '#475569' }}>
+                        Rodada {r.rodada}
+                        {r.estado ? ` · ${rotuloEstadoDeliberacao(r.estado)}` : ''}
+                        {typeof r.confianca === 'number' ? ` · ${pctConfianca(r.confianca)}` : ''}
+                      </span>
+                      {/* clampado: o parecer da rodada CORRENTE já está acima em bullets — aqui
+                          interessa a trajetória, não reler o texto inteiro. */}
+                      {r.motivo && (
+                        <p
+                          className="mt-0.5 line-clamp-2 leading-relaxed text-muted-foreground"
+                          title={r.motivo}
+                        >
+                          {r.motivo}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {retroativo && (
-        <div className="mt-3 space-y-1">
-          <LinhaSombra rotulo="Confere com o humano?">
-            {rotuloResultadoRetroativo(retroativo.resultado)}
-          </LinhaSombra>
-          <LinhaSombra rotulo="Agente × humano">
-            {rotuloVeredito(retroativo.veredito_agregado)} × {rotuloVeredito(retroativo.veredito_humano)}
-          </LinhaSombra>
-          {retroativo.motivo && (
-            <p className="whitespace-pre-wrap text-[12.5px] text-muted-foreground">
-              {retroativo.motivo}
-            </p>
+          {retroativo && (
+            <LinhaSombra rotulo="Confere com o humano?">
+              {rotuloResultadoRetroativo(retroativo.resultado)}
+              {' · '}
+              {rotuloVeredito(retroativo.veredito_agregado)} × {rotuloVeredito(retroativo.veredito_humano)}
+            </LinhaSombra>
           )}
+
+          {/* Sinal de treinamento: o admin diz se concorda com o agente. Estado nunca só por cor —
+              o botão marcado leva rótulo, ícone preenchido e aria-pressed. */}
+          <div
+            className="flex flex-wrap items-center gap-2 border-t pt-3"
+            style={{ borderColor: 'rgba(71,85,105,0.18)' }}
+          >
+            <span className="text-[12px] font-medium text-muted-foreground">
+              A recomendação está certa?
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant={feedback === 'like' ? 'default' : 'outline'}
+              aria-pressed={feedback === 'like'}
+              disabled={votando}
+              onClick={() => onVotar('like')}
+            >
+              <ThumbsUp className="h-4 w-4" fill={feedback === 'like' ? 'currentColor' : 'none'} />
+              Concordo
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={feedback === 'dislike' ? 'destructive' : 'outline'}
+              aria-pressed={feedback === 'dislike'}
+              disabled={votando}
+              onClick={() => onVotar('dislike')}
+            >
+              <ThumbsDown className="h-4 w-4" fill={feedback === 'dislike' ? 'currentColor' : 'none'} />
+              Discordo
+            </Button>
+            {feedback && (
+              <span className="text-[12px] text-muted-foreground">
+                {feedback === 'like' ? 'Você concordou.' : 'Você discordou.'} Clique de novo para
+                desmarcar.
+              </span>
+            )}
+          </div>
         </div>
       )}
-
-      {/* Sinal de treinamento: o admin diz se concorda com o agente. Estado nunca só por cor —
-          o botão marcado leva rótulo, ícone preenchido e aria-pressed. */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'rgba(71,85,105,0.18)' }}>
-        <span className="text-[12px] font-medium text-muted-foreground">
-          A recomendação está certa?
-        </span>
-        <Button
-          type="button"
-          size="sm"
-          variant={feedback === 'like' ? 'default' : 'outline'}
-          aria-pressed={feedback === 'like'}
-          disabled={votando}
-          onClick={() => onVotar('like')}
-        >
-          <ThumbsUp className="h-4 w-4" fill={feedback === 'like' ? 'currentColor' : 'none'} />
-          Concordo
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={feedback === 'dislike' ? 'destructive' : 'outline'}
-          aria-pressed={feedback === 'dislike'}
-          disabled={votando}
-          onClick={() => onVotar('dislike')}
-        >
-          <ThumbsDown className="h-4 w-4" fill={feedback === 'dislike' ? 'currentColor' : 'none'} />
-          Discordo
-        </Button>
-        {feedback && (
-          <span className="text-[12px] text-muted-foreground">
-            {feedback === 'like' ? 'Você concordou.' : 'Você discordou.'} Clique de novo para desmarcar.
-          </span>
-        )}
-      </div>
     </div>
   );
 }

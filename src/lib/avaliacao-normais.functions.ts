@@ -510,7 +510,9 @@ async function avaliarComContexto(
   // Motivo determinístico de sempre (comportamento padrão). Só quando a Frente 2 (redator) está
   // LIGADA, a mesa LLM está DESLIGADA e a mesa manda para conferência humana, humaniza a mensagem
   // com o LLM leve — fail-safe interno cai neste mesmo motivo. DEFAULT OFF = byte-idêntico ao de hoje.
-  let motivoFinal = conciliado.motivos.join(' ');
+  // Uma linha por especialista (o agregador já marcou cada frase com o autor) — a ficha renderiza
+  // como bullets. Parágrafo corrido fazia dois pareceres sobre a MESMA dúvida parecerem repetição.
+  let motivoFinal = conciliado.motivos.join('\n');
   if (conciliado.aplicarEmValidacao && redatorJustificativaLigado() && !modoLlm) {
     motivoFinal = await redigirJustificativa(montarFatosJustificativa(votos));
   }
@@ -872,7 +874,7 @@ export async function avancarDeliberacoesPendentes(
               rodada: delib.rodada,
               estado: delib.estado,
               confianca: delib.confianca,
-              motivo: votos?.julgamentos?.length ? votos.conciliado.motivos.join(' ') : delib.motivo,
+              motivo: votos?.julgamentos?.length ? votos.conciliado.motivos.join('\n') : delib.motivo,
             },
           ]),
           origem: ORIGEM_AGREGADOR,

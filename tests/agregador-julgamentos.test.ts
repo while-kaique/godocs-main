@@ -116,10 +116,11 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.divergencia).toBe(true);
     expect(r.confianca).toBeCloseTo(0.75 * 0.9, 5);
     // o argumento de quem objetou NUNCA some do parecer
-    expect(r.motivos).toContain(argCetico);
-    expect(r.motivos.join(" ")).toMatch(/sem quórum para barrar/i);
+    // marcado com o autor da frase (o parecer da ficha vira bullets por especialista)
+    expect(r.motivos).toContain(`Cético: ${argCetico}`);
+    expect(r.motivos.join(" ")).toMatch(/não é o bastante para barrar/i);
     // e NÃO promete triagem humana quando está recomendando aprovar
-    expect(r.motivos.join(" ")).not.toMatch(/enviado à triagem humana/i);
+    expect(r.motivos.join(" ")).not.toMatch(/vai para a triagem/i);
   });
 
   it("DOIS preocupados (quórum) → em_validacao, mesmo com dois tranquilos", () => {
@@ -133,7 +134,7 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     });
     expect(r.veredito).toBe("em_validacao");
     expect(r.aplicarEmValidacao).toBe(true);
-    expect(r.motivos).toContain("materialidade acima do teto");
+    expect(r.motivos).toContain("Financeiro: materialidade acima do teto");
   });
 
   it("painel de UM só, tranquilo e confiante → NUNCA aprovar (piso de quórum do painel)", () => {
@@ -154,7 +155,7 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.veredito).toBe("em_validacao");
     expect(r.divergencia).toBe(false);
     expect(r.confianca).toBeGreaterThan(0.85);
-    expect(r.motivos).toContain("materialidade acima do teto");
+    expect(r.motivos).toContain("Financeiro: materialidade acima do teto");
   });
 
   it("limiarConfianca custom (0.95): todos tranquilos conf 0.9 (confiança ≈0.9 < 0.95) → em_validacao", () => {
