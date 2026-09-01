@@ -88,6 +88,45 @@ describe("runOrchestrator — streaming da prosa", () => {
     expect(deltas.length).toBeGreaterThan(1); // veio em pedaços, não de uma vez
   });
 
+  it("cada delta carrega o TIPO do turno — o cliente distingue MEMORIAL (preview/complete) de PERGUNTA (question/options)", async () => {
+    // É o que faz o indicador "Finalizando memorial…" NÃO aparecer numa pergunta: o cliente
+    // só arma o indicador quando tipo é preview/complete. Aqui travamos a fiação do tipo.
+    async function tiposDe(turno: Record<string, unknown>): Promise<(string | undefined)[]> {
+      streamMock.mockImplementation(feed(JSON.stringify(turno), 4));
+      const tipos: (string | undefined)[] = [];
+      await runOrchestrator(
+        makeCtx(),
+        [{ role: "user", content: "x" }],
+        "saving",
+        documentacaoVazia(),
+        savingVazio(),
+        "",
+        ["saving"],
+        receitaVazia(),
+        { onDelta: (_c, tipo) => tipos.push(tipo) },
+      );
+      return tipos;
+    }
+
+    const tiposPreview = await tiposDe({
+      type: "preview",
+      content: "Memorial aqui, bem detalhado.",
+      coletado: documentacaoVazia(),
+      saving: savingVazio(),
+    });
+    expect(tiposPreview.length).toBeGreaterThan(0);
+    expect(tiposPreview.every((t) => t === "preview")).toBe(true);
+
+    const tiposQuestion = await tiposDe({
+      type: "question",
+      content: "Qual a base dessa estimativa de horas?",
+      coletado: documentacaoVazia(),
+      saving: savingVazio(),
+    });
+    expect(tiposQuestion.length).toBeGreaterThan(0);
+    expect(tiposQuestion.every((t) => t === "question")).toBe(true);
+  });
+
   it("turno OPTIONS: streama a prosa (campo question) token a token — bolha não nasce vazia", async () => {
     const pergunta = "Alguém já fazia esse trabalho?\nEscolha uma opção é assim.";
     const full = JSON.stringify({

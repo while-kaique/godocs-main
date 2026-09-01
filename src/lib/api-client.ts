@@ -80,7 +80,7 @@ export async function apiFetch<T>(path: string, body?: unknown, method?: string)
 export async function apiStream<T>(
   path: string,
   body: unknown,
-  opts?: { onDelta?: (chunk: string) => void },
+  opts?: { onDelta?: (chunk: string, tipo?: string) => void },
 ): Promise<T> {
   // Sandbox `/fluxos`: o demo intercepta como no apiFetch e devolve o resultado pronto
   // (sem streaming — nada de rede). onDelta simplesmente não dispara.
@@ -131,14 +131,14 @@ export async function apiStream<T>(
       if (!trimmed.startsWith('data:')) continue
       const payload = trimmed.slice(5).trim()
       if (!payload) continue
-      let msg: { t?: string; c?: string; r?: T; m?: string; status?: number; bloqueio?: BloqueioSubmissao }
+      let msg: { t?: string; c?: string; tipo?: string; r?: T; m?: string; status?: number; bloqueio?: BloqueioSubmissao }
       try {
         msg = JSON.parse(payload)
       } catch {
         continue
       }
       if (msg.t === 'delta' && typeof msg.c === 'string') {
-        opts?.onDelta?.(msg.c)
+        opts?.onDelta?.(msg.c, typeof msg.tipo === 'string' ? msg.tipo : undefined)
       } else if (msg.t === 'envelope') {
         envelope = (msg.r ?? null) as T | null
         envelopeRecebido = true

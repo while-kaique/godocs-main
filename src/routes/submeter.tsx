@@ -2121,6 +2121,12 @@ export function SubmeterPageContent({
   }
 
   /* ── Step 2 → Step 3 (agente já iniciado): propaga mudanças e detecta troca de tipo ── */
+  // Wrapper do "Continuar com Agente": a validação síncrona fica FORA do loading (falhar não
+  // pisca o spinner). O RESTO roda com `continuando` ligado DESDE O CLIQUE — o botão desabilita
+  // e mostra o loading na hora. Sem isto, o caminho de projeto PADRÃO fazia os awaits de
+  // metadados/tipos sem estado de loading: o botão parecia congelado e o usuário clicava várias
+  // vezes (cada clique redisparava atualizar-tipos). O try/finally garante que o loading sempre
+  // desliga em qualquer saída (retorno, erro, navegação).
   async function handleContinuarAgente() {
     // Projeto especial não tem tipo financeiro — segue direto. Para projeto padrão,
     // não permite avançar sem ao menos um tipo selecionado.
@@ -2132,7 +2138,15 @@ export function SubmeterPageContent({
       setTimeout(() => setShaking(false), 350);
       return;
     }
+    setContinuando(true);
+    try {
+      await handleContinuarAgenteImpl();
+    } finally {
+      setContinuando(false);
+    }
+  }
 
+  async function handleContinuarAgenteImpl() {
     // ── Projeto especial ──────────────────────────────────────────────────────
     // As entradas determinísticas da documentação são a descrição de negócio e o
     // contexto especial. Se algum deles (ou os arquivos) mudou, a documentação é
@@ -2436,13 +2450,22 @@ export function SubmeterPageContent({
     // streaming estiver DESLIGADO no servidor, nenhum delta chega, `streamingIniciado` fica
     // false e o fluxo é idêntico ao de antes (a bolha nasce do envelope, no fim).
     let streamingIniciado = false;
-    const onDelta = (chunk: string) => {
+    const onDelta = (chunk: string, tipo?: string) => {
       // Enquanto chega prosa, esconde o "Finalizando…" e reinicia o relógio. O indicador
       // só liga se os deltas pararem por 2s (acima do maior gap saudável de geração, ~1,7s)
       // sem o turno fechar — i.e., a cauda estruturada invisível ainda rodando.
+      // ⚠️ MAS só faz sentido quando o turno é um MEMORIAL (preview/complete): aí, depois da
+      // prosa, a cauda estruturada (saving/receita+cálculo) gera invisível e o botão "Enviar
+      // para Triagem" só liga no envelope. Num turno de PERGUNTA (question/options) o agente
+      // está ESPERANDO a resposta do usuário — não há memorial finalizando, então NÃO arma o
+      // indicador (senão "Finalizando memorial…" aparecia embaixo da pergunta indevidamente —
+      // regressão de quando as perguntas passaram a streamar).
+      const ehMemorial = tipo === "preview" || tipo === "complete";
       setChatFinalizando(false);
       if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
-      finalizarTimerRef.current = setTimeout(() => setChatFinalizando(true), 2000);
+      if (ehMemorial) {
+        finalizarTimerRef.current = setTimeout(() => setChatFinalizando(true), 2000);
+      }
       if (!streamingIniciado) {
         streamingIniciado = true;
         setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: chatFase }]);

@@ -545,8 +545,8 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         const enc = new TextEncoder();
         const send = (obj: unknown) =>
           writer.write(enc.encode(`data: ${JSON.stringify(obj)}\n\n`)).catch(() => {});
-        const onDelta = (c: string) => {
-          void send({ t: "delta", c });
+        const onDelta = (c: string, tipo?: string) => {
+          void send({ t: "delta", c, tipo });
         };
 
         const tarefa = (async () => {

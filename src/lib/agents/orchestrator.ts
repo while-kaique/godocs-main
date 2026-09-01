@@ -1492,7 +1492,7 @@ export async function runOrchestrator(
   // `preview`/`complete` (as gerações longas). `question`/`options` são curtos e sujeitos a
   // reescrita por gate → ficam bufferizados (§6 do plano). O retorno segue sendo o
   // OrchestratorResult COMPLETO; os gates pós-orquestrador (em chat.functions) mandam.
-  streamOpts: { onDelta?: (chunk: string) => void; reorderDocFinal?: boolean } = {},
+  streamOpts: { onDelta?: (chunk: string, tipo?: string) => void; reorderDocFinal?: boolean } = {},
 ): Promise<OrchestratorResult> {
   // Reordenação do wizard (fatia C): o CALLER lê a env `REORDER_DOC_FINAL` e passa o booleano
   // aqui (o orquestrador não lê env). Muda SÓ o mapa de transição (proximaFase); default false
@@ -1624,6 +1624,10 @@ export async function runOrchestrator(
         // De qual CAMPO do JSON sai a prosa a streamar: `type:options` guarda o texto da
         // pergunta em `question`; todos os demais (question/preview/complete) em `content`.
         let streamField: "content" | "question" = "content";
+        // Tipo do turno detectado — vai junto de cada delta para o cliente distinguir um
+        // MEMORIAL (preview/complete) de uma PERGUNTA (question/options): o indicador
+        // "Finalizando memorial…" só deve aparecer no primeiro caso.
+        let streamTipo: "preview" | "complete" | "question" | "options" | null = null;
         raw = await llmChatStream(messages, {
           jsonMode: true,
           temperature,
@@ -1652,11 +1656,12 @@ export async function runOrchestrator(
                 (tm[1] === "complete" && fase !== "doc_preview");
               // O campo da prosa muda por type: options guarda em `question`, o resto em `content`.
               streamField = tm[1] === "options" ? "question" : "content";
+              streamTipo = tm[1] as typeof streamTipo;
             }
             if (!streamAtivo) return; // ex.: complete de doc_preview — segue silencioso
             const prosa = extractPartialJsonStringField(rawAcc, streamField);
             if (prosa !== null && prosa.length > streamedProse.length && prosa.startsWith(streamedProse)) {
-              streamOpts.onDelta!(prosa.slice(streamedProse.length));
+              streamOpts.onDelta!(prosa.slice(streamedProse.length), streamTipo ?? undefined);
               streamedProse = prosa;
             }
           },
