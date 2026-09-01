@@ -574,7 +574,7 @@ export function SubmeterPageContent({
   const [approvedReceitaPreview, setApprovedReceitaPreview] = useState<string | null>(null);
   const [showReceitaForm, setShowReceitaForm] = useState(false);
   const [receitaFormLoading, setReceitaFormLoading] = useState(false);
-  const [transitionType, setTransitionType] = useState<"saving" | "receita">("saving");
+  const [transitionType, setTransitionType] = useState<"saving" | "receita" | "doc">("saving");
   // Rascunho do formulário de impacto (SavingForm) — vive no pai para persistir
   // quando o usuário navega para fora da etapa 3 e volta (o step 3 desmonta).
   const [formDraft, setFormDraft] = useState<SavingFormData>(emptyFormDraft);
@@ -2571,6 +2571,14 @@ export function SubmeterPageContent({
           if (previewFinanceiroEhReceita(chatFase)) setApprovedReceitaPreview(lastPreviewMsg.content);
           else setApprovedSavingPreview(lastPreviewMsg.content);
         }
+        // Tela de transição CLARA (como saving/receita têm): "Memorial aprovado! última etapa =
+        // documentação". Sem ela, o chat do memorial só trocava o cabeçalho para "Documentação
+        // Técnica" e a pessoa ficava perdida (não sabia que ainda faltava revisar a doc). Some
+        // assim que o conteúdo da doc começa a chegar.
+        setTransitionType("doc");
+        setShowTransition(true);
+        setChatFinalizando(false);
+        if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
         setChatMessages([]);
         setChatFase("doc");
         let refinoStreamIniciado = false;
@@ -2579,6 +2587,7 @@ export function SubmeterPageContent({
           { projeto_id: projetoId },
           {
             onDelta: (chunk) => {
+              setShowTransition(false);
               setChatFinalizando(false);
               if (!refinoStreamIniciado) {
                 refinoStreamIniciado = true;
@@ -2596,6 +2605,7 @@ export function SubmeterPageContent({
             },
           },
         );
+        setShowTransition(false); // garante esconder a transição mesmo se a doc não streamou
         const refinoMsg: ChatMessage = {
           role: "assistant",
           content: refino.content,

@@ -2220,7 +2220,7 @@ export function Step3Chat({
   chatBottomRef: React.RefObject<HTMLDivElement | null>;
   fase: ChatFase;
   showTransition: boolean;
-  transitionType?: "saving" | "receita";
+  transitionType?: "saving" | "receita" | "doc";
   approvedDocPreview: string | null;
   approvedSavingPreview: string | null;
   approvedReceitaPreview?: string | null;
@@ -2422,7 +2422,7 @@ export function Step3Chat({
               animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
             }}
           >
-            {transitionType === "receita" ? "Saving validado!" : "Documentação aprovada!"}
+            {transitionType === "doc" ? "Memorial aprovado!" : transitionType === "receita" ? "Saving validado!" : "Documentação aprovada!"}
           </h3>
           <p
             className="mb-6 text-[13px] text-center leading-relaxed max-w-[320px]"
@@ -2431,7 +2431,9 @@ export function Step3Chat({
               animation: "go-step-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
             }}
           >
-            {transitionType === "receita"
+            {transitionType === "doc"
+              ? "Última etapa: revisar a documentação técnica do projeto, que o agente já preparou em segundo plano. É só conferir se ficou tudo certo e ajustar o que precisar."
+              : transitionType === "receita"
               ? "Agora vamos analisar a receita incremental — quanto de receita nova esse projeto gera."
               : "Agora vamos calcular o impacto financeiro do seu projeto — quanto tempo e dinheiro ele economiza."}
           </p>
@@ -2452,7 +2454,7 @@ export function Step3Chat({
                 </svg>
               </div>
               <span className="text-[11px] font-semibold" style={{ color: "#16a34a" }}>
-                {transitionType === "receita" ? "Saving" : "Documentação"}
+                {transitionType === "doc" ? "Impacto" : transitionType === "receita" ? "Saving" : "Documentação"}
               </span>
             </div>
             <div
@@ -2464,10 +2466,10 @@ export function Step3Chat({
                 className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
                 style={{ background: "rgba(215,219,0,0.15)", color: "#6b6e00", border: "1.5px solid rgba(215,219,0,0.3)" }}
               >
-                {transitionType === "receita" ? "📈" : "2"}
+                {transitionType === "doc" ? "📄" : transitionType === "receita" ? "📈" : "2"}
               </div>
               <span className="text-[11px] font-semibold" style={{ color: "#6b6e00" }}>
-                {transitionType === "receita" ? "Receita" : "Impacto"}
+                {transitionType === "doc" ? "Documentação" : transitionType === "receita" ? "Receita" : "Impacto"}
               </span>
             </div>
           </div>
