@@ -67,8 +67,17 @@ describe('buildRespostasFormulario — bloco único do formulário', () => {
     expect(bloco).toMatch(/CONTRADIZER/i);
   });
 
-  it('é omitido por completo quando nada foi preenchido', () => {
-    expect(buildRespostasFormulario(ctxBase)).toBe('');
+  it('traz SEMPRE o tom (concisão + sem travessão), e sem respostas nem nome não traz o bloco do formulário', () => {
+    const bloco = buildRespostasFormulario({ ...ctxBase, nome_projeto: '' });
+    expect(bloco).toContain('COMO VOCÊ ESCREVE'); // o tom vem sempre
+    expect(bloco).toContain('travessão'); // proíbe hífen/travessão nas respostas
+    expect(bloco).not.toContain('RESPOSTAS QUE O AUTOR JÁ DEU'); // sem respostas → sem bloco do form
+  });
+
+  it('traz o NOME do projeto do formulário para o agente NUNCA reperguntá-lo', () => {
+    const bloco = buildRespostasFormulario(ctxBase); // ctxBase tem nome_projeto
+    expect(bloco).toContain('Nome do projeto');
+    expect(bloco).toContain('Conciliação diária');
   });
 
   it('sobrevive a valor legado sem prefixo (não derruba o prompt)', () => {

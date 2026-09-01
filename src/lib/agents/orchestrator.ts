@@ -129,8 +129,27 @@ COMO AGIR NA EDIÇÃO:
 // ⚠️ Campo NOVO no formulário → renderize AQUI (e nomeie em ProjetoContexto +
 // getProjetoContexto). Não volte a injetar campo solto direto no prompt: foi assim que o
 // contrafactual ficou órfão. O bloco é omitido inteiro quando não há nada preenchido.
+// Tom base do agente de conversa, prefixado a TODOS os prompts de chat (doc/saving/receita/
+// custo evitado) via buildRespostasFormulario. Concisão nas PERGUNTAS + proibição de
+// travessão/hífen como pontuação. ⚠️ NÃO encurta o MEMORIAL (preview): a concisão vale para
+// a coleta (perguntas), o memorial mantém a estrutura completa que já é pedida.
+const TOM_AGENTE = `COMO VOCÊ ESCREVE (vale para TODAS as suas mensagens):
+- Ao perguntar/conversar: vá DIRETO ao ponto, UMA pergunta curta por vez, o MÍNIMO de texto. Não resuma o que a pessoa já disse antes de perguntar, não escreva parágrafos para coletar um dado.
+- NUNCA use travessão (—) nem hífen como pausa/pontuação nas suas frases. Use frases curtas, vírgula e ponto.
+- Exceção: o MEMORIAL (o preview) mantém a estrutura completa que já é pedida — a concisão vale para as PERGUNTAS, não para o memorial.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+`;
+
 export function buildRespostasFormulario(ctx: ProjetoContexto): string {
   const linhas: string[] = [];
+
+  // O NOME do projeto é preenchido no formulário (Etapa 2) e vive em `ctx.nome_projeto`.
+  // Precisa aparecer aqui para o agente NUNCA reperguntá-lo — no fluxo reordenado a doc
+  // (de onde saía `coletado.nome_projeto`) ainda não rodou quando o saving começa, então
+  // sem isto o agente via o nome vazio e pedia "qual é o nome oficial do projeto?".
+  const nome = ctx.nome_projeto?.trim();
+  if (nome) linhas.push(`- Nome do projeto: "${nome}"`);
 
   const descricao = ctx.descricao_breve?.trim();
   if (descricao) linhas.push(`- Descrição do projeto (palavras do autor): "${descricao}"`);
@@ -156,9 +175,10 @@ export function buildRespostasFormulario(ctx: ProjetoContexto): string {
     );
   }
 
-  if (linhas.length === 0) return "";
-
-  return `RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (antes desta conversa):
+  const blocoForm =
+    linhas.length === 0
+      ? ""
+      : `RESPOSTAS QUE O AUTOR JÁ DEU NO FORMULÁRIO (antes desta conversa):
 ${linhas.join("\n")}
 
 ⚠️ COMO USAR ESTAS RESPOSTAS:
@@ -169,6 +189,9 @@ ${linhas.join("\n")}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 `;
+
+  // O TOM vem SEMPRE (mesmo sem respostas de formulário); o bloco de respostas é opcional.
+  return TOM_AGENTE + blocoForm;
 }
 
 // Contexto que as fases FINANCEIRAS herdam da fase de documentação. Fonte única das 3
@@ -189,7 +212,7 @@ export function buildDetalhesAprovados(
 ${resumoProjeto}
 
 DETALHES TÉCNICOS APROVADOS:
-- Nome: ${coletado.nome_projeto}
+- Nome: ${coletado.nome_projeto?.trim() || ctx.nome_projeto || "(nome do formulário — ver acima)"}
 - O que faz: ${coletado.o_que_faz}
 - Execução: ${coletado.execucao}
 - Fluxo: ${coletado.fluxo}${opcional("Dependências", coletado.dependencias)}${opcional("Configurar antes", coletado.configurar_antes)}${opcional("Pontos de atenção", coletado.atencao)}
