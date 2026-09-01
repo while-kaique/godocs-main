@@ -89,7 +89,10 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
     expect(r.confianca).toBeLessThan(0.5);
   });
 
-  it("um único especialista preocupa entre tranquilos → em_validacao, divergência true, motivos inclui o ARGUMENTO do preocupado", () => {
+  // ⚠️ REGRA MUDOU (01/09/2026): objeção SOLITÁRIA não barra mais — ver `QUORUM_PREOCUPACAO`.
+  // O cético adversarial objeta por ofício, e com veto de 1 a mesa nunca aprovava nada (20/20
+  // medidos em prod). A ressalva continua no parecer e a confiança continua caindo.
+  it("um único especialista preocupa entre tranquilos → APROVAR (sem quórum), com a ressalva REGISTRADA nos motivos", () => {
     const argCetico = "número fechou na conversa sem rastro de medição — refuto a aprovação";
     const r = agregarJulgamentos({
       julgamentos: [
@@ -99,9 +102,36 @@ describe("agregarJulgamentos — chair sobre os julgamentos LLM da mesa", () => 
         jul("cetico", true, 0.9, argCetico),
       ],
     });
-    expect(r.veredito).toBe("em_validacao");
+    expect(r.veredito).toBe("aprovar");
+    expect(r.aplicarEmValidacao).toBe(false);
+    // a divergência CONTINUA registrada (e derruba a confiança), só não veta
     expect(r.divergencia).toBe(true);
+    expect(r.confianca).toBeCloseTo(0.75 * 0.9, 5);
+    // o argumento de quem objetou NUNCA some do parecer
     expect(r.motivos).toContain(argCetico);
+    expect(r.motivos.join(" ")).toMatch(/sem quórum para barrar/i);
+    // e NÃO promete triagem humana quando está recomendando aprovar
+    expect(r.motivos.join(" ")).not.toMatch(/enviado à triagem humana/i);
+  });
+
+  it("DOIS preocupados (quórum) → em_validacao, mesmo com dois tranquilos", () => {
+    const r = agregarJulgamentos({
+      julgamentos: [
+        jul("fte", false, 0.9),
+        jul("financeiro", true, 0.9, "materialidade acima do teto"),
+        jul("rag", false, 0.9),
+        jul("cetico", true, 0.9, "impacto projetado vendido como realizado"),
+      ],
+    });
+    expect(r.veredito).toBe("em_validacao");
+    expect(r.aplicarEmValidacao).toBe(true);
+    expect(r.motivos).toContain("materialidade acima do teto");
+  });
+
+  it("painel de UM só, tranquilo e confiante → NUNCA aprovar (piso de quórum do painel)", () => {
+    const r = agregarJulgamentos({ julgamentos: [jul("fte", false, 1)] });
+    expect(r.veredito).toBe("em_validacao");
+    expect(r.aplicarEmValidacao).toBe(true);
   });
 
   it("todos preocupam e confiantes → em_validacao, SEM divergência (só um lado), confiança alta, motivos com os argumentos", () => {
