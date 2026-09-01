@@ -392,7 +392,7 @@ async function computarVotos(projeto: ProjetoRow, ctx: ContextoAvaliacao): Promi
       memorial: entrada?.memorial ?? '',
       doc: entrada?.doc ?? '',
     };
-    const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(' — '));
+    const vizinhosTexto = vizinhosArr.map((v) => [v.nome, v.area].filter(Boolean).join(', '));
     const votosDet: VotosDeterministicos = { fte, financeiro, rag, cetico };
     const entradas = montarEntradasEspecialistas(votosDet, texto, vizinhosTexto);
     // `julgarComEspecialista` NUNCA lança (fail-safe → voto determinístico daquela dimensão), então
@@ -496,7 +496,7 @@ async function avaliarComContexto(
   const projeto = await getProjetoById(projetoId);
   if (!projeto) return { ok: false, projeto_id: projetoId, motivo: 'projeto não encontrado' };
   if (projeto.especial === 1) {
-    return { ok: true, projeto_id: projetoId, motivo: 'especial — NO-OP', gravado: false };
+    return { ok: true, projeto_id: projetoId, motivo: 'especial, NO-OP', gravado: false };
   }
 
   const votos = await computarVotos(projeto, ctx);

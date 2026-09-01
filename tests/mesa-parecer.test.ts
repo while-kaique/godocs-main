@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { partirParecerMesa, ROTULO_CURTO_DIMENSAO } from '@/lib/mesa-parecer';
+import { partirParecerMesa, ROTULO_CURTO_DIMENSAO, semTravessao } from '@/lib/mesa-parecer';
 
 describe('partirParecerMesa — parecer da mesa em linhas atribuídas', () => {
   it('parte uma linha por especialista, com o autor separado do texto', () => {
@@ -57,5 +57,43 @@ describe('partirParecerMesa — parecer da mesa em linhas atribuídas', () => {
 
   it('autor sem texto depois do prefixo é descartado (não vira bullet vazio)', () => {
     expect(partirParecerMesa('Financeiro: ')).toEqual([]);
+  });
+});
+
+describe('semTravessao — o parecer do agente não usa traços', () => {
+  it('travessão entre frases vira vírgula', () => {
+    expect(semTravessao('Só um especialista objetou — a ressalva fica registrada.')).toBe(
+      'Só um especialista objetou, a ressalva fica registrada.',
+    );
+  });
+
+  it('travessão depois de pontuação não duplica a vírgula', () => {
+    expect(semTravessao('Falta registro, — precisa conferir.')).toBe('Falta registro, precisa conferir.');
+  });
+
+  it('en dash e hífen SOLTO também caem', () => {
+    expect(semTravessao('A vale 10 – B vale 20.')).toBe('A vale 10, B vale 20.');
+    expect(semTravessao('A vale 10 - B vale 20.')).toBe('A vale 10, B vale 20.');
+  });
+
+  it('traço no começo do texto é removido', () => {
+    expect(semTravessao('— O ganho é alto.')).toBe('O ganho é alto.');
+    expect(semTravessao('- O ganho é alto.')).toBe('O ganho é alto.');
+  });
+
+  it('⚠️ MANTÉM o hífen DENTRO da palavra (é ortografia, não pontuação)', () => {
+    const t = 'Confira o e-mail da pré-aprovação e o custo-benefício.';
+    expect(semTravessao(t)).toBe(t);
+    expect(semTravessao('Rodou no n8n e no back-end.')).toBe('Rodou no n8n e no back-end.');
+  });
+
+  it('texto sem traço nenhum passa intacto', () => {
+    const t = 'A economia usa 486 XMLs por mês, mas não há registro que comprove o volume.';
+    expect(semTravessao(t)).toBe(t);
+  });
+
+  it('vazio/nulo → string vazia (o normalizador cai no fallback)', () => {
+    expect(semTravessao(null)).toBe('');
+    expect(semTravessao('   —   ')).toBe('');
   });
 });

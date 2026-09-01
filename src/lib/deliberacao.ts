@@ -160,7 +160,7 @@ export function avancarDeliberacao(
       veredito: 'isento',
       confianca: 1,
       grau: 'alta',
-      motivo: 'Projeto especial ou de liderança — deliberação não se aplica (validação humana).',
+      motivo: 'Projeto especial. A deliberação não se aplica (validação humana).',
       encerrada: true,
     };
   }
@@ -174,7 +174,7 @@ export function avancarDeliberacao(
       veredito,
       confianca: sinais.confianca,
       grau: grauConfianca(sinais.confianca),
-      motivo: 'Deliberação já encerrada — estado preservado.',
+      motivo: 'Deliberação já encerrada, estado preservado.',
       encerrada: true,
     };
   }
@@ -209,7 +209,7 @@ export function avancarDeliberacao(
       veredito: 'em_validacao',
       confianca: sinais.confianca,
       grau,
-      motivo: 'Sem consenso ainda (divergência, confiança baixa ou objeção do cético) — nova rodada.',
+      motivo: 'Sem consenso ainda (divergência, confiança baixa ou objeção do cético). Nova rodada.',
       encerrada: false,
     };
   }
@@ -220,7 +220,7 @@ export function avancarDeliberacao(
     veredito: 'em_validacao',
     confianca: sinais.confianca,
     grau,
-    motivo: 'Sem consenso após as rodadas previstas — enviado à triagem humana.',
+    motivo: 'Sem consenso após as rodadas previstas. Enviado à triagem humana.',
     encerrada: true,
   };
 }
