@@ -806,23 +806,36 @@ export async function iniciarSubmissao(
     });
   }
 
-  let docTexto = "";
-  try {
-    docTexto = await extractTextFromMultipleFiles(data.docs);
-    log(
-      "iniciarSubmissao",
-      `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`,
-    );
-  } catch (extractErr) {
-    err("iniciarSubmissao", "Erro na extração de texto:", extractErr);
-    docTexto = "";
-  }
+  // Decide o CAMINHO cedo (antes da extração de texto). O fluxo REORDENADO tira a EXTRAÇÃO,
+  // o extrator e a compilação da doc do caminho crítico do clique — tudo vai para o background,
+  // então a tela de saving abre sem esperar. `podeFluxoDireto` é async; resolvemos UMA vez.
+  const ehFluxoDireto =
+    !!data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail));
+  const usaReorder = reorderDocFinal() && !data.especial && !ehFluxoDireto;
 
-  await insertChatMessage({
-    projeto_id: projeto.id,
-    role: "doc",
-    content: docTexto || "(documento sem texto legível)",
-  });
+  // Extração de TEXTO: no reordenado roda em BACKGROUND (junto do extrator/doc), para o clique
+  // de avançar não esperar. Nos demais (especial, fluxo direto, normal) o texto é necessário
+  // AGORA (compilação/orquestrador síncronos), então extrai aqui.
+  let docTexto = "";
+  if (!usaReorder) {
+    try {
+      docTexto = await extractTextFromMultipleFiles(data.docs);
+      log(
+        "iniciarSubmissao",
+        `Texto extraído de ${data.docs.length} arquivo(s): ${docTexto.length} chars`,
+      );
+    } catch (extractErr) {
+      err("iniciarSubmissao", "Erro na extração de texto:", extractErr);
+      docTexto = "";
+    }
+
+    // A mensagem "doc" (texto cru) — no reordenado é o background que a insere (com o texto extraído).
+    await insertChatMessage({
+      projeto_id: projeto.id,
+      role: "doc",
+      content: docTexto || "(documento sem texto legível)",
+    });
+  }
 
   // ── Projeto especial: pula o agente por completo ────────────────────────────
   // Projeto de alto impacto e difícil mensuração → não passa pela conversa, pela
@@ -857,12 +870,7 @@ export async function iniciarSubmissao(
 
   // Decide o CAMINHO antes do extrator. O fluxo direto (liderança) e o normal NÃO-reordenado
   // precisam do `coletado` síncrono aqui; o fluxo REORDENADO roda o extrator (chamada de IA) em
-  // BACKGROUND — o clique de avançar NÃO pode esperar IA (meta: 2-3s por etapa). `podeFluxoDireto`
-  // é async, então resolvemos UMA vez e reusamos no ramo abaixo.
-  const ehFluxoDireto =
-    !!data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail));
-  const usaReorder = reorderDocFinal() && !data.especial && !ehFluxoDireto;
-
+  // `ehFluxoDireto`/`usaReorder` já resolvidos acima (antes da extração de texto).
   let coletadoInicial: DocumentacaoColetada = {
     ...documentacaoVazia(),
     nome_projeto: data.nome_projeto,
@@ -924,8 +932,10 @@ export async function iniciarSubmissao(
   // (`coletado_inicial`) — o preview financeiro o relê por `coletadoParaFinanceiro`. O refino da doc
   // acontece por ÚLTIMO (transição saving/receita_preview→doc). Requer o bg-compile ligado.
   if (usaReorder) {
-    log("iniciarSubmissao", "Fluxo reordenado — extrator+doc em segundo plano; abrindo em saving.");
-    runBackground(extrairCompilarPersistir(projeto.id, ctx, docTexto || ""));
+    log("iniciarSubmissao", "Fluxo reordenado — extração+extrator+doc em segundo plano; abrindo em saving.");
+    // A extração de texto TAMBÉM vai para o background (não estava — era o resíduo no caminho
+    // crítico do clique). `ctx.doc_texto` está null aqui; o bg reconstrói o ctx com o texto.
+    runBackground(extrairTextoCompilarPersistir(projeto.id, ctx, data.docs));
     return { projeto_id: projeto.id, reorder_doc_final: true };
   }
 
@@ -3679,6 +3689,36 @@ function patchDaDocCompilada(
     patch.tem_ia_como_funcionalidade = coletado.tem_ia_como_funcionalidade;
   }
   return patch;
+}
+
+/**
+ * Fluxo REORDENADO — como `extrairCompilarPersistir`, mas EXTRAI o texto dos arquivos ANTES
+ * (essa extração era o resíduo síncrono no caminho crítico do clique). Insere a mensagem "doc"
+ * (texto cru) que os outros caminhos inserem síncrono, e reconstrói o ctx com o `doc_texto`
+ * extraído. FAIL-SAFE em cada passo (extração/insert nunca derrubam o pipeline).
+ */
+export async function extrairTextoCompilarPersistir(
+  projetoId: string,
+  ctx: ProjetoContexto,
+  docs: { base64: string; filename: string }[],
+): Promise<void> {
+  let docTexto = "";
+  try {
+    docTexto = await extractTextFromMultipleFiles(docs);
+  } catch (extractErr) {
+    err("extrairTextoCompilarPersistir", "Erro na extração de texto em background:", extractErr);
+    docTexto = "";
+  }
+  try {
+    await insertChatMessage({
+      projeto_id: projetoId,
+      role: "doc",
+      content: docTexto || "(documento sem texto legível)",
+    });
+  } catch (msgErr) {
+    err("extrairTextoCompilarPersistir", "Falha ao inserir mensagem doc em background:", msgErr);
+  }
+  await extrairCompilarPersistir(projetoId, { ...ctx, doc_texto: docTexto || null }, docTexto || "");
 }
 
 /**
