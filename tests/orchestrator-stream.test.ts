@@ -61,10 +61,11 @@ describe("runOrchestrator — streaming da prosa", () => {
     expect(deltas.length).toBeGreaterThan(1); // veio em pedaços, não de uma vez
   });
 
-  it("turno QUESTION: NÃO streama prosa (fica bufferizado)", async () => {
+  it("turno QUESTION: streama a prosa (content) incrementalmente e junta = content final", async () => {
+    const texto = "Qual o objetivo do projeto?\nMe conte com é detalhes.";
     const full = JSON.stringify({
       type: "question",
-      content: "Qual o objetivo do projeto?",
+      content: texto,
       coletado: documentacaoVazia(),
       saving: savingVazio(),
     });
@@ -82,7 +83,62 @@ describe("runOrchestrator — streaming da prosa", () => {
       { onDelta: (c) => deltas.push(c) },
     );
     expect(res.type).toBe("question");
-    expect(deltas).toEqual([]); // question não streama
+    // a prosa da PERGUNTA (campo content) deve chegar token a token
+    expect(deltas.join("")).toBe(texto);
+    expect(deltas.length).toBeGreaterThan(1); // veio em pedaços, não de uma vez
+  });
+
+  it("turno OPTIONS: streama a prosa (campo question) token a token — bolha não nasce vazia", async () => {
+    const pergunta = "Alguém já fazia esse trabalho?\nEscolha uma opção é assim.";
+    const full = JSON.stringify({
+      type: "options",
+      question: pergunta,
+      options: ["Sim", "Não", "Era terceirizado"],
+      coletado: documentacaoVazia(),
+      saving: savingVazio(),
+    });
+    streamMock.mockImplementation(feed(full, 4));
+    const deltas: string[] = [];
+    const res = await runOrchestrator(
+      makeCtx(),
+      [{ role: "user", content: "oi" }],
+      "saving",
+      documentacaoVazia(),
+      savingVazio(),
+      "",
+      ["saving"],
+      receitaVazia(),
+      { onDelta: (c) => deltas.push(c) },
+    );
+    expect(res.type).toBe("options");
+    // o texto vive em `question` (NÃO em content); precisa streamar, não string vazia
+    expect(deltas.join("")).toBe(pergunta);
+    expect(deltas.join("")).not.toBe("");
+    expect(deltas.length).toBeGreaterThan(1);
+  });
+
+  it("INVARIANTE doc_preview: type=complete na fase doc_preview NUNCA streama (compilação silenciosa)", async () => {
+    const full = JSON.stringify({
+      type: "complete",
+      content: "Documentação compilada pesada e longa.",
+      coletado: documentacaoVazia(),
+      saving: savingVazio(),
+    });
+    streamMock.mockImplementation(feed(full, 4));
+    const deltas: string[] = [];
+    const res = await runOrchestrator(
+      makeCtx(),
+      [{ role: "user", content: "compila a doc" }],
+      "doc_preview",
+      documentacaoVazia(),
+      savingVazio(),
+      "",
+      ["saving"],
+      receitaVazia(),
+      { onDelta: (c) => deltas.push(c) },
+    );
+    expect(res.type).toBe("complete");
+    expect(deltas).toEqual([]); // doc_preview complete segue silenciosa
   });
 
   it("sem onDelta: usa o caminho bufferizado (llmChatStream não é chamado)", async () => {

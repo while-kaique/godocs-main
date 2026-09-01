@@ -1574,6 +1574,9 @@ export async function runOrchestrator(
         let rawAcc = "";
         let streamedProse = "";
         let streamAtivo: boolean | null = null; // null = ainda não sei o `type`
+        // De qual CAMPO do JSON sai a prosa a streamar: `type:options` guarda o texto da
+        // pergunta em `question`; todos os demais (question/preview/complete) em `content`.
+        let streamField: "content" | "question" = "content";
         raw = await llmChatStream(messages, {
           jsonMode: true,
           temperature,
@@ -1589,18 +1592,25 @@ export async function runOrchestrator(
               // exigir o valor completo + aspas resolve isso.
               const tm = rawAcc.match(/"type"\s*:\s*"(preview|complete|question|options)"/);
               if (!tm) return; // `type` ainda não fechou (ou é desconhecido) — espera/não streama
-              // ⚠️ NÃO streamar o `complete` da fase doc_preview (aprovação da doc): ele é uma
-              // frase curta seguida da compilação PESADA (compilarDocumentacao, ~88s, sem
-              // stream) — streamar a frase curta esconderia o loader de "compilando..." e a
-              // tela pareceria travada. Os AJUSTES da doc (type preview em doc_preview) seguem
-              // streamando normal.
-              streamAtivo = tm[1] === "preview" || (tm[1] === "complete" && fase !== "doc_preview");
+              // As PERGUNTAS do agente (question/options) streamam a prosa como o preview: o
+              // texto chega token a token. ⚠️ Invariante preservado: NÃO streamar o `complete`
+              // da fase doc_preview (aprovação da doc) — é uma frase curta seguida da compilação
+              // PESADA (compilarDocumentacao, ~88s, sem stream); streamar a frase esconderia o
+              // loader de "compilando..." e a tela pareceria travada. Os AJUSTES da doc (type
+              // preview em doc_preview) seguem streamando normal.
+              streamAtivo =
+                tm[1] === "preview" ||
+                tm[1] === "question" ||
+                tm[1] === "options" ||
+                (tm[1] === "complete" && fase !== "doc_preview");
+              // O campo da prosa muda por type: options guarda em `question`, o resto em `content`.
+              streamField = tm[1] === "options" ? "question" : "content";
             }
-            if (!streamAtivo) return; // question/options: não streama a prosa
-            const content = extractPartialJsonStringField(rawAcc, "content");
-            if (content !== null && content.length > streamedProse.length && content.startsWith(streamedProse)) {
-              streamOpts.onDelta!(content.slice(streamedProse.length));
-              streamedProse = content;
+            if (!streamAtivo) return; // ex.: complete de doc_preview — segue silencioso
+            const prosa = extractPartialJsonStringField(rawAcc, streamField);
+            if (prosa !== null && prosa.length > streamedProse.length && prosa.startsWith(streamedProse)) {
+              streamOpts.onDelta!(prosa.slice(streamedProse.length));
+              streamedProse = prosa;
             }
           },
         });
