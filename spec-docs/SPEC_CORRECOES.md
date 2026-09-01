@@ -66,10 +66,42 @@ construção. **Um sinal que está SEMPRE aceso não é sinal.**
 confiança baixa ainda bloqueia), `tests/mesa-especialistas.test.ts`. Suíte **2298 verde**; `tsc` só os
 7 erros pré-existentes.
 
-**Status.** Branch `fix/mesa-veto-cetico`. ⚠️ **Escopo remedido, não escopo novo:** o que falta para a
-mesa ser cogitável como substituta do RPA **não é** esta regra — é (a) medir a acurácia com a regra
-nova sobre a base inteira e (b) resolver que **145 dos 649 normais (22%) são `isento`** por serem de
-liderança/especial, faixa que a mesa **não julga em absoluto** (`fluxoDireto: ehLider`).
+### Correção 2 (mesma sessão) — 22% da base saía `isento` só por ser de liderança
+
+**Sintoma.** **145 dos 649 normais (22%)** apareciam `isento` na coluna Sombra, e a medição mostrou
+que **100% deles eram por LIDERANÇA** (`especial = 0`): "Fluxo de Caixa FIP Gobeauty", "Triagem
+Automática de Comunicação de Fornecedores", "Radar Pix", "Painel Stock Flow", "RPA - Detecção de
+Obrigações Acessórias"… Decisão do Luis ao ver o resultado: *"não quero isento nunca"*.
+
+**Causa-raiz.** O gate `if (input.especial === true || input.fluxoDireto === true) return isento` no
+topo dos DOIS agregadores da mesa. A isenção fazia sentido no ANALISADOR (onde mexe em status), e foi
+herdada aqui por simetria — mas na mesa ela silenciava justamente a faixa que **mais** merece olhar:
+quem é coordenador+ submete pelo **fluxo DIRETO**, sem agente conversacional e **sem nenhum dos
+gates** (jornada, teto 220h, ≥44h, alocação, ganho projetado, sobreposição). E o desperdício era
+duplo: os 4 especialistas LLM **já rodavam** nesses projetos (não há curto-circuito antes do
+`Promise.all` — `ehLider` só alimentava este gate) e o parecer era **descartado**.
+
+**Fix.** O gate passa a olhar **só `especial`**, nos dois agregadores. `fluxoDireto` permanece no
+contrato (os chamadores o passam; `conciliarJulgamentos` também) com comentário explícito de que
+**não isenta** — para ninguém "consertar" de volta.
+- ⚠️ **A imunidade do ANALISADOR REAL segue INTOCADA** (`normalizarClassificacao` e
+  `decidirStatusSubmissao`, `analyzer.ts`): lá `fluxoDireto` decide **status de produção** ("não
+  auto-reprovar líder", decisão de 21/08/2026); aqui é só a recomendação em sombra. **NÃO unificar as
+  duas réguas** — são coisas diferentes com o mesmo nome de flag.
+- **Especial continua isento.** E como `avaliarComContexto` já retorna **antes de gravar** para
+  especiais (`'especial — NO-OP'`, `gravado: false` → célula **"—"**, nunca "isento"; confirmado nos
+  dados: 72 especiais, **0** linhas em `projeto_avaliacao`), o efeito prático é que **`isento`
+  desaparece da coluna Sombra**. Especiais seguem com o agente CLASSIFICADOR de estrelas, que é
+  outro fluxo.
+
+**Onde aterrissou.** `src/lib/agents/agregador-avaliacao.ts` (os 2 gates + 2 JSDoc),
+`src/lib/agents/mesa-especialistas.ts` (comentário no contrato). Testes atualizados nos 3 arquivos
+(`fluxoDireto` NÃO isenta / `especial` isenta): `tests/agregador-avaliacao.test.ts`,
+`tests/agregador-julgamentos.test.ts`, `tests/mesa-especialistas.test.ts`. Suíte **2300 verde**.
+
+**Status.** Branch `fix/mesa-veto-cetico` (as duas correções). ⚠️ **O que ainda falta para a mesa ser
+cogitável como substituta do RPA não é regra, é MEDIÇÃO:** rodar o backfill da base com as duas
+correções e recalcular a acurácia contra os 591 projetos com veredito humano assentado.
 
 ## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
 
