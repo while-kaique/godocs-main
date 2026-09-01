@@ -71,6 +71,31 @@ export function avaliarSinalRag(
 /** Limiar de confiança abaixo do qual a decisão vira humana (`em_validacao`). */
 export const LIMIAR_CONFIANCA_AGREGADOR = 0.6;
 
+/**
+ * QUÓRUM de preocupação para BARRAR uma aprovação — **só na mesa LLM (`agregarJulgamentos`)**.
+ *
+ * ⚠️ Era `>= 1` (qualquer preocupação vetava) e isso tornava `aprovar` INALCANÇÁVEL: um dos quatro
+ * especialistas é o CÉTICO ADVERSARIAL, cuja persona manda "TENTAR DERRUBAR uma aprovação", então
+ * uma objeção sempre aparecia. Medido em PROD (01/09/2026, 20 normais re-avaliados): **20/20**
+ * voltaram `em_validacao`, ZERO aprovações — a mesa mandava 100% ao humano, não reduzia trabalho
+ * nenhum e marcava 0% de acerto (100% "conservador") contra 589 aprovados humanos. Um sinal que
+ * está SEMPRE aceso não é sinal.
+ *
+ * Com quórum 2 a objeção solitária não barra, mas **continua registrada** nos `motivos` (a ficha
+ * mostra a ressalva) e **continua derrubando a confiança** pela concordância direcional. Duas ou
+ * mais preocupações barram como antes. Simétrico: nenhuma dimensão é privilegiada.
+ *
+ * ⚠️ `agregarVotos` (o agregador DETERMINÍSTICO) NÃO usa isto e segue byte-idêntico.
+ */
+export const QUORUM_PREOCUPACAO = 2;
+
+/**
+ * Piso de painel para poder recomendar `aprovar`. Com UM único parecer a concordância direcional é
+ * 1.0 por construção (o lado majoritário é o único lado) e inflaria a confiança — nunca aprovar no
+ * voto de um só. (Achado da revisão do T2, deixado em aberto para quando o painel virasse parcial.)
+ */
+export const MIN_JULGAMENTOS_PARA_APROVAR = 2;
+
 export type VeredictoAgregado = 'aprovar' | 'em_validacao' | 'isento';
 
 export type ResultadoAgregado = {
@@ -180,7 +205,10 @@ export function agregarVotos(input: {
  *
  * ## Invariantes (os mesmos de `agregarVotos`)
  * - **Nunca** um veredito negativo automático: só `aprovar`, `em_validacao` ou `isento`.
- * - Qualquer especialista que `preocupa` → `em_validacao` (a mesa não sobrepõe uma preocupação).
+ * - **Preocupação com QUÓRUM** (>= `QUORUM_PREOCUPACAO`) → `em_validacao`. Uma objeção SOLITÁRIA
+ *   não barra (o cético adversarial sempre acha uma), mas fica registrada nos `motivos` e derruba a
+ *   confiança pela concordância direcional. ⚠️ SUBSTITUI o invariante antigo "qualquer especialista
+ *   que preocupa → em_validacao", que tornava `aprovar` inalcançável — ver `QUORUM_PREOCUPACAO`.
  * - **Especial/liderança são ISENTOS** (validação 100% humana).
  * - MODO SOMBRA: só PRODUZ a recomendação; nada aqui muda status.
  *
@@ -231,7 +259,6 @@ export function agregarJulgamentos(input: {
 
   const preocupados = julgamentos.filter((j) => j.preocupa);
   const tranquilos = julgamentos.filter((j) => !j.preocupa);
-  const algumPreocupa = preocupados.length > 0;
   const divergencia = preocupados.length > 0 && tranquilos.length > 0;
 
   // Confiança = concordância DIRECIONAL (fração do painel no lado majoritário, ∈ [0.5, 1])
@@ -241,7 +268,11 @@ export function agregarJulgamentos(input: {
   const confiancaMedia = julgamentos.reduce((s, j) => s + clamp01(j.confianca), 0) / n;
   const confianca = clamp01(concordanciaDirecional * confiancaMedia);
 
-  const aplicarEmValidacao = algumPreocupa || confianca < limiar;
+  // Barra por QUÓRUM (>= 2 preocupados), não por qualquer objeção: ver `QUORUM_PREOCUPACAO`.
+  const bloqueiaPorPreocupacao = preocupados.length >= QUORUM_PREOCUPACAO;
+  // Painel de um só infla a concordância direcional (=1.0 por construção) — nunca aprovar assim.
+  const painelSuficiente = n >= MIN_JULGAMENTOS_PARA_APROVAR;
+  const aplicarEmValidacao = bloqueiaPorPreocupacao || confianca < limiar || !painelSuficiente;
   const veredito: VeredictoAgregado = aplicarEmValidacao ? 'em_validacao' : 'aprovar';
 
   const motivos: string[] = [];
@@ -249,8 +280,16 @@ export function agregarJulgamentos(input: {
   for (const j of preocupados) {
     if (j.argumento && j.argumento.trim()) motivos.push(j.argumento.trim());
   }
-  if (divergencia) {
+  // Só promete triagem humana quando a mesa REALMENTE está mandando para lá.
+  if (divergencia && aplicarEmValidacao) {
     motivos.push('Sinais divergentes entre os especialistas — enviado à triagem humana.');
+  }
+  // Objeção SOLITÁRIA (sem quórum): a mesa recomenda aprovar, mas o argumento de quem objetou já
+  // foi empilhado acima e NUNCA some — a ficha mostra a ressalva ao lado da recomendação.
+  if (!aplicarEmValidacao && preocupados.length > 0) {
+    motivos.push(
+      'Objeção isolada, sem quórum para barrar: a mesa recomenda aprovar, mas a ressalva acima fica registrada para a triagem.',
+    );
   }
   if (motivos.length === 0) {
     motivos.push(

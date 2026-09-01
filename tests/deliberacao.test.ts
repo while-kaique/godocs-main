@@ -155,8 +155,11 @@ describe('avancarDeliberacao', () => {
     expect(r.motivo.length).toBeGreaterThan(0);
   });
 
-  it('divergência → deliberando nas r1..r4, nao_consenso na r5', () => {
-    const sinais = { agregadoVeredito: 'aprovar' as const, divergencia: true, confianca: 0.9, ceticoRefuta: false };
+  // ⚠️ REGRA MUDOU (01/09/2026): `aprovar` + divergência agora É consenso — o quórum de preocupação
+  // já foi aplicado no agregador (ver QUORUM_PREOCUPACAO), e reexigir `!divergencia` aqui era a mesma
+  // trava duplicada. O cenário "sem consenso" parte do veredito que o agregador de fato barrou.
+  it('em_validacao → deliberando nas r1..r4, nao_consenso na r5', () => {
+    const sinais = { agregadoVeredito: 'em_validacao' as const, divergencia: true, confianca: 0.9, ceticoRefuta: false };
     let atual: { estado?: string | null; rodada?: number | null } = { estado: null, rodada: 0 };
     const rs = [] as ReturnType<typeof avancarDeliberacao>[];
     for (let i = 0; i < 5; i++) {
@@ -190,14 +193,36 @@ describe('avancarDeliberacao', () => {
     expect(rs[4].rodada).toBe(5);
   });
 
-  it('cético refuta bloqueia consenso na r1', () => {
+  // ⚠️ REGRA MUDOU (01/09/2026): a objeção do cético NÃO bloqueia mais o consenso por si só. Quem
+  // decide se ela barra é o QUÓRUM, no agregador; se o agregador disse `aprovar`, a deliberação não
+  // pode desdizer — era o que travava 100% dos projetos em `nao_consenso`.
+  it('cético refuta NÃO bloqueia mais o consenso (quem decide é o quórum, no agregador)', () => {
     const r = avancarDeliberacao(
       { estado: null, rodada: 0 },
       { agregadoVeredito: 'aprovar', divergencia: false, confianca: 0.9, ceticoRefuta: true },
     );
+    expect(r.estado).toBe('consenso');
+    expect(r.veredito).toBe('aprovar');
+    expect(r.encerrada).toBe(true);
+  });
+
+  it('objeção SOLITÁRIA (aprovar + divergência) fecha consenso na r1 — não fica moendo rodadas', () => {
+    const r = avancarDeliberacao(
+      { estado: null, rodada: 0 },
+      { agregadoVeredito: 'aprovar', divergencia: true, confianca: 0.7, ceticoRefuta: true },
+    );
+    expect(r.estado).toBe('consenso');
+    expect(r.rodada).toBe(1);
+    expect(r.encerrada).toBe(true);
+  });
+
+  it('confiança abaixo do limiar ainda bloqueia consenso mesmo com aprovar', () => {
+    const r = avancarDeliberacao(
+      { estado: null, rodada: 0 },
+      { agregadoVeredito: 'aprovar', divergencia: false, confianca: 0.5, ceticoRefuta: false },
+    );
     expect(r.estado).toBe('deliberando');
     expect(r.veredito).toBe('em_validacao');
-    expect(r.encerrada).toBe(false);
   });
 
   it('limiarConfianca custom respeitado', () => {
@@ -224,7 +249,7 @@ describe('avancarDeliberacao', () => {
   it('maxRodadas custom = 1 encerra em nao_consenso já na r1 sem consenso', () => {
     const r = avancarDeliberacao(
       { estado: null, rodada: 0 },
-      { agregadoVeredito: 'aprovar', divergencia: true, confianca: 0.9, ceticoRefuta: false },
+      { agregadoVeredito: 'em_validacao', divergencia: true, confianca: 0.9, ceticoRefuta: false },
       { maxRodadas: 1 },
     );
     expect(r.rodada).toBe(1);

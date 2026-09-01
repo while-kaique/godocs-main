@@ -113,7 +113,10 @@ describe('conciliarJulgamentos', () => {
     expect(r.aplicarEmValidacao).toBe(false);
   });
 
-  it('cético preocupa → em_validacao, ceticoRefutou=true, motivos incluem o argumento do cético', () => {
+  // ⚠️ REGRA MUDOU (01/09/2026): o cético SOZINHO não barra (QUORUM_PREOCUPACAO=2) — ele objeta por
+  // ofício e com veto de 1 a mesa nunca aprovava nada. `ceticoRefutou` continua exposto e o argumento
+  // continua no parecer.
+  it('cético preocupa SOZINHO → aprovar, mas ceticoRefutou=true e o argumento fica no parecer', () => {
     const js = [
       julg('fte', false, 0.9),
       julg('financeiro', false, 0.9),
@@ -121,10 +124,23 @@ describe('conciliarJulgamentos', () => {
       julg('cetico', true, 0.8, 'impacto projetado vendido como realizado'),
     ];
     const r = conciliarJulgamentos(js, {});
-    expect(r.veredito).toBe('em_validacao');
+    expect(r.veredito).toBe('aprovar');
+    expect(r.aplicarEmValidacao).toBe(false);
     expect(r.ceticoRefutou).toBe(true);
-    expect(r.aplicarEmValidacao).toBe(true);
     expect(r.motivos.join(' ')).toContain('impacto projetado vendido como realizado');
+  });
+
+  it('cético + financeiro preocupam (quórum) → em_validacao', () => {
+    const js = [
+      julg('fte', false, 0.9),
+      julg('financeiro', true, 0.9, 'materialidade acima do teto'),
+      julg('rag', false, 0.9),
+      julg('cetico', true, 0.8, 'impacto projetado vendido como realizado'),
+    ];
+    const r = conciliarJulgamentos(js, {});
+    expect(r.veredito).toBe('em_validacao');
+    expect(r.aplicarEmValidacao).toBe(true);
+    expect(r.ceticoRefutou).toBe(true);
   });
 
   it('especial/liderança → isento (nunca avalia)', () => {
