@@ -6,7 +6,26 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
-**Plano ativo — Mesa de avaliação: de eco-de-gate a TIME LLM crítico ✅ APROVADO (Luis, 28/08):**
+**Plano ativo — Fluidez do formulário: streamar as PERGUNTAS do agente (C) 🟡 CÓDIGO EXECUTADO (01/09):**
+C codado, suíte verde, revisor `conforme` — falta só o T6 (staging→prod→merge). recorte da frente de FLUIDEZ
+(sensível). Fatia de **código = C** CODADA server-only (~32 linhas em `orchestrator.ts`): `streamAtivo` inclui
+`question`/`options` (invariante `complete`-de-doc_preview preservado) + `streamField` por type (`type:options`
+guarda o texto em `question`, resto em `content`, reusando `extractPartialJsonStringField`). **T3/T4/T5 viraram
+no-ops** (cliente/`llm.ts` intocados — state-drift corrigido → blast BAIXO). Branch `feat/streamar-perguntas`
+(worktree `~/godocs-wt-streamar-perguntas`, off `origin/main`). Suíte 2295 verde, tsc +0, `worker.js`
+rebuildado. **NÃO deployado, NÃO no main.** Decisões
+travadas nesta sessão de planejamento (2 exploradores isolados): **E (`prodStatus`) FORA** — beco sem saída
+confirmado em código (é constante `"sim"` para todo projeto no chat; threadá-lo desligaria o gate de ganho
+projetado p/ TODOS e removeria a proteção contra número projetado). **I (agente auxiliar / 1ª pergunta durante
+a compilação) EM STANDBY** — viável e com desenho limpo (buffer de rascunho em chave própria do blob, padrão
+já vivo no reorder), MAS blast ALTO; a restrição a ferro fica registrada (auxiliar só escreve `coletado`,
+nunca `saving`/`receita`/campos de gate/msg assistant fora de banda). **D e consolidar gates FORA** (sensível,
+anti-loop). **Alavanca real de latência (trilha paralela, não-código):** veredito do **F** (`reasoning_effort=low`,
+já na staging, Luis submete e eu meço). Plano em `docs/plans/fluidez-streamar-perguntas.md`.
+**Próximo:** deployar `feat/streamar-perguntas` na STAGING `edf400b4` + Luis valida no navegador (perguntas token a token) → prod `674a3710` + merge no `main` → `/ggsd:ship`. ⚠️ Resolver antes a **colisão de staging** com a fatia-c (G+B+H) que está no `edf400b4` aguardando validação (`updateApp` troca a app inteira).
+
+_(Anterior — Mesa de avaliação: de eco-de-gate a TIME LLM crítico ✅ APROVADO (Luis, 28/08), aguardando código:)_
+**Plano — Mesa de avaliação: de eco-de-gate a TIME LLM crítico ✅ APROVADO (Luis, 28/08):**
 transformar a mesa de avaliação em SOMBRA (hoje 100% determinística, só ecoa o gate) num time de
 agentes LLM críticos — cada dimensão (Plausibilidade/FTE · Financeiro · Precedente/RAG · Cético)
 raciocina com LLM, deliberando até 5 rodadas por cron; parecer sobre **ganho total** (÷10, não
