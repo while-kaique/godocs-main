@@ -99,9 +99,72 @@ contrato (os chamadores o passam; `conciliarJulgamentos` também) com comentári
 (`fluxoDireto` NÃO isenta / `especial` isenta): `tests/agregador-avaliacao.test.ts`,
 `tests/agregador-julgamentos.test.ts`, `tests/mesa-especialistas.test.ts`. Suíte **2300 verde**.
 
-**Status.** Branch `fix/mesa-veto-cetico` (as duas correções). ⚠️ **O que ainda falta para a mesa ser
-cogitável como substituta do RPA não é regra, é MEDIÇÃO:** rodar o backfill da base com as duas
-correções e recalcular a acurácia contra os 591 projetos com veredito humano assentado.
+### Correção 3 (mesma sessão) — parecer com jargão, repetido e com traços; e a caixa dominava a ficha
+
+**Sintoma.** O Luis leu um parecer real de 47% e disse: *"está usando muitos termos difíceis e
+embaralhado demais"*; depois: *"não quero que nas linguagens usadas pelos agentes tenha hífens,
+traços"*. O texto tinha 900 caracteres, dizia "contrafactual", "coorte", "atribuição incremental",
+"materialidade", **repetia a mesma base de cálculo duas vezes** (344 compras sobre ~12 mil acessos
+vs. 576 numa coorte de 8.378 sessões) e ocupava o topo da ficha, empurrando a decisão humana para
+fora da vista.
+
+**Causa-raiz.** Três coisas independentes:
+1. **Jargão e tamanho:** o prompt pedia "1 a 3 frases" e não dizia nada sobre registro. Modelo
+   entregou laudo de analista.
+2. **A repetição NÃO era do modelo, era do agregador:** `motivos` empilhava o argumento de cada
+   preocupado e o `motivo` gravado era `motivos.join(' ')`. Quando dois especialistas levantavam a
+   MESMA dúvida, o parágrafo corrido lia como texto embaralhado, sem deixar ver que eram **duas
+   vozes concordando**.
+3. **Traços:** travessão em todos os textos da mesa e, principalmente, **no próprio prompt** (as
+   personas e as instruções eram cheias de `—`) — o modelo imita a pontuação que lê.
+
+**Fix.**
+- **Prompt** (`especialista-avaliacao.ts`): no MÁXIMO 2 frases curtas, português do dia a dia, com
+  **lista PROIBIDA explícita** e a tradução de cada termo, no máximo 2 números e sem repetir número;
+  diz o que preocupa **e o que resolveria**; proíbe travessão/hífen solto. Os travessões saíram
+  também das personas e do formato.
+- **Atribuição** (`agregarJulgamentos`): cada frase vai marcada com quem a escreveu
+  (`"Financeiro: ..."`) e o `motivo` junta as linhas com `\n`.
+- **Módulo PURO novo `src/lib/mesa-parecer.ts`** (fonte única, importável pelo CLIENTE — fica fora de
+  `agents/` porque importar o arquivo do especialista arrastaria os PROMPTS para o bundle):
+  `ROTULO_CURTO_DIMENSAO` (Horas · Financeiro · Precedente · Cético), `partirParecerMesa` e
+  **`semTravessao`**. ⚠️ `partirParecerMesa` é **tolerante ao formato ANTIGO** (parágrafo corrido sem
+  prefixo volta como uma linha sem autor) — nenhum backfill é necessário para a tela funcionar.
+  ⚠️ `semTravessao` **mantém o hífen DENTRO da palavra** (`e-mail`, `pré-aprovação`): ali é
+  ortografia, não pontuação. É a **TRAVA determinística**, aplicada em `normalizarJulgamento` (o
+  funil por onde TODO texto de LLM entra na mesa) — porque neste repo "prompt não segura" já custou
+  caro 3 vezes.
+- **UI** (`projeto-detalhe-dialog.tsx`): o painel Sombra nasce **COLAPSADO**. A tira mostra chip +
+  veredito + **confiança como número dominante** + "Divergiram"; parecer em bullets por especialista,
+  deliberação, rodadas (clampadas em 2 linhas, com `title`), retroativo e 👍/👎 abrem no dropdown. A
+  tira INTEIRA é o `<button aria-expanded>` (idioma do `AvisoPendencia`: alvo generoso, um stop de
+  teclado); foco visível, `motion-reduce`, estado nunca só por cor (chevron **+** a palavra
+  "Detalhes"/"Ocultar"). `ConfiancaDestaque` ganhou modo `compacta` em vez de um segundo componente.
+- ⚠️ Corrigidos de passagem os textos que ainda diziam **"Projeto especial ou de liderança"** —
+  mentira depois da Correção 2.
+- ⚠️ Este prompt **não está no `prompt-registry`** (a regra 3 cobre os prompts do chat de submissão,
+  não os da mesa de sombra).
+
+**Antes × depois (medido na staging).**
+- Antes: *"O ganho de R$ 51 mil/mês é material e depende de um contrafactual cuja base não está
+  claramente alinhada: as 344 compras esperadas… Sinais divergentes entre os especialistas — enviado
+  à triagem humana."* (900 chars, jargão, base repetida)
+- Depois: *"**Cético** · A economia usa 486 XMLs por mês, mas não há registro que comprove esse volume
+  nem o tempo manual. Também precisa conferir nos logs se falhas e retrabalho permitem mesmo
+  considerar zero hora depois."* + *"Só um especialista objetou. Não é o bastante para barrar, mas a
+  ressalva fica registrada."*
+
+**Onde aterrissou.** `src/lib/mesa-parecer.ts` (novo) · `src/lib/agents/especialista-avaliacao.ts` ·
+`src/lib/agents/agregador-avaliacao.ts` · `src/lib/deliberacao.ts` ·
+`src/lib/avaliacao-normais.functions.ts` · `src/components/dashboard/projeto-detalhe-dialog.tsx`.
+Testes: `tests/mesa-parecer.test.ts` (15 casos: atribuição, legado, dois-pontos no meio da frase,
+hífen ortográfico preservado). Suíte **2314 verde**.
+
+**Status.** Branch `fix/mesa-veto-cetico` (as três correções). ⚠️ **O que ainda falta para a mesa ser
+cogitável como substituta do RPA não é regra, é MEDIÇÃO:** rodar o backfill da base com as correções
+e recalcular a acurácia contra os 591 projetos com veredito humano assentado. ⚠️ **Ordem importa:** o
+backfill tem de vir DEPOIS destas correções de texto, senão os ~628 pareceres nascem na linguagem
+velha e a base precisaria ser reprocessada (outras ~2.500 chamadas de LLM).
 
 ## 2026-08-26 — Furos no histórico de versões (`projeto_versions`): submetidos sem snapshot
 

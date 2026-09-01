@@ -20,6 +20,7 @@
  * lança).
  */
 import type { LLMMessage } from "@/lib/llm";
+import { semTravessao } from "@/lib/mesa-parecer";
 
 /** As quatro dimensões da mesa. O `cetico` é ADVERSARIAL: existe para derrubar uma aprovação. */
 export type DimensaoAvaliacao = "fte" | "financeiro" | "rag" | "cetico";
@@ -82,10 +83,10 @@ export type JulgamentoEspecialista = {
 
 /** Personas — o QUÊ de cada especialista. O cético é o único ADVERSARIAL (derruba, não confere). */
 const PERSONA: Record<DimensaoAvaliacao, string> = {
-  fte: `Você é o especialista em PLAUSIBILIDADE DE HORAS (FTE) da mesa de avaliação do GoDocs. Você julga se o saving declarado (horas/mês) é crível para o número de pessoas que realmente faziam o trabalho. 220h/mês ≈ 1 pessoa em tempo integral (1 FTE). Total alto só se sustenta se atribuído a várias pessoas de verdade — um número que exige mais FTE do que a equipe declarada é implausível e pede olho humano.`,
+  fte: `Você é o especialista em PLAUSIBILIDADE DE HORAS (FTE) da mesa de avaliação do GoDocs. Você julga se o saving declarado (horas/mês) é crível para o número de pessoas que realmente faziam o trabalho. 220h/mês ≈ 1 pessoa em tempo integral (1 FTE). Total alto só se sustenta se atribuído a várias pessoas de verdade: um número que exige mais FTE do que a equipe declarada é implausível e pede olho humano.`,
   financeiro: `Você é o especialista FINANCEIRO da mesa de avaliação do GoDocs. Você julga a COERÊNCIA do impacto: o ganho total é material demais para aprovar sem conferência humana? o valor bate com o que o projeto descreve? há dupla contagem (o mesmo dinheiro contado como saving E como receita, ou como horas E como contrato)?`,
   rag: `Você é o especialista em PRECEDENTE da mesa de avaliação do GoDocs. Você compara este projeto com os projetos JÁ APROVADOS pela triagem humana (os vizinhos abaixo). Ele se parece com o que a empresa já aprovou, ou é um caso fora da vizinhança que merece conferência?`,
-  cetico: `Você é o CÉTICO ADVERSARIAL da mesa de avaliação do GoDocs. Sua tarefa é TENTAR DERRUBAR uma aprovação — não conferi-la, não elogiá-la. Um time que só concorda infla; você é a última trava crítica antes de o projeto ser aprovado em sombra. Procure o motivo pelo qual este projeto NÃO deveria ser aprovado sem olho humano: número implausível que "fechou" na conversa, impacto projetado vendido como realizado, dupla contagem, ausência de rastro. Se, tentando derrubar, você não achar do que reclamar, diga isso — refutar por precaução também é errar.`,
+  cetico: `Você é o CÉTICO ADVERSARIAL da mesa de avaliação do GoDocs. Sua tarefa é TENTAR DERRUBAR uma aprovação, não conferi-la, não elogiá-la. Um time que só concorda infla; você é a última trava crítica antes de o projeto ser aprovado em sombra. Procure o motivo pelo qual este projeto NÃO deveria ser aprovado sem olho humano: número implausível que "fechou" na conversa, impacto projetado vendido como realizado, dupla contagem, ausência de rastro. Se, tentando derrubar, você não achar do que reclamar, diga isso, porque refutar por precaução também é errar.`,
 };
 
 const ROTULO_DIMENSAO: Record<DimensaoAvaliacao, string> = {
@@ -105,7 +106,7 @@ export function fallbackDeterministico(entrada: EntradaEspecialista): Julgamento
   const argumento =
     (voto.motivo && voto.motivo.trim()) ||
     (voto.preocupa
-      ? `${ROTULO_DIMENSAO[dimensao]}: sinal de preocupação neste eixo — recomendo conferência humana.`
+      ? `${ROTULO_DIMENSAO[dimensao]}: sinal de preocupação neste eixo. Recomendo conferência humana.`
       : `${ROTULO_DIMENSAO[dimensao]}: sem sinal de preocupação neste eixo.`);
   return {
     dimensao,
@@ -129,7 +130,7 @@ function blocoOutrosVotos(outros: VotoResumido[]): string {
   return outros
     .map(
       (o) =>
-        `- ${ROTULO_DIMENSAO[o.dimensao]}: ${o.preocupa ? "PREOCUPA" : "sem preocupação"} — ${o.argumento}`,
+        `- ${ROTULO_DIMENSAO[o.dimensao]}: ${o.preocupa ? "PREOCUPA" : "sem preocupação"}. ${o.argumento}`,
     )
     .join("\n");
 }
@@ -148,12 +149,12 @@ Você recebe: o texto do projeto, o CÁLCULO determinístico do seu eixo (um SIN
 FORMATO — responda APENAS com JSON válido, sem texto fora do JSON:
 {
   "preocupa": true | false,
-  "argumento": "<1 ou 2 frases CURTAS, em português simples — ver as regras abaixo>",
+  "argumento": "<1 ou 2 frases CURTAS, em português simples (ver as regras abaixo)>",
   "confianca": <número 0 a 1: quão seguro você está do seu parecer>,
   "sinais": ["<pista curta>", "..."]
 }
 
-COMO ESCREVER O "argumento" — quem lê é a pessoa da TRIAGEM, com a fila cheia, não um analista:
+COMO ESCREVER O "argumento" (quem lê é a pessoa da TRIAGEM, com a fila cheia, não um analista):
 - No MÁXIMO 2 frases curtas. Se não couber, corte o detalhe — não escreva um laudo.
 - Português SIMPLES, do dia a dia. NÃO use estas palavras: "contrafactual", "coorte",
   "atribuição incremental", "materialidade", "material", "premissa", "implausivelmente",
@@ -163,7 +164,7 @@ COMO ESCREVER O "argumento" — quem lê é a pessoa da TRIAGEM, com a fila chei
   ganho à automação"; em vez de "valor material", "valor alto".
 - Diga O QUE preocupa e O QUE resolveria a dúvida ("falta o registro de X", "precisa conferir Y").
 - Cite no MÁXIMO 2 números — os que sustentam a dúvida. Não repita o mesmo número duas vezes.
-- Se NÃO preocupa, uma frase basta.`;
+- NÃO use travessão nem hífen solto para separar ideias. Use ponto ou vírgula.\n- Se NÃO preocupa, uma frase basta.`;
 
   const user = `PROJETO:
 - Nome: ${texto.nome}
@@ -211,7 +212,10 @@ export function normalizarJulgamento(
   if (!bruto || typeof bruto !== "object") return fallbackDeterministico(entrada);
 
   const o = bruto as Record<string, unknown>;
-  const argumento = typeof o.argumento === "string" ? o.argumento.trim() : "";
+  // ⚠️ `semTravessao` é a TRAVA do "sem traços no parecer" (decisão do Luis, 01/09/2026): o prompt
+  // também pede, mas aqui é onde TODO texto de LLM entra na mesa, então a régua final é esta.
+  // Roda ANTES do teste de vazio: um argumento que fosse só "—" não passa a valer.
+  const argumento = typeof o.argumento === "string" ? semTravessao(o.argumento) : "";
   if (!argumento) return fallbackDeterministico(entrada);
   // ⚠️ FAIL-CLOSED na direção SEGURA: `preocupa` malformado (ex.: string "true") NÃO vira `false`
   // por coerção — isso apagaria um sinal de preocupação num sistema cujo fim é justamente

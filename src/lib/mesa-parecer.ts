@@ -54,3 +54,27 @@ export function partirParecerMesa(motivo: string | null | undefined): LinhaParec
   }
   return linhas;
 }
+
+/**
+ * Tira TRAVESSÃO e HÍFEN-COMO-PONTUAÇÃO do texto do agente (decisão do Luis, 01/09/2026: o parecer
+ * não usa traços). Vira ponto ou vírgula, conforme o que já havia antes.
+ *
+ * ⚠️ **Mantém o hífen DENTRO da palavra** (`e-mail`, `pré-aprovação`, `custo-benefício`): ali ele é
+ * ortografia, não pontuação, e apagá-lo escreveria errado. Só casa traço cercado de espaço, traço
+ * no começo da linha, e o travessão/en dash em qualquer posição (esses nunca são ortografia).
+ *
+ * ⚠️ Isto é a TRAVA determinística. A instrução equivalente também está no prompt, mas neste repo
+ * "prompt não segura" já custou caro 3 vezes, então a régua final é esta função.
+ */
+export function semTravessao(texto: string | null | undefined): string {
+  let t = (texto ?? '').replace(/^[\s]*[—–-]+[\s]*/, '');
+  const junta = (fonte: string, off: number) => {
+    const antes = fonte.slice(0, off).trimEnd().slice(-1);
+    return /[,.;:!?]/.test(antes) ? ' ' : ', ';
+  };
+  // travessão e en dash: sempre pontuação
+  t = t.replace(/\s*[—–]\s*/g, (_m, off: number) => junta(t, off));
+  // hífen SOLTO (cercado de espaço) usado como travessão
+  t = t.replace(/\s+-+\s+/g, (_m, off: number) => junta(t, off));
+  return t.replace(/\s+([,.;:!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+}

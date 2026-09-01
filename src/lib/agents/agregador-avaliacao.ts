@@ -61,8 +61,8 @@ export function avaliarSinalRag(
   const motivo = apoio
     ? null
     : n === 0
-      ? 'Nenhum projeto aprovado semelhante no corpus — recomendo conferência humana.'
-      : 'Poucos projetos aprovados semelhantes — sinal fraco, recomendo conferência humana.';
+      ? 'Nenhum projeto aprovado semelhante no corpus. Recomendo conferência humana.'
+      : 'Poucos projetos aprovados semelhantes, sinal fraco. Recomendo conferência humana.';
 
   return { apoio, confianca, vizinhos: n, topSimilaridade: top, motivo };
 }
@@ -148,7 +148,7 @@ export function agregarVotos(input: {
       divergencia: false,
       isento: true,
       motivos: [
-        'Projeto especial ou de liderança — avaliação automática não se aplica (validação humana).',
+        'Projeto especial. A avaliação automática não se aplica (validação humana).',
       ],
     };
   }
@@ -181,7 +181,7 @@ export function agregarVotos(input: {
   if (!finOk && input.financeiro.motivo) motivos.push(input.financeiro.motivo);
   if (!ragOk && input.rag.motivo) motivos.push(input.rag.motivo);
   if (divergencia) {
-    motivos.push('Os especialistas divergiram — vai para a triagem.');
+    motivos.push('Os especialistas divergiram, então vai para a triagem.');
   }
   if (motivos.length === 0) {
     motivos.push('Saving plausível, financeiro coerente e semelhante a projetos já aprovados.');
@@ -248,7 +248,7 @@ export function agregarJulgamentos(input: {
       divergencia: false,
       isento: true,
       motivos: [
-        'Projeto especial ou de liderança — avaliação automática não se aplica (validação humana).',
+        'Projeto especial. A avaliação automática não se aplica (validação humana).',
       ],
     };
   }
@@ -271,7 +271,7 @@ export function agregarJulgamentos(input: {
       aplicarEmValidacao: true,
       divergencia: false,
       isento: false,
-      motivos: ['Sem pareceres dos especialistas — recomendo conferência humana.'],
+      motivos: ['Sem pareceres dos especialistas. Recomendo conferência humana.'],
     };
   }
 
@@ -305,19 +305,19 @@ export function agregarJulgamentos(input: {
   }
   // Só promete triagem humana quando a mesa REALMENTE está mandando para lá.
   if (divergencia && aplicarEmValidacao) {
-    motivos.push('Os especialistas divergiram — vai para a triagem.');
+    motivos.push('Os especialistas divergiram, então vai para a triagem.');
   }
   // Objeção SOLITÁRIA (sem quórum): a mesa recomenda aprovar, mas o argumento de quem objetou já
   // foi empilhado acima e NUNCA some — a ficha mostra a ressalva ao lado da recomendação.
   if (!aplicarEmValidacao && preocupados.length > 0) {
     motivos.push(
-      'Só um especialista objetou — não é o bastante para barrar, mas a ressalva fica registrada.',
+      'Só um especialista objetou. Não é o bastante para barrar, mas a ressalva fica registrada.',
     );
   }
   if (motivos.length === 0) {
     motivos.push(
       confianca < limiar
-        ? 'Os especialistas concordam que não há problema, mas sem segurança suficiente — recomendo conferência humana.'
+        ? 'Os especialistas concordam que não há problema, mas sem segurança suficiente. Recomendo conferência humana.'
         : 'Os especialistas concordam: sem sinal de preocupação nos eixos avaliados.',
     );
   }
