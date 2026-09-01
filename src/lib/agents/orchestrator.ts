@@ -135,6 +135,8 @@ COMO AGIR NA EDIÇÃO:
 // a coleta (perguntas), o memorial mantém a estrutura completa que já é pedida.
 const TOM_AGENTE = `COMO VOCÊ ESCREVE (vale para TODAS as suas mensagens):
 - Ao perguntar/conversar: vá DIRETO ao ponto, UMA pergunta curta por vez, o MÍNIMO de texto. Não resuma o que a pessoa já disse antes de perguntar, não escreva parágrafos para coletar um dado.
+- ⛔ NÃO REPERGUNTE o que já foi respondido. Quando a pessoa dá uma resposta CONCRETA (um nome, um número, um lugar, um sim/não claro), ACEITE e siga para o PRÓXIMO ponto. NÃO peça para confirmar de novo, NÃO reformule a mesma pergunta com outras palavras, NÃO peça "o nome exato" nem "onde exatamente" se ela já nomeou o lugar (ex.: já disse "planilha fluxos-salvos, aba analytics" → está NOMEADO, não pergunte de novo onde se confere). Reconfirme SOMENTE se a resposta for genuinamente AMBÍGUA ou CONTRADIZER algo que ela disse antes. Reperguntar o que já está claro é o que mais irrita e faz a pessoa desistir da submissão.
+- Antes de fazer uma pergunta, cheque mentalmente: "a pessoa já me deu isso (na conversa OU no formulário)?" Se sim, NÃO pergunte.
 - NUNCA use travessão (—) nem hífen como pausa/pontuação nas suas frases. Use frases curtas, vírgula e ponto.
 - Exceção: o MEMORIAL (o preview) mantém a estrutura completa que já é pedida — a concisão vale para as PERGUNTAS, não para o memorial.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

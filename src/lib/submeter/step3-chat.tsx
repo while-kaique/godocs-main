@@ -2741,7 +2741,12 @@ export function Step3Chat({
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
               onKeyDown={handleKeyDown}
-              disabled={loading}
+              // ⚠️ NÃO desabilitar por `loading`: um textarea disabled vira uma "parede" que
+              // engole cliques/foco enquanto o agente responde (e, com o streaming das perguntas,
+              // essa janela ficou de 2-4s) — a pessoa clica e nada acontece. O ENVIO já está
+              // travado durante o loading em 3 lugares (`podeEnviar` exige `!loading`, o botão
+              // fica disabled e `handleSendMessage` retorna cedo em `chatLoading`), então deixar a
+              // caixa clicável/editável é seguro: dá para JÁ ir digitando a resposta (estilo chat).
               aria-invalid={excedeuLimite}
             />
             <button
