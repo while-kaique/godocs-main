@@ -27,7 +27,7 @@
 
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { lerRollupMensal } from "@/integrations/db/client.server";
-import { getGodocsEnv } from "@/lib/env";
+import { rotuloAmbienteExterno } from "@/lib/env";
 
 // O endpoint de ingest do Gabriel processa o lote inteiro na resposta (upsert por
 // (period_key,area,tipo_saving)) e leva ~30s para ~150 linhas (medido 27/08: 147 linhas → 29,5s,
@@ -177,7 +177,7 @@ export function montarPayloadRollup(linhas: LinhaCumulativa[]): PayloadRollup {
  * e empurra para o Gabriel. `dry:true` monta e devolve o payload SEM enviar. Nunca lança.
  */
 export async function enviarRollupParaJG(opts: { dry: boolean }): Promise<ResultadoPush> {
-  const ambiente = getGodocsEnv() === "staging" ? "staging" : "producao";
+  const ambiente = rotuloAmbienteExterno();
   const agora = new Date();
   const geradoEm = agora.toISOString();
   const mesCorrente = `${agora.getUTCFullYear()}-${String(agora.getUTCMonth() + 1).padStart(2, "0")}`;

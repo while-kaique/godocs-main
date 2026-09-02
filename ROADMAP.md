@@ -15,8 +15,16 @@ determinístico de 4 categorias num acordeão; a fórmula do impacto muda (`1,0�
 por bloco); a documentação passa a ser compilada em background invisível; e a estrela passa a valer para todo
 projeto, com especial derivado dela.
 
-- ⬜ **T1** — ambiente v2 isolado (app `godocs-v2-staging`, aba `STAGING-V2`, guard de env)
-- ⬜ **T2** — núcleo puro do impacto (`src/lib/impacto.ts`), pesos e divisores como fonte única
+- ✅ **T1** — ambiente v2 isolado **no ar**: app **`f9c9a7ff`** (`godocs-v2-staging`, https://f9c9a7ff.devgogroup.com/,
+  SQLite próprio zerado), 9 secrets (`GODOCS_ENV=v2-staging` · `GOOGLE_SHEETS_TAB=STAGING-V2` · LLM) e o ambiente
+  novo reconhecido em **5** consumidores, não 1: `env.ts` (+ `rotuloAmbienteExterno`), `pinecone.ts`,
+  `gomoon-lideres`, `rollup-push`, `staging-banner`. Chat/Gomoon/push/Drive mudos por ausência de secret.
+  ⏳ Falta só a verificação com Google (submissão caindo na `STAGING-V2`) — os 6 secrets sensíveis foram
+  **dispensados pelo Luis** por ora.
+- ✅ **T2** — núcleo puro do impacto (`src/lib/impacto.ts`): 4 funções + `PESO_*`/`DIVISOR_FREQUENCIA` como
+  fonte única, **54 casos** de teste. Guardas que os revisores acharam: frequência fora do enum **lança**
+  (era `NaN` → `null` no dinheiro do Gomoon) e custo negativo **clampa** (aumentava o impacto).
+  Nenhum consumidor ainda — trocar as 5 réplicas da v1 é a T6.
 - ⬜ **T3** — modelo de dados dos 4 ganhos + exclusividade do ganho imensurável
 - ⬜ **T4** — componentes que faltam: acordeão · lista de itens · tabela de horas · campo de evidência com colar
 - ⬜ **T5** — Etapas 1, 2 e 3 reescritas (sai a Etapa 2.5)
@@ -25,7 +33,10 @@ projeto, com especial derivado dela.
 - ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
 - ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos (por último)
 
-**Próximo:** codar a **T2** (núcleo puro do impacto) com `/ggsd:code`, em paralelo à **T1** (provisionar o ambiente v2).
+**Próximo:** codar a **T3** (modelo de dados dos 4 ganhos + exclusividade do imensurável) com `/ggsd:code` — e nela
+**importar `Frequencia`/`DIVISOR_FREQUENCIA` de `impacto.ts`** em vez de redeclarar, senão a fonte única da fórmula
+nasce com duas cabeças (o `Frequencia` é hoje o **primeiro alias nomeado** dessa cadência no repo: `tipo_saving` é
+união inline repetida em ~11 lugares).
 
 ---
 

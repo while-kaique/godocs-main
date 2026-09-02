@@ -1,40 +1,62 @@
 # NEXT-SESSION
 
-## 🔧 T1 EM PREPARO (02/09) — ambiente v2 isolado
+## ✅ SESSÃO 02/09 — T1 e T2 do GoDocs v2 executadas
 
-**Worktree/space:** `/home/notebook/godocs-v2` (branch `feat/godocs-v2`, space Herdr `godocs-v2` = `w14`).
-`node_modules` linkado p/ `../godocs-main/node_modules`, `.env` copiado. **Baseline: 2314 testes verdes.**
+Branch **`feat/godocs-v2`**, na pasta **`/home/notebook/godocs-main`** (o worktree `godocs-v2` foi removido a
+pedido do Luis — "pode ser tudo no mesmo lugar"). Suíte **2381 verde**, `tsc` só com os 7 erros pré-existentes
+do `main`, `npm run build` + `build:worker` ok, `worker.js` commitado (regra 1).
 
-**Autorização do Luis (02/09):** criar o app `godocs-v2-staging` no Godeploy com **datasource novo**
-está liberado — ele puxa da aba **`STAGING-V2`, que JÁ EXISTE na planilha**, e sobem as **mesmas
-credenciais** da staging v1. Sem pendência de decisão.
+### T1 — ambiente v2 isolado ✅ (menos a verificação com Google)
+- App **`f9c9a7ff`** = `godocs-v2-staging` · https://f9c9a7ff.devgogroup.com/ · SQLite próprio zerado.
+- 9 secrets: `GODOCS_ENV=v2-staging`, `GOOGLE_SHEETS_TAB=STAGING-V2`, `ADMIN_EMAILS`, `APP_BASE_URL` e a
+  config de LLM (`sol` + `gpt-5.6-luna` + `LLM_REASONING_EFFORT_FAST=low`, valores do `CLAUDE.md`).
+- **Mudo por AUSÊNCIA de secret** (é assim que o ambiente não fala com ninguém): Chat, Chat de Ajuda,
+  Gomoon, push do JG e Drive (sem `GOOGLE_DRIVE_FOLDER_ID` o guard recusa e o `uploadDocsToDrive` engole →
+  submissão segue sem link, nunca escreve na pasta real).
+- ⚠️ **O achado que fez a T1 ser 5 arquivos, não 1:** `GODOCS_ENV=v2-staging` caía em **`'production'`** no
+  parser (só `'staging'` era reconhecido), o que **desligava** o `assertNaoEhDefaultDeProd` e mandava
+  Pinecone (namespace `prod`), Gomoon (`ambiente: 'producao'` → **DM em líder REAL**), rollup-push e o banner
+  para o caminho de produção. Régua nova: **`isStaging()`** vale para os dois ambientes de teste, e
+  **`rotuloAmbienteExterno()`** (`env.ts`) é a fonte única do rótulo que viaja para fora — estava digitado
+  igual em 2 lugares.
+- ⏳ **Pendente por decisão do Luis:** os 6 secrets sensíveis (`GOOGLE_SA_KEY_BASE64`, `GOOGLE_SA_CLIENT_EMAIL`,
+  `TG_API_TOKEN`, `API_PROXY_TOKEN`, `LLM_API_KEY`, `LLM_FALLBACK`) **não** foram setados ("n precisa desses").
+  Sem eles o app abre e o formulário roda, mas **nada sincroniza com a planilha** — então o critério de
+  aceitação 8 da T1 (submissão de teste caindo na `STAGING-V2` e em nenhuma outra aba) **não foi verificado**.
+  Quando for a hora do sync, é setar os 6 no `f9c9a7ff`.
 
-### ⚠️ Achado do mapeamento (faz o T1 ser 5 arquivos, não 1)
-`GODOCS_ENV=v2-staging` cai em **`'production'`** no parser de hoje (`env.ts:16` só reconhece
-`'staging'`) — isso **desliga o guard** `assertNaoEhDefaultDeProd` e joga tudo no caminho REAL.
-Pontos que leem o ambiente e precisam reconhecer o v2:
+### T2 — núcleo puro do impacto ✅
+**`src/lib/impacto.ts`** (novo, PURO): `mensalizar`/`divisorDe`, `impactoBruto`, `impactoLiquido`,
+`impactoLiquidoMensal` + `PESO_SAVING=1`/`PESO_CUSTO_EVITADO=0.5`/`PESO_RECEITA=0.1`/`DIVISOR_FREQUENCIA`.
+**54 casos** em `tests/impacto.test.ts`. **Nenhum consumidor ainda** — trocar as 5 réplicas da v1 é a **T6**.
+Duas guardas que os revisores acharam e que **não podem sair**:
+- **frequência fora do enum LANÇA** (`divisorDe`, fail-closed). Era `NaN`, e o caminho da falha é o pior:
+  `JSON.stringify(NaN)` → **`null`**, ou seja, campo de DINHEIRO nulo no payload do Gomoon em vez de erro, e
+  um `NaN` num `reduce` de rollup zera o total da área. O vocabulário das fontes da v1 é MAIOR que o enum
+  (`custoPeriodicidade` tem `'anual'` e `''`; `tipo_saving` pode ser `null`). ⚠️ **Nunca trocar por `?? 1`.**
+- **custo negativo CLAMPA em 0** (como `somarItens`/`custoProjetoMensalFromItens` da v1 já fazem). Sem isso,
+  `-500` num item de custo **aumentava** o impacto — a direção gameável.
 
-| Arquivo | Linha | Risco se não tratar |
-|---|---|---|
-| `src/lib/env.ts` | 12·16·21 | `GodocsEnv` + `getGodocsEnv` + `isStaging` — o guard do Sheet/Drive nunca dispara |
-| `src/lib/pinecone.ts` | 82 | namespace volta `'prod'` → **contamina o índice de produção** |
-| `src/lib/gomoon-lideres.functions.ts` | 371 | `ambiente: 'producao'` → **DM real para líder** (é a ÚNICA proteção, ver CLAUDE.md D-Gomoon) |
-| `src/lib/rollup-push.functions.ts` | 180 | push outbound marcado como produção |
-| `src/components/staging-banner.tsx` + `worker.ts` | 14·33 / 261 | faixa de ambiente não aparece no v2 (compara `=== 'staging'`) |
+### ⚠️ 3 pendências que são DECISÃO do Luis, não trabalho
+1. **Editei o texto da T1 no plano APROVADO** (`godocs-v2-submissao-deterministica.md:128-135`), para registrar
+   os 5 consumidores. O revisor de conformidade apontou, com razão, que mexer no plano aprovado **move a régua
+   contra a qual ele verifica**. **Manter ou reverter?** (Daquele ponto em diante só mexi em `Status:`/progresso.)
+2. **Os "3 exemplos da conversa"** que a T2 pede como guarda (`:142`) **não existem registrados** em lugar
+   nenhum — nem no plano, nem no repo. Os 54 casos foram derivados da FÓRMULA. Se o Luis tiver os números
+   daquela conversa, conferir contra eles: divergência apontaria erro de leitura da fórmula, não do teste.
+3. **`PESO_RECEITA = 0.1` NÃO é peso novo** — é a mesma regra do `÷10` da v1, agora encodada em **duas** réguas
+   independentes. Mudar o fator um dia exige tocar os dois lados, e o lado da v1 tem um "não corrigir aqui"
+   que ninguém vai ligar a este arquivo.
 
-Direção proposta: `isStaging()` passa a ser **true** para `staging` E `v2-staging` (é o predicado que
-carrega a segurança); os 3 sites `getGodocsEnv() === 'staging' ? … : 'producao'` passam a usar
-`isStaging()`; a faixa compara `!== 'production'`. Teste vivo: `tests/env-staging.test.ts`.
-
-**Isolamento é por env, não por código:** `GOOGLE_SHEETS_TAB=STAGING-V2` · `GOOGLE_SHEETS_ID` ·
-`GOOGLE_DRIVE_FOLDER_ID` (o guard recusa cair no default de prod: `sheets.ts:13-17`).
-
-**Próximo passo:** §7.1 test-writer sobre `tests/env-staging.test.ts` (red p/ `v2-staging`) → implementar
-os 5 pontos → `createApp godocs-v2-staging` + secrets (`GODOCS_ENV=v2-staging`, aba `STAGING-V2`, Chat e
-Gomoon mudos) → guarda do T1: submissão de teste escreve em `STAGING-V2` e **nunca** em `GoDocs`/`STAGING`.
+### Amarra obrigatória para a T3
+`impacto.ts` declara `Frequencia` e `DIVISOR_FREQUENCIA`. A T3 tem de **importar daqui**, nunca redeclarar —
+senão a fonte única da fórmula nasce com duas cabeças. Bônus do revisor de reuso: esse `Frequencia` é o
+**primeiro alias nomeado** da cadência no repo (hoje `tipo_saving` é união inline repetida em ~11 lugares:
+`agents/types.ts:78,216,442` · `chat.functions.ts:609,662` · `submeter.tsx:2665,2768` ·
+`step3-chat.tsx:885,1242,1455` · `constants.ts:739`) — vale considerá-lo o canônico da cadência.
 
 ## Plano ativo
-**→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026)
+**→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026) · **T1 e T2 executadas — próxima é a T3**
 
 > Branch `feat/godocs-v2`, worktree `~/godocs-wt-v2`. Frente NOVA e isolada: o GoDocs v2 (submissão
 > determinística sem agente no cliente). **Nada nesta branch toca prod (`674a3710`) nem o staging v1

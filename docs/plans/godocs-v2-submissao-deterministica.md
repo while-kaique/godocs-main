@@ -1,6 +1,8 @@
 # Plano — GoDocs v2: submissão determinística sem agente no cliente
 
-**Status:** ✅ aprovado (Luis, 02/09/2026)
+**Status:** ✅ aprovado (Luis, 02/09/2026) · **em execução — T1 e T2 executadas em 02/09** (branch `feat/godocs-v2`,
+suíte 2381 verde; revisores: conformidade `diverge-baixa`, qualidade `sugestoes`, reuso `duplicacao-intencional` —
+nenhum barrante). T1 fechada menos a verificação com Google (secrets sensíveis dispensados pelo Luis). Próxima: **T3**.
 
 **Objetivo:** substituir a coleta conversacional de ganho por um formulário determinístico de 4 categorias
 (saving efetivado · custo evitado · receita incremental · ganho imensurável), com nova fórmula de impacto,
@@ -127,7 +129,12 @@ Texto novo enxuto, em linguagem natural, sem travessão nem hífen decorativo.
 
 - **T1 — Ambiente v2 isolado.** Criar app `godocs-v2-staging` no Godeploy (datasource novo, zerado), secrets
   com `GODOCS_ENV=v2-staging`, aba `STAGING-V2` como alvo do sync, Chat e Gomoon desligados. Estender o guard
-  `assertNaoEhDefaultDeProd` (`src/lib/env.ts`) para reconhecer o ambiente novo.
+  `assertNaoEhDefaultDeProd` (`src/lib/env.ts`) para reconhecer o ambiente novo — **e todos os
+  consumidores que comparam com a literal `'staging'`**, que são o trabalho de verdade: `pinecone.ts`
+  (namespace ia para `prod` e contaminaria o índice de produção), `gomoon-lideres.functions.ts` e
+  `rollup-push.functions.ts` (campo `ambiente` saía `producao` → DM em líder REAL e escrita na série de
+  prod) e `staging-banner.tsx` (o v2 subiria sem faixa, visualmente idêntico a prod). A régua passa a ser
+  `isStaging()`/`rotuloAmbienteExterno()`, nunca a comparação literal.
   *(guarda: deploy sobe, `/api/auth/me` responde, e uma submissão de teste escreve em `STAGING-V2` — nunca em `GoDocs`/`STAGING`)*
 
 - **T2 — Núcleo puro do impacto** (`src/lib/impacto.ts`, novo). `mensalizar(valor, frequência)`,
