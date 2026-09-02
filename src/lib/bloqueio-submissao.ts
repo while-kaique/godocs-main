@@ -40,12 +40,12 @@ export const FIM_PADRAO_UTC = "2026-09-01T03:00:00Z";
  * ⚠️ Sem "-" nem "—" nas frases.
  */
 export const COPY_BLOQUEIO = {
-  /** ANTES da janela — o botão ainda funciona; é só um lembrete de prazo. */
+  /** ANTES da janela — o botão ainda funciona; é só um lembrete. */
   avisoPrevio:
-    "As novas submissões serão pausadas nesta terça, 25 de agosto, às 23h59. Se você já começou a submissão de um projeto, conclua o envio antes desse horário. Voltamos a receber submissões na terça, 1º de setembro.",
+    "Em breve o GoDocs vai receber uma versão nova e melhor. Durante a atualização, as submissões e edições ficam pausadas por um tempo. Se você já começou um projeto, conclua o envio antes.",
   /** DURANTE a janela — botão bloqueado. Também é a copy da recusa do servidor. */
   durante:
-    "As submissões estão pausadas no momento e voltam na terça, 1º de setembro. Os projetos que você já enviou seguem em avaliação normalmente pelo time de RPA.",
+    "Estamos preparando uma versão nova e melhor do GoDocs para deixar tudo mais simples para vocês. Enquanto isso, as submissões e edições ficam pausadas até esta sexta às 16h. Já já voltamos com as novidades.",
 } as const;
 
 /** Lê uma env de override de forma LAZY e segura no cliente (sem `process`). */
