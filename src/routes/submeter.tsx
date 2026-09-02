@@ -10,7 +10,6 @@ import { apiFetch, apiStream, ApiError, setDemoBackend } from "@/lib/api-client"
 import { criarDemoBackend, demoSeedForm, demoFile, CHAVE_TESTE_LIDERANCA, type FluxoDemo } from "@/lib/fluxos/demo-backend";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
-import { CODIGOS_TRIAGEM_ESPECIAL } from "@/lib/mensagens-submissao";
 
 import {
   filesToDocs, TOKEN_BLOCK_CHARS,
@@ -18,10 +17,9 @@ import {
   validarEtapa1,
   validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
   limitarCoautorUnico, deveMostrarIntro,
-  validarEtapa25Especial, motivoBloqueioEspecial,
   serializarFerramentas, desserializarFerramentas,
 } from "@/lib/submeter/constants";
-import type { FormData, FieldErrors, ChatFase, ChatMessage, SavingFormData, PapelParticipante } from "@/lib/submeter/constants";
+import type { FormData, FieldErrors, PapelParticipante } from "@/lib/submeter/constants";
 import { saveDraft, loadDraft, clearDraft, editDraftKey, deveDescartarDraftEdicao, type DraftSnapshot } from "@/lib/submeter/draft-storage";
 import type { VersaoSnapshot } from "@/lib/meus-projetos.functions";
 
@@ -45,8 +43,22 @@ import { FAQ_RODAPE } from "@/lib/faq/links";
 import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
-import { Etapa25 } from "@/lib/submeter/step25";
-import { Step3Chat, CyclingText } from "@/lib/submeter/step3-chat";
+import { Step3Ganhos } from "@/lib/submeter/step3-ganhos";
+import { RevisaoGanhos } from "@/lib/submeter/revisao-ganhos";
+import {
+  ganhosFormVazio,
+  paraGanhosDeclarados,
+  validarEtapa3,
+  type GanhosFormData,
+} from "@/lib/submeter/validacao-etapa3";
+import {
+  desserializarCategorias,
+  desserializarCustoRodar,
+  desserializarLinhasHoras,
+} from "@/lib/ganhos";
+import { GANHO_ROTULOS } from "@/lib/ganhos-rotulos";
+import { hojeIso } from "@/lib/calendario-datas";
+import { anexosUteis } from "@/lib/submeter/evidencia";
 import { IntroSubmissao } from "@/lib/submeter/intro";
 
 /* ──────────────────────────────────────────────
@@ -79,22 +91,6 @@ function SubmeterPage() {
    Page Component
    ────────────────────────────────────────────── */
 
-const emptyFormDraft = (): SavingFormData => ({
-  linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
-  alguemFazia: "",
-  eliminaGastoExterno: "",
-  temContrafactualAdicional: "",
-  temCustoEvitado: "",
-  custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-  temCustoProjeto: "",
-  custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-  tipoSaving: "",
-  custoExterno: "",
-  custoPeriodicidade: "",
-  valorReceita: "",
-  racionalReceita: "",
-});
-
 // Snapshot dos metadados com que o agente está alinhado — usado para detectar
 // edições feitas nas etapas anteriores depois que o agente já iniciou (item:
 // adaptação a idas e vindas).
@@ -109,7 +105,6 @@ type AgentMeta = {
   // papéis: mudar o texto tem de disparar metaChanged e ser persistido via
   // `atualizar-metadados`, senão a correção no meio do chat morre na tela.
   participantesContribuicoes: Record<string, string>;
-  dataCriacao: string;
   descricaoBreve: string;
   // Usa o AI Proxy interno? Entra no meta para que uma mudança dispare metaChanged.
   usaAiProxy: "sim" | "nao" | "";
@@ -118,7 +113,6 @@ type AgentMeta = {
   // gravado no SQLite.
   contrafactualAfetados: string;
   // Projeto especial: o contexto especial é entrada determinística da fase de doc.
-  contextoEspecial: string;
 };
 
 // Números finais recalculados pelo servidor na submissão (retorno de submeter-validacao).
@@ -512,36 +506,28 @@ export function SubmeterPageContent({
   // "o sistema quebrou" para um problema de preenchimento. Ver `lib/mensagens-submissao.ts`.
   const [bloqueio, setBloqueio] = useState<BloqueioSubmissao | null>(null);
 
-  // Chat state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatComplete, setChatComplete] = useState(false);
-  // "Finalizando…": depois que a prosa termina de streamar, o LLM ainda gera a cauda
-  // estruturada (invisível) do JSON e só então o envelope libera o botão. Nesse intervalo
-  // a bolha do assistente fica parada e nenhum loader aparece (o dos 3 pontos só vale
-  // quando a última mensagem é do usuário) → sensação de travamento. Este estado liga um
-  // indicador discreto quando os deltas param por um tempo mas o turno ainda não fechou.
-  const [chatFinalizando, setChatFinalizando] = useState(false);
-  const finalizarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [chatFase, setChatFase] = useState<ChatFase>("doc");
+  // ── Etapa 3 (v2): os blocos de ganho ──
+  // Não há mais estado de CONVERSA aqui (nem mensagens, nem fase, nem preview aprovado):
+  // o agente saiu do caminho do usuário (D4). O que sobra é o formulário determinístico,
+  // cuja régua vive em `validacao-etapa3.ts`.
+  const [ganhos, setGanhos] = useState<GanhosFormData>(ganhosFormVazio);
+  // Revisão antes do envio: a Etapa 3 valida, mostra o resumo e só então envia — o clique
+  // que dispara a submissão não pode ser o mesmo que descobre que falta preencher algo.
+  const [revisando, setRevisando] = useState(false);
+  // Loading do avanço Etapa 2 → 3 (garante o projeto criado antes de abrir os blocos).
+  const [avancando, setAvancando] = useState(false);
   const [projetoId, setProjetoId] = useState<string | null>(null);
   // Tipo(s) com que o fluxo do agente está alinhado — usado para detectar troca
   // de tipo (saving ↔ receita) quando o usuário volta à etapa 2 no meio do fluxo.
-  const [agentTipos, setAgentTipos] = useState<("saving" | "receita_incremental")[]>([]);
   // Metadados + assinatura dos arquivos com que o agente está alinhado (item:
   // propagar mudanças de metadado/arquivos ao agente).
   const [agentMeta, setAgentMeta] = useState<AgentMeta | null>(null);
   const [agentArquivosSig, setAgentArquivosSig] = useState<string>("");
-  const [continuando, setContinuando] = useState(false);
   // Snapshot da versão anterior — capturado uma vez no seed, nunca sobrescrito.
   // Usado na tela de comparação antes/depois do FinalReview.
   const [versaoAnterior, setVersaoAnterior] = useState<VersaoSnapshot | null>(null);
   // Passos nomeados exibidos no chat durante operações pesadas (null = 3 pontinhos).
-  const [chatLoadingSteps, setChatLoadingSteps] = useState<string[] | null>(null);
-  const [iniciandoChat, setIniciandoChat] = useState(false);
   // Fluxo DIRETO de liderança: loading do botão "Enviar direto" (cria projeto + doc por IA).
-  const [iniciandoDireto, setIniciandoDireto] = useState(false);
   // F2 — processamento da doc em segundo plano (só submissão nova). Ao subir arquivos na
   // Etapa 2, disparamos iniciar-submissao em background para a Etapa 3 abrir sem espera.
   const [bgStatus, setBgStatus] = useState<"idle" | "processando" | "pronto" | "erro">("idle");
@@ -555,32 +541,17 @@ export function SubmeterPageContent({
   // Sinaliza que o background já criou o projeto e a Etapa 2.5 (não-especial) deve delegar
   // ao fluxo de re-entrada (handleContinuarAgente) no PRÓXIMO render — com projetoId fresco
   // no estado, evitando ler o valor stale logo após o setProjetoId do background.
-  const [pendingContinuar, setPendingContinuar] = useState(false);
   // Projeto especial: envio direto (cria projeto + submete), pulando o agente.
-  const [enviandoEspecial, setEnviandoEspecial] = useState(false);
-  const [showTransition, setShowTransition] = useState(false);
-  const [approvedDocPreview, setApprovedDocPreview] = useState<string | null>(null);
-  const [approvedSavingPreview, setApprovedSavingPreview] = useState<string | null>(null);
   const [submittingProject, setSubmittingProject] = useState(false);
-  const [showSavingForm, setShowSavingForm] = useState(false);
-  const [savingFormLoading, setSavingFormLoading] = useState(false);
-  const [approvedReceitaPreview, setApprovedReceitaPreview] = useState<string | null>(null);
-  const [showReceitaForm, setShowReceitaForm] = useState(false);
-  const [receitaFormLoading, setReceitaFormLoading] = useState(false);
-  const [transitionType, setTransitionType] = useState<"saving" | "receita">("saving");
   // Rascunho do formulário de impacto (SavingForm) — vive no pai para persistir
   // quando o usuário navega para fora da etapa 3 e volta (o step 3 desmonta).
-  const [formDraft, setFormDraft] = useState<SavingFormData>(emptyFormDraft);
   // Snapshots do que foi enviado em cada fase financeira (separados para o fluxo
   // "ambos": permite editar o saving mesmo já estando na receita). Reenvio idêntico
   // ao snapshot volta ao chat sem reanalisar. O de saving sobrevive à transição
   // saving→receita; o de receita reseta ao (re)entrar na fase de receita.
-  const [savingSubmitted, setSavingSubmitted] = useState<SavingFormData | null>(null);
-  const [receitaSubmitted, setReceitaSubmitted] = useState<SavingFormData | null>(null);
   // Números finais recalculados pelo servidor na submissão — usados no comparativo
   // numérico antes×depois da tela de sucesso (somente edição, quando há versão anterior).
   const [ganhoFinal, setGanhoFinal] = useState<GanhoFinal | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
   // "Salvar rascunho": confirmação + estado (só quando já existe rascunho no servidor).
   const [showRascunhoConfirm, setShowRascunhoConfirm] = useState(false);
   const [salvandoRascunho, setSalvandoRascunho] = useState(false);
@@ -641,7 +612,7 @@ export function SubmeterPageContent({
         const afetadosSeed = desserializarAfetados(data.contrafactual_afetados as string | null);
 
         const newForm: FormData = {
-          escopo: (data.escopo as string) ?? "interno",
+          escopo: ((data.escopo as string) ?? "interno") as FormData["escopo"],
           prodStatus: "sim",
           nome: (data.responsavel_nome as string) ?? "",
           email: (data.responsavel_email as string) ?? "",
@@ -653,170 +624,71 @@ export function SubmeterPageContent({
           participantesPapeis,
           participantesContribuicoes,
           nomeProjeto: (data.nome_projeto as string) ?? "",
-          dataCriacao: (data.data_criacao_projeto as string) ?? "",
-          tipoProjeto: tiposProjeto,
+          // v2: as categorias vêm da coluna `ganho_categorias` (JSON). A leitura NUNCA
+          // lança e nunca inventa categoria — projeto gravado antes da v2 simplesmente
+          // volta sem nenhuma, e a Etapa 2 cobra a escolha.
+          ganhoCategorias: desserializarCategorias(data.ganho_categorias as string | null),
           descricaoBreve: (data.descricao_breve as string) ?? "",
           usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           contrafactualAfetadosTipo: afetadosSeed.tipo,
           contrafactualAfetados: afetadosSeed.lista,
-          especial: data.especial === true,
-          contextoEspecial: (data.contexto_especial as string) ?? "",
-          // Triagem do especial: campos SÓ DO FRONTEND (não existem no servidor), então a
-          // edição de um especial já submetido começa em branco e as 2 perguntas são
-          // respondidas de novo antes do reenvio — é o efeito desejado (especial legado
-          // passa pela triagem que não existia quando ele entrou).
-          especialDashboard: "",
-          especialGanhoOrganizacional: "",
         };
 
         setForm(newForm);
         setNomesExistentes((data.arquivos_nomes as string[]) ?? []);
         setProjetoId(id);
-        setAgentTipos(tiposProjeto);
-        setRespEspecial(data.especial ? "sim" : "nao");
 
-        // Seed de previews e snapshots financeiros a partir da documentação já salva
-        const doc = data.documentacao as Record<string, unknown> | null;
-        if (doc) {
-          // Doc preview
-          const conteudo = doc as Record<string, unknown>;
-          const partes: string[] = [];
-          if (conteudo.o_que_faz) partes.push(`**O que faz:** ${conteudo.o_que_faz}`);
-          if (conteudo.execucao) partes.push(`**Execução:** ${conteudo.execucao}`);
-          if (partes.length > 0) setApprovedDocPreview(partes.join("\n\n"));
-
-          // Saving snapshot
-          const saving = conteudo.saving as Record<string, unknown> | undefined;
-          if (saving) {
-            const linhasRaw = (saving.linhas as Array<Record<string, unknown>>) ?? [];
-            const linhas = linhasRaw.map((l) => ({
-              cargo: String(l.cargo ?? ""),
-              horasAntes: String(l.horas_antes ?? ""),
-              horasDepois: String(l.horas_depois ?? ""),
+        // ── Etapa 3: repõe os blocos de ganho das colunas da v2 ──
+        // ⚠️ Os valores voltam com MÁSCARA BR (`numeroParaMoedaBR`): a coluna guarda
+        // número, o input mostra "1.234,56", e reabrir com o número cru faria a máscara
+        // reler "1234.56" como centavos na primeira tecla digitada.
+        const moeda = (v: unknown) =>
+          v != null && v !== "" ? numeroParaMoedaBR(Number(v)) : "";
+        const freq = (v: unknown) => ((v as string) ?? "") as GanhosFormData["savingFrequencia"];
+        setGanhos({
+          ...ganhosFormVazio(),
+          savingValor: moeda(data.saving_efetivado_valor),
+          savingFrequencia: freq(data.saving_efetivado_frequencia),
+          savingEvidencia: (data.saving_efetivado_evidencia as string) ?? "",
+          savingDesde: (data.saving_efetivado_desde as string) ?? "",
+          ceFrequencia: freq(data.custo_evitado_frequencia),
+          ceLinhas: (() => {
+            const linhas = desserializarLinhasHoras(
+              data.custo_evitado_horas_linhas as string | null,
+            ).map((l) => ({
+              funcao: l.funcao,
+              funcaoDescricao: l.funcaoDescricao ?? "",
+              horasAntes: String(l.horasAntes),
+              horasDepois: String(l.horasDepois),
             }));
-            // Custo evitado: repopula a partir da coluna do projeto (JSON salvo na
-            // submissão). Mantém a edição fiel ao que foi enviado.
-            let custoEvitadoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
-            try {
-              const raw = data.custo_evitado_itens;
-              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
-              if (Array.isArray(arr)) {
-                custoEvitadoItens = arr.map((it: Record<string, unknown>) => ({
-                  nome: String(it.nome ?? ""),
-                  // valor é salvo como número no JSON → reexibe com máscara BR.
-                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
-                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
-                  justificativa: String(it.justificativa ?? ""),
-                }));
-              }
-            } catch {
-              custoEvitadoItens = [];
-            }
-            // Custos do projeto: mesma repopulação (JSON salvo na submissão).
-            let custoProjetoItens: import("@/lib/submeter/constants").CustoEvitadoItemInput[] = [];
-            try {
-              const raw = data.custo_projeto_itens;
-              const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
-              if (Array.isArray(arr)) {
-                custoProjetoItens = arr.map((it: Record<string, unknown>) => ({
-                  nome: String(it.nome ?? ""),
-                  valor: it.valor != null && it.valor !== "" ? numeroParaMoedaBR(Number(it.valor)) : "",
-                  recorrencia: (it.recorrencia as "mensal" | "pontual" | "") ?? "",
-                  justificativa: String(it.justificativa ?? ""),
-                }));
-              }
-            } catch {
-              custoProjetoItens = [];
-            }
-            // Reconstrói a árvore do form a partir do alguem_fazia persistido:
-            // 'externo' = custo evitado puro (Não → elimina Sim → sem adicional);
-            // 'nao' + custo evitado = contrafactual + custo evitado (elimina Sim → adicional Sim);
-            // 'nao' sem custo evitado = contrafactual puro (elimina Não); 'sim' = horas reais.
-            const afRaw = (data.alguem_fazia as string) ?? "";
-            const custoEvitadoFlag = (data.custo_evitado as "sim" | "nao" | "") ?? "";
-            let alguemFaziaSnap: "sim" | "nao" | "" = "";
-            let eliminaGastoExternoSnap: "sim" | "nao" | "" = "";
-            let temContrafactualAdicionalSnap: "sim" | "nao" | "" = "";
-            let temCustoEvitadoSnap: "sim" | "nao" | "" = "";
-            if (afRaw === "externo") {
-              alguemFaziaSnap = "nao";
-              eliminaGastoExternoSnap = "sim";
-              temContrafactualAdicionalSnap = "nao";
-            } else if (afRaw === "nao") {
-              alguemFaziaSnap = "nao";
-              if (custoEvitadoFlag === "sim") {
-                eliminaGastoExternoSnap = "sim";
-                temContrafactualAdicionalSnap = linhas.length > 0 ? "sim" : "nao";
-              } else {
-                eliminaGastoExternoSnap = "nao";
-              }
-            } else if (afRaw === "sim") {
-              alguemFaziaSnap = "sim";
-              temCustoEvitadoSnap = custoEvitadoFlag;
-            }
-            const savingSnap: import("@/lib/submeter/constants").SavingFormData = {
-              linhas: linhas.length > 0 ? linhas : [{ cargo: "", horasAntes: "", horasDepois: "" }],
-              alguemFazia: alguemFaziaSnap,
-              eliminaGastoExterno: eliminaGastoExternoSnap,
-              temContrafactualAdicional: temContrafactualAdicionalSnap,
-              temCustoEvitado: temCustoEvitadoSnap,
-              custoEvitadoItens: custoEvitadoItens.length > 0
-                ? custoEvitadoItens
-                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-              temCustoProjeto: (data.custo_projeto as "sim" | "nao" | "") ?? "",
-              custoProjetoItens: custoProjetoItens.length > 0
-                ? custoProjetoItens
-                : [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-              tipoSaving: (data.tipo_saving as string) ?? "",
-              custoExterno: String(data.custo_externo_mensal ?? ""),
-              custoPeriodicidade: "mensal",
-              valorReceita: "",
-              racionalReceita: "",
-            };
-            setSavingSubmitted(savingSnap);
-            setFormDraft(savingSnap);
-            if (saving.memorial_calculo) setApprovedSavingPreview(String(saving.memorial_calculo));
-          }
+            return linhas.length > 0 ? linhas : ganhosFormVazio().ceLinhas;
+          })(),
+          ceNaoContratado: moeda(data.custo_evitado_nao_contratado),
+          ceRacional: (data.custo_evitado_racional as string) ?? "",
+          receitaValor: moeda(data.receita_incremental_valor),
+          receitaFrequencia: freq(data.receita_incremental_frequencia),
+          receitaRacional: (data.receita_incremental_racional as string) ?? "",
+          receitaTipo: (data.receita_incremental_tipo as string) ?? "",
+          imensuravelRacional: (data.ganho_imensuravel_racional as string) ?? "",
+          custoRodar: (() => {
+            const itens = desserializarCustoRodar(data.custo_rodar_itens as string | null).map(
+              (i) => ({
+                nome: i.nome,
+                valor: numeroParaMoedaBR(i.valor),
+                frequencia: i.frequencia as GanhosFormData["custoRodar"][number]["frequencia"],
+                descricao: i.oQueE,
+              }),
+            );
+            return itens.length > 0 ? itens : ganhosFormVazio().custoRodar;
+          })(),
+        });
 
-          // Receita snapshot
-          const receita = conteudo.receita as Record<string, unknown> | undefined;
-          if (receita) {
-            const receitaSnap: import("@/lib/submeter/constants").SavingFormData = {
-              linhas: [{ cargo: "", horasAntes: "", horasDepois: "" }],
-              alguemFazia: "",
-              eliminaGastoExterno: "",
-              temContrafactualAdicional: "",
-              temCustoEvitado: "",
-              custoEvitadoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-              temCustoProjeto: "",
-              custoProjetoItens: [{ nome: "", valor: "", recorrencia: "", justificativa: "" }],
-              tipoSaving: (receita.tipo_saving as string) ?? "mensal",
-              custoExterno: "",
-              custoPeriodicidade: "mensal",
-              valorReceita: String(receita.valor_ganho_mensal ?? ""),
-              racionalReceita: (receita.racional as string) ?? "",
-            };
-            setReceitaSubmitted(receitaSnap);
-            if (receita.memorial_calculo) setApprovedReceitaPreview(String(receita.memorial_calculo));
-          }
-
-          // Se o projeto já tem previews completos, não precisa rodar o agente novamente.
-          // chatComplete = true faz o botão "Enviar" aparecer direto na etapa 3.
-          // Quando o usuário altera algo, handleContinuarAgente reseta chatComplete.
-          if (!data.especial && partes.length > 0) {
-            const hasSavingType = tiposProjeto.includes("saving");
-            const hasReceitaType = tiposProjeto.includes("receita_incremental");
-            const savingOk = !hasSavingType || (saving && saving.memorial_calculo);
-            const receitaOk = !hasReceitaType || (receita && receita.memorial_calculo);
-            if (savingOk && receitaOk) setChatComplete(true);
-          }
-        }
-
-        // Snapshot congelado da última versão submetida — para a tela de comparação.
+        // Doc preview não existe mais como tela (a doc é invisível — D6), mas o snapshot
+        // congelado da última versão segue alimentando a comparação antes/depois.
         const ultimaVersao = data.ultima_versao as VersaoSnapshot | null;
         if (ultimaVersao) setVersaoAnterior(ultimaVersao);
 
-        // Snapshot do agentMeta para que o agente não reprocesse se nada mudou
+        // Snapshot do agentMeta para não reprocessar a doc se nada mudou.
         setAgentMeta({
           nomeProjeto: newForm.nomeProjeto.trim(),
           ferramenta: newForm.escopo === "externo"
@@ -828,20 +700,17 @@ export function SubmeterPageContent({
             newForm.participantes,
             newForm.participantesContribuicoes,
           ),
-          dataCriacao: newForm.dataCriacao,
           descricaoBreve: newForm.descricaoBreve.trim(),
           usaAiProxy: newForm.usaAiProxy,
           contrafactualAfetados: serializarAfetados(
             newForm.contrafactualAfetadosTipo,
             newForm.contrafactualAfetados,
           ),
-          contextoEspecial: newForm.contextoEspecial.trim(),
         });
 
-        // R1 (refinamento pós-staging): a edição ABRE na Etapa 1 (participantes/papéis
-        // são o foco). As Etapas 1 e 2 já contam como alcançadas (clicáveis no topo).
+        // A edição ABRE na Etapa 1 (participantes/papéis são o foco). As Etapas 1 e 2 já
+        // contam como alcançadas (clicáveis no topo).
         setStep(1);
-        // Etapa 3 ainda não foi percorrida nesta sessão — não marcar como concluída.
         setCompletedSteps(new Set([1, 2]));
   }, []);
 
@@ -849,25 +718,20 @@ export function SubmeterPageContent({
   // retomada fiel de um rascunho ao atualizar/voltar à página, sem ida ao servidor.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rehydrateFromLocal = useCallback((d: DraftSnapshot) => {
-    // Rascunhos salvos antes desta feature não têm `participantesPapeis` — default {}
-    // para nunca ler `undefined[email]`.
     // ⚠️ Rascunho SALVO ANTES de um campo novo existir não tem a chave — espalhar o
-    // objeto cru deixa o campo `undefined` e qualquer `.join()/.some()` derruba a tela
-    // inteira (bug real: /submeter em branco com "This page didn't load"). Todo campo
-    // novo precisa de default aqui, como o `participantesPapeis`.
+    // objeto cru deixa o campo `undefined` e qualquer `.join()/.some()/.length` derruba a
+    // tela inteira (bug real: /submeter em branco com "This page didn't load"). TODO campo
+    // novo precisa de default aqui.
     setForm({
       ...d.form,
       participantesPapeis: d.form.participantesPapeis ?? {},
-      // Rascunho salvo antes desta feature não tem o mapa de contribuições → {}.
       participantesContribuicoes: d.form.participantesContribuicoes ?? {},
       contrafactualAfetadosTipo: d.form.contrafactualAfetadosTipo ?? "pessoa",
       contrafactualAfetados: d.form.contrafactualAfetados ?? [],
-      // Rascunho salvo antes da triagem do especial não tem as chaves → "" (não respondida).
-      especialDashboard: d.form.especialDashboard ?? "",
-      especialGanhoOrganizacional: d.form.especialGanhoOrganizacional ?? "",
-      // Rascunho salvo quando a ferramenta era ESCOLHA ÚNICA guardou `ferramenta: "Claude"`
-      // e não tem `ferramentas` — sem esta conversão o campo abriria vazio (perdendo o que
-      // a pessoa já tinha marcado) e o `.includes()` do seletor quebraria a tela.
+      // Rascunho da v1 não tem as categorias (tinha `tipoProjeto` + `especial`). Volta
+      // VAZIO de propósito: converter "saving" → "saving_efetivado" seria adivinhar a
+      // régua D1 no lugar da pessoa, e a régua D1 é justamente o que a v2 pergunta.
+      ganhoCategorias: d.form.ganhoCategorias ?? [],
       ferramentas: d.form.ferramentas ?? desserializarFerramentas(
         (d.form as unknown as { ferramenta?: string }).ferramenta,
       ).ferramentas,
@@ -876,45 +740,13 @@ export function SubmeterPageContent({
     setDocExistenteInvalidado(d.docExistenteInvalidado ?? false);
     setProjetoId(d.projetoId);
     setCompletedSteps(new Set(d.completedSteps ?? [1, 2]));
-    setChatMessages(d.chatMessages ?? []);
-    setChatFase(d.chatFase ?? "doc");
-    setChatComplete(!!d.chatComplete);
-    setAgentTipos(d.agentTipos ?? []);
     setAgentMeta((d.agentMeta as AgentMeta | null) ?? null);
     setAgentArquivosSig(d.agentArquivosSig ?? "");
-    setApprovedDocPreview(d.approvedDocPreview ?? null);
-    setApprovedSavingPreview(d.approvedSavingPreview ?? null);
-    setApprovedReceitaPreview(d.approvedReceitaPreview ?? null);
-    setSavingSubmitted(d.savingSubmitted ?? null);
-    setReceitaSubmitted(d.receitaSubmitted ?? null);
-    if (d.formDraft) setFormDraft(d.formDraft);
-    setRespEspecial(d.respEspecial ?? "");
-    // Sub-tela ativa da etapa 3 (no mesmo batch do formDraft p/ o SavingForm montar
-    // já com o draft certo). Em fase de IMPACTO em coleta ("saving"/"receita"):
-    //  • dados determinísticos INALTERADOS (formDraft == *Submitted) e conversa num
-    //    ponto retomável (última msg do agente) → PRESERVA o chat; nada a reprocessar
-    //    e a pessoa não perde a conversa.
-    //  • saving/receita ALTERADO (precisa reprocessar) OU conversa parada no meio de
-    //    uma requisição (última msg é do usuário, sem resposta) → volta ao FORMULÁRIO.
-    // Previews/doc/submissão completa mantêm a sub-tela que estava salva.
-    const faseRetomada = d.chatFase ?? "doc";
-    const msgs = d.chatMessages ?? [];
-    const ultimaMsg = msgs[msgs.length - 1];
-    const conversaRetomavel = !!ultimaMsg && ultimaMsg.role === "assistant";
-    const inalterado = (snap: SavingFormData | null) =>
-      snap != null && JSON.stringify(snap) === JSON.stringify(d.formDraft);
-    if (faseRetomada === "saving") {
-      const preservaChat = conversaRetomavel && inalterado(d.savingSubmitted);
-      setShowSavingForm(!preservaChat);
-      setShowReceitaForm(false);
-    } else if (faseRetomada === "receita") {
-      const preservaChat = conversaRetomavel && inalterado(d.receitaSubmitted);
-      setShowReceitaForm(!preservaChat);
-      setShowSavingForm(false);
-    } else {
-      setShowSavingForm(!!d.showSavingForm);
-      setShowReceitaForm(!!d.showReceitaForm);
-    }
+    // Blocos de ganho: rascunho da v1 não os tem — cai no formulário em branco.
+    setGanhos(d.ganhos ?? ganhosFormVazio());
+    // A revisão NUNCA volta aberta: ela afirma "confira e envie" sobre dados que podem
+    // ter sido restaurados pela metade, e o clique seguinte submete.
+    setRevisando(false);
     setStep(d.step ?? 3);
   }, []);
 
@@ -1007,39 +839,13 @@ export function SubmeterPageContent({
         }
         // Cross-device: sem snapshot local → seed do servidor + histórico do chat.
         applySeed(data, wantedId);
-        try {
-          const hist = await apiFetch<Array<Record<string, unknown>>>(
-            `/api/chat/historico/${wantedId}`,
-          );
-          if (!cancelled && Array.isArray(hist) && hist.length > 0) {
-            // Defesa em profundidade: só bolhas de conversa. O backend já filtra a
-            // role 'doc' (texto bruto dos arquivos) e parseia o JSON do assistant,
-            // mas mantemos o filtro aqui para nunca renderizar conteúdo cru vindo de
-            // dados legados/inesperados.
-            const conversa = hist.filter(
-              (m) => m.role === "user" || m.role === "assistant",
-            );
-            const msgs: ChatMessage[] = conversa.map((m) => ({
-              role: m.role === "user" ? "user" : "assistant",
-              content: String(m.content ?? ""),
-              options: (m.options as ChatMessage["options"]) ?? undefined,
-              isPreview: Boolean(m.isPreview),
-              isComplete: Boolean(m.isComplete),
-              fase: (m.fase as ChatFase | undefined) ?? undefined,
-            }));
-            if (msgs.length > 0) {
-              setChatMessages(msgs);
-              // Coerência da UI: alinha fase/estado de conclusão à última resposta do
-              // agente (senão a conversa retomada ficava presa na fase "doc").
-              const ultima = msgs[msgs.length - 1];
-              if (ultima.fase) setChatFase(ultima.fase);
-              if (ultima.isComplete) setChatComplete(true);
-              setStep(3);
-              setCompletedSteps(new Set([1, 2, 3]));
-            }
-          }
-        } catch (e) {
-          console.warn("[rascunho] histórico do chat indisponível:", e);
+        // ⚠️ A retomada cross-device NÃO repõe mais histórico de conversa: não existe
+        // conversa (D4). O `applySeed` acima já traz os blocos de ganho das colunas, que
+        // é o estado que a pessoa tinha. A rota `/api/chat/historico/:id` continua
+        // existindo para o Investigador, mas o formulário não a consome.
+        if (!cancelled) {
+          setStep(3);
+          setCompletedSteps(new Set([1, 2, 3]));
         }
       })
       .catch((e) => {
@@ -1070,16 +876,11 @@ export function SubmeterPageContent({
     participantesPapeis: {},
     participantesContribuicoes: {},
     nomeProjeto: "",
-    dataCriacao: today,
-    tipoProjeto: [],
+    ganhoCategorias: [],
     descricaoBreve: "",
     usaAiProxy: "",
     contrafactualAfetadosTipo: "pessoa",
     contrafactualAfetados: [],
-    especial: false,
-    contextoEspecial: "",
-    especialDashboard: "",
-    especialGanhoOrganizacional: "",
   });
 
   // Título da aba. Esta tela é a MESMA em dois modos (nova submissão × edição), e é
@@ -1167,16 +968,10 @@ export function SubmeterPageContent({
   }, []);
   const overrideLideranca = perfilAdmin && (!!liderancaOverride || liderancaFlag);
   const ehLiderancaEfetivo = perfilLideranca || overrideLideranca;
-  // O fluxo DIRETO vale só para SUBMISSÃO NOVA e projeto padrão. Edição de liderança
-  // segue a revisão guiada normal (evita o rehydrate/re-init do doc da edição); o
-  // especial já pula o agente por conta própria.
-  const modoDireto = ehLiderancaEfetivo && !form.especial && !editProjetoId;
-
-  // Etapa 2.5 (tipo de projeto): sub-tela entre a etapa 2 e o início do agente.
-  // Só aparece na PRIMEIRA passagem (antes do agente iniciar). Em re-entradas
-  // (projetoId já existe) o fluxo padrão de "Continuar com Agente" é mantido.
-  const [showEtapa25, setShowEtapa25] = useState(false);
-  const [respEspecial, setRespEspecial] = useState<"sim" | "nao" | "">("");
+  // ⚠️ O "fluxo direto de liderança" DEIXOU DE EXISTIR como bifurcação: na v2 não há
+  // agente no caminho de ninguém (D4), então o caminho determinístico é o único e a
+  // liderança não precisa de um atalho para escapar da conversa. `ehLiderancaEfetivo`
+  // sobrevive porque o perfil ainda decide o que o analisador pode fazer com o projeto.
 
   // Persiste o rascunho em andamento no localStorage para retomar ao
   // atualizar/voltar à página (sem criar um rascunho órfão novo). Só vale fora do
@@ -1195,28 +990,13 @@ export function SubmeterPageContent({
       nomesExistentes,
       docExistenteInvalidado,
       completedSteps: [...completedSteps],
-      chatMessages,
-      chatFase,
-      chatComplete,
-      agentTipos,
       agentMeta,
       agentArquivosSig,
-      approvedDocPreview,
-      approvedSavingPreview,
-      approvedReceitaPreview,
-      savingSubmitted,
-      receitaSubmitted,
-      formDraft,
-      respEspecial,
-      showSavingForm,
-      showReceitaForm,
+      ganhos,
     }, editProjetoId ? editDraftKey(editProjetoId) : undefined);
   }, [
     editProjetoId, projetoId, submitted, seedLoading, step, form, nomesExistentes,
-    docExistenteInvalidado,
-    completedSteps, chatMessages, chatFase, chatComplete, agentTipos, agentMeta,
-    agentArquivosSig, approvedDocPreview, approvedSavingPreview, approvedReceitaPreview,
-    savingSubmitted, receitaSubmitted, formDraft, respEspecial, showSavingForm, showReceitaForm,
+    docExistenteInvalidado, completedSteps, agentMeta, agentArquivosSig, ganhos,
   ]);
 
   // Ao submeter (qualquer fluxo), o rascunho deixa de existir — descarta o snapshot
@@ -1300,14 +1080,6 @@ export function SubmeterPageContent({
 
   const prodBlocked = !form.escopo || form.prodStatus === "dev" || form.prodStatus === "idle";
 
-  /* Triagem do especial: MESMA régua pura da tela e dos handlers de envio (fonte única
-     `motivoBloqueioEspecial`). Fica aqui, derivada do form a cada render, por dois motivos:
-     (1) o botão de envio precisa nascer DESABILITADO enquanto a triagem bloqueia — antes ele
-     seguia clicável e cada clique era mais um caminho para o mesmo bloqueio; (2) sendo
-     derivado, ele SOME sozinho quando a pessoa troca a resposta para "não" — o painel que
-     vinha de estado (`bloqueio`) sobrevivia à correção e mentia na tela. */
-  const motivoEspecialAtual = motivoBloqueioEspecial({ ...form, especial: respEspecial === "sim" });
-
   /* ── Metadados do agente: snapshot + detecção de mudança ── */
   // FONTE ÚNICA da string que vai para `projetos.ferramenta` (banco/Sheets). Antes esta
   // mesma expressão estava reescrita à mão em 5 lugares; com multi-seleção seriam 5
@@ -1335,15 +1107,13 @@ export function SubmeterPageContent({
       form.participantes,
       form.participantesContribuicoes,
     ),
-    dataCriacao: form.dataCriacao,
     descricaoBreve: form.descricaoBreve.trim(),
     usaAiProxy: form.usaAiProxy,
     contrafactualAfetados: serializarAfetados(
       form.contrafactualAfetadosTipo,
       form.contrafactualAfetados ?? [],
     ),
-    contextoEspecial: form.contextoEspecial.trim(),
-  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.participantesContribuicoes, form.dataCriacao, form.descricaoBreve, form.usaAiProxy, form.contrafactualAfetadosTipo, form.contrafactualAfetados, form.contextoEspecial, computeFerramenta]);
+  }), [form.nomeProjeto, form.participantes, form.participantesPapeis, form.participantesContribuicoes, form.descricaoBreve, form.usaAiProxy, form.contrafactualAfetadosTipo, form.contrafactualAfetados, computeFerramenta]);
 
   // Assinatura dos arquivos (caminho + tamanho) — muda se o usuário troca os arquivos.
   const arquivosSig = useCallback((): string => {
@@ -1385,9 +1155,9 @@ export function SubmeterPageContent({
               form.participantesContribuicoes,
             ),
             nome_projeto: form.nomeProjeto.trim(),
-            data_criacao: form.dataCriacao,
-            // SEM tipos/especial: a fase de doc não depende deles; a Etapa 2.5 os define
-            // depois (handleContinuarAgente sincroniza; especial converte via metadados).
+            // ⚠️ SEM `data_criacao`: o campo saiu do formulário na v2 (a data que vale é a
+            // de SUBMISSÃO). E sem tipos/categorias: a fase de doc não depende delas — o
+            // ganho declarado é gravado no envio, pela rota própria.
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
             contrafactual_afetados:
@@ -1398,19 +1168,11 @@ export function SubmeterPageContent({
         );
         setProjetoId(result.projeto_id);
         setNomesExistentes(arquivos.map((f) => f.name));
-        setAgentTipos([]);
         setAgentMeta(snapshotMeta());
         setAgentArquivosSig(arquivosSig());
-        setChatMessages([{
-          role: "assistant",
-          content: result.response.content,
-          options: result.response.options ?? undefined,
-          isComplete: result.response.isComplete,
-          isPreview: result.response.isPreview,
-          fase: result.response.fase,
-        }]);
-        setChatFase(result.response.fase ?? "doc");
-        if (result.response.isComplete) setChatComplete(true);
+        // ⚠️ A resposta do servidor NÃO vira mensagem na tela: a documentação é invisível
+        // (D6). O que interessa aqui é só o `projeto_id` — a doc segue compilando por
+        // trás e, se não terminar, o cron reconcilia.
         setDocExistenteInvalidado(false);
         setBgStatus("pronto");
         return result.projeto_id;
@@ -1455,18 +1217,6 @@ export function SubmeterPageContent({
     return () => { if (bgDebounceRef.current) clearTimeout(bgDebounceRef.current); };
   }, [editProjetoId, projetoId, arquivos, form, docExistenteInvalidado, arquivosSig, snapshotMeta, dispararDocBackground, perfilCarregado, ehLiderancaEfetivo, demoFluxo]);
 
-  // Após o background criar o projeto, a Etapa 2.5 (não-especial) delega ao fluxo de
-  // re-entrada num render com projetoId JÁ no estado (evita ler o valor stale).
-  // handleContinuarAgente é redefinida a cada render (não memoizada); incluí-la nas deps
-  // faria o efeito rodar todo render à toa — o guard já garante disparo único.
-  useEffect(() => {
-    if (pendingContinuar && projetoId && !continuando) {
-      setPendingContinuar(false);
-      void handleContinuarAgente();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingContinuar, projetoId, continuando]);
-
   /* ── Validation ── */
   function validateStep(n: number): boolean {
     // Etapa 1 (Envio): validação pura extraída. Em edição, relaxa os campos de
@@ -1492,8 +1242,9 @@ export function SubmeterPageContent({
   /* ── Navigation ── */
   function goToStep(target: number, dir: "forward" | "back") {
     setDirection(dir);
-    // Sair da etapa 2 (para 1 ou 3) fecha a sub-tela 2.5.
-    if (target !== 2) setShowEtapa25(false);
+    // Sair da Etapa 3 fecha a revisão: ela afirma "confira e envie" sobre um estado que a
+    // pessoa vai justamente voltar para mudar.
+    if (target !== 3) setRevisando(false);
     setStep(target);
     // Todo step ALCANÇADO fica navegável pelos índices do topo — não só os que o
     // usuário "concluiu" avançando. Senão, ao entrar no step 2 e voltar ao 1, o
@@ -1511,11 +1262,11 @@ export function SubmeterPageContent({
   function handleStepClick(target: number) {
     // A Etapa 1 é clicável no topo (submissão nova e edição), desde que já alcançada.
     if (!completedSteps.has(target) || target === step) return;
-    // Ir para a etapa 3 com o agente já iniciado: usa o mesmo fluxo do botão
-    // "Continuar com Agente" para detectar troca de tipo (saving ↔ receita) e
-    // reajustar o agente — senão a navegação pelo topo pularia essa detecção.
-    if (target === 3 && projetoId) {
-      handleContinuarAgente();
+    // Ir para a Etapa 3 pelo topo usa o MESMO caminho do botão: valida a Etapa 2, garante
+    // o projeto criado e propaga os metadados. Sem isto, a navegação pelo índice pularia a
+    // sincronização e o servidor ficaria sem a descrição/AI Proxy que a pessoa digitou.
+    if (target === 3) {
+      void handleAvancarParaGanhos();
       return;
     }
     goToStep(target, target < step ? "back" : "forward");
@@ -1532,1373 +1283,110 @@ export function SubmeterPageContent({
     }
   }
 
-  /* ── Step 2 → Etapa 2.5 (abre a sub-tela de tipo de projeto) ── */
-  function handleAbrirEtapa25() {
+  /* ── Step 2 → Step 3 ────────────────────────────────────────────────────────
+     Garante que o projeto EXISTE antes de abrir os blocos de ganho, e propaga o que a
+     pessoa digitou depois do disparo em background.
+
+     ⚠️ Não espera a DOCUMENTAÇÃO (D6): ela vem sendo compilada desde que o arquivo foi
+     anexado e continua rodando enquanto a pessoa preenche a Etapa 3. Se não terminar
+     antes do envio, o cron reconcilia — a submissão nunca fica presa na IA, que é o
+     critério de aceitação nº 1 do plano. */
+  async function handleAvancarParaGanhos() {
     if (!validateStep(2)) {
       setShaking(true);
       setTimeout(() => setShaking(false), 350);
       return;
     }
-    // Re-entrada: reflete a resposta já dada (especial vs. saving/receita).
-    if (respEspecial === "") {
-      if (form.especial) setRespEspecial("sim");
-      else if (form.tipoProjeto.length > 0) setRespEspecial("nao");
+    setAvancando(true);
+    try {
+      let id = projetoId;
+      if (!id) {
+        // ⚠️ Se o background está EM VOO, espera por ele em vez de disparar de novo:
+        // criar um segundo projeto aqui deixaria um órfão no banco a cada avanço rápido.
+        id = bgPromiseRef.current ? await bgPromiseRef.current : null;
+        if (!id) id = await dispararDocBackground();
+      }
+      if (!id) {
+        toast.error(
+          "Não foi possível registrar o projeto agora. Nada se perdeu — tente novamente em alguns segundos.",
+          { duration: 10000 },
+        );
+        return;
+      }
+      await sincronizarMetadados(id);
+      setRevisando(false);
+      goToStep(3, "forward");
+    } finally {
+      setAvancando(false);
     }
-    setShowEtapa25(true);
+  }
+
+  /* ── Propaga metadados/arquivos ao servidor, só quando algo mudou ──
+     O disparo em background acontece assim que há arquivo + nome (`camposMinimosDocProntos`),
+     então descrição, AI Proxy e "quem sentiria falta" normalmente são digitados DEPOIS.
+     Este é o ponto em que eles chegam ao servidor. Falha aqui NÃO barra o avanço: os dados
+     estão no formulário e voltam no envio; travar a navegação por causa da sincronização
+     seria trocar um dado incompleto por uma submissão impossível. */
+  async function sincronizarMetadados(id: string) {
+    const meta = snapshotMeta();
+    const sigArquivos = arquivosSig();
+    const metaMudou = JSON.stringify(meta) !== JSON.stringify(agentMeta);
+    const arquivosMudaram = sigArquivos !== agentArquivosSig;
+    if (!metaMudou && !arquivosMudaram) return;
+
+    try {
+      const docs = arquivosMudaram && arquivos.length > 0 ? await filesToDocs(arquivos) : undefined;
+      await apiFetchComRetry("/api/chat/atualizar-metadados", {
+        projeto_id: id,
+        nome_projeto: meta.nomeProjeto,
+        ferramenta: meta.ferramenta,
+        servico_externo: servicoExternoEnviado(),
+        membros: meta.participantes,
+        membros_papeis: meta.participantesPapeis,
+        membros_contribuicoes: meta.participantesContribuicoes,
+        descricao_breve: meta.descricaoBreve,
+        usa_ai_proxy: meta.usaAiProxy || undefined,
+        contrafactual_afetados: meta.contrafactualAfetados || undefined,
+        ...(docs ? { docs } : {}),
+      });
+      setAgentMeta(meta);
+      setAgentArquivosSig(sigArquivos);
+      if (docs) {
+        setNomesExistentes(arquivos.map((f) => f.name));
+        setDocExistenteInvalidado(false);
+      }
+    } catch (e) {
+      console.warn("[submeter] falha ao sincronizar metadados (segue para a Etapa 3):", e);
+    }
+  }
+
+  /* ── Etapa 3 → revisão ──
+     O clique que dispara a submissão não pode ser o mesmo que descobre que falta
+     preencher algo: aqui validamos e mostramos o resumo; o envio é o clique seguinte. */
+  function handleRevisar() {
+    const errs = validarEtapa3(form.ganhoCategorias ?? [], ganhos, { hojeISO: hojeIso() });
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    setBloqueio(null);
+    setRevisando(true);
     formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  /* ── Etapa 2.5: resposta sim/não ── */
-  function handleRespEspecial(r: "sim" | "nao") {
-    setRespEspecial(r);
-    updateField("especial", r === "sim");
-    // Limpa o campo da opção oposta para não enviar dado obsoleto.
-    if (r === "sim") updateField("tipoProjeto", []);
-    else {
-      updateField("contextoEspecial", "");
-      // Projeto padrão não passa pela triagem do especial — zera as respostas para
-      // não guardar resposta de pergunta que a tela não mostra mais (e para que
-      // voltar a "Sim" exija reafirmar as duas).
-      updateField("especialDashboard", "");
-      updateField("especialGanhoOrganizacional", "");
-      clearError("especialDashboard");
-      clearError("especialGanhoOrganizacional");
-      clearError("especialBloqueio");
-    }
-    clearError("especial");
-    clearError("contextoEspecial");
-    clearError("tipoProjeto");
-  }
-
-  /* ── Etapa 2.5: resposta de uma das 2 perguntas de triagem do especial ── */
-  function handleRespTriagemEspecial(
-    campo: "especialDashboard" | "especialGanhoOrganizacional",
-    valor: "sim" | "nao",
-  ) {
-    updateField(campo, valor);
-    clearError(campo);
-    clearError("especialBloqueio");
-    // Trocar a resposta é uma tentativa NOVA: um painel de bloqueio anterior (inclusive um
-    // vindo da API, como doc ausente) não pode ficar na tela contradizendo a resposta atual.
-    setBloqueio(null);
-    // Trocar a 1ª resposta para "sim" torna a 2ª pergunta invisível (o projeto já está
-    // bloqueado) — a resposta dela deixa de valer e é zerada, para nunca sobrar juízo
-    // sobre uma pergunta que a pessoa não está mais vendo.
-    if (campo === "especialDashboard" && valor === "sim") {
-      updateField("especialGanhoOrganizacional", "");
-      clearError("especialGanhoOrganizacional");
-    }
-  }
-
-  /* ── Valida a Etapa 2.5 antes de iniciar o agente ── */
-  function validateEtapa25(): boolean {
-    if (respEspecial === "") {
-      setError("especial", "Responda à pergunta acima para continuar");
-      return false;
-    }
-    if (respEspecial === "sim") {
-      // Triagem do especial (dashboard/painel · ganho organizacional): perguntas não
-      // respondidas + o BLOQUEIO, tudo da função pura em `constants.ts`.
-      const errsTriagem = validarEtapa25Especial({ ...form, especial: true });
-      if (Object.keys(errsTriagem).length > 0) {
-        setErrors((prev) => ({ ...prev, ...errsTriagem }));
-        return false;
-      }
-      if (!form.contextoEspecial.trim() || form.contextoEspecial.trim().length < 20) {
-        setError("contextoEspecial", "Descreva o contexto do projeto em pelo menos 20 caracteres");
-        return false;
-      }
-    } else if (form.tipoProjeto.length === 0) {
-      setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
-      return false;
-    }
-    return true;
-  }
-
-  /* ── Step 2 → Step 3: inicia o agente ── */
-  async function handleIniciarAgente() {
-    if (!validateStep(2) || !validateEtapa25()) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-
-    // F2: o background já criou (ou está criando) o projeto → NÃO recria (evita duplicado).
-    // Aguarda o disparo em voo; se produziu um projeto, delega ao fluxo de re-entrada
-    // (handleContinuarAgente via pendingContinuar, com projetoId fresco no estado).
-    if (bgPromiseRef.current) {
-      setIniciandoChat(true);
-      let bgId: string | null = null;
-      try { bgId = await bgPromiseRef.current; } catch { bgId = null; }
-      setIniciandoChat(false);
-      if (bgId) { setPendingContinuar(true); return; }
-      // background falhou (bgId null) → segue a criação síncrona normal abaixo.
-    }
-
-    if (arquivos.length === 0) return;
-
-    // Trava do orçamento de tokens: bloqueia se o conteúdo estimado estourar.
-    // Proxy: soma dos tamanhos dos arquivos + descrição (1 byte ≈ 1 char).
-    const charsEstimados =
-      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
-    if (charsEstimados > TOKEN_BLOCK_CHARS) {
-      const tokens = Math.round(charsEstimados / 4);
-      // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
-      toast.warning(
-        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
-        { duration: 10000 },
-      );
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-
-    setIniciandoChat(true);
-
-    try {
-      const docs = await filesToDocs(arquivos);
-
-      const ferramentaEnviada = computeFerramenta();
-
-      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF). A fase de doc
-      // é SILENCIOSA (não streama prosa) — só aguardamos o envelope final.
-      const result = await apiStream<{ projeto_id: string; response: ReturnType<typeof Object.create> }>(
-        "/api/chat/iniciar-submissao",
-        {
-          responsavel_nome: form.nome.trim(),
-          responsavel_email: form.email.trim(),
-          ferramenta: ferramentaEnviada,
-          escopo: form.escopo as "interno" | "externo",
-          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
-          membros: form.participantes,
-          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-          membros_contribuicoes: montarMembrosContribuicoes(
-            form.participantes,
-            form.participantesContribuicoes,
-          ),
-          nome_projeto: form.nomeProjeto.trim(),
-          data_criacao: form.dataCriacao,
-          // Projeto especial não envia tipos financeiros — o backend grava
-          // tipos_projeto=["especial"] e o fluxo pula saving/receita.
-          tipos_projeto: !form.especial && form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
-          tipo_projeto: !form.especial ? (form.tipoProjeto[0] || undefined) : undefined,
-          descricao_breve: form.descricaoBreve.trim() || undefined,
-          usa_ai_proxy: form.usaAiProxy || undefined,
-          contrafactual_afetados:
-            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-            undefined,
-          especial: form.especial || undefined,
-          contexto_especial: form.especial ? form.contextoEspecial.trim() : undefined,
-          docs,
-        },
-      );
-
-      setProjetoId(result.projeto_id);
-      // Cacheia os NOMES dos arquivos enviados — os File[] não sobrevivem a um
-      // reload, mas os nomes são persistidos no rascunho e exibidos na etapa 2 ao
-      // retomar (a pessoa vê o que já enviou, sem precisar reenviar para visualizar).
-      setNomesExistentes(arquivos.map((f) => f.name));
-      setDocExistenteInvalidado(false);
-      setAgentTipos(form.especial ? [] : form.tipoProjeto);
-      setAgentMeta(snapshotMeta());
-      setAgentArquivosSig(arquivosSig());
-
-      const firstMsg: ChatMessage = {
-        role: "assistant",
-        content: result.response.content,
-        options: result.response.options ?? undefined,
-        isComplete: result.response.isComplete,
-        isPreview: result.response.isPreview,
-        fase: result.response.fase,
-      };
-      setChatMessages([firstMsg]);
-      setChatFase(result.response.fase ?? "doc");
-
-      if (result.response.isComplete) {
-        setChatComplete(true);
-      }
-
-      setCompletedSteps((prev) => new Set([...prev, 2, 3]));
-      goToStep(3, "forward");
-    } catch (err) {
-      console.error('[submeter] iniciarAgente falhou:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Não foi possível iniciar o agente. ${msg}`, { duration: 12000 });
-    } finally {
-      setIniciandoChat(false);
-    }
-  }
-
-  /* ── Fluxo DIRETO de liderança: cria o projeto (doc por IA numa passada) e abre
-     direto o formulário determinístico de saving/receita, SEM passar pelo agente
-     conversacional. Só liderança/admin chega aqui (o botão só aparece p/ eles e o
-     servidor reconfere `fluxo_direto`). Espelha handleIniciarAgente na criação. ── */
-  async function handleContinuarDireto() {
-    if (!validateStep(2)) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-    if (arquivos.length === 0) return;
-
-    const charsEstimados =
-      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
-    if (charsEstimados > TOKEN_BLOCK_CHARS) {
-      const tokens = Math.round(charsEstimados / 4);
-      toast.warning(
-        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
-        { duration: 10000 },
-      );
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-
-    setIniciandoDireto(true);
-    try {
-      const docs = await filesToDocs(arquivos);
-      const ferramentaEnviada = computeFerramenta();
-
-      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF). No fluxo
-      // direto a doc é gerada numa passada, SEM prosa streamada — só o envelope importa.
-      const result = await apiStream<{ projeto_id: string; fluxo_direto?: boolean }>(
-        "/api/chat/iniciar-submissao",
-        {
-          responsavel_nome: form.nome.trim(),
-          responsavel_email: form.email.trim(),
-          ferramenta: ferramentaEnviada,
-          escopo: form.escopo as "interno" | "externo",
-          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
-          membros: form.participantes,
-          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-          membros_contribuicoes: montarMembrosContribuicoes(
-            form.participantes,
-            form.participantesContribuicoes,
-          ),
-          nome_projeto: form.nomeProjeto.trim(),
-          data_criacao: form.dataCriacao,
-          tipos_projeto: form.tipoProjeto.length > 0 ? form.tipoProjeto : undefined,
-          tipo_projeto: form.tipoProjeto[0] || undefined,
-          descricao_breve: form.descricaoBreve.trim() || undefined,
-          usa_ai_proxy: form.usaAiProxy || undefined,
-          contrafactual_afetados:
-            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-            undefined,
-          // O backend gera a doc por IA numa passada e NÃO inicia o chat.
-          fluxo_direto: true,
-          docs,
-        },
-      );
-
-      setProjetoId(result.projeto_id);
-      setNomesExistentes(arquivos.map((f) => f.name));
-      setDocExistenteInvalidado(false);
-      setAgentTipos(form.tipoProjeto);
-      setAgentMeta(snapshotMeta());
-      setAgentArquivosSig(arquivosSig());
-
-      // Sem chat: vai direto ao formulário determinístico da fase financeira. Se há
-      // saving, começa por ele (o "ambos" segue para a receita depois); só receita
-      // abre o formulário de receita.
-      setChatMessages([]);
-      setChatComplete(false);
-      setFormDraft(emptyFormDraft());
-      setSavingSubmitted(null);
-      setReceitaSubmitted(null);
-      setApprovedSavingPreview(null);
-      setApprovedReceitaPreview(null);
-      if (form.tipoProjeto.includes("saving")) {
-        setChatFase("saving");
-        setShowReceitaForm(false);
-        setShowSavingForm(true);
-      } else {
-        setChatFase("receita");
-        setShowSavingForm(false);
-        setShowReceitaForm(true);
-      }
-      setCompletedSteps((prev) => new Set([...prev, 2, 3]));
-      goToStep(3, "forward");
-    } catch (err) {
-      console.error("[submeter] fluxo direto falhou:", err);
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Não foi possível preparar a submissão. ${msg}`, { duration: 12000 });
-    } finally {
-      setIniciandoDireto(false);
-    }
-  }
-
-  /* ── Projeto especial: cria o projeto e submete direto, pulando o agente ── */
-  // Projeto de alto impacto e difícil mensuração não passa pela conversa nem pela
-  // análise financeira: a documentação é montada no backend a partir da descrição +
-  // contexto especial (sem IA) e segue direto para a base (planilha + banco). A
-  // validação é humana.
-  async function handleEnviarEspecial() {
-    // Triagem do especial (Etapa 2.5): dashboard/painel ou ganho apenas organizacional
-    // NÃO é projeto especial. Bloqueio determinístico — a tela já mostra o motivo no
-    // clique do "sim", e aqui ele vai pelo MESMO canal dos outros bloqueios de
-    // preenchimento (painel âmbar ancorado ao botão + toast curto): é orientação, não
-    // falha do sistema, então nunca em vermelho.
-    // ⚠️ NÃO chame `setBloqueio` aqui: na Etapa 2.5 o painel do especial é renderizado pelo
-    // `step25`, DERIVADO da resposta. Duplicar o mesmo aviso no estado dava DOIS painéis
-    // idênticos no primeiro clique e um painel que sobrevivia à troca da resposta.
-    // Este ramo é defesa em profundidade — o botão já nasce desabilitado com a triagem
-    // bloqueada, então só se chega aqui por teclado/automação.
-    if (motivoEspecialAtual) {
-      toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-    if (!validateStep(2) || !validateEtapa25()) {
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-    // Doc obrigatória — mas só barra quando NÃO há arquivo novo E NÃO há doc já enviada.
-    // Os File[] (`arquivos`) NÃO sobrevivem a um reload/rehydrate, mas a doc já subiu ao
-    // background e persiste como `nomesExistentes` (+ `projetoId`). Nesse estado a submissão
-    // especial segue pelo ramo `existenteId` com `reset_doc:true`, que remonta a doc da
-    // descrição+contexto SEM os arquivos locais — então `arquivos` vazio com doc existente
-    // DEVE prosseguir, nunca abortar em silêncio (o botão "morto" que a pessoa via após
-    // recarregar a página; workaround era excluir e re-anexar). `validarEtapa2` já mostra o
-    // erro visível quando não há doc alguma.
-    if (!editProjetoId && arquivos.length === 0 && nomesExistentes.length === 0) return;
-
-    setBloqueio(null);
-    setEnviandoEspecial(true);
-    try {
-      const ferramentaEnviada = computeFerramenta();
-
-      if (editProjetoId && projetoId) {
-        // Modo edição: atualiza metadados do projeto existente, reconstrói doc especial e reenvia.
-        // filesToDocs descarta arquivos vazios; se sobrar zero doc (nada novo ou só
-        // vazios), cai no reset_doc — que reusa os arquivos já enviados sem reupload.
-        const docs = arquivos.length > 0 ? await filesToDocs(arquivos) : [];
-
-        await apiFetchComRetry("/api/chat/atualizar-metadados", {
-          projeto_id: projetoId,
-          nome_projeto: form.nomeProjeto.trim(),
-          ferramenta: ferramentaEnviada,
-          servico_externo: servicoExternoEnviado(),
-          membros: form.participantes,
-          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-          membros_contribuicoes: montarMembrosContribuicoes(
-            form.participantes,
-            form.participantesContribuicoes,
-          ),
-          data_criacao: form.dataCriacao,
-          descricao_breve: form.descricaoBreve.trim() || undefined,
-          usa_ai_proxy: form.usaAiProxy || undefined,
-          contrafactual_afetados:
-            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-            undefined,
-          contexto_especial: form.contextoEspecial.trim(),
-          // Monta a doc especial sem IA no backend (legado não tem doc; sem isso o
-          // submeter-validacao quebrava com "Documentação ainda não foi gerada").
-          // Reflete a escolha real do usuário (este handler só roda com respEspecial
-          // = "sim", então é sempre true) — nunca hardcode: ver conversão especial→normal.
-          especial: form.especial,
-          ...(docs.length > 0 ? { docs } : { reset_doc: true }),
-        });
-
-        await apiFetch("/api/chat/submeter-validacao", { projeto_id: projetoId, modo: "edicao" });
-        queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
-        setSubmitted(true);
-        return;
-      }
-
-      // F2: o background criou um projeto NÃO-especial para ESTA submissão nova. Em vez de
-      // recriar (duplicado), CONVERTE em especial via atualizar-metadados (o backend monta
-      // buildDocEspecial sem IA e marca chat_completo — ver ramo `ehEspecial`) e submete.
-      // Aguarda o disparo em voo para pegar o id real (evita ler projetoId stale).
-      let bgIdEspecial: string | null = null;
-      if (bgPromiseRef.current) {
-        try { bgIdEspecial = await bgPromiseRef.current; } catch { bgIdEspecial = null; }
-      }
-      const existenteId = bgIdEspecial ?? projetoId;
-      if (existenteId) {
-        await apiFetchComRetry("/api/chat/atualizar-metadados", {
-          projeto_id: existenteId,
-          nome_projeto: form.nomeProjeto.trim(),
-          ferramenta: ferramentaEnviada,
-          servico_externo: servicoExternoEnviado(),
-          membros: form.participantes,
-          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-          membros_contribuicoes: montarMembrosContribuicoes(
-            form.participantes,
-            form.participantesContribuicoes,
-          ),
-          data_criacao: form.dataCriacao,
-          descricao_breve: form.descricaoBreve.trim() || undefined,
-          usa_ai_proxy: form.usaAiProxy || undefined,
-          contrafactual_afetados:
-            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-            undefined,
-          contexto_especial: form.contextoEspecial.trim(),
-          // A doc especial é montada da descrição + contexto (sem IA); não precisa reenviar
-          // arquivos. reset_doc garante a substituição da doc gerada pelo background.
-          especial: true,
-          reset_doc: true,
-        });
-        await apiFetch("/api/chat/submeter-validacao", { projeto_id: existenteId });
-        queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
-        setSubmitted(true);
-        return;
-      }
-
-      const docs = await filesToDocs(arquivos);
-
-      // 1) Cria o projeto (backend monta a doc sem IA e marca chat_completo).
-      // Rota SSE: `apiStream` trata event-stream (flag ON) e JSON (flag OFF); a doc especial
-      // é montada sem IA (silenciosa) — só aguardamos o envelope.
-      const result = await apiStream<{ projeto_id: string; especial?: boolean }>(
-        "/api/chat/iniciar-submissao",
-        {
-          responsavel_nome: form.nome.trim(),
-          responsavel_email: form.email.trim(),
-          ferramenta: ferramentaEnviada,
-          escopo: form.escopo as "interno" | "externo",
-          servico_externo: form.escopo === "externo" ? form.servicoExterno.trim() : undefined,
-          membros: form.participantes,
-          membros_papeis: montarMembrosPapeis(form.participantes, form.participantesPapeis),
-          membros_contribuicoes: montarMembrosContribuicoes(
-            form.participantes,
-            form.participantesContribuicoes,
-          ),
-          nome_projeto: form.nomeProjeto.trim(),
-          data_criacao: form.dataCriacao,
-          descricao_breve: form.descricaoBreve.trim() || undefined,
-          usa_ai_proxy: form.usaAiProxy || undefined,
-          contrafactual_afetados:
-            serializarAfetados(form.contrafactualAfetadosTipo, form.contrafactualAfetados ?? []) ||
-            undefined,
-          especial: true,
-          contexto_especial: form.contextoEspecial.trim(),
-          docs,
-        },
-      );
-
-      setProjetoId(result.projeto_id);
-
-      // 2) Submete direto para a base (planilha + banco). Análise IA não se aplica.
-      await apiFetch("/api/chat/submeter-validacao", { projeto_id: result.projeto_id });
-
-      queryClient.invalidateQueries({ queryKey: ["meus-projetos"] });
-      setSubmitted(true);
-    } catch (err) {
-      console.error('[submeter] envio de projeto especial falhou:', err);
-      const bloq = bloqueioDoErro(err);
-      if (bloq) {
-        // Mesmo painel da revisão final, aqui renderizado acima da navegação da Etapa 2.5
-        // (é onde mora o botão "Enviar Projeto" do fluxo especial).
-        setBloqueio(bloq);
-        toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
-      } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        toast.error(`Não foi possível enviar o projeto. ${msg}`, { duration: 12000 });
-      }
-    } finally {
-      setEnviandoEspecial(false);
-    }
-  }
-
-  /* ── Reprocessa a documentação quando os ARQUIVOS mudam após o agente iniciar ── */
-  async function reprocessarComNovosArquivos() {
-    if (!projetoId || arquivos.length === 0) return;
-
-    // Mesma trava de tokens do início.
-    const charsEstimados =
-      arquivos.reduce((acc, f) => acc + f.size, 0) + form.descricaoBreve.length;
-    if (charsEstimados > TOKEN_BLOCK_CHARS) {
-      const tokens = Math.round(charsEstimados / 4);
-      // Âmbar: é a seleção de arquivos que passou do orçamento, não uma falha do sistema.
-      toast.warning(
-        `Os arquivos selecionados somam ~${Math.round(tokens / 1000)}k tokens e o limite é ~200k. ` +
-        `Remova arquivos ou use o prompt de pré-documentação no Claude AI (painel acima).`,
-        { duration: 10000 },
-      );
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-
-    setContinuando(true);
-    try {
-      const docs = await filesToDocs(arquivos);
-      const meta = snapshotMeta();
-
-      // Tipos podem ter mudado junto — persiste antes (a doc re-roteia o impacto).
-      const tiposChanged =
-        form.tipoProjeto.length !== agentTipos.length ||
-        [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
-      if (tiposChanged) {
-        await apiFetch("/api/chat/atualizar-tipos", {
-          projeto_id: projetoId,
-          tipos_projeto: form.tipoProjeto,
-        });
-      }
-
-      const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
-        "/api/chat/atualizar-metadados",
-        {
-          projeto_id: projetoId,
-          nome_projeto: meta.nomeProjeto,
-          ferramenta: meta.ferramenta,
-          servico_externo: servicoExternoEnviado(),
-          membros: meta.participantes,
-          membros_papeis: meta.participantesPapeis,
-          membros_contribuicoes: meta.participantesContribuicoes,
-          data_criacao: meta.dataCriacao,
-          descricao_breve: meta.descricaoBreve,
-          usa_ai_proxy: meta.usaAiProxy || undefined,
-          contrafactual_afetados: meta.contrafactualAfetados || undefined,
-          contexto_especial: meta.contextoEspecial,
-          // Propaga a natureza do projeto: false sinaliza conversão especial→normal.
-          especial: form.especial,
-          docs,
-        },
-      );
-
-      // A base mudou → reseta TODO o estado do chat para a fase de doc.
-      setAgentMeta(meta);
-      setAgentArquivosSig(arquivosSig());
-      setAgentTipos(form.tipoProjeto);
-      setDocExistenteInvalidado(false);
-      setShowTransition(false);
-      setShowSavingForm(false);
-      setShowReceitaForm(false);
-      setApprovedDocPreview(null);
-      setApprovedSavingPreview(null);
-      setApprovedReceitaPreview(null);
-      setChatComplete(false);
-      setFormDraft(emptyFormDraft());
-      setSavingSubmitted(null);
-      setReceitaSubmitted(null);
-
-      if (result.reset && result.response) {
-        const msg: ChatMessage = {
-          role: "assistant",
-          content: result.response.content,
-          options: result.response.options ?? undefined,
-          isComplete: result.response.isComplete,
-          isPreview: result.response.isPreview,
-          fase: result.response.fase,
-        };
-        setChatMessages([msg]);
-        setChatFase(result.response.fase ?? "doc");
-        if (result.response.isComplete) setChatComplete(true);
-      }
-
-      toast.success("Arquivos atualizados — a documentação foi reprocessada.");
-      goToStep(3, "forward");
-    } catch (e) {
-      console.error("[submeter] falha ao reprocessar arquivos:", e);
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.error(`Não foi possível reprocessar os arquivos. ${msg}`, { duration: 12000 });
-    } finally {
-      setContinuando(false);
-    }
-  }
-
-  /* ── Step 2 → Step 3 (agente já iniciado): propaga mudanças e detecta troca de tipo ── */
-  async function handleContinuarAgente() {
-    // Projeto especial não tem tipo financeiro — segue direto. Para projeto padrão,
-    // não permite avançar sem ao menos um tipo selecionado.
-    if (!form.especial && form.tipoProjeto.length === 0) {
-      // Só o erro inline + shake: o toast vermelho duplicava, em vermelho, uma frase que já
-      // está na tela ao lado do campo.
-      setError("tipoProjeto", "Selecione ao menos um tipo de projeto");
-      setShaking(true);
-      setTimeout(() => setShaking(false), 350);
-      return;
-    }
-
-    // ── Projeto especial ──────────────────────────────────────────────────────
-    // As entradas determinísticas da documentação são a descrição de negócio e o
-    // contexto especial. Se algum deles (ou os arquivos) mudou, a documentação é
-    // reavaliada do zero; se nada mudou, só voltamos ao chat (aceita, sem reanalisar)
-    // — mesma lógica do "Editar Dados" do saving/receita.
-    if (form.especial) {
-      // `arquivos.length > 0`: mesmo guard do ramo padrão — evita o reprocesso falso da
-      // doc após reload/remontagem (arquivos File[] não sobrevivem ao localStorage).
-      if (projetoId && arquivos.length > 0 && arquivosSig() !== agentArquivosSig) {
-        await reprocessarComNovosArquivos();
-        return;
-      }
-      const meta = snapshotMeta();
-      const metaChanged = !agentMeta || JSON.stringify(meta) !== JSON.stringify(agentMeta);
-      if (projetoId && metaChanged) {
-        setContinuando(true);
-        try {
-          const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
-            "/api/chat/atualizar-metadados",
-            {
-              projeto_id: projetoId,
-              nome_projeto: meta.nomeProjeto,
-              ferramenta: meta.ferramenta,
-              servico_externo: servicoExternoEnviado(),
-              membros: meta.participantes,
-          membros_papeis: meta.participantesPapeis,
-          membros_contribuicoes: meta.participantesContribuicoes,
-              data_criacao: meta.dataCriacao,
-              descricao_breve: meta.descricaoBreve,
-              usa_ai_proxy: meta.usaAiProxy || undefined,
-              contrafactual_afetados: meta.contrafactualAfetados || undefined,
-              contexto_especial: meta.contextoEspecial,
-              especial: form.especial,
-              reset_doc: true,
-            },
-          );
-          setAgentMeta(meta);
-          // A doc foi reavaliada → reseta o estado do chat para a nova fase de doc.
-          setShowTransition(false);
-          setShowSavingForm(false);
-          setShowReceitaForm(false);
-          setApprovedDocPreview(null);
-          setApprovedSavingPreview(null);
-          setApprovedReceitaPreview(null);
-          setChatComplete(false);
-          setFormDraft(emptyFormDraft());
-          setSavingSubmitted(null);
-          setReceitaSubmitted(null);
-          if (result.reset && result.response) {
-            setChatMessages([{
-              role: "assistant",
-              content: result.response.content,
-              options: result.response.options ?? undefined,
-              isComplete: result.response.isComplete,
-              isPreview: result.response.isPreview,
-              fase: result.response.fase,
-            }]);
-            setChatFase(result.response.fase ?? "doc");
-            if (result.response.isComplete) setChatComplete(true);
-          }
-          toast.success("Documentação reavaliada com o novo contexto.");
-        } catch (e) {
-          console.error("[submeter] falha ao reavaliar projeto especial:", e);
-          const msg = e instanceof Error ? e.message : String(e);
-          toast.error(`Não foi possível reavaliar a documentação. ${msg}`, { duration: 12000 });
-          setContinuando(false);
-          return;
-        } finally {
-          setContinuando(false);
-        }
-      }
-      goToStep(3, "forward");
-      return;
-    }
-
-    // Arquivos trocados → reprocessa a doc do zero (cuida da navegação e retorna).
-    // ⚠️ Só dispara quando há arquivo NOVO de fato (`arquivos.length > 0`). Sem esse
-    // guard, após um reload/remontagem no meio da edição (recurso "reload não perde o
-    // chat"), o `agentArquivosSig` volta preenchido do rascunho, mas o `arquivos: File[]`
-    // NÃO (objetos File não serializam p/ localStorage) → `arquivosSig()` vira "" e a
-    // comparação acusava "arquivos mudaram" falsamente, forçando o reprocesso da doc e
-    // perdendo o saving já preenchido. `reprocessarComNovosArquivos` já é no-op sem
-    // arquivos, então sem o guard o "Continuar com Agente" só travava (early-return).
-    if (projetoId && arquivos.length > 0 && arquivosSig() !== agentArquivosSig) {
-      await reprocessarComNovosArquivos();
-      return;
-    }
-
-    // Metadados de texto mudaram → persiste; o agente lê frescos no próximo turno.
-    if (projetoId && agentMeta) {
-      const meta = snapshotMeta();
-      const metaChanged = JSON.stringify(meta) !== JSON.stringify(agentMeta);
-      if (metaChanged) {
-        try {
-          await apiFetchComRetry("/api/chat/atualizar-metadados", {
-            projeto_id: projetoId,
-            nome_projeto: meta.nomeProjeto,
-            ferramenta: meta.ferramenta,
-            servico_externo: servicoExternoEnviado(),
-            membros: meta.participantes,
-          membros_papeis: meta.participantesPapeis,
-          membros_contribuicoes: meta.participantesContribuicoes,
-            data_criacao: meta.dataCriacao,
-            descricao_breve: meta.descricaoBreve,
-            usa_ai_proxy: meta.usaAiProxy || undefined,
-            contrafactual_afetados: meta.contrafactualAfetados || undefined,
-            // Conversão especial→normal: este ramo só roda com form.especial=false,
-            // mas mandamos o valor real para o backend zerar a flag no banco.
-            especial: form.especial,
-          });
-          setAgentMeta(meta);
-        } catch (e) {
-          console.error("[submeter] falha ao atualizar metadados:", e);
-          const msg = e instanceof Error ? e.message : String(e);
-          toast.error(`Não foi possível salvar os dados do projeto. ${msg}`, { duration: 12000 });
-          return;
-        }
-      }
-    }
-
-    const changed =
-      form.tipoProjeto.length !== agentTipos.length ||
-      [...form.tipoProjeto].sort().join(",") !== [...agentTipos].sort().join(",");
-
-    // Projeto especial não tem tipos financeiros — pula a sincronização de tipos
-    // (enviar tipos_projeto=[] seria rejeitado pelo backend).
-    if (!form.especial && changed && projetoId) {
-      try {
-        await apiFetch("/api/chat/atualizar-tipos", {
-          projeto_id: projetoId,
-          tipos_projeto: form.tipoProjeto,
-        });
-        setAgentTipos(form.tipoProjeto);
-
-        // Se a documentação (fase 1) já foi concluída, ajustamos a fase de impacto.
-        // Em fase de doc, o próprio agente roteia ao aprovar a doc (lê tipos do banco).
-        const docConcluida = chatFase !== "doc" && chatFase !== "doc_preview";
-        if (docConcluida) {
-          const querSaving = form.tipoProjeto.includes("saving");
-          const querReceita = form.tipoProjeto.includes("receita_incremental");
-          const savingDone = approvedSavingPreview !== null;
-          const receitaDone = approvedReceitaPreview !== null;
-
-          if (querSaving && querReceita && savingDone && !receitaDone) {
-            // Caso comum: a pessoa concluiu o saving e só agora adicionou a receita.
-            // PRESERVA o saving já feito e segue direto para a fase de receita —
-            // antes, isso reiniciava o saving do zero (bug reportado).
-            setChatMessages([]);
-            setChatComplete(false);
-            setFormDraft(emptyFormDraft());
-            setReceitaSubmitted(null);
-            setShowSavingForm(false);
-            setShowReceitaForm(true);
-            setChatFase("receita");
-          } else {
-            // Demais casos (troca de tipo, remoção, mudança no meio da fase) →
-            // reinicia a fase de impacto a partir do saving (ou receita, se só receita).
-            setChatMessages([]);
-            setChatComplete(false);
-            setApprovedSavingPreview(null);
-            setApprovedReceitaPreview(null);
-            setFormDraft(emptyFormDraft());
-            setSavingSubmitted(null);
-            setReceitaSubmitted(null);
-            setShowSavingForm(querSaving);
-            setShowReceitaForm(!querSaving);
-            setChatFase(querSaving ? "saving" : "receita");
-          }
-        }
-      } catch (e) {
-        console.error("[submeter] falha ao atualizar tipos:", e);
-        const msg = e instanceof Error ? e.message : String(e);
-        toast.error(`Não foi possível salvar o tipo do projeto. ${msg}`, { duration: 12000 });
-        return;
-      }
-    }
-
-    // Fallback de edição: se chegou aqui sem mensagens e sem estar completo,
-    // o projeto tem documentação mas nenhum preview foi gerado (estado incompleto).
-    // Reinicializa o agente a partir do texto já extraído no banco.
-    // GUARDA: se o preview de doc já existe (fase doc concluída) e nada mudou desde
-    // o seed, não reinicia — o usuário só voltou a verificar, não alterou nada.
-    const _fbMeta = snapshotMeta();
-    const _fbNothingChanged = agentMeta !== null && JSON.stringify(_fbMeta) === JSON.stringify(agentMeta);
-    // Marca quando o fallback reinicializou a fase de doc — nesse caso o usuário
-    // deve revisar a doc, não pular direto para o formulário financeiro abaixo.
-    let reinitedDoc = false;
-    if (editProjetoId && chatMessages.length === 0 && !chatComplete && projetoId &&
-        !(approvedDocPreview !== null && _fbNothingChanged)) {
-      reinitedDoc = true;
-      setContinuando(true);
-      try {
-        const meta = snapshotMeta();
-        const result = await apiFetchComRetry<{ reset: boolean; response?: ReturnType<typeof Object.create> }>(
-          "/api/chat/atualizar-metadados",
-          {
-            projeto_id: projetoId,
-            nome_projeto: meta.nomeProjeto,
-            ferramenta: meta.ferramenta,
-            servico_externo: servicoExternoEnviado(),
-            membros: meta.participantes,
-          membros_papeis: meta.participantesPapeis,
-          membros_contribuicoes: meta.participantesContribuicoes,
-            data_criacao: meta.dataCriacao,
-            descricao_breve: meta.descricaoBreve,
-            usa_ai_proxy: meta.usaAiProxy || undefined,
-            contrafactual_afetados: meta.contrafactualAfetados || undefined,
-            especial: form.especial,
-            reset_doc: true,
-          }
-        );
-        setAgentMeta(meta);
-        if (result.reset && result.response) {
-          setChatMessages([{
-            role: "assistant",
-            content: result.response.content,
-            options: result.response.options ?? undefined,
-            isComplete: result.response.isComplete,
-            isPreview: result.response.isPreview,
-            fase: result.response.fase,
-          }]);
-          setChatFase(result.response.fase ?? "doc");
-          if (result.response.isComplete) setChatComplete(true);
-        }
-      } catch (e) {
-        console.error("[submeter] falha ao inicializar agente (edit fallback):", e);
-        const msg = e instanceof Error ? e.message : String(e);
-        toast.error(`Não foi possível retomar o agente. ${msg}`, { duration: 12000 });
-        setContinuando(false);
-        return;
-      } finally {
-        setContinuando(false);
-      }
-    }
-
-    // Edição sem mudanças: em vez de pular direto para a revisão final, leva o
-    // usuário pelas telas determinísticas (saving → receita) pré-preenchidas para
-    // revisão. Se ele não mudar nada, o submit do formulário avança sem reprocessar
-    // (ver handleSavingFormSubmit/handleReceitaFormSubmit).
-    //
-    // Dispara sempre que a documentação já existe (approvedDocPreview), não só
-    // quando chatComplete=true. Projetos com a doc gerada mas SEM memorial
-    // financeiro salvo (ex.: memorial_calculo nulo) entram aqui com chatComplete
-    // =false — antes caíam num chat de doc vazio e travavam em "Analisando e
-    // coletando informações...". Não dispara se o fallback acabou de reinicializar
-    // a doc (reinitedDoc): nesse caso o usuário precisa revisar a doc primeiro.
-    const docPronta = chatComplete || approvedDocPreview !== null;
-    if (editProjetoId && !form.especial && !reinitedDoc && docPronta && !showSavingForm && !showReceitaForm) {
-      const querSaving = form.tipoProjeto.includes("saving");
-      const querReceita = form.tipoProjeto.includes("receita_incremental");
-      // Fluxo "ambos": se o saving já foi aprovado e só a receita está pendente,
-      // abre direto a receita em vez de re-percorrer o saving.
-      const irParaReceita =
-        querReceita && (!querSaving || (approvedSavingPreview !== null && approvedReceitaPreview === null));
-      if (querSaving && !irParaReceita) {
-        setChatComplete(false);
-        openSavingForm();
-      } else if (querReceita) {
-        setChatComplete(false);
-        openReceitaForm();
-      }
-    }
-
-    goToStep(3, "forward");
-  }
-
-  /* ── Chat: enviar mensagem ── */
-  async function handleSendMessage(content: string, selectedOption?: number) {
-    if (!projetoId || chatLoading || chatComplete) return;
-
-    const userMsg: ChatMessage = { role: "user", content };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatInput("");
-    // A pessoa voltou a agir → o bloqueio da tentativa anterior deixa de descrever a tela.
-    setBloqueio(null);
-    setChatLoading(true);
-    setChatFinalizando(false);
-    if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
-    // Aprovar a doc dispara a compilação (operação pesada) — mostra passos nomeados
-    // em vez do loading genérico. Turnos simples de conversa ficam com os 3 pontos.
-    setChatLoadingSteps(chatFase === "doc_preview" ? LOADING_STEPS_COMPILAR : null);
-
-    setTimeout(() => {
-      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
-
-    // Streaming: a prosa vai chegando token a token e preenchendo uma bolha "viva" do
-    // assistente. `streamingIniciado` marca que a bolha já foi criada por um delta. Se o
-    // streaming estiver DESLIGADO no servidor, nenhum delta chega, `streamingIniciado` fica
-    // false e o fluxo é idêntico ao de antes (a bolha nasce do envelope, no fim).
-    let streamingIniciado = false;
-    const onDelta = (chunk: string) => {
-      // Enquanto chega prosa, esconde o "Finalizando…" e reinicia o relógio. O indicador
-      // só liga se os deltas pararem por 2s (acima do maior gap saudável de geração, ~1,7s)
-      // sem o turno fechar — i.e., a cauda estruturada invisível ainda rodando.
-      setChatFinalizando(false);
-      if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
-      finalizarTimerRef.current = setTimeout(() => setChatFinalizando(true), 2000);
-      if (!streamingIniciado) {
-        streamingIniciado = true;
-        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: chatFase }]);
-      } else {
-        setChatMessages((prev) => {
-          const copy = prev.slice();
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") {
-            copy[copy.length - 1] = { ...last, content: last.content + chunk };
-          }
-          return copy;
-        });
-      }
-    };
-
-    try {
-      const result = await apiStream<ReturnType<typeof Object.create>>(
-        "/api/chat/enviar-mensagem",
-        { projeto_id: projetoId, content, selected_option: selectedOption },
-        { onDelta },
-      );
-
-      const newFase: ChatFase = result.fase ?? chatFase;
-      const transitionToSaving = chatFase !== "saving" && newFase === "saving";
-      const transitionToReceita = chatFase !== "receita" && newFase === "receita";
-
-      const assistantMsg: ChatMessage = {
-        role: "assistant",
-        content: result.content,
-        options: result.options ?? undefined,
-        isComplete: result.isComplete,
-        isPreview: result.isPreview,
-        fase: newFase,
-      };
-
-      if (transitionToSaving) {
-        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
-        if (lastPreviewMsg) setApprovedDocPreview(lastPreviewMsg.content);
-
-        setTransitionType("saving");
-        setShowTransition(true);
-        setChatFase(newFase);
-        setTimeout(() => {
-          setShowTransition(false);
-          setChatMessages([]);
-          if (editProjetoId) {
-            // edição: pré-preenche com dados salvos anteriormente
-            setFormDraft(savingSubmitted ?? emptyFormDraft());
-          } else {
-            setFormDraft(emptyFormDraft());
-            setSavingSubmitted(null);
-            setReceitaSubmitted(null);
-          }
-          setShowSavingForm(true);
-        }, 3000);
-      } else if (transitionToReceita) {
-        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
-        // Captura preview de saving se vier de saving_preview, ou doc se vier de doc_preview
-        if (lastPreviewMsg) {
-          if (chatFase === "saving_preview") setApprovedSavingPreview(lastPreviewMsg.content);
-          else setApprovedDocPreview(lastPreviewMsg.content);
-        }
-
-        setTransitionType("receita");
-        setShowTransition(true);
-        setChatFase(newFase);
-        setTimeout(() => {
-          setShowTransition(false);
-          setChatMessages([]);
-          if (editProjetoId) {
-            // edição: pré-preenche com dados salvos anteriormente
-            setFormDraft(receitaSubmitted ?? emptyFormDraft());
-          } else {
-            setFormDraft(emptyFormDraft());
-            setReceitaSubmitted(null);
-          }
-          setShowReceitaForm(true);
-        }, 3000);
-      } else {
-        // Envelope canônico: se veio streaming, RECONCILIA a bolha viva (troca o texto
-        // provisório pelo `content` final + aplica type/isPreview/isComplete/options);
-        // senão, aparece a bolha nova de sempre.
-        if (streamingIniciado) {
-          setChatMessages((prev) => {
-            const copy = prev.slice();
-            copy[copy.length - 1] = assistantMsg;
-            return copy;
-          });
-        } else {
-          setChatMessages((prev) => [...prev, assistantMsg]);
-        }
-        setChatFase(newFase);
-      }
-
-      if (result.isComplete) {
-        const lastPreviewMsg = chatMessages.slice().reverse().find(m => m.isPreview && m.role === "assistant");
-        if (lastPreviewMsg) {
-          // Projeto especial encerra na fase de doc (sem saving/receita) → o preview
-          // aprovado é o da documentação. Demais casos: receita ou saving.
-          if (chatFase === "doc_preview") setApprovedDocPreview(lastPreviewMsg.content);
-          else if (chatFase === "receita_preview") setApprovedReceitaPreview(lastPreviewMsg.content);
-          else setApprovedSavingPreview(lastPreviewMsg.content);
-        }
-        setChatComplete(true);
-      }
-    } catch (err) {
-      console.error('[submeter] enviarMensagem falhou:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      // Falha de sistema (o turno não chegou ao servidor) → vermelho, mas tranquilizando:
-      // a conversa até aqui está salva e a pessoa só reenvia a última mensagem.
-      toast.error(
-        `Sua mensagem não foi enviada. ${msg} O restante da conversa está salvo — reenvie a última mensagem.`,
-        { duration: 12000 },
-      );
-      // Remove a última mensagem do usuário — e a bolha do assistente que estava streamando,
-      // se houver (senão sobraria uma prosa provisória órfã).
-      setChatMessages((prev) => prev.slice(0, streamingIniciado ? -2 : -1));
-    } finally {
-      setChatLoading(false);
-      setChatLoadingSteps(null);
-      setChatFinalizando(false);
-      if (finalizarTimerRef.current) clearTimeout(finalizarTimerRef.current);
-      setTimeout(() => {
-        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    }
-  }
-
-  /* ── Saving form: envia dados determinísticos e inicia chat ── */
-  async function handleSavingFormSubmit(formData: SavingFormData) {
-    if (!projetoId) return;
-    // Reabriu o formulário e reenviou sem mudar nada → não reanalisa, só volta ao
-    // chat exatamente onde estava (as mensagens da fase continuam em memória). Vale
-    // inclusive quando se edita o saving estando já na receita (fluxo "ambos").
-    if (savingSubmitted && JSON.stringify(formData) === JSON.stringify(savingSubmitted)) {
-      setShowSavingForm(false);
-      const temReceita = form.tipoProjeto.includes("receita_incremental");
-      if (editProjetoId) {
-        // Edição (revisão guiada): nada mudou → avança sem reprocessar. Se há receita,
-        // abre o formulário de receita; senão, vai para a revisão final — MAS só quando o
-        // memorial de saving JÁ foi aprovado (approvedSavingPreview). Sem preview aprovado
-        // (ex.: projeto convertido especial→saving cujo chat de saving parou numa pergunta,
-        // sem gerar memorial), NÃO marca a conversa como concluída: cai no chat da fase de
-        // saving (a pergunta pendente) para o memorial ser concluído. Antes marcava
-        // chatComplete direto e o botão "Enviar" aparecia sem memorial → 500 "sem ganho
-        // mensurável" mascarado por toast genérico (caso "Supply Lojas <> Estoque CDs").
-        if (temReceita) openReceitaForm();
-        else if (approvedSavingPreview !== null) setChatComplete(true);
-      } else if (temReceita && approvedSavingPreview !== null) {
-        // Fluxo "ambos": o usuário reabriu o saving (ex.: via "Voltar ao saving" da
-        // receita) e não mudou nada. Como o saving já foi aprovado, volta ao
-        // formulário de receita — senão cairia num chat vazio (as mensagens da fase
-        // de saving foram limpas na transição para a receita).
-        openReceitaForm();
-      } else if (!temReceita && approvedSavingPreview !== null) {
-        // Submissão nova, só saving: o usuário reabriu o formulário (ex.: via "Refazer"
-        // na revisão final) e não mudou nada → volta à revisão final, simétrico à edição.
-        // Só quando o memorial já foi aprovado (mesma guarda do ramo de edição).
-        setChatComplete(true);
-      }
-      // Demais casos: cai no chat da fase de saving exatamente onde estava.
-      return;
-    }
-    setSavingFormLoading(true);
-    // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial chega token a token e
-    // preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum delta
-    // chega, `streamingIniciado` fica false e o fluxo é idêntico ao JSON de antes.
-    // ⚠️ Durante esta chamada o FORMULÁRIO determinístico cobre o chat (com seu próprio
-    // loading) — o chat só renderiza com !showSavingForm && !showReceitaForm —, então a
-    // bolha viva fica invisível aqui; o conteúdo final aparece quando o form fecha, já
-    // reconciliado pelo envelope (`setChatMessages([savingMsg])` abaixo).
-    let streamingIniciado = false;
-    const onDelta = (chunk: string) => {
-      if (!streamingIniciado) {
-        streamingIniciado = true;
-        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "saving" }]);
-      } else {
-        setChatMessages((prev) => {
-          const copy = prev.slice();
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") {
-            copy[copy.length - 1] = { ...last, content: last.content + chunk };
-          }
-          return copy;
-        });
-      }
-    };
-    try {
-      const custoMensal = formData.custoExterno
-        ? formData.custoPeriodicidade === "anual"
-          ? parseFloat(formData.custoExterno) / 12
-          : parseFloat(formData.custoExterno)
-        : undefined;
-
-      // Árvore "ninguém fazia": as horas (quando existem) são contrafactuais —
-      // horas_depois é sempre 0 (a automação faz tudo). Custo evitado PURO (eliminou
-      // gasto externo, SEM trabalho adicional) NÃO tem horas → alguem_fazia='externo'
-      // e linhas vazias. Nos demais, o ganho é horas (reais no "sim", contrafactuais
-      // no "não") + custo evitado quando houver.
-      const isNaoBranch = formData.alguemFazia === "nao";
-      const custoEvitadoPuro =
-        isNaoBranch && formData.eliminaGastoExterno === "sim" && formData.temContrafactualAdicional === "nao";
-      const ninguemFazia = isNaoBranch;
-      const alguemFaziaPayload = custoEvitadoPuro ? "externo" : (formData.alguemFazia || undefined);
-      const linhas = custoEvitadoPuro
-        ? []
-        : formData.linhas
-            .filter((l) => l.cargo && l.horasAntes !== "" && (ninguemFazia || l.horasDepois !== ""))
-            .map((l) => ({
-              cargo: l.cargo,
-              horas_antes: parseFloat(l.horasAntes),
-              horas_depois: ninguemFazia ? 0 : parseFloat(l.horasDepois),
-            }));
-
-      // Custo evitado coletado: no ramo "Não" pela pergunta "elimina gasto externo?";
-      // no ramo "Sim" pela pergunta opcional de custo distinto. Backend soma pelo valor cheio (pontual e mensal, sem ÷12).
-      const temCustoEvitadoEfetivo = isNaoBranch
-        ? (formData.eliminaGastoExterno === "sim" ? "sim" : "nao")
-        : (formData.temCustoEvitado || undefined);
-      const custoEvitadoItens =
-        temCustoEvitadoEfetivo === "sim"
-          ? formData.custoEvitadoItens
-              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
-              .map((it) => ({
-                nome: it.nome.trim(),
-                valor: parseMoedaBR(it.valor),
-                recorrencia: it.recorrencia as "mensal" | "pontual",
-                justificativa: it.justificativa.trim(),
-              }))
-          : [];
-
-      // Custos do projeto: itens válidos quando "sim". O backend soma pelo valor cheio
-      // (pontual e mensal, sem ÷12) e SUBTRAI do saving (custo incorrido pra operar).
-      const custoProjetoItens =
-        formData.temCustoProjeto === "sim"
-          ? formData.custoProjetoItens
-              .filter((it) => it.nome.trim() && it.valor !== "" && it.recorrencia)
-              .map((it) => ({
-                nome: it.nome.trim(),
-                valor: parseMoedaBR(it.valor),
-                recorrencia: it.recorrencia as "mensal" | "pontual",
-                justificativa: it.justificativa.trim(),
-              }))
-          : [];
-
-      const result = await apiStream<ReturnType<typeof Object.create>>(
-        "/api/chat/iniciar-saving",
-        {
-          projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
-          alguem_fazia: alguemFaziaPayload,
-          linhas: linhas.length ? linhas : undefined,
-          custo_externo_mensal: custoMensal,
-          tem_custo_evitado: temCustoEvitadoEfetivo || undefined,
-          custo_evitado_itens: custoEvitadoItens.length ? custoEvitadoItens : undefined,
-          tem_custo_projeto: formData.temCustoProjeto || undefined,
-          custo_projeto_itens: custoProjetoItens.length ? custoProjetoItens : undefined,
-          // Liderança: memorial determinístico, sem gates (o servidor reconfere).
-          modo_direto: modoDireto || undefined,
-        },
-        { onDelta },
-      );
-      setShowSavingForm(false);
-      // Registra o saving enviado (detecção de "nada mudou" e edição posterior).
-      setSavingSubmitted(formData);
-      // Preview de saving aprovado anteriormente deixa de valer ao reiniciar a fase.
-      setApprovedSavingPreview(null);
-      // O saving mudou → tudo a jusante (receita) é invalidado: o backend apaga a
-      // conversa a partir do marcador de saving (inclui a receita), então resetamos
-      // o estado da receita aqui também. A pessoa refaz a receita depois.
-      setReceitaSubmitted(null);
-      setApprovedReceitaPreview(null);
-      setShowReceitaForm(false);
-      setChatComplete(false);
-      // Fluxo DIRETO de liderança: o backend já devolveu o memorial pronto (sem gates,
-      // sem chat). Aprova o preview e ou segue para a receita ("ambos") ou vai à revisão
-      // final. NÃO entra no chat (nenhuma mensagem de agente é exibida).
-      if (modoDireto) {
-        setApprovedSavingPreview(result.content ?? null);
-        setChatMessages([]);
-        if (form.tipoProjeto.includes("receita_incremental")) {
-          setChatFase("receita");
-          openReceitaForm();
-        } else {
-          setChatFase("completo");
-          setChatComplete(true);
-        }
-        return;
-      }
-      const savingMsg: ChatMessage = {
-        role: "assistant",
-        content: result.content,
-        options: result.options ?? undefined,
-        isComplete: result.isComplete,
-        isPreview: result.isPreview,
-        fase: result.fase ?? "saving",
-      };
-      setChatMessages([savingMsg]);
-      if (result.fase) setChatFase(result.fase);
-    } catch (e) {
-      console.error("[submeter] falha ao iniciar saving:", e);
-      const msg = e instanceof Error ? e.message : String(e);
-      // Se o streaming criou a bolha viva antes do erro, remove-a: o formulário continua
-      // aberto para correção e não pode sobrar uma prosa provisória órfã no chat.
-      if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
-      toast.error(
-        `Não foi possível iniciar a análise de impacto. ${msg} Os dados que você preencheu continuam no formulário.`,
-        { duration: 12000 },
-      );
-    } finally {
-      setSavingFormLoading(false);
-    }
-  }
-
-  /* ── Receita form: inicia fase receita incremental ── */
-  async function handleReceitaFormSubmit(formData: SavingFormData) {
-    if (!projetoId) return;
-    // Reenvio idêntico → volta ao chat existente sem reanalisar.
-    if (receitaSubmitted && JSON.stringify(formData) === JSON.stringify(receitaSubmitted)) {
-      setShowReceitaForm(false);
-      // Edição (revisão guiada): nada mudou → vai direto para a revisão final.
-      if (editProjetoId) setChatComplete(true);
-      return;
-    }
-    setReceitaFormLoading(true);
-    // Streaming SSE (flag LLM_STREAMING ON): a prosa do memorial de receita chega token a
-    // token e preenche uma bolha "viva", igual ao enviar-mensagem. Com a flag OFF nenhum
-    // delta chega e o fluxo é idêntico ao JSON de antes. ⚠️ Como no saving, o FORMULÁRIO
-    // cobre o chat durante esta chamada — a bolha só aparece quando o form fecha, já
-    // reconciliada pelo envelope (`setChatMessages([receitaMsg])` abaixo).
-    let streamingIniciado = false;
-    const onDelta = (chunk: string) => {
-      if (!streamingIniciado) {
-        streamingIniciado = true;
-        setChatMessages((prev) => [...prev, { role: "assistant", content: chunk, fase: "receita" }]);
-      } else {
-        setChatMessages((prev) => {
-          const copy = prev.slice();
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") {
-            copy[copy.length - 1] = { ...last, content: last.content + chunk };
-          }
-          return copy;
-        });
-      }
-    };
-    try {
-      const valorReceita = formData.valorReceita ? parseFloat(formData.valorReceita) : undefined;
-      const result = await apiStream<ReturnType<typeof Object.create>>(
-        "/api/chat/iniciar-receita",
-        {
-          projeto_id: projetoId,
-          tipo_saving: formData.tipoSaving as "mensal" | "pontual" | "trimestral" | "semestral",
-          valor_ganho_mensal: valorReceita,
-          racional: formData.racionalReceita.trim() || undefined,
-          // Liderança: memorial determinístico, sem gates (o servidor reconfere).
-          modo_direto: modoDireto || undefined,
-        },
-        { onDelta },
-      );
-      setShowReceitaForm(false);
-      // Registra a receita enviada (detecção de "nada mudou" e edição posterior).
-      setReceitaSubmitted(formData);
-      // Preview de receita aprovado anteriormente deixa de valer ao reiniciar a fase.
-      setApprovedReceitaPreview(null);
-      // Fluxo DIRETO de liderança: receita é a última fase → aprova o preview e vai
-      // direto à revisão final, sem chat.
-      if (modoDireto) {
-        setApprovedReceitaPreview(result.content ?? null);
-        setChatMessages([]);
-        setChatFase("completo");
-        setChatComplete(true);
-        return;
-      }
-      const receitaMsg: ChatMessage = {
-        role: "assistant",
-        content: result.content,
-        options: result.options ?? undefined,
-        isComplete: result.isComplete,
-        isPreview: result.isPreview,
-        fase: result.fase ?? "receita",
-      };
-      setChatMessages([receitaMsg]);
-      if (result.fase) setChatFase(result.fase);
-    } catch (e) {
-      console.error("[submeter] falha ao iniciar receita:", e);
-      const msg = e instanceof Error ? e.message : String(e);
-      // Se o streaming criou a bolha viva antes do erro, remove-a (form segue aberto).
-      if (streamingIniciado) setChatMessages((prev) => prev.slice(0, -1));
-      toast.error(
-        `Não foi possível iniciar a análise de receita. ${msg} Os dados que você preencheu continuam no formulário.`,
-        { duration: 12000 },
-      );
-    } finally {
-      setReceitaFormLoading(false);
-    }
-  }
-
-  /* ── Voltar ao formulário determinístico para editar os dados ── */
-  // A pessoa pode ter errado horas/cargo (saving) ou valor/racional (receita) e só
-  // perceber dentro do chat. Reabrir o formulário recoloca o snapshot da fase para
-  // edição. No fluxo "ambos" dá pra editar o saving mesmo já estando na receita —
-  // por isso cada um recoloca o SEU snapshot (não o rascunho compartilhado).
-  function openSavingForm() {
-    if (chatLoading) return;
-    // Reabre com o saving já submetido; na falta dele, preserva o rascunho em
-    // andamento (NUNCA volta a um formulário vazio descartando o que foi digitado).
-    setFormDraft(savingSubmitted ?? formDraft ?? emptyFormDraft());
-    setShowSavingForm(true);
-  }
-  function openReceitaForm() {
-    if (chatLoading) return;
-    setFormDraft(receitaSubmitted ?? formDraft ?? emptyFormDraft());
-    setShowReceitaForm(true);
-  }
-
-  /* ── Refazer o memorial financeiro a partir da revisão final ──────────────────
-     Na tela "Enviar para Triagem" a pessoa só conseguia mexer na documentação
-     (mandando um arquivo/informação nova, que reprocessa a doc). O memorial
-     financeiro já aprovado ficava travado — para trocar cargos/horas/valores era
-     preciso recomeçar tudo. Este atalho reabre o formulário determinístico da fase
-     financeira (cargos, horas, custos ou receita) SEM tocar na documentação: sai da
-     revisão final (`chatComplete=false`) e recoloca o snapshot já enviado, pronto
-     para editar. Ao reenviar o formulário, `handleSavingFormSubmit`/`...Receita`
-     reiniciam a fase (invalidando o preview antigo) ou, se nada mudou, devolvem à
-     revisão final. Só faz sentido quando existe memorial financeiro: projeto
-     especial (sem saving/receita) não recebe o botão. */
-  function handleReiniciarMemorial() {
-    if (chatLoading || submittingProject) return;
-    const temSaving = form.tipoProjeto.includes("saving");
-    const temReceita = form.tipoProjeto.includes("receita_incremental");
-    if (!temSaving && !temReceita) return;
-    setBloqueio(null);
-    setChatComplete(false);
-    if (temSaving) openSavingForm();
-    else openReceitaForm();
-  }
-
-  /* ── Enviar projeto ──────────────────────────────────────────────────────────
-     A análise automática (analisador) NÃO roda mais no cliente: o servidor a
-     dispara em background ao submeter (ver worker.ts → ctx.waitUntil). Assim a
-     tela de sucesso aparece na hora, a pessoa pode fechar a aba, e o resultado
-     fica disponível depois em "Meus Projetos". */
   async function handleSubmitProjeto() {
     if (!projetoId) return;
 
-    // Triagem do especial (Etapa 2.5) — mesma régua e mesma mensagem do
-    // `handleEnviarEspecial`. Está aqui porque um projeto marcado como especial também
-    // alcança a Etapa 3 (navegação pelo topo / conversão de tipo), e o bloqueio não pode
-    // depender de qual botão a pessoa achou primeiro.
-    // Idem: quem renderiza o aviso é a Etapa 2.5, para onde devolvemos a pessoa. Sem o
-    // `setBloqueio`, o painel de lá é o único e acompanha a resposta.
-    const motivoEspecialSubmit = motivoBloqueioEspecial(form);
-    if (motivoEspecialSubmit) {
+    // Rede de segurança: a revisão só abre com a Etapa 3 válida, mas revalidamos antes de
+    // enviar — o estado pode ter mudado entre os dois cliques (voltar, editar, reabrir).
+    const errs = validarEtapa3(form.ganhoCategorias ?? [], ganhos, { hojeISO: hojeIso() });
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      setRevisando(false);
       toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
-      setShowEtapa25(true);
-      goToStep(2, "back");
       return;
-    }
-
-    // Rede de segurança (defesa em profundidade): o botão "Enviar" só deveria aparecer
-    // com o memorial aprovado, mas se algum caminho marcar a conversa como concluída sem
-    // preview (ex.: handoff doc→saving + reload), barramos aqui com orientação clara em
-    // vez de deixar o servidor devolver 500 "sem ganho mensurável". Especial não tem
-    // memorial financeiro, então não se aplica.
-    // Tom âmbar, não vermelho: falta um passo do preenchimento, e o próprio clique já reabre
-    // o formulário — a frase diz o que a pessoa vai encontrar na tela.
-    if (!form.especial) {
-      if (form.tipoProjeto.includes("saving") && approvedSavingPreview === null) {
-        toast.warning(
-          "Falta aprovar o memorial de saving. Reabri o formulário de impacto — conclua as perguntas do agente até o memorial aparecer.",
-          { duration: 10000 },
-        );
-        setChatComplete(false);
-        openSavingForm();
-        return;
-      }
-      if (form.tipoProjeto.includes("receita_incremental") && approvedReceitaPreview === null) {
-        toast.warning(
-          "Falta aprovar o memorial de receita. Reabri o formulário de receita — conclua as perguntas do agente até o memorial aparecer.",
-          { duration: 10000 },
-        );
-        setChatComplete(false);
-        openReceitaForm();
-        return;
-      }
     }
 
     // Tentativa nova → o bloqueio anterior deixa de valer (um aviso velho ao lado de uma
@@ -2906,8 +1394,21 @@ export function SubmeterPageContent({
     setBloqueio(null);
     setSubmittingProject(true);
 
-    // Submissão — a prioridade. Se falhar, não mostra tela de sucesso.
     try {
+      // 1) Grava o ganho declarado. Vem ANTES da submissão porque é o que o servidor
+      //    recompõe para calcular o impacto — submeter sem isto daria projeto sem ganho.
+      await apiFetch("/api/submeter/ganhos", {
+        projeto_id: projetoId,
+        ganhos: paraGanhosDeclarados(form.ganhoCategorias ?? [], ganhos),
+        // Os anexos de evidência sobem como os documentos do projeto (Drive). Os vazios
+        // são descartados aqui: base64 em branco estoura o zod do servidor.
+        anexos: [
+          ...anexosUteis(ganhos.savingAnexos),
+          ...anexosUteis(ganhos.imensuravelAnexos),
+        ],
+      });
+
+      // 2) Submete para a triagem.
       const res = await apiFetch<{ ok: boolean; status: string; ganho?: GanhoFinal }>(
         "/api/chat/submeter-validacao",
         {
@@ -2921,14 +1422,12 @@ export function SubmeterPageContent({
       const bloq = bloqueioDoErro(e);
       if (bloq) {
         // Preenchimento: o texto inteiro (veredito + por que + caminhos) vai para o painel
-        // âmbar ancorado no botão, e o toast só chama a atenção para ele. Antes o parágrafo
-        // inteiro morava num toast vermelho de 20s.
+        // âmbar ancorado no botão, e o toast só chama a atenção para ele.
         setBloqueio(bloq);
         toast.warning(TOAST_ENVIO_PAUSADO, { duration: 6000 });
       } else {
         const msg = e instanceof Error ? e.message : "";
-        // Falha de sistema — aqui o vermelho é informação correta. Sem prefixo "Erro ao…",
-        // que empurrava a orientação do servidor para fora da vista.
+        // Falha de sistema — aqui o vermelho é informação correta.
         toast.error(
           msg
             ? `Não foi possível enviar o projeto. ${msg}`
@@ -3055,7 +1554,7 @@ export function SubmeterPageContent({
                 label={form.escopo === "externo" ? "Serviço Externo" : "Ferramenta"}
                 value={form.escopo === "externo" ? form.servicoExterno : computeFerramenta()}
               />
-              <SummaryRow label="Status" value={form.especial ? "Aguardando validação" : "Aguardando análise"} badge last />
+              <SummaryRow label="Status" value="Aguardando análise" badge last />
             </div>
 
             {/* Comparativo numérico antes×depois — só em edição com versão anterior. */}
@@ -3100,11 +1599,9 @@ export function SubmeterPageContent({
   const faqDoRodape =
     step === 3
       ? FAQ_RODAPE.memorial
-      : step === 2 && showEtapa25
-        ? FAQ_RODAPE.especial
-        : step === 2
-          ? FAQ_RODAPE.financeiro
-          : FAQ_RODAPE.indice;
+      : step === 2
+        ? FAQ_RODAPE.financeiro
+        : FAQ_RODAPE.indice;
 
   return (
     <PageFrame>
@@ -3189,7 +1686,7 @@ export function SubmeterPageContent({
                 </div>
               </StepAnimation>
             )}
-            {step === 2 && !showEtapa25 && (
+            {step === 2 && (
               <StepAnimation direction={direction}>
                 <Step2
                   form={form}
@@ -3205,98 +1702,29 @@ export function SubmeterPageContent({
                 />
               </StepAnimation>
             )}
-            {step === 2 && showEtapa25 && (
-              <StepAnimation direction={direction}>
-                <Etapa25
-                  form={form}
-                  errors={errors}
-                  updateField={updateField}
-                  clearError={clearError}
-                  resp={respEspecial}
-                  onResp={handleRespEspecial}
-                  onRespTriagem={handleRespTriagemEspecial}
-                />
-              </StepAnimation>
-            )}
             {step === 3 && (
               <StepAnimation direction={direction}>
-                <Step3Chat
-                  messages={chatMessages}
-                  input={chatInput}
-                  setInput={setChatInput}
-                  onSend={handleSendMessage}
-                  loading={chatLoading}
-                  loadingSteps={chatLoadingSteps}
-                  finalizando={chatFinalizando}
-                  isComplete={chatComplete}
-                  onSubmit={handleSubmitProjeto}
-                  submitting={submittingProject}
-                  chatBottomRef={chatBottomRef}
-                  fase={chatFase}
-                  showTransition={showTransition}
-                  transitionType={transitionType}
-                  approvedDocPreview={approvedDocPreview}
-                  approvedSavingPreview={approvedSavingPreview}
-                  approvedReceitaPreview={approvedReceitaPreview}
-                  tipoProjeto={form.tipoProjeto}
-                  escopo={form.escopo}
-                  showSavingForm={showSavingForm}
-                  onSavingFormSubmit={handleSavingFormSubmit}
-                  savingFormLoading={savingFormLoading}
-                  showReceitaForm={showReceitaForm}
-                  onReceitaFormSubmit={handleReceitaFormSubmit}
-                  receitaFormLoading={receitaFormLoading}
-                  formDraft={formDraft}
-                  onFormDraftChange={setFormDraft}
-                  onEditSaving={
-                    chatFase === "saving" || chatFase === "saving_preview"
-                      ? openSavingForm
-                      : (chatFase === "receita" || chatFase === "receita_preview") &&
-                          form.tipoProjeto.includes("saving") &&
-                          savingSubmitted
-                        ? openSavingForm
-                        : undefined
-                  }
-                  onEditReceita={
-                    chatFase === "receita" || chatFase === "receita_preview"
-                      ? openReceitaForm
-                      : undefined
-                  }
-                  // "Editar tipo": volta à tela de seleção de tipo (Etapa 2.5), não ao
-                  // início da etapa 2. showSavingForm persiste no pai; ao "Continuar com
-                  // Agente" sem mudanças, o form reaparece (handleContinuarAgente não o reseta).
-                  onSavingFormVoltar={() => { setShowEtapa25(true); goToStep(2, "back"); }}
-                  savingFormVoltarLabel="Editar tipo"
-                  // Form de receita: no fluxo "ambos" volta ao formulário de saving (sem
-                  // sair da etapa 3); se for só receita, volta à seleção de tipo (2.5).
-                  onReceitaFormVoltar={
-                    form.tipoProjeto.includes("saving")
-                      ? () => { setShowReceitaForm(false); openSavingForm(); }
-                      : () => { setShowEtapa25(true); goToStep(2, "back"); }
-                  }
-                  receitaFormVoltarLabel={
-                    form.tipoProjeto.includes("saving")
-                      ? "Editar saving"
-                      : "Editar tipo"
-                  }
-                  // Refazer memorial financeiro na revisão final. Só para projeto
-                  // com saving/receita (especial não tem memorial financeiro).
-                  onReiniciarMemorial={
-                    !form.especial &&
-                    (form.tipoProjeto.includes("saving") ||
-                      form.tipoProjeto.includes("receita_incremental"))
-                      ? handleReiniciarMemorial
-                      : undefined
-                  }
-                  bloqueio={bloqueio}
-                  versaoAnterior={versaoAnterior}
-                  novoResumo={{
-                    nome: form.nomeProjeto.trim(),
-                    descricaoBreve: form.descricaoBreve.trim(),
-                    ferramenta: computeFerramenta(),
-                    tiposProjeto: form.tipoProjeto,
-                  }}
-                />
+                {revisando ? (
+                  <RevisaoGanhos
+                    form={form}
+                    ganhos={ganhos}
+                    bloqueio={bloqueio}
+                    submitting={submittingProject}
+                    onEditar={() => setRevisando(false)}
+                    onEnviar={handleSubmitProjeto}
+                    ferramenta={computeFerramenta()}
+                  />
+                ) : (
+                  <Step3Ganhos
+                    categorias={form.ganhoCategorias ?? []}
+                    dados={ganhos}
+                    errors={errors}
+                    onChange={(patch) => setGanhos((atual) => ({ ...atual, ...patch }))}
+                    onSubmit={handleRevisar}
+                    onVoltar={() => goToStep(2, "back")}
+                    loading={submittingProject}
+                  />
+                )}
               </StepAnimation>
             )}
           </div>
@@ -3304,18 +1732,13 @@ export function SubmeterPageContent({
           {/* Bloqueio de envio do fluxo ESPECIAL (o botão "Enviar Projeto" fica na navegação
               da Etapa 2.5). Na etapa 3 o painel é renderizado dentro da revisão final, junto
               do botão "Enviar para Triagem". */}
-          {bloqueio && step === 2 && showEtapa25 && !CODIGOS_TRIAGEM_ESPECIAL.includes(bloqueio.codigo) && (
-            <div style={{ padding: "0 32px" }}>
-              <AvisoBloqueio bloqueio={bloqueio} />
-            </div>
-          )}
-
-          {/* Navigation */}
+          {/* Navegação. A Etapa 3 tem os botões dela dentro do próprio componente (e a
+              revisão tem os seus), por isso ela fica fora daqui. */}
           {step !== 3 && (
             <div style={{ padding: "0 32px 24px" }} className="mt-6 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={showEtapa25 ? () => setShowEtapa25(false) : handleBack}
+                onClick={handleBack}
                 className="go-btn-back"
                 style={{ visibility: step === 1 ? "hidden" : "visible" }}
               >
@@ -3333,102 +1756,25 @@ export function SubmeterPageContent({
                 </button>
               )}
 
-              {/* Etapa 2 (formulário) → abre a sub-tela 2.5 (tipo de projeto).
-                  Vale na primeira passagem e em re-entradas (permite trocar o tipo). */}
-              {step === 2 && !showEtapa25 && (
+              {/* Etapa 2 → Etapa 3. Um botão só: a Etapa 2.5 (tipo de projeto + triagem do
+                  especial) saiu, e o "Analisar com Agente" não existe mais — o ganho é
+                  declarado num formulário, não conversado. */}
+              {step === 2 && (
                 <button
                   type="button"
-                  onClick={handleAbrirEtapa25}
-                  className={cn("go-btn-next", shaking && "go-shake")}
-                >
-                  Próximo &rarr;
-                </button>
-              )}
-
-              {/* Etapa 2.5 — projeto especial: pula o agente e envia direto à base. */}
-              {step === 2 && showEtapa25 && respEspecial === "sim" && (
-                <button
-                  type="button"
-                  onClick={handleEnviarEspecial}
-                  // Com a triagem bloqueando, o botão fica QUIETO: o painel âmbar logo acima
-                  // é a explicação, e um botão que só devolve o mesmo aviso a cada clique
-                  // (duplicando-o) não ensina nada. `title` cobre quem chega pelo teclado.
-                  disabled={enviandoEspecial || !!motivoEspecialAtual}
-                  title={
-                    motivoEspecialAtual
-                      ? "Envio pausado: revise as respostas da triagem acima."
-                      : undefined
-                  }
+                  onClick={handleAvancarParaGanhos}
+                  disabled={avancando}
                   className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
                 >
-                  {enviandoEspecial ? (
+                  {avancando ? (
                     <>
-                      <CyclingText steps={editProjetoId ? LOADING_STEPS_EDITAR : LOADING_STEPS_ENVIAR_ESPECIAL} />
+                      <span>Preparando…</span>
                       <div className="go-spinner" />
                     </>
                   ) : (
-                    <span>Enviar Projeto &rarr;</span>
+                    <span>Próximo &rarr;</span>
                   )}
                 </button>
-              )}
-
-              {/* Etapa 2.5 (projeto padrão) — LIDERANÇA (cargo isento): pula o agente.
-                  Cria o projeto (doc por IA numa passada) e vai direto ao formulário
-                  determinístico de saving/receita. O servidor reconfere a permissão. */}
-              {step === 2 && showEtapa25 && respEspecial !== "sim" && modoDireto && (
-                <button
-                  type="button"
-                  onClick={handleContinuarDireto}
-                  disabled={iniciandoDireto}
-                  title="Como liderança, você segue direto para o preenchimento — sem conversar com o agente."
-                  className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
-                >
-                  {iniciandoDireto ? (
-                    <>
-                      <CyclingText steps={LOADING_STEPS_INICIAR} />
-                      <div className="go-spinner" />
-                    </>
-                  ) : (
-                    <span>Continuar &rarr;</span>
-                  )}
-                </button>
-              )}
-
-              {/* Etapa 2.5 (projeto padrão): inicia o agente (1ª vez) ou retoma (re-entrada). */}
-              {step === 2 && showEtapa25 && respEspecial !== "sim" && !modoDireto && (
-                projetoId ? (
-                  <button
-                    type="button"
-                    onClick={handleContinuarAgente}
-                    disabled={continuando}
-                    className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
-                  >
-                    {continuando ? (
-                      <>
-                        <CyclingText steps={LOADING_STEPS_REPROCESSAR} />
-                        <div className="go-spinner" />
-                      </>
-                    ) : (
-                      <span>Continuar com Agente &rarr;</span>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleIniciarAgente}
-                    disabled={iniciandoChat}
-                    className={cn("go-btn-next inline-flex items-center justify-center gap-2", shaking && "go-shake")}
-                  >
-                    {iniciandoChat ? (
-                      <>
-                        <CyclingText steps={LOADING_STEPS_INICIAR} />
-                        <div className="go-spinner" />
-                      </>
-                    ) : (
-                      <span>Analisar com Agente &rarr;</span>
-                    )}
-                  </button>
-                )
               )}
             </div>
           )}

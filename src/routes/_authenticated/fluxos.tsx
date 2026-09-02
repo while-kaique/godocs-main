@@ -11,21 +11,19 @@ export const Route = createFileRoute("/_authenticated/fluxos")({
   component: FluxosPage,
 });
 
-// Especial NÃO é aba própria: o "Projeto padrão" já oferece marcar especial na Etapa
-// 2.5, então uma aba separada seria redundante (decisão do Luis, 21/08/2026).
+// ⚠️ Eram TRÊS fluxos e sobrou UM. Na v1 havia "Projeto padrão" (conversa com o agente),
+// "Liderança" (cargo isento, que pulava o agente) e o especial embutido na Etapa 2.5. Na v2
+// não existe agente no caminho de ninguém (D4), a Etapa 2.5 saiu (D5) e o atalho da
+// liderança perdeu a razão de ser — ele existia justamente para escapar da conversa.
+// Sobrou o caminho único, que é o que este sandbox inspeciona.
 const FLUXOS: { id: FluxoDemo; rotulo: string; descricao: string }[] = [
   {
-    id: "normal",
-    rotulo: "Projeto padrão",
+    id: "padrao",
+    rotulo: "Submissão",
     descricao:
-      "Submissão comum: conversa com o agente, formulário de saving e revisão final. " +
-      "Para ver o fluxo ESPECIAL, marque 'especial' na Etapa 2.5 dentro deste mesmo fluxo.",
-  },
-  {
-    id: "lideranca",
-    rotulo: "Liderança",
-    descricao:
-      "Cargo isento: pula o agente conversacional. Doc por IA + formulário determinístico, sem gates.",
+      "As três etapas, do jeito que a pessoa vê: identidade e time, dados do projeto com " +
+      "os tipos de ganho, e os blocos de ganho no acordeão até a revisão. Nada é " +
+      "persistido e nenhuma chamada sai daqui.",
   },
 ];
 
