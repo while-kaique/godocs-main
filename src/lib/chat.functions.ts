@@ -713,8 +713,11 @@ function buildDocEspecial(data: {
 // determinístico. ⚠️ É uma PORTA que pula os freios de qualidade, então a permissão
 // é conferida SEMPRE no SERVIDOR — o flag do cliente sozinho nunca libera (senão
 // qualquer submissor burlaria os gates mandando `fluxo_direto:true`). Admin também
-// entra (para poder testar o fluxo — ver override `?lideranca=1`). Fail-to-false: se
-// a TeamGuide não responder, `ehLideranca` devolve false e cai no fluxo normal.
+// entra (para poder testar o fluxo — ver override `?lideranca=1`). Fail-to-false REAL: desde
+// o espelho da TeamGuide (02/09/2026), `ehLideranca` lê o snapshot local e é fail-safe —
+// TeamGuide/token fora devolve `false` (não lança), e o líder cai no fluxo NORMAL em vez de
+// abortar. Era exatamente aqui que o 401 do token expirado derrubava `iniciar-*` (incidente
+// 01–02/09/2026): o `return ehLideranca(alvo)` sem try/catch propagava o throw.
 async function podeFluxoDireto(email: string | null | undefined): Promise<boolean> {
   const alvo = (email ?? "").trim();
   if (!alvo) return false;
@@ -3767,15 +3770,18 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   // ── Derivar a ÁREA pelo email do responsável (TeamGuide) ───────────────────
   // A pessoa não escolhe mais a área no formulário — derivamos do cadastro dela
-  // na TeamGuide pelo email. Se não for encontrada (raríssimo — todo mundo está
-  // cadastrado lá), a área vira o aviso "ÁREA NÃO IDENTIFICADA". Em caso de falha
-  // da API (indisponibilidade), preservamos a área já gravada para não perder o
-  // dado durante uma queda transitória.
+  // na TeamGuide pelo email. Se não for encontrada, a área vira o aviso "ÁREA NÃO
+  // IDENTIFICADA" — MAS só quando não há área anterior a preservar.
+  // ⚠️ deriveAreaFromEmail agora é FAIL-SAFE (lê o espelho; NUNCA lança): devolve `null`
+  // tanto para "pessoa fora da TeamGuide" quanto para "espelho ainda vazio / TG fora". Antes
+  // as duas se distinguiam por throw-vs-null; agora, com `null`, PRESERVAMOS a área já
+  // gravada (`?? projeto.area`) antes do aviso, para que uma queda/bootstrap do espelho não
+  // sobrescreva uma área boa para "ÁREA NÃO IDENTIFICADA".
   const AREA_NAO_IDENTIFICADA = "ÁREA NÃO IDENTIFICADA";
   let areaFinal: string;
   try {
     const areaDerivada = await deriveAreaFromEmail(projeto.responsavel_email ?? "");
-    areaFinal = areaDerivada ?? AREA_NAO_IDENTIFICADA;
+    areaFinal = areaDerivada ?? projeto.area ?? AREA_NAO_IDENTIFICADA;
     if (areaDerivada) {
       log(
         "submeterParaValidacao",
@@ -3784,13 +3790,13 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     } else {
       log(
         "submeterParaValidacao",
-        `Email não encontrado na TeamGuide → "${AREA_NAO_IDENTIFICADA}" (${projeto.responsavel_email})`,
+        `Área não derivada (pessoa fora da TeamGuide ou espelho vazio) → "${areaFinal}" (${projeto.responsavel_email})`,
       );
     }
   } catch (tgErr) {
     err(
       "submeterParaValidacao",
-      "TeamGuide indisponível ao derivar área — preservando área existente:",
+      "Falha inesperada ao derivar área — preservando área existente:",
       tgErr,
     );
     areaFinal = projeto.area ?? AREA_NAO_IDENTIFICADA;
