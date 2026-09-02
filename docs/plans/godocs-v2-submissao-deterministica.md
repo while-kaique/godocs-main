@@ -6,6 +6,38 @@ reuso `duplicacao-intencional` — nenhum barrante). T1 fechada menos a verifica
 dispensados pelo Luis). Próximo: **bloco T4+T5 até o fluxo visual no ar no `f9c9a7ff`** (ver "Ordem de execução
 revisada" abaixo).
 
+### Decisão de execução — Luis, 02/09/2026 (tarde), em seletor
+Duas mudanças de ESCOPO/AMBIENTE autorizadas pelo dono do produto, que **sobrepõem** a letra
+anterior deste plano. Registradas aqui porque a régua contra a qual o revisor de conformidade
+verifica precisa refletir o que foi mandado, não o que foi planejado antes:
+
+1. **O bloco vai de T4 até T9, e sobe.** Não é mais "T4+T5". Palavras dele: *"se é até T9 ter as
+   telas completas, você já deve fazer até T9 agora mesmo. Não quero, eu falei até T5, mas até T9
+   e subir."* Ritmo: **emendar tudo**, sem check-in por fatia, chamando-o com o app no ar.
+
+2. **O ambiente isolado (D7) SAI; a frente sobe na staging v1 (`edf400b4`).** Palavras dele:
+   *"pode esquecer isso de v2 e subir pra staging principal mesmo. Não tem problema. Pelo menos lá
+   você tem todas as credenciais e consegue enxergar tudo."* O motivo é factual: `f9c9a7ff` tem 9
+   secrets contra os 45 de `edf400b4` — falta `GOOGLE_SA_KEY_BASE64`, `GOOGLE_SHEETS_ID`,
+   `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_*`, `TG_API_TOKEN`, `API_PROXY_TOKEN`, `LLM_API_KEY`, e
+   sem eles não há TeamGuide (áreas/cargos/participantes), Drive, planilha nem proxy de LLM.
+   ⚠️ Isso **revoga a 1ª Fronteira** quanto ao staging v1 (`edf400b4`) — **prod (`674a3710`)
+   continua intocada, sem exceção**. Consequências aceitas, com o remédio de cada uma:
+   - a staging deixa de validar a v1 enquanto a v2 estiver lá (regra 13); reverter = redeploy do
+     `main` + devolver o secret da aba;
+   - `GOOGLE_SHEETS_TAB` do `edf400b4` passa a apontar **`STAGING-V2`** (aba que já existe, gid
+     1169919423), para o cabeçalho da aba `STAGING` da v1 **não** ser reescrito pela T6;
+   - com a aba trocada, `reconciliarExclusoes` esvazia o SQLite da staging dos projetos v1 (a
+     planilha é a fonte do que aparece, e a `STAGING-V2` está vazia) — coerente com "a v2 nasce
+     com base zerada", mas o dashboard de lá fica vazio;
+   - os secrets `SUBMISSAO_BLOQUEIO_INICIO`/`_FIM` são removidos **na staging** para dar para
+     submeter (a pausa em prod não é tocada).
+
+3. **O agente sai do caminho do usuário SEM env-gate.** Palavras dele: *"só tira do caminho o
+   agente. Não vai ter mais no fluxo agente, então não tem por que ter."* Logo `iniciarSubmissao`
+   deixa de consultar `podeFluxoDireto` para decidir se compila a doc numa passada — não existe
+   mais o ramo conversacional a proteger. Nenhum predicado `isV2()` foi criado.
+
 ### Ordem de execução revisada — decisão do Luis, 02/09/2026
 As tarefas e os critérios de aceitação **não mudam**; muda o RITMO. **T4 e T5 viram um bloco único** cujo
 critério de pronto é o Luis **clicar da Etapa 1 até o botão "Submeter"** no app de staging v2 (`f9c9a7ff`), e
