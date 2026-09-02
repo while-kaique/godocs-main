@@ -6,6 +6,29 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
+**Frente GoDocs v2 — submissão determinística sem agente no cliente 🟡 (branch `feat/godocs-v2`, plano APROVADO em 02/09/2026):**
+Plano: [`docs/plans/godocs-v2-submissao-deterministica.md`](docs/plans/godocs-v2-submissao-deterministica.md) ·
+Spec: `SPEC.md` §4 Fase 3 (RF-200..RF-227) + INV-10..INV-15.
+Frente NOVA e isolada — **nada aqui toca prod (`674a3710`) nem o staging v1 (`edf400b4`)**; o ambiente é o
+`godocs-v2-staging` com a aba `STAGING-V2`. O agente sai do caminho do usuário e a coleta de ganho vira formulário
+determinístico de 4 categorias num acordeão; a fórmula do impacto muda (`1,0·S + 0,5·CE + 0,1·R − C`, mensalizada
+por bloco); a documentação passa a ser compilada em background invisível; e a estrela passa a valer para todo
+projeto, com especial derivado dela.
+
+- ⬜ **T1** — ambiente v2 isolado (app `godocs-v2-staging`, aba `STAGING-V2`, guard de env)
+- ⬜ **T2** — núcleo puro do impacto (`src/lib/impacto.ts`), pesos e divisores como fonte única
+- ⬜ **T3** — modelo de dados dos 4 ganhos + exclusividade do ganho imensurável
+- ⬜ **T4** — componentes que faltam: acordeão · lista de itens · tabela de horas · campo de evidência com colar
+- ⬜ **T5** — Etapas 1, 2 e 3 reescritas (sai a Etapa 2.5)
+- ⬜ **T6** — persistência, planilha e leitura (as 5 réplicas da fórmula passam a chamar a T2)
+- ⬜ **T7** — documentação invisível em background
+- ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
+- ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos (por último)
+
+**Próximo:** codar a **T2** (núcleo puro do impacto) com `/ggsd:code`, em paralelo à **T1** (provisionar o ambiente v2).
+
+---
+
 **Plano ativo — Frente 2: time autônomo de avaliação, FATIA B 🟡 (PARTE 1+2 CÓDIGO VERDE em 2026-08-27, NÃO fechada):**
 RAG por corpus de aprovados + especialista Financeiro + Agregador/juiz com confiança (confiança baixa/divergência → `em_validacao`,
 nunca decide negativo; especial/liderança isentos). Tudo env-gated, DEFAULT OFF (modo SOMBRA — grava recomendação, NÃO muda status).

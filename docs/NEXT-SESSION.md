@@ -1,6 +1,48 @@
 # NEXT-SESSION
 
 ## Plano ativo
+**→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026)
+
+> Branch `feat/godocs-v2`, worktree `~/godocs-wt-v2`. Frente NOVA e isolada: o GoDocs v2 (submissão
+> determinística sem agente no cliente). **Nada nesta branch toca prod (`674a3710`) nem o staging v1
+> (`edf400b4`)** — o ambiente é o `godocs-v2-staging`, aba `STAGING-V2`. O handoff da frente anterior
+> (mesa de avaliação) segue abaixo, preservado, e pertence à `main`.
+
+## O que esta sessão fez (02/09) — planejamento, zero código
+- Criou a branch `feat/godocs-v2` e a worktree `~/godocs-wt-v2` a partir de `origin/main` (`8b98cd4`).
+- Fechou com o Luis as **8 decisões** da v2 (régua saving efetivado × custo evitado, fórmula com pesos,
+  mensalização por bloco, fusão das duas linhas de custo, fim do agente no cliente, especial derivado de
+  estrela, doc invisível em background, ambiente isolado) — registradas em D1..D8 no plano.
+- Escreveu o plano aprovado `docs/plans/godocs-v2-submissao-deterministica.md` (roadmap T1..T9) e mapeou o
+  blast-radius com 3 exploradores em paralelo (formulário · cálculo/Sheets · background).
+- Cristalizou a spec: `SPEC.md` §4 **Fase 3** com **RF-200..RF-227** e os invariantes **INV-10..INV-15**,
+  mais a emenda ao **INV-03** (na v2 as horas deixam de compor o saving e passam a compor o custo evitado).
+
+## Próximo passo
+**Codar a T2 — o núcleo puro do impacto (`src/lib/impacto.ts`) — com `/ggsd:code`**, escrevendo o teste antes:
+pesos (`1,0` saving efetivado · `0,5` custo evitado · `0,1` receita) e divisores de frequência
+(pontual 4 · mensal 1 · trimestral 3 · semestral 6) como constantes nomeadas, com os 3 exemplos da conversa
+como casos. Em paralelo, a **T1** provisiona o app `godocs-v2-staging` e a aba `STAGING-V2`.
+
+## Pendências / avisos
+- **Nada nesta branch pode tocar prod (`674a3710`) nem o staging v1 (`edf400b4`)** — é a fronteira nº 1 do plano.
+- Os 3 exploradores rodaram **sem `docs/INDEX.md`/`docs/invariants.md`** (não existem neste repo): confiança
+  do mapeamento é **média**, e a sessão de código deve refazer a varredura profunda antes de mexer em
+  `SHEET_COLUMNS` e na fórmula.
+- **Cabeçalho real da aba `STAGING-V2` ainda não foi conferido** contra a proposta de colunas da T6 — usar
+  `scripts/dryrun-lider/cabecalho-full.ts`.
+- Assumido de olho aberto: com o chat fora, **os 7 gates conversacionais morrem** e nada barra número
+  implausível no envio. A validação vira 100% pós-submissão; regras de backend são frente posterior.
+- Os marcadores de gate em `.claude/` (`suite-status=verde`, `review-status=conforme`, `quality-status=limpo`)
+  são herança da frente anterior; esta sessão não rodou suíte porque não tocou código.
+
+---
+
+---
+
+# Handoff anterior (frente da mesa de avaliação — pertence à `main`)
+
+## Plano ativo
 `docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1–T7 concluídos e commitados; falta a revisão §9 fechar + o deploy do Luis.
 
 ## O que esta sessão fez (29/08) — T5, T6 e T7 fechados no código
