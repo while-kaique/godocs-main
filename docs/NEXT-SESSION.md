@@ -83,9 +83,12 @@ o envio), T7, T8, T9-servidor.
    recusar um projeto v2. Tem de passar a ler as colunas novas.
 3. **As 5 réplicas da fórmula** (`chat.functions.ts:3910`, `:4227`, `:4416`, `reconciliar-financeiro.ts:96`,
    `avaliacao-normais.functions.ts:282`) passam a chamar `impacto.ts`.
-4. **`SHEET_COLUMNS`** novo + **reescrever a linha 1 da aba `STAGING-V2`**: ela existe (gid **1169919423**)
-   mas está com o **cabeçalho da v1 clonado, 56 colunas** (`Saving Reais`, `Tipo de Saving`, `Especial?`…).
-   A proposta de cabeçalho está no plano. Depois disso, trocar `GOOGLE_SHEETS_TAB` da staging.
+4. ✅ **A linha 1 da `STAGING-V2` JÁ FOI REESCRITA** (02/09/2026): 59 colunas, **17 renomeações in-place +
+   3 novas**, decisão do Luis de **reaproveitar** em vez de criar. O mapeamento completo (e os 2 achados que
+   derrubaram a proposta antiga — a aba tem **578 linhas de dado**, não está vazia; e o "custo evitado" da v1
+   é o **saving efetivado** da v2) está no plano, seção *Cabeçalho da aba `STAGING-V2`*.
+   **Falta:** o `SHEET_COLUMNS` da T6 usar EXATAMENTE esses nomes, e só então trocar o `GOOGLE_SHEETS_TAB` da
+   staging (hoje ainda em `STAGING`, de propósito — nada escreve na aba nova até a T6).
 5. **Bump da `VERSAO_RECORTE_RESUMO`** se entrar coluna nova em `COLUNAS_RESUMO` — sem ele o campo nasce
    vazio para sempre.
 

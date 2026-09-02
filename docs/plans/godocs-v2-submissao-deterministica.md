@@ -246,24 +246,55 @@ Texto novo enxuto, em linguagem natural, sem travessão nem hífen decorativo.
   deixa a v2 sem rede e sem referência.
   *(guarda: suíte verde e nenhum import morto)*
 
-### Proposta de cabeçalho da aba `STAGING-V2` (a conferir contra o real)
+### Cabeçalho da aba `STAGING-V2` — ✅ APLICADO em 02/09/2026 (59 colunas)
 
-*Saem (12):* Data Criação · Alguém Fazia? · Especial? · Contexto do Projeto Especial · Alocação Ganhos ·
-Saving Horas Escalado · Saving Horas Real · Justificativa Saving Escalado e Real · Tipo de Saving ·
-Custo Mensal ou Pontual · Diff Horas/Antes · Diff Saving/Antes
+⚠️ **A proposta anterior desta seção (14 colunas novas, 12 removidas) foi DESCARTADA.** Duas correções de
+fato, apuradas ao ler a aba de verdade:
 
-*Entram (14):* Saving Efetivado · Freq. Saving Efetivado · Saving Efetivado Desde · Evidência Saving Efetivado ·
-Freq. Custo Evitado · Custo Evitado Horas · Racional Custo Evitado · Freq. Receita · Ganho Imensurável ·
-Custo para Rodar · Freq. Custo para Rodar · Impacto Bruto · Impacto Líquido · Impacto Líquido Mensal
+1. **A aba NÃO está vazia** — ela é um clone da `STAGING`, com **578 linhas de dado**. Zerá-la esvaziaria o
+   SQLite da staging no primeiro sync reverso (a planilha é a fonte do que aparece).
+2. **Quase tudo já existia.** A régua D1 só RENOMEOU conceitos: o que a v1 chama de **`Custo Evitado`** (a
+   empresa pagava e parou de pagar) é o **saving efetivado** da v2, e o **saving por horas** da v1 (hora
+   liberada de quem continua na folha) é o **custo evitado** da v2. Criar coluna nova para esses dois trios
+   seria duplicar dado que já está lá, nas 578 linhas.
 
-*Renomeiam:* Tipos Projeto → **Tipos de Ganho** · Memorial de Saving → **Parecer dos Validadores** ·
-Custo do Projeto + Custo Externo Mensal → **Custo para Rodar** (fusão, D3) · Receita Mensal → **Receita Incremental**
+Decisão do Luis: **reaproveitar**. Renomear cabeçalho **não move célula**, e o sync casa por **nome** — então
+as linhas antigas seguem legíveis, agora sob o nome certo. Foram **17 renomeações in-place + 3 colunas novas**
+ao fim (A→BG).
 
-*Ficam:* identidade e papéis · Descrição · URL · URL Godeploy · Ferramenta · Escopo · Usa AI Proxy ·
-Custo Evitado · Justificativa Custo Evitado · Horas em Reais · Tipo de Receita · Receita Memorial ·
-Status · Estrelas · Classificação · Complexidade · Observações · Motivo Reenvio · Motivo Reprovado ·
-Análise Antiagente · Aprovação do Líder · Justificativa Aprovação do Lider · Memorial anterior ·
-Atualizado Em · **ID Pai** · **ID Feature**
+| Coluna v1 (com dado nas 578 linhas) | Passou a significar |
+|---|---|
+| `Tipos Projeto` | **Tipos de Ganho** (as 4 categorias) |
+| `Custo Evitado` | **Saving Efetivado** (quanto era, o "antes" do par) |
+| `Justificativa Custo Evitado` | **Evidência Saving Efetivado** |
+| `Custo Mensal ou Pontual` | **Freq. Saving Efetivado** |
+| `Saving Horas` | **Custo Evitado Horas** (o braço das horas) |
+| `Horas em Reais` | **Custo Evitado Horas Reais** (o R$ derivado delas) |
+| `Tipo de Saving` | **Freq. Custo Evitado** |
+| `Justificativa Saving Escalado e Real` | **Racional Custo Evitado** |
+| `Custo do Projeto` | **Custo para Rodar** (fusão D3) |
+| `Custo do Projeto Mensal ou Pontual` | **Freq. Custo para Rodar** |
+| `Justificativa Custo do Projeto` | **Justificativa Custo para Rodar** |
+| `Receita Mensal` | **Receita Incremental** |
+| `Tipo de Receita` | **Freq. Receita** (era isso que ela guardava na prática) |
+| `Receita Memorial` | **Racional Receita** |
+| `Contexto do Projeto Especial` | **Ganho Imensurável** (o projeto cujo ganho não tem número) |
+| `Saving Reais` | **Impacto Bruto** |
+| `Ganho Total` | **Impacto Líquido** (já era o consolidado com o deflator da receita) |
+
+*Novas (3) — as perguntas que a v1 nunca fez:* **`Saving Efetivado Agora`** (a 2ª ponta do par; o saving é a
+DIFERENÇA) · **`Custo Evitado Não Contratado`** (a vaga não aberta, a consultoria não contratada) ·
+**`Impacto Líquido Mensal`** (a normalização no tempo do item 5.8).
+
+*Mortas, sem uso e NÃO apagadas* (apagar coluna do meio desalinharia as 578 linhas; nada as lê):
+`Data Criação` · `Alguém Fazia?` · `Especial?` · `Alocação Ganhos` · `Saving Horas Escalado` ·
+`Saving Horas Real` · `Custo Externo Mensal` · `Memorial de Saving` · `Diff Horas / Antes` ·
+`Diff Saving / Antes`.
+
+⚠️ **O `SHEET_COLUMNS` da T6 tem de usar EXATAMENTE estes nomes** (o casamento é por nome, com a tolerância
+de acento/caixa como rede) — inclusive o `Justificativa Aprovação do Lider` sem acento, que é o nome real.
+⚠️ As abas `STAGING` (55 colunas) e `GoDocs` (55) **não foram tocadas**, e o `GOOGLE_SHEETS_TAB` da staging
+**continua em `STAGING`**: nada disso está no caminho de escrita até a T6 trocar a env.
 
 ---
 
@@ -271,7 +302,10 @@ Atualizado Em · **ID Pai** · **ID Feature**
 
 1. Uma submissão completa vai da Etapa 1 ao envio **sem uma única chamada de LLM no caminho crítico**, e o
    tempo percebido não depende do proxy.
-2. Marcar ganho imensurável desmarca as outras 3, e marcar qualquer uma das 3 desmarca o imensurável.
+2. ⚠️ **REVOGADO em 02/09/2026 (Luis):** as 4 categorias combinam livremente, o imensurável incluído — um
+   projeto pode ter saving medido E um ganho sem número, e marcar os dois é insumo para o agente investigar.
+   O que a mistura não muda é a CONTA: `paraGanhosProjeto` só devolve `imensuravel: true` (impacto zero)
+   quando ele é a ÚNICA categoria marcada.
 3. Com 1, 2 ou 3 categorias marcadas, `Impacto Líquido` bate com a T2 no teste e na planilha; blocos não
    marcados entram como zero.
 4. Frequências diferentes entre blocos produzem o mensalizado correto por bloco (não um divisor de projeto).
