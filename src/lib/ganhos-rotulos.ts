@@ -103,3 +103,20 @@ export const FREQUENCIA_ABAS: { value: Frequencia; label: string }[] = [
   { value: 'semestral', label: 'Semestral' },
   { value: 'pontual', label: 'Pontual' },
 ]
+
+/**
+ * As abas da RECEITA — só **Mensal** e **Pontual**.
+ *
+ * ⚠️ Decisão do Luis (02/09/2026), e é a régua da PROD: no bloco de receita a v1 sempre
+ * ofereceu 2 cadências, não 4. Receita "a cada trimestre" quase nunca é o que a pessoa
+ * quer dizer — ela informa o mês ou o total de uma campanha —, e oferecer 4 convida a
+ * escolher errado num campo que multiplica o valor por 3 ou por 6.
+ *
+ * ⚠️ Deriva de `FREQUENCIA_ABAS` (FILTRA, não redigita): os rótulos e a ordem seguem
+ * vindo de um lugar só, e trimestral/semestral continuam VÁLIDOS no modelo
+ * (`DIVISOR_FREQUENCIA` os conhece, e o saving/custo evitado os oferecem) — o que muda é
+ * o que esta tela apresenta.
+ */
+export const FREQUENCIA_ABAS_RECEITA = FREQUENCIA_ABAS.filter(
+  (a) => a.value === 'mensal' || a.value === 'pontual',
+)

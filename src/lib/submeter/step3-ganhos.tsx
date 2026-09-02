@@ -1,7 +1,11 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { FieldError, InfoTooltip } from "./form-components";
-import { FREQUENCIA_ABAS, GANHO_ROTULOS } from "@/lib/ganhos-rotulos";
+import {
+  FREQUENCIA_ABAS,
+  FREQUENCIA_ABAS_RECEITA,
+  GANHO_ROTULOS,
+} from "@/lib/ganhos-rotulos";
 import { CATEGORIA_IMENSURAVEL, type GanhoCategoria } from "@/lib/ganhos";
 import type { Frequencia } from "@/lib/impacto";
 import { formatMoedaBR } from "./constants";
@@ -220,6 +224,7 @@ function SeletorFrequencia({
   erro,
   ariaLabel,
   nome,
+  abas = FREQUENCIA_ABAS,
 }: {
   valor: Frequencia | "";
   onChange: (v: Frequencia | "") => void;
@@ -227,15 +232,22 @@ function SeletorFrequencia({
   ariaLabel: string;
   /** Nome do grupo de rádio — único por bloco, senão as 3 fileiras viram um grupo só. */
   nome: string;
+  /**
+   * Quais cadências oferecer. Default: as 4. A RECEITA passa as 2 da prod
+   * (`FREQUENCIA_ABAS_RECEITA`) — ver o porquê na constante.
+   */
+  abas?: typeof FREQUENCIA_ABAS;
 }) {
   return (
     <div>
       <div
         role="radiogroup"
         aria-label={ariaLabel}
-        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+        // Com 2 opções, `grid-cols-2` já é a fileira inteira em qualquer largura; a 4ª
+        // coluna só entra na tela larga quando há 4 (senão sobra buraco).
+        className={cn("grid grid-cols-2 gap-2", abas.length > 2 && "sm:grid-cols-4")}
       >
-        {FREQUENCIA_ABAS.map(({ value, label }) => {
+        {abas.map(({ value, label }) => {
           const marcado = valor === value;
           return (
             <label
@@ -627,6 +639,7 @@ export function Step3Ganhos({
             <SeletorFrequencia
               ariaLabel="Frequência da receita incremental"
               nome="freq-receita-incremental"
+              abas={FREQUENCIA_ABAS_RECEITA}
               valor={dados.receitaFrequencia}
               onChange={(v) => onChange({ receitaFrequencia: v })}
               erro={errors.receitaFrequencia}
