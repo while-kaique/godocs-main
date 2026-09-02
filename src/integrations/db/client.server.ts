@@ -2430,6 +2430,108 @@ export function cleanupOldSyncRuns(daysToKeep = 7) {
   ]);
 }
 
+// ─── Espelho da TeamGuide (times/pessoas) + corridas + estado de alerta ──────
+// Molde: os acessores do `sheet_espelho`/`sync_runs` acima. O sync (`teamguide-espelho.ts`)
+// é o único que ESCREVE aqui; as leituras (`teamguide.server.ts`) só LEEM.
+
+export type TeamguideEspelhoRow = {
+  chave: string;
+  dados: string;
+  hash: string | null;
+  atualizado_em: number | null;
+};
+
+/** Lê a coleção crua ('times' | 'pessoas'). `undefined` = ainda não sincronizou. */
+export function getTeamguideEspelho(chave: string) {
+  return queryOne<TeamguideEspelhoRow>("SELECT * FROM teamguide_espelho WHERE chave = ?", [chave]);
+}
+
+/** Grava (ou substitui) uma coleção do espelho da TeamGuide. */
+export function upsertTeamguideEspelho(v: {
+  chave: string;
+  dados: string;
+  hash: string;
+  atualizado_em: number;
+}) {
+  // `INSERT OR REPLACE` (como o sheet_espelho): a linha é sempre gravada inteira e não há FK
+  // apontando para cá, então o REPLACE não cascateia nada.
+  return exec(
+    "INSERT OR REPLACE INTO teamguide_espelho (chave, dados, hash, atualizado_em) VALUES (?, ?, ?, ?)",
+    [v.chave, v.dados, v.hash, v.atualizado_em],
+  );
+}
+
+export type TeamguideSyncRunRow = {
+  id: string;
+  gatilho: string;
+  ok: number;
+  total: number | null;
+  duracao_ms: number | null;
+  detalhe: string | null;
+  iniciado_em: string | null;
+};
+
+/** Registra uma corrida do sync da TeamGuide (append-only). */
+export function insertTeamguideSyncRun(v: {
+  gatilho: string;
+  ok: number;
+  total: number;
+  duracao_ms: number;
+  detalhe: string | null;
+}) {
+  return exec(
+    "INSERT INTO teamguide_sync_runs (gatilho, ok, total, duracao_ms, detalhe) VALUES (?, ?, ?, ?, ?)",
+    [v.gatilho, v.ok, v.total, v.duracao_ms, v.detalhe],
+  );
+}
+
+/** Última corrida do sync da TeamGuide (qualquer desfecho) — para a rota de saúde. */
+export function getUltimaTeamguideSyncRun() {
+  // Desempate por `rowid` (ordem de INSERÇÃO, monotônica): `iniciado_em` é TEXT com resolução
+  // de SEGUNDO, e 2 corridas no mesmo segundo empatariam. ⚠️ NÃO usar `id` — é hex ALEATÓRIO,
+  // não crescente, então desempataria pela corrida errada. `id` é TEXT PK, logo não é alias de
+  // rowid → o rowid implícito segue a inserção.
+  return queryOne<TeamguideSyncRunRow>(
+    "SELECT * FROM teamguide_sync_runs ORDER BY iniciado_em DESC, rowid DESC LIMIT 1",
+    [],
+  );
+}
+
+/** Última corrida BEM-SUCEDIDA — define a idade real do espelho da TeamGuide. */
+export function getUltimaTeamguideSyncRunOk() {
+  return queryOne<TeamguideSyncRunRow>(
+    "SELECT * FROM teamguide_sync_runs WHERE ok = 1 ORDER BY iniciado_em DESC, rowid DESC LIMIT 1",
+    [],
+  );
+}
+
+/** Higiene: o log de corridas da TeamGuide cresce ~48/dia com o cron de 30 min. */
+export function cleanupOldTeamguideSyncRuns(daysToKeep = 7) {
+  return exec(
+    "DELETE FROM teamguide_sync_runs WHERE iniciado_em < datetime('now', '-' || ? || ' days')",
+    [daysToKeep],
+  );
+}
+
+export type AlertaEstadoRow = {
+  chave: string;
+  ultimo_em: number | null;
+  contagem: number | null;
+};
+
+/** Estado de dedup/cooldown de UMA fonte de alerta. `undefined` = nunca alertou. */
+export function getAlertaEstado(chave: string) {
+  return queryOne<AlertaEstadoRow>("SELECT * FROM alerta_estado WHERE chave = ?", [chave]);
+}
+
+/** Grava (ou substitui) o estado de cooldown de uma fonte de alerta. */
+export function upsertAlertaEstado(v: { chave: string; ultimo_em: number | null; contagem: number }) {
+  return exec(
+    "INSERT OR REPLACE INTO alerta_estado (chave, ultimo_em, contagem) VALUES (?, ?, ?)",
+    [v.chave, v.ultimo_em, v.contagem],
+  );
+}
+
 // ─── Row types ──────────────────────────────────────────────────────────────
 
 export type AdminRow = {

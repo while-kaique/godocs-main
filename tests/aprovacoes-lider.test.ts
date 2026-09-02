@@ -13,6 +13,12 @@ vi.mock('@/lib/areas/teamguide.server', () => ({
   getLideresDe: vi.fn(),
   getLideradosDe: vi.fn(),
 }));
+// O espelho da TeamGuide é considerado DISPONÍVEL aqui: estes testes exercitam a LÓGICA de
+// abrirPreAprovacao com as leituras da TeamGuide mockadas; o motivo `sem_lider` (e não
+// `teamguide_indisponivel`) só vale com o espelho populado.
+vi.mock('@/lib/teamguide-espelho', () => ({
+  espelhoTeamGuideDisponivel: vi.fn(async () => true),
+}));
 // `readAllRows` existe no mock porque `meus-projetos.functions` → `google/sync-reverse`
 // o importa; o detalhe do projeto não lê a planilha, então nunca é chamado.
 vi.mock('@/lib/google/sheets', () => ({
@@ -29,6 +35,7 @@ vi.mock('@/lib/auth.functions', async (importOriginal) => ({
 }));
 
 import { ehLideranca, getLideresDe, getLideradosDe } from '@/lib/areas/teamguide.server';
+import { espelhoTeamGuideDisponivel } from '@/lib/teamguide-espelho';
 import { updateRowByProjectId } from '@/lib/google/sheets';
 import { setDb, insertProjetoRaw, getAprovacoesDoProjeto } from '@/integrations/db/client.server';
 import {
@@ -220,6 +227,20 @@ describe('pré-aprovação do líder', () => {
       isento: true,
       motivo: 'teamguide_indisponivel',
       rotuloSheet: '—',
+    });
+  });
+
+  it('espelho da TeamGuide VAZIO → motivo teamguide_indisponivel (não sem_lider)', async () => {
+    // Leituras fail-safe (não lançam): sem líder e não-liderança, MAS o espelho está vazio →
+    // preserva `teamguide_indisponivel` em vez de afirmar `sem_lider`.
+    mockLideranca.mockResolvedValue(false);
+    mockLideres.mockResolvedValue([]);
+    vi.mocked(espelhoTeamGuideDisponivel).mockResolvedValueOnce(false);
+    const id = await criarProjeto();
+
+    expect(await abrirPreAprovacao(id)).toMatchObject({
+      isento: true,
+      motivo: 'teamguide_indisponivel',
     });
   });
 

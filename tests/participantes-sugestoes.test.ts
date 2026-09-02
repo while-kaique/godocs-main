@@ -1,8 +1,10 @@
 // Autocomplete de participantes: filtro puro do frontend (participantes-sugestoes)
-// e listagem da TeamGuide no backend (listarPessoasTeamGuide, fetch mockado).
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// e listagem da TeamGuide no backend (listarPessoasTeamGuide, agora lendo do ESPELHO).
+import { describe, it, expect, beforeEach } from 'vitest';
 import { filtrarSugestoes, type SugestaoParticipante } from '@/lib/submeter/participantes-sugestoes';
 import { listarPessoasTeamGuide } from '@/lib/areas/teamguide.server';
+import { criarDbMemoria } from './helpers/db-memoria';
+import { semearEspelhoTeamGuide } from './helpers/teamguide-espelho-fake';
 
 const PESSOAS: SugestaoParticipante[] = [
   { nome: 'Adriana Melo Da Penha', email: 'adriana.mello@gocase.com', cargo: 'Agente De Atendimento CX' },
@@ -59,13 +61,9 @@ describe('listarPessoasTeamGuide', () => {
     { id: 4, name: 'Bruna Lima 2', contactEmail: 'bruna.lima@gocase.com', position: 'Dup' },
   ];
 
-  beforeEach(() => {
-    process.env.TG_API_TOKEN = 'fake-token';
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => REFS } as Response)));
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    delete process.env.TG_API_TOKEN;
+  beforeEach(async () => {
+    await criarDbMemoria();
+    await semearEspelhoTeamGuide({ times: [], refs: REFS });
   });
 
   it('normaliza e-mail, descarta sem e-mail, dedup e ordena por nome', async () => {
@@ -76,8 +74,10 @@ describe('listarPessoasTeamGuide', () => {
     ]);
   });
 
-  it('lança erro sem TG_API_TOKEN', async () => {
-    delete process.env.TG_API_TOKEN;
-    await expect(listarPessoasTeamGuide()).rejects.toThrow(/TG_API_TOKEN/);
+  it('espelho vazio → [] (fail-safe, NÃO lança)', async () => {
+    await criarDbMemoria(); // banco novo, espelho vazio
+    const { __resetTeamguideSnapshotCache } = await import('@/lib/areas/teamguide.server');
+    __resetTeamguideSnapshotCache();
+    await expect(listarPessoasTeamGuide()).resolves.toEqual([]);
   });
 });

@@ -352,6 +352,43 @@ const SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_sync_runs_iniciado ON sync_runs(iniciado_em);
+
+  -- ESPELHO da TeamGuide (mesma ideia do sheet_espelho): a árvore de times e a lista de
+  -- pessoas vivem aqui, e as leituras (cargo, liderança, área, participantes, nome) leem
+  -- DAQUI -- fail-safe. A TeamGuide (api.teamguide.app) só é tocada pelo SYNC, fora do
+  -- caminho quente. Duas linhas: chave='times' e chave='pessoas', cada uma com o JSON do
+  -- array normalizado. Tabela DERIVADA/INTERNA: pode ser apagada e o próximo sync a
+  -- reconstrói, nada de estado do app mora aqui.
+  CREATE TABLE IF NOT EXISTS teamguide_espelho (
+    chave         TEXT PRIMARY KEY,                  -- 'times' | 'pessoas'
+    dados         TEXT NOT NULL,                     -- JSON do array normalizado
+    hash          TEXT,                              -- impressão do conteúdo (evita reescrita à toa)
+    atualizado_em INTEGER                            -- epoch ms da última gravação
+  );
+
+  -- Uma linha por execução do sync da TeamGuide (espelha sync_runs): diz, sem abrir log, se
+  -- o sync parou de rodar -- o risco desta arquitetura é o snapshot envelhecer em silêncio.
+  -- Append-only, nada aqui alimenta regra de negócio.
+  CREATE TABLE IF NOT EXISTS teamguide_sync_runs (
+    id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    gatilho     TEXT NOT NULL,                       -- 'cron'|'manual'|'sob-demanda'
+    ok          INTEGER NOT NULL DEFAULT 0,          -- 1 = leu a TeamGuide e espelhou
+    total       INTEGER DEFAULT 0,                   -- pessoas espelhadas
+    duracao_ms  INTEGER,
+    detalhe     TEXT,                                -- 1ª causa quando ok = 0
+    iniciado_em TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_tg_sync_runs_iniciado ON teamguide_sync_runs(iniciado_em);
+
+  -- Estado de dedup/cooldown dos alertas proativos no Chat de Ajuda (1 linha por fonte de
+  -- erro). Sem isto, um erro recorrente viraria N pings iguais. INTERNA, append-superseded.
+  CREATE TABLE IF NOT EXISTS alerta_estado (
+    chave     TEXT PRIMARY KEY,                      -- ex. 'teamguide-sync' | 'teamguide-token'
+    ultimo_em INTEGER,                               -- epoch ms do último envio de fato
+    contagem  INTEGER DEFAULT 0                      -- ocorrências suprimidas desde o último envio
+  );
+
   -- FAQ. Todo mundo LÊ em /faq, admin edita inline. Cada categoria é UM documento
   -- (coluna corpo, markdown leve) -- a lista de cards existe só no índice /faq.
   -- O conteúdo inicial nasce do FAQ_SEED (src/lib/faq/conteudo.ts) por seed IDEMPOTENTE
