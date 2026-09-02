@@ -12,8 +12,14 @@ import { getAlertaEstado, upsertAlertaEstado } from '@/integrations/db/client.se
 import { sendChatNotification } from '@/lib/google/chat';
 import { runBackground } from '@/lib/background';
 
-/** Janela em que uma repetição da MESMA fonte é contada em silêncio, não reenviada. */
+/** Janela padrão em que uma repetição da MESMA fonte é contada em silêncio, não reenviada. */
 export const COOLDOWN_ALERTA_MS = 30 * 60 * 1000;
+/**
+ * Cooldown para alertas de condição LENTA (ex.: "token expira em N dias"): a condição
+ * persiste por dias e o cron roda a cada 30 min, então o cooldown padrão de 30 min pingaria
+ * o Chat a cada corrida. 12 h → no máximo ~2 avisos/dia.
+ */
+export const COOLDOWN_ALERTA_LENTO_MS = 12 * 60 * 60 * 1000;
 
 function formatarMensagem(
   fonte: string,
@@ -44,6 +50,7 @@ export async function alertarErroIntegracao(
   fonte: string,
   titulo: string,
   detalhe?: string,
+  cooldownMs: number = COOLDOWN_ALERTA_MS,
 ): Promise<void> {
   try {
     const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL_AJUDA;
@@ -55,7 +62,7 @@ export async function alertarErroIntegracao(
     const suprimidas = estado?.contagem ?? 0;
 
     // Ainda no cooldown → conta em silêncio e sai.
-    if (ultimoEm != null && agora - ultimoEm < COOLDOWN_ALERTA_MS) {
+    if (ultimoEm != null && agora - ultimoEm < cooldownMs) {
       await upsertAlertaEstado({ chave: fonte, ultimo_em: ultimoEm, contagem: suprimidas + 1 });
       return;
     }

@@ -80,6 +80,28 @@ describe('alertarErroIntegracao', () => {
     expect(mockEnvio).not.toHaveBeenCalled();
   });
 
+  it('cooldown LONGO suprime uma repetição que o padrão (30min) já teria reenviado', async () => {
+    const { alertarErroIntegracao } = await carregarAlertas();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-09-02T10:00:00Z'));
+      await alertarErroIntegracao('teamguide-token', 'expira em 8 dias', undefined, 12 * 60 * 60 * 1000);
+      expect(mockEnvio).toHaveBeenCalledTimes(1);
+
+      // 1h depois: passou do cooldown de 30min, mas NÃO do de 12h → não reenvia.
+      vi.setSystemTime(new Date('2026-09-02T11:00:00Z'));
+      await alertarErroIntegracao('teamguide-token', 'expira em 8 dias', undefined, 12 * 60 * 60 * 1000);
+      expect(mockEnvio).toHaveBeenCalledTimes(1);
+
+      // 13h depois: passou do cooldown de 12h → reenvia.
+      vi.setSystemTime(new Date('2026-09-02T23:00:00Z'));
+      await alertarErroIntegracao('teamguide-token', 'expira em 8 dias', undefined, 12 * 60 * 60 * 1000);
+      expect(mockEnvio).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('NUNCA lança, mesmo se o envio ao Chat rejeitar', async () => {
     mockEnvio.mockRejectedValueOnce(new Error('chat 500'));
     const { alertarErroIntegracao } = await carregarAlertas();
