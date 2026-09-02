@@ -1,8 +1,20 @@
 # Plano — GoDocs v2: submissão determinística sem agente no cliente
 
-**Status:** ✅ aprovado (Luis, 02/09/2026) · **em execução — T1 e T2 executadas em 02/09** (branch `feat/godocs-v2`,
-suíte 2381 verde; revisores: conformidade `diverge-baixa`, qualidade `sugestoes`, reuso `duplicacao-intencional` —
-nenhum barrante). T1 fechada menos a verificação com Google (secrets sensíveis dispensados pelo Luis). Próxima: **T3**.
+**Status:** ✅ aprovado (Luis, 02/09/2026) · **em execução — T1, T2 e T3 executadas em 02/09** (branch
+`feat/godocs-v2`, suíte **2548 verde**; revisores da T3: conformidade `diverge-baixa`, qualidade `sugestoes`,
+reuso `duplicacao-intencional` — nenhum barrante). T1 fechada menos a verificação com Google (secrets sensíveis
+dispensados pelo Luis). Próximo: **bloco T4+T5 até o fluxo visual no ar no `f9c9a7ff`** (ver "Ordem de execução
+revisada" abaixo).
+
+### Ordem de execução revisada — decisão do Luis, 02/09/2026
+As tarefas e os critérios de aceitação **não mudam**; muda o RITMO. **T4 e T5 viram um bloco único** cujo
+critério de pronto é o Luis **clicar da Etapa 1 até o botão "Submeter"** no app de staging v2 (`f9c9a7ff`), e
+**os 3 revisores de contexto fresco rodam UMA vez, no fim do bloco**, não por fatia — o motivo declarado é que
+revisar fatia por fatia está demorando muito. O TDD-escala **continua** (teste antes de comportamento): com a
+revisão adiada, é ele que segura a régua. ⚠️ Consequência aceita: os marcadores de revisão ficam `pendente`
+durante o bloco e o **envio para o `main` fica barrado** até a revisão rodar — commit na branch e deploy no
+`f9c9a7ff` seguem livres. ⚠️ A **T6 fica FORA do bloco**, então o submit grava no SQLite do v2 e **não** chega
+à aba `STAGING-V2`.
 
 **Objetivo:** substituir a coleta conversacional de ganho por um formulário determinístico de 4 categorias
 (saving efetivado · custo evitado · receita incremental · ganho imensurável), com nova fórmula de impacto,
@@ -143,6 +155,15 @@ Texto novo enxuto, em linguagem natural, sem travessão nem hífen decorativo.
   Escrito antes de qualquer UI, com teste primeiro.
   *(guarda: `tests/impacto.test.ts` — os 3 exemplos da conversa, blocos ausentes = zero, frequências mistas, imensurável fora da conta)*
 
+- ✅ **T3 (EXECUTADA 02/09) — Modelo de dados dos 4 ganhos.**
+  Aterrissou em **`src/lib/ganhos.ts`** (módulo novo), **não** em `agents/types.ts`/`submeter/constants.ts`
+  como a linha abaixo diz: troca **autorizada pelo Luis em seletor** (o `agents/types.ts` é o arquivo que a
+  T9 demole, mistura o financeiro com 8 estados de gate de conversa e é importado por 26 arquivos). A letra
+  abaixo é anterior a essa decisão — **não "conserte" movendo os tipos de volta**; o cabeçalho do módulo
+  registra o porquê. Entregue: os 6 tipos + `categoriasValidas`/`alternarCategoria` + **3 pares de
+  serialização** (snake_case na coluna ↔ camelCase no tipo) + a ponte `paraGanhosProjeto`, **19 colunas** em
+  `projetos` e os 19 campos em `ProjetoRow`, com canário de schema. A receita ganhou **coluna própria**
+  (2ª decisão de seletor) — na v1 ela não tinha nenhuma, e era por isso que o rollup lia a planilha.
 - **T3 — Modelo de dados dos 4 ganhos.** Tipos em `agents/types.ts`/`submeter/constants.ts`
   (`GanhoCategoria`, `SavingEfetivado`, `CustoEvitado`, `ReceitaIncremental`, `GanhoImensuravel`, `CustoRodar`),
   colunas SQLite novas + migração, e a regra pura de exclusividade do checkbox

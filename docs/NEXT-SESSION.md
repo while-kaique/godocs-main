@@ -1,120 +1,104 @@
 # NEXT-SESSION
 
-## ✅ SESSÃO 02/09 — T1 e T2 do GoDocs v2 executadas
+## ✅ SESSÃO 02/09 (tarde) — T3 do GoDocs v2 executada
 
-Branch **`feat/godocs-v2`**, na pasta **`/home/notebook/godocs-main`** (o worktree `godocs-v2` foi removido a
-pedido do Luis — "pode ser tudo no mesmo lugar"). Suíte **2381 verde**, `tsc` só com os 7 erros pré-existentes
-do `main`, `npm run build` + `build:worker` ok, `worker.js` commitado (regra 1).
+Branch **`feat/godocs-v2`**, pasta `/home/notebook/godocs-main`. Suíte **2548 verde** (baseline da sessão:
+2381), `tsc` nos mesmos **7** erros pré-existentes do `main` (nenhum nos arquivos novos), `npm run build` +
+`build:worker` ok, `worker.js` rebuildado (regra 1).
 
-### T1 — ambiente v2 isolado ✅ (menos a verificação com Google)
-- App **`f9c9a7ff`** = `godocs-v2-staging` · https://f9c9a7ff.devgogroup.com/ · SQLite próprio zerado.
-- 9 secrets: `GODOCS_ENV=v2-staging`, `GOOGLE_SHEETS_TAB=STAGING-V2`, `ADMIN_EMAILS`, `APP_BASE_URL` e a
-  config de LLM (`sol` + `gpt-5.6-luna` + `LLM_REASONING_EFFORT_FAST=low`, valores do `CLAUDE.md`).
-- **Mudo por AUSÊNCIA de secret** (é assim que o ambiente não fala com ninguém): Chat, Chat de Ajuda,
-  Gomoon, push do JG e Drive (sem `GOOGLE_DRIVE_FOLDER_ID` o guard recusa e o `uploadDocsToDrive` engole →
-  submissão segue sem link, nunca escreve na pasta real).
-- ⚠️ **O achado que fez a T1 ser 5 arquivos, não 1:** `GODOCS_ENV=v2-staging` caía em **`'production'`** no
-  parser (só `'staging'` era reconhecido), o que **desligava** o `assertNaoEhDefaultDeProd` e mandava
-  Pinecone (namespace `prod`), Gomoon (`ambiente: 'producao'` → **DM em líder REAL**), rollup-push e o banner
-  para o caminho de produção. Régua nova: **`isStaging()`** vale para os dois ambientes de teste, e
-  **`rotuloAmbienteExterno()`** (`env.ts`) é a fonte única do rótulo que viaja para fora — estava digitado
-  igual em 2 lugares.
-- ⏳ **Pendente por decisão do Luis:** os 6 secrets sensíveis (`GOOGLE_SA_KEY_BASE64`, `GOOGLE_SA_CLIENT_EMAIL`,
-  `TG_API_TOKEN`, `API_PROXY_TOKEN`, `LLM_API_KEY`, `LLM_FALLBACK`) **não** foram setados ("n precisa desses").
-  Sem eles o app abre e o formulário roda, mas **nada sincroniza com a planilha** — então o critério de
-  aceitação 8 da T1 (submissão de teste caindo na `STAGING-V2` e em nenhuma outra aba) **não foi verificado**.
-  Quando for a hora do sync, é setar os 6 no `f9c9a7ff`.
+### O que entrou
+- **`src/lib/ganhos.ts`** (NOVO, ~560 linhas, PURO) — o modelo declarado pelo formulário e a **ponte** até a
+  fórmula da T2. Traz: `GANHO_CATEGORIAS`/`CATEGORIA_IMENSURAVEL`/`CATEGORIAS_MENSURAVEIS`; os tipos
+  `SavingEfetivado`, `CustoEvitadoLinhaHoras`, `CustoEvitado`, `ReceitaIncremental`, `GanhoImensuravel`,
+  `CustoRodarItem`/`CustoRodar`, `GanhosDeclarados`; as puras `categoriasValidas`, `alternarCategoria`,
+  **3 pares de serialização** e `paraGanhosProjeto`.
+- **19 colunas** em `projetos` (array `MIGRATIONS`, `schema.ts`) + os **19 campos** em `ProjetoRow`.
+- **167 casos** de teste novos: `tests/ganhos.test.ts` (66) e `tests/ganhos-serial.test.ts` (97) — os dois
+  escritos por **test-writers isolados, cegos à implementação** — e `tests/schema-colunas-v2.test.ts` (4).
 
-### T2 — núcleo puro do impacto ✅
-**`src/lib/impacto.ts`** (novo, PURO): `mensalizar`/`divisorDe`, `impactoBruto`, `impactoLiquido`,
-`impactoLiquidoMensal` + `PESO_SAVING=1`/`PESO_CUSTO_EVITADO=0.5`/`PESO_RECEITA=0.1`/`DIVISOR_FREQUENCIA`.
-**54 casos** em `tests/impacto.test.ts`. **Nenhum consumidor ainda** — trocar as 5 réplicas da v1 é a **T6**.
-Duas guardas que os revisores acharam e que **não podem sair**:
-- **frequência fora do enum LANÇA** (`divisorDe`, fail-closed). Era `NaN`, e o caminho da falha é o pior:
-  `JSON.stringify(NaN)` → **`null`**, ou seja, campo de DINHEIRO nulo no payload do Gomoon em vez de erro, e
-  um `NaN` num `reduce` de rollup zera o total da área. O vocabulário das fontes da v1 é MAIOR que o enum
-  (`custoPeriodicidade` tem `'anual'` e `''`; `tipo_saving` pode ser `null`). ⚠️ **Nunca trocar por `?? 1`.**
-- **custo negativo CLAMPA em 0** (como `somarItens`/`custoProjetoMensalFromItens` da v1 já fazem). Sem isso,
-  `-500` num item de custo **aumentava** o impacto — a direção gameável.
+### Duas decisões de seletor (autorizadas, não minhas)
+1. **Os tipos nasceram em módulo PRÓPRIO**, não em `agents/types.ts` como a letra da T3 dizia — aquele
+   arquivo é o que a **T9 demole**, mistura o financeiro com 8 estados de gate de conversa e é importado por
+   26 arquivos. Registrado no cabeçalho de `ganhos.ts` com um "não conserte movendo de volta".
+2. **A receita ganhou coluna própria.** Na v1 ela **não tinha nenhuma** (vivia só no blob
+   `documentacao.conteudo.receita`) — e era exatamente por isso que o rollup do squad Intelli precisava ler
+   a PLANILHA em vez do banco.
 
-### ⚠️ 3 pendências que são DECISÃO do Luis, não trabalho
-1. **Editei o texto da T1 no plano APROVADO** (`godocs-v2-submissao-deterministica.md:128-135`), para registrar
-   os 5 consumidores. O revisor de conformidade apontou, com razão, que mexer no plano aprovado **move a régua
-   contra a qual ele verifica**. **Manter ou reverter?** (Daquele ponto em diante só mexi em `Status:`/progresso.)
-2. **Os "3 exemplos da conversa"** que a T2 pede como guarda (`:142`) **não existem registrados** em lugar
-   nenhum — nem no plano, nem no repo. Os 54 casos foram derivados da FÓRMULA. Se o Luis tiver os números
-   daquela conversa, conferir contra eles: divergência apontaria erro de leitura da fórmula, não do teste.
-3. **`PESO_RECEITA = 0.1` NÃO é peso novo** — é a mesma regra do `÷10` da v1, agora encodada em **duas** réguas
-   independentes. Mudar o fator um dia exige tocar os dois lados, e o lado da v1 tem um "não corrigir aqui"
-   que ninguém vai ligar a este arquivo.
+### O que os revisores mudaram (não foi só carimbo — eles derrubaram 2 coisas minhas)
+- **A ponte não guardava o VALOR, só a frequência se guardava.** `impacto.ts` blinda a metade "frequência"
+  com `divisorDe` e explica o porquê; a metade "valor" passava crua. Sintoma medido: o MESMO input com
+  `valor: undefined` dava **líquido 0 e mensal `NaN`**, e `JSON.stringify(NaN)` vira **`null`** num campo de
+  dinheiro indo ao Gomoon. Fechado com **`valorFinito`** (fail-closed, erro nomeando o campo) nos 5 números
+  que atravessam. ⚠️ `0` e negativos **passam** de propósito (zero é legítimo; o clamp do custo é de
+  `impacto.ts`) — há guarda-corpo de teste para isso.
+- **Uma justificativa minha era FALSA.** Eu havia escrito que não validar na escrita protegia o salvamento
+  de rascunho; o rascunho vive em `localStorage` e essa coluna só é escrita no **submit**. Texto corrigido, e
+  o lado que importava foi fechado: item de **custo** malformado agora falha na escrita, porque custo que
+  evapora **INFLA** o impacto — a mesma direção gameável que `impacto.ts` blinda com `Math.max(0, …)`.
+- **O prefixo `custo_evitado_*` passou a nomear dois conceitos OPOSTOS** na mesma tabela. Pela régua D1, o
+  *custo evitado da v1* é o **saving efetivado da v2**. Registrado como "ARMADILHA DE NOME" no `schema.ts`:
+  quem fizer a T6 mapeia v1→saving efetivado, **nunca** v1→custo evitado.
 
-### Amarra obrigatória para a T3
-`impacto.ts` declara `Frequencia` e `DIVISOR_FREQUENCIA`. A T3 tem de **importar daqui**, nunca redeclarar —
-senão a fonte única da fórmula nasce com duas cabeças. Bônus do revisor de reuso: esse `Frequencia` é o
-**primeiro alias nomeado** da cadência no repo (hoje `tipo_saving` é união inline repetida em ~11 lugares:
-`agents/types.ts:78,216,442` · `chat.functions.ts:609,662` · `submeter.tsx:2665,2768` ·
-`step3-chat.tsx:885,1242,1455` · `constants.ts:739`) — vale considerá-lo o canônico da cadência.
+### Waivers e pendências REGISTRADAS no código (não são esquecimento)
+- **`initSchema` faz ~120 `db.exec` sequenciais por cold start** e a T3 somou 19. Waiver **aceito pelo
+  revisor**: o conserto (ler `PRAGMA table_info` uma vez) reescreve o bootstrap compartilhado com **prod** e
+  o staging v1, que a 1ª Fronteira proíbe tocar; N é fixo e a rede passou a ser o canário de schema.
+- **T6:** `getProjetosWithArea` faz `SELECT p.*` sem `LIMIT` e passará a arrastar as 5 colunas de texto longo
+  → trocar por lista explícita (padrão `PROJETO_INVESTIGADOR_COLS`).
+- **T6:** as 3 colunas `impacto_*` são **cache de 16 fontes sem contrato de invalidação** — um único escritor
+  grava ganho + os 3 no MESMO UPDATE, e **grave os 3 ou nenhum** (`impactoBruto` não usa divisor, mas
+  `impactoLiquidoMensal` lança em `divisorDe`: frequência suja materializaria derivado PARCIAL).
+- **Não tratado, de propósito:** um `tipos_projeto` da v1 lido como `ganho_categorias` devolveria lista
+  **parcial** que `categoriasValidas` aprova (o literal `receita_incremental` é compartilhado). Os dois
+  consertos possíveis **contradizem o contrato que o teste cego exige**, e a v2 nasce zerada sem migração.
 
-## Plano ativo
-**→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026) · **T1 e T2 executadas — próxima é a T3**
-
-> Branch `feat/godocs-v2`, worktree `~/godocs-wt-v2`. Frente NOVA e isolada: o GoDocs v2 (submissão
-> determinística sem agente no cliente). **Nada nesta branch toca prod (`674a3710`) nem o staging v1
-> (`edf400b4`)** — o ambiente é o `godocs-v2-staging`, aba `STAGING-V2`. O handoff da frente anterior
-> (mesa de avaliação) segue abaixo, preservado, e pertence à `main`.
-
-## O que esta sessão fez (02/09) — planejamento, zero código
-- Criou a branch `feat/godocs-v2` e a worktree `~/godocs-wt-v2` a partir de `origin/main` (`8b98cd4`).
-- Fechou com o Luis as **8 decisões** da v2 (régua saving efetivado × custo evitado, fórmula com pesos,
-  mensalização por bloco, fusão das duas linhas de custo, fim do agente no cliente, especial derivado de
-  estrela, doc invisível em background, ambiente isolado) — registradas em D1..D8 no plano.
-- Escreveu o plano aprovado `docs/plans/godocs-v2-submissao-deterministica.md` (roadmap T1..T9) e mapeou o
-  blast-radius com 3 exploradores em paralelo (formulário · cálculo/Sheets · background).
-- Cristalizou a spec: `SPEC.md` §4 **Fase 3** com **RF-200..RF-227** e os invariantes **INV-10..INV-15**,
-  mais a emenda ao **INV-03** (na v2 as horas deixam de compor o saving e passam a compor o custo evitado).
-
-## Próximo passo
-**Codar a T2 — o núcleo puro do impacto (`src/lib/impacto.ts`) — com `/ggsd:code`**, escrevendo o teste antes:
-pesos (`1,0` saving efetivado · `0,5` custo evitado · `0,1` receita) e divisores de frequência
-(pontual 4 · mensal 1 · trimestral 3 · semestral 6) como constantes nomeadas, com os 3 exemplos da conversa
-como casos. Em paralelo, a **T1** provisiona o app `godocs-v2-staging` e a aba `STAGING-V2`.
-
-## Pendências / avisos
-- **Nada nesta branch pode tocar prod (`674a3710`) nem o staging v1 (`edf400b4`)** — é a fronteira nº 1 do plano.
-- Os 3 exploradores rodaram **sem `docs/INDEX.md`/`docs/invariants.md`** (não existem neste repo): confiança
-  do mapeamento é **média**, e a sessão de código deve refazer a varredura profunda antes de mexer em
-  `SHEET_COLUMNS` e na fórmula.
-- **Cabeçalho real da aba `STAGING-V2` ainda não foi conferido** contra a proposta de colunas da T6 — usar
-  `scripts/dryrun-lider/cabecalho-full.ts`.
-- Assumido de olho aberto: com o chat fora, **os 7 gates conversacionais morrem** e nada barra número
-  implausível no envio. A validação vira 100% pós-submissão; regras de backend são frente posterior.
-- Os marcadores de gate em `.claude/` (`suite-status=verde`, `review-status=conforme`, `quality-status=limpo`)
-  são herança da frente anterior; esta sessão não rodou suíte porque não tocou código.
+### ⚠️ Uma pendência que é DECISÃO do Luis, não trabalho
+O plano, na **linha 146**, ainda diz "Tipos em `agents/types.ts`/`submeter/constants.ts`" — a letra anterior
+à decisão de seletor. Eu registrei a troca no cabeçalho do módulo e num bloco novo do plano, mas **não
+reescrevi aquela linha**: a sessão anterior levou um apontamento justo por editar o plano aprovado, porque
+isso move a régua contra a qual o revisor de conformidade verifica. **Reescrever a linha 146 ou deixar só o
+ponteiro?**
 
 ---
 
----
-
-# Handoff anterior (frente da mesa de avaliação — pertence à `main`)
-
 ## Plano ativo
-`docs/plans/mesa-avaliacao-parecer-raciocinado.md` — mesa de avaliação de eco-de-gate a auditor raciocinado (escopo B, time LLM em SOMBRA). **Em execução via /ggsd:code.** T1–T7 concluídos e commitados; falta a revisão §9 fechar + o deploy do Luis.
+**→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** ·
+Status: ✅ aprovado (Luis, 02/09/2026) · **T1, T2 e T3 executadas — próximo é o BLOCO T4+T5**
 
-## O que esta sessão fez (29/08) — T5, T6 e T7 fechados no código
-- **T5 (fiação da mesa LLM)** em `src/lib/avaliacao-normais.functions.ts`, gated por `especialistasMesaLlmLigados()` (`AVALIACAO_MESA_LLM`, DEFAULT OFF):
-  - `computarVotos`: quando LIGADO, monta `TextoProjeto` (via `montarEntradaSemanticaNormal`, `?? ''`) + `vizinhosTexto` (`nome — area`), roda `montarEntradasEspecialistas` (ponte T5) → `Promise.all(julgarComEspecialista)` (nunca lança) → `conciliarJulgamentos` como `conciliado` EFETIVO; `ceticoRefuta` = cético LLM `.preocupa`. OFF → determinístico byte-idêntico.
-  - `VotosPainel` += `julgamentos?`/`ceticoRefuta`. `serializarVotos` EXPORTADO + grava julgamentos ENXUTOS (`dimensao/preocupa/confianca/origem`, sem `argumento`/R$; chave só quando há julgamentos → OFF byte-idêntico).
-  - `avaliarComContexto` e `avancarDeliberacoesPendentes`: `ceticoRefuta` efetivo no sinal da deliberação + histórico grava o PARECER argumentado quando LIGADO; redator determinístico é PULADO no modo LLM (`&& !modoLlm`).
-- **T6 (rodadas na ficha)**: `montarAvaliacaoSombra` deixou de descartar `historico` + novo `parseHistoricoDeliberacao` (fail-soft) em `dashboard-admin.functions.ts`; tipo `avaliacaoSombra.deliberacao.historico[]`; render das rodadas em `projeto-detalhe-dialog.tsx` (só quando ≥2 rodadas). Lote passa `undefined→[]` (mantém o invariante de NÃO `SELECT historico` em lote — 32 MiB RPC).
-- **T7 (retroativo = rede)**: confirmado POR CONSTRUÇÃO — `avaliacao-retroativa.functions.ts` já roda `computarVotosDoProjeto` → mede a MESA NOVA (LLM) contra o veredito humano. Só o comentário-cabeçalho foi tornado explícito.
-- Testes novos: `tests/mesa-fiada-serializacao.test.ts` (4) + `tests/mesa-historico-rodadas.test.ts` (5). **Suíte cheia 2293 verde**; `tsc` só os 7 erros pré-existentes (chat.functions/submeter/especiais-painel). `worker.js` rebuildado (regra 1).
+> Branch `feat/godocs-v2`. Frente NOVA e isolada: **nada toca prod (`674a3710`) nem o staging v1
+> (`edf400b4`)** — o ambiente é o **`f9c9a7ff`** (`godocs-v2-staging`), aba `STAGING-V2`.
 
 ## Próximo passo
-**§9 FECHADA E LIMPA** (conformidade=`conforme` 0.92 · qualidade=`limpo` 0.86; 1 observação BAIXA não-bloqueante: render das rodadas só com ≥2 — decisão de UX consciente, deixada como está). Próximo é o **deploy**: **staging (`edf400b4`) → validar num projeto de receita real + um absurdo (500h) com `AVALIACAO_MESA_LLM` ligado SÓ na staging → prod (`674a3710`) → PR (`LuisEduardo100`)** + atualizar CLAUDE.md/spec. `/ggsd:ship` está liberado pela §9.
+**Codar o BLOCO T4+T5 com `/ggsd:code` e deployar no `f9c9a7ff`**, para o Luis validar de olho a submissão
+inteira **até o botão "Submeter"**.
 
-## Pendências / avisos
-- **§9 do T5–T7 — QUALIDADE=`limpo` (0.86, zero achados), CONFORMIDADE ainda em background** ao fechar a sessão. Colher o veredito de conformidade antes do ship (o `/ggsd:ship` barra até `.review-status` fechar).
-- **Byte-idêntico obrigatório com `AVALIACAO_MESA_LLM` OFF** — prod roda `AVALIACAO_NORMAIS` ON em sombra determinística; a fiação não pode alterar isso (testado em `mesa-fiada-serializacao`).
-- **Custo aceito**: com a mesa LLM ligada são N chamadas LLM/rodada × até 5 rodadas em background (sombra, cron-bounded) — Decisão 2 do plano.
-- **T6 no lote**: a ficha aberta pelo LOTE do /dashboard NÃO mostra as rodadas (historico não vem no lote); só a ficha individual (`getProjetoDashboard`) as traz. Decisão consciente (32 MiB RPC).
-- Ordem restante: **§9 → staging/prod/PR → CLAUDE.md/spec**.
+**Por que virou bloco (decisão do Luis, 02/09):** revisar fatia por fatia está demorando muito. Então T4
+(componentes: `Acordeao` · `ListaItens` · `TabelaHoras` · `CampoEvidencia` com colar) e T5 (Etapas 1, 2 e 3
+reescritas, sai a Etapa 2.5) andam juntas, e **os 3 revisores rodam UMA vez, no FIM do bloco**. O TDD-escala
+**continua** — com a revisão adiada, é o teste antes do comportamento que segura a régua.
+
+**O que esperar do ritmo:** os marcadores `.review-status`/`.quality-status` ficam **`pendente`** durante o
+bloco, e `pendente` **barra o `git push` e o `/ggsd:ship`** de propósito. **Commit na branch e deploy no
+`f9c9a7ff` NÃO são barrados** — o bloco anda; o que não anda é mandar para o `main` sem revisão.
+
+**As 4 amarras que a T3 deixou** (todas escritas no cabeçalho de `src/lib/ganhos.ts`, item por item):
+1. **A régua da Etapa 2 tem 2 endereços até a T5.** O "ao menos um tipo" e a exclusividade da v1 vivem
+   INLINE e duplicados em `routes/submeter.tsx` (`:1611`, `:2109`, `:1556`), sobre o vocabulário ANTIGO.
+   ⚠️ Apagar aquele par **no MESMO commit** em que ligar `categoriasValidas`, senão a régua nasce com duas
+   cabeças.
+2. **`custoEvitado.valorHoras` não tem origem decidida.** O canônico que converte hora em R$ é `CARGOS`
+   (`agents/types.ts`) resolvido por **`resolverValorHora`** (`agents/saving-calc.ts`, que já carrega o fix
+   do falso-zero). ⚠️ **Reusar aquele caminho** — escrever uma segunda tabela de valor/hora é a doença
+   ("fórmula em 5 lugares") que esta frente existe para curar.
+3. **Os componentes de checkbox entregam `onChange(string[])`**, então o call site **não sabe qual item foi
+   clicado** e não dá para aplicar `alternarCategoria` por cima. Dar-lhes um **`onToggle(value)`** é
+   pré-requisito para a exclusividade não ser reimplementada na tela.
+4. **Decidir se `serializarLinhasHoras` passa a validar** (hoje só o de custo valida; a razão da assimetria
+   está escrita, mas é decisão em aberto para quando o formulário escrever de verdade).
+
+**O que NÃO entra no bloco, e o que isso significa na hora de validar:** a **T6** (planilha) fica fora, então
+o clique em "Submeter" **grava no SQLite do v2 e não chega à aba `STAGING-V2`** — faltam a T6 *e* os 6
+secrets do Google que foram dispensados na T1. Para validar **o fluxo e as telas** isso basta; para ver a
+linha na planilha, é setar os 6 secrets + fazer a T6.
+
+⚠️ **Deploy é só no `f9c9a7ff`.** Prod (`674a3710`) e staging v1 (`edf400b4`) seguem intocados.

@@ -738,6 +738,118 @@ const MIGRATIONS = [
   // Botão "Voltar à versão anterior" do FAQ (D14): snapshot JSON de UM nível
   // (titulo/resumo/corpo + quando/quem). Restaurar consome o slot — não é histórico.
   'ALTER TABLE faq_categorias ADD COLUMN versao_anterior TEXT',
+  // ─────────────── GoDocs v2 — os 4 ganhos declarados (plano `godocs-v2-…`, T3) ───────────────
+  // Modelo NOVO da submissão determinística: a pessoa marca as categorias de ganho na
+  // Etapa 2 e preenche um bloco por categoria na Etapa 3. Os tipos e as regras puras
+  // ficam em `src/lib/ganhos.ts`, a fórmula em `src/lib/impacto.ts` (fonte única).
+  //
+  // ⚠️ Estas colunas NÃO substituem as da v1 (`saving_horas`/`saving_reais`/`tipo_saving`/
+  // `custo_evitado*`/`custo_projeto*`/`ganho_total_mensal`), que seguem servindo prod e o
+  // staging v1. As duas gerações convivem até a T9 aposentar a v1 — o banco da v2 nasce
+  // zerado, então nenhum projeto tem as duas preenchidas.
+  //
+  // ⚠️ ARMADILHA DE NOME: o prefixo `custo_evitado_*` passou a nomear DOIS conceitos
+  // OPOSTOS nesta tabela, e a tradução entre eles não é a identidade:
+  //
+  //   v1  `custo_evitado`/`_justificativa`/`_itens`  = gasto externo que a empresa PAGAVA
+  //                                                    e parou de pagar
+  //                                                 → pela régua D1, isso é o
+  //                                                   SAVING EFETIVADO da v2
+  //   v2  `custo_evitado_frequencia`/`_horas_linhas`/`_horas_valor`/`_nao_contratado`/
+  //       `_racional`                              = despesa que NUNCA NASCEU
+  //                                                   (vaga não aberta, consultoria não
+  //                                                   contratada, hora liberada de quem
+  //                                                   continua na folha)
+  //
+  // Mecanicamente não há risco hoje (`SAFE_UPDATE_FIELDS` é lista explícita, sem
+  // wildcard, e nada liga as duas gerações); o risco é HUMANO — ler o prefixo e supor
+  // continuidade. Quem for escrever a T6 tem de mapear `custo evitado v1` para
+  // `saving efetivado v2`, nunca para `custo evitado v2`.
+  //
+  // ⚠️ Colunas INTERNAS por enquanto: nada em `SAFE_UPDATE_FIELDS` e nada em
+  // `SHEET_COLUMNS` — a ida/volta com a planilha é a T6. Entrar em `SAFE_UPDATE_FIELDS`
+  // sem entrar no SELECT de `getProjetosParaSyncReverso` faria o cron reescrever a coluna
+  // a cada 5 min em silêncio, então as duas coisas andam juntas, na T6.
+  //
+  // ⚠️ MAIS DUAS PENDÊNCIAS PARA A T6, achadas na revisão desta fatia:
+  //   (a) `getProjetosWithArea` (`client.server.ts`) faz `SELECT p.*` de TODOS os
+  //       projetos, sem LIMIT, e o `mapProjeto` do admin espalha `...rest` — então as 5
+  //       colunas de TEXTO LONGO daqui (`saving_efetivado_evidencia`,
+  //       `custo_evitado_horas_linhas`, `custo_evitado_racional`,
+  //       `ganho_imensuravel_racional`, `custo_rodar_itens`) passarão a viajar por ali no
+  //       instante em que o formulário da v2 começar a escrever. É a forma exata das
+  //       lições dos 32 MiB de RPC e do payload de 563 KB do dashboard. Hoje é inofensivo
+  //       (as colunas nascem nulas e a rota não tem chamador no frontend), mas a T6 deve
+  //       trocar por lista explícita de colunas, como o `PROJETO_INVESTIGADOR_COLS` já faz.
+  //   (b) O `catch` mudo do loop de `MIGRATIONS` (abaixo) agora carrega 62 entradas, e o
+  //       conserto certo é ler `PRAGMA table_info` UMA vez e emitir só os ALTER que
+  //       faltam — 1 leitura em vez de 62 exceções engolidas no primeiro request de cada
+  //       isolate, e o erro deixa de ser mudo. NÃO foi feito nesta fatia de propósito:
+  //       reescrever o bootstrap compartilhado muda o cold start de PRODUÇÃO e do staging
+  //       v1, que a primeira Fronteira do plano da v2 proíbe tocar. O N é fixo e não
+  //       cresce com os dados. A rede que existe hoje é o canário
+  //       `tests/schema-colunas-v2.test.ts`, que falha se qualquer uma das 19 não aterrissar.
+  //
+  // ⚠️ A régua que separa as duas primeiras é uma só — "esse dinheiro estava saindo do
+  // caixa antes desta solução?". Sim → saving efetivado (comprovável, pesa 100%, por isso
+  // tem coluna de EVIDÊNCIA). Não, ia começar a sair → custo evitado (sem extrato
+  // possível, pesa 50%, por isso NÃO tem evidência). Hora liberada de quem continua na
+  // folha é capacidade que se deixou de comprar, não dinheiro no bolso: é custo evitado.
+  'ALTER TABLE projetos ADD COLUMN ganho_categorias TEXT',
+  // Saving efetivado — a despesa existia e PAROU. `desde` é a data em que o ganho passou
+  // a valer, e `evidencia` é o texto obrigatório que amarra o número a esta solução.
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor REAL',
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_frequencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_evidencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_desde TEXT',
+  // Custo evitado — a despesa nunca nasceu. Tem DOIS braços que somam antes do peso de
+  // 50%: as horas liberadas (tabela antes/depois por função, em `_horas_linhas`, cujo R$
+  // derivado fica em `_horas_valor`) e o que não chegou a ser contratado. A frequência é
+  // do BLOCO, não de cada braço.
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_frequencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_horas_linhas TEXT',
+  // ⚠️ O R$ das horas mora AQUI, separado das linhas que o justificam (`_horas_linhas`).
+  // Quando a T5 ligar o formulário, replicar a guarda log-only da v1
+  // (`avisarDivergenciaMemorialLinhas`): valor de horas sem linhas que o expliquem é
+  // divergência a avisar, não a bloquear — e a leitura de `_horas_linhas` descarta linha
+  // malformada, então essa divergência pode nascer sozinha.
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_horas_valor REAL',
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_nao_contratado REAL',
+  'ALTER TABLE projetos ADD COLUMN custo_evitado_racional TEXT',
+  // Receita incremental. ⚠️ Na v1 a receita NÃO tinha coluna em `projetos` — vivia só no
+  // blob `documentacao.conteudo.receita`, e é por isso que o rollup do squad Intelli teve
+  // de ler a PLANILHA em vez do banco. Aqui ela ganha coluna como os outros 3 blocos.
+  'ALTER TABLE projetos ADD COLUMN receita_incremental_valor REAL',
+  'ALTER TABLE projetos ADD COLUMN receita_incremental_frequencia TEXT',
+  'ALTER TABLE projetos ADD COLUMN receita_incremental_racional TEXT',
+  'ALTER TABLE projetos ADD COLUMN receita_incremental_tipo TEXT',
+  // Ganho imensurável — projeto sem número. ⚠️ Fica FORA de toda conta de impacto (é o
+  // que a estrela representa), e é EXCLUSIVO das outras 3 categorias.
+  'ALTER TABLE projetos ADD COLUMN ganho_imensuravel_racional TEXT',
+  // Custo para rodar — a FUSÃO das duas linhas de custo da v1 (`custo_externo_mensal`, a
+  // plataforma onde a solução roda, e `custo_projeto_itens`, API/SaaS por uso), que
+  // economicamente sempre foram a mesma coisa. Lista incremental em JSON
+  // `[{nome,valor,frequencia,o_que_e}]`. SUBTRAI com peso 100% — caixa saindo com a mesma
+  // certeza do saving efetivado.
+  'ALTER TABLE projetos ADD COLUMN custo_rodar_itens TEXT',
+  // Impacto MATERIALIZADO (bruto · líquido · líquido mensal), para a planilha, o rollup e
+  // as telas lerem sem recalcular. ⚠️ São valores DERIVADOS: sempre gravados a partir de
+  // `src/lib/impacto.ts`, nunca computados à mão no call site — foi a fórmula redigitada
+  // em 5 lugares que a v1 pagou. O Gomoon recebe o líquido MENSAL.
+  //
+  // ⚠️ CONTRATO DE INVALIDAÇÃO (a definir na T6, quando algo passar a escrever): estas 3
+  // são cache de 16 colunas-fonte, e cache sem invalidação mente. Duas regras:
+  //   • UM único escritor grava ganho + os 3 `impacto_*` no MESMO UPDATE, e nada lê
+  //     `impacto_*` fora dessa garantia. Dois escritores = número velho na planilha.
+  //   • **Grave os 3 ou nenhum.** `impactoBruto` não usa divisor, mas `impactoLiquidoMensal`
+  //     passa pelo `divisorDe`, que LANÇA em frequência desconhecida — então um projeto com
+  //     frequência suja materializaria o bruto e falharia no mensal, deixando derivado
+  //     PARCIAL, que é pior que derivado nenhum (o relatório soma o que existe).
+  //     ⚠️ `paraGanhosProjeto` valida o VALOR (`valorFinito`) mas não a FREQUÊNCIA — quem
+  //     materializar tem de tratar o throw do `divisorDe` como tudo-ou-nada.
+  'ALTER TABLE projetos ADD COLUMN impacto_bruto REAL',
+  'ALTER TABLE projetos ADD COLUMN impacto_liquido REAL',
+  'ALTER TABLE projetos ADD COLUMN impacto_liquido_mensal REAL',
 ];
 
 // Projetos LEGADO — importados manualmente (anteriores ao formulário GoDocs).

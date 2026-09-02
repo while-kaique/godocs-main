@@ -25,7 +25,15 @@ projeto, com especial derivado dela.
   fonte única, **54 casos** de teste. Guardas que os revisores acharam: frequência fora do enum **lança**
   (era `NaN` → `null` no dinheiro do Gomoon) e custo negativo **clampa** (aumentava o impacto).
   Nenhum consumidor ainda — trocar as 5 réplicas da v1 é a T6.
-- ⬜ **T3** — modelo de dados dos 4 ganhos + exclusividade do ganho imensurável
+- ✅ **T3** — modelo de dados dos 4 ganhos (`src/lib/ganhos.ts`, novo): os 6 tipos, a régua pura de
+  exclusividade (`categoriasValidas`/`alternarCategoria` — imensurável XOR o resto), **3 pares de
+  serialização** e a ponte `paraGanhosProjeto` para a fórmula da T2. **19 colunas** em `projetos`
+  (`MIGRATIONS`) + os 19 campos em `ProjetoRow`. **167 casos** novos (66 + 97 em autoria cega + 4 do
+  canário), suíte **2548 verde**. Os tipos nasceram em módulo PRÓPRIO, não em `agents/types.ts` como a
+  letra do plano dizia — troca autorizada pelo Luis (é o arquivo que a T9 demole). Guardas que os
+  revisores acharam: a ponte **não guardava o valor** (só a frequência se guardava — `undefined` dava
+  líquido 0 e mensal `NaN`, que vira `null` no dinheiro do Gomoon) e item de **custo** malformado
+  desaparecia calado, o que **infla** o impacto.
 - ⬜ **T4** — componentes que faltam: acordeão · lista de itens · tabela de horas · campo de evidência com colar
 - ⬜ **T5** — Etapas 1, 2 e 3 reescritas (sai a Etapa 2.5)
 - ⬜ **T6** — persistência, planilha e leitura (as 5 réplicas da fórmula passam a chamar a T2)
@@ -33,10 +41,32 @@ projeto, com especial derivado dela.
 - ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
 - ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos (por último)
 
-**Próximo:** codar a **T3** (modelo de dados dos 4 ganhos + exclusividade do imensurável) com `/ggsd:code` — e nela
-**importar `Frequencia`/`DIVISOR_FREQUENCIA` de `impacto.ts`** em vez de redeclarar, senão a fonte única da fórmula
-nasce com duas cabeças (o `Frequencia` é hoje o **primeiro alias nomeado** dessa cadência no repo: `tipo_saving` é
-união inline repetida em ~11 lugares).
+**BLOCO VISUAL — decisão do Luis em 02/09/2026 (muda o ritmo, não o escopo):** as próximas sessões vão
+**direto até o fluxo VISUAL no ar** no app de staging v2 (`f9c9a7ff`), para ele validar de olho a submissão
+inteira até o botão **"Submeter"**. Motivo declarado: revisar fatia por fatia está demorando muito.
+Consequências operacionais, todas registradas:
+- **T4 e T5 são um bloco só**, e o critério de pronto do bloco é *"o Luis clica da Etapa 1 até o botão de
+  submeter no `f9c9a7ff`"*, não "o componente tem teste".
+- **Os 3 revisores de contexto fresco rodam UMA vez, no FIM do bloco** — não por fatia. O TDD-escala
+  continua (teste antes do comportamento), porque é ele que segura a régua enquanto a revisão espera.
+- ⚠️ Os marcadores `.review-status`/`.quality-status` ficam **`pendente` durante o bloco**, e `pendente`
+  **barra o `git push`/`/ggsd:ship`** — de propósito. Commit na branch e deploy no `f9c9a7ff` **não** são
+  barrados, então o bloco anda; o que não anda é o envio para o `main` antes da revisão.
+- ⚠️ **Deploy é só no `f9c9a7ff`.** Prod (`674a3710`) e staging v1 (`edf400b4`) seguem intocados (1ª Fronteira).
+- ⏳ **A T6 (planilha) NÃO entra no bloco**, então o clique em "Submeter" vai gravar no SQLite do v2 e
+  **não** chegar à aba `STAGING-V2` — falta a T6 *e* os 6 secrets do Google que o Luis dispensou na T1.
+  Para o objetivo declarado (validar o FLUXO e as telas) isso basta; se ele quiser ver a linha na planilha,
+  é setar os 6 secrets + fazer a T6.
+
+**Próximo:** codar o **bloco T4+T5** (componentes que faltam → Etapas 1, 2 e 3 reescritas, sai a Etapa 2.5)
+com `/ggsd:code` e **deployar no `f9c9a7ff`** para o Luis validar o fluxo até o botão de submeter. A T3 deixou
+**4 amarras** que esse bloco tem de honrar, todas escritas no cabeçalho de `src/lib/ganhos.ts`: (1) a régua da
+Etapa 2 tem 2 endereços até lá — apagar o par inline de `routes/submeter.tsx` (`:1611`, `:2109`, `:1556`) no
+MESMO commit em que ligar `categoriasValidas`; (2) `custoEvitado.valorHoras` ainda não tem origem decidida —
+**reusar `CARGOS` + `resolverValorHora`**, nunca escrever uma segunda tabela de valor/hora; (3) os
+componentes de checkbox entregam `onChange(string[])` e o call site não sabe *qual* item foi clicado, então
+dar-lhes um `onToggle(value)` é pré-requisito de `alternarCategoria` não ser reimplementado na tela;
+(4) decidir se `serializarLinhasHoras` passa a validar (hoje só o de custo valida).
 
 ---
 
