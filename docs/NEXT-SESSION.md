@@ -73,8 +73,16 @@ planilha) — falta o resto da T6, T7, T8 e a T9-servidor**
 ## Próximo passo
 **Codar a T6 com `/ggsd:code`** — é ela que faz o botão "Submeter" funcionar (o cliente já chama
 `POST /api/submeter/ganhos`, que **não existe** → 404) e é ela que entrega o item **5.8** ao Gomoon. Depois,
-na ordem: **T7** (doc invisível), **T8** (estrelas para todo projeto) e **T9-servidor** (orquestrador, os 7
-gates, prompts e testes órfãos).
+na ordem: **T7** (doc invisível), **T8** (estrelas para todo projeto) e **T9-servidor** — que é
+**DESLIGAR** o agente do fluxo de submissão, ⚠️ **não apagá-lo**: *"não vamos excluir os agentes, vamos
+tirá-los do fluxo de submissão novo, mas vamos reaproveitá-los eventualmente"* (Luis, 02/09/2026). O código
+do orquestrador, dos 7 gates e dos prompts **fica**; sai só o que ficar de fato órfão.
+
+⚠️ **Régua de trabalho para a T6 em diante (Luis, 02/09/2026): não criar nada sem necessidade — reaproveitar
+o que existe.** Foi o que já derrubou 2 propostas minhas nesta sessão (14 colunas novas na planilha viraram 3,
+e a Etapa 3 redesenhada do zero voltou à linguagem da v1). Na T6 isso significa: a rota nova é **fiação** —
+`paraGanhosProjeto` + `impacto.ts` + `resolverValorHora`/`CARGOS` + os pares de serialização de `ganhos.ts`
+já existem e é para chamá-los, não reescrevê-los.
 
 ⚠️ **Antes de qualquer envio:** a **revisão de contexto fresco do bloco não rodou** (marcadores
 `.review-status`/`.quality-status` ausentes/`pendente`), e ela **barra o `git push` e o `/ggsd:ship``** — o

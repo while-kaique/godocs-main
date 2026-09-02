@@ -89,9 +89,11 @@ projeto, com especial derivado dela.
     na fiação** — é esta T6 que o entrega.
 - ⬜ **T7** — documentação invisível em background (`iniciarSubmissao` ainda inicia conversa no servidor)
 - ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
-- ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos. **Parcialmente feita**: o lado CLIENTE já
-  saiu junto com a T5 (handlers, estado, `step25.tsx`, sandbox de 3 fluxos → 1). Falta o lado SERVIDOR
-  (orquestrador, os 7 gates, prompts, `chat-simulation.tsx` e os testes órfãos).
+- ⬜ **T9** — **DESLIGAR** o agente do fluxo de submissão (⚠️ **não** "apagar" — decisão do Luis em
+  02/09/2026: *"não vamos excluir os agentes… vamos reaproveitá-los eventualmente"*). O lado CLIENTE já saiu
+  com a T5 (handlers, estado, `step25.tsx`, sandbox de 3 fluxos → 1). Falta o lado SERVIDOR: tirar
+  orquestrador/7 gates/prompts do **caminho da submissão**, **preservando o código** para outras frentes;
+  remover só o que ficar de fato órfão (import morto, teste de tela inexistente).
 
 **BLOCO VISUAL — ✅ CUMPRIDO em 02/09/2026** (o Luis clicou da Etapa 1 à revisão na staging e pediu a rodada
 de ajustes acima; ⚠️ o alvo do deploy passou a ser **`edf400b4`**, não o `f9c9a7ff` — ver o aviso do topo).

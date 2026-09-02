@@ -241,10 +241,17 @@ Texto novo enxuto, em linguagem natural, sem travessão nem hífen decorativo.
   especiais. Especial passa a ser derivado de estrela > 0 e o corpus deixa de ser só-especiais.
   *(guarda: recomendação gravada sem tocar a coluna "Estrelas"; projeto com nota humana continua sendo âncora, nunca reclassificado)*
 
-- **T9 — Limpeza do que morreu.** Remover chat de submissão, orquestrador conversacional, os 7 gates, prompts
-  e testes órfãos. **Feito por último**, depois que o fluxo novo estiver verde no staging v2 — apagar antes
-  deixa a v2 sem rede e sem referência.
-  *(guarda: suíte verde e nenhum import morto)*
+- **T9 — DESLIGAR o agente do fluxo de submissão. ⚠️ NÃO é "remover".** Decisão do Luis, 02/09/2026:
+  *"não vamos excluir os agentes, vamos tirá-los do fluxo de submissão novo, mas vamos reaproveitá-los
+  eventualmente"*. Então a T9 tira o chat, o orquestrador conversacional e os 7 gates do **caminho da
+  submissão** — e **preserva o código**, que segue disponível para outras frentes (a mesa de avaliação, o
+  classificador, o que vier). Só sai o que ficou **de fato órfão** (import morto, teste de tela que não
+  existe mais). **Feito por último**, depois que o fluxo novo estiver verde no staging.
+  ⚠️ A letra anterior desta tarefa dizia "remover chat de submissão, orquestrador conversacional, os 7
+  gates, prompts e testes órfãos" — **não cumpra essa letra**: apagar o orquestrador e os gates jogaria fora
+  régua de negócio caríssima (jornada/teto 220h, ganho projetado, sobreposição receita×custo evitado…) que
+  ninguém pediu para destruir.
+  *(guarda: suíte verde · nenhum import morto · e nenhum arquivo de agente/gate DELETADO sem o Luis pedir)*
 
 ### Cabeçalho da aba `STAGING-V2` — ✅ APLICADO em 02/09/2026 (59 colunas)
 
