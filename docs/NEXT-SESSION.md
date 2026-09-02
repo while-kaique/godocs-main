@@ -33,6 +33,18 @@ carrega a segurança); os 3 sites `getGodocsEnv() === 'staging' ? … : 'produca
 os 5 pontos → `createApp godocs-v2-staging` + secrets (`GODOCS_ENV=v2-staging`, aba `STAGING-V2`, Chat e
 Gomoon mudos) → guarda do T1: submissão de teste escreve em `STAGING-V2` e **nunca** em `GoDocs`/`STAGING`.
 
+### 🔒 Trava mecânica: esta pasta não toca prod nem staging v1
+Hook **PreToolUse** em `/home/notebook/godocs-v2/.claude/settings.json` +
+`.claude/hooks/guarda-app-v1.{sh,py}` (LOCAIS, no `.git/info/exclude` — nunca vão pro `main`):
+qualquer tool MUTANTE do GoDeploy (`updateApp`·`deleteApp`·`setAppSecret`·`deleteAppSecret`·
+`createCronJob`·`deleteCronJob`·`setCronJobEnabled`·`setAppOwner`·`setAppPrivate`·`setAppPublic`·
+`setAppSlug`) com `appId` **`674a3710`** (prod) ou **`edf400b4`** (staging v1) é **barrada (exit 2)**.
+`createApp` NÃO é barrado (é como o app do v2 nasce). **Fail-CLOSED**: JSON ilegível ou o próprio
+guard quebrando ainda barram se o payload citar um id da v1 (testado com o python sabotado).
+**Escopado** a esta pasta/branch — em `godocs-main` é no-op, para não travar o deploy legítimo da v1.
+⚠️ Falta a trava SIMÉTRICA (barrar o app do v2 a partir do `godocs-main`): só dá para escrever
+depois de o app existir, porque precisa do id. Fazer junto do T1.
+
 ## Plano ativo
 **→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026)
 
