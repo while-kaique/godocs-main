@@ -1,4 +1,4 @@
-import { categoriasValidas, type GanhoCategoria } from "@/lib/ganhos";
+import { erroCategorias, type GanhoCategoria } from "@/lib/ganhos";
 
 export const AREAS = [
   "AZ", "B2B Gobeauté", "B2B Gocase", "Contabilidade", "CSC", "CX",
@@ -498,24 +498,6 @@ export function validarEtapa2(
     errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
   if (!form.usaAiProxy) errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
 
-  // ── Categorias de ganho (v2) ──
-  // A régua é `categoriasValidas` (`@/lib/ganhos`), FONTE ÚNICA: recusa lista vazia e
-  // recusa a MISTURA do imensurável com qualquer categoria mensurável. ⚠️ Não redigitar
-  // "ao menos um" nem a exclusividade aqui — era exatamente assim que a v1 acabou com a
-  // régua de tipo espalhada INLINE em 3 pontos de `submeter.tsx` (:1556, :1611, :2109).
-  // ⚠️ Leitura DEFENSIVA: um rascunho salvo em `localStorage` antes desta feature não tem
-  // a chave, e `undefined.length` derruba /submeter inteira com "This page didn't load" —
-  // o bug real que o comentário do `rehydrateFromLocal` registra. O default vive nos DOIS
-  // lugares de propósito: aqui, porque esta função é portão de avanço, e lá, porque é
-  // quem repõe o estado.
-  const categoriasMarcadas = form.ganhoCategorias ?? [];
-  if (!categoriasValidas(categoriasMarcadas)) {
-    errs.ganhoCategorias =
-      categoriasMarcadas.length === 0
-        ? "Selecione ao menos um tipo de ganho"
-        : "Ganho imensurável não combina com os outros tipos: ou o ganho tem número, ou não tem";
-  }
-
   // ── Contrafactual ("se desligar hoje") — obrigatório RESPONDER, nada BARRA ──
   // O PONTEIRO movido (custo/receita/KPI + onde verificar) NÃO é mais pergunta de
   // formulário: quem conduz é o AGENTE, que constrói o racional junto com a pessoa e
@@ -537,6 +519,26 @@ export function validarEtapa2(
       "Você removeu arquivo(s) enviado(s) antes. Suba novamente os arquivos que deseja manter para regenerar a documentação.";
   }
 
+  return errs;
+}
+
+/**
+ * O portão da 1ª tela da Etapa 3 — a seleção dos tipos de ganho.
+ *
+ * ⚠️ Esta régua ESTAVA em `validarEtapa2` e saiu de lá com o campo: os cards de tipo de
+ * ganho viraram TELA PRÓPRIA (`selecao-ganho.tsx`, decisão do Luis em 02/09/2026), e
+ * portão que cobra campo que a tela não mostra é o pior defeito de formulário deste repo
+ * — o "Próximo" sacode e o erro fica numa etapa que a pessoa não está vendo.
+ *
+ * A mensagem vem de `erroCategorias` (`@/lib/ganhos`), fonte única com a rede do envio
+ * (`validarEtapa3`).
+ */
+export function validarSelecaoGanho(form: FormData): FieldErrors {
+  const errs: FieldErrors = {};
+  // Leitura DEFENSIVA: rascunho salvo antes desta feature não tem a chave, e
+  // `undefined.length` derrubaria /submeter inteira.
+  const erro = erroCategorias(form.ganhoCategorias ?? []);
+  if (erro) errs.ganhoCategorias = erro;
   return errs;
 }
 

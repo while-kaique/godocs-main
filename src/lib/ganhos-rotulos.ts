@@ -15,6 +15,7 @@
 // ⚠️ Sem travessão nem hífen decorativo no texto visível (pedido do plano). Acentuação
 // obrigatória (regra 4 do CLAUDE.md).
 import { GANHO_CATEGORIAS, type GanhoCategoria } from './ganhos'
+import type { Frequencia } from './impacto'
 
 export type RotuloGanho = {
   /** Nome curto, usado em título de bloco, chip e coluna. */
@@ -98,4 +99,23 @@ export const TIPOS_RECEITA: { value: string; label: string }[] = [
   { value: 'expansao', label: 'Mais receita do mesmo cliente (upsell, cross-sell)' },
   { value: 'retencao', label: 'Receita que deixou de ser perdida (churn evitado)' },
   { value: 'outro', label: 'Outro' },
+]
+
+/**
+ * As 4 frequências como ABAS lado a lado — rótulo CURTO, ordem por CADÊNCIA.
+ *
+ * ⚠️ Rótulo curto de propósito: `TIPO_SAVING_LABEL` (`projeto-rotulos.ts`) segue sendo o
+ * nome longo do valor onde há espaço para ele (ficha, planilha, resumo do bloco); em 4
+ * controles lado a lado, "Recorrente (mensal)" e "A cada trimestre" quebram em duas
+ * linhas e a fileira deixa de ser legível de relance. As duas listas descrevem o MESMO
+ * enum — ao acrescentar frequência, as duas mudam.
+ *
+ * ⚠️ A ordem é a da v1 (mensal, trimestral, semestral, pontual): a cadência crescente,
+ * com o "uma vez" no fim. Não é a ordem do `DIVISOR_FREQUENCIA` nem alfabética.
+ */
+export const FREQUENCIA_ABAS: { value: Frequencia; label: string }[] = [
+  { value: 'mensal', label: 'Mensal' },
+  { value: 'trimestral', label: 'Trimestral' },
+  { value: 'semestral', label: 'Semestral' },
+  { value: 'pontual', label: 'Pontual' },
 ]

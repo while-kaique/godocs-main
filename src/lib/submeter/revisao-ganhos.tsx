@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 import { SummaryRow } from "./form-components";
@@ -177,22 +177,17 @@ export function RevisaoGanhos({
       ) : null}
 
       <div className="mt-7 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onEditar}
-          disabled={submitting}
-          className="flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
-          style={{ color: "#6b6b7a", background: "rgba(0,0,0,0.04)" }}
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          Editar
+        {/* Mesmas pílulas do resto do wizard: `.go-btn-back` para voltar e, no envio, a
+            LIME `.go-btn-submit` — a mesma que fechava a submissão na v1. */}
+        <button type="button" onClick={onEditar} disabled={submitting} className="go-btn-back">
+          &larr; Editar
         </button>
         <button
           type="button"
           onClick={onEnviar}
           disabled={submitting}
-          className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-[13.5px] font-bold text-white transition-colors disabled:opacity-60"
-          style={{ background: "var(--go-blue)" }}
+          className="go-btn-submit inline-flex items-center justify-center gap-2"
+          style={{ width: "auto" }}
         >
           {submitting ? (
             <>
@@ -201,8 +196,8 @@ export function RevisaoGanhos({
             </>
           ) : (
             <>
-              <Send className="h-3.5 w-3.5" aria-hidden />
-              Enviar para triagem
+              <Send className="h-4 w-4" aria-hidden />
+              <span>Enviar para Triagem</span>
             </>
           )}
         </button>

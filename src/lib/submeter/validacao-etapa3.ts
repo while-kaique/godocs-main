@@ -16,7 +16,7 @@ import {
   type GanhosDeclarados,
 } from '@/lib/ganhos'
 import { TIPO_SAVING_LABEL, unidadeHoras } from '@/lib/projeto-rotulos'
-import { categoriasValidas } from '@/lib/ganhos'
+import { erroCategorias } from '@/lib/ganhos'
 import { parseMoedaBR, type FieldErrors } from './constants'
 import { erroEvidencia, type AnexoEvidencia } from './evidencia'
 import {
@@ -259,12 +259,10 @@ export function validarEtapa3(
 ): FieldErrors {
   const errs: FieldErrors = {}
 
-  if (!categoriasValidas(categorias)) {
-    errs.ganhoCategorias =
-      (categorias ?? []).length === 0
-        ? 'Selecione ao menos um tipo de ganho'
-        : 'Ganho imensurável não combina com os outros tipos: ou o ganho tem número, ou não tem'
-  }
+  // ⚠️ A MENSAGEM sai de `erroCategorias` (`@/lib/ganhos`), fonte única com o portão da
+  // Etapa 2: as duas frases estavam digitadas nos dois lugares.
+  const erroSelecao = erroCategorias(categorias)
+  if (erroSelecao) errs.ganhoCategorias = erroSelecao
 
   for (const categoria of categorias ?? []) {
     Object.assign(errs, validarBloco(categoria, dados, opts))

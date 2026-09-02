@@ -19,10 +19,7 @@ import {
   FieldError,
   RadioGroup,
   AfetadosInput,
-  CardCheckboxGroup,
 } from "./form-components";
-import { alternarCategoria, type GanhoCategoria } from "@/lib/ganhos";
-import { GANHO_OPCOES } from "@/lib/ganhos-rotulos";
 import { useSugestoesParticipantes } from "./participantes-sugestoes";
 import { useAreas } from "./areas-sugestoes";
 
@@ -678,45 +675,6 @@ export function Step2({
           loadingSuggestions={sugestoesLoading}
           areas={areas}
           loadingAreas={areasLoading}
-        />
-      </FormGroup>
-
-      {/* ── Tipos de ganho (v2) ─────────────────────────────────────────────────────
-          Vem por ÚLTIMO na etapa: a pessoa acabou de descrever o projeto e quem sentiria
-          falta dele, e é com isso na cabeça que ela classifica o ganho. Vindo antes, a
-          classificação é feita no escuro.
-
-          ⚠️ O toggle passa por `alternarCategoria` (`@/lib/ganhos`), que é a FONTE ÚNICA
-          da exclusividade nos DOIS sentidos (marcar imensurável deixa só ele; marcar
-          qualquer mensurável tira o imensurável). Foi para isso que o
-          `CardCheckboxGroup` ganhou `onToggle`: com `onChange(string[])` a tela não sabe
-          QUAL item foi clicado e a régua teria de ser reimplementada aqui — o erro que a
-          v1 cometeu em 3 lugares (`submeter.tsx:1556`, `:1611`, `:2109`).
-
-          ⚠️ A exclusividade age no CLIQUE, não só na validação do envio: deixar dois
-          incompatíveis marcados e só reclamar no fim faria a pessoa preencher dois
-          blocos da Etapa 3 e perder um. */}
-      <FormGroup>
-        <FormLabel
-          required
-          hint="Pode marcar mais de um. A pergunta que decide: esse dinheiro estava saindo do caixa antes desta solução?"
-        >
-          Que tipo de ganho este projeto trouxe?
-        </FormLabel>
-        <CardCheckboxGroup
-          options={GANHO_OPCOES}
-          value={form.ganhoCategorias}
-          onChange={() => {
-            /* não usado: quem manda é `onToggle` + `alternarCategoria` */
-          }}
-          onToggle={(alvo) => {
-            updateField(
-              "ganhoCategorias",
-              alternarCategoria(form.ganhoCategorias, alvo as GanhoCategoria),
-            );
-            clearError("ganhoCategorias");
-          }}
-          error={errors.ganhoCategorias}
         />
       </FormGroup>
 

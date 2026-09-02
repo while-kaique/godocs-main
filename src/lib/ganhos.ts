@@ -216,6 +216,24 @@ export function categoriasValidas(categorias: GanhoCategoria[]): boolean {
 }
 
 /**
+ * A mensagem de erro da seleção — FONTE ÚNICA do texto que o usuário lê.
+ *
+ * Nasceu porque as duas frases estavam digitadas em DOIS lugares (o portão da tela de
+ * seleção e a rede do envio, `validarEtapa3`): régua compartilhada com texto duplicado é
+ * como a v1 acabou com a mesma frase em 3 arquivos. Quem decide "é válido?" continua
+ * sendo `categoriasValidas` — aqui só se escolhe QUAL das duas falhas explicar.
+ *
+ * Devolve `undefined` quando a seleção está válida (mesma forma de um `FieldErrors`).
+ */
+export function erroCategorias(categorias: GanhoCategoria[]): string | undefined {
+  const lista = categorias ?? []
+  if (categoriasValidas(lista)) return undefined
+  return lista.length === 0
+    ? 'Selecione ao menos um tipo de ganho'
+    : 'Ganho imensurável não combina com os outros tipos: ou o ganho tem número, ou não tem'
+}
+
+/**
  * O clique num checkbox de categoria — com a exclusividade aplicada nos DOIS sentidos.
  *
  * É **toggle**: clicar numa já marcada desmarca. Marcar o imensurável deixa só ele;

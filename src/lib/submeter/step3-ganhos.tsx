@@ -1,10 +1,9 @@
 import * as React from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { FormGroup, FormLabel, FormSelect, FieldError } from "./form-components";
+import { cn } from "@/lib/utils";
+import { FormSelect, FieldError } from "./form-components";
 import { CampoData } from "@/components/calendario/calendario";
 import { hojeIso } from "@/lib/calendario-datas";
-import { TIPO_SAVING_LABEL } from "@/lib/projeto-rotulos";
-import { GANHO_ROTULOS, TIPOS_RECEITA } from "@/lib/ganhos-rotulos";
+import { FREQUENCIA_ABAS, GANHO_ROTULOS, TIPOS_RECEITA } from "@/lib/ganhos-rotulos";
 import { CATEGORIA_IMENSURAVEL, type GanhoCategoria } from "@/lib/ganhos";
 import type { Frequencia } from "@/lib/impacto";
 import { formatMoedaBR } from "./constants";
@@ -24,7 +23,14 @@ import {
   atualizarLinhaHoras,
   removerLinhaHoras,
 } from "./horas";
-import { adicionarItem, atualizarItem, removerItem } from "./itens-lista";
+import { adicionarItem, atualizarItem, itemVazio, removerItem } from "./itens-lista";
+import {
+  passosCustoEvitado,
+  passosReceita,
+  passosSaving,
+  respostaCustoRodarInicial,
+  type RespostaCustoRodar,
+} from "./revelacao";
 import {
   blocoCompleto,
   resumoBloco,
@@ -66,31 +72,210 @@ const ROTULOS_CUSTO_RODAR: RotulosLista = {
   botaoAdicionar: "Adicionar outro item",
 };
 
+/**
+ * Cada resposta abre a próxima. A animação é a mesma `go-fade-in-up` da v1.
+ *
+ * ⚠️ `prefers-reduced-motion` já é neutralizado globalmente (`styles.css:209`), inclusive
+ * para animação declarada em `style` inline — não precisa de guarda aqui.
+ */
+const REVELAR = { animation: "go-fade-in-up 0.35s ease both" } as const;
+
+/**
+ * O painel de um bloco — o cartão LIME da v1 (`step3-chat.tsx:1440`).
+ *
+ * A v2 tinha nascido com os campos soltos sobre branco, em azul: ficou uma tela de
+ * formulário genérico. O lime é o que dizia "aqui se fala do GANHO" na v1, e o Luis pediu
+ * essas cores de volta (02/09/2026). O verde escuro `#6b6e00` é o par legível do
+ * `--go-lime` sobre claro (o lime puro reprova contraste em texto pequeno).
+ */
+const VERDE_TEXTO = "#6b6e00";
+
+function PainelBloco({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="space-y-4 rounded-xl p-4"
+      style={{
+        background: "rgba(215,219,0,0.03)",
+        border: "1.5px solid rgba(215,219,0,0.15)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Uma pergunta do painel: rótulo curto, ajuda de UMA linha e o campo.
+ *
+ * ⚠️ Texto ENXUTO é regra desta tela, não estilo: o rótulo pergunta, a ajuda desempata, e
+ * a descrição longa da categoria já foi lida nos cards da Etapa 2 (`GANHO_ROTULOS`) — ela
+ * era repetida aqui e virou parágrafo que ninguém lê.
+ */
+function Pergunta({
+  titulo,
+  ajuda,
+  obrigatorio,
+  children,
+}: {
+  titulo: React.ReactNode;
+  ajuda?: React.ReactNode;
+  obrigatorio?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={REVELAR}>
+      <label
+        className="mb-1.5 block text-[12px] font-semibold"
+        style={{ color: "var(--go-text-heading)" }}
+      >
+        {titulo}
+        {obrigatorio ? <span style={{ color: "#e53e3e" }}> *</span> : null}
+      </label>
+      {ajuda ? (
+        <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+          {ajuda}
+        </p>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Par sim/não colado — o segmentado da v1 (`selectTinhaAntes` e irmãos).
+ *
+ * A11y: `role="radiogroup"` + `aria-checked`, e o estado não é só cor (o marcado fica
+ * preenchido e em negrito). Foco de teclado visível pelo `focus-visible` do reset.
+ */
+function SimNao({
+  valor,
+  onChange,
+  rotuloSim,
+  rotuloNao,
+  ariaLabel,
+}: {
+  valor: "sim" | "nao" | "";
+  onChange: (v: "sim" | "nao") => void;
+  rotuloSim: string;
+  rotuloNao: string;
+  ariaLabel: string;
+}) {
+  const opcoes: { v: "nao" | "sim"; lbl: string }[] = [
+    { v: "nao", lbl: rotuloNao },
+    { v: "sim", lbl: rotuloSim },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className="flex gap-0 overflow-hidden rounded-xl"
+      style={{ border: "1.5px solid rgba(215,219,0,0.2)" }}
+    >
+      {opcoes.map(({ v, lbl }, i) => {
+        const ativo = valor === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={ativo}
+            onClick={() => onChange(v)}
+            className={cn(
+              "flex-1 py-2.5 text-[12.5px] transition-all",
+              ativo ? "font-extrabold" : "font-semibold",
+            )}
+            style={{
+              background: ativo ? VERDE_TEXTO : "transparent",
+              color: ativo ? "#fff" : VERDE_TEXTO,
+              borderRight: i === 0 ? "1px solid rgba(215,219,0,0.2)" : "none",
+            }}
+          >
+            {lbl}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Frequência — as 4 ABAS lado a lado, como na v1 (NÃO um dropdown).
+ *
+ * ⚠️ Era um `FormSelect` e virou fileira de opções por decisão do Luis (02/09/2026): a
+ * cadência é a escolha que muda o SIGNIFICADO do valor digitado logo abaixo (um número
+ * "por mês" e o "acumulado do semestre" não são a mesma grandeza), e escolha assim fica
+ * VISÍVEL, não escondida atrás de um clique. Não voltar ao dropdown.
+ *
+ * ⚠️ O desenho é o `.go-radio-label`/`.go-radio-checked` do design system (`styles.css`),
+ * o mesmo retângulo de largura regular do resto do formulário — não um estilo novo
+ * escrito aqui. Rótulos e ordem vêm da fonte única `FREQUENCIA_ABAS`.
+ *
+ * A11y: `<input type="radio">` de verdade (setas do teclado + leitor de tela), escondido
+ * com `peer sr-only`, e o anel de foco acende no rótulo por `peer-focus-visible`. O
+ * estado NUNCA é só cor — a opção marcada também fica em negrito.
+ */
 function SeletorFrequencia({
   valor,
   onChange,
   erro,
   ariaLabel,
+  nome,
 }: {
   valor: Frequencia | "";
   onChange: (v: Frequencia | "") => void;
   erro?: string;
   ariaLabel: string;
+  /** Nome do grupo de rádio — único por bloco, senão as 3 fileiras viram um grupo só. */
+  nome: string;
 }) {
   return (
-    <FormSelect
-      aria-label={ariaLabel}
-      value={valor}
-      onChange={(e) => onChange(e.currentTarget.value as Frequencia | "")}
-      error={erro}
-    >
-      <option value="">Selecione...</option>
-      {(["mensal", "pontual", "trimestral", "semestral"] as Frequencia[]).map((f) => (
-        <option key={f} value={f}>
-          {TIPO_SAVING_LABEL[f]}
-        </option>
-      ))}
-    </FormSelect>
+    <div>
+      <div
+        role="radiogroup"
+        aria-label={ariaLabel}
+        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+      >
+        {FREQUENCIA_ABAS.map(({ value, label }) => {
+          const marcado = valor === value;
+          return (
+            <label
+              key={value}
+              className={cn(
+                "go-radio-label cursor-pointer select-none",
+                marcado && "go-radio-checked",
+              )}
+            >
+              <input
+                type="radio"
+                name={nome}
+                value={value}
+                checked={marcado}
+                onChange={() => onChange(value)}
+                className="peer sr-only"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-[inherit] peer-focus-visible:[box-shadow:0_0_0_3px_rgba(0,89,169,0.3)]"
+              />
+              <span className={marcado ? "font-extrabold" : undefined}>{label}</span>
+            </label>
+          );
+        })}
+      </div>
+      {/* Trimestral/semestral coletam o valor CHEIO do período (sem ÷3/÷6) — a mesma
+          decisão de produto da v1. Dizer isto aqui, no instante da escolha, é o que
+          impede a pessoa de informar a média mensal num campo que soma o período. */}
+      {(valor === "trimestral" || valor === "semestral") && (
+        <p className="mt-1.5 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+          Rotina a cada {valor === "trimestral" ? "3 meses" : "6 meses"}. Informe o valor{" "}
+          <strong>
+            acumulado do {valor === "trimestral" ? "trimestre" : "semestre"}
+          </strong>{" "}
+          (não a média por mês).
+        </p>
+      )}
+      <FieldError message={erro} />
+    </div>
   );
 }
 
@@ -198,6 +383,15 @@ export function Step3Ganhos({
 
   const [aberto, setAberto] = React.useState<string | null>(() => blocoInicial(blocos));
 
+  // "Tem custo para rodar?" — a pergunta que a v1 fazia antes de mostrar a lista. Vive
+  // aqui, e não no modelo, porque "não tem" É a lista vazia (`GanhosDeclarados`): não há
+  // campo novo a gravar. O valor inicial é DERIVADO do que já está preenchido
+  // (`respostaCustoRodarInicial`), senão quem volta ao passo com itens digitados veria a
+  // pergunta em branco e a própria lista escondida.
+  const [temCustoRodar, setTemCustoRodar] = React.useState<RespostaCustoRodar>(() =>
+    respostaCustoRodarInicial(dados.custoRodar),
+  );
+
   // A seleção pode mudar na Etapa 2 e voltar para cá: se o bloco aberto deixou de existir
   // (ou nunca houve um), reabre o primeiro. Sem isto o acordeão fica todo fechado sem a
   // pessoa ter fechado nada.
@@ -221,15 +415,24 @@ export function Step3Ganhos({
     setAberto(aoCompletar(blocos, completos, id));
   }
 
+  /**
+   * O conteúdo de um bloco — perguntas REVELADAS uma a uma (`revelacao.ts`).
+   *
+   * ⚠️ A ordem é a da conta: primeiro a CADÊNCIA (ela muda o significado do número),
+   * depois o número, depois a prova. Não reordenar para "pedir o valor logo" — foi a
+   * cadência escolhida antes que fez a v1 nunca receber média mensal num campo de
+   * período.
+   */
   function conteudoDe(categoria: GanhoCategoria): React.ReactNode {
-    const rotulo = GANHO_ROTULOS[categoria];
+    // Só aparece quando a última pergunta do bloco já está na tela: botão de "próximo"
+    // acima de perguntas ainda escondidas convida a pular o bloco pela metade.
     const rodape = (
-      <div className="mt-4 flex justify-end">
+      <div className="flex justify-end" style={REVELAR}>
         <button
           type="button"
           onClick={() => avancarDe(categoria)}
-          className="rounded-lg px-3.5 py-2 text-[12.5px] font-semibold transition-colors"
-          style={{ background: "rgba(0,89,169,0.08)", color: "var(--go-blue)" }}
+          className="rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-colors"
+          style={{ background: "rgba(215,219,0,0.16)", color: VERDE_TEXTO }}
         >
           Pronto, próximo
         </button>
@@ -237,209 +440,229 @@ export function Step3Ganhos({
     );
 
     if (categoria === "saving_efetivado") {
+      const passos = passosSaving(dados);
       return (
-        <div>
-          <p className="mb-3 text-[12px]" style={{ color: "#7b7b8a" }}>
-            {rotulo.descricao}
-          </p>
-          <FormGroup>
-            <FormLabel required>Com que frequência esse valor deixou de sair?</FormLabel>
+        <PainelBloco>
+          <Pergunta titulo="Com que frequência esse valor deixou de sair?" obrigatorio>
             <SeletorFrequencia
               ariaLabel="Frequência do saving efetivado"
+              nome="freq-saving-efetivado"
               valor={dados.savingFrequencia}
               onChange={(v) => onChange({ savingFrequencia: v })}
               erro={errors.savingFrequencia}
             />
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required>Quanto era?</FormLabel>
-            <CampoValor
-              ariaLabel="Valor do saving efetivado"
-              valor={dados.savingValor}
-              onChange={(v) => onChange({ savingValor: v })}
-              erro={errors.savingValor}
-            />
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required hint="A partir de quando a empresa parou de pagar">
-              Desde quando
-            </FormLabel>
-            <CampoData
-              valor={dados.savingDesde}
-              maximo={hoje}
-              ariaLabel="Desde quando o saving vale"
-              onChange={(iso) => onChange({ savingDesde: iso })}
-              erro={errors.savingDesde}
-            />
-            <FieldError message={errors.savingDesde} />
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required hint="Onde isso pode ser conferido: extrato, fatura, contrato encerrado">
-              Como se comprova
-            </FormLabel>
-            <CampoEvidencia
-              texto={dados.savingEvidencia}
-              anexos={dados.savingAnexos}
-              onChangeTexto={(v) => onChange({ savingEvidencia: v })}
-              onChangeAnexos={(v) => onChange({ savingAnexos: v })}
-              erro={errors.savingEvidencia}
-              placeholder="Ex: o contrato com a XPTO foi encerrado em maio; a fatura de junho já não tem a linha de R$ 1.200. Dá para conferir no financeiro, fornecedor XPTO."
-            />
-          </FormGroup>
-          {rodape}
-        </div>
+          </Pergunta>
+
+          {passos.valor ? (
+            <Pergunta titulo="Quanto era?" obrigatorio>
+              <CampoValor
+                ariaLabel="Valor do saving efetivado"
+                valor={dados.savingValor}
+                onChange={(v) => onChange({ savingValor: v })}
+                erro={errors.savingValor}
+              />
+            </Pergunta>
+          ) : null}
+
+          {passos.desde ? (
+            <Pergunta titulo="Desde quando a empresa parou de pagar?" obrigatorio>
+              <CampoData
+                valor={dados.savingDesde}
+                maximo={hoje}
+                ariaLabel="Desde quando o saving vale"
+                onChange={(iso) => onChange({ savingDesde: iso })}
+                erro={errors.savingDesde}
+              />
+              <FieldError message={errors.savingDesde} />
+            </Pergunta>
+          ) : null}
+
+          {passos.evidencia ? (
+            <Pergunta
+              titulo="Como se comprova?"
+              ajuda="Extrato, fatura ou contrato encerrado: diga onde alguém confere."
+              obrigatorio
+            >
+              <CampoEvidencia
+                texto={dados.savingEvidencia}
+                anexos={dados.savingAnexos}
+                onChangeTexto={(v) => onChange({ savingEvidencia: v })}
+                onChangeAnexos={(v) => onChange({ savingAnexos: v })}
+                erro={errors.savingEvidencia}
+                placeholder="Ex: contrato com a XPTO encerrado em maio; a fatura de junho já não tem a linha de R$ 1.200."
+              />
+            </Pergunta>
+          ) : null}
+
+          {passos.evidencia ? rodape : null}
+        </PainelBloco>
       );
     }
 
     if (categoria === "custo_evitado") {
+      const passos = passosCustoEvitado(dados);
       return (
-        <div>
-          <p className="mb-3 text-[12px]" style={{ color: "#7b7b8a" }}>
-            {rotulo.descricao}
-          </p>
-          <FormGroup>
-            <FormLabel required>Com que frequência esse ganho acontece?</FormLabel>
+        <PainelBloco>
+          <Pergunta titulo="Com que frequência esse ganho acontece?" obrigatorio>
             <SeletorFrequencia
               ariaLabel="Frequência do custo evitado"
+              nome="freq-custo-evitado"
               valor={dados.ceFrequencia}
               onChange={(v) => onChange({ ceFrequencia: v })}
               erro={errors.ceFrequencia}
             />
-          </FormGroup>
+          </Pergunta>
 
-          {/* Os DOIS braços somam antes do peso de 50%. Ter só um é caso normal, e a
-              validação exige "ao menos um" — não os dois. */}
-          <FormGroup>
-            <FormLabel hint="Quem fazia o trabalho à mão e quanto tempo levava. Deixe em branco se não havia trabalho manual.">
-              Horas liberadas
-            </FormLabel>
-            <TabelaHoras
-              linhas={dados.ceLinhas}
-              frequencia={dados.ceFrequencia}
-              errors={errors}
-              onAdicionar={() => onChange({ ceLinhas: adicionarLinhaHoras(dados.ceLinhas) })}
-              onRemover={(i) => onChange({ ceLinhas: removerLinhaHoras(dados.ceLinhas, i) })}
-              onAtualizar={(i, patch) =>
-                onChange({ ceLinhas: atualizarLinhaHoras(dados.ceLinhas, i, patch) })
-              }
-            />
-          </FormGroup>
+          {/* Os DOIS braços aparecem juntos: eles somam, e ter só um é o caso normal
+              (a validação exige ao menos um, nunca os dois). */}
+          {passos.bracos ? (
+            <>
+              <Pergunta
+                titulo="Horas liberadas"
+                ajuda="Quem fazia à mão e quanto tempo levava. Em branco se não havia trabalho manual."
+              >
+                <TabelaHoras
+                  linhas={dados.ceLinhas}
+                  frequencia={dados.ceFrequencia}
+                  errors={errors}
+                  onAdicionar={() => onChange({ ceLinhas: adicionarLinhaHoras(dados.ceLinhas) })}
+                  onRemover={(i) => onChange({ ceLinhas: removerLinhaHoras(dados.ceLinhas, i) })}
+                  onAtualizar={(i, patch) =>
+                    onChange({ ceLinhas: atualizarLinhaHoras(dados.ceLinhas, i, patch) })
+                  }
+                />
+              </Pergunta>
 
-          <FormGroup>
-            <FormLabel hint="A vaga que não foi aberta, a consultoria que não foi contratada. Deixe em branco se não houve.">
-              Valor que não chegou a ser contratado
-            </FormLabel>
-            <CampoValor
-              ariaLabel="Valor não contratado"
-              valor={dados.ceNaoContratado}
-              onChange={(v) => onChange({ ceNaoContratado: v })}
-              erro={errors.ceNaoContratado}
-            />
-          </FormGroup>
+              <Pergunta
+                titulo="Valor que não chegou a ser contratado"
+                ajuda="A vaga que não foi aberta, a consultoria que não foi contratada. Em branco se não houve."
+              >
+                <CampoValor
+                  ariaLabel="Valor não contratado"
+                  valor={dados.ceNaoContratado}
+                  onChange={(v) => onChange({ ceNaoContratado: v })}
+                  erro={errors.ceNaoContratado}
+                />
+              </Pergunta>
 
-          {/* O erro de "nenhum dos dois braços" fica ENTRE os dois campos que o
-              resolvem, não no fim do bloco: no fim, a pessoa lê "informe as horas ou o
-              valor" sem ver a qual par a frase se refere. */}
-          <FieldError message={errors.ceBracos} />
+              {/* O erro de "nenhum dos dois braços" fica ENTRE os dois campos que o
+                  resolvem: no fim do bloco, a frase não diz a qual par se refere. */}
+              <FieldError message={errors.ceBracos} />
+            </>
+          ) : null}
 
-          <FormGroup>
-            <FormLabel required hint={`Pelo menos ${RACIONAL_MIN} caracteres`}>
-              Por que essa despesa não aconteceu
-            </FormLabel>
-            <AreaTexto
-              ariaLabel="Racional do custo evitado"
-              valor={dados.ceRacional}
-              onChange={(v) => onChange({ ceRacional: v })}
-              erro={errors.ceRacional}
-              placeholder="Ex: o volume dobrou em janeiro e teríamos aberto duas vagas de conferente; com o robô a equipe atual absorveu."
-            />
-          </FormGroup>
-          {rodape}
-        </div>
+          {passos.racional ? (
+            <Pergunta
+              titulo="Por que essa despesa não aconteceu?"
+              ajuda={`Pelo menos ${RACIONAL_MIN} caracteres`}
+              obrigatorio
+            >
+              <AreaTexto
+                ariaLabel="Racional do custo evitado"
+                valor={dados.ceRacional}
+                onChange={(v) => onChange({ ceRacional: v })}
+                erro={errors.ceRacional}
+                placeholder="Ex: o volume dobrou em janeiro e teríamos aberto duas vagas de conferente; com o robô a equipe atual absorveu."
+              />
+            </Pergunta>
+          ) : null}
+
+          {passos.racional ? rodape : null}
+        </PainelBloco>
       );
     }
 
     if (categoria === "receita_incremental") {
+      const passos = passosReceita(dados);
       return (
-        <div>
-          <p className="mb-3 text-[12px]" style={{ color: "#7b7b8a" }}>
-            {rotulo.descricao}
-          </p>
-          <FormGroup>
-            <FormLabel required>Com que frequência essa receita entra?</FormLabel>
+        <PainelBloco>
+          <Pergunta titulo="Com que frequência essa receita entra?" obrigatorio>
             <SeletorFrequencia
               ariaLabel="Frequência da receita incremental"
+              nome="freq-receita-incremental"
               valor={dados.receitaFrequencia}
               onChange={(v) => onChange({ receitaFrequencia: v })}
               erro={errors.receitaFrequencia}
             />
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required>Quanto</FormLabel>
-            <CampoValor
-              ariaLabel="Valor da receita incremental"
-              valor={dados.receitaValor}
-              onChange={(v) => onChange({ receitaValor: v })}
-              erro={errors.receitaValor}
-            />
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required>De onde vem</FormLabel>
-            <FormSelect
-              aria-label="Tipo de receita"
-              value={dados.receitaTipo}
-              onChange={(e) => onChange({ receitaTipo: e.currentTarget.value })}
-              error={errors.receitaTipo}
+          </Pergunta>
+
+          {passos.valor ? (
+            <Pergunta titulo="Quanto entra?" obrigatorio>
+              <CampoValor
+                ariaLabel="Valor da receita incremental"
+                valor={dados.receitaValor}
+                onChange={(v) => onChange({ receitaValor: v })}
+                erro={errors.receitaValor}
+              />
+            </Pergunta>
+          ) : null}
+
+          {passos.tipo ? (
+            <Pergunta titulo="De onde vem esse dinheiro?" obrigatorio>
+              <FormSelect
+                aria-label="Tipo de receita"
+                value={dados.receitaTipo}
+                onChange={(e) => onChange({ receitaTipo: e.currentTarget.value })}
+                error={errors.receitaTipo}
+                style={{
+                  height: 40,
+                  fontSize: 13,
+                  border: errors.receitaTipo ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
+                }}
+              >
+                <option value="">Selecione...</option>
+                {TIPOS_RECEITA.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </FormSelect>
+            </Pergunta>
+          ) : null}
+
+          {passos.racional ? (
+            <Pergunta
+              titulo="Como esta solução gera essa receita?"
+              ajuda={`Pelo menos ${RACIONAL_MIN} caracteres`}
+              obrigatorio
             >
-              <option value="">Selecione...</option>
-              {TIPOS_RECEITA.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </FormSelect>
-          </FormGroup>
-          <FormGroup>
-            <FormLabel required hint={`Pelo menos ${RACIONAL_MIN} caracteres`}>
-              Como esta solução gera essa receita
-            </FormLabel>
-            <AreaTexto
-              ariaLabel="Racional da receita incremental"
-              valor={dados.receitaRacional}
-              onChange={(v) => onChange({ receitaRacional: v })}
-              erro={errors.receitaRacional}
-              placeholder="Ex: o fluxo recupera carrinhos abandonados por WhatsApp; antes de setembro ninguém fazia esse contato."
-            />
-          </FormGroup>
-          {rodape}
-        </div>
+              <AreaTexto
+                ariaLabel="Racional da receita incremental"
+                valor={dados.receitaRacional}
+                onChange={(v) => onChange({ receitaRacional: v })}
+                erro={errors.receitaRacional}
+                placeholder="Ex: o fluxo recupera carrinhos abandonados por WhatsApp; antes de setembro ninguém fazia esse contato."
+              />
+            </Pergunta>
+          ) : null}
+
+          {passos.racional ? rodape : null}
+        </PainelBloco>
       );
     }
 
-    // Imensurável — só o racional, pelo mesmo componente de evidência. Sem valor e sem
+    // Imensurável — uma pergunta só, pelo mesmo componente de evidência. Sem valor e sem
     // frequência: a categoria não tem número por definição, e o que a representa é a
-    // estrela (D5/D8).
+    // estrela (D5/D8). Aqui não há o que revelar em passos.
     return (
-      <div>
-        <p className="mb-3 text-[12px]" style={{ color: "#7b7b8a" }}>
-          {rotulo.descricao}
-        </p>
-        <FormGroup>
-          <FormLabel required hint="Diga o que mudou e o que teria acontecido sem isto">
-            Qual é o ganho
-          </FormLabel>
+      <PainelBloco>
+        <Pergunta
+          titulo="Qual é o ganho?"
+          ajuda="Diga o que mudou e o que teria acontecido sem isto."
+          obrigatorio
+        >
           <CampoEvidencia
             texto={dados.imensuravelRacional}
             anexos={dados.imensuravelAnexos}
             onChangeTexto={(v) => onChange({ imensuravelRacional: v })}
             onChangeAnexos={(v) => onChange({ imensuravelAnexos: v })}
             erro={errors.imensuravelRacional}
-            placeholder="Ex: o robô confere 100% dos lançamentos antes do fechamento. Antes a conferência era por amostra e uma multa de ICMS passou batida em 2025."
+            placeholder="Ex: o robô confere 100% dos lançamentos antes do fechamento. Antes era por amostra e uma multa de ICMS passou batida em 2025."
             rotuloAnexo="Anexar ou colar print"
           />
-        </FormGroup>
+        </Pergunta>
         {rodape}
-      </div>
+      </PainelBloco>
     );
   }
 
@@ -472,27 +695,50 @@ export function Step3Ganhos({
           É a FUSÃO das duas linhas de custo da v1 (`custo_externo_mensal`, a plataforma
           onde a solução roda, e `custo_projeto_itens`, API/SaaS por uso), que
           economicamente sempre foram a mesma coisa e que ninguém distinguia (D3). */}
-      <div className="mt-6 rounded-xl p-3.5" style={{ background: "var(--go-cream)" }}>
-        <FormLabel hint="API, plataforma, licença: o que a empresa paga para esta solução continuar rodando. Deixe em branco se não há custo.">
-          Custo para rodar
-        </FormLabel>
-        {soImensuravel ? (
-          <p className="mb-1 text-[11.5px]" style={{ color: "#7b7b8a" }}>
-            Registramos o custo, mas ele não entra em conta nenhuma neste projeto, porque
-            o ganho aqui não tem número.
-          </p>
-        ) : null}
-        <ListaItens
-          itens={dados.custoRodar}
-          errors={errors}
-          prefixoErro="cr"
-          rotulos={ROTULOS_CUSTO_RODAR}
-          onAdicionar={() => onChange({ custoRodar: adicionarItem(dados.custoRodar) })}
-          onRemover={(i) => onChange({ custoRodar: removerItem(dados.custoRodar, i) })}
-          onAtualizar={(i, patch) =>
-            onChange({ custoRodar: atualizarItem(dados.custoRodar, i, patch) })
-          }
-        />
+      <div className="mt-5">
+        <PainelBloco>
+          <Pergunta
+            titulo="Esta solução tem algum custo para rodar?"
+            ajuda="API, plataforma, licença: o que a empresa paga para ela continuar de pé."
+            obrigatorio
+          >
+            <SimNao
+              ariaLabel="Esta solução tem custo para rodar?"
+              valor={temCustoRodar}
+              rotuloNao="Não tem custo"
+              rotuloSim="Sim, tem custo"
+              onChange={(v) => {
+                setTemCustoRodar(v);
+                // "Não" LIMPA a lista: uma linha em branco é o que a validação ignora
+                // (`itemEmBranco`), então responder "não" depois de ter digitado algo
+                // não pode deixar um custo fantasma abatendo o ganho.
+                if (v === "nao") onChange({ custoRodar: [itemVazio()] });
+              }}
+            />
+          </Pergunta>
+
+          {temCustoRodar === "sim" ? (
+            <div style={REVELAR}>
+              {soImensuravel ? (
+                <p className="mb-2 text-[11px] leading-snug" style={{ color: "#8b8b9a" }}>
+                  Registramos o custo, mas ele não entra em conta nenhuma aqui: o ganho
+                  deste projeto não tem número.
+                </p>
+              ) : null}
+              <ListaItens
+                itens={dados.custoRodar}
+                errors={errors}
+                prefixoErro="cr"
+                rotulos={ROTULOS_CUSTO_RODAR}
+                onAdicionar={() => onChange({ custoRodar: adicionarItem(dados.custoRodar) })}
+                onRemover={(i) => onChange({ custoRodar: removerItem(dados.custoRodar, i) })}
+                onAtualizar={(i, patch) =>
+                  onChange({ custoRodar: atualizarItem(dados.custoRodar, i, patch) })
+                }
+              />
+            </div>
+          ) : null}
+        </PainelBloco>
       </div>
 
       {errors.ganhoCategorias ? (
@@ -501,26 +747,29 @@ export function Step3Ganhos({
         </div>
       ) : null}
 
+      {/* Navegação — as MESMAS pílulas das outras etapas (`.go-btn-back` / `.go-btn-next`,
+          styles.css). Estes botões estavam com estilo próprio (retângulo cinza + azul),
+          e etapa nenhuma do wizard tem botão assim: a Etapa 3 só desenha os seus aqui
+          porque ela fica fora da barra de navegação de `submeter.tsx`, não porque seja
+          outra linguagem visual. */}
       <div className="mt-7 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onVoltar}
-          disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
-          style={{ color: "#6b6b7a", background: "rgba(0,0,0,0.04)" }}
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          Voltar
+        <button type="button" onClick={onVoltar} disabled={loading} className="go-btn-back">
+          &larr; Voltar
         </button>
         <button
           type="button"
           onClick={onSubmit}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-[13.5px] font-bold text-white transition-colors disabled:opacity-60"
-          style={{ background: "var(--go-blue)" }}
+          className="go-btn-next inline-flex items-center justify-center gap-2"
         >
-          {loading ? "Enviando..." : "Revisar e enviar"}
-          {loading ? null : <ArrowRight className="h-3.5 w-3.5" aria-hidden />}
+          {loading ? (
+            <>
+              <span>Enviando…</span>
+              <div className="go-spinner" />
+            </>
+          ) : (
+            <span>Revisar e enviar &rarr;</span>
+          )}
         </button>
       </div>
     </div>

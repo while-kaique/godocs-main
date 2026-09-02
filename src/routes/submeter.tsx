@@ -15,7 +15,7 @@ import {
   filesToDocs, TOKEN_BLOCK_CHARS,
   parseMoedaBR, numeroParaMoedaBR, montarMembrosPapeis, montarMembrosContribuicoes,
   validarEtapa1,
-  validarEtapa2, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
+  validarEtapa2, validarSelecaoGanho, camposMinimosDocProntos, serializarAfetados, desserializarAfetados,
   limitarCoautorUnico, deveMostrarIntro,
   serializarFerramentas, desserializarFerramentas,
 } from "@/lib/submeter/constants";
@@ -44,6 +44,7 @@ import { SummaryRow } from "@/lib/submeter/form-components";
 import { Step1 } from "@/lib/submeter/step1";
 import { Step2 } from "@/lib/submeter/step2";
 import { Step3Ganhos } from "@/lib/submeter/step3-ganhos";
+import { SelecaoGanho } from "@/lib/submeter/selecao-ganho";
 import { RevisaoGanhos } from "@/lib/submeter/revisao-ganhos";
 import {
   ganhosFormVazio,
@@ -514,6 +515,12 @@ export function SubmeterPageContent({
   // Revisão antes do envio: a Etapa 3 valida, mostra o resumo e só então envia — o clique
   // que dispara a submissão não pode ser o mesmo que descobre que falta preencher algo.
   const [revisando, setRevisando] = useState(false);
+  // Qual das telas da Etapa 3 está no ar. A 1ª é a SELEÇÃO dos tipos de ganho (que era um
+  // campo no fim da Etapa 2 e virou tela própria — ver `selecao-ganho.tsx`); a 2ª são os
+  // blocos. Entrar na Etapa 3 sempre começa pela seleção, porque é ela que decide quais
+  // blocos existem — e é assim que ela aparece também no sandbox `/fluxos`, onde o
+  // formulário nasce pré-preenchido.
+  const [telaGanho, setTelaGanho] = useState<"tipos" | "blocos">("tipos");
   // Loading do avanço Etapa 2 → 3 (garante o projeto criado antes de abrir os blocos).
   const [avancando, setAvancando] = useState(false);
   const [projetoId, setProjetoId] = useState<string | null>(null);
@@ -1244,7 +1251,12 @@ export function SubmeterPageContent({
     setDirection(dir);
     // Sair da Etapa 3 fecha a revisão: ela afirma "confira e envie" sobre um estado que a
     // pessoa vai justamente voltar para mudar.
-    if (target !== 3) setRevisando(false);
+    if (target !== 3) {
+      setRevisando(false);
+      // Sair da Etapa 3 rearma a seleção: quem volta para mexer na descrição reentra pela
+      // tela que decide os blocos, com o que marcou ainda marcado.
+      setTelaGanho("tipos");
+    }
     setStep(target);
     // Todo step ALCANÇADO fica navegável pelos índices do topo — não só os que o
     // usuário "concluiu" avançando. Senão, ao entrar no step 2 e voltar ao 1, o
@@ -1315,10 +1327,26 @@ export function SubmeterPageContent({
       }
       await sincronizarMetadados(id);
       setRevisando(false);
+      setTelaGanho("tipos");
       goToStep(3, "forward");
     } finally {
       setAvancando(false);
     }
+  }
+
+  /* ── Etapa 3, tela 1 (seleção dos tipos) → tela 2 (os blocos) ──
+     Portão puro `validarSelecaoGanho`: ao menos um tipo, e imensurável sem mistura. Sem
+     I/O — o projeto já foi criado no avanço da Etapa 2. */
+  function handleAvancarParaBlocos() {
+    const errs = validarSelecaoGanho(form);
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 350);
+      return;
+    }
+    setTelaGanho("blocos");
+    formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   /* ── Propaga metadados/arquivos ao servidor, só quando algo mudou ──
@@ -1714,6 +1742,15 @@ export function SubmeterPageContent({
                     onEnviar={handleSubmitProjeto}
                     ferramenta={computeFerramenta()}
                   />
+                ) : telaGanho === "tipos" ? (
+                  <SelecaoGanho
+                    categorias={form.ganhoCategorias ?? []}
+                    erro={errors.ganhoCategorias}
+                    onChange={(proximas) => updateField("ganhoCategorias", proximas)}
+                    onLimparErro={() => clearError("ganhoCategorias")}
+                    onVoltar={() => goToStep(2, "back")}
+                    onProximo={handleAvancarParaBlocos}
+                  />
                 ) : (
                   <Step3Ganhos
                     categorias={form.ganhoCategorias ?? []}
@@ -1721,7 +1758,7 @@ export function SubmeterPageContent({
                     errors={errors}
                     onChange={(patch) => setGanhos((atual) => ({ ...atual, ...patch }))}
                     onSubmit={handleRevisar}
-                    onVoltar={() => goToStep(2, "back")}
+                    onVoltar={() => setTelaGanho("tipos")}
                     loading={submittingProject}
                   />
                 )}

@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validarEtapa2,
+  validarSelecaoGanho,
   camposMinimosDocProntos,
   serializarAfetados,
   desserializarAfetados,
@@ -73,43 +74,47 @@ describe('validarEtapa2 — campos', () => {
   // desapareceu: ele migrou para o "desde quando" do saving efetivado, e vive em
   // `tests/validacao-etapa3.test.ts` (fronteira de `hojeISO`).
 
-  describe('categorias de ganho (v2)', () => {
-    it('nenhuma categoria marcada bloqueia', () => {
-      const errs = validarEtapa2(baseForm({ ganhoCategorias: [] }), opts());
-      expect(errs.ganhoCategorias).toBeTruthy();
-    });
+  // ⚠️ As categorias de ganho SAÍRAM desta etapa (02/09/2026): viraram TELA PRÓPRIA na
+  // Etapa 3 e o portão passou a ser `validarSelecaoGanho`, testado abaixo. Cobrar aqui um
+  // campo que a Etapa 2 não mostra faria o "Próximo" sacudir sem erro visível.
+  it('NÃO cobra mais os tipos de ganho (o campo saiu da etapa)', () => {
+    const errs = validarEtapa2(baseForm({ ganhoCategorias: [] }), opts());
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+});
 
-    it('imensurável misturado com mensurável bloqueia', () => {
-      const errs = validarEtapa2(
-        baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
-        opts(),
-      );
-      expect(errs.ganhoCategorias).toBeTruthy();
-    });
+describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
+  it('nenhuma categoria marcada bloqueia', () => {
+    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: [] }));
+    expect(errs.ganhoCategorias).toBeTruthy();
+  });
 
-    it('as três mensuráveis combinam livremente', () => {
-      const errs = validarEtapa2(
-        baseForm({
-          ganhoCategorias: ['saving_efetivado', 'custo_evitado', 'receita_incremental'],
-        }),
-        opts(),
-      );
-      expect(errs.ganhoCategorias).toBeUndefined();
-    });
+  it('imensurável misturado com mensurável bloqueia', () => {
+    const errs = validarSelecaoGanho(
+      baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
+    );
+    expect(errs.ganhoCategorias).toBeTruthy();
+  });
 
-    it('só o imensurável passa', () => {
-      const errs = validarEtapa2(baseForm({ ganhoCategorias: ['imensuravel'] }), opts());
-      expect(errs.ganhoCategorias).toBeUndefined();
-    });
+  it('as três mensuráveis combinam livremente', () => {
+    const errs = validarSelecaoGanho(
+      baseForm({ ganhoCategorias: ['saving_efetivado', 'custo_evitado', 'receita_incremental'] }),
+    );
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
 
-    // Rascunho salvo em localStorage ANTES desta feature não tem a chave. Ler
-    // `undefined.length` derrubava /submeter inteira ("This page didn't load").
-    it('rascunho antigo sem a chave não derruba a validação', () => {
-      const semChave = baseForm();
-      delete (semChave as Partial<typeof semChave>).ganhoCategorias;
-      expect(() => validarEtapa2(semChave, opts())).not.toThrow();
-      expect(validarEtapa2(semChave, opts()).ganhoCategorias).toBeTruthy();
-    });
+  it('só o imensurável passa', () => {
+    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: ['imensuravel'] }));
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+
+  // Rascunho salvo em localStorage ANTES desta feature não tem a chave. Ler
+  // `undefined.length` derrubava /submeter inteira ("This page didn't load").
+  it('rascunho antigo sem a chave não derruba a validação', () => {
+    const semChave = baseForm();
+    delete (semChave as Partial<typeof semChave>).ganhoCategorias;
+    expect(() => validarSelecaoGanho(semChave)).not.toThrow();
+    expect(validarSelecaoGanho(semChave).ganhoCategorias).toBeTruthy();
   });
 });
 
