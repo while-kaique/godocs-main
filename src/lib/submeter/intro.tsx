@@ -65,7 +65,17 @@ const RESUMO_ETAPAS: Record<number, string> = {
 // validadores puros do formulário: este arquivo exporta só o componente (a regra
 // do fast refresh não deixa misturar).
 
-export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
+export function IntroSubmissao({
+  onProsseguir,
+  demo = false,
+}: {
+  onProsseguir: () => void;
+  // Sandbox `/fluxos` (admin): a intro é só uma TELA a inspecionar. O bloqueio
+  // temporário é uma pura função do relógio e travaria o botão dentro da janela,
+  // impedindo o dry-run — que nunca envia nada (backend mockado). No demo,
+  // ignoramos o bloqueio por completo (sem faixa, botão liberado).
+  demo?: boolean;
+}) {
   // Foco no topo do conteúdo (não no botão): o leitor de tela começa a ler a
   // apresentação em vez de anunciar "Ok, entendi, botão" antes do texto.
   const inicioRef = React.useRef<HTMLHeadingElement>(null);
@@ -73,8 +83,12 @@ export function IntroSubmissao({ onProsseguir }: { onProsseguir: () => void }) {
     inicioRef.current?.focus();
   }, []);
   // Bloqueio temporário de novas submissões (a intro só aparece em submissão nova —
-  // exatamente o que a janela pausa). Ver src/lib/bloqueio-submissao.ts.
-  const bloqueio = useBloqueioSubmissao();
+  // exatamente o que a janela pausa). Ver src/lib/bloqueio-submissao.ts. No sandbox
+  // (demo) o bloqueio é neutralizado: é uma view dry-run, não uma submissão real.
+  const bloqueioReal = useBloqueioSubmissao();
+  const bloqueio = demo
+    ? { fase: "livre" as const, bloqueado: false, mensagem: null }
+    : bloqueioReal;
 
   return (
     <PageFrame>
