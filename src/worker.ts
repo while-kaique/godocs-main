@@ -12,7 +12,7 @@ import {
   statusTeamGuideEspelho,
 } from "@/lib/teamguide-espelho";
 import { diasParaExpirarTokenTG } from "@/lib/teamguide-token";
-import { alertarErroIntegracao } from "@/lib/alertas.functions";
+import { alertarErroIntegracao, COOLDOWN_ALERTA_LENTO_MS } from "@/lib/alertas.functions";
 import {
   iniciarSubmissao,
   enviarMensagem,
@@ -330,6 +330,9 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
           "teamguide-token",
           `token da TeamGuide expira em ${dias} dia(s) (${data})`,
           "Renove o TG_API_TOKEN nos secrets do Godeploy (prod + staging) antes de vencer.",
+          // Cooldown LONGO: a expiração é condição lenta e o cron roda a cada 30 min — sem
+          // isto, o Chat de Ajuda receberia o aviso a cada corrida.
+          COOLDOWN_ALERTA_LENTO_MS,
         );
       }
       return json({ ...resultado, tokenDiasRestantes: dias });
