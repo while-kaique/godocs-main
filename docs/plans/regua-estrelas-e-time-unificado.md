@@ -234,7 +234,35 @@ depois de revalidar os deslocamentos do §6.
 
 ---
 
-## 9. Tarefas
+## 9. Backlog do Luis (5.1–5.7) → onde cada item aterrissa
+
+| Item | Onde | Estado |
+|---|---|---|
+| **5.1** Consolidar orquestrador + sub-agentes; ser crítico em aprovar × reprovar | Cérebro A (mesa que já existe) + **T5** (consenso) | aberto |
+| **5.2** Campo "é feature de projeto existente?" na submissão | **fora desta worktree** — é fluxo de submissão (`feat/godocs-v2`) | fronteira |
+| **5.3** Função AGLUTINADORA: projeto novo que é feature de projeto antigo | **T10** (novo) | aberto |
+| **5.4** Categorização (tipo × nível) | `categorizacao-projeto.ts` | ✅ **feito** |
+| **5.5** Critérios objetivos das estrelas 1–10 | `estrelas-regua.ts` (§3) | ✅ **feito** |
+| **5.6** Agente avaliador nos especiais | **T4** (cérebro B na régua nova) | aberto |
+| **5.7** Varredura dos já aprovados: aglutinar e recalcular impacto | **T7** + **T10** | aberto |
+
+⚠️ **5.2 é a contraparte da 5.3 e vive na outra frente.** A aglutinação funciona sem ela (detecta
+por similaridade), mas com o campo declarado ela fica muito mais barata. Quem for implementar o
+formulário na `feat/godocs-v2` precisa saber que este lado consome isso.
+
+⚠️ **O NÍVEL da 5.4 não é coluna nova:** é a `Complexidade` que já existe
+(`automacao|inteligencia|autonomia`, decidida pelos 2 eixos do `analyzer.ts`) traduzida para o nome
+que o produto usa, mais o degrau **Agêntico**, que está **TBD** — o rótulo foi aprovado, a
+fronteira não. Enquanto o Luis não fechar, `normalizarCategoria` **rebaixa** `agentico` para
+`autonomo`: nível com fronteira inventada é pior que nível a menos. A proposta registrada é
+"monta o próprio plano e itera até o objetivo" × autônomo, que "age dentro de um escopo dado".
+
+⚠️ **O TIPO é inferido, nunca declarado pelo autor** (decisão de 02/09): lista onde uma opção paga
+mais é convite à inflação, e a inferência acertou a separação da base só pelos nomes. Para não
+oscilar entre rodadas, o tipo sai de uma cascata de sinais binários com **precedência declarada**:
+`agente > sistema > app > dashboard > automacao`.
+
+## 10. Tarefas
 
 - **T1 — Validação cega da régua.** Aplicar a régua nos **498 não-especiais já notados** (não
   lidos) e comparar a forma da distribuição com a do §6. Se sair torta, a régua foi moldada nos 65.
@@ -247,6 +275,11 @@ depois de revalidar os deslocamentos do §6.
 - **T5 — Cérebro C (consenso):** módulo PURO de conciliação A×B + `.functions` que nunca lança.
 - **T6 — Auditoria de valor:** estender o Financeiro para emitir `valor_sugerido` + justificativa.
 - **T7 — Retroativo de 3 saídas** + relatório comparativo contra o gabarito humano.
+- **T10 — Aglutinação (5.3/5.7):** detectar que o projeto novo é FEATURE de um já documentado —
+  vizinho de altíssima similaridade + nome/escopo coincidente (o caso real das 3 duplicatas do §5).
+  Saída: `aglutinar_em: <id>` + evidência, **sempre para confirmação humana** (aglutinar errado
+  apaga um projeto do histórico de alguém). Na varredura dos aprovados, propõe também o impacto
+  CONSOLIDADO do conjunto, nunca a soma cega.
 - **T9 — Racional agregado + detector de achatamento (D12):** o relatório do retroativo emite,
   acima das notas, a distribuição das quedas por nível de destino e marca *achatamento suspeito*
   quando um único destino concentra mais de 50% delas. Fila de contestações (D11) no mesmo
