@@ -100,17 +100,46 @@ export const CATEGORIAS_MENSURAVEIS: readonly GanhoCategoria[] = GANHO_CATEGORIA
 // ─── os blocos, como o formulário da Etapa 3 os entrega ─────────────────────────
 
 /**
- * Saving efetivado: a linha de custo existia e PAROU.
+ * Saving efetivado: a linha de custo existia e ENCOLHEU (ou parou).
  *
- * `evidencia` é o texto obrigatório que amarra o número a ESTA solução (RF-208: anexo
- * sem texto é recusado — a prova sozinha não diz por que o ganho é desta automação), e
- * `desde` é a data em que o ganho passou a valer (RF-209).
+ * ⚠️ São DOIS valores, não um (decisão do Luis, 02/09/2026): a despesa pode ter caído de
+ * R$ 20k para R$ 5k, e nesse caso o saving são os R$ 15k da diferença — não os 20k nem os
+ * 5k. Quando a despesa acabou de vez, `valorAgora` é 0 e a diferença é o valor inteiro.
+ * Perguntar um único "quanto era" fazia o formulário aceitar 20k de saving num contrato
+ * que a empresa ainda paga.
+ *
+ * ⚠️ O saving NÃO é campo: é `savingLiquido(valorAntes, valorAgora)`. Guardar a diferença
+ * ao lado das duas pontas criaria um terceiro número para divergir dos outros dois.
+ *
+ * ⚠️ Onde estava `desde` (a data em que o ganho passou a valer, RF-209) não existe mais
+ * campo: o par antes/agora ocupou o lugar dela na tela. Não reintroduzir sem decisão — o
+ * "quando" que sobra é a data de SUBMISSÃO, a mesma régua que tirou a "data de criação"
+ * do formulário na v2.
+ *
+ * `evidencia` é o texto obrigatório que amarra o número a ESTA solução (RF-208: anexo sem
+ * texto é recusado — a prova sozinha não diz por que o ganho é desta automação).
  */
 export type SavingEfetivado = {
-  valor: number
+  /** Quanto saía do caixa ANTES, no período da `frequencia`. */
+  valorAntes: number
+  /** Quanto sai AGORA, no mesmo período. `0` = a despesa acabou. */
+  valorAgora: number
   frequencia: Frequencia
   evidencia: string
-  desde: string
+}
+
+/**
+ * O saving de fato: o que a despesa ENCOLHEU. Nunca negativo.
+ *
+ * ⚠️ Clampa em 0 em vez de lançar porque a régua de "agora tem de ser menor que antes"
+ * é do formulário (`validacao-etapa3.ts`), com mensagem no campo; aqui, na tradução para
+ * a fórmula, um par invertido não pode virar ganho NEGATIVO (que puxaria o impacto do
+ * projeto para baixo do zero) nem exceção que derruba o cálculo do lote.
+ */
+export function savingLiquido(valorAntes: number, valorAgora: number): number {
+  const antes = Number.isFinite(valorAntes) ? valorAntes : 0
+  const agora = Number.isFinite(valorAgora) ? valorAgora : 0
+  return Math.max(0, antes - agora)
 }
 
 /**
@@ -141,12 +170,18 @@ export type CustoEvitado = {
   racional: string
 }
 
-/** Receita incremental: dinheiro NOVO entrando. Pesa 10%. */
+/**
+ * Receita incremental: dinheiro NOVO entrando. Pesa 10%.
+ *
+ * ⚠️ NÃO tem campo "tipo de receita". Ele existiu por um dia (uma lista de 5 opções que
+ * eu declarei sem estar no plano) e o Luis o removeu em 02/09/2026: o bloco de receita da
+ * v2 é o da v1 — frequência, valor e racional —, e de onde vem o dinheiro é justamente o
+ * que o racional conta em uma frase. Não reintroduzir.
+ */
 export type ReceitaIncremental = {
   valor: number
   frequencia: Frequencia
   racional: string
-  tipo: string
 }
 
 /** Ganho imensurável: só o racional. Sem número, por definição. */
@@ -196,23 +231,24 @@ function canonizar(categorias: readonly GanhoCategoria[]): GanhoCategoria[] {
 /**
  * A seleção é válida? (RF-202 + "ao menos uma")
  *
- * Recusa a lista vazia (todo projeto declara algum ganho) e recusa a MISTURA do
- * imensurável com qualquer mensurável — o caso que a régua existe para barrar: número e
- * "não tem número" no mesmo projeto. As 3 mensuráveis combinam livremente.
+ * Recusa a lista vazia (todo projeto declara algum ganho) e recusa entrada com categoria
+ * desconhecida ou duplicada — fail-closed, porque a função é portão de submissão e portão
+ * não deve dar "válido" para lista que ele não reconhece.
  *
- * ⚠️ Também recusa entrada com categoria desconhecida ou duplicada (fail-closed): a
- * função é usada como portão de submissão, e portão não deve dar "válido" para lista
- * que ele não reconhece.
+ * ⚠️ **As 4 categorias combinam livremente, o imensurável INCLUÍDO** (decisão do Luis,
+ * 02/09/2026, revendo a RF-202). A régua anterior recusava "imensurável + qualquer
+ * mensurável" para não deixar número e "não tem número" no mesmo projeto — mas o projeto
+ * real pode ter as duas coisas: saving medido E um ganho de risco/qualidade sem número.
+ * Marcar o imensurável junto passa a ser INSUMO para o agente investigar, não uma
+ * contradição a barrar. O que a mistura NÃO faz é mudar a conta: sem número, o bloco
+ * imensurável não entra em nenhuma das 3 (ver `paraGanhosProjeto`).
  */
 export function categoriasValidas(categorias: GanhoCategoria[]): boolean {
   const lista = categorias ?? []
   if (lista.length === 0) return false
   const canonica = canonizar(lista)
   // desconhecida ou duplicada: o canônico não bate com o que veio
-  if (canonica.length !== lista.length) return false
-  const temImensuravel = canonica.includes(CATEGORIA_IMENSURAVEL)
-  const temMensuravel = canonica.some((c) => c !== CATEGORIA_IMENSURAVEL)
-  return !(temImensuravel && temMensuravel)
+  return canonica.length === lista.length
 }
 
 /**
@@ -226,23 +262,20 @@ export function categoriasValidas(categorias: GanhoCategoria[]): boolean {
  * Devolve `undefined` quando a seleção está válida (mesma forma de um `FieldErrors`).
  */
 export function erroCategorias(categorias: GanhoCategoria[]): string | undefined {
-  const lista = categorias ?? []
-  if (categoriasValidas(lista)) return undefined
-  return lista.length === 0
-    ? 'Selecione ao menos um tipo de ganho'
-    : 'Ganho imensurável não combina com os outros tipos: ou o ganho tem número, ou não tem'
+  if (categoriasValidas(categorias ?? [])) return undefined
+  return 'Selecione ao menos um tipo de ganho'
 }
 
 /**
- * O clique num checkbox de categoria — com a exclusividade aplicada nos DOIS sentidos.
+ * O clique num checkbox de categoria — **toggle simples**.
  *
- * É **toggle**: clicar numa já marcada desmarca. Marcar o imensurável deixa só ele;
- * marcar qualquer mensurável tira o imensurável. O resultado sai sempre na ordem
- * canônica e sem duplicata, e a lista recebida nunca é mutada.
+ * Clicar numa já marcada desmarca; clicar numa nova acrescenta. O resultado sai sempre na
+ * ordem canônica e sem duplicata, e a lista recebida nunca é mutada.
  *
- * ⚠️ A exclusividade mora AQUI, no clique, e não só na validação do envio: deixar a
- * tela mostrar "imensurável + saving marcados" e só reclamar no fim é pedir para a
- * pessoa preencher dois blocos e perder um.
+ * ⚠️ Aqui morava a EXCLUSIVIDADE do imensurável (marcá-lo desmarcava todo o resto, e
+ * qualquer mensurável o desmarcava). Ela saiu em 02/09/2026 junto com a régua de
+ * `categoriasValidas`: as 4 combinam. Não reintroduzir "desmarcar as outras" — um projeto
+ * pode ter saving medido e, além dele, um ganho sem número.
  */
 export function alternarCategoria(
   atuais: GanhoCategoria[],
@@ -252,8 +285,7 @@ export function alternarCategoria(
   if (marcadas.includes(alvo)) {
     return marcadas.filter((c) => c !== alvo)
   }
-  if (alvo === CATEGORIA_IMENSURAVEL) return [CATEGORIA_IMENSURAVEL]
-  return canonizar([...marcadas.filter((c) => c !== CATEGORIA_IMENSURAVEL), alvo])
+  return canonizar([...marcadas, alvo])
 }
 
 // ─── serialização (a coluna `projetos.ganho_categorias`) ────────────────────────
@@ -535,15 +567,23 @@ function valorFinito(valor: number, campo: string): number {
 export function paraGanhosProjeto(g: GanhosDeclarados): GanhosProjeto {
   const marcadas = canonizar(g.categorias ?? [])
 
-  if (marcadas.includes(CATEGORIA_IMENSURAVEL)) {
+  // ⚠️ `imensuravel: true` (impacto ZERO nas 3 contas, RF-219) só quando ele é a ÚNICA
+  // categoria — desde 02/09/2026 ele pode vir ACOMPANHADO de categorias com número, e aí
+  // o projeto TEM impacto: quem não entra na conta é o bloco sem número, não o projeto.
+  // Devolver `{imensuravel:true}` para a mistura zeraria um saving comprovado.
+  if (marcadas.length === 1 && marcadas[0] === CATEGORIA_IMENSURAVEL) {
     return { imensuravel: true }
   }
 
   const projeto: GanhosProjeto = {}
 
   if (marcadas.includes('saving_efetivado') && g.savingEfetivado) {
+    // O saving é a DIFERENÇA (antes − agora), nunca uma das pontas.
     projeto.savingEfetivado = {
-      valor: valorFinito(g.savingEfetivado.valor, 'savingEfetivado.valor'),
+      valor: savingLiquido(
+        valorFinito(g.savingEfetivado.valorAntes, 'savingEfetivado.valorAntes'),
+        valorFinito(g.savingEfetivado.valorAgora, 'savingEfetivado.valorAgora'),
+      ),
       frequencia: g.savingEfetivado.frequencia,
     }
   }

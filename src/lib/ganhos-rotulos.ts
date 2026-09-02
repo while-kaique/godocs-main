@@ -20,6 +20,13 @@ import type { Frequencia } from './impacto'
 export type RotuloGanho = {
   /** Nome curto, usado em título de bloco, chip e coluna. */
   titulo: string
+  /**
+   * Emoji do card de seleção — o mesmo idioma dos cards de tipo de projeto da PROD
+   * (💰 Saving Operacional · 📈 Receita Incremental), que o Luis pediu para seguir.
+   * ⚠️ Só decoração: o estado marcado/não nunca depende dele (o check redondo + a borda
+   * é que dizem).
+   */
+  icone: string
   /** A régua em uma frase: o que entra AQUI e não na categoria vizinha. */
   descricao: string
   /** Uma linha de exemplo concreto, para quem ainda hesita entre duas. */
@@ -28,6 +35,7 @@ export type RotuloGanho = {
 
 export const GANHO_ROTULOS: Record<GanhoCategoria, RotuloGanho> = {
   saving_efetivado: {
+    icone: '💰',
     titulo: 'Saving efetivado',
     descricao:
       'Havia uma despesa saindo do caixa e ela parou. Dá para comprovar num extrato, ' +
@@ -35,6 +43,7 @@ export const GANHO_ROTULOS: Record<GanhoCategoria, RotuloGanho> = {
     exemplo: 'Contrato cancelado, licença que ninguém paga mais, multa que parou.',
   },
   custo_evitado: {
+    icone: '🛡️',
     titulo: 'Custo evitado',
     descricao:
       'A despesa nunca nasceu. Não existe extrato porque não há linha que sumiu: o que ' +
@@ -44,11 +53,13 @@ export const GANHO_ROTULOS: Record<GanhoCategoria, RotuloGanho> = {
       'continua na equipe.',
   },
   receita_incremental: {
+    icone: '📈',
     titulo: 'Receita incremental',
     descricao: 'Dinheiro novo entrando, que não entraria sem esta solução.',
     exemplo: 'Vendas que a automação viabilizou, cobrança que passou a ser recuperada.',
   },
   imensuravel: {
+    icone: '⭐',
     titulo: 'Ganho imensurável',
     descricao:
       'O ganho é real mas não tem número: o valor está no risco que deixou de existir, ' +
@@ -65,54 +76,27 @@ export function tituloGanho(categoria: GanhoCategoria | string): string {
 /**
  * As opções dos cards da Etapa 2, na ordem CANÔNICA.
  *
- * ⚠️ O imensurável vem por ÚLTIMO de propósito: ele é exclusivo dos outros três, e
- * oferecê-lo antes convida a marcar "não tenho número" antes de olhar se tem.
+ * ⚠️ O imensurável vem por ÚLTIMO de propósito: oferecê-lo antes convida a marcar "não
+ * tenho número" antes de olhar se tem. (Ele deixou de ser EXCLUSIVO em 02/09/2026 — as 4
+ * podem ser marcadas juntas —, mas continua sendo a última da lista.)
  */
 export const GANHO_OPCOES: {
   value: GanhoCategoria
   title: string
   desc: string
+  icon: string
 }[] = GANHO_CATEGORIAS.map((c) => ({
   value: c,
   title: GANHO_ROTULOS[c].titulo,
   desc: `${GANHO_ROTULOS[c].descricao} ${GANHO_ROTULOS[c].exemplo}`,
+  icon: GANHO_ROTULOS[c].icone,
 }))
 
-/**
- * De onde vem a receita incremental (coluna "Tipo de Receita").
- *
- * ⚠️ DECISÃO A CONFIRMAR: o plano lista "tipo de receita" como campo do bloco, mas não
- * enumera os valores — e na v1 aquela coluna guardava, na prática, a RECORRÊNCIA
- * (`tipo_saving`), que na v2 já é a frequência do bloco. Esta lista é curta e declarada
- * de propósito (em vez de texto livre) porque a coluna vai a relatório: texto livre em
- * campo agregável vira 40 grafias do mesmo conceito, que foi o que a canonicalização das
- * áreas do rollup teve de consertar depois.
- *
- * ⚠️ `retencao` é a fronteira delicada: receita que deixou de ser perdida PARECE custo
- * evitado. A régua é a mesma D1 aplicada à receita — se o dinheiro ENTRA (o cliente
- * segue pagando), é receita; se o que aconteceu foi uma despesa não nascer, é custo
- * evitado.
- */
-export const TIPOS_RECEITA: { value: string; label: string }[] = [
-  { value: 'nova_venda', label: 'Venda nova que não existiria' },
-  { value: 'recuperacao', label: 'Receita recuperada (cobrança, carrinho, inadimplência)' },
-  { value: 'expansao', label: 'Mais receita do mesmo cliente (upsell, cross-sell)' },
-  { value: 'retencao', label: 'Receita que deixou de ser perdida (churn evitado)' },
-  { value: 'outro', label: 'Outro' },
-]
+// ⚠️ Aqui existia `TIPOS_RECEITA` (5 opções de "de onde vem a receita"), que eu declarei
+// sem estar no plano. O Luis removeu o campo em 02/09/2026: o bloco de receita é o da v1
+// (frequência · valor · racional), e de onde vem o dinheiro é o que o racional conta em
+// uma frase. Não reintroduzir a lista nem a coluna.
 
-/**
- * As 4 frequências como ABAS lado a lado — rótulo CURTO, ordem por CADÊNCIA.
- *
- * ⚠️ Rótulo curto de propósito: `TIPO_SAVING_LABEL` (`projeto-rotulos.ts`) segue sendo o
- * nome longo do valor onde há espaço para ele (ficha, planilha, resumo do bloco); em 4
- * controles lado a lado, "Recorrente (mensal)" e "A cada trimestre" quebram em duas
- * linhas e a fileira deixa de ser legível de relance. As duas listas descrevem o MESMO
- * enum — ao acrescentar frequência, as duas mudam.
- *
- * ⚠️ A ordem é a da v1 (mensal, trimestral, semestral, pontual): a cadência crescente,
- * com o "uma vez" no fim. Não é a ordem do `DIVISOR_FREQUENCIA` nem alfabética.
- */
 export const FREQUENCIA_ABAS: { value: Frequencia; label: string }[] = [
   { value: 'mensal', label: 'Mensal' },
   { value: 'trimestral', label: 'Trimestral' },

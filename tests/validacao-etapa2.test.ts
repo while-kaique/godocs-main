@@ -89,11 +89,14 @@ describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
     expect(errs.ganhoCategorias).toBeTruthy();
   });
 
-  it('imensurável misturado com mensurável bloqueia', () => {
+  // ⚠️ Era bloqueio até 02/09/2026 (RF-202 "imensurável XOR o resto"). O Luis liberou: as
+  // 4 combinam, porque um projeto pode ter saving medido E um ganho sem número — e marcar
+  // os dois é insumo para o agente investigar, não contradição.
+  it('imensurável junto com mensurável PASSA (as 4 combinam)', () => {
     const errs = validarSelecaoGanho(
       baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
     );
-    expect(errs.ganhoCategorias).toBeTruthy();
+    expect(errs.ganhoCategorias).toBeUndefined();
   });
 
   it('as três mensuráveis combinam livremente', () => {

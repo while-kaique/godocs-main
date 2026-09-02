@@ -35,6 +35,7 @@ import {
   paraGanhosProjeto,
   type GanhoCategoria,
   type GanhosDeclarados,
+  savingLiquido,
 } from '@/lib/ganhos';
 import {
   DIVISOR_FREQUENCIA,
@@ -49,12 +50,17 @@ import {
 
 // ─── fixtures: blocos preenchidos, do jeito que o formulário entrega ────────────
 
+// ⚠️ O saving efetivado tem DUAS pontas desde 02/09/2026 e o ganho é a DIFERENÇA
+// (`savingLiquido`). Nesta fixture o "agora" é 0 (a despesa acabou), então a diferença é
+// `valorAntes` — e `SAVING_GANHO` é o número que os testes de impacto esperam, para
+// ninguém reescrever a subtração em 6 asserções.
 const SAVING = {
-  valor: 12000,
+  valorAntes: 12000,
+  valorAgora: 0,
   frequencia: 'mensal' as Frequencia,
   evidencia: 'Contrato encerrado; extrato de abril e maio sem a cobrança.',
-  desde: '2026-04-01',
 };
+const SAVING_GANHO = SAVING.valorAntes - SAVING.valorAgora;
 
 const CUSTO_EVITADO = {
   frequencia: 'trimestral' as Frequencia,
@@ -130,7 +136,11 @@ describe('GANHO_CATEGORIAS — as 4 categorias da v2, e nenhuma a mais', () => {
 
 // ─── RF-202: a régua da seleção ─────────────────────────────────────────────────
 
-describe('categoriasValidas — RF-202 (imensurável XOR o resto) + "ao menos uma"', () => {
+// ⚠️ A RF-202 dizia "imensurável XOR o resto". Ela FOI REVISTA em 02/09/2026 (Luis): as 4
+// categorias combinam, o imensurável incluído — um projeto pode ter saving medido E um
+// ganho de risco/qualidade sem número, e marcar os dois é insumo para o agente investigar.
+// O que a mistura não faz é mudar a conta (ver o describe de `paraGanhosProjeto`).
+describe('categoriasValidas — "ao menos uma", e as 4 combinam', () => {
   it('lista VAZIA é inválida: todo projeto declara ao menos um ganho', () => {
     expect(categoriasValidas([])).toBe(false);
   });
@@ -154,13 +164,21 @@ describe('categoriasValidas — RF-202 (imensurável XOR o resto) + "ao menos um
     expect(categoriasValidas(['imensuravel'])).toBe(true);
   });
 
-  // O caso que a régua existe para recusar: número e "não tem número" no mesmo projeto.
-  it('imensurável misturado com QUALQUER mensurável é inválido', () => {
+  // Era o caso que a régua recusava até 02/09/2026. Agora PASSA — e o teste fica no lugar
+  // dele, virado, para a volta da exclusividade ser uma DECISÃO e não um efeito colateral.
+  it('imensurável junto com QUALQUER mensurável é válido (a régua caiu)', () => {
     for (const c of CATEGORIAS_MENSURAVEIS) {
-      expect(categoriasValidas([CATEGORIA_IMENSURAVEL, c])).toBe(false);
-      expect(categoriasValidas([c, CATEGORIA_IMENSURAVEL])).toBe(false);
+      expect(categoriasValidas([CATEGORIA_IMENSURAVEL, c])).toBe(true);
+      expect(categoriasValidas([c, CATEGORIA_IMENSURAVEL])).toBe(true);
     }
-    expect(categoriasValidas([...CATEGORIAS_MENSURAVEIS, CATEGORIA_IMENSURAVEL])).toBe(false);
+    expect(categoriasValidas([...CATEGORIAS_MENSURAVEIS, CATEGORIA_IMENSURAVEL])).toBe(true);
+  });
+
+  it('lista com categoria DESCONHECIDA ou duplicada segue inválida (fail-closed)', () => {
+    expect(categoriasValidas(['saving_efetivado', 'saving_efetivado'] as GanhoCategoria[])).toBe(
+      false,
+    );
+    expect(categoriasValidas(['saving' as GanhoCategoria])).toBe(false);
   });
 
   it('todas as 8 combinações válidas passam', () => {
@@ -170,23 +188,31 @@ describe('categoriasValidas — RF-202 (imensurável XOR o resto) + "ao menos um
   });
 });
 
-describe('alternarCategoria — o clique no checkbox, com a exclusividade nos DOIS sentidos', () => {
+describe('alternarCategoria — o clique no checkbox (toggle simples)', () => {
   it('marcar a primeira categoria devolve uma seleção de 1', () => {
     expect(alternarCategoria([], 'saving_efetivado')).toEqual(['saving_efetivado']);
   });
 
-  it('marcar imensurável DESMARCA as outras três', () => {
+  // ⚠️ Aqui a exclusividade era testada nos dois sentidos. Ela saiu em 02/09/2026: marcar
+  // o imensurável ACRESCENTA, não substitui.
+  it('marcar imensurável NÃO desmarca as outras três', () => {
     const cheio: GanhoCategoria[] = [
       'saving_efetivado',
       'custo_evitado',
       'receita_incremental',
     ];
-    expect(alternarCategoria(cheio, CATEGORIA_IMENSURAVEL)).toEqual([CATEGORIA_IMENSURAVEL]);
+    expect(alternarCategoria(cheio, CATEGORIA_IMENSURAVEL)).toEqual([
+      'saving_efetivado',
+      'custo_evitado',
+      'receita_incremental',
+      CATEGORIA_IMENSURAVEL,
+    ]);
   });
 
-  it('marcar qualquer mensurável DESMARCA o imensurável', () => {
+  it('marcar um mensurável NÃO desmarca o imensurável', () => {
     for (const c of CATEGORIAS_MENSURAVEIS) {
-      expect(alternarCategoria([CATEGORIA_IMENSURAVEL], c)).toEqual([c]);
+      expect(alternarCategoria([CATEGORIA_IMENSURAVEL], c)).toContain(c);
+      expect(alternarCategoria([CATEGORIA_IMENSURAVEL], c)).toContain(CATEGORIA_IMENSURAVEL);
     }
   });
 
@@ -334,11 +360,11 @@ describe('paraGanhosProjeto — RF-218: bloco NÃO marcado entra como ZERO', () 
 
   it('só saving marcado: o impacto bate com o do bloco ISOLADO', () => {
     const g = paraGanhosProjeto({ categorias: ['saving_efetivado'], savingEfetivado: SAVING });
-    const isolado = { savingEfetivado: { valor: SAVING.valor, frequencia: SAVING.frequencia } };
+    const isolado = { savingEfetivado: { valor: SAVING_GANHO, frequencia: SAVING.frequencia } };
     expect(impactoBruto(g)).toBeCloseTo(impactoBruto(isolado), 6);
     expect(impactoLiquido(g)).toBeCloseTo(impactoLiquido(isolado), 6);
     expect(impactoLiquidoMensal(g)).toBeCloseTo(impactoLiquidoMensal(isolado), 6);
-    expect(impactoLiquido(g)).toBeCloseTo(PESO_SAVING * SAVING.valor, 6);
+    expect(impactoLiquido(g)).toBeCloseTo(PESO_SAVING * SAVING_GANHO, 6);
   });
 
   // Quem manda é a SELEÇÃO. Trocar de categoria no meio do formulário deixa o bloco antigo
@@ -369,7 +395,7 @@ describe('paraGanhosProjeto — RF-218: bloco NÃO marcado entra como ZERO', () 
       receitaIncremental: RECEITA,
     });
     const esperado =
-      PESO_SAVING * SAVING.valor +
+      PESO_SAVING * SAVING_GANHO +
       PESO_CUSTO_EVITADO * (CUSTO_EVITADO.valorHoras + CUSTO_EVITADO.naoContratado) +
       PESO_RECEITA * RECEITA.valor;
     expect(impactoLiquido(g)).toBeCloseTo(esperado, 6);
@@ -384,9 +410,9 @@ describe('paraGanhosProjeto — RF-219: imensurável fica FORA de toda conta', (
     expect(impactoLiquidoMensal(g)).toBeCloseTo(0, 8);
   });
 
-  // Quem marcou imensurável não tem número: qualquer bloco financeiro sobrando no estado é
-  // resíduo da seleção anterior (RF-202 garante que os dois não coexistem).
-  it('imensurável com bloco financeiro sobrando no estado ainda dá ZERO', () => {
+  // ⚠️ Aqui o imensurável é a ÚNICA categoria marcada. Bloco financeiro sobrando no estado
+  // é resíduo de seleção anterior e não volta à conta pelas costas (RF-218).
+  it('imensurável SOZINHO, com bloco financeiro sobrando no estado, ainda dá ZERO', () => {
     const g = paraGanhosProjeto({
       categorias: ['imensuravel'],
       imensuravel: IMENSURAVEL,
@@ -396,6 +422,67 @@ describe('paraGanhosProjeto — RF-219: imensurável fica FORA de toda conta', (
     });
     expect(impactoBruto(g)).toBeCloseTo(0, 8);
     expect(impactoLiquido(g)).toBeCloseTo(0, 8);
+    expect(impactoLiquidoMensal(g)).toBeCloseTo(0, 8);
+  });
+});
+
+// ─── o par antes/agora do saving (02/09/2026) ───────────────────────────────────
+
+describe('savingLiquido — o saving é a DIFERENÇA, nunca uma das pontas', () => {
+  it('despesa que ENCOLHEU rende a diferença', () => {
+    expect(savingLiquido(20000, 5000)).toBe(15000);
+  });
+
+  it('despesa que ACABOU rende o valor inteiro', () => {
+    expect(savingLiquido(20000, 0)).toBe(20000);
+  });
+
+  // ⚠️ Clampa em 0 em vez de lançar: a régua de "agora tem de ser menor" é do formulário,
+  // com mensagem no campo. Aqui, um par invertido não pode virar ganho NEGATIVO (puxaria o
+  // impacto do projeto para baixo do zero) nem exceção que derruba o cálculo do lote.
+  it('par invertido ou igual dá ZERO, nunca negativo', () => {
+    expect(savingLiquido(5000, 5000)).toBe(0);
+    expect(savingLiquido(5000, 9000)).toBe(0);
+  });
+
+  it('valor não finito conta como 0 (não propaga NaN para a fórmula)', () => {
+    expect(savingLiquido(Number.NaN, 100)).toBe(0);
+    expect(savingLiquido(1000, Number.NaN)).toBe(1000);
+  });
+});
+
+describe('paraGanhosProjeto — imensurável ACOMPANHADO de categoria com número', () => {
+  // ⚠️ O caso que a liberação da RF-202 criou: as 4 combinam. Devolver `{imensuravel:true}`
+  // aqui (como fazia até 02/09/2026) ZERARIA um saving comprovado.
+  it('saving + imensurável: o saving CONTA e o imensurável não tira nada', () => {
+    const g = paraGanhosProjeto({
+      categorias: ['saving_efetivado', 'imensuravel'],
+      savingEfetivado: SAVING,
+      imensuravel: IMENSURAVEL,
+    });
+    expect(g.imensuravel).toBeUndefined();
+    expect(impactoBruto(g)).toBeCloseTo(SAVING_GANHO, 6);
+    expect(impactoLiquido(g)).toBeCloseTo(PESO_SAVING * SAVING_GANHO, 6);
+  });
+
+  it('o resultado é IGUAL ao do mesmo projeto sem o imensurável marcado', () => {
+    const com = paraGanhosProjeto({
+      categorias: ['saving_efetivado', 'receita_incremental', 'imensuravel'],
+      savingEfetivado: SAVING,
+      receitaIncremental: RECEITA,
+      imensuravel: IMENSURAVEL,
+    });
+    const sem = paraGanhosProjeto({
+      categorias: ['saving_efetivado', 'receita_incremental'],
+      savingEfetivado: SAVING,
+      receitaIncremental: RECEITA,
+    });
+    expect(impactoLiquidoMensal(com)).toBeCloseTo(impactoLiquidoMensal(sem), 8);
+  });
+
+  it('imensurável sozinho segue zerando tudo (a régua RF-219 não mudou)', () => {
+    const g = paraGanhosProjeto({ categorias: ['imensuravel'], imensuravel: IMENSURAVEL });
+    expect(g.imensuravel).toBe(true);
     expect(impactoLiquidoMensal(g)).toBeCloseTo(0, 8);
   });
 });
@@ -445,7 +532,7 @@ describe('paraGanhosProjeto — frequências MISTAS: cada bloco pela frequência
   it('saving mensal + receita pontual: não existe divisor único do projeto', () => {
     const g = paraGanhosProjeto({
       categorias: ['saving_efetivado', 'receita_incremental'],
-      savingEfetivado: { ...SAVING, valor: 3000, frequencia: 'mensal' },
+      savingEfetivado: { ...SAVING, valorAntes: 3000, frequencia: 'mensal' },
       receitaIncremental: { ...RECEITA, valor: 40000, frequencia: 'pontual' },
     });
     const esperado =
@@ -464,7 +551,7 @@ describe('paraGanhosProjeto — frequências MISTAS: cada bloco pela frequência
       receitaIncremental: RECEITA, // pontual
     });
     const esperado =
-      (PESO_SAVING * SAVING.valor) / DIVISOR_FREQUENCIA[SAVING.frequencia] +
+      (PESO_SAVING * SAVING_GANHO) / DIVISOR_FREQUENCIA[SAVING.frequencia] +
       (PESO_CUSTO_EVITADO * (CUSTO_EVITADO.valorHoras + CUSTO_EVITADO.naoContratado)) /
         DIVISOR_FREQUENCIA[CUSTO_EVITADO.frequencia] +
       (PESO_RECEITA * RECEITA.valor) / DIVISOR_FREQUENCIA[RECEITA.frequencia];
@@ -480,7 +567,7 @@ describe('paraGanhosProjeto — custoRodar é LISTA, cada item na frequência de
       custoRodar: CUSTO_RODAR,
     });
     const somaCrua = CUSTO_RODAR.reduce((t, i) => t + i.valor, 0);
-    expect(impactoLiquido(g)).toBeCloseTo(PESO_SAVING * SAVING.valor - somaCrua, 6);
+    expect(impactoLiquido(g)).toBeCloseTo(PESO_SAVING * SAVING_GANHO - somaCrua, 6);
   });
 
   it('no mensal, cada item mensaliza pela frequência DELE', () => {
@@ -494,11 +581,11 @@ describe('paraGanhosProjeto — custoRodar é LISTA, cada item na frequência de
       0,
     );
     const esperado =
-      (PESO_SAVING * SAVING.valor) / DIVISOR_FREQUENCIA[SAVING.frequencia] - custoMensal;
+      (PESO_SAVING * SAVING_GANHO) / DIVISOR_FREQUENCIA[SAVING.frequencia] - custoMensal;
     expect(impactoLiquidoMensal(g)).toBeCloseTo(esperado, 6);
     // e NÃO uma soma crua mensalizada por um divisor único
     const somaCrua = CUSTO_RODAR.reduce((t, i) => t + i.valor, 0);
-    expect(impactoLiquidoMensal(g)).not.toBeCloseTo(SAVING.valor - somaCrua, 6);
+    expect(impactoLiquidoMensal(g)).not.toBeCloseTo(SAVING_GANHO - somaCrua, 6);
   });
 
   it('lista ausente e lista vazia dão o mesmo resultado (custo 0)', () => {
@@ -525,7 +612,7 @@ describe('a amarra da fonte única: a frequência/divisor vem de @/lib/impacto',
     it(`saving em "${f}" mensaliza por DIVISOR_FREQUENCIA.${f}`, () => {
       const g = paraGanhosProjeto({
         categorias: ['saving_efetivado'],
-        savingEfetivado: { ...SAVING, valor: 12000, frequencia: f },
+        savingEfetivado: { ...SAVING, valorAntes: 12000, frequencia: f },
       });
       expect(impactoLiquidoMensal(g)).toBeCloseTo(
         (PESO_SAVING * 12000) / DIVISOR_FREQUENCIA[f],
@@ -537,7 +624,7 @@ describe('a amarra da fonte única: a frequência/divisor vem de @/lib/impacto',
   it('PONTUAL segue a régua da v2 (divisor de DIVISOR_FREQUENCIA, não valor cheio)', () => {
     const g = paraGanhosProjeto({
       categorias: ['saving_efetivado'],
-      savingEfetivado: { ...SAVING, valor: 4000, frequencia: 'pontual' },
+      savingEfetivado: { ...SAVING, valorAntes: 4000, frequencia: 'pontual' },
     });
     expect(impactoLiquidoMensal(g)).toBeCloseTo(4000 / DIVISOR_FREQUENCIA.pontual, 6);
     expect(impactoLiquidoMensal(g)).not.toBeCloseTo(4000, 6);

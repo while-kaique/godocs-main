@@ -87,7 +87,7 @@ describe("deveDescartarDraftEdicao: hoje NEUTRO (v2), e é decisão", () => {
 
   it("PRESERVA rascunho com blocos de ganho preenchidos — é o que se perderia", () => {
     const comGanhos = draft({
-      ganhos: { ...ganhosFormVazio(), savingValor: "1.200,00" },
+      ganhos: { ...ganhosFormVazio(), savingValorAntes: "1.200,00" },
     });
     expect(deveDescartarDraftEdicao({ serverTemDoc: false, draft: comGanhos })).toBe(false);
   });

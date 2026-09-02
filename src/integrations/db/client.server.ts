@@ -2530,6 +2530,9 @@ export type ProjetoRow = {
   saving_efetivado_frequencia: string | null; // 'pontual'|'mensal'|'trimestral'|'semestral'
   saving_efetivado_evidencia: string | null;
   saving_efetivado_desde: string | null;
+  /** As DUAS pontas do saving (o ganho é a diferença). Ver `ganhos.ts`. */
+  saving_efetivado_valor_antes: number | null;
+  saving_efetivado_valor_agora: number | null;
   // Custo evitado: a despesa nunca nasceu (sem extrato → pesa 50%, NÃO pede evidência).
   // Dois braços que SOMAM antes do peso: horas liberadas + o que não foi contratado.
   custo_evitado_frequencia: string | null;

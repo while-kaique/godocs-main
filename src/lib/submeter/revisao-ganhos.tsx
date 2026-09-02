@@ -3,12 +3,14 @@ import { Send } from "lucide-react";
 import { AvisoBloqueio } from "@/components/aviso-bloqueio";
 import type { BloqueioSubmissao } from "@/lib/mensagens-submissao";
 import { SummaryRow } from "./form-components";
-import { GANHO_ROTULOS, TIPOS_RECEITA } from "@/lib/ganhos-rotulos";
+import { GANHO_ROTULOS } from "@/lib/ganhos-rotulos";
+import { savingLiquido } from "@/lib/ganhos";
 import { TIPO_SAVING_LABEL, unidadeHoras } from "@/lib/projeto-rotulos";
 import { ordemBlocos } from "./acordeao-estado";
 import { totalHorasLiberadas } from "./horas";
 import { listaVazia } from "./itens-lista";
 import { anexosUteis } from "./evidencia";
+import { numeroParaMoedaBR, parseMoedaBR } from "./constants";
 import type { FormData } from "./constants";
 import type { GanhosFormData } from "./validacao-etapa3";
 
@@ -48,6 +50,12 @@ export function RevisaoGanhos({
   const categorias = ordemBlocos(form.ganhoCategorias ?? []);
   const freq = (f: string) => (f ? (TIPO_SAVING_LABEL[f] ?? f) : "—");
   const reais = (v: string) => (v.trim() === "" ? "—" : `R$ ${v}`);
+  // O ganho do saving é a DIFERENÇA entre as duas pontas — a régua é a de `ganhos.ts`,
+  // não uma subtração reescrita aqui.
+  const economiaSaving = savingLiquido(
+    parseMoedaBR(ganhos.savingValorAntes),
+    parseMoedaBR(ganhos.savingValorAgora),
+  );
 
   const custosDeclarados = listaVazia(ganhos.custoRodar) ? [] : ganhos.custoRodar;
 
@@ -92,9 +100,17 @@ export function RevisaoGanhos({
 
           {categoria === "saving_efetivado" ? (
             <>
-              <SummaryRow label="Valor" value={reais(ganhos.savingValor)} />
+              {/* As duas pontas E a diferença: é a diferença que vira o ganho, e
+                  mostrar só ela esconderia o que a pessoa digitou. */}
+              <SummaryRow label="Antes" value={reais(ganhos.savingValorAntes)} />
+              <SummaryRow label="Agora" value={reais(ganhos.savingValorAgora)} />
+              <SummaryRow
+                label="Saving"
+                value={
+                  economiaSaving > 0 ? `R$ ${numeroParaMoedaBR(economiaSaving)}` : "—"
+                }
+              />
               <SummaryRow label="Frequência" value={freq(ganhos.savingFrequencia)} />
-              <SummaryRow label="Desde" value={ganhos.savingDesde || "—"} />
               <SummaryRow
                 label="Comprovação"
                 value={
@@ -128,14 +144,7 @@ export function RevisaoGanhos({
           {categoria === "receita_incremental" ? (
             <>
               <SummaryRow label="Valor" value={reais(ganhos.receitaValor)} />
-              <SummaryRow label="Frequência" value={freq(ganhos.receitaFrequencia)} />
-              <SummaryRow
-                label="De onde vem"
-                value={
-                  TIPOS_RECEITA.find((t) => t.value === ganhos.receitaTipo)?.label ?? "—"
-                }
-                last
-              />
+              <SummaryRow label="Frequência" value={freq(ganhos.receitaFrequencia)} last />
             </>
           ) : null}
 

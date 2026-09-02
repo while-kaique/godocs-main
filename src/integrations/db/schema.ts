@@ -796,12 +796,30 @@ const MIGRATIONS = [
   // possível, pesa 50%, por isso NÃO tem evidência). Hora liberada de quem continua na
   // folha é capacidade que se deixou de comprar, não dinheiro no bolso: é custo evitado.
   'ALTER TABLE projetos ADD COLUMN ganho_categorias TEXT',
-  // Saving efetivado — a despesa existia e PAROU. `desde` é a data em que o ganho passou
-  // a valer, e `evidencia` é o texto obrigatório que amarra o número a esta solução.
+  // Saving efetivado — a despesa existia e ENCOLHEU (ou parou). ⚠️ São DOIS valores, não
+  // um: a despesa pode ter caído de 20k para 5k, e o saving são os 15k da diferença
+  // (`savingLiquido`, `ganhos.ts`). `evidencia` é o texto obrigatório que amarra o número
+  // a esta solução.
   'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor REAL',
   'ALTER TABLE projetos ADD COLUMN saving_efetivado_frequencia TEXT',
   'ALTER TABLE projetos ADD COLUMN saving_efetivado_evidencia TEXT',
   'ALTER TABLE projetos ADD COLUMN saving_efetivado_desde TEXT',
+  // ⚠️ As DUAS pontas do saving, acrescentadas em 02/09/2026 (decisão do Luis: "quanto era
+  // e quanto é agora"). Elas são a fonte; o saving é a diferença, derivada — não há coluna
+  // para ela.
+  //
+  // ⚠️ Com isso, TRÊS colunas acima/abaixo nascem LEGADO e nunca são escritas:
+  // `saving_efetivado_valor` (o valor único que virou par), `saving_efetivado_desde` (o
+  // campo "desde quando", que saiu da tela junto) e `receita_incremental_tipo` (lista de
+  // "de onde vem a receita" que nunca devia ter existido). Ficam declaradas porque este
+  // bootstrap é um vetor de `ALTER TABLE ADD COLUMN` cegos ao estado atual (ver a nota
+  // grande acima): remover uma linha do meio não apaga a coluna de quem já a criou, e
+  // `DROP COLUMN` aqui mudaria o cold start de prod/staging v1, que a Fronteira do plano
+  // proíbe tocar. Nada as lê e a T6 não as grava. **Não reaproveitar** nenhuma das três
+  // para outro sentido — coluna com dois significados é o defeito que a v2 existe para
+  // desfazer.
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_antes REAL',
+  'ALTER TABLE projetos ADD COLUMN saving_efetivado_valor_agora REAL',
   // Custo evitado — a despesa nunca nasceu. Tem DOIS braços que somam antes do peso de
   // 50%: as horas liberadas (tabela antes/depois por função, em `_horas_linhas`, cujo R$
   // derivado fica em `_horas_valor`) e o que não chegou a ser contratado. A frequência é
@@ -824,7 +842,10 @@ const MIGRATIONS = [
   'ALTER TABLE projetos ADD COLUMN receita_incremental_racional TEXT',
   'ALTER TABLE projetos ADD COLUMN receita_incremental_tipo TEXT',
   // Ganho imensurável — projeto sem número. ⚠️ Fica FORA de toda conta de impacto (é o
-  // que a estrela representa), e é EXCLUSIVO das outras 3 categorias.
+  // que a estrela representa). ⚠️ Ele NÃO é mais exclusivo das outras 3 (02/09/2026): um
+  // projeto pode declarar saving medido E um ganho sem número, e aí só o BLOCO sem número
+  // fica fora da conta — o projeto tem impacto. `imensuravel: true` em `GanhosProjeto` só
+  // quando ele é a ÚNICA categoria marcada.
   'ALTER TABLE projetos ADD COLUMN ganho_imensuravel_racional TEXT',
   // Custo para rodar — a FUSÃO das duas linhas de custo da v1 (`custo_externo_mensal`, a
   // plataforma onde a solução roda, e `custo_projeto_itens`, API/SaaS por uso), que

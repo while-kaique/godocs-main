@@ -654,10 +654,12 @@ export function SubmeterPageContent({
         const freq = (v: unknown) => ((v as string) ?? "") as GanhosFormData["savingFrequencia"];
         setGanhos({
           ...ganhosFormVazio(),
-          savingValor: moeda(data.saving_efetivado_valor),
+          // ⚠️ O par antes/agora vem das colunas NOVAS. `saving_efetivado_valor` e
+          // `_desde` são LEGADO (nunca escritos — ver `schema.ts`): não semear deles.
+          savingValorAntes: moeda(data.saving_efetivado_valor_antes),
+          savingValorAgora: moeda(data.saving_efetivado_valor_agora),
           savingFrequencia: freq(data.saving_efetivado_frequencia),
           savingEvidencia: (data.saving_efetivado_evidencia as string) ?? "",
-          savingDesde: (data.saving_efetivado_desde as string) ?? "",
           ceFrequencia: freq(data.custo_evitado_frequencia),
           ceLinhas: (() => {
             const linhas = desserializarLinhasHoras(
@@ -675,7 +677,6 @@ export function SubmeterPageContent({
           receitaValor: moeda(data.receita_incremental_valor),
           receitaFrequencia: freq(data.receita_incremental_frequencia),
           receitaRacional: (data.receita_incremental_racional as string) ?? "",
-          receitaTipo: (data.receita_incremental_tipo as string) ?? "",
           imensuravelRacional: (data.ganho_imensuravel_racional as string) ?? "",
           custoRodar: (() => {
             const itens = desserializarCustoRodar(data.custo_rodar_itens as string | null).map(
@@ -1432,6 +1433,7 @@ export function SubmeterPageContent({
         // são descartados aqui: base64 em branco estoura o zod do servidor.
         anexos: [
           ...anexosUteis(ganhos.savingAnexos),
+          ...anexosUteis(ganhos.receitaAnexos),
           ...anexosUteis(ganhos.imensuravelAnexos),
         ],
       });

@@ -16,8 +16,8 @@ import {
   type GanhosDeclarados,
 } from '@/lib/ganhos'
 import { TIPO_SAVING_LABEL, unidadeHoras } from '@/lib/projeto-rotulos'
-import { erroCategorias } from '@/lib/ganhos'
-import { parseMoedaBR, type FieldErrors } from './constants'
+import { erroCategorias, savingLiquido } from '@/lib/ganhos'
+import { numeroParaMoedaBR, parseMoedaBR, type FieldErrors } from './constants'
 import { erroEvidencia, type AnexoEvidencia } from './evidencia'
 import {
   linhaHorasVazia,
@@ -45,13 +45,14 @@ export const RACIONAL_MIN = 20
  * em texto): o número só nasce na conversão, que é onde a régua fail-closed age.
  */
 export type GanhosFormData = {
-  // ── Saving efetivado ──
-  savingValor: string
+  // ── Saving efetivado (o par antes/agora: o saving é a DIFERENÇA) ──
+  /** Quanto saía do caixa ANTES, no período da frequência. */
+  savingValorAntes: string
+  /** Quanto sai AGORA. "0" quando a despesa acabou de vez. */
+  savingValorAgora: string
   savingFrequencia: Frequencia | ''
   savingEvidencia: string
   savingAnexos: AnexoEvidencia[]
-  /** Desde quando o ganho vale (`YYYY-MM-DD`). */
-  savingDesde: string
 
   // ── Custo evitado (os 2 braços somam antes do peso de 50%) ──
   ceFrequencia: Frequencia | ''
@@ -63,7 +64,8 @@ export type GanhosFormData = {
   receitaValor: string
   receitaFrequencia: Frequencia | ''
   receitaRacional: string
-  receitaTipo: string
+  /** O racional aceita print/anexo, como o campo de evidência dos outros blocos. */
+  receitaAnexos: AnexoEvidencia[]
 
   // ── Ganho imensurável ──
   imensuravelRacional: string
@@ -124,18 +126,23 @@ export function validarBloco(
   const errs: FieldErrors = {}
 
   if (categoria === 'saving_efetivado') {
-    if (parseMoedaBR(dados.savingValor) <= 0) {
-      errs.savingValor = 'Informe o valor que deixou de sair'
+    // ⚠️ O par antes/agora: o saving é a DIFERENÇA. "Agora" pode legitimamente ser 0 (a
+    // despesa acabou), então o campo é cobrado por ESTAR PREENCHIDO, não por ser > 0 — e
+    // um "agora" ≥ "antes" é erro NO CAMPO, porque aí não houve saving nenhum.
+    const antes = parseMoedaBR(dados.savingValorAntes)
+    const agoraPreenchido = (dados.savingValorAgora ?? '').trim() !== ''
+    const agora = parseMoedaBR(dados.savingValorAgora)
+    if (antes <= 0) {
+      errs.savingValorAntes = 'Informe quanto a empresa pagava antes'
+    }
+    if (!agoraPreenchido) {
+      errs.savingValorAgora = 'Informe quanto paga agora (0 se parou de pagar)'
+    } else if (antes > 0 && agora >= antes) {
+      errs.savingValorAgora = 'O valor de agora tem de ser MENOR que o de antes'
     }
     if (!dados.savingFrequencia) errs.savingFrequencia = 'Selecione a frequência'
     const erroEv = erroEvidencia(dados.savingEvidencia, dados.savingAnexos)
     if (erroEv) errs.savingEvidencia = erroEv
-    if (!dados.savingDesde) {
-      errs.savingDesde = 'Informe desde quando o ganho vale'
-    } else if (dados.savingDesde > opts.hojeISO) {
-      // O GoDocs documenta ganho JÁ realizado — data futura é projeção.
-      errs.savingDesde = 'A data não pode ser no futuro'
-    }
     return errs
   }
 
@@ -172,8 +179,10 @@ export function validarBloco(
       errs.receitaValor = 'Informe o valor da receita'
     }
     if (!dados.receitaFrequencia) errs.receitaFrequencia = 'Selecione a frequência'
-    if (!dados.receitaTipo) errs.receitaTipo = 'Selecione de onde vem a receita'
-    if (racionalCurto(dados.receitaRacional)) errs.receitaRacional = MSG_RACIONAL
+    // O racional da receita usa a MESMA régua dos outros campos com prova (texto com
+    // substância; anexo não substitui texto), porque ele também aceita print.
+    const erroRac = erroEvidencia(dados.receitaRacional, dados.receitaAnexos)
+    if (erroRac) errs.receitaRacional = erroRac
     return errs
   }
 
@@ -204,8 +213,17 @@ export function resumoBloco(categoria: GanhoCategoria, dados: GanhosFormData): s
     partes.filter((p): p is string => !!p && p.trim() !== '').join(' · ')
 
   if (categoria === 'saving_efetivado') {
-    if (parseMoedaBR(dados.savingValor) <= 0) return ''
-    return juntar([`R$ ${dados.savingValor}`, freq(dados.savingFrequencia)])
+    // O resumo mostra o SAVING (a diferença), que é o número do projeto — não a ponta
+    // "antes", que sozinha exagera o ganho quando a despesa só encolheu.
+    const economia = savingLiquido(
+      parseMoedaBR(dados.savingValorAntes),
+      parseMoedaBR(dados.savingValorAgora),
+    )
+    if (economia <= 0) return ''
+    return juntar([
+      `R$ ${numeroParaMoedaBR(economia)}`,
+      freq(dados.savingFrequencia),
+    ])
   }
 
   if (categoria === 'custo_evitado') {
@@ -294,10 +312,10 @@ export function paraGanhosDeclarados(
 
   if (marcadas.includes('saving_efetivado')) {
     declarado.savingEfetivado = {
-      valor: parseMoedaBR(dados.savingValor),
+      valorAntes: parseMoedaBR(dados.savingValorAntes),
+      valorAgora: parseMoedaBR(dados.savingValorAgora),
       frequencia: (dados.savingFrequencia || 'mensal') as Frequencia,
       evidencia: dados.savingEvidencia,
-      desde: dados.savingDesde,
     }
   }
 
@@ -316,7 +334,6 @@ export function paraGanhosDeclarados(
       valor: parseMoedaBR(dados.receitaValor),
       frequencia: (dados.receitaFrequencia || 'mensal') as Frequencia,
       racional: dados.receitaRacional,
-      tipo: dados.receitaTipo,
     }
   }
 
@@ -333,11 +350,11 @@ export function paraGanhosDeclarados(
 /** Estado inicial: uma linha em branco em cada lista, para a tela ter o que mostrar. */
 export function ganhosFormVazio(): GanhosFormData {
   return {
-    savingValor: '',
+    savingValorAntes: '',
+    savingValorAgora: '',
     savingFrequencia: '',
     savingEvidencia: '',
     savingAnexos: [],
-    savingDesde: '',
     ceFrequencia: '',
     ceLinhas: [linhaHorasVazia()],
     ceNaoContratado: '',
@@ -345,7 +362,7 @@ export function ganhosFormVazio(): GanhosFormData {
     receitaValor: '',
     receitaFrequencia: '',
     receitaRacional: '',
-    receitaTipo: '',
+    receitaAnexos: [],
     imensuravelRacional: '',
     imensuravelAnexos: [],
     custoRodar: [itemVazio()],

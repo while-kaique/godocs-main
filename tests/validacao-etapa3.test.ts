@@ -26,11 +26,14 @@
 // racional do próprio `RACIONAL_MIN`. Nenhum literal 20 nos esperados.
 //
 // ⚠️ CONTRATO DAS CHAVES DE ERRO que este teste fixa (a tela consome estas chaves):
-//   saving          → `savingValor` · `savingFrequencia` · `savingEvidencia` · `savingDesde`
+//   saving          → `savingValorAntes` · `savingValorAgora` · `savingFrequencia` ·
+//                     `savingEvidencia`  (⚠️ o valor é um PAR: o ganho é a diferença; e o
+//                     `savingDesde` saiu da tela em 02/09/2026 junto com a chave dele)
 //   custo evitado   → `ceFrequencia` · `ceBracos` (nenhum dos 2 braços) · `ceRacional`
 //                     + as posicionais da tabela de horas (`h0funcao`, `h0antes`, `h0depois`,
 //                       `h0descricao`), vindas de `validarLinhasHoras`
-//   receita         → `receitaValor` · `receitaFrequencia` · `receitaRacional` · `receitaTipo`
+//   receita         → `receitaValor` · `receitaFrequencia` · `receitaRacional`
+//                     (⚠️ `receitaTipo` saiu: o bloco é o da PROD, sem lista de "de onde vem")
 //   imensurável     → `imensuravelRacional`
 //   custo para rodar→ prefixo `cr` (`cr0nome`, `cr0valor`, `cr0frequencia`, `cr0descricao`)
 //   seleção         → `ganhoCategorias`
@@ -68,11 +71,11 @@ const ANEXO = { base64: 'QUJD', filename: 'extrato.png' }
 /** Formulário inteiramente em branco, montado à mão (não depende de `ganhosFormVazio`). */
 function formEmBranco(): GanhosFormData {
   return {
-    savingValor: '',
+    savingValorAntes: '',
+    savingValorAgora: '',
     savingFrequencia: '',
     savingEvidencia: '',
     savingAnexos: [],
-    savingDesde: '',
 
     ceFrequencia: '',
     ceLinhas: [linhaHorasVazia()],
@@ -82,7 +85,7 @@ function formEmBranco(): GanhosFormData {
     receitaValor: '',
     receitaFrequencia: '',
     receitaRacional: '',
-    receitaTipo: '',
+    receitaAnexos: [],
 
     imensuravelRacional: '',
     imensuravelAnexos: [],
@@ -94,11 +97,11 @@ function formEmBranco(): GanhosFormData {
 function comSavingCompleto(base = formEmBranco()): GanhosFormData {
   return {
     ...base,
-    savingValor: '1.200,00',
+    savingValorAntes: '1.200,00',
+    savingValorAgora: '0,00',
     savingFrequencia: 'mensal',
     savingEvidencia: 'Contrato da terceirizada encerrado em julho, confere na fatura.',
     savingAnexos: [ANEXO],
-    savingDesde: '2026-07-01',
   }
 }
 
@@ -132,7 +135,6 @@ function comReceitaCompleta(base = formEmBranco()): GanhosFormData {
     receitaValor: '5.000,00',
     receitaFrequencia: 'mensal',
     receitaRacional: 'Conversão nova medida no relatório de vendas do mês.',
-    receitaTipo: 'recorrente',
   }
 }
 
@@ -168,18 +170,18 @@ function chavesCom(erros: Record<string, string>, prefixo: string): string[] {
 describe('ganhosFormVazio', () => {
   it('devolve tudo em branco', () => {
     const vazio = ganhosFormVazio()
-    expect(vazio.savingValor).toBe('')
+    expect(vazio.savingValorAntes).toBe('')
+    expect(vazio.savingValorAgora).toBe('')
     expect(vazio.savingFrequencia).toBe('')
     expect(vazio.savingEvidencia).toBe('')
     expect(vazio.savingAnexos).toEqual([])
-    expect(vazio.savingDesde).toBe('')
     expect(vazio.ceFrequencia).toBe('')
     expect(vazio.ceNaoContratado).toBe('')
     expect(vazio.ceRacional).toBe('')
     expect(vazio.receitaValor).toBe('')
     expect(vazio.receitaFrequencia).toBe('')
     expect(vazio.receitaRacional).toBe('')
-    expect(vazio.receitaTipo).toBe('')
+    expect(vazio.receitaAnexos).toEqual([])
     expect(vazio.imensuravelRacional).toBe('')
     expect(vazio.imensuravelAnexos).toEqual([])
   })
@@ -199,16 +201,56 @@ describe('ganhosFormVazio', () => {
 // ─────────────────────────── saving efetivado ───────────────────────────
 
 describe('validarBloco — saving efetivado (a linha de custo que PAROU)', () => {
-  it('bloco vazio acusa valor, frequência, evidência e desde quando, cada um na sua chave', () => {
+  it('bloco vazio acusa as DUAS pontas, a frequência e a evidência, cada uma na sua chave', () => {
     const erros = validarBloco('saving_efetivado', formEmBranco(), OPTS)
     expect(Object.keys(erros).sort()).toEqual(
-      ['savingDesde', 'savingEvidencia', 'savingFrequencia', 'savingValor'].sort(),
+      [
+        'savingValorAntes',
+        'savingValorAgora',
+        'savingEvidencia',
+        'savingFrequencia',
+      ].sort(),
     )
   })
 
-  it('valor que parseia para zero ou menos é erro (a régua de moeda é de centavos)', () => {
-    const dados = { ...comSavingCompleto(), savingValor: '0,00' }
-    expect(validarBloco('saving_efetivado', dados, OPTS)).toHaveProperty('savingValor')
+  it('"antes" que parseia para zero ou menos é erro (a régua de moeda é de centavos)', () => {
+    const dados = { ...comSavingCompleto(), savingValorAntes: '0,00' }
+    expect(validarBloco('saving_efetivado', dados, OPTS)).toHaveProperty('savingValorAntes')
+  })
+
+  // ⚠️ O par antes/agora (02/09/2026): o saving é a DIFERENÇA. Uma despesa que caiu de 20k
+  // para 5k rende 15k de ganho — e um "agora" ≥ "antes" não é saving nenhum.
+  it('"agora" MENOR que "antes" é o caso normal (despesa que só encolheu)', () => {
+    const dados = {
+      ...comSavingCompleto(),
+      savingValorAntes: '20.000,00',
+      savingValorAgora: '5.000,00',
+    }
+    expect(validarBloco('saving_efetivado', dados, OPTS)).toEqual({})
+  })
+
+  it('"agora" IGUAL ou MAIOR que "antes" é erro no campo "agora"', () => {
+    const igual = {
+      ...comSavingCompleto(),
+      savingValorAntes: '5.000,00',
+      savingValorAgora: '5.000,00',
+    }
+    expect(validarBloco('saving_efetivado', igual, OPTS)).toHaveProperty('savingValorAgora')
+
+    const maior = {
+      ...comSavingCompleto(),
+      savingValorAntes: '5.000,00',
+      savingValorAgora: '7.000,00',
+    }
+    expect(validarBloco('saving_efetivado', maior, OPTS)).toHaveProperty('savingValorAgora')
+  })
+
+  it('"agora" em BRANCO é erro, mas "0" é resposta válida (a despesa acabou)', () => {
+    const branco = { ...comSavingCompleto(), savingValorAgora: '' }
+    expect(validarBloco('saving_efetivado', branco, OPTS)).toHaveProperty('savingValorAgora')
+
+    const zero = { ...comSavingCompleto(), savingValorAgora: '0' }
+    expect(validarBloco('saving_efetivado', zero, OPTS)).toEqual({})
   })
 
   it('anexo sem texto continua RECUSADO — a prova não substitui a explicação (RF-208)', () => {
@@ -230,16 +272,10 @@ describe('validarBloco — saving efetivado (a linha de custo que PAROU)', () =>
     expect(validarBloco('saving_efetivado', noPiso, OPTS)).toEqual({})
   })
 
-  it('"desde quando" no FUTURO é erro — o GoDocs só documenta ganho já realizado', () => {
-    const amanha = { ...comSavingCompleto(), savingDesde: '2026-09-03' }
-    const erros = validarBloco('saving_efetivado', amanha, OPTS)
-    expect(erros).toHaveProperty('savingDesde')
-  })
-
-  it('"desde quando" igual a hoje é ACEITO (a fronteira do dia é inclusiva)', () => {
-    const hoje = { ...comSavingCompleto(), savingDesde: HOJE }
-    expect(validarBloco('saving_efetivado', hoje, OPTS)).toEqual({})
-  })
+  // ⚠️ Aqui viviam os 2 testes do "desde quando" (data futura = projeção). O campo saiu da
+  // tela em 02/09/2026 junto com a chave de erro dele; a régua de "ganho já realizado"
+  // segue sendo a premissa da Etapa 1 ("já está em produção?") e a evidência exigida
+  // acima. Não reintroduzir a data sem decisão.
 
   it('bloco completo não gera erro nenhum', () => {
     expect(validarBloco('saving_efetivado', comSavingCompleto(), OPTS)).toEqual({})
@@ -335,10 +371,12 @@ describe('validarBloco — custo evitado (a despesa que NUNCA nasceu)', () => {
 // ─────────────────────────── receita incremental ───────────────────────────
 
 describe('validarBloco — receita incremental (dinheiro NOVO entrando)', () => {
-  it('bloco vazio acusa os 4 campos, cada um na sua chave', () => {
+  // ⚠️ São 3 campos, os da PROD: frequência · valor · racional. O 4º (`receitaTipo`, "de
+  // onde vem a receita") saiu em 02/09/2026 — não voltar a esperá-lo.
+  it('bloco vazio acusa os 3 campos, cada um na sua chave', () => {
     const erros = validarBloco('receita_incremental', formEmBranco(), OPTS)
     expect(Object.keys(erros).sort()).toEqual(
-      ['receitaFrequencia', 'receitaRacional', 'receitaTipo', 'receitaValor'].sort(),
+      ['receitaFrequencia', 'receitaRacional', 'receitaValor'].sort(),
     )
   })
 
@@ -437,7 +475,7 @@ describe('validarEtapa3', () => {
 
   it('acusa o bloco marcado que está incompleto', () => {
     const erros = validarEtapa3(['saving_efetivado'], formEmBranco(), OPTS)
-    expect(erros).toHaveProperty('savingValor')
+    expect(erros).toHaveProperty('savingValorAntes')
     expect(erros).toHaveProperty('savingFrequencia')
   })
 
@@ -455,14 +493,17 @@ describe('validarEtapa3', () => {
     expect(erros).toHaveProperty('ganhoCategorias')
   })
 
-  it('MISTURA de imensurável com mensurável é erro próprio em ganhoCategorias', () => {
+  // ⚠️ Era erro até 02/09/2026 (RF-202). Agora a mistura PASSA — o imensurável combina com
+  // as mensuráveis e vale como insumo qualitativo; quem o deixa fora da CONTA é
+  // `paraGanhosProjeto`, não a validação.
+  it('MISTURA de imensurável com mensurável não é mais erro', () => {
     const dados = comImensuravelCompleto(comSavingCompleto())
     const erros = validarEtapa3(
       [CATEGORIA_IMENSURAVEL, 'saving_efetivado'],
       dados,
       OPTS,
     )
-    expect(erros).toHaveProperty('ganhoCategorias')
+    expect(erros.ganhoCategorias).toBeUndefined()
   })
 
   it('seleção válida com blocos completos devolve {}', () => {
@@ -553,12 +594,26 @@ describe('paraGanhosDeclarados', () => {
     expect(declarados.receitaIncremental).toBeDefined()
   })
 
-  it('o saving marcado atravessa com valor numérico, frequência do enum e a data', () => {
+  it('o saving marcado atravessa com as DUAS pontas numéricas e a frequência do enum', () => {
     const declarados = paraGanhosDeclarados(['saving_efetivado'], comSavingCompleto())
     expect(declarados.savingEfetivado).toMatchObject({
-      valor: 1200,
+      valorAntes: 1200,
+      valorAgora: 0,
       frequencia: 'mensal',
-      desde: '2026-07-01',
+    })
+  })
+
+  // O ganho é a DIFERENÇA, e ela é derivada na ponte para a fórmula — não é campo.
+  it('despesa que só ENCOLHEU atravessa as duas pontas (o ganho é a diferença)', () => {
+    const dados = {
+      ...comSavingCompleto(),
+      savingValorAntes: '20.000,00',
+      savingValorAgora: '5.000,00',
+    }
+    const declarados = paraGanhosDeclarados(['saving_efetivado'], dados)
+    expect(declarados.savingEfetivado).toMatchObject({
+      valorAntes: 20000,
+      valorAgora: 5000,
     })
   })
 
@@ -602,7 +657,7 @@ describe('paraGanhosDeclarados', () => {
     expect(declarados.receitaIncremental?.frequencia).toBe('pontual')
   })
 
-  it('a receita marcada atravessa com valor, racional e tipo', () => {
+  it('a receita marcada atravessa com valor, frequência e racional', () => {
     const declarados = paraGanhosDeclarados(
       ['receita_incremental'],
       comReceitaCompleta(),
@@ -610,8 +665,8 @@ describe('paraGanhosDeclarados', () => {
     expect(declarados.receitaIncremental).toMatchObject({
       valor: 5000,
       frequencia: 'mensal',
-      tipo: 'recorrente',
     })
+    expect(declarados.receitaIncremental?.racional).toBeTruthy()
   })
 
   it('o imensurável marcado atravessa só com o racional', () => {
@@ -662,12 +717,22 @@ describe('paraGanhosDeclarados', () => {
 // ─────────────────────────── bordas combinadas ───────────────────────────
 
 describe('bordas', () => {
-  it('a data de "desde" na fronteira: hoje entra, amanhã não', () => {
-    const hoje = { ...comSavingCompleto(), savingDesde: HOJE }
-    const amanha = { ...comSavingCompleto(), savingDesde: '2026-09-03' }
+  // ⚠️ Aqui estava a fronteira do "desde quando" (hoje entra, amanhã não). O campo saiu em
+  // 02/09/2026. A fronteira que ficou no bloco é a do PAR: "agora" < "antes".
+  it('a fronteira do par: "agora" menor completa o bloco, igual não', () => {
+    const menor = {
+      ...comSavingCompleto(),
+      savingValorAntes: '5.000,00',
+      savingValorAgora: '4.999,99',
+    }
+    const igual = {
+      ...comSavingCompleto(),
+      savingValorAntes: '5.000,00',
+      savingValorAgora: '5.000,00',
+    }
 
-    expect(blocoCompleto('saving_efetivado', hoje, OPTS)).toBe(true)
-    expect(blocoCompleto('saving_efetivado', amanha, OPTS)).toBe(false)
+    expect(blocoCompleto('saving_efetivado', menor, OPTS)).toBe(true)
+    expect(blocoCompleto('saving_efetivado', igual, OPTS)).toBe(false)
   })
 
   it('racional com exatamente RACIONAL_MIN caracteres é aceito nos dois blocos que o pedem', () => {

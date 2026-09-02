@@ -71,8 +71,13 @@ export function TabelaHoras({
             linha.
           </InfoTooltip>
         </span>
-        <span className="text-center">Antes ({unidade})</span>
-        <span className="text-center">Depois ({unidade})</span>
+        {/* ⚠️ "Horas antes" / "Horas depois", escrito assim (pedido do Luis, 02/09/2026).
+            Era "Antes ({unidade})" / "Depois ({unidade})": a unidade entre parênteses
+            roubava a palavra que importa e o cabeçalho lia como duas datas. A unidade do
+            período segue no rótulo do campo (`aria-label`) e na pergunta acima da
+            tabela. */}
+        <span className="text-center">Horas antes</span>
+        <span className="text-center">Horas depois</span>
         <span />
       </div>
 

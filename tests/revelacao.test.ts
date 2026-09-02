@@ -14,42 +14,50 @@ import { itemVazio } from '@/lib/submeter/itens-lista'
 // valor válido esconderia a pergunta seguinte no meio da digitação.
 
 describe('passosSaving', () => {
-  const zerado = { savingFrequencia: '', savingValor: '', savingDesde: '' }
+  const zerado = { savingFrequencia: '', savingValorAntes: '', savingValorAgora: '' }
 
   it('sem frequência, nada além dela aparece', () => {
-    expect(passosSaving(zerado)).toEqual({ valor: false, desde: false, evidencia: false })
+    expect(passosSaving(zerado)).toEqual({ valores: false, evidencia: false })
   })
 
-  it('frequência escolhida revela o valor, e só ele', () => {
+  it('frequência escolhida revela o PAR antes/agora, e só ele', () => {
     const p = passosSaving({ ...zerado, savingFrequencia: 'mensal' })
-    expect(p.valor).toBe(true)
-    expect(p.desde).toBe(false)
+    expect(p.valores).toBe(true)
     expect(p.evidencia).toBe(false)
   })
 
-  it('valor em digitação já revela o "desde quando" (não espera valor válido)', () => {
-    const p = passosSaving({ savingFrequencia: 'mensal', savingValor: '1', savingDesde: '' })
-    expect(p.desde).toBe(true)
+  // ⚠️ As duas pontas são uma comparação: a evidência só aparece quando AS DUAS estão
+  // preenchidas, senão o "quanto era" sozinho parece ser o ganho.
+  it('só o "antes" preenchido NÃO revela a evidência', () => {
+    const p = passosSaving({ ...zerado, savingFrequencia: 'mensal', savingValorAntes: '20.000' })
     expect(p.evidencia).toBe(false)
   })
 
-  it('data preenchida revela a evidência', () => {
+  it('as duas pontas preenchidas revelam a evidência (mesmo com "agora" = 0)', () => {
     const p = passosSaving({
       savingFrequencia: 'pontual',
-      savingValor: '1.200,00',
-      savingDesde: '2026-05-01',
+      savingValorAntes: '1.200,00',
+      savingValorAgora: '0',
     })
-    expect(p).toEqual({ valor: true, desde: true, evidencia: true })
+    expect(p).toEqual({ valores: true, evidencia: true })
   })
 
   it('só espaços não conta como resposta', () => {
-    const p = passosSaving({ savingFrequencia: 'mensal', savingValor: '   ', savingDesde: '' })
-    expect(p.desde).toBe(false)
+    const p = passosSaving({
+      savingFrequencia: 'mensal',
+      savingValorAntes: '20.000',
+      savingValorAgora: '   ',
+    })
+    expect(p.evidencia).toBe(false)
   })
 
-  it('valor sem frequência NÃO pula a ordem', () => {
-    const p = passosSaving({ savingFrequencia: '', savingValor: '900,00', savingDesde: '2026-01-01' })
-    expect(p).toEqual({ valor: false, desde: false, evidencia: false })
+  it('valores sem frequência NÃO pulam a ordem', () => {
+    const p = passosSaving({
+      savingFrequencia: '',
+      savingValorAntes: '900,00',
+      savingValorAgora: '0',
+    })
+    expect(p).toEqual({ valores: false, evidencia: false })
   })
 })
 
@@ -90,31 +98,28 @@ describe('passosCustoEvitado', () => {
   })
 })
 
+// ⚠️ São 3 perguntas, as da PROD: frequência → valor → racional. O passo "de onde vem"
+// (lista de tipos de receita) existiu por um dia e saiu — não voltar a testá-lo.
 describe('passosReceita', () => {
-  const zerado = { receitaFrequencia: '', receitaValor: '', receitaTipo: '' }
+  const zerado = { receitaFrequencia: '', receitaValor: '' }
 
-  it('a ordem é frequência → valor → de onde vem → racional', () => {
-    expect(passosReceita(zerado)).toEqual({ valor: false, tipo: false, racional: false })
+  it('a ordem é frequência → valor → racional', () => {
+    expect(passosReceita(zerado)).toEqual({ valor: false, racional: false })
     expect(passosReceita({ ...zerado, receitaFrequencia: 'mensal' })).toEqual({
       valor: true,
-      tipo: false,
       racional: false,
     })
-    expect(
-      passosReceita({ receitaFrequencia: 'mensal', receitaValor: '10.000,00', receitaTipo: '' }),
-    ).toEqual({ valor: true, tipo: true, racional: false })
-    expect(
-      passosReceita({
-        receitaFrequencia: 'mensal',
-        receitaValor: '10.000,00',
-        receitaTipo: 'nova_venda',
-      }),
-    ).toEqual({ valor: true, tipo: true, racional: true })
+    expect(passosReceita({ receitaFrequencia: 'mensal', receitaValor: '10.000,00' })).toEqual({
+      valor: true,
+      racional: true,
+    })
   })
 
-  it('tipo escolhido sem valor não revela o racional', () => {
-    const p = passosReceita({ receitaFrequencia: 'mensal', receitaValor: '', receitaTipo: 'expansao' })
-    expect(p.racional).toBe(false)
+  it('valor sem frequência não pula a ordem', () => {
+    expect(passosReceita({ receitaFrequencia: '', receitaValor: '10.000,00' })).toEqual({
+      valor: false,
+      racional: false,
+    })
   })
 })
 

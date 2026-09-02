@@ -18,7 +18,17 @@
 import { describe, it, expect } from 'vitest';
 import { criarDbMemoria } from './helpers/db-memoria';
 
-/** As 19 colunas que a T3 acrescentou, agrupadas como o formulário as preenche. */
+/**
+ * As colunas que a v2 acrescentou, agrupadas como o formulário as preenche.
+ *
+ * ⚠️ TRÊS delas nascem LEGADO e nunca são escritas (ver `schema.ts`):
+ * `saving_efetivado_valor` e `saving_efetivado_desde` — o valor único virou o PAR
+ * antes/agora e o "desde quando" saiu da tela (02/09/2026) — e
+ * `receita_incremental_tipo`, uma lista de "de onde vem a receita" que não devia ter
+ * existido. Continuam AQUI de propósito: o canário garante que o bootstrap as cria, e é
+ * isso que impede alguém de "limpar" o vetor de ALTER TABLE (o que não apaga a coluna de
+ * quem já a tem e faz o SELECT divergir entre bancos).
+ */
 const COLUNAS_V2 = [
   // a seleção das 4 categorias (JSON array)
   'ganho_categorias',
@@ -27,6 +37,9 @@ const COLUNAS_V2 = [
   'saving_efetivado_frequencia',
   'saving_efetivado_evidencia',
   'saving_efetivado_desde',
+  // as DUAS pontas do saving — o ganho é a diferença (`savingLiquido`), sem coluna própria
+  'saving_efetivado_valor_antes',
+  'saving_efetivado_valor_agora',
   // custo evitado — a despesa nunca nasceu (sem evidência, pesa 50%), dois braços
   'custo_evitado_frequencia',
   'custo_evitado_horas_linhas',

@@ -332,10 +332,10 @@ describe('desserializarCustoRodar — entrada suja nunca lança e nunca inventa'
     const g = paraGanhosProjeto({
       categorias: ['saving_efetivado'],
       savingEfetivado: {
-        valor: 1000,
+        valorAntes: 1000,
+        valorAgora: 0,
         frequencia: 'mensal',
         evidencia: 'Extrato sem a cobrança.',
-        desde: '2026-04-01',
       },
       custoRodar: desserializarCustoRodar(daColuna),
     });
@@ -369,10 +369,10 @@ const VALORES_SUJOS: { rotulo: string; valor: unknown }[] = [
 ];
 
 const SAVING_OK = {
-  valor: 12000,
+  valorAntes: 12000,
+  valorAgora: 0,
   frequencia: 'mensal' as Frequencia,
   evidencia: 'Contrato encerrado; extrato de abril e maio sem a cobrança.',
-  desde: '2026-04-01',
 };
 
 const CE_OK = {
@@ -387,7 +387,6 @@ const RECEITA_OK = {
   valor: 51000,
   frequencia: 'pontual' as Frequencia,
   racional: 'Campanha que só existe porque o robô monta a base.',
-  tipo: 'venda incremental',
 };
 
 const ITEM_CUSTO_OK: CustoRodarItem = {
@@ -407,11 +406,11 @@ const CAMPOS_DE_VALOR: {
   montar: (valor: unknown) => GanhosDeclarados;
 }[] = [
   {
-    campo: 'savingEfetivado.valor',
+    campo: 'savingEfetivado.valorAntes',
     nomeNoErro: /saving/i,
     montar: (valor) => ({
       categorias: ['saving_efetivado'],
-      savingEfetivado: comCampoSujo(SAVING_OK, 'valor', valor),
+      savingEfetivado: comCampoSujo(SAVING_OK, 'valorAntes', valor),
     }),
   },
   {
@@ -464,7 +463,7 @@ describe('paraGanhosProjeto — valor não finito LANÇA (fail-closed, como divi
     expect(() =>
       paraGanhosProjeto({
         categorias: ['saving_efetivado'],
-        savingEfetivado: comCampoSujo(SAVING_OK, 'valor', undefined),
+        savingEfetivado: comCampoSujo(SAVING_OK, 'valorAntes', undefined),
       }),
     ).toThrow();
   });
@@ -522,7 +521,7 @@ describe('paraGanhosProjeto — quem manda é a SELEÇÃO, não o resíduo do bl
     const declarado: GanhosDeclarados = {
       categorias: ['receita_incremental'],
       receitaIncremental: RECEITA_OK,
-      savingEfetivado: comCampoSujo(SAVING_OK, 'valor', undefined),
+      savingEfetivado: comCampoSujo(SAVING_OK, 'valorAntes', undefined),
       custoEvitado: comCampoSujo(CE_OK, 'valorHoras', Number.NaN),
     };
     expect(() => paraGanhosProjeto(declarado)).not.toThrow();
@@ -536,7 +535,7 @@ describe('paraGanhosProjeto — quem manda é a SELEÇÃO, não o resíduo do bl
     const declarado: GanhosDeclarados = {
       categorias: ['imensuravel'],
       imensuravel: { racional: 'Tira o risco de erro manual, sem número que dê para medir.' },
-      savingEfetivado: comCampoSujo(SAVING_OK, 'valor', null),
+      savingEfetivado: comCampoSujo(SAVING_OK, 'valorAntes', null),
       receitaIncremental: comCampoSujo(RECEITA_OK, 'valor', '1.000,50'),
       custoRodar: [comCampoSujo(ITEM_CUSTO_OK, 'valor', Number.NaN)],
     };

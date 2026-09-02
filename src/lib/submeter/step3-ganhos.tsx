@@ -1,9 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { FormSelect, FieldError } from "./form-components";
-import { CampoData } from "@/components/calendario/calendario";
-import { hojeIso } from "@/lib/calendario-datas";
-import { FREQUENCIA_ABAS, GANHO_ROTULOS, TIPOS_RECEITA } from "@/lib/ganhos-rotulos";
+import { FieldError, InfoTooltip } from "./form-components";
+import { FREQUENCIA_ABAS, GANHO_ROTULOS } from "@/lib/ganhos-rotulos";
 import { CATEGORIA_IMENSURAVEL, type GanhoCategoria } from "@/lib/ganhos";
 import type { Frequencia } from "@/lib/impacto";
 import { formatMoedaBR } from "./constants";
@@ -15,6 +13,8 @@ import {
   blocoInicial,
   ordemBlocos,
 } from "./acordeao-estado";
+import { unidadeHoras } from "@/lib/projeto-rotulos";
+import { hojeIso } from "@/lib/calendario-datas";
 import { CampoEvidencia } from "./campo-evidencia";
 import { ListaItens, type RotulosLista } from "./lista-itens";
 import { TabelaHoras } from "./tabela-horas";
@@ -61,7 +61,7 @@ import {
  */
 const ROTULOS_CUSTO_RODAR: RotulosLista = {
   colunaNome: "Item",
-  placeholderNome: "Ex: OpenAI API · GoDeploy · ElevenLabs",
+  placeholderNome: "Ex: OpenAI API · ElevenLabs",
   ariaNome: "Nome do item de custo para rodar",
   placeholderValor: "99,90",
   ariaValor: "Valor do item de custo para rodar",
@@ -378,6 +378,12 @@ export function Step3Ganhos({
   loading: boolean;
 }) {
   const blocos = React.useMemo(() => ordemBlocos(categorias), [categorias]);
+  // ⚠️ `hojeISO` segue no parâmetro de `validarBloco`/`validarEtapa3` embora nenhuma régua
+  // o consuma hoje: a única que dependia dele era o "desde quando" do saving (data no
+  // futuro = projeção), campo que saiu em 02/09/2026 quando o valor virou o par
+  // antes/agora. Mantido como em `validarEtapa2` e `demoSeedForm`, que fizeram a mesma
+  // escolha ao perder a "data de criação" — o dia continua sendo injetado (nunca lido de
+  // um `Date` interno), então uma régua de data que volte já nasce testável.
   const hoje = hojeIso();
   const opts = React.useMemo(() => ({ hojeISO: hoje }), [hoje]);
 
@@ -443,7 +449,7 @@ export function Step3Ganhos({
       const passos = passosSaving(dados);
       return (
         <PainelBloco>
-          <Pergunta titulo="Com que frequência esse valor deixou de sair?" obrigatorio>
+          <Pergunta titulo="Com que frequência esse valor saía do caixa?" obrigatorio>
             <SeletorFrequencia
               ariaLabel="Frequência do saving efetivado"
               nome="freq-saving-efetivado"
@@ -453,27 +459,48 @@ export function Step3Ganhos({
             />
           </Pergunta>
 
-          {passos.valor ? (
-            <Pergunta titulo="Quanto era?" obrigatorio>
-              <CampoValor
-                ariaLabel="Valor do saving efetivado"
-                valor={dados.savingValor}
-                onChange={(v) => onChange({ savingValor: v })}
-                erro={errors.savingValor}
-              />
-            </Pergunta>
-          ) : null}
-
-          {passos.desde ? (
-            <Pergunta titulo="Desde quando a empresa parou de pagar?" obrigatorio>
-              <CampoData
-                valor={dados.savingDesde}
-                maximo={hoje}
-                ariaLabel="Desde quando o saving vale"
-                onChange={(iso) => onChange({ savingDesde: iso })}
-                erro={errors.savingDesde}
-              />
-              <FieldError message={errors.savingDesde} />
+          {/* ⚠️ O PAR antes/agora, lado a lado: o saving é a DIFERENÇA. Uma despesa pode
+              ter caído de R$ 20k para R$ 5k, e aí o ganho são os R$ 15k — perguntar um
+              valor só fazia o formulário aceitar 20k de saving num contrato que a empresa
+              ainda paga. Quando a despesa acabou, "agora" é 0. */}
+          {passos.valores ? (
+            <Pergunta
+              titulo="Quanto era e quanto é agora?"
+              ajuda="O saving é a diferença entre os dois. Se a despesa acabou de vez, escreva 0 em “agora”."
+              obrigatorio
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <span
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wide"
+                    style={{ color: "#9a9aa8" }}
+                  >
+                    Antes
+                  </span>
+                  <CampoValor
+                    ariaLabel="Quanto a empresa pagava antes"
+                    valor={dados.savingValorAntes}
+                    onChange={(v) => onChange({ savingValorAntes: v })}
+                    erro={errors.savingValorAntes}
+                    placeholder="20.000,00"
+                  />
+                </div>
+                <div>
+                  <span
+                    className="mb-1 block text-[11px] font-semibold uppercase tracking-wide"
+                    style={{ color: "#9a9aa8" }}
+                  >
+                    Agora
+                  </span>
+                  <CampoValor
+                    ariaLabel="Quanto a empresa paga agora"
+                    valor={dados.savingValorAgora}
+                    onChange={(v) => onChange({ savingValorAgora: v })}
+                    erro={errors.savingValorAgora}
+                    placeholder="5.000,00"
+                  />
+                </div>
+              </div>
             </Pergunta>
           ) : null}
 
@@ -489,7 +516,7 @@ export function Step3Ganhos({
                 onChangeTexto={(v) => onChange({ savingEvidencia: v })}
                 onChangeAnexos={(v) => onChange({ savingAnexos: v })}
                 erro={errors.savingEvidencia}
-                placeholder="Ex: contrato com a XPTO encerrado em maio; a fatura de junho já não tem a linha de R$ 1.200."
+                placeholder="Ex: contrato com a XPTO renegociado em maio; a fatura de junho caiu de R$ 20.000 para R$ 5.000."
               />
             </Pergunta>
           ) : null}
@@ -518,7 +545,7 @@ export function Step3Ganhos({
           {passos.bracos ? (
             <>
               <Pergunta
-                titulo="Horas liberadas"
+                titulo={`Horas liberadas (${unidadeHoras(dados.ceFrequencia || "mensal")})`}
                 ajuda="Quem fazia à mão e quanto tempo levava. Em branco se não havia trabalho manual."
               >
                 <TabelaHoras
@@ -533,9 +560,24 @@ export function Step3Ganhos({
                 />
               </Pergunta>
 
+              {/* ⚠️ A explicação vive num "izinho" (pedido do Luis): como AJUDA fixa
+                  embaixo do rótulo ela competia com o rótulo e a pergunta ficava
+                  confusa. O gatilho é o mesmo `InfoTooltip` da tabela de horas — hover E
+                  foco de teclado. */}
               <Pergunta
-                titulo="Valor que não chegou a ser contratado"
-                ajuda="A vaga que não foi aberta, a consultoria que não foi contratada. Em branco se não houve."
+                titulo={
+                  <span className="inline-flex items-center gap-1.5">
+                    Valor que não chegou a ser contratado
+                    <InfoTooltip
+                      largura={280}
+                      ariaLabel="O que entra em valor que não chegou a ser contratado"
+                    >
+                      A <strong>vaga que não foi aberta</strong>, a{" "}
+                      <strong>consultoria que não foi contratada</strong>. Deixe em branco
+                      se não houve.
+                    </InfoTooltip>
+                  </span>
+                }
               >
                 <CampoValor
                   ariaLabel="Valor não contratado"
@@ -576,7 +618,12 @@ export function Step3Ganhos({
       const passos = passosReceita(dados);
       return (
         <PainelBloco>
-          <Pergunta titulo="Com que frequência essa receita entra?" obrigatorio>
+          {/* ⚠️ Este bloco é o da PROD, campo a campo (pedido do Luis, 02/09/2026):
+              frequência do ganho · quanto de receita nova · racional em uma frase. A
+              única coisa que muda é o racional aceitar anexo/print, que na v1 era função
+              do chat. NÃO reintroduzir o "de onde vem esse dinheiro" com lista de
+              opções — foi invenção minha e saiu. */}
+          <Pergunta titulo="Frequência do ganho" obrigatorio>
             <SeletorFrequencia
               ariaLabel="Frequência da receita incremental"
               nome="freq-receita-incremental"
@@ -587,7 +634,11 @@ export function Step3Ganhos({
           </Pergunta>
 
           {passos.valor ? (
-            <Pergunta titulo="Quanto entra?" obrigatorio>
+            <Pergunta
+              titulo="Ganho de receita"
+              ajuda="Quanto de receita NOVA o projeto gera no período que você marcou acima."
+              obrigatorio
+            >
               <CampoValor
                 ariaLabel="Valor da receita incremental"
                 valor={dados.receitaValor}
@@ -597,41 +648,25 @@ export function Step3Ganhos({
             </Pergunta>
           ) : null}
 
-          {passos.tipo ? (
-            <Pergunta titulo="De onde vem esse dinheiro?" obrigatorio>
-              <FormSelect
-                aria-label="Tipo de receita"
-                value={dados.receitaTipo}
-                onChange={(e) => onChange({ receitaTipo: e.currentTarget.value })}
-                error={errors.receitaTipo}
-                style={{
-                  height: 40,
-                  fontSize: 13,
-                  border: errors.receitaTipo ? "1.5px solid #e53e3e" : "1.5px solid rgba(215,219,0,0.2)",
-                }}
-              >
-                <option value="">Selecione...</option>
-                {TIPOS_RECEITA.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </FormSelect>
-            </Pergunta>
-          ) : null}
-
           {passos.racional ? (
             <Pergunta
-              titulo="Como esta solução gera essa receita?"
-              ajuda={`Pelo menos ${RACIONAL_MIN} caracteres`}
+              titulo="Racional"
+              ajuda={
+                <>
+                  Em uma frase, de onde vem essa receita e como o número foi apurado. Ex.:{" "}
+                  <em>as estampas geradas com IA vendem esse valor por mês</em>.
+                </>
+              }
               obrigatorio
             >
-              <AreaTexto
-                ariaLabel="Racional da receita incremental"
-                valor={dados.receitaRacional}
-                onChange={(v) => onChange({ receitaRacional: v })}
+              <CampoEvidencia
+                texto={dados.receitaRacional}
+                anexos={dados.receitaAnexos}
+                onChangeTexto={(v) => onChange({ receitaRacional: v })}
+                onChangeAnexos={(v) => onChange({ receitaAnexos: v })}
                 erro={errors.receitaRacional}
-                placeholder="Ex: o fluxo recupera carrinhos abandonados por WhatsApp; antes de setembro ninguém fazia esse contato."
+                placeholder="Ex: o fluxo recupera carrinhos abandonados por WhatsApp; antes de setembro ninguém fazia esse contato. Base: relatório de vendas recuperadas."
+                rotuloAnexo="Anexar ou colar print"
               />
             </Pergunta>
           ) : null}

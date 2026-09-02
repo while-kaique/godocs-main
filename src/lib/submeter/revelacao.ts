@@ -24,23 +24,25 @@ function respondido(valor: string): boolean {
 }
 
 export type PassosSaving = {
-  /** "Quanto era?" — depois da frequência. */
-  valor: boolean
-  /** "Desde quando" — depois do valor. */
-  desde: boolean
-  /** "Como se comprova" — depois da data. */
+  /** O PAR "quanto era / quanto é agora" — depois da frequência. */
+  valores: boolean
+  /** "Como se comprova" — depois de as duas pontas estarem preenchidas. */
   evidencia: boolean
 }
 
+/**
+ * ⚠️ As duas pontas aparecem JUNTAS: elas são uma comparação, e revelar o "agora" só
+ * depois do "antes" esconderia metade da pergunta que dá sentido à outra metade.
+ */
 export function passosSaving(d: {
   savingFrequencia: string
-  savingValor: string
-  savingDesde: string
+  savingValorAntes: string
+  savingValorAgora: string
 }): PassosSaving {
-  const valor = respondido(d.savingFrequencia)
-  const desde = valor && respondido(d.savingValor)
-  const evidencia = desde && respondido(d.savingDesde)
-  return { valor, desde, evidencia }
+  const valores = respondido(d.savingFrequencia)
+  const evidencia =
+    valores && respondido(d.savingValorAntes) && respondido(d.savingValorAgora)
+  return { valores, evidencia }
 }
 
 export type PassosCustoEvitado = {
@@ -67,20 +69,20 @@ export function passosCustoEvitado(d: {
 
 export type PassosReceita = {
   valor: boolean
-  /** "De onde vem" — depois do valor. */
-  tipo: boolean
   racional: boolean
 }
 
+/**
+ * ⚠️ São 3 perguntas, como na v1: frequência → valor → racional. O "de onde vem" (a lista
+ * `TIPOS_RECEITA` que eu havia inventado) saiu em 02/09/2026 — não recriar o passo.
+ */
 export function passosReceita(d: {
   receitaFrequencia: string
   receitaValor: string
-  receitaTipo: string
 }): PassosReceita {
   const valor = respondido(d.receitaFrequencia)
-  const tipo = valor && respondido(d.receitaValor)
-  const racional = tipo && respondido(d.receitaTipo)
-  return { valor, tipo, racional }
+  const racional = valor && respondido(d.receitaValor)
+  return { valor, racional }
 }
 
 /**
