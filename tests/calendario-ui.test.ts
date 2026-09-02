@@ -12,7 +12,11 @@ import { resolve } from 'node:path';
 const ler = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
 const dashboard = ler('src/routes/_authenticated/dashboard.tsx');
-const step2 = ler('src/lib/submeter/step2.tsx');
+// ⚠️ O campo de data do formulário MUDOU DE LUGAR na v2: a "data de criação" da
+// Etapa 2 saiu (a data que vale passa a ser a de SUBMISSÃO) e quem usa o calendário
+// agora é o "desde quando" do saving efetivado, na Etapa 3. O guard é o mesmo — o campo
+// não pode voltar ao `type="date"` do sistema operacional — só o arquivo é outro.
+const step3 = ler('src/lib/submeter/step3-ganhos.tsx');
 const calendario = ler('src/components/calendario/calendario.tsx');
 
 describe('/dashboard — barra de filtros', () => {
@@ -48,17 +52,20 @@ describe('/dashboard — barra de filtros', () => {
   });
 });
 
-describe('Etapa 2 — campo de data', () => {
+describe('Etapa 3 — campo de data ("desde quando")', () => {
   it('usa o calendário do GoDocs, não o do sistema operacional', () => {
-    expect(step2).toContain('<CampoData');
+    expect(step3).toContain('<CampoData');
     // Regex ancorada na linha: o comentário do arquivo CITA o `type="date"` que saiu.
-    expect(step2).not.toMatch(/^\s*type="date"/m);
+    expect(step3).not.toMatch(/^\s*type="date"/m);
   });
 
-  it('mantém a janela permitida (2024 → hoje) e o formato ISO do schema', () => {
-    expect(step2).toContain('minimo="2024-01-01"');
-    expect(step2).toContain('maximo={hojeIso()}');
-    expect(step2).toContain('updateField("dataCriacao", iso)');
+  it('barra data futura na própria tela e mantém o ISO do schema', () => {
+    // Teto = hoje. O GoDocs documenta ganho JÁ realizado, então uma data futura é
+    // projeção — e o dia fora da janela aparece apagado, em vez de virar um erro que só
+    // a validação conta depois. O piso fica ABERTO de propósito: um saving pode ter
+    // começado antes de 2024 (a janela de 2024 era da "data de criação", que saiu).
+    expect(step3).toContain('maximo={hoje}');
+    expect(step3).toContain('onChange={(iso) => onChange({ savingDesde: iso })}');
   });
 });
 

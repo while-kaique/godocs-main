@@ -29,16 +29,11 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     participantesPapeis: {},
     participantesContribuicoes: {},
     nomeProjeto: 'Automação de Relatórios',
-    dataCriacao: '2026-01-10',
-    tipoProjeto: [],
+    ganhoCategorias: ['saving_efetivado'],
     descricaoBreve: 'x'.repeat(60),
     usaAiProxy: 'sim',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: ['maria@gocase.com'],
-    especial: false,
-    contextoEspecial: '',
-    especialDashboard: '',
-    especialGanhoOrganizacional: '',
     ...over,
   };
 }
@@ -73,10 +68,48 @@ describe('validarEtapa2 — campos', () => {
     expect(errs.usaAiProxy).toBeTruthy();
   });
 
-  it('data no futuro bloqueia; data válida passa', () => {
-    expect(validarEtapa2(baseForm({ dataCriacao: '2027-01-01' }), opts()).dataCriacao).toBeTruthy();
-    expect(validarEtapa2(baseForm({ dataCriacao: '2023-12-31' }), opts()).dataCriacao).toBeTruthy();
-    expect(validarEtapa2(baseForm({ dataCriacao: HOJE }), opts()).dataCriacao).toBeUndefined();
+  // ⚠️ A "data de criação" SAIU do formulário na v2 (a data que vale é a de SUBMISSÃO,
+  // porque só se submete o que já está em produção). O guard de "data no futuro" não
+  // desapareceu: ele migrou para o "desde quando" do saving efetivado, e vive em
+  // `tests/validacao-etapa3.test.ts` (fronteira de `hojeISO`).
+
+  describe('categorias de ganho (v2)', () => {
+    it('nenhuma categoria marcada bloqueia', () => {
+      const errs = validarEtapa2(baseForm({ ganhoCategorias: [] }), opts());
+      expect(errs.ganhoCategorias).toBeTruthy();
+    });
+
+    it('imensurável misturado com mensurável bloqueia', () => {
+      const errs = validarEtapa2(
+        baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
+        opts(),
+      );
+      expect(errs.ganhoCategorias).toBeTruthy();
+    });
+
+    it('as três mensuráveis combinam livremente', () => {
+      const errs = validarEtapa2(
+        baseForm({
+          ganhoCategorias: ['saving_efetivado', 'custo_evitado', 'receita_incremental'],
+        }),
+        opts(),
+      );
+      expect(errs.ganhoCategorias).toBeUndefined();
+    });
+
+    it('só o imensurável passa', () => {
+      const errs = validarEtapa2(baseForm({ ganhoCategorias: ['imensuravel'] }), opts());
+      expect(errs.ganhoCategorias).toBeUndefined();
+    });
+
+    // Rascunho salvo em localStorage ANTES desta feature não tem a chave. Ler
+    // `undefined.length` derrubava /submeter inteira ("This page didn't load").
+    it('rascunho antigo sem a chave não derruba a validação', () => {
+      const semChave = baseForm();
+      delete (semChave as Partial<typeof semChave>).ganhoCategorias;
+      expect(() => validarEtapa2(semChave, opts())).not.toThrow();
+      expect(validarEtapa2(semChave, opts()).ganhoCategorias).toBeTruthy();
+    });
   });
 });
 
