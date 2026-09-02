@@ -51,18 +51,52 @@ projeto, com especial derivado dela.
   tinha: o custo evitado exige **ao menos um** dos dois braços. **No ar na staging** (`edf400b4`), suíte
   **2773 verde**, `npm run build` ok.
   ⏳ **O envio final ainda quebra** — depende da T6.
-- 🟡 **T6** — persistência, planilha e leitura. Falta TUDO: a rota `POST /api/submeter/ganhos` (que o cliente
-  já chama), a materialização dos 3 `impacto_*`, o `SHEET_COLUMNS` novo, a reescrita do cabeçalho da aba
-  `STAGING-V2` (hoje é o header da v1 clonado, 56 colunas) e as **5 réplicas** da fórmula passando a chamar a T2.
+- ✅ **T5 — rodada de AJUSTES com o Luis de olho na staging** (02/09/2026, fim do dia; suíte **2800 verde**,
+  staging `edf400b4` version 291). O que mudou, e o que cada mudança revoga:
+  - **A Etapa 3 voltou à linguagem visual da v1** — painel lime por bloco, **revelação progressiva**
+    (`revelacao.ts`, puro + 16 casos: cada resposta abre a próxima pergunta), frequência em **4 abas lado a
+    lado** (não dropdown), rótulo curto + ajuda de uma linha, e as pílulas `.go-btn-*` do design system.
+    ⚠️ Motivo declarado: *"você criou um design do 0 em cima de referência nenhuma… podia ter reaproveitado
+    muita coisa"*. Registrado como regra de trabalho — **tela nova ADAPTA a v1**, não recria.
+  - **Tipos de ganho em TELA PRÓPRIA** (`selecao-ganho.tsx`), 1ª tela da Etapa 3 — eram um campo no fim da
+    Etapa 2. A régua saiu de `validarEtapa2` (portão não pode cobrar campo que a etapa não mostra) e virou
+    `validarSelecaoGanho`.
+  - **Saving efetivado = par "quanto era" + "quanto é agora"**; o *"desde quando"* saiu. Uma despesa pode ter
+    caído de 20k para 5k, e o saving são os 15k — perguntar UM valor aceitava 20k de ganho num contrato que a
+    empresa ainda paga. O ganho é DERIVADO (`savingLiquido`, clampado em 0). Colunas
+    `saving_efetivado_valor_antes/_agora`; as 3 antigas ficam LEGADO e nunca são escritas.
+  - ⚠️ **REVOGA a exclusividade do imensurável (RF-202 / critério nº 2 do plano):** as **4 categorias
+    combinam**. Um projeto pode ter saving medido E ganho sem número, e marcar os dois é insumo para o agente
+    investigar. `paraGanhosProjeto` só devolve `imensuravel: true` (impacto zero) quando ele é a **única**
+    categoria — devolvê-lo na mistura ZERARIA um saving comprovado.
+  - **Receita = o bloco da PROD**: frequência (só **Mensal/Pontual**) · valor · racional com anexo/print. A
+    lista "de onde vem essa receita" que eu havia inventado saiu do modelo, da tela, da coluna e dos testes.
+  - Custo para rodar deixou de abrir linha em branco para todo projeto (pergunta **sim/não** primeiro);
+    tooltip no "não contratado"; cabeçalho da tabela vira **"Horas antes/Horas depois"**.
+- 🟡 **T6** — persistência, planilha e leitura.
+  - ✅ **Cabeçalho da aba `STAGING-V2` reescrito** (02/09/2026): **59 colunas**, **17 renomeações in-place + 3
+    novas**. Decisão do Luis: **reaproveitar, não criar**. Dois achados derrubaram a proposta antiga do plano:
+    a aba **não está vazia** (é clone da `STAGING`, **578 linhas** — zerá-la esvaziaria o SQLite da staging no
+    1º sync reverso) e **quase tudo já existia**, porque a régua D1 só renomeou conceitos: o `Custo Evitado`
+    da v1 (a empresa pagava e parou) é o **saving efetivado** da v2, e o saving por HORAS da v1 é o **custo
+    evitado** da v2. Novas de verdade só as 3 perguntas que a v1 nunca fez: `Saving Efetivado Agora`,
+    `Custo Evitado Não Contratado` e `Impacto Líquido Mensal`. Mapeamento completo no plano.
+  - ⏳ **Falta:** a rota `POST /api/submeter/ganhos` (que o cliente **já chama** — sem ela o envio dá 404), a
+    materialização dos 3 `impacto_*` (**os 3 ou nenhum**), o `SHEET_COLUMNS` com os nomes novos, a troca do
+    `GOOGLE_SHEETS_TAB` da staging (hoje ainda em `STAGING`, de propósito) e as **5 réplicas** da fórmula
+    passando a chamar a T2. O item **5.8** (impacto bruto × líquido, deflatores 100/50/10 e o líquido
+    **mensalizado** por projeto para o Gomoon) está **decidido e codado na régua** (`impacto.ts`) e **pendente
+    na fiação** — é esta T6 que o entrega.
 - ⬜ **T7** — documentação invisível em background (`iniciarSubmissao` ainda inicia conversa no servidor)
 - ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
 - ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos. **Parcialmente feita**: o lado CLIENTE já
   saiu junto com a T5 (handlers, estado, `step25.tsx`, sandbox de 3 fluxos → 1). Falta o lado SERVIDOR
   (orquestrador, os 7 gates, prompts, `chat-simulation.tsx` e os testes órfãos).
 
-**BLOCO VISUAL — decisão do Luis em 02/09/2026 (muda o ritmo, não o escopo):** as próximas sessões vão
-**direto até o fluxo VISUAL no ar** no app de staging v2 (`f9c9a7ff`), para ele validar de olho a submissão
-inteira até o botão **"Submeter"**. Motivo declarado: revisar fatia por fatia está demorando muito.
+**BLOCO VISUAL — ✅ CUMPRIDO em 02/09/2026** (o Luis clicou da Etapa 1 à revisão na staging e pediu a rodada
+de ajustes acima; ⚠️ o alvo do deploy passou a ser **`edf400b4`**, não o `f9c9a7ff` — ver o aviso do topo).
+A decisão que o criou: as sessões iriam **direto até o fluxo VISUAL no ar**, para ele validar de olho a
+submissão inteira até o botão **"Submeter"**, porque revisar fatia por fatia estava demorando muito.
 Consequências operacionais, todas registradas:
 - **T4 e T5 são um bloco só**, e o critério de pronto do bloco é *"o Luis clica da Etapa 1 até o botão de
   submeter no `f9c9a7ff`"*, não "o componente tem teste".
@@ -77,16 +111,18 @@ Consequências operacionais, todas registradas:
   Para o objetivo declarado (validar o FLUXO e as telas) isso basta; se ele quiser ver a linha na planilha,
   é setar os 6 secrets + fazer a T6.
 
-**Próximo:** codar o **bloco T4+T5** (componentes que faltam → Etapas 1, 2 e 3 reescritas, sai a Etapa 2.5)
-com `/ggsd:code` e **deployar no `f9c9a7ff`** para o Luis validar o fluxo até o botão de submeter. A T3 deixou
-**4 amarras** que esse bloco tem de honrar, todas escritas no cabeçalho de `src/lib/ganhos.ts`: (1) a régua da
-Etapa 2 tem 2 endereços até lá — apagar o par inline de `routes/submeter.tsx` (`:1611`, `:2109`, `:1556`) no
-MESMO commit em que ligar `categoriasValidas`; (2) `custoEvitado.valorHoras` ainda não tem origem decidida —
-**reusar `CARGOS` + `resolverValorHora`**, nunca escrever uma segunda tabela de valor/hora; (3) os
-componentes de checkbox entregam `onChange(string[])` e o call site não sabe *qual* item foi clicado, então
-dar-lhes um `onToggle(value)` é pré-requisito de `alternarCategoria` não ser reimplementado na tela;
-(4) decidir se `serializarLinhasHoras` passa a validar (hoje só o de custo valida).
-
+**Próximo:** codar a **T6** com `/ggsd:code` — é ela que faz o botão "Submeter" funcionar (hoje o cliente
+chama `POST /api/submeter/ganhos`, que **não existe** → 404) e é ela que entrega o item **5.8** ao Gomoon.
+Ordem: rota + gravação das colunas da v2 e dos 3 `impacto_*` → `SHEET_COLUMNS` com os nomes já escritos na
+`STAGING-V2` → as 5 réplicas da fórmula chamando `impacto.ts` → trocar o `GOOGLE_SHEETS_TAB` da staging.
+Depois: **T7** (doc invisível — `iniciarSubmissao` ainda inicia conversa no servidor), **T8** (estrelas para
+todo projeto) e **T9-servidor** (orquestrador, os 7 gates, prompts e testes órfãos).
+⚠️ **A revisão de contexto fresco do bloco NÃO rodou** — os 3 marcadores estão ausentes/`pendente`, e isso
+**barra o `git push` e o `/ggsd:ship`** (commit na branch e deploy na staging seguem livres). Destravar =
+rodar `ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` (+ `ggsd:revisor-reuso`, só-sugestão) e
+gravar os vereditos nos marcadores. As 4 amarras que a T3 deixou seguem valendo, escritas no cabeçalho de
+`src/lib/ganhos.ts` — em especial **reusar `CARGOS` + `resolverValorHora`** para o R$ da hora, nunca uma
+segunda tabela de valor/hora.
 ---
 
 **Plano ativo — Frente 2: time autônomo de avaliação, FATIA B 🟡 (PARTE 1+2 CÓDIGO VERDE em 2026-08-27, NÃO fechada):**
