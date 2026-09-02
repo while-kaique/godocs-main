@@ -1,10 +1,16 @@
 # Plano — GoDocs v2: submissão determinística sem agente no cliente
 
-**Status:** ✅ aprovado (Luis, 02/09/2026) · **em execução — T1, T2 e T3 executadas em 02/09** (branch
-`feat/godocs-v2`, suíte **2548 verde**; revisores da T3: conformidade `diverge-baixa`, qualidade `sugestoes`,
-reuso `duplicacao-intencional` — nenhum barrante). T1 fechada menos a verificação com Google (secrets sensíveis
-dispensados pelo Luis). Próximo: **bloco T4+T5 até o fluxo visual no ar no `f9c9a7ff`** (ver "Ordem de execução
-revisada" abaixo).
+**Status:** ✅ aprovado (Luis, 02/09/2026) · **em execução — T1, T2, T3, T4 e T5 executadas em 02/09**
+(branch `feat/godocs-v2`, suíte **2773 verde**, `npm run build` ok). O fluxo VISUAL está **no ar na staging
+v1 `edf400b4`** (https://godocs-staging.devgogroup.com/) — ver "Decisão de execução" abaixo, que mudou o
+ambiente. T1 fechada menos a verificação com Google (secrets sensíveis dispensados pelo Luis).
+
+⚠️ **Os 3 revisores de contexto fresco AINDA NÃO RODARAM** (é o ritmo acordado: rodam uma vez, no fim do
+bloco). `.review-status` e `.quality-status` estão em **`pendente`**, o que **barra o `git push` e o
+`/ggsd:ship`** de propósito — commit na branch e deploy na staging seguem livres.
+
+**Próximo:** ajustes pedidos pelo Luis (a definir na próxima sessão) **antes** da T7 e da T9; depois **T6**
+(a rota de persistência + a planilha), que é o que fecha o envio.
 
 ### Decisão de execução — Luis, 02/09/2026 (tarde), em seletor
 Duas mudanças de ESCOPO/AMBIENTE autorizadas pelo dono do produto, que **sobrepõem** a letra

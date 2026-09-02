@@ -9,8 +9,12 @@
 **Frente GoDocs v2 — submissão determinística sem agente no cliente 🟡 (branch `feat/godocs-v2`, plano APROVADO em 02/09/2026):**
 Plano: [`docs/plans/godocs-v2-submissao-deterministica.md`](docs/plans/godocs-v2-submissao-deterministica.md) ·
 Spec: `SPEC.md` §4 Fase 3 (RF-200..RF-227) + INV-10..INV-15.
-Frente NOVA e isolada — **nada aqui toca prod (`674a3710`) nem o staging v1 (`edf400b4`)**; o ambiente é o
-`godocs-v2-staging` com a aba `STAGING-V2`. O agente sai do caminho do usuário e a coleta de ganho vira formulário
+⚠️ **O AMBIENTE MUDOU em 02/09/2026 (tarde), por decisão do Luis:** a frente saiu do `f9c9a7ff` e passou a
+subir na **staging v1 (`edf400b4`, https://godocs-staging.devgogroup.com/)**, porque o app isolado tinha só 9
+dos 45 secrets — sem `GOOGLE_SA_KEY_BASE64`, `GOOGLE_SHEETS_ID`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_*`,
+`TG_API_TOKEN`, `API_PROXY_TOKEN` nem `LLM_API_KEY`, lá não há TeamGuide (áreas/cargos/participantes), Drive,
+planilha nem proxy de LLM. **Prod (`674a3710`) continua intocada, sem exceção.** Consequência aceita: a
+staging deixa de validar a v1 enquanto a v2 estiver lá (regra 13) — reverter é redeploy do `main`. O agente sai do caminho do usuário e a coleta de ganho vira formulário
 determinístico de 4 categorias num acordeão; a fórmula do impacto muda (`1,0·S + 0,5·CE + 0,1·R − C`, mensalizada
 por bloco); a documentação passa a ser compilada em background invisível; e a estrela passa a valer para todo
 projeto, com especial derivado dela.
@@ -34,12 +38,27 @@ projeto, com especial derivado dela.
   revisores acharam: a ponte **não guardava o valor** (só a frequência se guardava — `undefined` dava
   líquido 0 e mensal `NaN`, que vira `null` no dinheiro do Gomoon) e item de **custo** malformado
   desaparecia calado, o que **infla** o impacto.
-- ⬜ **T4** — componentes que faltam: acordeão · lista de itens · tabela de horas · campo de evidência com colar
-- ⬜ **T5** — Etapas 1, 2 e 3 reescritas (sai a Etapa 2.5)
-- ⬜ **T6** — persistência, planilha e leitura (as 5 réplicas da fórmula passam a chamar a T2)
-- ⬜ **T7** — documentação invisível em background
+- ✅ **T4** — os 4 componentes, cada um com a régua extraída para um módulo PURO: `acordeao-estado.ts` (33
+  casos) · `itens-lista.ts` (36) · `horas.ts` (67) · `evidencia.ts` (31) + os 4 `.tsx` e um canário de a11y
+  (21). O motivo da divisão é mecânico: o Vitest daqui roda `environment: 'node'` e só inclui
+  `tests/**/*.test.ts` — **não renderiza componente**, então lógica dentro do `.tsx` seria lógica sem teste.
+  Achados: `parseHorasBR` **não existia** (usar `parseMoedaBR` em horas leria "12,5" como R$ 0,13);
+  `depois > antes` virou erro nomeado em vez de zero silencioso; a opção **"Outro"** na função e o **tooltip**
+  são funcionalidade nova (a v1 só tinha os 7 cargos).
+- ✅ **T5** — Etapas 1, 2 e 3 reescritas, **a Etapa 2.5 apagada** e o agente fora do caminho do usuário.
+  `submeter.tsx` 3459 → 2194 linhas (−1324 de handlers de conversa/especial). `validacao-etapa3.ts` (59 casos)
+  tirou do componente o `validate()` de 23 checagens que era inalcançável por teste. Régua nova que a v1 não
+  tinha: o custo evitado exige **ao menos um** dos dois braços. **No ar na staging** (`edf400b4`), suíte
+  **2773 verde**, `npm run build` ok.
+  ⏳ **O envio final ainda quebra** — depende da T6.
+- 🟡 **T6** — persistência, planilha e leitura. Falta TUDO: a rota `POST /api/submeter/ganhos` (que o cliente
+  já chama), a materialização dos 3 `impacto_*`, o `SHEET_COLUMNS` novo, a reescrita do cabeçalho da aba
+  `STAGING-V2` (hoje é o header da v1 clonado, 56 colunas) e as **5 réplicas** da fórmula passando a chamar a T2.
+- ⬜ **T7** — documentação invisível em background (`iniciarSubmissao` ainda inicia conversa no servidor)
 - ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
-- ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos (por último)
+- ⬜ **T9** — limpeza do chat, dos 7 gates e dos prompts órfãos. **Parcialmente feita**: o lado CLIENTE já
+  saiu junto com a T5 (handlers, estado, `step25.tsx`, sandbox de 3 fluxos → 1). Falta o lado SERVIDOR
+  (orquestrador, os 7 gates, prompts, `chat-simulation.tsx` e os testes órfãos).
 
 **BLOCO VISUAL — decisão do Luis em 02/09/2026 (muda o ritmo, não o escopo):** as próximas sessões vão
 **direto até o fluxo VISUAL no ar** no app de staging v2 (`f9c9a7ff`), para ele validar de olho a submissão
