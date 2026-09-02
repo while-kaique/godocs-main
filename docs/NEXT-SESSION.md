@@ -1,5 +1,38 @@
 # NEXT-SESSION
 
+## 🔧 T1 EM PREPARO (02/09) — ambiente v2 isolado
+
+**Worktree/space:** `/home/notebook/godocs-v2` (branch `feat/godocs-v2`, space Herdr `godocs-v2` = `w14`).
+`node_modules` linkado p/ `../godocs-main/node_modules`, `.env` copiado. **Baseline: 2314 testes verdes.**
+
+**Autorização do Luis (02/09):** criar o app `godocs-v2-staging` no Godeploy com **datasource novo**
+está liberado — ele puxa da aba **`STAGING-V2`, que JÁ EXISTE na planilha**, e sobem as **mesmas
+credenciais** da staging v1. Sem pendência de decisão.
+
+### ⚠️ Achado do mapeamento (faz o T1 ser 5 arquivos, não 1)
+`GODOCS_ENV=v2-staging` cai em **`'production'`** no parser de hoje (`env.ts:16` só reconhece
+`'staging'`) — isso **desliga o guard** `assertNaoEhDefaultDeProd` e joga tudo no caminho REAL.
+Pontos que leem o ambiente e precisam reconhecer o v2:
+
+| Arquivo | Linha | Risco se não tratar |
+|---|---|---|
+| `src/lib/env.ts` | 12·16·21 | `GodocsEnv` + `getGodocsEnv` + `isStaging` — o guard do Sheet/Drive nunca dispara |
+| `src/lib/pinecone.ts` | 82 | namespace volta `'prod'` → **contamina o índice de produção** |
+| `src/lib/gomoon-lideres.functions.ts` | 371 | `ambiente: 'producao'` → **DM real para líder** (é a ÚNICA proteção, ver CLAUDE.md D-Gomoon) |
+| `src/lib/rollup-push.functions.ts` | 180 | push outbound marcado como produção |
+| `src/components/staging-banner.tsx` + `worker.ts` | 14·33 / 261 | faixa de ambiente não aparece no v2 (compara `=== 'staging'`) |
+
+Direção proposta: `isStaging()` passa a ser **true** para `staging` E `v2-staging` (é o predicado que
+carrega a segurança); os 3 sites `getGodocsEnv() === 'staging' ? … : 'producao'` passam a usar
+`isStaging()`; a faixa compara `!== 'production'`. Teste vivo: `tests/env-staging.test.ts`.
+
+**Isolamento é por env, não por código:** `GOOGLE_SHEETS_TAB=STAGING-V2` · `GOOGLE_SHEETS_ID` ·
+`GOOGLE_DRIVE_FOLDER_ID` (o guard recusa cair no default de prod: `sheets.ts:13-17`).
+
+**Próximo passo:** §7.1 test-writer sobre `tests/env-staging.test.ts` (red p/ `v2-staging`) → implementar
+os 5 pontos → `createApp godocs-v2-staging` + secrets (`GODOCS_ENV=v2-staging`, aba `STAGING-V2`, Chat e
+Gomoon mudos) → guarda do T1: submissão de teste escreve em `STAGING-V2` e **nunca** em `GoDocs`/`STAGING`.
+
 ## Plano ativo
 **→ [docs/plans/godocs-v2-submissao-deterministica.md](plans/godocs-v2-submissao-deterministica.md)** · Status: ✅ aprovado (Luis, 02/09/2026)
 
