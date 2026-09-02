@@ -77,6 +77,11 @@ na ordem: **T7** (doc invisível), **T8** (estrelas para todo projeto) e **T9-se
 **DESLIGAR** o agente do fluxo de submissão, ⚠️ **não apagá-lo**: *"não vamos excluir os agentes, vamos
 tirá-los do fluxo de submissão novo, mas vamos reaproveitá-los eventualmente"* (Luis, 02/09/2026). O código
 do orquestrador, dos 7 gates e dos prompts **fica**; sai só o que ficar de fato órfão.
+✅ **O backup já existe:** tag **`arquivo/agentes-conversacionais-v1`** (último commit com tudo vivo;
+`git show <tag>:<caminho>` recupera) + a seção **ARQUIVO** em `docs/agents.md` com o inventário e a
+arquitetura. ⚠️ A tag é **local** até a branch ser pushada. **Regra da T9:** arquivo removido do código
+efetivo é copiado para `docs/arquivo/agentes-conversacionais/` no **mesmo commit** — nada fica só no
+histórico.
 
 ⚠️ **Régua de trabalho para a T6 em diante (Luis, 02/09/2026): não criar nada sem necessidade — reaproveitar
 o que existe.** Foi o que já derrubou 2 propostas minhas nesta sessão (14 colunas novas na planilha viraram 3,
