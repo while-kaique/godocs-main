@@ -27,12 +27,14 @@ export type FaseBloqueio = "antes" | "durante" | "livre";
 export type JanelaBloqueio = { inicio: number; fim: number };
 
 // ── Marcos PADRÃO (baked), em UTC ────────────────────────────────────────────
-// BRT = UTC-3.
-//  • Início: terça 25/08/2026 23h59 BRT  = 2026-08-26T02:59:00Z
-//  • Reabre: terça 01/09/2026 00h00 BRT  = 2026-09-01T03:00:00Z
+// BRT = UTC-3. ⚠️ Estes defaults BAKED são o que o CLIENTE usa (no navegador não há
+// `process.env`, então a faixa/botão saem daqui). Os secrets só movem o gate do SERVIDOR,
+// não a tela — por isso, para o AVISO aparecer, a janela tem de estar BAKED aqui.
+//  • Início: 02/09/2026 (já passado no deploy) = 2026-09-02T00:00:00Z
+//  • Reabre: sexta 04/09/2026 16h00 BRT        = 2026-09-04T19:00:00Z
 // Bloqueado quando  INICIO <= agora < FIM  (fim é exclusivo = instante de reabertura).
-export const INICIO_PADRAO_UTC = "2026-08-26T02:59:00Z";
-export const FIM_PADRAO_UTC = "2026-09-01T03:00:00Z";
+export const INICIO_PADRAO_UTC = "2026-09-02T00:00:00Z";
+export const FIM_PADRAO_UTC = "2026-09-04T19:00:00Z";
 
 /**
  * Copy — FONTE ÚNICA. As três frases pedidas (aviso prévio · durante · recusa) se
