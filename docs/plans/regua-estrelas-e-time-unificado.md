@@ -40,9 +40,24 @@ Três causas medidas, em ordem de impacto:
 - **D7 — Descontinuado é soft delete.** Fora de qualquer contagem, corpus ou avaliação.
 - **D8 — Ressubmissão do mesmo escopo não pontua.** Verificável no espelho (existe outra linha do
   mesmo projeto com ganho medido? esta não recebe estrela).
-- **D9 — Os 4 projetos com nota humana 6–10 são ÂNCORA.** Pela régua nova, 3 deles caem para 5★
-  (ver §6). Decisão pendente do Luis: revalidar os 4 pelo comitê, ou tratá-los como âncora
-  histórica e valer a régua só daqui para frente.
+- **D9 — Os 4 projetos com nota humana 6–10 são ÂNCORA CONGELADA** (Luis, 02/09/2026). A régua não
+  os rebaixa, nem agora nem depois. Eles seguem no corpus como exemplares.
+- **D11 — Discordância da âncora vira CONTESTAÇÃO registrada, nunca mudança de nota.** Quando o
+  projeto tem nota humana e a régua chega a um nível menor, o agente grava
+  `contestacao: { nota_humana, nota_regua, criterio_aplicado, gatilho_que_falhou, racional, evidencia }`
+  — **racional CONCISO, no máximo 2 frases**, e o gatilho que falhou tem de ser NOMEADO com a
+  citação da doc (ex.: *"o processo manual anterior existia — 300h/mês declaradas"*). Não altera
+  nada, não aparece para o autor: vai para uma fila de revisão do comitê.
+- **D12 — Queda em massa para a mesma prateleira é suspeita da RÉGUA, não dos projetos.** Muitos
+  projetos convergindo para o mesmo nível é o sintoma de achatamento que esta frente existe para
+  evitar (foi o defeito dos "10 critérios somados"). O relatório do retroativo é obrigado a emitir
+  um **racional AGREGADO** acima das notas individuais: quando **mais de 50% das quedas apontam
+  para o MESMO nível de destino**, o lote é marcado como *achatamento suspeito* e o critério é
+  revisado antes de qualquer queda ser aceita.
+- **D12b — O aprendizado é sobre a RÉGUA, nunca sobre os rótulos.** As análises acumuladas (e as
+  contestações) alimentam o ajuste dos critérios e do prompt, por decisão humana. O corpus do RAG
+  continua crescendo **só com nota humana** — aprender das próprias saídas é o feedback loop que a
+  peça 4 já evita (`rotuloExemplar`).
 - **D10 — Um time só de agentes.** Os times separados (padrões × especiais) se unem e entram em
   consenso sobre dar estrela ou não, e sobre o valor declarado.
 
@@ -193,7 +208,8 @@ Não distingue especial de padrão. Recebe os pareceres de A e B e produz **um**
   negativo sozinho.
 - **Escape 6–10 sempre vai ao humano**, com a sugestão de posição.
 - **Estrela nunca é gravada na coluna "Estrelas"** — a nota só muda por clique de gente.
-- **Projeto com nota humana não é reclassificado** (é âncora e exemplar do corpus).
+- **Projeto com nota humana não é reclassificado** (é âncora e exemplar do corpus). Discordância
+  vira **contestação** (D11): 2 frases, gatilho nomeado, evidência citada — nunca nota nova.
 - **Sem evidência citada da doc, o critério não vale** — cai um nível ou vira `baixa`.
 
 ### Confiança — como se calcula (declarado, não sentido)
@@ -231,6 +247,10 @@ depois de revalidar os deslocamentos do §6.
 - **T5 — Cérebro C (consenso):** módulo PURO de conciliação A×B + `.functions` que nunca lança.
 - **T6 — Auditoria de valor:** estender o Financeiro para emitir `valor_sugerido` + justificativa.
 - **T7 — Retroativo de 3 saídas** + relatório comparativo contra o gabarito humano.
+- **T9 — Racional agregado + detector de achatamento (D12):** o relatório do retroativo emite,
+  acima das notas, a distribuição das quedas por nível de destino e marca *achatamento suspeito*
+  quando um único destino concentra mais de 50% delas. Fila de contestações (D11) no mesmo
+  relatório, ordenada por confiança.
 - **T8 — Painel:** coluna/ficha com estrela recomendada, critério aplicado, evidência e confiança —
   em SOMBRA, sem tocar "Estrelas".
 
