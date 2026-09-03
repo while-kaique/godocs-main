@@ -28,6 +28,9 @@ import {
   retroativoCustosPontuais,
   recompilarDocsPendentes,
 } from "@/lib/chat.functions";
+// GoDocs v2 — persistência do ganho declarado (T6). Módulo próprio: o `chat.functions`
+// é o caminho conversacional, que a T9 tira do fluxo de submissão.
+import { salvarGanhos } from "@/lib/ganhos.functions";
 import { reconciliarSnapshots } from "@/lib/reconciliar-snapshots";
 import { recalcularRollupBackfill } from "@/lib/rollup-backfill";
 import { derivarTotaisPorArea } from "@/lib/rollup-financeiro";
@@ -143,6 +146,8 @@ import {
   reabrirPreAprovacoes,
 } from "@/lib/aprovacoes.functions";
 import { registrarAtividade, listarAtividades } from "@/lib/atividades.functions";
+import { listarCiclos, lerArvore, listarLog } from "@/lib/agentes-log.functions";
+import { avaliarProjetoComTime } from "@/lib/avaliacao/time.functions";
 import {
   notificarLideresPendentes,
   notificarLideresDoProjeto,
@@ -259,6 +264,20 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
       }
       const admin = email ? await isAdmin(email) : false;
       return json({ ehLideranca: lider, isAdmin: admin });
+    }
+
+    // ── GoDocs v2: grava o ganho declarado na Etapa 3 (formulário determinístico) ──
+    // Chamada pelo cliente ANTES de `/api/chat/submeter-validacao` — as duas dividem o
+    // mesmo `try` lá, então uma falha aqui aborta a submissão de propósito (submeter sem
+    // o ganho gravado daria projeto sem impacto).
+    //
+    // ⚠️ Fora do bloco `/api/chat/*`: aquele if é do fluxo conversacional (carrega
+    // streaming SSE, `insertApiLog` e a tradução de ZodError daquele caminho). Aqui o
+    // tratamento de erro é o do `catch` geral do roteador — o mesmo do `/api/submeter/perfil`.
+    if (pathname === "/api/submeter/ganhos" && method === "POST") {
+      const body = await readBody<unknown>(request);
+      const resultado = await salvarGanhos(body, getEmailFromRequest(request));
+      return json(resultado);
     }
 
     // ── Config pública (rótulo do ambiente) — usado pela faixa de staging ──
@@ -883,6 +902,60 @@ async function handleApi(request: Request, url: URL, ctx?: ExecCtx): Promise<Res
         await listarAtividades({
           cursor: url.searchParams.get("cursor") ?? undefined,
           limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+
+    // ── Time de avaliação (T15/T20) — roda em SOMBRA sob demanda, só admin. Nada grava em
+    // "Estrelas"/"Status"; devolve o resultado e registra o log em árvore (agente_log).
+    if (pathname === "/api/admin/avaliacao/time" && method === "POST") {
+      await requireAdmin(request);
+      const body = (await request.json().catch(() => ({}))) as { projetoId?: string; cicloId?: string | null; sincrono?: boolean };
+      if (!body.projetoId) return errorJson("projetoId é obrigatório", 400);
+      // Default em BACKGROUND (até ~30 chamadas LLM; uma request cortada deixaria o ciclo 'aberto').
+      // Resultado sai em GET /api/admin/agentes/ciclos e /api/admin/agentes/arvore?ciclo=&projeto=.
+      if (body.sincrono === true) {
+        return json(await avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }), 200, {
+          "Cache-Control": "no-store",
+        });
+      }
+      runBackground(
+        avaliarProjetoComTime(body.projetoId, { cicloId: body.cicloId ?? null, gatilho: "manual" }).then((r) =>
+          console.log("[avaliacao-time]", body.projetoId, r.ok ? `ok ciclo=${r.ciclo_id}` : `falhou: ${r.motivo}`),
+        ),
+      );
+      return json({ ok: true, agendado: true, projetoId: body.projetoId }, 202, { "Cache-Control": "no-store" });
+    }
+
+    // ── Memória e LOG dos agentes avaliadores (T21) — leitura em árvore, só admin ──
+    if (pathname === "/api/admin/agentes/ciclos" && method === "GET") {
+      await requireAdmin(request);
+      return json(
+        await listarCiclos({
+          cursor: url.searchParams.get("cursor") ?? undefined,
+          limit: url.searchParams.get("limit") ?? undefined,
+        }),
+        200,
+        { "Cache-Control": "no-store" },
+      );
+    }
+    if (pathname === "/api/admin/agentes/arvore" && method === "GET") {
+      await requireAdmin(request);
+      const ciclo = url.searchParams.get("ciclo");
+      if (!ciclo) return errorJson("Parâmetro 'ciclo' é obrigatório", 400);
+      return json(await lerArvore(ciclo, url.searchParams.get("projeto") ?? undefined), 200, {
+        "Cache-Control": "no-store",
+      });
+    }
+    if (pathname === "/api/admin/agentes/log" && method === "GET") {
+      await requireAdmin(request);
+      const q = (k: string) => url.searchParams.get(k) ?? undefined;
+      return json(
+        await listarLog({
+          agente: q("agente"), desde: q("desde"), veredito: q("veredito"), projeto: q("projeto"),
+          ciclo: q("ciclo"), cursor: q("cursor"), limit: q("limit"),
         }),
         200,
         { "Cache-Control": "no-store" },

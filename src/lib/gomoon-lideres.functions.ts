@@ -30,7 +30,7 @@
 
 import { getPendenciasPorLider } from '@/integrations/db/client.server';
 import { derivarNomeDeEmail } from '@/lib/auth.functions';
-import { getGodocsEnv } from '@/lib/env';
+import { rotuloAmbienteExterno } from '@/lib/env';
 import { ehProjetoTesteE2E } from '@/lib/google/chat';
 import { renderMensagemLider } from '@/lib/gomoon-mensagens';
 
@@ -368,7 +368,7 @@ function baseResultado(dry: boolean): ResultadoNotificacao {
   return {
     ok: false,
     dry,
-    ambiente: getGodocsEnv() === 'staging' ? 'staging' : 'producao',
+    ambiente: rotuloAmbienteExterno(),
     gerado_em: new Date().toISOString(),
     lideres: 0,
     liderados: 0,

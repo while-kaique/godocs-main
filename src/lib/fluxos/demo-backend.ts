@@ -11,7 +11,14 @@
 import type { DemoBackend } from '@/lib/api-client'
 import type { FormData } from '@/lib/submeter/constants'
 
-export type FluxoDemo = 'normal' | 'especial' | 'lideranca'
+/**
+ * ⚠️ Eram TRÊS fluxos (`normal` · `especial` · `lideranca`). Na v2 sobrou UM: o agente
+ * saiu do caminho do usuário (D4), a Etapa 2.5 do especial saiu (D5 — especial passa a ser
+ * derivado de estrela > 0) e o "fluxo direto de liderança" perdeu o sentido, porque ele
+ * existia justamente para a liderança escapar da conversa. O tipo continua sendo uma união
+ * de um membro para o sandbox seguir aceitando fluxos novos sem mudar de forma.
+ */
+export type FluxoDemo = 'padrao'
 
 // Flag (sessionStorage) que faz o formulário REAL de /submeter rodar como liderança
 // para ADMIN testar. Usada em vez de `?lideranca=1` porque o edge do Godeploy engole a
@@ -21,12 +28,14 @@ export type FluxoDemo = 'normal' | 'especial' | 'lideranca'
 export const CHAVE_TESTE_LIDERANCA = 'godocs:teste-lideranca'
 
 /**
- * Preenche o formulário com dados de EXEMPLO para o sandbox — assim dá para avançar
- * pelas telas sem digitar. `tipoProjeto` fica vazio no especial (a natureza é definida
- * na Etapa 2.5); nos demais, é saving. O contrafactual entra pré-preenchido (o
- * autocomplete depende de dados reais que o sandbox não tem).
+ * Preenche o formulário com dados de EXEMPLO para o sandbox — assim dá para avançar pelas
+ * telas sem digitar. O contrafactual entra pré-preenchido porque o autocomplete depende de
+ * dados reais (TeamGuide) que o sandbox não tem.
+ *
+ * ⚠️ `hojeISO` continua no parâmetro embora a "data de criação" tenha saído do formulário:
+ * o call site já o calcula e o sandbox pode voltar a precisar de uma data de exemplo.
  */
-export function demoSeedForm(fluxo: FluxoDemo, hojeISO: string): Partial<FormData> {
+export function demoSeedForm(_fluxo: FluxoDemo, _hojeISO: string): Partial<FormData> {
   return {
     escopo: 'interno',
     prodStatus: 'sim',
@@ -39,18 +48,13 @@ export function demoSeedForm(fluxo: FluxoDemo, hojeISO: string): Partial<FormDat
     participantes: [],
     participantesPapeis: {},
     nomeProjeto: 'Conciliação Financeira (demonstração)',
-    dataCriacao: hojeISO,
-    tipoProjeto: fluxo === 'especial' ? [] : ['saving'],
+    ganhoCategorias: ['custo_evitado'],
     descricaoBreve:
       'Automação que concilia os lançamentos financeiros do dia, cruza com o extrato ' +
       'bancário e sinaliza divergências para o time financeiro conferir. Exemplo de demonstração.',
     usaAiProxy: 'nao',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: ['pessoa:analista.financeiro@gocase.com'],
-    especial: false,
-    contextoEspecial: '',
-    especialDashboard: '',
-    especialGanhoOrganizacional: '',
   }
 }
 
@@ -67,51 +71,18 @@ export function demoFile(): File {
 const LATENCIA_MS = 650
 const espera = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-const DOC_EXEMPLO = [
-  '## Documentação (exemplo de demonstração)',
-  '',
-  '### O que o projeto faz',
-  'Automação que concilia os lançamentos financeiros do dia e sinaliza divergências.',
-  '',
-  '### Como funciona',
-  '1. Lê os relatórios exportados do ERP.',
-  '2. Cruza com o extrato bancário.',
-  '3. Gera um resumo das diferenças e notifica o time.',
-  '',
-  '### Ferramenta',
-  'Python + GoDeploy.',
-].join('\n')
-
-const SAVING_PREVIEW_EXEMPLO = [
-  '**Memorial pronto!** Revise abaixo e me diga se ficou algum problema — eu ajusto. Se estiver tudo certo, é só enviar para a triagem.',
-  '',
-  '### Contexto',
-  'Conciliação financeira diária que era feita manualmente por um analista.',
-  '',
-  '### Saving de Pessoas',
-  '- **Analista Financeiro**: 40 → 8 h/mês (economia de 32 h/mês)',
-  '',
-  '**Total de horas economizadas:** 32 h/mês',
-].join('\n')
-
 const GANHO_EXEMPLO = {
-  saving_horas: 32,
-  saving_reais: null,
-  tipo_saving: 'mensal',
-  receita_valor: null,
-  receita_tipo: null,
-  custo_externo_mensal: null,
+  impacto_bruto: 12000,
+  impacto_liquido: 5900,
+  impacto_liquido_mensal: 5900,
 }
 
 /**
- * Cria um backend de demonstração para um fluxo. Mantém um pequeno estado de conversa
- * (contador de turnos do chat de doc) no fechamento — cada seleção de fluxo recria o
- * handler do zero, então o estado nasce limpo.
+ * Cria o backend de demonstração. Não guarda mais estado de conversa (não há conversa):
+ * cada rota devolve o SHAPE que o backend real devolve, para os componentes reais
+ * renderizarem de verdade.
  */
 export function criarDemoBackend(fluxo: FluxoDemo): DemoBackend {
-  // Passo do chat de documentação (fluxo normal): 0 = 1ª pergunta, 1 = preview, 2 = aprovado.
-  let passoDoc = 0
-
   return async function demoBackend(path, _body, _method) {
     await espera(LATENCIA_MS)
 
@@ -124,121 +95,27 @@ export function criarDemoBackend(fluxo: FluxoDemo): DemoBackend {
       }
     }
     if (path === '/api/submeter/perfil') {
-      return { ehLideranca: fluxo === 'lideranca', isAdmin: true }
+      return { ehLideranca: false, isAdmin: true }
     }
     if (path === '/api/config') {
       return { env: 'production' }
     }
 
     // ── Criação do projeto ──
+    // ⚠️ Nenhuma mensagem de chat na resposta: a documentação é compilada em BACKGROUND e
+    // é invisível ao usuário (D6). O que o formulário consome daqui é só o `projeto_id`.
     if (path === '/api/chat/iniciar-submissao') {
-      // Liderança: doc por IA numa passada, sem chat (o frontend abre o formulário).
-      if (fluxo === 'lideranca') {
-        return { projeto_id: 'demo', fluxo_direto: true }
-      }
-      // Especial: doc montada sem IA, pronta para submissão (o frontend chama submeter).
-      if (fluxo === 'especial') {
-        return { projeto_id: 'demo', especial: true }
-      }
-      // Normal: começa o chat de documentação com a 1ª pergunta.
-      passoDoc = 0
-      return {
-        projeto_id: 'demo',
-        response: {
-          type: 'question',
-          content:
-            'Vamos documentar seu projeto. Em uma frase, o que exatamente esta automação faz hoje em produção? (exemplo de demonstração)',
-          options: null,
-          fase: 'doc',
-          isPreview: false,
-          isComplete: false,
-        },
-      }
+      return { projeto_id: `demo-${fluxo}` }
     }
 
-    // ── Chat de documentação (fluxo normal) ──
-    if (path === '/api/chat/enviar-mensagem') {
-      passoDoc += 1
-      if (passoDoc === 1) {
-        // Devolve o PREVIEW da documentação para aprovação.
-        return {
-          type: 'preview',
-          content: DOC_EXEMPLO,
-          options: null,
-          fase: 'doc_preview',
-          isPreview: true,
-          isComplete: false,
-          coletado: null,
-        }
-      }
-      if (passoDoc === 2) {
-        // Doc aprovada → transição para a fase de saving (abre o formulário).
-        return {
-          type: 'content',
-          content: 'Documentação registrada. Agora vamos ao impacto financeiro.',
-          options: null,
-          fase: 'saving',
-          isPreview: false,
-          isComplete: false,
-          coletado: null,
-        }
-      }
-      // Aprovação do memorial de saving → conclui (revisão final).
-      return {
-        type: 'complete',
-        content: SAVING_PREVIEW_EXEMPLO,
-        options: null,
-        fase: 'completo',
-        isPreview: true,
-        isComplete: true,
-        saving: null,
-      }
-    }
-
-    // ── Formulário determinístico de saving ──
-    if (path === '/api/chat/iniciar-saving') {
-      // Liderança: memorial pronto na hora (sem chat). Normal: preview para aprovação
-      // no chat (o frontend mostra o preview e o usuário aprova).
-      if (fluxo === 'lideranca') {
-        return {
-          type: 'complete',
-          content: SAVING_PREVIEW_EXEMPLO,
-          options: null,
-          fase: 'completo',
-          isPreview: true,
-          isComplete: true,
-          saving: null,
-          receita: null,
-        }
-      }
-      return {
-        type: 'preview',
-        content: SAVING_PREVIEW_EXEMPLO,
-        options: null,
-        fase: 'saving_preview',
-        isPreview: true,
-        isComplete: false,
-        saving: null,
-      }
-    }
-
-    if (path === '/api/chat/iniciar-receita') {
-      return {
-        type: 'complete',
-        content:
-          '**Memorial pronto!** Revise abaixo... (exemplo)\n\n### Receita Incremental\nGanho de receita estimado pela liderança.',
-        options: null,
-        fase: 'completo',
-        isPreview: true,
-        isComplete: true,
-        saving: null,
-        receita: null,
-      }
-    }
-
-    // ── Metadados (usado na conversão/edição de especial) ──
+    // ── Metadados (descrição / AI Proxy / afetados digitados depois do disparo) ──
     if (path === '/api/chat/atualizar-metadados') {
       return { ok: true, reset: false }
+    }
+
+    // ── Ganho declarado (Etapa 3) ──
+    if (path === '/api/submeter/ganhos') {
+      return { ok: true }
     }
 
     // ── Envio final ──
@@ -246,8 +123,8 @@ export function criarDemoBackend(fluxo: FluxoDemo): DemoBackend {
       return { ok: true, status: 'em_validacao', ganho: GANHO_EXEMPLO }
     }
 
-    // Qualquer outra chamada (ex.: sugestões de participantes/áreas): default benigno.
-    // A maioria dos endpoints não roteirizados aqui são listas — devolve vazio.
+    // Qualquer outra chamada (ex.: sugestões de participantes/áreas): default benigno —
+    // a maioria dos endpoints não roteirizados aqui são listas.
     console.warn('[demo-backend] path não roteirizado:', path)
     return []
   }

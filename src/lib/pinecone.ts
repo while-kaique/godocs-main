@@ -27,6 +27,8 @@
  */
 
 /** Plano de controle (criar/descrever índice). Fixo — não é por índice. */
+import { getGodocsEnv } from '@/lib/env';
+
 const PINECONE_CONTROL_URL = 'https://api.pinecone.io';
 
 /** Versão da API do Pinecone enviada em todo request. Override por `PINECONE_API_VERSION`. */
@@ -75,12 +77,18 @@ export function pineconeConfig(): PineconeConfig | null {
 }
 
 /**
- * Namespace do ambiente corrente: `prod` ou `staging` (decisão 3). Deriva do `GODOCS_ENV` —
- * a MESMA env que separa Sheet, Drive e Chat. Não aceita override próprio de propósito.
+ * Namespace do ambiente corrente (decisão 3). Deriva do `GODOCS_ENV` — a MESMA env que
+ * separa Sheet, Drive e Chat. Não aceita override próprio de propósito.
+ *
+ * ⚠️ Cada ambiente tem namespace PRÓPRIO: comparar direto com a string `'staging'`
+ * mandava o `v2-staging` para `'prod'` e contaminaria o índice de produção. A régua é o
+ * `getGodocsEnv()`, fonte única do ambiente.
  */
-export function namespacePinecone(): 'prod' | 'staging' {
-  const raw = (envDo()?.GODOCS_ENV || '').trim().toLowerCase();
-  return raw === 'staging' ? 'staging' : 'prod';
+export function namespacePinecone(): 'prod' | 'staging' | 'v2-staging' {
+  const ambiente = getGodocsEnv();
+  if (ambiente === 'staging') return 'staging';
+  if (ambiente === 'v2-staging') return 'v2-staging';
+  return 'prod';
 }
 
 function cabecalhos(cfg: PineconeConfig): Record<string, string> {

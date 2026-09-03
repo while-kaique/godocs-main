@@ -1,5 +1,51 @@
 # Sistema de Agentes IA
 
+## ⚠️ ARQUIVO — o que a v2 tira do fluxo de submissão (e como recuperar)
+
+> **A v2 DESLIGA o agente da submissão; ela NÃO apaga os agentes.** Decisão do Luis, 02/09/2026: *"não vamos
+> excluir os agentes, vamos tirá-los do fluxo de submissão novo, mas vamos reaproveitá-los eventualmente"*.
+> Esta seção existe para que o trabalho e a ARQUITETURA não se perdam quando a T9 desconectar o chat — e para
+> que ninguém precise reconstruir por arqueologia o que já está escrito.
+
+**Marco no git (o backup):** a tag **`arquivo/agentes-conversacionais-v1`** aponta para o último commit em que
+todo o fluxo conversacional está VIVO e funcionando em produção. Recuperar qualquer arquivo é
+`git show arquivo/agentes-conversacionais-v1:<caminho>`; ver a árvore inteira,
+`git ls-tree -r arquivo/agentes-conversacionais-v1 src/lib/agents`.
+⚠️ A tag é **local até a branch `feat/godocs-v2` ser pushada** (o gate de revisão barra o push hoje). Enquanto
+isso, o backup vive no clone desta máquina + nesta seção.
+
+**Regra de execução da T9:** arquivo que a T9 REMOVER do código efetivo é **copiado no MESMO commit** para
+`docs/arquivo/agentes-conversacionais/` — nada fica só no histórico. Nenhum arquivo de agente/gate/prompt é
+deletado sem o Luis pedir.
+
+### Inventário do que compõe o fluxo conversacional (linhas em 02/09/2026)
+
+| Arquivo | Linhas | O que carrega |
+|---|---|---|
+| `src/lib/chat.functions.ts` | 4597 | as rotas de conversa (`iniciarSubmissao`, `enviarMensagem`, `iniciarSaving`, `iniciarReceita`, `submeterParaValidacao`) **e os 7 gates determinísticos** |
+| `src/lib/agents/orchestrator.ts` | 1757 | o orquestrador: prompts por fase, retry/regex, `TAXONOMIA_DESTINO_GANHO`, `BLOCO_SECOES_CRITERIO`, `blocoGanhoRealProjetado`, `mensagemMemorialPronto` |
+| `src/lib/submeter/step3-chat.tsx` | 2800 | a TELA do chat + o `SavingForm` da v1 (a linguagem visual que a v2 reaproveita) |
+| `src/lib/agents/analyzer.ts` | 921 | o analisador pós-submissão (complexidade, critério de projeto, `normalizarClassificacao`) |
+| `src/lib/agents/custo-evitado-chat.ts` | 454 | gate do custo evitado declarado no chat (caso SmartOnline/DIFAL) |
+| `src/lib/agents/ganho-projetado.ts` | 413 | gate ganho real × projetado (2 hooks, anti-loop) |
+| `src/lib/agents/sobreposicao-receita.ts` | 273 | gate receita × custo evitado (caso Sucesso.AI) |
+| `src/lib/agents/memorial-format.ts` | 325 | `MEMORIAL_ESQUELETO` — a estrutura do memorial por modo |
+| `src/lib/agents/types.ts` | 446 | `CARGOS`/`valor_hora`, os 8 estados de gate, os tipos do financeiro da v1 |
+| `src/lib/agents/{extractor,doc-compiler,doc-render,validator,saving-calc,email-agent}.ts` | 328·155·124·116·242·120 | extração, compilação e render da doc, validação, `resolverValorHora`, e-mails |
+
+⚠️ **Fora do escopo da T9, e é importante não confundir:** os agentes de **avaliação** (mesa, cético,
+especialista, agregador, redator) e os de **especiais** (classificador, lentes, calibrador, revisor) **não
+têm nada a ver com o chat de submissão** — eles rodam pós-submissão, em batch/cron, e seguem em produção.
+
+### Onde está o "por quê" de cada gate
+Os 7 gates são a parte mais caro-de-reconstruir, e a razão de cada um (com o caso real que o originou) está
+escrita no **`CLAUDE.md`**, seção *Memorial padronizado* — **fonte única, não reescrita aqui**: base CLT
+220h/mês (jornada + teto por pessoa) · economia alta ≥44h (alocação dos ganhos) · carga real × ganho por
+escala · ganho real × projetado · sobreposição receita × custo evitado · custo evitado declarado no chat ·
+critério de projeto `[1.3]`/`[1.4]`. Cada bloco lá tem o *"origem: caso X"* que explica por que o prompt
+sozinho não segurava — é essa memória que torna o código reaproveitável em vez de curioso.
+
+
 O chat é orquestrado por uma máquina de estados que avança por fases, cada uma com um system prompt específico. Os agentes ficam em `src/lib/agents/`.
 
 ## Visão geral dos agentes

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { estaBloqueado } from "@/lib/bloqueio-submissao";
+import { useBloqueioSubmissao } from "@/components/aviso-bloqueio-submissao";
 import { SubmeterPageContent } from "./submeter";
 
 export const Route = createFileRoute("/editar/$id")({
@@ -23,6 +23,7 @@ function EditarPage() {
   // participa é levado à visualização. O gate definitivo é server-side no submit —
   // isto evita carregar o editor à toa e dá o feedback certo.
   const [estado, setEstado] = useState<"checando" | "ok">("checando");
+  const bloqueio = useBloqueioSubmissao();
 
   useEffect(() => {
     let ativo = true;
@@ -30,7 +31,13 @@ function EditarPage() {
     // reenvio/edição também para. URL direta para o editor volta à listagem — o gate
     // DURO continua sendo o servidor (`deveRecusarSubmissao`), isto é só a porta do
     // cliente. Fonte única do relógio em `src/lib/bloqueio-submissao.ts`.
-    if (estaBloqueado()) {
+    //
+    // ⚠️ `bloqueio.bloqueado` (o HOOK), não `estaBloqueado()` cru: o hook já resolve
+    // "estou em produção?" — e fora dela a pausa não se aplica, porque a versão nova
+    // que o aviso anuncia é exatamente a que se valida no staging (barrar a edição lá
+    // tornaria o reenvio impossível de testar). Enquanto o ambiente é desconhecido o
+    // hook devolve a régua de produção, então a dúvida erra para o lado de bloquear.
+    if (bloqueio.bloqueado) {
       navigate({ to: "/meus-projetos", replace: true });
       return;
     }
@@ -47,7 +54,7 @@ function EditarPage() {
     return () => {
       ativo = false;
     };
-  }, [id, navigate]);
+  }, [id, navigate, bloqueio.bloqueado]);
 
   if (estado === "checando") {
     return (

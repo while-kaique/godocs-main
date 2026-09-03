@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validarEtapa2,
+  validarSelecaoGanho,
   camposMinimosDocProntos,
   serializarAfetados,
   desserializarAfetados,
@@ -29,16 +30,11 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     participantesPapeis: {},
     participantesContribuicoes: {},
     nomeProjeto: 'Automação de Relatórios',
-    dataCriacao: '2026-01-10',
-    tipoProjeto: [],
+    ganhoCategorias: ['saving_efetivado'],
     descricaoBreve: 'x'.repeat(60),
     usaAiProxy: 'sim',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: ['maria@gocase.com'],
-    especial: false,
-    contextoEspecial: '',
-    especialDashboard: '',
-    especialGanhoOrganizacional: '',
     ...over,
   };
 }
@@ -73,10 +69,55 @@ describe('validarEtapa2 — campos', () => {
     expect(errs.usaAiProxy).toBeTruthy();
   });
 
-  it('data no futuro bloqueia; data válida passa', () => {
-    expect(validarEtapa2(baseForm({ dataCriacao: '2027-01-01' }), opts()).dataCriacao).toBeTruthy();
-    expect(validarEtapa2(baseForm({ dataCriacao: '2023-12-31' }), opts()).dataCriacao).toBeTruthy();
-    expect(validarEtapa2(baseForm({ dataCriacao: HOJE }), opts()).dataCriacao).toBeUndefined();
+  // ⚠️ A "data de criação" SAIU do formulário na v2 (a data que vale é a de SUBMISSÃO,
+  // porque só se submete o que já está em produção). O guard de "data no futuro" não
+  // desapareceu: ele migrou para o "desde quando" do saving efetivado, e vive em
+  // `tests/validacao-etapa3.test.ts` (fronteira de `hojeISO`).
+
+  // ⚠️ As categorias de ganho SAÍRAM desta etapa (02/09/2026): viraram TELA PRÓPRIA na
+  // Etapa 3 e o portão passou a ser `validarSelecaoGanho`, testado abaixo. Cobrar aqui um
+  // campo que a Etapa 2 não mostra faria o "Próximo" sacudir sem erro visível.
+  it('NÃO cobra mais os tipos de ganho (o campo saiu da etapa)', () => {
+    const errs = validarEtapa2(baseForm({ ganhoCategorias: [] }), opts());
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+});
+
+describe('validarSelecaoGanho — a 1ª tela da Etapa 3', () => {
+  it('nenhuma categoria marcada bloqueia', () => {
+    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: [] }));
+    expect(errs.ganhoCategorias).toBeTruthy();
+  });
+
+  // ⚠️ Era bloqueio até 02/09/2026 (RF-202 "imensurável XOR o resto"). O Luis liberou: as
+  // 4 combinam, porque um projeto pode ter saving medido E um ganho sem número — e marcar
+  // os dois é insumo para o agente investigar, não contradição.
+  it('imensurável junto com mensurável PASSA (as 4 combinam)', () => {
+    const errs = validarSelecaoGanho(
+      baseForm({ ganhoCategorias: ['saving_efetivado', 'imensuravel'] }),
+    );
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+
+  it('as três mensuráveis combinam livremente', () => {
+    const errs = validarSelecaoGanho(
+      baseForm({ ganhoCategorias: ['saving_efetivado', 'custo_evitado', 'receita_incremental'] }),
+    );
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+
+  it('só o imensurável passa', () => {
+    const errs = validarSelecaoGanho(baseForm({ ganhoCategorias: ['imensuravel'] }));
+    expect(errs.ganhoCategorias).toBeUndefined();
+  });
+
+  // Rascunho salvo em localStorage ANTES desta feature não tem a chave. Ler
+  // `undefined.length` derrubava /submeter inteira ("This page didn't load").
+  it('rascunho antigo sem a chave não derruba a validação', () => {
+    const semChave = baseForm();
+    delete (semChave as Partial<typeof semChave>).ganhoCategorias;
+    expect(() => validarSelecaoGanho(semChave)).not.toThrow();
+    expect(validarSelecaoGanho(semChave).ganhoCategorias).toBeTruthy();
   });
 });
 

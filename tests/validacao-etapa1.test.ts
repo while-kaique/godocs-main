@@ -23,17 +23,12 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     participantes: [],
     participantesPapeis: {},
     participantesContribuicoes: {},
+    ganhoCategorias: ['saving_efetivado'],
     nomeProjeto: '',
-    dataCriacao: '',
-    tipoProjeto: [],
     descricaoBreve: '',
     usaAiProxy: '',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: [],
-    especial: false,
-    contextoEspecial: '',
-    especialDashboard: '',
-    especialGanhoOrganizacional: '',
     ...over,
   };
 }

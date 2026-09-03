@@ -5,13 +5,14 @@ import { FlaskConical } from "lucide-react";
 //
 // O bundle do SPA é IDÊNTICO em prod e staging — o cliente descobre o ambiente
 // consultando /api/config (que lê `GODOCS_ENV` no worker, em tempo de request).
-// Em produção o componente não renderiza nada (env !== 'staging' → null).
+// Em produção o componente não renderiza nada. ⚠️ A régua é `=== 'production'`,
+// NÃO `!== 'staging'`: com a segunda, o ambiente v2 subiria SEM faixa nenhuma.
 //
 // Decisão visual: o app inteiro é `--go-blue`; a faixa usa o acento `--go-lime`
 // + fita de zona de teste justamente para INTERROMPER a identidade normal e
 // deixar inconfundível que este NÃO é o ambiente de produção.
 
-type PublicConfig = { env: "production" | "staging" };
+type PublicConfig = { env: "production" | "staging" | "v2-staging" };
 
 // Tinta quase-preta (puxada pro tom do lime) — alto contraste sobre o lime.
 const INK = "#14160a";
@@ -30,7 +31,9 @@ export function StagingBanner() {
     refetchOnWindowFocus: false,
   });
 
-  if (data?.env !== "staging") return null;
+  if (!data || data.env === "production") return null;
+
+  const rotulo = data.env === "v2-staging" ? "Staging V2" : "Staging";
 
   return (
     <div
@@ -54,7 +57,7 @@ export function StagingBanner() {
       />
       <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
         <FlaskConical aria-hidden="true" size={15} strokeWidth={2.5} className="shrink-0" />
-        <span className="font-bold uppercase tracking-[0.14em]">Staging</span>
+        <span className="font-bold uppercase tracking-[0.14em]">{rotulo}</span>
         <span aria-hidden="true" className="opacity-50">
           ·
         </span>

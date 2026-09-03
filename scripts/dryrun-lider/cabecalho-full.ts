@@ -1,7 +1,7 @@
-// LEITURA PURA: cabeçalho INTEIRO da aba `GoDocs` (prod) com índice/letra + checagem de
+// LEITURA PURA: cabeçalho INTEIRO da aba escolhida por ABA_ALVO (default GoDocs) com índice/letra + checagem de
 // chaves AMBÍGUAS (2 cabeçalhos que normalizam igual → o valor é descartado no append).
 //
-//   npx vitest run --config scripts/dryrun-lider/cabecalho-full.config.ts
+//   ABA_ALVO='STAGING-V2' npx vitest run --config scripts/dryrun-lider/cabecalho-full.config.ts
 import fs from 'node:fs';
 import { it } from 'vitest';
 
@@ -14,10 +14,11 @@ const { colLetter, chaveColuna } = await import('@/lib/google/sheets');
 const { SHEET_COLUMNS } = await import('@/lib/google/sheets');
 const ID = process.env.GOOGLE_SHEETS_ID || '1xS2zIMu-PGiqxUDOnLNXTqSzUzPlJsQW0_R1Z_4Cxnk';
 
-it('cabeçalho inteiro + ambiguidades', async () => {
+const ABA = process.env.ABA_ALVO || 'GoDocs';
+it(`cabeçalho inteiro + ambiguidades — aba ${ABA}`, async () => {
   const t = await getAccessToken();
   const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${ID}/values/${encodeURIComponent("'GoDocs'!1:1")}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${ID}/values/${encodeURIComponent(`'${ABA}'!1:1`)}`,
     { headers: { Authorization: `Bearer ${t}` } },
   );
   const j = (await r.json()) as { values?: string[][] };

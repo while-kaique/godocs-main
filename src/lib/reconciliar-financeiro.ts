@@ -69,13 +69,22 @@ export function parseItensDaJustificativa(just: string | null | undefined): Cust
   const itens: CustoItem[] = []
   for (const linha of linhas) {
     // O travessão do gerador é "—"; aceita "-" para texto reeditado à mão.
-    const m = /^[•*-]\s*(.+?)\s+[—-]\s*R\$\s*([\d.,]+)\s*\((pontual|mensal)\)\.?\s*(.*)$/i.exec(linha)
+    // ⚠️ As 4 frequências, não 2. O escritor do GoDocs v2 (`celulasGanhoV2`, `google/sync.ts`)
+    // emite `(trimestral)`/`(semestral)` nesta MESMA célula ("Justificativa Custo para Rodar"),
+    // e com a regex de 2 o parser devolvia `null` → a reconciliação abortava FAIL-CLOSED em
+    // todo projeto v2 de custo trimestral/semestral. Escritor e parser vivem separados; quando
+    // um ganhou vocabulário novo, o outro tinha de acompanhar.
+    const m = /^[•*-]\s*(.+?)\s+[—-]\s*R\$\s*([\d.,]+)\s*\((pontual|mensal|trimestral|semestral)\)\.?\s*(.*)$/i.exec(linha)
     if (!m) return null
     const valor = parseValorBR(m[2])
     if (!isFinite(valor) || valor < 0) return null
     itens.push({
       nome: m[1].trim(),
       valor: round2(valor),
+      // ⚠️ Só `pontual` é distinguido do resto porque o modelo v1 de `CustoItem` tem apenas
+      // as 2 recorrências. Trimestral/semestral (vocabulário do v2) caem em `mensal` — que é
+      // o que a v1 já fazia com qualquer não-pontual. Reconstituir a cadência exata exigiria
+      // ampliar `CustoItem`, e esta rotina é de reparo da v1, não de migração.
       recorrencia: m[3].toLowerCase() === 'pontual' ? 'pontual' : 'mensal',
       justificativa: m[4].trim(),
     })
@@ -136,29 +145,29 @@ export async function reconciliarFinanceiroDoSheet(
   if (!row) return falha('Projeto não encontrado na planilha (nada a reconciliar).')
 
   // ── Itens reconstruídos × total da célula: têm de fechar, senão aborta ──
-  const itensEvitado = parseItensDaJustificativa(row['Justificativa Custo Evitado'] as string)
+  const itensEvitado = parseItensDaJustificativa(row['Evidência Saving Efetivado'] as string)
   if (itensEvitado === null)
     return falha(
-      'Não foi possível reconstruir os itens de "Justificativa Custo Evitado" (texto fora do formato gerado pelo app). Reconciliação abortada para não gravar palpite.',
+      'Não foi possível reconstruir os itens de "Evidência Saving Efetivado" (texto fora do formato gerado pelo app). Reconciliação abortada para não gravar palpite.',
     )
-  const itensProjeto = parseItensDaJustificativa(row['Justificativa Custo do Projeto'] as string)
+  const itensProjeto = parseItensDaJustificativa(row['Justificativa Custo para Rodar'] as string)
   if (itensProjeto === null)
     return falha(
-      'Não foi possível reconstruir os itens de "Justificativa Custo do Projeto" (texto fora do formato gerado pelo app). Reconciliação abortada.',
+      'Não foi possível reconstruir os itens de "Justificativa Custo para Rodar" (texto fora do formato gerado pelo app). Reconciliação abortada.',
     )
 
-  const totalEvitadoSheet = round2(Math.max(0, parseValorBR(String(row['Custo Evitado'] ?? '0')) || 0))
-  const totalProjetoSheet = round2(Math.max(0, parseValorBR(String(row['Custo do Projeto'] ?? '0')) || 0))
+  const totalEvitadoSheet = round2(Math.max(0, parseValorBR(String(row['Saving Efetivado'] ?? '0')) || 0))
+  const totalProjetoSheet = round2(Math.max(0, parseValorBR(String(row['Custo para Rodar'] ?? '0')) || 0))
   const somaEvitado = somarItens(itensEvitado)
   const somaProjeto = somarItens(itensProjeto)
 
   if (Math.abs(somaEvitado - totalEvitadoSheet) > 0.01)
     return falha(
-      `Divergência na planilha: "Custo Evitado" = ${totalEvitadoSheet}, mas os itens da justificativa somam ${somaEvitado}. Corrija a planilha antes de reconciliar.`,
+      `Divergência na planilha: "Saving Efetivado" = ${totalEvitadoSheet}, mas os itens da justificativa somam ${somaEvitado}. Corrija a planilha antes de reconciliar.`,
     )
   if (Math.abs(somaProjeto - totalProjetoSheet) > 0.01)
     return falha(
-      `Divergência na planilha: "Custo do Projeto" = ${totalProjetoSheet}, mas os itens da justificativa somam ${somaProjeto}. Corrija a planilha antes de reconciliar.`,
+      `Divergência na planilha: "Custo para Rodar" = ${totalProjetoSheet}, mas os itens da justificativa somam ${somaProjeto}. Corrija a planilha antes de reconciliar.`,
     )
 
   const docRow = await getDocumentacao(projetoId)
@@ -200,10 +209,10 @@ export async function reconciliarFinanceiroDoSheet(
   await upsertDocumentacao(projetoId, conteudo)
   await updateProjeto(projetoId, {
     custo_evitado: itensEvitado.length > 0 ? 'sim' : 'nao',
-    custo_evitado_justificativa: (row['Justificativa Custo Evitado'] as string) || null,
+    custo_evitado_justificativa: (row['Evidência Saving Efetivado'] as string) || null,
     custo_evitado_itens: JSON.stringify(itensEvitado),
     custo_projeto: itensProjeto.length > 0 ? 'sim' : 'nao',
-    custo_projeto_justificativa: (row['Justificativa Custo do Projeto'] as string) || null,
+    custo_projeto_justificativa: (row['Justificativa Custo para Rodar'] as string) || null,
     custo_projeto_itens: JSON.stringify(itensProjeto),
     saving_reais: savingReaisNovo,
     ganho_total_mensal: ganhoNovo > 0 ? ganhoNovo : null,

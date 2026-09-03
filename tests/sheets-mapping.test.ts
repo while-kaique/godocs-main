@@ -24,13 +24,13 @@ const okResp = (body: unknown) =>
 // ANTES de Saving Reais / Tipo de Saving / Memorial.
 const LIVE_HEADERS = [
   'ID Projeto',
-  'Saving Horas',
-  'Horas em Reais',
-  'Custo Evitado',
-  'Justificativa Custo Evitado',
-  'Custo Mensal ou Pontual',
-  'Saving Reais',
-  'Tipo de Saving',
+  'Custo Evitado Horas',
+  'Custo Evitado Horas Reais',
+  'Saving Efetivado',
+  'Evidência Saving Efetivado',
+  'Freq. Saving Efetivado',
+  'Impacto Bruto',
+  'Freq. Custo Evitado',
   'Memorial de Saving',
   'Status',
   'Observações',
@@ -40,16 +40,16 @@ const LIVE_HEADERS = [
 describe('orderValuesByHeaders (puro)', () => {
   it('alinha valores pela ORDEM do cabeçalho real, não pela ordem de inserção', () => {
     const values = {
-      'Saving Reais': 420,
+      'Impacto Bruto': 420,
       'ID Projeto': 'p1',
-      'Custo Evitado': 150,
-      'Saving Horas': 10,
-      'Horas em Reais': 300,
+      'Saving Efetivado': 150,
+      'Custo Evitado Horas': 10,
+      'Custo Evitado Horas Reais': 300,
     };
     const row = orderValuesByHeaders(LIVE_HEADERS, values);
-    expect(row[LIVE_HEADERS.indexOf('Custo Evitado')]).toBe(150);
-    expect(row[LIVE_HEADERS.indexOf('Saving Reais')]).toBe(420);
-    expect(row[LIVE_HEADERS.indexOf('Horas em Reais')]).toBe(300);
+    expect(row[LIVE_HEADERS.indexOf('Saving Efetivado')]).toBe(150);
+    expect(row[LIVE_HEADERS.indexOf('Impacto Bruto')]).toBe(420);
+    expect(row[LIVE_HEADERS.indexOf('Custo Evitado Horas Reais')]).toBe(300);
     expect(row[LIVE_HEADERS.indexOf('Memorial de Saving')]).toBe('');
   });
 });
@@ -93,12 +93,12 @@ describe('appendRow (por nome)', () => {
 
     await appendRow({
       'ID Projeto': 'p1',
-      'Saving Horas': 10,
-      'Horas em Reais': 300,
-      'Custo Evitado': 150,
-      'Custo Mensal ou Pontual': 'Mensal',
-      'Saving Reais': 420,
-      'Tipo de Saving': 'mensal',
+      'Custo Evitado Horas': 10,
+      'Custo Evitado Horas Reais': 300,
+      'Saving Efetivado': 150,
+      'Freq. Saving Efetivado': 'Mensal',
+      'Impacto Bruto': 420,
+      'Freq. Custo Evitado': 'mensal',
       'Status': 'Pendente',
     });
 
@@ -106,10 +106,10 @@ describe('appendRow (por nome)', () => {
     const body = JSON.parse((appendCall[1] as RequestInit).body as string);
     const row = body.values[0] as (string | number)[];
 
-    expect(row[LIVE_HEADERS.indexOf('Custo Evitado')]).toBe(150);
-    expect(row[LIVE_HEADERS.indexOf('Saving Reais')]).toBe(420);
-    expect(row[LIVE_HEADERS.indexOf('Tipo de Saving')]).toBe('mensal');
-    expect(row[LIVE_HEADERS.indexOf('Horas em Reais')]).toBe(300);
+    expect(row[LIVE_HEADERS.indexOf('Saving Efetivado')]).toBe(150);
+    expect(row[LIVE_HEADERS.indexOf('Impacto Bruto')]).toBe(420);
+    expect(row[LIVE_HEADERS.indexOf('Freq. Custo Evitado')]).toBe('mensal');
+    expect(row[LIVE_HEADERS.indexOf('Custo Evitado Horas Reais')]).toBe(300);
     expect(String(appendCall[0])).toContain(`A%3A${colLetter(LIVE_HEADERS.length - 1)}`);
   });
 });
@@ -153,7 +153,7 @@ describe('casamento de coluna tolerante a acento/caixa (05/08/2026)', () => {
     expect(chaveColuna('Justificativa Aprovação do Líder')).toBe(
       chaveColuna('  justificativa aprovacao do  LIDER '),
     );
-    expect(chaveColuna('Participantes')).not.toBe(chaveColuna('Participantes 2'));
+    expect(chaveColuna('Coautor')).not.toBe(chaveColuna('Participante'));
   });
 
   it('update grava na coluna sem acento quando o código manda o nome acentuado', async () => {
@@ -225,9 +225,9 @@ describe('readAllRows (por nome)', () => {
 
     const rows = await readAllRows();
     expect(rows).toHaveLength(1);
-    // "Saving Reais" deve ler 420 (coluna real T), não 300 (Horas em Reais, posição antiga P)
-    expect(rows[0]['Saving Reais']).toBe('420');
-    expect(rows[0]['Tipo de Saving']).toBe('mensal');
-    expect(rows[0]['Custo Evitado']).toBe('150');
+    // "Impacto Bruto" deve ler 420 (coluna real T), não 300 (Horas em Reais, posição antiga P)
+    expect(rows[0]['Impacto Bruto']).toBe('420');
+    expect(rows[0]['Freq. Custo Evitado']).toBe('mensal');
+    expect(rows[0]['Saving Efetivado']).toBe('150');
   });
 });

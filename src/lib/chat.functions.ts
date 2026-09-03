@@ -113,7 +113,7 @@ import {
   mergeDocCompilada,
   soCamposDaDoc,
 } from "@/lib/agents/doc-async";
-import { docCompiladorLLMOpts, docCompiladorSubmitLLMOpts } from "@/lib/agents/doc-modelo";
+import { docCompiladorLLMOpts } from "@/lib/agents/doc-modelo";
 import type { LLMOptions } from "@/lib/llm";
 import { validarDocumentacao } from "@/lib/agents/validator";
 import {
@@ -580,6 +580,13 @@ const iniciarSubmissaoSchema = z.object({
   // conversa) e o fluxo NÃO inicia o chat — o frontend segue direto ao formulário
   // determinístico de saving/receita. Ignorado para `especial` (que já pula tudo).
   fluxo_direto: z.boolean().optional(),
+  // ⚠️ GoDocs v2 (T9): o agente conversacional SAIU do fluxo de submissão — a doc passou a
+  // ser compilada em UMA passada, em background. O ramo de CONVERSA continua existindo e
+  // FUNCIONANDO (a decisão do Luis foi "tirar do fluxo, não excluir — vamos reaproveitá-los
+  // eventualmente"), mas só é alcançado por quem PEDE explicitamente: hoje, o painel admin
+  // de cenários (`src/lib/testes/scenario-launcher.tsx`), que existe justamente para exercitar
+  // o agente. O formulário real NUNCA manda esta flag.
+  modo_conversa: z.boolean().optional(),
   docs: z
     .array(z.object({ base64: z.string().min(1), filename: z.string().min(1) }))
     .min(1)
@@ -870,45 +877,43 @@ export async function iniciarSubmissao(
     }
   }
 
-  // ── Fluxo DIRETO de liderança: compila a doc por IA numa ÚNICA passada (a partir
-  // do que o extrator pegou dos arquivos/descrição) e NÃO inicia o chat. O frontend
-  // segue direto ao formulário determinístico de saving/receita. A permissão é
-  // conferida no SERVIDOR (o flag do cliente sozinho não libera). Ver `podeFluxoDireto`.
-  if (data.fluxo_direto && !data.especial && (await podeFluxoDireto(solicitanteEmail))) {
-    let doc: DocumentacaoGerada;
-    try {
-      doc = await compilarDocumentacao(ctx, coletadoInicial);
-    } catch (compileErr) {
-      // A liderança não tem chat para retentar — se a IA falhar, cai numa doc mínima
-      // determinística (título + descrição) para a submissão não travar. A validação
-      // de qualidade é humana (equipe RPA), igual ao caminho especial.
-      err(
-        "iniciarSubmissao",
-        "Compilação da doc falhou no fluxo direto — usando doc mínima:",
-        compileErr,
-      );
-      doc = buildDocEspecial({
-        nome_projeto: data.nome_projeto,
-        responsavel_nome: data.responsavel_nome,
-        responsavel_email: data.responsavel_email,
-        ferramenta: data.ferramenta,
-        membros: data.membros,
-        descricao_breve: data.descricao_breve,
-      });
-    }
-    const docComSinais = {
-      ...doc,
-      tem_ia_como_funcionalidade: coletadoInicial.tem_ia_como_funcionalidade ?? null,
-    };
-    await upsertDocumentacao(projeto.id, docComSinais);
+  // ── GoDocs v2 (T7 + T9) — CAMINHO PADRÃO: a doc é INVISÍVEL ─────────────────
+  //
+  // T9: o agente conversacional saiu do fluxo de submissão. Antes, este ponto rodava o
+  // orquestrador na fase `doc` e devolvia uma PERGUNTA ao usuário; o ramo que pulava isso
+  // exigia `fluxo_direto` + `podeFluxoDireto` (o atalho da liderança). Como o formulário v2
+  // não manda mais `fluxo_direto`, TODA submissão caía na conversa e a linha de
+  // `documentacao` nunca era gravada — e `submeterParaValidacao` recusava com
+  // `bloqueioDocAusente()`. Por isso o antigo ramo de exceção virou a REGRA, sem env-gate,
+  // sem predicado `isV2()` e sem consultar cargo nenhum (decisão do Luis, 02/09/2026).
+  //
+  // T7: e ela é compilada em SEGUNDO PLANO. O que fica gravado agora é o PLACEHOLDER
+  // (`placeholderDocPendente`, que carrega o `coletado` do extrator); a compilação segue por
+  // `runBackground` enquanto a pessoa preenche a Etapa 3. ⚠️ O `await` da compilação vivia
+  // aqui, no caminho crítico: com ele, o clique de "Avançar" da Etapa 2 esperava o LLM, que é
+  // exatamente o que a v2 existe para acabar ("a pessoa não sente que existe uma doc sendo
+  // processada nos fundos", D6).
+  //
+  // ⚠️ Falha de compilação NÃO derruba a submissão: a doc fica pendente e há DUAS redes —
+  // `reconciliarDocSePendente` (no submit) e o cron `recompilarDocsPendentes`. É por isso
+  // que o `buildDocEspecial` deixou de ser chamado aqui: doc mínima gravada agora apagaria
+  // a pendência e o cron nunca reprocessaria (fallback prematuro vira doc pobre definitiva).
+  if (!data.modo_conversa) {
+    await upsertDocumentacao(projeto.id, placeholderDocPendente(coletadoInicial));
+    runBackground(compilarEPersistirDoc(projeto.id, ctx, coletadoInicial));
     log(
       "iniciarSubmissao",
-      `Fluxo direto (liderança): doc compilada por IA — projeto ${projeto.id} pronto para o formulário.`,
+      `Doc encomendada em segundo plano — projeto ${projeto.id} liberado sem esperar o LLM.`,
     );
     return { projeto_id: projeto.id, fluxo_direto: true };
   }
 
-  log("iniciarSubmissao", "Rodando orquestrador (fase doc)...");
+  // ── Ramo de CONVERSA — preservado de propósito (T9: desligar ≠ apagar) ──────
+  // Só é alcançado por quem pede `modo_conversa` explicitamente: hoje, o painel admin de
+  // cenários. O orquestrador, os 7 gates e os prompts continuam vivos e exercitáveis por
+  // aqui — "não vamos excluir os agentes, vamos tirá-los do fluxo de submissão novo, mas
+  // vamos reaproveitá-los eventualmente" (Luis, 02/09/2026).
+  log("iniciarSubmissao", "Rodando orquestrador (fase doc) — modo CONVERSA (painel de cenários)...");
   const resultado = await runOrchestrator(
     ctx,
     [],
@@ -2896,7 +2901,7 @@ export async function atualizarTipos(rawData: unknown) {
     tipo_projeto: data.tipos_projeto[0],
     especial: false,
     // Deixou de ser especial → o contexto especial não descreve mais o projeto.
-    // Limpa para a coluna "Contexto do Projeto Especial" virar "—" (edição fidedigna
+    // Limpa para a coluna "Ganho Imensurável" virar "—" (edição fidedigna
     // ao novo tipo). ouTraco(null) → "—" no sync.
     contexto_especial: null,
   });
@@ -3022,13 +3027,13 @@ export async function atualizarMetadados(rawData: unknown) {
   // o `atualizarTipos` roda ANTES desta chamada (submeter.tsx) e já zerou a flag, então
   // o guard não disparava — e o passo 1 acima acabava de REGRAVAR o `contexto_especial`
   // que o form ainda carregava. Resultado: flag zerada, texto órfão no SQLite e na coluna
-  // "Contexto do Projeto Especial" (casos "Farol de Ciência do Código de Conduta" e
+  // "Ganho Imensurável" (casos "Farol de Ciência do Código de Conduta" e
   // "GoStream - Checklist Proposta", ago/2026). Por isso olhamos TAMBÉM o contexto: com
   // `especial: false` explícito, contexto especial preenchido é sempre resíduo.
   const temContextoResidual = (ctxData?.contexto_especial ?? '').trim().length > 0;
   if (data.especial === false && (ctxData?.especial === 1 || temContextoResidual)) {
     // Zera a flag E limpa o contexto especial (não descreve mais o projeto) — a coluna
-    // "Contexto do Projeto Especial" vira "—" no sync. Edição fidedigna ao novo tipo.
+    // "Ganho Imensurável" vira "—" no sync. Edição fidedigna ao novo tipo.
     await updateProjeto(data.projeto_id, { especial: false, contexto_especial: null });
     log(
       "atualizarMetadados",
@@ -3110,23 +3115,35 @@ export async function atualizarMetadados(rawData: unknown) {
     }
   }
 
-  // Última operação que pode lançar. Se chegou aqui, a nova doc está pronta.
-  const resultado = await runOrchestrator(ctx, [], "doc", coletadoInicial, savingVazio());
-
-  // ── TROCA (só agora) — apaga o antigo e grava o novo. Sequência curta de ops de
-  // banco, sem trabalho de rede no meio que possa ser cancelado deixando estado parcial.
+  // ── TROCA — apaga o texto antigo e grava o novo. Sequência curta de ops de banco,
+  // sem trabalho de rede no meio que possa ser cancelado deixando estado parcial.
+  //
+  // ⚠️ T9: aqui rodava um `runOrchestrator` (fase `doc`) cujo resultado virava um turno
+  // `assistant` — o 2º ponto em que o agente entrava no fluxo de submissão. Ele saiu; a doc
+  // volta a ser compilada em SEGUNDO PLANO (T7), como em `iniciarSubmissao`. A mensagem
+  // `role: "doc"` FICA: ela é o texto cru extraído dos arquivos, que o analisador e o resumo
+  // do Drive leem — não é turno de conversa.
   await deleteChatMessagesByProjeto(data.projeto_id);
   await insertChatMessage({
     projeto_id: data.projeto_id,
     role: "doc",
     content: docTexto || "(documento sem texto legível)",
   });
-  await insertChatMessage({
-    projeto_id: data.projeto_id,
-    role: "assistant",
-    content: JSON.stringify(resultado),
-    options: resultado.type === "options" ? resultado.options : null,
-  });
+  // ⚠️ PATCH, nunca `upsertDocumentacao` — este é o caminho da EDIÇÃO. `upsertDocumentacao`
+  // faz REPLACE do `conteudo` inteiro, e o blob de um projeto v1 guarda `saving`/`receita`,
+  // que são a fonte do financeiro no submit: gravar o placeholder por cima APAGARIA o
+  // financeiro de quem só trocou um anexo em `/editar/$id`. É a mesma disciplina do
+  // `patchDaDocCompilada` (json_patch + `soCamposDaDoc`), pelo mesmo motivo.
+  // Linha inexistente (0 atualizadas) → aí sim cria; `null` (adaptador não informa) NÃO cria,
+  // para não sobrescrever às cegas um financeiro recém-gravado.
+  const linhasDoc = await patchDocumentacaoConteudo(
+    data.projeto_id,
+    placeholderDocPendente(coletadoInicial) as unknown as Record<string, unknown>,
+  );
+  if (linhasDoc === 0) {
+    await upsertDocumentacao(data.projeto_id, placeholderDocPendente(coletadoInicial));
+  }
+  runBackground(compilarEPersistirDoc(data.projeto_id, ctx, coletadoInicial));
   // Nomes dos arquivos atualizados só após o sucesso da regeneração (o link do Drive
   // é gerado depois, em submeterParaValidacao).
   if (temDocs) {
@@ -3135,8 +3152,8 @@ export async function atualizarMetadados(rawData: unknown) {
     });
   }
 
-  log("atualizarMetadados", `Documentação reiniciada — fase: ${resultado.fase}`);
-  return { ok: true, reset: true, response: formatResponse(resultado) };
+  log("atualizarMetadados", "Documentação reiniciada — recompilação encomendada em segundo plano.");
+  return { ok: true, reset: true };
 }
 
 // ─── Analisar projeto (pré-submissão) ───────────────────────────────────────
@@ -3146,6 +3163,26 @@ const analisarProjetoSchema = z.object({ projeto_id: z.string().min(1) });
 export async function analisarProjetoFn(rawData: unknown) {
   const { projeto_id } = analisarProjetoSchema.parse(rawData);
   log("analisarProjeto", `projeto=${projeto_id}`);
+
+  // ⚠️ T7 — o analisador NÃO roda sobre PLACEHOLDER. Com a doc compilada em segundo plano,
+  // ela pode ainda não ter aterrissado quando a análise dispara (ela sai do
+  // `processarPosSubmissao`, logo após o submit). Sobre o placeholder, `buildUserMessage`
+  // escreve "(não preenchido)" nos 6 campos da doc e o LLM devolve parecer, complexidade e
+  // `classificacao_avaliacao` sobre uma doc VAZIA — e nada corrige isso depois:
+  // `reconciliarComplexidade` só preenche campo em branco, nunca sobrescreve o que já foi
+  // escrito. Pular é reversível; analisar cedo, não. Quem retoma é o cron
+  // (`recompilarDocsPendentes`), que redispara a análise assim que a doc fica pronta.
+  const docPendente = await getDocumentacao(projeto_id);
+  if (docPendente) {
+    const conteudoPendente = parseJson<Record<string, unknown>>(docPendente.conteudo) ?? {};
+    if (precisaCompilarDoc(conteudoPendente)) {
+      log(
+        "analisarProjeto",
+        `Doc ainda em compilação — análise ADIADA para o cron (projeto ${projeto_id}).`,
+      );
+      return { ok: true, adiado: "doc_pendente" as const };
+    }
+  }
 
   const resultado = await analisarProjetoAgent(projeto_id);
 
@@ -3626,24 +3663,29 @@ export async function reconciliarDocSePendente(
     // `conteudo` em memória fundido p/ o downstream (Drive/analisador) usar a doc completa.
     return mergeDocCompilada(conteudo, doc, coletadoPendente);
   } catch (compileErr) {
-    // No MODO ASSÍNCRONO o cliente NÃO pode travar: ele já seguiu com o `coletado`. Se o luna
-    // não entregou nem aqui (com o timeout folgado), DEFERIMOS — a doc fica PENDENTE e é
-    // recompilada no luna pelo cron (`recompilarDocsPendentes`); nunca publicamos doc de mini.
-    // No modo síncrono (default de hoje) mantém o bloqueio: sem async não há rede que recomponha.
-    if (docCompilacaoAssincronaAtiva()) {
-      err(
-        "reconciliarDocSePendente",
-        `Compilação falhou no submit (projeto ${projetoId}) — DEFERIDA p/ recompilação no luna (doc fica pendente):`,
-        compileErr,
-      );
-      return conteudo; // permanece com compilacao_pendente:true → cron recompila depois
-    }
+    // O cliente NÃO pode travar: ele já seguiu com o `coletado`. Se o LLM não entregou nem
+    // aqui (com o timeout folgado), DEFERIMOS — a doc fica PENDENTE e é recompilada pelo cron
+    // (`recompilarDocsPendentes`, que ao terminar redispara a análise); nunca publicamos doc
+    // de mini.
+    //
+    // ⚠️ T7 (v2): este adiamento era condicionado a `docCompilacaoAssincronaAtiva()`, com o
+    // argumento "sem async não há rede que recomponha". A condição CAIU porque as duas metades
+    // do argumento deixaram de valer: a doc agora é SEMPRE compilada em segundo plano no fluxo
+    // de submissão, e a rede (o cron) roda independente da flag. Mantê-la significaria bloquear
+    // a submissão inteira por um soluço do proxy, num fluxo que **não tem mais chat para
+    // retentar** — o usuário ficaria com "documentação ausente" e nenhuma saída. Bloquear aqui
+    // é irreversível para ele; adiar é reversível para nós.
+    //
+    // ⚠️ Isso pressupõe o cron `/api/cron/recompilar-docs-pendentes` AGENDADO no ambiente. Sem
+    // ele, a doc adiada não é recompilada por ninguém e o projeto fica sem documentação (e sem
+    // análise, porque o redisparo mora no mesmo cron). Ao provisionar um app novo, este cron
+    // entra junto com o `sync-sheets-to-sqlite`.
     err(
       "reconciliarDocSePendente",
-      `Compilação da doc falhou no submit (projeto ${projetoId}) — não submetendo doc incompleta:`,
+      `Compilação falhou no submit (projeto ${projetoId}) — DEFERIDA p/ o cron (doc fica pendente):`,
       compileErr,
     );
-    throw erroDeBloqueio(bloqueioDocAusente());
+    return conteudo; // permanece com compilacao_pendente:true → cron recompila depois
   }
 }
 
@@ -3675,8 +3717,38 @@ export async function recompilarDocsPendentes(
         projeto,
         docCompiladorLLMOpts(),
       );
-      if (precisaCompilarDoc(reconc)) pendentes++;
-      else recompilados++;
+      if (precisaCompilarDoc(reconc)) {
+        pendentes++;
+      } else {
+        recompilados++;
+        // ⚠️ Só projeto SUBMETIDO. A fila de docs pendentes (`getDocsPendentesCompilacao`)
+        // não filtra status, e o placeholder nasce lá no `iniciarSubmissao` — ou seja, todo
+        // RASCUNHO em que a compilação de fundo falhou está nela. Analisar um rascunho não é
+        // só inútil: `analisarProjetoFn` grava `status`/`validated_at` e espelha a linha, o
+        // rascunho deixaria de ser rascunho, apareceria no `/dashboard` (o gotcha nº 1 daquela
+        // tela) e, por não existir na planilha, seria APAGADO em cascata pela
+        // `reconciliarExclusoes` depois da carência de 1h. Todos os outros disparos de análise
+        // já são escopados a submetidos.
+        if (!projeto.submitted_at) continue;
+        // O submit seguiu sem esperar a doc (D6) e por isso NÃO gravou o resumo no Drive:
+        // agora que a doc existe, o resumo é gravado/atualizado in-place (não lança).
+        await salvarResumoDocNoDrive(projeto_id, projeto, reconc, projeto.area ?? null);
+        // A análise daquele projeto foi ADIADA quando
+        // ele foi submetido (o guard em `analisarProjetoFn`). Sem este redisparo o projeto
+        // ficaria PARA SEMPRE sem parecer: `reconciliarComplexidade` só repõe campo vazio,
+        // e nada mais volta a olhar para ele. Fire-and-forget com catch próprio — a corrida
+        // do cron não pode cair por causa de uma análise (é a mesma disciplina do
+        // `analisarEmBackground` do worker).
+        runBackground(
+          analisarProjetoFn({ projeto_id }).catch((e) =>
+            err(
+              "recompilarDocsPendentes",
+              `Análise pós-recompilação falhou (projeto ${projeto_id}):`,
+              e,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       // reconciliarDocSePendente pode lançar no modo síncrono; aqui a corrida nunca cai.
       pendentes++;
@@ -3688,6 +3760,50 @@ export async function recompilarDocsPendentes(
     `verificados=${pend.length} recompilados=${recompilados} pendentes=${pendentes}`,
   );
   return { verificados: pend.length, recompilados, pendentes };
+}
+
+// Salva/atualiza o RESUMO da documentação como UM doc no Drive (link único na coluna "URL").
+// Em edição atualiza o MESMO doc in-place — N edições não geram N arquivos. NUNCA lança: o Drive
+// falhando não pode derrubar submissão nem cron. Usado pelo submit (doc já compilada) e pelo cron
+// `recompilarDocsPendentes` (doc compilada depois de o submit ter seguido sem esperar — D6).
+export async function salvarResumoDocNoDrive(
+  projeto_id: string,
+  projeto: NonNullable<Awaited<ReturnType<typeof getProjetoById>>>,
+  conteudo: Record<string, unknown>,
+  areaFinal: string | null,
+  now: string = new Date().toISOString(),
+): Promise<string | null> {
+  try {
+    const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
+    // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
+    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, "doc");
+    const docUsuarioMsg = await getDocMessage(projeto_id);
+    const md = renderResumoDocumentacao(projeto, conteudo, {
+      resumoProjeto: extrairResumoProjeto(msgsResumo),
+      docUsuario: docUsuarioMsg?.content ?? null,
+      arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
+    });
+    const sanit = (x: string) =>
+      (x || "")
+        .replace(/[|/\\]+/g, "-")
+        .replace(/->|→|<>/g, "-")
+        .replace(/\s+/g, " ")
+        .replace(/[^\w\sÀ-ÿ.\-]/g, "")
+        .trim()
+        .replace(/\s/g, "_")
+        .slice(0, 80);
+    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, "")}_${sanit(projeto.nome ?? "projeto")}_${sanit(areaFinal ?? projeto.area ?? "")}.md`;
+    const link = await upsertResumoDoc(filename, md, linkExistente);
+    if (link) {
+      await updateProjeto(projeto_id, { arquivos_links: [link] });
+      (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
+      log("salvarResumoDocNoDrive", `Resumo da doc salvo no Drive: ${link}`);
+    }
+    return link;
+  } catch (driveErr) {
+    err("salvarResumoDocNoDrive", "Falha ao salvar resumo no Drive (não bloqueante):", driveErr);
+    return null;
+  }
 }
 
 export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?: string | null) {
@@ -3707,16 +3823,15 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
 
   if (!projeto) throw new Error("Projeto não encontrado.");
 
-  // Reconciliação da doc ASSÍNCRONA: garante a doc compilada ANTES do Drive/analisador,
-  // preservando saving/receita; bloqueia se a compilação falhar. Ver reconciliarDocSePendente.
-  // Submit é AWAITED no clique "Enviar" → perfil FAIL-FAST (0 retries, timeout limitado): sob
-  // proxy degradado defere rápido em vez de pendurar a requisição; o cron recompila no folgado.
-  conteudo = await reconciliarDocSePendente(
-    projeto_id,
-    conteudo,
-    projeto,
-    docCompiladorSubmitLLMOpts(),
-  );
+  // D6 (v2) — "a submissão NÃO espera": se a doc ainda está em compilação (placeholder), o
+  // submit segue SEM nenhuma chamada de LLM no caminho crítico. Quem fecha a doc é o cron
+  // (`recompilarDocsPendentes`), que ao compilar redispara a análise E refaz o resumo no Drive.
+  // (Antes havia um `await reconciliarDocSePendente(...)` aqui — o achado ALTO da revisão de
+  // conformidade da v2: contradizia D6 e o critério 1 do plano.)
+  const docPendenteNoSubmit = precisaCompilarDoc(conteudo);
+  if (docPendenteNoSubmit) {
+    log("submeterParaValidacao", `Doc ainda pendente — submissão segue sem esperar (D6); o cron recompila (projeto ${projeto_id}).`);
+  }
 
   // Rede de segurança: re-deriva R$ das horas antes de popular colunas/planilha.
   // Garante saving_reais correto mesmo que doc.saving tenha sido salvo com R$ zerado
@@ -3942,7 +4057,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     ),
   );
   // Coluna "Memorial de Saving" (V) recebe SÓ o memorial de saving (com R$). O memorial de
-  // receita vai SOMENTE para "Receita Memorial" (Z); em projeto só-receita, V fica "—".
+  // receita vai SOMENTE para "Racional Receita" (Z); em projeto só-receita, V fica "—".
   // (memorial_calculo no banco segue sendo o unificado — usado em "Memorial anterior"/auditoria.)
   const memorialSavingLimpo =
     tiposProjeto.includes("saving") && saving
@@ -3956,7 +4071,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   const alocacaoGanhos = extrairAlocacaoGanhos(
     normalizarMarcadoresMemorial((saving as SavingColetado | undefined)?.memorial_calculo),
   );
-  // "Justificativa Saving Escalado e Real": análise do agente para o split (fatiada do
+  // "Racional Custo Evitado": análise do agente para o split (fatiada do
   // memorial; fallback determinístico quando o split se aplica mas não foi consolidado).
   const justificativaCargaEscala = derivarJustificativaCargaEscala(
     saving as Record<string, unknown> | undefined,
@@ -4020,37 +4135,11 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   }
 
   // ── Resumo da documentação → UM doc no Drive (link único na coluna "URL") ──
-  // Salva o RESUMO da documentação gerada pelo agente como UM documento no Drive
-  // (NÃO os arquivos crus enviados). Em edição, atualiza o MESMO doc in-place — N
-  // edições não geram N arquivos. Não bloqueia a submissão se o Drive falhar.
-  try {
-    const linkExistente = parseJson<string[]>(projeto.arquivos_links)?.[0] ?? null;
-    // Doc completa de ponta a ponta: resumo do agente + texto dos arquivos do usuário.
-    const msgsResumo = await getChatMessagesExcludeRole(projeto_id, "doc");
-    const docUsuarioMsg = await getDocMessage(projeto_id);
-    const md = renderResumoDocumentacao(projeto, conteudo, {
-      resumoProjeto: extrairResumoProjeto(msgsResumo),
-      docUsuario: docUsuarioMsg?.content ?? null,
-      arquivosNomes: parseJson<string[]>(projeto.arquivos_nomes) ?? [],
-    });
-    const sanit = (x: string) =>
-      (x || "")
-        .replace(/[|/\\]+/g, "-")
-        .replace(/->|→|<>/g, "-")
-        .replace(/\s+/g, " ")
-        .replace(/[^\w\sÀ-ÿ.\-]/g, "")
-        .trim()
-        .replace(/\s/g, "_")
-        .slice(0, 80);
-    const filename = `${now.slice(0, 10)}_${now.slice(11, 19).replace(/:/g, "")}_${sanit(projeto.nome ?? "projeto")}_${sanit(areaFinal ?? "")}.md`;
-    const link = await upsertResumoDoc(filename, md, linkExistente);
-    if (link) {
-      await updateProjeto(projeto_id, { arquivos_links: [link] });
-      (projeto as { arquivos_links?: string | null }).arquivos_links = JSON.stringify([link]);
-      log("submeterParaValidacao", `Resumo da doc salvo no Drive: ${link}`);
-    }
-  } catch (driveErr) {
-    err("submeterParaValidacao", "Falha ao salvar resumo no Drive (não bloqueante):", driveErr);
+  // Só com a doc COMPILADA: gravar o resumo do placeholder deixaria "(não preenchido)" no
+  // Drive até uma edição futura (achado ALTO da revisão de qualidade). Doc pendente → o cron
+  // grava o resumo quando compilar (`salvarResumoDocNoDrive`, chamado em recompilarDocsPendentes).
+  if (!docPendenteNoSubmit) {
+    await salvarResumoDocNoDrive(projeto_id, projeto, conteudo, areaFinal ?? null, now);
   }
 
   // Evento de timeline: submissão/reenvio finalizado (fecha o histórico).
@@ -4088,7 +4177,7 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
   // ── Contexto especial órfão: rede final antes de qualquer escrita ────────────
   // O projeto deixou de ser especial em algum ponto do fluxo (Etapa 2.5 → saving/
   // receita), mas o texto do "porquê é especial" continuou no banco: ele não descreve
-  // mais este projeto e não pode ir para a coluna "Contexto do Projeto Especial" nem
+  // mais este projeto e não pode ir para a coluna "Ganho Imensurável" nem
   // aparecer em /projeto/$id. As duas limpezas de origem (`atualizarTipos` e
   // `atualizarMetadados`) são condicionais e dependem de o formulário chamá-las na
   // ordem certa — aqui não depende de nada: se `especial` é 0 no momento do submit,
@@ -4189,7 +4278,7 @@ export async function resyncGoogle(rawData: unknown) {
   if (!projeto) throw new Error("Projeto não encontrado.");
 
   // Contexto especial órfão: o resync reescreve a linha INTEIRA a partir do banco, então
-  // sem esta limpeza ele REGRAVA o texto residual na coluna "Contexto do Projeto Especial"
+  // sem esta limpeza ele REGRAVA o texto residual na coluna "Ganho Imensurável"
   // — é justamente o resync a ferramenta usada para consertar linhas antigas (casos "Farol
   // de Ciência do Código de Conduta" e "GoStream - Checklist Proposta", 19/08/2026).
   await limparContextoEspecialOrfao(projeto_id, projeto, "resyncGoogle");
@@ -4233,7 +4322,7 @@ export async function resyncGoogle(rawData: unknown) {
   const ganhoTotalMensal = savingMensal + receitaValor / 10;
 
   const tiposProjeto = parseJson<string[]>(projeto.tipos_projeto) ?? [];
-  // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Receita Memorial").
+  // V "Memorial de Saving" = só saving (receita vai só na coluna Z "Racional Receita").
   const memorialSavingLimpo =
     tiposProjeto.includes("saving") && saving
       ? stripMarkdown(
@@ -4445,10 +4534,10 @@ export async function retroativoCustosPontuais(rawData: unknown) {
         ? stripMarkdown(enriquecerMemorial(savingRecalc, undefined, ["saving"]))
         : "—";
       await updateRowByProjectId(id, {
-        "Custo Evitado": newEvitado,
-        "Custo do Projeto": newProjeto,
-        "Saving Reais": savingReaisNew,
-        "Ganho Total": ganhoNewRound,
+        "Saving Efetivado": newEvitado,
+        "Custo para Rodar": newProjeto,
+        "Impacto Bruto": savingReaisNew,
+        "Impacto Líquido": ganhoNewRound,
         "Memorial de Saving": memorialSavingLimpo,
         "Atualizado Em": nowFortaleza(),
       });
@@ -4539,9 +4628,9 @@ export async function retroativoCustosPontuais(rawData: unknown) {
       ganho_total_mensal: newGanho > 0 ? newGanho : null,
     });
     await updateRowByProjectId(id, {
-      "Custo Evitado": newEvitado,
-      "Saving Reais": newSaving,
-      "Ganho Total": newGanho,
+      "Saving Efetivado": newEvitado,
+      "Impacto Bruto": newSaving,
+      "Impacto Líquido": newGanho,
       "Atualizado Em": nowFortaleza(),
     });
     log(

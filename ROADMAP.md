@@ -6,6 +6,127 @@
 > Contexto: projeto já em produção (`https://godocs.devgogroup.com/`). O GGSD foi adotado em 2026-07-17
 > para dar estrutura às **próximas** mudanças; o histórico anterior está no git, no `CLAUDE.md` e em `spec-docs/`.
 
+**Frente GoDocs v2 — submissão determinística sem agente no cliente 🟡 (branch `feat/godocs-v2`, plano APROVADO em 02/09/2026):**
+Plano: [`docs/plans/godocs-v2-submissao-deterministica.md`](docs/plans/godocs-v2-submissao-deterministica.md) ·
+Spec: `SPEC.md` §4 Fase 3 (RF-200..RF-227) + INV-10..INV-15.
+⚠️ **O AMBIENTE MUDOU em 02/09/2026 (tarde), por decisão do Luis:** a frente saiu do `f9c9a7ff` e passou a
+subir na **staging v1 (`edf400b4`, https://godocs-staging.devgogroup.com/)**, porque o app isolado tinha só 9
+dos 45 secrets — sem `GOOGLE_SA_KEY_BASE64`, `GOOGLE_SHEETS_ID`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_OAUTH_*`,
+`TG_API_TOKEN`, `API_PROXY_TOKEN` nem `LLM_API_KEY`, lá não há TeamGuide (áreas/cargos/participantes), Drive,
+planilha nem proxy de LLM. **Prod (`674a3710`) continua intocada, sem exceção.** Consequência aceita: a
+staging deixa de validar a v1 enquanto a v2 estiver lá (regra 13) — reverter é redeploy do `main`. O agente sai do caminho do usuário e a coleta de ganho vira formulário
+determinístico de 4 categorias num acordeão; a fórmula do impacto muda (`1,0·S + 0,5·CE + 0,1·R − C`, mensalizada
+por bloco); a documentação passa a ser compilada em background invisível; e a estrela passa a valer para todo
+projeto, com especial derivado dela.
+
+- ✅ **T1** — ambiente v2 isolado **no ar**: app **`f9c9a7ff`** (`godocs-v2-staging`, https://f9c9a7ff.devgogroup.com/,
+  SQLite próprio zerado), 9 secrets (`GODOCS_ENV=v2-staging` · `GOOGLE_SHEETS_TAB=STAGING-V2` · LLM) e o ambiente
+  novo reconhecido em **5** consumidores, não 1: `env.ts` (+ `rotuloAmbienteExterno`), `pinecone.ts`,
+  `gomoon-lideres`, `rollup-push`, `staging-banner`. Chat/Gomoon/push/Drive mudos por ausência de secret.
+  ⏳ Falta só a verificação com Google (submissão caindo na `STAGING-V2`) — os 6 secrets sensíveis foram
+  **dispensados pelo Luis** por ora.
+- ✅ **T2** — núcleo puro do impacto (`src/lib/impacto.ts`): 4 funções + `PESO_*`/`DIVISOR_FREQUENCIA` como
+  fonte única, **54 casos** de teste. Guardas que os revisores acharam: frequência fora do enum **lança**
+  (era `NaN` → `null` no dinheiro do Gomoon) e custo negativo **clampa** (aumentava o impacto).
+  Nenhum consumidor ainda — trocar as 5 réplicas da v1 é a T6.
+- ✅ **T3** — modelo de dados dos 4 ganhos (`src/lib/ganhos.ts`, novo): os 6 tipos, a régua pura de
+  exclusividade (`categoriasValidas`/`alternarCategoria` — imensurável XOR o resto), **3 pares de
+  serialização** e a ponte `paraGanhosProjeto` para a fórmula da T2. **19 colunas** em `projetos`
+  (`MIGRATIONS`) + os 19 campos em `ProjetoRow`. **167 casos** novos (66 + 97 em autoria cega + 4 do
+  canário), suíte **2548 verde**. Os tipos nasceram em módulo PRÓPRIO, não em `agents/types.ts` como a
+  letra do plano dizia — troca autorizada pelo Luis (é o arquivo que a T9 demole). Guardas que os
+  revisores acharam: a ponte **não guardava o valor** (só a frequência se guardava — `undefined` dava
+  líquido 0 e mensal `NaN`, que vira `null` no dinheiro do Gomoon) e item de **custo** malformado
+  desaparecia calado, o que **infla** o impacto.
+- ✅ **T4** — os 4 componentes, cada um com a régua extraída para um módulo PURO: `acordeao-estado.ts` (33
+  casos) · `itens-lista.ts` (36) · `horas.ts` (67) · `evidencia.ts` (31) + os 4 `.tsx` e um canário de a11y
+  (21). O motivo da divisão é mecânico: o Vitest daqui roda `environment: 'node'` e só inclui
+  `tests/**/*.test.ts` — **não renderiza componente**, então lógica dentro do `.tsx` seria lógica sem teste.
+  Achados: `parseHorasBR` **não existia** (usar `parseMoedaBR` em horas leria "12,5" como R$ 0,13);
+  `depois > antes` virou erro nomeado em vez de zero silencioso; a opção **"Outro"** na função e o **tooltip**
+  são funcionalidade nova (a v1 só tinha os 7 cargos).
+- ✅ **T5** — Etapas 1, 2 e 3 reescritas, **a Etapa 2.5 apagada** e o agente fora do caminho do usuário.
+  `submeter.tsx` 3459 → 2194 linhas (−1324 de handlers de conversa/especial). `validacao-etapa3.ts` (59 casos)
+  tirou do componente o `validate()` de 23 checagens que era inalcançável por teste. Régua nova que a v1 não
+  tinha: o custo evitado exige **ao menos um** dos dois braços. **No ar na staging** (`edf400b4`), suíte
+  **2773 verde**, `npm run build` ok.
+  ⏳ **O envio final ainda quebra** — depende da T6.
+- ✅ **T5 — rodada de AJUSTES com o Luis de olho na staging** (02/09/2026, fim do dia; suíte **2800 verde**,
+  staging `edf400b4` version 291). O que mudou, e o que cada mudança revoga:
+  - **A Etapa 3 voltou à linguagem visual da v1** — painel lime por bloco, **revelação progressiva**
+    (`revelacao.ts`, puro + 16 casos: cada resposta abre a próxima pergunta), frequência em **4 abas lado a
+    lado** (não dropdown), rótulo curto + ajuda de uma linha, e as pílulas `.go-btn-*` do design system.
+    ⚠️ Motivo declarado: *"você criou um design do 0 em cima de referência nenhuma… podia ter reaproveitado
+    muita coisa"*. Registrado como regra de trabalho — **tela nova ADAPTA a v1**, não recria.
+  - **Tipos de ganho em TELA PRÓPRIA** (`selecao-ganho.tsx`), 1ª tela da Etapa 3 — eram um campo no fim da
+    Etapa 2. A régua saiu de `validarEtapa2` (portão não pode cobrar campo que a etapa não mostra) e virou
+    `validarSelecaoGanho`.
+  - **Saving efetivado = par "quanto era" + "quanto é agora"**; o *"desde quando"* saiu. Uma despesa pode ter
+    caído de 20k para 5k, e o saving são os 15k — perguntar UM valor aceitava 20k de ganho num contrato que a
+    empresa ainda paga. O ganho é DERIVADO (`savingLiquido`, clampado em 0). Colunas
+    `saving_efetivado_valor_antes/_agora`; as 3 antigas ficam LEGADO e nunca são escritas.
+  - ⚠️ **REVOGA a exclusividade do imensurável (RF-202 / critério nº 2 do plano):** as **4 categorias
+    combinam**. Um projeto pode ter saving medido E ganho sem número, e marcar os dois é insumo para o agente
+    investigar. `paraGanhosProjeto` só devolve `imensuravel: true` (impacto zero) quando ele é a **única**
+    categoria — devolvê-lo na mistura ZERARIA um saving comprovado.
+  - **Receita = o bloco da PROD**: frequência (só **Mensal/Pontual**) · valor · racional com anexo/print. A
+    lista "de onde vem essa receita" que eu havia inventado saiu do modelo, da tela, da coluna e dos testes.
+  - Custo para rodar deixou de abrir linha em branco para todo projeto (pergunta **sim/não** primeiro);
+    tooltip no "não contratado"; cabeçalho da tabela vira **"Horas antes/Horas depois"**.
+- 🟡 **T6** — persistência, planilha e leitura.
+  - ✅ **Cabeçalho da aba `STAGING-V2` reescrito** (02/09/2026): **59 colunas**, **17 renomeações in-place + 3
+    novas**. Decisão do Luis: **reaproveitar, não criar**. Dois achados derrubaram a proposta antiga do plano:
+    a aba **não está vazia** (é clone da `STAGING`, **578 linhas** — zerá-la esvaziaria o SQLite da staging no
+    1º sync reverso) e **quase tudo já existia**, porque a régua D1 só renomeou conceitos: o `Custo Evitado`
+    da v1 (a empresa pagava e parou) é o **saving efetivado** da v2, e o saving por HORAS da v1 é o **custo
+    evitado** da v2. Novas de verdade só as 3 perguntas que a v1 nunca fez: `Saving Efetivado Agora`,
+    `Custo Evitado Não Contratado` e `Impacto Líquido Mensal`. Mapeamento completo no plano.
+  - ⏳ **Falta:** a rota `POST /api/submeter/ganhos` (que o cliente **já chama** — sem ela o envio dá 404), a
+    materialização dos 3 `impacto_*` (**os 3 ou nenhum**), o `SHEET_COLUMNS` com os nomes novos, a troca do
+    `GOOGLE_SHEETS_TAB` da staging (hoje ainda em `STAGING`, de propósito) e as **5 réplicas** da fórmula
+    passando a chamar a T2. O item **5.8** (impacto bruto × líquido, deflatores 100/50/10 e o líquido
+    **mensalizado** por projeto para o Gomoon) está **decidido e codado na régua** (`impacto.ts`) e **pendente
+    na fiação** — é esta T6 que o entrega.
+- ⬜ **T7** — documentação invisível em background (`iniciarSubmissao` ainda inicia conversa no servidor)
+- ⬜ **T8** — estrelas para todo projeto (estende a mesa de normais)
+- ⬜ **T9** — **DESLIGAR** o agente do fluxo de submissão (⚠️ **não** "apagar" — decisão do Luis em
+  02/09/2026: *"não vamos excluir os agentes… vamos reaproveitá-los eventualmente"*). O lado CLIENTE já saiu
+  com a T5 (handlers, estado, `step25.tsx`, sandbox de 3 fluxos → 1). Falta o lado SERVIDOR: tirar
+  orquestrador/7 gates/prompts do **caminho da submissão**, **preservando o código** para outras frentes;
+  remover só o que ficar de fato órfão (import morto, teste de tela inexistente).
+
+**BLOCO VISUAL — ✅ CUMPRIDO em 02/09/2026** (o Luis clicou da Etapa 1 à revisão na staging e pediu a rodada
+de ajustes acima; ⚠️ o alvo do deploy passou a ser **`edf400b4`**, não o `f9c9a7ff` — ver o aviso do topo).
+A decisão que o criou: as sessões iriam **direto até o fluxo VISUAL no ar**, para ele validar de olho a
+submissão inteira até o botão **"Submeter"**, porque revisar fatia por fatia estava demorando muito.
+Consequências operacionais, todas registradas:
+- **T4 e T5 são um bloco só**, e o critério de pronto do bloco é *"o Luis clica da Etapa 1 até o botão de
+  submeter no `f9c9a7ff`"*, não "o componente tem teste".
+- **Os 3 revisores de contexto fresco rodam UMA vez, no FIM do bloco** — não por fatia. O TDD-escala
+  continua (teste antes do comportamento), porque é ele que segura a régua enquanto a revisão espera.
+- ⚠️ Os marcadores `.review-status`/`.quality-status` ficam **`pendente` durante o bloco**, e `pendente`
+  **barra o `git push`/`/ggsd:ship`** — de propósito. Commit na branch e deploy no `f9c9a7ff` **não** são
+  barrados, então o bloco anda; o que não anda é o envio para o `main` antes da revisão.
+- ⚠️ **Deploy é só no `f9c9a7ff`.** Prod (`674a3710`) e staging v1 (`edf400b4`) seguem intocados (1ª Fronteira).
+- ⏳ **A T6 (planilha) NÃO entra no bloco**, então o clique em "Submeter" vai gravar no SQLite do v2 e
+  **não** chegar à aba `STAGING-V2` — falta a T6 *e* os 6 secrets do Google que o Luis dispensou na T1.
+  Para o objetivo declarado (validar o FLUXO e as telas) isso basta; se ele quiser ver a linha na planilha,
+  é setar os 6 secrets + fazer a T6.
+
+**Próximo:** codar a **T6** com `/ggsd:code` — é ela que faz o botão "Submeter" funcionar (hoje o cliente
+chama `POST /api/submeter/ganhos`, que **não existe** → 404) e é ela que entrega o item **5.8** ao Gomoon.
+Ordem: rota + gravação das colunas da v2 e dos 3 `impacto_*` → `SHEET_COLUMNS` com os nomes já escritos na
+`STAGING-V2` → as 5 réplicas da fórmula chamando `impacto.ts` → trocar o `GOOGLE_SHEETS_TAB` da staging.
+Depois: **T7** (doc invisível — `iniciarSubmissao` ainda inicia conversa no servidor), **T8** (estrelas para
+todo projeto) e **T9-servidor** (orquestrador, os 7 gates, prompts e testes órfãos).
+⚠️ **A revisão de contexto fresco do bloco NÃO rodou** — os 3 marcadores estão ausentes/`pendente`, e isso
+**barra o `git push` e o `/ggsd:ship`** (commit na branch e deploy na staging seguem livres). Destravar =
+rodar `ggsd:verificador-conformidade` + `ggsd:revisor-qualidade` (+ `ggsd:revisor-reuso`, só-sugestão) e
+gravar os vereditos nos marcadores. As 4 amarras que a T3 deixou seguem valendo, escritas no cabeçalho de
+`src/lib/ganhos.ts` — em especial **reusar `CARGOS` + `resolverValorHora`** para o R$ da hora, nunca uma
+segunda tabela de valor/hora.
+---
+
 **Plano ativo — Frente 2: time autônomo de avaliação, FATIA B 🟡 (PARTE 1+2 CÓDIGO VERDE em 2026-08-27, NÃO fechada):**
 RAG por corpus de aprovados + especialista Financeiro + Agregador/juiz com confiança (confiança baixa/divergência → `em_validacao`,
 nunca decide negativo; especial/liderança isentos). Tudo env-gated, DEFAULT OFF (modo SOMBRA — grava recomendação, NÃO muda status).

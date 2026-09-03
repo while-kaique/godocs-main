@@ -12,7 +12,11 @@ import { resolve } from 'node:path';
 const ler = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
 const dashboard = ler('src/routes/_authenticated/dashboard.tsx');
-const step2 = ler('src/lib/submeter/step2.tsx');
+// ⚠️ O campo de data do formulário MUDOU DE LUGAR na v2: a "data de criação" da
+// Etapa 2 saiu (a data que vale passa a ser a de SUBMISSÃO) e quem usa o calendário
+// agora é o "desde quando" do saving efetivado, na Etapa 3. O guard é o mesmo — o campo
+// não pode voltar ao `type="date"` do sistema operacional — só o arquivo é outro.
+const step3 = ler('src/lib/submeter/step3-ganhos.tsx');
 const calendario = ler('src/components/calendario/calendario.tsx');
 
 describe('/dashboard — barra de filtros', () => {
@@ -48,19 +52,25 @@ describe('/dashboard — barra de filtros', () => {
   });
 });
 
-describe('Etapa 2 — campo de data', () => {
-  it('usa o calendário do GoDocs, não o do sistema operacional', () => {
-    expect(step2).toContain('<CampoData');
-    // Regex ancorada na linha: o comentário do arquivo CITA o `type="date"` que saiu.
-    expect(step2).not.toMatch(/^\s*type="date"/m);
-  });
+// ⚠️ A Etapa 3 NÃO tem mais campo de data. O "desde quando o ganho vale" (que usava o
+// `CampoData` deste calendário, com teto em hoje) saiu em 02/09/2026, quando o valor do
+// saving virou o PAR antes/agora — a tela pergunta "quanto era e quanto é agora", não
+// quando começou. Os dois testes que viviam aqui checavam aquele campo.
+//
+// O canário fica, virado do avesso: se um campo de data voltar à Etapa 3, ele tem de vir
+// pelo `CampoData` (nunca pelo `type="date"` nativo, que foi o motivo do calendário
+// próprio existir) — e é isso que este teste garante, sem exigir que o campo exista.
+describe('Etapa 3 — data, se voltar, vem pelo calendário do GoDocs', () => {
+  it('não usa o input de data nativo', () => {
+    expect(step3).not.toMatch(/^\s*type="date"/m)
+  })
 
-  it('mantém a janela permitida (2024 → hoje) e o formato ISO do schema', () => {
-    expect(step2).toContain('minimo="2024-01-01"');
-    expect(step2).toContain('maximo={hojeIso()}');
-    expect(step2).toContain('updateField("dataCriacao", iso)');
-  });
-});
+  it('se houver <CampoData, ele tem teto (o GoDocs documenta ganho JÁ realizado)', () => {
+    if (step3.includes('<CampoData')) {
+      expect(step3).toContain('maximo=')
+    }
+  })
+})
 
 describe('calendário — piso de acessibilidade', () => {
   it('tem UMA parada de Tab que sempre existe no mês visível', () => {

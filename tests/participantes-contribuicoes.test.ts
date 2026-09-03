@@ -41,17 +41,12 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     participantes: ['ana@gocase.com'],
     participantesPapeis: { 'ana@gocase.com': 'coexecutor' },
     participantesContribuicoes: { 'ana@gocase.com': TEXTO_OK },
+    ganhoCategorias: ['saving_efetivado'],
     nomeProjeto: '',
-    dataCriacao: '',
-    tipoProjeto: [],
     descricaoBreve: '',
     usaAiProxy: '',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: [],
-    especial: false,
-    contextoEspecial: '',
-    especialDashboard: '',
-    especialGanhoOrganizacional: '',
     ...over,
   };
 }

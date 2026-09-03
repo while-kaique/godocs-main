@@ -39,7 +39,7 @@ function linha(over: Record<string, string> = {}) {
     Ferramenta: 'Python',
     Status: 'Pendente',
     'Data Submissão': '12/05/2026',
-    'Ganho Total': 'R$ 5.700,00',
+    'Impacto Líquido': 'R$ 5.700,00',
     // Colunas MANUAIS da equipe + memorial: só a ficha as mostra, nunca a listagem.
     'Diff Horas / Antes': '+12',
     'Memorial de Saving': 'memorial completo '.repeat(40),

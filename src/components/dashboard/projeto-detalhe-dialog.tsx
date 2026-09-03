@@ -138,14 +138,14 @@ const GRUPOS: Grupo[] = [
       'Área',
       'Nome Completo',
       'Email',
-      'Participantes',
-      'Participantes 2',
+      'Coautor',
+      'Participante',
       'Contribuidor',
-      'Tipos Projeto',
+      'Tipos de Ganho',
       'Ferramenta',
       'Escopo',
       'Especial?',
-      'Contexto do Projeto Especial',
+      'Ganho Imensurável',
       'Usa AI Proxy',
       'URL',
     ],
@@ -154,12 +154,12 @@ const GRUPOS: Grupo[] = [
     titulo: 'Saving e horas',
     colunas: [
       'Alguém Fazia?',
-      'Tipo de Saving',
-      'Saving Horas',
+      'Freq. Custo Evitado',
+      'Custo Evitado Horas',
       'Saving Horas Real',
       'Saving Horas Escalado',
-      'Horas em Reais',
-      'Saving Reais',
+      'Custo Evitado Horas Reais',
+      'Impacto Bruto',
       'Diff Horas / Antes',
       'Diff Saving / Antes',
     ],
@@ -167,16 +167,16 @@ const GRUPOS: Grupo[] = [
   {
     titulo: 'Custos e receita',
     colunas: [
-      'Custo Evitado',
-      'Custo Mensal ou Pontual',
-      'Justificativa Custo Evitado',
+      'Saving Efetivado',
+      'Freq. Saving Efetivado',
+      'Evidência Saving Efetivado',
       'Custo Externo Mensal',
-      'Custo do Projeto',
-      'Custo do Projeto Mensal ou Pontual',
-      'Justificativa Custo do Projeto',
-      'Receita Mensal',
-      'Tipo de Receita',
-      'Ganho Total',
+      'Custo para Rodar',
+      'Freq. Custo para Rodar',
+      'Justificativa Custo para Rodar',
+      'Receita Incremental',
+      'Freq. Receita',
+      'Impacto Líquido',
     ],
   },
   {
@@ -191,14 +191,14 @@ const GRUPOS: Grupo[] = [
       'Motivo Reenvio',
       'Observações',
       'Alocação Ganhos',
-      'Justificativa Saving Escalado e Real',
+      'Racional Custo Evitado',
       'Análise Antiagente',
     ],
   },
 ];
 
 /** Textos longos: vão em bloco de largura cheia, dentro de um `<details>`. */
-const MEMORIAIS = ['Memorial de Saving', 'Receita Memorial', 'Memorial anterior'];
+const MEMORIAIS = ['Memorial de Saving', 'Racional Receita', 'Memorial anterior'];
 
 /** A descrição abre a ficha (é a primeira coisa que a triagem lê). */
 const DESCRICAO = 'Descrição';
@@ -310,7 +310,7 @@ function Campo({ nome, valor }: { nome: string; valor: string }) {
   return (
     <div className={longo ? 'sm:col-span-2' : undefined}>
       <dt className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
-        {/* Rótulo de exibição: as colunas de papel se chamam "Participantes"/"Participantes 2"
+        {/* Rótulo de exibição: as colunas de papel se chamam "Coautor"/"Participante"
             na planilha, mas quem submeteu escolheu "Coautor"/"Participante" — a ficha fala a
             língua do formulário. A CHAVE da célula continua sendo o nome da coluna. */}
         {rotuloColuna(nome)}

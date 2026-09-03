@@ -1,0 +1,22 @@
+{
+  "titulo": "Time de Agentes no Retroativo",
+  "linhas": [
+    "Base inteira de prod avaliada em sombra: 713 projetos, 7.397 chamadas de modelo, zero erro de execução, 35 dólares.",
+    "O time nunca aprovou um projeto que a triagem humana reprovou. Zero erro grave em 713.",
+    "Toda aprovação do time coincidiu com a triagem humana: 67 de 67 com gabarito. Aprovar é a saída pronta para agir sozinha quando a amostra medida chegar a 300.",
+    "Humano virou exceção: 5 projetos (0,7%). Dois deles são Sucesso.AI e Portal de Reembolsos, os dois casos reais de dupla contagem já conhecidos. O time os pegou sem saber deles.",
+    "O time é mais rigoroso que a triagem histórica, que aprovou 91% da base. Em 617 projetos ele pede ajuste com em média 2,4 perguntas concretas ao autor. Os motivos do cético: 121 contradições internas, 113 ganhos projetados tratados como realizados, 98 erros de conta, 36 duplas contagens.",
+    "Estrelas pela régua intacta: 336 comparáveis, 43% exatas, 82% dentro de 1 nível, sem achatamento. Um escape para 6 a 10 indicado: IARA + Central RA.",
+    "Auditoria de valor: 121 projetos (17%) com valor declarado marcado como absurdo, com valor sugerido e justificativa para a triagem revisar.",
+    "O que mudou o resultado entre as rodadas foram travas estruturais, não prompt: ajuste exige dado duro, especial sem número não preocupa o financeiro, refutação sustentada com pergunta vira ajuste.",
+    "Decisão pendente: aceitar o rigor do time como o novo padrão de triagem, ou calibrar para a leniência histórica. Os dados para decidir estão na tabela abaixo."
+  ],
+  "rodadas": [
+    {"ciclo":"r01 (30, seed 7)","n":30,"aprovar":0,"ajuste":27,"humano":3,"merito":"14%","estrela1":"69%","erro_grave":0,"mudou":"prompts iniciais"},
+    {"ciclo":"r02 (mesmos 30)","n":30,"aprovar":3,"ajuste":26,"humano":1,"merito":"29%","estrela1":"69%","erro_grave":0,"mudou":"preocupação exige sinal concreto, não falta de anexo"},
+    {"ciclo":"r03 (mesmos 30)","n":30,"aprovar":4,"ajuste":17,"humano":9,"merito":"36%","estrela1":"69%","erro_grave":0,"mudou":"ajuste exige dado duro; travas especial sem número e cético por material"},
+    {"ciclo":"r04 (mesmos 30)","n":30,"aprovar":5,"ajuste":24,"humano":1,"merito":"43%","estrela1":"62%","erro_grave":0,"mudou":"refutação sustentada do cético vira ajuste com pergunta ao autor"},
+    {"ciclo":"r05 (100 novos, seed 11)","n":100,"aprovar":20,"ajuste":79,"humano":1,"merito":"28%","estrela1":"70%","erro_grave":0,"mudou":"mesma variante 4, amostra nova"},
+    {"ciclo":"r06 (base inteira)","n":713,"aprovar":91,"ajuste":617,"humano":5,"merito":"16%","estrela1":"82%","erro_grave":0,"mudou":"mesma variante 4, 713 projetos ativos"}
+  ]
+}

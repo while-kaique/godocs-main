@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type BetterSqlite3 from 'better-sqlite3';
 import { criarDbMemoria } from './helpers/db-memoria';
 
-// Frente 1 (T6) — wiring da compilação ASSÍNCRONA: a reconciliação no submit e o persist do
-// background. Cobre o que o §9 apontou sem teste:
-//  - "submit aguarda doc": reconciliarDocSePendente compila quando pendente, preservando o
-//    financeiro, e BLOQUEIA se a compilação falhar (nunca submete doc incompleta).
-//  - "doc em background não bloqueia / fail-safe": compilarEPersistirDoc persiste via patch e
-//    NUNCA lança (deixa pendente p/ o submit reconciliar).
+// Frente 1 (T6) — wiring da compilação ASSÍNCRONA: `reconciliarDocSePendente` e o persist do
+// background. ⚠️ Desde a v2 (D6, 03/09/2026) o SUBMIT NÃO chama mais `reconciliarDocSePendente`:
+// quem a usa é o cron `recompilarDocsPendentes` (ver `tests/submit-sem-llm-d6.test.ts`). Aqui:
+//  - reconciliarDocSePendente compila quando pendente, preservando o financeiro, e NÃO lança
+//    quando a compilação falha (a doc fica pendente para a próxima corrida).
+//  - compilarEPersistirDoc persiste via patch e NUNCA lança.
 
 // Mocka SÓ compilarDocumentacao (mantém o resto do módulo real via importOriginal).
 vi.mock('@/lib/agents/doc-compiler', async (importOriginal) => {
@@ -96,15 +96,32 @@ describe('reconciliarDocSePendente — submit garante a doc, preserva financeiro
     expect(vi.mocked(compilarDocumentacao)).not.toHaveBeenCalled();
   });
 
-  it('compilação FALHA → LANÇA (nunca submete doc incompleta)', async () => {
+  // ⚠️ DECISÃO INVERTIDA na T7 do GoDocs v2 (02/09/2026). Este teste cobrava o oposto —
+  // "compilação FALHA → LANÇA (nunca submete doc incompleta)" —, e a razão registrada era
+  // "sem async não há rede que recomponha". As duas metades caíram: no fluxo v2 a doc é
+  // SEMPRE compilada em segundo plano, e a rede (o cron `recompilar-docs-pendentes`, que ao
+  // terminar redispara a análise) roda independente de flag. Com a régua antiga, um soluço do
+  // proxy no submit bloquearia a submissão inteira num fluxo que NÃO TEM MAIS CHAT para
+  // retentar — o usuário veria "documentação ausente" sem saída nenhuma.
+  //
+  // O dente continua: a doc não pode ser dada por PRONTA. Ela tem de permanecer PENDENTE,
+  // que é o que faz o cron voltar nela. Publicar doc incompleta segue sendo o defeito.
+  it('compilação FALHA → NÃO lança, e a doc fica PENDENTE para o cron', async () => {
     const { compilarDocumentacao } = await import('@/lib/agents/doc-compiler');
     vi.mocked(compilarDocumentacao).mockRejectedValueOnce(new Error('IA fora'));
     const { reconciliarDocSePendente } = await import('@/lib/chat.functions');
+    const { precisaCompilarDoc } = await import('@/lib/agents/doc-async');
 
     await seedDoc('r3', { compilacao_pendente: true, coletado_pendente: { nome_projeto: 'X' } });
     const conteudo = await lerDoc('r3');
 
-    await expect(reconciliarDocSePendente('r3', conteudo, projetoFake)).rejects.toThrow();
+    const reconc = await reconciliarDocSePendente('r3', conteudo, projetoFake);
+
+    // Não bloqueia o submit...
+    expect(reconc).toBeTruthy();
+    // ...mas NÃO finge que a doc ficou pronta — senão o cron nunca voltaria nela.
+    expect(precisaCompilarDoc(reconc)).toBe(true);
+    expect(precisaCompilarDoc(await lerDoc('r3'))).toBe(true);
   });
 
   it('repassa o perfil de LLM (fail-fast do submit) ao compilador', async () => {

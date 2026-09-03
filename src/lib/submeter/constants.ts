@@ -1,7 +1,4 @@
-import {
-  mensagemEspecialInvalido,
-  type MotivoBloqueioEspecial,
-} from "@/lib/mensagens-submissao";
+import { erroCategorias, type GanhoCategoria } from "@/lib/ganhos";
 
 export const AREAS = [
   "AZ", "B2B Gobeauté", "B2B Gocase", "Contabilidade", "CSC", "CX",
@@ -350,7 +347,9 @@ export function contribuicoesCopiadas(
 export const STEPS = [
   { id: 1, label: "Envio" },
   { id: 2, label: "Projeto" },
-  { id: 3, label: "Agente" },
+  // ⚠️ Era "Agente". Na v2 não existe agente no caminho do usuário (D4): a Etapa 3 é o
+  // formulário determinístico dos blocos de ganho.
+  { id: 3, label: "Ganho" },
 ];
 
 /**
@@ -492,13 +491,9 @@ export function validarEtapa2(
 
   if (!form.nomeProjeto.trim() || form.nomeProjeto.trim().length < 3)
     errs.nomeProjeto = "Informe o nome do projeto (mínimo 3 caracteres)";
-  if (!form.dataCriacao) {
-    errs.dataCriacao = "Informe a data de criação";
-  } else if (form.dataCriacao < "2024-01-01") {
-    errs.dataCriacao = "A data mínima é 01/01/2024";
-  } else if (form.dataCriacao > hojeISO) {
-    errs.dataCriacao = "A data não pode ser no futuro";
-  }
+  // ⚠️ A "data de criação" SAIU do formulário (v2): a data que vale passa a ser a de
+  // SUBMISSÃO, porque só se submete o que já está em produção — perguntar as duas
+  // convidava a datar o projeto pelo commit inicial, que não é quando o ganho começou.
   if (!form.descricaoBreve.trim() || form.descricaoBreve.trim().length < 60)
     errs.descricaoBreve = "Descreva o contexto em pelo menos 60 caracteres";
   if (!form.usaAiProxy) errs.usaAiProxy = "Selecione se o projeto usa o AI Proxy";
@@ -528,47 +523,22 @@ export function validarEtapa2(
 }
 
 /**
- * TRIAGEM DO ESPECIAL (Etapa 2.5) — qual pergunta desqualificou o projeto.
+ * O portão da 1ª tela da Etapa 3 — a seleção dos tipos de ganho.
  *
- * Só se aplica a quem marcou `especial`; projeto padrão (saving/receita) nunca é
- * afetado. Precedência: **dashboard primeiro**, porque é o critério OBJETIVO (não
- * depende de julgar a natureza do ganho). Devolve `null` quando nada bloqueia —
- * inclusive com as perguntas ainda em branco (aí o que cobra a resposta é
- * `validarEtapa25Especial`, não este predicado). Função pura — testável.
- */
-export function motivoBloqueioEspecial(
-  form: Pick<FormData, "especial" | "especialDashboard" | "especialGanhoOrganizacional">,
-): MotivoBloqueioEspecial | null {
-  if (!form.especial) return null;
-  if (form.especialDashboard === "sim") return "dashboard";
-  if (form.especialGanhoOrganizacional === "sim") return "organizacional";
-  return null;
-}
-
-/**
- * Erros da triagem do especial: perguntas não respondidas + o BLOQUEIO em si.
+ * ⚠️ Esta régua ESTAVA em `validarEtapa2` e saiu de lá com o campo: os cards de tipo de
+ * ganho viraram TELA PRÓPRIA (`selecao-ganho.tsx`, decisão do Luis em 02/09/2026), e
+ * portão que cobra campo que a tela não mostra é o pior defeito de formulário deste repo
+ * — o "Próximo" sacode e o erro fica numa etapa que a pessoa não está vendo.
  *
- * O que é exigido acompanha exatamente o que a tela mostra: a 2ª pergunta só é
- * cobrada quando a 1ª foi respondida com "não" (com "sim" o projeto já está
- * bloqueado e a 2ª pergunta não aparece — cobrar uma resposta invisível travaria o
- * formulário sem dizer onde). A mensagem do bloqueio vem da FONTE ÚNICA
- * `mensagens-submissao.ts` (nunca texto solto na tela). Função pura — testável.
+ * A mensagem vem de `erroCategorias` (`@/lib/ganhos`), fonte única com a rede do envio
+ * (`validarEtapa3`).
  */
-export function validarEtapa25Especial(
-  form: Pick<FormData, "especial" | "especialDashboard" | "especialGanhoOrganizacional">,
-): FieldErrors {
-  if (!form.especial) return {};
+export function validarSelecaoGanho(form: FormData): FieldErrors {
   const errs: FieldErrors = {};
-
-  if (!form.especialDashboard) {
-    errs.especialDashboard = "Responda esta pergunta para continuar";
-  } else if (form.especialDashboard === "nao" && !form.especialGanhoOrganizacional) {
-    errs.especialGanhoOrganizacional = "Responda esta pergunta para continuar";
-  }
-
-  const motivo = motivoBloqueioEspecial(form);
-  if (motivo) errs.especialBloqueio = mensagemEspecialInvalido(motivo);
-
+  // Leitura DEFENSIVA: rascunho salvo antes desta feature não tem a chave, e
+  // `undefined.length` derrubaria /submeter inteira.
+  const erro = erroCategorias(form.ganhoCategorias ?? []);
+  if (erro) errs.ganhoCategorias = erro;
   return errs;
 }
 
@@ -608,8 +578,10 @@ export interface FormData {
   // "" = ainda não escrito. Só o banco recebe (coluna interna) — não vai ao Sheets.
   participantesContribuicoes: Record<string, string>;
   nomeProjeto: string;
-  dataCriacao: string;
-  tipoProjeto: ("saving" | "receita_incremental")[];
+  // As categorias de ganho declaradas na Etapa 2. Substitui o `tipoProjeto` da v1 e a
+  // flag `especial` (que na v2 deixa de ser declarada pelo usuário — D5: especial passa
+  // a ser DERIVADO de estrela > 0, e a estrela só muda por clique humano).
+  ganhoCategorias: GanhoCategoria[];
   descricaoBreve: string;
   // Usa o AI Proxy (gateway interno de IA da empresa, ai-proxy.gogroupbr.com)?
   // Governança de custo: projetos que usam IA deveriam rotear pelo proxy interno.
@@ -625,19 +597,6 @@ export interface FormData {
   // "o que piora" (`contrafactualReclamacao`) foi REMOVIDO em 03/08/2026.
   contrafactualAfetadosTipo: AfetadoTipo;
   contrafactualAfetados: string[];
-  // Projeto especial (etapa 2.5): altíssimo impacto que não se encaixa em saving/receita.
-  especial: boolean;
-  contextoEspecial: string;
-  // ─── Triagem do especial (Etapa 2.5, só quando `especial` é true) ───
-  // Duas perguntas sim/não, EM SEQUÊNCIA (a 2ª só aparece depois da 1ª), antes do
-  // contexto especial. Qualquer "sim" DESQUALIFICA o especial e bloqueia o envio
-  // (ver `motivoBloqueioEspecial` + `mensagens-submissao.ts`). '' = não respondida.
-  // ⚠️ São campos SÓ DO FRONTEND (como `prodStatus`): não vão ao backend, a nenhum
-  // prompt e a nenhuma coluna do Sheets — o papel delas é impedir a submissão
-  // errada na porta, e o que sobrevive ao envio é a natureza do projeto
-  // (`especial`/`tipos_projeto`), que já é gravada.
-  especialDashboard: "sim" | "nao" | "";
-  especialGanhoOrganizacional: "sim" | "nao" | "";
 }
 
 // Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área

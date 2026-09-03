@@ -132,7 +132,7 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
 
     const depois = await getProjetoById(projeto.id);
     expect(depois?.especial).toBe(0);
-    // Contexto especial limpo na conversão (coluna "Contexto do Projeto Especial" → "—").
+    // Contexto especial limpo na conversão (coluna "Ganho Imensurável" → "—").
     expect(depois?.contexto_especial == null || depois?.contexto_especial === '').toBe(true);
     // reset:false = caminho normal (sem reconstrução da doc especial / sem return especial).
     expect((res as { reset: boolean }).reset).toBe(false);
@@ -142,7 +142,7 @@ describe('atualizarMetadados: edição de projeto especial monta a doc sem IA', 
   // roda ANTES do `atualizarMetadados`. O primeiro zerava a flag; quando o segundo
   // chegava, o guard exigia `especial === 1` no banco, não disparava — e o passo de
   // persistência REGRAVAVA o `contexto_especial` que o form ainda carregava. Resultado:
-  // flag zerada, texto órfão no SQLite e na coluna "Contexto do Projeto Especial".
+  // flag zerada, texto órfão no SQLite e na coluna "Ganho Imensurável".
   it('ordem real do form (tipos → metadados) não deixa contexto especial órfão', async () => {
     const projeto = await insertProjeto({
       responsavel_nome: 'Izadora',

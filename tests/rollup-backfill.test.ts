@@ -26,32 +26,32 @@ describe("rollup histórico — backfill do ESPELHO (integração)", () => {
     // ── Entram: Status = "Aprovado" ──
     await seedEspelho("ap1", {
       Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "15/06/2026",
-      "Tipo de Saving": "mensal", "Saving Reais": "100",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "100",
     });
     await seedEspelho("ap2", {
       Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "20/06/2026",
-      "Tipo de Saving": "mensal", "Saving Reais": "200",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "200",
     });
-    // ap3 tem RECEITA na PLANILHA (coluna "Receita Mensal"), sem documentação nenhuma —
+    // ap3 tem RECEITA na PLANILHA (coluna "Receita Incremental"), sem documentação nenhuma —
     // prova que a receita vem do espelho, não de `documentacao.conteudo.receita`.
     await seedEspelho("ap3", {
       Status: "Aprovado", "Área": "Contábil", "Data Submissão": "10/06/2026",
-      "Tipo de Saving": "mensal", "Saving Reais": "50", "Receita Mensal": "500",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "50", "Receita Incremental": "500",
     });
     // aprovado SEM data → conta no total, mas não posiciona no tempo (fica fora das células).
     await seedEspelho("semdata", {
       Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "",
-      "Tipo de Saving": "mensal", "Saving Reais": "70",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "70",
     });
 
     // ── Ficam de fora: status ≠ "Aprovado" ──
     await seedEspelho("pend", {
       Status: "Pendente", "Área": "Fiscal", "Data Submissão": "15/06/2026",
-      "Tipo de Saving": "mensal", "Saving Reais": "999",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "999",
     });
     await seedEspelho("desc", {
       Status: "Descontinuado", "Área": "Fiscal", "Data Submissão": "15/06/2026",
-      "Tipo de Saving": "mensal", "Saving Reais": "999",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "999",
     });
   });
 
@@ -93,5 +93,40 @@ describe("rollup histórico — backfill do ESPELHO (integração)", () => {
     );
     expect(fiscal?.saving_reais).toBe(300);
     expect(fiscal?.num_projetos).toBe(2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Linha do GoDocs v2: "Impacto Bruto" JÁ inclui a receita (D2: S + CE + R), então
+// lê-lo direto ao lado de "Receita Incremental" contaria a receita DUAS vezes na série
+// empurrada ao squad Intelli — cujo contrato é saving e receita CRUS e SEPARADOS.
+// O discriminador de geração é "Impacto Líquido Mensal", coluna que só o v2 escreve.
+describe("rollup — v2 não conta a receita duas vezes", () => {
+  beforeAll(async () => {
+    await criarDbMemoria();
+    // v2: bruto 1000 = saving 700 + receita 300. O saving CRU tem de sair 700.
+    await seedEspelho("v2a", {
+      Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "10/07/2026",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "1000",
+      "Receita Incremental": "300", "Impacto Líquido Mensal": "820",
+    });
+    // v1: a MESMA célula não inclui receita — nada pode ser descontado dela.
+    await seedEspelho("v1a", {
+      Status: "Aprovado", "Área": "Fiscal", "Data Submissão": "11/07/2026",
+      "Freq. Custo Evitado": "mensal", "Impacto Bruto": "1000",
+      "Receita Incremental": "300",
+    });
+  });
+
+  it("v2 desconta a receita do bruto; v1 fica intacta", async () => {
+    await recalcularRollupBackfill();
+    const linhas = await lerRollupMensal();
+    const julho = linhas.filter((l) => l.periodo === "2026-07" && l.area === "Fiscal");
+    const saving = julho.reduce((s, l) => s + (l.saving_reais ?? 0), 0);
+    const receita = julho.reduce((s, l) => s + (l.receita_reais ?? 0), 0);
+    // 700 (v2, já sem a receita) + 1000 (v1, intacta) = 1700 — e NÃO 2000.
+    expect(saving).toBe(1700);
+    // A receita segue CRUA e SEPARADA, uma vez de cada linha.
+    expect(receita).toBe(600);
   });
 });

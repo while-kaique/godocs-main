@@ -108,7 +108,7 @@ function linha(over: Record<string, string> = {}) {
     Área: 'CSC',
     Status: 'Pendente',
     'Data Submissão': '12/05/2026',
-    'Ganho Total': 'R$ 5.700,00',
+    'Impacto Líquido': 'R$ 5.700,00',
     Ferramenta: 'Python',
     ...over,
   } as Record<string, string>;

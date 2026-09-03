@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, PauseCircle } from "lucide-react";
 import { estadoBloqueio, type FaseBloqueio } from "@/lib/bloqueio-submissao";
 
@@ -17,13 +18,48 @@ import { estadoBloqueio, type FaseBloqueio } from "@/lib/bloqueio-submissao";
  * `src/lib/bloqueio-submissao.ts` — nenhum texto mora aqui.
  */
 
-/** Reavalia o estado no mount e a cada minuto (cobre a página aberta cruzando a virada). */
+/** Nada a avisar, nada a bloquear — o mesmo formato que `estadoBloqueio` devolve na fase livre. */
+const SEM_BLOQUEIO = { fase: "livre" as FaseBloqueio, mensagem: null, bloqueado: false };
+
+/**
+ * Reavalia o estado no mount e a cada minuto (cobre a página aberta cruzando a virada).
+ *
+ * ⚠️ FORA DE PRODUÇÃO a pausa NÃO se aplica. O motivo é o conteúdo do próprio aviso: ele
+ * anuncia que "o GoDocs vai receber uma versão nova e melhor" — e essa versão nova é
+ * exatamente o que se valida no app de STAGING. Manter a faixa lá desabilitaria o botão
+ * "Submeter" no único ambiente onde a coisa anunciada pode ser testada.
+ *
+ * ⚠️ Por que aqui, e não movendo a janela em `bloqueio-submissao.ts`: aquele módulo é PURO
+ * e é a fonte única da janela e da copy, com testes que travam os marcos. Mexer nas
+ * constantes para liberar o staging mudaria a régua de PRODUÇÃO junto (o cliente não lê
+ * `process.env`, só os defaults baked) e quebraria os testes do módulo. A distinção
+ * "onde estou rodando" é da BORDA, não da régua.
+ *
+ * Reusa a MESMA query da faixa de staging (`public-config`, cache infinito), então não
+ * custa requisição nova. Enquanto o ambiente é desconhecido, vale a régua de produção: a
+ * dúvida erra para o lado de bloquear, nunca para o de liberar indevidamente.
+ */
 export function useBloqueioSubmissao() {
   const [estado, setEstado] = useState(() => estadoBloqueio());
   useEffect(() => {
     const id = setInterval(() => setEstado(estadoBloqueio()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  const { data } = useQuery<{ env: string }>({
+    queryKey: ["public-config"],
+    queryFn: async () => {
+      const res = await fetch("/api/config");
+      if (!res.ok) return { env: "production" };
+      return (await res.json()) as { env: string };
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  if (data && data.env !== "production") return SEM_BLOQUEIO;
   return estado;
 }
 
