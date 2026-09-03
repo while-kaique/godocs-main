@@ -16,12 +16,19 @@
  *   npx tsx --env-file=.env scripts/v2/classificar-paralelo.mts --go     # grava
  */
 
+import { rodarPoolAdaptativo } from './_concorrencia.mts';
+
 const BASE = process.argv.includes('--staging')
   ? 'https://godocs-staging.devgogroup.com'
   : 'https://godocs.devgogroup.com';
 const VALENDO = process.argv.includes('--go');
 const COOKIE = process.env.E2E_COOKIE ?? '';
-const CONCORRENCIA = Number(process.env.CONC ?? 6);
+// Concorrência ADAPTATIVA (ver `_concorrencia.mts`): `CONC` é o PONTO DE PARTIDA, não o teto.
+// A rodada sobe sozinha enquanto o gateway aguenta e recua pela metade ao primeiro 502 — que é
+// o que permite ir mais rápido SEM atropelar produção, com quem divide os slots de Codex.
+const CONC_INICIAL = Number(process.env.CONC ?? 24);
+const CONC_MAX = Number(process.env.CONC_MAX ?? 72);
+const CONC_MIN = Number(process.env.CONC_MIN ?? 4);
 const TIMEOUT_MS = 180_000;
 
 type Rec = { estrelas_recomendada?: number; confianca?: string; leitura?: string; contestada?: boolean };
@@ -70,7 +77,7 @@ if (process.env.APROVADOS === '1') {
   ).json()) as { projetos?: Alvo[] };
   projetos = lista.projetos ?? [];
 }
-console.log(`${projetos.length} especiais · concorrência ${CONCORRENCIA} · ${VALENDO ? 'VALENDO' : 'ENSAIO'}\n`);
+console.log(`${projetos.length} projetos · concorrência adaptativa ${CONC_INICIAL}→${CONC_MAX} (piso ${CONC_MIN}) · ${VALENDO ? 'VALENDO' : 'ENSAIO'}\n`);
 
 const notas = new Map<number, number>();
 const linhas: Array<{ id: string; nome: string; area: string; humana: number | null; agente: number | null; leitura: string }> = [];
@@ -78,41 +85,56 @@ const falhas: Array<{ id: string; erro: string }> = [];
 let feitos = 0;
 const t0 = Date.now();
 
-async function trabalhar(fila: typeof projetos): Promise<void> {
-  for (;;) {
-    const p = fila.shift();
-    if (!p) return;
-    try {
-      const s = await post<Saida>('/api/admin/especiais/classificar', {
-        projetoId: p.id,
-        dry: !VALENDO,
-        forcar: true,
-      });
-      const nota = s.recomendacao?.estrelas_recomendada ?? null;
-      if (nota != null) notas.set(nota, (notas.get(nota) ?? 0) + 1);
-      linhas.push({ id: p.id, nome: p.nome, area: p.area ?? '', humana: p.estrelas, agente: nota, leitura: s.recomendacao?.leitura ?? s.motivo ?? '' });
-    } catch (e) {
-      // ⚠️ Falha NÃO é nota 0: sem esta lista, uma rajada de 502 viraria "a base é toda baixa".
-      falhas.push({ id: p.id, erro: e instanceof Error ? e.message : String(e) });
-    }
-    feitos++;
-    process.stdout.write(`   ${feitos}/${projetos.length} · ${Math.round((Date.now() - t0) / 1000)}s\r`);
+async function classificar(p: Alvo): Promise<void> {
+  try {
+    const s = await post<Saida>('/api/admin/especiais/classificar', {
+      projetoId: p.id,
+      dry: !VALENDO,
+      forcar: true,
+    });
+    const nota = s.recomendacao?.estrelas_recomendada ?? null;
+    if (nota != null) notas.set(nota, (notas.get(nota) ?? 0) + 1);
+    linhas.push({ id: p.id, nome: p.nome, area: p.area ?? '', humana: p.estrelas, agente: nota, leitura: s.recomendacao?.leitura ?? s.motivo ?? '' });
+  } catch (e) {
+    // ⚠️ Falha NÃO é nota 0: sem esta lista, uma rajada de 502 viraria "a base é toda baixa".
+    // O pool re-tenta a saturação sozinho; o que chega aqui já esgotou as tentativas.
+    falhas.push({ id: p.id, erro: e instanceof Error ? e.message : String(e) });
+    throw e; // devolve ao pool para ele decidir recuar/re-enfileirar
   }
 }
 
-const fila = [...projetos];
-await Promise.all(Array.from({ length: CONCORRENCIA }, () => trabalhar(fila)));
+const rel = await rodarPoolAdaptativo({
+  itens: projetos,
+  inicial: CONC_INICIAL,
+  maximo: CONC_MAX,
+  minimo: CONC_MIN,
+  tarefa: async (p) => {
+    // Uma re-tentativa do pool não pode deixar a falha anterior no relatório.
+    const i = falhas.findIndex((f) => f.id === p.id);
+    if (i >= 0) falhas.splice(i, 1);
+    await classificar(p);
+  },
+  aoProgredir: (f, t, alvo) => {
+    feitos = f;
+    process.stdout.write(`   ${f}/${t} · ${Math.round((Date.now() - t0) / 1000)}s · conc ${alvo}    \r`);
+  },
+});
+console.log(`\n\nconcorrência: terminou em ${rel.alvoFinal} (pico ${rel.alvoMax}, piso ${rel.alvoMin}) · ${rel.recuos} recuos · ${rel.reentradas} re-tentativas`);
 
-// ⚠️ REPESCAGEM. Concorrência alta satura o gateway e devolve 502 — e um 502 NÃO é "nota
-// baixa", é "ninguém perguntou". Sem esta volta, subir a concorrência trocaria tempo por
-// buracos silenciosos no relatório. Uma passada só, com metade da concorrência.
+// ⚠️ REPESCAGEM. O pool já re-tenta a saturação, mas uma rajada longa pode esgotar as
+// tentativas de um item. Uma passada final, conservadora, para 502 nunca virar buraco no
+// relatório — a diferença entre "não é feature" e "ninguém perguntou".
 if (falhas.length) {
-  console.log(`\n\nrepescando ${falhas.length} falhas com concorrência ${Math.ceil(CONCORRENCIA / 2)}…`);
+  console.log(`\nrepescando ${falhas.length} falhas em ritmo conservador…`);
   const refazer = falhas.map((f) => projetos.find((p) => p.id === f.id)!).filter(Boolean);
   falhas.length = 0;
-  feitos = 0;
-  const fila2 = [...refazer];
-  await Promise.all(Array.from({ length: Math.ceil(CONCORRENCIA / 2) }, () => trabalhar(fila2)));
+  await rodarPoolAdaptativo({
+    itens: refazer,
+    inicial: CONC_MIN,
+    maximo: Math.max(CONC_MIN, 8),
+    minimo: 2,
+    tarefa: classificar,
+  });
 }
 
 console.log(`\n\nfeitos em ${Math.round((Date.now() - t0) / 1000)}s · falhas: ${falhas.length}`);
