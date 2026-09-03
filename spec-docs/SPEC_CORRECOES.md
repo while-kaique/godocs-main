@@ -288,6 +288,43 @@ que as chamadas às rotas SSE usam `apiStream`, não `apiFetch`).
 `LLM_STREAMING=0`** (streaming DESLIGADO): esta subida é o deploy do cliente corrigido, com risco
 zero — o comportamento é idêntico ao json de sempre. **Religar `LLM_STREAMING` só depois da
 validação E2E** do fluxo com streaming.
+## 2026-08-24 — `resyncGoogle` corrompia 2 colunas de projeto-FEATURE (parecer do estágio errado + zerava "ID Pai")
+
+**Status:** ✅ corrigido (aguarda re-revisão + aprovação p/ prod) · **Branch:** `feat/projeto-vinculado`
+
+**Sintoma (2 bugs, achados em revisão de código).** No reparo administrativo `resyncGoogle`
+(regrava a linha inteira da planilha a partir do banco), num **projeto-feature** (vínculo
+pai↔filho, aprovação sequencial de 2 líderes): **(1)** a coluna **"Aprovação do Líder"** — que é
+do **estágio 1** — recebia o parecer do **estágio 2** quando o estágio 1 é ISENTO (autor é
+liderança) e as únicas linhas em `projeto_aprovacoes` são do estágio 2; **(2)** a coluna
+**"ID Pai"** era zerada para **"—"** a cada resync, apagando o vínculo de feature.
+
+**Causa-raiz (a mesma para os dois).** O `resyncGoogle` não recebeu a disciplina de
+estágio/`undefined` dos escritores primários. **(1)** ele recomputava `aprovacaoLider`/
+justificativa de `getAprovacoesDoProjeto(...)` **sem** filtrar `estagio === 1` — os outros 3
+escritores (`abrirPreAprovacao`, `decidirAprovacao`, `dispensarPreAprovacao`) já filtram. **(2)**
+em `google/sync.ts`, `row['ID Pai'] = ouTraco(p.idPai)` era **incondicional** (sem o guard
+`undefined` ≠ `null` que protege as colunas do líder logo acima), e o `resyncGoogle` chamava
+`syncSubmitToGoogle({modo:'edicao'})` **sem** passar `idPai` → `ouTraco(undefined) = "—"`. Como
+"ID Pai" **não** está em `SAFE_UPDATE_FIELDS`, nada restaurava o valor.
+
+**Fix.** **(1)** `resyncGoogle` (`chat.functions.ts`) filtra
+`getAprovacoesDoProjeto(...).filter(l => Number(l.estagio) === 1)` antes de
+`rotuloAprovacaoSheet`/`justificativaAprovacaoSheet` (mesmo predicado dos primários). **(2)**
+defesa em profundidade: em `google/sync.ts` a coluna "ID Pai" ganhou o guard `undefined` ≠ `null`
+(`if (p.idPai !== undefined || p.modo !== 'edicao')` → `undefined` OMITE, `null` grava "—"); e o
+`resyncGoogle` passa `idPai: projeto.projeto_pai_id ?? null`, **restaurando** ativamente o vínculo.
+
+**"ID Feature" (lista de filhos na linha do PAI) — verificado, NÃO tocado.** Ela é escrita **só**
+cross-row, por um `updateRowByProjectId(paiId, {"ID Feature": ...})` PARCIAL (nunca faz parte do
+`row` de `syncSubmitToGoogle`), e updates parciais deixam colunas omitidas intactas. Logo um
+resync do pai (via `syncSubmitToGoogle`) **não pode zerá-la**. "ID Pai" e "ID Feature" confirmadas
+**fora** de `SAFE_UPDATE_FIELDS` (sync reverso não as toca).
+
+**Onde aterrissou.** `src/lib/chat.functions.ts` (`resyncGoogle`), `src/lib/google/sync.ts`
+(guard da coluna "ID Pai"). **Testes:** `tests/resync-vinculo-lider.test.ts` (novo — resync com
+estágio 1 isento não vaza estágio 2; controle com estágio 1 pendente; restaura/`null` do "ID Pai")
+e casos de "ID Pai"/"ID Feature" em `tests/sync-aprovacao-lider-colunas.test.ts`. Suíte: verde.
 
 ---
 

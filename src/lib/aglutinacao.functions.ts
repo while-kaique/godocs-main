@@ -391,3 +391,114 @@ export async function decidirSugestaoAglutinacao(body: unknown, adminEmail: stri
 
   return { ok: true, estado: aceitar ? 'aceito' : 'rejeitado', planilha };
 }
+
+/**
+ * Avalia UM projeto recém-submetido: ele é feature de algum projeto que já existe?
+ *
+ * Roda em background no `processarPosSubmissao`, ao lado do analisador — a submissão nunca
+ * espera por isto e **nunca cai** por causa disto.
+ *
+ * ⚠️ **Só sugere.** Continua valendo a regra da tela: o vínculo na planilha só nasce do
+ * ACEITE humano no painel. A diferença é que a sugestão agora chega sozinha, em vez de
+ * esperar alguém lembrar de rodar a varredura.
+ *
+ * ⚠️ **Quem já DECLAROU o pai na Etapa 1 fica de fora.** A pessoa disse o que o projeto é;
+ * um palpite do agente por cima disso não acrescenta nada e ainda apareceria no painel como
+ * decisão pendente sobre um caso já decidido.
+ *
+ * ⚠️ Compara o projeto novo contra a base INTEIRA, mas julga só ele: é 1 chamada de LLM, não
+ * a varredura toda. O custo de submeter não muda de ordem de grandeza.
+ */
+export async function avaliarAglutinacaoDaSubmissao(projetoId: string): Promise<{
+  ok: boolean;
+  sugeriu: boolean;
+  motivo?: string;
+}> {
+  try {
+    const id = String(projetoId ?? '').trim();
+    if (!id) return { ok: false, sugeriu: false, motivo: 'sem id' };
+
+    const brutos = await getProjetosParaAglutinacao();
+    const alvoBruto = brutos.find((p) => p.id.trim().toLowerCase() === id.toLowerCase());
+    if (!alvoBruto) return { ok: false, sugeriu: false, motivo: 'projeto não encontrado' };
+
+    const projetos = brutos
+      .map(paraAglutinavel)
+      .filter((p): p is ProjetoAglutinavel => p !== null);
+    const universo = new Map(projetos.map((p) => [p.id, p]));
+    const alvo = universo.get(alvoBruto.id);
+    if (!alvo) return { ok: false, sugeriu: false, motivo: 'projeto sem nome utilizável' };
+    if (alvo.jaVinculado) return { ok: true, sugeriu: false, motivo: 'o autor já declarou o pai' };
+
+    const textos = projetos.map((p) => ({
+      nome: p.nome,
+      descricao: p.descricao,
+      documentacao: p.documentacao,
+    }));
+    const idf = calcularIdf(
+      textos.map((t) => [
+        ...tokenizar(t.nome),
+        ...tokenizar(t.descricao ?? ''),
+        ...tokenizar(t.documentacao ?? ''),
+      ]),
+    );
+    const pesos = textos.map(tokensPesados);
+    const i = projetos.findIndex((p) => p.id === alvo.id);
+
+    // Fonte vetorial dos vetores JÁ gravados (sem chave nova). Falha → só o léxico.
+    const vetores = new Map<string, number[]>();
+    try {
+      for (const row of await getEmbeddingsProjetos()) {
+        if (!universo.has(row.projeto_id)) continue;
+        const v = base64ParaVetor(row.vetor);
+        if (v.length) vetores.set(row.projeto_id, v);
+      }
+    } catch (e) {
+      console.error('[aglutinacao] submissão sem fonte vetorial (segue só com o léxico):', e);
+    }
+
+    const viz = projetos
+      .map((o, j) => {
+        if (o.id === alvo.id) return null;
+        const contido = nomeContido(textos[i], textos[j], idf);
+        const pre = prefixoDeFamilia(textos[i], textos[j], idf);
+        const lexica = similaridadeFinal(similaridade(pesos[i], pesos[j], idf), {
+          contido,
+          prefixo: pre.length > 0,
+        });
+        const va = vetores.get(alvo.id);
+        const vb = vetores.get(o.id);
+        const cos = va && vb ? cosseno(va, vb) : 0;
+        return {
+          id: o.id,
+          similaridade: cos >= PISO_VETOR_AGLUTINACAO ? Math.max(lexica, cos) : lexica,
+        };
+      })
+      .filter((x): x is { id: string; similaridade: number } => x !== null);
+
+    const cands = candidatosDe(alvo, viz, universo);
+    // ⚠️ Só interessa o par em que o NOVO é o filho: um projeto recém-submetido pode ser o
+    // PAI de algo mais novo ainda (impossível) ou o filho de algo mais antigo (o caso). O
+    // `candidatosDe` já decide a direção pelo relógio; aqui a gente só descarta o inverso.
+    const comoFilho = cands.filter((c) => c.filhoId === alvo.id);
+    if (comoFilho.length === 0) return { ok: true, sugeriu: false, motivo: 'sem candidato a pai' };
+
+    const { sugestao, erro } = await julgarAglutinacao(alvo, comoFilho, universo);
+    if (erro) return { ok: false, sugeriu: false, motivo: erro };
+    if (!sugestao) return { ok: true, sugeriu: false, motivo: 'o agente disse que é projeto próprio' };
+
+    await upsertAglutinacao({
+      filho_id: sugestao.filhoId,
+      pai_id: sugestao.paiId,
+      similaridade: sugestao.similaridade,
+      confianca: sugestao.confianca,
+      justificativa: sugestao.justificativa,
+      origem: 'submissao',
+    });
+    return { ok: true, sugeriu: true };
+  } catch (e) {
+    // Nunca lança: é background ao lado do analisador, e a submissão não pode cair por isto.
+    console.error('[aglutinacao] falha ao avaliar a submissão:', e);
+    return { ok: false, sugeriu: false, motivo: (e as Error)?.message };
+  }
+}

@@ -181,6 +181,9 @@ export type SubmitSyncParams = {
   // sem líder / TeamGuide fora). Repassada ao `buildSubmitMessage`; só faz sentido
   // junto de `notificarChat: true`.
   notaPreAprovacao?: string | null;
+  // Vínculo de FEATURE → coluna "ID Pai" (linha do FILHO): id do projeto PAI, ou null →
+  // "—" (projeto novo). A coluna "ID Feature" (lista no PAI) é escrita à parte (cross-row).
+  idPai?: string | null;
 };
 
 export type UpdateSyncParams = {
@@ -561,6 +564,18 @@ export async function syncSubmitToGoogle(p: SubmitSyncParams): Promise<void> {
     }
     if (p.justificativaAprovacaoLider !== undefined || p.modo !== 'edicao') {
       row['Justificativa Aprovação do Líder'] = ouTraco(p.justificativaAprovacaoLider);
+    }
+
+    // "ID Pai": vínculo de FEATURE — na linha do FILHO, o id do projeto PAI. Reflete o
+    // estado do SQLite (não é editável pela triagem). ⚠️ Mesma régua `undefined` ≠ `null`
+    // das 2 colunas do líder acima: `null` = "não se aplica" → grava "—"; **`undefined` =
+    // "não sei, não encoste"** e OMITE a coluna. Como a coluna NÃO está em
+    // SAFE_UPDATE_FIELDS, nada a restaura pelo sync reverso — um chamador que rode
+    // `syncSubmitToGoogle({modo:'edicao'})` sem passar `idPai` (o resyncGoogle antes deste
+    // fix) zerava o vínculo do pai a cada resync. O APPEND nasce agora → célula com "—".
+    // A coluna "ID Feature" (lista do PAI) é cross-row, escrita à parte (nunca aqui).
+    if (p.idPai !== undefined || p.modo !== 'edicao') {
+      row['ID Pai'] = ouTraco(p.idPai);
     }
 
     // "Memorial anterior": na EDIÇÃO com memorial da versão anterior, grava-o; em

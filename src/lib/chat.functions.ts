@@ -32,6 +32,7 @@ import {
   insertAnalise,
   gravarVersaoProjeto,
   getAprovacoesDoProjeto,
+  vincularFilhoAoPai,
   parseJson,
 } from "@/integrations/db/client.server";
 import { runBackground } from "@/lib/background";
@@ -130,6 +131,7 @@ import { deriveAreaFromEmail, ehLideranca } from "@/lib/areas/teamguide.server";
 import { memorialDiretoReceita, memorialDiretoSaving } from "@/lib/submeter-direto";
 import {
   abrirPreAprovacao,
+  abrirPreAprovacaoProjetoPai,
   dispensarPreAprovacao,
   justificativaAprovacaoSheet,
   rotuloAprovacaoSheet,
@@ -172,6 +174,11 @@ import {
 import { readAllRows, updateRowByProjectId } from "@/lib/google/sheets";
 import { upsertResumoDoc } from "@/lib/google/drive";
 import { renderResumoDocumentacao } from "@/lib/agents/doc-render";
+import { lerLinhaEspelho, espelharEscrita } from "@/lib/sheet-espelho";
+import {
+  prefixarNomeFeature,
+  serializarIdsFeatureSheet,
+} from "@/lib/projeto-vinculo";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -587,6 +594,9 @@ const iniciarSubmissaoSchema = z.object({
   // de cenários (`src/lib/testes/scenario-launcher.tsx`), que existe justamente para exercitar
   // o agente. O formulário real NUNCA manda esta flag.
   modo_conversa: z.boolean().optional(),
+  // Projeto como FEATURE de outro (Etapa 1): id do projeto PAI. Vale só na submissão
+  // NOVA (decisão do Luis). O nome do filho ganha o prefixo "[feature de <NOME do pai>]".
+  projeto_pai_id: z.string().max(64).optional().nullable(),
   docs: z
     .array(z.object({ base64: z.string().min(1), filename: z.string().min(1) }))
     .min(1)
@@ -742,6 +752,21 @@ export async function iniciarSubmissao(
   const data = iniciarSubmissaoSchema.parse(rawData);
   log("iniciarSubmissao", `Iniciando para "${data.nome_projeto}" (${data.responsavel_email})`);
 
+  // Vínculo de FEATURE: resolve o NOME do pai (server-side, não confia em texto do
+  // cliente) para prefixar o nome do filho com "[feature de <NOME do pai>]". Preferimos
+  // o nome do SQLite; caí para o espelho da planilha (legado que só existe na aba).
+  const paiId = (data.projeto_pai_id ?? "").trim() || null;
+  let nomeFinal = data.nome_projeto;
+  if (paiId) {
+    try {
+      const pai = await getProjetoById(paiId);
+      const nomePai = pai?.nome ?? (await lerLinhaEspelho(paiId))?.["Projeto"] ?? null;
+      nomeFinal = prefixarNomeFeature(data.nome_projeto, nomePai);
+    } catch (paiErr) {
+      err("iniciarSubmissao", "Falha ao resolver nome do pai (segue sem prefixo):", paiErr);
+    }
+  }
+
   let projeto;
   try {
     projeto = await insertProjeto({
@@ -755,7 +780,8 @@ export async function iniciarSubmissao(
       membros: data.membros,
       membros_papeis: data.membros_papeis ?? null,
       membros_contribuicoes: data.membros_contribuicoes ?? null,
-      nome: data.nome_projeto,
+      nome: nomeFinal,
+      projeto_pai_id: paiId,
       data_criacao_projeto: data.data_criacao,
       // Projeto especial: marca "Tipo de Projeto" como "especial" (banco + planilha)
       // e ignora os tipos financeiros — o fluxo não passa pelas fases de saving/receita.
@@ -4179,6 +4205,19 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
     );
   }
 
+  // ── Estágio 2 (feature de outro projeto): abre AGORA se o estágio 1 for ISENTO ──
+  // Quando o autor é liderança / sem líder / especial / TeamGuide fora, o estágio 1 nunca
+  // será aprovado por clique — ele já está "satisfeito". Então, se este projeto é uma
+  // feature de outro, abrimos a fila do líder do dono do PAI já na submissão (Q2/Q7). Se
+  // o estágio 1 abriu fila REAL, o estágio 2 é aberto no gatilho pós-aprovação
+  // (`decidirAprovacao`). `abrirPreAprovacaoProjetoPai` é idempotente e NUNCA lança.
+  if (
+    preAprovacao.isento &&
+    (projeto as { projeto_pai_id?: string | null }).projeto_pai_id
+  ) {
+    await abrirPreAprovacaoProjetoPai(projeto_id);
+  }
+
   // ── Contexto especial órfão: rede final antes de qualquer escrita ────────────
   // O projeto deixou de ser especial em algum ponto do fluxo (Etapa 2.5 → saving/
   // receita), mas o texto do "porquê é especial" continuou no banco: ele não descreve
@@ -4230,8 +4269,32 @@ export async function submeterParaValidacao(rawData: unknown, solicitanteEmail?:
         // líder, TeamGuide fora). Quem entra em fila é anunciado na pré-aprovação.
         notificarChat: momentoNotificacao.quando === 'submissao',
         notaPreAprovacao: momentoNotificacao.nota,
+        // Vínculo de FEATURE → coluna "ID Pai" na linha deste (filho). null → "—".
+        idPai: (projeto as { projeto_pai_id?: string | null }).projeto_pai_id ?? null,
       }),
     );
+  }
+
+  // ── Vínculo de FEATURE: acumula o id deste FILHO na linha do PAI (cross-row) ──
+  // Grava "ID Feature" (lista acumulada, sem duplicar) na linha do pai e reespelha,
+  // além de somar o id em `projeto_filhos_ids` do pai no SQLite. Best-effort e
+  // fire-and-forget: nunca derruba a submissão do filho (o vínculo primário é o
+  // `projeto_pai_id` do filho, já persistido).
+  {
+    const paiId = (projeto as { projeto_pai_id?: string | null }).projeto_pai_id ?? null;
+    if (paiId) {
+      runBackground(
+        (async () => {
+          const lista = await vincularFilhoAoPai(paiId, projeto_id);
+          if (!lista) return; // pai não existe no SQLite — nada a espelhar
+          const celula = { "ID Feature": serializarIdsFeatureSheet(lista) } as const;
+          await updateRowByProjectId(paiId, celula);
+          await espelharEscrita(paiId, celula);
+        })().catch((e) =>
+          err("submeterParaValidacao", "Falha ao vincular feature ao pai (não bloqueante):", e),
+        ),
+      );
+    }
   }
 
   // A linha deste projeto acabou de mudar na planilha (append/update via `runBackground`).
@@ -4346,7 +4409,14 @@ export async function resyncGoogle(rawData: unknown) {
   // então ele espelha o que a tabela INTERNA `projeto_aprovacoes` já diz — inclusive
   // um parecer JÁ DADO. Sem fila (isento/legado) manda `undefined`: a coluna fica como
   // está, em vez de virar "—" e apagar o estado que o submit gravou.
-  const filaLider = await getAprovacoesDoProjeto(projeto_id);
+  // ⚠️ A coluna "Aprovação do Líder" é do ESTÁGIO 1 — computa SÓ sobre essas linhas
+  // (mesmo predicado dos escritores primários: `dispensarPreAprovacao`,
+  // `decidirAprovacao`). Num projeto-feature com estágio 1 ISENTO (autor liderança), as
+  // únicas linhas em `projeto_aprovacoes` são do estágio 2; sem o filtro elas passavam
+  // o guard e gravavam o parecer do 2º líder na coluna do 1º.
+  const filaLider = (await getAprovacoesDoProjeto(projeto_id)).filter(
+    (l) => Number(l.estagio) === 1,
+  );
   const aprovacaoLider = filaLider.length ? rotuloAprovacaoSheet(filaLider) : undefined;
   const justificativaAprovacaoLider = filaLider.length
     ? justificativaAprovacaoSheet(filaLider)
@@ -4372,6 +4442,11 @@ export async function resyncGoogle(rawData: unknown) {
     ganhoTotalMensal,
     aprovacaoLider,
     justificativaAprovacaoLider,
+    // Vínculo de FEATURE → coluna "ID Pai" (linha do FILHO). Derivado do banco (fonte da
+    // verdade; não está em SAFE_UPDATE_FIELDS, então nada o restaura pelo sync reverso):
+    // o resync RESTAURA ativamente o vínculo. `?? null` grava "—" quando não há pai —
+    // nunca `undefined`, que aqui OMITE a coluna (guard em syncSubmitToGoogle).
+    idPai: projeto.projeto_pai_id ?? null,
     // Re-sync é REPARO administrativo (regravar a linha da planilha) — não avisa
     // ninguém. Antes disparava uma mensagem no grupo por projeto reparado.
     notificarChat: false,

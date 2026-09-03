@@ -106,3 +106,49 @@ describe('Sheets — colunas da pré-aprovação do líder', () => {
     expect(rowDoAppend()[JUSTIFICATIVA]).toBe('—');
   });
 });
+
+// Coluna "ID Pai" (vínculo de FEATURE na linha do FILHO). Mesma régua `undefined` ≠ `null`
+// das colunas do líder — e o mesmo motivo: a coluna NÃO está em SAFE_UPDATE_FIELDS, então
+// nada a restaura pelo sync reverso. Um chamador que rode `syncSubmitToGoogle({modo:'edicao'})`
+// SEM passar `idPai` (o `resyncGoogle` antes do fix) zerava o vínculo do pai a cada resync.
+const ID_PAI = 'ID Pai';
+const ID_FEATURE = 'ID Feature';
+
+describe('Sheets — coluna "ID Pai" (vínculo de FEATURE)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (updateRowByProjectId as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+  });
+
+  it('EDIÇÃO com idPai = valor: grava o id do pai', async () => {
+    await syncSubmitToGoogle({ ...baseParams, modo: 'edicao', idPai: 'PAI-1' });
+    expect(rowDoUpdate()[ID_PAI]).toBe('PAI-1');
+  });
+
+  it('EDIÇÃO com idPai = null (sem pai): grava "—"', async () => {
+    await syncSubmitToGoogle({ ...baseParams, modo: 'edicao', idPai: null });
+    expect(rowDoUpdate()[ID_PAI]).toBe('—');
+  });
+
+  it('RE-SYNC sem idPai (undefined): NÃO toca a coluna — não zera o vínculo', async () => {
+    // Regressão: com `ouTraco(undefined)` incondicional isto gravava "—" e apagava o pai.
+    await syncSubmitToGoogle({ ...baseParams, modo: 'edicao' });
+    expect(ID_PAI in rowDoUpdate()).toBe(false);
+  });
+
+  it('SUBMISSÃO NOVA sem idPai: a célula NASCE com "—", nunca vazia', async () => {
+    await syncSubmitToGoogle({ ...baseParams, modo: 'novo' });
+    expect(rowDoAppend()[ID_PAI]).toBe('—');
+  });
+
+  it('"ID Feature" NUNCA é escrita por syncSubmitToGoogle (é cross-row, à parte) — ', async () => {
+    // Garante que um resync do PAI (via syncSubmitToGoogle) não pode zerar a lista de
+    // filhos: a coluna simplesmente não faz parte da linha construída aqui.
+    await syncSubmitToGoogle({ ...baseParams, modo: 'edicao', idPai: 'PAI-1' });
+    expect(ID_FEATURE in rowDoUpdate()).toBe(false);
+    vi.clearAllMocks();
+    (updateRowByProjectId as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    await syncSubmitToGoogle({ ...baseParams, modo: 'novo' });
+    expect(ID_FEATURE in rowDoAppend()).toBe(false);
+  });
+});

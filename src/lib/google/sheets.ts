@@ -129,19 +129,24 @@ export const SHEET_COLUMNS = [
   // comentário. A coluna acima fica só com o ESTADO (Pré-aprovado/Pré-pendente/
   // Pré-reprovado) — decisão do Luis, 03/08/2026.
   'Justificativa Aprovação do Líder',
+  // ─── Projeto como FEATURE de outro projeto (vínculo pai↔filho) ───────────────
+  // "ID Pai": na linha do FILHO, o id do projeto PAI (uma feature aponta 1 pai).
+  // "ID Feature": na linha do PAI, a LISTA acumulada dos ids das features (mesmo
+  // padrão das colunas de participantes — cross-row via updateRowByProjectId).
+  // ⚠️ Duas origens escrevem aqui, e elas não se confundem: a DECLARAÇÃO do autor na
+  // Etapa 1 (o vínculo que ele afirma) e o ACEITE humano no painel de aglutinação (a
+  // sugestão do agente, que até ser aceita mora só numa tabela INTERNA — palpite gravado
+  // na planilha é indistinguível de fato declarado para quem lê depois).
+  // ⚠️ As 2 colunas precisam existir no cabeçalho de GoDocs e STAGING (mapeamento por
+  // NOME — se faltar, a célula é ignorada com aviso e o resto do sync segue).
+  'ID Pai',
+  'ID Feature',
   // ─── GoDocs v2 — as 3 perguntas que a v1 nunca fez (BE, BF, BG) ─────────────
   // As demais colunas da v2 são RENOMEAÇÕES in-place das da v1 (a régua D1 trocou os
   // conceitos de nome: o `Custo Evitado` da v1 — a empresa pagava e parou — é o SAVING
   // EFETIVADO da v2, e o saving por HORAS da v1 é o CUSTO EVITADO da v2). Renomear
   // cabeçalho não move célula e o casamento é por NOME, então as 578 linhas antigas
   // seguem legíveis sob o nome novo.
-  // ─── Vínculo entre projetos (aglutinação, item 5.3) ─────────────────────────
-  // Já existiam no cabeçalho da STAGING-V2 (BC/BD) antes deste código: o `ID Pai` fica na
-  // linha do FILHO e o `ID Feature` na linha do PAI. ⚠️ Escritas SÓ pelo ACEITE humano no
-  // painel de aglutinação — a sugestão do agente mora numa tabela INTERNA, porque palpite
-  // gravado na planilha é indistinguível de fato declarado para quem lê depois.
-  'ID Pai',
-  'ID Feature',
   'Saving Efetivado Agora',         // BE (a 2ª ponta do par; o saving é a DIFERENÇA)
   'Custo Evitado Não Contratado',   // BF (a vaga não aberta, a consultoria não contratada)
   'Impacto Líquido Mensal',         // BG (o líquido normalizado no tempo — vai ao Gomoon)

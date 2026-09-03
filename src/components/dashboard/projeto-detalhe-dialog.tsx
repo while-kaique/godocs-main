@@ -123,6 +123,9 @@ type Detalhe = {
   avaliacaoSombra?: AvaliacaoSombra | null;
   /** Voto do admin sobre a recomendação em sombra. */
   feedback?: 'like' | 'dislike' | null;
+  // Pré-aprovação do estágio 2 (líder do dono do projeto PAI) — só quando é feature de
+  // outro projeto. Vem do SQLite (o estágio 2 não tem coluna no Sheets).
+  preAprovacaoPai?: { estado: string; justificativa: string } | null;
 };
 
 type Grupo = { titulo: string; colunas: string[] };
@@ -893,6 +896,20 @@ export function ProjetoDetalheDialog({
                   votando={votando}
                   onVotar={votarSombra}
                 />
+              </Secao>
+            )}
+
+            {/* Estágio 2 — feature de outro projeto: parecer do líder do DONO DO PAI. Vem
+                do SQLite (o estágio 2 não tem coluna no Sheets), para a triagem ver os DOIS
+                pareceres sem abrir a planilha. */}
+            {detalhe.preAprovacaoPai && (
+              <Secao titulo="Pré-aprovação do líder do projeto pai (feature)">
+                <p className="text-[13px] font-semibold" style={{ color: 'var(--go-blue)' }}>
+                  {detalhe.preAprovacaoPai.estado}
+                </p>
+                <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-muted-foreground">
+                  {detalhe.preAprovacaoPai.justificativa}
+                </p>
               </Secao>
             )}
 

@@ -113,3 +113,34 @@ export function renderMensagemLider(lider: {
   // esta linha tem de voltar junto, senão a DM fica sem caminho nenhum.
   return linhas.join('\n');
 }
+
+/**
+ * Aviso ao líder do DONO DO PROJETO PAI quando uma NOVA FEATURE (projeto vinculado) é
+ * submetida no projeto dele (estágio 2 da pré-aprovação). Função PURA.
+ *
+ * Copy PRÓPRIA (pedido do Luis): tem de deixar CLARO que se refere a uma feature nova
+ * implementada no projeto DELE, não a um projeto solto de um liderado. Sem valores em R$
+ * (mesma régua §7.1) e sem travessão/hífen como separador (só a grafia correta de
+ * "pré-aprovação" leva hífen). Markup HTML de cartão (`<b>`), sem `<a href>` (D22) — quem
+ * leva à fila é o botão "Abrir a fila" que o cartão monta do campo `url`.
+ */
+export function renderMensagemLiderFeature(dados: {
+  nome: string | null;
+  autorNome: string;
+  projetoPaiNome: string;
+  featureNome: string;
+}): string {
+  const primeiro = primeiroNome(dados.nome);
+  const saudacao = primeiro ? `Oi, ${primeiro}! ` : 'Oi! ';
+  const autor = (dados.autorNome ?? '').trim() || 'Alguém da equipe';
+  const pai = (dados.projetoPaiNome ?? '').trim() || 'um projeto seu';
+  const feature = (dados.featureNome ?? '').trim();
+
+  const linhas: string[] = [
+    '<b>Nova feature para pré-aprovar no GoDocs</b> 🧩',
+    '',
+    `${saudacao}${autor} implementou uma nova feature no projeto <b>${pai}</b> e ela aguarda a sua pré-aprovação.`,
+  ];
+  if (feature) linhas.push('', `Feature: <b>${feature}</b>`);
+  return linhas.join('\n');
+}

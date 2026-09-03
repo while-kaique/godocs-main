@@ -639,6 +639,18 @@ export function SubmeterPageContent({
           usaAiProxy: ((data.usa_ai_proxy as string) ?? "") as FormData["usaAiProxy"],
           contrafactualAfetadosTipo: afetadosSeed.tipo,
           contrafactualAfetados: afetadosSeed.lista,
+          // Vínculo de FEATURE é read-only na edição (só a submissão nova o cria). O
+          // prefixo "[feature de <pai>]" no nome já mostra o vínculo; aqui só semeamos o
+          // estado para o step1 exibir a referência.
+          // ⚠️ Os campos do ESPECIAL que a branch de origem semeava aqui NÃO voltaram: a v2
+          // os removeu do formulário (D5 — especial passou a ser derivado da estrela).
+          vinculo: (data.projeto_pai_id as string | null) ? "feature" : "novo",
+          paiId: (data.projeto_pai_id as string | null) ?? "",
+          // O NOME do pai não vem no seed (o backend devolve só o id) — e não precisa: o
+          // prefixo "[feature de <pai>]" já está no nome do projeto, e na edição o vínculo
+          // é read-only. `paiProdStatus` é gate de porta da submissão NOVA, então nasce vazio.
+          paiNome: "",
+          paiProdStatus: "",
         };
 
         setForm(newForm);
@@ -889,6 +901,10 @@ export function SubmeterPageContent({
     usaAiProxy: "",
     contrafactualAfetadosTipo: "pessoa",
     contrafactualAfetados: [],
+    vinculo: "novo",
+    paiId: "",
+    paiNome: "",
+    paiProdStatus: "",
   });
 
   // Título da aba. Esta tela é a MESMA em dois modos (nova submissão × edição), e é
@@ -1166,6 +1182,7 @@ export function SubmeterPageContent({
             // ⚠️ SEM `data_criacao`: o campo saiu do formulário na v2 (a data que vale é a
             // de SUBMISSÃO). E sem tipos/categorias: a fase de doc não depende delas — o
             // ganho declarado é gravado no envio, pela rota própria.
+            projeto_pai_id: form.vinculo === "feature" && form.paiId ? form.paiId : undefined,
             descricao_breve: form.descricaoBreve.trim() || undefined,
             usa_ai_proxy: form.usaAiProxy || undefined,
             contrafactual_afetados:

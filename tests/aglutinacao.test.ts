@@ -246,3 +246,31 @@ describe('varredura em duas fases (03/09/2026)', () => {
     ).toBeNull();
   });
 });
+
+describe('avaliação na SUBMISSÃO (03/09/2026)', () => {
+  it('quem já DECLAROU o pai na Etapa 1 fica de fora da sugestão automática', () => {
+    // A pessoa disse o que o projeto é; um palpite por cima disso não acrescenta nada e
+    // ainda apareceria no painel como decisão pendente sobre um caso já decidido.
+    const declarado = p('novo', 5000, { jaVinculado: true });
+    const uni = universo(declarado, p('velho', 1000));
+    expect(candidatosDe(declarado, [{ id: 'velho', similaridade: 0.9 }], uni)).toEqual([]);
+  });
+
+  it('só o par em que o projeto NOVO é o filho interessa na submissão', () => {
+    // Um recém-submetido pode ser o PAI de algo ainda mais novo (impossível pelo relógio)
+    // ou o FILHO de algo mais antigo (o caso real). A direção sai do relógio, não do LLM.
+    const novo = p('novo', 5000);
+    const uni = universo(novo, p('velho', 1000), p('futuro', 9000));
+    const cands = candidatosDe(
+      novo,
+      [
+        { id: 'velho', similaridade: 0.8 },
+        { id: 'futuro', similaridade: 0.9 },
+      ],
+      uni,
+    );
+    const comoFilho = cands.filter((c) => c.filhoId === novo.id);
+    expect(comoFilho).toHaveLength(1);
+    expect(comoFilho[0].paiId).toBe('velho');
+  });
+});

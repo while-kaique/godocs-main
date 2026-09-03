@@ -6,6 +6,7 @@ import type { FormData, FieldErrors, PapelParticipante } from "./constants";
 import {
   SectionTitle, FormGroup, FormLabel, FormInput,
   RadioGroup, GridCheckboxGroup, InfoTooltip, ParticipantesPapeisInput, LegendaPapeis,
+  ProjetoPaiInput,
 } from "./form-components";
 import { useSugestoesParticipantes, prefetchSugestoesParticipantes } from "./participantes-sugestoes";
 
@@ -142,6 +143,97 @@ export function Step1({
         </div>
       )}
     </FormGroup>
+  );
+
+  // Bloco do VÍNCULO (projeto novo × feature de um projeto existente) — só na submissão
+  // NOVA (o vínculo é criado uma vez; na edição vira referência read-only). Vale nos 3
+  // fluxos (padrão/especial/liderança), que compartilham este formulário.
+  const paiProdBlocked =
+    form.vinculo === "feature" && (form.paiProdStatus === "dev" || form.paiProdStatus === "idle");
+  const blocoVinculo = (
+    <div
+      className="relative mb-6 rounded-xl p-4"
+      style={{ background: "rgba(199,233,253,0.3)", border: "1px solid rgba(0,89,169,0.08)" }}
+    >
+      <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--go-text-heading)" }}>
+        Este projeto é novo ou uma feature de um projeto existente?
+        <InfoTooltip>
+          <strong className="mb-1 block text-white">Projeto novo vs. Feature</strong>
+          <span className="block mb-2" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <strong style={{ color: "var(--go-lime)" }}>Projeto novo</strong> — uma automação
+            independente, submetida do zero.
+          </span>
+          <span className="block" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <strong style={{ color: "var(--go-lime)" }}>Feature</strong> — um incremento
+            implementado dentro de um projeto que já existe. Você escolhe o projeto pai; o
+            ganho documentado é o desta feature.
+          </span>
+        </InfoTooltip>
+      </div>
+      <RadioGroup
+        name="vinculo"
+        value={form.vinculo || "novo"}
+        onChange={(v) => {
+          updateField("vinculo", v as FormData["vinculo"]);
+          if (v !== "feature") {
+            updateField("paiId", "");
+            updateField("paiNome", "");
+            updateField("paiProdStatus", "");
+            clearError("paiId");
+            clearError("paiProdStatus");
+          }
+        }}
+        error={errors.vinculo}
+        options={[
+          { value: "novo", label: "🆕 Projeto novo" },
+          { value: "feature", label: "🧩 Feature de um projeto existente" },
+        ]}
+      />
+      {form.vinculo === "feature" && (
+        <div className="mt-3.5" style={{ animation: "go-slide-down 0.25s ease" }}>
+          <FormLabel required>O projeto pai já está em produção?</FormLabel>
+          <RadioGroup
+            name="paiProdStatus"
+            value={form.paiProdStatus}
+            onChange={(v) => { updateField("paiProdStatus", v as FormData["paiProdStatus"]); clearError("paiProdStatus"); }}
+            error={errors.paiProdStatus}
+            vertical
+            options={[
+              { value: "sim", label: "🟢 Sim, já está em produção" },
+              { value: "dev", label: "🔧 Não, ainda está sendo desenvolvido" },
+              { value: "idle", label: "⏸️ Está pronto, mas ainda não é utilizado" },
+            ]}
+          />
+          {paiProdBlocked && (
+            <div
+              className="mt-3 rounded-lg p-3.5"
+              style={{ background: "rgba(220,38,38,0.03)", border: "1px solid rgba(220,38,38,0.12)", animation: "go-slide-down 0.3s ease" }}
+            >
+              <div className="mb-1 text-[13px] font-bold" style={{ color: "#dc2626" }}>🚫 Projeto pai não está em produção</div>
+              <div className="text-xs leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
+                Só documentamos ganho já realizado — o projeto pai precisa estar em produção.
+              </div>
+            </div>
+          )}
+          {form.paiProdStatus === "sim" && (
+            <div className="mt-3.5">
+              <FormLabel required>Qual é o projeto pai?</FormLabel>
+              <ProjetoPaiInput
+                paiId={form.paiId}
+                paiNome={form.paiNome}
+                onSelect={(id, nome) => {
+                  updateField("paiId", id);
+                  updateField("paiNome", nome);
+                  clearError("paiId");
+                }}
+                onClear={() => { updateField("paiId", ""); updateField("paiNome", ""); }}
+                error={errors.paiId}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 
   // Opções do seletor = a lista canônica + qualquer valor LEGADO que o projeto já
@@ -308,10 +400,13 @@ export function Step1({
             ? "Pronto, sem uso"
             : "—";
     // A ferramenta SAIU desta lista (virou campo editável abaixo) — só escopo e status
-    // continuam fixos na edição.
+    // continuam fixos na edição. O vínculo de FEATURE é read-only (criado na submissão).
     const linhasProjeto = [
       { rotulo: "Escopo", valor: escopoLabel },
       { rotulo: "Status", valor: statusLabel },
+      ...(form.vinculo === "feature"
+        ? [{ rotulo: "Feature do projeto", valor: form.paiNome || form.paiId || "—" }]
+        : []),
     ];
 
     return (
@@ -354,6 +449,9 @@ export function Step1({
   // ── Modo SUBMISSÃO NOVA: formulário completo editável (comportamento inalterado) ──
   return (
     <div>
+      {/* ── Vínculo: projeto novo × feature de um projeto existente ── */}
+      {blocoVinculo}
+
       {/* ── Gate de Escopo ── */}
       <div
         className="relative mb-6 rounded-xl p-4"

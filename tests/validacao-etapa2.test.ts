@@ -35,6 +35,10 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     usaAiProxy: 'sim',
     contrafactualAfetadosTipo: 'pessoa',
     contrafactualAfetados: ['maria@gocase.com'],
+    vinculo: 'novo',
+    paiId: '',
+    paiNome: '',
+    paiProdStatus: '',
     ...over,
   };
 }
