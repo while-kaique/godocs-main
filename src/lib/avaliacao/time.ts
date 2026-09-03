@@ -31,7 +31,7 @@ import {
   type SaidaEstrela,
 } from '@/lib/avaliacao/cerebro-estrela';
 import { conciliar, type Consenso, type Liberacao } from '@/lib/avaliacao/consenso';
-import { textoJustificativaInterna, textoAoAutor, dossieDeComite } from '@/lib/avaliacao/textos';
+import { textoJustificativaInterna, textoAoAutor, dossieDeComite, ocultarValoresMonetarios } from '@/lib/avaliacao/textos';
 import type { TipoNo } from '@/lib/agentes-log';
 
 export type Papel = 'especialista' | 'estrela' | 'cetico';
@@ -57,7 +57,7 @@ export type VizinhoTime = { id: string; nome: string; nota: number | null; statu
 export const MAX_RODADAS_DEBATE = 2;
 export const FERRAMENTAS_POR_AGENTE = 2;
 
-export type ResultadoCetico = { refuta: boolean; motivo: string | null; sinais: string[]; fallback: boolean };
+export type ResultadoCetico = { refuta: boolean; motivo: string | null; sinais: string[]; fallback: boolean; pergunta_ao_autor?: string | null };
 
 export type ResultadoTime = {
   projeto_id: string;
@@ -79,7 +79,7 @@ export function buildPromptCetico(args: { dossieTexto: string; julgamentos: Julg
   const system = `Você é o CÉTICO adversarial do time de avaliação do GoDocs. Sua tarefa é TENTAR DERRUBAR a aprovação, não conferi-la: procure a condição-limite que os especialistas deixaram passar (horas raspando o teto, valor inflado, evidência que é só o próprio entregável, duplicata, ganho projetado em vez de medido). Você lê o dossiê, os julgamentos dos especialistas e a estrela recomendada. Refutar exige um SINAL CONCRETO citado do dossiê: número implausível, contradição interna, duplicata, ganho projetado, dupla contagem. "Não é auditável", "não há anexo" ou "falta evidência independente" NÃO são motivo — a base legada foi documentada só pela planilha e a triagem humana aprovou com esse material. Se não encontrar nada concreto, diga que não refuta: refutar sem sinal nomeado é ruído que trava o time.
 
 FORMATO DE RESPOSTA — responda APENAS com um objeto JSON:
-{ "refuta": <bool>, "motivo": "<uma frase concreta com a evidência, ou null>", "sinais": ["<condição-limite detectada>", "..."] }`;
+{ "refuta": <bool>, "motivo": "<uma frase concreta com a evidência, ou null>", "sinais": ["<condição-limite detectada>", "..."], "pergunta_ao_autor": "<quando refuta: UMA pergunta (até 220 caracteres) que o autor consegue responder e que resolve a sua refutação; sem R$ por hora; null se a refutação não se resolve com o autor>" }`;
   const user = [
     'DOSSIÊ DO PROJETO:',
     args.dossieTexto,
@@ -103,7 +103,10 @@ export function normalizarCetico(bruto: unknown): ResultadoCetico | null {
   const refuta = o.refuta === true || (typeof o.refuta === 'string' && /^(true|sim|s|yes|1)$/i.test(o.refuta.trim()));
   const motivo = typeof o.motivo === 'string' && o.motivo.trim() ? o.motivo.trim() : null;
   const sinais = Array.isArray(o.sinais) ? o.sinais.filter((x): x is string => typeof x === 'string' && x.trim().length > 0) : [];
-  return { refuta, motivo, sinais, fallback: false };
+  const perguntaCrua = typeof o.pergunta_ao_autor === 'string' ? o.pergunta_ao_autor.trim() : '';
+  const pergunta_ao_autor = perguntaCrua ? ocultarValoresMonetarios(perguntaCrua) : null;
+  // A chave só existe quando o cético propôs pergunta (mantém o shape mínimo de sempre).
+  return pergunta_ao_autor ? { refuta, motivo, sinais, fallback: false, pergunta_ao_autor } : { refuta, motivo, sinais, fallback: false };
 }
 
 /**
@@ -337,6 +340,18 @@ export async function avaliarComTime(args: {
     julgamentos = await rodarRodada(debateId, rodadas, julgamentos, cetico.motivo ?? 'refutou sem motivo nomeado');
     merito = consolidarMerito(julgamentos, { temVizinhos });
     cetico = await rodarCetico(julgamentos, estrela, debateId, rodadas);
+  }
+  // D13 — humano é EXCEÇÃO. Refutação do cético que SOBREVIVE à réplica e traz uma pergunta
+  // respondível vira AJUSTE ao autor (a saída autônoma), não fila humana. Medido na rodada 3: 8 dos 9
+  // humanos eram "debate não fechou" com o cético apontando contradição concreta (erro de conta,
+  // 6 h × 4,5 h, bot em staging) — pergunta que o autor resolve. Sem pergunta, segue para o humano.
+  if (cetico.refuta && merito.veredito === 'aprovar' && cetico.pergunta_ao_autor) {
+    merito = {
+      ...merito,
+      veredito: 'ajuste',
+      perguntas_ao_autor: [...merito.perguntas_ao_autor, cetico.pergunta_ao_autor],
+      ressalvas: [...merito.ressalvas, `Cético sustentou a refutação: ${cetico.motivo ?? 'sem motivo'}`],
+    };
   }
   const debateFechou = !(cetico.refuta && merito.veredito === 'aprovar');
 
