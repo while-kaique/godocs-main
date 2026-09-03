@@ -34,7 +34,8 @@ T19 → T20 → T10. **Pronto para `/ggsd:code`.**
 - **Retroativo (T19):** harness em `scripts/avaliacao-retro/`; dump só-leitura da planilha de prod (734
   linhas); rodadas em `docs/plans/retro-rodadas/` com diário em `§11.7` do plano. 4 rodadas de 30 na mesma
   amostra (variantes 1→4) fecharam o roteamento: humano 3%, 0 erro grave, aprovar preciso; depois amostra
-  nova de 100 e a base inteira.
+  nova de 100 e a BASE INTEIRA (713): 91 aprovar · 617 ajuste · 5 humano, 0 erro grave, aprovar 100% preciso,
+  estrela 82% em ±1. Artefato: https://claude.ai/code/artifact/af90c8e9-0e8a-4946-9192-45224e2cec49
 - **Régua intacta (D20).** Toda calibração foi em prompt do MÉRITO/CÉTICO ou em trava estrutural.
 
 ## Próximo passo

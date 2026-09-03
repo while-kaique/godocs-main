@@ -671,3 +671,17 @@ rota `POST /api/admin/avaliacao/time` roda em background e devolve 202 (`sincron
 antes de registrar; ausente → 400) · cache `id → pai` no registrador (hoje 1 SELECT por nó) · retenção de
 `agente_log`/`avaliacao_ciclos` concluídos (irmã de `cleanupOldApiLogs`) · reaper de ciclos `aberto` antigos.
 **Fora desta fatia:** T20 (painel sombra no `/dashboard`) e T10 (aglutinação de feature em projeto existente).
+- **Rodada 6 (`r06-base-v4`, BASE INTEIRA, 713 ativos, US$ 35,04, 7.397 chamadas, 0 erro de execução, 309
+  réplicas):** **91 aprovar (12,8%) · 617 ajuste (86,5%) · 5 humano (0,7%)**; mérito **0 erro grave em 713**,
+  **aprovar 100% preciso em 67**, reprovados 3/3 → ajuste; "conservador" 366 (a triagem histórica aprovou
+  91% da base). Estrelas: **336 comparáveis, exato 43%, dentro de 1 = 82%**, viés +0,38, sem achatamento;
+  especiais (65): 21 aprovar · 42 ajuste · 2 humano, estrela ±1 = 65%; 1 escape indicado (IARA + Central
+  RA, nota humana 0). Valor: **121 absurdos** (17%). Os 5 humanos: **Sucesso.AI e Portal de Reembolsos**
+  (os 2 casos reais de dupla contagem do `SPEC_CORRECOES.md`), Mix Produtos Gobeaute, ecom-metrics-hub e o
+  escape. Motivos do cético em aprovados humanos (560): 121 contradições internas · 113 ganho projetado ·
+  98 erros de conta · 36 duplas contagens. Média de 2,4 perguntas por ajuste. Relatório `r06-base-v4.md`;
+  JSON completo e árvore do log (18 MB) fora do repo em `~/godocs-retro-dados/` (com o dump e os embeddings).
+  **Leitura final:** o time é SEGURO (nunca aprova o que o humano reprovou; nunca erra ao aprovar) e mais
+  RIGOROSO que a triagem histórica. A decisão que falta é do Luis: rigor do time como novo padrão, ou
+  calibrar para a leniência histórica (§11.5 (c) e este diário são o insumo). **Artefato:**
+  https://claude.ai/code/artifact/af90c8e9-0e8a-4946-9192-45224e2cec49
