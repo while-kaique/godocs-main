@@ -520,16 +520,34 @@ consenso, texto ao autor e dossiê de comitê → **forte** (`LLM_MODEL`); embed
   `AVALIACAO_LIBERAR_AJUSTE` (default OFF) só passam a agir quando a `politicaDeLiberacao` autoriza.
   "Estrelas" e "Status" continuam **só por clique humano** até a liberação.
 
-- **T21 — Memória e LOG dos agentes (pedido do Luis, 03/09, PRIMEIRA a entrar)**: tabelas INTERNAS
-  **`agente_log`** (por ciclo × projeto × agente: entrada resumida, tools chamadas com argumentos e retorno,
-  conclusão ÍNTEGRA, confiança, rodada do debate, veredito final, modelo, custo/tokens, `created_at`) e
-  **`avaliacao_ciclos`** (uma linha por rodada de retroativo: data, amostra e seed, modelo, variante do
-  prompt, métricas agregadas, caminho do relatório). `registrarLogAgente` **nunca lança** (auditoria não
-  derruba a avaliação — mesma régua de `registrarAtividade`). Fora de `SAFE_UPDATE_FIELDS`, sem Sheets,
-  comentário do schema **sem `;`**. Leitura: `GET /api/admin/agentes/log?projeto=&ciclo=&agente=`
-  (`requireAdmin`) + o script de rodada imprime o resumo. Vetorizar o log fica **fora** até a busca por
-  texto livre se provar necessária. Motivo: *"para não ficarmos às cegas e esquecer o que rodamos na terça,
-  qual foi a conclusão da semana passada, por que o agente estava dando erro."*
+- **T21 — Memória e LOG dos agentes em ÁRVORE (pedido do Luis, 03/09, PRIMEIRA a entrar).** Tabelas
+  INTERNAS no SQLite do app (fora de `SAFE_UPDATE_FIELDS`, sem Sheets, comentário do schema **sem `;`**):
+  - **`avaliacao_ciclos`** — a RAIZ: uma linha por rodada (retroativo ou avaliação real): data, gatilho,
+    amostra e seed, modelo por papel, variante do prompt, métricas agregadas, caminho do relatório, status.
+  - **`agente_log`** — um nó por passo de agente, **sempre pendurado num pai**: `id` · `ciclo_id` (raiz,
+    obrigatório) · **`pai_id`** (nó que chamou; `NULL` só para o orquestrador do projeto dentro do ciclo) ·
+    **`caminho`** (materialized path `ciclo/orquestrador/cerebroA/especialista-financeiro/tool-3`, para
+    puxar a subárvore com UM `LIKE 'prefixo/%'`) · `profundidade` · `projeto_id` · `agente` (nome do
+    papel) · `tipo` (`orquestrador|cerebro|especialista|cetico|consenso|tool|debate`) · `rodada` ·
+    `entrada` (resumo) · `saida` (conclusão ÍNTEGRA, não resumida) · `tools_chamadas` (JSON: nome,
+    argumentos, retorno) · `confianca` · `veredito` · `modelo` · `tokens_in/out` · `custo_usd` ·
+    `duracao_ms` · `erro` · `created_at`.
+  - **Regra de árvore, cobrada em código e em teste:** `registrarNoAgente` **recusa nó sem `pai_id`** que
+    não seja o orquestrador do projeto, e recusa `pai_id` de outro ciclo. Nada fica solto: da raiz dá para
+    chegar a toda tool chamada, e de qualquer tool dá para subir até o ciclo. **Nunca lança** para fora
+    (auditoria não derruba a avaliação — régua de `registrarAtividade`); a recusa é logada e contada.
+  - **Índices para consulta rápida:** `(ciclo_id, projeto_id)` · `(projeto_id, created_at)` ·
+    `(agente, created_at)` · `(pai_id)` · `(caminho)` · `(veredito)`. Perguntas que têm de sair em uma
+    consulta: *o que o cético concluiu no projeto X na rodada de terça* · *toda a subárvore do orquestrador
+    do projeto X* · *todos os erros do especialista financeiro na última semana* · *quantos ciclos caíram
+    em `humano` por mês*.
+  - **Leitura:** `GET /api/admin/agentes/ciclos` · `GET /api/admin/agentes/arvore?ciclo=&projeto=`
+    (devolve a árvore montada) · `GET /api/admin/agentes/log?agente=&desde=&veredito=` (`requireAdmin`).
+    O script de rodada imprime o resumo do ciclo e o caminho do relatório.
+  - Vetorizar o log fica **fora** até a busca por texto livre se provar necessária. Motivo do Luis: *"para
+    não ficarmos às cegas e esquecer o que rodamos na terça, qual foi a conclusão da semana passada, por que
+    o agente estava dando erro"* e *"divida em árvore: esse agente está conectado a tal, que está conectado a
+    tal — não deixe solto para perdermos."*
 
 **Ordem:** **T21** → T11 → T12 → T13/T14 (paralelas) → T16 → T15 → T17 → T18 → T19 (rodadas) → T20 → T10.
 
