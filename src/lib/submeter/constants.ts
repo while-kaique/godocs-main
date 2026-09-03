@@ -395,14 +395,12 @@ export function validarEtapa1(
   // Campos do projeto (escopo/status/ferramenta) só travam na submissão NOVA. Em
   // edição, um legado pode não tê-los preenchidos — não bloqueia (D2/RF-103).
   if (!modoEdicao) {
-    // Vínculo de FEATURE: se marcou "feature", precisa escolher o PAI e o pai tem de
-    // estar em produção (mesma régua do próprio projeto — só se documenta ganho já real).
-    if (form.vinculo === "feature") {
-      if (!form.paiId.trim())
-        errs.paiId = "Escolha o projeto do qual este é uma feature";
-      else if (form.paiProdStatus !== "sim")
-        errs.paiProdStatus = "O projeto pai precisa estar em produção";
-    }
+    // Vínculo de FEATURE: se marcou "feature", precisa escolher o PAI. ⚠️ NÃO se pergunta
+    // se o pai está em produção: ele é escolhido dentro da nossa base, e todo projeto da
+    // base já passou pelo gate de produção na própria submissão. O gate que vale aqui é o
+    // do `prodStatus` DESTA feature, abaixo.
+    if (form.vinculo === "feature" && !form.paiId.trim())
+      errs.paiId = "Escolha o projeto do qual este é uma feature";
     if (!form.escopo)
       errs.escopo = "Selecione se a solução é interna ou externa";
     if (!form.prodStatus)
@@ -624,7 +622,6 @@ export interface FormData {
   paiNome: string;
   // Gate de porta (só frontend, como `prodStatus`): o pai precisa estar em produção.
   // Não vai ao backend, a nenhum prompt nem ao Sheets.
-  paiProdStatus: "sim" | "dev" | "idle" | "";
 }
 
 // Quem sentiria falta se a automação parasse: pessoas específicas OU um time/área

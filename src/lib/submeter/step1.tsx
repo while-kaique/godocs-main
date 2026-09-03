@@ -148,8 +148,6 @@ export function Step1({
   // Bloco do VÍNCULO (projeto novo × feature de um projeto existente) — só na submissão
   // NOVA (o vínculo é criado uma vez; na edição vira referência read-only). Vale nos 3
   // fluxos (padrão/especial/liderança), que compartilham este formulário.
-  const paiProdBlocked =
-    form.vinculo === "feature" && (form.paiProdStatus === "dev" || form.paiProdStatus === "idle");
   const blocoVinculo = (
     <div
       className="relative mb-6 rounded-xl p-4"
@@ -178,9 +176,7 @@ export function Step1({
           if (v !== "feature") {
             updateField("paiId", "");
             updateField("paiNome", "");
-            updateField("paiProdStatus", "");
             clearError("paiId");
-            clearError("paiProdStatus");
           }
         }}
         error={errors.vinculo}
@@ -191,46 +187,23 @@ export function Step1({
       />
       {form.vinculo === "feature" && (
         <div className="mt-3.5" style={{ animation: "go-slide-down 0.25s ease" }}>
-          <FormLabel required>O projeto pai já está em produção?</FormLabel>
-          <RadioGroup
-            name="paiProdStatus"
-            value={form.paiProdStatus}
-            onChange={(v) => { updateField("paiProdStatus", v as FormData["paiProdStatus"]); clearError("paiProdStatus"); }}
-            error={errors.paiProdStatus}
-            vertical
-            options={[
-              { value: "sim", label: "🟢 Sim, já está em produção" },
-              { value: "dev", label: "🔧 Não, ainda está sendo desenvolvido" },
-              { value: "idle", label: "⏸️ Está pronto, mas ainda não é utilizado" },
-            ]}
+          <FormLabel required>Qual é o projeto pai?</FormLabel>
+          {/* Sem pergunta de produção aqui: o pai é escolhido DENTRO da nossa base, e todo
+              projeto da base já passou pelo gate de produção da Etapa 1 na própria submissão.
+              Repetir a pergunta só adicionava um passo cuja resposta já é conhecida — e podia
+              contradizer o que a base afirma. O gate de produção que vale é o DESTA feature,
+              logo acima. */}
+          <ProjetoPaiInput
+            paiId={form.paiId}
+            paiNome={form.paiNome}
+            onSelect={(id, nome) => {
+              updateField("paiId", id);
+              updateField("paiNome", nome);
+              clearError("paiId");
+            }}
+            onClear={() => { updateField("paiId", ""); updateField("paiNome", ""); }}
+            error={errors.paiId}
           />
-          {paiProdBlocked && (
-            <div
-              className="mt-3 rounded-lg p-3.5"
-              style={{ background: "rgba(220,38,38,0.03)", border: "1px solid rgba(220,38,38,0.12)", animation: "go-slide-down 0.3s ease" }}
-            >
-              <div className="mb-1 text-[13px] font-bold" style={{ color: "#dc2626" }}>🚫 Projeto pai não está em produção</div>
-              <div className="text-xs leading-relaxed" style={{ color: "var(--go-text-primary)" }}>
-                Só documentamos ganho já realizado — o projeto pai precisa estar em produção.
-              </div>
-            </div>
-          )}
-          {form.paiProdStatus === "sim" && (
-            <div className="mt-3.5">
-              <FormLabel required>Qual é o projeto pai?</FormLabel>
-              <ProjetoPaiInput
-                paiId={form.paiId}
-                paiNome={form.paiNome}
-                onSelect={(id, nome) => {
-                  updateField("paiId", id);
-                  updateField("paiNome", nome);
-                  clearError("paiId");
-                }}
-                onClear={() => { updateField("paiId", ""); updateField("paiNome", ""); }}
-                error={errors.paiId}
-              />
-            </div>
-          )}
         </div>
       )}
     </div>

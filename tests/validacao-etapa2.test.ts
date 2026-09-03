@@ -40,7 +40,6 @@ function baseForm(over: Partial<FormData> = {}): FormData {
     vinculo: 'novo',
     paiId: '',
     paiNome: '',
-    paiProdStatus: '',
     ...over,
   };
 }

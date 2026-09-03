@@ -652,9 +652,8 @@ export function SubmeterPageContent({
           paiId: (data.projeto_pai_id as string | null) ?? "",
           // O NOME do pai não vem no seed (o backend devolve só o id) — e não precisa: o
           // prefixo "[feature de <pai>]" já está no nome do projeto, e na edição o vínculo
-          // é read-only. `paiProdStatus` é gate de porta da submissão NOVA, então nasce vazio.
+          // é read-only.
           paiNome: "",
-          paiProdStatus: "",
           temAppGodeploy: (data.url_godeploy as string | null) ? "sim" : "",
           urlGodeploy: (data.url_godeploy as string | null) ?? "",
         };
@@ -914,7 +913,6 @@ export function SubmeterPageContent({
     vinculo: "novo",
     paiId: "",
     paiNome: "",
-    paiProdStatus: "",
   });
 
   // Título da aba. Esta tela é a MESMA em dois modos (nova submissão × edição), e é
