@@ -5,48 +5,72 @@
    "nome": "SofIA do FP&A",
    "area": "FP&A",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 1,
+   "leitura": "A SofIA consolida DREs e entrega análises para consultas da diretoria. Fica em 1 porque funciona sob demanda e produz informação para alguém agir, sem executar a ação seguinte. Para subir, precisaria rodar sozinha em uma rotina comprovada e realizar uma etapa operacional completa.",
+   "dossie": "insuficiente",
+   "memorial_ch": 133,
+   "memorial_anterior_ch": 431,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-043",
    "nome": "Relatório Diário de Testes A/B (GrowthBook → Google Chat)",
    "area": "Tecnologia",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "A automação prepara e envia diariamente resultados de testes A/B ao time de negócio e ao CEO. O memorial apresenta apenas uma economia estimada, sem comprovar envios recorrentes ou decisões tomadas com o relatório. Para subir, precisa mostrar histórico de uso e quem consulta os dados para agir.",
+   "dossie": "insuficiente",
+   "memorial_ch": 88,
+   "memorial_anterior_ch": 197,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-051",
    "nome": "Cruzamento de NF, NFD e chave de acesso",
    "area": "CSC",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Cruza bases XML e operacionais para preencher NFD e chave de acesso. Fica em 0 porque é uma tarefa pontual, semelhante ao Cruzamento de XML, e o memorial só demonstra economia de tempo. Para subir, precisaria comprovar uso recorrente por outras pessoas e participação em uma rotina mais ampla.",
+   "dossie": "insuficiente",
+   "memorial_ch": 122,
+   "memorial_anterior_ch": 414,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-054",
    "nome": "Reconversão de leads",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O fluxo detecta reconversões no HubSpot e avisa o vendedor pelo Google Chat. O memorial calcula economia, mas não comprova que os alertas já são usados de forma recorrente. Para subir, precisa mostrar envios reais e ações tomadas pela equipe a partir deles.",
+   "dossie": "insuficiente",
+   "memorial_ch": 98,
+   "memorial_anterior_ch": 295,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-036",
    "nome": "Influencer Hub",
    "area": "GROWTH",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O app permite que influenciadores registrem datas de postagem conforme as regras de cada marca. Fica em 0 porque o memorial traz apenas economia estimada, sem comprovar uso recorrente ou impacto além desse saving. Para subir, precisa mostrar usuários ativos e uma rotina real sustentada pelo app.",
+   "dossie": "insuficiente",
+   "memorial_ch": 175,
+   "memorial_anterior_ch": 357,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-057",
    "nome": "Meta Base - Estoque",
    "area": "Operações",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O fluxo atualiza diariamente uma planilha com dados de estoque extraídos do Metabase. O benefício apresentado se limita a uma tarefa local e ao pequeno saving de tempo, sem impacto comprovado em decisões ou operações. Para subir, precisaria mostrar uso recorrente da planilha por outro processo relevante.",
+   "dossie": "insuficiente",
+   "memorial_ch": 64,
+   "memorial_anterior_ch": 200,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-062",
@@ -133,8 +157,12 @@
    "nome": "Automação de fluxos de comunicação de admissões",
    "area": "GENTE E GESTÃO",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza e-mails e avisos internos após o cadastro de uma admissão. O memorial traz apenas uma estimativa de economia, sem comprovar que a rotina está em uso. Para subir, precisa mostrar execuções recorrentes e admissões processadas automaticamente.",
+   "dossie": "insuficiente",
+   "memorial_ch": 57,
+   "memorial_anterior_ch": 134,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-031",
@@ -229,8 +257,12 @@
    "nome": "Farol Overview D-1 Produtividade",
    "area": "Operações",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O fluxo envia diariamente um resumo da produtividade do dia anterior. Fica em 0 porque o memorial só comprova economia de tempo em uma tarefa local, sem mostrar quem usa o farol ou qual decisão ele orienta. Para subir, precisa comprovar leitores recorrentes e ações tomadas com essas informações.",
+   "dossie": "insuficiente",
+   "memorial_ch": 79,
+   "memorial_anterior_ch": 104,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-053",
@@ -253,8 +285,12 @@
    "nome": "Farol Diário Completo - Gocase",
    "area": "Operações",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O Farol reúne informações detalhadas da operação do dia anterior. Fica em 0 porque o memorial só calcula horas poupadas e não comprova quem consulta o material nem quais decisões ele orienta. Para subir, precisa mostrar uso recorrente por outras pessoas e ações tomadas a partir das informações.",
+   "dossie": "insuficiente",
+   "memorial_ch": 58,
+   "memorial_anterior_ch": 76,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-033",
@@ -277,8 +313,12 @@
    "nome": "Farol Overview D-1",
    "area": "Operações",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Reúne diariamente informações D-1 da operação e poupa tempo do Especialista de Custos. O relato mostra apenas a economia de uma hora por dia, sem comprovar uso recorrente nem decisões tomadas com o farol. Para subir, precisa demonstrar quem o consulta, com que frequência e quais ações operacionais ele orienta.",
+   "dossie": "insuficiente",
+   "memorial_ch": 79,
+   "memorial_anterior_ch": 89,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-065a",
@@ -437,8 +477,12 @@
    "nome": "Automação do envio do report de Melhorias do Inbound",
    "area": "CSC",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O script envia semanalmente um relatório de status pelo Google Chat. Fica em 0 porque é uma automação local e o único resultado apresentado é a economia de uma hora por mês, sem prova de uso nas decisões. Para subir, precisaria mostrar quem consulta o relatório com frequência e quais ações toma a partir dele.",
+   "dossie": "insuficiente",
+   "memorial_ch": 58,
+   "memorial_anterior_ch": 89,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-084",
@@ -629,8 +673,12 @@
    "nome": "Automação - Consulta de Análise de Crédito",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza consultas de crédito para clientes B2B, mas o memorial só apresenta uma estimativa de economia e não comprova uso real. Para subir, precisa mostrar registros de execução recorrente e que a consulta gera uma ação operacional sem início manual.",
+   "dossie": "insuficiente",
+   "memorial_ch": 33,
+   "memorial_anterior_ch": 242,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-122",
@@ -645,8 +693,12 @@
    "nome": "Validação de faturas automatizado",
    "area": "B2B Gobeaute",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza a validação mensal de quatro faturas e reduz o tempo gasto nessa tarefa. Fica em 0 porque o benefício descrito se limita ao pequeno saving local, sem prova de uso por outras pessoas ou de erros evitados. Para subir, precisa mostrar uso recorrente e bloqueios reais de faturas incorretas.",
+   "dossie": "insuficiente",
+   "memorial_ch": 33,
+   "memorial_anterior_ch": 275,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-097",
@@ -677,16 +729,24 @@
    "nome": "Automação de atualização de relatório de transportes ao dash de pedidos",
    "area": "Operações",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza a atualização diária da base de transportes no painel de pedidos. O relato só demonstra economia de tempo e não comprova uso recorrente nem mudança nas decisões da operação. Para subir, precisa apresentar registros de execução e mostrar quem usa os dados atualizados para agir.",
+   "dossie": "insuficiente",
+   "memorial_ch": 32,
+   "memorial_anterior_ch": 308,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-162",
    "nome": "SPG · Comparativos Automáticos",
    "area": "Sourcing & Procurement Gobeaute",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Padroniza comparativos, normaliza unidades, calcula custos e gera materiais para envio. O uso começou ontem, então ainda não há recorrência comprovada para justificar uma nota maior. Para subir, precisa mostrar volume real por algumas semanas e adoção contínua por Jéssica e Viviane.",
+   "dossie": "insuficiente",
+   "memorial_ch": 34,
+   "memorial_anterior_ch": 1086,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-128",
@@ -717,16 +777,24 @@
    "nome": "SPG · Agente Comparativo Automático IA",
    "area": "Sourcing & Procurement Gobeaute",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O agente normaliza propostas complexas, calcula o custo total e sugere um fornecedor. Fica em 0 porque há apenas uso pontual desde o dia anterior à submissão, sem rotina recorrente comprovada. Para subir, precisa mostrar uso contínuo por compradores e decisões reais tomadas com sua saída.",
+   "dossie": "insuficiente",
+   "memorial_ch": 32,
+   "memorial_anterior_ch": 789,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-161",
    "nome": "SPG · Carteira de Pedidos Online",
    "area": "Sourcing & Procurement Gobeaute",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Centraliza a carteira de pedidos, registra alterações e permite consultar prazos antigos. Ainda não completou a primeira revisão mensal, então o uso recorrente e o ganho seguem estimados. Para subir, precisa comprovar ciclos reais em que a equipe consulte e atualize o módulo.",
+   "dossie": "insuficiente",
+   "memorial_ch": 31,
+   "memorial_anterior_ch": 789,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-135",
@@ -741,8 +809,12 @@
    "nome": "Ciclo de Compras 2026",
    "area": "Sourcing & Procurement Gobeaute",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O script consolidou seis abas e evitou uma revisão manual de oito horas. Foi uma execução pontual, sem recorrência, e todo o benefício já está registrado no saving. Para subir, precisaria continuar em uso e sustentar decisões ou ações recorrentes da equipe.",
+   "dossie": "insuficiente",
+   "memorial_ch": 32,
+   "memorial_anterior_ch": 616,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-129",
@@ -869,8 +941,12 @@
    "nome": "Chat de deadline de térmicos",
    "area": "Produção",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Envia alertas de prazos de térmicos no Google Chat. O memorial só calcula uma economia estimada e não comprova uso recorrente nem ações tomadas após os avisos. Para subir, precisa mostrar usuários ativos e casos medidos em que o alerta evitou atrasos.",
+   "dossie": "insuficiente",
+   "memorial_ch": 75,
+   "memorial_anterior_ch": 188,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-143",
@@ -925,8 +1001,12 @@
    "nome": "Atualização de base de Operações B2B",
    "area": "Operações Gobeaute",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "A automação atualiza a base de Operações B2B e reduz o tempo gasto nessa tarefa. O memorial mostra apenas a economia calculada, sem comprovar uso recorrente da base ou efeito em decisões e rotinas. Para subir, precisa mostrar execuções reais e quem usa os dados atualizados para trabalhar.",
+   "dossie": "insuficiente",
+   "memorial_ch": 36,
+   "memorial_anterior_ch": 316,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-163",
@@ -949,8 +1029,12 @@
    "nome": "Tabela para tropa - Otimização",
    "area": "Operações Gobeaute",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Reduz o tempo gasto na otimização de uma tabela para a equipe de vendas. O memorial registra apenas economia de horas, sem comprovar uso recorrente por outras pessoas ou mudança nas decisões. Para subir, precisa mostrar a rotina em produção, quem usa a tabela e quais ações ela orienta.",
+   "dossie": "insuficiente",
+   "memorial_ch": 33,
+   "memorial_anterior_ch": 284,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-149",
@@ -1029,8 +1113,12 @@
    "nome": "OEE BB Indústria",
    "area": "Operações Gocase - Administrativo",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 1,
+   "leitura": "O dashboard consolida dados de produção e direciona a análise das perdas nas máquinas. Fica em 1 porque informa o Líder de Produção, mas não executa correções nem toma decisões sozinho. Para subir, precisaria acionar automaticamente manutenção ou ajustes operacionais.",
+   "dossie": "insuficiente",
+   "memorial_ch": 54,
+   "memorial_anterior_ch": 1788,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-158",
@@ -1061,8 +1149,12 @@
    "nome": "Gestão de Endereçamento Logístico",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza a localização de pedidos nos paletes da expedição. O memorial traz apenas economia estimada, sem comprovar que a automação está rodando e sendo usada na rotina. Para subir, precisa mostrar execuções reais e uso recorrente pelo operador.",
+   "dossie": "insuficiente",
+   "memorial_ch": 38,
+   "memorial_anterior_ch": 754,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-174",
@@ -1085,8 +1177,12 @@
    "nome": "Automação de relatório de Absenteísmo",
    "area": "Produção",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza um relatório mensal de absenteísmo e declara apenas economia de cinco horas. Fica em 0 porque não há prova de uso recorrente nem de decisões tomadas com o relatório. Para subir, precisa mostrar quem o usa, com que frequência e quais ações ele orienta.",
+   "dossie": "insuficiente",
+   "memorial_ch": 46,
+   "memorial_anterior_ch": 129,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-168",
@@ -1149,8 +1245,12 @@
    "nome": "Gosales - Propostas <> Hubspot",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Integra propostas do Gosales ao HubSpot para dez vendedores. Fica em 0 porque o memorial só calcula horas poupadas e não comprova execuções reais. Para subir, precisa mostrar histórico de propostas enviadas automaticamente e uso recorrente pelo time.",
+   "dossie": "insuficiente",
+   "memorial_ch": 78,
+   "memorial_anterior_ch": 341,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-177",
@@ -1165,16 +1265,24 @@
    "nome": "Tool - Estoque Gocase",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "A ferramenta consulta o estoque da Gocase em tempo real. Fica em 0 porque o memorial só calcula economia estimada e não comprova uso recorrente nem decisões tomadas com a consulta. Para subir, precisa mostrar usuários ativos, frequência medida e ações realizadas a partir dos dados.",
+   "dossie": "insuficiente",
+   "memorial_ch": 103,
+   "memorial_anterior_ch": 280,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "LEGADO-236",
    "nome": "Prazo de Entrega — Lookup CEP",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Automatiza uma consulta simples de prazo de entrega por CEP. O memorial apresenta apenas o saving estimado, sem comprovar uso recorrente ou execução autônoma. Para subir, precisa mostrar execuções reais e quem usa o resultado na rotina de atendimento.",
+   "dossie": "insuficiente",
+   "memorial_ch": 32,
+   "memorial_anterior_ch": 327,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-184",
@@ -1205,8 +1313,12 @@
    "nome": "Material Bruto - Lookup",
    "area": "B2B Gocase",
    "humana": 1,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "Faz consultas de material bruto para cinco vendedores e reduz o tempo de espera. Fica em 0 porque o memorial só calcula horas e saving, sem comprovar uso recorrente nem mudança nas decisões. Para subir, precisa mostrar execuções reais e como a equipe usa a consulta para agir.",
+   "dossie": "insuficiente",
+   "memorial_ch": 78,
+   "memorial_anterior_ch": 426,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-175",
@@ -1261,8 +1373,12 @@
    "nome": "Automação Separação de Processos de Importação",
    "area": "Contabilidade",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "A automação separa processos de importação e estima economia com base no volume de linhas. O memorial só calcula horas e dinheiro, sem comprovar que ela esteja rodando e sustentando uma rotina real. Para subir, precisa mostrar execuções recorrentes e quem usa o resultado.",
+   "dossie": "insuficiente",
+   "memorial_ch": 50,
+   "memorial_anterior_ch": 331,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-208",
@@ -1421,8 +1537,12 @@
    "nome": "Visão alerta integrações divergente Shopify x Intelipost GB",
    "area": "Transportes",
    "humana": 0,
-   "agente": null,
-   "leitura": "projeto sem contexto para classificar"
+   "agente": 0,
+   "leitura": "O projeto gera alertas de divergências entre Shopify e Intelipost. O memorial calcula economia de tempo, mas não comprova que o alerta esteja em uso nem que alguém aja sobre ele. Para subir, precisa mostrar uso recorrente e correções realizadas a partir dos alertas.",
+   "dossie": "insuficiente",
+   "memorial_ch": 30,
+   "memorial_anterior_ch": 126,
+   "nota_completada_em": "2026-09-03"
   },
   {
    "id": "legado-227",
@@ -5179,38 +5299,15 @@
    "erro": "HTTP 503: <!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endi"
   }
  ],
- "dist": [
-  [
-   0,
-   278
-  ],
-  [
-   1,
-   148
-  ],
-  [
-   2,
-   119
-  ],
-  [
-   3,
-   39
-  ],
-  [
-   4,
-   11
-  ],
-  [
-   5,
-   16
-  ],
-  [
-   6,
-   4
-  ],
-  [
-   7,
-   1
-  ]
- ]
+ "dist": {
+  "0": 306,
+  "1": 150,
+  "2": 119,
+  "3": 39,
+  "4": 11,
+  "5": 16,
+  "6": 4,
+  "7": 1
+ },
+ "nota_run1": "616 projetos rodaram em 03/09. Os 30 restantes eram invisíveis por um bug de caixa no id (LEGADO-* maiúsculo) e foram completados no mesmo dia, DEPOIS de ajustes de prompt (recomendação do escape, regras de escrita) e do complemento de memorial. Eles vêm marcados dossie=insuficiente: o \"Memorial de Saving\" deles tem mediana de 57 caracteres (a conta que a triagem escreveu) contra 1.903 dos memoriais do app, entao a nota deles NAO deve ser lida como veredito sobre o projeto nem contar como concordancia/divergencia."
 }
