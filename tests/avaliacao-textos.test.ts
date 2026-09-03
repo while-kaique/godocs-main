@@ -28,13 +28,16 @@ import {
   ocultarValoresMonetarios,
   type ParComite,
 } from "@/lib/avaliacao/textos";
+import type { Consenso } from "@/lib/avaliacao/consenso";
+import type { SaidaMerito } from "@/lib/avaliacao/cerebro-merito";
+import type { SaidaEstrela } from "@/lib/avaliacao/cerebro-estrela";
 
 // ─── Tipos LOCAIS de entrada (espelham cerebro-merito / cerebro-estrela / consenso, escritos em paralelo) ──
 
 type Veredito = "aprovar" | "ajuste" | "humano";
 type Valor = { absurdo: boolean; valor_sugerido: number | null; justificativa: string } | null;
 
-type Consenso = {
+type ConsensoLocal = {
   saida: Veredito;
   veredito_merito: Veredito;
   estrela: number;
@@ -59,7 +62,7 @@ type Julgamento = {
   fallback: boolean;
 };
 
-type SaidaMerito = {
+type SaidaMeritoLocal = {
   veredito: Veredito;
   julgamentos: Julgamento[];
   preocupacoes: string[];
@@ -69,7 +72,7 @@ type SaidaMerito = {
   sinais: { temEvidenciaCitada: boolean; temVizinhos: boolean };
 };
 
-type SaidaEstrela = {
+type SaidaEstrelaLocal = {
   nota: number;
   criterio_aplicado: string;
   desqualificador: string | null;
@@ -89,7 +92,7 @@ type SaidaEstrela = {
 
 const PROJETO = { id: "abc123", nome: "Portal de Reembolsos" };
 
-function consenso(over: Partial<Consenso> = {}): Consenso {
+function consenso(over: Partial<ConsensoLocal> = {}): Consenso {
   return {
     saida: "aprovar",
     veredito_merito: "aprovar",
@@ -104,7 +107,7 @@ function consenso(over: Partial<Consenso> = {}): Consenso {
     contestacao: null,
     age_sozinho: true,
     ...over,
-  };
+  } as unknown as Consenso;
 }
 
 function julgamento(over: Partial<Julgamento> = {}): Julgamento {
@@ -120,7 +123,7 @@ function julgamento(over: Partial<Julgamento> = {}): Julgamento {
   };
 }
 
-function merito(over: Partial<SaidaMerito> = {}): SaidaMerito {
+function merito(over: Partial<SaidaMeritoLocal> = {}): SaidaMerito {
   return {
     veredito: "aprovar",
     julgamentos: [julgamento()],
@@ -130,10 +133,10 @@ function merito(over: Partial<SaidaMerito> = {}): SaidaMerito {
     ressalvas: [],
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
-  };
+  } as unknown as SaidaMerito;
 }
 
-function estrela(over: Partial<SaidaEstrela> = {}): SaidaEstrela {
+function estrela(over: Partial<SaidaEstrelaLocal> = {}): SaidaEstrela {
   return {
     nota: 3,
     criterio_aplicado: "garante: a automação garante o resultado sem revisão humana",
@@ -149,7 +152,7 @@ function estrela(over: Partial<SaidaEstrela> = {}): SaidaEstrela {
     ancora_congelada: false,
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
-  };
+  } as unknown as SaidaEstrela;
 }
 
 const SEM_VAZAMENTO = ["undefined", "null", "[object Object]"];

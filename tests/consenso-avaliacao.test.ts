@@ -30,10 +30,12 @@ import {
   type Liberacao,
   type Consenso,
 } from '@/lib/avaliacao/consenso';
+import type { SaidaMerito } from '@/lib/avaliacao/cerebro-merito';
+import type { SaidaEstrela } from '@/lib/avaliacao/cerebro-estrela';
 
 // ─── Tipos locais de entrada (espelham o contrato do plano; não importam os cérebros) ─────────
 
-type SaidaMerito = {
+type SaidaMeritoLocal = {
   veredito: 'aprovar' | 'ajuste' | 'humano';
   julgamentos: unknown[];
   preocupacoes: string[];
@@ -43,7 +45,7 @@ type SaidaMerito = {
   sinais: { temEvidenciaCitada: boolean; temVizinhos: boolean };
 };
 
-type SaidaEstrela = {
+type SaidaEstrelaLocal = {
   nota: number;
   criterio_aplicado: string;
   desqualificador: string | null;
@@ -61,7 +63,7 @@ type SaidaEstrela = {
 
 // ─── Fábricas ────────────────────────────────────────────────────────────────
 
-function merito(over: Partial<SaidaMerito> = {}): SaidaMerito {
+function merito(over: Partial<SaidaMeritoLocal> = {}): SaidaMerito {
   return {
     veredito: 'aprovar',
     julgamentos: [],
@@ -71,10 +73,10 @@ function merito(over: Partial<SaidaMerito> = {}): SaidaMerito {
     ressalvas: [],
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
-  };
+  } as unknown as SaidaMerito;
 }
 
-function estrela(over: Partial<SaidaEstrela> = {}): SaidaEstrela {
+function estrela(over: Partial<SaidaEstrelaLocal> = {}): SaidaEstrela {
   return {
     nota: 3,
     criterio_aplicado: 'garante',
@@ -90,7 +92,7 @@ function estrela(over: Partial<SaidaEstrela> = {}): SaidaEstrela {
     ancora_congelada: false,
     sinais: { temEvidenciaCitada: true, temVizinhos: true },
     ...over,
-  };
+  } as unknown as SaidaEstrela;
 }
 
 const LIBERADO: Liberacao = { aprovar: true, ajuste: true, motivos: [] };
