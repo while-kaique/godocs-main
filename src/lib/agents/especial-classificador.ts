@@ -27,6 +27,7 @@ import {
   NOTA_MAX,
   FAIXA_ESCAPE,
   GATILHOS_ESCAPE,
+  REGRAS_DO_PORQUE,
   descreverReguaAgente,
   descreverEscape,
   escapeValido,
@@ -139,12 +140,7 @@ DISCIPLINA:
 
 ⚠️ NO ESCAPE, preencha "evidencias" com uma citação LITERAL da doc/memorial para CADA gatilho. Sem as duas citações a nota volta automaticamente para 5★ — não parafraseie, cite.
 
-COMO ESCREVER O PORQUÊ (a pessoa que lê não conhece a régua por dentro):
-- Escreva 2 a 3 frases curtas, nesta ordem: o que o projeto FAZ · por que é essa nota e não a de cima · o que faria subir, em termos concretos deste projeto.
-- PROIBIDO usar o vocabulário interno da régua. Nunca escreva: "gatilho", "escape", "piso", "critério aplicado", "desqualificador", "faixa", "promoção", "dependente nomeado", "modo anterior deixou de existir", "irreversibilidade", "não existiria sem ele". Essas são as palavras do CÓDIGO, não do leitor.
-- Diga a mesma coisa em português comum. Em vez de "falta prova de que o modo anterior deixou de existir", escreva "para subir, faltaria mostrar que ninguém mais faz esse trabalho do jeito antigo". Em vez de "sem dependente nomeado", escreva "nenhum outro projeto é citado como dependente deste".
-- Nada de "conforme a régua", "de acordo com o critério", "alinhado ao nível". Fale do PROJETO, não do instrumento.
-- Citar um projeto de comparação é bom e ajuda ("faz o mesmo que o Godash, que é 1"). Citar o número do critério não é.
+${REGRAS_DO_PORQUE}
 
 FORMATO DE RESPOSTA:
 Responda APENAS com JSON válido, exatamente neste formato, sem texto fora do JSON:

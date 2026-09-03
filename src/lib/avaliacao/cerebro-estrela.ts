@@ -17,6 +17,7 @@ import {
   aplicarPromocao,
   escapeValido,
   montarContestacao,
+  REGRAS_DO_PORQUE,
   contarFrases,
   CONTESTACAO_MAX_FRASES,
   type ChavePisoZero,
@@ -62,12 +63,7 @@ const FORMATO_JSON = `FORMATO DE RESPOSTA — responda APENAS com um objeto JSON
   "gatilho_que_falhou": "<só quando o dossiê traz uma nota humana MAIOR que a sua: qual critério/gatilho dela não se sustenta, com a citação>"
 }`;
 
-const DISCIPLINA = `COMO ESCREVER O PORQUÊ (a pessoa que lê não conhece a régua por dentro):
-- Escreva 2 a 3 frases curtas, nesta ordem: o que o projeto FAZ · por que é essa nota e não a de cima · o que faria subir, em termos concretos deste projeto.
-- PROIBIDO usar o vocabulário interno da régua. Nunca escreva: "gatilho", "escape", "piso", "critério aplicado", "desqualificador", "faixa", "promoção", "dependente nomeado", "modo anterior deixou de existir", "irreversibilidade", "não existiria sem ele". Essas são as palavras do CÓDIGO, não do leitor.
-- Diga a mesma coisa em português comum. Em vez de "falta prova de que o modo anterior deixou de existir", escreva "para subir, faltaria mostrar que ninguém mais faz esse trabalho do jeito antigo". Em vez de "sem dependente nomeado", escreva "nenhum outro projeto é citado como dependente deste".
-- Nada de "conforme a régua", "de acordo com o critério", "alinhado ao nível". Fale do PROJETO, não do instrumento.
-- Citar um projeto de comparação é bom e ajuda ("faz o mesmo que o Godash, que é 1"). Citar o número do critério não é.
+const DISCIPLINA = `${REGRAS_DO_PORQUE}
 
 DISCIPLINA:
 - Raciocine em cima da régua, mas NÃO a reescreva: cada nível é o texto acima, e você conclui a partir dele com um racional que faça sentido no contexto deste projeto.

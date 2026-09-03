@@ -169,11 +169,20 @@ describe('render para o prompt', () => {
     expect(t).toMatch(/PISTA/i);
   });
 
-  it('o escape exige os dois gatilhos e devolve o NÚMERO ao comitê', () => {
+  // ⚠️ Decisão do Luis, 03/09/2026: o agente RECOMENDA um número de 6 a 10 com o porquê, mas o
+  // veredito registrado continua sendo a FAIXA. Antes o prompt dizia "NÃO escolha o número" e
+  // mesmo assim exigia um inteiro no JSON, então ele escolhia às cegas e ninguém via o
+  // raciocínio. O comitê ganha um ponto de partida; o poder de cravar a nota não muda de mãos.
+  it('o escape exige os dois gatilhos, registra a FAIXA e pede a recomendação com porquê', () => {
     const t = descreverEscape();
     for (const g of GATILHOS_ESCAPE) expect(t).toContain(g.texto);
     expect(t).toMatch(/comitê humano/);
-    expect(t).toMatch(/NÃO escolha o número/);
+    // o veredito é a faixa...
+    expect(t).toMatch(/VEREDITO que fica registrado é a FAIXA/);
+    // ...e ainda assim se pede um número recomendado, com justificativa
+    expect(t).toMatch(/RECOMENDE um número/);
+    expect(t).toMatch(/por que esse e não o vizinho/);
+    expect(t).not.toMatch(/NÃO escolha o número/);
   });
 
   it('a distribuição esperada NÃO vai para o prompt — seria cota, não critério', () => {

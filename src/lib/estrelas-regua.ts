@@ -354,16 +354,45 @@ export function descreverEscape(): string {
     '⚠️ Isso NÃO vale para "poderá ser usado por", "abre portas para" ou dependente sem nome — aí',
     'não há atividade em curso, e a nota fica em 5★.',
     '',
-    `Você indica a FAIXA e cita a evidência de cada gatilho. NÃO escolha o número entre ${FAIXA_ESCAPE.min} e ${FAIXA_ESCAPE.max}: isso é do comitê humano.`,
+    `O VEREDITO que fica registrado é a FAIXA ${FAIXA_ESCAPE.min}-${FAIXA_ESCAPE.max}, não um número.`,
+    `Ainda assim, RECOMENDE um número de ${FAIXA_ESCAPE.min} a ${FAIXA_ESCAPE.max} e diga em UMA frase simples por que esse e não o vizinho`,
+    'de cima ou de baixo, comparando com os projetos que já estão na faixa. Quem crava o número final é o',
+    'comitê humano; sua recomendação é o ponto de partida da conversa dele, e uma recomendação sem porquê não serve de nada.',
+    'Cite também a evidência de cada gatilho.',
   ].join('\n');
 }
+
+/**
+ * Como o PORQUÊ é escrito — **FONTE ÚNICA**, interpolada pelos prompts que produzem texto lido
+ * por gente (classificador, cérebro da estrela, lentes do painel).
+ *
+ * ⚠️ Estava DIGITADA DUAS VEZES, palavra por palavra, em `agents/especial-classificador.ts` e
+ * em `avaliacao/cerebro-estrela.ts`. Duas cópias divergem na primeira vez que alguém melhora uma
+ * frase — e este texto é a única coisa que a pessoa da triagem realmente lê. Não redigite: altere
+ * a constante.
+ *
+ * ⚠️ **Regras de 03/09/2026 (Luis):** linguagem natural, fácil, que um leigo entenda de primeira,
+ * e **sem travessão nem hífen como pontuação**. "Quem entende o que é complexo explica fácil" —
+ * mas sem ser prolixo: explicar fácil é escrever CURTO, não escrever mais.
+ */
+export const REGRAS_DO_PORQUE = `COMO ESCREVER O PORQUÊ (quem lê não conhece a régua por dentro e não vai perguntar):
+- Escreva 2 a 3 frases curtas, nesta ordem: o que o projeto FAZ · por que é essa nota e não a de cima · o que faria subir, em termos concretos deste projeto.
+- LINGUAGEM NATURAL, de conversa. Quem entende de verdade explica fácil: escreva como explicaria a alguém de outra área, que nunca viu este sistema. Se uma frase precisa ser relida para ser entendida, reescreva.
+- CURTO. Explicar fácil é escrever menos, não mais. Nada de rodeio, preâmbulo ou repetir com outras palavras o que já foi dito.
+- ⚠️ NÃO use travessão (—) nem hífen (-) como pontuação no meio da frase. Separe com vírgula, ponto ou dois pontos. Hífen só dentro de palavra composta.
+- PROIBIDO usar o vocabulário interno da régua. Nunca escreva: "gatilho", "escape", "piso", "critério aplicado", "desqualificador", "faixa", "promoção", "dependente nomeado", "modo anterior deixou de existir", "irreversibilidade", "não existiria sem ele". Essas são as palavras do CÓDIGO, não do leitor.
+- Diga a mesma coisa em português comum. Em vez de "falta prova de que o modo anterior deixou de existir", escreva "para subir, faltaria mostrar que ninguém mais faz esse trabalho do jeito antigo". Em vez de "sem dependente nomeado", escreva "nenhum outro projeto é citado como dependente deste".
+- Nada de "conforme a régua", "de acordo com o critério", "alinhado ao nível". Fale do PROJETO, não do instrumento.
+- Citar um projeto de comparação é bom e ajuda ("faz o mesmo que o Godash, que é 1"). Citar o número do critério não é.`;
 
 // ─── Escape: validação da saída ──────────────────────────────────────────────
 
 export type IndicacaoEscape = {
   /**
-   * A nota que o agente devolveu. Qualquer valor na faixa serve como "indico o escape" — o número
-   * em si é descartado pelo comitê, que decide por comparação.
+   * O número que o agente RECOMENDA dentro da faixa. O veredito registrado continua sendo a
+   * FAIXA (é o comitê humano que crava 6, 7, 8, 9 ou 10), mas a recomendação não é descartada:
+   * ela é o ponto de partida da conversa do comitê, e por isso o prompt cobra o porquê dela.
+   * Para o guard `escapeValido`, qualquer valor DENTRO da faixa vale como "indico o escape".
    */
   sugestao: number;
   /** Cada gatilho com a frase da doc que o sustenta. Sem citação, o escape não vale. */

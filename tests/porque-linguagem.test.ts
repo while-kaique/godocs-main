@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildSystemPromptEspecial } from '@/lib/agents/especial-classificador';
 import { buildPromptEstrela } from '@/lib/avaliacao/cerebro-estrela';
+import { REGRAS_DO_PORQUE } from '@/lib/estrelas-regua';
 
 /**
  * ⚠️ O texto que a pessoa lê não pode carregar o vocabulário do CÓDIGO. "falta prova de que o
@@ -17,5 +18,25 @@ describe('o porquê é escrito em português comum', () => {
       // e traz a tradução, não só a proibição
       expect(p).toContain('ninguém mais faz esse trabalho do jeito antigo');
     }
+  });
+
+  // ⚠️ O bloco estava DIGITADO nos dois prompts, palavra por palavra. Duas cópias divergem na
+  // primeira vez que alguém melhora uma frase, e este texto é o único que a triagem lê de fato.
+  it('os 2 prompts usam a MESMA fonte, não uma cópia cada', () => {
+    const classificador = buildSystemPromptEspecial();
+    const cerebro = buildPromptEstrela({ dossieTexto: 'x', vizinhos: [] }).map((m) => m.content).join('\n');
+    expect(classificador).toContain(REGRAS_DO_PORQUE);
+    expect(cerebro).toContain(REGRAS_DO_PORQUE);
+  });
+
+  // Decisão do Luis, 03/09/2026: linguagem natural que um leigo entenda de primeira, sem
+  // travessão nem hífen como pontuação, e CURTO — explicar fácil é escrever menos, não mais.
+  it('as regras cobram linguagem simples, curta e sem travessão', () => {
+    expect(REGRAS_DO_PORQUE).toMatch(/LINGUAGEM NATURAL/);
+    expect(REGRAS_DO_PORQUE).toMatch(/travessão/);
+    expect(REGRAS_DO_PORQUE).toMatch(/hífen/);
+    expect(REGRAS_DO_PORQUE).toMatch(/CURTO/);
+    // não basta proibir: tem de dizer com o que substituir
+    expect(REGRAS_DO_PORQUE).toMatch(/vírgula, ponto ou dois pontos/);
   });
 });
